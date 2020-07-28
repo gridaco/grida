@@ -18,6 +18,8 @@
   "devDependencies": {
     "@nuxt/types": "^2.14.0",
     "@nuxt/typescript-build": "^2.0.2",
-    "@nuxtjs/vuetify": "^1.11.2"
+    "@nuxtjs/vuetify": "^1.11.2",
+    "node-sass": "^4.14.1",
+    "sass-loader": "^7.1.0"
   }
 }
