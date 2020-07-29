@@ -2,7 +2,7 @@
   <div class="text-center">
     <v-menu open-on-hover offset-y>
       <template v-slot:activator="{ on, attrs }">
-        <v-btn text large color="primary" href="/products" v-bind="attrs" v-on="on">products</v-btn>
+        <v-btn text large color="primary" to="/products" v-bind="attrs" v-on="on">products</v-btn>
       </template>
       <v-card>
         <v-list>
@@ -15,12 +15,6 @@
               <v-list-item-title>John Leider</v-list-item-title>
               <v-list-item-subtitle>Founder of Vuetify.js</v-list-item-subtitle>
             </v-list-item-content>
-
-            <v-list-item-action>
-              <v-btn :class="fav ? 'red--text' : ''" icon @click="fav = !fav">
-                <v-icon>mdi-heart</v-icon>
-              </v-btn>
-            </v-list-item-action>
           </v-list-item>
         </v-list>
 

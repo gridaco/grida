@@ -6,13 +6,14 @@
 </template>
 
 <script>
-  export default {
-    async asyncData ({ $content }) {
-      const page = await $content('docs/remote-ui').fetch()
+export default {
+  layout: "docs",
+  async asyncData({ $content }) {
+    const page = await $content("docs/remote-ui").fetch();
 
-      return {
-        page
-      }
-    }
-  }
+    return {
+      page,
+    };
+  },
+};
 </script>

@@ -1,17 +1,6 @@
 <template>
   <v-app light>
-    <v-app-bar fixed color="white" elevate-on-scroll app>
-      <!--      <v-toolbar-title v-text="title" />-->
-      <nuxt-link to="/">
-        <img src="../static/icon.png" class="logo" />
-      </nuxt-link>
-      <v-spacer />
-      <ProductsHoverMenu></ProductsHoverMenu>
-      <v-btn text large color="primary" href="/docs">docs</v-btn>
-      <v-btn text large color="primary" href="/blogs">blogs</v-btn>
-      <v-btn text large color="primary">search</v-btn>
-      <v-btn text large color="primary" href="/github">github</v-btn>
-    </v-app-bar>
+    <app-bar></app-bar>
     <v-main>
       <v-container>
         <nuxt />
