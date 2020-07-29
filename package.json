@@ -6,7 +6,8 @@
     "dev": "nuxt-ts",
     "build": "nuxt-ts build",
     "start": "nuxt-ts start",
-    "generate": "nuxt-ts generate"
+    "generate": "nuxt-ts generate",
+    "ghp-deploy": "push-dir --dir=dist --branch=gh-pages --cleanup"
   },
   "dependencies": {
     "@nuxt/content": "^1.5.0",
@@ -23,6 +24,7 @@
     "@nuxt/typescript-build": "^2.0.2",
     "@nuxtjs/vuetify": "^1.11.2",
     "node-sass": "^4.14.1",
+    "push-dir": "^0.4.1",
     "sass-loader": "^7.1.0"
   }
 }
