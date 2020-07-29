@@ -1,5 +1,7 @@
 # bridged.io
 
+![](./docs/readme/images/home-example.png)
+
 ## Build Setup
 
 ```bash
