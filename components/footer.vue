@@ -43,7 +43,7 @@ import Vue from "vue";
 import Component from "vue-class-component";
 @Component
 export default class Footer extends Vue {
-  icons = ["mdi-facebook", "mdi-twitter", "mdi-linkedin", "mdi-instagram"];
+  icons = ["mdi-facebook", "mdi-twitter", "mdi-github", "mdi-instagram"];
   products = ["inapp-bridge", "remote-ui"];
 }
 </script>

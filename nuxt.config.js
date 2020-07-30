@@ -83,7 +83,7 @@ export default {
       dark: false,
       themes: {
         light: {
-          primary: colors.blue,
+          primary: "#ED6570",
           accent: colors.grey,
           secondary: colors.amber,
           info: colors.teal.lighten1,

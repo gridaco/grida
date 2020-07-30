@@ -1,13 +1,21 @@
 <template>
   <v-layout column justify-center align-center>
     <v-flex xs12 sm8 md6>
-      <h1>Bridged</h1>
+      <div class="text-center">
+        <h1>next-gen<br/>ui framework for all</h1>
+        <h5 class="pa-3">cross platform ui stadard.<br/>development & maintanence made easy</h5>
+      </div>
+      <div class="pa-3">
+        <v-btn color="primary" elevation="false" x-large>try bridged in 5 minutes</v-btn>
+      </div>
+
     </v-flex>
   </v-layout>
 </template>
 
-<script>
-export default {
-  components: {},
-};
+<script lang="ts">
+import Vue from 'vue'
+export default Vue.extend({
+  
+})
 </script>

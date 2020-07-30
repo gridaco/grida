@@ -5,7 +5,7 @@
     <v-main>
       <v-container>
         <v-row>
-          <v-card elevation="12" width="256">
+          <v-card elevation="0" width="180">
             <v-navigation-drawer floating permanent>
               <v-list dense rounded>
                 <v-list-item v-for="item in items" :key="item.title" link nuxt>
@@ -16,7 +16,9 @@
               </v-list>
             </v-navigation-drawer>
           </v-card>
-          <nuxt />
+          <div class="pa-6">
+            <nuxt />
+          </div>
         </v-row>
       </v-container>
     </v-main>
