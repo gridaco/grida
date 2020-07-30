@@ -1,4 +1,4 @@
-# bridged.io
+# [bridged.io](https://softmarshmallow.github.io/bridged.io/)
 
 ![](./docs/readme/images/home-example.png)
 
