@@ -5,12 +5,12 @@ description: Bridged documentations
 
 ## Bridged docs
 
-- remote-ui
-- inapp-bridge
-- schema-studio
-- stile
-- typr lang
-- bridged-ui
+- [remote-ui](/docs/remote-ui)
+- [inapp-bridge](/docs/inapp-bridge)
+- [schema-studio](/docs/schema-studio)
+- [stile](/docs/stile)
+- [typr lang](/docs/typr-lang)
+- [bridged-ui](/docs/bridged-ui)
 
 
 

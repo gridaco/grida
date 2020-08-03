@@ -8,7 +8,13 @@
           <v-card elevation="0" width="180">
             <v-navigation-drawer floating permanent>
               <v-list dense rounded>
-                <v-list-item v-for="item in items" :key="item.title" link nuxt>
+                <v-list-item
+                  v-on:click="onclick(item)"
+                  v-for="item in items"
+                  :key="item.title"
+                  link
+                  nuxt
+                >
                   <v-list-item-content>
                     <v-list-item-title>{{ item.title }}</v-list-item-title>
                   </v-list-item-content>
@@ -32,11 +38,26 @@
 import Vue from "vue";
 import Component from "vue-class-component";
 
+interface IDocItem {
+  title: string;
+  to: string;
+}
+
 @Component
 export default class Docs extends Vue {
-  items = [
+  items: Array<IDocItem> = [
     { title: "introduction", to: "/docs" },
-    { title: "remote-ui/flutter", to: "/docs/remote-ui" },
+    { title: "remote-ui", to: "/docs/remote-ui" },
+    { title: "remote-ui/flutter", to: "/docs/remote-ui#flutter" },
+    { title: "remote-ui/node-js", to: "/docs/remote-ui" },
+    { title: "remote-ui.icons", to: "/docs/remote-ui" },
+    { title: "remote-ui.actions", to: "/docs/remote-ui" },
+    { title: "remote-ui.layouts", to: "/docs/remote-ui" },
   ];
+
+  async onclick(params: IDocItem) {
+    console.log(params.to);
+    this.$router.push(params.to);
+  }
 }
 </script>

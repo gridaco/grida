@@ -22,5 +22,6 @@ export default Vue.extend({});
 
 
 <style lang="sass" scoped>
-
+.logo
+  width: 36px
 </style>

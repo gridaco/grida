@@ -9,7 +9,7 @@
 export default {
   layout: "docs",
   async asyncData({ $content }) {
-    const page = await $content("docs/remote-ui").fetch();
+    const page = await $content("docs/remote-ui/index").fetch();
 
     return {
       page,
