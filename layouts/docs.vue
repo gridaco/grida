@@ -46,6 +46,7 @@ interface IDocItem {
 @Component
 export default class Docs extends Vue {
   items: Array<IDocItem> = [
+    { title: "getting started", to: "/docs/getting-started" },
     { title: "introduction", to: "/docs" },
     { title: "remote-ui", to: "/docs/remote-ui" },
     { title: "remote-ui/flutter", to: "/docs/remote-ui#flutter" },
