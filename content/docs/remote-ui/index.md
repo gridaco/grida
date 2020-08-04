@@ -4,6 +4,24 @@ description: Learn how to use remote-ui.
 ---
 
 
+<code-group>
+  <code-block label="Yarn" active>
+
+  ```bash
+  yarn add @nuxt/content-theme-docs
+  ```
+
+  </code-block>
+  <code-block label="NPM">
+
+  ```bash
+  npm install @nuxt/content-theme-docs
+  ```
+
+  </code-block>
+</code-group>
+
+
 >ICONS
 
 server side (node)
