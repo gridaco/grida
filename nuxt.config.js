@@ -11,10 +11,6 @@ export default {
   ** See https://nuxtjs.org/api/configuration-target
   */
   target: 'static',
-  router: {
-    // for deploying on github pages
-    base: '/bridged.xyz/'
-  },
 
   /*
   ** Headers of the page
