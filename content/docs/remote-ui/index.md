@@ -27,12 +27,12 @@ description: Learn how to use remote-ui.
 server side (node)
 
 ```typescript
-import * as rui from "@bridged.io/remote-ui-core"
+import * as rui from "@bridged.xyz/remote-ui-core"
 console.log(rui.icons.material.note)
 
 // or...
 
-import { icons } from "@bridged.io/remote-ui-core"
+import { icons } from "@bridged.xyz/remote-ui-core"
 console.log(icons.material.note)
 
 /// >> logs 
