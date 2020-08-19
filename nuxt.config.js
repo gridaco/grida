@@ -47,6 +47,7 @@ export default {
   */
   buildModules: [
     '@nuxt/typescript-build',
+    // '@nuxtjs/tailwindcss',
     '@nuxtjs/vuetify',
   ],
   /*
@@ -96,6 +97,16 @@ export default {
           error: colors.deepOrange.accent4,
           success: colors.green.accent3
         }
+      }
+    }
+  },
+  tailwindcss: {
+    config: {
+      /* Extend the Tailwind config here */
+      purge: {
+        content: [
+          'content/**/**.md'
+        ]
       }
     }
   },
