@@ -13,7 +13,7 @@ export default {
   target: 'static',
   router: {
     // for deploying on github pages
-    base: '/bridged.io/'
+    base: '/bridged.xyz/'
   },
 
   /*
