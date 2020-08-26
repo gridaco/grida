@@ -28,7 +28,7 @@ jobs:
       uses: peaceiris/actions-gh-pages@v3
       with:
         personal_token: ${{ secrets.COMMIT_SECRET }}
-        publish_dir: ./public
+        publish_dir: ./dist
         force_orphan: true
         user_name: 'github-actions[bot]'
         user_email: 'github-actions[bot]@users.noreply.github.com'
