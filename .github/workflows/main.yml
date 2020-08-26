@@ -27,5 +27,5 @@ jobs:
     - name: Deploy
       uses: peaceiris/actions-gh-pages@v3
       with:
-        personal_token: ${{ secrets.PERSONAL_TOKEN }}
+        personal_token: ${{ secrets.COMMIT_SECRET }}
         publish_dir: ./public
