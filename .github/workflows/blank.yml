@@ -1,0 +1,30 @@
+name: CI
+
+# Controls when the action will run. Triggers the workflow on push or pull request
+# events but only for the master branch
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
+    - uses: actions/checkout@v2
+
+    - name: Setup Node
+      uses: actions/setup-node@v1
+      with:
+        node-version: '12.x'
+    
+    - run: yarn generate
+
+    - name: Deploy
+      uses: peaceiris/actions-gh-pages@v3
+      with:
+        personal_token: ${{ secrets.PERSONAL_TOKEN }}
+        publish_dir: ./public
