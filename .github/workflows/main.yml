@@ -20,7 +20,7 @@ jobs:
       run: |
         touch .env
         echo "$DOT_ENV" > .env
-        ls
+        ls -a
       shell: bash
       env:
         DOT_ENV: ${{secrets.DOT_ENV}}
