@@ -103,16 +103,6 @@ export default {
       }
     }
   },
-  tailwindcss: {
-    config: {
-      /* Extend the Tailwind config here */
-      purge: {
-        content: [
-          'content/**/**.md'
-        ]
-      }
-    }
-  },
   // Doc: https://firebase.nuxtjs.org/guide/getting-started/#full-configuration
   firebase: {
     config: {
