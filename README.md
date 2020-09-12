@@ -2,6 +2,9 @@
 
 ![](./docs/readme/images/home-example.png)
 
+
+[join slack](https://join.slack.com/t/bridgedhq/shared_invite/zt-h9eyanie-U_t2XB1mrzRxcPww306aCA)
+
 ## Build Setup
 
 ```bash
