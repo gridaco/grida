@@ -23,3 +23,22 @@ $ yarn generate
 ```
 
 For detailed explanation on how things work, check out [Nuxt.js docs](https://nuxtjs.org).
+
+
+## Sitemap
+- [code.bridged.xyz](code.bridged.xyz)
+- [design.bridged.xyz](design.bridged.xyz)
+- [console.bridged.xyz](console.bridged.xyz)
+- [labs.bridged.xyz](labs.bridged.xyz)
+- [bridged.xyz/roadmap](bridged.xyz/roadmap)
+- [bridged.xyz/github](bridged.xyz/github)
+- [bridged.xyz/products](bridged.xyz/products)
+- [bridged.xyz/products/dynamic](bridged.xyz/products/dynamic)
+- [bridged.xyz/products/inappbridge](bridged.xyz/products/inappbridge)
+- [bridged.xyz/products/schema-studio](bridged.xyz/tools/schema-studio)
+- [bridged.xyz/products/react](bridged.xyz/products/react)
+- [bridged.xyz/platforms/flutter](bridged.xyz/platforms/flutter)
+- [bridged.xyz/plugins](bridged.xyz/plugins)
+- [bridged.xyz/plugins/figma](bridged.xyz/plugins/figma)
+- [bridged.xyz/plugins/sketch](bridged.xyz/plugins/sketch)
+- [bridged.xyz/tools](bridged.xyz/tools)
