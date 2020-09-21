@@ -18,8 +18,8 @@
         </v-row>
 
         <v-card-text>
-          <v-btn v-for="icon in icons" :key="icon" class="mx-4 white--text" icon>
-            <v-icon size="24px">{{ icon }}</v-icon>
+          <v-btn v-for="s in social" :key="s" class="mx-4 white--text" icon :href="s.link">
+            <v-icon size="24px">{{ s.icon }}</v-icon>
           </v-btn>
         </v-card-text>
 
@@ -43,7 +43,29 @@ import Vue from "vue";
 import Component from "vue-class-component";
 @Component
 export default class Footer extends Vue {
-  icons = ["mdi-facebook", "mdi-twitter", "mdi-github", "mdi-instagram"];
+  social: Array<SocialItem> = [
+    {
+      icon: "mdi-facebook",
+      link: "https://facebook.com/bridged.xyz",
+    },
+    {
+      icon: "mdi-twitter",
+      link: "https://facebook.com/bridged.xyz",
+    },
+    {
+      icon: "mdi-github",
+      link: "https://github.com/bridgedxyz",
+    },
+    {
+      icon: "mdi-instagram",
+      link: "https://facebook.com/bridged.xyz",
+    },
+  ];
   products = ["inapp-bridge", "remote-ui"];
+}
+
+interface SocialItem {
+  icon: string;
+  link: string;
 }
 </script>
