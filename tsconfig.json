@@ -1,0 +1,25 @@
+{
+    "compilerOptions": {
+        "target": "es2016",
+        "module": "commonjs",
+        "lib": [
+            "es2017",
+            "es7",
+            "es6",
+            "dom"
+        ],
+        "types": [
+            "node"
+        ],
+        "declaration": true,
+        "outDir": "dist",
+        "esModuleInterop": true,
+        "sourceMap": true,
+        "experimentalDecorators": true,
+        "noUnusedLocals": false,
+    },
+    "exclude": [
+        "node_modules",
+        "dist",
+    ]
+}

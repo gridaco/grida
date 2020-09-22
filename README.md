@@ -31,3 +31,10 @@
 - responsive mode (responsive components)
 - visual engine in-the-box
 - context engine in-the-box
+
+
+## References
+**skia**
+- [npm](https://www.npmjs.com/package/canvaskit-wasm)
+- [github](https://github.com/google/skia/tree/master/modules/canvaskit)
+- [website](https://skia.org/user/modules/canvaskit)

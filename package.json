@@ -8,5 +8,9 @@
   "private": false,
   "dependencies": {
     "canvaskit-wasm": "^0.17.3"
+  },
+  "devDependencies": {
+    "@types/canvaskit-wasm": "^0.9.1",
+    "@types/node": "^14.11.2"
   }
 }

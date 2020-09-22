@@ -2,6 +2,16 @@
 # yarn lockfile v1
 
 
+"@types/canvaskit-wasm@^0.9.1":
+  version "0.9.1"
+  resolved "https://registry.yarnpkg.com/@types/canvaskit-wasm/-/canvaskit-wasm-0.9.1.tgz#e07f54841d71f9eb08a5a47b87bb3bcc7dcd1e37"
+  integrity sha512-EQvkORP3s4fMRFduRgQizoc2zecd2z98AjjGn3DF49XpqRqxgVmtvwM9io+aQb4deklKK36Z7oHI/mpMpeYEWQ==
+
+"@types/node@^14.11.2":
+  version "14.11.2"
+  resolved "https://registry.yarnpkg.com/@types/node/-/node-14.11.2.tgz#2de1ed6670439387da1c9f549a2ade2b0a799256"
+  integrity sha512-jiE3QIxJ8JLNcb1Ps6rDbysDhN4xa8DJJvuC9prr6w+1tIh+QAbYyNF3tyiZNLDBIuBCf4KEcV2UvQm/V60xfA==
+
 canvaskit-wasm@^0.17.3:
   version "0.17.3"
   resolved "https://registry.yarnpkg.com/canvaskit-wasm/-/canvaskit-wasm-0.17.3.tgz#969e359858946ac1bf4af564272938ac519a1307"
