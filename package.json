@@ -1,0 +1,12 @@
+{
+  "name": "studio",
+  "version": "0.0.1",
+  "main": "index.js",
+  "repository": "https://github.com/bridgedxyz/studio",
+  "author": "woojoo jung <woojoo@softmarshmallow.com>",
+  "license": "MIT",
+  "private": false,
+  "dependencies": {
+    "canvaskit-wasm": "^0.17.3"
+  }
+}
