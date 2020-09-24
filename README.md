@@ -3,7 +3,10 @@
 ![](./docs/readme/images/home-example.png)
 
 
-[join slack](https://join.slack.com/t/bridgedhq/shared_invite/zt-h9eyanie-U_t2XB1mrzRxcPww306aCA)
+## In case you are looking for roadmap or contribution
+- [join slack](https://join.slack.com/t/bridgedhq/shared_invite/zt-h9eyanie-U_t2XB1mrzRxcPww306aCA) and develop with community
+- [general contribution guideline](https://github.com/bridgedxyz/contributing-and-license)
+- [raodmap](https://github.com/bridgedxyz/roadmap)
 
 ## Build Setup
 
