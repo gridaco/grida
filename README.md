@@ -8,7 +8,7 @@
 
 ## Engine & Foundation
 - studio is built uppon skia graphics library 
-- the core component used is followed by *bridged ui system*
+- the core component used is followed by *[reflect design system](https://github.com/reflect.bridged.xyz)*
 - studio's surface is built on react
 
 
