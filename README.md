@@ -1,4 +1,4 @@
-# studio
+# reflection
 > an opensource wasm application explicitly designed for service application design/development
 
 - developer first
