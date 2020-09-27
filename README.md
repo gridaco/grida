@@ -1,4 +1,4 @@
-# reflection
+# bridged (opensource collaborative realtime ui editor)
 > an opensource wasm application explicitly designed for service application design/development
 
 - developer first
