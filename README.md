@@ -11,6 +11,8 @@
 - the core component used is followed by *[reflect design system](https://github.com/bridgedxyz/reflect.bridged.xyz)*
 - studio's surface is built on react
 
+## The design
+design of bridged editor on [figma](https://www.figma.com/file/Y0Gh77AqBoHH7dG1GtK3xF/bridged?node-id=0%3A1)
 
 
 ## Backend
