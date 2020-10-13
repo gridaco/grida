@@ -5,7 +5,6 @@
 - plugin sdk and core engine api is mapped 1:1
 - right on to production code
 
-
 ## Engine & Foundation
 - studio is built uppon skia graphics library 
 - the core component used is followed by *[reflect design system](https://github.com/bridgedxyz/reflect.bridged.xyz)*
@@ -14,6 +13,13 @@
 ## The design
 design of bridged editor on [figma](https://www.figma.com/file/Y0Gh77AqBoHH7dG1GtK3xF/bridged?node-id=0%3A1)
 
+## Workspace
+
+artboard workspace
+
+## Scriptable
+
+scripting built in with js/ts sdk and add-on plugin
 
 ## Backend
 - TBD
