@@ -1,4 +1,4 @@
-# [bridged.xyz](https://bridged.xyz/)
+# [bridged.xyz](https://bridged.xyz/) (ARCHIVED - NuxtJS ver.)
 
 ![](./docs/readme/images/home-example.png)
 
