@@ -18,7 +18,8 @@
           x-large
           href="docs/getting-started"
           nuxt
-        >try bridged in 5 minutes</v-btn>
+          >try bridged in 5 minutes</v-btn
+        >
       </div>
     </v-flex>
   </v-layout>
@@ -28,3 +29,8 @@
 import Vue from "vue";
 export default Vue.extend({});
 </script>
+
+
+
+<style lang="scss" scoped>
+</style>
