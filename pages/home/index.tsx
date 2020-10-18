@@ -2,7 +2,7 @@ import { Button, createMuiTheme, ThemeProvider, Typography } from '@material-ui/
 import React from 'react';
 import Hero from './hero';
 import LintSection from "./lint-section"
-import "./index.module.css"
+// import "./index.module.css"
 
 const landingTheme = createMuiTheme({
     typography: {
