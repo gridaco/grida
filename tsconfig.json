@@ -20,9 +20,11 @@
     "jsx": "preserve"
   },
   "include": [
-    "pages"
+    "pages",
+    "styles"
   ],
   "exclude": [
-    "node_modules"
+    "node_modules",
+    "legacy"
   ]
 }
