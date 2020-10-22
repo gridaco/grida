@@ -1,1 +1,31 @@
-.code_background {}
+.code_background {
+  img {
+    display: block;
+    margin: 0 auto;
+  }
+}
+
+.grid_container {
+  width: 80vw;
+  margin: 150px auto;
+}
+
+.grid {
+  box-shadow: 0px 4px 48px rgba(0, 0, 0, 0.12) !important;
+  border-radius: 44px !important;
+  text-align: center !important;
+  padding: 40px;
+  color: #fff;
+}
+
+.icon_box {
+  background-color: rgba(34, 27, 115, 0.83);
+  border-radius: 24px;
+  // float: left;
+  width: 120px;
+  height: 120px;
+}
+
+.contents {
+  float: left;
+}
