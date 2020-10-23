@@ -37,7 +37,7 @@ const FeatureOverview = () => {
 
       <div style={{ width: '940px', margin: '0 auto' }}>
         <Text
-          style={{ color: '#fff' }}
+          style={{ color: '#fff', fontSize: '36px' }}
           algin="left"
           variant="h4"
           value="Based on powerful engine, we provide desing linting, which leads to
