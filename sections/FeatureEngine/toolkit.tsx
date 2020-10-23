@@ -22,11 +22,13 @@ export const featureEngineContents = {
     return (
       <>
         With most advanced UI Context detection <br />
-        technology in the world. Humans are better <br />
-        with tools. But tools with no intelligence simply <br />
-        slow us down. If you designed a button, It <br />
-        should be recognized as a button. Don’t worry, <br />
-        We know that’s a button.
+        technology in the world. Humans are better with <br />
+        tools. But tools with no intelligence simply slow
+        <br />
+        us down. If you designed a button, It should be
+        <br />
+        recognized as a button. Don’t worry, We know <br />
+        that’s a button.
       </>
     );
   },

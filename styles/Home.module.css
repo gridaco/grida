@@ -22,6 +22,16 @@
   margin: 0 auto;
 }
 
+.btn {
+  width: 246px;
+  height: 72px;
+  font-size: 21px;
+  background-color: #EE1347 !important;
+  border-radius: 140px !important;
+  color: #fff !important;
+
+}
+
 .footer {
   width: 100%;
   height: 100px;

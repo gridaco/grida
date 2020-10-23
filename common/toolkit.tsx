@@ -6,6 +6,8 @@ import {
   FeatureCodegen,
   FeatureEngine,
   FeatureLint,
+  FeatureInstant,
+  FooterCta,
 } from '../sections';
 
 export const sections = [
@@ -15,4 +17,6 @@ export const sections = [
   { content: <FeatureCodegen /> },
   { content: <FeatureEngine /> },
   { content: <FeatureLint /> },
+  { content: <FeatureInstant /> },
+  { content: <FooterCta /> },
 ];

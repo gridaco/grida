@@ -19,7 +19,7 @@ const FeatureOverview = () => {
       </div>
 
       <div className={styles.grid_container}>
-        <Grid container spacing={3}>
+        <Grid container spacing={8}>
           {featureGrid.map((item) => {
             return (
               <Grid item xl={4} lg={6} xs={12} key={item.title}>
