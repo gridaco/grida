@@ -3,12 +3,13 @@ import { Text } from '../../components';
 // @ts-ignore
 import styles from './index.module.scss';
 // @ts-ignore
+import home from '../../styles/Home.module.css';
+// @ts-ignore
 import codeBg from '../../images/code_background.svg';
 import Paper from '@material-ui/core/Paper';
 import Grid from '@material-ui/core/Grid';
-import { makeStyles, createStyles, Theme } from '@material-ui/core/styles';
 
-import { featureGrid } from './toolkit';
+import { featureGrid, featureOverviewContents } from './toolkit';
 
 const FeatureOverview = () => {
   return (
@@ -21,7 +22,7 @@ const FeatureOverview = () => {
         <Grid container spacing={3}>
           {featureGrid.map((item) => {
             return (
-              <Grid item xs={4} key={item.title}>
+              <Grid item xl={4} lg={6} xs={12} key={item.title}>
                 <Paper className={styles.grid}>
                   <div className={styles.icon_box}>icon</div>
                   <div className={styles.contents}>
@@ -35,16 +36,12 @@ const FeatureOverview = () => {
         </Grid>
       </div>
 
-      <div style={{ width: '940px', margin: '0 auto' }}>
+      <div className={home.inner_container}>
         <Text
-          style={{ color: '#fff' }}
+          className={styles.contents}
           algin="left"
           variant="h4"
-          value="Based on powerful engine, we provide desing linting, which leads to
-          human-level generated code. Which means, Good design will not have to
-          be coded manually. But don’t worry, we don’t put any middlewares or
-          magic behind the scene. Everything is generated with native code base,
-          So you can make your product still."
+          value={featureOverviewContents.content()}
         />
       </div>
     </>

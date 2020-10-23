@@ -3,6 +3,7 @@ import React from 'react';
 import { CustomButton, Text } from '../../components';
 // @ts-ignore
 import styles from './index.module.scss';
+import { heroContents } from './toolkit';
 
 const Hero = () => {
   return (
@@ -11,23 +12,19 @@ const Hero = () => {
         <Text
           algin="center"
           variant="h1"
-          value="designs that are meant <br/> to be implemented"
+          value={heroContents.title()}
           style={{ fontWeight: 'bold', color: '#FFF' }}
         />
+        <div className={styles.sub_title}>
+          <Text algin="center" variant="h6" value={heroContents.subTitle()} />
+        </div>
 
-        <Text
-          algin="center"
-          variant="h6"
-          value="your design, your code, your content. in one place."
-          style={{ color: '#A0BBFF' }}
-        />
         <div style={{ textAlign: 'center' }}>
           <CustomButton
             variant="contained"
             href=""
             value="GET STARTED"
             type="default"
-            style={{ borderRadius: '140px' }}
             className={styles.hero_btn}
           />
         </div>

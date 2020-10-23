@@ -41,5 +41,5 @@ export interface TextTypes {
     | 'inherit';
   className?: string;
   style?: CSSProperties;
-  value: string;
+  value: any;
 }
