@@ -2,19 +2,15 @@
 
 ![](./docs/readme/images/home-example.png)
 
-
 ## In case you are looking for roadmap or contribution
+
 - [join slack](https://join.slack.com/t/bridgedhq/shared_invite/zt-h9eyanie-U_t2XB1mrzRxcPww306aCA) and develop with community
 - [general contribution guideline](https://github.com/bridgedxyz/contributing-and-license)
 - [raodmap](https://github.com/bridgedxyz/roadmap)
 
-
 ## Design
 
 The design of bridged.xyz website is oppenned and shared, can be found [here](https://www.figma.com/file/Gaznaw1QHppxvs9UkqNOb0/bridged.xyz?node-id=0%3A1)
-
-
-
 
 > This is a [Next.js](https://nextjs.org/) project bootstrapped with [`create-next-app`](https://github.com/vercel/next.js/tree/canary/packages/create-next-app).
 
@@ -47,14 +43,8 @@ The easiest way to deploy your Next.js app is to use the [Vercel Platform](https
 
 Check out our [Next.js deployment documentation](https://nextjs.org/docs/deployment) for more details.
 
-
-
-
-
-
-
-
 ## Sitemap
+
 - [code.bridged.xyz](https://code.bridged.xyz)
 - [design.bridged.xyz](https://design.bridged.xyz)
 - [console.bridged.xyz](https://console.bridged.xyz)

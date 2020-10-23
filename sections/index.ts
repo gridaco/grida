@@ -5,6 +5,8 @@ import FeatureCloudSync from './FeatureCloudsync';
 import FeatureCodegen from './FeatureCodegen';
 import FeatureEngine from './FeatureEngine';
 import FeatureLint from './FeatureLint';
+import FeatureInstant from './FeatureInstant';
+import FooterCta from './FooterCta';
 
 export {
   Header,
@@ -14,4 +16,6 @@ export {
   FeatureCodegen,
   FeatureEngine,
   FeatureLint,
+  FeatureInstant,
+  FooterCta,
 };
