@@ -15,7 +15,7 @@ const FeatureEngine = () => {
       </div>
       <div className={styles.sub_title}>
         <Text value={featureEngineContents.subTitleFirst()} />
-        <Text value={featureEngineContents.subTitleSeconde()} />
+        <Text value={featureEngineContents.subTitleSecond()} />
       </div>
       <div>
         <Link href="/" style={{ color: '#463F95' }}>

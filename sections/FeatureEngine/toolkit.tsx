@@ -18,7 +18,7 @@ export const featureEngineContents = {
       </>
     );
   },
-  subTitleSeconde: () => {
+  subTitleSecond: () => {
     return (
       <>
         With most advanced UI Context detection <br />

@@ -12,7 +12,7 @@ export const featureCloudSyncContents = {
   subTitleFirst: () => {
     return <>Your design is</>;
   },
-  subTitleSeconde: () => {
+  subTitleSecond: () => {
     return (
       <>
         “Micro-manage your contents.” <br />
