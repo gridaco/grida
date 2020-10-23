@@ -5,33 +5,38 @@ import { featureCodegenContents } from './toolkit';
 
 // @ts-ignore
 import styles from './index.module.scss';
+// @ts-ignore
+import home from '../../styles/Home.module.css';
 
 const FeatureCodegen = () => {
   return (
     <>
-      <div>
-        <Text
-          className={styles.title}
-          algin="left"
-          value={featureCodegenContents.title()}
-        />
-      </div>
-      <div className={styles.sub_title_box}>
-        <Text
-          algin="left"
-          variant="h5"
-          value={featureCodegenContents.subTitleFirst()}
-        />
-        <Text
-          algin="left"
-          variant="h5"
-          value={featureCodegenContents.subTitleSeconde()}
-        />
-      </div>
-      <div className={styles.link}>
-        <Link href="/" style={{ color: '#463F95' }}>
-          <Text algin="left" variant="h5" value="Learn more how it works" />
-        </Link>
+      <div className={home.inner_container}>
+        <div>
+          <Text
+            className={styles.title}
+            algin="left"
+            value={featureCodegenContents.title()}
+          />
+        </div>
+        <div className={styles.sub_title_box}>
+          <Text
+            algin="left"
+            variant="h5"
+            value={featureCodegenContents.subTitleFirst()}
+          />
+          <Text
+            algin="left"
+            variant="h5"
+            className={styles.sub_title_second}
+            value={featureCodegenContents.subTitleSecond()}
+          />
+        </div>
+        <div className={styles.link}>
+          <Link href="/" style={{ color: '#463F95' }}>
+            <Text algin="left" variant="h5" value="Learn more how it works" />
+          </Link>
+        </div>
       </div>
     </>
   );

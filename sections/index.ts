@@ -1,10 +1,10 @@
 import Header from './Header';
 import Hero from './Hero';
 import FeatureOverview from './FeatureOverview';
-import FeatureCloudSync from './FeatureCloudSync';
+import FeatureCloudSync from './FeatureCloudsync';
 import FeatureCodegen from './FeatureCodegen';
 import FeatureEngine from './FeatureEngine';
-import FeatureLint from './FeatureLint'
+import FeatureLint from './FeatureLint';
 
 export {
   Header,
@@ -13,5 +13,5 @@ export {
   FeatureCloudSync,
   FeatureCodegen,
   FeatureEngine,
-  FeatureLint
+  FeatureLint,
 };

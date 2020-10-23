@@ -2,21 +2,16 @@ const endTag = '< /.';
 
 export const featureCodegenContents = {
   title: () => {
-    return (
-      <>
-        Code is - your <br />
-        prototype {endTag}
-      </>
-    );
+    return <>Code is - your prototype {endTag}</>;
   },
   subTitleFirst: () => {
     return <>Finally, the usable code exporter</>;
   },
-  subTitleSeconde: () => {
+  subTitleSecond: () => {
     return (
       <>
         readable, production ready code. no custom <br />
-        implementaion. all in standard form.
+        implementation. all in standard form.
       </>
     );
   },

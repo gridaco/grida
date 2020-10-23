@@ -2,11 +2,22 @@
   font-weight: 900 !important;
   color: #fff;
   font-size: 112px !important;
+  letter-spacing: 0.01em !important;
+  line-height: 100% !important;
 }
 
 .sub_title_box {
   color: #fff;
-  margin-top: 140px;
+  margin-top: 143px;
+
+
+  .sub_title_second {
+    margin-top: 14px;
+    font-size: 36px !important;
+    font-weight: 500 !important;
+    line-height: 49px !important;
+    letter-spacing: 0.01em !important;
+  }
 }
 
 .link {
