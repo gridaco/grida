@@ -15,14 +15,15 @@ export const headerMenu = [
     label: 'Support',
     href: '',
   },
+];
+
+export const headerSubMenu = [
   {
     label: 'Blog',
     href: '',
-    sub: true,
   },
   {
     label: 'Github',
     href: '',
-    sub: true,
   },
 ];

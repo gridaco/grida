@@ -1,6 +1,6 @@
-.header {
+.header_container {
   width: 100%;
-  height: 80px;
+  height: 100px;
   position: fixed;
   top: 0;
   padding: 0 328px;
@@ -8,12 +8,36 @@
   text-align: center;
   border-bottom: 1px solid rgba($color: #3A3390, $alpha: 0.2);
   backdrop-filter: blur(64px);
+  z-index: 999;
 
-  span {
-    color: #463f95;
+  .header {
+    width: 1024px;
+    margin: 0 auto;
+  }
+
+  .nav {
+    float: left;
+    margin: 38px 214px 37px 88px;
+
+    span {
+      color: #463f95;
+      font-size: 21px;
+
+    }
+  }
+
+  .sub_nav {
+    float: left;
+    margin: 38px 0 37px 0;
+
+    span {
+      color: #463f95;
+      font-size: 21px;
+    }
   }
 }
 
 .logo {
   float: left;
+  margin: 22px 0;
 }

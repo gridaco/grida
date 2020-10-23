@@ -36,3 +36,19 @@ export const featureGrid = [
     content: 'content',
   },
 ];
+
+export const featureOverviewContents = {
+  content: () => {
+    return (
+      <>
+        Based on powerful engine, we provide design linting, <br />
+        which leads to human-level generated code. Which <br />
+        means, Good design will not have to be coded manually. <br />
+        But don’t worry, we don’t put any middlewares or magic <br />
+        behind the scene. <br />
+        Everything is generated with native code base, So you <br />
+        can make your product still.
+      </>
+    );
+  },
+};

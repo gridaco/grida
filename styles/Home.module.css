@@ -17,6 +17,11 @@
   align-items: center;
 }
 
+.inner_container {
+  width: 1024px;
+  margin: 0 auto;
+}
+
 .footer {
   width: 100%;
   height: 100px;

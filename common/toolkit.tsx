@@ -2,13 +2,17 @@ import {
   Header,
   Hero,
   FeatureOverview,
-  FeatureCloudsync,
+  FeatureCloudSync,
   FeatureCodegen,
+  FeatureEngine,
+  FeatureLint,
 } from '../sections';
 
 export const sections = [
   { content: <Hero /> },
   { content: <FeatureOverview /> },
-  { content: <FeatureCloudsync /> },
+  { content: <FeatureCloudSync /> },
   { content: <FeatureCodegen /> },
+  { content: <FeatureEngine /> },
+  { content: <FeatureLint /> },
 ];

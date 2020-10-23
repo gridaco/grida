@@ -1,6 +1,7 @@
 import { Link } from '@material-ui/core';
 import React from 'react';
 import { Text } from '../../components';
+import { featureCodegenContents } from './toolkit';
 
 // @ts-ignore
 import styles from './index.module.scss';
@@ -8,24 +9,23 @@ import styles from './index.module.scss';
 const FeatureCodegen = () => {
   return (
     <>
-      <div style={{ color: '#fff' }}>
+      <div>
         <Text
           className={styles.title}
           algin="left"
-          variant="h2"
-          value="Code is - your <br/> prototype </."
+          value={featureCodegenContents.title()}
         />
       </div>
       <div className={styles.sub_title_box}>
         <Text
           algin="left"
           variant="h5"
-          value="Finally, the usable code exporter"
+          value={featureCodegenContents.subTitleFirst()}
         />
         <Text
           algin="left"
           variant="h5"
-          value="readable, production ready code. no custom implementaion. all in <br/> standard form."
+          value={featureCodegenContents.subTitleSeconde()}
         />
       </div>
       <div className={styles.link}>
