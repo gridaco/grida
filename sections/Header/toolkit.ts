@@ -3,19 +3,16 @@ import { BLOG, GITHUB } from '../../common/toolkit';
 export const headerMenu = [
   {
     label: 'Reflect',
-    href: '',
-  },
-  {
-    label: 'Tutorial',
-    href: '',
+    href: 'reflect.bridged.xyz',
   },
   {
     label: 'Pricing',
-    href: '',
+    href: 'bridged.xyz/pricing',
   },
   {
     label: 'Support',
-    href: '',
+    href:
+      'https://www.notion.so/bridgedxyz/Support-903ea94faba240d3ae6804751c8e4aee',
   },
 ];
 
