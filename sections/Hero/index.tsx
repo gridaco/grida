@@ -6,7 +6,7 @@ import styles from './index.module.scss';
 // @ts-ignore
 import home from '../../styles/Home.module.css';
 
-import { COMMUNITY_LINK_FLUTTER } from '../../common/toolkit';
+import { BRIDGED_COMMUNITY_FLUTTER } from '../../common/toolkit';
 
 import { heroContents } from './toolkit';
 
@@ -27,7 +27,7 @@ const Hero = () => {
         <div style={{ textAlign: 'center', marginTop: '41px' }}>
           <CustomButton
             variant="contained"
-            href={COMMUNITY_LINK_FLUTTER}
+            href={BRIDGED_COMMUNITY_FLUTTER}
             value="GET STARTED"
             type="default"
             className={home.btn}
