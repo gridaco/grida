@@ -1,3 +1,5 @@
+import { BLOG, GITHUB } from '../../common/toolkit';
+
 export const headerMenu = [
   {
     label: 'Reflect',
@@ -20,10 +22,10 @@ export const headerMenu = [
 export const headerSubMenu = [
   {
     label: 'Blog',
-    href: '',
+    href: 'https://medium.com/bridgedxyz',
   },
   {
     label: 'Github',
-    href: '',
+    href: 'https://github.com/bridgedxyz',
   },
 ];

@@ -8,6 +8,7 @@ import styles from './index.module.scss';
 // @ts-ignore
 import home from '../../styles/Home.module.css';
 import { featureEngineContents } from './toolkit';
+import { ENGINE } from '../../common/toolkit';
 
 const FeatureEngine = () => {
   return (
@@ -32,7 +33,7 @@ const FeatureEngine = () => {
           />
         </div>
         <div>
-          <Link href="/" style={{ color: '#463F95' }}>
+          <Link href={ENGINE} style={{ color: '#463F95' }}>
             <Text algin="left" variant="h5" value="Learn more about engine" />
           </Link>
         </div>

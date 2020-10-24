@@ -3,7 +3,7 @@ import React from 'react';
 import styles from './index.module.scss';
 // @ts-ignore
 import home from '../../styles/Home.module.css';
-import { COMMUNITY_LINK_FLUTTER } from '../../common/toolkit';
+import { BRIDGED_COMMUNITY_FLUTTER } from '../../common/toolkit';
 import { Text, CustomButton } from '../../components';
 import { footerCtaContents } from './toolkit';
 const FooterCta = () => {
@@ -28,7 +28,7 @@ const FooterCta = () => {
         <div style={{ marginTop: '148px' }}>
           <CustomButton
             variant="contained"
-            href={COMMUNITY_LINK_FLUTTER}
+            href={BRIDGED_COMMUNITY_FLUTTER}
             value="GET STARTED"
             type="default"
             className={home.btn}
