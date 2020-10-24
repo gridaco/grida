@@ -5,6 +5,9 @@ import { CustomButton, Text } from '../../components';
 import styles from './index.module.scss';
 // @ts-ignore
 import home from '../../styles/Home.module.css';
+
+import { COMMUNITY_LINK_FLUTTER } from '../../common/toolkit';
+
 import { heroContents } from './toolkit';
 
 const Hero = () => {
@@ -24,7 +27,7 @@ const Hero = () => {
         <div style={{ textAlign: 'center', marginTop: '41px' }}>
           <CustomButton
             variant="contained"
-            href=""
+            href={COMMUNITY_LINK_FLUTTER}
             value="GET STARTED"
             type="default"
             className={home.btn}

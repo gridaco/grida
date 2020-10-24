@@ -1,4 +1,4 @@
-export const footerCta = {
+export const footerCtaContents = {
   title: () => {
     return (
       <>
