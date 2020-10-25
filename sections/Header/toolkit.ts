@@ -1,29 +1,28 @@
+import { BLOG, GITHUB } from '../../common/toolkit';
+
 export const headerMenu = [
   {
     label: 'Reflect',
-    href: '',
-  },
-  {
-    label: 'Tutorial',
-    href: '',
+    href: 'https://reflect.bridged.xyz',
   },
   {
     label: 'Pricing',
-    href: '',
+    href: 'https://bridged.xyz/pricing',
   },
   {
     label: 'Support',
-    href: '',
+    href:
+      'https://www.notion.so/bridgedxyz/Support-903ea94faba240d3ae6804751c8e4aee',
   },
 ];
 
 export const headerSubMenu = [
   {
     label: 'Blog',
-    href: '',
+    href: 'https://medium.com/bridgedxyz',
   },
   {
     label: 'Github',
-    href: '',
+    href: 'https://github.com/bridgedxyz',
   },
 ];

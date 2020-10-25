@@ -5,6 +5,7 @@ import styles from './index.module.scss';
 import logoWhite from '../../static/logo-white.svg';
 
 import { headerMenu, headerSubMenu } from './toolkit';
+import { Link } from '@material-ui/core';
 
 const Header = () => {
   return (
@@ -19,12 +20,14 @@ const Header = () => {
               let _interval = 0;
               if (i !== 0) _interval = 44;
               return (
-                <span
-                  className="center"
-                  style={{ marginLeft: `${_interval}px` }}
-                >
-                  {item.label}
-                </span>
+                <Link href={item.href} key={i}>
+                  <span
+                    className="center"
+                    style={{ marginLeft: `${_interval}px` }}
+                  >
+                    {item.label}
+                  </span>
+                </Link>
               );
             })}
           </div>
@@ -33,12 +36,14 @@ const Header = () => {
               let _interval = 0;
               if (i !== 0) _interval = 44;
               return (
-                <span
-                  className="center"
-                  style={{ marginLeft: `${_interval}px` }}
-                >
-                  {item.label}
-                </span>
+                <Link href={item.href} key={i}>
+                  <span
+                    className="center"
+                    style={{ marginLeft: `${_interval}px` }}
+                  >
+                    {item.label}
+                  </span>
+                </Link>
               );
             })}
           </div>
