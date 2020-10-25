@@ -3,11 +3,11 @@ import { BLOG, GITHUB } from '../../common/toolkit';
 export const headerMenu = [
   {
     label: 'Reflect',
-    href: 'reflect.bridged.xyz',
+    href: 'https://reflect.bridged.xyz',
   },
   {
     label: 'Pricing',
-    href: 'bridged.xyz/pricing',
+    href: 'https://bridged.xyz/pricing',
   },
   {
     label: 'Support',
