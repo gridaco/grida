@@ -15,6 +15,7 @@ const FeatureCodegen = () => {
         <div>
           <Text
             className={styles.title}
+            variant="h1"
             algin="left"
             value={featureCodegenContents.title()}
           />
@@ -33,7 +34,11 @@ const FeatureCodegen = () => {
             value={featureCodegenContents.subTitleSecond()}
           />
         </div>
-        <div className={styles.link}></div>
+        <div className={styles.link}>
+          <Link href="/" style={{ color: '#463F95' }}>
+            <Text algin="left" variant="h5" value="Learn more how it works" />
+          </Link>
+        </div>
       </div>
     </>
   );

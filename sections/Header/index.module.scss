@@ -1,3 +1,6 @@
+@import '../../styles/variables.scss';
+
+
 .header_container {
   width: 100%;
   height: 100px;
@@ -20,6 +23,7 @@
     margin: 38px 214px 37px 88px;
 
     span {
+      //subTitle1
       color: #463f95;
       font-size: 21px;
 

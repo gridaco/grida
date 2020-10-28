@@ -23,10 +23,12 @@ const FeatureEngine = () => {
         </div>
         <div className={styles.sub_title_box}>
           <Text
+            variant="h6"
             className={styles.sub_title}
             value={featureEngineContents.subTitleFirst()}
           />
           <Text
+            variant="h6"
             className={styles.sub_title}
             style={{ marginTop: '40px' }}
             value={featureEngineContents.subTitleSecond()}
@@ -34,7 +36,7 @@ const FeatureEngine = () => {
         </div>
         <div>
           <Link href={ENGINE} style={{ color: '#463F95' }}>
-            <Text algin="left" variant="h5" value="Learn more about engine" />
+            <Text algin="left" variant="h6" value="Learn more about engine" />
           </Link>
         </div>
       </div>

@@ -22,7 +22,7 @@ const FeatureOverview = () => {
         <Text
           className={styles.contents}
           algin="left"
-          variant="h4"
+          variant="h6"
           value={featureOverviewContents.content()}
         />
       </div>

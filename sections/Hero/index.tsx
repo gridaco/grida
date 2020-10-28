@@ -18,7 +18,7 @@ const Hero = () => {
           algin="center"
           variant="h1"
           value={heroContents.title()}
-          style={{ fontWeight: 'bold', color: '#FFF' }}
+          style={{  color: '#FFF' }}
         />
         <div className={styles.sub_title}>
           <Text algin="center" variant="h6" value={heroContents.subTitle()} />

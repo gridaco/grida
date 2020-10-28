@@ -21,14 +21,14 @@ const FeatureCloudSync = () => {
       <div className={home.inner_container} style={{ color: '#fff' }}>
         <Text
           algin="left"
-          variant="h5"
+          variant="h6"
           className={styles.sub_title}
           style={{ marginTop: '121px' }}
           value={featureCloudSyncContents.subTitleFirst()}
         />
         <Text
           algin="left"
-          variant="h5"
+          variant="h6"
           className={styles.sub_title}
           style={{ margin: '24px 0 79px 0x' }}
           value={featureCloudSyncContents.subTitleSecond()}

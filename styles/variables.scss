@@ -1,1 +1,16 @@
-$text-point: #FF327C
+$text-point: #FF327C;
+
+$breakpoint-mobile: 768px;
+$breakpoint-desktop: 1024px;
+
+@mixin md {
+  @media (max-width: #{$breakpoint-desktop})and (min-width : #{$breakpoint-mobile + 1px}) {
+    @content;
+  }
+}
+
+@mixin sm {
+  @media (max-width: #{$breakpoint-mobile}) {
+    @content;
+  }
+}
