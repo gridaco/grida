@@ -35,7 +35,7 @@ const FeatureCloudSync = () => {
         />
       </div>
       <div>
-        <img src={updateBtnWithPhone} />
+        <img src={updateBtnWithPhone} style={{ width: '100vw' }}/>
       </div>
     </>
   );

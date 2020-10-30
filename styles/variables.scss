@@ -1,31 +1,35 @@
-$point-pink: #EE1347;
-$light-point-pink : #FF327C;
-$light-grey-pink: #C07B7B;
-$grey-pink: #C35151;
+$point-pink: #ee1347;
+$light-point-pink: #ff327c;
+$light-grey-pink: #c07b7b;
+$grey-pink: #c35151;
 
 $light-black: #040030;
-$deep-indigo: #0B0645;
-$light-indigo: #463F95;
-$indigo: #3A3390;
-$sky-blue: #A0BBFF;
+$deep-indigo: #0b0645;
+$light-indigo: #463f95;
+$indigo: #3a3390;
+$sky-blue: #a0bbff;
 
-$light-purple: #BEB8FF;
-$point-blue: #0038FF;
-$point-yellow: #FFB800;
-$point-orange: #FF9E45;
-
+$light-purple: #beb8ff;
+$point-blue: #0038ff;
+$point-yellow: #ffb800;
+$point-orange: #ff9e45;
 
 $breakpoint-mobile: 768px;
 $breakpoint-desktop: 1024px;
+$breakpoint-widescreen: 1280px;
+
+$inner-container-mobile: 720px;
+$inner-container-desktop: 876px;
+$inner-container-widescreen: 1024px;
 
 @mixin md {
-  @media (max-width: #{$breakpoint-desktop})and (min-width : #{$breakpoint-mobile + 1px}) {
+  @media (min-width: #{$breakpoint-desktop})and (max-width : #{$breakpoint-widescreen - 1px}) {
     @content;
   }
 }
 
 @mixin sm {
-  @media (max-width: #{$breakpoint-mobile}) {
+  @media (min-width: #{$breakpoint-mobile}) and (max-width: #{$breakpoint-desktop - 1px}) {
     @content;
   }
 }

@@ -1,6 +1,7 @@
 import React from 'react';
 import { Button, ThemeProvider, Typography } from '@material-ui/core';
 import { CustomButtonTypes } from '../../common/types';
+import Text from '../Text';
 
 const CustomButton: React.FC<CustomButtonTypes> = ({
   variant,
@@ -21,7 +22,7 @@ const CustomButton: React.FC<CustomButtonTypes> = ({
         href={href}
         style={style}
       >
-        {value}
+        <Text variant="button" value={value} />
       </Button>
     </>
   );

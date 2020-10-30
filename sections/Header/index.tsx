@@ -6,7 +6,7 @@ import logoWhite from '../../static/logo-white.svg';
 
 import { headerMenu, headerSubMenu } from './toolkit';
 import { Link } from '@material-ui/core';
-
+import { Text } from '../../components';
 
 const Header = () => {
   return (
@@ -22,12 +22,12 @@ const Header = () => {
               if (i !== 0) _interval = 44;
               return (
                 <Link href={item.href} key={i}>
-                  <span
-                    className="center"
+                  <Text
+                    className={styles.menu}
+                    variant="subtitle1"
                     style={{ marginLeft: `${_interval}px` }}
-                  >
-                    {item.label}
-                  </span>
+                    value={item.label}
+                  />
                 </Link>
               );
             })}
@@ -38,12 +38,12 @@ const Header = () => {
               if (i !== 0) _interval = 44;
               return (
                 <Link href={item.href} key={i}>
-                  <span
-                    className="center"
+                  <Text
+                    className={styles.menu}
+                    variant="subtitle1"
                     style={{ marginLeft: `${_interval}px` }}
-                  >
-                    {item.label}
-                  </span>
+                    value={item.label}
+                  />
                 </Link>
               );
             })}

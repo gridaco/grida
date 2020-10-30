@@ -40,8 +40,8 @@ const FeatureEngine = () => {
           </Link>
         </div>
       </div>
-      <div>
-        <img src={featureEngineGraphic} />
+      <div >
+        <img src={featureEngineGraphic} style={{ width: '100vw' }}/>
       </div>
     </>
   );

@@ -34,8 +34,8 @@ const FeatureInstant = () => {
           />
         </div>
       </div>
-      <div>
-        <img src={featureInstantImg} />
+      <div >
+        <img src={featureInstantImg} style={{ width: '100vw' }}/>
       </div>
     </>
   );
