@@ -12,16 +12,16 @@ const theme = createMuiTheme({
       xl: 1920,
     },
   },
-  // typography: {
-  //   fontFamily: 'Roboto',
-  // },
+  typography: {
+    fontFamily: 'Roboto',
+  },
 });
 
 theme.typography.h1 = {
   fontWeight: 900,
   fontSize: '7rem',
   lineHeight: '100%',
-
+  // fontFamily: 'Roboto',
   [theme.breakpoints.down('md')]: {
     fontWeight: 900,
     fontSize: '76px',
