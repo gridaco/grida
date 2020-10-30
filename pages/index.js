@@ -25,6 +25,11 @@ export default function Home() {
         />
         {/* region seo optimizations */}
         <link rel="icon" href="/favicon.png" />
+        <link
+          href="http://fonts.googleapis.com/css?family=Roboto:400,100,300,100italic,300italic,400italic,500italic,500,700,700italic,900,900italic"
+          rel="stylesheet"
+          type="text/css"
+        />
       </Head>
       <ThemeProvider theme={theme}>
         <main className={styles.main}>
