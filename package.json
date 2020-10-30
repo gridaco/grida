@@ -17,7 +17,8 @@
     "next-images": "^1.6.0",
     "node-sass": "^4.14.1",
     "react": "16.14.0",
-    "react-dom": "16.14.0"
+    "react-dom": "16.14.0",
+    "yarn.lock": "^0.0.1-security"
   },
   "devDependencies": {
     "@types/node": "^14.11.10",
