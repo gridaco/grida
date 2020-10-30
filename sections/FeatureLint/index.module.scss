@@ -1,13 +1,16 @@
+@import '../../styles/variables.scss';
+
 .title {
-  color: #fff;
+  color: $light-indigo;
+
+  em {
+    font-style: normal;
+    color: $light-point-pink;
+  }
 }
 
 .sub_title {
   color: #fff;
   margin-top: 48px !important;
   margin-bottom: 168px !important;
-}
-
-.video_test {
-  width: 100vw;
 }

@@ -24,7 +24,7 @@ const FeatureLint = () => {
         />
       </div>
       <div>
-        <img className={styles.video_test} src={videoTestImage} />
+        <img style={{ width: '100vw' }} src={videoTestImage} />
       </div>
     </>
   );

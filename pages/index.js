@@ -9,6 +9,7 @@ export default function Home() {
   return (
     <div className={styles.container}>
       <Head>
+        {/* region seo optimizations */}
         <title> bridged.xyz </title>
         <meta
           name="description"
@@ -22,6 +23,7 @@ export default function Home() {
           name="author"
           content="bridged.xyz team and community collaborators"
         />
+        {/* region seo optimizations */}
         <link rel="icon" href="/favicon.png" />
       </Head>
       <ThemeProvider theme={theme}>

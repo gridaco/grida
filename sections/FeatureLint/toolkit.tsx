@@ -2,9 +2,9 @@ export const featureLintContents = {
   title: () => {
     return (
       <>
-        Lint your design — <br />
-        Visually, and <br />
-        Constructively.
+        <em>Lint</em> your design — <br />
+        <em>Visually,</em> and <br />
+        <em>Constructively.</em>
       </>
     );
   },
