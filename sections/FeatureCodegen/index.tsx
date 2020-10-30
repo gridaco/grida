@@ -6,7 +6,7 @@ import { featureCodegenContents } from './toolkit';
 // @ts-ignore
 import styles from './index.module.scss';
 // @ts-ignore
-import home from '../../styles/Home.module.css';
+import home from '../../styles/Home.module.scss';
 
 const FeatureCodegen = () => {
   return (

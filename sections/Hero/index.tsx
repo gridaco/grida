@@ -4,7 +4,7 @@ import { CustomButton, Text } from '../../components';
 // @ts-ignore
 import styles from './index.module.scss';
 // @ts-ignore
-import home from '../../styles/Home.module.css';
+import home from '../../styles/Home.module.scss';
 
 import { BRIDGED_COMMUNITY_FLUTTER } from '../../common/toolkit';
 
@@ -18,7 +18,7 @@ const Hero = () => {
           algin="center"
           variant="h1"
           value={heroContents.title()}
-          style={{  color: '#FFF' }}
+          style={{ color: '#FFF' }}
         />
         <div className={styles.sub_title}>
           <Text algin="center" variant="h6" value={heroContents.subTitle()} />

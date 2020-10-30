@@ -8,6 +8,7 @@ import {
   FeatureLint,
   FeatureInstant,
   FooterCta,
+  FooterPunchline,
 } from '../sections';
 
 export const sections = [
@@ -18,6 +19,7 @@ export const sections = [
   { content: <FeatureEngine /> },
   { content: <FeatureLint /> },
   { content: <FeatureInstant /> },
+  { content: <FooterPunchline /> },
   { content: <FooterCta /> },
 ];
 

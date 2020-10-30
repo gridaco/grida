@@ -1,0 +1,14 @@
+@import '../../styles/variables.scss';
+
+.title_box {
+  width: 768px;
+}
+
+.title {
+  color: $light-grey-pink;
+
+  em {
+    font-style: normal;
+    color: $grey-pink;
+  }
+}

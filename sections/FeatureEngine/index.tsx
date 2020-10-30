@@ -6,7 +6,7 @@ import featureEngineGraphic from '../../images/feature_engine_graphic.svg';
 // @ts-ignore
 import styles from './index.module.scss';
 // @ts-ignore
-import home from '../../styles/Home.module.css';
+import home from '../../styles/Home.module.scss';
 import { featureEngineContents } from './toolkit';
 import { ENGINE } from '../../common/toolkit';
 

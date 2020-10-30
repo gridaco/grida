@@ -1,5 +1,5 @@
 import Head from 'next/head';
-import styles from '../styles/Home.module.css';
+import styles from '../styles/Home.module.scss';
 import { sections } from '../common/toolkit';
 import { Header } from '../sections';
 import { ThemeProvider } from '@material-ui/core';

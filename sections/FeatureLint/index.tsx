@@ -6,7 +6,7 @@ import videoTestImage from '../../images/feature_lint_video_image.svg';
 // @ts-ignore
 import styles from './index.module.scss';
 // @ts-ignore
-import home from '../../styles/Home.module.css';
+import home from '../../styles/Home.module.scss';
 
 const FeatureLint = () => {
   return (

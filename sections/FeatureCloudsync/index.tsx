@@ -4,7 +4,7 @@ import updateBtnWithPhone from '../../images/update_btn_with_phone.svg';
 // @ts-ignore
 import styles from './index.module.scss';
 // @ts-ignore
-import home from '../../styles/Home.module.css';
+import home from '../../styles/Home.module.scss';
 import { featureCloudSyncContents } from './toolkit';
 import { Text } from '../../components';
 
