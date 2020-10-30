@@ -1,19 +1,16 @@
+@import '../../styles/variables.scss';
+
 .title {
-  color: #fff;
-  font-weight: 900 !important;
-  line-height: 100% !important;
-  letter-spacing: 0em !important;
+  color: $light-indigo;
+
+  em {
+    font-style: normal;
+    color: $light-point-pink;
+  }
 }
 
 .sub_title {
   color: #fff;
-  font-weight: 500 !important;
-  line-height: 49px !important;
-  letter-spacing: 0em !important;
   margin-top: 48px !important;
   margin-bottom: 168px !important;
-}
-
-.video_test {
-  width: 100vw;
 }

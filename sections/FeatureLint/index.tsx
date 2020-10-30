@@ -6,7 +6,7 @@ import videoTestImage from '../../images/feature_lint_video_image.svg';
 // @ts-ignore
 import styles from './index.module.scss';
 // @ts-ignore
-import home from '../../styles/Home.module.css';
+import home from '../../styles/Home.module.scss';
 
 const FeatureLint = () => {
   return (
@@ -24,7 +24,7 @@ const FeatureLint = () => {
         />
       </div>
       <div>
-        <img className={styles.video_test} src={videoTestImage} />
+        <img style={{ width: '100vw' }} src={videoTestImage} />
       </div>
     </>
   );

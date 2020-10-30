@@ -2,7 +2,7 @@ import React from 'react';
 // @ts-ignore
 import styles from './index.module.scss';
 // @ts-ignore
-import home from '../../styles/Home.module.css';
+import home from '../../styles/Home.module.scss';
 import { BRIDGED_COMMUNITY_FLUTTER } from '../../common/toolkit';
 import { Text, CustomButton } from '../../components';
 import { footerCtaContents } from './toolkit';

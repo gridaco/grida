@@ -6,7 +6,7 @@ import { featureCodegenContents } from './toolkit';
 // @ts-ignore
 import styles from './index.module.scss';
 // @ts-ignore
-import home from '../../styles/Home.module.css';
+import home from '../../styles/Home.module.scss';
 
 const FeatureCodegen = () => {
   return (
@@ -15,6 +15,7 @@ const FeatureCodegen = () => {
         <div>
           <Text
             className={styles.title}
+            variant="h1"
             algin="left"
             value={featureCodegenContents.title()}
           />
@@ -33,7 +34,11 @@ const FeatureCodegen = () => {
             value={featureCodegenContents.subTitleSecond()}
           />
         </div>
-        <div className={styles.link}></div>
+        <div className={styles.link}>
+          <Link href="/" style={{ color: '#463F95' }}>
+            <Text algin="left" variant="h5" value="Learn more how it works" />
+          </Link>
+        </div>
       </div>
     </>
   );

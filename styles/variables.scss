@@ -1,1 +1,39 @@
-$text-point: #FF327C
+$point-pink: #ee1347;
+$light-point-pink: #ff327c;
+$light-grey-pink: #c07b7b;
+$grey-pink: #c35151;
+
+$light-black: #040030;
+$deep-indigo: #0b0645;
+$light-indigo: #463f95;
+$indigo: #3a3390;
+$background-indigo: #292467;
+
+
+
+$sky-blue: #a0bbff;
+
+$light-purple: #beb8ff;
+$point-blue: #0038ff;
+$point-yellow: #ffb800;
+$point-orange: #ff9e45;
+
+$breakpoint-mobile: 768px;
+$breakpoint-desktop: 1024px;
+$breakpoint-widescreen: 1280px;
+
+$inner-container-mobile: 720px;
+$inner-container-desktop: 876px;
+$inner-container-widescreen: 1024px;
+
+@mixin md {
+  @media (min-width: #{$breakpoint-desktop})and (max-width : #{$breakpoint-widescreen - 1px}) {
+    @content;
+  }
+}
+
+@mixin sm {
+  @media (min-width: #{$breakpoint-mobile}) and (max-width: #{$breakpoint-desktop - 1px}) {
+    @content;
+  }
+}

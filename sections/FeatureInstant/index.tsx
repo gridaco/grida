@@ -8,7 +8,7 @@ import featureInstantImg from '../../images/feature_instant_img.svg';
 // @ts-ignore
 import styles from './index.module.scss';
 // @ts-ignore
-import home from '../../styles/Home.module.css';
+import home from '../../styles/Home.module.scss';
 
 const FeatureInstant = () => {
   return (
@@ -34,8 +34,8 @@ const FeatureInstant = () => {
           />
         </div>
       </div>
-      <div>
-        <img src={featureInstantImg} />
+      <div >
+        <img src={featureInstantImg} style={{ width: '100vw' }}/>
       </div>
     </>
   );

@@ -10,7 +10,7 @@ export const featureCloudSyncContents = {
     );
   },
   subTitleFirst: () => {
-    return <>Your design is</>;
+    return <>Your design is your server</>;
   },
   subTitleSecond: () => {
     return (

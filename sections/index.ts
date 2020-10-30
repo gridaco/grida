@@ -7,6 +7,7 @@ import FeatureEngine from './FeatureEngine';
 import FeatureLint from './FeatureLint';
 import FeatureInstant from './FeatureInstant';
 import FooterCta from './FooterCta';
+import FooterPunchline from './FooterPunchline';
 
 export {
   Header,
@@ -18,4 +19,5 @@ export {
   FeatureLint,
   FeatureInstant,
   FooterCta,
+  FooterPunchline,
 };
