@@ -1,7 +1,14 @@
+/* @import 'fontsource-roboto'; */
+
+body {
+  font-family: 'Roboto', sans-serif;
+}
+
 html,
 body {
   padding: 0;
   margin: 0;
+  /* font-family: 'Roboto'; */
 }
 
 a {
