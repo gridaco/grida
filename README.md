@@ -4,7 +4,7 @@
 
 ## In case you are looking for roadmap or contribution
 
-- [join slack](https://join.slack.com/t/bridgedhq/shared_invite/zt-h9eyanie-U_t2XB1mrzRxcPww306aCA) and develop with community
+- [join slack](https://github.com/bridgedxyz/contributing-and-license#general-contribution) and develop with community
 - [general contribution guideline](https://github.com/bridgedxyz/contributing-and-license)
 - [raodmap](https://github.com/bridgedxyz/roadmap)
 
