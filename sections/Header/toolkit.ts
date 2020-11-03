@@ -12,7 +12,7 @@ export const headerMenu = [
   {
     label: 'Support',
     href:
-      'https://www.notion.so/bridgedxyz/Support-903ea94faba240d3ae6804751c8e4aee',
+      'https://support.bridged.xyz',
   },
 ];
 
