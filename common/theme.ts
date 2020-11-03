@@ -19,7 +19,7 @@ const theme = createMuiTheme({
 
 theme.typography.h1 = {
   fontWeight: 900,
-  fontSize: '7rem',
+  fontSize: '112px',
   lineHeight: '100%',
   // fontFamily: 'Roboto',
 

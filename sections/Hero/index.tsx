@@ -34,8 +34,6 @@ const Hero = () => {
           />
         </div>
       </div>
-
-      <img src="" />
     </>
   );
 };

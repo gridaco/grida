@@ -12,6 +12,7 @@
   border-bottom: 1px solid rgba($color: #3A3390, $alpha: 0.2);
   backdrop-filter: blur(64px);
   z-index: 999;
+  overflow-x: scroll;
 }
 
 .header {
