@@ -3,10 +3,11 @@ import React from 'react';
 import styles from './index.module.scss';
 // @ts-ignore
 import logoWhite from '../../static/logo-white.svg';
-
+// @ts-ignore
+import xsLogoWhite from '../../images/xs_logo_white.svg';
 import { headerMenu, headerSubMenu } from './toolkit';
 import { Link } from '@material-ui/core';
-import { Text } from '../../components';
+import { Text, CustomDrawer } from '../../components';
 
 const Header = () => {
   return (
@@ -16,6 +17,10 @@ const Header = () => {
           <div className={styles.logo}>
             <img src={logoWhite} />
           </div>
+          <div className={styles.xs_logo}>
+            <img src={xsLogoWhite} />
+          </div>
+
           <div className={styles.nav}>
             {headerMenu.map((item, i) => {
               let _interval = 0;

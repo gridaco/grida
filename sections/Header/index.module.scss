@@ -43,6 +43,19 @@
   display: inline-block;
 }
 
+.logo {
+  float: left;
+  margin: 22px 0;
+  margin-right: 88px;
+}
+
+.xs_logo {
+  float: left;
+  display: block;
+  margin: 12px 0;
+  margin-right: 24px;
+}
+
 @include md {
   .header {
     width: $inner-container-desktop;
@@ -61,16 +74,43 @@
   .sub_nav {
     width: 127px;
   }
+
+  .logo {
+    display: none;
+  }
+
+  .xs_logo {
+    display: block;
+  }
 }
 
 @include xs {
- 
-}
+  .header_container {
+    height: 60px;
+  }
 
+  .header {
+    width: $inner-container-small-mobile;
 
+    img {
+      width: 36px;
+    }
+  }
 
-.logo {
-  float: left;
-  margin: 22px 0;
-  margin-right: 88px;
+  .nav {
+    display: none;
+  }
+
+  .sub_nav {
+    display: none;
+  }
+
+  .logo {
+    display: none;
+  }
+
+  .xs_logo {
+    display: block;
+  }
+
 }
