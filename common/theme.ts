@@ -21,17 +21,23 @@ theme.typography.h1 = {
   fontWeight: 900,
   fontSize: '112px',
   lineHeight: '100%',
-  // fontFamily: 'Roboto',
 
   [theme.breakpoints.down('md')]: {
     fontWeight: 900,
     fontSize: '76px',
     lineHeight: '100%',
   },
-  [theme.breakpoints.down('xs')]: {
+  [theme.breakpoints.down('sm')]: {
     fontWeight: 900,
     fontSize: '64px',
     lineHeight: '100%',
+  },
+  [theme.breakpoints.down('xs')]: {
+    fontWeight: 900,
+    fontSize: '36px',
+    lineHeight: '100%',
+
+    letterSpacing: '0.01em',
   },
 };
 
@@ -44,9 +50,14 @@ theme.typography.h2 = {
     fontSize: '64px',
     lineHeight: '100%',
   },
-  [theme.breakpoints.down('xs')]: {
+  [theme.breakpoints.down('sm')]: {
     fontWeight: 'bold',
     fontSize: '48px',
+    lineHeight: '100%',
+  },
+  [theme.breakpoints.down('xs')]: {
+    fontWeight: 'bold',
+    fontSize: '36px',
     lineHeight: '100%',
   },
 };
@@ -60,10 +71,15 @@ theme.typography.h3 = {
     fontSize: '48px',
     lineHeight: '56px',
   },
-  [theme.breakpoints.down('xs')]: {
+  [theme.breakpoints.down('sm')]: {
     fontWeight: 500,
     fontSize: '36px',
     lineHeight: '42px',
+  },
+  [theme.breakpoints.down('xs')]: {
+    fontWeight: 500,
+    fontSize: '32px',
+    lineHeight: '37px',
   },
 };
 
@@ -76,10 +92,15 @@ theme.typography.h4 = {
     fontSize: '48px',
     lineHeight: '56px',
   },
-  [theme.breakpoints.down('xs')]: {
+  [theme.breakpoints.down('sm')]: {
     fontWeight: 900,
     fontSize: '36px',
     lineHeight: '42px',
+  },
+  [theme.breakpoints.down('xs')]: {
+    fontWeight: 900,
+    fontSize: '32px',
+    lineHeight: '37px',
   },
 };
 
@@ -91,6 +112,11 @@ theme.typography.h5 = {
     fontWeight: 900,
     fontSize: '36px',
     lineHeight: '42px',
+  },
+  [theme.breakpoints.down('sm')]: {
+    fontWeight: 900,
+    fontSize: '24px',
+    lineHeight: '28px',
   },
   [theme.breakpoints.down('xs')]: {
     fontWeight: 900,
@@ -106,6 +132,11 @@ theme.typography.h6 = {
   [theme.breakpoints.down('md')]: {
     fontWeight: 500,
     fontSize: '36px',
+    lineHeight: '135%',
+  },
+  [theme.breakpoints.down('sm')]: {
+    fontWeight: 500,
+    fontSize: '24px',
     lineHeight: '135%',
   },
   [theme.breakpoints.down('xs')]: {
@@ -124,6 +155,11 @@ theme.typography.subtitle1 = {
     fontSize: '21px',
     lineHeight: '25px',
   },
+  [theme.breakpoints.down('sm')]: {
+    fontWeight: 'bold',
+    fontSize: '18px',
+    lineHeight: '21px',
+  },
   [theme.breakpoints.down('xs')]: {
     fontWeight: 'bold',
     fontSize: '18px',
@@ -140,10 +176,15 @@ theme.typography.subtitle2 = {
     fontSize: '18px',
     lineHeight: '21px',
   },
-  [theme.breakpoints.down('xs')]: {
+  [theme.breakpoints.down('sm')]: {
     fontWeight: 'bold',
     fontSize: '21px',
     lineHeight: '25px',
+  },
+  [theme.breakpoints.down('xs')]: {
+    fontWeight: 'bold',
+    fontSize: '14px',
+    lineHeight: '16px',
   },
 };
 
@@ -155,6 +196,11 @@ theme.typography.body1 = {
     fontWeight: 500,
     fontSize: '18px',
     lineHeight: '21px',
+  },
+  [theme.breakpoints.down('sm')]: {
+    fontWeight: 500,
+    fontSize: '12px',
+    lineHeight: '14px',
   },
   [theme.breakpoints.down('xs')]: {
     fontWeight: 500,
@@ -171,6 +217,11 @@ theme.typography.body2 = {
     fontWeight: 'normal',
     fontSize: '18px',
     lineHeight: '21px',
+  },
+  [theme.breakpoints.down('sm')]: {
+    fontWeight: 'normal',
+    fontSize: '11px',
+    lineHeight: '13px',
   },
   [theme.breakpoints.down('xs')]: {
     fontWeight: 'normal',
@@ -190,6 +241,12 @@ theme.typography.button = {
     lineHeight: '28px',
     fontVariant: 'small-caps',
   },
+  [theme.breakpoints.down('sm')]: {
+    fontWeight: 500,
+    fontSize: '14px',
+    lineHeight: '16px',
+    fontVariant: 'small-caps',
+  },
   [theme.breakpoints.down('xs')]: {
     fontWeight: 500,
     fontSize: '14px',
@@ -207,6 +264,11 @@ theme.typography.caption = {
     fontSize: '12px',
     lineHeight: '14px',
   },
+  [theme.breakpoints.down('sm')]: {
+    fontWeight: 'normal',
+    fontSize: '10px',
+    lineHeight: '12px',
+  },
   [theme.breakpoints.down('xs')]: {
     fontWeight: 'normal',
     fontSize: '10px',
@@ -223,6 +285,12 @@ theme.typography.overline = {
     fontWeight: 500,
     fontSize: '11px',
     lineHeight: '13px',
+    fontVariant: 'small-caps',
+  },
+  [theme.breakpoints.down('sm')]: {
+    fontWeight: 500,
+    fontSize: '10px',
+    lineHeight: '12px',
     fontVariant: 'small-caps',
   },
   [theme.breakpoints.down('xs')]: {
