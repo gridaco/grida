@@ -20,7 +20,7 @@
 }
 
 .inner_container {
-  width: 1024px;
+  width: $inner-container-widescreen;
   margin: 0 auto;
 }
 
@@ -37,6 +37,18 @@
 
 @include md {
   .inner_container {
-    width: 876px;
+    width: $inner-container-desktop;
+  }
+}
+
+@include sm {
+  .inner_container {
+    width: $inner-container-mobile;
+  }
+}
+
+@include xs {
+  .inner_container {
+    width: $inner-container-small-mobile;
   }
 }

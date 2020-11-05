@@ -23,7 +23,7 @@ const FeatureCodegen = () => {
         <div className={styles.sub_title_box}>
           <Text
             algin="left"
-            variant="h5"
+            variant="h6"
             className={styles.sub_title_first}
             value={featureCodegenContents.subTitleFirst()}
           />

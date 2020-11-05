@@ -13,7 +13,7 @@ import { heroContents } from './toolkit';
 const Hero = () => {
   return (
     <>
-      <div style={{ margin: '0 240px' }}>
+      <div className={styles.title_box}>
         <Text
           algin="center"
           variant="h1"
@@ -34,8 +34,6 @@ const Hero = () => {
           />
         </div>
       </div>
-
-      <img src="" />
     </>
   );
 };
