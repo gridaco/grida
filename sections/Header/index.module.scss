@@ -1,6 +1,5 @@
 @import '../../styles/variables.scss';
 
-
 .header_container {
   width: 100vw;
   height: 100px;
@@ -9,7 +8,7 @@
   // padding: 0 328px;
   background: rgba(11, 6, 69, 0.8);
   text-align: center;
-  border-bottom: 1px solid rgba($color: #3A3390, $alpha: 0.2);
+  border-bottom: 1px solid rgba($color: #3a3390, $alpha: 0.2);
   backdrop-filter: blur(64px);
   z-index: 999;
   overflow-x: scroll;
@@ -19,7 +18,6 @@
   width: $inner-container-widescreen;
   margin: 0 auto;
 }
-
 
 .nav {
   float: left;
@@ -35,7 +33,6 @@
   margin-top: 38px;
   margin-bottom: 37px;
   margin-right: 0;
-
 }
 
 .menu {
@@ -51,7 +48,7 @@
 
 .xs_logo {
   float: left;
-  display: block;
+  display: none;
   margin: 12px 0;
   margin-right: 24px;
 }
@@ -112,5 +109,4 @@
   .xs_logo {
     display: block;
   }
-
 }
