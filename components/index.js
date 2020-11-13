@@ -1,9 +1,9 @@
 import CustomButton from "./CustomButton";
 import Text from "./Text";
-import CustomDrawer from './CustomDrawer'
+import XsNav from "./XsNav";
 
 export {
   CustomButton,
   Text,
-  CustomDrawer
+  XsNav
 };

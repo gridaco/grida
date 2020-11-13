@@ -9,7 +9,6 @@ export default function Home() {
   return (
     <div className={styles.container}>
       <Head>
-        {/* region seo optimizations */}
         <title> bridged.xyz </title>
         <meta
           name="description"
@@ -23,7 +22,6 @@ export default function Home() {
           name="author"
           content="bridged.xyz team and community collaborators"
         />
-        {/* region seo optimizations */}
         <link rel="icon" href="/favicon.png" />
         <link
           href="https://fonts.googleapis.com/css?family=Roboto:400,100,300,100italic,300italic,400italic,500italic,500,700,700italic,900,900italic"
@@ -36,13 +34,7 @@ export default function Home() {
           <Header />
           {sections.map((item) => {
             return (
-              <div
-                style={{
-                  marginTop: '300px',
-                }}
-              >
-                {item.content}
-              </div>
+              <div className={styles.section_container}>{item.content}</div>
             );
           })}
         </main>

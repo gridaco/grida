@@ -44,7 +44,7 @@ export interface TextTypes {
   value: any;
 }
 
-export interface CustomDrawerTypes {
+export interface XsNavTypes {
   visible: boolean;
   setVisible: any;
 }
