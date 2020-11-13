@@ -25,13 +25,6 @@ const Hero = () => {
         </div>
 
         <div style={{ textAlign: 'center', marginTop: '41px' }}>
-          {/* <CustomButton
-            variant="contained"
-            href={BRIDGED_COMMUNITY_FLUTTER}
-            value="GET STARTED"
-            type="default"
-            className={home.btn}
-          /> */}
           <Button
             variant="contained"
             href={BRIDGED_COMMUNITY_FLUTTER}
