@@ -43,3 +43,8 @@ export interface TextTypes {
   style?: CSSProperties;
   value: any;
 }
+
+export interface XsNavTypes {
+  visible: boolean;
+  setVisible: any;
+}
