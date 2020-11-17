@@ -13,7 +13,6 @@
   -moz-backdrop-filter: blur(64px);
 
   z-index: 999;
-  overflow-x: scroll;
 }
 
 .header {
@@ -50,6 +49,7 @@
   float: left;
   margin: 22px 0;
   margin-right: 88px;
+  cursor: pointer;
 }
 
 .xs_logo {
@@ -57,6 +57,7 @@
   display: none;
   margin: 12px 0;
   margin-right: 24px;
+  cursor: pointer;
 }
 
 .drawer {
@@ -66,7 +67,6 @@
     width: 100vw;
     height: 60px;
     padding: 0 16px;
-
   }
 
   .navbar {
@@ -87,7 +87,6 @@
     margin-bottom: 36px;
     text-align: center;
     padding: 0 16px;
-
   }
 
   .btn {
@@ -98,7 +97,6 @@
     padding-bottom: 19px;
   }
 }
-
 
 @include md {
   .header {

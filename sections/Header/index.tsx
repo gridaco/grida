@@ -20,11 +20,15 @@ const Header = () => {
     <>
       <div className={styles.header_container}>
         <div className={styles.header}>
-          <div className={styles.logo}>
-            <img src={logoWhite} />
+          <div className={styles.logo} onClick={() => (location.href = '/')}>
+            <img src={logoWhite} alt="bridged.xyz_logo" />
           </div>
-          <div className={styles.xs_logo} style={{ width: '36px' }}>
-            <img src={xsLogoWhite} />
+          <div
+            className={styles.xs_logo}
+            style={{ width: '36px' }}
+            onClick={() => (location.href = '/')}
+          >
+            <img src={xsLogoWhite} alt="bridged.xyz_miniLogo" />
           </div>
 
           <div className={styles.nav}>
