@@ -79,6 +79,8 @@ class _CustomPainterDraggableState extends State<CustomPainterDraggable> {
           painter: RectanglePainter(
               rect: Rect.fromLTWH(xPos, yPos, width, height), image: _image),
           child: Container(),
+          isComplex: true,
+            willChange: true,
         ),
       ),
     );
@@ -99,7 +101,7 @@ class RectanglePainter extends CustomPainter {
 
   drawImage(Canvas canvas) {
     if (image != null) {
-      for (var i = 0; i < 0; i ++){
+      for (var i = 0; i < 100; i ++){
         canvas.drawImage(image, new Offset(0.0, 0.0), new Paint());
       }
     }

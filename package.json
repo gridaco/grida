@@ -1,0 +1,7 @@
+{
+    "name": "bridged",
+    "private": true,
+    "workspaces": [
+        "packages/*"
+    ]
+}
