@@ -1,6 +1,28 @@
+@import '../../styles/variables.scss';
+
+.title_box {
+  margin: 0 240px;
+}
+
+@include md {
+  .title_box {
+    margin: 0 74px;
+  }
+}
+
+@include sm {
+  .title_box {
+    margin: 0 24px;
+  }
+}
+
+@include xs {
+  .title_box {
+    margin: 0 24px;
+  }
+}
+
 .sub_title {
   color: #A0BBFF;
   margin-top: 36px;
 }
-
-

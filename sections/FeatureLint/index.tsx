@@ -18,14 +18,12 @@ const FeatureLint = () => {
           value={featureLintContents.title()}
         />
         <Text
-          variant="h4"
+          variant="h6"
           className={styles.sub_title}
           value={featureLintContents.subTitle()}
         />
       </div>
-      <div>
         <img style={{ width: '100vw' }} src={videoTestImage} />
-      </div>
     </>
   );
 };

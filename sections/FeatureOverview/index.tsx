@@ -12,11 +12,11 @@ import { featureOverviewContents } from './toolkit';
 const FeatureOverview = () => {
   return (
     <>
-      <div className={styles.code_background}>
+      {/* <div style={{ width: '100vw' }}>
         <img src={codeBg} />
-      </div>
+      </div> */}
 
-      <div className={styles.grid_container}></div>
+      {/* <div className={styles.grid_container}></div> */}
 
       <div className={home.inner_container}>
         <Text

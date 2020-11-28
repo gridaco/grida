@@ -4,8 +4,26 @@
   width: 768px;
 }
 
+@include md {
+  .title_box {
+    width: 657px;
+  }
+}
+
+@include sm {
+  .title_box {
+    width: 540px;
+  }
+}
+
+@include xs {
+  .title_box {
+    width: 252px;
+  }
+}
+
 .title {
-  color: $light-grey-pink;
+  color: $light-pink;
 
   em {
     font-style: normal;
