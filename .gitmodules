@@ -1,0 +1,3 @@
+[submodule "packages/console.bridged.xyz"]
+	path = packages/console.bridged.xyz
+	url = https://github.com/bridgedxyz/console.bridged.xyz
