@@ -1,4 +1,10 @@
-import { Typography, Button } from '@material-ui/core';
+import {
+  Typography,
+  Button,
+  CardMedia,
+  Card,
+  CardActionArea,
+} from '@material-ui/core';
 import React from 'react';
 import { CustomButton, Text } from '../../components';
 // @ts-ignore
@@ -33,6 +39,15 @@ const Hero = () => {
           >
             <Text variant="button" value="GET STARTED" />
           </Button>
+        </div>
+        <div className={styles.video}>
+          <iframe
+            className={styles.video}
+            src="https://www.youtube.com/embed/RIZjZFoDhRc?controls=0"
+            // frameborder="0"
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+            // allowfullscreen
+          ></iframe>
         </div>
       </div>
     </>

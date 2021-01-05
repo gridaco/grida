@@ -4,9 +4,22 @@
   margin: 0 240px;
 }
 
+.video {
+  margin: 0 auto;
+  margin-top: 120px;
+  width: 1066px;
+  height: 666px;
+}
+
 @include md {
   .title_box {
     margin: 0 74px;
+  }
+
+  .video {
+    margin-top: 101px;
+    width: 870px;
+    height: 543px;
   }
 }
 
@@ -14,11 +27,21 @@
   .title_box {
     margin: 0 24px;
   }
+
+  .video {
+    width: 768px;
+    height: 511px;
+  }
 }
 
 @include xs {
   .title_box {
     margin: 0 24px;
+  }
+
+  .video {
+    // width: calc(100vw - 32px);
+    // height: 215px;
   }
 }
 
