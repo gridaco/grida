@@ -105,8 +105,8 @@ const Header = () => {
                 </div>
                 <List>
                   {headerMenu.map((item) => (
-                    <div className={styles.navbar}>
-                      <Link href={item.href} key={item.href}>
+                    <div className={styles.navbar} key={item.href}>
+                      <Link href={item.href}>
                         <Text
                           variant="subtitle1"
                           value={item.label}
@@ -117,8 +117,8 @@ const Header = () => {
                     </div>
                   ))}
                   {headerSubMenu.map((item) => (
-                    <div className={styles.navbar}>
-                      <Link href={item.href} key={item.href}>
+                    <div className={styles.navbar} key={item.href}>
+                      <Link href={item.href}>
                         <Text
                           variant="subtitle1"
                           value={item.label}
