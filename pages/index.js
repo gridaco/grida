@@ -34,7 +34,9 @@ export default function Home() {
           <Header />
           {sections.map((item) => {
             return (
-              <div className={styles.section_container}>{item.content}</div>
+              <div className={styles.section_container} key={item.content}>
+                {item.content}
+              </div>
             );
           })}
         </main>
