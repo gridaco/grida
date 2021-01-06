@@ -14,7 +14,6 @@ import styles from './index.module.scss';
 import home from '../../styles/Home.module.scss';
 import { BRIDGED_COMMUNITY_FLUTTER } from '../../common/toolkit';
 import { heroContents } from './toolkit';
-import { VideoPlayer } from '../Hero/videoPlayer';
 
 // @ts-ignore
 import videoPreview from '../../images/hero-video-preview.png';
