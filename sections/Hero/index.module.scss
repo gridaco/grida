@@ -4,6 +4,12 @@
   margin: 0 240px;
 }
 
+.sub_title {
+  color: #A0BBFF;
+  margin-top: 36px;
+}
+
+
 .video_player_wrapper {
   margin-top: 120px;
   cursor: pointer;
@@ -17,8 +23,6 @@
   margin: 0 auto;
 
 }
-
-
 
 .video_play {
   position: absolute;
@@ -49,15 +53,16 @@
   }
 
   .youtube_player_wrapper {
+    width: 100%;
     margin: 0 auto;
     position: absolute;
     bottom: 0;
-    right: 0;
     left: 0;
     top: 0;
     display: flex;
     align-items: center;
     justify-content: center;
+
     border: 0;
   }
 
@@ -68,18 +73,17 @@
     z-index: 999;
   }
 
-  iframe {
+  .youtube_iframe {
     border: 0;
-
-    @media (max-width: 640px) {
-      margin: 0 32px;
-    }
+    width: 90vw;
+    height: 50.625vw;
   }
 }
 
 
 @include md {
   .title_box {
+
     margin: 0 74px;
   }
 
@@ -96,11 +100,12 @@
     width: 164px;
     height: 164px;
   }
+
 }
 
 @include sm {
   .title_box {
-    margin: 0 24px;
+    margin: 0;
   }
 
   .video {
@@ -128,10 +133,4 @@
     width: 56px;
     height: 56px;
   }
-
-}
-
-.sub_title {
-  color: #A0BBFF;
-  margin-top: 36px;
 }

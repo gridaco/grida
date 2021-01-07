@@ -88,6 +88,7 @@ const Hero = () => {
             </div>
             <div className={styles.youtube_player_wrapper}>
               <iframe
+                className={styles.youtube_iframe}
                 width="640"
                 height="360"
                 src="https://www.youtube.com/embed/RIZjZFoDhRc?autoplay=1&mute=1&allowfullscreen=1"
