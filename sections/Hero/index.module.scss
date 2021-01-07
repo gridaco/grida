@@ -1,14 +1,16 @@
 @import '../../styles/variables.scss';
 
 .title_box {
-  margin: 0 240px;
+  .title {
+    width: 1190px;
+    margin: 0 auto;
+  }
 }
 
 .sub_title {
   color: #A0BBFF;
   margin-top: 36px;
 }
-
 
 .video_player_wrapper {
   margin-top: 120px;
@@ -21,7 +23,6 @@
   height: 666px;
   position: relative;
   margin: 0 auto;
-
 }
 
 .video_play {
@@ -81,11 +82,21 @@
 }
 
 
+@include lg {
+  .title_box {
+    .title {
+      width: 1023px;
+    }
+  }
+}
+
 @include md {
   .title_box {
-
-    margin: 0 74px;
+    .title {
+      width: 876px;
+    }
   }
+
 
   .video_player_wrapper {
     margin-top: 101px;
@@ -105,7 +116,9 @@
 
 @include sm {
   .title_box {
-    margin: 0;
+    .title {
+      width: 720px;
+    }
   }
 
   .video {
@@ -121,7 +134,9 @@
 
 @include xs {
   .title_box {
-    margin: 0 24px;
+    .title {
+      width: 343px;
+    }
   }
 
   .video {

@@ -35,6 +35,7 @@ const Hero = () => {
           algin="center"
           variant="h1"
           value={heroContents.title()}
+          className={styles.title}
           style={{ color: '#FFF' }}
         />
         <div className={styles.sub_title}>

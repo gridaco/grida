@@ -27,6 +27,13 @@ $inner-container-mobile: 720px;
 $inner-container-desktop: 876px;
 $inner-container-widescreen: 1024px;
 
+
+@mixin lg {
+  @media (min-width: #{$breakpoint-widescreen }) {
+    @content
+  }
+}
+
 @mixin md {
   @media (min-width: #{$breakpoint-desktop})and (max-width : #{$breakpoint-widescreen - 1px}) {
     @content;
