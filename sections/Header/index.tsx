@@ -25,7 +25,7 @@ const Header = () => {
           </div>
           <div
             className={styles.xs_logo}
-            style={{ width: '36px' }}
+            style={{ width: '56px' }}
             onClick={() => (location.href = '/')}
           >
             <img src={xsLogoWhite} alt="bridged.xyz_miniLogo" />
