@@ -1,7 +1,13 @@
-import '../styles/globals.css'
+import { useEffect } from 'react';
+import { analytics } from '../utils/firebase';
+import '../styles/globals.css';
 
 function MyApp({ Component, pageProps }) {
-  return <Component {...pageProps} />
+  useEffect(() => {
+    analytics();
+  }, []);
+
+  return <Component {...pageProps} />;
 }
 
-export default MyApp
+export default MyApp;
