@@ -9,7 +9,7 @@ const config = {
   storageBuket: process.env.FIREBASE_STORAGE_BUKET,
   messagingSenderId: process.env.FIREBASE_MESSAGING_SENDER_ID,
   apId: process.env.FIREBASE_APP_ID,
-  measurementId: process.env.FIREBASE_MEASYREMENT_ID,
+  measurementId: process.env.FIREBASE_MEASUREMENT_ID,
 };
 
 if (!firebase.apps.length) {
@@ -19,3 +19,4 @@ if (!firebase.apps.length) {
 const analytics = firebase.analytics;
 
 export { firebase, analytics };
+
