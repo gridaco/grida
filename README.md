@@ -6,7 +6,7 @@
 
 - [join slack](https://github.com/bridgedxyz/contributing-and-license#general-contribution) and develop with community
 - [general contribution guideline](https://github.com/bridgedxyz/contributing-and-license)
-- [raodmap](https://github.com/bridgedxyz/roadmap)
+- [roadmap](https://github.com/bridgedxyz/roadmap)
 
 ## Design
 
