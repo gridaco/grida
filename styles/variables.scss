@@ -15,6 +15,7 @@ $sky-blue: #a0bbff;
 
 $light-purple: #beb8ff;
 $vivid-blue: #0038ff;
+$cobalt-blue: #2562FF;
 $point-yellow: #ffb800;
 $point-orange: #ff9e45;
 
@@ -28,9 +29,10 @@ $inner-container-desktop: 876px;
 $inner-container-widescreen: 1024px;
 
 
+
 @mixin lg {
   @media (min-width: #{$breakpoint-widescreen }) {
-    @content
+    @content;
   }
 }
 
