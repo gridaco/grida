@@ -27,13 +27,7 @@ const FeatureEngine = () => {
           <Text
             variant="h6"
             className={styles.sub_title}
-            value={featureEngineContents.subTitleFirst()}
-          />
-          <Text
-            variant="h6"
-            className={styles.sub_title}
-            style={{ marginTop: '40px' }}
-            value={featureEngineContents.subTitleSecond()}
+            value={featureEngineContents.subTitle()}
           />
         </div>
         <div>
@@ -44,10 +38,7 @@ const FeatureEngine = () => {
         <img src={featureEngineGraphic} className={styles.graphic} />
       </div>
       <div>
-        <img
-          src={xlFeatureEngineGraphic}
-          className={styles.xl_graphic}
-        />
+        <img src={xlFeatureEngineGraphic} className={styles.xl_graphic} />
       </div>
     </>
   );

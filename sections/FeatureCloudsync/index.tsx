@@ -32,9 +32,12 @@ const FeatureCloudSync = () => {
           style={{ margin: '24px 0 79px 0x' }}
           value={featureCloudSyncContents.subTitleSecond()}
         />
-        <img src={updateBtnWithPhone} style={{ width: '100%' }} />
+        <img
+          src={updateBtnWithPhone}
+          className={styles.cloudSync_img}
+          style={{ width: '100%' }}
+        />
       </div>
-      <div></div>
     </>
   );
 };

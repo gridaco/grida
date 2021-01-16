@@ -1,5 +1,4 @@
 import {
-  Header,
   Hero,
   FeatureOverview,
   FeatureCloudSync,
@@ -8,15 +7,17 @@ import {
   FeatureInstant,
   FooterCta,
   FooterPunchline,
+  FeatureManageableWork,
 } from '../sections';
 
 export const sections = [
   { content: <Hero /> },
   { content: <FeatureOverview /> },
+  { content: <FeatureInstant /> },
   { content: <FeatureCloudSync /> },
   { content: <FeatureEngine /> },
   { content: <FeatureLint /> },
-  { content: <FeatureInstant /> },
+  { content: <FeatureManageableWork /> },
   { content: <FooterPunchline /> },
   { content: <FooterCta /> },
 ];
