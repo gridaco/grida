@@ -1,3 +1,5 @@
+@import '../../styles/variables.scss';
+
 .title {
   color: #fff;
 }
@@ -6,4 +8,24 @@
   margin-top: 53px;
   margin-bottom: 100px;
   color: #fff;
+}
+
+.xl_graphic {
+  display: none;
+  width: 100vw;
+}
+
+.graphic {
+  display: block;
+  width: 100%;
+}
+
+@include xl {
+  .xl_graphic {
+    display: inline;
+  }
+
+  .graphic {
+    display: none;
+  }
 }

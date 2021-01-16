@@ -2,7 +2,9 @@ import { Link } from '@material-ui/core';
 import React from 'react';
 import { Text } from '../../components';
 // @ts-ignore
-import featureEngineGraphic from '../../images/feature_engine_graphic.svg';
+import xlFeatureEngineGraphic from '../../images/feature_engine_graphic_xl.svg';
+// @ts-ignore
+import featureEngineGraphic from '../../images/feature_engine_graphic.png';
 // @ts-ignore
 import styles from './index.module.scss';
 // @ts-ignore
@@ -39,9 +41,13 @@ const FeatureEngine = () => {
             <Text algin="left" variant="h6" value="Learn more about engine" />
           </Link>
         </div>
+        <img src={featureEngineGraphic} className={styles.graphic} />
       </div>
-      <div >
-        <img src={featureEngineGraphic} style={{ width: '100vw' }}/>
+      <div>
+        <img
+          src={xlFeatureEngineGraphic}
+          className={styles.xl_graphic}
+        />
       </div>
     </>
   );
