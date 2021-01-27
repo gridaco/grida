@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-// import { analytics } from '../utils/firebase';
+import { analytics } from '../utils/firebase';
 import '../styles/globals.css';
 
 function MyApp({ Component, pageProps }) {
