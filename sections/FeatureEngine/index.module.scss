@@ -1,9 +1,62 @@
+@import '../../styles/variables.scss';
+
 .title {
-  color: #fff;
+  color: $point-orange;
 }
 
 .sub_title_box {
   margin-top: 53px;
   margin-bottom: 100px;
-  color: #fff;
+
+  .sub_title {
+    color: $sky-blue;
+
+    .sub_title_point {
+      color: $point-yellow;
+    }
+  }
+}
+
+.xl_graphic {
+  display: none;
+  width: 100vw;
+}
+
+.graphic {
+  display: block;
+  width: 100%;
+}
+
+@include xl {
+  .xl_graphic {
+    display: inline;
+  }
+
+  .graphic {
+    display: none;
+  }
+}
+
+@include lg {
+  .graphic {
+    margin-top: 240px;
+  }
+}
+
+@include md {
+  .graphic {
+    margin-top: 200px;
+  }
+}
+
+@include sm {
+  .graphic {
+    margin-top: 160px;
+  }
+}
+
+@include xs {
+  .graphic {
+    margin-top: 106px;
+  }
 }

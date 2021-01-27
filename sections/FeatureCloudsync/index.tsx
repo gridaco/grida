@@ -17,8 +17,7 @@ const FeatureCloudSync = () => {
           className={styles.title}
           value={featureCloudSyncContents.title()}
         />
-      </div>
-      <div className={home.inner_container} style={{ color: '#fff' }}>
+
         <Text
           algin="left"
           variant="h6"
@@ -33,9 +32,11 @@ const FeatureCloudSync = () => {
           style={{ margin: '24px 0 79px 0x' }}
           value={featureCloudSyncContents.subTitleSecond()}
         />
-      </div>
-      <div>
-        <img src={updateBtnWithPhone} style={{ width: '100vw' }}/>
+        <img
+          src={updateBtnWithPhone}
+          className={styles.cloudSync_img}
+          style={{ width: '100%' }}
+        />
       </div>
     </>
   );

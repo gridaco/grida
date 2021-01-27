@@ -1,3 +1,6 @@
+// @ts-ignore
+import styles from './index.module.scss';
+
 export const featureCloudSyncContents = {
   title: () => {
     return (
@@ -10,7 +13,12 @@ export const featureCloudSyncContents = {
     );
   },
   subTitleFirst: () => {
-    return <>Your design is your server</>;
+    return (
+      <>
+        Your design is
+        <i style={{ fontStyle: 'normal', color: '#ffb800' }}> your server</i>
+      </>
+    );
   },
   subTitleSecond: () => {
     return (
