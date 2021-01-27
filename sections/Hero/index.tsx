@@ -52,6 +52,7 @@ const Hero = () => {
             <Text variant="button" value="GET STARTED" />
           </Button>
         </div>
+
         <div className={styles.video_player_wrapper}>
           <div className={styles.video}>
             <img

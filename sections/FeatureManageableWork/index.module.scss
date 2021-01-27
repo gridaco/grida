@@ -1,0 +1,40 @@
+@import '../../styles/variables.scss';
+
+
+.title {
+  color: #fff;
+}
+
+.subTitle_box {
+  margin-top: 72px;
+}
+
+.subTitle {
+  color: $sky-blue;
+}
+
+@include lg {
+  .subTitle_box {
+    width: 768px;
+  }
+}
+
+
+@include md {
+  .subTitle_box {
+    width: 657px;
+    margin-top: 42px;
+  }
+}
+
+@include sm {
+  .subTitle_box {
+    margin-top: 70px;
+  }
+}
+
+@include xs {
+  .subTitle_box {
+    margin-top: 30px;
+  }
+}
