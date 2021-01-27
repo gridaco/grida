@@ -11,7 +11,7 @@
 .main {
   flex: 1;
   width: 100%;
-  background-color: #0b0645;
+  background-color: $indigo-600;
   display: flex;
   flex-direction: column;
   justify-content: center;
@@ -28,7 +28,7 @@
 }
 
 .btn {
-  background-color: #EE1347 !important;
+  background-color: $cobalt-blue !important;
   border-radius: 140px !important;
   color: #fff !important;
   padding: 21px 44px !important;
@@ -45,7 +45,6 @@
       margin-top: 200px;
     }
   }
-
 }
 
 @include sm {
