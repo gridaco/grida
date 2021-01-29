@@ -1,6 +1,11 @@
 import { BLOG, GITHUB } from '../../common/toolkit';
 
-export const headerMenu = [
+interface INavMenu{
+  label: string
+  href: string
+}
+
+export const headerMenu :INavMenu[]= [
   {
     label: 'Reflect',
     href: 'https://reflect.bridged.xyz',
@@ -16,7 +21,7 @@ export const headerMenu = [
   },
 ];
 
-export const headerSubMenu = [
+export const headerSubMenu: INavMenu[] = [
   {
     label: 'Blog',
     href: 'https://medium.com/bridgedxyz',

@@ -13,6 +13,7 @@ import { Text } from '../../components';
 import MenuIcon from '@material-ui/icons/Menu';
 import ClearIcon from '@material-ui/icons/Clear';
 import { BRIDGED_COMMUNITY_FLUTTER } from '../../common/toolkit';
+import { SignupMvpButton } from '../../components/signup/signup.mvp';
 
 const Header = () => {
   const [visible, setVisible] = useState(false);
@@ -62,6 +63,7 @@ const Header = () => {
                 </Link>
               );
             })}
+            <SignupMvpButton />
           </div>
 
           <div className={styles.xs_nav}>
