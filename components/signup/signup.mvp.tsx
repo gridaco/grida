@@ -10,13 +10,19 @@ export const MVP_SIGNUP_TYPEFORM_URL =
  * this component is for temporary use until bridged's services api gets to release accounts and authentication service online.
  * @returns
  */
-export function SignupMvpButton(buttonStyle: any) {
+
+interface SignupMvpButtonProps {
+  value: string;
+  style: CSSProperties;
+}
+export function SignupMvpButton({ value, style }: SignupMvpButtonProps) {
   const onclick = () => {
     open(MVP_SIGNUP_TYPEFORM_URL);
   };
+
   return (
-    <Button onClick={onclick} variant="contained" style={buttonStyle.style}>
-      <Text variant="button" value="SIGNUP" />
+    <Button onClick={onclick} variant="contained" style={style}>
+      <Text variant="button" value={value} />
     </Button>
   );
 }

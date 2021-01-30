@@ -62,7 +62,7 @@ const Header = () => {
               );
             })}
             <SignupMvpButton
-              child="signup"
+              value="signup"
               style={{
                 fontSize: '16px',
                 backgroundColor: '#2562FF',
@@ -138,7 +138,7 @@ const Header = () => {
                   ))}
                   <div className={styles.btn_box}>
                     <SignupMvpButton
-                      child="SIGNUP"
+                      value="SIGNUP"
                       style={{
                         width: '100%',
                         backgroundColor: '#2562FF',
