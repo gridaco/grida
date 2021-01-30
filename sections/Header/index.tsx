@@ -50,20 +50,25 @@ const Header = () => {
           </div>
           <div className={styles.sub_nav}>
             {headerSubMenu.map((item, i) => {
-              let _interval = 0;
-              if (i !== 0) _interval = 44;
               return (
                 <Link href={item.href} key={i}>
                   <Text
                     className={styles.menu}
                     variant="subtitle1"
-                    style={{ marginLeft: `${_interval}px` }}
+                    style={{ marginRight: '44px' }}
                     value={item.label}
                   />
                 </Link>
               );
             })}
-            <SignupMvpButton />
+            <SignupMvpButton
+              style={{
+                backgroundColor: '#2562FF',
+                borderRadius: '140px',
+                color: '#fff',
+                marginTop: '-6px',
+              }}
+            />
           </div>
 
           <div className={styles.xs_nav}>
@@ -93,7 +98,6 @@ const Header = () => {
                   <Button
                     onClick={() => {
                       setVisible(!visible);
-                      console.log(visible);
                     }}
                     style={{
                       float: 'right',
@@ -131,6 +135,17 @@ const Header = () => {
                     </div>
                   ))}
                   <div className={styles.btn_box}>
+                    <SignupMvpButton
+                      style={{
+                        width: '100%',
+                        backgroundColor: '#2562FF',
+                        borderRadius: '140px',
+                        color: '#fff',
+                        paddingTop: '19px',
+                        paddingBottom: '19px',
+                        marginBottom: '1rem',
+                      }}
+                    />
                     <Button
                       variant="contained"
                       href={BRIDGED_COMMUNITY_FLUTTER}
