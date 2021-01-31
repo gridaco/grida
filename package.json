@@ -1,37 +1,38 @@
 {
-  "name": "bridged.xyz",
-  "version": "0.1.0",
-  "private": true,
-  "scripts": {
-    "postinstall": "tsc",
-    "dev": "next dev",
-    "build": "next build",
-    "start": "next start"
-  },
-  "dependencies": {
-    "@material-ui/core": "^4.11.0",
-    "@material-ui/icons": "^4.9.1",
-    "@zeit/next-sass": "^1.0.1",
-    "axios": "^0.21.1",
-    "firebase": "^8.0.0",
-    "fontsource-roboto": "^3.0.3",
-    "framer-motion": "^2.9.4",
-    "fs": "^0.0.1-security",
-    "globby": "^11.0.2",
-    "next": "9.5.5",
-    "next-images": "^1.6.0",
-    "node-sass": "^4.14.1",
-    "prettier": "^2.2.1",
-    "react": "16.14.0",
-    "react-dom": "16.14.0",
-    "react-markdown": "^5.0.3",
-    "yarn.lock": "^0.0.1-security"
-  },
-  "devDependencies": {
-    "@types/node": "^14.11.10",
-    "@types/react": "^16.9.53",
-    "eslint-config-airbnb": "^18.2.0",
-    "eslint-config-prettier": "^6.14.0",
-    "typescript": "^4.0.3"
-  }
+    "name": "bridged.xyz",
+    "version": "0.1.0",
+    "private": true,
+    "scripts": {
+        "postinstall": "tsc",
+        "dev": "next dev",
+        "build": "next build",
+        "start": "next start",
+        "sitemap": "./sitemap.sh"
+    },
+    "dependencies": {
+        "@material-ui/core": "^4.11.0",
+        "@material-ui/icons": "^4.9.1",
+        "@zeit/next-sass": "^1.0.1",
+        "axios": "^0.21.1",
+        "firebase": "^8.0.0",
+        "fontsource-roboto": "^3.0.3",
+        "framer-motion": "^2.9.4",
+        "fs": "^0.0.1-security",
+        "globby": "^11.0.2",
+        "next": "9.5.5",
+        "next-images": "^1.6.0",
+        "node-sass": "^4.14.1",
+        "prettier": "^2.2.1",
+        "react": "16.14.0",
+        "react-dom": "16.14.0",
+        "react-markdown": "^5.0.3",
+        "yarn.lock": "^0.0.1-security"
+    },
+    "devDependencies": {
+        "@types/node": "^14.11.10",
+        "@types/react": "^16.9.53",
+        "eslint-config-airbnb": "^18.2.0",
+        "eslint-config-prettier": "^6.14.0",
+        "typescript": "^4.0.3"
+    }
 }
