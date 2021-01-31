@@ -1,4 +1,4 @@
-name: Sitemap-Generator             
+name: sitemap-generator             
 on: 
   push:                            
     branches:
