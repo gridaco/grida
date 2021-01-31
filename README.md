@@ -61,3 +61,37 @@ Check out our [Next.js deployment documentation](https://nextjs.org/docs/deploym
 - [bridged.xyz/plugins/figma](https://bridged.xyz/plugins/figma)
 - [bridged.xyz/plugins/sketch](https://bridged.xyz/plugins/sketch)
 - [bridged.xyz/tools](https://bridged.xyz/tools)
+
+### Sitemap Generate Shell Script
+
+```sh
+#!/bin/sh
+
+# After deleting the previous contents, create an empty folder
+cd public && rm -rf sitemap && mkdir sitemap
+cd .. && cd scripts
+printf "\n"
+
+
+# Code definitions that should be executed
+for SITEMAP in 'common' 'whatsnew'; do
+    echo "Generating sitemap-${SITEMAP}.xml..."
+    # Excute
+    node ./sitemap-${SITEMAP}.js
+    printf "\n"
+done
+
+# compress xml files with gz extension
+echo "Compressing generated xml files..."
+node ./compress.js
+printf "\n"
+
+# Create a representative sitemap.xml file to define which sites are located
+echo "Generating sitemap index files..."
+node ./sitemap.js
+printf "\n"
+cd ..
+
+# Send update request to Google based on sitemap uploaded to server
+curl http://google.com/ping?sitemap=http://bridged.xyz/sitemap.xml
+```
