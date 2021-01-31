@@ -20,3 +20,5 @@ echo "Generating sitemap index files..."
 node ./sitemap.js
 printf "\n"
 cd ..
+
+curl http://google.com/ping?sitemap=http://bridged.xyz/sitemap.xml
