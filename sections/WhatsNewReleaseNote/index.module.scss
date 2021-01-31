@@ -1,0 +1,87 @@
+@import '../../styles/variables.scss';
+.content_box {
+    margin-top: 30px;
+    h3 {
+        color: #fff;
+        font-size: 2.5em;
+        margin: 0px 0px 20px 0px;
+        font-weight: 300;
+    }
+    p {
+        font-size: 1.25em;
+        color: #fff;
+        font-weight: 200;
+    }
+}
+
+.markdown {
+    img {
+        width: 100%;
+    }
+    blockquote {
+        padding: 0 1em;
+        border-left: 0.25em solid #fff;
+    }
+    p {
+        line-height: 1.25;
+    }
+}
+
+@include lg {
+    .title_box {
+        .title {
+            width: 1023px;
+        }
+    }
+}
+
+@include md {
+    .title_box {
+        .title {
+            width: 876px;
+        }
+    }
+    .video_player_wrapper {
+        margin-top: 101px;
+    }
+    .video {
+        width: 870px;
+        height: 543px;
+    }
+    .video_play {
+        width: 164px;
+        height: 164px;
+    }
+}
+
+@include sm {
+    .title_box {
+        .title {
+            width: 720px;
+        }
+    }
+    .video {
+        width: 768px;
+        height: 511px;
+    }
+    .video_play {
+        width: 100px;
+        height: 100px;
+    }
+}
+
+@include xs {
+    .title_box {
+        .title {
+            width: 343px;
+        }
+    }
+    .video {
+        width: 375px;
+        height: 247px;
+    }
+    .video_play {
+        width: 56px;
+        height: 56px;
+    }
+}

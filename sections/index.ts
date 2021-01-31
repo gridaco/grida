@@ -8,6 +8,8 @@ import FeatureInstant from './FeatureInstant';
 import FooterCta from './FooterCta';
 import FooterPunchline from './FooterPunchline';
 import FeatureManageableWork from './FeatureManageableWork';
+import WhatsNewHeaderLabel from './WhatsNewHeaderLabel';
+import WhatsNewReleaseNote from './WhatsNewReleaseNote';
 
 export {
   Header,
@@ -20,4 +22,6 @@ export {
   FooterCta,
   FooterPunchline,
   FeatureManageableWork,
+  WhatsNewHeaderLabel,
+  WhatsNewReleaseNote
 };
