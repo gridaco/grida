@@ -9,7 +9,6 @@ interface WhatsNewReleaseNoteProps {
 }
 
 const WhatsNewReleaseNote = ({ release }: WhatsNewReleaseNoteProps) => {
-    console.log(release)
     return (
         <div className={style.content_box}>
             <h3>{release.name}</h3>
