@@ -1,5 +1,8 @@
 name: sitemap-generator             
 on: 
+  pull_request:
+    branches: 
+      - master
   push:                            
     branches:
       - master
