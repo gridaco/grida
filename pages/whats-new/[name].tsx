@@ -1,18 +1,30 @@
 import React, { useState } from 'react';
 import { useRouter } from 'next/router';
+import useAsyncEffect from '../../utils/useAsyncEffect';
 import axios from 'axios';
 import Head from 'next/head';
+import { Header, WhatsNewHeaderLabel, WhatsNewReleaseNote } from '../../sections';
 import { ThemeProvider } from '@material-ui/core';
-import theme from '../common/theme';
+import theme from '../../common/theme';
 //@ts-ignore
-import style from '../styles/Home.module.scss';
-import { Header } from '../sections';
+import style from './whats-new.module.scss';
+import { GithubReleaseNote, getGithubReleaseNote } from '../../utils/getGithubReleaseNote';
+const githubName = 'bridgedxyz';
 
-const Pricing = () => {
+const UpdateNoteDetail = () => {
+  const {
+    query: { name },
+  } = useRouter();
+  const [releases, setReleases] = useState<Array<GithubReleaseNote>>([]);
+
+  useAsyncEffect(async () => {
+    name !== undefined && setReleases(await getGithubReleaseNote(githubName, name as string))
+  }, [name]);
+
   return (
     <div className={style.conatiner}>
       <Head>
-        <title> What 's new in Bridged </title>
+        <title>Bridged {name} Release Notes</title>
         <meta
           name="description"
           content="designs that are meant to be implemented. automate your frontend development process. no more boring."
@@ -36,7 +48,8 @@ const Pricing = () => {
         <Header />
         <main className={style.main}>
           <div className={style.section_container}>
-            <h1 style={{ color: "#fff" }}>Bridged is FREE!</h1>
+            <WhatsNewHeaderLabel installUrl={releases[0]?.html_url} label={name} />
+            {releases.map(i => <WhatsNewReleaseNote release={i} />)}
           </div>
         </main>
       </ThemeProvider>
@@ -44,4 +57,4 @@ const Pricing = () => {
   );
 };
 
-export default Pricing;
+export default UpdateNoteDetail;
