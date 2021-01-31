@@ -17,7 +17,7 @@ const WhatsNewHeaderLabel = ({ label, installUrl }: WhatsNewHeaderLabelProps) =>
     return (
         <div className={styles.title_box}>
             <h1>{capitalize(label as string)}</h1>
-            <small>Install this version with <a href={installUrl}>Github</a></small>
+            <small>Install latest version on <a href={installUrl}>Github</a></small>
         </div>
     )
 }
