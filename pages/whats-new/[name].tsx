@@ -24,7 +24,7 @@ const UpdateNoteDetail = () => {
   return (
     <div className={style.conatiner}>
       <Head>
-        <title> What 's new in Bridged {name}</title>
+        <title>Bridged {name} Release Notes</title>
         <meta
           name="description"
           content="designs that are meant to be implemented. automate your frontend development process. no more boring."
