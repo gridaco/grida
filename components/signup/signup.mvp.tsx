@@ -2,6 +2,7 @@ import React, { FC, StyleHTMLAttributes } from 'react';
 import { CSSProperties } from '@material-ui/core/styles/withStyles';
 import Text from '../Text';
 import { Button } from '@material-ui/core';
+import { analytics } from '../../utils/firebase';
 
 export const MVP_SIGNUP_TYPEFORM_URL =
   'https://woojooj.typeform.com/to/uyTSms5Q';
@@ -15,9 +16,11 @@ interface SignupMvpButtonProps {
   value: string;
   style: CSSProperties;
 }
+
 export function SignupMvpButton({ value, style }: SignupMvpButtonProps) {
   const onclick = () => {
     open(MVP_SIGNUP_TYPEFORM_URL);
+    analytics().logEvent("primary-signup-click");
   };
 
   return (
