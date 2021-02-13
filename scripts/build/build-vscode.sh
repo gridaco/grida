@@ -7,12 +7,12 @@ APP_ROOT=$(pwd)
 # build vscode source and vscode builtin extensions
 function main() {
 	cd ${APP_ROOT}
-	rsync -a resources/gulp-github1s.js packages/vscode
+	rsync -a resources/gulp-githubsurf.js packages/vscode
 	cd packages/vscode
 
 	yarn gulp compile-build
-	yarn gulp optimize --gulpfile ./gulp-github1s.js
-	yarn gulp minify --gulpfile ./gulp-github1s.js
+	yarn gulp optimize --gulpfile ./gulp-githubsurf.js
+	yarn gulp minify --gulpfile ./gulp-githubsurf.js
 
 	echo "build vscode done!"
 }
