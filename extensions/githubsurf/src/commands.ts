@@ -1,5 +1,5 @@
 /**
- * @file github1s commands
+ * @file githubsurf commands
  * @author netcon
  */
 

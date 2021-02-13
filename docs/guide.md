@@ -6,9 +6,7 @@ Thanks to the very powerful and flexible extensibility of VS Code, we can easily
 
 On the other hand, GitHub provides the powerful [REST API](https://docs.github.com/en/rest) that can be used for a variety of tasks which includes reading directories and files for sure.
 
-According to the above, obviously, the core concept of GitHub1s is to implement a VS Code Extension (includes FileSystemProvider) using GitHub REST API.
-
-*We may switch to the GitHub GraphQL API for more friendly user experience in the future, thanks to @xcv58 and @kanhegaonkarsaurabh. See details at [Issue 12](https://github.com/conwnet/github1s/issues/12).*
+According to the above, obviously, the core concept of githubsurf is to implement a VS Code Extension (includes FileSystemProvider) using GitHub REST API.
 
 github.surf is a purely static web app (because it really doesn't need a backend service, does it?). So we just deploy it on [GitHub Pages](https://pages.github.com/) now (the `gh-pages` branch of this repository), and it is free. The service of github.surf could be reliable (GitHub is very reliable) because nobody needs to pay the web hosting bills.
 
@@ -49,7 +47,7 @@ What happens after you run `yarn watch`?
 
 4. Watch the `src` directory, merge it in to `packages/vscode/src` if something in it has been changed. (When a new file is merged into `packages/vscode/src`, it will trigger the watcher that is described in Step 3)
 
-5. Go to `extensions/github1s` and run `yarn watch`, it will trigger a new build if something has been changed.
+5. Go to `extensions/githubsurf` and run `yarn watch`, it will trigger a new build if something has been changed.
 
 6. Watch the `extensions` directory and the `packages/vscode/out` directory, merge them into the `dist` directory if something changed in them.
 

@@ -8,7 +8,7 @@ APP_ROOT=$(pwd)
 function main() {
 	./scripts/clean-build.sh
 	cd ${APP_ROOT}
-	rm -rf node_modules lib extensions/github1s/node_modules
+	rm -rf node_modules lib extensions/githubsurf/node_modules
 	echo "clean all"
 }
 

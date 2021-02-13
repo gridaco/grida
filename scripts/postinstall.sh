@@ -5,7 +5,7 @@ cd "$(dirname "${0}")/.."
 APP_ROOT=$(pwd)
 
 function main() {
-	# install github1s extensions dependencies
+	# install githubsurf extensions dependencies
 	for entry in "${APP_ROOT}/extensions"/*
 	do
 		if [ -d "$entry" ]

@@ -13,5 +13,5 @@ if [ -e "${APP_ROOT}/dist/static" ]; then
 	sed "s/{STATIC_FOLDER}/${STATIC_FOLDER_NAME}/" "${APP_ROOT}/resources/index-hash.html" > "${APP_ROOT}/dist/index.html"
 	echo "hash static files done"
 else
-	echo "Please build github1s first"
+	echo "Please build githubsurf first"
 fi
