@@ -17,8 +17,8 @@
 - ✅ Github support - Surf GitHub repository on browser with vscode environment
 - ✅ Official Chrome extension - Launch surf with extension button
 - ✅ Official CLI - `surf .` command for opening surf on terminal
-- Gitlab support ([gitlab.surf](https://gitlab.surf)) (comming soon)
-- Bitbucket support ([bitbucket.surf](https://bitbucket.surf)) (comming soon)
+- Gitlab support ([gitlab.surf](https://gitlab.surf)) (enhance)
+- Bitbucket support ([bitbucket.surf](https://bitbucket.surf)) (enhance)
 - Remote compile & terminal support in browser (comming soon)
 
 
