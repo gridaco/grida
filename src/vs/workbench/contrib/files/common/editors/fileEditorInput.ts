@@ -186,7 +186,7 @@ export class FileEditorInput extends AbstractTextResourceEditorInput implements 
 	}
 
 	private decorateLabel(label: string): string {
-		// modify-by-github1s, remove read-only tips
+		// modify-by-github-surf, remove read-only tips
 		// const orphaned = this.model?.hasState(TextFileEditorModelState.ORPHAN);
 		// const readonly = this.isReadonly();
 

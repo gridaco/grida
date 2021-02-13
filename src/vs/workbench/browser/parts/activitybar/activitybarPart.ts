@@ -569,7 +569,7 @@ export class ActivitybarPart extends Part implements IActivityBarService {
 			ignoreOrientationForPreviousAndNextKey: true
 		}));
 
-	// modify-by-github1s, hide home-bar-icon-badge
+	// modify-by-github-surf, hide home-bar-icon-badge
 		// const homeBarIconBadge = document.createElement('div');
 		// homeBarIconBadge.classList.add('home-bar-icon-badge');
 		// this.homeBarContainer.appendChild(homeBarIconBadge);
@@ -1049,7 +1049,7 @@ export class ActivitybarPart extends Part implements IActivityBarService {
 	}
 
 	private get accountsVisibilityPreference(): boolean {
-		// modify-by-github1s, hide VS Code activity bar Accounts Button
+		// modify-by-github.surf, hide VS Code activity bar Accounts Button
 		// return this.storageService.getBoolean(AccountsActivityActionViewItem.ACCOUNTS_VISIBILITY_PREFERENCE_KEY, StorageScope.GLOBAL, true);
 		return false;
 	}
