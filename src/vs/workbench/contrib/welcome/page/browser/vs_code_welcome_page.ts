@@ -33,11 +33,11 @@ export default () => `
 				<div class="section help">
 					<h2 class="caption">${escape(localize('welcomePage.help', "Help"))}</h2>
 					<ul>
-						<li><a href="https://github.com/bridged/github.surf" target="_blank">github.surf Repository</a></li>
+						<li><a href="https://github.com/bridgedxyz/github.surf" target="_blank">github.surf Repository</a></li>
 						<li><a href="https://github.com/microsoft/vscode" target="_blank">VS Code Repository</a></li>
 						<li><a href="https://docs.github.com/en/rest" target="_blank">GitHub REST API Documentation</a></li>
 						<li><a href="https://code.visualstudio.com/docs" target="_blank">VS Code Documentation</a></li>
-						<li><a href="https://github.com/bridged/github.surf/issues" target="_blank">Advices and Issues</a></li>
+						<li><a href="https://github.com/bridgedxyz/github.surf/issues" target="_blank">Advices and Issues</a></li>
 					</ul>
 				</div>
 				<p class="showOnStartup"><input type="checkbox" id="showOnStartup" class="checkbox"> <label class="caption" for="showOnStartup">${escape(localize('welcomePage.showOnStartup', "Show welcome page on startup"))}</label></p>

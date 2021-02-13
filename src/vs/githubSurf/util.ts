@@ -20,7 +20,7 @@ export const parseGitHubUrl = (url: string): GitHubRouteState => {
 	const hasBranchName = hasFileType && parts[3];
 
 	return {
-		owner: parts[0] || 'bridged',
+		owner: parts[0] || 'bridgedxyz',
 		repo: parts[1] || 'github.surf',
 		type: (hasFileType ? parts[2] : 'tree').toLowerCase(),
 		branch: hasBranchName ? parts[3] : 'HEAD',
