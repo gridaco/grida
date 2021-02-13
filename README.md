@@ -8,9 +8,20 @@
 
 > 🏄‍♂️ Surf your repository like a pro
 
-[![Deploy github.surf with Vercel](https://vercel.com/button)](https://vercel.com/new/git/external?repository-url=https://github.com/bridgedxyz/github.surf&project-name=github.surf&repo-name=github.surf) [![](https://img.shields.io/badge/cli-latest-brightgreen)](https://www.npmjs.com/package/@bridged.xyz/surf)
-
-
+<p align="center">
+  <a href="https://www.npmjs.com/package/@bridged.xyz/surf">
+    <image alt="surf cli on npm" src="https://img.shields.io/badge/cli-latest-brightgreen"/>
+  </a>
+  <a href="https://vercel.com/new/git/external?repository-url=https://github.com/bridgedxyz/github.surf&project-name=github.surf&repo-name=github.surf">
+    <image alt="Deploy github.surf with Vercel" src="https://vercel.com/button"/>
+  </a>
+  <a href="https://twitter.com/intent/tweet?text=Wow:&url=https%3A%2F%2Fgithub.com%2Fbridgedxyz%2Fgithub.surf">
+    <image alt="Twitter" src="https://img.shields.io/twitter/url?style=social&url=https%3A%2F%2Fgithub.com%2Fbridgedxyz%2Fgithub.surf">
+  </a>
+  <a href="https://github.com/bridgedxyz/github.surf/blob/main/LICENSE">
+    <image alt="GitHub license" src="https://img.shields.io/github/license/bridgedxyz/github.surf">
+ </a>
+</p>
 
 ## Features
 
