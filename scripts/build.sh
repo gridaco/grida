@@ -11,7 +11,7 @@ function main() {
 	cd "${APP_ROOT}/scripts"
 	./build/sync-code.sh
 	./build/build-vscode.sh
-	./build/build-github1s-extensions.sh
+	./build/build-surf-extensions.sh
 	./package.sh
 
 	echo "all build done!"
