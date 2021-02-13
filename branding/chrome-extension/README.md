@@ -1,0 +1,1 @@
+## Branding resources of surf chrome extension

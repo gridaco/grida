@@ -1,6 +1,7 @@
 # defaults
 .DS_Store
-
+.pem
+.crx
 
 # Logs
 logs
