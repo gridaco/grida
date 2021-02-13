@@ -12,7 +12,7 @@
 		"target": "es2017",
 		"paths": {
 			"vs/*": [
-				"./src/vs/*",
+				"./customize/vs/*",
 				"./packages/vscode/src/vs/*"
 			],
 		},

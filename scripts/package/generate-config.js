@@ -5,10 +5,10 @@ const path = require('path');
 
 const APP_ROOT = path.join(__dirname, '../..');
 const VSCODE_PATH = path.join(APP_ROOT, 'packages/vscode');
-const enableExtensions = require(path.join(APP_ROOT, 'resources/builtin-extensions.json'));
+const enableExtensions = require(path.join(APP_ROOT, 'configs/builtin-extensions.json'));
 
 /**
- * Loosely based on `getExtensionKind` from `src/vs/workbench/services/extensions/common/extensionsUtil.ts`
+ * Loosely based on `getExtensionKind` from `customize/vs/workbench/services/extensions/common/extensionsUtil.ts`
  */
 const isWebExtension = (manifest) => {
     if (manifest && typeof manifest.extensionKind !== 'undefined') {

@@ -12,7 +12,7 @@ function watch_vscode() {
 
 function watch_surf() {
 	cd ${APP_ROOT}/scripts/watch
-	node watch-src.js 2>&1 > /dev/null &
+	node watch-customize.js 2>&1 > /dev/null &
 	echo "watching surf"
 }
 
