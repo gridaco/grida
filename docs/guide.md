@@ -1,6 +1,6 @@
 # How it works
 
-Github1s is based on [VS Code 1.52.1](https://github.com/microsoft/vscode/tree/1.52.1) now. VS Code can be built for a browser version officially. I also used the code and got inspired by [Code Server](https://github.com/cdr/code-server).
+github.surf is based on [VS Code 1.52.1](https://github.com/microsoft/vscode/tree/1.52.1) now. VS Code can be built for a browser version officially. I also used the code and got inspired by [Code Server](https://github.com/cdr/code-server).
 
 Thanks to the very powerful and flexible extensibility of VS Code, we can easily implement a VS Code extension that provides the custom File IO ability using [FileSystemProvider API](https://code.visualstudio.com/api/references/vscode-api#FileSystemProvider). There is an official demo named [vscode-web-playground](https://github.com/microsoft/vscode-web-playground) which shows how it is used.
 
@@ -10,7 +10,7 @@ According to the above, obviously, the core concept of GitHub1s is to implement 
 
 *We may switch to the GitHub GraphQL API for more friendly user experience in the future, thanks to @xcv58 and @kanhegaonkarsaurabh. See details at [Issue 12](https://github.com/conwnet/github1s/issues/12).*
 
-GitHub1s is a purely static web app (because it really doesn't need a backend service, does it?). So we just deploy it on [GitHub Pages](https://pages.github.com/) now (the `gh-pages` branch of this repository), and it is free. The service of GitHub1s could be reliable (GitHub is very reliable) because nobody needs to pay the web hosting bills.
+github.surf is a purely static web app (because it really doesn't need a backend service, does it?). So we just deploy it on [GitHub Pages](https://pages.github.com/) now (the `gh-pages` branch of this repository), and it is free. The service of github.surf could be reliable (GitHub is very reliable) because nobody needs to pay the web hosting bills.
 
 # Rate Limit
 
@@ -20,13 +20,13 @@ Another thing that needs attention is [Rate Limit](https://docs.github.com/en/re
 
 > For API requests using Basic Authentication or OAuth, you can make up to 5,000 requests per hour.
 
-So, if you meet some problems when you use GitHub1s, even if you are using newer browsers, you could try to set a [GitHub OAuth Token](https://docs.github.com/en/rest/overview/resources-in-the-rest-api#oauth2-token-sent-in-a-header). Don't worry, we cannot see your token. It is only stored in your browser [IndexedDB](https://developer.mozilla.org/en-US/docs/Web/API/IndexedDB_API) with [VS Code Extension globalState API](https://code.visualstudio.com/api/references/vscode-api#ExtensionContext) (Actually we don't have a server, do we?).
+So, if you meet some problems when you use github.surf, even if you are using newer browsers, you could try to set a [GitHub OAuth Token](https://docs.github.com/en/rest/overview/resources-in-the-rest-api#oauth2-token-sent-in-a-header). Don't worry, we cannot see your token. It is only stored in your browser [IndexedDB](https://developer.mozilla.org/en-US/docs/Web/API/IndexedDB_API) with [VS Code Extension globalState API](https://code.visualstudio.com/api/references/vscode-api#ExtensionContext) (Actually we don't have a server, do we?).
 
 But this does not mean the token is absolutely safe, **don't forget to clean it while you are using a device that doesn't belong to you**.
 
 # Development
 
-As you see, running GitHub1s locally is not difficult. After cloning the repository, just run these commands:
+As you see, running github.surf locally is not difficult. After cloning the repository, just run these commands:
 
 ```shell
 $ yarn
