@@ -52,6 +52,8 @@ Download our official chrome [here](https://chrome.google.com/webstore/detail/ai
 
 ## 🏄‍♂️ `surf` CLI
 
+<p align="center"><image src="./docs/gifs/cli-demo.gif"/></p>
+
 Like vscode's `code .`, we support our command `surf`
 
 ```shell
