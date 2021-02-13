@@ -1,7 +1,7 @@
 {
-  "name": "github1s",
+  "name": "githubsurf",
   "version": "0.0.0",
-  "publisher": "github1s",
+  "publisher": "githubsurf",
   "description": "",
   "private": true,
   "main": "index.js",
@@ -9,11 +9,11 @@
     "lib": "lib"
   },
   "activationEvents": [
-    "onFileSystem:github1s",
-    "onCommand:github1s.validate-token",
-    "onCommand:github1s.update-token",
-    "onCommand:github1s.clear-token",
-    "onView:github1s"
+    "onFileSystem:githubsurf",
+    "onCommand:githubsurf.validate-token",
+    "onCommand:githubsurf.update-token",
+    "onCommand:githubsurf.clear-token",
+    "onView:githubsurf"
   ],
   "browser": "./dist/extension",
   "engines": {
@@ -32,7 +32,7 @@
     "views": {
       "github1s": [
         {
-          "id": "github1s-settings",
+          "id": "githubsurf-settings",
           "name": "Settings",
           "type": "webview"
         }
@@ -40,17 +40,17 @@
     },
     "commands": [
       {
-        "command": "github1s.update-token",
+        "command": "githubsurf.update-token",
         "title": "Update GitHub OAuth Token",
         "category": "GitHub1s"
       },
       {
-        "command": "github1s.validate-token",
+        "command": "githubsurf.validate-token",
         "title": "Validate Current GitHub OAuth Token",
         "category": "GitHub1s"
       },
       {
-        "command": "github1s.clear-token",
+        "command": "githubsurf.clear-token",
         "title": "Clear Current GitHub OAuth Token",
         "category": "GitHub1s"
       }

@@ -15,7 +15,7 @@ export function activate(context: vscode.ExtensionContext) {
 
 	context.subscriptions.push(vscode.window.registerWebviewViewProvider(SettingsView.viewType, new SettingsView()));
 
-	context.subscriptions.push(vscode.commands.registerCommand('github1s.validate-token', commandValidateToken));
-	context.subscriptions.push(vscode.commands.registerCommand('github1s.update-token', commandUpdateToken));
-	context.subscriptions.push(vscode.commands.registerCommand('github1s.clear-token', commandClearToken));
+	context.subscriptions.push(vscode.commands.registerCommand('githubsurf.validate-token', commandValidateToken));
+	context.subscriptions.push(vscode.commands.registerCommand('githubsurf.update-token', commandUpdateToken));
+	context.subscriptions.push(vscode.commands.registerCommand('githubsurf.clear-token', commandClearToken));
 }

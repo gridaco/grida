@@ -1,5 +1,5 @@
 /**
- * @file VSCode GitHub1sFs Provider
+ * @file VSCode GithubsurfFs Provider
  * @author netcon
  */
 
@@ -103,7 +103,7 @@ const entriesToMap = (entries, uri) => {
 };
 
 export class GitHub1sFS implements FileSystemProvider, Disposable {
-	static scheme = 'github1s';
+	static scheme = 'githubsurf';
 	private readonly disposable: Disposable;
 	private _emitter = new EventEmitter<FileChangeEvent[]>();
 	private root: Directory = null;

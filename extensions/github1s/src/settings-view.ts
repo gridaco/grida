@@ -16,7 +16,7 @@ interface WebviewState {
 }
 
 export class SettingsView implements vscode.WebviewViewProvider {
-	public static readonly viewType = 'github1s-settings';
+	public static readonly viewType = 'githubsurf-settings';
 	private readonly _extensionContext: vscode.ExtensionContext;
 	private _webviewView: vscode.WebviewView;
 
