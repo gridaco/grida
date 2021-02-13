@@ -14,6 +14,8 @@
 
 Download our official chrome [here]()
 
+![surf chrome extension](./branding/chrome-extension/surf-chrome-preview.png)
+
 
 
 ## 🏄‍♂️ `surf` CLI
