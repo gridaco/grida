@@ -32,7 +32,7 @@ function watch_dist() {
 function main() {
 	rm -rf "${APP_ROOT}/dist"
 	cd "${APP_ROOT}/scripts"
-	./package/copy-resources.sh
+	./package/copy-web.sh
 	./package/copy-node_modules.sh
 	./package/copy-extensions.sh
 	node ./package/generate-config.js

@@ -9,7 +9,7 @@ function main() {
 	./package/copy-vscode.sh
 	./package/copy-extensions.sh
 	./package/copy-node_modules.sh
-	./package/copy-resources.sh
+	./package/copy-web.sh
 	node ./package/generate-config.js
 
 	echo "all copy done!"

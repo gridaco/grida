@@ -9,14 +9,14 @@ function main() {
 	mkdir -p dist
 	if [ "${IS_BUILD-}" ];
 	then
-		cp resources/index.html dist/index.html
+		cp web/index.html dist/index.html
 	else
-		cp resources/index-dev.html dist/index.html
+		cp web/index-dev.html dist/index.html
 	fi
-	cp resources/favicon.png dist
-	cp resources/manifest.json dist
+	cp web/favicon.png dist
+	cp web/manifest.json dist
 
-	echo "copy resources done!"
+	echo "copy web done!"
 }
 
 main "$@"
