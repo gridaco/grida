@@ -103,11 +103,9 @@ You can generate new token for github.surf on [here](https://github.com/settings
 
 
 
+## Supported languages / frameworks extensions (themes)
 
-
-## Supported languages / frameworks
-
-[As listed here](./extensions),
+[As listed here](./extensions) and [surf-code-extensions](https://github.com/bridgedxyz/surf-code-extensions) here, we support below extensions in-the-box
 
 - Vue
 - JS/TS/JSX/TSX (React, Svelete, and other js based frrameworks)
@@ -118,6 +116,7 @@ You can generate new token for github.surf on [here](https://github.com/settings
 - Ocaml
 - Vetur
 - Jupyter Notebook - [deepmind/deepmind-research demo](https://github.surf/deepmind/deepmind-research)
+- Material theme
 
 
 
@@ -156,6 +155,15 @@ Learn more about contribution at [CONTRIBUTING.md](./CONTRIBUTING.md)
 ## Disclamer
 
 this project is inspired from [cdr/code-server](https://github.com/cdr/code-server) and [conwnet/github1s](https://github.com/conwnet/github1s). the base code was forked from github1s (MIT License at the point of fork), which we are replacing it with our own implementations and approaches.
+
+
+
+## See Also
+
+- [surf.codes](https://surf.codes)
+- [surf-code-extensions](https://github.com/bridgedxyz/surf-code-extensions)
+
+
 
 
 
