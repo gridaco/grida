@@ -23,9 +23,9 @@
     "viewsContainers": {
       "activitybar": [
         {
-          "id": "github1s",
-          "title": "GitHub1s",
-          "icon": "assets/github1s.svg"
+          "id": "githubsurf",
+          "title": "Surf",
+          "icon": "assets/key.svg"
         }
       ]
     },
