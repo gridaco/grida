@@ -19,15 +19,16 @@ if (GITHUB_BUTTON_NAV_AVAILABLE) {
         let openInNewPage = DEFAULT_OPEN_IN_NEW_PAGE_CONFIG;
         try {
             // use custom options if only available
-            backgroundColor = obj.backgroundColor;
-            textColor = obj.textColor;
-            openInNewPage = obj.openInNewPage;
+            if(obj.backgroundColor) {backgroundColor = obj.backgroundColor;}
+            if(obj.textColor) {textColor = obj.textColor;}
+            if(obj.openInNewPage) {openInNewPage = obj.openInNewPage;}
         } catch (_) {}
 
 
+        console.log(backgroundColor);
         // Create the github.surf button
         let btn = document.createElement("a");
-        btn.innerHTML = "🏄‍♂️ Surf";
+        btn.innerHTML = "🏄‍♂️ &nbsp Surf";
         btn.classList = "btn ml-2 d-none d-md-block";
         btn.href = window.location.href.replace("https://github.com/", "https://github.surf/");
 
@@ -35,10 +36,10 @@ if (GITHUB_BUTTON_NAV_AVAILABLE) {
         if (openInNewPage) {
             btn.target = "_blank";
         }
-        if (!backgroundColor.startsWith("#")){
+        if (backgroundColor.startsWith("#")){
             backgroundColor = `#${backgroundColor}`;
         }
-        if (!textColor.startsWith("#")){
+        if (textColor.startsWith("#")){
             textColor = `#${textColor}`;
         }
         btn.style.backgroundColor = backgroundColor;
