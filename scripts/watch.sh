@@ -17,7 +17,7 @@ function watch_surf() {
 }
 
 function watch_extensions() {
-	cd ${APP_ROOT}/extensions/github1s
+	cd ${APP_ROOT}/extensions/githubsurf
 	yarn dev 2>&1 > /dev/null &
 	echo "watching extensions"
 }

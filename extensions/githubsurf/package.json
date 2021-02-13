@@ -30,7 +30,7 @@
       ]
     },
     "views": {
-      "github1s": [
+      "githubsurf": [
         {
           "id": "githubsurf-settings",
           "name": "Settings",
@@ -42,17 +42,17 @@
       {
         "command": "githubsurf.update-token",
         "title": "Update GitHub OAuth Token",
-        "category": "GitHub1s"
+        "category": "githubsurf"
       },
       {
         "command": "githubsurf.validate-token",
         "title": "Validate Current GitHub OAuth Token",
-        "category": "GitHub1s"
+        "category": "githubsurf"
       },
       {
         "command": "githubsurf.clear-token",
         "title": "Clear Current GitHub OAuth Token",
-        "category": "GitHub1s"
+        "category": "githubsurf"
       }
     ]
   },
