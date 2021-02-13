@@ -2,7 +2,7 @@
 [![](https://vsmarketplacebadge.apphb.com/installs-short/mathiasfrohlich.Kotlin.svg)](https://marketplace.visualstudio.com/items?itemName=mathiasfrohlich.Kotlin)
 [![](https://vsmarketplacebadge.apphb.com/rating-short/mathiasfrohlich.Kotlin.svg)](https://marketplace.visualstudio.com/items?itemName=mathiasfrohlich.Kotlin)
 
-# This extension is a fork from [vscode-kotlin](https://github.com/mathiasfrohlich/vscode-kotlin) for github1s
+# This extension is a fork from [vscode-kotlin](https://github.com/mathiasfrohlich/vscode-kotlin) for githubsurf
 
 # At present only languages features is reserved
 

@@ -71,8 +71,8 @@ export class WelcomePageContribution implements IWorkbenchContribution {
 		if (enabled && lifecycleService.startupKind !== StartupKind.ReloadedWindow) {
 			const route = parseGitHubUrl(window.location.href);
 			const activeResource = editorService.activeEditor?.resource;
-			if (route.path !== '/' && (!activeResource || activeResource.scheme === 'github1s' || activeResource.path !== route.path)) {
-				const file = URI.from({ scheme: 'github1s', authority: `${route.owner}+${route.repo}+${route.branch}`, path: route.path });
+			if (route.path !== '/' && (!activeResource || activeResource.scheme === 'githubsurf' || activeResource.path !== route.path)) {
+				const file = URI.from({ scheme: 'githubsurf', authority: `${route.owner}+${route.repo}+${route.branch}`, path: route.path });
 				fileService.resolve(file)
 					.then(() => this.commandService.executeCommand(route.type === 'tree' ? 'revealInExplorer' : 'vscode.open', file))
 					.then(() => this.registerListeners(), () => this.registerListeners());
@@ -118,7 +118,7 @@ export class WelcomePageContribution implements IWorkbenchContribution {
 
 
 	private getGitHubFilePathOrEmpty(uri?: URI): string {
-		if (!uri || !uri.path || uri.scheme !== 'github1s') {
+		if (!uri || !uri.path || uri.scheme !== 'githubsurf') {
 			return '';
 		}
 		return uri.path.startsWith('/') ? uri.path : `/${uri.path}`;
@@ -354,7 +354,7 @@ class WelcomePage extends Disposable {
 		}
 
 		gitHubTokenStatus.then(tokenStatus => this.doUpdateGitHubTokenStatus(container, tokenStatus));
-		this.registerGitHub1sListeners(container);
+		this.registerGitHubSurfListeners(container);
 
 		recentlyOpened.then(({ workspaces }) => {
 			// Filter out the current workspace
@@ -396,9 +396,9 @@ class WelcomePage extends Disposable {
 		}));
 	}
 
-	registerGitHub1sListeners(container: HTMLElement) {
+	registerGitHubSurfListeners(container: HTMLElement) {
 		container.querySelector('.refresh-button')?.addEventListener('click', () => this.refreshGitHubTokenStatus(container));
-		container.querySelector('.create-new-token')?.addEventListener('click', () => window?.open('https://github.com/settings/tokens/new?scopes=repo&description=GitHub1s'));
+		container.querySelector('.create-new-token')?.addEventListener('click', () => window?.open('https://github.com/settings/tokens/new?scopes=repo&description=githubsurf'));
 		container.querySelector('.update-oauth-token')?.addEventListener('click', () => this.commandService.executeCommand('githubsurf.update-token').then(() => this.refreshGitHubTokenStatus(container)));
 		container.querySelector('.clear-oauth-token')?.addEventListener('click', () => this.commandService.executeCommand('githubsurf.clear-token').then(() => this.refreshGitHubTokenStatus(container)));
 	}

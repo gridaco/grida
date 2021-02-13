@@ -231,7 +231,7 @@ export class ExplorerView extends ViewPane {
 			const title = workspace.folders.map(folder => folder.name).join();
 			// modify by github.surf, set file explorer title with `${route.owner}/${route.repo}`
 			const currentFolderUri = workspace.folders?.[0].uri;
-			const textContent = (currentFolderUri && currentFolderUri.scheme === 'github1s' && currentFolderUri.authority)
+			const textContent = (currentFolderUri && currentFolderUri.scheme === 'githubsurf' && currentFolderUri.authority)
 				? currentFolderUri.authority.split('+').slice(0, 2).join('/')
 	: this.name;
 			titleElement.textContent = textContent;

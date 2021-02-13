@@ -1,5 +1,5 @@
 /**
- * @file github1s fetch api
+ * @file githubsurf fetch api
  * @author netcon
  */
 
@@ -74,6 +74,6 @@ export const fetch = (url: string, options?: RequestInit) => {
 			if (response.status === 404) {
 				throw new RequestNotFoundError('Not Found', token);
 			}
-			throw new RequestError(`GitHub1s: Request got HTTP ${response.status} response`, token);
+			throw new RequestError(`githubsurf: Request got HTTP ${response.status} response`, token);
 		});
 };

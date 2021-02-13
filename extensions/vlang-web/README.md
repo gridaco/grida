@@ -3,7 +3,7 @@
 [![Version](https://vsmarketplacebadge.apphb.com/version/vlanguage.vscode-vlang.svg)](https://marketplace.visualstudio.com/items?itemName=vlanguage.vscode-vlang)
 [![Installs](https://vsmarketplacebadge.apphb.com/installs/vlanguage.vscode-vlang.svg)](https://marketplace.visualstudio.com/items?itemName=vlanguage.vscode-vlang)
 ![GitHub Workflow Status](https://img.shields.io/github/workflow/status/vlang/vscode-vlang/CI)
-# This extension is a fork from [vscode-vlang](https://github.com/vlang/vscode-vlang) for github1s.
+# This extension is a fork from [vscode-vlang](https://github.com/vlang/vscode-vlang) for githubsurf.
 
 Provides [V language](https://vlang.io) support for Visual Studio Code.
 

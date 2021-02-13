@@ -2,7 +2,7 @@
 
 [![Main workflow](https://img.shields.io/github/workflow/status/ocamllabs/vscode-ocaml-platform/Main%20workflow?branch=master)](https://github.com/ocamllabs/vscode-ocaml-platform/actions?query=workflow%3A%22Main+workflow%22+branch%3Amaster)
 
-# This extension is a fork from [vscode-ocaml-platform](https://github.com/ocamllabs/vscode-ocaml-platform) for github1s.
+# This extension is a fork from [vscode-ocaml-platform](https://github.com/ocamllabs/vscode-ocaml-platform) for githubsurf.
 
 Visual Studio Code extension for OCaml and relevant tools.
 

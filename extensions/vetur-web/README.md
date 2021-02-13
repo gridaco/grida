@@ -18,7 +18,7 @@
   <br>
 </p>
 
-# This extension is a fork from [Vetur](https://github.com/vuejs/vetur) for github1s.
+# This extension is a fork from [Vetur](https://github.com/vuejs/vetur) for githubsurf.
 
 # At present only languages features is reserved
 

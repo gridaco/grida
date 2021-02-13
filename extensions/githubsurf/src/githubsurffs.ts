@@ -102,7 +102,7 @@ const entriesToMap = (entries, uri) => {
 	return map;
 };
 
-export class GitHub1sFS implements FileSystemProvider, Disposable {
+export class GitHubSurfFS implements FileSystemProvider, Disposable {
 	static scheme = 'githubsurf';
 	private readonly disposable: Disposable;
 	private _emitter = new EventEmitter<FileChangeEvent[]>();
@@ -112,7 +112,7 @@ export class GitHub1sFS implements FileSystemProvider, Disposable {
 
 	constructor() {
 		this.disposable = Disposable.from(
-			workspace.registerFileSystemProvider(GitHub1sFS.scheme, this, { isCaseSensitive: true, isReadonly: true }),
+			workspace.registerFileSystemProvider(GitHubSurfFS.scheme, this, { isCaseSensitive: true, isReadonly: true }),
 		);
 	}
 

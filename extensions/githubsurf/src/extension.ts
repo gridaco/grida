@@ -4,14 +4,14 @@
  */
 
 import * as vscode from 'vscode';
-import { GitHub1sFS } from './github1sfs';
+import { GitHubSurfFS } from './githubsurffs';
 import { SettingsView } from './settings-view';
 import { setExtensionContext } from './util';
 import { commandUpdateToken, commandValidateToken, commandClearToken } from './commands';
 
 export function activate(context: vscode.ExtensionContext) {
 	setExtensionContext(context);
-	context.subscriptions.push(new GitHub1sFS());
+	context.subscriptions.push(new GitHubSurfFS());
 
 	context.subscriptions.push(vscode.window.registerWebviewViewProvider(SettingsView.viewType, new SettingsView()));
 

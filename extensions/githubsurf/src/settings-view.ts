@@ -1,5 +1,5 @@
 /**
- * @file GitHub1s Settings Webview Provider
+ * @file githubsurf Settings Webview Provider
  * @author netcon
  */
 
@@ -266,7 +266,7 @@ button.secondary:hover {
 			<div>For API requests using Authentication, you can make up to 5,000 requests per hour.</div>
 		</div>
 		<div class="token-link">
-			<a href="https://github.com/settings/tokens/new?scopes=repo&description=GitHub1s" target="_blank">
+			<a href="https://github.com/settings/tokens/new?scopes=repo&description=githubsurf" target="_blank">
 				Generate New OAuth Token
 			</a>
 		</div>

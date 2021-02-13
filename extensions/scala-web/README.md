@@ -1,4 +1,4 @@
-# This extension is a fork from [vscode-scala-syntax](https://github.com/scala/vscode-scala-syntax) for github1s
+# This extension is a fork from [vscode-scala-syntax](https://github.com/scala/vscode-scala-syntax) for githubsurf
 
 # At present only languages features is reserved
 

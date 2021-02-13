@@ -379,21 +379,21 @@ class WindowIndicator implements IWindowIndicator {
 				uri = workspace.workspaceUri;
 			}
 
-			if (uri?.scheme === 'github1s') {
+			if (uri?.scheme === 'githubsurf') {
 				[repositoryOwner, repositoryName] = uri.authority.split('+');
 			}
 		}
 
 		// Repo
 		if (repositoryName && repositoryOwner) {
-			this.label = localize('playgroundLabelRepository', "$(remote) GitHub1s: {0}/{1}", repositoryOwner, repositoryName);
-			this.tooltip = localize('playgroundRepositoryTooltip', "GitHub1s: {0}/{1}", repositoryOwner, repositoryName);
+			this.label = localize('playgroundLabelRepository', "$(remote) githubsurf: {0}/{1}", repositoryOwner, repositoryName);
+			this.tooltip = localize('playgroundRepositoryTooltip', "githubsurf: {0}/{1}", repositoryOwner, repositoryName);
 		}
 
 		// No Repo
 		else {
-			this.label = localize('playgroundLabel', "$(remote) GitHub1s");
-			this.tooltip = localize('playgroundTooltip', "GitHub1s");
+			this.label = localize('playgroundLabel', "$(remote) githubsurf");
+			this.tooltip = localize('playgroundTooltip', "githubsurf");
 		}
 	}
 }
@@ -401,7 +401,7 @@ class WindowIndicator implements IWindowIndicator {
 (function () {
 	const route = parseGitHubUrl(window.location.href);
 	const config: IWorkbenchConstructionOptions & { folderUri?: UriComponents, workspaceUri?: UriComponents } = {
-		folderUri: URI.from({ scheme: "github1s", path: '/', authority: `${route.owner}+${route.repo}+${route.branch}` }),
+		folderUri: URI.from({ scheme: "githubsurf", path: '/', authority: `${route.owner}+${route.repo}+${route.branch}` }),
 		staticExtensions: [],
 		enableSyncByDefault: false,
 		webWorkerExtensionHostIframeSrc: document.getElementById('vscode-extension-host-iframe-src')?.getAttribute('data-settings') as string,
