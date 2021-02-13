@@ -117,6 +117,7 @@ You can generate new token for github.surf on [here](https://github.com/settings
 - Scala
 - Ocaml
 - Vetur
+- Jupyter Notebook - [deepmind/deepmind-research demo](https://github.surf/deepmind/deepmind-research)
 
 
 
