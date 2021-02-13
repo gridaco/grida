@@ -12,7 +12,7 @@ const NOTIFICATION_STORAGE_VALUE = '20210212';
 const notification = {
 	title: 'ATTENTION: This page is NOT officially provided by GitHub.',
 	content: 'github.surf is an open source project, which is not officially provided by GitHub.',
-	link: 'https://github.com/bridged/github.surf',
+	link: 'https://github.com/bridgedxyz/github.surf',
 };
 
 const notificationHtml = `
