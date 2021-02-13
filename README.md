@@ -16,6 +16,8 @@ Download our official chrome [here](https://chrome.google.com/webstore/detail/ai
 
 ![surf chrome extension](./docs/gifs/surf-extension-chrome-demo.gif)
 
+[Building and installing chrome extension on your own](./chrome-extension/README.md)
+
 
 
 ## 🏄‍♂️ `surf` CLI
