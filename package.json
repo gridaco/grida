@@ -26,6 +26,7 @@
     "clean-build": "./scripts/clean-build.sh",
     "clean": "./scripts/clean.sh",
     "build": "./scripts/build.sh",
+    "vercel-build": "yarn setup && yarn build",
     "hash": "./scripts/hash.sh",
     "package": "./scripts/package.sh",
     "watch": "./scripts/watch.sh",
