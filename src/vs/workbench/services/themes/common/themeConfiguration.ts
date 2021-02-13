@@ -14,7 +14,7 @@ import { workbenchColorsSchemaId } from 'vs/platform/theme/common/colorRegistry'
 import { tokenStylingSchemaId } from 'vs/platform/theme/common/tokenClassificationRegistry';
 import { ThemeSettings, IWorkbenchColorTheme, IWorkbenchFileIconTheme, IColorCustomizations, ITokenColorCustomizations, IWorkbenchProductIconTheme, ISemanticTokenColorCustomizations, IExperimentalSemanticTokenColorCustomizations } from 'vs/workbench/services/themes/common/workbenchThemeService';
 import { IConfigurationService, ConfigurationTarget } from 'vs/platform/configuration/common/configuration';
-// modify-by-github1s, default dark theme
+// modify-by-github-surf, default dark theme
 import { isMacintosh, isWindows } from 'vs/base/common/platform';
 
 const DEFAULT_THEME_DARK_SETTING_VALUE = 'Default Dark+';
@@ -35,7 +35,7 @@ const colorThemeSettingEnumDescriptions: string[] = [];
 const colorThemeSettingSchema: IConfigurationPropertySchema = {
 	type: 'string',
 	description: nls.localize('colorTheme', "Specifies the color theme used in the workbench."),
-	// modify-by-github1s, default dark theme
+	// modify-by-github-surf, default dark theme
 	default: DEFAULT_THEME_DARK_SETTING_VALUE,
 	enum: colorThemeSettingEnum,
 	enumDescriptions: colorThemeSettingEnumDescriptions,

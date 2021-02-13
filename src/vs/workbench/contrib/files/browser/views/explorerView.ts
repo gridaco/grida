@@ -229,7 +229,7 @@ export class ExplorerView extends ViewPane {
 		const setHeader = () => {
 			const workspace = this.contextService.getWorkspace();
 			const title = workspace.folders.map(folder => folder.name).join();
-			// modify by github1s, set file explorer title with `${route.owner}/${route.repo}`
+			// modify by github.surf, set file explorer title with `${route.owner}/${route.repo}`
 			const currentFolderUri = workspace.folders?.[0].uri;
 			const textContent = (currentFolderUri && currentFolderUri.scheme === 'github1s' && currentFolderUri.authority)
 				? currentFolderUri.authority.split('+').slice(0, 2).join('/')

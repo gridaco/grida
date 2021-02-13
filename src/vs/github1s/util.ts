@@ -1,5 +1,5 @@
 /**
- * @file github1s common utils
+ * @file github.surf common utils
  * @autor netcon
  */
 
@@ -20,8 +20,8 @@ export const parseGitHubUrl = (url: string): GitHubRouteState => {
 	const hasBranchName = hasFileType && parts[3];
 
 	return {
-		owner: parts[0] || 'conwnet',
-		repo: parts[1] || 'github1s',
+		owner: parts[0] || 'bridged',
+		repo: parts[1] || 'github.surf',
 		type: (hasFileType ? parts[2] : 'tree').toLowerCase(),
 		branch: hasBranchName ? parts[3] : 'HEAD',
 		path: '/' + (hasBranchName ? parts.slice(4).join('/') : ''),

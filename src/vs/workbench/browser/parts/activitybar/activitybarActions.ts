@@ -191,7 +191,7 @@ export class HomeActivityActionViewItem extends MenuActivityActionViewItem {
 		super(MenuId.MenubarHomeMenu, action, colors, themeService, menuService, contextMenuService, contextKeyService, configurationService, environmentService);
 	}
 
-	// modify-by-github1s, open current github repository in an new Tab directly
+	// modify-by-github-surf, open current github repository in an new Tab directly
 	render(container: HTMLElement): void {
 		super.render(container);
 

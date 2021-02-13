@@ -1,18 +1,18 @@
 /**
- * @file github1s notification
+ * @file github.surf notification
  * @author netcon
  */
 
 import 'vs/css!./notification';
 
-const NOTIFICATION_STORAGE_KEY = 'GITHUB1S_NOTIFICATION';
+const NOTIFICATION_STORAGE_KEY = 'GITHUB_SURF_NOTIFICATION';
 // change it if a new notification should be shown
 const NOTIFICATION_STORAGE_VALUE = '20210212';
 
 const notification = {
 	title: 'ATTENTION: This page is NOT officially provided by GitHub.',
-	content: 'GitHub1s is an open source project, which is not officially provided by GitHub.',
-	link: 'https://github.com/conwnet/github1s',
+	content: 'github.surf is an open source project, which is not officially provided by GitHub.',
+	link: 'https://github.com/bridged/github.surf',
 };
 
 const notificationHtml = `
@@ -38,7 +38,7 @@ export const renderNotification = () => {
 	}
 
 	const notificationElement = <HTMLDivElement>document.createElement('div');
-	notificationElement.classList.add('github1s-notification');
+	notificationElement.classList.add('github-surf-notification');
 	notificationElement.innerHTML = notificationHtml;
 	document.body.appendChild(notificationElement);
 
