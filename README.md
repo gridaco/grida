@@ -34,6 +34,7 @@
 - ✅ Official CLI - `surf .` command for opening surf on terminal
 - Gitlab support ([gitlab.surf](https://gitlab.surf)) (enhance)
 - Bitbucket support ([bitbucket.surf](https://bitbucket.surf)) (enhance)
+- [surf.codes](https://surf.codes) for private, custom scm (enhance)
 - Remote compile & terminal support in browser (comming soon)
 
 
