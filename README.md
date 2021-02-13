@@ -4,7 +4,7 @@
 
 <p align="center"><image src="branding/logo.png"/></p>
 
-<p align="center"><image src="branding/url-example.png"/></p>
+<p align="center"><a href="https://github.surf"><image src="branding/url-example.png"/></a></p>
 
 > 🏄‍♂️ Surf your repository like a pro
 
