@@ -8,11 +8,15 @@
 
 > 🏄‍♂️ Surf your repository like a pro
 
+[![Deploy github.surf with Vercel](https://vercel.com/button)](https://vercel.com/new/git/external?repository-url=https://github.com/bridgedxyz/github.surf&project-name=github.surf&repo-name=github.surf) [![](https://img.shields.io/badge/cli-latest-brightgreen)](https://www.npmjs.com/package/@bridged.xyz/surf)
+
 
 
 ## Features
 
 ![github.surf](./docs/images/github-surf-browser-preview.png)
+
+[**TL;DR Jump to demo**](https://github.surf)
 
 - ✅ Github support - Surf GitHub repository on browser with vscode environment
 - ✅ Official Chrome extension - Launch surf with extension button
