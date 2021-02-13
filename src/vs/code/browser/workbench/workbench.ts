@@ -18,8 +18,8 @@ import { localize } from 'vs/nls';
 import { Schemas } from 'vs/base/common/network';
 import product from 'vs/platform/product/common/product';
 import { parseLogLevel } from 'vs/platform/log/common/log';
-import { parseGitHubUrl } from 'vs/github1s/util';
-import { renderNotification } from 'vs/github1s/notification';
+import { parseGitHubUrl } from 'vs/githubSurf/util';
+import { renderNotification } from 'vs/githubSurf/notification';
 
 function doCreateUri(path: string, queryValues: Map<string, string>): URI {
 	let query: string | undefined = undefined;

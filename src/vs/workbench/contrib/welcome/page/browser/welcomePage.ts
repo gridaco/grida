@@ -47,7 +47,7 @@ import { IEditorOptions } from 'vs/platform/editor/common/editor';
 import { IWorkbenchLayoutService } from 'vs/workbench/services/layout/browser/layoutService';
 import { IViewletService } from 'vs/workbench/services/viewlet/browser/viewlet';
 import { buttonBackground, buttonHoverBackground, welcomePageBackground } from 'vs/workbench/contrib/welcome/page/browser/welcomePageColors';
-import { parseGitHubUrl } from 'vs/github1s/util';
+import { parseGitHubUrl } from 'vs/githubSurf/util';
 
 const configurationKey = 'workbench.startupEditor';
 const oldConfigurationKey = 'workbench.welcome.enabled';
