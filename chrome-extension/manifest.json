@@ -1,0 +1,39 @@
+{
+    "manifest_version": 2,
+    "name": "Surf Extension",
+    "version": "0.0.1",
+    "permissions": [
+        "storage"
+    ],
+    "description": "Surf github / gitlab / bitbucket repository in vscode with github.surf",
+    "icons": {
+        "16": "assets/surf.png",
+        "48": "assets/surf.png",
+        "128": "assets/surf.png"
+    },
+    "author": "bridged.xyz authors",
+    "homepage_url": "https://github.com/bridgedxyz/github.surf",
+    "content_scripts": [
+        {
+            "matches": [
+                "https://github.com/*/*"
+            ],
+            "js": ["surf.github.js"]
+        },
+        {
+            "matches": [
+                "https://gitlab.com/*/*"
+            ],
+            "js": ["surf.gitlab.js"]
+        },
+        {
+            "matches": [
+                "https://bitbucket.com/*/*"
+            ],
+            "js": ["surf.bitbucket.js"]
+        }
+    ],
+    "options_ui": {
+        "page": "options.html"
+    }
+}
