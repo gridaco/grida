@@ -9,13 +9,13 @@
 > 🏄‍♂️ Surf your repository like a pro
 
 <p align="center">
-  <a href="https://www.npmjs.com/package/@bridged.xyz/surf">
+  <a href="https://www.npmjs.com/package/@bridged.xyz/surf" style="border-right: 1px solid #4D4D4D">
     <image alt="surf cli on npm" src="https://img.shields.io/badge/cli-latest-brightgreen"/>
   </a>
-  <a href="https://vercel.com/new/git/external?repository-url=https://github.com/bridgedxyz/github.surf&project-name=github.surf&repo-name=github.surf">
+  <a href="https://vercel.com/new/git/external?repository-url=https://github.com/bridgedxyz/github.surf&project-name=github.surf&repo-name=github.surf" style="border-right: 1px solid #4D4D4D">
     <image alt="Deploy github.surf with Vercel" src="https://vercel.com/button"/>
   </a>
-  <a href="https://twitter.com/intent/tweet?text=Wow:&url=https%3A%2F%2Fgithub.com%2Fbridgedxyz%2Fgithub.surf">
+  <a href="https://twitter.com/intent/tweet?text=Wow:&url=https%3A%2F%2Fgithub.com%2Fbridgedxyz%2Fgithub.surf" style="border-right: 1px solid #4D4D4D">
     <image alt="Twitter" src="https://img.shields.io/twitter/url?style=social&url=https%3A%2F%2Fgithub.com%2Fbridgedxyz%2Fgithub.surf">
   </a>
   <a href="https://github.com/bridgedxyz/github.surf/blob/main/LICENSE">
