@@ -12,7 +12,7 @@
 
 ## Chrome extension
 
-Download our official chrome [here]()
+Download our official chrome [here](https://chrome.google.com/webstore/detail/aipkghikndfblkikafmbahbekkhmppia) (It's currently under review)
 
 ![surf chrome extension](./branding/chrome-extension/surf-chrome-preview.png)
 
@@ -23,10 +23,12 @@ Download our official chrome [here]()
 Like vscode's `code .`, we support our command `surf`
 
 ```shell
-# install the cli
-brew install surf
+# === install the cli ===
+npm -g install @bridged.xyz/surf
+		# or with yarn
+		yarn global add @bridged.xyz/surf
 
-# and surf 🏄
+# and surf 🏄 !
 surf .
 ```
 
@@ -39,6 +41,8 @@ surf .
 - Vue
 - JS/TS/JSX/TSX (React, Svelete, and other js based frrameworks)
 - Dart & Flutter
+
+
 
 
 

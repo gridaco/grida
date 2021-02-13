@@ -1,7 +1,10 @@
 # defaults
 .DS_Store
-.pem
-.crx
+
+# chrome extension
+chrome-extension.pem
+chrome-extension.crx
+chrome-extension.zip
 
 # Logs
 logs
