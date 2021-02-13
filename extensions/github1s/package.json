@@ -1,0 +1,82 @@
+{
+  "name": "github1s",
+  "version": "0.0.0",
+  "publisher": "github1s",
+  "description": "",
+  "private": true,
+  "main": "index.js",
+  "directories": {
+    "lib": "lib"
+  },
+  "activationEvents": [
+    "onFileSystem:github1s",
+    "onCommand:github1s.validate-token",
+    "onCommand:github1s.update-token",
+    "onCommand:github1s.clear-token",
+    "onView:github1s"
+  ],
+  "browser": "./dist/extension",
+  "engines": {
+    "vscode": "^1.48.0"
+  },
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "github1s",
+          "title": "GitHub1s",
+          "icon": "assets/github1s.svg"
+        }
+      ]
+    },
+    "views": {
+      "github1s": [
+        {
+          "id": "github1s-settings",
+          "name": "Settings",
+          "type": "webview"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "github1s.update-token",
+        "title": "Update GitHub OAuth Token",
+        "category": "GitHub1s"
+      },
+      {
+        "command": "github1s.validate-token",
+        "title": "Validate Current GitHub OAuth Token",
+        "category": "GitHub1s"
+      },
+      {
+        "command": "github1s.clear-token",
+        "title": "Clear Current GitHub OAuth Token",
+        "category": "GitHub1s"
+      }
+    ]
+  },
+  "scripts": {
+    "clean": "rm -rf dist out",
+    "build": "webpack --config extension.webpack.config.js --mode production",
+    "compile": "webpack --config extension.webpack.config.js --mode production",
+    "dev": "webpack --config extension.webpack.config.js --watch"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@apollo/client": "^3.3.9",
+    "graphql": "^15.5.0",
+    "js-base64": "^3.6.0",
+    "json-stable-stringify": "^1.0.1",
+    "p-finally": "^2.0.1",
+    "webpack-cli": "^4.4.0"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.52.0",
+    "ts-loader": "^8.0.14",
+    "typescript": "^4.1.3",
+    "webpack": "^4.46.0"
+  }
+}
