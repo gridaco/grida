@@ -14,7 +14,7 @@
 
 Download our official chrome [here](https://chrome.google.com/webstore/detail/aipkghikndfblkikafmbahbekkhmppia) (It's currently under review)
 
-![surf chrome extension](./branding/chrome-extension/surf-chrome-preview.png)
+![surf chrome extension](./docs/gifs/surf-extension-chrome-demo.gif)
 
 
 
@@ -32,7 +32,16 @@ npm -g install @bridged.xyz/surf
 surf .
 ```
 
+You can use this as you sub editor, which can be useful when you're exploring your master/main repository when you are at your own branch on your local machine
 
+```
+# different branch
+surf . -b
+```
+
+
+
+Learn more at [surf-cli](https://github.com/bridgedxyz/surf-cli)
 
 
 
