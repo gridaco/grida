@@ -1,2 +1,4 @@
 # github.surf
-urf GitHub code with VS Code.
+surf GitHub code with VS Code.
+
+![github.surf url example](branding/url-example.png)
