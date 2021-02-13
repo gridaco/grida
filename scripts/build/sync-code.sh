@@ -4,10 +4,10 @@ set -euo pipefail
 cd "$(dirname "${0}")/../.."
 APP_ROOT=$(pwd)
 
-# sync src/* to vscode
+# sync customize/* to vscode
 function main() {
 	cd ${APP_ROOT}
-	rsync -a src/ packages/vscode/src
+	rsync -a customize/ packages/vscode/src
 }
 
 main "$@"
