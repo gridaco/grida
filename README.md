@@ -2,9 +2,9 @@
 
 
 
-![](./branding/logo.png)
+<p align="center"><image src="branding/logo.png"/></p>
 
-![github.surf url example](branding/url-example.png)
+<p align="center"><image src="branding/url-example.png"/></p>
 
 > 🏄‍♂️ Surf your repository like a pro
 
