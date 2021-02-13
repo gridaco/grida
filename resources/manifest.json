@@ -1,7 +1,7 @@
 {
-  "name": "GitHub1S",
-  "short_name": "GitHub1s",
-  "start_url": "/",
-  "lang": "en-US",
-  "display": "standalone"
+    "name": "github.surf",
+    "short_name": "github.surf",
+    "start_url": "/",
+    "lang": "en-US",
+    "display": "standalone"
 }
