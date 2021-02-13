@@ -107,7 +107,7 @@ export class SettingsView implements vscode.WebviewViewProvider {
 	<meta charset="UTF-8">
 	<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'nonce-${nonce}'; script-src 'nonce-${nonce}';">
 	<meta name="viewport" content="width=device-width, initial-scale=1.0">
-	<title>GitHub1s Settings</title>
+	<title>Github Surf Settings</title>
 	<style nonce="${nonce}">
 html {
 	box-sizing: border-box;

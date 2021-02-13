@@ -152,7 +152,7 @@
     self.require = {
         baseUrl: `${window.location.origin}/static/vscode`,
         recordStats: true,
-        trustedTypesPolicy: window.trustedTypes ? .createPolicy('amdLoader', {
+        trustedTypesPolicy: window.trustedTypes?.createPolicy('amdLoader', {
             createScriptURL(value) {
                 if (value.startsWith(window.location.origin)) {
                     return value;
