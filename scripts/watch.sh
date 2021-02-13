@@ -5,7 +5,7 @@ cd "$(dirname "${0}")/.."
 APP_ROOT=$(pwd)
 
 function watch_vscode() {
-	cd ${APP_ROOT}/lib/vscode
+	cd ${APP_ROOT}/packages/vscode
 	yarn watch 2>&1 > /dev/null &
 	echo "watching vscode"
 }
@@ -41,7 +41,7 @@ function main() {
 	watch_github1s_extension
 
 	echo 'please waiting...'
-	while [ ! -e "${APP_ROOT}/lib/vscode/out" ]
+	while [ ! -e "${APP_ROOT}/packages/vscode/out" ]
 	do
 		echo "waiting for vsocde build..."
 		sleep 3

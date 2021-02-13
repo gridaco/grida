@@ -15,16 +15,10 @@ function main() {
 		fi
 	done
 
-	# clone vscode and install dependencies
+
+	#  install vscode dependencies
 	cd ${APP_ROOT}
-	if [ -d "lib/vscode" ]; then
-		echo "./lib/vscode already exists, skip clone."
-		exit 0
-	fi
-	mkdir -p lib
-	cd lib
-	git clone --depth 1 -b 1.52.1 https://github.com/microsoft/vscode.git vscode
-	cd vscode
+	cd packages/vscode
 	yarn --frozen-lockfile
 }
 

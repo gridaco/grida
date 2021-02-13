@@ -1,3 +1,3 @@
 **/node_modules/**
-**/lib/vscode/**
+**/packages/vscode/**
 **/dist/**

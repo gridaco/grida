@@ -13,7 +13,7 @@
 		"paths": {
 			"vs/*": [
 				"./src/vs/*",
-				"./lib/vscode/src/vs/*"
+				"./packages/vscode/src/vs/*"
 			],
 		},
 		"lib": [

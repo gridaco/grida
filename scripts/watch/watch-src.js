@@ -8,7 +8,7 @@ const APP_ROOT = path.join(__dirname, '../..');
 
 const main = () => {
 	const SOURCE = path.join(APP_ROOT, 'src');
-	const TARGET = path.join(APP_ROOT, 'lib/vscode/src');
+	const TARGET = path.join(APP_ROOT, 'packages/vscode/src');
 	const watcher = chokidar.watch(SOURCE);
 
 	watcher.on('all', () => {

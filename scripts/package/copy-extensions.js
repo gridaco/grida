@@ -12,7 +12,7 @@ const main = () => {
 
 	enableExtensions.forEach(extension => {
 		fs.copySync(
-			path.join(APP_ROOT, 'lib/vscode', extension.path),
+			path.join(APP_ROOT, 'packages/vscode', extension.path),
 			path.join(TARGET_DIR, path.basename(extension.path)),
 			{ filter: src => !src.includes('node_modules') }
 		);

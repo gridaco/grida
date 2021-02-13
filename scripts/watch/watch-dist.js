@@ -23,7 +23,7 @@ const debounce = (func, delay) => {
 };
 
 const autoSyncVscodeOut = async () => {
-	const SOURCE = path.join(APP_ROOT, 'lib/vscode/out');
+	const SOURCE = path.join(APP_ROOT, 'packages/vscode/out');
 	const TARGET = path.join(APP_ROOT, 'dist/static/vscode');
 
 	await util.promisify(cp.exec)(`rsync -a ${SOURCE}/ ${TARGET}`);

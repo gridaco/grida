@@ -5,7 +5,7 @@ cd "$(dirname "${0}")/../.."
 APP_ROOT=$(pwd)
 
 function ensureBuiltinExtensitions() {
-	cd "${APP_ROOT}/lib/vscode"
+	cd "${APP_ROOT}/packages/vscode"
 	if [ ! -e "extensions/emmet/dist/browser" ]
 	then
 		echo "compile vscode builtin extensions..."

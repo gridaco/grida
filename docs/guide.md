@@ -43,15 +43,15 @@ What happens after you run `yarn watch`?
 
 1. Copy some necessary resources (`index.html`, extensions config, libraries, etc.) to the `dist` directory.
 
-2. Go to `lib/vscode` and run `yarn gulp compile-web` to build the necessary extensions, then copy it to the `dist/extensions` directory.
+2. Go to `packages/vscode` and run `yarn gulp compile-web` to build the necessary extensions, then copy it to the `dist/extensions` directory.
 
-3. Go to `lib/vscode` and run `yarn watch` (the native watch of vscode), it will trigger a new build if something in it has been changed.
+3. Go to `packages/vscode` and run `yarn watch` (the native watch of vscode), it will trigger a new build if something in it has been changed.
 
-4. Watch the `src` directory, merge it in to `lib/vscode/src` if something in it has been changed. (When a new file is merged into `lib/vscode/src`, it will trigger the watcher that is described in Step 3)
+4. Watch the `src` directory, merge it in to `packages/vscode/src` if something in it has been changed. (When a new file is merged into `packages/vscode/src`, it will trigger the watcher that is described in Step 3)
 
 5. Go to `extensions/github1s` and run `yarn watch`, it will trigger a new build if something has been changed.
 
-6. Watch the `extensions` directory and the `lib/vscode/out` directory, merge them into the `dist` directory if something changed in them.
+6. Watch the `extensions` directory and the `packages/vscode/out` directory, merge them into the `dist` directory if something changed in them.
 
 Note that since we have modified the source code of VS Code, it may get into trouble when merging a newer version VS Code.
 
