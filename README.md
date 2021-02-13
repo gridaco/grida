@@ -43,7 +43,7 @@
 
 ## Chrome extension
 
-Download our official chrome [here](https://chrome.google.com/webstore/detail/aipkghikndfblkikafmbahbekkhmppia) (It's currently under review)
+Download our official chrome [here](chrome_link) (It's currently under review)
 
 ![surf chrome extension](./docs/gifs/surf-extension-chrome-demo.gif)
 
@@ -178,3 +178,15 @@ this project is inspired from [cdr/code-server](https://github.com/cdr/code-serv
 - [bridgedxyz/console.bridged.xyz](https://github.com/bridgedxyz/console.bridged.xyz)
 - [bridgedxyz/appbox](https://github.com/bridgedxyz/appbox)
 
+
+
+
+
+[![get-chrome-ext][chrome_badge]][chrome_link]
+[![get-firefox-addon][firefox_badge]][firefox_link]
+
+
+[chrome_link]: https://chrome.google.com/webstore/detail/aipkghikndfblkikafmbahbekkhmppia
+[chrome_badge]: ./branding/badges/chrome-badge.png
+[firefox_link]: https://addons.mozilla.org/firefox/addon/
+[firefox_badge]: ./branding/badges/firefox-badge.png
