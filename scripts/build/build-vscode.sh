@@ -7,7 +7,7 @@ APP_ROOT=$(pwd)
 # build vscode source and vscode builtin extensions
 function main() {
 	cd ${APP_ROOT}
-	rsync -a ${pwd}/gulp-githubsurf.js packages/vscode
+	rsync -a scripts/build/gulp-githubsurf.js packages/vscode
 	cd packages/vscode
 
 	yarn gulp compile-build
