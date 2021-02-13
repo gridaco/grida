@@ -7,7 +7,7 @@ APP_ROOT=$(pwd)
 # execute all necessary tasks
 function main() {
 	cd ${APP_ROOT}
-	rm -rf dist extensions/githubsurf/dist
+	rm -rf dist extensions/githubsurf/dist extensions/githubsurf/jupyter-web/dist
 	echo "remove dist"
 }
 
