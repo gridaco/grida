@@ -4,9 +4,24 @@
 
 ![](./branding/logo.png)
 
+![github.surf url example](branding/url-example.png)
+
 > 🏄‍♂️ Surf your repository like a pro
 
-![github.surf url example](branding/url-example.png)
+
+
+## Features
+
+![github.surf](./docs/images/github-surf-browser-preview.png)
+
+- ✅ Github support - Surf GitHub repository on browser with vscode environment
+- ✅ Official Chrome extension - Launch surf with extension button
+- ✅ Official CLI - `surf .` command for opening surf on terminal
+- Gitlab support ([gitlab.surf](https://gitlab.surf)) (comming soon)
+- Bitbucket support ([bitbucket.surf](https://bitbucket.surf)) (comming soon)
+- Remote compile & terminal support in browser (comming soon)
+
+
 
 
 
@@ -47,6 +62,32 @@ Learn more at [surf-cli](https://github.com/bridgedxyz/surf-cli)
 
 
 
+
+
+## Notes
+
+For unlimited usage, you must provide github token in `key` icon tab
+
+You can generate new token for github.surf on [here](https://github.com/settings/tokens/new?scopes=repo&description=githubsurf)
+
+![provide oauth token for unlimited usage on github.surf](./docs/images/tutorial-provide-oauth-token.png)
+
+
+
+## Limitations
+
+**Max requests per hour**
+
+- [github](https://docs.github.com/en/rest/reference/rate-limit) - 60 requests per hour if no token provided (5000 when provided)
+- [gitlab](https://docs.gitlab.com/ee/security/rate_limits.html#:~:text=Introduced%20in%20GitLab%2012.9.,requests%20per%20minute%20per%20user.) - 5 reqests per **minute**
+- [bitbucket](https://support.atlassian.com/bitbucket-cloud/docs/api-request-limits/) - 60 requests per hour
+
+[Learn more about providing a token for unlimited usage](./docs/guide.md)
+
+
+
+
+
 ## Supported languages / frameworks
 
 [As listed here](./extensions),
@@ -76,6 +117,10 @@ The technology behind this is under development in [appbox](https://github.com/b
 ## Contribution
 
 ### Join the community
+
+- join slack - [here on notion](https://www.notion.so/bridgedxyz/Bridged-OSS-Community-c6983f668e3e4204aed8856da0e73483)
+- view design - [here on figma](https://www.figma.com/file/R3U3OHaoPVd4D7Z9mcaqIE/github.surf?node-id=14%3A0)
+- view the project board - [here on github](https://github.com/bridgedxyz/github.surf/projects)
 
 Learn more about contribution at [CONTRIBUTING.md](./CONTRIBUTING.md)
 
