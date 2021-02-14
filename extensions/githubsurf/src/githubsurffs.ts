@@ -16,9 +16,10 @@ import {
 	Uri,
 } from 'vscode';
 import { noop, dirname, reuseable, hasValidToken } from './util';
-import { parseUri, readGitHubDirectory, readGitHubFile } from './api';
+import { parseUri, readGistDirectory, readGitHubDirectory, readGitHubFile } from './api';
 import { apolloClient, githubObjectQuery } from './client';
 import { toUint8Array as decodeBase64 } from 'js-base64';
+import { parse } from 'graphql';
 
 const textEncoder = new TextEncoder();
 
@@ -31,6 +32,7 @@ export class File implements FileStat {
 	size: number;
 	name: string;
 	sha: string;
+	content?: string;
 	data?: Uint8Array;
 
 	constructor(public uri: Uri, name: string, options?: any) {
@@ -41,6 +43,7 @@ export class File implements FileStat {
 		this.sha = (options && ('sha' in options)) ? options.sha : '';
 		this.size = (options && ('size' in options)) ? options.size : 0;
 		this.data = (options && ('data' in options)) ? options.data : null;
+		this.content = options.content;
 	}
 }
 
@@ -107,6 +110,8 @@ export class GitHubSurfFS implements FileSystemProvider, Disposable {
 	private readonly disposable: Disposable;
 	private _emitter = new EventEmitter<FileChangeEvent[]>();
 	private root: Directory = null;
+	private scmType = location.host.split('.')[0];
+	// private scmType = "gist"
 
 	onDidChangeFile: Event<FileChangeEvent[]> = this._emitter.event;
 
@@ -207,20 +212,45 @@ export class GitHubSurfFS implements FileSystemProvider, Disposable {
 						return parent.getNameTypePairs();
 					});
 			}
-			return readGitHubDirectory(uri).then(data => {
-				parent.entries = new Map<string, Entry>();
-				return data.tree.map((item: any) => {
-					const fileType: FileType = item.type === 'tree' ? FileType.Directory : FileType.File;
-					parent.entries.set(
-						item.path, fileType === FileType.Directory
-						? new Directory(uri, item.path, { sha: item.sha })
-						: new File(uri, item.path, { sha: item.sha, size: item.size })
-					);
-					return [item.path, fileType];
-				});
-			});
+
+			switch (this.scmType) {
+				case "github":
+					return readGitHubDirectory(uri).then(data => {
+						parent.entries = new Map<string, Entry>();
+						return data.tree.map((item: any) => {
+							const fileType: FileType = item.type === 'tree' ? FileType.Directory : FileType.File;
+							parent.entries.set(
+								item.path, fileType === FileType.Directory
+								? new Directory(uri, item.path, { sha: item.sha })
+								: new File(uri, item.path, { sha: item.sha, size: item.size })
+							);
+							return [item.path, fileType];
+						});
+					});
+				case "gist":
+					return readGistDirectory(uri).then(data => {
+						parent.entries = new Map<string, Entry>();
+						return Object.keys(data.files).map((key: any) => {
+							const item = data.files[key];
+							const fileType: FileType = FileType.File;
+							parent.entries.set(
+								item.filename, new File(uri, item.filename, { content : item.content })
+							);
+							return [item.filename, fileType];
+						});
+					});
+			}
 		});
 	}, (uri: Uri) => uri.toString());
+
+	changeStringToUint8Array = reuseable((str : string) => {
+		let buf = new ArrayBuffer(str.length);
+		let bufView = new Uint8Array(buf);
+		for (let i=0, strLen=str.length; i < strLen; i++) {
+			bufView[i] = str.charCodeAt(i);
+		}
+		return bufView;
+	});
 
 	readFile = reuseable((uri: Uri): Uint8Array | Thenable<Uint8Array> => {
 		if (!uri.authority) {
@@ -230,16 +260,21 @@ export class GitHubSurfFS implements FileSystemProvider, Disposable {
 			if (file.data !== null) {
 				return file.data;
 			}
-
 			/**
 			 * Below code will only be triggered in two cases:
 			 *   1. The GraphQL query is disabled
 			 *   2. The GraphQL query is enabled, but the blob/file is binary
 			 */
-			return readGitHubFile(uri, file.sha).then(blob => {
-				file.data = decodeBase64(blob.content);
-				return file.data;
-			});
+			switch (this.scmType) {
+				case "github":
+					return readGitHubFile(uri, file.sha).then(blob => {
+						file.data = decodeBase64(blob.content);
+						return file.data;
+					});
+				case "gist":
+					return this.changeStringToUint8Array(file.content);
+			}
+			
 		});
 	}, (uri: Uri) => uri.toString());
 

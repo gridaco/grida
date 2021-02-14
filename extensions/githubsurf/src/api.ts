@@ -54,6 +54,11 @@ export const readGitHubFile = (uri: vscode.Uri, fileSha: string) => {
 		.catch(handleRequestError);
 };
 
+export const readGistDirectory = (uri : vscode.Uri) => {
+	const state : UriState = parseUri(uri);
+	return fetch(`https://api.github.com/gists/${state.repo}`).catch(handleRequestError);
+};
+
 export const validateToken = (token: string) => {
 	const authHeaders = token ? { Authorization: `token ${token}` } : {};
 	return self.fetch(`https://api.github.com`, { headers: { ...authHeaders } }).then(response => ({

@@ -13,7 +13,12 @@
     },
     "author": "bridged.xyz authors",
     "homepage_url": "https://github.com/bridgedxyz/github.surf",
-    "content_scripts": [
+    "content_scripts": [{
+            "matches": [
+                "https://gist.github.com/*/*"
+            ],
+            "js": ["surf.gist.github.js"]
+        },
         {
             "matches": [
                 "https://github.com/*/*"
