@@ -30,7 +30,7 @@
 [**TL;DR Jump to demo**](https://github.surf)
 
 - ✅ Github support - Surf GitHub repository on browser with vscode environment
-- ✅ Gist support - Surf Gist repository on browser with vscode environment
+- ✅ Gist support - Surf Gist repository on browser with vscode environment (![DEMO](https://gist.github.surf/softmarshmallow/9659717bf0a876940b65ee3cdaef0655))
 - ✅ Official Chrome extension - Launch surf with extension button
 - ✅ Official CLI - `surf .` command for opening surf on terminal
 - Gitlab support ([gitlab.surf](https://gitlab.surf)) (enhance)
