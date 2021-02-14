@@ -13,19 +13,18 @@ const KEY_CONFIG_OPEN_IN_NEW_PAGE = "config.open-in-new-page";
 const GITHUB_BUTTON_NAV_AVAILABLE = buttonNav[0] != null;
 if (GITHUB_BUTTON_NAV_AVAILABLE) {
     // Load saved options
-    chrome.storage.sync.get([KEY_BUTTON_BG_STYLE, KEY_BUTTON_TEXT_STYLE, KEY_CONFIG_OPEN_IN_NEW_PAGE], function (obj) {  
+    chrome.storage.sync.get([KEY_BUTTON_BG_STYLE, KEY_BUTTON_TEXT_STYLE, KEY_CONFIG_OPEN_IN_NEW_PAGE], function(obj) {
         let backgroundColor = DEFAULT_BG_COLOR;
         let textColor = DEFAULT_TEXT_COLOR;
         let openInNewPage = DEFAULT_OPEN_IN_NEW_PAGE_CONFIG;
         try {
             // use custom options if only available
-            if(obj.backgroundColor) {backgroundColor = obj.backgroundColor;}
-            if(obj.textColor) {textColor = obj.textColor;}
-            if(obj.openInNewPage) {openInNewPage = obj.openInNewPage;}
+            if (obj.backgroundColor) { backgroundColor = obj.backgroundColor; }
+            if (obj.textColor) { textColor = obj.textColor; }
+            if (obj.openInNewPage) { openInNewPage = obj.openInNewPage; }
         } catch (_) {}
 
 
-        console.log(backgroundColor);
         // Create the github.surf button
         let btn = document.createElement("a");
         btn.innerHTML = "🏄‍♂️ &nbsp Surf";
@@ -36,15 +35,15 @@ if (GITHUB_BUTTON_NAV_AVAILABLE) {
         if (openInNewPage) {
             btn.target = "_blank";
         }
-        if (backgroundColor.startsWith("#")){
+        if (backgroundColor.startsWith("#")) {
             backgroundColor = `#${backgroundColor}`;
         }
-        if (textColor.startsWith("#")){
+        if (textColor.startsWith("#")) {
             textColor = `#${textColor}`;
         }
         btn.style.backgroundColor = backgroundColor;
         btn.style.color = textColor;
-        
+
         // insert the button in the github button group navigation
         buttonNav[0].appendChild(btn);
     });

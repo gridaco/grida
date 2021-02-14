@@ -25,7 +25,6 @@ if (GIST_BUTTON_NAV_AVAILABLE) {
         } catch (_) {}
 
 
-        console.log(backgroundColor);
         // Create the gist.github.surf button
         let btn = document.createElement("a");
         btn.innerHTML = "🏄‍♂️ &nbsp Surf";
@@ -67,12 +66,10 @@ if (GIST_BUTTON_HEADER_AVAILBLE) {
         } catch (_) {}
 
 
-        console.log(backgroundColor);
-        // Create the gist.github.surf button
 
 
         // insert the button in the github button group navigation
-
+        // Create the gist.github.surf button
         for (let idx = 0; idx < fileHeaders.length; idx++) {
             let buttonWrapper = document.createElement("div");
             buttonWrapper.className = "file-actions flex-order-2 pt-0 ml-2";
