@@ -104,6 +104,12 @@ You can generate new token for github.surf on [here](https://github.com/settings
 
 
 
+**Github Enterprise usage**
+
+You have to modify [api.ts](https://github.com/bridgedxyz/github.surf/blob/main/extensions/githubsurf/src/api.ts) and deploy as-your-own via Deploy on vercel button on the top of this document. api.guthub.com shall point to your-server.example.com
+
+
+
 ## Supported languages / frameworks extensions (themes)
 
 [As listed here](./extensions) and [surf-code-extensions](https://github.com/bridgedxyz/surf-code-extensions) here, we support below extensions in-the-box
