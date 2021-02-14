@@ -43,7 +43,7 @@ function main() {
 	echo 'please wait...'
 	while [ ! -e "${APP_ROOT}/packages/vscode/out" ]
 	do
-		echo "waiting for vsocde build..."
+		echo "waiting for vscode build..."
 		sleep 3
 	done
 	watch_dist
