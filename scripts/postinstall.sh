@@ -8,7 +8,7 @@ function main() {
 	# install githubsurf extensions dependencies
 	for entry in "${APP_ROOT}/extensions"/*
 	do
-		if [ -d "$entry" ]
+		if [ -f "$entry/package.json" ]
 		then
 			cd $entry
 			yarn --frozen-lockfile
