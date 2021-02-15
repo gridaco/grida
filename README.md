@@ -15,6 +15,7 @@
   <a href="https://vercel.com/new/git/external?repository-url=https://github.com/bridgedxyz/github.surf&project-name=github.surf&repo-name=github.surf" style="border-right: 1px solid #4D4D4D">
     <image alt="Deploy github.surf with Vercel" src="https://vercel.com/button"/>
   </a>
+	<a href="https://www.producthunt.com/posts/github-surf?utm_source=badge-featured&utm_medium=badge&utm_souce=badge-github-surf" target="_blank" style="border-right: 1px solid #4D4D4D"><img src="https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=284549&theme=light" alt="GitHub Surf - Open repositories in a VSCode environment in your browser | Product Hunt" style="width: 250px; height: 54px;" width="250" height="54" /></a>
   <a href="https://twitter.com/intent/tweet?text=Wow:&url=https%3A%2F%2Fgithub.com%2Fbridgedxyz%2Fgithub.surf" style="border-right: 1px solid #4D4D4D">
     <image alt="Twitter" src="https://img.shields.io/twitter/url?style=social&url=https%3A%2F%2Fgithub.com%2Fbridgedxyz%2Fgithub.surf">
   </a>
