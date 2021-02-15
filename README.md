@@ -33,8 +33,7 @@
 - ✅ Gist support - Surf Gist repository on browser with vscode environment ([DEMO](https://gist.github.surf/softmarshmallow/9659717bf0a876940b65ee3cdaef0655))
 - ✅ Official Chrome extension - Launch surf with extension button
 - ✅ Official CLI - `surf .` command for opening surf on terminal
-- Gitlab support ([gitlab.surf](https://gitlab.surf)) (enhance)
-- Bitbucket support ([bitbucket.surf](https://bitbucket.surf)) (enhance)
+- Gitlab & Bitbucket support ([gitlab.surf](https://gitlab.surf)) ([bitbucket.surf](https://bitbucket.surf))  (enhance)
 - [surf.codes](https://surf.codes) for private, custom scm (enhance)
 - Remote compile & terminal support in browser (comming soon)
 
@@ -50,9 +49,17 @@ Download our official chrome [here](chrome_link) (It's currently under review)
 
 [Building and installing chrome extension on your own](./chrome-extension/README.md)
 
+**This also works for the GIST too**
+
+![gist surf](./docs/gifs/gist-surf-chrome-demo.gif)
+
 
 
 ## 🏄‍♂️ `surf` CLI
+
+<p align="center"><image src="./branding/surf-cli-cover.png"/></p>
+
+
 
 <p align="center"><image src="./docs/gifs/cli-demo.gif"/></p>
 
