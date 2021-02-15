@@ -45,33 +45,51 @@
     ],
     "main": "./src/extension",
     "contributes": {
-        "languages": [{
-            "id": "jupyter",
-            "aliases": [
-                "Jupyter",
-                "jupyter"
-            ],
-            "extensions": [
-                ".ipynb"
-            ],
-            "configuration": "./language-configuration.json"
-        }],
-        "commands": [{
-            "command": "jupyter.showPreview",
-            "title": "Show preview",
-            "category": "Jupyter"
-        }],
-        "menus": {
-            "editor/title": [{
+        "languages": [
+            {
+                "id": "jupyter",
+                "aliases": [
+                    "Jupyter",
+                    "jupyter"
+                ],
+                "extensions": [
+                    ".ipynb"
+                ],
+                "configuration": "./language-configuration.json"
+            }
+        ],
+        "commands": [
+            {
                 "command": "jupyter.showPreview",
-                "when": "editorLangId == jupyter",
-                "group": "navigation"
-            }]
+                "title": "Show preview",
+                "category": "Jupyter"
+            }
+        ],
+        "menus": {
+            "editor/title": [
+                {
+                    "command": "jupyter.showPreview",
+                    "when": "editorLangId == jupyter",
+                    "group": "navigation"
+                }
+            ]
         }
     },
     "activationEvents": [
         "onLanguage:jupyter",
         "onCommand:jupyter.showPreview"
+    ],
+    "languages": [
+        {
+            "id": "jupyter",
+            "extensions": [
+                ".ipynb"
+            ],
+            "aliases": [
+                "ipynb",
+                "Ipynb"
+            ]
+        }
     ],
     "scripts": {
         "clean": "rm -rf dist out",
