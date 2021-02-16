@@ -9,7 +9,7 @@
 > 🏄‍♂️ Surf your repository like a pro
 
 
-> ❗️ This repo is forked from Github1s. If you are looking for github1s.com, please visit [here](https://github.com/conwnet/github1s)
+> ❗️ This repo is forked from Github1s. If you are looking for github1s.com, please visit [here](https://github.com/conwnet/github1s). Please note that most of the code / work is done by conwnet and github1s contributors (more details below), and we are happy to use the original implementations to modify with more customizations.
 
 <p align="center">
   <a href="https://www.npmjs.com/package/@bridged.xyz/surf" style="border-right: 1px solid #4D4D4D">
