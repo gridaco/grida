@@ -8,6 +8,9 @@
 
 > 🏄‍♂️ Surf your repository like a pro
 
+
+> ❗️ If you are looking for github1s.com, please visit [here](https://github.com/conwnet/github1s)
+
 <p align="center">
   <a href="https://www.npmjs.com/package/@bridged.xyz/surf" style="border-right: 1px solid #4D4D4D">
     <image alt="surf cli on npm" src="https://img.shields.io/badge/cli-latest-brightgreen"/>
