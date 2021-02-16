@@ -206,6 +206,7 @@ this project is inspired from [cdr/code-server](https://github.com/cdr/code-serv
 - 🇰🇷 - [(ko) 🏄‍♂️ Github.surf 를 소개합니다! — 코드를 서핑하기 가장 빠르고 쿨한 방법 (CLI, Extension 지원)](https://medium.com/bridgedxyz/ko-%EF%B8%8F-github-surf%EB%A5%BC-%EC%86%8C%EA%B0%9C%ED%95%A9%EB%8B%88%EB%8B%A4-%EC%BD%94%EB%93%9C%EB%A5%BC-%EC%84%9C%ED%95%91%ED%95%98%EA%B8%B0-%EA%B0%80%EC%9E%A5-%EB%B9%A0%EB%A5%B4%EA%B3%A0-%EC%BF%A8%ED%95%9C-%EB%B0%A9%EB%B2%95-cli-extension-%EC%A7%80%EC%9B%90-65e6a9a07bd5)
 - 🇩🇪 - WIP
 - 🇨🇳 - WIP
+- 🇯🇵 - WIP
 
 
 
