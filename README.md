@@ -79,7 +79,7 @@ npm -g install @bridged.xyz/surf
 surf .
 ```
 
-You can use this as you sub editor, which can be useful when you're exploring your master/main repository when you are at your own branch on your local machine
+You can use this as your sub editor, which can be useful when you're exploring your master/main repository when you are at your own branch on your local machine
 
 ```sh
 # different branch
@@ -109,7 +109,7 @@ You can generate new token for github.surf on [here](https://github.com/settings
 **Max requests per hour**
 
 - [github](https://docs.github.com/en/rest/reference/rate-limit) - 60 requests per hour if no token provided (5000 when provided)
-- [gitlab](https://docs.gitlab.com/ee/security/rate_limits.html#:~:text=Introduced%20in%20GitLab%2012.9.,requests%20per%20minute%20per%20user.) - 5 reqests per **minute**
+- [gitlab](https://docs.gitlab.com/ee/security/rate_limits.html#:~:text=Introduced%20in%20GitLab%2012.9.,requests%20per%20minute%20per%20user.) - 5 requests per **minute**
 - [bitbucket](https://support.atlassian.com/bitbucket-cloud/docs/api-request-limits/) - 60 requests per hour
 
 [Learn more about providing a token for unlimited usage](./docs/guide.md)
@@ -118,7 +118,7 @@ You can generate new token for github.surf on [here](https://github.com/settings
 
 **Github Enterprise usage**
 
-You have to modify [api.ts](https://github.com/bridgedxyz/github.surf/blob/main/extensions/githubsurf/src/api.ts) and deploy as-your-own via Deploy on vercel button on the top of this document. api.guthub.com shall point to your-server.example.com
+You have to modify [api.ts](https://github.com/bridgedxyz/github.surf/blob/main/extensions/githubsurf/src/api.ts) and deploy as-your-own via Deploy on vercel button on the top of this document. api.github.com shall point to your-server.example.com
 
 
 
@@ -127,7 +127,7 @@ You have to modify [api.ts](https://github.com/bridgedxyz/github.surf/blob/main/
 [As listed here](./extensions) and [surf-code-extensions](https://github.com/bridgedxyz/surf-code-extensions) here, we support below extensions in-the-box
 
 - Vue
-- JS/TS/JSX/TSX (React, Svelete, and other js based frrameworks)
+- JS/TS/JSX/TSX (React, Svelete, and other js based frameworks)
 - Dart & Flutter
 - Elm
 - Kotlin
@@ -143,7 +143,7 @@ You have to modify [api.ts](https://github.com/bridgedxyz/github.surf/blob/main/
 
 - PWA Support
 - Enterprise account support (github enterprise)
-- Cusom extensions support
+- Custom extensions support
 - Mobile screen support
 - Remote cli & build support
 - More powerful Private repository experience
@@ -152,9 +152,9 @@ You have to modify [api.ts](https://github.com/bridgedxyz/github.surf/blob/main/
 
 ## Remote compile / App preview (for ui applications) & CLI Capabilities.
 
-For repositories containing project such like flutter, react and other main ui frameworks we are planning to suport live-compile-preview feature of the application. the main issue with this will be the pricing and performance limitation. since we are going to keep this project free / fast for everyone
+For repositories containing project such like flutter, react and other main ui frameworks we are planning to suport live-compile-preview feature of the application. The main issue with this will be the pricing and performance limitation, since we are going to keep this project free / fast for everyone.
 
-The technology behind this is under development in [appbox](https://github.com/bridgedyxz/appbox) and [console](https://github.com/bridgedxyz/console.bridged.xyz). you can see the remote-compile demo on [assistant](https://github.com/bridgedxyz/assistant)
+The technology behind this is under development in [appbox](https://github.com/bridgedyxz/appbox) and [console](https://github.com/bridgedxyz/console.bridged.xyz). You can see the remote-compile demo on [assistant](https://github.com/bridgedxyz/assistant)
 
 
 
@@ -171,9 +171,9 @@ Learn more about contribution at [CONTRIBUTING.md](./CONTRIBUTING.md)
 
 
 
-## Disclamer
+## Disclaimer
 
-this project is inspired from [cdr/code-server](https://github.com/cdr/code-server) and [conwnet/github1s](https://github.com/conwnet/github1s). the base code was forked from github1s (MIT License at the point of fork), which we are replacing it with our own implementations and approaches.
+This project is inspired from [cdr/code-server](https://github.com/cdr/code-server) and [conwnet/github1s](https://github.com/conwnet/github1s). The base code was forked from github1s (MIT License at the point of fork), which we are replacing it with our own implementations and approaches.
 
 
 
