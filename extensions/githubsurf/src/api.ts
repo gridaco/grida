@@ -23,6 +23,8 @@ export const parseUri = (uri: vscode.Uri): UriState => {
 	};
 };
 
+const BRIDGED_CORS = "https://cors.bridged.cc/";
+
 const handleRequestError = (error: RequestError) => {
 	if (error instanceof RequestRateLimitError) {
 		if (!error.token) {
@@ -57,6 +59,24 @@ export const readGitHubFile = (uri: vscode.Uri, fileSha: string) => {
 export const readGistDirectory = (uri : vscode.Uri) => {
 	const state : UriState = parseUri(uri);
 	return fetch(`https://api.github.com/gists/${state.repo}`).catch(handleRequestError);
+};
+
+const getGitlabOwnerId  = (owner : string) => {
+	return fetch(`https://gitlab.com/api/v4/users?username=${owner}`).then(r => r[0].id );
+};
+
+const getGitlabProjectId = async ({owner, repo} : UriState) => {
+	return fetch(`https://gitlab.com/api/v4/users/${await getGitlabOwnerId(owner)}/projects?search=${repo}`).then(r => r[0].id);
+};
+
+export const readGitlabDirectory = async (uri : vscode.Uri) => {
+	const state : UriState = parseUri(uri);
+	return fetch(`https://gitlab.com/api/v4/projects/${await getGitlabProjectId(state)}/repository/tree`).catch(handleRequestError);
+};
+
+export const readGitlabFile = async (uri: vscode.Uri, fileSha: string) => {
+	const state: UriState = parseUri(uri);
+	return fetch(`https://gitlab.com/api/v4/projects/${await getGitlabProjectId(state)}/repository/blobs/${fileSha}`).catch(handleRequestError);
 };
 
 export const validateToken = (token: string) => {
