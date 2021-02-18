@@ -22,6 +22,8 @@ So, if you meet some problems when you use github.surf, even if you are using ne
 
 But this does not mean the token is absolutely safe, **don't forget to clean it while you are using a device that doesn't belong to you**.
 
+As an end user, you can easily run the command `githubsurf: Update github OAuth Token` to fill the [generated github token](https://github.com/settings/tokens/new) for `github.surf` in browser.
+
 # Development
 
 As you see, running github.surf locally is not difficult. After cloning the repository, just run these commands:
