@@ -239,7 +239,7 @@ export class GitHubSurfFS implements FileSystemProvider, Disposable {
 							return parent.getNameTypePairs();
 						});
 				}
-
+				console.log();
 				switch (this.scmType) {
 					case "github":
 						return readGitHubDirectory(uri).then((data) => {

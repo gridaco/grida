@@ -88,10 +88,11 @@ const getGitlabGroupProjectId = async ({owner, repo} : UriState) => {
 export const readGitlabDirectory = async (uri : vscode.Uri) => {
 	const state : UriState = parseUri(uri);
 	const ownerId = await getGitlabPersonalOwnerId(state.owner);
+	console.log(state);
 	if (ownerId === null) {
-		return fetch(`https://gitlab.com/api/v4/projects/${await getGitlabGroupProjectId(state)}/repository/tree?per_page=100`).catch(handleRequestError);
+		return fetch(`https://gitlab.com/api/v4/projects/${await getGitlabGroupProjectId(state)}/repository/tree?per_page=100&path=${state.path !== "/" ? state.path.substr(1) : "/"}`).catch(handleRequestError);
 	} else {
-		return fetch(`https://gitlab.com/api/v4/projects/${await getGitlabPersonalProjectId(state)}/repository/tree?per_page=100`).catch(handleRequestError);
+		return fetch(`https://gitlab.com/api/v4/projects/${await getGitlabPersonalProjectId(state)}/repository/tree?per_page=100&path=${state.path !== "/" ? state.path.substr(1) : "/"}`).catch(handleRequestError);
 	}
 };
 
