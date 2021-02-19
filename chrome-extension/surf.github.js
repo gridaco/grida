@@ -27,7 +27,7 @@ if (GITHUB_BUTTON_NAV_AVAILABLE) {
 
         // Create the github.surf button
         let btn = document.createElement("a");
-        btn.innerHTML = "🏄‍♂️ &nbsp Surf";
+        btn.innerHTML = "🏄‍&nbsp Surf";
         btn.classList = "btn ml-2 d-none d-md-block";
         btn.href = window.location.href.replace("https://github.com/", "https://github.surf/");
 
