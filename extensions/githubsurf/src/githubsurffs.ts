@@ -124,8 +124,8 @@ export class GitHubSurfFS implements FileSystemProvider, Disposable {
 	private readonly disposable: Disposable;
 	private _emitter = new EventEmitter<FileChangeEvent[]>();
 	private root: Directory = null;
-	private scmType = location.host.split(".")[0];
-	// private scmType = "gitlab";
+	// private scmType = location.host.split(".")[0];
+	private scmType = "gitlab";
 
 	onDidChangeFile: Event<FileChangeEvent[]> = this._emitter.event;
 
@@ -332,6 +332,8 @@ export class GitHubSurfFS implements FileSystemProvider, Disposable {
 							file.data = decodeBase64(blob.content);
 							return file.data;
 						});
+					case "bitbucket":
+						return; 
 				}
 			});
 		},
