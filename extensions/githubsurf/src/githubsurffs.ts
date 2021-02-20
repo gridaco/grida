@@ -16,7 +16,7 @@ import {
 	Uri,
 } from 'vscode';
 import { noop, dirname, reuseable, hasValidToken } from './util';
-import { parseUri, readGistDirectory, readGitHubDirectory, readGitHubFile } from './api';
+import { parseUri, readGistDirectory, readGitHubDirectory, readGitHubFile, readGitlabDirectory, readGitlabFile } from './api';
 import { apolloClient, githubObjectQuery } from './client';
 import { toUint8Array as decodeBase64 } from 'js-base64';
 import { parse } from 'graphql';
@@ -111,7 +111,7 @@ export class GitHubSurfFS implements FileSystemProvider, Disposable {
 	private _emitter = new EventEmitter<FileChangeEvent[]>();
 	private root: Directory = null;
 	private scmType = location.host.split('.')[0];
-	// private scmType = "gist"
+	// private scmType = "gitlab"
 
 	onDidChangeFile: Event<FileChangeEvent[]> = this._emitter.event;
 
@@ -239,6 +239,19 @@ export class GitHubSurfFS implements FileSystemProvider, Disposable {
 							return [item.filename, fileType];
 						});
 					});
+				case "gitlab":
+					return readGitlabDirectory(uri).then(data => {
+						parent.entries = new Map<string, Entry>();
+						return data.map((item: any) => {
+							const fileType: FileType = item.type === 'tree' ? FileType.Directory : FileType.File;
+							parent.entries.set(
+								item.path, fileType === FileType.Directory
+								? new Directory(uri, item.path, { sha: item.sha })
+								: new File(uri, item.path, { sha: item.sha, size: item.size })
+							);
+							return [item.path, fileType];
+						});
+					});
 			}
 		});
 	}, (uri: Uri) => uri.toString());
@@ -256,7 +269,7 @@ export class GitHubSurfFS implements FileSystemProvider, Disposable {
 		if (!uri.authority) {
 			throw FileSystemError.FileNotFound(uri);
 		}
-		return this._lookupAsFile(uri, false).then(file => {
+		return this._lookupAsFile(uri, true).then(file => {
 			if (file.data !== null) {
 				return file.data;
 			}
@@ -273,6 +286,11 @@ export class GitHubSurfFS implements FileSystemProvider, Disposable {
 					});
 				case "gist":
 					return this.changeStringToUint8Array(file.content);
+				case "gitlab":
+					return readGitlabFile(uri, file.sha).then(blob => {
+						file.data = decodeBase64(blob.content);
+						return file.data;
+					});
 			}
 			
 		});
