@@ -14,19 +14,12 @@ import {
 	FileStat,
 	FileType,
 	Uri,
-} from "vscode";
-import { noop, dirname, reuseable, hasValidToken } from "./util";
-import {
-	parseUri,
-	readGistDirectory,
-	readGitHubDirectory,
-	readGitHubFile,
-	readGitlabDirectory,
-	readGitlabFile,
-} from "./api";
-import { apolloClient, githubObjectQuery } from "./client";
-import { toUint8Array as decodeBase64 } from "js-base64";
-import { parse } from "graphql";
+} from 'vscode';
+import { noop, dirname, reuseable, hasValidToken } from './util';
+import { parseUri, readGistDirectory, readGitHubDirectory, readGitHubFile } from './api';
+import { apolloClient, githubObjectQuery } from './client';
+import { toUint8Array as decodeBase64 } from 'js-base64';
+import { parse } from 'graphql';
 
 const textEncoder = new TextEncoder();
 
@@ -47,9 +40,9 @@ export class File implements FileStat {
 		this.ctime = Date.now();
 		this.mtime = Date.now();
 		this.name = name;
-		this.sha = options && "sha" in options ? options.sha : "";
-		this.size = options && "size" in options ? options.size : 0;
-		this.data = options && "data" in options ? options.data : null;
+		this.sha = (options && ('sha' in options)) ? options.sha : '';
+		this.size = (options && ('size' in options)) ? options.size : 0;
+		this.data = (options && ('data' in options)) ? options.data : null;
 		this.content = options.content;
 	}
 }
@@ -70,15 +63,13 @@ export class Directory implements FileStat {
 		this.size = 0;
 		this.name = name;
 		this.entries = null;
-		this.sha = options && "sha" in options ? options.sha : "";
-		this.size = options && "size" in options ? options.size : 0;
+		this.sha = (options && ('sha' in options)) ? options.sha : '';
+		this.size = (options && ('size' in options)) ? options.size : 0;
 	}
 
-	getNameTypePairs() {
-		return Array.from(this.entries?.values() || []).map((item: Entry) => [
-			item.name,
-			item instanceof Directory ? FileType.Directory : FileType.File,
-		]);
+	getNameTypePairs () {
+		return Array.from(this.entries?.values() || [])
+			.map((item: Entry) => [item.name, item instanceof Directory ? FileType.Directory : FileType.File]);
 	}
 }
 
@@ -96,22 +87,17 @@ const entriesToMap = (entries, uri) => {
 	}
 	const map = new Map<string, Entry>();
 	entries.forEach((item: any) => {
-		const isDirectory = item.type === "tree";
+		const isDirectory = item.type === 'tree';
 		let entry;
 		if (isDirectory) {
 			entry = new Directory(uri, item.name, { sha: item.oid });
-			entry.entries = entriesToMap(
-				item?.object?.entries,
-				Uri.joinPath(uri, item.name)
-			);
+			entry.entries = entriesToMap(item?.object?.entries, Uri.joinPath(uri, item.name));
 		} else {
 			entry = new File(uri, item.name, {
 				sha: item.oid,
 				size: item.object?.byteSize,
 				// Set data to `null` if the blob is binary so that it will trigger the RESTful endpoint fallback.
-				data: item.object?.isBinary
-					? null
-					: textEncoder.encode(item?.object?.text),
+				data: item.object?.isBinary ? null : textEncoder.encode(item?.object?.text)
 			});
 		}
 		map.set(item.name, entry);
@@ -120,21 +106,18 @@ const entriesToMap = (entries, uri) => {
 };
 
 export class GitHubSurfFS implements FileSystemProvider, Disposable {
-	static scheme = "githubsurf";
+	static scheme = 'githubsurf';
 	private readonly disposable: Disposable;
 	private _emitter = new EventEmitter<FileChangeEvent[]>();
 	private root: Directory = null;
-	private scmType = location.host.split(".")[0];
-	// private scmType = "gitlab";
+	private scmType = location.host.split('.')[0];
+	// private scmType = "gist"
 
 	onDidChangeFile: Event<FileChangeEvent[]> = this._emitter.event;
 
 	constructor() {
 		this.disposable = Disposable.from(
-			workspace.registerFileSystemProvider(GitHubSurfFS.scheme, this, {
-				isCaseSensitive: true,
-				isReadonly: true,
-			})
+			workspace.registerFileSystemProvider(GitHubSurfFS.scheme, this, { isCaseSensitive: true, isReadonly: true }),
 		);
 	}
 
@@ -146,9 +129,8 @@ export class GitHubSurfFS implements FileSystemProvider, Disposable {
 	private async _lookup(uri: Uri, silent: false): Promise<Entry>;
 	private async _lookup(uri: Uri, silent: boolean): Promise<Entry | undefined>;
 	private async _lookup(uri: Uri, silent: boolean): Promise<Entry | undefined> {
-		let parts = uri.path.split("/").filter(Boolean);
-		let entry: Entry =
-			this.root || (this.root = new Directory(uri.with({ path: "/" }), ""));
+		let parts = uri.path.split('/').filter(Boolean);
+		let entry: Entry = this.root || (this.root = new Directory(uri.with({ path: '/' }), ''));
 		for (const part of parts) {
 			let child: Entry | undefined;
 			if (entry instanceof Directory) {
@@ -169,10 +151,7 @@ export class GitHubSurfFS implements FileSystemProvider, Disposable {
 		return entry;
 	}
 
-	private async _lookupAsDirectory(
-		uri: Uri,
-		silent: boolean
-	): Promise<Directory> {
+	private async _lookupAsDirectory(uri: Uri, silent: boolean): Promise<Directory> {
 		const entry = await this._lookup(uri, silent);
 		if (entry instanceof Directory) {
 			return entry;
@@ -197,10 +176,7 @@ export class GitHubSurfFS implements FileSystemProvider, Disposable {
 		return this._lookupAsDirectory(_dirname, false);
 	}
 
-	watch(
-		uri: Uri,
-		options: { recursive: boolean; excludes: string[] }
-	): Disposable {
+	watch(uri: Uri, options: { recursive: boolean; excludes: string[]; }): Disposable {
 		return new Disposable(noop);
 	}
 
@@ -208,165 +184,117 @@ export class GitHubSurfFS implements FileSystemProvider, Disposable {
 		return this._lookup(uri, false);
 	}
 
-	readDirectory = reuseable(
-		(uri: Uri): [string, FileType][] | Thenable<[string, FileType][]> => {
-			if (!uri.authority) {
-				throw FileSystemError.FileNotFound(uri);
+	readDirectory = reuseable((uri: Uri): [string, FileType][] | Thenable<[string, FileType][]> => {
+		if (!uri.authority) {
+			throw FileSystemError.FileNotFound(uri);
+		}
+		return this._lookupAsDirectory(uri, false).then(parent => {
+			if (parent.entries !== null) {
+				return parent.getNameTypePairs();
 			}
-			return this._lookupAsDirectory(uri, false).then((parent) => {
-				if (parent.entries !== null) {
-					return parent.getNameTypePairs();
-				}
 
-				if (hasValidToken() && ENABLE_GRAPH_SQL) {
-					const state = parseUri(uri);
-					const directory = state.path.substring(1);
-					return apolloClient
-						.query({
-							query: githubObjectQuery,
-							variables: {
-								owner: state.owner,
-								repo: state.repo,
-								expression: `${state.branch}:${directory}`,
-							},
-						})
-						.then((response) => {
-							const entries = response.data?.repository?.object?.entries;
-							if (!entries) {
-								throw FileSystemError.FileNotADirectory(uri);
-							}
-							parent.entries = entriesToMap(entries, uri);
-							return parent.getNameTypePairs();
-						});
-				}
+			if (hasValidToken() && ENABLE_GRAPH_SQL) {
+				const state = parseUri(uri);
+				const directory = state.path.substring(1);
+				return apolloClient.query({
+					query: githubObjectQuery, variables: {
+						owner: state.owner,
+						repo: state.repo,
+						expression: `${state.branch}:${directory}`
+					}
+				})
+					.then((response) => {
+						const entries = response.data?.repository?.object?.entries;
+						if (!entries) {
+							throw FileSystemError.FileNotADirectory(uri);
+						}
+						parent.entries = entriesToMap(entries, uri);
+						return parent.getNameTypePairs();
+					});
+			}
 
-				switch (this.scmType) {
-					case "github":
-						return readGitHubDirectory(uri).then((data) => {
-							parent.entries = new Map<string, Entry>();
-							return data.tree.map((item: any) => {
-								const fileType: FileType =
-									item.type === "tree" ? FileType.Directory : FileType.File;
-								parent.entries.set(
-									item.path,
-									fileType === FileType.Directory
-										? new Directory(uri, item.path, { sha: item.sha })
-										: new File(uri, item.path, {
-												sha: item.sha,
-												size: item.size,
-										  })
-								);
-								return [item.path, fileType];
-							});
+			switch (this.scmType) {
+				case "github":
+					return readGitHubDirectory(uri).then(data => {
+						parent.entries = new Map<string, Entry>();
+						return data.tree.map((item: any) => {
+							const fileType: FileType = item.type === 'tree' ? FileType.Directory : FileType.File;
+							parent.entries.set(
+								item.path, fileType === FileType.Directory
+								? new Directory(uri, item.path, { sha: item.sha })
+								: new File(uri, item.path, { sha: item.sha, size: item.size })
+							);
+							return [item.path, fileType];
 						});
-					case "gist":
-						return readGistDirectory(uri).then((data) => {
-							parent.entries = new Map<string, Entry>();
-							return Object.keys(data.files).map((key: any) => {
-								const item = data.files[key];
-								const fileType: FileType = FileType.File;
-								parent.entries.set(
-									item.filename,
-									new File(uri, item.filename, { content: item.content })
-								);
-								return [item.filename, fileType];
-							});
+					});
+				case "gist":
+					return readGistDirectory(uri).then(data => {
+						parent.entries = new Map<string, Entry>();
+						return Object.keys(data.files).map((key: any) => {
+							const item = data.files[key];
+							const fileType: FileType = FileType.File;
+							parent.entries.set(
+								item.filename, new File(uri, item.filename, { content : item.content })
+							);
+							return [item.filename, fileType];
 						});
-					case "gitlab":
-						return readGitlabDirectory(uri).then((data) => {
-							parent.entries = new Map<string, Entry>();
-							return data.map((item: any) => {
-								const fileType: FileType =
-									item.type === "tree" ? FileType.Directory : FileType.File;
-								parent.entries.set(
-									item.path,
-									fileType === FileType.Directory
-										? new Directory(uri, item.path, { sha: item.id })
-										: new File(uri, item.path, {
-												sha: item.id,
-												size: item.size,
-										  })
-								);
-								return [item.path, fileType];
-							});
-						});
-				}
-			});
-		},
-		(uri: Uri) => uri.toString()
-	);
+					});
+			}
+		});
+	}, (uri: Uri) => uri.toString());
 
-	changeStringToUint8Array = reuseable((str: string) => {
+	changeStringToUint8Array = reuseable((str : string) => {
 		let buf = new ArrayBuffer(str.length);
 		let bufView = new Uint8Array(buf);
-		for (let i = 0, strLen = str.length; i < strLen; i++) {
+		for (let i=0, strLen=str.length; i < strLen; i++) {
 			bufView[i] = str.charCodeAt(i);
 		}
 		return bufView;
 	});
 
-	readFile = reuseable(
-		(uri: Uri): Uint8Array | Thenable<Uint8Array> => {
-			if (!uri.authority) {
-				throw FileSystemError.FileNotFound(uri);
+	readFile = reuseable((uri: Uri): Uint8Array | Thenable<Uint8Array> => {
+		if (!uri.authority) {
+			throw FileSystemError.FileNotFound(uri);
+		}
+		return this._lookupAsFile(uri, false).then(file => {
+			if (file.data !== null) {
+				return file.data;
 			}
-			return this._lookupAsFile(uri, false).then((file) => {
-				if (file.data !== null) {
-					return file.data;
-				}
-				/**
-				 * Below code will only be triggered in two cases:
-				 *   1. The GraphQL query is disabled
-				 *   2. The GraphQL query is enabled, but the blob/file is binary
-				 */
-				switch (this.scmType) {
-					case "github":
-						return readGitHubFile(uri, file.sha).then((blob) => {
-							file.data = decodeBase64(blob.content);
-							return file.data;
-						});
-					case "gist":
-						return this.changeStringToUint8Array(file.content);
-					case "gitlab":
-						return readGitlabFile(uri, file.sha).then((blob) => {
-							file.data = decodeBase64(blob.content);
-							return file.data;
-						});
-				}
-			});
-		},
-		(uri: Uri) => uri.toString()
-	);
+			/**
+			 * Below code will only be triggered in two cases:
+			 *   1. The GraphQL query is disabled
+			 *   2. The GraphQL query is enabled, but the blob/file is binary
+			 */
+			switch (this.scmType) {
+				case "github":
+					return readGitHubFile(uri, file.sha).then(blob => {
+						file.data = decodeBase64(blob.content);
+						return file.data;
+					});
+				case "gist":
+					return this.changeStringToUint8Array(file.content);
+			}
+			
+		});
+	}, (uri: Uri) => uri.toString());
 
 	createDirectory(uri: Uri): void | Thenable<void> {
 		return Promise.resolve();
 	}
 
-	writeFile(
-		uri: Uri,
-		content: Uint8Array,
-		options: { create: boolean; overwrite: boolean }
-	): void | Thenable<void> {
+	writeFile(uri: Uri, content: Uint8Array, options: { create: boolean; overwrite: boolean; }): void | Thenable<void> {
 		return Promise.resolve();
 	}
 
-	delete(uri: Uri, options: { recursive: boolean }): void | Thenable<void> {
+	delete(uri: Uri, options: { recursive: boolean; }): void | Thenable<void> {
 		return Promise.resolve();
 	}
 
-	rename(
-		oldUri: Uri,
-		newUri: Uri,
-		options: { overwrite: boolean }
-	): void | Thenable<void> {
+	rename(oldUri: Uri, newUri: Uri, options: { overwrite: boolean; }): void | Thenable<void> {
 		return Promise.resolve();
 	}
 
-	copy?(
-		source: Uri,
-		destination: Uri,
-		options: { overwrite: boolean }
-	): void | Thenable<void> {
+	copy?(source: Uri, destination: Uri, options: { overwrite: boolean; }): void | Thenable<void> {
 		return Promise.resolve();
 	}
 }
