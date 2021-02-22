@@ -128,7 +128,7 @@ You have to modify [api.ts](https://github.com/bridgedxyz/github.surf/blob/main/
 [As listed here](./extensions) and [surf-code-extensions](https://github.com/bridgedxyz/surf-code-extensions) here, we support below extensions in-the-box
 
 - Vue
-- JS/TS/JSX/TSX (React, Svelete, and other js based frameworks)
+- JS/TS/JSX/TSX (React, Svelte, and other js based frameworks)
 - Dart & Flutter
 - Elm
 - Kotlin
