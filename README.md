@@ -5,6 +5,10 @@
 - plugin sdk and core engine api is mapped 1:1
 - right on to production code
 
+## This application is under development and will be available on stable channel on early 2022
+This project, A.K.A `Bridged Studiio` is under development with foundation technologies. We are looking forward that Bridged will change the industry design/development standard by this piece of OSS Project. For updates, please subscribe our news letter on [bridged.xyz](https://bridged.xyz)
+
+
 ## Engine & Foundation
 - studio is built uppon skia graphics library 
 - the core component used is followed by *[reflect design system](https://github.com/bridgedxyz/reflect.bridged.xyz)*
