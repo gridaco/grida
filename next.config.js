@@ -3,7 +3,9 @@
 const withTM = require("next-transpile-modules");
 
 module.exports = withTM({
-    webpack: function(config) {
+    webpack: function(config, {
+        isServer
+    }) {
         config.module.rules.push({
             test: /\.(eot|woff|woff2|ttf|svg|png|jpg|gif)$/,
             use: {
@@ -14,6 +16,18 @@ module.exports = withTM({
                 },
             },
         });
+        config.module.rules.push({
+            test: /\.md$/,
+            use: 'raw-loader',
+        })
+        if (!isServer) {
+            config.node = {
+                fs: 'empty',
+                net: 'empty',
+                tls: 'empty',
+                "fs-extra": 'empty',
+            }
+        }
         return config;
     },
     transpileModules: ["lodash-es"],
