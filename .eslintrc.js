@@ -28,6 +28,7 @@ module.exports = {
                         "/^pages/",
                         "/^public/",
                         "/^utils/",
+                        "/^layouts/",
                     ],
                     ["parent", "sibling", "index"],
                 ],
