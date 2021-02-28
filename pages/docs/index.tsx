@@ -2,18 +2,13 @@ import React, { useEffect } from 'react'
 import { NextPage } from 'next';
 import fs from 'fs';
 import { cwd } from 'process';
-
-type Docs = {
-    type: "file" | "dir" | string;
-    fileName: string;
-    child?: Docs[];
-}
+import { Docs } from 'utils/models/docs';
 
 interface DocsListPageProps {
     docsList: Docs[]
 }
 
-const DocsMainPAge: NextPage<DocsListPageProps> = ({ docsList }) => {
+const DocsListPage: NextPage<DocsListPageProps> = ({ docsList }) => {
 
     return (
         <div>
@@ -22,7 +17,7 @@ const DocsMainPAge: NextPage<DocsListPageProps> = ({ docsList }) => {
     )
 }
 
-DocsMainPAge.getInitialProps = async (context) => {
+DocsListPage.getInitialProps = async (context) => {
     const docsFiles: Array<string> = await fs.promises.readdir(cwd() + '/docs');
     const docsContent = docsFiles.map(async root => {
         if (root.includes(".md")) {
@@ -43,4 +38,4 @@ DocsMainPAge.getInitialProps = async (context) => {
     return { docsList: await Promise.all(docsContent) };
 }
 
-export default DocsMainPAge
+export default DocsListPage
