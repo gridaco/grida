@@ -1,6 +1,6 @@
 # TODO
 
-- Fix getInitialProps file system issue ( fs ) : can not load docs file struct.
+- Fix issues that fail to load docs file tree
 
 **ISSUE LOGIC**
 
@@ -23,6 +23,18 @@ const docsContent = docsFiles?.map(async root => {
 });
 return { docsList: await Promise.all(docsContent), mdxSource };
 ```
+
+**ISSUE DESCRIPTION**
+
+Nextjs is SSR Framework, so the server side can create and send the initial props.
+
+In this case, We are using the logic above because I can list up the documents on the sidebar only if I know the file tree of docs.
+
+The problematic part is the fs of nodejs. fs library is cannot be used by clients.
+
+So after adding logic to the server for use in webpack, we added above code to getInitaiProps in nextjs.
+
+However, it does not run in a product environment while it does well in a development environment.
 
 # REFERNCE
 
