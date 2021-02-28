@@ -23,9 +23,6 @@ module.exports = withTM({
         if (!isServer) {
             config.node = {
                 fs: 'empty',
-                net: 'empty',
-                tls: 'empty',
-                "fs-extra": 'empty',
             }
         }
         return config;
