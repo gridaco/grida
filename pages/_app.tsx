@@ -9,6 +9,7 @@ import Header from "components/header";
 import Fonts from "components/fonts";
 import { defaultTheme } from "utils/styled";
 import { useRouter } from "next/router";
+import { Box } from "rebass";
 
 const MyApp = ({ Component, pageProps }: AppProps) => {
   const router = useRouter();
@@ -91,9 +92,9 @@ const MyApp = ({ Component, pageProps }: AppProps) => {
         `}
       >
         <Header />
-        <div>
+        <Box mx={["200px"]}>
           <Component {...pageProps} />
-        </div>
+        </Box>
         <Footer />
       </div>
     </Providers>
