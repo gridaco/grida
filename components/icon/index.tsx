@@ -32,7 +32,7 @@ const Icon = (props: IconProps) => {
                 cursor: isClickable && "pointer",
                 ...style,
             }}
-            {...boxStyle}
+            {...boxStyle as any}
         >
             <svg viewBox={`0 0 ${icons[name].width} ${icons[name].height}`}>
                 {icons[name].svg}
