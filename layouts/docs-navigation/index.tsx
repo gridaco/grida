@@ -12,9 +12,6 @@ interface DocsNavigationProps {
 const DocsNavigation: React.FC<DocsNavigationProps> = ({ docsList = [] }) => {
     const [navigationDocsList, setNavigationDocsList] = useState([]);
 
-    console.log(1, docsList)
-    console.log(2, navigationDocsList)
-
     useEffect(() => {
         if (docsList.length !== 0) {
             localStorage.setItem("docsList", JSON.stringify(docsList))
@@ -27,7 +24,7 @@ const DocsNavigation: React.FC<DocsNavigationProps> = ({ docsList = [] }) => {
     return (
         <NavigationWrapper flexDirection="column" mr="70px">
             <DocsSearchBar />
-            {navigationDocsList.map(i => !i.fileName.includes(".md") && <DocsNavigationSection key={`navigation-${i.fileName}`} docs={i} />)}
+            {navigationDocsList?.map(i => !i.fileName.includes(".md") && <DocsNavigationSection key={`navigation-${i.fileName}`} docs={i} />)}
         </NavigationWrapper>
     )
 }
