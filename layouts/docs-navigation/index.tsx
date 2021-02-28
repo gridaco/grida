@@ -3,28 +3,14 @@ import styled from '@emotion/styled';
 import { Flex } from 'rebass';
 import DocsSearchBar from 'components/docs-search-bar';
 import DocsNavigationSection from 'components/docs-navigation-section';
-import { Docs } from 'utils/models/docs';
+import { docs } from 'utils/methods/getDocs';
 
-interface DocsNavigationProps {
-    docsList?: Docs[]
-}
-
-const DocsNavigation: React.FC<DocsNavigationProps> = ({ docsList = [] }) => {
-    const [navigationDocsList, setNavigationDocsList] = useState([]);
-
-    useEffect(() => {
-        if (docsList.length !== 0) {
-            localStorage.setItem("docsList", JSON.stringify(docsList))
-            setNavigationDocsList(docsList)
-        } else {
-            setNavigationDocsList(JSON.parse(localStorage.getItem("docsList")))
-        }
-    }, [])
+const DocsNavigation: React.FC = () => {
 
     return (
         <NavigationWrapper flexDirection="column" mr="70px">
             <DocsSearchBar />
-            {navigationDocsList?.map(i => !i.fileName.includes(".md") && <DocsNavigationSection key={`navigation-${i.fileName}`} docs={i} />)}
+            {Object.keys(docs).map(i => <DocsNavigationSection key={`navigation`} docs={docs[i]} />)}
         </NavigationWrapper>
     )
 }

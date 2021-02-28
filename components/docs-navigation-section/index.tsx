@@ -1,20 +1,37 @@
-import React from 'react'
+import React, { useEffect, useState } from 'react'
 import styled from '@emotion/styled'
 import { Flex, Heading } from 'rebass';
-import { Docs } from 'utils/models/docs'
 import Link from 'next/link';
 
-interface DocsNavigationSectionProps {
-    docs: Docs
-}
+const DocsNavigationSection: React.FC<any> = ({ docs }) => {
+    const [title, setTitle] = useState("");
+    const [childs, setChilds] = useState([]);
 
-const DocsNavigationSection: React.FC<DocsNavigationSectionProps> = ({ docs }) => {
+    useEffect(() => {
+        setTitle(docs[0]?.fileName.replace("/", ""));
+        setChilds(docs.map(i => {
+            return {
+                fileName: i.fileName.split("/")[i.fileName.split("/").length - 1],
+                content: i.content
+            }
+        }));
+    }, [docs])
+
     return (
-        <SectionWrapper flexDirection="column">
-            <Link href={`/docs/${docs.fileName}`}>
-                <Heading fontSize="18px" fontWeight={500}>{docs.fileName}</Heading>
-            </Link>
-            {docs.child.map(i => <Link key={`child-${i.fileName}`} href={`/docs/${docs.fileName}/${i.fileName.replace(".md", "")}`}>{i.fileName}</Link>)}
+        (title != "" && !title.includes(".md")) && <SectionWrapper flexDirection="column">
+
+            {childs.map((i, ix) =>
+                ix === 0 ?
+                    <Link href={`/docs/${title}`}>
+                        <Heading fontSize="18px" fontWeight={500}>{title}</Heading>
+                    </Link> :
+                    <Link
+                        key={`child-${i.fileName}`}
+                        href={`/docs/${title}/${i.fileName.replace(".md", "")}`}
+                    >
+                        {i.fileName.replace(".md", "")}
+                    </Link>
+            )}
         </SectionWrapper>
     )
 }
