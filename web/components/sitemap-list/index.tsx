@@ -17,7 +17,7 @@ const SitemapList: React.FC<SitemapListProps> = ({ sitemap }) => {
             </Link>
             {
                 child.map(i =>
-                    <Link href={i.href}>
+                    <Link href={i.href} key={i.label}>
                         <Text fontSize="14px" mb="15px" color="#292929">{i.label}</Text>
                     </Link>
                 )

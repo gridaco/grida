@@ -20,7 +20,7 @@ const Footer = () => {
                     </SitemapWrapper>
                 </FooterContent>
                 <Box mt="80px">
-                    {iconList.map(i => <Icon name={i} mr="12px" />)}
+                    {iconList.map(i => <Icon key={i} name={i} mr="12px" />)}
                 </Box>
                 <FooterBottom justifyContent="space-between" my="24px">
                     <Text>Copyright © 2021 Bridged XYZ LLC</Text>

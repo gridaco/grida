@@ -22,8 +22,8 @@ const Header = () => {
                     </Link>
                     <NavigationWrapper ml="60px" alignItems="center">
                         {HeaderMap.map(i => !i.href ?
-                            <ExpandHeaderItem item={i} /> :
-                            <Link href={i.href}>
+                            <ExpandHeaderItem key={i.label} item={i} /> :
+                            <Link href={i.href} key={i.label}>
                                 <Text mx="12px" color="#8B8B8B" fontWeight="bold" fontSize="16px">{i.label}</Text>
                             </Link>
                         )}
