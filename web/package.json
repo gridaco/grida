@@ -10,7 +10,7 @@
         "type-check": "tsc --noEmit -p .",
         "lint": "eslint --ext .ts,.tsx .",
         "lintfix": "eslint --fix --ext .ts,.tsx .",
-        "setup": "git pull --recurse-submodules",
+        "setup": "git submodule update --init --recursive",
         "vercel:setup": "yarn setup",
         "vercel:install": "yarn vercel:setup & yarn install",
         "vercel:build": "yarn build"
