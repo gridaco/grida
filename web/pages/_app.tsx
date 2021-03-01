@@ -93,7 +93,7 @@ const MyApp = ({ Component, pageProps }: AppProps) => {
         `}
       >
         <Header />
-        <Box mx={["200px"]}>
+        <Box>
           <Component {...pageProps} />
         </Box>
         <Footer />

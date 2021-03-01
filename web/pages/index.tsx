@@ -1,11 +1,14 @@
 import React from "react";
-import { Button } from "@reflect-ui/react-core";
-const index = () => {
+import { Flex } from "rebass";
+import BridgedOuttro from "sections/BridgedOuttro";
+
+
+const MainPage = () => {
   return (
-    <div>
-      <Button>test reflect button</Button>
-    </div>
+    <Flex>
+      <BridgedOuttro />
+    </Flex>
   );
 };
 
-export default index;
+export default MainPage;
