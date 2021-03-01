@@ -8,7 +8,7 @@
     "workspaces": [
         "web",
         "packages/*",
-        "packages/refect-ui/packages/*"
+        "packages/reflect-ui/packages/*"
     ],
     "scripts": {
         "setup": "git submodule update --init --recursive",

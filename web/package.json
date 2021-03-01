@@ -12,6 +12,7 @@
         "lintfix": "eslint --fix --ext .ts,.tsx ."
     },
     "dependencies": {
+        "@reflect-ui/react-core": "0.0.1",
         "@emotion/babel-preset-css-prop": "^10",
         "@emotion/core": "^10.0.16",
         "@emotion/styled": "^10.0.15",
