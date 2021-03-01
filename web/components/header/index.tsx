@@ -55,10 +55,6 @@ const SignupButton = styled(Button)`
 const NavigationWrapper = styled(Flex)`
     height: 24px;
 
-    &::first-child {
-        margin-left: 0px !important;
-    }
-
     @media (max-width: 767px) {
         display: none;
     }
