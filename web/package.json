@@ -16,12 +16,12 @@
         "vercel:build": "yarn build"
     },
     "dependencies": {
-        "@reflect-ui/react-core": "0.0.1",
         "@emotion/babel-preset-css-prop": "^10",
         "@emotion/core": "^10.0.16",
         "@emotion/styled": "^10.0.15",
         "@material-ui/core": "^4.11.3",
         "@material-ui/icons": "^4.11.2",
+        "@reflect-ui/react-core": "0.0.1",
         "@types/react-gtm-module": "^2.0.0",
         "@zeit/next-css": "^1.0.1",
         "axios": "^0.21.1",
@@ -29,6 +29,7 @@
         "dayjs": "^1.8.16",
         "emotion-theming": "^10.0.14",
         "fontfaceobserver": "^2.1.0",
+        "framer-motion": "^3.9.0",
         "gray-matter": "^4.0.2",
         "i18next": "^19.0.1",
         "isomorphic-unfetch": "^3.0.0",
