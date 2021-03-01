@@ -1,6 +1,0 @@
-[submodule "packages/refect-core"]
-	path = packages/refect-core
-	url = https://github.com/bridgedxyz/reflect-core-ts
-[submodule "packages/refect-ui"]
-	path = packages/refect-ui
-	url = https://github.com/bridgedxyz/reflect-ui-react
