@@ -14,7 +14,7 @@
         "setup": "git submodule update --init --recursive",
         "vercel:setup": "yarn setup",
         "vercel:install": "yarn vercel:setup & yarn install",
-        "vercel:build": "yarn build:web",
+        "vercel:build": "yarn workspace web vercel:build",
         "web": "yarn workspace web dev",
         "build:web": "yarn workspace web build"
     }
