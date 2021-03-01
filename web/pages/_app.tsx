@@ -47,6 +47,10 @@ const MyApp = ({ Component, pageProps }: AppProps) => {
             margin-block-end: 0.3em;
           }
 
+          .cursor {
+            cursor: pointer;
+          }
+
           .fonts-loaded {
             body,
             button,
