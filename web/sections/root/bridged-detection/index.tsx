@@ -13,14 +13,7 @@ const BridgedDetection = () => {
 
                 <Desc mr="auto" mt="48px">Finally, the tool understands your design. More inteligence means less modification. Which leads us to blazing fast workflow.</Desc>
 
-                <Box width="100%" height="600px" mt="90px" mb="100px" style={{ position: "relative" }}>
-                    <Box width="120%" height="600px" mt="90px" mb="100px" style={{
-                        position: "absolute",
-                        top: "-15%",
-                        width: "calc(100 % + 20 %)",
-                        left: "-10%"
-                    }} bg="#000" />
-                </Box>
+                <Box width="100%" height="600px" mt="90px" bg="#000" mb="100px" />
 
                 <Link href="/">
                     <Text className="cursor" mr="auto" color="#7D7D7D" fontSize="24px">Learn how the engine works <Icon name="arrowDown" isVerticalMiddle style={{ transform: "rotate(270deg)" }} /></Text>
