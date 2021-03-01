@@ -14,7 +14,7 @@ const Footer = () => {
         <Flex alignItems="center" justifyContent="center" width="100%" bg="#eee" >
             <Flex width={["320px", "730px", "985px", "1250px"]} my={["40px", "50px", "100px", "150px"]} mx="20px" flexDirection='column'>
                 <FooterContent width="100%" >
-                    <Icon name="bridged" mr="100px" mb="64px" ml="20px" />
+                    <Icon name="bridged" mr="100px" mb="64px" />
                     <SitemapWrapper>
                         {Sitemap.map(i => <SitemapList key={i.label} sitemap={i} />)}
                     </SitemapWrapper>
@@ -53,12 +53,13 @@ const FooterBottom = styled(Flex)`
 
         .policys {
             display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(90px, 1fr));
+            grid-template-columns: repeat(auto-fill, minmax(95px, 1fr));
             margin-top: 20px;
 
             div {
                 margin-top: 4px;
                 white-space: nowrap;
+                margin-left: 0px !important;
             }
         }
     }

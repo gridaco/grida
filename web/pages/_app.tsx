@@ -39,6 +39,7 @@ const MyApp = ({ Component, pageProps }: AppProps) => {
           a {
             text-decoration: none;
             color: inherit;
+            cursor: pointer;
           }
 
           p {

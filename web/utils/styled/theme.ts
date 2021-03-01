@@ -24,20 +24,17 @@ export interface ThemeInterface extends Theme {
 
 const defaultButtonProps = {
   bg: "primary",
-  borderRadius: "27px",
-  p: "13px 25px",
-  fontSize: "15px",
+  borderRadius: "19px",
+  p: "6px 20px",
+  fontSize: "16px",
   fontWeight: 500,
-  color: "secondary",
-  borderColor: "gray80",
-  letterSpacing: "-0.75px",
   cursor: "pointer",
 };
 
 const defaultTheme: ThemeInterface = {
   breakpoints: ["320px", "768px", "1024px", "1280px"],
   colors: {
-    primary: "#3F00DD",
+    primary: "#2562FF",
     secondary: "#F6EEC1",
     gray5: "#fbfbfb",
     gray10: "#f2f2f2",
@@ -52,10 +49,6 @@ const defaultTheme: ThemeInterface = {
   buttons: {
     primary: {
       ...defaultButtonProps,
-      ":hover": {
-        backgroundColor: "#5B22E9",
-        color: "white",
-      },
     },
     secondary: {
       ...defaultButtonProps,
