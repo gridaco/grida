@@ -1,0 +1,3 @@
+[submodule "packages/refect-core-ts"]
+	path = packages/refect-core-ts
+	url = https://github.com/bridgedxyz/reflect-core-ts
