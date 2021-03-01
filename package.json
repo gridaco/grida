@@ -7,7 +7,6 @@
     },
     "workspaces": [
         "web",
-        "packages/*",
         "packages/reflect-ui/packages/*"
     ],
     "scripts": {
