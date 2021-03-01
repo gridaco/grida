@@ -8,7 +8,7 @@ import { HeaderMap } from './headermap';
 
 const Header = () => {
     return (
-        <Flex alignItems="center" justifyContent="center" width="100%" height="60px"  >
+        <HeaderWrapper alignItems="center" justifyContent="center" width="100%" height="60px"  >
             <Flex width={["320px", "730px", "985px", "1250px"]} mx="20px" justifyContent="space-between" alignItems="center" height="100%">
                 <ResponsiveMenu>
                     <Icon name="headerMenu" />
@@ -31,11 +31,16 @@ const Header = () => {
                 </Flex>
                 <SignupButton fontSize={["13px", "13px", "15px"]} p={["6px 10px", "6px 10px", "9px 20px", "9px 20px"]}>Sign up</SignupButton>
             </Flex>
-        </Flex>
+        </HeaderWrapper>
     )
 }
 
 export default Header
+
+const HeaderWrapper = styled(Flex)`
+    position: fixed;
+    background-color: #fff;
+`
 
 const Bridged = styled(Icon)`
     

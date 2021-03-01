@@ -93,7 +93,7 @@ const MyApp = ({ Component, pageProps }: AppProps) => {
         `}
       >
         <Header />
-        <Box>
+        <Box mt="60px">
           <Component {...pageProps} />
         </Box>
         <Footer />
