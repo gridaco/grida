@@ -35,7 +35,7 @@ const defaultButtonProps = {
 };
 
 const defaultTheme: ThemeInterface = {
-  breakpoints: ["360px", "720px", "1024px", "1680px"],
+  breakpoints: ["320px", "768px", "1024px", "1280px"],
   colors: {
     primary: "#3F00DD",
     secondary: "#F6EEC1",
