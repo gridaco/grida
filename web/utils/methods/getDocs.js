@@ -34,5 +34,5 @@ function importAll(r) {
 }
 
 export const docs = importAll(
-    require.context('../../docs/', true, /\.md$/)
+    require.context('../../../docs/', true, /\.md$/)
 );
