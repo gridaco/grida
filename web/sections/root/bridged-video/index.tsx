@@ -48,8 +48,13 @@ const Desc = styled(Text)`
     text-align: center;
     margin-top: 40px;
 
-    @media (max-width: 767px) {
+    @media (max-width: 769px) {
         max-width: 570px;
+    }
+
+    @media (max-width: 500px) {
+        max-width: 280px;
+        font-size: 16px;
     }
 `
 

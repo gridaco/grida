@@ -29,6 +29,7 @@ module.exports = {
                         "/^public/",
                         "/^utils/",
                         "/^layouts/",
+                        "/^sections/",
                     ],
                     ["parent", "sibling", "index"],
                 ],
