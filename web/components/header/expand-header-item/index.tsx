@@ -36,10 +36,13 @@ const ExpandHeaderItem = ({ item, isExpand, onExpandHeader, onContractHeader, ty
                         bg="white"
                         height="430px"
                         onClick={onModalInnerClick}
-                        onMouseOver={onExpandHeader}
-                        onMouseLeave={onContractHeader}
                     >
-                        <ExpandHeaderContent width={["320px", "730px", "985px", "1040px"]} height="100%">
+                        <ExpandHeaderContent
+                            width={["320px", "730px", "985px", "1040px"]}
+                            height="100%"
+                            onMouseOver={onExpandHeader}
+                            onMouseLeave={onContractHeader}
+                        >
                             <Product iconName="mockIcon" title="Globalization" desc="Tell customer about this product. Keep it simple" />
                             <Product iconName="mockIcon" title="Globalization" desc="Tell customer about this product. Keep it simple" />
                             <Product iconName="mockIcon" title="Globalization" desc="Tell customer about this product. Keep it simple" />
