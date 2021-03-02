@@ -16,7 +16,6 @@ function DocsNavigation() {
   }, []);
 
   const docs = manifest ? manifest[0] : undefined;
-  console.log(docs);
   return (
     <NavigationWrapper flexDirection="column" mr="70px">
       <DocsSearchBar />
