@@ -17,6 +17,7 @@ const ExpandHeaderItem = ({ item, isExpand, onExpandHeader, onContractHeader }) 
     return (
         <Flex >
             <Label
+                className="cursor"
                 color={isExpand ? "#000" : "#8B8B8B"}
                 isBorder={isExpand}
                 onMouseOver={onExpandHeader}
@@ -27,24 +28,24 @@ const ExpandHeaderItem = ({ item, isExpand, onExpandHeader, onContractHeader }) 
                 <Icon name={isExpand ? "arrowUp" : "arrowDown"} isVerticalMiddle />
             </Label>
             {isExpand && <ModalBackground onClick={onClose} >
-                    <Modal
-                        p={["10px", "10px", "15px 30px"]}
-                        bg="white"
-                        height="430px"
-                        onClick={onModalInnerClick}
-                        onMouseOver={onExpandHeader}
-                        onMouseLeave={onContractHeader}
-                    >
-                        <ExpandHeaderContent width={["320px", "730px", "985px", "1040px"]} height="100%">
-                            <Product />
-                            <Product />
-                            <Product />
-                            <Product />
-                            <Product />
-                            <Product />
-                            <Product />
-                        </ExpandHeaderContent>
-                    </Modal>
+                <Modal
+                    p={["10px", "10px", "15px 30px"]}
+                    bg="white"
+                    height="430px"
+                    onClick={onModalInnerClick}
+                    onMouseOver={onExpandHeader}
+                    onMouseLeave={onContractHeader}
+                >
+                    <ExpandHeaderContent width={["320px", "730px", "985px", "1040px"]} height="100%">
+                        <Product />
+                        <Product />
+                        <Product />
+                        <Product />
+                        <Product />
+                        <Product />
+                        <Product />
+                    </ExpandHeaderContent>
+                </Modal>
             </ModalBackground>}
         </Flex>
     )

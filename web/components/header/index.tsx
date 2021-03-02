@@ -48,6 +48,8 @@ const Header = () => {
 							) : (
 									<Link href={i.href} key={i.label}>
 										<Item
+											onMouseOver={() => setCurrentExpandHeader("")}
+											className="cursor"
 											mx="12px"
 											color="#8B8B8B"
 											fontWeight="bold"
