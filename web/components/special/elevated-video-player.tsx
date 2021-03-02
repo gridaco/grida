@@ -1,11 +1,13 @@
 import styled from "@emotion/styled";
 import Icon from "components/icon";
 import React from "react";
-import { motion } from "framer-motion";
+import { motion, useTransform, useViewportScroll } from "framer-motion";
 function ElevatedVideoPlayer() {
+  const { scrollYProgress } = useViewportScroll();
+  const scale = useTransform(scrollYProgress, [0, 0.08], [0.8, 1]);
   return (
     //   video player mouse hover scale motion
-    <Frame whileHover={{ scale: 1.01 }}>
+    <Frame style={{ scale }}>
       {/* play button click motion */}
       <PlayButtonFrame whileTap={{ scale: 0.9 }} whileHover={{ scale: 1.1 }}>
         <PlayButton name="videoPlay" />
