@@ -4,7 +4,9 @@ import React from "react";
 import { motion } from "framer-motion";
 function ElevatedVideoPlayer() {
   return (
-    <Frame>
+    //   video player mouse hover scale motion
+    <Frame whileHover={{ scale: 1.01 }}>
+      {/* play button click motion */}
       <PlayButtonFrame whileTap={{ scale: 0.9 }} whileHover={{ scale: 1.1 }}>
         <PlayButton name="videoPlay" />
       </PlayButtonFrame>
