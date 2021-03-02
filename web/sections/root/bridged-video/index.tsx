@@ -8,10 +8,11 @@ const BridgedVideoSection = () => {
   return (
     <Frame alignItems="center" justifyContent="center">
       <Flex
-        width={["320px", "730px", "985px", "1250px"]}
+        width={["320px", "730px", "985px", "1040px"]}
         alignItems="center"
         justifyContent="center"
         flexDirection="column"
+        mt="60px"
       >
         <Heading fontSize="80px" fontWeight="bold" textAlign="center">
           Designs that are meant to be implemented.
@@ -25,7 +26,7 @@ const BridgedVideoSection = () => {
         <StartButton mt="40px" p={["12px 28px"]}>
           Start now
         </StartButton>
-        <div style={{ margin: 120 }}>
+        <div style={{ margin: 0 }}>
           <ElevatedVideoPlayer />
         </div>
         {/* <SVGIcon name="videoPlaceholder" /> */}
@@ -53,7 +54,7 @@ const StartButton = styled(Button)`
 
 const Heading = styled(Text)`
   max-width: 900px;
-  margin-top: 100px;
+  margin-top: 60px;
 
   @media (max-width: 500px) {
     max-width: 280px;

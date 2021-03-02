@@ -7,7 +7,7 @@ const BridgedCollaborate = () => {
     return (
         <React.Fragment>
             <CollaborateWrapper alignItems="center" justifyContent="center" >
-                <Flex width={["320px", "730px", "985px", "1250px"]} mt="auto" mx="20px" alignItems="center" justifyContent="center" flexDirection="column">
+                <Flex width={["320px", "730px", "985px", "1040px"]} mt="auto" mx="20px" alignItems="center" justifyContent="center" flexDirection="column">
                     <Box mr="auto">
                         <Text fontSize={["36px", "36px", "64px"]} fontWeight="bold" >Collaborate</Text>
                         <Text fontSize={["36px", "36px", "64px"]} fontWeight="bold" >as the</Text>
