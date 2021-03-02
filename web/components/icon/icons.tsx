@@ -18,6 +18,7 @@ export interface IconList {
   headerMenu: IconListProps;
   videoPlay: IconListProps;
   videoPlaceholder: IconListProps;
+  mockIcon: IconListProps
 }
 
 const icons: IconList = {
@@ -313,6 +314,13 @@ const icons: IconList = {
       </svg>
     ),
   },
+  mockIcon: {
+    width: 24,
+    height: 24,
+    svg: <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <rect width="24" height="24" rx="4" fill="#F1F1F1" />
+    </svg>
+  }
 };
 
 export default icons;
