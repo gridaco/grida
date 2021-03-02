@@ -1,13 +1,23 @@
 import Icon from "components/icon";
 import Link from "next/link";
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import styled from "@emotion/styled";
+import { center } from 'utils/styled/styles';
 import { Box, Flex, Text, Button } from "rebass";
 import ExpandHeaderItem from "./expand-header-item";
 import { HeaderMap } from "./headermap";
 
 const Header = () => {
-	const [currentExpandHeader, setCurrentExpandHeader] = useState("Products");
+	const [currentExpandHeader, setCurrentExpandHeader] = useState("");
+	const [isOpenMenu, setIsOpenMenu] = useState(false);
+
+	useEffect(() => {
+		if (isOpenMenu) {
+			document.getElementsByTagName("body")[0].style.overflow = "hidden"
+		} else {
+			document.getElementsByTagName("body")[0].style.overflow = "auto"
+		}
+	}, [isOpenMenu])
 
 	return (
 		<HeaderWrapper
@@ -23,15 +33,15 @@ const Header = () => {
 				alignItems="center"
 				height="100%"
 			>
-				<ResponsiveMenu>
-					<Icon name="headerMenu" />
+				<ResponsiveMenu className="cursor" onClick={() => setIsOpenMenu(!isOpenMenu)}>
+					<Icon name={isOpenMenu ? "headerClose" : "headerMenu"} />
 				</ResponsiveMenu>
 				<Flex alignItems="center">
 					<Link href="/">
-						<Bridged name="bridged" width={32} height={32} />
+						<Bridged className="cursor" name="bridged" width={32} height={32} />
 					</Link>
 					<Link href="/">
-						<ResponsiveTitle fontSize="18px" ml="8px" fontWeight="600">
+						<ResponsiveTitle className="cursor" fontSize="18px" ml="8px" fontWeight="600">
 							Bridged
             </ResponsiveTitle>
 					</Link>
@@ -64,14 +74,25 @@ const Header = () => {
 				</Flex>
 				<SignupButton
 					onClick={() => {
-						window.location.assign("https://accounts.bridged.xyz/signup");
+						!isOpenMenu && window.location.assign("https://accounts.bridged.xyz/signup");
 					}}
+					style={{ opacity: isOpenMenu && 0 }}
 					fontSize={["13px", "13px", "15px"]}
 					p={["6px 10px", "6px 10px", "9px 20px", "9px 20px"]}
 				>
 					Sign up
         </SignupButton>
 			</Flex>
+			{isOpenMenu &&
+				<ResponsiveMenu style={{ position: "absolute", top: 60 }} bg="#fff" width="100%" height="100vh" px="20px" flexDirection="column">
+					<Button width="100%" bg="#2562FF" height="35px" fontSize="13px">
+						Sign up
+					</Button>
+					<Button width="100%" bg="#fff" color="#000" height="35px" fontSize="13px" style={center}>
+						<Icon name="lock" isVerticalMiddle mr="6px" /> Sign up
+					</Button>
+				</ResponsiveMenu>
+			}
 		</HeaderWrapper>
 	);
 };
@@ -82,6 +103,7 @@ const HeaderWrapper = styled(Flex)`
   position: fixed;
   background-color: #fff;
   z-index: 999;
+	border-bottom: 1px solid #F8F8F8;
 `;
 
 const Bridged = styled(Icon)`
@@ -98,6 +120,10 @@ const Item = styled(Text)`
 
 const SignupButton = styled(Button)`
   height: 35px;
+
+	@media (min-width: 767px) {
+		opacity: 1 !important;
+  }
 
   @media (max-width: 767px) {
     height: 25px;

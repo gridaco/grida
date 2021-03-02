@@ -18,7 +18,9 @@ export interface IconList {
   headerMenu: IconListProps;
   videoPlay: IconListProps;
   videoPlaceholder: IconListProps;
-  mockIcon: IconListProps
+  mockIcon: IconListProps;
+  headerClose: IconListProps;
+  lock: IconListProps;
 }
 
 const icons: IconList = {
@@ -319,6 +321,21 @@ const icons: IconList = {
     height: 24,
     svg: <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
       <rect width="24" height="24" rx="4" fill="#F1F1F1" />
+    </svg>
+  },
+  headerClose: {
+    width: 32,
+    height: 32,
+    svg: <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <circle cx="16" cy="16" r="16" fill="#ECECEC" />
+      <path d="M22.7188 10.5946L21.3088 9.18457L15.7188 14.7746L10.1287 9.18457L8.71875 10.5946L14.3088 16.1846L8.71875 21.7746L10.1287 23.1846L15.7188 17.5946L21.3088 23.1846L22.7188 21.7746L17.1287 16.1846L22.7188 10.5946Z" fill="#686868" />
+    </svg>
+  },
+  lock: {
+    width: 16,
+    height: 16,
+    svg: <svg width="17" height="16" viewBox="0 0 17 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M12.5003 5.33317H11.8337V3.99984C11.8337 2.15984 10.3403 0.666504 8.50033 0.666504C6.66033 0.666504 5.16699 2.15984 5.16699 3.99984V5.33317H4.50033C3.76699 5.33317 3.16699 5.93317 3.16699 6.6665V13.3332C3.16699 14.0665 3.76699 14.6665 4.50033 14.6665H12.5003C13.2337 14.6665 13.8337 14.0665 13.8337 13.3332V6.6665C13.8337 5.93317 13.2337 5.33317 12.5003 5.33317ZM8.50033 11.3332C7.76699 11.3332 7.16699 10.7332 7.16699 9.99984C7.16699 9.2665 7.76699 8.6665 8.50033 8.6665C9.23366 8.6665 9.83366 9.2665 9.83366 9.99984C9.83366 10.7332 9.23366 11.3332 8.50033 11.3332ZM10.567 5.33317H6.43366V3.99984C6.43366 2.85984 7.36033 1.93317 8.50033 1.93317C9.64033 1.93317 10.567 2.85984 10.567 3.99984V5.33317Z" fill="#323232" />
     </svg>
   }
 };

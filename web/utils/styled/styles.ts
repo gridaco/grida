@@ -5,3 +5,9 @@ export const resetUl = css`
   padding: 0;
   margin: 0;
 `;
+
+export const center = {
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center"
+}

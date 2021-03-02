@@ -11,7 +11,7 @@ const MainPage = () => {
   return (
     <Flex flexDirection="column">
       <BridgedVideoSection />
-      <BridgedIntroduce />
+      {/* <BridgedIntroduce /> */}
       <BridgedDetection />
       <BridgedSolutions />
       <BridgedCollaborate />

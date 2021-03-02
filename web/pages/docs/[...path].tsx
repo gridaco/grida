@@ -21,7 +21,7 @@ export default function Post({ post, preview }) {
         <PostTitle>Loading…</PostTitle>
       ) : (
         <>
-          <article style={{ margin: 200 }}>
+          <article >
             <Head>
               <title>{post.title}</title>
               {post.ogImage && (
