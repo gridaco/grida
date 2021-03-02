@@ -143,8 +143,11 @@ const Bridged = styled(Icon)`
 `;
 
 const Item = styled(Text)`
-	&:hover{
-		color:#000;
+
+	@media (min-width: 767px) {
+		&:hover{
+			color:#000;
+		}
 	}
 `
 
