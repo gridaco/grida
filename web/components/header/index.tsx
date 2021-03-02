@@ -1,12 +1,14 @@
 import Icon from "components/icon";
 import Link from "next/link";
-import React from "react";
+import React, { useState } from "react";
 import styled from "@emotion/styled";
 import { Box, Flex, Text, Button } from "rebass";
 import ExpandHeaderItem from "./expand-header-item";
 import { HeaderMap } from "./headermap";
 
 const Header = () => {
+	const [currentExpandHeader, setCurrentExpandHeader] = useState("Products");
+
 	return (
 		<HeaderWrapper
 			alignItems="center"
@@ -36,17 +38,23 @@ const Header = () => {
 					<NavigationWrapper ml="60px" alignItems="center">
 						{HeaderMap.map(i =>
 							!i.href ? (
-								<ExpandHeaderItem key={i.label} item={i} />
+								<ExpandHeaderItem
+									key={i.label}
+									item={i}
+									isExpand={currentExpandHeader === i.label}
+									onExpandHeader={() => setCurrentExpandHeader(i.label)}
+									onContractHeader={() => setCurrentExpandHeader("")}
+								/>
 							) : (
 									<Link href={i.href} key={i.label}>
-										<Text
+										<Item
 											mx="12px"
 											color="#8B8B8B"
 											fontWeight="bold"
 											fontSize="16px"
 										>
 											{i.label}
-										</Text>
+										</Item>
 									</Link>
 								),
 						)}
@@ -79,6 +87,12 @@ const Bridged = styled(Icon)`
     position: absolute;
   }
 `;
+
+const Item = styled(Text)`
+	&:hover{
+		color:#000;
+	}
+`
 
 const SignupButton = styled(Button)`
   height: 35px;
