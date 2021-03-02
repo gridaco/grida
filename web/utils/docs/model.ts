@@ -10,3 +10,13 @@ export interface DocsConfig {
   routes: string[];
   routesWithoutIndex: string[];
 }
+
+// from manifest.json
+export interface DocsRoute {
+  title: string;
+  path: string;
+  open?: boolean;
+  routes?: DocsRoute[];
+}
+
+export type DocsManifest = { routes: DocsRoute[] }[];

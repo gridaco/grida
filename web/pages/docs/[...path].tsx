@@ -26,7 +26,7 @@ export default function Post({ post, preview }) {
         ) : (
           <>
             <article style={{ margin: 200 }}>
-              {/* <DocsNavigation /> */}
+              <DocsNavigation />
               <Head>
                 <title>{post.title} | Next.js Blog Example</title>
                 <meta property="og:image" content={post.ogImage?.url} />
