@@ -1,28 +1,77 @@
 import fs from "fs";
-import { join } from "path";
+import { join, resolve } from "path";
 import matter from "gray-matter";
+const { readdir } = require("fs").promises;
 
 const docsDir = join(process.cwd(), "../docs");
 
-export function getPostSlugs() {
-  return fs
-    .readdirSync(docsDir)
-    .filter(f => f.includes(".md") || f.includes(".mdx"));
+async function getFiles(dir) {
+  const dirents = await readdir(dir, { withFileTypes: true });
+  const files = await Promise.all(
+    dirents.map(dirent => {
+      const res = resolve(dir, dirent.name);
+      return dirent.isDirectory() ? getFiles(res) : res;
+    }),
+  );
+  return Array.prototype.concat(...files);
+}
+
+export async function getPostPaths() {
+  const all = await getFiles(docsDir);
+  const allMdxPaths = all.filter(f => f.includes(".md") || f.includes(".mdx"));
+
+  const final = [];
+  for (const mp of allMdxPaths) {
+    const sp = mp.split("/");
+    const filenamewithext = sp[sp.length - 1];
+    const filename = filenamewithext.replace(".mdx", "");
+    if (filename == "index") {
+      final.push(mp.replace("index.mdx", ""));
+    }
+    final.push(mp);
+  }
+  return final;
 }
 
 interface Post {
-  content;
-  date;
-  slug;
+  content?;
+  date?;
+  slug?;
+  path: string[];
 }
 
-export function getPostBySlug(slug, fields = []): Post {
-  const realSlug = slug.replace(/\.md$/, "");
-  const fullPath = join(docsDir, `${realSlug}.md`);
-  const fileContents = fs.readFileSync(fullPath, "utf8");
+export function getPostByPath(path: string | string[], fields = []): Post {
+  if (Array.isArray(path)) {
+    let builtPath = "";
+    path.map(p => {
+      builtPath = builtPath + "/" + p;
+    });
+    path = builtPath;
+  }
+
+  path = path.replace(docsDir, "");
+  path = path.replace(/\.mdx$/, "");
+  const splits = path.split("/").filter(Boolean);
+  const realSlug = splits[splits.length - 1];
+
+  let fullPath = `${path}`;
+  if (!fullPath.includes(docsDir)) {
+    fullPath = join(docsDir, `${path}`);
+  }
+
+  let fileContents;
+  if (fs.existsSync(`${fullPath}.mdx`)) {
+    fileContents = fs.readFileSync(`${fullPath}.mdx`, "utf8");
+  } else if (fs.existsSync(`${fullPath}/index.mdx`)) {
+    fileContents = fs.readFileSync(`${fullPath}/index.mdx`, "utf8");
+  }
+
   const { data, content } = matter(fileContents);
 
-  const items = {};
+  const items: Post = {
+    slug: realSlug,
+    path: splits,
+  };
 
   // Ensure only the minimal needed data is exposed
   fields.forEach(field => {
@@ -32,22 +81,17 @@ export function getPostBySlug(slug, fields = []): Post {
     if (field === "content") {
       items[field] = content;
     }
-
     if (data[field]) {
       items[field] = data[field];
     }
   });
 
-  return items as any;
+  return items;
 }
 
-export function getAllPosts(fields = []) {
-  const slugs = getPostSlugs();
-  const posts = slugs
-    .map(slug => getPostBySlug(slug, fields))
-    // sort posts by date in descending order
-    .sort((post1, post2) =>
-      (post1 as any).date > (post2 as any).date ? -1 : 1,
-    );
+export async function getAllPosts(fields = []) {
+  const paths = await getPostPaths();
+  const posts = paths.map(slug => getPostByPath(slug, fields));
+
   return posts;
 }
