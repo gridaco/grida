@@ -1,23 +1,25 @@
-import React, { useEffect, useState } from 'react'
-import styled from '@emotion/styled';
-import { Flex } from 'rebass';
-import DocsSearchBar from 'components/docs-search-bar';
-import DocsNavigationSection from 'components/docs-navigation-section';
-import { docs } from 'utils/methods/getDocs';
+import React, { useEffect, useState } from "react";
+import styled from "@emotion/styled";
+import { Flex } from "rebass";
+import DocsSearchBar from "components/docs-search-bar";
+import DocsNavigationSection from "components/docs-navigation-section";
+import { DocsPost } from "../../utils/docs/model";
 
-const DocsNavigation: React.FC = () => {
-
-    return (
-        <NavigationWrapper flexDirection="column" mr="70px">
-            <DocsSearchBar />
-            {Object.keys(docs).map(i => <DocsNavigationSection key={`navigation`} docs={docs[i]} />)}
-        </NavigationWrapper>
-    )
+function DocsNavigation(props: { docs: DocsPost[] }) {
+  return (
+    <NavigationWrapper flexDirection="column" mr="70px">
+      <DocsSearchBar />
+      {props.docs &&
+        Object.keys(props.docs).map(i => (
+          <DocsNavigationSection key={`navigation`} docs={props.docs[i]} />
+        ))}
+    </NavigationWrapper>
+  );
 }
 
-export default DocsNavigation
+export default DocsNavigation;
 
 const NavigationWrapper = styled(Flex)`
-    min-width: 250px;
-    height: 100%;
-`
+  min-width: 250px;
+  height: 100%;
+`;

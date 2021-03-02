@@ -2,7 +2,7 @@ import fs from "fs";
 import { join, resolve } from "path";
 import matter from "gray-matter";
 const { readdir } = require("fs").promises;
-
+import { DocsPost } from "./model";
 const docsDir = join(process.cwd(), "../docs");
 
 async function getFiles(dir) {
@@ -33,14 +33,7 @@ export async function getPostPaths() {
   return final;
 }
 
-interface Post {
-  content?;
-  date?;
-  slug?;
-  path: string[];
-}
-
-export function getPostByPath(path: string | string[], fields = []): Post {
+export function getPostByPath(path: string | string[], fields = []): DocsPost {
   if (Array.isArray(path)) {
     let builtPath = "";
     path.map(p => {
@@ -68,7 +61,7 @@ export function getPostByPath(path: string | string[], fields = []): Post {
 
   const { data, content } = matter(fileContents);
 
-  const items: Post = {
+  const items: DocsPost = {
     slug: realSlug,
     path: splits,
   };

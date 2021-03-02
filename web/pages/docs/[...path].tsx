@@ -10,11 +10,12 @@ import PostTitle from "../../components/docs-mdx//post-title";
 import Head from "next/head";
 import markdownToHtml from "../../utils/docs/md-to-html";
 
-export default function Post({ post, morePosts, preview }) {
+export default function Post({ post, list, preview }) {
   const router = useRouter();
   if (!router.isFallback && !post.slug) {
     return <ErrorPage statusCode={404} />;
   }
+  console.log("list", list);
   return (
     <Layout preview={preview}>
       <Container>
@@ -24,7 +25,8 @@ export default function Post({ post, morePosts, preview }) {
         ) : (
           <>
             <article style={{ margin: 200 }}>
-              {/* <Head>
+              {/* <DocsNavigation /> */}
+              <Head>
                 <title>{post.title} | Next.js Blog Example</title>
                 <meta property="og:image" content={post.ogImage?.url} />
               </Head>
@@ -33,7 +35,7 @@ export default function Post({ post, morePosts, preview }) {
                 coverImage={post.coverImage}
                 date={post.date}
                 author={post.author}
-              /> */}
+              />
               <PostBody content={post.content} />
             </article>
           </>
@@ -70,7 +72,6 @@ export async function getStaticProps({
 
 export async function getStaticPaths() {
   const posts = await getAllPosts(["slug"]);
-
   const paths = posts.map(post => {
     return {
       params: {
@@ -78,8 +79,6 @@ export async function getStaticPaths() {
       },
     };
   });
-
-  console.log("paths", posts);
 
   return {
     paths: paths,
