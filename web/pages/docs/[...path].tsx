@@ -1,3 +1,4 @@
+import React from "react";
 import { useRouter } from "next/router";
 import ErrorPage from "next/error";
 import Container from "../../components/docs-mdx/container";
@@ -9,13 +10,13 @@ import { getPostByPath, getAllPosts } from "../../utils/docs/api";
 import PostTitle from "../../components/docs-mdx//post-title";
 import Head from "next/head";
 import markdownToHtml from "../../utils/docs/md-to-html";
+import DocsNavigation from "layout/docs-navigation";
 
-export default function Post({ post, list, preview }) {
+export default function Post({ post, preview }) {
   const router = useRouter();
   if (!router.isFallback && !post.slug) {
     return <ErrorPage statusCode={404} />;
   }
-  console.log("list", list);
   return (
     <Layout preview={preview}>
       <Container>
@@ -50,13 +51,7 @@ export async function getStaticProps({
 }: {
   params: { path: string[] };
 }) {
-  const post = getPostByPath(params.path, [
-    "title",
-    "date",
-    "slug",
-    "author",
-    "content",
-  ]);
+  const post = getPostByPath(params.path);
 
   const content = await markdownToHtml(post.content || "");
 
@@ -71,11 +66,11 @@ export async function getStaticProps({
 }
 
 export async function getStaticPaths() {
-  const posts = await getAllPosts(["slug"]);
+  const posts = await getAllPosts();
   const paths = posts.map(post => {
     return {
       params: {
-        path: post.path,
+        path: post.route,
       },
     };
   });

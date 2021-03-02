@@ -2,89 +2,96 @@ import fs from "fs";
 import { join, resolve } from "path";
 import matter from "gray-matter";
 const { readdir } = require("fs").promises;
-import { DocsPost } from "./model";
-const docsDir = join(process.cwd(), "../docs");
+import { DocsPost, DocsConfig } from "./model";
 
-async function getFiles(dir) {
+const DOCS_ROOT_DIR = join(process.cwd(), "../docs");
+const MDX_EXT = ".mdx";
+
+async function getFilesIn(dir: string): Promise<readonly string[]> {
   const dirents = await readdir(dir, { withFileTypes: true });
   const files = await Promise.all(
     dirents.map(dirent => {
       const res = resolve(dir, dirent.name);
-      return dirent.isDirectory() ? getFiles(res) : res;
+      return dirent.isDirectory() ? getFilesIn(res) : res;
     }),
   );
   return Array.prototype.concat(...files);
 }
 
-export async function getPostPaths() {
-  const all = await getFiles(docsDir);
-  const allMdxPaths = all.filter(f => f.includes(".md") || f.includes(".mdx"));
+let DOCS_CONFIG: DocsConfig;
 
-  const final = [];
+export async function makeDocsConfig(): Promise<DocsConfig> {
+  if (DOCS_CONFIG) {
+    return DOCS_CONFIG;
+  }
+  const allFiles = await getFilesIn(DOCS_ROOT_DIR);
+  const allMdxPaths = allFiles
+    .filter(f => f.includes(MDX_EXT))
+    .map(f => f.replace(DOCS_ROOT_DIR, ""));
+
+  const routes = [];
   for (const mp of allMdxPaths) {
     const sp = mp.split("/");
     const filenamewithext = sp[sp.length - 1];
-    const filename = filenamewithext.replace(".mdx", "");
+    const filename = filenamewithext.replace(MDX_EXT, "");
     if (filename == "index") {
-      final.push(mp.replace("index.mdx", ""));
+      routes.push(mp.replace("index.mdx", ""));
     }
-    final.push(mp);
+    routes.push(mp);
   }
-  return final;
+
+  const routesWithoutIndex = routes.filter(r => {
+    const sp = r.split("/");
+    return sp[sp.length - 1] !== "index";
+  });
+
+  DOCS_CONFIG = {
+    files: allMdxPaths,
+    routes: routes,
+    routesWithoutIndex: routesWithoutIndex,
+  };
+
+  return DOCS_CONFIG;
 }
 
-export function getPostByPath(path: string | string[], fields = []): DocsPost {
+export function getPostByPath(path: string | string[]): DocsPost {
+  // make ['a', b] as 'a/b'
   if (Array.isArray(path)) {
-    let builtPath = "";
-    path.map(p => {
-      builtPath = builtPath + "/" + p;
-    });
-    path = builtPath;
+    path = path.join("/");
   }
 
-  path = path.replace(docsDir, "");
-  path = path.replace(/\.mdx$/, "");
+  path = path.replace(DOCS_ROOT_DIR, "");
+  path = path.replace(MDX_EXT, "");
   const splits = path.split("/").filter(Boolean);
   const realSlug = splits[splits.length - 1];
 
-  let fullPath = `${path}`;
-  if (!fullPath.includes(docsDir)) {
-    fullPath = join(docsDir, `${path}`);
+  // make ful path
+  let fullPath;
+  if (!path.includes(DOCS_ROOT_DIR)) {
+    fullPath = join(DOCS_ROOT_DIR, `${path}`);
   }
 
   let fileContents;
-  if (fs.existsSync(`${fullPath}.mdx`)) {
-    fileContents = fs.readFileSync(`${fullPath}.mdx`, "utf8");
+  if (fs.existsSync(`${fullPath}${MDX_EXT}`)) {
+    fileContents = fs.readFileSync(`${fullPath}${MDX_EXT}`, "utf8");
   } else if (fs.existsSync(`${fullPath}/index.mdx`)) {
     fileContents = fs.readFileSync(`${fullPath}/index.mdx`, "utf8");
   }
 
   const { data, content } = matter(fileContents);
 
-  const items: DocsPost = {
+  const item: DocsPost = {
     slug: realSlug,
-    path: splits,
+    route: splits,
+    content: content,
   };
 
-  // Ensure only the minimal needed data is exposed
-  fields.forEach(field => {
-    if (field === "slug") {
-      items[field] = realSlug;
-    }
-    if (field === "content") {
-      items[field] = content;
-    }
-    if (data[field]) {
-      items[field] = data[field];
-    }
-  });
-
-  return items;
+  return item;
 }
 
-export async function getAllPosts(fields = []) {
-  const paths = await getPostPaths();
-  const posts = paths.map(slug => getPostByPath(slug, fields));
+export async function getAllPosts() {
+  const paths = await makeDocsConfig();
+  const posts = paths.routes.map(slug => getPostByPath(slug));
 
   return posts;
 }
