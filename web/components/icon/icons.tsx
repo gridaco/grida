@@ -239,7 +239,7 @@ const icons: IconList = {
         fill="none"
         xmlns="http://www.w3.org/2000/svg"
       >
-        <circle cx="56" cy="56" r="56" fill="black" fill-opacity="0.8" />
+        <circle cx="56" cy="56" r="56" fill="black" fillOpacity="0.8" />
         <path
           d="M79.8125 51.3034C83.8125 53.6128 83.8125 59.3863 79.8125 61.6957L49.0625 79.4492C45.0625 81.7586 40.0625 78.8718 40.0625 74.253L40.0625 38.746C40.0625 34.1272 45.0625 31.2404 49.0625 33.5498L79.8125 51.3034Z"
           fill="white"

@@ -7,7 +7,7 @@ import Link from 'next/link';
 const BridgedDetection = () => {
     return (
         <DetectionWrapper alignItems="center" justifyContent="center" mx="20px">
-            <Flex width={["320px", "730px", "985px", "1250px"]} alignItems="center" justifyContent="center" flexDirection="column">
+            <Flex width={["320px", "730px", "985px", "1040px"]} alignItems="center" justifyContent="center" flexDirection="column">
                 <Text fontSize={["36px", "36px", "64px"]} fontWeight="bold" mr="auto">Yes, we know.</Text>
                 <Text fontSize={["36px", "36px", "64px"]} fontWeight="bold" mr="auto">That's a </Text>
 

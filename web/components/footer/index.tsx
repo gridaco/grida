@@ -12,7 +12,7 @@ const iconList: Array<keyof IconList> = ["youtube", "instagram", "twitter", "fac
 const Footer = () => {
     return (
         <Flex alignItems="center" justifyContent="center" width="100%" bg="#eee" >
-            <Flex width={["320px", "730px", "985px", "1250px"]} my={["40px", "50px", "100px", "150px"]} mx="20px" flexDirection='column'>
+            <Flex width={["320px", "730px", "985px", "1040px"]} my={["40px", "50px", "100px", "150px"]} mx="20px" flexDirection='column'>
                 <FooterContent width="100%" >
                     <Icon name="bridged" mr="100px" mb="64px" />
                     <SitemapWrapper>
@@ -77,7 +77,7 @@ const SitemapWrapper = styled(Box)`
   width: 100%;
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
-  grid-column-gap: 100px;
+  grid-column-gap: 80px;
   grid-row-gap: 64px;
 
   @media (max-width: 360px) {
