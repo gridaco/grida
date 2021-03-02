@@ -6,7 +6,7 @@
             "routes": [
                 {
                     "title": "Getting Started",
-                    "path": "/docs/getting-started.md"
+                    "path": "/docs/getting-started"
                 },
                 {
                     "title": "Assistant",
@@ -187,33 +187,89 @@
                     ]
                 },
                 {
-                    "title": "Upgrade Guide",
-                    "path": "/docs/upgrading.md"
-                },
-                {
-                    "title": "Migrating to Next.js",
+                    "title": "Packages",
                     "routes": [
                         {
-                            "title": "Incrementally Adopting Next.js",
-                            "path": "/docs/migrating/incremental-adoption.md"
+                            "title": "Dynamic",
+                            "path": "/docs/dynamic"
                         },
                         {
-                            "title": "Migrating from Gatsby",
-                            "path": "/docs/migrating/from-gatsby.md"
+                            "title": "InApp Bridge",
+                            "path": "/docs/inapp-bridge"
+                        }
+                    ]
+                },
+                {
+                    "title": "Platforms",
+                    "routes": [
+                        {
+                            "title": "Figma",
+                            "routes": [
+                                {
+                                    "title": "Introduction",
+                                    "path": "/docs/platforms/figma"
+                                }
+                            ]
                         },
                         {
-                            "title": "Migrating from Create React App",
-                            "path": "/docs/migrating/from-create-react-app.md"
+                            "title": "XD",
+                            "routes": [
+                                {
+                                    "title": "Introduction",
+                                    "path": "/docs/platforms/figma"
+                                }
+                            ]
                         },
                         {
-                            "title": "Migrating from React Router",
-                            "path": "/docs/migrating/from-react-router.md"
+                            "title": "Flutter",
+                            "routes": [
+                                {
+                                    "title": "Introduction",
+                                    "path": "/docs/platforms/figma"
+                                }
+                            ]
+                        },
+                        {
+                            "title": "React",
+                            "routes": [
+                                {
+                                    "title": "Introduction",
+                                    "path": "/docs/platforms/react"
+                                }
+                            ]
+                        },
+                        {
+                            "title": "Sketch",
+                            "routes": [
+                                {
+                                    "title": "Introduction",
+                                    "path": "/docs/platforms/sketch"
+                                }
+                            ]
+                        },
+                        {
+                            "title": "Vue",
+                            "routes": [
+                                {
+                                    "title": "Introduction",
+                                    "path": "/docs/platforms/vue"
+                                }
+                            ]
+                        },
+                        {
+                            "title": "HTML/CSS",
+                            "routes": [
+                                {
+                                    "title": "Introduction",
+                                    "path": "/docs/platforms/vanilla-web"
+                                }
+                            ]
                         }
                     ]
                 },
                 {
                     "title": "FAQ",
-                    "path": "/docs/faq.md"
+                    "path": "/docs/faq"
                 }
             ]
         },

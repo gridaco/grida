@@ -4,7 +4,7 @@ import React from "react";
 import { motion, useTransform, useViewportScroll } from "framer-motion";
 function ElevatedVideoPlayer() {
   const { scrollYProgress } = useViewportScroll();
-  const scale = useTransform(scrollYProgress, [0, 0.08], [0.8, 1]);
+  const scale = useTransform(scrollYProgress, [0, 0.05], [0.8, 1]);
   return (
     //   video player mouse hover scale motion
     <Frame style={{ scale }}>

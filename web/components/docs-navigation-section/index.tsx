@@ -11,7 +11,14 @@ function DocsNavigationSection(props: { route: DocsRoute; level?: number }) {
   return (
     <div style={{ marginLeft: level * 20 }}>
       <SectionWrapper flexDirection="column">
-        <h4>{routeConfig.title}</h4>
+        {routeConfig.path ? (
+          <Link href={routeConfig.path ?? ""}>
+            <h4>{routeConfig.title}</h4>
+          </Link>
+        ) : (
+          <h4>{routeConfig.title}</h4>
+        )}
+
         {routeConfig.routes &&
           routeConfig.routes.map((i, ix) =>
             i.routes ? (
