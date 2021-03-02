@@ -1,12 +1,9 @@
-import React, { useEffect } from 'react'
-import { NextPage } from 'next';
+import React from "react";
 
-const DocsListPage: NextPage = () => {
-
-    return (
-        <div>
-        </div>
-    )
+export default function() {
+  return (
+    <div>
+      <h1>Welcome to Bridged Docs</h1>
+    </div>
+  );
 }
-
-export default DocsListPage
