@@ -1,15 +1,17 @@
 import React from "react";
 import { Flex } from "rebass";
-import BridgedCollaborate from "sections/root/bridged-collaborate";
-import BridgedDetection from "sections/root/bridged-detection";
-import BridgedOuttro from "sections/root/bridged-outtro";
-import BridgedSolutions from "sections/root/bridged-solutions";
-import BridgedVideoSection from "sections/root/bridged-video";
+import BridgedCollaborate from "sections/bridged/bridged-collaborate";
+import BridgedDetection from "sections/bridged/bridged-detection";
+import BridgedIntroduce from "sections/bridged/bridged-introduce";
+import BridgedOuttro from "sections/bridged/bridged-outtro";
+import BridgedSolutions from "sections/bridged/bridged-solutions";
+import BridgedVideoSection from "sections/bridged/bridged-video";
 
 const MainPage = () => {
   return (
     <Flex flexDirection="column">
       <BridgedVideoSection />
+      <BridgedIntroduce />
       <BridgedDetection />
       <BridgedSolutions />
       <BridgedCollaborate />
