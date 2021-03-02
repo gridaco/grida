@@ -1,10 +1,7 @@
 import React from "react";
 import { useRouter } from "next/router";
 import ErrorPage from "next/error";
-import Container from "../../components/docs-mdx/container";
 import PostBody from "../../components/docs-mdx/post-body";
-import Header from "../../components/docs-mdx/header";
-import PostHeader from "../../components/docs-mdx/post-header";
 import Layout from "../../components/docs-mdx//layout";
 import { getPostByPath, getAllPosts } from "../../utils/docs/api";
 import PostTitle from "../../components/docs-mdx//post-title";
@@ -19,29 +16,22 @@ export default function Post({ post, preview }) {
   }
   return (
     <Layout preview={preview}>
-      <Container>
-        <Header />
-        {router.isFallback ? (
-          <PostTitle>Loading…</PostTitle>
-        ) : (
-          <>
-            <article style={{ margin: 200 }}>
-              <DocsNavigation />
-              <Head>
-                <title>{post.title} | Next.js Blog Example</title>
-                <meta property="og:image" content={post.ogImage?.url} />
-              </Head>
-              <PostHeader
-                title={post.title}
-                coverImage={post.coverImage}
-                date={post.date}
-                author={post.author}
-              />
-              <PostBody content={post.content} />
-            </article>
-          </>
-        )}
-      </Container>
+      <DocsNavigation />
+      {router.isFallback ? (
+        <PostTitle>Loading…</PostTitle>
+      ) : (
+        <>
+          <article style={{ margin: 200 }}>
+            <Head>
+              <title>{post.title}</title>
+              {post.ogImage && (
+                <meta property="og:image" content={post.ogImage.url} />
+              )}
+            </Head>
+            <PostBody content={post.content} />
+          </article>
+        </>
+      )}
     </Layout>
   );
 }
