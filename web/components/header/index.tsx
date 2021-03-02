@@ -49,6 +49,7 @@ const Header = () => {
 						{HeaderMap.map(i =>
 							!i.href ? (
 								<ExpandHeaderItem
+									type="desktop"
 									key={i.label}
 									item={i}
 									isExpand={currentExpandHeader === i.label}
@@ -84,13 +85,42 @@ const Header = () => {
         </SignupButton>
 			</Flex>
 			{isOpenMenu &&
-				<ResponsiveMenu style={{ position: "absolute", top: 60 }} bg="#fff" width="100%" height="100vh" px="20px" flexDirection="column">
-					<Button width="100%" bg="#2562FF" height="35px" fontSize="13px">
-						Sign up
-					</Button>
-					<Button width="100%" bg="#fff" color="#000" height="35px" fontSize="13px" style={center}>
-						<Icon name="lock" isVerticalMiddle mr="6px" /> Sign up
-					</Button>
+				<ResponsiveMenu justifyContent="space-between" style={{ position: "absolute", top: 60, height: "calc(100vh - 60px)" }} bg="#fff" width="100%" px="20px" pb="24px" flexDirection="column">
+					<Flex mt="24px" flexDirection="column">
+						{HeaderMap.map(i =>
+							!i.href ? (
+								<ExpandHeaderItem
+									key={i.label}
+									type="mobile"
+									item={i}
+									isExpand={currentExpandHeader === i.label}
+									onExpandHeader={() => setCurrentExpandHeader(i.label)}
+									onContractHeader={() => setCurrentExpandHeader("")}
+								/>
+							) : (
+									<Link href={i.href} key={i.label}>
+										<Item
+											onMouseOver={() => setCurrentExpandHeader("")}
+											className="cursor"
+											my="12px"
+											color="#8B8B8B"
+											fontWeight="bold"
+											fontSize="16px"
+										>
+											{i.label}
+										</Item>
+									</Link>
+								),
+						)}
+					</Flex>
+					<Box>
+						<Button width="100%" bg="#2562FF" height="35px" fontSize="13px" mb="12px">
+							Sign up
+						</Button>
+						<Button width="100%" bg="#fff" color="#000" height="35px" fontSize="13px" style={center}>
+							<Icon name="lock" isVerticalMiddle mr="6px" /> Sign in
+						</Button>
+					</Box>
 				</ResponsiveMenu>
 			}
 		</HeaderWrapper>

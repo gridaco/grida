@@ -6,7 +6,7 @@ import Icon from 'components/icon';
 
 const Product = ({ title, iconName, desc }) => {
   return (
-    <ProductWrapper width="100%" height="100%" justifyContent="center" flexDirection="column" >
+    <ProductWrapper width="100%" height="100%" justifyContent="center" flexDirection="column" mt="12px">
       <Flex alignItems="center" mb="11px">
         <Icon name={iconName} />
         <Text fontWeight="500" fontSize="16px" ml="9px">{title}</Text>
@@ -21,4 +21,8 @@ export default Product
 const ProductWrapper = styled(Flex)`
   max-width: 255px;
   max-height: 70px;
+
+  @media (max-width: 767px) {
+    max-width: 320px;
+  }
 `

@@ -4,7 +4,7 @@ import { Text, Flex, Box } from 'rebass';
 import styled from '@emotion/styled';
 import Product from 'components/product';
 
-const ExpandHeaderItem = ({ item, isExpand, onExpandHeader, onContractHeader }) => {
+const ExpandHeaderItem = ({ item, isExpand, onExpandHeader, onContractHeader, type }) => {
 
     const onClose = useCallback(() => {
         onContractHeader()
@@ -15,46 +15,59 @@ const ExpandHeaderItem = ({ item, isExpand, onExpandHeader, onContractHeader }) 
     }, []);
 
     return (
-        <Flex >
-            <Label
-                className="cursor"
-                color={isExpand ? "#000" : "#8B8B8B"}
-                isBorder={isExpand}
-                onMouseOver={onExpandHeader}
-                fontWeight="bold"
-                fontSize="16px"
-            >
-                {item.label}
-                <Icon name={isExpand ? "arrowUp" : "arrowDown"} isVerticalMiddle />
-            </Label>
-            {isExpand && <ModalBackground onClick={onClose} >
-                <Modal
-                    p={["10px", "10px", "15px 30px"]}
-                    bg="white"
-                    height="430px"
-                    onClick={onModalInnerClick}
-                    onMouseOver={onExpandHeader}
-                    onMouseLeave={onContractHeader}
+        <React.Fragment>
+            <Flex >
+                <Label
+                    className="cursor"
+                    color={isExpand ? "#000" : "#8B8B8B"}
+                    isBorder={isExpand && type == "desktop"}
+                    onMouseOver={type == "desktop" ? onExpandHeader : null}
+                    onClick={type == "mobile" ? isExpand ? onContractHeader : onExpandHeader : null}
+                    fontWeight="bold"
+                    fontSize="16px"
+                    mx={type === "desktop" && "12px"}
                 >
-                    <ExpandHeaderContent width={["320px", "730px", "985px", "1040px"]} height="100%">
-                        <Product iconName="mockIcon" title="Globalization" desc="Tell customer about this product. Keep it simple" />
-                        <Product iconName="mockIcon" title="Globalization" desc="Tell customer about this product. Keep it simple" />
-                        <Product iconName="mockIcon" title="Globalization" desc="Tell customer about this product. Keep it simple" />
-                        <Product iconName="mockIcon" title="Globalization" desc="Tell customer about this product. Keep it simple" />
-                        <Product iconName="mockIcon" title="Globalization" desc="Tell customer about this product. Keep it simple" />
-                        <Product iconName="mockIcon" title="Globalization" desc="Tell customer about this product. Keep it simple" />
-                        <Product iconName="mockIcon" title="Globalization" desc="Tell customer about this product. Keep it simple" />
-                    </ExpandHeaderContent>
-                </Modal>
-            </ModalBackground>}
-        </Flex>
+                    {item.label}
+                    <Icon name={isExpand ? "arrowUp" : "arrowDown"} isVerticalMiddle />
+                </Label>
+                {isExpand && type === "desktop" && <ModalBackground onClick={onClose} >
+                    <Modal
+                        p={["10px", "10px", "15px 30px"]}
+                        bg="white"
+                        height="430px"
+                        onClick={onModalInnerClick}
+                        onMouseOver={onExpandHeader}
+                        onMouseLeave={onContractHeader}
+                    >
+                        <ExpandHeaderContent width={["320px", "730px", "985px", "1040px"]} height="100%">
+                            <Product iconName="mockIcon" title="Globalization" desc="Tell customer about this product. Keep it simple" />
+                            <Product iconName="mockIcon" title="Globalization" desc="Tell customer about this product. Keep it simple" />
+                            <Product iconName="mockIcon" title="Globalization" desc="Tell customer about this product. Keep it simple" />
+                            <Product iconName="mockIcon" title="Globalization" desc="Tell customer about this product. Keep it simple" />
+                            <Product iconName="mockIcon" title="Globalization" desc="Tell customer about this product. Keep it simple" />
+                            <Product iconName="mockIcon" title="Globalization" desc="Tell customer about this product. Keep it simple" />
+                            <Product iconName="mockIcon" title="Globalization" desc="Tell customer about this product. Keep it simple" />
+                        </ExpandHeaderContent>
+                    </Modal>
+                </ModalBackground>}
+
+            </Flex>
+            {isExpand && type === "mobile" && <Flex flexDirection="column" mt="12px" mb="24px">
+                <Product iconName="mockIcon" title="Globalization" desc="Tell customer about this product. Keep it simple" />
+                <Product iconName="mockIcon" title="Globalization" desc="Tell customer about this product. Keep it simple" />
+                <Product iconName="mockIcon" title="Globalization" desc="Tell customer about this product. Keep it simple" />
+                <Product iconName="mockIcon" title="Globalization" desc="Tell customer about this product. Keep it simple" />
+                <Product iconName="mockIcon" title="Globalization" desc="Tell customer about this product. Keep it simple" />
+                <Product iconName="mockIcon" title="Globalization" desc="Tell customer about this product. Keep it simple" />
+                <Product iconName="mockIcon" title="Globalization" desc="Tell customer about this product. Keep it simple" />
+            </Flex>}
+        </React.Fragment>
     )
 }
 
 export default ExpandHeaderItem
 
 const Label = styled(Text) <{ isBorder: boolean }>`
-    margin: 0px 12px;
     font-weight: bold;
     font-size: 16px;
     display: flex;
@@ -65,8 +78,10 @@ const Label = styled(Text) <{ isBorder: boolean }>`
         border-bottom: 2px solid black;
     `}
 
-    &:hover {
-        color: #000;
+    @media (min-width: 767px) {
+        &:hover {
+            color: #000;
+        }
     }
 `
 
