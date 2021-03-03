@@ -28,6 +28,7 @@
         "babel-plugin-apply-mdx-type-prop": "^1.6.22",
         "dayjs": "^1.8.16",
         "emotion-theming": "^10.0.14",
+        "firebase": "^8.2.9",
         "fontfaceobserver": "^2.1.0",
         "framer-motion": "^3.9.0",
         "gray-matter": "^4.0.2",
