@@ -43,6 +43,14 @@ const MyApp = ({ Component, pageProps }: AppProps) => {
             min-height: 100vh;
           }
 
+          .no-drag {
+            -ms-user-select: none; 
+            -moz-user-select: -moz-none; 
+            -webkit-user-select: none; 
+            -khtml-user-select: none; 
+            user-select:none;
+          }
+
           input {
             box-sizing: border-box;
           }
