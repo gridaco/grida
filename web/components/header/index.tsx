@@ -6,6 +6,7 @@ import { center } from 'utils/styled/styles';
 import { Box, Flex, Text, Button } from "rebass";
 import ExpandHeaderItem from "./expand-header-item";
 import { HeaderMap } from "./headermap";
+import { LandingpageUrls } from 'utils/landingpage/constants';
 
 const Header = () => {
 	const [currentExpandHeader, setCurrentExpandHeader] = useState("");
@@ -74,9 +75,7 @@ const Header = () => {
 					</NavigationWrapper>
 				</Flex>
 				<SignupButton
-					onClick={() => {
-						!isOpenMenu && window.location.assign("https://accounts.bridged.xyz/signup");
-					}}
+					onClick={() => !isOpenMenu && window.location.assign(LandingpageUrls.signup)}
 					style={{ opacity: isOpenMenu && 0 }}
 					fontSize={["13px", "13px", "15px"]}
 					p={["6px 10px", "6px 10px", "9px 20px", "9px 20px"]}
@@ -84,7 +83,8 @@ const Header = () => {
 					Sign up
         </SignupButton>
 			</Flex>
-			{isOpenMenu &&
+			{
+				isOpenMenu &&
 				<ResponsiveMenu justifyContent="space-between" style={{ position: "absolute", top: 60, height: "calc(100vh - 60px)" }} bg="#fff" width="100%" px="20px" pb="24px" flexDirection="column">
 					<Flex mt="24px" flexDirection="column">
 						{HeaderMap.map(i =>
@@ -116,13 +116,13 @@ const Header = () => {
 						<Button width="100%" bg="#2562FF" height="35px" fontSize="13px" mb="12px">
 							Sign up
 						</Button>
-						<Button width="100%" bg="#fff" color="#000" height="35px" fontSize="13px" style={center}>
+						<Button width="100%" bg="#fff" color="#000" height="35px" fontSize="13px" style={center} onClick={() => window.location.assign(LandingpageUrls.login)}>
 							<Icon name="lock" isVerticalMiddle mr="6px" /> Sign in
 						</Button>
 					</Box>
 				</ResponsiveMenu>
 			}
-		</HeaderWrapper>
+		</HeaderWrapper >
 	);
 };
 

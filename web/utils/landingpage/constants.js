@@ -1,5 +1,5 @@
 export const LandingpageUrls = {
-    login: "https://accounts.bridged.xyz/login",
+    login: "https://accounts.bridged.xyz/",
     signup: "https://accounts.bridged.xyz/signup",
 
     // video

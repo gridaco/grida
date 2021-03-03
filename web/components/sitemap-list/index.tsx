@@ -13,12 +13,12 @@ const SitemapList: React.FC<SitemapListProps> = ({ sitemap }) => {
     return (
         <Flex flexDirection="column">
             <Link href={href}>
-                <Text fontWeight="500" fontSize="18px" mb="40px">{label}</Text>
+                <Text className="cursor" fontWeight="500" fontSize="18px" mb="40px">{label}</Text>
             </Link>
             {
                 child.map(i =>
                     <Link href={i.href} key={i.label}>
-                        <Text fontSize="14px" mb="15px" color="#292929">{i.label}</Text>
+                        <Text className="cursor" fontSize="14px" mb="15px" color="#292929">{i.label}</Text>
                     </Link>
                 )
             }
