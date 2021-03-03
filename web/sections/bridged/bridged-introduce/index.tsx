@@ -17,8 +17,12 @@ const BridgedIntroduce = () => {
           <Desc mr="auto" mt="30px">Keep you design live, not as a prototype, but as a product. Instantly convert your design to code, prototype, product within a click. No coding required</Desc>
         </Box>
         <AbsoulteImageArea>
-          <CodeView>
-            <Image src="/code_live.png" width="460" height="770" />
+          <CodeView width="460px" height="770px" bg="#212121">
+            <header>
+              <span />
+              <span />
+              <span />
+            </header>
           </CodeView>
           <PlatformView>
             <Image src="/figma_live.png" width="904" height="565" />
@@ -34,10 +38,10 @@ const BridgedIntroduce = () => {
             <Text fontSize="24px" mb="8px" color="#7D7D7D" >How do Design to code work? <Icon name="arrowDown" isVerticalMiddle style={{ transform: "rotate(270deg)" }} /></Text>
             <Text fontSize="24px" mb="8px" color="#7D7D7D">That just got ON AIR <Icon name="arrowDown" isVerticalMiddle style={{ transform: "rotate(270deg)" }} /></Text>
           </Box>
-          <LiveArea >
+          <LiveArea>
             <Image className="app" src="/simluator.png" width="390" height="788" />
             <GradientView>
-              <Image src="/gradient-bg.png" width="2080" height="1765" />
+              <Image src="/gradient-live.png" width="1440" height="1040" />
             </GradientView>
           </LiveArea>
         </Flex>
@@ -73,6 +77,24 @@ const CodeView = styled(Box)`
   position: absolute;
   top: -27%;
   right: -15%;
+  border-radius: 12px;
+  
+  header {
+    display: flex;
+    align-items: center;
+    height: 50px;
+    padding: 0px 20px;
+    border-top-left-radius: 12px;
+    border-top-right-radius: 12px;
+
+    span {
+      background-color:#3D3D3D;
+      width: 16px;
+      height: 16px;
+      margin-right: 10px;
+      border-radius: 50%;
+    }
+  }
 `
 
 const PlatformView = styled(Box)`
@@ -84,10 +106,6 @@ const PlatformView = styled(Box)`
 
 const LiveArea = styled(Box)`
   position: relative;
-
-  .app {
-    z-index: 998;
-  }
 `
 
 const GradientView = styled(Box)`
@@ -96,4 +114,6 @@ const GradientView = styled(Box)`
   height: 1765px;
   top: -75%;
   left: -170%;
+  filter: blur(600px);
+  z-index: -1;
 `
