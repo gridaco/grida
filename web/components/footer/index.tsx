@@ -50,7 +50,7 @@ const Footer = () => {
                 </FooterContent>
                 <Box mt="80px">
                     {iconList.map(i =>
-                        <Link href={i.href}>
+                        <Link href={i.href} key={i.icon}>
                             <Icon className="cursor" key={i.icon} name={i.icon} mr="12px" />
                         </Link>
                     )}
