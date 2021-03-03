@@ -8,7 +8,7 @@ import Icon from 'components/icon';
 
 const BridgedIntroduce = () => {
   return (
-    <IntroduceWrapper className="no-drag" alignItems="center" justifyContent="center">
+    <IntroduceWrapper  alignItems="center" justifyContent="center">
       <Flex width={["320px", "730px", "985px", "1040px"]} mx="20px" alignItems="center" justifyContent="center" flexDirection="column">
         <Box mr="auto">
           <Text fontSize={["36px", "36px", "64px"]} fontWeight="bold" >Designs,</Text>
@@ -24,7 +24,7 @@ const BridgedIntroduce = () => {
               <span />
             </header>
           </CodeView>
-          <PlatformView>
+          <PlatformView className="no-drag">
             <Image src="/figma_live.png" width="904" height="565" />
           </PlatformView>
         </AbsoulteImageArea>
@@ -38,7 +38,7 @@ const BridgedIntroduce = () => {
             <Text fontSize="24px" mb="8px" color="#7D7D7D" >How do Design to code work? <Icon name="arrowDown" isVerticalMiddle style={{ transform: "rotate(270deg)" }} /></Text>
             <Text fontSize="24px" mb="8px" color="#7D7D7D">That just got ON AIR <Icon name="arrowDown" isVerticalMiddle style={{ transform: "rotate(270deg)" }} /></Text>
           </Box>
-          <LiveArea>
+          <LiveArea className="no-drag">
             <Image className="app" src="/simluator.png" width="390" height="788" />
             <GradientView>
               <Image src="/gradient-live.png" width="1440" height="1040" />
