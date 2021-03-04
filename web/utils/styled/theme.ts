@@ -24,7 +24,7 @@ export interface ThemeInterface extends Theme {
 
 const defaultButtonProps = {
   bg: "primary",
-  borderRadius: "19px",
+  borderRadius: "60px",
   p: "6px 20px",
   fontSize: "16px",
   fontWeight: 500,
