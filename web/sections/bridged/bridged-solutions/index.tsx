@@ -2,13 +2,48 @@ import React from 'react'
 import { Flex, Button, Text, Box } from 'rebass';
 import styled from '@emotion/styled';
 import Link from 'next/link';
+import GradientSolutions from './gradient-solutaions';
+
+const SolutionList = [
+    {
+        title : "idea",
+        subTitle: "Instantly create 'idea' from your design",
+        desc: "With powerful Design2Code Engine, Bridged generates production ready code that can also easily be used for existing projects. Supprt for components, various code styles, naming convention, fille & directory structure are included."
+    },
+    {
+        title : "code",
+        subTitle: "Instantly create 'code' from your design",
+        desc: "With powerful Design2Code Engine, Bridged generates production ready code that can also easily be used for existing projects. Supprt for components, various code styles, naming convention, fille & directory structure are included.",
+        gradient: "linear-gradient(99.57deg, #6268FF 0%, #9039FF 100%)"
+    }, 
+    {
+        title : "server",
+        subTitle: "Instantly create 'server' from your design",
+        desc: "With powerful Design2Code Engine, Bridged generates production ready code that can also easily be used for existing projects. Supprt for components, various code styles, naming convention, fille & directory structure are included."
+    }, 
+    {
+        title : "translations",
+        subTitle: "Instantly create 'translations' from your design",
+        desc: "With powerful Design2Code Engine, Bridged generates production ready code that can also easily be used for existing projects. Supprt for components, various code styles, naming convention, fille & directory structure are included."
+    }, 
+    {
+        title : "insight",
+        subTitle: "Instantly create 'insight' from your design",
+        desc: "With powerful Design2Code Engine, Bridged generates production ready code that can also easily be used for existing projects. Supprt for components, various code styles, naming convention, fille & directory structure are included."
+    }, 
+    {
+        title : "everything",
+        subTitle: "Instantly create 'everything' from your design",
+        desc: "With powerful Design2Code Engine, Bridged generates production ready code that can also easily be used for existing projects. Supprt for components, various code styles, naming convention, fille & directory structure are included."
+    }, 
+]
 
 const BridgedSolutions = () => {
     return (
         <SolutionsWrapper alignItems="center" justifyContent="center" mx="20px">
             <Flex width={["320px", "730px", "985px", "1040px"]} alignItems="center" justifyContent="center" flexDirection="column">
                 <Text fontSize={["36px", "36px", "64px"]} fontWeight="bold" mr="auto">Your design is your</Text>
-                <Text fontSize={["36px", "36px", "64px"]} fontWeight="bold" mr="auto">code server translations...</Text>
+                <GradientSolutions list={SolutionList} />
 
                 <Box width="100%" height="650px" mt="90px" bg="#000" mb="100px" />
 
