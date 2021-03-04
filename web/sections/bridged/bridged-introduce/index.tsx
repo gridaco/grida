@@ -8,6 +8,25 @@ import CodeFrameworks from './code-framework';
 import DesignPlatforms from './design-platform';
 import ActionItem from 'components/action-item';
 
+const Onair = () => {
+  return <OnairButton>
+    ON AIR
+  </OnairButton>
+}
+
+const OnairButton = styled.button`
+  margin-left: 20px;
+  background: linear-gradient(263.03deg, #DD308F 0%, #EA4F42 100%);
+  box-shadow: 0px 4px 32px rgba(255, 0, 0, 0.25);
+  width: 140px;
+  padding: 12px;
+  border: none;
+  border-radius: 19px;
+  color: #fff;
+  font-size: 32px;
+  font-weight: bold;
+`
+
 
 const BridgedIntroduce = () => {
   return (
@@ -26,7 +45,10 @@ const BridgedIntroduce = () => {
         <Flex width="100%" justifyContent="space-between">
           <Box>
             <Text fontSize="24px" mb="17px">What you’ve just sketched?</Text>
-            <Text fontSize={["36px", "36px", "64px"]} fontWeight="bold" mb="35px" style={{ maxWidth: 360 }}>That just got ON AIR</Text>
+            <Flex >
+              <Text fontSize={["36px", "36px", "64px"]} fontWeight="bold" mb="35px" style={{ display: "flex", alignItems: 'center' }}>That just got <Onair /></Text>
+            </Flex>
+
             <LiveAreaMobile className="no-drag">
               <Image className="app" src="/simluator.png" width="390" height="788" />
               <GradientView>
