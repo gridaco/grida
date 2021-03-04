@@ -1,17 +1,28 @@
-import React from 'react'
+import React, { useState } from 'react'
 import { Flex, Button, Text, Box } from 'rebass';
 import styled from '@emotion/styled';
 import Icon from 'components/icon';
 import Link from 'next/link';
 import { LandingpageUrls } from 'utils/landingpage/constants';
 import ActionItem from 'components/action-item';
+import MotionButton from 'components/motion/button';
+import MotionRadio from 'components/motion/radio';
+
+const renderMoitonComponents = [MotionButton, MotionRadio]
 
 const BridgedDetection = () => {
+    const [currentMotionIndex, setCurrentMotionIndex] = useState(0);
+    
     return (
         <DetectionWrapper alignItems="center" justifyContent="center" mx="20px">
             <Flex width={["320px", "730px", "985px", "1040px"]} alignItems="center" justifyContent="center" flexDirection="column">
-                <Text fontSize={["36px", "36px", "64px"]} fontWeight="bold" mr="auto">Yes, we know.</Text>
-                <Text fontSize={["36px", "36px", "64px"]} fontWeight="bold" mr="auto">That's a </Text>
+                <Box mr="auto">
+                    <Text fontSize={["36px", "36px", "64px"]} fontWeight="bold">Yes, we know.</Text>
+                    <Flex alignItems="center">
+                        <Text fontSize={["36px", "36px", "64px"]} fontWeight="bold" mr='20px'>That's a</Text>
+                        {renderMoitonComponents.map((i, ix) => ix === currentMotionIndex && i())}
+                    </Flex>
+                </Box>
 
                 <Desc mr="auto" mt="48px">Finally, the tool understands your design. More inteligence means less modification. Which leads us to blazing fast workflow.</Desc>
 
