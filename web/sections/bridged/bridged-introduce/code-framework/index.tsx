@@ -1,10 +1,14 @@
-import React from 'react'
+import React, { useState } from 'react'
 import { Flex, Button, Text, Box } from 'rebass';
 import styled from '@emotion/styled';
 import Image from 'next/image';
 import Icon from 'components/icon';
 
+const renderPlatforms = ["flutter", "react", "svelte", "html"]
+
 const CodeFrameworks = () => {
+  const [currentPlatform, setCurrentPlatform] = useState("flutter");
+  
   return (
     <Flex flex={1} flexDirection="column" alignItems="flex-end" justifyContent="flex-end">
       <CodeView width="460px" height="770px" bg="#212121">
@@ -20,18 +24,27 @@ const CodeFrameworks = () => {
         </div>
 
       </CodeView>
-      <Box>
-        <Icon name="bridged" width={24} height={24} />
-        <Icon name="bridged" width={24} height={24} ml="28px" />
-        <Icon name="bridged" width={24} height={24} ml="28px" />
-        <Icon name="bridged" width={24} height={24} ml="28px" />
-      </Box>
+      <Platforms >
+        {renderPlatforms.map(i => <PlatformIcon className="cursor" onClick={() => setCurrentPlatform(i)} isActive={currentPlatform === i} src={`/platform-icons/${i}.png`} width="24" height="24"  />)}
+      </Platforms>
       <BlankArea />
     </Flex>
   )
 }
 
 export default CodeFrameworks
+
+const Platforms = styled(Box)`
+  div {
+    width: 24px;
+    height: 24px;
+    margin-left: 28px !important;
+  }
+`
+
+const PlatformIcon = styled(Image)<{ isActive : boolean }>`
+    ${p => p.isActive ? 'filter: saturate(100%);' : 'filter: saturate(0);'}
+`
 
 const CodeView = styled(Box)`
   position: absolute;

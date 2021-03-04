@@ -1,10 +1,14 @@
-import React from 'react'
+import React, { useState } from 'react'
 import { Flex, Button, Text, Box } from 'rebass';
 import styled from '@emotion/styled';
 import Image from 'next/image';
 import Icon from 'components/icon';
 
+const renderPlatforms = ["figma", "sketch", "adobexd"]
+
 const DesignPlatforms = () => {
+  const [currentPlatform, setCurrentPlatform] = useState("figma");
+
   return (
     <Flex height="100%" flex={1} flexDirection="column" alignItems="flex-start" justifyContent="flex-end">
       <PlatformView className="no-drag">
@@ -13,17 +17,26 @@ const DesignPlatforms = () => {
 
         </PlatformPreview>
       </PlatformView>
-      <Box>
-        <Icon name="bridged" width={24} height={24} mr="28px" />
-        <Icon name="bridged" width={24} height={24} mr="28px" />
-        <Icon name="bridged" width={24} height={24} mr="28px" />
-        <Icon name="bridged" width={24} height={24} />
-      </Box>
+      <Platforms>
+        {renderPlatforms.map(i => <PlatformIcon className="cursor" onClick={() => setCurrentPlatform(i)} isActive={currentPlatform === i} src={`/platform-icons/${i}.png`} width="24" height="24"  />)}
+      </Platforms>
     </Flex>
   )
 }
 
 export default DesignPlatforms
+
+const Platforms = styled(Box)`
+  div {
+    width: 24px;
+    height: 24px;
+    margin-left: 28px !important;
+  }
+`
+
+const PlatformIcon = styled(Image)<{ isActive : boolean }>`
+    ${p => p.isActive ? 'filter: saturate(100%);' : 'filter: saturate(0);'}
+`
 
 const PlatformPreview = styled(Flex)`
   width: 440px;
