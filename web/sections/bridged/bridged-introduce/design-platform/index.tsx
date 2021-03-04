@@ -18,7 +18,7 @@ const DesignPlatforms = () => {
         </PlatformPreview>
       </PlatformView>
       <Platforms>
-        {renderPlatforms.map(i => <PlatformIcon className="cursor" onClick={() => setCurrentPlatform(i)} isActive={currentPlatform === i} src={`/platform-icons/${i}.png`} width="24" height="24"  />)}
+        {renderPlatforms.map(i => <PlatformIcon key={i} className="cursor" onClick={() => setCurrentPlatform(i)} isActive={currentPlatform === i} src={`/platform-icons/${i}.png`} width="24" height="24"  />)}
       </Platforms>
     </Flex>
   )
