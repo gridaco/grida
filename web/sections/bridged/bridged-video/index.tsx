@@ -60,6 +60,7 @@ const Desc = styled(Text)`
   font-weight: medium;
   text-align: center;
   margin-top: 40px;
+  color: #444545;
 
   @media (max-width: 769px) {
     max-width: 570px;
