@@ -12,7 +12,6 @@ const BridgedVideoSection = () => {
         alignItems="center"
         justifyContent="center"
         flexDirection="column"
-        mt="60px"
       >
         <Heading fontSize="80px" fontWeight="bold" textAlign="center">
           Designs that are meant to be implemented.
@@ -23,13 +22,12 @@ const BridgedVideoSection = () => {
           content backend in-the-box. With a click. A hackable tool that's
           designed for hackers.
         </Desc>
-        <StartButton mt="40px" p={["12px 28px"]}>
+        <StartButton mt="40px" mb="20px" p={["12px 28px"]}>
           Start now
         </StartButton>
         <div style={{ margin: 0 }}>
           <ElevatedVideoPlayer />
         </div>
-        {/* <SVGIcon name="videoPlaceholder" /> */}
       </Flex>
     </Frame>
   );
@@ -38,12 +36,6 @@ const BridgedVideoSection = () => {
 export default BridgedVideoSection;
 
 const Frame = styled(Flex)`
-  height: 1200px;
-
-  @media (max-width: 767px) {
-    height: 900px;
-  }
-
   margin-bottom: 120px;
 `;
 
