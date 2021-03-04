@@ -3,6 +3,7 @@ import { Flex, Button, Text } from "rebass";
 import styled from "@emotion/styled";
 import Icon from "components/icon";
 import ElevatedVideoPlayer from "components/special/elevated-video-player";
+import { Typography } from '@reflect-ui/react-core';
 
 const BridgedVideoSection = () => {
   return (
@@ -13,6 +14,7 @@ const BridgedVideoSection = () => {
         justifyContent="center"
         flexDirection="column"
       >
+        
         <Heading fontSize="80px" fontWeight="bold" textAlign="center">
           Designs that are meant to be implemented.
         </Heading>

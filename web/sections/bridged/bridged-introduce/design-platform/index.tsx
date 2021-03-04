@@ -12,13 +12,12 @@ const DesignPlatforms = () => {
   return (
     <Flex height="100%" flex={1} flexDirection="column" alignItems="flex-start" justifyContent="flex-end">
       <PlatformView className="no-drag">
-        <Image src="/figma_live.png" width="904" height="565" />
+        <Image src={`/live-desing-apps/${currentPlatform}.png`} width="904" height="565" />
         <PlatformPreview bg="#F3F3F3">
-
-        </PlatformPreview>
+      </PlatformPreview>
       </PlatformView>
       <Platforms>
-        {renderPlatforms.map(i => <Image key={i} className="cursor" onClick={() => setCurrentPlatform(i)} src={`/platform-icons/${i}/${currentPlatform === i ? "default" : "grey"}.png`} width="24" height="24"  />)}
+        {renderPlatforms.map(i => <Image key={i} className="cursor" onClick={() => setCurrentPlatform(i)} src={`/platform-icons/${i}/${currentPlatform === i ? "default" : "grey"}.png`} width="24" height="24" />)}
       </Platforms>
     </Flex>
   )
