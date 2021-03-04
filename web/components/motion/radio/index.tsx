@@ -1,11 +1,12 @@
-import React from 'react'
+import React from "react";
+import { MotionItemContainer, MotionItemProps } from "../base";
 
-const MotionRadio = () => {
+function MotionRadio(props: MotionItemProps) {
   return (
-    <div>
-      
-    </div>
-  )
+    <MotionItemContainer onTriggerNext={props.onTriggerNext}>
+      <div>TODO: RADIO HERE</div>
+    </MotionItemContainer>
+  );
 }
 
-export default MotionRadio
+export default MotionRadio;

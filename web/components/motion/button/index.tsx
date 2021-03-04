@@ -1,19 +1,22 @@
-import React from 'react'
+import React from "react";
 import styled from "@emotion/styled";
-import { motion } from 'framer-motion';
+import { motion } from "framer-motion";
+import { MotionItemContainer, MotionItemProps } from "../base";
 
-const MotionButton = () => {
+function MotionButton(props: MotionItemProps) {
   return (
-    <Button whileTap={{ scale: 0.9 }} whileHover={{ scale: 1.1 }}  className="cursor">
-      button
-    </Button>
-  )
+    <MotionItemContainer onTriggerNext={props.onTriggerNext}>
+      <Button whileTap={{ scale: 0.95 }} whileHover={{ scale: 1.05 }}>
+        button
+      </Button>
+    </MotionItemContainer>
+  );
 }
 
-export default MotionButton
+export default MotionButton;
 
 const Button = styled(motion.div)`
-  background-color: #2562FF;
+  background-color: #2562ff;
   width: 200px;
   height: 70px;
   color: #fff;
@@ -23,4 +26,4 @@ const Button = styled(motion.div)`
   font-size: 50px;
   border-radius: 19px;
   border: none;
-`
+`;
