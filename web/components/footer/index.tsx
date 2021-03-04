@@ -65,7 +65,7 @@ const Footer = () => {
         <FooterBottom justifyContent="space-between" my="24px">
           <Text>Copyright © 2021 Bridged XYZ LLC</Text>
           <Flex className="policys">
-            <Link href="">
+            <Link href={URLS.landing.cookies_policy}>
               <Text className="cursor">Cookies</Text>
             </Link>
             <Link href={URLS.landing.privacy_policy}>

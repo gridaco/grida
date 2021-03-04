@@ -14,7 +14,8 @@ export const LandingpageUrls = {
 
     // misc
     privacy_policy: "docs/support/privacy-policy",
-    terms_and_conditions: "docs/support/terms-and-conditins",
+    terms_and_conditions: "docs/support/terms-and-conditoins",
+    cookies_policy: "docs/support/cookies-policy",
 }
 
 const DownloadUrls = {
