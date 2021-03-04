@@ -41,6 +41,7 @@ const MyApp = ({ Component, pageProps }: AppProps) => {
             word-break: keep-all;
             letter-spacing: -0.65px;
             min-height: 100vh;
+            overflow-x: hidden;
           }
 
           .no-drag {

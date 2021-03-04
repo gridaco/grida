@@ -26,7 +26,6 @@ const CodeFrameworks = () => {
         <Icon name="bridged" width={24} height={24} ml="28px" />
         <Icon name="bridged" width={24} height={24} ml="28px" />
       </Box>
-      <BlankArea />
     </Flex>
   )
 }
@@ -46,15 +45,16 @@ const CodeView = styled(Box)`
 
   @media (max-width: 800px) {
     top: -35%;
-    right: -42% !important;
+    right: -38% !important;
   }
-/* 
-  @media (max-width: 320px) {
-    width: 280px;
+
+  @media (max-width: 720px) {
+    width: 100%;
     height: 410px;
-    top: 45% !important;
-    right: -0% !important;
-  } */
+    top: auto;
+    bottom: 5% !important;
+    right: 0% !important;
+  }
   
   header {
     display: flex;

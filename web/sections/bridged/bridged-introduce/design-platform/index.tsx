@@ -39,14 +39,32 @@ const PlatformPreview = styled(Flex)`
     top: 15%;
     left: 45%;
   }
+
+  @media (max-width: 720px) {
+    width: 280px;
+    height: 350px;
+    top: 20%;
+    left: -5%;
+  }
+
+  @media (max-width: 400px) {
+    width: 280px;
+    height: 350px;
+    top: 20%;
+    left: 0% !important;
+  }
+
 `
 
 const PlatformView = styled(Flex)`
   flex-direction: column;
   position: absolute;
-  top: 10%;
-  left: -38%;
   filter: drop-shadow(0 1px 2px rgba(0,0,0,.5));
+
+  @media (min-width: 940px) {
+    top: 10%;
+    left: -38%;
+  }
 
   @media (max-width: 940px) {
     top: 5%;
@@ -55,8 +73,31 @@ const PlatformView = styled(Flex)`
 
   @media (max-width: 800px) {
     top: 10%;
-    left: -58% !important;
+    left: -65% !important;
   }
+
+  @media (max-width: 720px) {
+    top: 5%;
+    right: -20% !important;
+    left: auto !important;
+
+    img {
+      width: 500px;
+      height: 310px;
+    }
+  }
+
+  @media (max-width: 400px) {
+
+    img {
+      width: 500px;
+      height: 310px;
+      top: 5%;
+      right: -10% !important;
+      left: auto !important;
+    }
+  }
+
 
   /* @media (max-width: 320px) {
     width: 526px;
