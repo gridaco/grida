@@ -4,6 +4,7 @@ import styled from '@emotion/styled';
 import Icon from 'components/icon';
 import Link from 'next/link';
 import { LandingpageUrls } from 'utils/landingpage/constants';
+import ActionItem from 'components/action-item';
 
 const BridgedDetection = () => {
     return (
@@ -16,9 +17,7 @@ const BridgedDetection = () => {
 
                 <Box width="100%" height="600px" mt="90px" bg="#000" mb="100px" />
 
-                <Link href={LandingpageUrls.article_how_engine_works}>
-                    <Text className="cursor" mr="auto" color="#7D7D7D" fontSize="24px">Learn how the engine works <Icon name="arrowDown" isVerticalMiddle style={{ transform: "rotate(270deg)" }} /></Text>
-                </Link>
+                <ActionItem href={LandingpageUrls.article_how_engine_works} label="Learn how the engine works" />
             </Flex>
 
         </DetectionWrapper>

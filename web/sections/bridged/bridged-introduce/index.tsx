@@ -6,6 +6,7 @@ import Link from 'next/link';
 import Icon from 'components/icon';
 import CodeFrameworks from './code-framework';
 import DesignPlatforms from './design-platform';
+import ActionItem from 'components/action-item';
 
 
 const BridgedIntroduce = () => {
@@ -35,8 +36,8 @@ const BridgedIntroduce = () => {
 
             <Desc mr="auto" mb="70px" >Design to Code Feature supports Major design tools including Sketch, Figma and Adobe XD. Code is converted to Major Platforms / Languages / Frameworks with various coding styles. These lines of code is ready to use.</Desc>
 
-            <Text fontSize="24px" mb="8px" color="#7D7D7D" >How do Design to code work? <Icon name="arrowDown" isVerticalMiddle style={{ transform: "rotate(270deg)" }} /></Text>
-            <Text fontSize="24px" mb="8px" color="#7D7D7D">That just got ON AIR <Icon name="arrowDown" isVerticalMiddle style={{ transform: "rotate(270deg)" }} /></Text>
+            <ActionItem label="How do Design to code work?" href="/" />
+            <ActionItem label="That just got ON AIR" href="/" />
           </Box>
           <LiveAreaDesktop className="no-drag">
             <IphoneView className="app" >
