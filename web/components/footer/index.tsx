@@ -40,7 +40,7 @@ const iconList: Array<{
 
 const Footer = () => {
     return (
-        <Flex alignItems="center" justifyContent="center" width="100%" bg="#eee" >
+        <Flex alignItems="center" justifyContent="center" width="100%" >
             <Flex width={["320px", "730px", "985px", "1040px"]} my={["40px", "50px", "100px", "150px"]} mx="20px" flexDirection='column'>
                 <FooterContent width="100%" >
                     <Icon name="bridged" mr="100px" mb="64px" />
