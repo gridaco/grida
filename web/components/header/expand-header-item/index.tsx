@@ -20,7 +20,6 @@ const ExpandHeaderItem = ({ item, isExpand, onExpandHeader, onContractHeader, ty
                 <Label
                     className="cursor"
                     color={isExpand ? "#000" : "#8B8B8B"}
-                    isBorder={isExpand && type == "desktop"}
                     onMouseOver={type == "desktop" ? onExpandHeader : null}
                     onClick={type == "mobile" ? isExpand ? onContractHeader : onExpandHeader : null}
                     fontWeight="bold"
@@ -70,16 +69,12 @@ const ExpandHeaderItem = ({ item, isExpand, onExpandHeader, onContractHeader, ty
 
 export default ExpandHeaderItem
 
-const Label = styled(Text) <{ isBorder: boolean }>`
+const Label = styled(Text)`
     font-weight: bold;
     font-size: 16px;
     display: flex;
     align-items: center;
     padding: 16px 0px;
-
-    ${p => p.isBorder && `
-        border-bottom: 2px solid black;
-    `}
 
     @media (min-width: 767px) {
         &:hover {
