@@ -18,7 +18,11 @@ export const LandingpageUrls = {
 }
 
 const DownloadUrls = {
-
+    download_figma_plugin: "https://www.figma.com/community/plugin/896445082033423994/Bridged",
+    download_sketch_plugin: "https://github.com/bridgedxyz/assistant/releases",
+    download_xd_plugin: "https://github.com/bridgedxyz/assistant/releases",
+    download_vscoode_extension: "https://github.com/bridgedxyz/vscode-extension/",
+    download_desktop_app: "https://github.com/bridgedxyz/bridged/releases",
 }
 
 const SociallUrls = {
