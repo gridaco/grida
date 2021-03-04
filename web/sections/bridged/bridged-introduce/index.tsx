@@ -18,46 +18,10 @@ const OnairButton = styled.button`
   // region gradient animation
   background: linear-gradient(318deg, #f537ff, #ff6565, #ff379f, #ff373e);
   background-size: 800% 800%;
+ 
+  animation: AutoGradient 3s ease infinite;
 
-  -webkit-animation: AnimationName 3s ease infinite;
-  -moz-animation: AnimationName 3s ease infinite;
-  -o-animation: AnimationName 3s ease infinite;
-  animation: AnimationName 3s ease infinite;
-
-  @-webkit-keyframes AnimationName {
-    0% {
-      background-position: 0% 42%;
-    }
-    50% {
-      background-position: 100% 59%;
-    }
-    100% {
-      background-position: 0% 42%;
-    }
-  }
-  @-moz-keyframes AnimationName {
-    0% {
-      background-position: 0% 42%;
-    }
-    50% {
-      background-position: 100% 59%;
-    }
-    100% {
-      background-position: 0% 42%;
-    }
-  }
-  @-o-keyframes AnimationName {
-    0% {
-      background-position: 0% 42%;
-    }
-    50% {
-      background-position: 100% 59%;
-    }
-    100% {
-      background-position: 0% 42%;
-    }
-  }
-  @keyframes AnimationName {
+  @keyframes AutoGradient {
     0% {
       background-position: 0% 42%;
     }
