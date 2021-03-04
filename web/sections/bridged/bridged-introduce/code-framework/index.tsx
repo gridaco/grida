@@ -25,7 +25,7 @@ const CodeFrameworks = () => {
 
       </CodeView>
       <Platforms >
-        {renderPlatforms.map(i => <PlatformIcon key={i} className="cursor" onClick={() => setCurrentPlatform(i)} isActive={currentPlatform === i} src={`/platform-icons/${i}.png`} width="24" height="24"  />)}
+        {renderPlatforms.map(i => <Image key={i} className="cursor" onClick={() => setCurrentPlatform(i)} src={`/platform-icons/${i}/${currentPlatform === i ? "default" : "grey"}.png`} width="24" height="24"  />)}
       </Platforms>
       <BlankArea />
     </Flex>
@@ -40,10 +40,6 @@ const Platforms = styled(Box)`
     height: 24px;
     margin-left: 28px !important;
   }
-`
-
-const PlatformIcon = styled(Image)<{ isActive : boolean }>`
-    ${p => p.isActive ? 'filter: saturate(100%);' : 'filter: saturate(0);'}
 `
 
 const CodeView = styled(Box)`
