@@ -9,14 +9,30 @@ export const LandingpageUrls = {
     article_how_do_design_to_code_work: "/docs/concepts/design-to-code",
     article_how_engine_works: "/docs/concepts/detection",
 
-
-    // social
-    facebook: "https://facebook.com/bridgedxyz",
-    instagram: "https://instagram.com/bridged.xyz",
-    twitter: "https://twitter.com/bridgedxyz",
-    github: "https://github.com/bridgedxyz",
+    // demo
+    try_the_demo_1: "https://console.bridged.xyz",
 
     // misc
     privacy_policy: "docs/support/privacy-policy",
     terms_and_conditions: "docs/support/terms-and-conditins",
+}
+
+const DownloadUrls = {
+
+}
+
+const SociallUrls = {
+    // social
+    youtube: "https://www.youtube.com/channel/UCgJO5apXl_pXRfTxNrkbEBw",
+    facebook: "https://facebook.com/bridgedxyz",
+    instagram: "https://instagram.com/bridged.xyz",
+    twitter: "https://twitter.com/bridgedxyz",
+    github: "https://github.com/bridgedxyz",
+    dribbble: "https://dribbble.com/bridged",
+}
+
+export const URLS = {
+    landing: LandingpageUrls,
+    downloads: DownloadUrls,
+    social: SociallUrls
 }
