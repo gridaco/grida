@@ -1,188 +1,174 @@
 export type Sitemap = {
-    label: string;
-    href: string;
-    child?: Sitemap[]
-}
+  label: string;
+  href: string;
+  child?: Sitemap[];
+};
 
 export const Products: Sitemap = {
-    label: "Products",
-    href: "/product",
-    child: [
-        {
-            label: "Cloud",
-            href: "/product/cloud",
-        },
-        {
-            label: "Globalization",
-            href: "/product/g11n",
-        },
-        {
-            label: "Reflect",
-            href: "/product/reflect",
-        },
-        {
-            label: "Surf",
-            href: "/product/surf",
-        },
-        {
-            label: "Assistant",
-            href: "/product/assistant",
-        },
-        {
-            label: "Console",
-            href: "/product/console",
-        },
-        {
-            label: "Appbox",
-            href: "/product/appbox",
-        }
-    ]
-}
+  label: "Products",
+  href: "/products",
+  child: [
+    {
+      label: "Cloud",
+      href: "/cloud",
+    },
+    {
+      label: "Globalization",
+      href: "/globalization",
+    },
+    {
+      label: "Reflect",
+      href: "https://reflect.bridged.xyz",
+    },
+    {
+      label: "Surf",
+      href: "https://surf.codes",
+    },
+    {
+      label: "Assistant",
+      href: "/assistant",
+    },
+    {
+      label: "Console",
+      href: "/console",
+    },
+    {
+      label: "Appbox",
+      href: "/appbox",
+    },
+  ],
+};
 
 export const Solutions: Sitemap = {
-    label: "Solutions",
-    href: "/solution",
-    child: [
-        {
-            label: "Handoff",
-            href: "/solution/handoff",
-        },
-        {
-            label: "Get Started",
-            href: "/solution/getstart",
-        },
-        {
-            label: "API Docs",
-            href: "/solution/api",
-        },
-        {
-            label: "Papers",
-            href: "/solution/papers",
-        },
-        {
-            label: "Blogs",
-            href: "/solution/blogs",
-        },
-        {
-            label: "Showcase",
-            href: "/solution/showcase",
-        }
-    ]
-}
+  label: "Solutions",
+  href: "/solutions",
+  child: [
+    {
+      label: "Showcase",
+      href: "/showcase",
+    },
+    {
+      label: "Handoff",
+      href: "/handoff",
+    },
+    {
+      label: "Get Started",
+      href: "/getstart",
+    },
+  ],
+};
 
 export const Resources: Sitemap = {
-    label: "Resources",
-    href: "/resource",
-    child: [
-        {
-            label: "Docs",
-            href: "/resource/docs",
-        },
-        {
-            label: "Get Started",
-            href: "/resource/getstart",
-        },
-        {
-            label: "API Docs",
-            href: "/resource/api",
-        },
-        {
-            label: "Papers",
-            href: "/resource/papers",
-        },
-        {
-            label: "Blogs",
-            href: "/resource/blogs",
-        },
-        {
-            label: "Showcase",
-            href: "/resource/showcase",
-        }
-    ]
-}
+  label: "Resources",
+  href: "/resources",
+  child: [
+    {
+      label: "Gettiing Started",
+      href: "/dcs/getting-started",
+    },
+    {
+      label: "Docs",
+      href: "/docs",
+    },
+    {
+      label: "API Docs",
+      href: "/docs/api",
+    },
+    {
+      label: "Papers",
+      href: "/resources/papers",
+    },
+    {
+      label: "Blogs",
+      href: "https://medium.com/bridgedxyz",
+    },
+  ],
+};
 
 export const Platforms: Sitemap = {
-    label: "Platforms",
-    href: "/platform",
-    child: [
-        {
-            label: "Figma",
-            href: "/platform/figma",
-        },
-        {
-            label: "Sketch",
-            href: "/platform/sketch",
-        },
-        {
-            label: "XD",
-            href: "/platform/xd",
-        },
-        {
-            label: "React",
-            href: "/platform/react",
-        },
-        {
-            label: "Flutter",
-            href: "/platform/flutter",
-        },
-        {
-            label: "Vue",
-            href: "/platform/vue",
-        },
-        {
-            label: "Svelte",
-            href: "/platform/svelte",
-        },
-        {
-            label: "HTML/CSS",
-            href: "/platform/pureweb",
-        },
-        {
-            label: "Reflect",
-            href: "/platform/reflect",
-        }
-    ]
-}
+  label: "Platforms",
+  href: "/platforms",
+  child: [
+    {
+      label: "Figma",
+      href: "/docs/platforms/figma",
+    },
+    {
+      label: "Sketch",
+      href: "/docs/platforms/sketch",
+    },
+    {
+      label: "XD",
+      href: "/docs/platforms/xd",
+    },
+    {
+      label: "React",
+      href: "/docs/platforms/react",
+    },
+    {
+      label: "Flutter",
+      href: "/docs/platforms/flutter",
+    },
+    {
+      label: "Vue",
+      href: "/docs/platforms/vue",
+    },
+    {
+      label: "Svelte",
+      href: "/docs/platforms/svelte",
+    },
+    {
+      label: "HTML/CSS",
+      href: "/docs/platforms/vanilla-web",
+    },
+    {
+      label: "Reflect",
+      href: "https://reflect.bridged.xyz",
+    },
+  ],
+};
 
 export const Together: Sitemap = {
-    label: "Together",
-    href: "/together",
-    child: [
-        {
-            label: "Let's create together",
-            href: "/together/create",
-        },
-        {
-            label: "How to contribute",
-            href: "/together/contribute",
-        },
-        {
-            label: "Github",
-            href: "/together/github",
-        },
-        {
-            label: "Projects",
-            href: "/together/projects",
-        },
-        {
-            label: "Join us on Slack",
-            href: "/together/slack",
-        },
-        {
-            label: "Meetups",
-            href: "/together/meetup",
-        },
-        {
-            label: "Reddit",
-            href: "/together/reddit",
-        }
-    ]
-}
+  label: "Together",
+  href: "https://together.bridged.xyz",
+  child: [
+    {
+      label: "Let's create together",
+      href: "/together/create",
+    },
+    {
+      label: "How to contribute",
+      href: "/together/contribute",
+    },
+    {
+      label: "Github",
+      href: "https://github.com/bridgedxyz",
+    },
+    {
+      label: "Projects",
+      href: "/together/projects",
+    },
+    {
+      label: "Join us on Slack",
+      href:
+        "https://together.bridged.xyz/Bridged-OSS-Community-c6983f668e3e4204aed8856da0e73483",
+    },
+    {
+      label: "Meetups",
+      href:
+        "https://together.bridged.xyz/Bridged-Meetups-e28469913e35444d80d29921559fe7ff",
+    },
+    {
+      label: "Reddit",
+      href: "https://www.reddit.com/r/bridged/",
+    },
+  ],
+};
 
 export const Sitemap: Sitemap[] = [
-    Products,
-    Solutions,
-    Resources,
-    Platforms,
-    Together
-]
+  Products,
+  Solutions,
+  Resources,
+  Platforms,
+  Together,
+];

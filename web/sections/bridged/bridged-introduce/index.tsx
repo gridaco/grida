@@ -7,6 +7,7 @@ import Icon from "components/icon";
 import CodeFrameworks from "./code-framework";
 import DesignPlatforms from "./design-platform";
 import ActionItem from "components/action-item";
+import { LandingpageUrls } from "utils/landingpage/constants";
 
 const Onair = () => {
   return <OnairButton>ON AIR</OnairButton>;
@@ -18,7 +19,7 @@ const OnairButton = styled.button`
   // region gradient animation
   background: linear-gradient(318deg, #f537ff, #ff6565, #ff379f, #ff373e);
   background-size: 800% 800%;
- 
+
   animation: AutoGradient 3s ease infinite;
 
   @keyframes AutoGradient {
@@ -107,8 +108,14 @@ const BridgedIntroduce = () => {
               code is ready to use.
             </Desc>
 
-            <ActionItem label="How do Design to code work?" href="/" />
-            <ActionItem label="That just got ON AIR" href="/" />
+            <ActionItem
+              label="How do Design to code work?"
+              href={LandingpageUrls.article_how_do_design_to_code_work}
+            />
+            <ActionItem
+              label="Try the demo"
+              href={LandingpageUrls.try_the_demo_1}
+            />
           </Box>
           <LiveAreaDesktop className="no-drag">
             <IphoneView className="app">
