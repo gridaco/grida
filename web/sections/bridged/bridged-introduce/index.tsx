@@ -98,7 +98,7 @@ const BridgedIntroduce = () => {
             <LiveAreaMobile className="no-drag">
               <Image
                 className="app"
-                src="/simluator.png"
+                src="/iPhone12-frame-blank.png"
                 width="390"
                 height="788"
               />
@@ -128,7 +128,7 @@ const BridgedIntroduce = () => {
           </Box>
           <LiveAreaDesktop className="no-drag">
             <IphoneView className="app">
-              <Image src="/simluator.png" width="auto" height="auto" />
+              <Image src="/iPhone12-frame-blank.png" width="auto" height="auto" />
             </IphoneView>
             <IphoneAppView>
                 <AppUi />
