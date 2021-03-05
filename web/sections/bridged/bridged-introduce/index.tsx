@@ -8,6 +8,7 @@ import CodeFrameworks from "./code-framework";
 import DesignPlatforms from "./design-platform";
 import ActionItem from "components/action-item";
 import { LandingpageUrls } from "utils/landingpage/constants";
+import AppUi from "./app-ui";
 
 const Onair = () => {
   return <OnairButton>ON AIR</OnairButton>;
@@ -102,7 +103,7 @@ const BridgedIntroduce = () => {
                 height="788"
               />
               <IphoneAppView>
-                <Image src="/inframe.png" width="auto" height="auto" />
+                <AppUi />
               </IphoneAppView>
               <GradientView>
                 <Image src="/gradient-live.png" width="478" height="814" />
@@ -130,7 +131,7 @@ const BridgedIntroduce = () => {
               <Image src="/simluator.png" width="auto" height="auto" />
             </IphoneView>
             <IphoneAppView>
-              <Image src="/inframe.png" width="auto" height="auto" />
+                <AppUi />
             </IphoneAppView>
             <GradientView>
               <Image src="/gradient-live.png" width="1440" height="1040" />
@@ -146,17 +147,17 @@ export default BridgedIntroduce;
 
 const IphoneAppView = styled(Box)`
     position: absolute;
-    top: 2%;
-    right: 8%;
+    top: 3%;
+    right: 7%;
 
-    img {
+    div {
       width: 280px !important;
       height: 620px !important;
     }
 
   @media (max-width: 720px) {
     right: 21.5%;
-    img {
+    div {
       width: 260px !important;
       height: 540px !important;
     }
@@ -164,7 +165,7 @@ const IphoneAppView = styled(Box)`
 
   @media (max-width: 430px) {
     right: 16%;
-    img {
+    div {
       width: 260px !important;
       height: 540px !important;
     }
@@ -172,7 +173,7 @@ const IphoneAppView = styled(Box)`
 
   @media (max-width: 375px) {
     right: 11.5%;
-    img {
+    div {
       width: 260px !important;
       height: 540px !important;
     }
@@ -180,7 +181,7 @@ const IphoneAppView = styled(Box)`
 
   @media (max-width: 320px) {
     right: 4%;
-    img {
+    div {
       width: 260px !important;
       height: 540px !important;
     }

@@ -10,7 +10,11 @@ const GradientSolutions = ({ list, currentSolution, changeSolution, type }) => {
 
   useEffect(() => {
     if (seconds === 0) {
-      scrollabelDiv.current.scrollLeft = 0
+      if (window.screen.availWidth >= 500) {
+        scrollabelDiv.current.scrollLeft = list[0].width[0]
+      } else {
+        scrollabelDiv.current.scrollLeft = list[0].width[1]
+      }
       changeSolution("code")
     }
 
