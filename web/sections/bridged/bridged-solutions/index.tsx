@@ -11,7 +11,7 @@ const SolutionList = [
         subTitle: "Instantly create 'code' from your design",
         desc: "With powerful Design2Code Engine, Bridged generates production ready code that can also easily be used for existing projects. Supprt for components, various code styles, naming convention, fille & directory structure are included.",
         gradient: "linear-gradient(99.57deg, #6268FF 0%, #9039FF 100%)",
-        width: [0, 0]
+        width: [0, 170]
     },
     {
         title: "server",

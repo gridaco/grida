@@ -31,6 +31,16 @@ const GradientSolutions = ({ list, currentSolution, changeSolution, type }) => {
     return () => clearInterval(countdown);
   }, [minutes, seconds]);
 
+  useEffect(() => {
+    if (scrollabelDiv.current != null ) {
+      if (window.screen.availWidth >= 500) {
+        scrollabelDiv.current.scrollLeft = list[0].width[0]
+      } else {
+        scrollabelDiv.current.scrollLeft = list[0].width[1]
+      }
+    }
+  }, [scrollabelDiv])
+
   return (
     <Postioner>
 
