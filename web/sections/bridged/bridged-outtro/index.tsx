@@ -2,6 +2,7 @@ import Icon from 'components/icon'
 import React from 'react'
 import { Button, Flex, Text } from 'rebass'
 import styled from '@emotion/styled';
+import { Section } from 'components/section';
 
 const BridgedOuttro = () => {
     return (

@@ -9,6 +9,7 @@ import DesignPlatforms from "./design-platform";
 import ActionItem from "components/action-item";
 import { LandingpageUrls } from "utils/landingpage/constants";
 import AppUi from "./app-ui";
+import { Section } from "components/section";
 
 const Onair = () => {
   return <OnairButton>ON AIR</OnairButton>;
@@ -56,30 +57,22 @@ const BridgedIntroduce = () => {
     <IntroduceWrapper alignItems="center" justifyContent="center">
       <Flex
         width={["320px", "730px", "985px", "1040px"]}
-        mx="20px"
         alignItems="center"
         justifyContent="center"
         flexDirection="column"
       >
-        <Box mr="auto">
-          <Text fontSize={["36px", "36px", "64px"]} fontWeight="bold">
-            Designs,
-          </Text>
-          <Text fontSize={["36px", "36px", "64px"]} fontWeight="bold">
-            come to live.
-          </Text>
-
-          <Desc mr="auto" mt="30px">
-            Keep you design live, not as a prototype, but as a product.
-            Instantly convert your design to code, prototype, product within a
-            click. No coding required
-          </Desc>
-        </Box>
+          <Section
+            margin="0px"
+            align="left"
+            title={`Designs,\ncome to live.`}
+            description="Keep you design live, not as a prototype, but as a product. Instantly convert your design to code, prototype, product within a click. No coding required"
+          />
         <AbsoulteImageArea>
           <DesignPlatforms />
           <CodeFrameworks />
         </AbsoulteImageArea>
         <Flex width="100%" justifyContent="space-between">
+
           <Box>
             <Text fontSize="24px" mb="17px">
               What you’ve just sketched?
@@ -207,6 +200,10 @@ const IntroduceWrapper = styled(Flex)`
 
   @media (max-width: 768px) {
     height: 2700px;
+  }
+
+  .section-desc {
+    max-width: 520px
   }
 `;
 
