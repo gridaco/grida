@@ -1,7 +1,7 @@
-import React, { useEffect, useRef, useState } from 'react'
-import { Box, Flex, Text } from 'rebass';
-import styled from '@emotion/styled';
-
+import React, { useEffect, useRef, useState } from "react";
+import { Box, Flex, Text } from "rebass";
+import styled from "@emotion/styled";
+const AUTO_RESET_SEC = 3;
 const GradientSolutions = ({ list, currentSolution, changeSolution, type }) => {
   const scrollabelDiv = useRef(null);
   const [minutes, setMinutes] = useState(0);
@@ -11,11 +11,11 @@ const GradientSolutions = ({ list, currentSolution, changeSolution, type }) => {
   useEffect(() => {
     if (seconds === 0) {
       if (window.screen.availWidth >= 769) {
-        scrollabelDiv.current.scrollLeft = list[0].width[0]
+        scrollabelDiv.current.scrollLeft = list[0].width[0];
       } else {
-        scrollabelDiv.current.scrollLeft = list[0].width[1]
+        scrollabelDiv.current.scrollLeft = list[0].width[1];
       }
-      changeSolution("code")
+      changeSolution("code");
     }
 
     const countdown = setInterval(() => {
@@ -35,65 +35,87 @@ const GradientSolutions = ({ list, currentSolution, changeSolution, type }) => {
   }, [minutes, seconds]);
 
   useEffect(() => {
-    if (scrollabelDiv.current != null ) {
+    if (scrollabelDiv.current != null) {
       if (window.screen.availWidth >= 769) {
-        scrollabelDiv.current.scrollLeft = list[0].width[0]
+        scrollabelDiv.current.scrollLeft = list[0].width[0];
       } else {
-        scrollabelDiv.current.scrollLeft = list[0].width[1]
+        scrollabelDiv.current.scrollLeft = list[0].width[1];
       }
     }
-  }, [scrollabelDiv])
+  }, [scrollabelDiv]);
 
   return (
-    <Postioner>
-
+    <Postioner className="no-drag">
       <ScrollView ref={scrollabelDiv}>
         <Desktop width="100%">
-          {list.map((i, ix) => <span className="cursor" onClick={() => {
-            changeSolution(i.title);
-            scrollabelDiv.current.scrollLeft = i.width[0];
-            setSeconds(3)
-          }} style={currentSolution === i.title ? { backgroundImage: i.gradient } : { color: "#F1F1F1" }}>{i.title}</span>)}
+          {list.map((i, ix) => (
+            <span
+              className="cursor"
+              onClick={() => {
+                changeSolution(i.title);
+                scrollabelDiv.current.scrollLeft = i.width[0];
+                setSeconds(AUTO_RESET_SEC);
+              }}
+              style={
+                currentSolution === i.title
+                  ? { backgroundImage: i.gradient }
+                  : { color: "#F1F1F1" }
+              }
+            >
+              {i.title}
+            </span>
+          ))}
         </Desktop>
         <Mobile width="100%">
-        {list.map((i, ix) => <span className="cursor" onClick={() => {
-            changeSolution(i.title);
-            scrollabelDiv.current.scrollLeft = i.width[1];
-            setSeconds(3)
-          }} style={currentSolution === i.title ? { backgroundImage: i.gradient } : { color: "#F1F1F1" }}>{i.title}</span>)}
+          {list.map((i, ix) => (
+            <span
+              className="cursor"
+              onClick={() => {
+                changeSolution(i.title);
+                scrollabelDiv.current.scrollLeft = i.width[1];
+                setSeconds(AUTO_RESET_SEC);
+              }}
+              style={
+                currentSolution === i.title
+                  ? { backgroundImage: i.gradient }
+                  : { color: "#F1F1F1" }
+              }
+            >
+              {i.title}
+            </span>
+          ))}
         </Mobile>
       </ScrollView>
       <RightFade />
     </Postioner>
-  )
-}
+  );
+};
 
-export default GradientSolutions
+export default GradientSolutions;
 
 const Mobile = styled(Box)`
   display: none;
-  @media(max-width: 769px) {
+  @media (max-width: 769px) {
     display: block;
   }
-`
+`;
 
 const Desktop = styled(Box)`
-  @media(max-width: 770px) {
+  @media (max-width: 770px) {
     display: none;
   }
-`
+`;
 
 const Postioner = styled(Flex)`
   position: relative;
   width: 150%;
   height: 100px;
 
-  
-  @media(max-width: 768px) {
+  @media (max-width: 768px) {
     margin-top: 20px;
     height: 40px;
   }
-`
+`;
 
 const ScrollView = styled(Flex)`
   overflow-x: hidden;
@@ -102,7 +124,7 @@ const ScrollView = styled(Flex)`
 
   &:before {
     left: 0;
-    background: linear-gradient(90deg,#fff,hsla(0,0%,100%,0));
+    background: linear-gradient(90deg, #fff, hsla(0, 0%, 100%, 0));
     content: "";
     top: 0;
     width: 8%;
@@ -114,7 +136,7 @@ const ScrollView = styled(Flex)`
 
   &:after {
     right: 0;
-    background: linear-gradient(90deg,hsla(0,0%,100%,0),#fff);
+    background: linear-gradient(90deg, hsla(0, 0%, 100%, 0), #fff);
     content: "";
     top: 0;
     width: 8%;
@@ -129,14 +151,13 @@ const ScrollView = styled(Flex)`
     margin: 0px 20px;
     font-size: 80px;
     font-weight: bold;
-    color:transparent;
+    color: transparent;
     -webkit-background-clip: text;
     background-clip: text;
 
-    @media(max-width: 768px) {
+    @media (max-width: 768px) {
       font-size: 36px;
     }
-   
 
     &:first-child {
       margin-left: 260px;
@@ -176,22 +197,23 @@ const ScrollView = styled(Flex)`
       margin-right: 1000px;
     }
   }
-`
+`;
 
 const LeftFade = styled(Box)`
-
-    position: absolute;
-    width: 200px;
-    height: 100px;
-    background: linear-gradient(270deg, rgba(255, 255, 255, 0) 0%, #FFFFFF 51.56%);
-    top: 0px;
-    left: -15%;
-    @media(max-width: 400px) {
-      width: 50px
-    }
- 
-  
-`
+  position: absolute;
+  width: 200px;
+  height: 100px;
+  background: linear-gradient(
+    270deg,
+    rgba(255, 255, 255, 0) 0%,
+    #ffffff 51.56%
+  );
+  top: 0px;
+  left: -15%;
+  @media (max-width: 400px) {
+    width: 50px;
+  }
+`;
 
 const RightFade = styled(Box)`
   position: absolute;
@@ -199,8 +221,8 @@ const RightFade = styled(Box)`
   height: 100px;
   top: 0;
   right: -10%;
-  background: linear-gradient(90deg, rgba(255, 255, 255, 0) 0%, #FFFFFF 48.44%);
-  @media(max-width: 400px) {
-    width: 50px
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0) 0%, #ffffff 48.44%);
+  @media (max-width: 400px) {
+    width: 50px;
   }
-`
+`;
