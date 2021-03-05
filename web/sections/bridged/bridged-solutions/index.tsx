@@ -1,58 +1,69 @@
-import React from 'react'
+import React, { useState, useEffect } from 'react'
 import { Flex, Button, Text, Box } from 'rebass';
 import styled from '@emotion/styled';
 import Link from 'next/link';
 import GradientSolutions from './gradient-solutaions';
 
+
 const SolutionList = [
     {
-        title : "idea",
+        title: "idea",
         subTitle: "Instantly create 'idea' from your design",
         desc: "With powerful Design2Code Engine, Bridged generates production ready code that can also easily be used for existing projects. Supprt for components, various code styles, naming convention, fille & directory structure are included."
     },
     {
-        title : "code",
+        title: "code",
         subTitle: "Instantly create 'code' from your design",
         desc: "With powerful Design2Code Engine, Bridged generates production ready code that can also easily be used for existing projects. Supprt for components, various code styles, naming convention, fille & directory structure are included.",
         gradient: "linear-gradient(99.57deg, #6268FF 0%, #9039FF 100%)"
-    }, 
+    },
     {
-        title : "server",
+        title: "server",
         subTitle: "Instantly create 'server' from your design",
         desc: "With powerful Design2Code Engine, Bridged generates production ready code that can also easily be used for existing projects. Supprt for components, various code styles, naming convention, fille & directory structure are included."
-    }, 
+    },
     {
-        title : "translations",
+        title: "translations",
         subTitle: "Instantly create 'translations' from your design",
         desc: "With powerful Design2Code Engine, Bridged generates production ready code that can also easily be used for existing projects. Supprt for components, various code styles, naming convention, fille & directory structure are included."
-    }, 
+    },
     {
-        title : "insight",
+        title: "insight",
         subTitle: "Instantly create 'insight' from your design",
         desc: "With powerful Design2Code Engine, Bridged generates production ready code that can also easily be used for existing projects. Supprt for components, various code styles, naming convention, fille & directory structure are included."
-    }, 
+    },
     {
-        title : "everything",
+        title: "everything",
         subTitle: "Instantly create 'everything' from your design",
         desc: "With powerful Design2Code Engine, Bridged generates production ready code that can also easily be used for existing projects. Supprt for components, various code styles, naming convention, fille & directory structure are included."
-    }, 
+    },
 ]
 
 const BridgedSolutions = () => {
+    const [currentSolution, setCurrentSolution] = useState("idea");
+    const [currentIndex, setCurrentIndex] = useState(0);
+    useEffect(() => {
+        SolutionList.map((i, ix) => {
+            if (i.title === currentSolution) {
+                setCurrentIndex(ix)
+            }
+        })
+    }, [currentSolution])
+
     return (
         <SolutionsWrapper alignItems="center" justifyContent="center" mx="20px">
             <Flex width={["320px", "730px", "985px", "1040px"]} alignItems="center" justifyContent="center" flexDirection="column">
                 <Text fontSize={["36px", "36px", "64px"]} fontWeight="bold" mr="auto">Your design is your</Text>
-                <GradientSolutions list={SolutionList} />
+                <GradientSolutions list={SolutionList} currentSolution={currentSolution} changeSolution={title => setCurrentSolution(title)} />
 
                 <Box width="100%" height="650px" mt="90px" bg="#000" mb="100px" />
 
-                <Text fontSize="18px" fontWeight="bold" mr="auto">Instantly create code from your design</Text>
-                <Desc mr="auto">With powerful Design2Code Engine, Bridged generates production ready code that can also easily be used for existing projects. Supprt for components, various code styles, naming convention, fille & directory structure are included.</Desc>
+                <Text fontSize="18px" fontWeight="bold" mr="auto">{SolutionList[currentIndex].subTitle}</Text>
+                <Desc mr="auto">{SolutionList[currentIndex].desc}</Desc>
 
                 <Text fontSize="18px" fontWeight="bold" mr="auto" mt="40px" pb="12px" style={{ borderBottom: "1px solid black" }}>See also</Text>
                 <Solutions mr="auto" mt="9px">
-                    <Link href="/">
+                <Link href="/">
                         <span>idea</span>
                     </Link>
                     <Link href="/">

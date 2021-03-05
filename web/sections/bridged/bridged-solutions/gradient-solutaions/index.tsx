@@ -3,14 +3,13 @@ import { Box, Flex, Text } from 'rebass';
 import styled from '@emotion/styled';
 
 
-const GradientSolutions = ({ list }) => {
-  const [currentGradient, setCurrentGradient] = useState("code");
+const GradientSolutions = ({ list, currentSolution, changeSolution }) => {
   
   return (
     <Postioner>
       <LeftFade />
       <ScrollView>
-        {list.map(i => <span className="cursor" onClick={() => setCurrentGradient(i.title)} style={currentGradient === i.title ? { backgroundImage : i.gradient } : { color : "#F1F1F1"}}>{i.title}</span>)}
+        {list.map(i => <span className="cursor" onClick={() => changeSolution(i.title)} style={currentSolution === i.title ? { backgroundImage : i.gradient } : { color : "#F1F1F1"}}>{i.title}</span>)}
       </ScrollView>
       <RightFade />
     </Postioner>
