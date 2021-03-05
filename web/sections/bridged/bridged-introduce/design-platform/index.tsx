@@ -1,30 +1,53 @@
-import React, { useState } from 'react'
-import { Flex, Button, Text, Box } from 'rebass';
-import styled from '@emotion/styled';
-import Image from 'next/image';
-import Icon from 'components/icon';
+import React, { useState } from "react";
+import { Flex, Button, Text, Box } from "rebass";
+import styled from "@emotion/styled";
+import Image from "next/image";
+import Icon from "components/icon";
 
-const renderPlatforms = ["figma", "sketch", "adobexd"]
+const renderPlatforms = ["figma", "sketch", "adobexd"];
 
 const DesignPlatforms = () => {
   const [currentPlatform, setCurrentPlatform] = useState("figma");
 
   return (
-    <Flex height="100%" flex={1} flexDirection="column" alignItems="flex-start" justifyContent="flex-end">
+    <Flex
+      height="100%"
+      flex={1}
+      flexDirection="column"
+      alignItems="flex-start"
+      justifyContent="flex-end"
+    >
       <PlatformView className="no-drag">
-        <Image src={`/live-desing-apps/${currentPlatform}.png`} width="904" height="565" />
-        <PlatformPreview bg="#fff">
+        <PlatformAppBackgroundView>
+          <Image
+            src={`/live-desing-apps/${currentPlatform}.png`}
+            width="904"
+            height="565"
+          />
+        </PlatformAppBackgroundView>
+        <DesignFramePreview bg="#fff">
           <Image src="/design_source.png" width="440px" height="540px" />
-        </PlatformPreview>
+        </DesignFramePreview>
       </PlatformView>
       <Platforms>
-        {renderPlatforms.map(i => <Image key={i} className="cursor" onClick={() => setCurrentPlatform(i)} src={`/platform-icons/${i}/${currentPlatform === i ? "default" : "grey"}.png`} width="24" height="24" />)}
+        {renderPlatforms.map(i => (
+          <Image
+            key={i}
+            className="cursor"
+            onClick={() => setCurrentPlatform(i)}
+            src={`/platform-icons/${i}/${
+              currentPlatform === i ? "default" : "grey"
+            }.png`}
+            width="24"
+            height="24"
+          />
+        ))}
       </Platforms>
     </Flex>
-  )
-}
+  );
+};
 
-export default DesignPlatforms
+export default DesignPlatforms;
 
 const Platforms = styled(Box)`
   div {
@@ -32,11 +55,12 @@ const Platforms = styled(Box)`
     height: 24px;
     margin-left: 28px !important;
   }
-`
+`;
 
-const PlatformPreview = styled(Flex)`
-  width: 440px;
-  height: 540px;
+const DesignFramePreview = styled(Flex)`
+  box-shadow: 0px 4px 128px 32px rgba(0, 0, 0, 0.08);
+  width: 350px;
+  height: 542px;
   top: 15%;
   position: absolute;
   border-radius: 12px;
@@ -45,8 +69,8 @@ const PlatformPreview = styled(Flex)`
   justify-content: center;
 
   div {
-    width: 150px;
-    height: 178px;
+    width: 252px;
+    height: 300px;
   }
 
   @media (max-width: 800px) {
@@ -69,13 +93,16 @@ const PlatformPreview = styled(Flex)`
     top: 20%;
     left: 0% !important;
   }
+`;
 
-`
+const PlatformAppBackgroundView = styled.div`
+  box-shadow: 0px 4px 128px 32px rgba(0, 0, 0, 0.08);
+  opacity: 0.7;
+`;
 
 const PlatformView = styled(Flex)`
   flex-direction: column;
   position: absolute;
-  filter: drop-shadow(0 1px 2px rgba(0,0,0,.5));
 
   @media (min-width: 940px) {
     top: 10%;
@@ -104,7 +131,6 @@ const PlatformView = styled(Flex)`
   }
 
   @media (max-width: 400px) {
-
     img {
       width: 500px;
       height: 310px;
@@ -114,11 +140,10 @@ const PlatformView = styled(Flex)`
     }
   }
 
-
   /* @media (max-width: 320px) {
     width: 526px;
     height: 423px;
     top: 5% !important;
     left: 10% !important;
   } */
-`
+`;
