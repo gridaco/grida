@@ -5,12 +5,10 @@ import Icon from "components/icon";
 import ElevatedVideoPlayer from "components/special/elevated-video-player";
 import { Typography } from '@reflect-ui/react-core';
 import { Section } from "components/section";
-import BlankArea from "components/blank-area";
 
 const BridgedVideoSection = () => {
   return (
     <Frame alignItems="center" flexDirection="column" justifyContent="center">
-      <BlankArea height={60} />
       <Section
         align="center"
         title="Designs that are meant to be implemented."
