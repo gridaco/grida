@@ -152,6 +152,9 @@ const Item = styled(Text)`
 
 const SignupButton = styled(Button)`
   height: 35px;
+	display: flex;
+  align-items: center;
+  justify-content: center;
 
 	@media (min-width: 767px) {
 		opacity: 1 !important;
