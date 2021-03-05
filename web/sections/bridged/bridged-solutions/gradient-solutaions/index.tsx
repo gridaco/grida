@@ -10,7 +10,7 @@ const GradientSolutions = ({ list, currentSolution, changeSolution, type }) => {
 
   useEffect(() => {
     if (seconds === 0) {
-      if (window.screen.availWidth >= 500) {
+      if (window.screen.availWidth >= 769) {
         scrollabelDiv.current.scrollLeft = list[0].width[0]
       } else {
         scrollabelDiv.current.scrollLeft = list[0].width[1]
@@ -36,7 +36,7 @@ const GradientSolutions = ({ list, currentSolution, changeSolution, type }) => {
 
   useEffect(() => {
     if (scrollabelDiv.current != null ) {
-      if (window.screen.availWidth >= 500) {
+      if (window.screen.availWidth >= 769) {
         scrollabelDiv.current.scrollLeft = list[0].width[0]
       } else {
         scrollabelDiv.current.scrollLeft = list[0].width[1]
@@ -139,11 +139,29 @@ const ScrollView = styled(Flex)`
    
 
     &:first-child {
-      padding-left: 240px;
+      margin-left: 260px;
+    }
+
+    @media (max-width: 1025px) {
+      &:first-child {
+        margin-left: 250px;
+      }
+    }
+
+    @media (max-width: 769px) {
+      &:first-child {
+        margin-left: 260px;
+      }
+    }
+
+    @media (max-width: 425px) {
+      &:first-child {
+        margin-left: 170px;
+      }
     }
 
     &:last-child {
-      padding-right: 1000px;
+      margin-right: 1000px;
     }
   }
 `

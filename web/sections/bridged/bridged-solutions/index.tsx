@@ -18,35 +18,35 @@ const SolutionList = [
         subTitle: "Instantly create 'server' from your design",
         desc: "With powerful Design2Code Engine, Bridged generates production ready code that can also easily be used for existing projects. Supprt for components, various code styles, naming convention, fille & directory structure are included.",
         gradient: "linear-gradient(99.57deg, #B062FF 0%, #9C39FF 100%)",
-        width: [215, 200]
+        width: [215, 185]
     },
     {
         title: "translations",
         subTitle: "Instantly create 'translations' from your design",
         desc: "With powerful Design2Code Engine, Bridged generates production ready code that can also easily be used for existing projects. Supprt for components, various code styles, naming convention, fille & directory structure are included.",
         gradient: "linear-gradient(99.57deg, #FBA33C 0%, #FFC700 100%)",
-        width: [475, 340]
+        width: [475, 325]
     },
     {
         title: "insight",
         subTitle: "Instantly create 'insight' from your design",
         desc: "With powerful Design2Code Engine, Bridged generates production ready code that can also easily be used for existing projects. Supprt for components, various code styles, naming convention, fille & directory structure are included.",
         gradient: "linear-gradient(99.57deg, #6BCBC5 0%, #79E8AC 100%)",
-        width: [935, 560]
+        width: [935, 545]
     },
     {
         title: "GIT",
         subTitle: "Instantly create 'GIT' from your design",
         desc: "With powerful Design2Code Engine, Bridged generates production ready code that can also easily be used for existing projects. Supprt for components, various code styles, naming convention, fille & directory structure are included.",
         gradient: "linear-gradient(99.57deg, #0E1279 0%, #632655 100%)",
-        width: [1215, 710]
+        width: [1215, 695]
     },
     {
         title: "everything",
         subTitle: "Instantly create 'everything' from your design",
         desc: "With powerful Design2Code Engine, Bridged generates production ready code that can also easily be used for existing projects. Supprt for components, various code styles, naming convention, fille & directory structure are included.",
         gradient: "linear-gradient(99.57deg, #9FA3F7 0%, #C49AFA 100%)",
-        width: [1385, 800]
+        width: [1385, 790]
     },
 ]
 
