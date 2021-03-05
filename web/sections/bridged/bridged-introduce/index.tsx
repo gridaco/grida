@@ -22,8 +22,9 @@ const OnairButton = styled.button`
   background: linear-gradient(318deg, #f537ff, #ff6565, #ff379f, #ff373e);
   background-size: 800% 800%;
 
-  animation: AutoGradient 3s ease infinite;
-
+  // DISABLING DUE TO PURFORMANCE ISSUE WITH GRADIENT ANIMATION
+  /* animation: AutoGradient 3s ease infinite; */
+  /* 
   @keyframes AutoGradient {
     0% {
       background-position: 0% 42%;
@@ -34,7 +35,7 @@ const OnairButton = styled.button`
     100% {
       background-position: 0% 42%;
     }
-  }
+  } */
   // endregion gradient animation
 
   box-shadow: 0px 4px 32px rgba(255, 0, 0, 0.25);
@@ -47,14 +48,18 @@ const OnairButton = styled.button`
   font-weight: bold;
 
   @media (min-width: 500px) {
-   margin-left: 20px;
-  margin-top: 0px;
+    margin-left: 20px;
+    margin-top: 0px;
   }
 `;
 
 const BridgedIntroduce = () => {
   return (
-    <IntroduceWrapper flexDirection="column" alignItems="center" justifyContent="center">
+    <IntroduceWrapper
+      flexDirection="column"
+      alignItems="center"
+      justifyContent="center"
+    >
       <Section
         margin="0px"
         align="left"
@@ -66,19 +71,22 @@ const BridgedIntroduce = () => {
         <CodeFrameworks />
       </AbsoulteImageArea>
       <Flex width="100%" justifyContent="space-between">
-
         <Box>
           <Text fontSize="24px" mb="17px">
             What you’ve just sketched?
-            </Text>
-          <Flex alignItems="center" flexDirection={["column", "column", "row"]} mb="35px">
+          </Text>
+          <Flex
+            alignItems="center"
+            flexDirection={["column", "column", "row"]}
+            mb="35px"
+          >
             <Text
               fontSize={["36px", "36px", "64px"]}
               fontWeight="bold"
               mr="auto"
             >
               That just got
-              </Text>
+            </Text>
             <Onair />
           </Flex>
 
@@ -98,11 +106,11 @@ const BridgedIntroduce = () => {
           </LiveAreaMobile>
 
           <Desc mr="auto" mb="70px">
-            Design to Code Feature supports Major design tools including
-            Sketch, Figma and Adobe XD. Code is converted to Major Platforms /
-            Languages / Frameworks with various coding styles. These lines of
-            code is ready to use.
-            </Desc>
+            Design to Code Feature supports Major design tools including Sketch,
+            Figma and Adobe XD. Code is converted to Major Platforms / Languages
+            / Frameworks with various coding styles. These lines of code is
+            ready to use.
+          </Desc>
 
           <Flex flexDirection="column">
             <ActionItem
@@ -134,14 +142,14 @@ const BridgedIntroduce = () => {
 export default BridgedIntroduce;
 
 const IphoneAppView = styled(Box)`
-    position: absolute;
-    top: 2.5%;
-    right: 5.5%;
+  position: absolute;
+  top: 2.5%;
+  right: 5.5%;
 
-    div {
-      width: 290px !important;
-      height: 625px !important;
-    }
+  div {
+    width: 290px !important;
+    height: 625px !important;
+  }
 
   @media (max-width: 720px) {
     right: 21.5%;
@@ -185,7 +193,6 @@ const Platforms = styled(Flex)`
     background-color: #000;
     margin-left: 24px;
   }
-  
 `;
 
 const IntroduceWrapper = styled(Flex)`
@@ -196,7 +203,7 @@ const IntroduceWrapper = styled(Flex)`
   }
 
   .section-desc {
-    max-width: 520px
+    max-width: 520px;
   }
 `;
 
