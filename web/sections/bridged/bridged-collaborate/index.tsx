@@ -20,6 +20,16 @@ const MotionIcon = styled(Icon)`
         }
     }
 
+    @media (max-width: 760px) {
+        top: -65%;
+        left: -5%;
+
+        svg {
+            width: 64px;
+            height: 64px;
+        }
+    }
+
     @media (max-width: 426px) {
         top: -65%;
         left: -5%;
