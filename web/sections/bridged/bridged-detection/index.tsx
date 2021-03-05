@@ -25,11 +25,11 @@ const BridgedDetection = () => {
           <Text fontSize={["36px", "36px", "64px"]} fontWeight="bold">
             Yes, we know.
           </Text>
-          <Flex alignItems="center">
+          <Flex alignItems="center" flexDirection={["column", "column","row"]}>
             <Text
               fontSize={["36px", "36px", "64px"]}
               fontWeight="bold"
-              mr="20px"
+              mr="auto"
             >
               That's a
             </Text>

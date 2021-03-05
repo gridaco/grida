@@ -40,8 +40,8 @@ const SolutionList = [
 ]
 
 const BridgedSolutions = () => {
-    const [currentSolution, setCurrentSolution] = useState("idea");
-    const [currentIndex, setCurrentIndex] = useState(0);
+    const [currentSolution, setCurrentSolution] = useState("code");
+    const [currentIndex, setCurrentIndex] = useState(1);
     useEffect(() => {
         SolutionList.map((i, ix) => {
             if (i.title === currentSolution) {

@@ -14,8 +14,8 @@ const Onair = () => {
 };
 
 const OnairButton = styled.button`
-  margin-left: 20px;
-
+  margin-right: auto;
+  margin-top: 20px;
   // region gradient animation
   background: linear-gradient(318deg, #f537ff, #ff6565, #ff379f, #ff373e);
   background-size: 800% 800%;
@@ -43,6 +43,11 @@ const OnairButton = styled.button`
   color: #fff;
   font-size: 32px;
   font-weight: bold;
+
+  @media (min-width: 500px) {
+   margin-left: 20px;
+  margin-top: 0px;
+  }
 `;
 
 const BridgedIntroduce = () => {
@@ -78,15 +83,15 @@ const BridgedIntroduce = () => {
             <Text fontSize="24px" mb="17px">
               What you’ve just sketched?
             </Text>
-            <Flex>
+            <Flex alignItems="center" flexDirection={["column", "column", "row"]} mb="35px">
               <Text
                 fontSize={["36px", "36px", "64px"]}
                 fontWeight="bold"
-                mb="35px"
-                style={{ display: "flex", alignItems: "center" }}
+                mr="auto"
               >
-                That just got <Onair />
+                That just got
               </Text>
+              <Onair />
             </Flex>
 
             <LiveAreaMobile className="no-drag">
@@ -198,7 +203,7 @@ const IntroduceWrapper = styled(Flex)`
   height: 2000px;
 
   @media (max-width: 768px) {
-    height: 2500px;
+    height: 2700px;
   }
 `;
 

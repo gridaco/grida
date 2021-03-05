@@ -4,12 +4,12 @@ import styled from '@emotion/styled';
 
 
 const GradientSolutions = ({ list, currentSolution, changeSolution }) => {
-  
+
   return (
     <Postioner>
       <LeftFade />
       <ScrollView>
-        {list.map(i => <span className="cursor" onClick={() => changeSolution(i.title)} style={currentSolution === i.title ? { backgroundImage : i.gradient } : { color : "#F1F1F1"}}>{i.title}</span>)}
+        {list.map(i => <span className="cursor" onClick={() => changeSolution(i.title)} style={currentSolution === i.title ? { backgroundImage: i.gradient } : { color: "#F1F1F1" }}>{i.title}</span>)}
       </ScrollView>
       <RightFade />
     </Postioner>
@@ -24,13 +24,19 @@ const Postioner = styled(Flex)`
   height: 50px;
 
   
+  @media(max-width: 768px) {
+    margin-top: 20px;
+  }
 `
 
 const ScrollView = styled(Flex)`
   overflow-x: auto;
-  padding: 0px 150px;
+
+
+  
 
   span {
+    height: auto;
     margin: 0px 20px;
     font-size: 80px;
     font-weight: bold;
@@ -43,8 +49,12 @@ const ScrollView = styled(Flex)`
     }
    
 
+    &:first-child {
+      padding-left: 100px;
+    }
+    
     &:last-child {
-      padding-right: 200px;
+      padding-right: 100px;
     }
   }
 
@@ -67,7 +77,7 @@ const RightFade = styled(Box)`
   width: 200px;
   height: 100px;
   top: 0;
-  right: 0;
+  right: -10%;
   background: linear-gradient(90deg, rgba(255, 255, 255, 0) 0%, #FFFFFF 48.44%);
   @media(max-width: 400px) {
     width: 50px
