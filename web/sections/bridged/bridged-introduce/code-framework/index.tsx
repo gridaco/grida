@@ -60,11 +60,9 @@ const CodeFrameworks = () => {
           <span />
         </header>
         <div className="body">
-          <main>
             <SyntaxHighlighter language={currentPlatform.lang} style={a11yDark}>
               {currentPlatform.source}
             </SyntaxHighlighter>
-          </main>
         </div>
       </CodeView>
       <Platforms>
@@ -144,10 +142,11 @@ const CodeView = styled(Box)`
     align-items: center;
     justify-content: center;
 
-    main {
-      width: 95%;
-      height: 95%;
-    }
+    pre {
+        width: 95%;
+        height: 95%;
+        padding: 0px;
+      }
   }
 `;
 

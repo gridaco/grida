@@ -96,6 +96,9 @@ const BridgedIntroduce = () => {
                 width="390"
                 height="788"
               />
+              <IphoneAppView>
+                <Image src="/inframe.png" width="auto" height="auto" />
+              </IphoneAppView>
               <GradientView>
                 <Image src="/gradient-live.png" width="478" height="814" />
               </GradientView>
@@ -121,6 +124,9 @@ const BridgedIntroduce = () => {
             <IphoneView className="app">
               <Image src="/simluator.png" width="auto" height="auto" />
             </IphoneView>
+            <IphoneAppView>
+              <Image src="/inframe.png" width="auto" height="auto" />
+            </IphoneAppView>
             <GradientView>
               <Image src="/gradient-live.png" width="1440" height="1040" />
             </GradientView>
@@ -133,14 +139,47 @@ const BridgedIntroduce = () => {
 
 export default BridgedIntroduce;
 
-const PlatformMotions = styled(Box)`
-  width: 280px;
-  height: 350px;
-  background: #f3f3f3;
-  border-radius: 12px;
-  position: absolute;
-  left: -5.5%;
-  top: 15%;
+const IphoneAppView = styled(Box)`
+    position: absolute;
+    top: 2%;
+    right: 8%;
+
+    img {
+      width: 280px !important;
+      height: 620px !important;
+    }
+
+  @media (max-width: 720px) {
+    right: 21.5%;
+    img {
+      width: 260px !important;
+      height: 540px !important;
+    }
+  }
+
+  @media (max-width: 430px) {
+    right: 16%;
+    img {
+      width: 260px !important;
+      height: 540px !important;
+    }
+  }
+
+  @media (max-width: 375px) {
+    right: 11.5%;
+    img {
+      width: 260px !important;
+      height: 540px !important;
+    }
+  }
+
+  @media (max-width: 320px) {
+    right: 4%;
+    img {
+      width: 260px !important;
+      height: 540px !important;
+    }
+  }
 `;
 
 const Platforms = styled(Flex)`
@@ -152,6 +191,7 @@ const Platforms = styled(Flex)`
     background-color: #000;
     margin-left: 24px;
   }
+  
 `;
 
 const IntroduceWrapper = styled(Flex)`

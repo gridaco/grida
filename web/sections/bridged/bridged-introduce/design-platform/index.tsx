@@ -13,8 +13,9 @@ const DesignPlatforms = () => {
     <Flex height="100%" flex={1} flexDirection="column" alignItems="flex-start" justifyContent="flex-end">
       <PlatformView className="no-drag">
         <Image src={`/live-desing-apps/${currentPlatform}.png`} width="904" height="565" />
-        <PlatformPreview bg="#F3F3F3">
-      </PlatformPreview>
+        <PlatformPreview bg="#fff">
+          <Image src="/design_source.png" width="440px" height="540px" />
+        </PlatformPreview>
       </PlatformView>
       <Platforms>
         {renderPlatforms.map(i => <Image key={i} className="cursor" onClick={() => setCurrentPlatform(i)} src={`/platform-icons/${i}/${currentPlatform === i ? "default" : "grey"}.png`} width="24" height="24" />)}
@@ -40,6 +41,13 @@ const PlatformPreview = styled(Flex)`
   position: absolute;
   border-radius: 12px;
   left: 40%;
+  align-items: center;
+  justify-content: center;
+
+  div {
+    width: 150px;
+    height: 178px;
+  }
 
   @media (max-width: 800px) {
     width: 400px;
