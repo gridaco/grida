@@ -72,13 +72,13 @@ export default GradientSolutions
 
 const Mobile = styled(Box)`
   display: none;
-  @media(max-width: 768px) {
+  @media(max-width: 769px) {
     display: block;
   }
 `
 
 const Desktop = styled(Box)`
-  @media(max-width: 768px) {
+  @media(max-width: 770px) {
     display: none;
   }
 `

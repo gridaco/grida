@@ -1,4 +1,5 @@
 import React from "react";
+import styled from '@emotion/styled';
 
 // tripple click or above
 const TRIGGER_NEXT_MUTIPLE_CLICKS = 3;
@@ -16,7 +17,7 @@ export function MotionItemContainer(props: MotionItemContainerProps) {
     props.onTriggerNext();
   };
   return (
-    <div
+    <Postioner
       className="no-drag cursor"
       onClick={e => {
         if (e.detail >= TRIGGER_NEXT_MUTIPLE_CLICKS) {
@@ -25,6 +26,10 @@ export function MotionItemContainer(props: MotionItemContainerProps) {
       }}
     >
       {props.children}
-    </div>
+    </Postioner>
   );
 }
+
+const Postioner = styled.div`
+  margin-right: auto;
+`

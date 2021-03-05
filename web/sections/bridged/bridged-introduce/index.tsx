@@ -147,12 +147,12 @@ export default BridgedIntroduce;
 
 const IphoneAppView = styled(Box)`
     position: absolute;
-    top: 3%;
-    right: 7%;
+    top: 2.5%;
+    right: 5.5%;
 
     div {
-      width: 280px !important;
-      height: 620px !important;
+      width: 290px !important;
+      height: 625px !important;
     }
 
   @media (max-width: 720px) {
@@ -243,6 +243,7 @@ const IphoneView = styled(Flex)`
   img {
     width: 325px !important;
     height: 657px !important;
+    z-index: 1;
   }
 `;
 
@@ -260,6 +261,7 @@ const LiveAreaMobile = styled(Flex)`
     img {
       width: 280px !important;
       height: 566px !important;
+      z-index: 1;
     }
   }
 `;
