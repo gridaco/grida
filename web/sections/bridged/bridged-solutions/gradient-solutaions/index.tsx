@@ -21,11 +21,12 @@ export default GradientSolutions
 const Postioner = styled(Flex)`
   position: relative;
   width: 100%;
-  height: 50px;
+  height: 100px;
 
   
   @media(max-width: 768px) {
     margin-top: 20px;
+    height: 40px;
   }
 `
 
