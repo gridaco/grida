@@ -14,49 +14,42 @@ const BridgedDetection = () => {
   const [currentMotionIndex, setCurrentMotionIndex] = useState(0);
 
   return (
-    <DetectionWrapper alignItems="center" justifyContent="center" mx="20px">
-      <Flex
-        width={["320px", "730px", "985px", "1040px"]}
-        alignItems="center"
-        justifyContent="center"
-        flexDirection="column"
-      >
-        <Box mr="auto">
-          <Text fontSize={["36px", "36px", "64px"]} fontWeight="bold">
-            Yes, we know.
+    <DetectionWrapper flexDirection="column" alignItems="center" width="100%" justifyContent="center" mx="20px">
+      <Box mr="auto">
+        <Text fontSize={["36px", "36px", "64px"]} fontWeight="bold">
+          Yes, we know.
           </Text>
-          <Flex alignItems="center" flexDirection={["column", "column","row"]}>
-            <Text
-              fontSize={["36px", "36px", "64px"]}
-              fontWeight="bold"
-              mr="auto"
-            >
-              That's a
+        <Flex alignItems="center" flexDirection={["column", "column", "row"]}>
+          <Text
+            fontSize={["36px", "36px", "64px"]}
+            fontWeight="bold"
+            mr="auto"
+          >
+            That's a
             </Text>
-            {renderMoitonComponents.map(
-              (i, ix) =>
-                ix === currentMotionIndex % renderMoitonComponents.length &&
-                i({
-                  onTriggerNext: () => {
-                    setCurrentMotionIndex(currentMotionIndex + 1);
-                  },
-                }),
-            )}
-          </Flex>
-        </Box>
+          {renderMoitonComponents.map(
+            (i, ix) =>
+              ix === currentMotionIndex % renderMoitonComponents.length &&
+              i({
+                onTriggerNext: () => {
+                  setCurrentMotionIndex(currentMotionIndex + 1);
+                },
+              }),
+          )}
+        </Flex>
+      </Box>
 
-        <Desc mr="auto" mt="48px">
-          Finally, the tool understands your design. More inteligence means less
-          modification. Which leads us to blazing fast workflow.
+      <Desc mr="auto" mt="48px">
+        Finally, the tool understands your design. More inteligence means less
+        modification. Which leads us to blazing fast workflow.
         </Desc>
 
-        <Box width="100%" height="600px" mt="90px" bg="#000" mb="100px" />
+      <Box width="100%" height="600px" mt="90px" bg="#000" mb="100px" />
 
-        <ActionItem
-          href={LandingpageUrls.article_how_engine_works}
-          label="Learn how the engine works"
-        />
-      </Flex>
+      <ActionItem
+        href={LandingpageUrls.article_how_engine_works}
+        label="Learn how the engine works"
+      />
     </DetectionWrapper>
   );
 };

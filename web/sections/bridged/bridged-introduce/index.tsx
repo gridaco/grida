@@ -54,85 +54,78 @@ const OnairButton = styled.button`
 
 const BridgedIntroduce = () => {
   return (
-    <IntroduceWrapper alignItems="center" justifyContent="center">
-      <Flex
-        width={["320px", "730px", "985px", "1040px"]}
-        alignItems="center"
-        justifyContent="center"
-        flexDirection="column"
-      >
-          <Section
-            margin="0px"
-            align="left"
-            title={`Designs,\ncome to live.`}
-            description="Keep you design live, not as a prototype, but as a product. Instantly convert your design to code, prototype, product within a click. No coding required"
-          />
-        <AbsoulteImageArea>
-          <DesignPlatforms />
-          <CodeFrameworks />
-        </AbsoulteImageArea>
-        <Flex width="100%" justifyContent="space-between">
+    <IntroduceWrapper flexDirection="column" alignItems="center" justifyContent="center">
+      <Section
+        margin="0px"
+        align="left"
+        title={`Designs,\ncome to live.`}
+        description="Keep you design live, not as a prototype, but as a product. Instantly convert your design to code, prototype, product within a click. No coding required"
+      />
+      <AbsoulteImageArea>
+        <DesignPlatforms />
+        <CodeFrameworks />
+      </AbsoulteImageArea>
+      <Flex width="100%" justifyContent="space-between">
 
-          <Box>
-            <Text fontSize="24px" mb="17px">
-              What you’ve just sketched?
+        <Box>
+          <Text fontSize="24px" mb="17px">
+            What you’ve just sketched?
             </Text>
-            <Flex alignItems="center" flexDirection={["column", "column", "row"]} mb="35px">
-              <Text
-                fontSize={["36px", "36px", "64px"]}
-                fontWeight="bold"
-                mr="auto"
-              >
-                That just got
+          <Flex alignItems="center" flexDirection={["column", "column", "row"]} mb="35px">
+            <Text
+              fontSize={["36px", "36px", "64px"]}
+              fontWeight="bold"
+              mr="auto"
+            >
+              That just got
               </Text>
-              <Onair />
-            </Flex>
+            <Onair />
+          </Flex>
 
-            <LiveAreaMobile className="no-drag">
-              <Image
-                className="app"
-                src="/iPhone12-frame-blank.png"
-                width="390"
-                height="788"
-              />
-              <IphoneAppView>
-                <AppUi />
-              </IphoneAppView>
-              <GradientView>
-                <Image src="/gradient-live.png" width="478" height="814" />
-              </GradientView>
-            </LiveAreaMobile>
-
-            <Desc mr="auto" mb="70px">
-              Design to Code Feature supports Major design tools including
-              Sketch, Figma and Adobe XD. Code is converted to Major Platforms /
-              Languages / Frameworks with various coding styles. These lines of
-              code is ready to use.
-            </Desc>
-
-            <Flex flexDirection="column">
-              <ActionItem
-                label="How do Design to code work?"
-                href={LandingpageUrls.article_how_do_design_to_code_work}
-              />
-              <ActionItem
-                label="Try the demo"
-                href={LandingpageUrls.try_the_demo_1}
-              />
-            </Flex>
-          </Box>
-          <LiveAreaDesktop className="no-drag">
-            <IphoneView className="app">
-              <Image src="/iPhone12-frame-blank.png" width="auto" height="auto" />
-            </IphoneView>
+          <LiveAreaMobile className="no-drag">
+            <Image
+              className="app"
+              src="/iPhone12-frame-blank.png"
+              width="390"
+              height="788"
+            />
             <IphoneAppView>
               <AppUi />
             </IphoneAppView>
             <GradientView>
-              <Image src="/gradient-live.png" width="1440" height="1040" />
+              <Image src="/gradient-live.png" width="478" height="814" />
             </GradientView>
-          </LiveAreaDesktop>
-        </Flex>
+          </LiveAreaMobile>
+
+          <Desc mr="auto" mb="70px">
+            Design to Code Feature supports Major design tools including
+            Sketch, Figma and Adobe XD. Code is converted to Major Platforms /
+            Languages / Frameworks with various coding styles. These lines of
+            code is ready to use.
+            </Desc>
+
+          <Flex flexDirection="column">
+            <ActionItem
+              label="How do Design to code work?"
+              href={LandingpageUrls.article_how_do_design_to_code_work}
+            />
+            <ActionItem
+              label="Try the demo"
+              href={LandingpageUrls.try_the_demo_1}
+            />
+          </Flex>
+        </Box>
+        <LiveAreaDesktop className="no-drag">
+          <IphoneView className="app">
+            <Image src="/iPhone12-frame-blank.png" width="auto" height="auto" />
+          </IphoneView>
+          <IphoneAppView>
+            <AppUi />
+          </IphoneAppView>
+          <GradientView>
+            <Image src="/gradient-live.png" width="1440" height="1040" />
+          </GradientView>
+        </LiveAreaDesktop>
       </Flex>
     </IntroduceWrapper>
   );

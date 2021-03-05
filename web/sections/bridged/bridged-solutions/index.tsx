@@ -62,35 +62,33 @@ const BridgedSolutions = () => {
     }, [currentSolution])
 
     return (
-        <SolutionsWrapper alignItems="center" justifyContent="center" mx="20px">
-            <Flex width={["320px", "730px", "985px", "1040px"]} alignItems="center" justifyContent="center" flexDirection="column">
-                <Text fontSize={["36px", "36px", "64px"]} fontWeight="bold" mr="auto">Your design is your</Text>
-                <GradientSolutions type="desktop" list={SolutionList} currentSolution={currentSolution} changeSolution={title => setCurrentSolution(title)} />
+        <SolutionsWrapper alignItems="center" justifyContent="center" mx="20px" flexDirection="column">
+            <Text fontSize={["36px", "36px", "64px"]} fontWeight="bold" mr="auto">Your design is your</Text>
+            <GradientSolutions type="desktop" list={SolutionList} currentSolution={currentSolution} changeSolution={title => setCurrentSolution(title)} />
 
-                <Box width="100%" height="650px" mt="90px" bg="#000" mb="100px" />
+            <Box width="100%" height="650px" mt="90px" bg="#000" mb="100px" />
 
-                <Text fontSize="18px" fontWeight="bold" mr="auto">{SolutionList[currentIndex].subTitle}</Text>
-                <Desc mr="auto">{SolutionList[currentIndex].desc}</Desc>
+            <Text fontSize="18px" fontWeight="bold" mr="auto">{SolutionList[currentIndex].subTitle}</Text>
+            <Desc mr="auto">{SolutionList[currentIndex].desc}</Desc>
 
-                <Text fontSize="18px" fontWeight="bold" mr="auto" mt="40px" pb="12px" style={{ borderBottom: "1px solid black" }}>See also</Text>
-                <Solutions mr="auto" mt="9px">
-                    <Link href="/">
-                        <span>idea</span>
-                    </Link>
-                    <Link href="/">
-                        <span>server</span>
-                    </Link>
-                    <Link href="/">
-                        <span>translations</span>
-                    </Link>
-                    <Link href="/">
-                        <span>insight</span>
-                    </Link>
-                    <Link href="/">
-                        <span>everything</span>
-                    </Link>
-                </Solutions>
-            </Flex>
+            <Text fontSize="18px" fontWeight="bold" mr="auto" mt="40px" pb="12px" style={{ borderBottom: "1px solid black" }}>See also</Text>
+            <Solutions mr="auto" mt="9px">
+                <Link href="/">
+                    <span>idea</span>
+                </Link>
+                <Link href="/">
+                    <span>server</span>
+                </Link>
+                <Link href="/">
+                    <span>translations</span>
+                </Link>
+                <Link href="/">
+                    <span>insight</span>
+                </Link>
+                <Link href="/">
+                    <span>everything</span>
+                </Link>
+            </Solutions>
         </SolutionsWrapper>
     )
 }
