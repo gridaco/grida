@@ -1190,6 +1190,13 @@
     lodash "^4.17.19"
     to-fast-properties "^2.0.0"
 
+"@crello/react-lottie@^0.0.11":
+  version "0.0.11"
+  resolved "https://registry.yarnpkg.com/@crello/react-lottie/-/react-lottie-0.0.11.tgz#1d581000b9fd98fdc490aac23458e19141db3861"
+  integrity sha512-V+U50f2k1pRBpfVyHEUc3A+L9bwQnQxuxRZqP5w/mKcTlc9h8mmuYOI5gh3S6VAUrUhzyIE1NgN/pHHU0EhBNA==
+  dependencies:
+    lottie-web "^5.7.3"
+
 "@emotion/babel-plugin-jsx-pragmatic@^0.1.5":
   version "0.1.5"
   resolved "https://registry.yarnpkg.com/@emotion/babel-plugin-jsx-pragmatic/-/babel-plugin-jsx-pragmatic-0.1.5.tgz#27debfe9c27c4d83574d509787ae553bf8a34d7e"
@@ -6697,7 +6704,7 @@ loose-envify@^1.1.0, loose-envify@^1.4.0:
   dependencies:
     js-tokens "^3.0.0 || ^4.0.0"
 
-lottie-web@^5.1.3:
+lottie-web@^5.1.3, lottie-web@^5.7.3:
   version "5.7.6"
   resolved "https://registry.yarnpkg.com/lottie-web/-/lottie-web-5.7.6.tgz#f20e5555ff120dc1e07ba53adb40061e822f3c48"
   integrity sha512-qn/KYMI4QQvFDhtoxs0RPkn9uZKhDB9keE5BKgbJlSRfNEZpRiDlwBE9ibYz4nPhbyE+NUlt8IRIVR7g5OSX3w==

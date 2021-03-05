@@ -1,15 +1,25 @@
-import React from "react";
+import React, { useEffect, useRef, useState } from "react";
 import styled from "@emotion/styled";
-import Image from "next/image";
 import { Flex } from "rebass";
-
+import useOnScreen from "utils/hooks/use-on-screen";
 import Lottie from "react-lottie";
 import animationData from "./live-demo-app-design-motion/comp.json";
 
 export default function LiveDesignDemoFrame() {
+  const [isStopped, setIsStopped] = useState(true);
+  const ref = useRef();
+  const isVisible = useOnScreen(ref);
+
+  useEffect(() => {
+    if (isVisible) {
+      setIsStopped(false);
+    }
+  }, [isVisible]);
+
   const defaultMotionOptions = {
-    loop: true,
-    autoplay: true,
+    loop: false,
+    autoplay: false,
+    isClickToPauseDisabled: true,
     animationData: animationData,
     rendererSettings: {
       preserveAspectRatio: "xMidYMid slice",
@@ -17,9 +27,18 @@ export default function LiveDesignDemoFrame() {
   };
 
   return (
-    <DesignFramePreview bg="#fff">
-      <Lottie options={defaultMotionOptions} height={400} width={400} />
-      {/* <Image src="/design_source.png" width="440px" height="540px" /> */}
+    <DesignFramePreview bg="#F5F5F5" ref={ref}>
+      <Lottie
+        options={defaultMotionOptions}
+        isStopped={isStopped}
+        onClick={event => {
+          event.preventDefault();
+          console.log(isStopped);
+          if (isStopped == true) {
+            setIsStopped(false);
+          }
+        }}
+      />
     </DesignFramePreview>
   );
 }
