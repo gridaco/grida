@@ -117,21 +117,23 @@ const BridgedIntroduce = () => {
               code is ready to use.
             </Desc>
 
-            <ActionItem
-              label="How do Design to code work?"
-              href={LandingpageUrls.article_how_do_design_to_code_work}
-            />
-            <ActionItem
-              label="Try the demo"
-              href={LandingpageUrls.try_the_demo_1}
-            />
+            <Flex flexDirection="column">
+              <ActionItem
+                label="How do Design to code work?"
+                href={LandingpageUrls.article_how_do_design_to_code_work}
+              />
+              <ActionItem
+                label="Try the demo"
+                href={LandingpageUrls.try_the_demo_1}
+              />
+            </Flex>
           </Box>
           <LiveAreaDesktop className="no-drag">
             <IphoneView className="app">
               <Image src="/iPhone12-frame-blank.png" width="auto" height="auto" />
             </IphoneView>
             <IphoneAppView>
-                <AppUi />
+              <AppUi />
             </IphoneAppView>
             <GradientView>
               <Image src="/gradient-live.png" width="1440" height="1040" />
