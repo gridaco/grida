@@ -26,4 +26,8 @@ const Button = styled(motion.div)`
   font-size: 50px;
   border-radius: 19px;
   border: none;
+
+  @media(max-width: 500px) {
+    margin-top: 20px;
+  }
 `;

@@ -32,9 +32,6 @@ const Postioner = styled(Flex)`
 const ScrollView = styled(Flex)`
   overflow-x: auto;
 
-
-  
-
   span {
     height: auto;
     margin: 0px 20px;
@@ -52,14 +49,11 @@ const ScrollView = styled(Flex)`
     &:first-child {
       padding-left: 100px;
     }
-    
+
     &:last-child {
       padding-right: 100px;
     }
   }
-
-  
-
 `
 
 const LeftFade = styled(Box)`
