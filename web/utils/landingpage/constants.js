@@ -13,9 +13,9 @@ export const LandingpageUrls = {
     try_the_demo_1: "https://console.bridged.xyz",
 
     // misc
-    privacy_policy: "docs/support/privacy-policy",
-    terms_and_conditions: "docs/support/terms-and-conditoins",
-    cookies_policy: "docs/support/cookies-policy",
+    privacy_policy: "/docs/support/privacy-policy",
+    terms_and_conditions: "/docs/support/terms-and-conditions",
+    cookies_policy: "/docs/support/cookies-policy",
 }
 
 const DownloadUrls = {
