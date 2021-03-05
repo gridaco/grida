@@ -52,7 +52,7 @@ const Platforms = styled(Box)`
   div {
     width: 24px;
     height: 24px;
-    margin-left: 28px !important;
+    margin-right: 28px !important;
   }
 `;
 
