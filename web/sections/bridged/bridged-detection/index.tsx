@@ -14,7 +14,7 @@ const BridgedDetection = () => {
   const [currentMotionIndex, setCurrentMotionIndex] = useState(0);
 
   return (
-    <DetectionWrapper flexDirection="column" alignItems="center" width="100%" justifyContent="center" mx="20px">
+    <DetectionWrapper flexDirection="column" alignItems="center" width="100%" justifyContent="center">
       <Box mr="auto">
         <Text fontSize={["36px", "36px", "64px"]} fontWeight="bold">
           Yes, we know.

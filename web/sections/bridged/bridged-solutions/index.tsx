@@ -62,7 +62,7 @@ const BridgedSolutions = () => {
     }, [currentSolution])
 
     return (
-        <SolutionsWrapper alignItems="center" justifyContent="center" mx="20px" flexDirection="column">
+        <SolutionsWrapper alignItems="center" justifyContent="center" flexDirection="column">
             <Text fontSize={["36px", "36px", "64px"]} fontWeight="bold" mr="auto">Your design is your</Text>
             <GradientSolutions type="desktop" list={SolutionList} currentSolution={currentSolution} changeSolution={title => setCurrentSolution(title)} />
 

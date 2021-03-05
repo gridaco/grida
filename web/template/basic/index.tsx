@@ -7,7 +7,7 @@ function BasicTemplate(props) {
 
   return (
     <Flex alignItems="center" justifyContent="center" >
-      <Flex flexDirection="column" width={["320px", "730px", "985px", "1040px"]}>
+      <Flex flexDirection="column" width={["280px", "730px", "985px", "1040px"]} mx="20px">
         <BlankArea height={40} />
         {children}
         <BlankArea height={30} />
