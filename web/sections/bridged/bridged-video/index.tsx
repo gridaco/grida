@@ -4,6 +4,8 @@ import styled from "@emotion/styled";
 import Icon from "components/icon";
 import ElevatedVideoPlayer from "components/special/elevated-video-player";
 import { Typography } from '@reflect-ui/react-core';
+import { Section } from "components/section";
+import BlankArea from "components/blank-area";
 
 const BridgedVideoSection = () => {
   return (
@@ -14,19 +16,18 @@ const BridgedVideoSection = () => {
         justifyContent="center"
         flexDirection="column"
       >
-        
-        <Heading fontSize="80px" fontWeight="bold" textAlign="center">
-          Designs that are meant to be implemented.
-        </Heading>
-        <Desc>
-          All your contents, logics, components are already designed. With
-          Bridged, You can make them alive with design to code, with automatic
-          content backend in-the-box. With a click. A hackable tool that's
-          designed for hackers.
-        </Desc>
-        <StartButton mt="40px" mb="20px" p={["12px 28px"]}>
-          Start now
-        </StartButton>
+        <BlankArea height={60} />
+        <Section
+          align="center"
+          title="Designs that are meant to be implemented." 
+          description="Make twice no more. All you’ll ever need for frontend development. A hackable tool that's designed for hackers." 
+          isButton
+          buttonOption={{
+            label: "Start now",
+            href: "",
+            marginOption: "40px 0px 20px 0px"
+          }}
+        />
         <div style={{ margin: 0 }}>
           <ElevatedVideoPlayer />
         </div>
