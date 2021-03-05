@@ -50,6 +50,10 @@ const Heading = styled(Text)`
   max-width: 900px;
   margin-top: 60px;
 
+  @media (max-width: 850px) {
+    max-width: 720px;
+  }
+
   @media (max-width: 500px) {
     max-width: 280px;
     font-size: 48px;
