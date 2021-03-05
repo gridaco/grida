@@ -55,7 +55,7 @@ const Heading = styled(Text)`
   }
 
   @media (max-width: 500px) {
-    max-width: 280px;
+    max-width: 90%;
     font-size: 48px;
   }
 `;
