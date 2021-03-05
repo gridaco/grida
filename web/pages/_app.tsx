@@ -108,6 +108,7 @@ const MyApp = ({ Component, pageProps }: AppProps) => {
           rel="stylesheet"
           type="text/css"
         />
+        <script defer src="https://unpkg.com/smoothscroll-polyfill@0.4.4/dist/smoothscroll.min.js"></script>
       </Head>
       <div
         css={css`
