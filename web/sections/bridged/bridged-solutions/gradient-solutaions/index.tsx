@@ -2,7 +2,6 @@ import React, { useEffect, useRef, useState } from 'react'
 import { Box, Flex, Text } from 'rebass';
 import styled from '@emotion/styled';
 
-
 const GradientSolutions = ({ list, currentSolution, changeSolution, type }) => {
   const scrollabelDiv = useRef(null);
   const [minutes, setMinutes] = useState(0);
@@ -95,10 +94,23 @@ const Postioner = styled(Flex)`
 const ScrollView = styled(Flex)`
   overflow-x: hidden;
   scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
 
   &:before {
     left: 0;
     background: linear-gradient(90deg,#fff,hsla(0,0%,100%,0));
+    content: "";
+    top: 0;
+    width: 8%;
+    height: 100%;
+    position: absolute;
+    z-index: 100;
+    pointer-events: none;
+  }
+
+  &:after {
+    right: 0;
+    background: linear-gradient(90deg,hsla(0,0%,100%,0),#fff);
     content: "";
     top: 0;
     width: 8%;

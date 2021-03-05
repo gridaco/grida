@@ -42,6 +42,10 @@ const MyApp = ({ Component, pageProps }: AppProps) => {
             letter-spacing: -0.65px;
             min-height: 100vh;
             overflow-x: hidden;
+            scroll-behavior: smooth;
+            @media (prefers-reduced-motion: reduce) {
+                scroll-behavior: auto;
+            }
           }
 
           .no-drag {
