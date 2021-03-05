@@ -26,7 +26,9 @@ const Button = styled(motion.div)`
   font-size: 50px;
   border-radius: 19px;
   border: none;
-
+  @media(min-width: 501px) {
+    margin-left: 20px;
+  }
   @media(max-width: 500px) {
     margin-top: 20px;
   }
