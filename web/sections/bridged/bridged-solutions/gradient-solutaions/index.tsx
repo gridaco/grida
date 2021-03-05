@@ -160,6 +160,12 @@ const ScrollView = styled(Flex)`
       }
     }
 
+    @media (max-width: 320px) {
+      &:first-child {
+        margin-left: 140px;
+      }
+    }
+
     &:last-child {
       margin-right: 1000px;
     }
