@@ -44,6 +44,7 @@
         "react-dom": "^16.10.2",
         "react-i18next": "^11.2.5",
         "react-query": "^3.6.0",
+        "react-syntax-highlighter": "^15.4.3",
         "rebass": "^4.0.3",
         "remark-html": "^13.0.1",
         "styled-system": "^5.1.0"

@@ -1,16 +1,58 @@
-import React, { useState } from 'react'
-import { Flex, Button, Text, Box } from 'rebass';
-import styled from '@emotion/styled';
-import Image from 'next/image';
-import Icon from 'components/icon';
+import React, { useState } from "react";
+import { Flex, Button, Text, Box } from "rebass";
+import styled from "@emotion/styled";
+import Image from "next/image";
+import {
+  FLUTTER_COMPONENT_FULL_SOURCE,
+  REACT_JSCSS_COMPONENT_FULL_SOURCE,
+  HTML_COMPONENT_FULL_SOURCE,
+} from "./snippets";
+import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
+import { a11yDark } from "react-syntax-highlighter/dist/cjs/styles/prism";
 
-const renderPlatforms = ["flutter", "react", "svelte", "html"]
+interface DevFrameworkDemoConfig {
+  name: string;
+  lang: string;
+  source: string;
+}
+
+const DEFAULT_DEMO_ITEM_FLUTTER = {
+  name: "flutter",
+  lang: "dart",
+  source: FLUTTER_COMPONENT_FULL_SOURCE,
+};
+
+const DEV_FRAMEWORKS: DevFrameworkDemoConfig[] = [
+  DEFAULT_DEMO_ITEM_FLUTTER,
+  {
+    name: "html",
+    lang: "html",
+    source: HTML_COMPONENT_FULL_SOURCE,
+  },
+  {
+    name: "react",
+    lang: "tsx",
+    source: REACT_JSCSS_COMPONENT_FULL_SOURCE,
+  },
+  {
+    name: "svelte",
+    lang: "svelte",
+    source: REACT_JSCSS_COMPONENT_FULL_SOURCE,
+  },
+];
 
 const CodeFrameworks = () => {
-  const [currentPlatform, setCurrentPlatform] = useState("flutter");
-  
+  const [currentPlatform, setCurrentPlatform] = useState<
+    DevFrameworkDemoConfig
+  >(DEFAULT_DEMO_ITEM_FLUTTER);
+
   return (
-    <Flex flex={1} flexDirection="column" alignItems="flex-end" justifyContent="flex-end">
+    <Flex
+      flex={1}
+      flexDirection="column"
+      alignItems="flex-end"
+      justifyContent="flex-end"
+    >
       <CodeView width="460px" height="770px" bg="#212121">
         <header>
           <span />
@@ -19,20 +61,32 @@ const CodeFrameworks = () => {
         </header>
         <div className="body">
           <main>
-            Code section
-              </main>
+            <SyntaxHighlighter language={currentPlatform.lang} style={a11yDark}>
+              {currentPlatform.source}
+            </SyntaxHighlighter>
+          </main>
         </div>
-
       </CodeView>
-      <Platforms >
-        {renderPlatforms.map(i => <Image key={i} className="cursor" onClick={() => setCurrentPlatform(i)} src={`/platform-icons/${i}/${currentPlatform === i ? "default" : "grey"}.png`} width="24" height="24"  />)}
+      <Platforms>
+        {DEV_FRAMEWORKS.map(i => (
+          <Image
+            key={i.name}
+            className="cursor"
+            onClick={() => setCurrentPlatform(i)}
+            src={`/platform-icons/${i.name}/${
+              currentPlatform.name === i.name ? "default" : "grey"
+            }.png`}
+            width="24"
+            height="24"
+          />
+        ))}
       </Platforms>
       <BlankArea />
     </Flex>
-  )
-}
+  );
+};
 
-export default CodeFrameworks
+export default CodeFrameworks;
 
 const Platforms = styled(Box)`
   div {
@@ -40,7 +94,7 @@ const Platforms = styled(Box)`
     height: 24px;
     margin-left: 28px !important;
   }
-`
+`;
 
 const CodeView = styled(Box)`
   position: absolute;
@@ -65,7 +119,7 @@ const CodeView = styled(Box)`
     bottom: 5% !important;
     right: 0% !important;
   }
-  
+
   header {
     display: flex;
     align-items: center;
@@ -75,7 +129,7 @@ const CodeView = styled(Box)`
     border-top-right-radius: 12px;
 
     span {
-      background-color:#3D3D3D;
+      background-color: #3d3d3d;
       width: 16px;
       height: 16px;
       margin-right: 10px;
@@ -84,7 +138,7 @@ const CodeView = styled(Box)`
   }
 
   .body {
-    width:100%;
+    width: 100%;
     height: calc(100% - 50px);
     display: flex;
     align-items: center;
@@ -93,17 +147,15 @@ const CodeView = styled(Box)`
     main {
       width: 95%;
       height: 95%;
-      background-color: #fff;
     }
   }
-  
-`
+`;
 
 const BlankArea = styled(Box)`
   height: 200px;
-  width:100%;
+  width: 100%;
 
   @media (max-width: 720px) {
     display: none;
   }
-`
+`;
