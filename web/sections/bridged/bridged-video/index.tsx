@@ -9,29 +9,22 @@ import BlankArea from "components/blank-area";
 
 const BridgedVideoSection = () => {
   return (
-    <Frame alignItems="center" justifyContent="center">
-      <Flex
-        width={["320px", "730px", "985px", "1040px"]}
-        alignItems="center"
-        justifyContent="center"
-        flexDirection="column"
-      >
-        <BlankArea height={60} />
-        <Section
-          align="center"
-          title="Designs that are meant to be implemented." 
-          description="Make twice no more. All you’ll ever need for frontend development. A hackable tool that's designed for hackers." 
-          isButton
-          buttonOption={{
-            label: "Start now",
-            href: "",
-            marginOption: "40px 0px 20px 0px"
-          }}
-        />
-        <div style={{ margin: 0 }}>
-          <ElevatedVideoPlayer />
-        </div>
-      </Flex>
+    <Frame alignItems="center" flexDirection="column" justifyContent="center">
+      <BlankArea height={60} />
+      <Section
+        align="center"
+        title="Designs that are meant to be implemented."
+        description="Make twice no more. All you’ll ever need for frontend development. A hackable tool that's designed for hackers."
+        isButton
+        buttonOption={{
+          label: "Start now",
+          href: "",
+          marginOption: "40px 0px 20px 0px"
+        }}
+      />
+      <div style={{ margin: 0 }}>
+        <ElevatedVideoPlayer />
+      </div>
     </Frame>
   );
 };

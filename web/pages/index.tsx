@@ -6,14 +6,17 @@ import BridgedIntroduce from "sections/bridged/bridged-introduce";
 import BridgedOuttro from "sections/bridged/bridged-outtro";
 import BridgedSolutions from "sections/bridged/bridged-solutions";
 import BridgedVideoSection from "sections/bridged/bridged-video";
+import BasicTemplate from "template/basic";
 
 const MainPage = () => {
   return (
     <Flex flexDirection="column">
-      <BridgedVideoSection />
-      <BridgedIntroduce />
-      <BridgedDetection />
-      <BridgedSolutions />
+      <BasicTemplate>
+        <BridgedVideoSection />
+        <BridgedIntroduce />
+        <BridgedDetection />
+        <BridgedSolutions />
+      </BasicTemplate>
       <BridgedCollaborate />
       <BridgedOuttro />
     </Flex>
