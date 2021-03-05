@@ -34,7 +34,8 @@ const StartButton = styled(Button)`
 
 const OuttroWrapper = styled(Flex)`
     height: 900px;
-
+    z-index: 9;
+    
      @media (max-width: 767px) {
         height: 570px;
     }

@@ -18,10 +18,12 @@ const GradientSolutions = ({ list, currentSolution, changeSolution }) => {
 
 export default GradientSolutions
 
-const Postioner = styled(Box)`
+const Postioner = styled(Flex)`
   position: relative;
   width: 100%;
   height: 50px;
+
+  
 `
 
 const ScrollView = styled(Flex)`
@@ -35,6 +37,10 @@ const ScrollView = styled(Flex)`
     color:transparent;
     -webkit-background-clip: text;
     background-clip: text;
+
+    @media(max-width: 768px) {
+      font-size: 36px;
+    }
    
 
     &:last-child {
@@ -51,6 +57,9 @@ const LeftFade = styled(Box)`
   width: 200px;
   height: 100px;
   background: linear-gradient(270deg, rgba(255, 255, 255, 0) 0%, #FFFFFF 51.56%);
+  @media(max-width: 400px) {
+    width: 50px
+  }
 `
 
 const RightFade = styled(Box)`
@@ -59,5 +68,8 @@ const RightFade = styled(Box)`
   height: 100px;
   top: 0;
   right: 0;
-  background: linear-gradient(90deg, rgba(255, 255, 255, 0) 0%, #FFFFFF 48.44%)
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0) 0%, #FFFFFF 48.44%);
+  @media(max-width: 400px) {
+    width: 50px
+  }
 `
