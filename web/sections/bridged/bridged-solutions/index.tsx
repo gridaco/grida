@@ -7,41 +7,52 @@ import GradientSolutions from './gradient-solutaions';
 
 const SolutionList = [
     {
-        title: "idea",
-        subTitle: "Instantly create 'idea' from your design",
-        desc: "With powerful Design2Code Engine, Bridged generates production ready code that can also easily be used for existing projects. Supprt for components, various code styles, naming convention, fille & directory structure are included."
-    },
-    {
         title: "code",
         subTitle: "Instantly create 'code' from your design",
         desc: "With powerful Design2Code Engine, Bridged generates production ready code that can also easily be used for existing projects. Supprt for components, various code styles, naming convention, fille & directory structure are included.",
-        gradient: "linear-gradient(99.57deg, #6268FF 0%, #9039FF 100%)"
+        gradient: "linear-gradient(99.57deg, #6268FF 0%, #9039FF 100%)",
+        width: [0, 0]
     },
     {
         title: "server",
         subTitle: "Instantly create 'server' from your design",
-        desc: "With powerful Design2Code Engine, Bridged generates production ready code that can also easily be used for existing projects. Supprt for components, various code styles, naming convention, fille & directory structure are included."
+        desc: "With powerful Design2Code Engine, Bridged generates production ready code that can also easily be used for existing projects. Supprt for components, various code styles, naming convention, fille & directory structure are included.",
+        gradient: "linear-gradient(99.57deg, #B062FF 0%, #9C39FF 100%)",
+        width: [215, 200]
     },
     {
         title: "translations",
         subTitle: "Instantly create 'translations' from your design",
-        desc: "With powerful Design2Code Engine, Bridged generates production ready code that can also easily be used for existing projects. Supprt for components, various code styles, naming convention, fille & directory structure are included."
+        desc: "With powerful Design2Code Engine, Bridged generates production ready code that can also easily be used for existing projects. Supprt for components, various code styles, naming convention, fille & directory structure are included.",
+        gradient: "linear-gradient(99.57deg, #FBA33C 0%, #FFC700 100%)",
+        width: [475, 340]
     },
     {
         title: "insight",
         subTitle: "Instantly create 'insight' from your design",
-        desc: "With powerful Design2Code Engine, Bridged generates production ready code that can also easily be used for existing projects. Supprt for components, various code styles, naming convention, fille & directory structure are included."
+        desc: "With powerful Design2Code Engine, Bridged generates production ready code that can also easily be used for existing projects. Supprt for components, various code styles, naming convention, fille & directory structure are included.",
+        gradient: "linear-gradient(99.57deg, #6BCBC5 0%, #79E8AC 100%)",
+        width: [935, 560]
+    },
+    {
+        title: "GIT",
+        subTitle: "Instantly create 'GIT' from your design",
+        desc: "With powerful Design2Code Engine, Bridged generates production ready code that can also easily be used for existing projects. Supprt for components, various code styles, naming convention, fille & directory structure are included.",
+        gradient: "linear-gradient(99.57deg, #0E1279 0%, #632655 100%)",
+        width: [1215, 710]
     },
     {
         title: "everything",
         subTitle: "Instantly create 'everything' from your design",
-        desc: "With powerful Design2Code Engine, Bridged generates production ready code that can also easily be used for existing projects. Supprt for components, various code styles, naming convention, fille & directory structure are included."
+        desc: "With powerful Design2Code Engine, Bridged generates production ready code that can also easily be used for existing projects. Supprt for components, various code styles, naming convention, fille & directory structure are included.",
+        gradient: "linear-gradient(99.57deg, #9FA3F7 0%, #C49AFA 100%)",
+        width: [1385, 800]
     },
 ]
 
 const BridgedSolutions = () => {
     const [currentSolution, setCurrentSolution] = useState("code");
-    const [currentIndex, setCurrentIndex] = useState(1);
+    const [currentIndex, setCurrentIndex] = useState(0);
     useEffect(() => {
         SolutionList.map((i, ix) => {
             if (i.title === currentSolution) {
@@ -54,7 +65,7 @@ const BridgedSolutions = () => {
         <SolutionsWrapper alignItems="center" justifyContent="center" mx="20px">
             <Flex width={["320px", "730px", "985px", "1040px"]} alignItems="center" justifyContent="center" flexDirection="column">
                 <Text fontSize={["36px", "36px", "64px"]} fontWeight="bold" mr="auto">Your design is your</Text>
-                <GradientSolutions list={SolutionList} currentSolution={currentSolution} changeSolution={title => setCurrentSolution(title)} />
+                <GradientSolutions type="desktop" list={SolutionList} currentSolution={currentSolution} changeSolution={title => setCurrentSolution(title)} />
 
                 <Box width="100%" height="650px" mt="90px" bg="#000" mb="100px" />
 
@@ -63,7 +74,7 @@ const BridgedSolutions = () => {
 
                 <Text fontSize="18px" fontWeight="bold" mr="auto" mt="40px" pb="12px" style={{ borderBottom: "1px solid black" }}>See also</Text>
                 <Solutions mr="auto" mt="9px">
-                <Link href="/">
+                    <Link href="/">
                         <span>idea</span>
                     </Link>
                     <Link href="/">
