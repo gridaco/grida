@@ -34,6 +34,7 @@ const SociallUrls = {
     twitter: "https://twitter.com/bridgedxyz",
     github: "https://github.com/bridgedxyz",
     dribbble: "https://dribbble.com/bridged",
+    medium: "https://medium.com/bridgedxyz",
 }
 
 export const URLS = {
