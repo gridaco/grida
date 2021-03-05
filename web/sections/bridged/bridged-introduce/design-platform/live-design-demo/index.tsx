@@ -3,10 +3,23 @@ import styled from "@emotion/styled";
 import Image from "next/image";
 import { Flex } from "rebass";
 
+import Lottie from "react-lottie";
+import animationData from "./live-demo-app-design-motion/comp.json";
+
 export default function LiveDesignDemoFrame() {
+  const defaultMotionOptions = {
+    loop: true,
+    autoplay: true,
+    animationData: animationData,
+    rendererSettings: {
+      preserveAspectRatio: "xMidYMid slice",
+    },
+  };
+
   return (
     <DesignFramePreview bg="#fff">
-      <Image src="/design_source.png" width="440px" height="540px" />
+      <Lottie options={defaultMotionOptions} height={400} width={400} />
+      {/* <Image src="/design_source.png" width="440px" height="540px" /> */}
     </DesignFramePreview>
   );
 }
