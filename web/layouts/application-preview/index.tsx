@@ -32,4 +32,48 @@ const Application = styled(Box)`
   position: absolute;
   width: 90%;
   height: 95%;
+  z-index: 1;
+
+  @media (max-width: 768px) {
+
+    h1 {
+      font-size: 20px;
+    }
+
+    .profile {
+      width: 40px !important;
+      height: 40px !important;
+    }
+
+    .comment {
+      font-size: 10px;
+    }
+
+    .playing {
+      font-size: 11px;
+    }
+
+    .music-profile {
+      width: 50px !important;
+      height: 50px !important;
+      margin: 0px !important;
+    }
+
+    .music-title {
+      font-size: 12px !important;
+    }
+
+    .music-info {
+      font-size: 11px !important;
+    }
+
+    .play {
+      width: 24px;
+    }
+
+    .album-info {
+      font-size: 10px;
+      letter-spacing: -1.5%;
+    }
+  }
 `
