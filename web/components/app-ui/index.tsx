@@ -53,6 +53,8 @@ const AppUI = () => {
         <Music />
         <Music />
         <Music />
+        <Music />
+        <Music />
       </Flex>
 
 

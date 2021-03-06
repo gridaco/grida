@@ -265,6 +265,7 @@ const GradientView = styled(Box)`
   left: -170%;
   filter: blur(600px);
   z-index: -1;
+  will-change: transform;
 
   @media (max-width: 720px) {
     width: 768px !important;
