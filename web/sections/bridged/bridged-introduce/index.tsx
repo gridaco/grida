@@ -2,14 +2,12 @@ import React from "react";
 import Image from "next/image";
 import { Flex, Button, Text, Box } from "rebass";
 import styled from "@emotion/styled";
-import Link from "next/link";
-import Icon from "components/icon";
 import CodeFrameworks from "./code-framework";
 import DesignPlatforms from "./design-platform";
 import ActionItem from "components/action-item";
 import { LandingpageUrls } from "utils/landingpage/constants";
-import AppUi from "./app-ui";
 import { Section } from "components/section";
+import AppPreview from "layout/application-preview";
 
 const Onair = () => {
   return <OnairButton>ON AIR</OnairButton>;
@@ -97,15 +95,7 @@ const BridgedIntroduce = () => {
           </FlexBox>
 
           <LiveAreaMobile className="no-drag">
-            <Image
-              className="app"
-              src="/iPhone12-frame-blank.png"
-              width="390"
-              height="788"
-            />
-            <IphoneAppView>
-              <AppUi />
-            </IphoneAppView>
+            <AppPreview />
             <GradientView>
               <Image src="/gradient-live.png" width="478" height="814" />
             </GradientView>
@@ -130,12 +120,7 @@ const BridgedIntroduce = () => {
           </Flex>
         </Box>
         <LiveAreaDesktop className="no-drag">
-          <IphoneView className="app">
-            <Image src="/iPhone12-frame-blank.png" width="auto" height="auto" />
-          </IphoneView>
-          <IphoneAppView>
-            <AppUi />
-          </IphoneAppView>
+          <AppPreview />
           <GradientView>
             <Image src="/gradient-live.png" width="1440" height="1040" />
           </GradientView>

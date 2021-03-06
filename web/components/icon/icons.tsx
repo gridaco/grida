@@ -22,6 +22,9 @@ export interface IconList {
   headerClose: IconListProps;
   lock: IconListProps;
   loading: IconListProps;
+  home: IconListProps;
+  graph: IconListProps;
+  play: IconListProps;
 }
 
 const icons: IconList = {
@@ -349,6 +352,38 @@ const icons: IconList = {
           <stop stop-color="#5873FF" />
           <stop offset="1" stop-color="#4DA0CE" />
         </linearGradient>
+      </defs>
+    </svg>
+  },
+  home: {
+    width: 42,
+    height: 42,
+    svg: <svg width="42" height="43" viewBox="0 0 42 43" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M17.6191 35.4596V25.1076H24.5204V35.4596H33.1471V21.6569H38.3231L21.0697 6.12891L3.81641 21.6569H8.99241V35.4596H17.6191Z" fill="black" />
+    </svg>
+  },
+  graph: {
+    width: 42,
+    height: 42,
+    svg: <svg width="43" height="43" viewBox="0 0 43 43" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M6.83409 32.8538L17.1861 22.4846L24.0874 29.3859L38.7528 12.8917L36.32 10.459L24.0874 24.2099L17.1861 17.3086L4.24609 30.2658L6.83409 32.8538Z" fill="#8F8F8F" />
+    </svg>
+  },
+  play: {
+    width: 42,
+    height: 42,
+    svg: <svg width="42" height="43" viewBox="0 0 42 43" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <g opacity="0.2" filter="url(#filter0_b)">
+        <circle cx="20.7763" cy="21.6796" r="20.704" fill="black" />
+      </g>
+      <path d="M13.875 9.60254V33.7572L32.8537 21.6799L13.875 9.60254Z" fill="black" />
+      <defs>
+        <filter id="filter0_b" x="-27.5331" y="-26.6297" width="96.6187" height="96.6187" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+          <feFlood flood-opacity="0" result="BackgroundImageFix" />
+          <feGaussianBlur in="BackgroundImage" stdDeviation="13.8027" />
+          <feComposite in2="SourceAlpha" operator="in" result="effect1_backgroundBlur" />
+          <feBlend mode="normal" in="SourceGraphic" in2="effect1_backgroundBlur" result="shape" />
+        </filter>
       </defs>
     </svg>
   }
