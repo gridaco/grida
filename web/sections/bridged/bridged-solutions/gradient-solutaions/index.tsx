@@ -221,31 +221,3 @@ const ScrollView = styled(Flex)`
     }
   }
 `;
-
-const LeftFade = styled(Box)`
-  position: absolute;
-  width: 200px;
-  height: 100px;
-  background: linear-gradient(
-    270deg,
-    rgba(255, 255, 255, 0) 0%,
-    #ffffff 51.56%
-  );
-  top: 0px;
-  left: -15%;
-  @media (max-width: 400px) {
-    width: 50px;
-  }
-`;
-
-const RightFade = styled(Box)`
-  position: absolute;
-  width: 200px;
-  height: 100px;
-  top: 0;
-  right: -10%;
-  background: linear-gradient(90deg, rgba(255, 255, 255, 0) 0%, #ffffff 48.44%);
-  @media (max-width: 400px) {
-    width: 50px;
-  }
-`;

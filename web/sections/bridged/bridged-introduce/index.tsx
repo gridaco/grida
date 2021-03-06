@@ -175,14 +175,6 @@ const LiveAreaDesktop = styled(Box)`
   }
 `;
 
-const IphoneView = styled(Flex)`
-  img {
-    width: 325px !important;
-    height: 657px !important;
-    z-index: 1;
-  }
-`;
-
 const LiveAreaMobile = styled(Flex)`
   position: relative;
   margin-bottom: 40px;
@@ -217,7 +209,8 @@ const GradientView = styled(Box)`
   @media (max-width: 720px) {
     width: 768px !important;
     height: 1297px !important;
-    left: -100%;
+    top: -150%;
+    left: -50%;
     /* 
       720px under devide ( mobile ) is other image, 
       cuz, blur use GPU, mobile GPU has limit resource
