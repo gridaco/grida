@@ -6,21 +6,37 @@ import { useState, useEffect, useRef } from "react";
  * @param ref
  * @returns
  */
-export default function useOnScreen(ref) {
+export default function useOnScreen(
+  ref,
+  options?: {
+    threshold?: number | number[];
+    rootMargin?: number | string;
+  },
+) {
+  const { threshold, rootMargin } = options;
   const [isIntersecting, setIntersecting] = useState(false);
 
   const observer: any = useRef();
 
   useEffect(() => {
-    observer.current = new IntersectionObserver(([entry]) =>
-      setIntersecting(entry.isIntersecting),
+    observer.current = new IntersectionObserver(
+      ([entry]) => {
+        setIntersecting(entry.isIntersecting);
+      },
+      {
+        threshold: threshold ? threshold : 0.5,
+        rootMargin:
+          typeof rootMargin == "number" ? `${rootMargin}px` : rootMargin,
+      },
     );
-    observer.current.observe(ref.current);
+    if (ref) {
+      observer.current.observe(ref.current);
+    }
     // Remove the observer as soon as the component is unmounted
     return () => {
-      observer.current.disconnect();
+      observer.current.unobserve(ref.current);
     };
-  }, []);
+  }, [ref]);
 
   return isIntersecting;
 }

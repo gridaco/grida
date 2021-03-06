@@ -8,13 +8,15 @@ import animationData from "public/animations/live-demo-app-design-motion/comp.js
 export default function LiveDesignDemoFrame() {
   const [isStopped, setIsStopped] = useState(true);
   const ref = useRef();
-  const isVisible = useOnScreen(ref);
+  const isVisible = useOnScreen(ref, {
+    threshold: 0.8,
+  });
 
   useEffect(() => {
     if (isVisible) {
       setIsStopped(false);
     }
-  }, [isVisible]);
+  }, [isVisible, ref]);
 
   const defaultMotionOptions = {
     loop: false,

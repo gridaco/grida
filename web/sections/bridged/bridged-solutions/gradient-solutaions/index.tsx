@@ -94,6 +94,7 @@ const GradientSolutions = ({ list, currentSolution, changeSolution, type }) => {
 export default GradientSolutions;
 
 const Mobile = styled(Box)`
+  will-change: transform;
   display: none;
   @media (max-width: 769px) {
     display: block;
@@ -101,6 +102,7 @@ const Mobile = styled(Box)`
 `;
 
 const Desktop = styled(Box)`
+  will-change: transform;
   @media (max-width: 770px) {
     display: none;
   }
