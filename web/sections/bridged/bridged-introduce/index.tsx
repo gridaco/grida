@@ -97,7 +97,7 @@ const BridgedIntroduce = () => {
           <LiveAreaMobile className="no-drag">
             <AppPreview />
             <GradientView>
-              <Image src="/gradient-live.png" width="478" height="814" />
+              <Image src="/mobile-gradient-blur-xs.png" width="478" height="814" />
             </GradientView>
           </LiveAreaMobile>
 
@@ -263,13 +263,17 @@ const GradientView = styled(Box)`
   height: 1765px;
   top: -75%;
   left: -170%;
-  filter: blur(600px);
   z-index: -1;
   will-change: transform;
 
+  @media (min-width: 721px) {
+    filter: blur(300px);
+  }
   @media (max-width: 720px) {
     width: 768px !important;
     height: 1297px !important;
+    left: -100%;
+    filter: blur(100px);
 
     img {
       width: 768px !important;
