@@ -3,7 +3,7 @@ import styled from "@emotion/styled";
 import { Flex } from "rebass";
 import useOnScreen from "utils/hooks/use-on-screen";
 import Lottie from "react-lottie";
-import animationData from "./live-demo-app-design-motion/comp.json";
+import animationData from "public/animations/live-demo-app-design-motion/comp.json";
 
 export default function LiveDesignDemoFrame() {
   const [isStopped, setIsStopped] = useState(true);
