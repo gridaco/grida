@@ -15,6 +15,12 @@ const Onair = () => {
   return <OnairButton>ON AIR</OnairButton>;
 };
 
+const FlexBox = styled(Flex)`
+  @media(max-width: 880px) {
+    flex-direction: column;
+  }
+`
+
 const OnairButton = styled.button`
   margin-right: auto;
   margin-top: 20px;
@@ -47,7 +53,7 @@ const OnairButton = styled.button`
   font-size: 32px;
   font-weight: bold;
 
-  @media (min-width: 500px) {
+  @media (min-width: 880px) {
     margin-left: 20px;
     margin-top: 0px;
   }
@@ -75,7 +81,7 @@ const BridgedIntroduce = () => {
           <Text fontSize="24px" mb="17px">
             What you’ve just sketched?
           </Text>
-          <Flex
+          <FlexBox
             alignItems="center"
             flexDirection={["column", "column", "row"]}
             mb="35px"
@@ -88,7 +94,7 @@ const BridgedIntroduce = () => {
               That just got
             </Text>
             <Onair />
-          </Flex>
+          </FlexBox>
 
           <LiveAreaMobile className="no-drag">
             <Image
