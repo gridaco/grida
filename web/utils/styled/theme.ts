@@ -32,7 +32,7 @@ const defaultButtonProps = {
 };
 
 const defaultTheme: ThemeInterface = {
-  breakpoints: ["320px", "768px", "1024px", "1280px"],
+  breakpoints: ["321px", "769px", "1025px", "1281px"],
   colors: {
     primary: "#2562FF",
     secondary: "#F6EEC1",

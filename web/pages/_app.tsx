@@ -122,7 +122,7 @@ const MyApp = ({ Component, pageProps }: AppProps) => {
         `}
       >
         <Header />
-        <Box mt="60px">
+        <Box mt="60px" style={{ position: "relative"}}>
           <Component {...pageProps} />
         </Box>
         <Footer />
