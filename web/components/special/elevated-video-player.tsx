@@ -17,6 +17,7 @@ function ElevatedVideoPlayer() {
 }
 
 const Frame = styled(motion.div)`
+  will-change: transform;
   background: #ffffff;
   /* landingpage/video-elevation */
   box-shadow: 0px 4px 128px 32px rgba(0, 0, 0, 0.08);
