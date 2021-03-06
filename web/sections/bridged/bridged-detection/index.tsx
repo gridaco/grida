@@ -7,6 +7,7 @@ import { LandingpageUrls } from "utils/landingpage/constants";
 import ActionItem from "components/action-item";
 import MotionButton from "components/motion/button";
 import MotionRadio from "components/motion/radio";
+import ButtonDetectionDemoFrame from "./demos/button.demo";
 
 const renderMoitonComponents = [MotionButton, MotionRadio];
 
@@ -14,19 +15,20 @@ const BridgedDetection = () => {
   const [currentMotionIndex, setCurrentMotionIndex] = useState(0);
 
   return (
-    <DetectionWrapper flexDirection="column" alignItems="center" width="100%" justifyContent="center">
+    <DetectionWrapper
+      flexDirection="column"
+      alignItems="center"
+      width="100%"
+      justifyContent="center"
+    >
       <Box mr="auto">
         <Text fontSize={["36px", "36px", "64px"]} fontWeight="bold">
           Yes, we know.
-          </Text>
+        </Text>
         <Flex alignItems="center" flexDirection={["column", "column", "row"]}>
-          <Text
-            fontSize={["36px", "36px", "64px"]}
-            fontWeight="bold"
-            mr="auto"
-          >
+          <Text fontSize={["36px", "36px", "64px"]} fontWeight="bold" mr="auto">
             That's a
-            </Text>
+          </Text>
           {renderMoitonComponents.map(
             (i, ix) =>
               ix === currentMotionIndex % renderMoitonComponents.length &&
@@ -42,9 +44,11 @@ const BridgedDetection = () => {
       <Desc mr="auto" mt="48px">
         Finally, the tool understands your design. More inteligence means less
         modification. Which leads us to blazing fast workflow.
-        </Desc>
+      </Desc>
 
-      <Box width="100%" height="600px" mt="90px" bg="#000" mb="100px" />
+      <Box width="100%" height="600px" mt="90px" bg="#454545" mb="100px">
+        <ButtonDetectionDemoFrame />
+      </Box>
 
       <ActionItem
         href={LandingpageUrls.article_how_engine_works}
