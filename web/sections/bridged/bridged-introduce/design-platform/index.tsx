@@ -21,6 +21,7 @@ const DesignPlatforms = () => {
       <PlatformView className="no-drag">
         <PlatformAppBackgroundView>
           <Image
+            alt="platform"
             src={`/live-desing-apps/${currentPlatform}.png`}
             width="904"
             height="565"
@@ -31,12 +32,12 @@ const DesignPlatforms = () => {
       <Platforms>
         {renderPlatforms.map(i => (
           <Image
+            alt="platform"
             key={i}
             className="cursor"
             onClick={() => setCurrentPlatform(i)}
-            src={`/platform-icons/${i}/${
-              currentPlatform === i ? "default" : "grey"
-            }.png`}
+            src={`/platform-icons/${i}/${currentPlatform === i ? "default" : "grey"
+              }.png`}
             width="24"
             height="24"
           />

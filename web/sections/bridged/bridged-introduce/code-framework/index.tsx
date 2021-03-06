@@ -60,20 +60,20 @@ const CodeFrameworks = () => {
           <span />
         </header>
         <div className="body">
-            <SyntaxHighlighter language={currentPlatform.lang} style={a11yDark}>
-              {currentPlatform.source}
-            </SyntaxHighlighter>
+          <SyntaxHighlighter language={currentPlatform.lang} style={a11yDark}>
+            {currentPlatform.source}
+          </SyntaxHighlighter>
         </div>
       </CodeView>
       <Platforms>
         {DEV_FRAMEWORKS.map(i => (
           <Image
+            alt="platform"
             key={i.name}
             className="cursor"
             onClick={() => setCurrentPlatform(i)}
-            src={`/platform-icons/${i.name}/${
-              currentPlatform.name === i.name ? "default" : "grey"
-            }.png`}
+            src={`/platform-icons/${i.name}/${currentPlatform.name === i.name ? "default" : "grey"
+              }.png`}
             width="24"
             height="24"
           />

@@ -14,7 +14,7 @@ const Onair = () => {
 };
 
 const FlexBox = styled(Flex)`
-  @media(max-width: 880px) {
+  @media(max-width: 945px) {
     flex-direction: column;
   }
 `
@@ -51,7 +51,7 @@ const OnairButton = styled.button`
   font-size: 32px;
   font-weight: bold;
 
-  @media (min-width: 880px) {
+  @media (min-width: 946px) {
     margin-left: 20px;
     margin-top: 0px;
   }
@@ -97,11 +97,11 @@ const BridgedIntroduce = () => {
           <LiveAreaMobile className="no-drag">
             <AppPreview />
             <GradientView>
-              <Image src="/mobile-gradient-blur-xs.png" width="478" height="814" />
+              <Image src="/mobile-gradient-blur-xs.png" alt="gradient" width="478" height="814" />
             </GradientView>
           </LiveAreaMobile>
 
-          <Desc mr="auto" mb="70px">
+          <Desc mr="20px" mb="70px">
             Design to Code Feature supports Major design tools including Sketch,
             Figma and Adobe XD. Code is converted to Major Platforms / Languages
             / Frameworks with various coding styles. These lines of code is
@@ -122,7 +122,7 @@ const BridgedIntroduce = () => {
         <LiveAreaDesktop className="no-drag">
           <AppPreview />
           <GradientView>
-            <Image src="/gradient-live.png" width="1440" height="1040" />
+            <Image src="/gradient-live.png" alt="gradient" width="1440" height="1040" />
           </GradientView>
         </LiveAreaDesktop>
       </Flex>
@@ -198,7 +198,7 @@ const GradientView = styled(Box)`
   position: absolute;
   width: 2080px !important;
   height: 1765px;
-  top: -75%;
+  top: -50%;
   left: -170%;
   z-index: -1;
   will-change: transform;

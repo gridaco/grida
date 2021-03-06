@@ -58,20 +58,20 @@ const BridgedCollaborate = () => {
             </CollaborateWrapper>
             <Bottom width="100%" height="850px" mt="90px">
                 <BottomImage>
-                    <Image src="/final_bg.png" width="auto" height="auto" />
+                    <Image src="/final_bg.png" alt="background_in_collaborate" width="auto" height="auto" />
                 </BottomImage>
                 <DemoApp>
-                    <Image src="/dummy_img.png" width="auto" height="auto" />
+                    <Image src="/dummy_img.png" alt="dummy_in_collaborate" width="auto" height="auto" />
                 </DemoApp>
                 <NotiImages>
                     <Notification top={20} right={0}>
-                        <Image src="/noti3.png" width="auto" height="auto" />
+                        <Image src="/noti3.png" alt="notification" width="auto" height="auto" />
                     </Notification>
                     <Notification top={10} right={10}>
-                        <Image src="/noti2.png" width="auto" height="auto" />
+                        <Image src="/noti2.png" alt="notification" width="auto" height="auto" />
                     </Notification>
                     <Notification top={1} right={20}>
-                        <Image src="/noti1.png" width="auto" height="auto" />
+                        <Image src="/noti1.png" alt="notification" width="auto" height="auto" />
                     </Notification>
                 </NotiImages>
             </Bottom>

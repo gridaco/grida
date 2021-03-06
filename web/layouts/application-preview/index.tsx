@@ -12,6 +12,7 @@ const AppPreview = () => {
         src="/iPhone12-frame-blank.png"
         width="390"
         height="788"
+        alt="frame_iphone"
       />
       <Application>
         <AppUI />
