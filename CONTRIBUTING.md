@@ -30,3 +30,23 @@ Join slack via link on README, contact maintaners for rapid contribution. otherw
 
 - XS
   - 320 (iPhone SE)
+
+## Techniques
+
+**Animations / Motioons**
+
+- [Framer motion](https://framer.com/motion)
+- After Effects + BodyMobvin + [Lottie](https://github.com/airbnb/lottie-web) (uses react-lottie as a wrapper)
+
+**Global State Management**
+
+- [RecoilJS](https://recoiljs.org/)
+
+**Reponsive Layout Development**
+
+- [Rebass](https://rebassjs.org/)
+
+**General UI Development**
+
+- [Reflect React](https://reflect-ui.com)
+- [Emotion/styled](https://emotion.sh/docs/styled)
