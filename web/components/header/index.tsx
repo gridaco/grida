@@ -14,9 +14,9 @@ const Header = () => {
 
 	useEffect(() => {
 		if (isOpenMenu) {
-			document.getElementsByTagName("body")[0].style.overflow = "hidden"
+			document.getElementsByTagName("html")[0].style.overflowY = "hidden"
 		} else {
-			document.getElementsByTagName("body")[0].style.overflow = "auto"
+			document.getElementsByTagName("html")[0].style.overflowY = "auto"
 		}
 	}, [isOpenMenu])
 
