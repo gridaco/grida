@@ -46,7 +46,7 @@ const BridgedDetection = () => {
         modification. Which leads us to blazing fast workflow.
       </Desc>
 
-      <Box width="100%" height="600px" mt="90px" bg="#454545" mb="100px">
+      <Box width="100%"  mt="90px" mb="100px">
         <ButtonDetectionDemoFrame />
       </Box>
 
@@ -64,7 +64,7 @@ const DetectionWrapper = styled(Flex)`
   height: 1400px;
 
   @media (max-width: 767px) {
-    height: 1300px;
+    height: 900px;
   }
 `;
 
