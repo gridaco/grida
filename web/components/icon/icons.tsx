@@ -346,11 +346,11 @@ const icons: IconList = {
     width: 84,
     height: 84,
     svg: <svg width="84" height="84" viewBox="0 0 84 84" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <path fill-rule="evenodd" clip-rule="evenodd" d="M41.8026 74.7602C51.7701 74.7602 60.6979 70.3088 66.7064 63.2854L57.3797 57.9006C53.3649 61.8344 47.8665 64.2599 41.8017 64.2599C32.6414 64.2599 24.7734 58.7267 21.3576 50.8203H23.9587C26.5452 50.8203 28.1618 48.0203 26.8685 45.7803L17.4115 29.4003C16.1183 27.1603 12.8851 27.1603 11.5919 29.4003L2.13486 45.7803C0.841591 48.0203 2.45817 50.8203 5.0447 50.8203H10.2436C14.0948 64.6291 26.7656 74.7602 41.8026 74.7602ZM62.2461 33.1802H59.6449C57.0584 33.1802 55.4418 35.9802 56.7351 38.2202L66.1921 54.6002C67.4854 56.8402 70.7185 56.8402 72.0118 54.6002L81.4688 38.2202C82.762 35.9802 81.1455 33.1802 78.5589 33.1802H73.3616C69.5105 19.3714 56.8396 9.24023 41.8026 9.24023C32.1599 9.24023 23.4903 13.4063 17.4954 20.0367L26.8979 25.4652C30.8437 21.9064 36.0697 19.7399 41.8017 19.7399C50.9623 19.7399 58.8305 25.2734 62.2461 33.1802Z" fill="url(#paint0_linear)" />
+      <path fillRule="evenodd" clipRule="evenodd" d="M41.8026 74.7602C51.7701 74.7602 60.6979 70.3088 66.7064 63.2854L57.3797 57.9006C53.3649 61.8344 47.8665 64.2599 41.8017 64.2599C32.6414 64.2599 24.7734 58.7267 21.3576 50.8203H23.9587C26.5452 50.8203 28.1618 48.0203 26.8685 45.7803L17.4115 29.4003C16.1183 27.1603 12.8851 27.1603 11.5919 29.4003L2.13486 45.7803C0.841591 48.0203 2.45817 50.8203 5.0447 50.8203H10.2436C14.0948 64.6291 26.7656 74.7602 41.8026 74.7602ZM62.2461 33.1802H59.6449C57.0584 33.1802 55.4418 35.9802 56.7351 38.2202L66.1921 54.6002C67.4854 56.8402 70.7185 56.8402 72.0118 54.6002L81.4688 38.2202C82.762 35.9802 81.1455 33.1802 78.5589 33.1802H73.3616C69.5105 19.3714 56.8396 9.24023 41.8026 9.24023C32.1599 9.24023 23.4903 13.4063 17.4954 20.0367L26.8979 25.4652C30.8437 21.9064 36.0697 19.7399 41.8017 19.7399C50.9623 19.7399 58.8305 25.2734 62.2461 33.1802Z" fill="url(#paint0_linear)" />
       <defs>
         <linearGradient id="paint0_linear" x1="41.8018" y1="9.24023" x2="41.8018" y2="74.7602" gradientUnits="userSpaceOnUse">
-          <stop stop-color="#5873FF" />
-          <stop offset="1" stop-color="#4DA0CE" />
+          <stop stopColor="#5873FF" />
+          <stop offset="1" stopColor="#4DA0CE" />
         </linearGradient>
       </defs>
     </svg>
@@ -378,8 +378,8 @@ const icons: IconList = {
       </g>
       <path d="M13.875 9.60254V33.7572L32.8537 21.6799L13.875 9.60254Z" fill="black" />
       <defs>
-        <filter id="filter0_b" x="-27.5331" y="-26.6297" width="96.6187" height="96.6187" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
-          <feFlood flood-opacity="0" result="BackgroundImageFix" />
+        <filter id="filter0_b" x="-27.5331" y="-26.6297" width="96.6187" height="96.6187" filterUnits="userSpaceOnUse" colorInterpolationFilters="sRGB">
+          <feFlood floodOpacity="0" result="BackgroundImageFix" />
           <feGaussianBlur in="BackgroundImage" stdDeviation="13.8027" />
           <feComposite in2="SourceAlpha" operator="in" result="effect1_backgroundBlur" />
           <feBlend mode="normal" in="SourceGraphic" in2="effect1_backgroundBlur" result="shape" />

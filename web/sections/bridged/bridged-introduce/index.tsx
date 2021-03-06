@@ -132,61 +132,6 @@ const BridgedIntroduce = () => {
 
 export default BridgedIntroduce;
 
-const IphoneAppView = styled(Box)`
-  position: absolute;
-  top: 2.5%;
-  right: 5.5%;
-
-  .app-ui {
-    width: 290px !important;
-    height: 625px !important;
-    background-color: #ffffff;
-  }
-
-  @media (max-width: 720px) {
-    right: 21.5%;
-    div {
-      width: 260px !important;
-      height: 540px !important;
-    }
-  }
-
-  @media (max-width: 430px) {
-    right: 16%;
-    div {
-      width: 260px !important;
-      height: 540px !important;
-    }
-  }
-
-  @media (max-width: 375px) {
-    right: 11.5%;
-    div {
-      width: 260px !important;
-      height: 540px !important;
-    }
-  }
-
-  @media (max-width: 320px) {
-    right: 4%;
-    div {
-      width: 260px !important;
-      height: 540px !important;
-    }
-  }
-`;
-
-const Platforms = styled(Flex)`
-  height: 36px;
-
-  span {
-    width: 24px;
-    height: 24px;
-    background-color: #000;
-    margin-left: 24px;
-  }
-`;
-
 const IntroduceWrapper = styled(Flex)`
   height: 2000px;
 
@@ -273,6 +218,12 @@ const GradientView = styled(Box)`
     width: 768px !important;
     height: 1297px !important;
     left: -100%;
+    /* 
+      720px under devide ( mobile ) is other image, 
+      cuz, blur use GPU, mobile GPU has limit resource
+
+      ... So downgrade blur value & change image ( sm, lx )
+     */
     filter: blur(100px);
 
     img {

@@ -6,14 +6,15 @@ const GradientSolutions = ({ list, currentSolution, changeSolution, type }) => {
   const scrollabelDiv = useRef(null);
   const [minutes, setMinutes] = useState(0);
   const [seconds, setSeconds] = useState(3);
-  const [currentIndex, setCurrentIndex] = useState(0);
+  const [currentX, setCurrentX] = useState(0);
 
   useEffect(() => {
     if (seconds === 0) {
       if (window.screen.availWidth >= 769) {
         scrollabelDiv.current.scrollLeft = list[0].width[0];
       } else {
-        scrollabelDiv.current.scrollLeft = list[0].width[1];
+        setCurrentX(list[0].width[1])
+        // scrollabelDiv.current.scrollLeft = list[0].width[1];
       }
       changeSolution("code");
     }
@@ -46,7 +47,7 @@ const GradientSolutions = ({ list, currentSolution, changeSolution, type }) => {
 
   return (
     <Postioner className="no-drag">
-      <ScrollView ref={scrollabelDiv}>
+      <ScrollView ref={scrollabelDiv} style={{ transform: `translateX(-${currentX}px) translateZ(0px)` }}>
         <Desktop width="100%">
           {list.map((i, ix) => (
             <span
@@ -72,7 +73,8 @@ const GradientSolutions = ({ list, currentSolution, changeSolution, type }) => {
               className="cursor"
               onClick={() => {
                 changeSolution(i.title);
-                scrollabelDiv.current.scrollLeft = i.width[1];
+                setCurrentX(i.width[1]);
+                // scrollabelDiv.current.scrollLeft = i.width[1];
                 setSeconds(AUTO_RESET_SEC);
               }}
               style={
@@ -86,7 +88,6 @@ const GradientSolutions = ({ list, currentSolution, changeSolution, type }) => {
           ))}
         </Mobile>
       </ScrollView>
-      <RightFade />
     </Postioner>
   );
 };
@@ -94,7 +95,6 @@ const GradientSolutions = ({ list, currentSolution, changeSolution, type }) => {
 export default GradientSolutions;
 
 const Mobile = styled(Box)`
-  will-change: transform;
   display: none;
   @media (max-width: 769px) {
     display: block;
@@ -120,7 +120,7 @@ const Postioner = styled(Flex)`
 `;
 
 const ScrollView = styled(Flex)`
-  overflow-x: hidden;
+  width: 100%;
   scroll-behavior: smooth;
   -webkit-overflow-scrolling: touch;
 
@@ -165,44 +165,59 @@ const ScrollView = styled(Flex)`
       margin-left: 17%;
     }
 
-    @media (max-width: 1025px) {
-      &:first-child {
-        margin-left: 250px;
-      }
-    }
-
-    @media (max-width: 900px) {
-      &:first-child {
-        margin-left: 210px;
-      }
-    }
-
-    @media (max-width: 769px) {
-      &:first-child {
-        margin-left: 260px;
-      }
-    }
-
-    @media (max-width: 425px) {
-      &:first-child {
-        margin-left: 170px;
-      }
-    }
-
-    @media (max-width: 375px) {
-      &:first-child {
-        margin-left: 160px;
-      }
-    }
-
-    @media (max-width: 320px) {
-      &:first-child {
-        margin-left: 140px;
-      }
-    }
-
     &:last-child {
       margin-right: 1000px;
+    }
+  }
+
+  @media (max-width: 768px) {
+    transition: transform 330ms ease-in-out;
+
+    &:before {
+      content: none;
+    }
+
+    &:after {
+      content: none;
+    }
+
+    span {
+
+      @media (max-width: 1025px) {
+        &:first-child {
+          margin-left: 250px;
+        }
+      }
+
+      @media (max-width: 900px) {
+        &:first-child {
+          margin-left: 210px;
+        }
+      }
+
+      @media (max-width: 769px) {
+        &:first-child {
+          margin-left: 260px;
+        }
+      }
+
+      @media (max-width: 425px) {
+        &:first-child {
+          margin-left: 170px;
+        }
+      }
+
+      @media (max-width: 375px) {
+        &:first-child {
+          margin-left: 160px;
+        }
+      }
+
+      @media (max-width: 320px) {
+        &:first-child {
+          margin-left: 140px;
+        }
+      }
     }
   }
 `;
