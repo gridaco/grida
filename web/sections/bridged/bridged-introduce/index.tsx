@@ -146,9 +146,10 @@ const IphoneAppView = styled(Box)`
   top: 2.5%;
   right: 5.5%;
 
-  div {
+  .app-ui {
     width: 290px !important;
     height: 625px !important;
+    background-color: #ffffff;
   }
 
   @media (max-width: 720px) {
