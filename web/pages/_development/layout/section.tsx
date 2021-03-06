@@ -2,7 +2,7 @@ import React, { useState } from 'react'
 import SectionLayout from 'layout/section'
 import { Box, Button, Flex } from 'rebass'
 
-const LayoutPage = () => {
+const SectionPage = () => {
   const [align, setAlign] = useState<"start" | "center" | "end">("start");
   const [inherit, setInherit] = useState<boolean>(false);
   return (
@@ -65,4 +65,4 @@ const LayoutPage = () => {
   )
 }
 
-export default LayoutPage
+export default SectionPage

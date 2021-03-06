@@ -13,7 +13,6 @@ interface SectionLayoutProps {
 const SectionLayout: React.FC<SectionLayoutProps> = ({ variant = "content-default", inherit = true, alignContent = "start", children }) => {
   const parentFlexBox = useRef(null);
   const childFlexBox = useRef(null);
-  const [childWidth, setChildWidth] = useState<Array<string> | string>([]);
 
   const getWidthUseVaraint = () => {
     switch (variant) {
@@ -88,8 +87,6 @@ const SectionLayout: React.FC<SectionLayoutProps> = ({ variant = "content-defaul
           break;
       }
     }
-
-    console.log(style)
 
     return style
   }
