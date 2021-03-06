@@ -47,7 +47,7 @@ const GradientSolutions = ({ list, currentSolution, changeSolution, type }) => {
 
   return (
     <Postioner className="no-drag">
-      <ScrollView ref={scrollabelDiv} style={{ transform: `translateX(-${currentX}px) translateZ(0px)` }}>
+      <ScrollView ref={scrollabelDiv} style={currentX != 0 ? { transform: `translateX(-${currentX}px) translateZ(0px)` } : {}}>
         <Desktop width="100%">
           {list.map((i, ix) => (
             <span
@@ -123,7 +123,7 @@ const ScrollView = styled(Flex)`
   width: 100%;
   scroll-behavior: smooth;
   -webkit-overflow-scrolling: touch;
-
+  overflow-x: hidden;
   &:before {
     left: 0;
     background: linear-gradient(90deg, #fff, hsla(0, 0%, 100%, 0));
