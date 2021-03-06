@@ -15,7 +15,8 @@
         "vercel:install": "yarn vercel:setup & yarn install",
         "vercel:build": "yarn workspace web vercel:build",
         "web": "yarn workspace web dev",
-        "build:web": "yarn workspace web build"
+        "build:web": "yarn workspace web build",
+        "sitemap-gen": "./scripts/sitemap-gen/runner.sh"
     },
     "dependencies": {
         "smoothscroll-polyfill": "^0.4.4"
