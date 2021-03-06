@@ -1,8 +1,6 @@
 import React, { useState } from "react";
-import { Flex, Button, Text, Box } from "rebass";
+import { Flex, Text, Box } from "rebass";
 import styled from "@emotion/styled";
-import Icon from "components/icon";
-import Link from "next/link";
 import { LandingpageUrls } from "utils/landingpage/constants";
 import ActionItem from "components/action-item";
 import MotionButton from "components/motion/button";

@@ -2,7 +2,6 @@ import React, { useState } from "react";
 import { Flex, Box } from "rebass";
 import styled from "@emotion/styled";
 import Image from "next/image";
-import Icon from "components/icon";
 import LiveDesignDemoFrame from "./live-design-demo";
 
 const renderPlatforms = ["figma", "sketch", "adobexd"];

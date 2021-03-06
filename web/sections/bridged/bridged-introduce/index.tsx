@@ -1,6 +1,6 @@
 import React from "react";
 import Image from "next/image";
-import { Flex, Button, Text, Box } from "rebass";
+import { Flex, Text, Box } from "rebass";
 import styled from "@emotion/styled";
 import CodeFrameworks from "./code-framework";
 import DesignPlatforms from "./design-platform";

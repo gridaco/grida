@@ -1,7 +1,6 @@
 import React from 'react'
-import { Flex, Button, Text, Box } from 'rebass';
+import { Flex, Text, Box } from 'rebass';
 import styled from '@emotion/styled';
-import Link from 'next/link';
 import Image from 'next/image';
 import Icon from 'components/icon';
 

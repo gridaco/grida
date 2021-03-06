@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Flex, Button, Text, Box } from "rebass";
+import { Flex, Box } from "rebass";
 import styled from "@emotion/styled";
 import Image from "next/image";
 import {

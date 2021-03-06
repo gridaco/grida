@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { Flex, Button, Text, Box } from 'rebass';
+import { Flex, Text, Box } from 'rebass';
 import styled from '@emotion/styled';
 import Link from 'next/link';
 import GradientSolutions from './gradient-solutaions';
