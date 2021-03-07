@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import SectionLayout from 'layout/section'
-import { Button, Flex, Heading, Text } from 'rebass'
+import { Box, Flex, Heading, Text } from 'rebass'
 import styled from '@emotion/styled';
 import BlankArea from 'components/blank-area';
 import { media } from 'utils/styled/media';
@@ -32,8 +32,8 @@ const OnlineApp: React.FC<OnlineAppProps> = ({ isMobile }) => {
     <SectionLayout alignContent="start" backgroundColor="rgba(0,0,0,0)">
       <DesignToCode />
       <BlankArea height={150} />
-      <Flex justifyContent="space-between" width="100%">
-        <Flex flexDirection="column">
+      <Flex justifyContent={["center", "space-between", "space-between", "space-between"]} width="100%">
+        <Flex flexDirection="column" width="100%">
           <BlankArea height={75} />
           <Text fontSize="24px" mb="15px">What you’ve just sketched?</Text>
           <OnlineTitle fontSize={["32px", "36px", "36px", "36px"]}>
@@ -58,7 +58,7 @@ const OnlineApp: React.FC<OnlineAppProps> = ({ isMobile }) => {
             href={LandingpageUrls.try_the_demo_1}
           />
         </Flex>
-        <DesktopView style={{ position: "relative"}}>
+        <DesktopView style={{ position: "relative" }}>
           <ApplicationPreview />
           <div className="gradient-view no-drag">
             <Image src={assetUrl} alt="gradient" width="1040" height="1027" />

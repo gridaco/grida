@@ -68,7 +68,7 @@ const Products = () => {
         if (current == 0) {
           setX(0)
         } else if (current == elInedx) {
-          setX(x + size );
+          setX(x + size);
         }
       });
     }
@@ -222,5 +222,17 @@ const List = styled.span<{ gradient: string }>`
   &:first-child {
     margin-left: 0;
     padding-left: 0;
+  }
+
+  ${props => media("0px", (props.theme as ThemeInterface).breakpoints[0])} {
+    &:first-child {
+      padding-left: 10px;
+    }
+  }
+
+  ${props => media((props.theme as ThemeInterface).breakpoints[0], (props.theme as ThemeInterface).breakpoints[1])} {
+    &:first-child {
+      padding-left: 1%;
+    }
   }
 `;

@@ -23,6 +23,7 @@ export const DesktopView = styled.div`
       filter: blur(10px);
       top: -45%;
       right: -20%;
+      z-index: -1;
 
       
       div {
@@ -41,11 +42,14 @@ export const MobileView = styled.div`
 
   ${props => media("0px", (props.theme as ThemeInterface).breakpoints[0])} {
     display: flex;
+    align-items: center;
+    justify-content: center;
 
     .gradient-view {
       position: absolute;
       filter: blur(10px);
       top: -20%;
+      z-index: -1;
 
       div {
         width: 768px !important;

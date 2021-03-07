@@ -31,10 +31,10 @@ const Popup = (props: PopupProps) => {
       buttonRef.current.focus();
     }
 
-    document.body.style.overflow = "hidden";
+    document.getElementsByTagName("html")[0].style.overflowY = "hidden"
 
     return () => {
-      document.body.style.overflow = "";
+      document.getElementsByTagName("html")[0].style.overflowY = "auto"
     };
   }, []);
 
