@@ -8,6 +8,7 @@ import { ThemeInterface } from 'utils/styled/theme';
 import Link from 'next/link';
 import { motion } from "framer-motion";
 import { PRODUCT_LIST } from 'utils/landingpage/constants';
+import ReactPlayer from 'react-player'
 
 const Products = () => {
   const [x, setX] = useState<number>(0);
@@ -101,7 +102,9 @@ const Products = () => {
         </Container>
       </SectionLayout>
       <SectionLayout variant="content-overflow-1" inherit={false} alignContent="center">
-        <Flex width={["95%", "95%", "100%", "100%"]} height="700px" bg="#000" mt="50px" mx={["20px", "20px", 0, 0]} />
+        <VideoWrapper width={["95%", "95%", "100%", "100%"]} height="700px" mt="50px" mx={["20px", "20px", 0, 0]} >
+          <ReactPlayer url={PRODUCT_LIST[beforeClick].path} loop playing />
+        </VideoWrapper>
       </SectionLayout>
       <Heading fontSize="18px" mt="40px">{PRODUCT_LIST[beforeClick].subTitle}</Heading>
       <Description fontSize={["21px", "21px", "21px", "24px"]}>{PRODUCT_LIST[beforeClick].desc}</Description>
@@ -130,6 +133,14 @@ const Products = () => {
 }
 
 export default Products
+
+const VideoWrapper = styled(Flex)`
+
+  div {
+    width: 100% !important;
+    height: 100% !important;
+  }
+`
 
 const More = styled(Text)`
   padding-bottom: 8px;

@@ -1,8 +1,7 @@
-// @ts-check
-
 const withTM = require("next-transpile-modules");
+const withVideos = require('next-videos')
 
-module.exports = withTM({
+module.exports = withVideos(withTM({
     webpack: function(config, {
         isServer
     }) {
@@ -31,4 +30,4 @@ module.exports = withTM({
     images: {
         domains: ['img.youtube.com']
     }
-});
+}))
