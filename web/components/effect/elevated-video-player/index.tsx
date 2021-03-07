@@ -14,6 +14,8 @@ const VideoContainer = styled(Flex)`
   div, iframe {
     width: 100%;
     height: 50vw;
+
+    max-height: 690px;
   }
 `
 
@@ -25,8 +27,8 @@ function ElevatedVideoPlayer() {
   const handleClickLogin = useCallback(() => {
     addPopup({
       title: "",
-      element: <SectionLayout variant="content-overflow-1">
-        <VideoContainer width="100%" >
+      element: 
+        <VideoContainer width="100%" height="100%">
           <YouTube className="video" videoId="RIZjZFoDhRc" opts={{
             playerVars: {
               rel: 0,
@@ -35,9 +37,9 @@ function ElevatedVideoPlayer() {
               autoplay: 1
             }
           }} />
-        </VideoContainer>
-      </SectionLayout>,
+        </VideoContainer>,
       showOnlyBody: true,
+      height: "50vw"
     });
   }, []);
 
