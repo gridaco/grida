@@ -88,7 +88,7 @@ export default Footer;
 const FooterContent = styled(Flex)`
   justify-content: center;
 
-  ${props => media(null, (props.theme as ThemeInterface).breakpoints[1])} {
+  ${props => media(null, (props.theme as ThemeInterface).breakpoints[0])} {
     flex-direction: column;
   }
 
@@ -98,7 +98,7 @@ const FooterBottom = styled(Flex)`
   color: #4e4e4e;
   font-size: 14px;
 
-  ${props => media(null, (props.theme as ThemeInterface).breakpoints[1])} {
+  ${props => media(null, (props.theme as ThemeInterface).breakpoints[0])} {
    flex-direction: column;
 
     .policys {

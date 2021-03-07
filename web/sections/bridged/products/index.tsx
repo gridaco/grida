@@ -16,7 +16,7 @@ const Products = () => {
         <GradientRowList />
       </SectionLayout>
       <SectionLayout variant="content-overflow-1" inherit={false} alignContent="center">
-        <Flex width="95%" height="700px" bg="#000" mt="50px" mx="20px" />
+        <Flex width={["95%","95%","100%","100%"]} height="700px" bg="#000" mt="50px" mx={["20px", "20px", 0, 0]} />
       </SectionLayout>
       <Heading fontSize="18px" mt="40px">Instantly create code from your design.</Heading>
       <Description fontSize={["21px", "21px", "21px", "24px"]}>With powerful Design2Code Engine, Bridged generates production ready code that can also easily be used for existing projects. Supprt for components, various code styles, naming convention, fille & directory structure are included.</Description>

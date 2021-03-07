@@ -39,7 +39,7 @@ const GradientRowList = () => {
         if (current == 0) { 
           setX(0)
         } else if (current > elInedx) {
-          setX(x - size);
+          setX(x - size - 30);
         }
       });
     } else if (beforeClick > current) {
@@ -47,7 +47,7 @@ const GradientRowList = () => {
         if (current == 0) { 
           setX(0)
         } else if (current == elInedx) {
-          setX(x + size);
+          setX(x + size +30);
         }
       });
     }
@@ -132,10 +132,12 @@ const RowFrame = styled(motion.div)`
 
 const List = styled.span`
   padding-left: 10px;
+  margin-left: 30px;
   background: linear-gradient(30deg, #0567fa, #c561ff);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   &:first-child {
+    margin-left: 0;
     padding-left: 0;
   }
 `;
