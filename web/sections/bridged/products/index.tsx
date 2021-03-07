@@ -119,31 +119,25 @@ const Products = () => {
           </RowFrame>
         </Container>
       </SectionLayout>
-      <SectionLayout
-        variant="content-overflow-1"
-        inherit={false}
-        alignContent="center"
+      <VideoWrapper
+        width={["95%", "95%", "100%", "100%"]}
+        mt="50px"
+        mx={["20px", "20px", 0, 0]}
       >
-        <VideoWrapper
-          width={["95%", "95%", "100%", "100%"]}
-          mt="50px"
-          mx={["20px", "20px", 0, 0]}
+        <motion.div
+          variants={videoPlayerMotionAnimationVariants}
+          animate={isVideoPlayerReady ? "loaded" : "loading"}
         >
-          <motion.div
-            variants={videoPlayerMotionAnimationVariants}
-            animate={isVideoPlayerReady ? "loaded" : "loading"}
-          >
-            <ReactPlayer
-              onReady={() => setIsVideoPlayerReady(true)}
-              onEnded={() => setIsVideoPlayerReady(true)}
-              url={PRODUCT_LIST[beforeClick].path}
-              loop
-              playing
-              muted
-            />
-          </motion.div>
-        </VideoWrapper>
-      </SectionLayout>
+          <ReactPlayer
+            onReady={() => setIsVideoPlayerReady(true)}
+            onEnded={() => setIsVideoPlayerReady(true)}
+            url={PRODUCT_LIST[beforeClick].path}
+            loop
+            playing
+            muted
+          />
+        </motion.div>
+      </VideoWrapper>
       <Heading fontSize="18px" mt="40px">
         {PRODUCT_LIST[beforeClick].subTitle}
       </Heading>
