@@ -13,7 +13,7 @@ const Products = () => {
   const [x, setX] = useState<number>(0);
   const [beforeClick, setBeforeClick] = useState<number>(0);
   const [counter, setCounter] = useState(1)
- 
+
 
   const elRefs = React.useRef([]);
   let elWidth = [];
@@ -46,26 +46,29 @@ const Products = () => {
   useEffect(() => {
     if (elRefs.current[0].current !== null) {
       elWidth = elRefs.current.map(
-        innerElRef => innerElRef.current.offsetWidth,
+        innerElRef => innerElRef.current.offsetWidth + 30,
       );
     }
   }, [beforeClick, counter]);
 
   function handleTransform(current: number) {
+    let targetSize = 0;
+
     if (beforeClick < current) {
-      elWidth.map((size, elInedx) => {
+      elWidth.map((size, elIndex) => {
         if (current == 0) {
           setX(0)
-        } else if (current > elInedx) {
-          setX(x - size - 30);
+        } else if (current > elIndex) {
+          targetSize += size;
         }
       });
+      setX(-targetSize);
     } else if (beforeClick > current) {
       elWidth.map((size, elInedx) => {
         if (current == 0) {
           setX(0)
         } else if (current == elInedx) {
-          setX(x + size + 30);
+          setX(x + size );
         }
       });
     }
