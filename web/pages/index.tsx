@@ -12,7 +12,8 @@ const MainPage: NextPage<MainPageAppProps> = ({ isMobileView }) => {
   const [openCookieAlert, setOpenCookieAlert] = useState(true);
 
   useEffect(() => {
-    if (Boolean(cookie["cookieconsent_status"])) {
+    console.log(!Boolean(cookie["cookieconsent_status"]))
+    if (!Boolean(cookie["cookieconsent_status"])) {
       setOpenCookieAlert(false)
     }
   }, [cookie])
@@ -25,13 +26,13 @@ const MainPage: NextPage<MainPageAppProps> = ({ isMobileView }) => {
         sameSite: true,
       })
     }
-    setOpenCookieAlert(false)
+    setOpenCookieAlert(true)
   }, [cookie])
 
   return (
     <React.Fragment>
       {BridgedSection.map((item) => item.content(isMobileView))}
-      {openCookieAlert && <CookieAccept accpetCookie={onAcceptCookie} />}
+      {!openCookieAlert && <CookieAccept accpetCookie={onAcceptCookie} />}
     </React.Fragment>
   )
 }
