@@ -116,11 +116,15 @@ const CodeView = styled(Box)`
     display: flex;
     align-items: center;
     justify-content: center;
+    border-bottom-left-radius: 12px;
+    border-bottom-right-radius: 12px;
 
     pre {
         width: 95%;
         height: 95%;
-        padding: 0px;
+        padding: 0px !important;
+        border-bottom-left-radius: 12px;
+    border-bottom-right-radius: 12px;
       }
   }
   
