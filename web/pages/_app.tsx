@@ -11,6 +11,8 @@ import Fonts from "components/fonts";
 import { defaultTheme } from "utils/styled";
 import { useRouter } from "next/router";
 import { Box } from "rebass";
+import { PopupConsumer, PopupInfo, PopupProvider } from "utils/context/PopupContext";
+import Popup from "components/popup";
 
 const MyApp = ({ Component, pageProps }: AppProps) => {
   const router = useRouter();
@@ -18,6 +20,18 @@ const MyApp = ({ Component, pageProps }: AppProps) => {
   useEffect(() => {
     Fonts();
   }, [router.events, router.pathname]);
+
+  const renderPopups = () => {
+    return (
+      <PopupConsumer>
+        {state =>
+          (state[0].popupList as PopupInfo[]).map(popup => (
+            <Popup key={popup.id} info={popup} />
+          ))
+        }
+      </PopupConsumer>
+    );
+  }
 
   return (
     <Providers>
@@ -106,11 +120,12 @@ const MyApp = ({ Component, pageProps }: AppProps) => {
         `}
       >
         <Header />
-        <Box mt="60px" style={{ position: "relative"}}>
+        <Box mt="60px" style={{ position: "relative" }}>
           <Component {...pageProps} />
         </Box>
         <Footer />
       </div>
+      {renderPopups()}
     </Providers>
   );
 };
@@ -121,9 +136,11 @@ const Providers = ({
   children: React.ReactNode;
 }) => {
   return (
-    <CookiesProvider>
-      <ThemeProvider theme={defaultTheme}>{children}</ThemeProvider>
-    </CookiesProvider>
+    <PopupProvider>
+      <CookiesProvider>
+        <ThemeProvider theme={defaultTheme}>{children}</ThemeProvider>
+      </CookiesProvider>
+    </PopupProvider>
   );
 };
 

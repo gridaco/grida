@@ -24,6 +24,7 @@
         "react-cookie": "^4.0.3",
         "react-lottie": "^1.2.3",
         "react-syntax-highlighter": "^15.4.3",
+        "react-youtube": "^7.13.1",
         "smoothscroll-polyfill": "^0.4.4"
     }
 }

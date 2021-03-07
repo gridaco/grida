@@ -26,6 +26,7 @@ export interface IconList {
   graph: IconListProps;
   play: IconListProps;
   gradient: IconListProps;
+  close: IconListProps;
 }
 
 const icons: IconList = {
@@ -418,7 +419,14 @@ const icons: IconList = {
         </clipPath>
       </defs>
     </svg>
-
+  },
+  close: {
+    width: 19,
+    height: 19,
+    svg: <g>
+      <path strokeLinecap="round" stroke="currentColor" d="M18 18L0 0" />
+      <path strokeLinecap="round" stroke="currentColor" d="M18 0L0 18" />
+    </g>
   }
 };
 

@@ -28,4 +28,7 @@ module.exports = withTM({
         return config;
     },
     transpileModules: ["lodash-es"],
+    images: {
+        domains: ['img.youtube.com']
+    }
 });
