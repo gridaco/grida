@@ -164,7 +164,7 @@ const Description = styled(Text)`
 const Container = styled(Flex)`
   position: relative;
   width: 100%;
-  height: 100px;
+  margin-top: 10px;
   display: flex;
   align-items: center;
   justify-content: center;
