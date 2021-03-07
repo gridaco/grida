@@ -15,7 +15,7 @@ interface SectionLayoutProps {
   backgroundColor?: string
 }
 
-const SectionLayout: React.FC<SectionLayoutProps> = ({ variant = "content-default", inherit = true, alignContent = "start", children, debug = false, backgroundColor = "#fff", debugOption }) => {
+const SectionLayout: React.FC<SectionLayoutProps> = ({ variant = "content-default", inherit = true, alignContent = "start", children, debug = false, backgroundColor = "rgb(0,0,0,0)", debugOption }) => {
   const parentFlexBox = useRef(null);
   const childFlexBox = useRef(null);
   const [isChecked, setIsChecked] = useState(true);
