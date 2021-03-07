@@ -8,6 +8,8 @@ import { ThemeInterface } from "utils/styled/theme";
 const GradientRowList = () => {
   const [x, setX] = useState<number>(0);
   const [beforeClick, setBeforeClick] = useState<number>(0);
+  const [counter, setCounter] = useState(1)
+
   const elRefs = React.useRef([]);
   let elWidth = [];
   const contents = ["code", "server", "translations", "insight", "GIT", "everything"];
@@ -16,6 +18,12 @@ const GradientRowList = () => {
     stiffness: 700,
     damping: 30,
   };
+
+  React.useEffect(() => {
+    const timer =
+      counter >= 0 && setInterval(() => counter === 0 ? setX(0) : setCounter(counter - 1), 1000);
+    return () => clearInterval(timer);
+  }, [counter]);
 
   useEffect(() => {
     elRefs.current = Array(contents.length)
@@ -30,13 +38,12 @@ const GradientRowList = () => {
         innerElRef => innerElRef.current.offsetWidth,
       );
     }
-    // console.log("useEffect [beforeClick]", elWidth);
-  }, [beforeClick]);
+  }, [beforeClick, counter]);
 
   function handleTransform(current: number) {
     if (beforeClick < current) {
       elWidth.map((size, elInedx) => {
-        if (current == 0) { 
+        if (current == 0) {
           setX(0)
         } else if (current > elInedx) {
           setX(x - size - 30);
@@ -44,14 +51,15 @@ const GradientRowList = () => {
       });
     } else if (beforeClick > current) {
       elWidth.map((size, elInedx) => {
-        if (current == 0) { 
+        if (current == 0) {
           setX(0)
         } else if (current == elInedx) {
-          setX(x + size +30);
+          setX(x + size + 30);
         }
       });
     }
     setBeforeClick(current);
+    setCounter(3)
   }
 
   return (
