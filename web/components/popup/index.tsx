@@ -59,7 +59,6 @@ const Popup = (props: PopupProps) => {
   return (
     <ModalBackground onClick={onClose}>
       <Modal
-        width={info.width || "360px"}
         // p={["10px", "10px", "15px 30px"]}
         // bg="white"
         // borderColor="gray30"
@@ -128,9 +127,12 @@ const ModalBackground = styled.div`
 
 const Modal = styled(Box)`
   position: absolute;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   top: 50%;
   left: 50%;
-  max-height: ${props => (props.height ? "initial" : "70%")};
+  /* max-height: ${props => (props.height ? "initial" : "70%")}; */
   overflow-y: scroll;
   /* border: 1px solid; */
   border-radius: 7px;
