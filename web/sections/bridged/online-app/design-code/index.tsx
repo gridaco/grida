@@ -33,7 +33,7 @@ const Description = styled(Text)`
   color: #444545;
 
   ${props => media("0px", (props.theme as ThemeInterface).breakpoints[0])} {
-    max-width: 280px;
+    max-width: 100%;
   }
 `
 
