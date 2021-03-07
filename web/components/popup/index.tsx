@@ -1,6 +1,6 @@
 import styled from "@emotion/styled";
 import React, { useCallback, useEffect, useRef, Children } from "react";
-import { Box, Text, Button } from "rebass";
+import { Flex, Text, Button } from "rebass";
 import { borderColor, height } from "styled-system";
 
 import Icon from "components/icon";
@@ -60,7 +60,7 @@ const Popup = (props: PopupProps) => {
     <ModalBackground onClick={onClose}>
       <Modal
         width={info.width || "90%"}
-        height={info.height || "90%"}
+        height={info.height as string || "90%"}
         // p={["10px", "10px", "15px 30px"]}
         // bg="white"
         // borderColor="gray30"
@@ -127,7 +127,7 @@ const ModalBackground = styled.div`
   z-index: 1050;
 `;
 
-const Modal = styled(Box)`
+const Modal = styled(Flex)`
   position: absolute;
   display: flex;
   align-items: center;
