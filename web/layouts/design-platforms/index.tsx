@@ -4,6 +4,7 @@ import styled from '@emotion/styled';
 import Image from 'next/image'
 import { media } from 'utils/styled/media';
 import { ThemeInterface } from 'utils/styled/theme';
+import LiveDesignDemoFrame from 'components/motion/live-design-demo';
 
 const renderPlatforms = ["figma", "sketch", "adobexd"];
 
@@ -35,9 +36,7 @@ const DesignPlatforms = () => {
             />
           ))}
         </div>
-        <div className="preview">
-
-        </div>
+         <LiveDesignDemoFrame />
       </PlatformView>
     </AbosulteView>
   )

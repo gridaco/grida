@@ -9,6 +9,7 @@ import ActionItem from 'components/action-item';
 import { LandingpageUrls } from "utils/landingpage/constants";
 import MotionButton from "components/motion/button";
 import MotionRadio from "components/motion/radio";
+import ButtonDetectDemo from 'components/motion/button-detect-demo';
 
 const renderMoitonComponents = [MotionButton, MotionRadio];
 
@@ -31,7 +32,7 @@ const LayoutDetect = () => {
       </DetectTitle>
       <Description fontSize={["21px", "21px", "21px", "24px"]}>Finally, the tool understands your design. More inteligence means less modification. Which leads us to blazing fast workflow.</Description>
       <SectionLayout variant="content-overflow-1" inherit={false}>
-        <Flex width="95%" height="700px" bg="#000" mt="50px" mx="20px" />
+        <ButtonDetectDemo />
       </SectionLayout>
       <BlankArea height={30} />
       <ActionItem

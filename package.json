@@ -19,6 +19,7 @@
         "sitemap-gen": "./scripts/sitemap-gen/runner.sh"
     },
     "dependencies": {
+        "react-lottie": "^1.2.3",
         "smoothscroll-polyfill": "^0.4.4"
     }
 }
