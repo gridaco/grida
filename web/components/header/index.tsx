@@ -79,7 +79,7 @@ const Header = () => {
 
 				<SignupButton
 					onClick={() => !isOpenMenu && window.location.assign(LandingpageUrls.signup)}
-					style={{ opacity: isOpenMenu && 0 }}
+					style={{ opacity: isOpenMenu && 0  }}
 					fontSize={["13px", "13px", "15px"]}
 					p={["6px 10px", "6px 10px", "9px 20px", "9px 20px"]}
 					variant="noShadow"
@@ -176,9 +176,14 @@ const SignupButton = styled(Button)`
   align-items: center;
   justify-content: center;
 
-	${props => media(null, (props.theme as ThemeInterface).breakpoints[0])} {
+	${props => media((props.theme as ThemeInterface).breakpoints[0], null)} {
     height: 25px;
 		opacity: 1 !important;
+  }
+
+	${props => media((props.theme as ThemeInterface).breakpoints[1], null)} {
+		background-color: #fff;
+		color: #2562FF;
   }
 `;
 
