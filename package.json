@@ -19,7 +19,9 @@
         "sitemap-gen": "./scripts/sitemap-gen/runner.sh"
     },
     "dependencies": {
+        "cookie": "^0.4.1",
         "framer-motion": "^3.10.0",
+        "react-cookie": "^4.0.3",
         "react-lottie": "^1.2.3",
         "react-syntax-highlighter": "^15.4.3",
         "smoothscroll-polyfill": "^0.4.4"

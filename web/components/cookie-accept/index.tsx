@@ -4,7 +4,11 @@ import { Flex } from "rebass";
 import SectionLayout from "layouts/section";
 import BlankArea from "components/blank-area";
 
-const CookieAccept: React.FC = () => {
+interface CookieAcceptProps {
+  accpetCookie: (isAccept : boolean) => void
+}
+
+const CookieAccept: React.FC<CookieAcceptProps> = ({ accpetCookie }) => {
   return (
     <Positioner>
       <BlankArea height={24} />
@@ -19,8 +23,8 @@ const CookieAccept: React.FC = () => {
         </Desc>
 
         <BtnArea pb={["20px", "0px", "20px", "0px"]}>
-          <Button isAccept={true}>Accept</Button>
-          <Button isAccept={false}>Decline</Button>
+          <Button isAccept={true} onClick={() => accpetCookie(true)}>Accept</Button>
+          <Button isAccept={false} onClick={() => accpetCookie(false)}>Decline</Button>
         </BtnArea>
       </SectionLayout>
     </Positioner>

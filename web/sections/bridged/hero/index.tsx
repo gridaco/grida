@@ -4,6 +4,8 @@ import { Button, Heading, Text } from 'rebass'
 import styled from '@emotion/styled';
 import BlankArea from 'components/blank-area';
 import { ElevatedVideoPlayer } from 'components/effect';
+import { media } from 'utils/styled/media';
+import { ThemeInterface } from 'utils/styled/theme';
 
 const Hero = () => {
   return (
@@ -27,7 +29,17 @@ const HeroText = styled(Heading)`
 `
 
 const Description = styled(Text)`
+  max-width: 800px;
   text-align: center;
   margin-top: 40px;
   color: #444545;
+
+  ${props => media("0px", (props.theme as ThemeInterface).breakpoints[0])} {
+    max-width: 280px;
+  }
+
+  ${props => media((props.theme as ThemeInterface).breakpoints[0], (props.theme as ThemeInterface).breakpoints[1])} {
+    max-width: 570px;
+  }
+  
 `
