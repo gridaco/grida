@@ -6,11 +6,13 @@ import { media } from 'utils/styled/media';
 import BlankArea from 'components/blank-area';
 import { ThemeInterface } from 'utils/styled/theme';
 import Link from 'next/link';
+import GradientRowList from 'components/gradient-row-list';
 
 const Products = () => {
   return (
     <SectionLayout alignContent="start" >
       <Heading fontSize={["32px", "64px", "64px", "80px"]}>Your design is your</Heading>
+      <GradientRowList />
       <SectionLayout variant="content-overflow-1" inherit={false}>
         <Flex width="95%" height="700px" bg="#000" mt="50px" mx="20px" />
       </SectionLayout>
