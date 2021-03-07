@@ -14,6 +14,7 @@ const Products = () => {
   const [x, setX] = useState<number>(0);
   const [beforeClick, setBeforeClick] = useState<number>(0);
   const [counter, setCounter] = useState(1);
+  const [isReady, setIsReady] = useState(false);
 
   const elRefs = React.useRef([]);
   let elWidth = [];
@@ -22,6 +23,10 @@ const Products = () => {
     stiffness: 200,
     damping: 25,
   };
+
+  useEffect(() => {
+    console.log(isReady)
+  }, [isReady])
 
   useEffect(() => {
     const timer =
@@ -112,7 +117,7 @@ const Products = () => {
       </SectionLayout>
       <SectionLayout variant="content-overflow-1" inherit={false} alignContent="center">
         <VideoWrapper width={["95%", "95%", "100%", "100%"]} height="700px" mt="50px" mx={["20px", "20px", 0, 0]} >
-          <ReactPlayer url={PRODUCT_LIST[beforeClick].path} loop playing />
+          <ReactPlayer onReady={() => setIsReady(true)} url={PRODUCT_LIST[beforeClick].path} loop playing />
         </VideoWrapper>
       </SectionLayout>
       <Heading fontSize="18px" mt="40px">
