@@ -45,7 +45,7 @@ const Positioner = styled.div`
 `;
 
 const Wrapper = styled(Flex)`
-  height: 107;
+  height: 107px;
   margin-top: 36px;
   display: flex;
   flex-direction: column;
@@ -62,10 +62,6 @@ const Desc = styled.div`
   line-height: 17px;
 
   color: #4e4e4e;
-
-  flex: none;
-  order: 0;
-  flex-grow: 0;
 `;
 
 const BtnArea = styled(Flex)`
@@ -78,7 +74,6 @@ const BtnArea = styled(Flex)`
 `;
 
 const Button = styled.div<Color>`
-  font-family: Roboto;
   font-style: normal;
   font-weight: 500;
   font-size: 16px;
@@ -91,9 +86,6 @@ const Button = styled.div<Color>`
   color: #2562ff;
   color: ${p => (p.isAccept ? "#2562ff" : "#5B5C5D")};
 
-  flex: none;
-  order: 0;
-  flex-grow: 0;
   margin: 0px 10px;
 
   cursor: pointer;
