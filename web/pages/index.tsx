@@ -1,26 +1,10 @@
-import React from "react";
-import { Flex } from "rebass";
-import BridgedCollaborate from "sections/bridged/bridged-collaborate";
-import BridgedDetection from "sections/bridged/bridged-detection";
-import BridgedIntroduce from "sections/bridged/bridged-introduce";
-import BridgedOuttro from "sections/bridged/bridged-outtro";
-import BridgedSolutions from "sections/bridged/bridged-solutions";
-import BridgedVideoSection from "sections/bridged/bridged-video";
-import BasicTemplate from "template/basic";
+import React from 'react'
+import { BridgedSection } from 'common/toolkit';
 
 const MainPage = () => {
   return (
-    <Flex flexDirection="column">
-      <BasicTemplate>
-        <BridgedVideoSection />
-        <BridgedIntroduce />
-        <BridgedDetection />
-        <BridgedSolutions />
-      </BasicTemplate>
-      <BridgedCollaborate />
-      <BridgedOuttro />
-    </Flex>
-  );
-};
+    BridgedSection.map((item) => item.content)
+  )
+}
 
-export default MainPage;
+export default MainPage

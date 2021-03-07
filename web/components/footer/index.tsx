@@ -7,42 +7,44 @@ import SitemapList from "components/sitemap-list";
 import { IconList } from "components/icon/icons";
 import Link from "next/link";
 import { URLS } from "utils/landingpage/constants";
+import { media } from "utils/styled/media";
+import { ThemeInterface } from "utils/styled/theme";
 
 const iconList: Array<{
   icon: keyof IconList;
   href: string;
 }> = [
-  {
-    icon: "youtube",
-    href: URLS.social.youtube,
-  },
-  {
-    icon: "instagram",
-    href: URLS.social.instagram,
-  },
-  {
-    icon: "twitter",
-    href: URLS.social.twitter,
-  },
-  {
-    icon: "facebook",
-    href: URLS.social.facebook,
-  },
-  {
-    icon: "dribble",
-    href: URLS.social.dribbble,
-  },
-  {
-    icon: "github",
-    href: URLS.social.github,
-  },
-];
+    {
+      icon: "youtube",
+      href: URLS.social.youtube,
+    },
+    {
+      icon: "instagram",
+      href: URLS.social.instagram,
+    },
+    {
+      icon: "twitter",
+      href: URLS.social.twitter,
+    },
+    {
+      icon: "facebook",
+      href: URLS.social.facebook,
+    },
+    {
+      icon: "dribble",
+      href: URLS.social.dribbble,
+    },
+    {
+      icon: "github",
+      href: URLS.social.github,
+    },
+  ];
 
 const Footer = () => {
   return (
     <Flex alignItems="center" justifyContent="center" width="100%">
       <Flex
-        width={["320px", "730px", "985px", "1040px"]}
+        width={["100%", "730px", "985px", "1040px"]}
         my={["40px", "50px", "100px", "150px"]}
         mx="20px"
         flexDirection="column"
@@ -66,13 +68,13 @@ const Footer = () => {
           <Text>Copyright © 2021 Bridged XYZ LLC</Text>
           <Flex className="policys">
             <Link href={URLS.landing.cookies_policy}>
-              <Text className="cursor">Cookies</Text>
+              <span className="cursor">Cookies</span>
             </Link>
             <Link href={URLS.landing.privacy_policy}>
-              <Text className="cursor">Privacy policy</Text>
+              <span className="cursor">Privacy policy</span>
             </Link>
             <Link href={URLS.landing.terms_and_conditions}>
-              <Text className="cursor">Terms and conditions</Text>
+              <span className="cursor">Terms and conditions</span>
             </Link>
           </Flex>
         </FooterBottom>
@@ -86,32 +88,39 @@ export default Footer;
 const FooterContent = styled(Flex)`
   justify-content: center;
 
-  @media (max-width: 767px) {
+  ${props => media(null, (props.theme as ThemeInterface).breakpoints[1])} {
     flex-direction: column;
   }
+
 `;
 
 const FooterBottom = styled(Flex)`
   color: #4e4e4e;
   font-size: 14px;
-  @media (max-width: 767px) {
-    flex-direction: column;
+
+  ${props => media(null, (props.theme as ThemeInterface).breakpoints[1])} {
+   flex-direction: column;
 
     .policys {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(95px, 1fr));
       margin-top: 20px;
+      display: grid;
+      grid-template-rows: repeat(3, 20px);
+      grid-template-columns: repeat(2, 120px);
+      grid-template-areas:
+      "span span ."
+      "span . .";
 
-      div {
-        margin-top: 4px;
+      span {
+        margin-top: 10px;
         white-space: nowrap;
         margin-left: 0px !important;
+        margin-right: 16px;
       }
     }
   }
 
   .policys {
-    div {
+    span {
       margin-left: 16px;
     }
   }
@@ -124,7 +133,7 @@ const SitemapWrapper = styled(Box)`
   grid-column-gap: 80px;
   grid-row-gap: 64px;
 
-  @media (max-width: 360px) {
+  ${props => media(null, (props.theme as ThemeInterface).breakpoints[0])} {
     grid-column-gap: 80px;
   }
 `;

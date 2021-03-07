@@ -1,1 +1,0 @@
-export const LOG_CTA_GET_STARTED = "LOG_CTA_GET_STARTED";

@@ -18,7 +18,6 @@
             "layout/*": ["./layouts/*"],
             "pages/*": ["./pages/*"],
             "utils/*": ["utils/*"],
-            "sections/*": ["sections/*"],
             "public/*": ["public/*"]
         },
         "isolatedModules": true

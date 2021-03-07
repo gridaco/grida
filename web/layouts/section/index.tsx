@@ -8,22 +8,28 @@ interface SectionLayoutProps {
   variant?: "full-width" | "content-overflow-1" | "content-default" | "content-inset-1";
   inherit?: boolean
   alignContent?: "start" | "center" | "end"
+  debug?: boolean
+  debugOption?: {
+    debugPostion?: string
+  }
+  backgroundColor?: string
 }
 
-const SectionLayout: React.FC<SectionLayoutProps> = ({ variant = "content-default", inherit = true, alignContent = "start", children }) => {
+const SectionLayout: React.FC<SectionLayoutProps> = ({ variant = "content-default", inherit = true, alignContent = "start", children, debug = false, backgroundColor = "#fff", debugOption }) => {
   const parentFlexBox = useRef(null);
   const childFlexBox = useRef(null);
+  const [isChecked, setIsChecked] = useState(true);
 
   const getWidthUseVaraint = () => {
     switch (variant) {
       case "full-width":
         return "100%";
       case "content-overflow-1":
-        return ["320px", "768px", "1024px", "1280px"];
+        return ["100%", "768px", "1024px", "1280px"];
       case "content-default":
-        return ["284px", "728px", "984px", "1040px"];
+        return ["100%", "728px", "984px", "1040px"];
       case "content-inset-1":
-        return ["280px", "664px", "864px", "932px"];
+        return ["100%", "664px", "864px", "932px"];
     }
   }
 
@@ -39,7 +45,8 @@ const SectionLayout: React.FC<SectionLayoutProps> = ({ variant = "content-defaul
   }
 
   useEffect(() => {
-    if (!inherit) {
+      childFlexBox.current.style.zIndex = 5
+      if (!inherit) {
       parentFlexBox.current.style.height = childFlexBox.current.clientHeight + "px"
     }
     if (variants.includes(parentFlexBox.current.parentElement.classList.item(0))) {
@@ -55,9 +62,9 @@ const SectionLayout: React.FC<SectionLayoutProps> = ({ variant = "content-defaul
     switch (variant) {
       case "full-width":
       case "content-overflow-1":
-        return "0px"
+        return ["0px", "0px", "0px", "0px"]
       case "content-default":
-        return "20px"
+        return ["20px", "20px", "20px", "0px"]
       case "content-inset-1":
         return ["20px", "4%", "4%", "4%"]
     }
@@ -69,20 +76,23 @@ const SectionLayout: React.FC<SectionLayoutProps> = ({ variant = "content-defaul
       switch (variant) {
         case "full-width":
           style = {
-            position: "absolute", 
-            left: "0px" 
+            position: "absolute",
+            left: "0px",
+            zIndex: 5,
           };
           break;
         case "content-overflow-1":
           style = {
-            position: "absolute", 
-            transform: "translate(40%, 0px)"
+            position: "absolute",
+            transform: "translate(0%, 0px)",
+            zIndex: 5,
           }
           break;
         case "content-default":
-          style = { 
-            position: "absolute", 
-            transform: "translate(44%, 0px)"
+          style = {
+            position: "absolute",
+            transform: "translate(44%, 0px)",
+            zIndex: 5,
           };
           break;
       }
@@ -93,20 +103,25 @@ const SectionLayout: React.FC<SectionLayoutProps> = ({ variant = "content-defaul
 
   return (
     <Flex
+      width="100%"
       ref={parentFlexBox}
       alignItems="center"
       justifyContent="center"
       height={childFlexBox.current?.clientHeight + "px"}
     >
+      {debug && <Debug>
+        <span style={{ transform: `translate(-30px, -${debugOption.debugPostion}%)` }}> <input type="checkbox" onClick={e => setIsChecked(!isChecked)} defaultChecked={isChecked} />{variant}</span>
+      </Debug>}
       <Flex
         mx={getMarginUseVaraint()}
         ref={childFlexBox}
         className={variant}
-        bg="rgba(83, 245, 255, 0.4)"
+        bg={!debug ? backgroundColor : "rgba(83, 245, 255, 0.4)"}
         width={getWidthUseVaraint()}
         flexDirection="column"
         alignItems={getAlignContent()}
         style={getAbsoluteStyle()}
+        
       >
         {children}
       </Flex>
@@ -115,3 +130,14 @@ const SectionLayout: React.FC<SectionLayoutProps> = ({ variant = "content-defaul
 }
 
 export default SectionLayout
+
+const Debug = styled.div`
+
+  span {
+    position: absolute;
+    
+    background-color: red;
+    padding: 0px 5px;
+    color: #fff;
+  }
+`

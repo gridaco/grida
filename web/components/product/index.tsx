@@ -2,6 +2,8 @@ import React from 'react'
 import { Box, Flex, Text } from 'rebass';
 import styled from '@emotion/styled';
 import Icon from 'components/icon';
+import { ThemeInterface } from 'utils/styled/theme';
+import { media } from 'utils/styled/media';
 
 
 const Product = ({ title, iconName, desc }) => {
@@ -22,7 +24,7 @@ const ProductWrapper = styled(Flex)`
   max-width: 255px;
   max-height: 70px;
 
-  @media (max-width: 767px) {
+  ${props => media(null, (props.theme as ThemeInterface).breakpoints[1])} {
     max-width: 320px;
   }
 `

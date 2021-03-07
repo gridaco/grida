@@ -1,48 +1,48 @@
-import React, { useEffect, useState } from "react";
-import styled from "@emotion/styled";
-import { Flex, Heading } from "rebass";
-import Link from "next/link";
-import { DocsRoute } from "utils/docs/model";
+import React, { useEffect, useState } from 'react'
+import styled from '@emotion/styled'
+import { Flex, Heading } from 'rebass';
+import Link from 'next/link';
 
-function DocsNavigationSection(props: { route: DocsRoute; level?: number }) {
-  const routeConfig = props.route;
-  const level = props.level ?? 0;
+const DocsNavigationSection: React.FC<any> = ({ docs }) => {
+    const [title, setTitle] = useState("");
+    const [childs, setChilds] = useState([]);
 
-  return (
-    <div style={{ marginLeft: level * 20 }}>
-      <SectionWrapper flexDirection="column">
-        {routeConfig.path ? (
-          <Link href={routeConfig.path ?? ""}>
-            <h4>{routeConfig.title}</h4>
-          </Link>
-        ) : (
-          <h4>{routeConfig.title}</h4>
-        )}
+    useEffect(() => {
+        setTitle(docs[0]?.fileName.replace("/", ""));
+        setChilds(docs.map(i => {
+            return {
+                fileName: i.fileName.split("/")[i.fileName.split("/").length - 1],
+                content: i.content
+            }
+        }));
+    }, [docs])
 
-        {routeConfig.routes &&
-          routeConfig.routes.map((i, ix) =>
-            i.routes ? (
-              <DocsNavigationSection route={i} level={level + 1} />
-            ) : (
-              <Link href={i.path}>
-                <Heading fontSize="16px" fontWeight={400}>
-                  {i.title}
-                </Heading>
-              </Link>
-            ),
-          )}
-      </SectionWrapper>
-    </div>
-  );
+    return (
+        (title != "" && !title.includes(".md")) && <SectionWrapper flexDirection="column">
+
+            {childs.map((i, ix) =>
+                ix === 0 ?
+                    <Link href={`/docs/${title}`}>
+                        <Heading fontSize="18px" fontWeight={500}>{title}</Heading>
+                    </Link> :
+                    <Link
+                        key={`child-${i.fileName}`}
+                        href={`/docs/${title}/${i.fileName.replace(".md", "")}`}
+                    >
+                        {i.fileName.replace(".md", "")}
+                    </Link>
+            )}
+        </SectionWrapper>
+    )
 }
 
-export default DocsNavigationSection;
+export default DocsNavigationSection
 
 const SectionWrapper = styled(Flex)`
-  margin-top: 50px;
+    margin-top: 50px;
 
-  a {
-    margin-top: 12px;
-    color: #686868;
-  }
-`;
+    a {
+        margin-top: 12px;
+        color: #686868;
+    }
+`

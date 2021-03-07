@@ -10,22 +10,11 @@ import Fonts from "components/fonts";
 import { defaultTheme } from "utils/styled";
 import { useRouter } from "next/router";
 import { Box } from "rebass";
-import { analytics } from "utils/firebase";
 
 const MyApp = ({ Component, pageProps }: AppProps) => {
   const router = useRouter();
 
   useEffect(() => {
-    // region set firebase analytics
-    try {
-      analytics();
-    } catch (_) {
-      console.error(
-        "seems like you are a contributor! ignore this message since this is a warning that we could not find firebase credentials to initialize.",
-      );
-    }
-    // endregion set firebase analytics
-
     Fonts();
   }, [router.events, router.pathname]);
 
@@ -48,14 +37,6 @@ const MyApp = ({ Component, pageProps }: AppProps) => {
             }
           }
 
-          .no-drag {
-            -ms-user-select: none; 
-            -moz-user-select: -moz-none; 
-            -webkit-user-select: none; 
-            -khtml-user-select: none; 
-            user-select:none;
-          }
-
           input {
             box-sizing: border-box;
           }
@@ -63,16 +44,11 @@ const MyApp = ({ Component, pageProps }: AppProps) => {
           a {
             text-decoration: none;
             color: inherit;
-            cursor: pointer;
           }
 
           p {
             margin-block-start: 0.3em;
             margin-block-end: 0.3em;
-          }
-
-          .cursor {
-            cursor: pointer;
           }
 
           .fonts-loaded {
@@ -83,7 +59,7 @@ const MyApp = ({ Component, pageProps }: AppProps) => {
             h1,
             h2,
             h3 {
-              font-family: "Roboto", sans-serif;
+              font-family: 'Roboto', sans-serif;
             }
           }
 
@@ -112,7 +88,6 @@ const MyApp = ({ Component, pageProps }: AppProps) => {
           rel="stylesheet"
           type="text/css"
         />
-        <script defer src="https://unpkg.com/smoothscroll-polyfill@0.4.4/dist/smoothscroll.min.js"></script>
       </Head>
       <div
         css={css`
@@ -131,8 +106,14 @@ const MyApp = ({ Component, pageProps }: AppProps) => {
   );
 };
 
-const Providers = ({ children }: { children: React.ReactNode }) => {
-  return <ThemeProvider theme={defaultTheme}>{children}</ThemeProvider>;
+const Providers = ({
+  children,
+}: {
+  children: React.ReactNode;
+}) => {
+  return (
+    <ThemeProvider theme={defaultTheme}>{children}</ThemeProvider>
+  );
 };
 
 export default MyApp;

@@ -1,12 +1,14 @@
 import Icon from "components/icon";
 import Link from "next/link";
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import styled from "@emotion/styled";
 import { center } from 'utils/styled/styles';
 import { Box, Flex, Text, Button } from "rebass";
 import ExpandHeaderItem from "./expand-header-item";
 import { HeaderMap } from "./headermap";
 import { LandingpageUrls } from 'utils/landingpage/constants';
+import { ThemeInterface } from "utils/styled/theme";
+import { media } from "utils/styled/media";
 
 const Header = () => {
 	const [currentExpandHeader, setCurrentExpandHeader] = useState("");
@@ -20,23 +22,23 @@ const Header = () => {
 		}
 	}, [isOpenMenu])
 
+	const handleClickMenu = useCallback(() => setIsOpenMenu(!isOpenMenu), [isOpenMenu])
+
+	const onClickExpandHeader = useCallback((title: string) => 	setCurrentExpandHeader(title), [])
+
 	return (
-		<HeaderWrapper
-			alignItems="center"
-			justifyContent="center"
-			width="100%"
-			height="60px"
-		>
+		<HeaderWrapper>
 			<Flex
-				width={["320px", "730px", "985px", "1040px"]}
-				mx="20px"
+				width={["100%", "728px", "984px", "1040px"]}
+				mx={["20px"]}
 				justifyContent="space-between"
 				alignItems="center"
 				height="100%"
 			>
-				<ResponsiveMenu className="cursor" onClick={() => setIsOpenMenu(!isOpenMenu)}>
+				<ResponsiveMenu className="cursor" onClick={handleClickMenu}>
 					<Icon name={isOpenMenu ? "headerClose" : "headerMenu"} />
 				</ResponsiveMenu>
+
 				<Flex alignItems="center">
 					<Link href="/">
 						<Bridged className="cursor" name="bridged" width={32} height={32} />
@@ -54,13 +56,13 @@ const Header = () => {
 									key={i.label}
 									item={i}
 									isExpand={currentExpandHeader === i.label}
-									onExpandHeader={() => setCurrentExpandHeader(i.label)}
-									onContractHeader={() => setCurrentExpandHeader("")}
+									onExpandHeader={() => onClickExpandHeader(i.label)}
+									onContractHeader={() => onClickExpandHeader("")}
 								/>
 							) : (
 									<Link href={i.href} key={i.label}>
 										<Item
-											onMouseOver={() => setCurrentExpandHeader("")}
+											onMouseOver={() => onClickExpandHeader("")}
 											className="cursor"
 											mx="12px"
 											color="#8B8B8B"
@@ -74,18 +76,31 @@ const Header = () => {
 						)}
 					</NavigationWrapper>
 				</Flex>
+
 				<SignupButton
 					onClick={() => !isOpenMenu && window.location.assign(LandingpageUrls.signup)}
 					style={{ opacity: isOpenMenu && 0 }}
 					fontSize={["13px", "13px", "15px"]}
 					p={["6px 10px", "6px 10px", "9px 20px", "9px 20px"]}
+					variant="noShadow"
 				>
 					Sign up
         </SignupButton>
+
 			</Flex>
+
 			{
 				isOpenMenu &&
-				<ResponsiveMenu justifyContent="space-between" style={{ position: "absolute", top: 60, height: "calc(100vh - 60px)" }} bg="#fff" width="100%" px="20px" pb="24px" flexDirection="column">
+				<ResponsiveMenu
+					justifyContent="space-between"
+					style={{ position: "absolute", top: 60, height: "calc(100vh - 60px)" }}
+					bg="#fff"
+					width="100%"
+					px="20px"
+					pb="24px"
+					flexDirection="column"
+				>
+					
 					<Flex mt="24px" flexDirection="column">
 						{HeaderMap.map(i =>
 							!i.href ? (
@@ -94,8 +109,8 @@ const Header = () => {
 									type="mobile"
 									item={i}
 									isExpand={currentExpandHeader === i.label}
-									onExpandHeader={() => setCurrentExpandHeader(i.label)}
-									onContractHeader={() => setCurrentExpandHeader("")}
+									onExpandHeader={() => onClickExpandHeader(i.label)}
+									onContractHeader={() => onClickExpandHeader("")}
 								/>
 							) : (
 									<Link href={i.href} key={i.label}>
@@ -112,16 +127,18 @@ const Header = () => {
 								),
 						)}
 					</Flex>
+
 					<Box>
-						<Button width="100%" bg="#2562FF" height="35px" fontSize="13px" mb="12px">
+						<Button variant="noShadow" width="100%" bg="#2562FF" height="35px" fontSize="13px" mb="12px">
 							Sign up
 						</Button>
-						<Button width="100%" bg="#fff" color="#000" height="35px" fontSize="13px" style={center} onClick={() => window.location.assign(LandingpageUrls.login)}>
+						<Button variant="noShadow" width="100%" bg="#fff" color="#000" height="35px" fontSize="13px" style={center} onClick={() => window.location.assign(LandingpageUrls.login)}>
 							<Icon name="lock" isVerticalMiddle mr="6px" /> Sign in
 						</Button>
 					</Box>
 				</ResponsiveMenu>
 			}
+
 		</HeaderWrapper >
 	);
 };
@@ -133,21 +150,25 @@ const HeaderWrapper = styled(Flex)`
   background-color: #fff;
   z-index: 999;
 	border-bottom: 1px solid #F8F8F8;
+	width: 100%;
+	height: 60px;	
+	justify-content: center;
+	align-items: center;
 `;
 
 const Bridged = styled(Icon)`
-  @media (max-width: 767px) {
+	${props => media(null, (props.theme as ThemeInterface).breakpoints[0])} {
     position: absolute;
   }
 `;
 
 const Item = styled(Text)`
 
-	@media (min-width: 767px) {
-		&:hover{
+	${props => media(null, (props.theme as ThemeInterface).breakpoints[0])} {
+    &:hover{
 			color:#000;
 		}
-	}
+  }
 `
 
 const SignupButton = styled(Button)`
@@ -156,33 +177,31 @@ const SignupButton = styled(Button)`
   align-items: center;
   justify-content: center;
 
-	@media (min-width: 767px) {
-		opacity: 1 !important;
-  }
-
-  @media (max-width: 767px) {
+	${props => media(null, (props.theme as ThemeInterface).breakpoints[0])} {
     height: 25px;
+		opacity: 1 !important;
   }
 `;
 
 const NavigationWrapper = styled(Flex)`
   height: 24px;
 
-  @media (max-width: 767px) {
+	${props => media(null, (props.theme as ThemeInterface).breakpoints[0])} {
     display: none;
-  }
+	}
 `;
 
 const ResponsiveMenu = styled(Flex)`
   display: none;
 
-  @media (max-width: 767px) {
+	${props => media(null, (props.theme as ThemeInterface).breakpoints[0])} {
     display: flex;
-  }
+	}
 `;
 
 const ResponsiveTitle = styled(Text)`
-  @media (max-width: 1100px) {
+
+${props => media(null, (props.theme as ThemeInterface).breakpoints[1])} {
     display: none;
-  }
+	}
 `;

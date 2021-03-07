@@ -11,7 +11,6 @@ module.exports = {
                     layouts: "./layouts",
                     pages: "./pages",
                     public: "./public",
-                    sections: "./sections",
                 },
             },
         ],

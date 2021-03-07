@@ -25,6 +25,7 @@ export interface IconList {
   home: IconListProps;
   graph: IconListProps;
   play: IconListProps;
+  gradient: IconListProps;
 }
 
 const icons: IconList = {
@@ -386,6 +387,38 @@ const icons: IconList = {
         </filter>
       </defs>
     </svg>
+  },
+  gradient: {
+    width: 2080,
+    height: 1765,
+    svg: <svg width="2080" height="1765" viewBox="0 0 2080 1765" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <g clipPath="url(#clip0)">
+        <g filter="url(#filter0_f)">
+          <path d="M671.05 363.565C486.945 351.244 420.471 543.482 410.247 641.14C381.027 810.91 293.548 821.057 327.85 1002.6C362.151 1184.15 739.835 1187.77 938.931 1345.41C1138.03 1503.04 1695.75 1295.58 1724.97 1216.76C1754.19 1137.95 1805.73 810.729 1675.24 805.656C1544.75 800.583 1304.45 584.611 1242.75 480.067C1181.04 375.523 901.181 378.966 671.05 363.565Z" fill="url(#paint0_linear)" />
+          <path d="M671.05 363.565C486.945 351.244 420.471 543.482 410.247 641.14C381.027 810.91 293.548 821.057 327.85 1002.6C362.151 1184.15 739.835 1187.77 938.931 1345.41C1138.03 1503.04 1695.75 1295.58 1724.97 1216.76C1754.19 1137.95 1805.73 810.729 1675.24 805.656C1544.75 800.583 1304.45 584.611 1242.75 480.067C1181.04 375.523 901.181 378.966 671.05 363.565Z" fill="url(#paint1_radial)" />
+        </g>
+      </g>
+      <defs>
+        <filter id="filter0_f" x="-280" y="-237" width="2640" height="2240" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+          <feFlood floodOpacity="0" result="BackgroundImageFix" />
+          <feBlend mode="normal" in="SourceGraphic" in2="BackgroundImageFix" result="shape" />
+          <feGaussianBlur stdDeviation="300" result="effect1_foregroundBlur" />
+        </filter>
+        <linearGradient id="paint0_linear" x1="423.995" y1="636.408" x2="1723.97" y2="1237.26" gradientUnits="userSpaceOnUse">
+          <stop stopColor="#FB9090" stopOpacity="0" />
+          <stop offset="0.450625" stopColor="#FB9090" stopOpacity="0.549375" />
+          <stop offset="1" stopColor="#FB9090" stopOpacity="0" />
+        </linearGradient>
+        <radialGradient id="paint1_radial" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(1303.5 658.001) rotate(120.895) scale(397.297 549.613)">
+          <stop stopColor="#5E77FF" />
+          <stop offset="1" stopColor="#AC85FF" stopOpacity="0" />
+        </radialGradient>
+        <clipPath id="clip0">
+          <rect width="2080" height="1765" fill="white" />
+        </clipPath>
+      </defs>
+    </svg>
+
   }
 };
 
