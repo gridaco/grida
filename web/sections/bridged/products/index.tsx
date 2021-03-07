@@ -7,14 +7,21 @@ import BlankArea from "components/blank-area";
 import { ThemeInterface } from "utils/styled/theme";
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { PRODUCT_LIST } from 'utils/landingpage/constants';
-import ReactPlayer from 'react-player'
+import { PRODUCT_LIST } from "utils/landingpage/constants";
+import ReactPlayer from "react-player";
+
+// region video framer motion values
+const videoPlayerMotionAnimationVariants = {
+  loading: { opacity: 0, delay: 0, default: { duration: 1 } },
+  loaded: { opacity: 1, delay: 0, default: { duration: 1 } },
+};
+// endregion video framer motion values
 
 const Products = () => {
   const [x, setX] = useState<number>(0);
   const [beforeClick, setBeforeClick] = useState<number>(0);
   const [counter, setCounter] = useState(1);
-  const [isReady, setIsReady] = useState(false);
+  const [isVideoPlayerReady, setIsVideoPlayerReady] = useState(false);
 
   const elRefs = React.useRef([]);
   let elWidth = [];
@@ -25,8 +32,8 @@ const Products = () => {
   };
 
   useEffect(() => {
-    console.log(isReady)
-  }, [isReady])
+    console.log(isVideoPlayerReady);
+  }, [isVideoPlayerReady]);
 
   useEffect(() => {
     const timer =
@@ -57,7 +64,7 @@ const Products = () => {
     }
   }, [beforeClick, counter]);
 
-  function handleTransform(current: number) {
+  function handleTabSelectionChange(current: number) {
     let targetSize = 0;
 
     if (beforeClick < current) {
@@ -79,6 +86,7 @@ const Products = () => {
       });
     }
     setBeforeClick(current);
+    setIsVideoPlayerReady(false);
     setCounter(3);
   }
 
@@ -103,7 +111,7 @@ const Products = () => {
                   <List
                     gradient={beforeClick === i ? item.gradient : "#F1F1F1"}
                     onClick={e => {
-                      handleTransform(i);
+                      handleTabSelectionChange(i);
                     }}
                     ref={elRefs.current[i]}
                   >
@@ -115,9 +123,29 @@ const Products = () => {
           </RowFrame>
         </Container>
       </SectionLayout>
-      <SectionLayout variant="content-overflow-1" inherit={false} alignContent="center">
-        <VideoWrapper width={["95%", "95%", "100%", "100%"]} height="700px" mt="50px" mx={["20px", "20px", 0, 0]} >
-          <ReactPlayer onReady={() => setIsReady(true)} url={PRODUCT_LIST[beforeClick].path} loop playing />
+      <SectionLayout
+        variant="content-overflow-1"
+        inherit={false}
+        alignContent="center"
+      >
+        <VideoWrapper
+          width={["95%", "95%", "100%", "100%"]}
+          height="700px"
+          mt="50px"
+          mx={["20px", "20px", 0, 0]}
+        >
+          <motion.div
+            variants={videoPlayerMotionAnimationVariants}
+            animate={isVideoPlayerReady ? "loaded" : "loading"}
+          >
+            <ReactPlayer
+              onReady={() => setIsVideoPlayerReady(true)}
+              onEnded={() => setIsVideoPlayerReady(true)}
+              url={PRODUCT_LIST[beforeClick].path}
+              loop
+              playing
+            />
+          </motion.div>
         </VideoWrapper>
       </SectionLayout>
       <Heading fontSize="18px" mt="40px">
@@ -126,6 +154,7 @@ const Products = () => {
       <Description fontSize={["21px", "21px", "21px", "24px"]}>
         {PRODUCT_LIST[beforeClick].desc}
       </Description>
+      {/* todo: temprarily disabled */}
       {/* <BlankArea height={30} />
       <More>See also</More>
       <MoreLists>
@@ -153,12 +182,11 @@ const Products = () => {
 export default Products;
 
 const VideoWrapper = styled(Flex)`
-
   div {
     width: 100% !important;
     height: 100% !important;
   }
-`
+`;
 
 const More = styled(Text)`
   padding-bottom: 8px;
