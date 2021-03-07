@@ -12,7 +12,9 @@ const Products = () => {
   return (
     <SectionLayout alignContent="start" >
       <Heading fontSize={["32px", "64px", "64px", "80px"]}>Your design is your</Heading>
-      <GradientRowList />
+      <SectionLayout variant="content-overflow-1" inherit={false} alignContent="center">
+        <GradientRowList />
+      </SectionLayout>
       <SectionLayout variant="content-overflow-1" inherit={false} alignContent="center">
         <Flex width="95%" height="700px" bg="#000" mt="50px" mx="20px" />
       </SectionLayout>

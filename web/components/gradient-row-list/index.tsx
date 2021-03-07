@@ -2,13 +2,15 @@ import styled from "@emotion/styled";
 import { motion, useTransform, useMotionValue } from "framer-motion";
 import React, { useState, useEffect, createRef } from "react";
 import { Flex, Heading } from "rebass";
+import { media } from "utils/styled/media";
+import { ThemeInterface } from "utils/styled/theme";
 
 const GradientRowList = () => {
   const [x, setX] = useState<number>(0);
   const [beforeClick, setBeforeClick] = useState<number>(0);
   const elRefs = React.useRef([]);
   let elWidth = [];
-  const contents = ["code", "server", "translations", "insight"];
+  const contents = ["code", "server", "translations", "insight", "GIT", "everything"];
   const spring = {
     type: "spring",
     stiffness: 700,
@@ -19,7 +21,7 @@ const GradientRowList = () => {
     elRefs.current = Array(contents.length)
       .fill(null)
       .map((_, i) => elRefs.current[i] || createRef());
-    console.log(elRefs);
+    // console.log("useEffect []", elRefs);
   }, []);
 
   useEffect(() => {
@@ -28,19 +30,23 @@ const GradientRowList = () => {
         innerElRef => innerElRef.current.offsetWidth,
       );
     }
-    console.log(elWidth);
+    // console.log("useEffect [beforeClick]", elWidth);
   }, [beforeClick]);
 
   function handleTransform(current: number) {
     if (beforeClick < current) {
       elWidth.map((size, elInedx) => {
-        if (current > elInedx) {
+        if (current == 0) { 
+          setX(0)
+        } else if (current > elInedx) {
           setX(x - size);
         }
       });
     } else if (beforeClick > current) {
       elWidth.map((size, elInedx) => {
-        if (current < elInedx) {
+        if (current == 0) { 
+          setX(0)
+        } else if (current == elInedx) {
           setX(x + size);
         }
       });
@@ -76,10 +82,45 @@ const Container = styled(Flex)`
   position: relative;
   width: 100%;
   height: 100px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  margin: auto;
+
+  &:before {
+    left: 0;
+    background: linear-gradient(90deg,#fff,hsla(0,0%,100%,0));
+    content: "";
+    top: 0;
+    width: 8%;
+    height: 100%;
+    position: absolute;
+    z-index: 100;
+    pointer-events: none;
+  }
+
+  &:after {
+    right: 0;
+    background: linear-gradient(90deg,hsla(0,0%,100%,0),#fff);
+    content: "";
+    top: 0;
+    width: 8%;
+    height: 100%;
+    position: absolute;
+    z-index: 100;
+    pointer-events: none;
+  }
 `;
 
 const RowFrame = styled(motion.div)`
   display: flex;
+  width: 80%;
+
+  ${props => media("0px", (props.theme as ThemeInterface).breakpoints[2])} {
+    width: 95%;
+  }
+  
   cursor: pointer;
 
   &[data-isOn="true"] {
@@ -94,7 +135,6 @@ const List = styled.span`
   background: linear-gradient(30deg, #0567fa, #c561ff);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
-
   &:first-child {
     padding-left: 0;
   }
