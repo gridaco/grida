@@ -59,6 +59,7 @@ const Popup = (props: PopupProps) => {
   return (
     <ModalBackground onClick={onClose}>
       <Modal
+        width={info.width || "90%"}
         // p={["10px", "10px", "15px 30px"]}
         // bg="white"
         // borderColor="gray30"
