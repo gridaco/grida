@@ -17,9 +17,9 @@ import Popup from "components/popup";
 const MyApp = ({ Component, pageProps }: AppProps) => {
   const router = useRouter();
 
-  useEffect(() => {
-    Fonts();
-  }, [router.events, router.pathname]);
+  // useEffect(() => {
+  //   Fonts();
+  // }, [router.events, router.pathname]);
 
   const renderPopups = () => {
     return (
@@ -106,11 +106,20 @@ const MyApp = ({ Component, pageProps }: AppProps) => {
           content="bridged.xyz team and community collaborators"
         />
         <link rel="icon" href="/favicon.png" />
-        <link
-          href="https://fonts.googleapis.com/css?family=Roboto:400,100,300,100italic,300italic,400italic,500italic,500,700,700italic,900,900italic"
-          rel="stylesheet"
-          type="text/css"
-        />
+
+        {/* <!-- connect to domain of font files --> */}
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+
+        {/* <!-- optionally increase loading priority --> */}
+        <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Roboto:ital,wght@0,100;0,300;0,400;0,500;0,700;0,900;1,100;1,300;1,400;1,500;1,700;1,900&" />        
+
+        {/* <!-- async CSS --> */}
+        <link rel="stylesheet" media="print" href="https://fonts.googleapis.com/css2?family=Roboto:ital,wght@0,100;0,300;0,400;0,500;0,700;0,900;1,100;1,300;1,400;1,500;1,700;1,900&" />       
+
+        {/* <!-- no-JS fallback --> */}
+        <noscript>
+            <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:ital,wght@0,100;0,300;0,400;0,500;0,700;0,900;1,100;1,300;1,400;1,500;1,700;1,900&" />
+        </noscript>
       </Head>
       <div
         css={css`
