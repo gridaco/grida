@@ -3,6 +3,7 @@ import SectionLayout from 'layout/section'
 import React from 'react'
 import { Button, Flex, Heading } from 'rebass'
 import styled from '@emotion/styled';
+import LandingMainCtaButton from 'components/landingpage/main-cta-button';
 
 
 const Slogan = () => {
@@ -13,7 +14,7 @@ const Slogan = () => {
         <SloganText fontSize={["32px", "64px", "64px", "80px"]}>
           <Icon name="bridged" width={[32, 64]} height={[32, 64]} isVerticalMiddle mr={[12, 28]} /> will do the rest
         </SloganText>
-        <Button mt={["32px", "90px", "90px", "90px"]}>Start now</Button>
+        <LandingMainCtaButton/>
       </Flex>
     </SectionLayout>
   )

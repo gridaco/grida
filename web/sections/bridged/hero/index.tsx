@@ -6,6 +6,7 @@ import BlankArea from 'components/blank-area';
 import { ElevatedVideoPlayer } from 'components/effect';
 import { media } from 'utils/styled/media';
 import { ThemeInterface } from 'utils/styled/theme';
+import LandingMainCtaButton from 'components/landingpage/main-cta-button';
 
 const Hero = () => {
   return (
@@ -13,7 +14,7 @@ const Hero = () => {
       <BlankArea height={75} />
       <HeroText fontSize={["32px", "64px", "64px", "80px"]}>Designs that are meant to be implemented.</HeroText>
       <Description fontSize={["21px", "21px", "21px", "24px"]}>Make twice no more. All you’ll ever need for frontend development. A hackable tool that's designed for hackers.</Description>
-      <Button mt={["32px", "90px", "90px", "90px"]} mb="50px">Start now</Button>
+      <LandingMainCtaButton/>
 
       <ElevatedVideoPlayer />
       
