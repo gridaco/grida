@@ -121,7 +121,7 @@ const Products = () => {
       <Description fontSize={["21px", "21px", "21px", "24px"]}>
         {PRODUCT_LIST[beforeClick].desc}
       </Description>
-      <BlankArea height={30} />
+      {/* <BlankArea height={30} />
       <More>See also</More>
       <MoreLists>
         <Link href="/">
@@ -139,7 +139,7 @@ const Products = () => {
         <Link href="/">
           <span>everything</span>
         </Link>
-      </MoreLists>
+      </MoreLists> */}
       <BlankArea height={150} />
     </SectionLayout>
   );
