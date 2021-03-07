@@ -44,7 +44,7 @@ function ElevatedVideoPlayer() {
   return (
     <Frame style={{ scale }}>
       <div className="youtube-thumbnail">
-        <Image src="https://img.youtube.com/vi/RIZjZFoDhRc/maxresdefault.jpg" width="auto" height="auto" />
+        <Image src="https://img.youtube.com/vi/RIZjZFoDhRc/maxresdefault.jpg" alt="thumbnail" width="auto" height="auto" />
       </div>
       {/* play button click motion */}
       <PlayButtonFrame whileTap={{ scale: 0.9 }} whileHover={{ scale: 1.1 }} onClick={handleClickLogin}>
