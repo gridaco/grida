@@ -15,7 +15,7 @@ const Collaborate = () => {
         <SyncIcon name="loading" mr="10px" />
         <Heading fontSize={["32px", "64px"]} dangerouslySetInnerHTML={{ __html: "Collaborate<br/>as the<br/>way it should be" }} />
       </Flex>
-      <Description fontSize={["21px", "21px", "21px", "24px"]}>
+      <Description fontSize={["21px", "21px", "21px", "24px"]} mx="20px">
         Create your products effecient, fast, and the way it makes sence liike never befor. //Using prototyping tools. Once modified, your work gets broken... Who wants that? Design with Bridged, which lasts. Designed your screen, connected a button, watched it work on your phone. But production? That’s just starting from scratch
       </Description>
       <BlankArea height={50} />
