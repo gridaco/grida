@@ -89,6 +89,10 @@ const MyApp = ({ Component, pageProps }: AppProps) => {
           button {
             outline: none;
           }
+
+          * {
+            font-family: 'Roboto', sans-serif;
+          }
         `}
       />
       <Head>
