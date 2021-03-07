@@ -32,16 +32,12 @@ const Products = () => {
   };
 
   useEffect(() => {
-    console.log(isVideoPlayerReady);
-  }, [isVideoPlayerReady]);
-
-  useEffect(() => {
     const timer =
       counter >= 0 &&
       setInterval(() => {
         if (counter === 0) {
-          setX(0);
-          setBeforeClick(0);
+          // setX(0);
+          // setBeforeClick(0);
         } else {
           setCounter(counter - 1);
         }
@@ -144,6 +140,7 @@ const Products = () => {
               url={PRODUCT_LIST[beforeClick].path}
               loop
               playing
+              muted
             />
           </motion.div>
         </VideoWrapper>
