@@ -1,36 +1,36 @@
-import React, { useState, useEffect, createRef } from 'react'
-import SectionLayout from 'layout/section'
-import { Flex, Heading, Text } from 'rebass'
-import styled from '@emotion/styled';
-import { media } from 'utils/styled/media';
-import BlankArea from 'components/blank-area';
-import { ThemeInterface } from 'utils/styled/theme';
-import Link from 'next/link';
+import React, { useState, useEffect, createRef } from "react";
+import SectionLayout from "layout/section";
+import { Flex, Heading, Text } from "rebass";
+import styled from "@emotion/styled";
+import { media } from "utils/styled/media";
+import BlankArea from "components/blank-area";
+import { ThemeInterface } from "utils/styled/theme";
+import Link from "next/link";
 import { motion } from "framer-motion";
-import { PRODUCT_LIST } from 'utils/landingpage/constants';
+import { PRODUCT_LIST } from "utils/landingpage/constants";
 
 const Products = () => {
   const [x, setX] = useState<number>(0);
   const [beforeClick, setBeforeClick] = useState<number>(0);
-  const [counter, setCounter] = useState(1)
-
+  const [counter, setCounter] = useState(1);
 
   const elRefs = React.useRef([]);
   let elWidth = [];
   const spring = {
     type: "spring",
-    stiffness: 700,
-    damping: 30,
+    stiffness: 200,
+    damping: 25,
   };
 
   useEffect(() => {
     const timer =
-      counter >= 0 && setInterval(() => {
+      counter >= 0 &&
+      setInterval(() => {
         if (counter === 0) {
           setX(0);
-          setBeforeClick(0)
+          setBeforeClick(0);
         } else {
-          setCounter(counter - 1)
+          setCounter(counter - 1);
         }
       }, 1000);
     return () => clearInterval(timer);
@@ -57,7 +57,7 @@ const Products = () => {
     if (beforeClick < current) {
       elWidth.map((size, elIndex) => {
         if (current == 0) {
-          setX(0)
+          setX(0);
         } else if (current > elIndex) {
           targetSize += size;
         }
@@ -66,23 +66,32 @@ const Products = () => {
     } else if (beforeClick > current) {
       elWidth.map((size, elInedx) => {
         if (current == 0) {
-          setX(0)
+          setX(0);
         } else if (current == elInedx) {
           setX(x + size);
         }
       });
     }
     setBeforeClick(current);
-    setCounter(3)
+    setCounter(3);
   }
 
   return (
-    <SectionLayout alignContent="start" >
-      <Heading fontSize={["32px", "64px", "64px", "80px"]}>Your design is your</Heading>
-      <SectionLayout variant="content-overflow-1" inherit={false} alignContent="center">
+    <SectionLayout alignContent="start">
+      <Heading fontSize={["32px", "64px", "64px", "80px"]}>
+        Your design is your
+      </Heading>
+      <SectionLayout
+        variant="content-overflow-1"
+        inherit={false}
+        alignContent="center"
+      >
         <Container>
           <RowFrame animate={{ x: x }} transition={spring}>
-            <Heading fontSize={["32px", "64px", "64px", "80px"]} className="no-drag">
+            <Heading
+              fontSize={["32px", "64px", "64px", "80px"]}
+              className="no-drag"
+            >
               {PRODUCT_LIST.map((item, i) => {
                 return (
                   <List
@@ -100,11 +109,25 @@ const Products = () => {
           </RowFrame>
         </Container>
       </SectionLayout>
-      <SectionLayout variant="content-overflow-1" inherit={false} alignContent="center">
-        <Flex width={["95%", "95%", "100%", "100%"]} height="700px" bg="#000" mt="50px" mx={["20px", "20px", 0, 0]} />
+      <SectionLayout
+        variant="content-overflow-1"
+        inherit={false}
+        alignContent="center"
+      >
+        <Flex
+          width={["95%", "95%", "100%", "100%"]}
+          height="700px"
+          bg="#000"
+          mt="50px"
+          mx={["20px", "20px", 0, 0]}
+        />
       </SectionLayout>
-      <Heading fontSize="18px" mt="40px">{PRODUCT_LIST[beforeClick].subTitle}</Heading>
-      <Description fontSize={["21px", "21px", "21px", "24px"]}>{PRODUCT_LIST[beforeClick].desc}</Description>
+      <Heading fontSize="18px" mt="40px">
+        {PRODUCT_LIST[beforeClick].subTitle}
+      </Heading>
+      <Description fontSize={["21px", "21px", "21px", "24px"]}>
+        {PRODUCT_LIST[beforeClick].desc}
+      </Description>
       <BlankArea height={30} />
       <More>See also</More>
       <MoreLists>
@@ -126,30 +149,30 @@ const Products = () => {
       </MoreLists>
       <BlankArea height={150} />
     </SectionLayout>
-  )
-}
+  );
+};
 
-export default Products
+export default Products;
 
 const More = styled(Text)`
   padding-bottom: 8px;
   border-bottom: 2px solid black;
-`
+`;
 
 const MoreLists = styled(Flex)`
   margin-top: 10px;
-  
-  span {
-        margin-right: 24px;
-        font-size: 18px;
-        color: #AEAEAE;
-    }
 
-    @media (max-width: 767px) {
-        overflow-x: auto;
-        width: 100%;
-    }
-`
+  span {
+    margin-right: 24px;
+    font-size: 18px;
+    color: #aeaeae;
+  }
+
+  @media (max-width: 767px) {
+    overflow-x: auto;
+    width: 100%;
+  }
+`;
 
 const Description = styled(Text)`
   max-width: 780px;
@@ -159,7 +182,7 @@ const Description = styled(Text)`
   ${props => media("0px", (props.theme as ThemeInterface).breakpoints[0])} {
     max-width: 280px;
   }
-`
+`;
 
 const Container = styled(Flex)`
   position: relative;
@@ -173,7 +196,7 @@ const Container = styled(Flex)`
 
   &:before {
     left: 0;
-    background: linear-gradient(90deg,#fff,hsla(0,0%,100%,0));
+    background: linear-gradient(90deg, #fff, hsla(0, 0%, 100%, 0));
     content: "";
     top: 0;
     width: 8%;
@@ -185,7 +208,7 @@ const Container = styled(Flex)`
 
   &:after {
     right: 0;
-    background: linear-gradient(90deg,hsla(0,0%,100%,0),#fff);
+    background: linear-gradient(90deg, hsla(0, 0%, 100%, 0), #fff);
     content: "";
     top: 0;
     width: 8%;
@@ -203,7 +226,7 @@ const RowFrame = styled(motion.div)`
   ${props => media("0px", (props.theme as ThemeInterface).breakpoints[2])} {
     width: 95%;
   }
-  
+
   cursor: pointer;
 
   &[data-isOn="true"] {
@@ -230,7 +253,11 @@ const List = styled.span<{ gradient: string }>`
     }
   }
 
-  ${props => media((props.theme as ThemeInterface).breakpoints[0], (props.theme as ThemeInterface).breakpoints[1])} {
+  ${props =>
+    media(
+      (props.theme as ThemeInterface).breakpoints[0],
+      (props.theme as ThemeInterface).breakpoints[1],
+    )} {
     &:first-child {
       padding-left: 1%;
     }
