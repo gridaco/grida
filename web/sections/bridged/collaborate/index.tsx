@@ -65,12 +65,12 @@ const SyncIcon = styled(Icon)`
 
 const Description = styled(Text)`
   margin-top: 36px;
-  max-width: 525px;
   color: #444545;
   margin-left: 120px;
+  max-width: 525px;
 
   ${props => media("0px", (props.theme as ThemeInterface).breakpoints[0])} {
-    max-width: 250px;
+    max-width: 100%;
     margin-left: 20px;
   }
 
