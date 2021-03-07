@@ -126,7 +126,6 @@ const Products = () => {
       >
         <VideoWrapper
           width={["95%", "95%", "100%", "100%"]}
-          height="700px"
           mt="50px"
           mx={["20px", "20px", 0, 0]}
         >
@@ -179,10 +178,25 @@ const Products = () => {
 export default Products;
 
 const VideoWrapper = styled(Flex)`
+  height: 700px;
+
   div {
     width: 100% !important;
     height: 100% !important;
   }
+
+  ${props => media("0px", (props.theme as ThemeInterface).breakpoints[0])} {
+    height: 350px;
+  }
+  
+  ${props => media((props.theme as ThemeInterface).breakpoints[0], (props.theme as ThemeInterface).breakpoints[1])} {
+    height: 500px;
+  }
+  
+  ${props => media((props.theme as ThemeInterface).breakpoints[1], (props.theme as ThemeInterface).breakpoints[2])} {
+    height: 700px;
+  }
+
 `;
 
 const More = styled(Text)`
