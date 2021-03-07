@@ -15,6 +15,13 @@ const ApplicationPreview = () => {
       />
       <Preview>
         {/* <AppUI /> */}
+        <Image
+          className="app"
+          src="/assets/source.png"
+          width="390"
+          height="788"
+          alt="frame_iphone"
+        />
       </Preview>
     </Postioner>
   )
@@ -26,12 +33,12 @@ const Postioner = styled(Flex)`
   position: relative;
   align-items: center;
   justify-content: center;
+  z-index: 1;
 `
 
 const Preview = styled(Flex)`
   width: 90%;
   height: 95%;
   position: absolute;
-  background-color: red;
   border-radius: 30px;
 `
