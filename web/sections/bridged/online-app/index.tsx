@@ -33,7 +33,7 @@ const OnlineApp: React.FC<OnlineAppProps> = ({ isMobile }) => {
       <DesignToCode />
       <BlankArea height={150} />
       <Flex justifyContent={["center", "space-between", "space-between", "space-between"]} width="100%">
-        <Flex flexDirection="column" width="100%">
+        <Flex flexDirection="column" width="100%" mr="40px">
           <BlankArea height={75} />
           <Text fontSize="24px" mb="15px">What you’ve just sketched?</Text>
           <OnlineTitle fontSize={["32px", "36px", "36px", "36px"]}>
