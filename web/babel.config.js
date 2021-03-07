@@ -10,6 +10,7 @@ module.exports = {
                     utils: "./utils",
                     layouts: "./layouts",
                     pages: "./pages",
+                    common: "./common",
                     public: "./public",
                 },
             },
