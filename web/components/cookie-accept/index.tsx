@@ -1,11 +1,14 @@
 import React from "react";
 import styled from "@emotion/styled";
 import { Flex } from "rebass";
+import SectionLayout from "layouts/section";
+import BlankArea from "components/blank-area";
 
 const CookieAccept: React.FC = () => {
   return (
     <Positioner>
-      <Wrapper width={["100%", "728px", "984px", "1040px"]} px="20px">
+      <BlankArea height={24} />
+      <SectionLayout variant="content-default" alignContent="center">
         <Desc>
           This website stores cookies on your browser. These cookies are used to
           improve your website experience and provide more personalized services
@@ -19,7 +22,7 @@ const CookieAccept: React.FC = () => {
           <Button isAccept={true}>Accept</Button>
           <Button isAccept={false}>Decline</Button>
         </BtnArea>
-      </Wrapper>
+      </SectionLayout>
     </Positioner>
   );
 };
@@ -42,14 +45,6 @@ const Positioner = styled.div`
   display: flex;
   align-items: center;
   flex-direction: column;
-`;
-
-const Wrapper = styled(Flex)`
-  height: 107px;
-  margin-top: 36px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
 `;
 
 const Desc = styled.div`
