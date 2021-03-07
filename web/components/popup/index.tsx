@@ -133,6 +133,7 @@ const Modal = styled(Box)`
   top: 50%;
   left: 50%;
   max-width: 1240px;
+  max-height: 690px;
   /* max-height: ${props => (props.height ? "initial" : "70%")}; */
   overflow-y: scroll;
   /* border: 1px solid; */
