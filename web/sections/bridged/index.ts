@@ -1,5 +1,5 @@
 import Hero from './hero';
-import DesignToCode from './design-code';
+import DesignToCode from './online-app/design-code';
 import OnlineApp from './online-app';
 import LayoutDetect from './layout-detect';
 import Products from './products';

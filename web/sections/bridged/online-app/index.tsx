@@ -10,6 +10,7 @@ import { LandingpageUrls } from 'utils/landingpage/constants';
 import OnairButton from 'components/effect/onair-button';
 import ApplicationPreview from 'layout/application-preview';
 import { DesktopView, MobileView } from 'utils/styled/styles';
+import { DesignToCode } from '..';
 import Image from 'next/image';
 
 interface OnlineAppProps {
@@ -29,6 +30,7 @@ const OnlineApp: React.FC<OnlineAppProps> = ({ isMobile }) => {
 
   return (
     <SectionLayout alignContent="start" backgroundColor="rgba(0,0,0,0)">
+      <DesignToCode />
       <BlankArea height={150} />
       <Flex justifyContent="space-between" width="100%">
         <Flex flexDirection="column">

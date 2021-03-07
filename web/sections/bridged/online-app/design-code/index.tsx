@@ -3,14 +3,14 @@ import SectionLayout from 'layout/section'
 import { Box, Flex, Heading, Text } from 'rebass'
 import styled from '@emotion/styled';
 import { media } from 'utils/styled/media';
-import BlankArea from 'components/blank-area';
 import { ThemeInterface } from 'utils/styled/theme';
 import DesignPlatforms from 'layout/design-platforms';
 import CodePreview from 'layout/code-preview';
+import BlankArea from 'components/blank-area';
 
 const DesignToCode = () => {
   return (
-    <SectionLayout alignContent="start" >
+    <SectionLayout alignContent="start" backgroundColor="rgba(0,0,0,0)">
       <Heading fontSize={["32px", "64px", "64px", "80px"]}>Designs,</Heading>
       <Heading fontSize={["32px", "64px", "64px", "80px"]}>come to live</Heading>
       <Description fontSize={["18px", "24px", "24px", "24px"]}>Keep you design live, not as a prototype, but as a product. Instantly convert your design to code, prototype, product within a click. No coding required</Description>
