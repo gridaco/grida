@@ -1,6 +1,12 @@
+const MVP_SIGNUP_TYPEFORM_URL =
+  'https://woojooj.typeform.com/to/uyTSms5Q';
 export const LandingpageUrls = {
     login: "https://accounts.bridged.xyz/",
-    signup: "https://accounts.bridged.xyz/signup",
+
+    // todo region swap sign up when ready
+    signup: MVP_SIGNUP_TYPEFORM_URL,
+    // signup: "https://accounts.bridged.xyz/signup",
+    // todo endregion swap sign up when ready
 
     // video
     latest_promotion_video_youtube: "https://www.youtube.com/watch?v=RIZjZFoDhRc&ab_channel=Bridged",
