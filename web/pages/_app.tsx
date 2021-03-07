@@ -38,6 +38,14 @@ const MyApp = ({ Component, pageProps }: AppProps) => {
             }
           }
 
+          .cursor {
+            cursor: pointer;
+          }
+
+          .no-drag {
+            user-select:none;
+          }
+
           input {
             box-sizing: border-box;
           }

@@ -41,7 +41,7 @@ const OnlineApp: React.FC<OnlineAppProps> = ({ isMobile }) => {
           </OnlineTitle>
           <MobileView style={{ marginTop: 40, position: "relative" }}>
             <ApplicationPreview />
-            <div className="gradient-view">
+            <div className="gradient-view no-drag">
               <Image src="/assets/mobile/mobile-gradient-blur-xs.png" alt="gradient" width="768" height="520" />
             </div>
           </MobileView>
@@ -60,7 +60,7 @@ const OnlineApp: React.FC<OnlineAppProps> = ({ isMobile }) => {
         </Flex>
         <DesktopView style={{ position: "relative"}}>
           <ApplicationPreview />
-          <div className="gradient-view">
+          <div className="gradient-view no-drag">
             <Image src={assetUrl} alt="gradient" width="1040" height="1027" />
           </div>
         </DesktopView>

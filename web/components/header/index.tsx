@@ -164,7 +164,8 @@ const Bridged = styled(Icon)`
 
 const Item = styled(Text)`
 
-	${props => media(null, (props.theme as ThemeInterface).breakpoints[0])} {
+
+	${props => media((props.theme as ThemeInterface).breakpoints[0], null)} {
     &:hover{
 			color:#000;
 		}

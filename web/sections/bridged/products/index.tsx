@@ -79,7 +79,7 @@ const Products = () => {
       <SectionLayout variant="content-overflow-1" inherit={false} alignContent="center">
         <Container>
           <RowFrame animate={{ x: x }} transition={spring}>
-            <Heading fontSize={["32px", "64px", "64px", "80px"]}>
+            <Heading fontSize={["32px", "64px", "64px", "80px"]} className="no-drag">
               {PRODUCT_LIST.map((item, i) => {
                 return (
                   <List
