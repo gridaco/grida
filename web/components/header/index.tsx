@@ -24,7 +24,7 @@ const Header = () => {
 
 	const handleClickMenu = useCallback(() => setIsOpenMenu(!isOpenMenu), [isOpenMenu])
 
-	const onClickExpandHeader = useCallback((title: string) => 	setCurrentExpandHeader(title), [])
+	const onClickExpandHeader = useCallback((title: string) => setCurrentExpandHeader(title), [])
 
 	return (
 		<HeaderWrapper>
@@ -60,19 +60,19 @@ const Header = () => {
 									onContractHeader={() => onClickExpandHeader("")}
 								/>
 							) : (
-									<Link href={i.href} key={i.label}>
-										<Item
-											onMouseOver={() => onClickExpandHeader("")}
-											className="cursor"
-											mx="12px"
-											color="#8B8B8B"
-											fontWeight="bold"
-											fontSize="16px"
-										>
-											{i.label}
-										</Item>
-									</Link>
-								),
+								<Link href={i.href} key={i.label}>
+									<Item
+										onMouseOver={() => onClickExpandHeader("")}
+										className="cursor"
+										mx="12px"
+										color="#8B8B8B"
+										fontWeight="bold"
+										fontSize="16px"
+									>
+										{i.label}
+									</Item>
+								</Link>
+							),
 						)}
 					</NavigationWrapper>
 				</Flex>
@@ -100,7 +100,7 @@ const Header = () => {
 					pb="24px"
 					flexDirection="column"
 				>
-					
+
 					<Flex mt="24px" flexDirection="column">
 						{HeaderMap.map(i =>
 							!i.href ? (
@@ -113,18 +113,18 @@ const Header = () => {
 									onContractHeader={() => onClickExpandHeader("")}
 								/>
 							) : (
-									<Link href={i.href} key={i.label}>
-										<Item
-											className="cursor"
-											my="12px"
-											color="#8B8B8B"
-											fontWeight="bold"
-											fontSize="16px"
-										>
-											{i.label}
-										</Item>
-									</Link>
-								),
+								<Link href={i.href} key={i.label}>
+									<Item
+										className="cursor"
+										my="12px"
+										color="#8B8B8B"
+										fontWeight="bold"
+										fontSize="16px"
+									>
+										{i.label}
+									</Item>
+								</Link>
+							),
 						)}
 					</Flex>
 
@@ -165,11 +165,9 @@ const Bridged = styled(Icon)`
 const Item = styled(Text)`
 
 
-	${props => media((props.theme as ThemeInterface).breakpoints[0], null)} {
-    &:hover{
-			color:#000;
-		}
-  }
+  &:hover{
+		color:#000;
+	}
 `
 
 const SignupButton = styled(Button)`
