@@ -1,7 +1,7 @@
 const MVP_SIGNUP_TYPEFORM_URL =
   'https://woojooj.typeform.com/to/uyTSms5Q';
 export const LandingpageUrls = {
-    login: "https://accounts.bridged.xyz/",
+    signin: "https://accounts.bridged.xyz/",
 
     // todo region swap sign up when ready
     signup: MVP_SIGNUP_TYPEFORM_URL,

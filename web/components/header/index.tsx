@@ -36,6 +36,10 @@ const Header = () => {
     open(URLS.landing.signup);
   };
 
+  const handleSigninClick = () => {
+    !isOpenMenu && window.location.assign(URLS.landing.signin);
+  };
+
   return (
     <HeaderWrapper>
       <Flex
@@ -164,7 +168,7 @@ const Header = () => {
               height="35px"
               fontSize="13px"
               style={center}
-              onClick={() => window.location.assign(LandingpageUrls.login)}
+              onClick={handleSigninClick}
             >
               <Icon name="lock" isVerticalMiddle mr="6px" /> Sign in
             </Button>
