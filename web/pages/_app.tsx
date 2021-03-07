@@ -3,6 +3,7 @@ import { ThemeProvider } from "emotion-theming";
 import { AppProps } from "next/app";
 import Head from "next/head";
 import React, { useEffect } from "react";
+import { CookiesProvider } from "react-cookie"
 
 import Footer from "components/footer";
 import Header from "components/header";
@@ -112,7 +113,9 @@ const Providers = ({
   children: React.ReactNode;
 }) => {
   return (
-    <ThemeProvider theme={defaultTheme}>{children}</ThemeProvider>
+    <CookiesProvider>
+      <ThemeProvider theme={defaultTheme}>{children}</ThemeProvider>
+    </CookiesProvider>
   );
 };
 
