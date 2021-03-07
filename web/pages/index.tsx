@@ -1,6 +1,7 @@
 import React from 'react'
 import { BridgedSection } from 'common/toolkit';
 import { NextPage, NextPageContext } from 'next';
+import CookieAccept from 'components/cookie-accept';
 interface MainPageAppProps {
   isMobileView: boolean
 }
@@ -10,6 +11,7 @@ const MainPage : NextPage<MainPageAppProps> = ({ isMobileView }) => {
   return (
     <React.Fragment>
       {BridgedSection.map((item) => item.content(isMobileView) )}
+      {/* <CookieAccept /> */}
     </React.Fragment>
   )
 }

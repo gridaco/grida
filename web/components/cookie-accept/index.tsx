@@ -45,6 +45,7 @@ const Positioner = styled.div`
   display: flex;
   align-items: center;
   flex-direction: column;
+  box-shadow: 0px 4px 4px rgba(0, 0, 0, 0.25);
 `;
 
 const Desc = styled.div`
