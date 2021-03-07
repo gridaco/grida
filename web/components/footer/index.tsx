@@ -105,7 +105,7 @@ const FooterBottom = styled(Flex)`
       margin-top: 20px;
       display: grid;
       grid-template-rows: repeat(3, 20px);
-      grid-template-columns: repeat(2, 120px);
+      grid-template-columns: repeat(2, 80px);
       grid-template-areas:
       "span span ."
       "span . .";
