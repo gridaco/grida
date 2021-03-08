@@ -22,9 +22,9 @@ function DocsNavigationSection(props: { route: DocsRoute; level?: number }) {
         {routeConfig.routes &&
           routeConfig.routes.map((i, ix) =>
             i.routes ? (
-              <DocsNavigationSection route={i} level={level + 1} />
+              <DocsNavigationSection route={i} level={level + 1} key={ix} />
             ) : (
-              <Link href={i.path}>
+              <Link href={i.path} key={ix}>
                 <Heading fontSize="16px" fontWeight={400}>
                   {i.title}
                 </Heading>

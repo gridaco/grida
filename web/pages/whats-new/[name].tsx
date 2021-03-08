@@ -48,7 +48,7 @@ const UpdateNoteDetail = () => {
       <Flex style={center}>
         <Flex width={["320px", "730px", "985px", "1040px"]} flexDirection="column" mx="20px" mb="20px">
           <WhatsNewHeaderLabel installUrl={releases[0]?.html_url} label={name} />
-          {releases.map(i => <WhatsNewReleaseNote release={i} />)}
+          {releases.map(i => <WhatsNewReleaseNote release={i} key={i.id} />)}
         </Flex>
       </Flex>
     </React.Fragment>

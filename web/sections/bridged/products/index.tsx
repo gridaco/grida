@@ -105,6 +105,7 @@ const Products = () => {
               {PRODUCT_LIST.map((item, i) => {
                 return (
                   <List
+                    key={i}
                     gradient={beforeClick === i ? item.gradient : "#F1F1F1"}
                     onClick={e => {
                       handleTabSelectionChange(i);

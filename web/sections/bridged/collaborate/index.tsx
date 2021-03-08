@@ -30,7 +30,7 @@ const Collaborate = () => {
             />
           </div>
           <div className="notifications">
-            {[...Array(3)].map((_, ix) => <div className="notification" style={{ right: 10 * ix, bottom: 10 * ix }}>
+            {[...Array(3)].map((_, ix) => <div key={ix} className="notification" style={{ right: 10 * ix, bottom: 10 * ix }}>
               <Image
                 key="notification"
                 src="/assets/notification.png"
