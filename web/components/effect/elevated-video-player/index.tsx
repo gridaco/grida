@@ -57,6 +57,7 @@ function ElevatedVideoPlayer() {
 }
 
 const Frame = styled(motion.div)`
+  position: relative;
   will-change: transform;
   background: #ffffff;
   /* landingpage/video-elevation */
@@ -72,7 +73,7 @@ const Frame = styled(motion.div)`
     width: 100%;
     height: 100%;
     border-radius: 24px;
-    
+
     div {
       width: 100% !important;
       height: 100% !important;

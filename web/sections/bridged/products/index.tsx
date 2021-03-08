@@ -22,9 +22,9 @@ const Products = () => {
   const [beforeClick, setBeforeClick] = useState<number>(0);
   const [counter, setCounter] = useState(1);
   const [isVideoPlayerReady, setIsVideoPlayerReady] = useState(false);
+  const [elWidth, setElWidth] = useState([]);
 
   const elRefs = React.useRef([]);
-  let elWidth = [];
   const spring = {
     type: "spring",
     stiffness: 200,
@@ -32,16 +32,7 @@ const Products = () => {
   };
 
   useEffect(() => {
-    const timer =
-      counter >= 0 &&
-      setInterval(() => {
-        if (counter === 0) {
-          // setX(0);
-          // setBeforeClick(0);
-        } else {
-          setCounter(counter - 1);
-        }
-      }, 1000);
+    const timer = counter >= 0 && setInterval(() => setCounter(counter - 1), 1000);
     return () => clearInterval(timer);
   }, [counter]);
 
@@ -49,20 +40,19 @@ const Products = () => {
     elRefs.current = Array(PRODUCT_LIST.length)
       .fill(null)
       .map((_, i) => elRefs.current[i] || createRef());
-    // console.log("useEffect []", elRefs);
   }, []);
 
   useEffect(() => {
     if (elRefs.current[0].current !== null) {
-      elWidth = elRefs.current.map(
+      setElWidth(elRefs.current.map(
         innerElRef => innerElRef.current.offsetWidth + 30,
-      );
+      ))
     }
   }, [beforeClick, counter]);
 
   function handleTabSelectionChange(current: number) {
     let targetSize = 0;
-
+    console.log(beforeClick, current)
     if (beforeClick < current) {
       elWidth.map((size, elIndex) => {
         if (current == 0) {
@@ -71,6 +61,7 @@ const Products = () => {
           targetSize += size;
         }
       });
+      console.log(targetSize)
       setX(-targetSize);
     } else if (beforeClick > current) {
       elWidth.map((size, elInedx) => {
@@ -83,7 +74,6 @@ const Products = () => {
     }
     setBeforeClick(current);
     setIsVideoPlayerReady(false);
-    setCounter(3);
   }
 
   return (
@@ -105,6 +95,7 @@ const Products = () => {
               {PRODUCT_LIST.map((item, i) => {
                 return (
                   <List
+                    key={i}
                     gradient={beforeClick === i ? item.gradient : "#F1F1F1"}
                     onClick={e => {
                       handleTabSelectionChange(i);
@@ -119,31 +110,25 @@ const Products = () => {
           </RowFrame>
         </Container>
       </SectionLayout>
-      <SectionLayout
-        variant="content-overflow-1"
-        inherit={false}
-        alignContent="center"
+      <VideoWrapper
+        width={["95%", "95%", "100%", "100%"]}
+        mt="50px"
+        mx={["20px", "20px", 0, 0]}
       >
-        <VideoWrapper
-          width={["95%", "95%", "100%", "100%"]}
-          mt="50px"
-          mx={["20px", "20px", 0, 0]}
+        <motion.div
+          variants={videoPlayerMotionAnimationVariants}
+          animate={isVideoPlayerReady ? "loaded" : "loading"}
         >
-          <motion.div
-            variants={videoPlayerMotionAnimationVariants}
-            animate={isVideoPlayerReady ? "loaded" : "loading"}
-          >
-            <ReactPlayer
-              onReady={() => setIsVideoPlayerReady(true)}
-              onEnded={() => setIsVideoPlayerReady(true)}
-              url={PRODUCT_LIST[beforeClick].path}
-              loop
-              playing
-              muted
-            />
-          </motion.div>
-        </VideoWrapper>
-      </SectionLayout>
+          <ReactPlayer
+            onReady={() => setIsVideoPlayerReady(true)}
+            onEnded={() => setIsVideoPlayerReady(true)}
+            url={PRODUCT_LIST[beforeClick].path}
+            loop
+            playing
+            muted
+          />
+        </motion.div>
+      </VideoWrapper>
       <Heading fontSize="18px" mt="40px">
         {PRODUCT_LIST[beforeClick].subTitle}
       </Heading>
@@ -266,7 +251,7 @@ const Container = styled(Flex)`
 
 const RowFrame = styled(motion.div)`
   display: flex;
-  width: 80%;
+  width: 80.5%;
 
   ${props => media("0px", (props.theme as ThemeInterface).breakpoints[2])} {
     width: 95%;
@@ -283,18 +268,18 @@ const RowFrame = styled(motion.div)`
 
 const List = styled.span<{ gradient: string }>`
   padding-left: 10px;
-  margin-left: 30px;
+  margin-left: 26px;
   background: ${p => p.gradient};
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
-  &:first-child {
+  &:first-of-type {
     margin-left: 0;
     padding-left: 0;
   }
 
   ${props => media("0px", (props.theme as ThemeInterface).breakpoints[0])} {
-    &:first-child {
-      padding-left: 10px;
+    &:first-of-type {
+      padding-left: 25px;
     }
   }
 
@@ -303,7 +288,7 @@ const List = styled.span<{ gradient: string }>`
       (props.theme as ThemeInterface).breakpoints[0],
       (props.theme as ThemeInterface).breakpoints[1],
     )} {
-    &:first-child {
+    &:first-of-type {
       padding-left: 1%;
     }
   }

@@ -48,6 +48,7 @@ const Collaborate = () => {
           <div className="notifications">
             {[...Array(3)].map((_, ix) => (
               <div
+                key={ix}
                 className="notification"
                 style={{ right: 10 * ix, bottom: 10 * ix }}
               >
@@ -162,10 +163,9 @@ const BackgroundImage = styled(Flex)`
     z-index: 2;
 
     div {
-      max-width: 350px !important;
-      max-height: 1040px;
+      max-width: 515px !important;
+      height: 1040px;
       width: 100% !important;
-      height: 100% !important;
     }
   }
 

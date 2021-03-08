@@ -30,7 +30,9 @@ const OnlineApp: React.FC<OnlineAppProps> = ({ isMobile }) => {
 
   return (
     <SectionLayout alignContent="start" backgroundColor="rgba(0,0,0,0)">
-      <DesignToCode />
+      <DisableMargin>
+        <DesignToCode />
+      </DisableMargin>
       <BlankArea height={150} />
       <Flex
         justifyContent={[
@@ -109,5 +111,11 @@ const Description = styled(Text)`
 
   ${props => media("0px", (props.theme as ThemeInterface).breakpoints[0])} {
     max-width: 100%;
+  }
+`;
+
+const DisableMargin = styled.div`
+  .content-default {
+    margin: 0px !important;
   }
 `;
