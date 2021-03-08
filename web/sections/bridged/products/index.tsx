@@ -22,9 +22,9 @@ const Products = () => {
   const [beforeClick, setBeforeClick] = useState<number>(0);
   const [counter, setCounter] = useState(1);
   const [isVideoPlayerReady, setIsVideoPlayerReady] = useState(false);
+  const [elWidth, setElWidth] = useState([]);
 
   const elRefs = React.useRef([]);
-  let elWidth = [];
   const spring = {
     type: "spring",
     stiffness: 200,
@@ -32,16 +32,7 @@ const Products = () => {
   };
 
   useEffect(() => {
-    const timer =
-      counter >= 0 &&
-      setInterval(() => {
-        if (counter === 0) {
-          // setX(0);
-          // setBeforeClick(0);
-        } else {
-          setCounter(counter - 1);
-        }
-      }, 1000);
+    const timer = counter >= 0 && setInterval(() => setCounter(counter - 1), 1000);
     return () => clearInterval(timer);
   }, [counter]);
 
@@ -49,20 +40,19 @@ const Products = () => {
     elRefs.current = Array(PRODUCT_LIST.length)
       .fill(null)
       .map((_, i) => elRefs.current[i] || createRef());
-    // console.log("useEffect []", elRefs);
   }, []);
 
   useEffect(() => {
     if (elRefs.current[0].current !== null) {
-      elWidth = elRefs.current.map(
+      setElWidth(elRefs.current.map(
         innerElRef => innerElRef.current.offsetWidth + 30,
-      );
+      ))
     }
   }, [beforeClick, counter]);
 
   function handleTabSelectionChange(current: number) {
     let targetSize = 0;
-
+    console.log(beforeClick, current)
     if (beforeClick < current) {
       elWidth.map((size, elIndex) => {
         if (current == 0) {
@@ -71,6 +61,7 @@ const Products = () => {
           targetSize += size;
         }
       });
+      console.log(targetSize)
       setX(-targetSize);
     } else if (beforeClick > current) {
       elWidth.map((size, elInedx) => {
@@ -83,7 +74,6 @@ const Products = () => {
     }
     setBeforeClick(current);
     setIsVideoPlayerReady(false);
-    setCounter(3);
   }
 
   return (
