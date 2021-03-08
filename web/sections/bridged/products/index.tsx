@@ -251,7 +251,7 @@ const Container = styled(Flex)`
 
 const RowFrame = styled(motion.div)`
   display: flex;
-  width: 80%;
+  width: 80.5%;
 
   ${props => media("0px", (props.theme as ThemeInterface).breakpoints[2])} {
     width: 95%;
@@ -268,7 +268,7 @@ const RowFrame = styled(motion.div)`
 
 const List = styled.span<{ gradient: string }>`
   padding-left: 10px;
-  margin-left: 30px;
+  margin-left: 26px;
   background: ${p => p.gradient};
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
@@ -279,7 +279,7 @@ const List = styled.span<{ gradient: string }>`
 
   ${props => media("0px", (props.theme as ThemeInterface).breakpoints[0])} {
     &:first-of-type {
-      padding-left: 10px;
+      padding-left: 25px;
     }
   }
 
