@@ -115,6 +115,7 @@ const Description = styled(Text)`
 
   ${props => media("0px", (props.theme as ThemeInterface).breakpoints[0])} {
     max-width: 100%;
+    line-height: 22px;
   }
 `;
 

@@ -65,6 +65,7 @@ const DetectTitle = styled(Heading)`
   ${props => media("0px", (props.theme as ThemeInterface).breakpoints[0])} {
     align-items: flex-start;
     flex-direction: column;
+    line-height: 98.1%;
   }
 `;
 
@@ -78,5 +79,6 @@ const Description = styled(Text)`
 
   ${props => media("0px", (props.theme as ThemeInterface).breakpoints[0])} {
     max-width: 100%;
+    line-height: 22px;
   }
 `;
