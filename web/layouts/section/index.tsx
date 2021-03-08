@@ -1,6 +1,8 @@
 import React, { useRef, useEffect, useState } from 'react'
 import { Flex } from 'rebass';
-import styled from '@emotion/styled';
+import styled, { CSSObject } from '@emotion/styled';
+import { InterpolationWithTheme } from '@emotion/core';
+import { ThemeInterface } from 'utils/styled/theme';
 
 const variants = ["full-width", "content-overflow-1", "content-default", "content-inset-1"]
 
@@ -13,9 +15,11 @@ interface SectionLayoutProps {
     debugPostion?: string
   }
   backgroundColor?: string
+  className?: string
+  notAutoAllocateHeight?: boolean
 }
 
-const SectionLayout: React.FC<SectionLayoutProps> = ({ variant = "content-default", inherit = true, alignContent = "start", children, debug = false, backgroundColor = "rgb(0,0,0,0)", debugOption }) => {
+const SectionLayout: React.FC<SectionLayoutProps> = ({ variant = "content-default", inherit = true, alignContent = "start", children, debug = false, backgroundColor = "rgb(0,0,0,0)", debugOption, className, notAutoAllocateHeight = false }) => {
   const parentFlexBox = useRef(null);
   const childFlexBox = useRef(null);
   const [isChecked, setIsChecked] = useState(true);
@@ -46,9 +50,9 @@ const SectionLayout: React.FC<SectionLayoutProps> = ({ variant = "content-defaul
 
   useEffect(() => {
       childFlexBox.current.style.zIndex = 5
-      if (!inherit) {
-      parentFlexBox.current.style.height = childFlexBox.current.clientHeight + "px"
-    }
+      if (!inherit && !notAutoAllocateHeight) {
+        parentFlexBox.current.style.height = childFlexBox.current.clientHeight + "px"
+      }
     if (variants.includes(parentFlexBox.current.parentElement.classList.item(0))) {
       if (inherit) {
         childFlexBox.current.style.width = "100%"
@@ -103,6 +107,7 @@ const SectionLayout: React.FC<SectionLayoutProps> = ({ variant = "content-defaul
 
   return (
     <Flex
+      className={className || ""}
       width="100%"
       ref={parentFlexBox}
       alignItems="center"

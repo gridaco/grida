@@ -1,5 +1,6 @@
 import { css } from "@emotion/core";
 import styled from '@emotion/styled';
+import { Box } from "rebass";
 import { media } from "./media";
 import { ThemeInterface } from "./theme";
 
@@ -57,4 +58,52 @@ export const MobileView = styled.div`
       }
     }
   }
+`
+
+export const BodyCustomStyleInAbosulteSectionLayout = styled(Box)`
+
+  .design-to-code-absoulte-view {
+    height: 600px;
+
+    ${props => media("0px", (props.theme as ThemeInterface).breakpoints[0])} {
+      height: 1200px;
+    }
+  }
+
+  .button-detect-lottie-motion {
+    height: 636px;
+
+    ${props => media("0px", (props.theme as ThemeInterface).breakpoints[0])} {
+      height: 375px;
+    }
+
+    ${props => media((props.theme as ThemeInterface).breakpoints[0], (props.theme as ThemeInterface).breakpoints[1])} {
+      height: 423px;
+    }
+
+    ${props => media((props.theme as ThemeInterface).breakpoints[1], (props.theme as ThemeInterface).breakpoints[2])} {
+      height: 529px;
+    }
+  }
+
+  .gradient-row-tab {
+    height: 94px;
+
+    ${props => media("0px", (props.theme as ThemeInterface).breakpoints[0])} {
+      height: 37px;
+    }
+
+    ${props => media((props.theme as ThemeInterface).breakpoints[0], (props.theme as ThemeInterface).breakpoints[2])} {
+      height: 74px;
+    }
+
+    ${props => media((props.theme as ThemeInterface).breakpoints[2], (props.theme as ThemeInterface).breakpoints[3])} {
+      height: 92px;
+    }
+  }
+
+  .bottom-application-notification {
+    height: 739px;
+  }
+
 `

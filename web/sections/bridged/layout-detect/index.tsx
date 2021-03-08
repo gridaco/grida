@@ -38,7 +38,7 @@ const LayoutDetect = () => {
         modification. Which leads us to blazing fast workflow. Just design it.
         We’ll know.
       </Description>
-      <SectionLayout variant="content-overflow-1" inherit={false}>
+      <SectionLayout className="button-detect-lottie-motion" variant="content-overflow-1" inherit={false} notAutoAllocateHeight>
         <ButtonDetectDemo />
       </SectionLayout>
       <BlankArea height={30} />

@@ -14,6 +14,7 @@ import { Box } from "rebass";
 import { PopupConsumer, PopupInfo, PopupProvider } from "utils/context/PopupContext";
 import Popup from "components/popup";
 import { analytics } from "utils/firebase";
+import { BodyCustomStyleInAbosulteSectionLayout } from "utils/styled/styles";
 
 const MyApp = ({ Component, pageProps }: AppProps) => {
   const router = useRouter();
@@ -131,9 +132,9 @@ const MyApp = ({ Component, pageProps }: AppProps) => {
         `}
       >
         <Header />
-        <Box mt="60px" style={{ position: "relative" }}>
+        <BodyCustomStyleInAbosulteSectionLayout mt="60px" style={{ position: "relative" }}>
           <Component {...pageProps} />
-        </Box>
+        </BodyCustomStyleInAbosulteSectionLayout>
         <Footer />
       </div>
       {renderPopups()}

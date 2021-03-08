@@ -82,9 +82,11 @@ const Products = () => {
         Your design is your
       </Heading>
       <SectionLayout
+      className="gradient-row-tab"
         variant="content-overflow-1"
         inherit={false}
         alignContent="center"
+        notAutoAllocateHeight
       >
         <Container>
           <RowFrame animate={{ x: x }} transition={spring}>

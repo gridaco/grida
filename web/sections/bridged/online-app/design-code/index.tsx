@@ -7,6 +7,7 @@ import { ThemeInterface } from "utils/styled/theme";
 import DesignPlatforms from "layout/design-platforms";
 import CodePreview from "layout/code-preview";
 import BlankArea from "components/blank-area";
+import { css } from "@emotion/core";
 
 const DesignToCode = () => {
   return (
@@ -20,7 +21,7 @@ const DesignToCode = () => {
         Instantly convert your design to code, prototype and product within a
         click. No coding required.
       </Description>
-      <SectionLayout variant="full-width" inherit={false}>
+      <SectionLayout className="design-to-code-absoulte-view" variant="full-width" inherit={false} notAutoAllocateHeight>
         <Positioner>
           <DesignPlatforms />
           <CodePreview />

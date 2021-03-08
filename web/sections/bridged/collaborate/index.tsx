@@ -35,7 +35,7 @@ const Collaborate = () => {
         Forget all the time you’ve spent repeating yourself.
       </Description>
       <BlankArea height={50} />
-      <SectionLayout variant="full-width" inherit={false}>
+      <SectionLayout className="bottom-application-notification" variant="full-width" inherit={false} notAutoAllocateHeight>
         <BackgroundImage>
           <div className="background-img">
             <Image
