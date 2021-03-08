@@ -64,7 +64,7 @@ export const Resources: Sitemap = {
   child: [
     {
       label: "Gettiing Started",
-      href: "/dcs/getting-started",
+      href: "/docs/getting-started",
     },
     {
       label: "Docs",
