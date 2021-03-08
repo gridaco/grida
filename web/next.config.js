@@ -41,7 +41,7 @@ module.exports = withVideos(withTM({
     images: {
         domains: ['img.youtube.com']
     },
-    env: [
+    env: {
         ...FIREBASE_ENV_VARS
-    ]
+    }
 }))
