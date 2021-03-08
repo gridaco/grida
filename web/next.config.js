@@ -1,5 +1,6 @@
 const withTM = require("next-transpile-modules");
 const withVideos = require('next-videos')
+const CompressionPlugin = require("compression-webpack-plugin");
 
 const FIREBASE_ENV_VARS = {
     FIREBASE_API_KEY: process.env.FIREBASE_API_KEY,
@@ -30,6 +31,7 @@ module.exports = withVideos(withTM({
             test: /\.md$/,
             use: 'raw-loader',
         })
+        config.plugins.push(new CompressionPlugin());
         if (!isServer) {
             config.node = {
                 fs: 'empty',

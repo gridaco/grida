@@ -70,6 +70,7 @@
         "stylelint-prettier": "^1.1.1",
         "typescript": "^3.6.3",
         "url-loader": "^2.1.0",
-        "webpack": "^4.41.0"
+        "webpack": "^4.44.0",
+        "compression-webpack-plugin": "^6.1.0"
     }
 }
