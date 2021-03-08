@@ -1,22 +1,38 @@
-import React from 'react'
-import SectionLayout from 'layout/section'
-import { Flex, Heading, Text } from 'rebass'
+import React from "react";
+import SectionLayout from "layout/section";
+import { Flex, Heading, Text } from "rebass";
 import styled from "@emotion/styled";
-import Icon from 'components/icon';
-import { ThemeInterface } from 'utils/styled/theme';
-import { media } from 'utils/styled/media';
-import BlankArea from 'components/blank-area';
-import Image from 'next/image';
+import Icon from "components/icon";
+import { ThemeInterface } from "utils/styled/theme";
+import { media } from "utils/styled/media";
+import BlankArea from "components/blank-area";
+import Image from "next/image";
 
 const Collaborate = () => {
   return (
-    <SectionLayout variant="content-overflow-1" alignContent="start" backgroundColor="rgb(0,0,0,0)">
-      <Flex mt="20px" mx="20px" flexDirection={["column", "column", "row", "row"]}>
+    <SectionLayout
+      variant="content-overflow-1"
+      alignContent="start"
+      backgroundColor="rgb(0,0,0,0)"
+    >
+      <Flex
+        mt="20px"
+        mx="20px"
+        flexDirection={["column", "column", "row", "row"]}
+      >
         <SyncIcon name="loading" mr="10px" />
-        <Heading fontSize={["32px", "64px"]} dangerouslySetInnerHTML={{ __html: "Collaborate<br/>as the<br/>way it should be" }} />
+        <Heading
+          fontSize={["32px", "64px"]}
+          dangerouslySetInnerHTML={{
+            __html: "Collaborate<br/>as the<br/>way it should be",
+          }}
+        />
       </Flex>
       <Description fontSize={["21px", "21px", "21px", "24px"]} mx="20px">
-        Create your products effecient, fast, and the way it makes sence liike never befor. //Using prototyping tools. Once modified, your work gets broken... Who wants that? Design with Bridged, which lasts. Designed your screen, connected a button, watched it work on your phone. But production? That’s just starting from scratch
+        With super intuitive workflow that we provide, you’ll find out how
+        blazing-fast the collaboration can get. Create your products as the way
+        it makes sense. When the cycle gets shorter, The good thing happens.
+        Forget all the time you’ve spent repeating yourself.
       </Description>
       <BlankArea height={50} />
       <SectionLayout variant="full-width" inherit={false}>
@@ -30,15 +46,20 @@ const Collaborate = () => {
             />
           </div>
           <div className="notifications">
-            {[...Array(3)].map((_, ix) => <div className="notification" style={{ right: 10 * ix, bottom: 10 * ix }}>
-              <Image
-                key="notification"
-                src="/assets/notification.png"
-                width="auto"
-                height="auto"
-                alt="notification"
-              />
-            </div>)}
+            {[...Array(3)].map((_, ix) => (
+              <div
+                className="notification"
+                style={{ right: 10 * ix, bottom: 10 * ix }}
+              >
+                <Image
+                  key="notification"
+                  src="/assets/notification.png"
+                  width="auto"
+                  height="auto"
+                  alt="notification"
+                />
+              </div>
+            ))}
           </div>
           <div className="application-ui">
             <Image
@@ -51,17 +72,17 @@ const Collaborate = () => {
         </BackgroundImage>
       </SectionLayout>
     </SectionLayout>
-  )
-}
+  );
+};
 
-export default Collaborate
+export default Collaborate;
 
 const SyncIcon = styled(Icon)`
   ${props => media(null, (props.theme as ThemeInterface).breakpoints[2])} {
     width: 64px;
     height: 64px;
   }
-`
+`;
 
 const Description = styled(Text)`
   margin-top: 36px;
@@ -74,18 +95,30 @@ const Description = styled(Text)`
     margin-left: 20px;
   }
 
-  ${props => media((props.theme as ThemeInterface).breakpoints[0], (props.theme as ThemeInterface).breakpoints[1])} {
+  ${props =>
+    media(
+      (props.theme as ThemeInterface).breakpoints[0],
+      (props.theme as ThemeInterface).breakpoints[1],
+    )} {
     margin-left: 20px;
   }
 
-  ${props => media((props.theme as ThemeInterface).breakpoints[1], (props.theme as ThemeInterface).breakpoints[2])} {
+  ${props =>
+    media(
+      (props.theme as ThemeInterface).breakpoints[1],
+      (props.theme as ThemeInterface).breakpoints[2],
+    )} {
     margin-left: 100px;
   }
 
-  ${props => media((props.theme as ThemeInterface).breakpoints[2], (props.theme as ThemeInterface).breakpoints[3])} {
+  ${props =>
+    media(
+      (props.theme as ThemeInterface).breakpoints[2],
+      (props.theme as ThemeInterface).breakpoints[3],
+    )} {
     margin-left: 120px;
   }
-`
+`;
 
 const BackgroundImage = styled(Flex)`
   position: relative;
@@ -110,7 +143,7 @@ const BackgroundImage = styled(Flex)`
       width: 100%;
       height: 100%;
       position: absolute;
-      
+
       div {
         max-width: 690px;
         max-height: 225px;
@@ -129,15 +162,14 @@ const BackgroundImage = styled(Flex)`
     z-index: 2;
 
     div {
-        max-width: 350px !important;
-        max-height: 1040px;
-        width: 100% !important;
-        height: 100% !important;
-      }
+      max-width: 350px !important;
+      max-height: 1040px;
+      width: 100% !important;
+      height: 100% !important;
+    }
   }
 
   ${props => media("0px", (props.theme as ThemeInterface).breakpoints[0])} {
-
     .notifications {
       transform: translate(50vw, 5vh);
     }
@@ -151,17 +183,21 @@ const BackgroundImage = styled(Flex)`
       left: 5%;
       bottom: -30%;
     }
-    
+
     .application-ui > div {
       max-width: 280px !important;
       max-height: 600px;
     }
   }
 
-  ${props => media((props.theme as ThemeInterface).breakpoints[0], (props.theme as ThemeInterface).breakpoints[1])} {
+  ${props =>
+    media(
+      (props.theme as ThemeInterface).breakpoints[0],
+      (props.theme as ThemeInterface).breakpoints[1],
+    )} {
     .application-ui {
       left: 5%;
       bottom: -10%;
     }
   }
-`
+`;

@@ -1,20 +1,20 @@
-import React, { useEffect, useState } from 'react'
-import SectionLayout from 'layout/section'
-import { Box, Flex, Heading, Text } from 'rebass'
-import styled from '@emotion/styled';
-import BlankArea from 'components/blank-area';
-import { media } from 'utils/styled/media';
-import { ThemeInterface } from 'utils/styled/theme';
-import ActionItem from 'components/action-item';
-import { LandingpageUrls } from 'utils/landingpage/constants';
-import OnairButton from 'components/effect/onair-button';
-import ApplicationPreview from 'layout/application-preview';
-import { DesktopView, MobileView } from 'utils/styled/styles';
-import { DesignToCode } from '..';
-import Image from 'next/image';
+import React, { useEffect, useState } from "react";
+import SectionLayout from "layout/section";
+import { Box, Flex, Heading, Text } from "rebass";
+import styled from "@emotion/styled";
+import BlankArea from "components/blank-area";
+import { media } from "utils/styled/media";
+import { ThemeInterface } from "utils/styled/theme";
+import ActionItem from "components/action-item";
+import { LandingpageUrls } from "utils/landingpage/constants";
+import OnairButton from "components/effect/onair-button";
+import ApplicationPreview from "layout/application-preview";
+import { DesktopView, MobileView } from "utils/styled/styles";
+import { DesignToCode } from "..";
+import Image from "next/image";
 
 interface OnlineAppProps {
-  isMobile?: boolean
+  isMobile?: boolean;
 }
 
 const OnlineApp: React.FC<OnlineAppProps> = ({ isMobile }) => {
@@ -26,31 +26,51 @@ const OnlineApp: React.FC<OnlineAppProps> = ({ isMobile }) => {
     } else {
       setAssetUrl("/assets/gradient-bg.png");
     }
-  }, [isMobile])
+  }, [isMobile]);
 
   return (
     <SectionLayout alignContent="start" backgroundColor="rgba(0,0,0,0)">
       <DesignToCode />
       <BlankArea height={150} />
-      <Flex justifyContent={["center", "space-between", "space-between", "space-between"]} width="100%">
+      <Flex
+        justifyContent={[
+          "center",
+          "space-between",
+          "space-between",
+          "space-between",
+        ]}
+        width="100%"
+      >
         <Flex flexDirection="column" width="100%" mr="40px">
           <BlankArea height={75} />
-          <Text fontSize="24px" mb="15px">What you’ve just sketched?</Text>
+          <Text fontSize="24px" mb="15px">
+            What you’ve just sketched?
+          </Text>
           <OnlineTitle fontSize={["32px", "36px", "36px", "36px"]}>
             <span>That just got</span> <OnairButton />
           </OnlineTitle>
           <MobileView style={{ marginTop: 40, position: "relative" }}>
             <ApplicationPreview />
             <div className="gradient-view no-drag">
-              <Image src="/assets/mobile/mobile-gradient-blur-xs.png" alt="gradient" width="768" height="520" />
+              <Image
+                src="/assets/mobile/mobile-gradient-blur-xs.png"
+                alt="gradient"
+                width="768"
+                height="520"
+              />
             </div>
           </MobileView>
-          <Description fontSize={["18px", "21px", "21px", "24px"]}>Design to Code Feature supports Major design tools including Sketch, Figma and Adobe XD. Code is converted to Major Platforms / Languages / Frameworks with various coding styles. These lines of code is ready to use. Design once, Run everywhere</Description>
+          <Description fontSize={["18px", "21px", "21px", "24px"]}>
+            Design to Code Feature supports Major design tools including Sketch,
+            Figma and Adobe XD. Code is converted to Major
+            Platforms/Languages/Frameworks with various coding styles. These
+            lines of code is ready to use. Design once, Run everywhere.
+          </Description>
 
           <BlankArea height={50} />
 
           <ActionItem
-            label="How do Design to code work?"
+            label="How does Design to code work?"
             href={LandingpageUrls.article_how_do_design_to_code_work}
           />
           <ActionItem
@@ -67,11 +87,10 @@ const OnlineApp: React.FC<OnlineAppProps> = ({ isMobile }) => {
       </Flex>
       <BlankArea height={100} />
     </SectionLayout>
-  )
-}
+  );
+};
 
-
-export default OnlineApp
+export default OnlineApp;
 
 const OnlineTitle = styled(Heading)`
   display: flex;
@@ -81,7 +100,7 @@ const OnlineTitle = styled(Heading)`
     align-items: flex-start;
     flex-direction: column;
   }
-`
+`;
 
 const Description = styled(Text)`
   max-width: 520px;
@@ -91,4 +110,4 @@ const Description = styled(Text)`
   ${props => media("0px", (props.theme as ThemeInterface).breakpoints[0])} {
     max-width: 100%;
   }
-`
+`;
