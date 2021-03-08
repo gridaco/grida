@@ -1,31 +1,49 @@
-import React from "react";
+import React, { useEffect } from "react";
 import styled from "@emotion/styled";
-import { Flex } from "rebass";
+import { Flex, Heading } from "rebass";
 import SectionLayout from "layouts/section";
 import BlankArea from "components/blank-area";
+import { useWindowWidth } from "utils/hooks/use-window-width";
+import { defaultTheme } from "utils/styled";
+import { LandingpageUrls } from 'utils/landingpage/constants';
+import Link from 'next/link'
+
+function replaceStylePxToNumber(stylePx: string) {
+  return parseInt(stylePx.replace("px", ""));
+}
 
 interface CookieAcceptProps {
-  accpetCookie: (isAccept : boolean) => void
+  accpetCookie: () => void;
 }
 
 const CookieAccept: React.FC<CookieAcceptProps> = ({ accpetCookie }) => {
+  const width = useWindowWidth();
+
   return (
     <Positioner>
-      <BlankArea height={24} />
       <SectionLayout variant="content-default" alignContent="center">
-        <Desc>
-          This website stores cookies on your browser. These cookies are used to
-          improve your website experience and provide more personalized services
-          to you, both on this website and through other media. We won't track
-          your information when you visit our site. But in order to comply with
-          your preferences, we'll have to use just one tiny cookie so that
-          you're not asked to make this choice again.
-        </Desc>
+        <Flex width="100%" justifyContent="space-between" alignItems="center">
+          <Flex flexDirection="column">
+            {width < replaceStylePxToNumber(defaultTheme.breakpoints[0]) ? <Title>
+                We use <Link href={LandingpageUrls.cookies_policy}>cookies</Link> for better website experience
+              </Title>: (
+              <Title>We use cookies</Title>
+            )}
+            {width > replaceStylePxToNumber(defaultTheme.breakpoints[0]) && (
+              <Desc>
+                Bridged collects cookies for handling signin, analysing our
+                traffic and making website usage faster.
+                <Link href={LandingpageUrls.cookies_policy}>Learn more</Link>
+              </Desc>
+            )}
+          </Flex>
 
-        <BtnArea pb={["20px", "0px", "20px", "0px"]}>
-          <Button isAccept={true} onClick={() => accpetCookie(true)}>Accept</Button>
-          <Button isAccept={false} onClick={() => accpetCookie(false)}>Decline</Button>
-        </BtnArea>
+          <Button className="cursor" onClick={() => accpetCookie()}>
+            {width < replaceStylePxToNumber(defaultTheme.breakpoints[0])
+              ? "OK"
+              : "Accept"}
+          </Button>
+        </Flex>
       </SectionLayout>
     </Positioner>
   );
@@ -33,60 +51,54 @@ const CookieAccept: React.FC<CookieAcceptProps> = ({ accpetCookie }) => {
 
 export default CookieAccept;
 
-interface Color {
-  isAccept: Boolean;
-}
-
 const Positioner = styled.div`
+  display: flex;
+  align-items: center;
+  flex-direction: column;
+  justify-content: center;
+
   position: fixed;
   bottom: 0;
 
   width: 100%;
-  height: 182px;
-  background-color: #ffffff;
+  height: 110px;
+  background-color: #fff;
   z-index: 998;
-
-  display: flex;
-  align-items: center;
-  flex-direction: column;
-  box-shadow: 0px 4px 4px rgba(0, 0, 0, 0.25);
+  
+  a {
+    margin: 0px 2px;
+    text-decoration: underline;
+  }
 `;
 
 const Desc = styled.div`
   width: 100%;
 
-  font-family: Helvetica Neue;
-  font-style: normal;
-  font-weight: normal;
   font-size: 14px;
   line-height: 17px;
+  letter-spacing: 0em;
 
   color: #4e4e4e;
 `;
 
-const BtnArea = styled(Flex)`
-  width: 145px;
-  height: 35px;
-  display: flex;
-  justify-content: space-between;
-  margin-top: 24px;
-  margin-left: auto;
-`;
-
-const Button = styled.div<Color>`
-  font-style: normal;
+const Button = styled.div`
   font-weight: 500;
   font-size: 16px;
-  line-height: 19px;
 
   display: flex;
   align-items: center;
   justify-content: center;
+  letter-spacing: 0em;
 
   color: #2562ff;
-  color: ${p => (p.isAccept ? "#2562ff" : "#5B5C5D")};
+`;
 
-  margin: 0px 10px;
+const Title = styled(Heading)`
+  color: #4e4e4e;
+  font-size: 16px;
+  font-weight: 500;
+  margin-bottom: 8px;
+  line-height: 20px;
+  letter-spacing: 0em;
 
-  cursor: pointer;
 `;

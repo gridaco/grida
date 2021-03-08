@@ -27,19 +27,14 @@ const MainPage: NextPage<MainPageAppProps> = ({ isMobileView }) => {
     }
   }, [cookie]);
 
-  const onAcceptCookie = useCallback(
-    (isAccept: boolean) => {
-      if (isAccept) {
-        setCookie(COOKIE_CONSENT_ACCEPTENCE_STATUS_KEY, true, {
-          path: "/",
-          maxAge: 3600 * 24 * 365, // Expires after 1hr
-          sameSite: true,
-        });
-      }
-      setOpenCookieAlert(true);
-    },
-    [cookie],
-  );
+  const onAcceptCookie = useCallback(() => {
+    setCookie(COOKIE_CONSENT_ACCEPTENCE_STATUS_KEY, true, {
+      path: "/",
+      maxAge: 3600 * 24 * 365, // Expires after 1hr
+      sameSite: true,
+    });
+    setOpenCookieAlert(true);
+  }, [cookie]);
 
   return (
     <React.Fragment>
