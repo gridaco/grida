@@ -199,6 +199,9 @@ const Bridged = styled(Icon)`
 `;
 
 const Item = styled(Text)`
+  font-weight: 500;
+  letter-spacing: 0em;
+
   &:hover {
     color: #000;
   }
@@ -238,6 +241,8 @@ const ResponsiveMenu = styled(Flex)`
 `;
 
 const ResponsiveTitle = styled(Text)`
+  letter-spacing: -0.035em;
+  font-weight: 600;
   ${props => media(null, (props.theme as ThemeInterface).breakpoints[1])} {
     display: none;
   }
