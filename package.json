@@ -20,6 +20,7 @@
     },
     "dependencies": {
         "cookie": "^0.4.1",
+        "firebase": "^8.2.10",
         "framer-motion": "^3.10.0",
         "next-videos": "^1.4.0",
         "react-cookie": "^4.0.3",
@@ -27,6 +28,7 @@
         "react-player": "^2.9.0",
         "react-syntax-highlighter": "^15.4.3",
         "react-youtube": "^7.13.1",
+        "remark-html": "^13.0.1",
         "smoothscroll-polyfill": "^0.4.4"
     }
 }

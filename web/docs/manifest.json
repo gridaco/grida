@@ -1,0 +1,409 @@
+{
+    "routes": [
+        {
+            "title": "Documentation",
+            "heading": true,
+            "routes": [
+                {
+                    "title": "Getting Started",
+                    "path": "/docs/getting-started"
+                },
+                {
+                    "title": "Assistant",
+                    "open": true,
+                    "routes": [
+                        {
+                            "title": "Introduction",
+                            "path": "/docs/assistant/index"
+                        },
+                        {
+                            "title": "Design Assistant",
+                            "path": "/docs/assistant/design-assistant"
+                        },
+                        {
+                            "title": "Design Assistant",
+                            "path": "/docs/assistant/design-assistant/icons-loader"
+                        },
+                        {
+                            "title": "Components View",
+                            "path": "/docs/assistant/components-view"
+                        },
+                        {
+                            "title": "Code View",
+                            "path": "/docs/assistant/code-view"
+                        },
+                        {
+                            "title": "Quick look",
+                            "path": "/docs/assistant/quicklook"
+                        },
+                        {
+                            "title": "Click to copy",
+                            "path": "/docs/assistant/click-to-copy"
+                        },
+                        {
+                            "title": "Design Linting",
+                            "path": "/docs/assistant/linter"
+                        },
+                        {
+                            "title": "Preferences",
+                            "path": "/docs/assistant/preferences"
+                        },
+                        {
+                            "title": "Environment Variables",
+                            "path": "/docs/assistant/environment-variables"
+                        }
+                    ]
+                },
+                {
+                    "title": "Conventions",
+                    "routes": [
+                        {
+                            "title": "Introduction",
+                            "path": "/docs/conventions/index"
+                        },
+                        {
+                            "title": "Naming conventions",
+                            "routes": [
+                                {
+                                    "title": "Routes",
+                                    "path": "/docs/conventions/routes"
+                                },
+                                {
+                                    "title": "Dynamic Routes",
+                                    "path": "/docs/conventions/dynamic-routes"
+                                }
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "title": "GIT integration",
+                    "path": "/docs/deployment.md"
+                },
+                {
+                    "title": "Cloud Platform",
+                    "path": "/docs/authentication.md"
+                },
+                {
+                    "title": "Advanced Features",
+                    "routes": [
+                        {
+                            "title": "Preview Mode",
+                            "path": "/docs/advanced-features/preview-mode.md"
+                        },
+                        {
+                            "title": "Dynamic Import",
+                            "path": "/docs/advanced-features/dynamic-import.md"
+                        },
+                        {
+                            "title": "Automatic Static Optimization",
+                            "path": "/docs/advanced-features/automatic-static-optimization.md"
+                        },
+                        {
+                            "title": "Static HTML Export",
+                            "path": "/docs/advanced-features/static-html-export.md"
+                        },
+                        {
+                            "title": "Absolute Imports and Module Path Aliases",
+                            "path": "/docs/advanced-features/module-path-aliases.md"
+                        },
+                        {
+                            "title": "AMP Support",
+                            "routes": [
+                                {
+                                    "title": "Introduction",
+                                    "path": "/docs/advanced-features/amp-support/introduction.md"
+                                },
+                                {
+                                    "title": "Adding AMP Components",
+                                    "path": "/docs/advanced-features/amp-support/adding-amp-components.md"
+                                },
+                                {
+                                    "title": "AMP Validation",
+                                    "path": "/docs/advanced-features/amp-support/amp-validation.md"
+                                },
+                                {
+                                    "title": "AMP in Static HTML export",
+                                    "path": "/docs/advanced-features/amp-support/amp-in-static-html-export.md"
+                                },
+                                {
+                                    "title": "TypeScript",
+                                    "path": "/docs/advanced-features/amp-support/typescript.md"
+                                }
+                            ]
+                        },
+                        {
+                            "title": "Customizing Babel Config",
+                            "path": "/docs/advanced-features/customizing-babel-config.md"
+                        },
+                        {
+                            "title": "Customizing PostCSS Config",
+                            "path": "/docs/advanced-features/customizing-postcss-config.md"
+                        },
+                        {
+                            "title": "Custom Server",
+                            "path": "/docs/advanced-features/custom-server.md"
+                        },
+                        {
+                            "title": "Custom `App`",
+                            "path": "/docs/advanced-features/custom-app.md"
+                        },
+                        {
+                            "title": "Custom `Document`",
+                            "path": "/docs/advanced-features/custom-document.md"
+                        },
+                        {
+                            "title": "Custom Error Page",
+                            "path": "/docs/advanced-features/custom-error-page.md"
+                        },
+                        {
+                            "title": "`src` Directory",
+                            "path": "/docs/advanced-features/src-directory.md"
+                        },
+                        {
+                            "title": "Multi Zones",
+                            "path": "/docs/advanced-features/multi-zones.md"
+                        },
+                        {
+                            "title": "Measuring performance",
+                            "path": "/docs/advanced-features/measuring-performance.md"
+                        },
+                        {
+                            "title": "Debugging",
+                            "path": "/docs/advanced-features/debugging.md"
+                        },
+                        {
+                            "title": "Source Maps",
+                            "path": "/docs/advanced-features/source-maps.md"
+                        },
+                        {
+                            "title": "Codemods",
+                            "path": "/docs/advanced-features/codemods.md"
+                        },
+                        {
+                            "title": "Internationalized Routing",
+                            "path": "/docs/advanced-features/i18n-routing.md"
+                        }
+                    ]
+                },
+                {
+                    "title": "Packages",
+                    "routes": [
+                        {
+                            "title": "Dynamic",
+                            "path": "/docs/dynamic"
+                        },
+                        {
+                            "title": "InApp Bridge",
+                            "path": "/docs/inapp-bridge"
+                        }
+                    ]
+                },
+                {
+                    "title": "Platforms",
+                    "routes": [
+                        {
+                            "title": "Figma",
+                            "routes": [
+                                {
+                                    "title": "Introduction",
+                                    "path": "/docs/platforms/figma"
+                                }
+                            ]
+                        },
+                        {
+                            "title": "XD",
+                            "routes": [
+                                {
+                                    "title": "Introduction",
+                                    "path": "/docs/platforms/figma"
+                                }
+                            ]
+                        },
+                        {
+                            "title": "Flutter",
+                            "routes": [
+                                {
+                                    "title": "Introduction",
+                                    "path": "/docs/platforms/figma"
+                                }
+                            ]
+                        },
+                        {
+                            "title": "React",
+                            "routes": [
+                                {
+                                    "title": "Introduction",
+                                    "path": "/docs/platforms/react"
+                                }
+                            ]
+                        },
+                        {
+                            "title": "Sketch",
+                            "routes": [
+                                {
+                                    "title": "Introduction",
+                                    "path": "/docs/platforms/sketch"
+                                }
+                            ]
+                        },
+                        {
+                            "title": "Vue",
+                            "routes": [
+                                {
+                                    "title": "Introduction",
+                                    "path": "/docs/platforms/vue"
+                                }
+                            ]
+                        },
+                        {
+                            "title": "HTML/CSS",
+                            "routes": [
+                                {
+                                    "title": "Introduction",
+                                    "path": "/docs/platforms/vanilla-web"
+                                }
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "title": "FAQ",
+                    "path": "/docs/faq"
+                }
+            ]
+        },
+        {
+            "title": "API Reference",
+            "heading": true,
+            "routes": [
+                {
+                    "title": "CLI",
+                    "path": "/docs/api-reference/cli.md"
+                },
+                {
+                    "title": "Create Next App",
+                    "path": "/docs/api-reference/create-next-app.md"
+                },
+                {
+                    "title": "next/router",
+                    "path": "/docs/api-reference/next/router.md"
+                },
+                {
+                    "title": "next/link",
+                    "path": "/docs/api-reference/next/link.md"
+                },
+                {
+                    "title": "next/image",
+                    "path": "/docs/api-reference/next/image.md"
+                },
+                {
+                    "title": "next/head",
+                    "path": "/docs/api-reference/next/head.md"
+                },
+                {
+                    "title": "next/amp",
+                    "path": "/docs/api-reference/next/amp.md"
+                },
+                {
+                    "title": "Data Fetching",
+                    "routes": [
+                        {
+                            "title": "getInitialProps",
+                            "path": "/docs/api-reference/data-fetching/getInitialProps.md"
+                        }
+                    ]
+                },
+                {
+                    "title": "Static Optimization Indicator",
+                    "path": "/docs/api-reference/next.config.js/static-optimization-indicator.md"
+                },
+                {
+                    "title": "next.config.js",
+                    "routes": [
+                        {
+                            "title": "Introduction",
+                            "path": "/docs/api-reference/next.config.js/introduction.md"
+                        },
+                        {
+                            "title": "Environment Variables",
+                            "path": "/docs/api-reference/next.config.js/environment-variables.md"
+                        },
+                        {
+                            "title": "Base Path",
+                            "path": "/docs/api-reference/next.config.js/basepath.md"
+                        },
+                        {
+                            "title": "Rewrites",
+                            "path": "/docs/api-reference/next.config.js/rewrites.md"
+                        },
+                        {
+                            "title": "Redirects",
+                            "path": "/docs/api-reference/next.config.js/redirects.md"
+                        },
+                        {
+                            "title": "Custom Headers",
+                            "path": "/docs/api-reference/next.config.js/headers.md"
+                        },
+                        {
+                            "title": "Custom Page Extensions",
+                            "path": "/docs/api-reference/next.config.js/custom-page-extensions.md"
+                        },
+                        {
+                            "title": "CDN Support with Asset Prefix",
+                            "path": "/docs/api-reference/next.config.js/cdn-support-with-asset-prefix.md"
+                        },
+                        {
+                            "title": "Custom Webpack Config",
+                            "path": "/docs/api-reference/next.config.js/custom-webpack-config.md"
+                        },
+                        {
+                            "title": "Compression",
+                            "path": "/docs/api-reference/next.config.js/compression.md"
+                        },
+                        {
+                            "title": "Runtime Configuration",
+                            "path": "/docs/api-reference/next.config.js/runtime-configuration.md"
+                        },
+                        {
+                            "title": "Disabling x-powered-by",
+                            "path": "/docs/api-reference/next.config.js/disabling-x-powered-by.md"
+                        },
+                        {
+                            "title": "Disabling ETag Generation",
+                            "path": "/docs/api-reference/next.config.js/disabling-etag-generation.md"
+                        },
+                        {
+                            "title": "Setting a custom build directory",
+                            "path": "/docs/api-reference/next.config.js/setting-a-custom-build-directory.md"
+                        },
+                        {
+                            "title": "Configuring the Build ID",
+                            "path": "/docs/api-reference/next.config.js/configuring-the-build-id.md"
+                        },
+                        {
+                            "title": "Configuring onDemandEntries",
+                            "path": "/docs/api-reference/next.config.js/configuring-onDemandEntries.md"
+                        },
+                        {
+                            "title": "Ignoring TypeScript Errors",
+                            "path": "/docs/api-reference/next.config.js/ignoring-typescript-errors.md"
+                        },
+                        {
+                            "title": "exportPathMap",
+                            "path": "/docs/api-reference/next.config.js/exportPathMap.md"
+                        },
+                        {
+                            "title": "Trailing Slash",
+                            "path": "/docs/api-reference/next.config.js/trailing-slash.md"
+                        },
+                        {
+                            "title": "React Strict Mode",
+                            "path": "/docs/api-reference/next.config.js/react-strict-mode.md"
+                        }
+                    ]
+                }
+            ]
+        }
+    ]
+}

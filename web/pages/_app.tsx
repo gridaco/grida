@@ -13,11 +13,22 @@ import { useRouter } from "next/router";
 import { Box } from "rebass";
 import { PopupConsumer, PopupInfo, PopupProvider } from "utils/context/PopupContext";
 import Popup from "components/popup";
+import { analytics } from "utils/firebase";
 
 const MyApp = ({ Component, pageProps }: AppProps) => {
   const router = useRouter();
 
   useEffect(() => {
+    // region set firebase analytics
+    try {
+      analytics();
+    } catch (_) {
+      console.error(
+        "seems like you are a contributor! ignore this message since this is a warning that we could not find firebase credentials to initialize.",
+      );
+    }
+    // endregion set firebase analytics
+
     Fonts();
   }, [router.events, router.pathname]);
 
