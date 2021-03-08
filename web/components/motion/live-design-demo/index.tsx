@@ -35,7 +35,6 @@ export default function LiveDesignDemoFrame() {
         isStopped={isStopped}
         onClick={event => {
           event.preventDefault();
-          console.log(isStopped);
           if (isStopped == true) {
             setIsStopped(false);
           }

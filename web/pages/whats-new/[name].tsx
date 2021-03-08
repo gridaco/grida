@@ -20,8 +20,6 @@ const UpdateNoteDetail = () => {
     name !== undefined && setReleases(await getGithubReleaseNote(githubName, name as string))
   }, [name]);
 
-  console.log(releases)
-
   return (
     <React.Fragment>
       <Head>

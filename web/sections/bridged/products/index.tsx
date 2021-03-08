@@ -52,7 +52,6 @@ const Products = () => {
 
   function handleTabSelectionChange(current: number) {
     let targetSize = 0;
-    console.log(beforeClick, current)
     if (beforeClick < current) {
       elWidth.map((size, elIndex) => {
         if (current == 0) {
@@ -61,7 +60,6 @@ const Products = () => {
           targetSize += size;
         }
       });
-      console.log(targetSize)
       setX(-targetSize);
     } else if (beforeClick > current) {
       elWidth.map((size, elInedx) => {
