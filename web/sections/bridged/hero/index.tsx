@@ -34,6 +34,19 @@ const HeroText = styled(Heading)`
   text-align: center;
   letter-spacing: -0.03em;
   line-height: 98.1%;
+  max-width: 920px;
+
+  ${props => media("0px", (props.theme as ThemeInterface).breakpoints[0])} {
+    max-width: 100%;
+  }
+  
+  ${props =>
+    media(
+      (props.theme as ThemeInterface).breakpoints[0],
+      (props.theme as ThemeInterface).breakpoints[1],
+    )} {
+    max-width: 728px;
+  }
 `;
 
 const Description = styled(Text)`
