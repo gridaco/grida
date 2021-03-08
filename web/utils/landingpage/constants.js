@@ -52,7 +52,7 @@ export const URLS = {
 export const PRODUCT_LIST = [{
         title: "code",
         subTitle: "Instantly create code from your design",
-        desc: "With powerful Design2Code Engine, Bridged generates production ready code that can also easily be used for existing projects. Supprt for components, various code styles, naming convention, fille & directory structure are included.",
+        desc: "With powerful Design2Code Engine, Bridged generates production ready code that can also easily be used for existing projects. Supprt for components, various code styles, naming conventions and fille/directory structures are supported.",
         gradient: "linear-gradient(99.57deg, #6268FF 0%, #9039FF 100%)",
         type: "video",
         path: require('public/videos/your-design-is-your-code.mp4')

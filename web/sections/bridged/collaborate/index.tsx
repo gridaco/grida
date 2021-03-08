@@ -29,9 +29,9 @@ const Collaborate = () => {
         />
       </Flex>
       <Description fontSize={["21px", "21px", "21px", "24px"]} mx="20px">
-        With super intuitive workflow that we provide, you’ll find out how
-        blazing-fast the collaboration can get. Create your products as the way
-        it makes sense. When the cycle gets shorter, The good thing happens.
+        With Bridged’s super intuitive workflow, you’ll find out how
+        blazing-fast the collaborating can get. Create your products as the way
+        it make sense. When the cycle gets shorter, the good thing happens.
         Forget all the time you’ve spent repeating yourself.
       </Description>
       <BlankArea height={50} />
