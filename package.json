@@ -20,6 +20,7 @@
     },
     "dependencies": {
         "cookie": "^0.4.1",
+        "firebase": "^8.2.10",
         "framer-motion": "^3.10.0",
         "next-videos": "^1.4.0",
         "react-cookie": "^4.0.3",
