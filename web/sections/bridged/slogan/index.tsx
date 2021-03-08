@@ -14,7 +14,7 @@ const Slogan = () => {
         <SloganText fontSize={["32px", "64px", "64px", "80px"]}>
           <Icon name="bridged" width={[32, 64]} height={[32, 64]} isVerticalMiddle mr={[12, 28]} /> will do the rest
         </SloganText>
-        <LandingMainCtaButton/>
+        <LandingMainCtaButton />
       </Flex>
     </SectionLayout>
   )
@@ -28,4 +28,7 @@ const SloganText = styled(Heading)`
   path {
     fill: #fff;
   }
+
+  letter-spacing: -0.03em;
+
 `

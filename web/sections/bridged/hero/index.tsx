@@ -32,6 +32,8 @@ export default Hero;
 
 const HeroText = styled(Heading)`
   text-align: center;
+  letter-spacing: -0.03em;
+  line-height: 98.1%;
 `;
 
 const Description = styled(Text)`
@@ -39,6 +41,9 @@ const Description = styled(Text)`
   text-align: center;
   margin-top: 40px;
   color: #444545;
+  line-height: 33px;
+  font-weight: 500;
+  letter-spacing: 0em;
 
   ${props => media("0px", (props.theme as ThemeInterface).breakpoints[0])} {
     max-width: 100%;

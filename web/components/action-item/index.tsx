@@ -6,7 +6,19 @@ import Icon from 'components/icon';
 const ActionItem = ({ label, href }) => {
   return (
     <Link href={href} >
-        <span className="cusror" style={{ marginRight: "auto", color: "#7D7D7D", fontSize: 20, marginBottom: 25 }}>{label} <Icon name="arrowDown" isVerticalMiddle style={{ transform: "rotate(270deg)" }} /></span>
+      <span
+        className="cusror"
+        style={{
+          marginRight: "auto",
+          color: "#7D7D7D",
+          fontSize: 20,
+          marginBottom: 25,
+          letterSpacing: "0em",
+          fontWeight: 500
+        }}
+      >
+        {label} <Icon name="arrowDown" isVerticalMiddle style={{ transform: "rotate(270deg)" }} />
+      </span>
     </Link>
   )
 }

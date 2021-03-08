@@ -5,7 +5,7 @@ import { media } from 'utils/styled/media';
 
 const OnairButton = () => {
   return (
-    <Button>
+    <Button style={{ letterSpacing: "0em" }}>
       ON AIR
     </Button>
   )

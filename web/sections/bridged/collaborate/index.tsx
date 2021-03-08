@@ -23,10 +23,10 @@ const Collaborate = () => {
         <SyncIcon name="loading" mr="10px" />
         <Heading
           fontSize={["32px", "64px"]}
-          dangerouslySetInnerHTML={{
-            __html: "Collaborate<br/>as the<br/>way it should be",
-          }}
-        />
+          style={{ lineHeight: "98.1%" }}
+        >
+          Collaborate<br />as the<br />way it should be
+        </Heading>
       </Flex>
       <Description fontSize={["21px", "21px", "21px", "24px"]} mx="20px">
         With Bridged’s super intuitive workflow, you’ll find out how
@@ -86,11 +86,13 @@ const SyncIcon = styled(Icon)`
 `;
 
 const Description = styled(Text)`
+  line-height: 33px;
   margin-top: 36px;
   color: #444545;
   margin-left: 120px;
   max-width: 525px;
-
+  font-weight: 500;
+  
   ${props => media("0px", (props.theme as ThemeInterface).breakpoints[0])} {
     max-width: 100%;
     margin-left: 20px;

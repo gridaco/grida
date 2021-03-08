@@ -12,8 +12,8 @@ import { css } from "@emotion/core";
 const DesignToCode = () => {
   return (
     <SectionLayout alignContent="start" backgroundColor="rgba(0,0,0,0)">
-      <Heading fontSize={["32px", "64px", "64px", "80px"]}>Designs,</Heading>
-      <Heading fontSize={["32px", "64px", "64px", "80px"]}>
+      <Heading fontSize={["32px", "64px", "64px", "80px"]} style={{ letterSpacing: "0em", lineHeight: "98.1%" }}>
+        Designs, <br />
         come to live
       </Heading>
       <Description fontSize={["18px", "24px", "24px", "24px"]}>
@@ -38,6 +38,11 @@ const Description = styled(Text)`
   max-width: 520px;
   margin-top: 20px;
   color: #444545;
+  font-weight: 500;
+
+  line-height: 33px;
+  letter-spacing: 0em;
+
 
   ${props => media("0px", (props.theme as ThemeInterface).breakpoints[0])} {
     max-width: 100%;

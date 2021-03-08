@@ -13,6 +13,7 @@ import ButtonDetectDemo from "components/motion/button-detect-demo";
 
 const renderMoitonComponents = [MotionButton];
 
+
 const LayoutDetect = () => {
   const [currentMotionIndex, setCurrentMotionIndex] = useState(0);
 
@@ -55,6 +56,9 @@ const LayoutDetect = () => {
 export default LayoutDetect;
 
 const DetectTitle = styled(Heading)`
+
+  line-height: 63px;
+  letter-spacing: 0em;
   display: flex;
   align-items: center;
 
@@ -65,9 +69,12 @@ const DetectTitle = styled(Heading)`
 `;
 
 const Description = styled(Text)`
+  line-height: 33px;
+  letter-spacing: 0em;
   max-width: 520px;
   margin-top: 40px;
   color: #444545;
+  font-weight: 500;
 
   ${props => media("0px", (props.theme as ThemeInterface).breakpoints[0])} {
     max-width: 100%;

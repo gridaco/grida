@@ -78,7 +78,7 @@ const Products = () => {
 
   return (
     <SectionLayout alignContent="start">
-      <Heading fontSize={["32px", "64px", "64px", "80px"]}>
+      <Heading fontSize={["32px", "64px", "64px", "80px"]} style={{ letterSpacing: "0em"}}>
         Your design is your
       </Heading>
       <SectionLayout
@@ -131,7 +131,7 @@ const Products = () => {
           />
         </motion.div>
       </VideoWrapper>
-      <Heading fontSize="18px" mt="40px">
+      <Heading fontSize="18px" mt="40px" fontWeight="600" letterSpacing="0em" >
         {PRODUCT_LIST[beforeClick].subTitle}
       </Heading>
       <Description fontSize={["21px", "21px", "21px", "24px"]}>
@@ -210,6 +210,9 @@ const Description = styled(Text)`
   max-width: 780px;
   margin-top: 20px;
   color: #444545;
+  font-weight: 500;
+  line-height: 33px;
+  letter-spacing: 0em;
 
   ${props => media("0px", (props.theme as ThemeInterface).breakpoints[0])} {
     max-width: 100%;
@@ -274,6 +277,8 @@ const List = styled.span<{ gradient: string }>`
   background: ${p => p.gradient};
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
+  letter-spacing: 0em;
+
   &:first-of-type {
     margin-left: 0;
     padding-left: 0;

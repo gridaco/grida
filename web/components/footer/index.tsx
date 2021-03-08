@@ -97,7 +97,8 @@ const FooterContent = styled(Flex)`
 const FooterBottom = styled(Flex)`
   color: #4e4e4e;
   font-size: 14px;
-
+  letter-spacing: 0em;
+  font-weight: 400;
   ${props => media(null, (props.theme as ThemeInterface).breakpoints[0])} {
    flex-direction: column;
 

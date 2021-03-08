@@ -45,11 +45,11 @@ const OnlineApp: React.FC<OnlineAppProps> = ({ isMobile }) => {
       >
         <Flex flexDirection="column" width="100%" mr="40px">
           <BlankArea height={75} />
-          <Text fontSize="24px" mb="15px">
+          <Text fontSize="24px" mb="15px" style={{ letterSpacing: "0em" }}>
             What you’ve just sketched?
           </Text>
           <OnlineTitle fontSize={["32px", "36px", "36px", "36px"]}>
-            <span>That just got</span> <OnairButton />
+            <span style={{ letterSpacing: "0em" }}>That just got</span> <OnairButton />
           </OnlineTitle>
           <MobileView style={{ marginTop: 40, position: "relative" }}>
             <ApplicationPreview />
@@ -105,9 +105,13 @@ const OnlineTitle = styled(Heading)`
 `;
 
 const Description = styled(Text)`
+
+  line-height: 33px;
+  letter-spacing: 0em;
   max-width: 520px;
-  margin-top: 40px;
+  margin-top: 30px;
   color: #444545;
+  font-weight: 500;
 
   ${props => media("0px", (props.theme as ThemeInterface).breakpoints[0])} {
     max-width: 100%;
