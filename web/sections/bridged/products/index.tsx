@@ -281,13 +281,13 @@ const List = styled.span<{ gradient: string }>`
   background: ${p => p.gradient};
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
-  &:first-child {
+  &:first-of-type {
     margin-left: 0;
     padding-left: 0;
   }
 
   ${props => media("0px", (props.theme as ThemeInterface).breakpoints[0])} {
-    &:first-child {
+    &:first-of-type {
       padding-left: 10px;
     }
   }
@@ -297,7 +297,7 @@ const List = styled.span<{ gradient: string }>`
       (props.theme as ThemeInterface).breakpoints[0],
       (props.theme as ThemeInterface).breakpoints[1],
     )} {
-    &:first-child {
+    &:first-of-type {
       padding-left: 1%;
     }
   }
