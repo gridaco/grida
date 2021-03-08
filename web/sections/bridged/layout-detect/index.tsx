@@ -11,7 +11,7 @@ import MotionButton from "components/motion/button";
 import MotionRadio from "components/motion/radio";
 import ButtonDetectDemo from 'components/motion/button-detect-demo';
 
-const renderMoitonComponents = [MotionButton, MotionRadio];
+const renderMoitonComponents = [MotionButton];
 
 const LayoutDetect = () => {
   const [currentMotionIndex, setCurrentMotionIndex] = useState(0);

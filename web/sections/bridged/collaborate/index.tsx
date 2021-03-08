@@ -129,10 +129,9 @@ const BackgroundImage = styled(Flex)`
     z-index: 2;
 
     div {
-        max-width: 350px !important;
-        max-height: 1040px;
+        max-width: 515px !important;
+        height: 1040px;
         width: 100% !important;
-        height: 100% !important;
       }
   }
 
