@@ -79,7 +79,12 @@ const Collaborate = () => {
 export default Collaborate;
 
 const SyncIcon = styled(Icon)`
-  ${props => media(null, (props.theme as ThemeInterface).breakpoints[2])} {
+  ${props => media("0px", (props.theme as ThemeInterface).breakpoints[0])} {
+    width: 32px;
+    height: 32px;
+  }
+
+  ${props => media((props.theme as ThemeInterface).breakpoints[1], (props.theme as ThemeInterface).breakpoints[2])} {
     width: 64px;
     height: 64px;
   }
