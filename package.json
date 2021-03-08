@@ -27,6 +27,7 @@
         "react-player": "^2.9.0",
         "react-syntax-highlighter": "^15.4.3",
         "react-youtube": "^7.13.1",
+        "remark-html": "^13.0.1",
         "smoothscroll-polyfill": "^0.4.4"
     }
 }
