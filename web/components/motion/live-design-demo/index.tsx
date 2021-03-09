@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import styled from "@emotion/styled";
 import { Flex } from "rebass";
 import useOnScreen from "utils/hooks/use-on-screen";
-import Lottie from "react-lottie";
+import ReactPlayer from "react-player";
 import animationData from "public/animations/live-demo-app-design-motion/comp.json";
 
 export default function LiveDesignDemoFrame() {
@@ -30,7 +30,7 @@ export default function LiveDesignDemoFrame() {
 
   return (
     <DesignFramePreview bg="#F5F5F5" ref={ref} className="preview">
-      <Lottie
+      {/* <Lottie
         options={defaultMotionOptions}
         isStopped={isStopped}
         onClick={event => {
@@ -39,6 +39,12 @@ export default function LiveDesignDemoFrame() {
             setIsStopped(false);
           }
         }}
+      /> */}
+      <ReactPlayer
+        url={require('public/videos/loop_landingpage-210306-motionsource-section-2-1.mp4')}
+        loop
+        playing
+        muted
       />
     </DesignFramePreview>
   );
@@ -56,8 +62,7 @@ const DesignFramePreview = styled(Flex)`
   justify-content: center;
 
   div {
-    width: 252px;
-    height: 300px;
-  }
+    height: 100% !important;
 
+  }
 `;
