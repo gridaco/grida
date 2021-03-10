@@ -30,6 +30,7 @@ export interface IconList {
   question: IconListProps;
   plus: IconListProps;
   faqClose: IconListProps;
+  okaySign: IconListProps;
 }
 
 const icons: IconList = {
@@ -628,6 +629,25 @@ const icons: IconList = {
         <circle cx="16" cy="16" r="16" fill="#D7D7D7" />
         <path
           d="M23.3437 10.41L21.9337 9L16.3437 14.59L10.7537 9L9.34375 10.41L14.9337 16L9.34375 21.59L10.7537 23L16.3437 17.41L21.9337 23L23.3437 21.59L17.7537 16L23.3437 10.41Z"
+          fill="white"
+        />
+      </svg>
+    ),
+  },
+  okaySign: {
+    width: 24,
+    height: 24,
+    svg: (
+      <svg
+        width="24"
+        height="24"
+        viewBox="0 0 24 24"
+        fill="none"
+        xmlns="http://www.w3.org/2000/svg"
+      >
+        <circle cx="12" cy="12" r="12" fill="#2562FF" />
+        <path
+          d="M10.0001 14.7799L7.2201 11.9999L6.27344 12.9399L10.0001 16.6666L18.0001 8.66656L17.0601 7.72656L10.0001 14.7799Z"
           fill="white"
         />
       </svg>
