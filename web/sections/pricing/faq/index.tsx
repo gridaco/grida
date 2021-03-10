@@ -4,10 +4,6 @@ import { Flex, Heading } from "rebass";
 import SectionLayout from "layout/section";
 import Question from "components/question";
 
-interface FaqProps {
-  list: string;
-}
-
 const questionList = [
   {
     title: "How do Bridged make money?",
