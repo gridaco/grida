@@ -112,7 +112,7 @@ const SectionLayout: React.FC<SectionLayoutProps> = ({ variant = "content-defaul
       ref={parentFlexBox}
       alignItems="center"
       justifyContent="center"
-      height={childFlexBox.current?.clientHeight + "px"}
+      height="100%"
     >
       {debug && <Debug>
         <span style={{ transform: `translate(-30px, -${debugOption.debugPostion}%)` }}> <input type="checkbox" onClick={e => setIsChecked(!isChecked)} defaultChecked={isChecked} />{variant}</span>
