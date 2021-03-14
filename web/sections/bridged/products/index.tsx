@@ -76,7 +76,7 @@ const Products = () => {
 
   return (
     <SectionLayout alignContent="start">
-      <Heading fontSize={["32px", "64px", "64px", "80px"]} style={{ letterSpacing: "0em"}}>
+      <Heading fontSize={["32px", "64px", "64px", "64px"]} style={{ letterSpacing: "0em"}}>
         Your design is your
       </Heading>
       <SectionLayout
@@ -129,7 +129,7 @@ const Products = () => {
           />
         </motion.div>
       </VideoWrapper>
-      <Heading fontSize="18px" mt="40px" fontWeight="600" letterSpacing="0em" >
+      <Heading fontSize="32px" mt="40px" fontWeight="600" letterSpacing="0em" style={{ maxWidth: "50%"}} >
         {PRODUCT_LIST[beforeClick].subTitle}
       </Heading>
       <Description fontSize={["21px", "21px", "21px", "24px"]}>
@@ -155,7 +155,7 @@ const Products = () => {
           <span>everything</span>
         </Link>
       </MoreLists> */}
-      <BlankArea height={150} />
+      <BlankArea height={315} />
     </SectionLayout>
   );
 };
@@ -205,12 +205,12 @@ const MoreLists = styled(Flex)`
 `;
 
 const Description = styled(Text)`
-  max-width: 780px;
-  margin-top: 20px;
+  max-width: 760px;
+  margin-top: 32px;
   color: #444545;
-  font-weight: 500;
-  line-height: 33px;
-  letter-spacing: 0em;
+  font-weight: 400;
+  line-height: 38px;
+  letter-spacing: 0.01em;
 
   ${props => media("0px", (props.theme as ThemeInterface).breakpoints[0])} {
     max-width: 100%;
@@ -221,7 +221,7 @@ const Description = styled(Text)`
 const Container = styled(Flex)`
   position: relative;
   width: 100%;
-  margin-top: 10px;
+  margin-top: 0px;
   display: flex;
   align-items: center;
   justify-content: center;

@@ -33,7 +33,6 @@ const OnlineApp: React.FC<OnlineAppProps> = ({ isMobile }) => {
       <DisableMargin>
         <DesignToCode />
       </DisableMargin>
-      <BlankArea height={150} />
       <Flex
         justifyContent={[
           "center",
@@ -49,7 +48,8 @@ const OnlineApp: React.FC<OnlineAppProps> = ({ isMobile }) => {
             What you’ve just sketched?
           </Text>
           <OnlineTitle fontSize={["32px", "36px", "36px", "36px"]}>
-            <span style={{ letterSpacing: "0em" }}>That just got</span> <OnairButton />
+            <span style={{ letterSpacing: "0em" }}>That just got</span>{" "}
+            <OnairButton />
           </OnlineTitle>
           <MobileView style={{ marginTop: 40, position: "relative" }}>
             <ApplicationPreview />
@@ -62,14 +62,14 @@ const OnlineApp: React.FC<OnlineAppProps> = ({ isMobile }) => {
               />
             </div>
           </MobileView>
-          <Description fontSize={["18px", "21px", "21px", "24px"]}>
+          <Description fontSize={["18px", "21px", "21px", "25px"]}>
             Design to Code Feature supports Major design tools including Sketch,
             Figma and Adobe XD. Code is converted to Major
             Platforms/Languages/Frameworks with various coding styles. These
             lines of code is ready to use. Design once, Run everywhere.
           </Description>
 
-          <BlankArea height={50} />
+          <BlankArea height={80} />
 
           <ActionItem
             label="How does Design to code work?"
@@ -87,7 +87,7 @@ const OnlineApp: React.FC<OnlineAppProps> = ({ isMobile }) => {
           </div>
         </DesktopView>
       </Flex>
-      <BlankArea height={100} />
+      <BlankArea height={180} />
     </SectionLayout>
   );
 };
@@ -105,13 +105,12 @@ const OnlineTitle = styled(Heading)`
 `;
 
 const Description = styled(Text)`
-
-  line-height: 33px;
+  line-height: 38px;
   letter-spacing: 0em;
-  max-width: 520px;
+  max-width: 525px;
   margin-top: 30px;
   color: #444545;
-  font-weight: 500;
+  font-weight: 400;
 
   ${props => media("0px", (props.theme as ThemeInterface).breakpoints[0])} {
     max-width: 100%;

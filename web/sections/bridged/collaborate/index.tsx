@@ -20,15 +20,15 @@ const Collaborate = () => {
         mx="20px"
         flexDirection={["column", "column", "row", "row"]}
       >
-        <SyncIcon name="loading" mr="10px" />
+        <SyncIcon name="loading" mr="20px" />
         <Heading
           fontSize={["32px", "64px"]}
           style={{ lineHeight: "98.1%" }}
         >
-          Collaborate<br />as the<br />way it should be
+          Collaborate as<br />the way it should be
         </Heading>
       </Flex>
-      <Description fontSize={["21px", "21px", "21px", "24px"]} mx="20px">
+      <Description fontSize={["21px", "21px", "21px", "25px"]} mx="20px">
         With Bridged’s super intuitive workflow, you’ll find out how
         blazing-fast the collaborating can get. Create your products as the way
         it make sense. When the cycle gets shorter, the good thing happens.
@@ -91,12 +91,13 @@ const SyncIcon = styled(Icon)`
 `;
 
 const Description = styled(Text)`
-  line-height: 33px;
+  line-height: 38px;
   margin-top: 36px;
   color: #444545;
   margin-left: 120px;
-  max-width: 525px;
-  font-weight: 500;
+  max-width: 655px;
+  font-weight: 400;
+  letter-spacing: 0em;
   
   ${props => media("0px", (props.theme as ThemeInterface).breakpoints[0])} {
     max-width: 100%;

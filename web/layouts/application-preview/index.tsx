@@ -11,8 +11,8 @@ const ApplicationPreview = () => {
       <Image
         className="app"
         src="/assets/iPhone12-frame-blank.png"
-        width="390"
-        height="788"
+        width="390px"
+        height="788px"
         alt="frame_iphone"
       />
       <Preview>
@@ -20,8 +20,8 @@ const ApplicationPreview = () => {
         <Image
           className="app"
           src="/assets/source.png"
-          width="390"
-          height="788"
+          width="390px"
+          height="788px"
           alt="frame_iphone"
         />
       </Preview>
@@ -36,6 +36,8 @@ const Postioner = styled(Flex)`
   align-items: center;
   justify-content: center;
   z-index: 1;
+  width: 390px;
+  height: 788px;
 `
 
 const Preview = styled(Flex)`

@@ -54,6 +54,7 @@ const AbosulteView = styled(Flex)`
     max-width: none !important;
     width: 904px !important;
     height: 565px !important;
+    opacity: 0.7;
   }
 
   .platforms > div {

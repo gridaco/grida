@@ -13,13 +13,14 @@ const DesignToCode = () => {
   return (
     <SectionLayout alignContent="start" backgroundColor="rgba(0,0,0,0)">
       <Heading
-        fontSize={["32px", "64px", "64px", "80px"]}
+        fontSize={["32px", "64px", "64px", "64px"]}
         style={{ letterSpacing: "0em", lineHeight: "98.1%" }}
+        mb={["10px"]}
       >
         Designs, <br />
-        come to live
+        come to live.
       </Heading>
-      <Description fontSize={["18px", "24px", "24px", "24px"]}>
+      <Description fontSize={["18px", "24px", "24px", "25px"]}>
         Keep your design live. Not as a prototype, but as a ready product.
         Instantly convert your design to code, prototype and product within a
         click. No coding required.
@@ -35,7 +36,7 @@ const DesignToCode = () => {
           <CodePreview />
         </Positioner>
       </SectionLayout>
-      <BlankArea height={100} />
+      <BlankArea height={190} />
     </SectionLayout>
   );
 };
@@ -46,9 +47,10 @@ const Description = styled(Text)`
   max-width: 520px;
   margin-top: 20px;
   color: #444545;
-  font-weight: 500;
+  font-weight: 400;
 
   line-height: 33px;
+  line-height: 38px;
   letter-spacing: 0em;
 
   ${props => media("0px", (props.theme as ThemeInterface).breakpoints[0])} {
@@ -62,6 +64,7 @@ const Positioner = styled(Box)`
   height: 600px;
   width: 100%;
   display: flex;
+  margin-top: 50px;
 
   ${props => media("0px", (props.theme as ThemeInterface).breakpoints[0])} {
     height: 1200px;
