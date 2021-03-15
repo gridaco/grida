@@ -78,7 +78,7 @@ const Frame = styled(motion.div)`
   box-shadow: 0px 4px 128px 32px rgba(0, 0, 0, 0.08);
   border-radius: 24px;
   max-width: 1040px;
-  max-height: 540px;
+  max-height: 585px;
   width: 80vw;
   height: 50vw;
 
@@ -87,7 +87,7 @@ const Frame = styled(motion.div)`
     width: 100%;
     height: 100%;
     border-radius: 24px;
-
+    overflow: hidden;
     div {
       width: 100% !important;
       height: 100% !important;
