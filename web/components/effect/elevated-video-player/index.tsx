@@ -2,22 +2,22 @@ import styled from "@emotion/styled";
 import Icon from "components/icon";
 import React, { useCallback } from "react";
 import { motion, useTransform, useViewportScroll } from "framer-motion";
-import YouTube from 'react-youtube';
+import YouTube from "react-youtube";
 import Image from "next/image";
 import { usePopupContext } from "utils/context/PopupContext";
 import SectionLayout from "layout/section";
 import { Flex } from "rebass";
+import ReactPlayer from "react-player";
 
 const VideoContainer = styled(Flex)`
-
-
-  div, iframe {
+  div,
+  iframe {
     width: 100%;
     height: 50vw;
 
     max-height: 690px;
   }
-`
+`;
 
 function ElevatedVideoPlayer() {
   const { scrollYProgress } = useViewportScroll();
@@ -27,29 +27,43 @@ function ElevatedVideoPlayer() {
   const handleClickLogin = useCallback(() => {
     addPopup({
       title: "",
-      element: 
+      element: (
         <VideoContainer width="100%" height="100%">
-          <YouTube className="video" videoId="RIZjZFoDhRc" opts={{
-            playerVars: {
-              rel: 0,
-              showinfo: 0,
-              enablejsapi: 1,
-              autoplay: 1
-            }
-          }} />
-        </VideoContainer>,
+          <YouTube
+            className="video"
+            videoId="RIZjZFoDhRc"
+            opts={{
+              playerVars: {
+                rel: 0,
+                showinfo: 0,
+                enablejsapi: 1,
+                autoplay: 1,
+              },
+            }}
+          />
+        </VideoContainer>
+      ),
       showOnlyBody: true,
-      height: "50vw"
+      height: "50vw",
     });
   }, []);
 
   return (
     <Frame style={{ scale }}>
       <div className="youtube-thumbnail">
-        <Image src="/assets/video-thumbnail.jpeg" alt="thumbnail" width="auto" height="auto" />
+        <ReactPlayer
+          url={require("public/videos/promotion-video-preview.mp4")}
+          loop
+          playing
+          muted
+        />
       </div>
       {/* play button click motion */}
-      <PlayButtonFrame whileTap={{ scale: 0.9 }} whileHover={{ scale: 1.1 }} onClick={handleClickLogin}>
+      <PlayButtonFrame
+        whileTap={{ scale: 0.9 }}
+        whileHover={{ scale: 1.1 }}
+        onClick={handleClickLogin}
+      >
         <PlayButton name="videoPlay" />
       </PlayButtonFrame>
     </Frame>
@@ -77,11 +91,6 @@ const Frame = styled(motion.div)`
     div {
       width: 100% !important;
       height: 100% !important;
-
-      img {
-    border-radius: 24px;
-
-      }
     }
   }
 `;
