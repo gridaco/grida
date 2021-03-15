@@ -31,6 +31,8 @@ export interface IconList {
   plus: IconListProps;
   faqClose: IconListProps;
   okaySign: IconListProps;
+  questionMark: IconListProps;
+  check: IconListProps;
 }
 
 const icons: IconList = {
@@ -649,6 +651,42 @@ const icons: IconList = {
         <path
           d="M10.0001 14.7799L7.2201 11.9999L6.27344 12.9399L10.0001 16.6666L18.0001 8.66656L17.0601 7.72656L10.0001 14.7799Z"
           fill="white"
+        />
+      </svg>
+    ),
+  },
+  questionMark: {
+    width: 24,
+    height: 24,
+    svg: (
+      <svg
+        width="24"
+        height="24"
+        viewBox="0 0 24 24"
+        fill="none"
+        xmlns="http://www.w3.org/2000/svg"
+      >
+        <path
+          d="M12 2C6.48 2 2 6.48 2 12C2 17.52 6.48 22 12 22C17.52 22 22 17.52 22 12C22 6.48 17.52 2 12 2ZM13 19H11V17H13V19ZM15.07 11.25L14.17 12.17C13.45 12.9 13 13.5 13 15H11V14.5C11 13.4 11.45 12.4 12.17 11.67L13.41 10.41C13.78 10.05 14 9.55 14 9C14 7.9 13.1 7 12 7C10.9 7 10 7.9 10 9H8C8 6.79 9.79 5 12 5C14.21 5 16 6.79 16 9C16 9.88 15.64 10.68 15.07 11.25Z"
+          fill="#E1E1E1"
+        />
+      </svg>
+    ),
+  },
+  check: {
+    width: 17,
+    height: 13,
+    svg: (
+      <svg
+        width="18"
+        height="14"
+        viewBox="0 0 18 14"
+        fill="none"
+        xmlns="http://www.w3.org/2000/svg"
+      >
+        <path
+          d="M6.00016 11.1698L1.83016 6.99984L0.410156 8.40984L6.00016 13.9998L18.0002 1.99984L16.5902 0.589844L6.00016 11.1698Z"
+          fill="#A9A9A9"
         />
       </svg>
     ),
