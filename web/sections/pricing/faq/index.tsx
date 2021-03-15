@@ -3,6 +3,7 @@ import styled from "@emotion/styled";
 import { Flex, Heading } from "rebass";
 import SectionLayout from "layout/section";
 import Question from "components/question";
+import BlankArea from "components/blank-area";
 
 const questionList = [
   {
@@ -35,6 +36,7 @@ const Faq: React.FC = () => {
           ))}
         </Wrapper>
       </Flex>
+      <BlankArea height={170} />
     </SectionLayout>
   );
 };
