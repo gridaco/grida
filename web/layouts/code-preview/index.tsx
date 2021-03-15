@@ -54,7 +54,17 @@ const CodePreview = () => {
       <Flex width="100%">
         <Box width="25%" height="1px" />
         <Box width="25%" height="1px" />
-        <ViewWrapper width="37%" flexDirection="column" alignItems={["flex-start","flex-start","flex-start","flex-start","flex-end"]}>
+        <ViewWrapper
+          width="37%"
+          flexDirection="column"
+          alignItems={[
+            "flex-start",
+            "flex-start",
+            "flex-start",
+            "flex-start",
+            "flex-end",
+          ]}
+        >
           <CodeView width="460px" height="770px" bg="#212121">
             <header>
               <span />
@@ -86,7 +96,7 @@ const CodePreview = () => {
             ))}
           </Platforms>
         </ViewWrapper>
-        <Box width="13%" height="1px" />
+        <Box width={["0px", "0px", "0px", "0px", "13%"]} height="1px" />
       </Flex>
     </SectionLayout>
     // <AbosulteView width='50%'>
@@ -98,11 +108,14 @@ const CodePreview = () => {
 export default CodePreview;
 
 const ViewWrapper = styled(Flex)`
-
-  ${props => media((props.theme as ThemeInterface).breakpoints[0], (props.theme as ThemeInterface).breakpoints[3])} {
+  ${props =>
+    media(
+      (props.theme as ThemeInterface).breakpoints[0],
+      (props.theme as ThemeInterface).breakpoints[3],
+    )} {
     transform: translateX(45%);
   }
-`
+`;
 
 const Platforms = styled.div`
   margin-top: 20px;

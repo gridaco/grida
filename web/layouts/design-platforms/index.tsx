@@ -102,6 +102,22 @@ const PlatformView = styled.div`
   .platforms {
     margin-top: 20px;
   }
+
+  ${props =>
+    media(
+      (props.theme as ThemeInterface).breakpoints[0],
+      (props.theme as ThemeInterface).breakpoints[1],
+    )} {
+    transform: translateY(-27.5%);
+  }
+
+  ${props =>
+    media(
+      (props.theme as ThemeInterface).breakpoints[1],
+      (props.theme as ThemeInterface).breakpoints[2],
+    )} {
+    transform: translateY(-24%);
+  }
 `;
 
 const Postioner = styled(Flex)`
@@ -122,63 +138,12 @@ const Postioner = styled(Flex)`
       width: 100% !important;
     }
 
-    ${props => media((props.theme as ThemeInterface).breakpoints[0],(props.theme as ThemeInterface).breakpoints[3])} {
+    ${props =>
+      media(
+        (props.theme as ThemeInterface).breakpoints[0],
+        (props.theme as ThemeInterface).breakpoints[3],
+      )} {
       direction: rtl;
-    }
-  }
-`;
-
-const AbosulteView = styled(Flex)`
-  top: 5%;
-  left: 15%;
-
-  .platform-image > div {
-    box-shadow: 0px 4px 128px 32px rgba(0, 0, 0, 0.08);
-    max-width: none !important;
-    width: 904px !important;
-    height: 565px !important;
-  }
-
-  .platforms > div {
-    width: 24px;
-    height: 24px;
-    margin-right: 28px !important;
-  }
-
-  .platforms {
-    width: 110%;
-    left: 50%;
-    bottom: -100px;
-  }
-
-  .preview {
-    box-shadow: 0px 4px 128px 32px rgba(0, 0, 0, 0.08);
-    width: 440px;
-    height: 540px;
-    background-color: #f3f3f3;
-    border-radius: 12px;
-    right: 12.5%;
-    bottom: -7.5%;
-  }
-
-  ${props => media("0px", (props.theme as ThemeInterface).breakpoints[0])} {
-    right: 5%;
-
-    .platform-image > div {
-      width: 507px !important;
-      height: 317px !important;
-    }
-
-    .platforms {
-      bottom: -150px;
-      left: 0%;
-    }
-
-    .preview {
-      left: 0%;
-      bottom: -30%;
-      width: 280px;
-      height: 349px;
     }
   }
 
@@ -187,16 +152,7 @@ const AbosulteView = styled(Flex)`
       (props.theme as ThemeInterface).breakpoints[0],
       (props.theme as ThemeInterface).breakpoints[1],
     )} {
-    left: -60%;
-
-    .platforms {
-      left: 130%;
-    }
-
-    .preview {
-      left: 105%;
-      bottom: -7.5%;
-    }
+    width: 80% !important;
   }
 
   ${props =>
@@ -204,42 +160,6 @@ const AbosulteView = styled(Flex)`
       (props.theme as ThemeInterface).breakpoints[1],
       (props.theme as ThemeInterface).breakpoints[2],
     )} {
-    left: -30%;
-
-    .platforms {
-      left: 70%;
-    }
-
-    .preview {
-      left: 65%;
-      bottom: -7.5%;
-    }
-  }
-
-  ${props =>
-    media(
-      (props.theme as ThemeInterface).breakpoints[2],
-      (props.theme as ThemeInterface).breakpoints[3],
-    )} {
-    left: -15%;
-
-    .platforms {
-      left: auto;
-      right: -65%;
-    }
-
-    .preview {
-      left: 55%;
-      bottom: -7.5%;
-    }
-  }
-
-  ${props => media((props.theme as ThemeInterface).breakpoints[3], "")} {
-    left: 5%;
-
-    .preview {
-      left: 40%;
-      bottom: -7.5%;
-    }
+    width: 60% !important;
   }
 `;

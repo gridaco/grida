@@ -69,18 +69,4 @@ const DesignFramePreview = styled(Flex)`
     border-radius: 12px;
   }
 
-  ${props => media("0px", (props.theme as ThemeInterface).breakpoints[0])} {
-    width: calc(100vw - 40px) !important;
-    height: auto !important;
-    div {
-      width: calc(100vw - 40px) !important;
-      height: auto !important;
-    }
-
-    video {
-      box-shadow: 0px 4px 128px 32px rgba(0, 0, 0, 0.08);
-      border-radius: 12px;
-      height: auto !important;
-    }
-  }
 `;
