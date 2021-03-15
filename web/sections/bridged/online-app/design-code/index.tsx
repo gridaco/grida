@@ -12,20 +12,28 @@ import { css } from "@emotion/core";
 const DesignToCode = () => {
   return (
     <SectionLayout alignContent="start" backgroundColor="rgba(0,0,0,0)">
-      <Heading
-        fontSize={["32px", "64px", "64px", "64px"]}
-        style={{ letterSpacing: "0em", lineHeight: "98.1%" }}
-        mb={["10px"]}
-      >
-        Designs, <br />
-        come to live.
-      </Heading>
-      <Description fontSize={["18px", "24px", "24px", "25px"]}>
-        Keep your design live. Not as a prototype, but as a ready product.
-        Instantly convert your design to code, prototype and product within a
-        click. No coding required.
-      </Description>
-      <SectionLayout
+      <Flex width="100%">
+        <Flex className="text-platform" flexDirection="column">
+          <Heading
+            fontSize={["32px", "64px", "64px", "64px"]}
+            style={{ letterSpacing: "0em", lineHeight: "98.1%" }}
+            mb={["10px"]}
+          >
+            Designs, <br />
+            come to live.
+          </Heading>
+          <Description fontSize={["18px", "24px", "24px", "25px"]}>
+            Keep your design live. Not as a prototype, but as a ready product.
+            Instantly convert your design to code, prototype and product within
+            a click. No coding required.
+          </Description>
+          <DesignPlatforms />
+        </Flex>
+        <Flex className="code-view" width="50%" justifyContent="flex-end">
+          <CodePreview />
+        </Flex>
+      </Flex>
+      {/* <SectionLayout
         className="design-to-code-absoulte-view"
         variant="full-width"
         inherit={false}
@@ -35,7 +43,7 @@ const DesignToCode = () => {
           <DesignPlatforms />
           <CodePreview />
         </Positioner>
-      </SectionLayout>
+      </SectionLayout> */}
       <BlankArea height={190} />
     </SectionLayout>
   );
@@ -59,14 +67,16 @@ const Description = styled(Text)`
   }
 `;
 
-const Positioner = styled(Box)`
-  position: relative;
-  height: 600px;
-  width: 100%;
-  display: flex;
-  margin-top: 50px;
-
+const Mobile = styled.div`
+  display: none
   ${props => media("0px", (props.theme as ThemeInterface).breakpoints[0])} {
-    height: 1200px;
+    display: block;
+  }
+`;
+
+const Desktop = styled.div`
+  ${props => media("0px", (props.theme as ThemeInterface).breakpoints[0])} {
+    max-width: 100%;
+    line-height: 22px;
   }
 `;

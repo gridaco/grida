@@ -1,27 +1,53 @@
-import React, { useState } from 'react'
-import { Box, Flex } from 'rebass'
-import styled from '@emotion/styled';
-import Image from 'next/image'
-import { media } from 'utils/styled/media';
-import { ThemeInterface } from 'utils/styled/theme';
-import LiveDesignDemoFrame from 'components/motion/live-design-demo';
+import React, { useState, useRef, useEffect } from "react";
+import { Box, Flex } from "rebass";
+import styled from "@emotion/styled";
+import Image from "next/image";
+import { media } from "utils/styled/media";
+import { ThemeInterface } from "utils/styled/theme";
+import LiveDesignDemoFrame from "components/motion/live-design-demo";
+import SectionLayout from "layout/section";
 
 const renderPlatforms = ["figma", "sketch", "adobexd"];
 
 const DesignPlatforms = () => {
   const [currentPlatform, setCurrentPlatform] = useState("figma");
+  const scrollRef = useRef(null);
+
+  // useEffect(() => {
+  //   window.addEventListener(
+  //     "resize",
+  //     () => (scrollRef.current.scrollLeft = 295),
+  //   );
+
+  //   return window.addEventListener(
+  //     "resize",
+  //     () => (scrollRef.current.scrollLeft = 295),
+  //   );
+  // }, []);
 
   return (
-    <AbosulteView width="50%">
-      <PlatformView>
-        <div className="platform-image">
-          <Image
-            alt="platform"
-            src={`/assets/design-platforms/${currentPlatform}.png`}
-            width="auto"
-            height="auto"
-          />
-        </div>
+    <React.Fragment>
+      <SectionLayout variant="full-width" inherit={false} alignContent="center">
+        <Flex width="100%" height="100%">
+          <Postioner
+            width="50%"
+            justifyContent="flex-end"
+            flexDirection="column"
+          >
+            <div className="platforms-preview" ref={scrollRef}>
+              <Image
+                alt="platform"
+                src={`/assets/design-platforms/${currentPlatform}.png`}
+                width="auto"
+                height="565px"
+              />
+            </div>
+          </Postioner>
+          <Box width="50%" height="100%" />
+        </Flex>
+      </SectionLayout>
+      <PlatformView className="previews">
+        <LiveDesignDemoFrame />
         <div className="platforms">
           {renderPlatforms.map(i => (
             <Image
@@ -29,23 +55,80 @@ const DesignPlatforms = () => {
               key={i}
               className="cursor"
               onClick={() => setCurrentPlatform(i)}
-              src={`/assets/platform-icons/${i}/${currentPlatform === i ? "default" : "grey"
-                }.png`}
+              src={`/assets/platform-icons/${i}/${
+                currentPlatform === i ? "default" : "grey"
+              }.png`}
               width="24"
               height="24"
             />
           ))}
         </div>
-         <LiveDesignDemoFrame />
       </PlatformView>
-    </AbosulteView>
-  )
-}
+    </React.Fragment>
+    // <AbosulteView width="50%">
+    //   <PlatformView>
+    //     <div className="platform-image">
+    //       <Image
+    //         alt="platform"
+    //         src={`/assets/design-platforms/${currentPlatform}.png`}
+    //         width="auto"
+    //         height="auto"
+    //       />
+    //     </div>
 
-export default DesignPlatforms
+    //  <LiveDesignDemoFrame />
+    //   </PlatformView>
+    // </AbosulteView>
+  );
+};
+
+export default DesignPlatforms;
+
+const PlatformView = styled.div`
+  position: absolute;
+  z-index: 950;
+  border-radius: 12px;
+  top: 24%;
+  transform: translateY(-23.5%);
+  margin-left: auto;
+  height: 580px;
+
+  .platforms > div {
+    width: 24px;
+    height: 24px;
+    margin-right: 28px !important;
+  }
+
+  .platforms {
+    margin-top: 20px;
+  }
+`;
+
+const Postioner = styled(Flex)`
+  position: relative;
+
+  .platforms-preview {
+    margin-left: auto;
+    overflow: auto;
+    margin-top: 60px;
+    max-width: 920px;
+    width: 100%;
+    opacity: 0.6;
+    div {
+      min-width: 818px;
+      left: 20%;
+      transform: translateX(-20%);
+      max-width: 920px !important;
+      width: 100% !important;
+    }
+
+    ${props => media((props.theme as ThemeInterface).breakpoints[0],(props.theme as ThemeInterface).breakpoints[3])} {
+      direction: rtl;
+    }
+  }
+`;
 
 const AbosulteView = styled(Flex)`
-  position: absolute;
   top: 5%;
   left: 15%;
 
@@ -54,7 +137,6 @@ const AbosulteView = styled(Flex)`
     max-width: none !important;
     width: 904px !important;
     height: 565px !important;
-    opacity: 0.7;
   }
 
   .platforms > div {
@@ -65,17 +147,15 @@ const AbosulteView = styled(Flex)`
 
   .platforms {
     width: 110%;
-    left: 85%;
-    position: absolute;
+    left: 50%;
     bottom: -100px;
   }
-  
+
   .preview {
     box-shadow: 0px 4px 128px 32px rgba(0, 0, 0, 0.08);
-    position: absolute;
     width: 440px;
     height: 540px;
-    background-color:#F3F3F3;
+    background-color: #f3f3f3;
     border-radius: 12px;
     right: 12.5%;
     bottom: -7.5%;
@@ -102,7 +182,11 @@ const AbosulteView = styled(Flex)`
     }
   }
 
-  ${props => media((props.theme as ThemeInterface).breakpoints[0], (props.theme as ThemeInterface).breakpoints[1])} {
+  ${props =>
+    media(
+      (props.theme as ThemeInterface).breakpoints[0],
+      (props.theme as ThemeInterface).breakpoints[1],
+    )} {
     left: -60%;
 
     .platforms {
@@ -115,7 +199,11 @@ const AbosulteView = styled(Flex)`
     }
   }
 
-  ${props => media((props.theme as ThemeInterface).breakpoints[1], (props.theme as ThemeInterface).breakpoints[2])} {
+  ${props =>
+    media(
+      (props.theme as ThemeInterface).breakpoints[1],
+      (props.theme as ThemeInterface).breakpoints[2],
+    )} {
     left: -30%;
 
     .platforms {
@@ -128,7 +216,11 @@ const AbosulteView = styled(Flex)`
     }
   }
 
-  ${props => media((props.theme as ThemeInterface).breakpoints[2], (props.theme as ThemeInterface).breakpoints[3])} {
+  ${props =>
+    media(
+      (props.theme as ThemeInterface).breakpoints[2],
+      (props.theme as ThemeInterface).breakpoints[3],
+    )} {
     left: -15%;
 
     .platforms {
@@ -150,23 +242,4 @@ const AbosulteView = styled(Flex)`
       bottom: -7.5%;
     }
   }
-
-  
-`
-
-const Platforms = styled(Box)`
-  margin-left: auto;
-  position: absolute;
-  right: 28%;
-  bottom: -10%;
-  div {
-    width: 24px;
-    height: 24px;
-    margin-right: 28px !important;
-  }
-`;
-
-const PlatformView = styled(Flex)`
-  flex-direction: column;
-  position: relative;
 `;

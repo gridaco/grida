@@ -4,6 +4,8 @@ import { Flex } from "rebass";
 import useOnScreen from "utils/hooks/use-on-screen";
 import ReactPlayer from "react-player";
 import animationData from "public/animations/live-demo-app-design-motion/comp.json";
+import { media } from "utils/styled/media";
+import { ThemeInterface } from "utils/styled/theme";
 
 export default function LiveDesignDemoFrame() {
   const [isStopped, setIsStopped] = useState(true);
@@ -29,7 +31,7 @@ export default function LiveDesignDemoFrame() {
   };
 
   return (
-    <DesignFramePreview bg="#F5F5F5" ref={ref} className="preview">
+    <DesignFramePreview ref={ref} className="preview">
       {/* <Lottie
         options={defaultMotionOptions}
         isStopped={isStopped}
@@ -41,7 +43,7 @@ export default function LiveDesignDemoFrame() {
         }}
       /> */}
       <ReactPlayer
-        url={require('public/videos/loop_landingpage-210306-motionsource-section-2-1.mp4')}
+        url={require("public/videos/loop_landingpage-210306-motionsource-section-2-1.mp4")}
         loop
         playing
         muted
@@ -51,18 +53,34 @@ export default function LiveDesignDemoFrame() {
 }
 
 const DesignFramePreview = styled(Flex)`
-  box-shadow: 0px 4px 128px 32px rgba(0, 0, 0, 0.08);
-  width: 350px;
-  height: 542px;
-  top: 15%;
-  position: absolute;
-  border-radius: 12px;
-  left: 40%;
+  width: 350px !important;
+  height: 580px !important;
   align-items: center;
   justify-content: center;
+  border-radius: 12px;
 
   div {
     height: 100% !important;
+    width: 350px !important;
+  }
 
+  video {
+    box-shadow: 0px 4px 128px 32px rgba(0, 0, 0, 0.08);
+    border-radius: 12px;
+  }
+
+  ${props => media("0px", (props.theme as ThemeInterface).breakpoints[0])} {
+    width: calc(100vw - 40px) !important;
+    height: auto !important;
+    div {
+      width: calc(100vw - 40px) !important;
+      height: auto !important;
+    }
+
+    video {
+      box-shadow: 0px 4px 128px 32px rgba(0, 0, 0, 0.08);
+      border-radius: 12px;
+      height: auto !important;
+    }
   }
 `;
