@@ -3,7 +3,7 @@ import styled from "@emotion/styled";
 import FeatureListMobileView from "./mobile-view";
 import FeatureListDesktopView from "./desktop-view";
 import { Flex } from "rebass";
-import { DesktopView, MobileView } from "utils/styled/styles";
+import { DesktopView } from "utils/styled/styles";
 import { media } from "utils/styled/media";
 import { ThemeInterface } from "utils/styled/theme";
 
