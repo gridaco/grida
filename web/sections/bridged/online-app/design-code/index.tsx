@@ -11,8 +11,8 @@ import { css } from "@emotion/core";
 
 const DesignToCode = () => {
   return (
-    <SectionLayout alignContent="start" backgroundColor="rgba(0,0,0,0)">
-      <Flex width="100%" flexDirection={["column", "row", "row", "row"]}>
+    <SectionLayout  alignContent="start" backgroundColor="rgba(0,0,0,0)">
+      <Flex className="no-drag" width="100%" flexDirection={["column", "row", "row", "row"]}>
         <Flex className="text-platform" flexDirection="column">
           <Heading
             fontSize={["32px", "64px", "64px", "64px"]}

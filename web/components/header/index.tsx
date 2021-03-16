@@ -212,13 +212,14 @@ const SignupButton = styled(Button)`
   display: flex;
   align-items: center;
   justify-content: center;
+  opacity: 0 !important;
 
   ${props => media((props.theme as ThemeInterface).breakpoints[0], null)} {
     height: 25px;
     opacity: 1 !important;
   }
 
-  ${props => media((props.theme as ThemeInterface).breakpoints[1], null)} {
+  ${props => media((props.theme as ThemeInterface).breakpoints[0], null)} {
     background-color: #fff;
     color: #2562ff;
   }

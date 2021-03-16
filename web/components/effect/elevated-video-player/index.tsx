@@ -91,6 +91,10 @@ const Frame = styled(motion.div)`
     div {
       width: 100% !important;
       height: 100% !important;
+      
+      video {
+        object-fit: cover;
+      }
     }
   }
 `;

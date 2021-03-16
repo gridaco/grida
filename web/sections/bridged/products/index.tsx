@@ -308,8 +308,13 @@ const List = styled.span<{ gradient: string }>`
   }
 
   ${props => media("0px", (props.theme as ThemeInterface).breakpoints[0])} {
+    margin-left: 35px;
     &:first-of-type {
-      padding-left: 25px;
+      padding-left: 10px;
+    }
+
+    &:last-of-type {
+      margin-left: 27px;
     }
   }
 
