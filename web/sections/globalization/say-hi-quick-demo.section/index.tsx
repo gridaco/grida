@@ -5,7 +5,7 @@ import Image from "next/image";
 import SectionLayout from "layout/section";
 export default function GlobalizationQuickDemoSayHiSection() {
   return (
-    <SectionLayout variant="content-default">
+    <SectionLayout debug variant="content-default">
       <div>
         <LandingpageText variant="h2">
           Say hi to deisgn-first globalization

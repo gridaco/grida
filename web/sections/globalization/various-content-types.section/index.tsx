@@ -5,7 +5,7 @@ import React from "react";
 
 export default function GlobalizationUnimitYourStoryTellingSection() {
   return (
-    <SectionLayout>
+    <SectionLayout debug>
       <div key="text-layout">
         <LandingpageText variant="h2">
           Unlimit your story telling

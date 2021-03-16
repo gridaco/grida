@@ -1,10 +1,11 @@
 import LandingpageText from "components/landingpage/text";
+import SectionLayout from "layout/section";
 import React from "react";
 import { Button } from "rebass";
 
 export default function GlobalizationHeroSection() {
   return (
-    <div>
+    <SectionLayout debug>
       <LandingpageText variant="h1" textAlign="center">
         Globalize your design.
       </LandingpageText>
@@ -13,6 +14,6 @@ export default function GlobalizationHeroSection() {
         and even feedback. Product use designers, developers, and translators.
       </LandingpageText>
       <Button>Join the wait list</Button>
-    </div>
+    </SectionLayout>
   );
 }

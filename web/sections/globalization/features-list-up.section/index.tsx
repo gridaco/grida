@@ -15,7 +15,7 @@ const FEATURES: FeatureListupCardItemDisplayData[] = [
 
 export default function GlobalizationFeaturesListupSection() {
   return (
-    <SectionLayout variant="content-overflow-1">
+    <SectionLayout debug variant="content-overflow-1">
       <LandingpageText variant="h2" textAlign="center">
         Ready to be extended.
       </LandingpageText>
