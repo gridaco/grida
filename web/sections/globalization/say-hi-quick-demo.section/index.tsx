@@ -5,9 +5,9 @@ import Image from "next/image";
 import SectionLayout from "layout/section";
 export default function GlobalizationQuickDemoSayHiSection() {
   return (
-    <div>
+    <SectionLayout variant="content-default">
       <div>
-        <LandingpageText variant="h1">
+        <LandingpageText variant="h2">
           Say hi to deisgn-first globalization
         </LandingpageText>
         <LandingpageText variant="body1">
@@ -15,7 +15,7 @@ export default function GlobalizationQuickDemoSayHiSection() {
         </LandingpageText>
       </div>
       <ActionItem label="Try the demo" href="/_development/todo" />
-      <SectionLayout variant="full-width">
+      <SectionLayout variant="full-width" inherit={false}>
         {/* todo: sizing */}
         <Image
           src="https://via.placeholder.com/150"
@@ -23,6 +23,6 @@ export default function GlobalizationQuickDemoSayHiSection() {
           height="200px"
         />
       </SectionLayout>
-    </div>
+    </SectionLayout>
   );
 }
