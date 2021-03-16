@@ -33,7 +33,7 @@ const Collaborate = () => {
         it make sense. When the cycle gets shorter, the good thing happens.
         Forget all the time you’ve spent repeating yourself.
       </Description>
-      <BlankArea height={[50, 50]} />
+      <BlankArea height={[0, 50]} />
       <SectionLayout
         className="bottom-application-notification"
         variant="full-width"
@@ -140,9 +140,8 @@ const Description = styled(Text)`
 
 const BackgroundImage = styled(Flex)`
   position: relative;
-
+  
   .background-img {
-    background-color: #000;
     div {
       width: 100vw !important;
       height: 55vh !important;

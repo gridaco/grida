@@ -176,7 +176,7 @@ const CodeView = styled(Box)`
 `;
 
 const Mobile = styled.div`
-  display: none
+  display: none;
     ${props => media("0px", (props.theme as ThemeInterface).breakpoints[0])} {
     display: block;
   }

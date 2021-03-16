@@ -187,7 +187,8 @@ const VideoWrapper = styled(Flex)`
   }
 
   ${props => media("0px", (props.theme as ThemeInterface).breakpoints[0])} {
-    height: 350px;
+    height: 100%;
+    margin-left: 0px !important;
   }
 
   ${props =>

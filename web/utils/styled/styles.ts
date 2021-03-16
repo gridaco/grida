@@ -118,5 +118,29 @@ export const BodyCustomStyleInAbosulteSectionLayout = styled(Box)`
 
   .bottom-application-notification {
     height: 739px;
+
+    .full-width {
+      bottom: 12%;
+
+      ${props => media("0px", (props.theme as ThemeInterface).breakpoints[0])} {
+        bottom: 8%;
+      }
+
+      ${props =>
+        media(
+          (props.theme as ThemeInterface).breakpoints[0],
+          (props.theme as ThemeInterface).breakpoints[2],
+        )} {
+        bottom: 11%;
+      }
+
+      ${props =>
+        media(
+          (props.theme as ThemeInterface).breakpoints[2],
+          (props.theme as ThemeInterface).breakpoints[3],
+        )} {
+        bottom: 12%;
+      }
+    }
   }
 `;
