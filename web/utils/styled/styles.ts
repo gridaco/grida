@@ -1,5 +1,5 @@
 import { css } from "@emotion/core";
-import styled from '@emotion/styled';
+import styled from "@emotion/styled";
 import { Box } from "rebass";
 import { media } from "./media";
 import { ThemeInterface } from "./theme";
@@ -13,30 +13,29 @@ export const resetUl = css`
 export const center = {
   display: "flex",
   alignItems: "center",
-  justifyContent: "center"
-}
+  justifyContent: "center",
+};
 
 export const DesktopView = styled.div`
   display: flex;
 
   .gradient-view {
-      position: absolute;
-      filter: blur(10px);
-      top: -45%;
-      right: -20%;
-      z-index: -1;
+    position: absolute;
+    filter: blur(10px);
+    top: -45%;
+    right: -20%;
+    z-index: -1;
 
-      
-      div {
-        width: 1040px !important;
-        height: 1027px !important;
-      }
+    div {
+      width: 1040px !important;
+      height: 1027px !important;
     }
+  }
 
   ${props => media("0px", (props.theme as ThemeInterface).breakpoints[0])} {
     display: none;
   }
-`
+`;
 
 export const MobileView = styled.div`
   display: none;
@@ -58,10 +57,9 @@ export const MobileView = styled.div`
       }
     }
   }
-`
+`;
 
 export const BodyCustomStyleInAbosulteSectionLayout = styled(Box)`
-
   .design-to-code-absoulte-view {
     height: 600px;
 
@@ -74,14 +72,22 @@ export const BodyCustomStyleInAbosulteSectionLayout = styled(Box)`
     height: 636px;
 
     ${props => media("0px", (props.theme as ThemeInterface).breakpoints[0])} {
-      height: 375px;
+      height: auto;
     }
 
-    ${props => media((props.theme as ThemeInterface).breakpoints[0], (props.theme as ThemeInterface).breakpoints[1])} {
+    ${props =>
+      media(
+        (props.theme as ThemeInterface).breakpoints[0],
+        (props.theme as ThemeInterface).breakpoints[1],
+      )} {
       height: 423px;
     }
 
-    ${props => media((props.theme as ThemeInterface).breakpoints[1], (props.theme as ThemeInterface).breakpoints[2])} {
+    ${props =>
+      media(
+        (props.theme as ThemeInterface).breakpoints[1],
+        (props.theme as ThemeInterface).breakpoints[2],
+      )} {
       height: 529px;
     }
   }
@@ -93,11 +99,19 @@ export const BodyCustomStyleInAbosulteSectionLayout = styled(Box)`
       height: 37px;
     }
 
-    ${props => media((props.theme as ThemeInterface).breakpoints[0], (props.theme as ThemeInterface).breakpoints[2])} {
+    ${props =>
+      media(
+        (props.theme as ThemeInterface).breakpoints[0],
+        (props.theme as ThemeInterface).breakpoints[2],
+      )} {
       height: 74px;
     }
 
-    ${props => media((props.theme as ThemeInterface).breakpoints[2], (props.theme as ThemeInterface).breakpoints[3])} {
+    ${props =>
+      media(
+        (props.theme as ThemeInterface).breakpoints[2],
+        (props.theme as ThemeInterface).breakpoints[3],
+      )} {
       height: 92px;
     }
   }
@@ -105,5 +119,4 @@ export const BodyCustomStyleInAbosulteSectionLayout = styled(Box)`
   .bottom-application-notification {
     height: 739px;
   }
-
-`
+`;
