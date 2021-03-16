@@ -69,4 +69,11 @@ const DesignFramePreview = styled(Flex)`
     border-radius: 12px;
   }
 
+  ${props => media("0px", (props.theme as ThemeInterface).breakpoints[0])} {
+    width: 280px !important;
+    height: 465px !important;
+    div {
+      width: 280px !important;
+    }
+  }
 `;

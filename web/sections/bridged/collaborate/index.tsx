@@ -21,11 +21,10 @@ const Collaborate = () => {
         flexDirection={["column", "column", "row", "row"]}
       >
         <SyncIcon name="loading" mr="20px" />
-        <Heading
-          fontSize={["32px", "64px"]}
-          style={{ lineHeight: "98.1%" }}
-        >
-          Collaborate as<br />the way it should be
+        <Heading fontSize={["32px", "64px"]} style={{ lineHeight: "98.1%" }}>
+          Collaborate as
+          <br />
+          the way it should be
         </Heading>
       </Flex>
       <Description fontSize={["21px", "21px", "21px", "25px"]} mx="20px">
@@ -34,8 +33,13 @@ const Collaborate = () => {
         it make sense. When the cycle gets shorter, the good thing happens.
         Forget all the time you’ve spent repeating yourself.
       </Description>
-      <BlankArea height={50} />
-      <SectionLayout className="bottom-application-notification" variant="full-width" inherit={false} notAutoAllocateHeight>
+      <BlankArea height={[50, 50]} />
+      <SectionLayout
+        className="bottom-application-notification"
+        variant="full-width"
+        inherit={false}
+        notAutoAllocateHeight
+      >
         <BackgroundImage>
           <div className="background-img">
             <Image
@@ -84,7 +88,11 @@ const SyncIcon = styled(Icon)`
     height: 32px;
   }
 
-  ${props => media((props.theme as ThemeInterface).breakpoints[1], (props.theme as ThemeInterface).breakpoints[2])} {
+  ${props =>
+    media(
+      (props.theme as ThemeInterface).breakpoints[1],
+      (props.theme as ThemeInterface).breakpoints[2],
+    )} {
     width: 64px;
     height: 64px;
   }
@@ -98,11 +106,11 @@ const Description = styled(Text)`
   max-width: 655px;
   font-weight: 400;
   letter-spacing: 0em;
-  
+
   ${props => media("0px", (props.theme as ThemeInterface).breakpoints[0])} {
     max-width: 100%;
     margin-left: 20px;
-    line-height: 22px;
+    line-height: 25px;
   }
 
   ${props =>

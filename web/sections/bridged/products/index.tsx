@@ -32,7 +32,8 @@ const Products = () => {
   };
 
   useEffect(() => {
-    const timer = counter >= 0 && setInterval(() => setCounter(counter - 1), 1000);
+    const timer =
+      counter >= 0 && setInterval(() => setCounter(counter - 1), 1000);
     return () => clearInterval(timer);
   }, [counter]);
 
@@ -44,9 +45,9 @@ const Products = () => {
 
   useEffect(() => {
     if (elRefs.current[0].current !== null) {
-      setElWidth(elRefs.current.map(
-        innerElRef => innerElRef.current.offsetWidth + 30,
-      ))
+      setElWidth(
+        elRefs.current.map(innerElRef => innerElRef.current.offsetWidth + 30),
+      );
     }
   }, [beforeClick, counter]);
 
@@ -76,11 +77,14 @@ const Products = () => {
 
   return (
     <SectionLayout alignContent="start">
-      <Heading fontSize={["32px", "64px", "64px", "64px"]} style={{ letterSpacing: "0em"}}>
+      <Heading
+        fontSize={["32px", "64px", "64px", "64px"]}
+        style={{ letterSpacing: "0em" }}
+      >
         Your design is your
       </Heading>
       <SectionLayout
-      className="gradient-row-tab"
+        className="gradient-row-tab"
         variant="content-overflow-1"
         inherit={false}
         alignContent="center"
@@ -129,9 +133,15 @@ const Products = () => {
           />
         </motion.div>
       </VideoWrapper>
-      <Heading fontSize="32px" mt="40px" fontWeight="600" letterSpacing="0em" style={{ maxWidth: "50%"}} >
+      <SubTitle
+        fontSize={["18px", "32px", "32px", "32px"]}
+        mt="40px"
+        fontWeight="600"
+        letterSpacing="0em"
+        style={{ maxWidth: "50%" }}
+      >
         {PRODUCT_LIST[beforeClick].subTitle}
-      </Heading>
+      </SubTitle>
       <Description fontSize={["21px", "21px", "21px", "24px"]}>
         {PRODUCT_LIST[beforeClick].desc}
       </Description>
@@ -155,12 +165,18 @@ const Products = () => {
           <span>everything</span>
         </Link>
       </MoreLists> */}
-      <BlankArea height={315} />
+      <BlankArea height={[158, 315]} />
     </SectionLayout>
   );
 };
 
 export default Products;
+
+const SubTitle = styled(Heading)`
+  ${props => media("0px", (props.theme as ThemeInterface).breakpoints[0])} {
+    max-width: calc(100vw - 40px) !important;
+  }
+`;
 
 const VideoWrapper = styled(Flex)`
   height: 700px;
@@ -173,15 +189,22 @@ const VideoWrapper = styled(Flex)`
   ${props => media("0px", (props.theme as ThemeInterface).breakpoints[0])} {
     height: 350px;
   }
-  
-  ${props => media((props.theme as ThemeInterface).breakpoints[0], (props.theme as ThemeInterface).breakpoints[1])} {
+
+  ${props =>
+    media(
+      (props.theme as ThemeInterface).breakpoints[0],
+      (props.theme as ThemeInterface).breakpoints[1],
+    )} {
     height: 500px;
   }
-  
-  ${props => media((props.theme as ThemeInterface).breakpoints[1], (props.theme as ThemeInterface).breakpoints[2])} {
+
+  ${props =>
+    media(
+      (props.theme as ThemeInterface).breakpoints[1],
+      (props.theme as ThemeInterface).breakpoints[2],
+    )} {
     height: 700px;
   }
-
 `;
 
 const More = styled(Text)`
@@ -214,7 +237,7 @@ const Description = styled(Text)`
 
   ${props => media("0px", (props.theme as ThemeInterface).breakpoints[0])} {
     max-width: 100%;
-    line-height: 22px;
+    line-height: 25px;
   }
 `;
 

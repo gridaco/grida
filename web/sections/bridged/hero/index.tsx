@@ -11,7 +11,7 @@ import LandingMainCtaButton from "components/landingpage/main-cta-button";
 const Hero = () => {
   return (
     <SectionLayout alignContent="center">
-      <BlankArea height={198} />
+      <BlankArea height={[101, 198]} />
       <HeroText fontSize={["32px", "64px", "64px", "80px"]}>
         Designs that are meant to be implemented.
       </HeroText>
@@ -23,7 +23,7 @@ const Hero = () => {
 
       <ElevatedVideoPlayer />
 
-      <BlankArea height={200} />
+      <BlankArea height={[273, 200]} />
     </SectionLayout>
   );
 };
@@ -40,7 +40,6 @@ const HeroText = styled(Heading)`
     max-width: 100%;
   }
 
-  
   ${props =>
     media(
       (props.theme as ThemeInterface).breakpoints[0],

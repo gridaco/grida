@@ -12,7 +12,7 @@ import { css } from "@emotion/core";
 const DesignToCode = () => {
   return (
     <SectionLayout alignContent="start" backgroundColor="rgba(0,0,0,0)">
-      <Flex width="100%">
+      <Flex width="100%" flexDirection={["column", "row", "row", "row"]}>
         <Flex className="text-platform" flexDirection="column">
           <Heading
             fontSize={["32px", "64px", "64px", "64px"]}
@@ -29,7 +29,11 @@ const DesignToCode = () => {
           </Description>
           <DesignPlatforms />
         </Flex>
-        <Flex className="code-view" width="50%" justifyContent="flex-end">
+        <Flex
+          className="code-view"
+          width={["100%", "50%", "50%", "50%"]}
+          justifyContent={["flex-start", "flex-end", "flex-end", "flex-end"]}
+        >
           <CodePreview />
         </Flex>
       </Flex>
@@ -44,7 +48,7 @@ const DesignToCode = () => {
           <CodePreview />
         </Positioner>
       </SectionLayout> */}
-      <BlankArea height={190} />
+      <BlankArea height={[100, 190]} />
     </SectionLayout>
   );
 };
@@ -62,14 +66,14 @@ const Description = styled(Text)`
   letter-spacing: 0em;
 
   ${props => media("0px", (props.theme as ThemeInterface).breakpoints[0])} {
-    max-width: 100%;
-    line-height: 22px;
+    max-width: calc(100vw - 40px);
+    line-height: 25px;
   }
 `;
 
 const Mobile = styled.div`
   display: none
-  ${props => media("0px", (props.theme as ThemeInterface).breakpoints[0])} {
+    ${props => media("0px", (props.theme as ThemeInterface).breakpoints[0])} {
     display: block;
   }
 `;

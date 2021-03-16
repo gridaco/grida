@@ -12,6 +12,7 @@ import Image from "next/image";
 import { media } from "utils/styled/media";
 import { ThemeInterface } from "utils/styled/theme";
 import SectionLayout from "layout/section";
+import CodePreviewMobile from "./mobile";
 
 interface DevFrameworkDemoConfig {
   name: string;
@@ -50,55 +51,63 @@ const CodePreview = () => {
   >(DEFAULT_DEMO_ITEM_FLUTTER);
 
   return (
-    <SectionLayout variant="full-width" inherit={false}>
-      <Flex width="100%">
-        <Box width="25%" height="1px" />
-        <Box width="25%" height="1px" />
-        <ViewWrapper
-          width="37%"
-          flexDirection="column"
-          alignItems={[
-            "flex-start",
-            "flex-start",
-            "flex-start",
-            "flex-start",
-            "flex-end",
-          ]}
-        >
-          <CodeView width="460px" height="770px" bg="#212121">
-            <header>
-              <span />
-              <span />
-              <span />
-            </header>
-            <div className="body">
-              <SyntaxHighlighter
-                language={currentPlatform.lang}
-                style={a11yDark}
-              >
-                {currentPlatform.source}
-              </SyntaxHighlighter>
-            </div>
-          </CodeView>
-          <Platforms className="platforms">
-            {DEV_FRAMEWORKS.map(i => (
-              <Image
-                alt="platform"
-                key={i.name}
-                className="cursor"
-                onClick={() => setCurrentPlatform(i)}
-                src={`/assets/platform-icons/${i.name}/${
-                  currentPlatform.name === i.name ? "default" : "grey"
-                }.png`}
-                width="24"
-                height="24"
-              />
-            ))}
-          </Platforms>
-        </ViewWrapper>
-        <Box width={["0px", "0px", "0px", "0px", "13%"]} height="1px" />
-      </Flex>
-    </SectionLayout>
+    <React.Fragment>
+      <Mobile>
+        <CodePreviewMobile />
+      </Mobile>
+      <Desktop>
+        <SectionLayout variant="full-width" inherit={false}>
+          <Flex width="100%">
+            <Box width="25%" height="1px" />
+            <Box width="25%" height="1px" />
+            <ViewWrapper
+              width="37%"
+              flexDirection="column"
+              alignItems={[
+                "flex-start",
+                "flex-start",
+                "flex-start",
+                "flex-start",
+                "flex-end",
+              ]}
+            >
+              <CodeView width="460px" height="770px" bg="#212121">
+                <header>
+                  <span />
+                  <span />
+                  <span />
+                </header>
+                <div className="body">
+                  <SyntaxHighlighter
+                    language={currentPlatform.lang}
+                    style={a11yDark}
+                  >
+                    {currentPlatform.source}
+                  </SyntaxHighlighter>
+                </div>
+              </CodeView>
+              <Platforms className="platforms">
+                {DEV_FRAMEWORKS.map(i => (
+                  <Image
+                    alt="platform"
+                    key={i.name}
+                    className="cursor"
+                    onClick={() => setCurrentPlatform(i)}
+                    src={`/assets/platform-icons/${i.name}/${
+                      currentPlatform.name === i.name ? "default" : "grey"
+                    }.png`}
+                    width="24"
+                    height="24"
+                  />
+                ))}
+              </Platforms>
+            </ViewWrapper>
+            <Box width={["0px", "0px", "0px", "0px", "13%"]} height="1px" />
+          </Flex>
+        </SectionLayout>
+      </Desktop>
+    </React.Fragment>
+
     // <AbosulteView width='50%'>
 
     // </AbosulteView>
@@ -163,5 +172,19 @@ const CodeView = styled(Box)`
       border-bottom-left-radius: 12px;
       border-bottom-right-radius: 12px;
     }
+  }
+`;
+
+const Mobile = styled.div`
+  display: none
+    ${props => media("0px", (props.theme as ThemeInterface).breakpoints[0])} {
+    display: block;
+  }
+`;
+
+const Desktop = styled.div`
+  display: block;
+  ${props => media("0px", (props.theme as ThemeInterface).breakpoints[0])} {
+    display: none;
   }
 `;

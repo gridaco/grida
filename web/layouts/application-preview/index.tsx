@@ -37,7 +37,8 @@ const Postioner = styled(Flex)`
   justify-content: center;
   z-index: 1;
   width: 390px !important;
-  height: 788px;
+  max-height: 788px;
+  height: auto;
 `
 
 const Preview = styled(Flex)`

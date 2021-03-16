@@ -1,12 +1,23 @@
-import React from 'react'
+import React from "react";
+import styled from "@emotion/styled";
+import { media } from "utils/styled/media";
+import { ThemeInterface } from "utils/styled/theme";
 
 interface BlankAreaProps {
-  height: number
+  height: number[];
 }
 
-export default function BlankArea(props : BlankAreaProps) {
+export default function BlankArea(props: BlankAreaProps) {
   const { height } = props;
-  return (
-    <div style={{ height, width: "100%", backgroundColor: "rgba(0,0,0,0)" }} />
-  )
+  return <Div height={height} />;
 }
+
+const Div = styled.div<BlankAreaProps>`
+  width: 100%;
+  background-color: rgba(0, 0, 0, 0);
+  height: ${p => p.height[1]}px;
+
+  ${props => media("0px", (props.theme as ThemeInterface).breakpoints[0])} {
+    height: ${p => p.height[0]}px;
+  }
+`;

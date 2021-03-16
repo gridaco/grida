@@ -43,7 +43,6 @@ const OnlineApp: React.FC<OnlineAppProps> = ({ isMobile }) => {
         width="100%"
       >
         <Flex flexDirection="column" width="100%" mr="40px">
-          <BlankArea height={75} />
           <Text fontSize="24px" mb="15px" style={{ letterSpacing: "0em" }}>
             What you’ve just sketched?
           </Text>
@@ -69,7 +68,7 @@ const OnlineApp: React.FC<OnlineAppProps> = ({ isMobile }) => {
             lines of code is ready to use. Design once, Run everywhere.
           </Description>
 
-          <BlankArea height={80} />
+          <BlankArea height={[48, 80]} />
 
           <ActionItem
             label="How does Design to code work?"
@@ -87,7 +86,7 @@ const OnlineApp: React.FC<OnlineAppProps> = ({ isMobile }) => {
           </div>
         </DesktopView>
       </Flex>
-      <BlankArea height={180} />
+      <BlankArea height={[73, 180]} />
     </SectionLayout>
   );
 };
@@ -114,7 +113,7 @@ const Description = styled(Text)`
 
   ${props => media("0px", (props.theme as ThemeInterface).breakpoints[0])} {
     max-width: 100%;
-    line-height: 22px;
+    line-height: 25px;
   }
 `;
 

@@ -6,12 +6,12 @@ import { media } from "utils/styled/media";
 import { ThemeInterface } from "utils/styled/theme";
 import LiveDesignDemoFrame from "components/motion/live-design-demo";
 import SectionLayout from "layout/section";
+import DesignPlatformsMobile from "./mobile";
 
 const renderPlatforms = ["figma", "sketch", "adobexd"];
 
 const DesignPlatforms = () => {
   const [currentPlatform, setCurrentPlatform] = useState("figma");
-  const scrollRef = useRef(null);
 
   // useEffect(() => {
   //   window.addEventListener(
@@ -27,43 +27,52 @@ const DesignPlatforms = () => {
 
   return (
     <React.Fragment>
-      <SectionLayout variant="full-width" inherit={false} alignContent="center">
-        <Flex width="100%" height="100%">
-          <Postioner
-            width="50%"
-            justifyContent="flex-end"
-            flexDirection="column"
-          >
-            <div className="platforms-preview" ref={scrollRef}>
+      <Mobile>
+        <DesignPlatformsMobile />
+      </Mobile>
+      <Desktop>
+        <SectionLayout
+          variant="full-width"
+          inherit={false}
+          alignContent="center"
+        >
+          <Flex width="100%" height="100%">
+            <Postioner
+              width="50%"
+              justifyContent="flex-end"
+              flexDirection="column"
+            >
+              <div className="platforms-preview">
+                <Image
+                  alt="platform"
+                  src={`/assets/design-platforms/${currentPlatform}.png`}
+                  width="auto"
+                  height="565px"
+                />
+              </div>
+            </Postioner>
+            <Box width="50%" height="100%" />
+          </Flex>
+        </SectionLayout>
+        <PlatformView className="previews">
+          <LiveDesignDemoFrame />
+          <div className="platforms">
+            {renderPlatforms.map(i => (
               <Image
                 alt="platform"
-                src={`/assets/design-platforms/${currentPlatform}.png`}
-                width="auto"
-                height="565px"
+                key={i}
+                className="cursor"
+                onClick={() => setCurrentPlatform(i)}
+                src={`/assets/platform-icons/${i}/${
+                  currentPlatform === i ? "default" : "grey"
+                }.png`}
+                width="24"
+                height="24"
               />
-            </div>
-          </Postioner>
-          <Box width="50%" height="100%" />
-        </Flex>
-      </SectionLayout>
-      <PlatformView className="previews">
-        <LiveDesignDemoFrame />
-        <div className="platforms">
-          {renderPlatforms.map(i => (
-            <Image
-              alt="platform"
-              key={i}
-              className="cursor"
-              onClick={() => setCurrentPlatform(i)}
-              src={`/assets/platform-icons/${i}/${
-                currentPlatform === i ? "default" : "grey"
-              }.png`}
-              width="24"
-              height="24"
-            />
-          ))}
-        </div>
-      </PlatformView>
+            ))}
+          </div>
+        </PlatformView>
+      </Desktop>
     </React.Fragment>
     // <AbosulteView width="50%">
     //   <PlatformView>
@@ -161,5 +170,20 @@ const Postioner = styled(Flex)`
       (props.theme as ThemeInterface).breakpoints[2],
     )} {
     width: 60% !important;
+  }
+`;
+
+const Mobile = styled.div`
+  display: none;
+  ${props => media("0px", (props.theme as ThemeInterface).breakpoints[0])} {
+    display: block;
+    margin-bottom: 300px;
+  }
+`;
+
+const Desktop = styled.div`
+  display: block;
+  ${props => media("0px", (props.theme as ThemeInterface).breakpoints[0])} {
+    display: none;
   }
 `;
