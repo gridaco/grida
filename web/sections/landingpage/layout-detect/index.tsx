@@ -10,6 +10,7 @@ import { LandingpageUrls } from "utils/landingpage/constants";
 import MotionButton from "components/landingpage/motion/button";
 import MotionRadio from "components/landingpage/motion/radio";
 import ButtonDetectDemo from "components/landingpage/motion/button-detect-demo";
+import LandingpageText from "components/landingpage/text";
 
 const renderMoitonComponents = [MotionButton];
 
@@ -18,14 +19,9 @@ const LayoutDetect = () => {
 
   return (
     <SectionLayout alignContent="start">
-      <Heading
-        fontSize={["32px", "64px", "64px", "64px"]}
-        style={{ lineHeight: "90%" }}
-      >
-        Yeah, we know.
-      </Heading>
-      <DetectTitle fontSize={["32px", "64px", "64px", "64px"]}>
-        <span>That's a</span>{" "}
+      <LandingpageText variant="h2">Yeah, we know.</LandingpageText>
+      <DetectTitle variant="h2">
+        <span>That's a</span>
         {renderMoitonComponents.map(
           (i, ix) =>
             ix === currentMotionIndex % renderMoitonComponents.length &&
@@ -36,7 +32,7 @@ const LayoutDetect = () => {
             }),
         )}
       </DetectTitle>
-      <Description fontSize={["21px", "21px", "21px", "24.5px"]}>
+      <Description variant="body1">
         Finally, the tool understands your design. More inteligence means less
         modification. Which leads us to blazing fast workflow. Just design it.
         We’ll know.
@@ -62,29 +58,21 @@ const LayoutDetect = () => {
 
 export default LayoutDetect;
 
-const DetectTitle = styled(Heading)`
-  line-height: 63px;
-  letter-spacing: 0em;
+const DetectTitle = styled(LandingpageText)`
   display: flex;
   align-items: center;
 
   ${props => media("0px", (props.theme as ThemeInterface).breakpoints[0])} {
     align-items: flex-start;
     flex-direction: column;
-    line-height: 98.1%;
   }
 `;
 
-const Description = styled(Text)`
-  line-height: 38px;
-  letter-spacing: 0em;
+const Description = styled(LandingpageText)`
   max-width: 520px;
   margin-top: 40px;
-  color: #444545;
-  font-weight: 400;
 
   ${props => media("0px", (props.theme as ThemeInterface).breakpoints[0])} {
     max-width: 100%;
-    line-height: 25px;
   }
 `;

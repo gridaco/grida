@@ -7,6 +7,7 @@ import { ThemeInterface } from "utils/styled/theme";
 import { media } from "utils/styled/media";
 import BlankArea from "components/blank-area";
 import Image from "next/image";
+import LandingpageText from "components/landingpage/text";
 
 const Collaborate = () => {
   return (
@@ -21,13 +22,13 @@ const Collaborate = () => {
         flexDirection={["column", "column", "row", "row"]}
       >
         <SyncIcon name="loading" mr="20px" />
-        <Heading fontSize={["32px", "64px"]} style={{ lineHeight: "98.1%" }}>
+        <LandingpageText variant="h2">
           Collaborate as
           <br />
           the way it should be
-        </Heading>
+        </LandingpageText>
       </Flex>
-      <Description fontSize={["21px", "21px", "21px", "25px"]} mx="20px">
+      <Description variant="body1">
         With Bridged’s super intuitive workflow, you’ll find out how
         blazing-fast the collaborating can get. Create your products as the way
         it make sense. When the cycle gets shorter, the good thing happens.
@@ -98,19 +99,14 @@ const SyncIcon = styled(Icon)`
   }
 `;
 
-const Description = styled(Text)`
-  line-height: 38px;
+const Description = styled(LandingpageText)`
   margin-top: 36px;
-  color: #444545;
   margin-left: 120px;
   max-width: 655px;
-  font-weight: 400;
-  letter-spacing: 0em;
 
   ${props => media("0px", (props.theme as ThemeInterface).breakpoints[0])} {
     max-width: 100%;
     margin-left: 20px;
-    line-height: 25px;
   }
 
   ${props =>

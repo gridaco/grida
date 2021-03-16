@@ -9,6 +9,7 @@ import Link from "next/link";
 import { motion } from "framer-motion";
 import { PRODUCT_LIST } from "utils/landingpage/constants";
 import ReactPlayer from "react-player";
+import LandingpageText from "components/landingpage/text";
 
 // region video framer motion values
 const videoPlayerMotionAnimationVariants = {
@@ -77,12 +78,7 @@ const Products = () => {
 
   return (
     <SectionLayout alignContent="start">
-      <Heading
-        fontSize={["32px", "64px", "64px", "64px"]}
-        style={{ letterSpacing: "0em" }}
-      >
-        Your design is your
-      </Heading>
+      <LandingpageText variant="h2">Your design is your</LandingpageText>
       <SectionLayout
         className="gradient-row-tab"
         variant="content-overflow-1"
@@ -92,10 +88,7 @@ const Products = () => {
       >
         <Container>
           <RowFrame animate={{ x: x }} transition={spring}>
-            <Heading
-              fontSize={["32px", "64px", "64px", "80px"]}
-              className="no-drag"
-            >
+            <LandingpageText variant="h1" className="no-drag">
               {PRODUCT_LIST.map((item, i) => {
                 return (
                   <List
@@ -110,7 +103,7 @@ const Products = () => {
                   </List>
                 );
               })}
-            </Heading>
+            </LandingpageText>
           </RowFrame>
         </Container>
       </SectionLayout>
@@ -138,11 +131,11 @@ const Products = () => {
         mt="40px"
         fontWeight="600"
         letterSpacing="0em"
-        style={{ maxWidth: "50%" }}
+        style={{ maxWidth: "60%" }}
       >
         {PRODUCT_LIST[beforeClick].subTitle}
       </SubTitle>
-      <Description fontSize={["21px", "21px", "21px", "24px"]}>
+      <Description variant="body1">
         {PRODUCT_LIST[beforeClick].desc}
       </Description>
       {/* todo: temprarily disabled */}
@@ -208,37 +201,12 @@ const VideoWrapper = styled(Flex)`
   }
 `;
 
-const More = styled(Text)`
-  padding-bottom: 8px;
-  border-bottom: 2px solid black;
-`;
-
-const MoreLists = styled(Flex)`
-  margin-top: 10px;
-
-  span {
-    margin-right: 24px;
-    font-size: 18px;
-    color: #aeaeae;
-  }
-
-  @media (max-width: 767px) {
-    overflow-x: auto;
-    width: 100%;
-  }
-`;
-
-const Description = styled(Text)`
+const Description = styled(LandingpageText)`
   max-width: 760px;
   margin-top: 32px;
-  color: #444545;
-  font-weight: 400;
-  line-height: 38px;
-  letter-spacing: 0.01em;
 
   ${props => media("0px", (props.theme as ThemeInterface).breakpoints[0])} {
     max-width: 100%;
-    line-height: 25px;
   }
 `;
 
@@ -326,5 +294,25 @@ const List = styled.span<{ gradient: string }>`
     &:first-of-type {
       padding-left: 1%;
     }
+  }
+`;
+
+const More = styled(Text)`
+  padding-bottom: 8px;
+  border-bottom: 2px solid black;
+`;
+
+const MoreLists = styled(Flex)`
+  margin-top: 10px;
+
+  span {
+    margin-right: 24px;
+    font-size: 18px;
+    color: #aeaeae;
+  }
+
+  @media (max-width: 767px) {
+    overflow-x: auto;
+    width: 100%;
   }
 `;
