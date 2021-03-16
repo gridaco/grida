@@ -1,1 +1,1 @@
-export * from './bridged';
+export * from "./landingpage";

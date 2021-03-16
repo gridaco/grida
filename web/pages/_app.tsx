@@ -21,26 +21,9 @@ import { BodyCustomStyleInAbosulteSectionLayout } from "utils/styled/styles";
 import "../utils/styled/fonts.css";
 import { useCookies } from "react-cookie";
 
-function getURLParameter(name) {
-	return decodeURI((RegExp(name + '=' + '(.+?)(&|$)').exec(location.search)||[,null])[1]);
-}
-
-function hideURLParams() {
-	var hide = ['token'];
-	for(var h in hide) {
-		if(getURLParameter(h)) {
-			history.replaceState(null, document.getElementsByTagName("title")[0].innerHTML, window.location.pathname);
-		}
-	}
-}
-
-const COOKIE_ACCESS_TOKEN_KEY = "_token";
-
 const MyApp = ({ Component, pageProps }: AppProps) => {
   const router = useRouter();
-  const [cookie, setCookie] = useCookies([
-    COOKIE_ACCESS_TOKEN_KEY,
-  ]);
+ 
 
   useEffect(() => {
     // region set firebase analytics
@@ -53,22 +36,6 @@ const MyApp = ({ Component, pageProps }: AppProps) => {
     }
     // endregion set firebase analytics
   }, [router.events, router.pathname]);
-
-  useEffect(() => {
-    window.addEventListener("load", () => {
-      if (!!router.query.token) {
-        setCookie(COOKIE_ACCESS_TOKEN_KEY, router.query.token, {
-          path: "/",
-          maxAge: 3600 * 24 * 7, // Expires after 7days
-          sameSite: true,
-        });
-      }
-      hideURLParams()
-    });
-    return window.addEventListener("load", () => {
-      hideURLParams()
-    });
-  }, []);
 
   const renderPopups = () => {
     return (

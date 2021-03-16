@@ -7,9 +7,9 @@ import BlankArea from "components/blank-area";
 import { ThemeInterface } from "utils/styled/theme";
 import ActionItem from "components/action-item";
 import { LandingpageUrls } from "utils/landingpage/constants";
-import MotionButton from "components/motion/button";
-import MotionRadio from "components/motion/radio";
-import ButtonDetectDemo from "components/motion/button-detect-demo";
+import MotionButton from "components/landingpage/motion/button";
+import MotionRadio from "components/landingpage/motion/radio";
+import ButtonDetectDemo from "components/landingpage/motion/button-detect-demo";
 
 const renderMoitonComponents = [MotionButton];
 

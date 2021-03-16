@@ -3,7 +3,7 @@ import SectionLayout from "layout/section";
 import { Button, Heading, Text } from "rebass";
 import styled from "@emotion/styled";
 import BlankArea from "components/blank-area";
-import { ElevatedVideoPlayer } from "components/effect";
+import { ElevatedVideoPlayer } from "components/landingpage/effect";
 import { media } from "utils/styled/media";
 import { ThemeInterface } from "utils/styled/theme";
 import LandingMainCtaButton from "components/landingpage/main-cta-button";

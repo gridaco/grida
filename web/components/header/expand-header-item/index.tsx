@@ -1,90 +1,159 @@
-import Icon from 'components/icon';
-import React, { useCallback, useState } from 'react'
-import { Text, Flex, Box } from 'rebass';
-import styled from '@emotion/styled';
-import Product from 'components/product';
-import { ThemeInterface } from 'utils/styled/theme';
-import { media } from 'utils/styled/media';
+import Icon from "components/icon";
+import React, { useCallback, useState } from "react";
+import { Text, Flex, Box } from "rebass";
+import styled from "@emotion/styled";
+import Product from "components/header/product";
+import { ThemeInterface } from "utils/styled/theme";
+import { media } from "utils/styled/media";
 
-const ExpandHeaderItem = ({ item, isExpand, onExpandHeader, onContractHeader, type }) => {
+const ExpandHeaderItem = ({
+  item,
+  isExpand,
+  onExpandHeader,
+  onContractHeader,
+  type,
+}) => {
+  const onClose = useCallback(() => {
+    onContractHeader();
+  }, []);
 
-	const onClose = useCallback(() => {
-		onContractHeader()
-	}, []);
+  const onModalInnerClick = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+  }, []);
 
-	const onModalInnerClick = useCallback((e: React.MouseEvent) => {
-		e.stopPropagation();
-	}, []);
+  return (
+    <React.Fragment>
+      <Flex>
+        <Label
+          className="cursor"
+          color={isExpand ? "#000" : "#8B8B8B"}
+          onMouseOver={type == "desktop" ? onExpandHeader : null}
+          onClick={
+            type == "mobile"
+              ? isExpand
+                ? onContractHeader
+                : onExpandHeader
+              : null
+          }
+          fontWeight="bold"
+          fontSize="16px"
+          mx={type === "desktop" && "12px"}
+        >
+          {item.label}
+          <Icon name={isExpand ? "arrowUp" : "arrowDown"} isVerticalMiddle />
+        </Label>
+        {isExpand && type === "desktop" && (
+          <ModalBackground onClick={onClose}>
+            <Modal
+              p={["10px", "10px", "15px 30px"]}
+              bg="white"
+              height="430px"
+              onClick={onModalInnerClick}
+            >
+              <ExpandHeaderContent
+                width={["320px", "730px", "985px", "1040px"]}
+                height="100%"
+                onMouseOver={onExpandHeader}
+                onMouseLeave={onContractHeader}
+              >
+                <Product
+                  iconName="mockIcon"
+                  title="Globalization"
+                  desc="Tell customer about this product. Keep it simple"
+                />
+                <Product
+                  iconName="mockIcon"
+                  title="Globalization"
+                  desc="Tell customer about this product. Keep it simple"
+                />
+                <Product
+                  iconName="mockIcon"
+                  title="Globalization"
+                  desc="Tell customer about this product. Keep it simple"
+                />
+                <Product
+                  iconName="mockIcon"
+                  title="Globalization"
+                  desc="Tell customer about this product. Keep it simple"
+                />
+                <Product
+                  iconName="mockIcon"
+                  title="Globalization"
+                  desc="Tell customer about this product. Keep it simple"
+                />
+                <Product
+                  iconName="mockIcon"
+                  title="Globalization"
+                  desc="Tell customer about this product. Keep it simple"
+                />
+                <Product
+                  iconName="mockIcon"
+                  title="Globalization"
+                  desc="Tell customer about this product. Keep it simple"
+                />
+              </ExpandHeaderContent>
+            </Modal>
+          </ModalBackground>
+        )}
+      </Flex>
+      {isExpand && type === "mobile" && (
+        <Flex flexDirection="column" mt="12px" mb="24px">
+          <Product
+            iconName="mockIcon"
+            title="Globalization"
+            desc="Tell customer about this product. Keep it simple"
+          />
+          <Product
+            iconName="mockIcon"
+            title="Globalization"
+            desc="Tell customer about this product. Keep it simple"
+          />
+          <Product
+            iconName="mockIcon"
+            title="Globalization"
+            desc="Tell customer about this product. Keep it simple"
+          />
+          <Product
+            iconName="mockIcon"
+            title="Globalization"
+            desc="Tell customer about this product. Keep it simple"
+          />
+          <Product
+            iconName="mockIcon"
+            title="Globalization"
+            desc="Tell customer about this product. Keep it simple"
+          />
+          <Product
+            iconName="mockIcon"
+            title="Globalization"
+            desc="Tell customer about this product. Keep it simple"
+          />
+          <Product
+            iconName="mockIcon"
+            title="Globalization"
+            desc="Tell customer about this product. Keep it simple"
+          />
+        </Flex>
+      )}
+    </React.Fragment>
+  );
+};
 
-	return (
-		<React.Fragment>
-			<Flex >
-				<Label
-					className="cursor"
-					color={isExpand ? "#000" : "#8B8B8B"}
-					onMouseOver={type == "desktop" ? onExpandHeader : null}
-					onClick={type == "mobile" ? isExpand ? onContractHeader : onExpandHeader : null}
-					fontWeight="bold"
-					fontSize="16px"
-					mx={type === "desktop" && "12px"}
-				>
-					{item.label}
-					<Icon name={isExpand ? "arrowUp" : "arrowDown"} isVerticalMiddle />
-				</Label>
-				{isExpand && type === "desktop" && <ModalBackground onClick={onClose} >
-					<Modal
-						p={["10px", "10px", "15px 30px"]}
-						bg="white"
-						height="430px"
-						onClick={onModalInnerClick}
-					>
-						<ExpandHeaderContent
-							width={["320px", "730px", "985px", "1040px"]}
-							height="100%"
-							onMouseOver={onExpandHeader}
-							onMouseLeave={onContractHeader}
-						>
-							<Product iconName="mockIcon" title="Globalization" desc="Tell customer about this product. Keep it simple" />
-							<Product iconName="mockIcon" title="Globalization" desc="Tell customer about this product. Keep it simple" />
-							<Product iconName="mockIcon" title="Globalization" desc="Tell customer about this product. Keep it simple" />
-							<Product iconName="mockIcon" title="Globalization" desc="Tell customer about this product. Keep it simple" />
-							<Product iconName="mockIcon" title="Globalization" desc="Tell customer about this product. Keep it simple" />
-							<Product iconName="mockIcon" title="Globalization" desc="Tell customer about this product. Keep it simple" />
-							<Product iconName="mockIcon" title="Globalization" desc="Tell customer about this product. Keep it simple" />
-						</ExpandHeaderContent>
-					</Modal>
-				</ModalBackground>}
-
-			</Flex>
-			{isExpand && type === "mobile" && <Flex flexDirection="column" mt="12px" mb="24px">
-				<Product iconName="mockIcon" title="Globalization" desc="Tell customer about this product. Keep it simple" />
-				<Product iconName="mockIcon" title="Globalization" desc="Tell customer about this product. Keep it simple" />
-				<Product iconName="mockIcon" title="Globalization" desc="Tell customer about this product. Keep it simple" />
-				<Product iconName="mockIcon" title="Globalization" desc="Tell customer about this product. Keep it simple" />
-				<Product iconName="mockIcon" title="Globalization" desc="Tell customer about this product. Keep it simple" />
-				<Product iconName="mockIcon" title="Globalization" desc="Tell customer about this product. Keep it simple" />
-				<Product iconName="mockIcon" title="Globalization" desc="Tell customer about this product. Keep it simple" />
-			</Flex>}
-		</React.Fragment>
-	)
-}
-
-export default ExpandHeaderItem
+export default ExpandHeaderItem;
 
 const Label = styled(Text)`
-    font-weight: bold;
-    font-size: 16px;
-    display: flex;
-    align-items: center;
-    padding: 16px 0px;
+  font-weight: bold;
+  font-size: 16px;
+  display: flex;
+  align-items: center;
+  padding: 16px 0px;
 
-
-    ${props => media(null, (props.theme as ThemeInterface).breakpoints[1])} {
-        &:hover {
-            color: #000;
-        }
+  ${props => media(null, (props.theme as ThemeInterface).breakpoints[1])} {
+    &:hover {
+      color: #000;
     }
-`
+  }
+`;
 
 const ModalBackground = styled.div`
   position: fixed;
@@ -110,12 +179,11 @@ const Modal = styled(Flex)`
 `;
 
 const ExpandHeaderContent = styled(Flex)`
-    display: grid;
-    grid-template-columns: 250px 250px;
-    grid-template-rows: 70px 70px;
-    grid-column-gap: 48px;
-    grid-row-gap: 21px;
+  display: grid;
+  grid-template-columns: 250px 250px;
+  grid-template-rows: 70px 70px;
+  grid-column-gap: 48px;
+  grid-row-gap: 21px;
 
-    max-height: 350px;
-
-`
+  max-height: 350px;
+`;

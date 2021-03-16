@@ -9,10 +9,14 @@ import { HeaderMap } from "./headermap";
 import { URLS } from "utils/landingpage/constants";
 import { ThemeInterface } from "utils/styled/theme";
 import { media } from "utils/styled/media";
+import { useCookies } from "react-cookie";
+
+const COOKIE_ACCESS_TOKEN_KEY = "_token";
 
 const Header = () => {
   const [currentExpandHeader, setCurrentExpandHeader] = useState("");
   const [isOpenMenu, setIsOpenMenu] = useState(false);
+  const [cookie, setCookie] = useCookies([COOKIE_ACCESS_TOKEN_KEY]);
 
   useEffect(() => {
     if (isOpenMenu) {
@@ -32,12 +36,19 @@ const Header = () => {
   );
 
   const handleSignupClick = () => {
-    // !isOpenMenu && window.location.assign(URLS.landing.signup)
-    window.location.href = URLS.landing.signup;
+    if (cookie[COOKIE_ACCESS_TOKEN_KEY] != null) {
+      window.location.href = URLS.landing.try_the_demo_1;
+    } else {
+      window.location.href = URLS.landing.signup;
+    }
   };
 
   const handleSigninClick = () => {
-    !isOpenMenu && (window.location.href = URLS.landing.signin);
+    if (cookie[COOKIE_ACCESS_TOKEN_KEY] != null) {
+      window.location.href = URLS.landing.try_the_demo_1;
+    } else {
+      !isOpenMenu && (window.location.href = URLS.landing.signin);
+    }
   };
 
   return (
@@ -55,7 +66,13 @@ const Header = () => {
 
         <Flex alignItems="center">
           <Link href="/">
-            <Bridged className="cursor" name="bridged" width={32} height={32} />
+            <Bridged
+              className="cursor"
+              name="bridged"
+              width={32}
+              height={32}
+              ml={["20px", "8px", "8px", "8px"]}
+            />
           </Link>
           <Link href="/">
             <ResponsiveTitle
@@ -103,7 +120,9 @@ const Header = () => {
           p={["6px 10px", "6px 10px", "9px 20px", "9px 20px"]}
           variant="noShadow"
         >
-          Sign up
+          {cookie[COOKIE_ACCESS_TOKEN_KEY] != null
+            ? "Go to console"
+            : "Sign up"}
         </SignupButton>
       </Flex>
 
@@ -156,6 +175,10 @@ const Header = () => {
               height="35px"
               fontSize="13px"
               mb="12px"
+              disabled={cookie[COOKIE_ACCESS_TOKEN_KEY] != null}
+              style={{
+                opacity: cookie[COOKIE_ACCESS_TOKEN_KEY] != null ? 0 : 1,
+              }}
               onClick={handleSignupClick}
             >
               Sign up
@@ -170,7 +193,9 @@ const Header = () => {
               style={center}
               onClick={handleSigninClick}
             >
-              <Icon name="lock" isVerticalMiddle mr="6px" /> Sign in
+              {cookie[COOKIE_ACCESS_TOKEN_KEY] != null
+                ? "Go to console"
+                : <Icon name="lock" isVerticalMiddle mr="6px" /> + "Sign in"}
             </Button>
           </Box>
         </ResponsiveMenu>
