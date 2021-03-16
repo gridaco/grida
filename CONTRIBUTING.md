@@ -50,3 +50,22 @@ Join slack via link on README, contact maintaners for rapid contribution. otherw
 
 - [Reflect React](https://reflect-ui.com)
 - [Emotion/styled](https://emotion.sh/docs/styled)
+
+
+## React coding conventions
+**for root components**
+- use function as component
+- don't use const as component
+- don't use React.FC as component
+- don't export function as default on end of file explicitly.
+``` tsx
+export default function GeneralComponent(props: {
+  title: string
+  desc: string
+}){
+  <div>
+    <h1>{props.title}</h1>
+    <p>{props.desc}</p>
+  </div>
+}
+```
