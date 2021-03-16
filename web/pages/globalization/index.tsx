@@ -1,14 +1,11 @@
 import React from "react";
-
+import Sections from "sections/globalization";
 export default function GlobalizationPage() {
   return (
     <div>
       <p>hi. i'm globalization</p>
-      <SectionFaq />
+      <Sections.FAQs />
+      <Sections.CTA />
     </div>
   );
-}
-
-function SectionFaq() {
-  return <div>FAQs</div>;
 }
