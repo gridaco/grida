@@ -12,11 +12,11 @@ import { css } from "@emotion/core";
 const DesignToCode = () => {
   return (
     <SectionLayout  alignContent="start" backgroundColor="rgba(0,0,0,0)">
-      <Flex className="no-drag" width="100%" flexDirection={["column", "row", "row", "row"]}>
+      <Flex width="100%" flexDirection={["column", "row", "row", "row"]}>
         <Flex className="text-platform" flexDirection="column">
           <Heading
             fontSize={["32px", "64px", "64px", "64px"]}
-            style={{ letterSpacing: "0em", lineHeight: "98.1%" }}
+            style={{ letterSpacing: "0em", lineHeight: "98.1%", zIndex: 99 }}
             mb={["10px"]}
           >
             Designs, <br />
@@ -60,7 +60,8 @@ const Description = styled(Text)`
   margin-top: 20px;
   color: #444545;
   font-weight: 400;
-
+  z-index: 99;
+  
   line-height: 33px;
   line-height: 38px;
   letter-spacing: 0em;
