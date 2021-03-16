@@ -30,7 +30,7 @@ const MainPage: NextPage<MainPageAppProps> = ({ isMobileView }) => {
   const onAcceptCookie = useCallback(() => {
     setCookie(COOKIE_CONSENT_ACCEPTENCE_STATUS_KEY, true, {
       path: "/",
-      maxAge: 3600 * 24 * 365, // Expires after 1hr
+      maxAge: 3600 * 24 * 365, // Expires after 1year
       sameSite: true,
     });
     setOpenCookieAlert(true);

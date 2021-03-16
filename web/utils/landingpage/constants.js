@@ -1,10 +1,16 @@
 const MVP_SIGNUP_TYPEFORM_URL =
-  'https://woojooj.typeform.com/to/uyTSms5Q';
+    'https://woojooj.typeform.com/to/uyTSms5Q';
+
+const LOCAL = "http://localhost:3000/";
+
+const PRODUCT = "https://bridged.xyz/";
+
+
 export const LandingpageUrls = {
     signin: "https://accounts.bridged.xyz/",
 
     // todo region swap sign up when ready
-    signup: MVP_SIGNUP_TYPEFORM_URL,
+    signup: `https://accounts.bridged.xyz?redirect_uri=${process.env.NODE_ENV !== "production" ? LOCAL : PRODUCT}`,
     // signup: "https://accounts.bridged.xyz/signup",
     // todo endregion swap sign up when ready
 

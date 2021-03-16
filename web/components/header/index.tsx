@@ -33,11 +33,11 @@ const Header = () => {
 
   const handleSignupClick = () => {
     // !isOpenMenu && window.location.assign(URLS.landing.signup)
-    open(URLS.landing.signup);
+    window.location.href = URLS.landing.signup;
   };
 
   const handleSigninClick = () => {
-    !isOpenMenu && window.location.assign(URLS.landing.signin);
+    !isOpenMenu && (window.location.href = URLS.landing.signin);
   };
 
   return (

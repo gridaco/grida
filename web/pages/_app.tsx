@@ -3,21 +3,44 @@ import { ThemeProvider } from "emotion-theming";
 import { AppProps } from "next/app";
 import Head from "next/head";
 import React, { useEffect } from "react";
-import { CookiesProvider } from "react-cookie"
+import { CookiesProvider } from "react-cookie";
 
 import Footer from "components/footer";
 import Header from "components/header";
 import { defaultTheme } from "utils/styled";
 import { useRouter } from "next/router";
 import { Box } from "rebass";
-import { PopupConsumer, PopupInfo, PopupProvider } from "utils/context/PopupContext";
+import {
+  PopupConsumer,
+  PopupInfo,
+  PopupProvider,
+} from "utils/context/PopupContext";
 import Popup from "components/popup";
 import { analytics } from "utils/firebase";
 import { BodyCustomStyleInAbosulteSectionLayout } from "utils/styled/styles";
 import "../utils/styled/fonts.css";
+import { useCookies } from "react-cookie";
+
+function getURLParameter(name) {
+	return decodeURI((RegExp(name + '=' + '(.+?)(&|$)').exec(location.search)||[,null])[1]);
+}
+
+function hideURLParams() {
+	var hide = ['token'];
+	for(var h in hide) {
+		if(getURLParameter(h)) {
+			history.replaceState(null, document.getElementsByTagName("title")[0].innerHTML, window.location.pathname);
+		}
+	}
+}
+
+const COOKIE_ACCESS_TOKEN_KEY = "_token";
 
 const MyApp = ({ Component, pageProps }: AppProps) => {
   const router = useRouter();
+  const [cookie, setCookie] = useCookies([
+    COOKIE_ACCESS_TOKEN_KEY,
+  ]);
 
   useEffect(() => {
     // region set firebase analytics
@@ -29,8 +52,23 @@ const MyApp = ({ Component, pageProps }: AppProps) => {
       );
     }
     // endregion set firebase analytics
-
   }, [router.events, router.pathname]);
+
+  useEffect(() => {
+    window.addEventListener("load", () => {
+      if (!!router.query.token) {
+        setCookie(COOKIE_ACCESS_TOKEN_KEY, router.query.token, {
+          path: "/",
+          maxAge: 3600 * 24 * 7, // Expires after 7days
+          sameSite: true,
+        });
+      }
+      hideURLParams()
+    });
+    return window.addEventListener("load", () => {
+      hideURLParams()
+    });
+  }, []);
 
   const renderPopups = () => {
     return (
@@ -42,7 +80,7 @@ const MyApp = ({ Component, pageProps }: AppProps) => {
         }
       </PopupConsumer>
     );
-  }
+  };
 
   return (
     <Providers>
@@ -59,7 +97,7 @@ const MyApp = ({ Component, pageProps }: AppProps) => {
             overflow-x: hidden;
             scroll-behavior: smooth;
             @media (prefers-reduced-motion: reduce) {
-                scroll-behavior: auto;
+              scroll-behavior: auto;
             }
           }
 
@@ -68,7 +106,7 @@ const MyApp = ({ Component, pageProps }: AppProps) => {
           }
 
           .no-drag {
-            user-select:none;
+            user-select: none;
           }
 
           input {
@@ -124,7 +162,10 @@ const MyApp = ({ Component, pageProps }: AppProps) => {
         `}
       >
         <Header />
-        <BodyCustomStyleInAbosulteSectionLayout mt="60px" style={{ position: "relative" }}>
+        <BodyCustomStyleInAbosulteSectionLayout
+          mt="60px"
+          style={{ position: "relative" }}
+        >
           <Component {...pageProps} />
         </BodyCustomStyleInAbosulteSectionLayout>
         <Footer />
@@ -134,11 +175,7 @@ const MyApp = ({ Component, pageProps }: AppProps) => {
   );
 };
 
-const Providers = ({
-  children,
-}: {
-  children: React.ReactNode;
-}) => {
+const Providers = ({ children }: { children: React.ReactNode }) => {
   return (
     <PopupProvider>
       <CookiesProvider>
