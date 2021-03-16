@@ -11,11 +11,11 @@ import LandingMainCtaButton from "components/landingpage/main-cta-button";
 const Hero = () => {
   return (
     <SectionLayout alignContent="center">
-      <BlankArea height={75} />
+      <BlankArea height={[101, 198]} />
       <HeroText fontSize={["32px", "64px", "64px", "80px"]}>
         Designs that are meant to be implemented.
       </HeroText>
-      <Description fontSize={["21px", "21px", "21px", "24px"]}>
+      <Description fontSize={["21px", "21px", "21px", "25px"]}>
         Make twice no more. All you’ll ever need for frontend development. A
         hackable tool designed for hackers.
       </Description>
@@ -23,7 +23,7 @@ const Hero = () => {
 
       <ElevatedVideoPlayer />
 
-      <BlankArea height={200} />
+      <BlankArea height={[273, 200]} />
     </SectionLayout>
   );
 };
@@ -33,14 +33,13 @@ export default Hero;
 const HeroText = styled(Heading)`
   text-align: center;
   letter-spacing: -0.03em;
-  line-height: 98.1%;
+  line-height: 97.1%;
   max-width: 920px;
 
   ${props => media("0px", (props.theme as ThemeInterface).breakpoints[0])} {
     max-width: 100%;
   }
 
-  
   ${props =>
     media(
       (props.theme as ThemeInterface).breakpoints[0],
@@ -55,8 +54,8 @@ const Description = styled(Text)`
   text-align: center;
   margin-top: 40px;
   color: #444545;
-  line-height: 33px;
-  font-weight: 500;
+  line-height: 38px;
+  font-weight: 400;
   letter-spacing: 0em;
 
   ${props => media("0px", (props.theme as ThemeInterface).breakpoints[0])} {

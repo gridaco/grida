@@ -13,16 +13,18 @@ import ButtonDetectDemo from "components/motion/button-detect-demo";
 
 const renderMoitonComponents = [MotionButton];
 
-
 const LayoutDetect = () => {
   const [currentMotionIndex, setCurrentMotionIndex] = useState(0);
 
   return (
     <SectionLayout alignContent="start">
-      <Heading fontSize={["32px", "64px", "64px", "80px"]}>
+      <Heading
+        fontSize={["32px", "64px", "64px", "64px"]}
+        style={{ lineHeight: "90%" }}
+      >
         Yeah, we know.
       </Heading>
-      <DetectTitle fontSize={["32px", "64px", "64px", "80px"]}>
+      <DetectTitle fontSize={["32px", "64px", "64px", "64px"]}>
         <span>That's a</span>{" "}
         {renderMoitonComponents.map(
           (i, ix) =>
@@ -34,21 +36,26 @@ const LayoutDetect = () => {
             }),
         )}
       </DetectTitle>
-      <Description fontSize={["21px", "21px", "21px", "24px"]}>
+      <Description fontSize={["21px", "21px", "21px", "24.5px"]}>
         Finally, the tool understands your design. More inteligence means less
         modification. Which leads us to blazing fast workflow. Just design it.
         We’ll know.
       </Description>
-      <SectionLayout className="button-detect-lottie-motion" variant="content-overflow-1" inherit={false} notAutoAllocateHeight>
-        <ButtonDetectDemo />
-      </SectionLayout>
-      <BlankArea height={30} />
+      <BlankArea height={[33, 50]} />
       <ActionItem
         href={LandingpageUrls.article_how_engine_works}
         label="Learn how the engine works"
       />
+      <SectionLayout
+        className="button-detect-lottie-motion"
+        variant="content-overflow-1"
+        inherit={false}
+        notAutoAllocateHeight
+      >
+        <ButtonDetectDemo />
+      </SectionLayout>
 
-      <BlankArea height={150} />
+      <BlankArea height={[150, 150]} />
     </SectionLayout>
   );
 };
@@ -56,7 +63,6 @@ const LayoutDetect = () => {
 export default LayoutDetect;
 
 const DetectTitle = styled(Heading)`
-
   line-height: 63px;
   letter-spacing: 0em;
   display: flex;
@@ -70,15 +76,15 @@ const DetectTitle = styled(Heading)`
 `;
 
 const Description = styled(Text)`
-  line-height: 33px;
+  line-height: 38px;
   letter-spacing: 0em;
   max-width: 520px;
   margin-top: 40px;
   color: #444545;
-  font-weight: 500;
+  font-weight: 400;
 
   ${props => media("0px", (props.theme as ThemeInterface).breakpoints[0])} {
     max-width: 100%;
-    line-height: 22px;
+    line-height: 25px;
   }
 `;

@@ -20,22 +20,26 @@ const Collaborate = () => {
         mx="20px"
         flexDirection={["column", "column", "row", "row"]}
       >
-        <SyncIcon name="loading" mr="10px" />
-        <Heading
-          fontSize={["32px", "64px"]}
-          style={{ lineHeight: "98.1%" }}
-        >
-          Collaborate<br />as the<br />way it should be
+        <SyncIcon name="loading" mr="20px" />
+        <Heading fontSize={["32px", "64px"]} style={{ lineHeight: "98.1%" }}>
+          Collaborate as
+          <br />
+          the way it should be
         </Heading>
       </Flex>
-      <Description fontSize={["21px", "21px", "21px", "24px"]} mx="20px">
+      <Description fontSize={["21px", "21px", "21px", "25px"]} mx="20px">
         With Bridged’s super intuitive workflow, you’ll find out how
         blazing-fast the collaborating can get. Create your products as the way
         it make sense. When the cycle gets shorter, the good thing happens.
         Forget all the time you’ve spent repeating yourself.
       </Description>
-      <BlankArea height={50} />
-      <SectionLayout className="bottom-application-notification" variant="full-width" inherit={false} notAutoAllocateHeight>
+      <BlankArea height={[0, 50]} />
+      <SectionLayout
+        className="bottom-application-notification"
+        variant="full-width"
+        inherit={false}
+        notAutoAllocateHeight
+      >
         <BackgroundImage>
           <div className="background-img">
             <Image
@@ -84,24 +88,29 @@ const SyncIcon = styled(Icon)`
     height: 32px;
   }
 
-  ${props => media((props.theme as ThemeInterface).breakpoints[1], (props.theme as ThemeInterface).breakpoints[2])} {
+  ${props =>
+    media(
+      (props.theme as ThemeInterface).breakpoints[1],
+      (props.theme as ThemeInterface).breakpoints[2],
+    )} {
     width: 64px;
     height: 64px;
   }
 `;
 
 const Description = styled(Text)`
-  line-height: 33px;
+  line-height: 38px;
   margin-top: 36px;
   color: #444545;
   margin-left: 120px;
-  max-width: 525px;
-  font-weight: 500;
-  
+  max-width: 655px;
+  font-weight: 400;
+  letter-spacing: 0em;
+
   ${props => media("0px", (props.theme as ThemeInterface).breakpoints[0])} {
     max-width: 100%;
     margin-left: 20px;
-    line-height: 22px;
+    line-height: 25px;
   }
 
   ${props =>
@@ -131,9 +140,8 @@ const Description = styled(Text)`
 
 const BackgroundImage = styled(Flex)`
   position: relative;
-
+  
   .background-img {
-    background-color: #000;
     div {
       width: 100vw !important;
       height: 55vh !important;

@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState } from "react";
 import {
   FLUTTER_COMPONENT_FULL_SOURCE,
   REACT_JSCSS_COMPONENT_FULL_SOURCE,
@@ -6,11 +6,13 @@ import {
 } from "./snippets";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { a11yDark } from "react-syntax-highlighter/dist/cjs/styles/prism";
-import { Flex, Box } from 'rebass';
-import styled from '@emotion/styled';
-import Image from 'next/image';
-import { media } from 'utils/styled/media';
-import { ThemeInterface } from 'utils/styled/theme';
+import { Flex, Box } from "rebass";
+import styled from "@emotion/styled";
+import Image from "next/image";
+import { media } from "utils/styled/media";
+import { ThemeInterface } from "utils/styled/theme";
+import SectionLayout from "layout/section";
+import CodePreviewMobile from "./mobile";
 
 interface DevFrameworkDemoConfig {
   name: string;
@@ -45,53 +47,97 @@ const DEV_FRAMEWORKS: DevFrameworkDemoConfig[] = [
 
 const CodePreview = () => {
   const [currentPlatform, setCurrentPlatform] = useState<
-  DevFrameworkDemoConfig
->(DEFAULT_DEMO_ITEM_FLUTTER);
+    DevFrameworkDemoConfig
+  >(DEFAULT_DEMO_ITEM_FLUTTER);
 
   return (
-    <AbosulteView width='50%'>
-      <CodeView width="460px" height="770px" bg="#212121">
-        <header>
-          <span />
-          <span />
-          <span />
-        </header>
-        <div className="body">
-          <SyntaxHighlighter language={currentPlatform.lang} style={a11yDark}>
-            {currentPlatform.source}
-          </SyntaxHighlighter>
-        </div>
-      </CodeView>
-      <div className="platforms">
-        {DEV_FRAMEWORKS.map(i => (
-          <Image
-            alt="platform"
-            key={i.name}
-            className="cursor"
-            onClick={() => setCurrentPlatform(i)}
-            src={`/assets/platform-icons/${i.name}/${currentPlatform.name === i.name ? "default" : "grey"
-              }.png`}
-            width="24"
-            height="24"
-          />
-        ))}
-      </div>
-    </AbosulteView>
-  )
-}
+    <React.Fragment>
+      <Mobile>
+        <CodePreviewMobile />
+      </Mobile>
+      <Desktop>
+        <SectionLayout variant="full-width" inherit={false}>
+          <Flex width="100%">
+            <Box width="25%" height="1px" />
+            <Box width="25%" height="1px" />
+            <ViewWrapper
+              width="37%"
+              flexDirection="column"
+              alignItems={[
+                "flex-start",
+                "flex-start",
+                "flex-start",
+                "flex-start",
+                "flex-end",
+              ]}
+            >
+              <CodeView width="460px" height="770px" bg="#212121">
+                <header>
+                  <span />
+                  <span />
+                  <span />
+                </header>
+                <div className="body">
+                  <SyntaxHighlighter
+                    language={currentPlatform.lang}
+                    style={a11yDark}
+                  >
+                    {currentPlatform.source}
+                  </SyntaxHighlighter>
+                </div>
+              </CodeView>
+              <Platforms className="platforms">
+                {DEV_FRAMEWORKS.map(i => (
+                  <Image
+                    alt="platform"
+                    key={i.name}
+                    className="cursor"
+                    onClick={() => setCurrentPlatform(i)}
+                    src={`/assets/platform-icons/${i.name}/${
+                      currentPlatform.name === i.name ? "default" : "grey"
+                    }.png`}
+                    width="24"
+                    height="24"
+                  />
+                ))}
+              </Platforms>
+            </ViewWrapper>
+            <Box width={["0px", "0px", "0px", "0px", "13%"]} height="1px" />
+          </Flex>
+        </SectionLayout>
+      </Desktop>
+    </React.Fragment>
 
-export default CodePreview
+    // <AbosulteView width='50%'>
+
+    // </AbosulteView>
+  );
+};
+
+export default CodePreview;
+
+const ViewWrapper = styled(Flex)`
+  ${props =>
+    media(
+      (props.theme as ThemeInterface).breakpoints[0],
+      (props.theme as ThemeInterface).breakpoints[3],
+    )} {
+    transform: translateX(45%);
+  }
+`;
+
+const Platforms = styled.div`
+  margin-top: 20px;
+  div {
+    width: 24px;
+    height: 24px;
+    margin-right: 28px !important;
+  }
+`;
 
 const CodeView = styled(Box)`
-  position: absolute;
   bottom: 0%;
   border-radius: 12px;
-
-  ${props => media("0px", (props.theme as ThemeInterface).breakpoints[0])} {
-    width: 170%;
-    min-width: 280px;
-    height: 410px;
-  }
 
   header {
     display: flex;
@@ -120,37 +166,25 @@ const CodeView = styled(Box)`
     border-bottom-right-radius: 12px;
 
     pre {
-        width: 95%;
-        height: 95%;
-        padding: 0px !important;
-        border-bottom-left-radius: 12px;
-    border-bottom-right-radius: 12px;
-      }
+      width: 95%;
+      height: 95%;
+      padding: 0px !important;
+      border-bottom-left-radius: 12px;
+      border-bottom-right-radius: 12px;
+    }
   }
-  
-`
+`;
 
-const AbosulteView = styled(Flex)`
-  position: absolute;
-  right: -20%;
-  bottom: 15%;
-
-  .platforms {
-    width: 150%;
-    position: absolute;
-    bottom: -50px;
+const Mobile = styled.div`
+  display: none;
+    ${props => media("0px", (props.theme as ThemeInterface).breakpoints[0])} {
+    display: block;
   }
-  
+`;
 
-  .platforms > div {
-    width: 24px;
-    height: 24px;
-    margin-left: 28px !important;
-  }
-
+const Desktop = styled.div`
+  display: block;
   ${props => media("0px", (props.theme as ThemeInterface).breakpoints[0])} {
-    right: 42.5%;
-    bottom: 0%;
+    display: none;
   }
-
-`
+`;
