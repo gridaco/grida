@@ -29,13 +29,14 @@ const StartNow: React.FC = () => {
       width="100%"
       height="368px"
       flexDirection={["column", "row", "row", "row"]}
+      backgroundColor="#ffffff"
     >
       <LeftWrapper
         width={["100%", "50%", "50%", "50%"]}
         alignItems="center"
         justifyContent="center"
       >
-        <DescWrapper
+        <Flex
           width="100%"
           height="256px"
           alignItems="center"
@@ -43,12 +44,12 @@ const StartNow: React.FC = () => {
           justifyContent="space-between"
         >
           {descList.map((item, ix) => (
-            <Desc ml="10px" width="90%" key={ix}>
+            <Desc ml="10px" width="90%" color="#5e5e5e" fontSize="18px" key={ix}>
               <Icon mr="16px" name="okaySign" />
               {item.title}
             </Desc>
           ))}
-        </DescWrapper>
+        </Flex>
       </LeftWrapper>
       <RightWrapper
         width={["100%", "50%", "50%", "50%"]}
@@ -57,17 +58,22 @@ const StartNow: React.FC = () => {
         justifyContent="center"
       >
         <Flex alignItems="baseline" mb="24px">
-          <Zero>$0</Zero>
-          <Month ml="4px">/mo</Month>
+          <Heading fontSize="56px" letterSpacing="0em" color="#000000">$0</Heading>
+          <Text color="#636363" letterSpacing="0em" fontSize="42px" ml="4px">/mo</Text>
         </Flex>
-        <StartButton
+        <Button
           width={["232px", "337px", "337px", "337px"]}
+          height="46px"
+          fontSize="18px"
+          fontWeight="bold"
+          color="#ffffff"
           variant="secondary"
+          border="1px solid #93b1ff"
           mb="40px"
         >
           Start now
-        </StartButton>
-        <NoCredit>No credit card required</NoCredit>
+        </Button>
+        <NoCredit fontSize="18px" color="#575757">No credit card required</NoCredit>
       </RightWrapper>
     </Card>
   );
@@ -76,7 +82,6 @@ const StartNow: React.FC = () => {
 export default StartNow;
 
 const Card = styled(Flex)`
-  background: #ffffff;
   box-shadow: 0px 4px 64px 12px rgba(0, 0, 0, 0.08);
   border-radius: 8px;
 
@@ -97,47 +102,12 @@ const RightWrapper = styled(Flex)`
   }
 `;
 
-const DescWrapper = styled(Flex)``;
-
 const Desc = styled(Flex)`
-  font-size: 18px;
   letter-spacing: 0em;
   text-align: left;
-
-  color: #5e5e5e;
-`;
-
-const Zero = styled(Heading)`
-  font-size: 56px;
-  letter-spacing: 0em;
-  line-height: 135%;
-
-  color: #000000;
-`;
-
-const Month = styled(Text)`
-  font-size: 42px;
-  line-height: 135%;
-
-  color: #636363;
-  letter-spacing: 0em;
-`;
-
-const StartButton = styled(Button)`
-  height: 46px;
-  font-size: 18px;
-  font-weight: bold;
-  line-height: 22px;
-
-  color: #ffffff;
-  border: 1px solid #93b1ff;
 `;
 
 const NoCredit = styled(Flex)`
-  font-size: 18px;
   letter-spacing: 0em;
   text-align: left;
-  line-height: 135%;
-
-  color: #575757;
 `;

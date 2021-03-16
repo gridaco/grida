@@ -19,7 +19,7 @@ const Question: React.FC<QuestionProps> = ({ list }) => {
 
   return (
     <Flex flexDirection="column">
-      <Wrapper
+      <Flex
         width="100%"
         alignItems="center"
         justifyContent="space-between"
@@ -32,7 +32,7 @@ const Question: React.FC<QuestionProps> = ({ list }) => {
           className="cursor"
           mr={!isOpen ? "9px" : "0px"}
         />
-      </Wrapper>
+      </Flex>
 
       {isOpen && (
         <Desc width="95%" mb={["89px", "39px", "43px", "48px"]}>
@@ -51,7 +51,6 @@ const Title = styled(Text)`
   text-align: left;
 `;
 
-const Wrapper = styled(Flex)``;
 
 const Desc = styled(Flex)`
   font-size: 20px;

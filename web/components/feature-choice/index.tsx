@@ -24,7 +24,7 @@ const FeatureChoice: React.FC<FeatureChoiceProps> = props => {
   };
 
   return (
-    <Card width="100%" backgroundColor="#ccc" alignItems="center" mb="58px">
+    <Flex width="100%" backgroundColor="#ccc" alignItems="center" mb="58px">
       <Flex flexDirection="column">
         <Text mt="17px" mb="33px" fontSize="18px" color="#7e7e7e">
           {titleList}{" "}
@@ -58,14 +58,12 @@ const FeatureChoice: React.FC<FeatureChoiceProps> = props => {
         ))}
 
         <Text fontSize="16px" fontWeight="bold" style={{ cursor: "pointer" }}>
-          View all <Icon name="arrowDown" isVerticalMiddle />{" "}
+          View all <Icon name="arrowDown" isVerticalMiddle />
         </Text>
       </Flex>
-    </Card>
+    </Flex>
   );
 };
-
-const Card = styled(Flex)``;
 
 const Item = styled(Flex)`
   &:last-child {
@@ -74,7 +72,7 @@ const Item = styled(Flex)`
 `;
 
 const Feature = styled(Flex)`
-  &:first-child {
+  &:first-of-type {
     margin-top: 24px;
   }
 
