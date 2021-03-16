@@ -3,4 +3,9 @@ import PlanList from "./plan-list";
 import Faq from "./faq";
 import FeatureList from "./feature-list";
 
-export { FreePlan, PlanList, Faq, FeatureList };
+export default {
+  Hero_TryFreePlan: FreePlan,
+  ComparePlans: PlanList,
+  FeaturesAndPricingTable: FeatureList,
+  FAQs: Faq,
+};

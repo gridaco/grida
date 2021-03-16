@@ -1,9 +1,11 @@
 import React, { useCallback, useState, useEffect } from "react";
-import { BridgedSection } from "common/toolkit";
 import { NextPage, NextPageContext } from "next";
 import CookieAccept from "components/cookie-accept";
 import { useCookies } from "react-cookie";
 import { motion } from "framer-motion";
+
+import Sections from "sections/bridged";
+
 interface MainPageAppProps {
   isMobileView: boolean;
 }
@@ -38,7 +40,13 @@ const MainPage: NextPage<MainPageAppProps> = ({ isMobileView }) => {
 
   return (
     <React.Fragment>
-      {BridgedSection.map(item => item.content(isMobileView))}
+      <Sections.Hero />
+      <Sections.Section2_1_design_to_code />
+      <Sections.Section2_2_just_got_online isMobile={isMobileView} />
+      <Sections.Section3_how_engine_works />
+      <Sections.Section4_features_tab />
+      <Sections.Section5_collaboration />
+      <Sections.FinalCta />
       {!openCookieAlert && (
         <motion.div
           initial="hidden"

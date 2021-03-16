@@ -10,7 +10,7 @@ import { LandingpageUrls } from "utils/landingpage/constants";
 import OnairButton from "components/effect/onair-button";
 import ApplicationPreview from "layout/application-preview";
 import { DesktopView, MobileView } from "utils/styled/styles";
-import { DesignToCode } from "..";
+import DesignToCode from "./design-code";
 import Image from "next/image";
 
 interface OnlineAppProps {

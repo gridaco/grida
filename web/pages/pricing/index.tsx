@@ -1,6 +1,13 @@
-import { PricingSection } from "common/toolkit";
 import React from "react";
 
+import Sections from "sections/pricing";
 export default function PricingPage() {
-  return PricingSection.map(item => item.content());
+  return (
+    <>
+      <Sections.Hero_TryFreePlan />
+      <Sections.ComparePlans />
+      <Sections.FeaturesAndPricingTable />
+      <Sections.FAQs />
+    </>
+  );
 }
