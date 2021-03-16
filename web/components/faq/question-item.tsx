@@ -2,15 +2,10 @@ import React, { useState } from "react";
 import styled from "@emotion/styled";
 import { Flex, Text } from "rebass";
 import Icon from "components/icon";
+import { FaqQnaItem } from "./interface";
 
-interface QuestionProps {
-  list: {
-    title: string;
-    desc?: string;
-  };
-}
-
-const Question: React.FC<QuestionProps> = ({ list }) => {
+export default function QuestionItem(props: { question: FaqQnaItem }) {
+  const { question } = props;
   const [isOpen, setIsOpen] = useState(false);
 
   const handleIconClick = () => {
@@ -25,7 +20,7 @@ const Question: React.FC<QuestionProps> = ({ list }) => {
         justifyContent="space-between"
         mb={["40px", "36px", "36px", "28px"]}
       >
-        <Title mr={["51px", 0, 0, 0]}>{list.title}</Title>
+        <Title mr={["51px", 0, 0, 0]}>{question.query}</Title>
         <Icon
           onClick={handleIconClick}
           name={isOpen ? "faqClose" : "plus"}
@@ -36,21 +31,18 @@ const Question: React.FC<QuestionProps> = ({ list }) => {
 
       {isOpen && (
         <Desc width="95%" mb={["89px", "39px", "43px", "48px"]}>
-          {list.desc}
+          {question.answer}
         </Desc>
       )}
     </Flex>
   );
-};
-
-export default Question;
+}
 
 const Title = styled(Text)`
   font-size: 20px;
   letter-spacing: 0em;
   text-align: left;
 `;
-
 
 const Desc = styled(Flex)`
   font-size: 20px;
