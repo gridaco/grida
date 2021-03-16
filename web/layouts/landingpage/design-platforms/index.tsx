@@ -4,7 +4,7 @@ import styled from "@emotion/styled";
 import Image from "next/image";
 import { media } from "utils/styled/media";
 import { ThemeInterface } from "utils/styled/theme";
-import LiveDesignDemoFrame from "components/motion/live-design-demo";
+import LiveDesignDemoFrame from "components/landingpage/motion/live-design-demo";
 import SectionLayout from "layout/section";
 import DesignPlatformsMobile from "./mobile";
 

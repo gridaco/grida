@@ -4,14 +4,14 @@ import { Box, Flex, Heading, Text } from "rebass";
 import styled from "@emotion/styled";
 import { media } from "utils/styled/media";
 import { ThemeInterface } from "utils/styled/theme";
-import DesignPlatforms from "layout/design-platforms";
-import CodePreview from "layout/code-preview";
+import DesignPlatforms from "layout/landingpage/design-platforms";
+import CodePreview from "layout/landingpage/code-preview";
 import BlankArea from "components/blank-area";
 import { css } from "@emotion/core";
 
 const DesignToCode = () => {
   return (
-    <SectionLayout  alignContent="start" backgroundColor="rgba(0,0,0,0)">
+    <SectionLayout alignContent="start" backgroundColor="rgba(0,0,0,0)">
       <Flex width="100%" flexDirection={["column", "row", "row", "row"]}>
         <Flex className="text-platform" flexDirection="column">
           <Heading
@@ -61,7 +61,7 @@ const Description = styled(Text)`
   color: #444545;
   font-weight: 400;
   z-index: 99;
-  
+
   line-height: 33px;
   line-height: 38px;
   letter-spacing: 0em;

@@ -4,7 +4,7 @@ import CookieAccept from "components/cookie-accept";
 import { useCookies } from "react-cookie";
 import { motion } from "framer-motion";
 
-import Sections from "sections/bridged";
+import Sections from "sections/landingpage";
 
 interface MainPageAppProps {
   isMobileView: boolean;
@@ -41,8 +41,7 @@ const MainPage: NextPage<MainPageAppProps> = ({ isMobileView }) => {
   return (
     <React.Fragment>
       <Sections.Hero />
-      <Sections.Section2_1_design_to_code />
-      <Sections.Section2_2_just_got_online isMobile={isMobileView} />
+      <Sections.Section2_design_to_code isMobile={isMobileView} />
       <Sections.Section3_how_engine_works />
       <Sections.Section4_features_tab />
       <Sections.Section5_collaboration />
