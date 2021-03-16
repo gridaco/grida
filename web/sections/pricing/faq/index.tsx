@@ -36,7 +36,7 @@ const Faq: React.FC = () => {
           ))}
         </Wrapper>
       </Flex>
-      <BlankArea height={170} />
+      <BlankArea height={[170, 170]} />
     </SectionLayout>
   );
 };

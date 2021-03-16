@@ -101,7 +101,7 @@ const PlanList: React.FC = () => {
 
   return (
     <SectionLayout alignContent="center">
-      <BlankArea height={331} />
+      <BlankArea height={(331, 331)} />
       <Title mb="43px">Pay as you grow</Title>
       <Desc mb={["69px", "185px", "145px", "159px"]}>
         Start small, pay when you’re ready.
@@ -209,7 +209,7 @@ const PlanList: React.FC = () => {
           </CardWrapper>
         </ForTeam>
       </Wrapper>
-      <BlankArea height={264} />
+      <BlankArea height={[264, 264]} />
     </SectionLayout>
   );
 };
