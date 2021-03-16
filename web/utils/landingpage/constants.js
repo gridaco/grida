@@ -7,10 +7,10 @@ const PRODUCT = "https://bridged.xyz/";
 
 
 export const LandingpageUrls = {
-    signin: "https://accounts.bridged.xyz/",
+    signin: `https://accounts.bridged.xyz/signin?redirect_uri=${process.env.NODE_ENV !== "production" ? LOCAL : PRODUCT}`,
 
     // todo region swap sign up when ready
-    signup: `https://accounts.bridged.xyz?redirect_uri=${process.env.NODE_ENV !== "production" ? LOCAL : PRODUCT}`,
+    signup: `https://accounts.bridged.xyz/signup?redirect_uri=${process.env.NODE_ENV !== "production" ? LOCAL : PRODUCT}`,
     // signup: "https://accounts.bridged.xyz/signup",
     // todo endregion swap sign up when ready
 
