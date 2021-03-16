@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useCallback } from "react";
 import styled from "@emotion/styled";
 import { Flex, Heading, Text, Button } from "rebass";
 import SectionLayout from "layout/section";
@@ -6,6 +6,7 @@ import BlankArea from "components/blank-area";
 import Icon from "components/icon";
 import { media } from "utils/styled/media";
 import { ThemeInterface } from "utils/styled/theme";
+import { usePopupContext } from "utils/context/PopupContext";
 
 const forYouTitleList = [
   {
@@ -59,6 +60,45 @@ const forTeamTitleList = [
 ];
 
 const PlanList: React.FC = () => {
+  const { addPopup, removePopup } = usePopupContext();
+
+  const handleClickQuestionMark = useCallback(() => {
+    addPopup({
+      title: "",
+      element: (
+        <FreePlanPopup pt="48px" pb="96px" px="48px">
+          <Icon
+            name="faqClose"
+            ml="auto"
+            onClick={() => removePopup()}
+            style={{ cursor: "pointer" }}
+          />
+          <Flex alignItems="center" flexDirection="column">
+            <Heading mb="48px" fontWeight="bold" fontSize="36px">
+              What are the limitations of free plan?
+            </Heading>
+            <Text
+              color="#686868"
+              textAlign="center"
+              lineHeight="43px"
+              letterSpacing="0em"
+              fontWeight="400"
+              fontSize="24px"
+            >
+              To build an enterprise level application, you’ll need a paid plan.
+              Paid plan includes extra default storage and unlimited projects
+              count. Also cloud objects such as translation token can be stored
+              up to 1 million. The extra usage will be charged as Standard Cloud
+              Fee.
+            </Text>
+          </Flex>
+        </FreePlanPopup>
+      ),
+      showOnlyBody: true,
+      height: "50vw",
+    });
+  }, []);
+
   return (
     <SectionLayout alignContent="center">
       <BlankArea height={331} />
@@ -85,7 +125,12 @@ const PlanList: React.FC = () => {
           <CardWrapper width="85%" height="90%" flexDirection="column">
             <CardTitle justifyContent="space-between" alignItems="center">
               For you
-              <Icon name="questionMark" isVerticalMiddle />
+              <Icon
+                onClick={handleClickQuestionMark}
+                name="questionMark"
+                isVerticalMiddle
+                style={{ cursor: "pointer" }}
+              />
             </CardTitle>
             <Text
               mb="33px"
@@ -170,6 +215,12 @@ const PlanList: React.FC = () => {
 };
 
 export default PlanList;
+
+const FreePlanPopup = styled(Flex)`
+  flex-direction: column;
+  background-color: #ffffff;
+  border-radius: 8px;
+`;
 
 const Title = styled(Heading)`
   font-weight: bold;
