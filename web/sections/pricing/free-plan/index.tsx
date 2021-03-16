@@ -9,7 +9,7 @@ const FreePlan = () => {
   return (
     <SectionLayout alignContent="center">
       <Flex alignItems="center" flexDirection="column" width="100%">
-        <BlankArea height={221} />
+        <BlankArea height={[221, 221]} />
         <FreeText mb="43px">Free for dreamers</FreeText>
         <Desc width="80%" mb="132px">
           Unlock your possibility, express your ideas faster then ever. Bridged
