@@ -5,7 +5,15 @@ import Icon from "components/icon";
 import SectionLayout from "layout/section";
 
 interface FeatureProps {
-  data: any;
+  data: {
+    id: number;
+    title: string;
+    feature: {
+      id: number;
+      name: string;
+      price: string[];
+    }[];
+  }[];
 }
 
 const FeatureListDesktopView: React.FC<FeatureProps> = ({ data }) => {
@@ -32,7 +40,7 @@ const FeatureListDesktopView: React.FC<FeatureProps> = ({ data }) => {
             <Content flex="1">Free</Content>
             <Content flex="1">Team</Content>
             <Content flex="1" alignItems="center">
-              Extra usage{" "}
+              Extra usage
               <Icon
                 name="questionMark"
                 ml="5px"
