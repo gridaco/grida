@@ -18,8 +18,10 @@ import Popup from "components/popup";
 import { analytics } from "utils/firebase";
 import { BodyCustomStyleInAbosulteSectionLayout } from "utils/styled/styles";
 import "../utils/styled/fonts.css";
+import { MDXProvider } from "@mdx-js/react";
+import { _MDX_COMPONENTS } from "components/mdx";
 
-const MyApp = ({ Component, pageProps }: AppProps) => {
+const App = ({ Component, pageProps }: AppProps) => {
   const router = useRouter();
 
   useEffect(() => {
@@ -143,10 +145,12 @@ const Providers = ({ children }: { children: React.ReactNode }) => {
   return (
     <PopupProvider>
       <CookiesProvider>
-        <ThemeProvider theme={defaultTheme}>{children}</ThemeProvider>
+        <MDXProvider components={_MDX_COMPONENTS}>
+          <ThemeProvider theme={defaultTheme}>{children}</ThemeProvider>
+        </MDXProvider>
       </CookiesProvider>
     </PopupProvider>
   );
 };
 
-export default MyApp;
+export default App;
