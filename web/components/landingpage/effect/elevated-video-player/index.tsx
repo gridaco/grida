@@ -1,6 +1,6 @@
 import styled from "@emotion/styled";
 import Icon from "components/icon";
-import React, { useCallback } from "react";
+import React, { useCallback, useState } from "react";
 import { motion, useTransform, useViewportScroll } from "framer-motion";
 import { usePopupContext } from "utils/context/PopupContext";
 import { Flex } from "rebass";
@@ -19,9 +19,20 @@ const VideoContainer = styled(Flex)`
 function ElevatedVideoPlayer() {
   const { scrollYProgress } = useViewportScroll();
   const scale = useTransform(scrollYProgress, [0, 0.05], [0.8, 1]);
+  const [actualVideoPlaying, setActualVideoPlaying] = useState(false);
   const { addPopup } = usePopupContext();
 
-  const handleOnYoutubePlayEnd = () => {};
+  // region event handlers
+  const handleOnYoutubePlayStart = () => {
+    setActualVideoPlaying(true);
+  };
+  const handleOnYoutubePlayEnd = () => {
+    setActualVideoPlaying(false);
+  };
+  const handlePopupClose = () => {
+    setActualVideoPlaying(false);
+  };
+  // endregion event handlers
 
   const handleClickLogin = useCallback(() => {
     addPopup({
@@ -33,11 +44,14 @@ function ElevatedVideoPlayer() {
             width="100%"
             playing
             loop
+            muted
+            onStart={handleOnYoutubePlayStart}
             onEnded={handleOnYoutubePlayEnd}
           />
         </VideoContainer>
       ),
       showOnlyBody: true,
+      onDismiss: handlePopupClose,
       height: "50vw",
     });
   }, []);
@@ -48,7 +62,7 @@ function ElevatedVideoPlayer() {
         <ReactPlayer
           url={require("public/videos/promotion-video-preview.mp4")}
           loop
-          playing
+          playing={!actualVideoPlaying}
           muted
         />
       </div>

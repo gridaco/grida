@@ -20,6 +20,7 @@ export interface PopupInfo {
   closeAction?: () => void;
   showOnlyBody?: boolean;
   withoutConfirm?: boolean;
+  onDismiss?: () => void;
 }
 
 interface PopupState {
@@ -39,7 +40,7 @@ export const PopupProvider = props => {
 
   const initialState: PopupState = {
     popupList: [],
-    lastPopupId: 0
+    lastPopupId: 0,
   };
 
   return (
@@ -54,11 +55,11 @@ export const PopupConsumer = PopupContext.Consumer;
 export const usePopupContext = (): PopupState & PopupDispatch => {
   const [state, setState] = useContext(PopupContext) as [
     PopupState,
-    Dispatch<SetStateAction<PopupState>>
+    Dispatch<SetStateAction<PopupState>>,
   ];
 
   function addPopup(popupInfo: PopupInfo) {
-    setState((prev) => ({
+    setState(prev => ({
       ...prev,
       popupList: prev.popupList.concat({
         ...popupInfo,
@@ -70,11 +71,23 @@ export const usePopupContext = (): PopupState & PopupDispatch => {
   }
 
   function removePopup(id?: number) {
-    setState((prev) => ({
+    const removeAndUpdate = (prev: PopupState) => {
+      return prev.popupList.filter((popup, i) => {
+        if (id == undefined) {
+          return prev.popupList.length - 1 !== i;
+        }
+        if (id == popup.id) {
+          // emmit dismiss event to closing target popup
+          popup.onDismiss?.();
+          return false;
+        } else {
+          return true;
+        }
+      });
+    };
+    setState(prev => ({
       ...prev,
-      popupList: prev.popupList.filter((popup, i) =>
-        id ? id !== popup.id : prev.popupList.length - 1 !== i
-      ),
+      popupList: removeAndUpdate(prev),
     }));
   }
 
