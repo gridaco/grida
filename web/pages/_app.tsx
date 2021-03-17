@@ -18,6 +18,9 @@ import Popup from "components/popup";
 import { analytics } from "utils/firebase";
 import { BodyCustomStyleInAbosulteSectionLayout } from "utils/styled/styles";
 import "../utils/styled/fonts.css";
+import { MDXProvider } from "@mdx-js/react";
+import { _MDX_COMPONENTS } from "components/mdx";
+import { SEO_DEFAULTS } from "utils/seo";
 
 const MyApp = ({ Component, pageProps }: AppProps) => {
   const router = useRouter();
@@ -103,19 +106,16 @@ const MyApp = ({ Component, pageProps }: AppProps) => {
         `}
       />
       <Head>
-        <title>bridged.xyz</title>
-        <meta
-          name="description"
-          content="designs that are meant to be implemented. automate your frontend development process. no more boring."
-        />
-        <meta
-          name="keywords"
-          content="flutter, design to code, figma to code, flutter code generation, design handoff, design linting, code generation"
-        />
-        <meta
-          name="author"
-          content="bridged.xyz team and community collaborators"
-        />
+        <title>{SEO_DEFAULTS.title}</title>
+        <meta name="description" content={SEO_DEFAULTS.description} />
+        <meta name="keywords" content={SEO_DEFAULTS.keywords} />
+        <meta name="author" content={SEO_DEFAULTS.author} />
+
+        <meta property="og:title" content={SEO_DEFAULTS.og.title} />
+        <meta property="og:type" content={SEO_DEFAULTS.og.type} />
+        <meta property="og:url" content={SEO_DEFAULTS.og.url} />
+        <meta property="og:image" content={SEO_DEFAULTS.og.image} />
+
         <link rel="icon" href="/favicon.png" />
       </Head>
       <div
