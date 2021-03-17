@@ -24,7 +24,7 @@ const FeatureChoice: React.FC<FeatureChoiceProps> = props => {
   };
 
   return (
-    <Flex width="100%" backgroundColor="#ccc" alignItems="center" mb="58px">
+    <Flex width="100%" alignItems="center" mb="58px">
       <Flex flexDirection="column">
         <Text mt="17px" mb="33px" fontSize="18px" color="#7e7e7e">
           {titleList}{" "}
@@ -47,7 +47,7 @@ const FeatureChoice: React.FC<FeatureChoiceProps> = props => {
               {item.feature.map((i, idx) => (
                 <Feature width="100%" key={i.id}>
                   {isOpen.includes(ix) && (
-                    <Flex mb="12px" width="62%">
+                    <Flex mb="12px">
                       {i.name}
                     </Flex>
                   )}
