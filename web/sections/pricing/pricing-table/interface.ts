@@ -5,7 +5,7 @@
  * team: "50,000 / Mo"
  * extra: "$1 / 2K"
  */
-export interface FeaturePricingItemm {
+export interface FeaturePricingItem {
   alias: string;
   feature: string;
   // not used for now
