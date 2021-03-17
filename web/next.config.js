@@ -1,5 +1,6 @@
 const withTM = require("next-transpile-modules");
 const withVideos = require("next-videos");
+
 const withMDX = require("@next/mdx")({
   extension: /\.mdx?$/,
 });

@@ -1,5 +1,6 @@
 import FAQs from "components/faq";
 import { FaqDisplayData } from "components/faq/interface";
+import SectionLayout from "layout/section";
 import React from "react";
 
 const GLOBALIZATION_QUESTIONS: FaqDisplayData = [
@@ -20,5 +21,9 @@ const GLOBALIZATION_QUESTIONS: FaqDisplayData = [
 ];
 
 export default function SectionFaq() {
-  return <FAQs questions={GLOBALIZATION_QUESTIONS} />;
+  return (
+    <SectionLayout alignContent="center">
+      <FAQs questions={GLOBALIZATION_QUESTIONS} />;
+    </SectionLayout>
+  );
 }
