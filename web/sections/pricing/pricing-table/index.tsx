@@ -5,8 +5,9 @@ import SectionLayout from "layout/section";
 import BlankArea from "components/blank-area";
 import Icon from "components/icon";
 import { media } from "utils/styled/media";
-import { ThemeInterface } from "utils/styled/theme";
+import defaultTheme, { ThemeInterface } from "utils/styled/theme";
 import { usePopupContext } from "utils/context/PopupContext";
+import { useWindowWidth } from "utils/hooks/use-window-width";
 
 const forYouTitleList = [
   {
@@ -59,41 +60,63 @@ const forTeamTitleList = [
   },
 ];
 
-const PlanList: React.FC = () => {
+function replaceStylePxToNumber(stylePx: string) {
+  return parseInt(stylePx.replace("px", ""));
+}
+
+export default function PlanList() {
   const { addPopup, removePopup } = usePopupContext();
+  const width = useWindowWidth();
 
   const handleClickQuestionMark = useCallback(() => {
     addPopup({
       title: "",
       element: (
-        <FreePlanPopup pt="48px" pb="96px" px="48px">
-          <Icon
-            name="faqClose"
-            ml="auto"
-            onClick={() => removePopup()}
-            style={{ cursor: "pointer" }}
-          />
-          <Flex alignItems="center" flexDirection="column">
-            <Heading mb="48px" fontWeight="bold" fontSize="36px">
-              What are the limitations of free plan?
-            </Heading>
-            <Text
-              color="#686868"
-              textAlign="center"
-              lineHeight="43px"
-              letterSpacing="0em"
-              fontWeight="400"
-              fontSize="24px"
+        <SectionLayout>
+          <FreePlanPopup
+            width="100%"
+            alignItems="center"
+            px="48px"
+            pt="48px"
+            pb="96px"
+          >
+            {width > replaceStylePxToNumber(defaultTheme.breakpoints[0]) && (
+              <Icon
+                name="faqClose"
+                ml="auto"
+                onClick={() => removePopup()}
+                style={{ cursor: "pointer" }}
+              />
+            )}
+
+            <Flex
+              width="100%"
+              alignItems="center"
+              px={["20px", "96px", "96px", "96px"]}
+              flexDirection="column"
             >
-              To build an enterprise level application, you’ll need a paid plan.
-              Paid plan includes extra default storage and unlimited projects
-              count. Also cloud objects such as translation token can be stored
-              up to 1 million. The extra usage will be charged as Standard Cloud
-              Fee.
-            </Text>
-          </Flex>
-        </FreePlanPopup>
+              <Heading mb="48px" fontWeight="bold" fontSize="36px">
+                What are the limitations of free plan?
+              </Heading>
+              <Text
+                color="#686868"
+                textAlign="center"
+                lineHeight="43px"
+                letterSpacing="0em"
+                fontWeight="400"
+                fontSize={["18px", "24px", "24px", "24px"]}
+              >
+                To build an enterprise level application, you’ll need a paid
+                plan. Paid plan includes extra default storage and unlimited
+                projects count. Also cloud objects such as translation token can
+                be stored up to 1 million. The extra usage will be charged as
+                Standard Cloud Fee.
+              </Text>
+            </Flex>
+          </FreePlanPopup>
+        </SectionLayout>
       ),
+      showOnlyBody: true,
       height: "50vw",
     });
   }, []);
@@ -211,9 +234,7 @@ const PlanList: React.FC = () => {
       <BlankArea height={[264, 264]} />
     </SectionLayout>
   );
-};
-
-export default PlanList;
+}
 
 const FreePlanPopup = styled(Flex)`
   flex-direction: column;
