@@ -10,6 +10,7 @@ import { URLS } from "utils/landingpage/constants";
 import { ThemeInterface } from "utils/styled/theme";
 import { media } from "utils/styled/media";
 import { useCookies } from "react-cookie";
+import { useRouter } from "next/router";
 
 const COOKIE_ACCESS_TOKEN_KEY = "_token";
 
@@ -17,7 +18,8 @@ const Header = () => {
   const [currentExpandHeader, setCurrentExpandHeader] = useState("");
   const [isOpenMenu, setIsOpenMenu] = useState(false);
   const [cookie, setCookie] = useCookies([COOKIE_ACCESS_TOKEN_KEY]);
-
+  const [currentRouter, setCurrentRouter] = useState("");
+  const router = useRouter();
   useEffect(() => {
     if (isOpenMenu) {
       document.getElementsByTagName("html")[0].style.overflowY = "hidden";
@@ -50,6 +52,14 @@ const Header = () => {
       !isOpenMenu && (window.location.href = URLS.landing.signin);
     }
   };
+
+  useEffect(() => {
+    setCurrentRouter(router.asPath);
+
+    if (currentRouter != router.asPath && currentRouter != "") {
+      setIsOpenMenu(false)
+    }
+  }, [router])
 
   return (
     <HeaderWrapper>
