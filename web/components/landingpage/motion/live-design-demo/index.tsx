@@ -43,7 +43,7 @@ export default function LiveDesignDemoFrame() {
         }}
       /> */}
       <ReactPlayer
-        url={require("public/videos/loop_landingpage-210306-motionsource-section-2-1.mp4")}
+        url={require("public/videos/landingpage-section2-live-design-demo.min.mp4")}
         loop
         playing
         muted

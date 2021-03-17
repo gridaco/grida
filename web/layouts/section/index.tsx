@@ -140,7 +140,7 @@ const SectionLayout: React.FC<SectionLayoutProps> = ({
         <Debug>
           <span
             style={{
-              transform: `translate(-30px, -${debugOption.debugPostion}%)`,
+              transform: `translate(-30px, -${debugOption?.debugPostion}%)`,
             }}
           >
             {" "}

@@ -62,7 +62,7 @@ const Collaborate = () => {
                   src="/assets/notification.png"
                   width="auto"
                   height="auto"
-                  alt="notification"
+                  alt="bridged collaboration slack notification"
                 />
               </div>
             ))}
@@ -72,7 +72,7 @@ const Collaborate = () => {
               src="/assets/application-image-view.png"
               width="auto"
               height="auto"
-              alt="application-image-view"
+              alt="bridged collaboration for app developers"
             />
           </div>
         </BackgroundImage>
@@ -136,7 +136,7 @@ const Description = styled(LandingpageText)`
 
 const BackgroundImage = styled(Flex)`
   position: relative;
-  
+
   .background-img {
     div {
       width: 100vw !important;

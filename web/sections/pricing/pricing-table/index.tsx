@@ -117,6 +117,7 @@ export default function PlanList() {
         </SectionLayout>
       ),
       showOnlyBody: true,
+      height: "50vw",
     });
   }, []);
 

@@ -248,6 +248,7 @@ const Container = styled(Flex)`
 const RowFrame = styled(motion.div)`
   display: flex;
   width: 80.5%;
+  padding-bottom: 10px;
 
   ${props => media("0px", (props.theme as ThemeInterface).breakpoints[2])} {
     width: 95%;
