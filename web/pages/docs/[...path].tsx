@@ -21,7 +21,7 @@ export default function Post({ post, preview }) {
         <PostTitle>Loading…</PostTitle>
       ) : (
         <>
-          <article >
+          <article style={{ width: "100%" }}>
             <Head>
               <title>{post.title}</title>
               {post.ogImage && (
@@ -43,13 +43,11 @@ export async function getStaticProps({
 }) {
   const post = getPostByPath(params.path);
 
-  const content = await markdownToHtml(post.content || "");
-
   return {
     props: {
       post: {
         ...post,
-        content,
+        content: post.content,
       },
     },
   };

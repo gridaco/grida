@@ -23,6 +23,7 @@
         "firebase": "^8.2.10",
         "framer-motion": "^3.10.0",
         "next-videos": "^1.4.0",
+        "prism-react-renderer": "^1.2.0",
         "react-cookie": "^4.0.3",
         "react-lottie": "^1.2.3",
         "react-player": "^2.9.0",

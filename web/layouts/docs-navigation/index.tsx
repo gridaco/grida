@@ -18,7 +18,7 @@ function DocsNavigation() {
   const docs = manifest ? manifest[0] : undefined;
   return (
     <NavigationWrapper flexDirection="column" mr="70px">
-      <DocsSearchBar />
+      {/* <DocsSearchBar /> */}
       {docs &&
         docs.routes.map(i => <DocsNavigationSection key={i.title} route={i} />)}
     </NavigationWrapper>
