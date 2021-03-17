@@ -120,7 +120,7 @@ export const BodyCustomStyleInAbosulteSectionLayout = styled(Box)`
     height: 739px;
 
     .full-width {
-      bottom: 12%;
+      bottom: 11%;
 
       ${props => media("0px", (props.theme as ThemeInterface).breakpoints[0])} {
         bottom: 8%;
