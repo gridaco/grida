@@ -71,7 +71,7 @@ const Header = () => {
               name="bridged"
               width={32}
               height={32}
-              ml={["20px", "8px", "8px", "8px"]}
+              ml={["8px", "8px", "8px", "8px"]}
             />
           </Link>
           <Link href="/">
