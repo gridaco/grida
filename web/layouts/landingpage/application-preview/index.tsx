@@ -1,9 +1,9 @@
-import React from 'react'
-import { Box, Flex } from 'rebass';
-import styled from "@emotion/styled"
-import Image from 'next/image';
-import { media } from 'utils/styled/media';
-import { ThemeInterface } from 'utils/styled/theme';
+import React from "react";
+import { Box, Flex } from "rebass";
+import styled from "@emotion/styled";
+import Image from "next/image";
+import { media } from "utils/styled/media";
+import { ThemeInterface } from "utils/styled/theme";
 
 const ApplicationPreview = () => {
   return (
@@ -13,7 +13,7 @@ const ApplicationPreview = () => {
         src="/assets/sample-app-as-image.png"
         width="390px"
         height="788px"
-        alt="frame_iphone"
+        alt="bridged demo app - design to code"
       />
       {/* <Preview>
         <AppUI />
@@ -26,10 +26,10 @@ const ApplicationPreview = () => {
         />
       </Preview> */}
     </Postioner>
-  )
-}
+  );
+};
 
-export default ApplicationPreview
+export default ApplicationPreview;
 
 const Postioner = styled(Flex)`
   position: relative;
@@ -39,7 +39,7 @@ const Postioner = styled(Flex)`
   width: 390px !important;
   max-height: 788px;
   height: auto;
-`
+`;
 
 const Preview = styled(Flex)`
   width: 90%;
@@ -47,7 +47,11 @@ const Preview = styled(Flex)`
   position: absolute;
   border-radius: 30px;
 
-  ${props => media((props.theme as ThemeInterface).breakpoints[0], (props.theme as ThemeInterface).breakpoints[1])} {
+  ${props =>
+    media(
+      (props.theme as ThemeInterface).breakpoints[0],
+      (props.theme as ThemeInterface).breakpoints[1],
+    )} {
     height: 90%;
   }
-`
+`;
