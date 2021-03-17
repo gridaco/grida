@@ -36,7 +36,7 @@ const SectionLayout: React.FC<SectionLayoutProps> = ({
   debug = false,
   backgroundColor = "rgb(0,0,0,0)",
   debugOption,
-  className,
+  className = "",
   notAutoAllocateHeight = false,
 }) => {
   const parentFlexBox = useRef(null);
@@ -129,7 +129,7 @@ const SectionLayout: React.FC<SectionLayoutProps> = ({
 
   return (
     <Flex
-      className={className || ""}
+      className={className}
       width="100%"
       ref={parentFlexBox}
       alignItems="center"
@@ -140,7 +140,7 @@ const SectionLayout: React.FC<SectionLayoutProps> = ({
         <Debug>
           <span
             style={{
-              transform: `translate(-30px, -${debugOption?.debugPostion}%)`,
+              transform: `translate(-30px, -${debugOption.debugPostion}%)`,
             }}
           >
             {" "}
