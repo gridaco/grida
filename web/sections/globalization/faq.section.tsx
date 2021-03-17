@@ -22,7 +22,7 @@ const GLOBALIZATION_QUESTIONS: FaqDisplayData = [
 
 export default function SectionFaq() {
   return (
-    <SectionLayout debug>
+    <SectionLayout alignContent="center">
       <FAQs questions={GLOBALIZATION_QUESTIONS} />;
     </SectionLayout>
   );
