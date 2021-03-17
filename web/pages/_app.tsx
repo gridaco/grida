@@ -21,6 +21,7 @@ import "../utils/styled/fonts.css";
 import { MDXProvider } from "@mdx-js/react";
 import { _MDX_COMPONENTS } from "components/mdx";
 import { SEO_DEFAULTS } from "utils/seo";
+import makeKeywords from "utils/seo/make-keywords";
 
 const App = ({ Component, pageProps }: AppProps) => {
   const router = useRouter();
@@ -108,7 +109,7 @@ const App = ({ Component, pageProps }: AppProps) => {
       <Head>
         <title>{SEO_DEFAULTS.title}</title>
         <meta name="description" content={SEO_DEFAULTS.description} />
-        <meta name="keywords" content={SEO_DEFAULTS.keywords} />
+        <meta name="keywords" content={makeKeywords(SEO_DEFAULTS.keywords)} />
         <meta name="author" content={SEO_DEFAULTS.author} />
 
         <meta property="og:title" content={SEO_DEFAULTS.og.title} />
