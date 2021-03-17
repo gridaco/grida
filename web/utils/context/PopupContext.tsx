@@ -14,12 +14,6 @@ export interface PopupInfo {
   message?: string;
   element?: JSX.Element;
   height?: ResponsiveValue<TLengthStyledSystem>;
-  confirmLabel?: string;
-  confirmAction?: () => void;
-  closeLabel?: string;
-  closeAction?: () => void;
-  showOnlyBody?: boolean;
-  withoutConfirm?: boolean;
   onDismiss?: () => void;
 }
 

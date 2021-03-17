@@ -9,7 +9,6 @@ import Footer from "components/footer";
 import Header from "components/header";
 import { defaultTheme } from "utils/styled";
 import { useRouter } from "next/router";
-import { Box } from "rebass";
 import {
   PopupConsumer,
   PopupInfo,
@@ -19,11 +18,9 @@ import Popup from "components/popup";
 import { analytics } from "utils/firebase";
 import { BodyCustomStyleInAbosulteSectionLayout } from "utils/styled/styles";
 import "../utils/styled/fonts.css";
-import { useCookies } from "react-cookie";
 
 const MyApp = ({ Component, pageProps }: AppProps) => {
   const router = useRouter();
- 
 
   useEffect(() => {
     // region set firebase analytics
