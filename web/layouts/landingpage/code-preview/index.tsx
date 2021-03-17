@@ -89,7 +89,7 @@ const CodePreview = () => {
               <Platforms className="platforms">
                 {DEV_FRAMEWORKS.map(i => (
                   <Image
-                    alt="platform"
+                    alt="bridged supported design platforms"
                     key={i.name}
                     className="cursor"
                     onClick={() => setCurrentPlatform(i)}
@@ -177,7 +177,7 @@ const CodeView = styled(Box)`
 
 const Mobile = styled.div`
   display: none;
-    ${props => media("0px", (props.theme as ThemeInterface).breakpoints[0])} {
+  ${props => media("0px", (props.theme as ThemeInterface).breakpoints[0])} {
     display: block;
   }
 `;

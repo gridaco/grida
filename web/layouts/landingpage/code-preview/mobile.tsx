@@ -63,7 +63,7 @@ const CodePreviewMobile = () => {
       <Platforms className="platforms">
         {DEV_FRAMEWORKS.map(i => (
           <Image
-            alt="platform"
+            alt="bridged supported platforms icon"
             key={i.name}
             className="cursor"
             onClick={() => setCurrentPlatform(i)}

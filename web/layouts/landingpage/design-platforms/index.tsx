@@ -44,7 +44,7 @@ const DesignPlatforms = () => {
             >
               <div className="platforms-preview">
                 <Image
-                  alt="platform"
+                  alt="bridged supported design patforms"
                   src={`/assets/design-platforms/${currentPlatform}.png`}
                   width="auto"
                   height="565px"
@@ -59,7 +59,7 @@ const DesignPlatforms = () => {
           <div className="platforms">
             {renderPlatforms.map(i => (
               <Image
-                alt="platform"
+                alt="bridged supported platform icons"
                 key={i}
                 className="cursor"
                 onClick={() => setCurrentPlatform(i)}

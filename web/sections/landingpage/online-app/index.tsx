@@ -56,7 +56,7 @@ const OnlineApp: React.FC<OnlineAppProps> = ({ isMobile }) => {
             <div className="gradient-view no-drag">
               <Image
                 src="/assets/mobile/mobile-gradient-blur-xs.png"
-                alt="gradient"
+                alt="gradient-bg"
                 width="768"
                 height="520"
               />
