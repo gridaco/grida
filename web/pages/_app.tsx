@@ -22,7 +22,7 @@ import { MDXProvider } from "@mdx-js/react";
 import { _MDX_COMPONENTS } from "components/mdx";
 import { SEO_DEFAULTS } from "utils/seo";
 
-const MyApp = ({ Component, pageProps }: AppProps) => {
+const App = ({ Component, pageProps }: AppProps) => {
   const router = useRouter();
 
   useEffect(() => {
@@ -143,10 +143,12 @@ const Providers = ({ children }: { children: React.ReactNode }) => {
   return (
     <PopupProvider>
       <CookiesProvider>
-        <ThemeProvider theme={defaultTheme}>{children}</ThemeProvider>
+        <MDXProvider components={_MDX_COMPONENTS}>
+          <ThemeProvider theme={defaultTheme}>{children}</ThemeProvider>
+        </MDXProvider>
       </CookiesProvider>
     </PopupProvider>
   );
 };
 
-export default MyApp;
+export default App;
