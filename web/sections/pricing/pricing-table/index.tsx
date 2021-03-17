@@ -94,7 +94,6 @@ const PlanList: React.FC = () => {
           </Flex>
         </FreePlanPopup>
       ),
-      showOnlyBody: true,
       height: "50vw",
     });
   }, []);

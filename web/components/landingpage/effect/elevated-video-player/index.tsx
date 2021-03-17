@@ -50,7 +50,6 @@ function ElevatedVideoPlayer() {
           />
         </VideoContainer>
       ),
-      showOnlyBody: true,
       onDismiss: handlePopupClose,
       height: "50vw",
     });
