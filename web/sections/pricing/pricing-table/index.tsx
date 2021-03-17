@@ -116,7 +116,6 @@ export default function PlanList() {
           </FreePlanPopup>
         </SectionLayout>
       ),
-      showOnlyBody: true,
       height: "50vw",
     });
   }, []);
