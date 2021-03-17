@@ -139,6 +139,7 @@ const Postioner = styled(Flex)`
     max-width: 920px;
     width: 100%;
     opacity: 0.6;
+    box-shadow: 0px 4px 128px 32px rgba(0, 0, 0, 0.08);
     div {
       min-width: 818px;
       left: 20%;

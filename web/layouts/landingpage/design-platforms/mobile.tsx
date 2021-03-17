@@ -51,6 +51,7 @@ const Positoner = styled(Flex)`
   .platform-preview {
     transform: translateX(0.5%);
     opacity: 0.6;
+    box-shadow: 0px 4px 128px 32px rgba(0, 0, 0, 0.08);
 
     div {
       width: 507px !important;
