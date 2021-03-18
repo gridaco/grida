@@ -52,7 +52,6 @@ function ElevatedVideoPlayer() {
         </VideoContainer>
       ),
       onDismiss: handlePopupClose,
-      height: "50vw",
     });
   }, []);
 
