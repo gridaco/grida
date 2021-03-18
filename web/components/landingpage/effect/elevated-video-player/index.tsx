@@ -107,6 +107,7 @@ const Frame = styled(motion.div)`
 `;
 
 const PlayButtonFrame = styled(motion.div)`
+  cursor: pointer;
   position: relative;
   width: 112px;
   height: 112px;

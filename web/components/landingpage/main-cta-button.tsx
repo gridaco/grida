@@ -1,6 +1,7 @@
 import styled from "@emotion/styled";
 import React from "react";
-import { Button } from "rebass";
+import { Button, Box } from "rebass";
+import { motion } from "framer-motion";
 import { URLS } from "utils/landingpage/constants";
 
 export default function LandingMainCtaButton() {
@@ -8,13 +9,14 @@ export default function LandingMainCtaButton() {
     open(URLS.downloads.download_figma_plugin);
   };
   return (
-    <MainButton
+    <Box
       mt={["24px", "24px", "40px", "40px"]}
       mb={["134px", "84px", "100px", "145px"]}
-      onClick={handleCta}
     >
-      Start now
-    </MainButton>
+      <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+        <MainButton onClick={handleCta}>Start now</MainButton>
+      </motion.div>
+    </Box>
   );
 }
 
