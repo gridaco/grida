@@ -113,7 +113,7 @@ const Modal = styled(Flex)`
   overflow-y: scroll;
   /* border: 1px solid; */
   border-radius: 7px;
-  box-shadow: 4px 6px 20px 0 rgba(0, 0, 0, 0.09);
+  /* box-shadow: 4px 6px 20px 0 rgba(0, 0, 0, 0.09); */
   transform: translate(-50%, -50%);
   ${borderColor}
 `;
