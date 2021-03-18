@@ -4,11 +4,12 @@ import Icon from "components/icon";
 import styled from "@emotion/styled";
 import { media } from "utils/styled/media";
 import { ThemeInterface } from "utils/styled/theme";
+import { motion } from "framer-motion";
 
 const ActionItem = ({ label, href }) => {
   return (
     <Link href={href}>
-      <Text className="cusror">
+      <Text whileHover={{ color: "#1c1c1c" }}>
         {label}
         <Icon
           name="arrowDown"
@@ -20,7 +21,8 @@ const ActionItem = ({ label, href }) => {
   );
 };
 
-const Text = styled.span`
+const Text = styled(motion.span)`
+  cursor: pointer;
   max-width: calc(100vw - 40px);
   width: 100vw;
   margin-right: auto;
