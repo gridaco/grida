@@ -17,7 +17,7 @@ export default function FAQs(props: { questions: FaqDisplayData }) {
           ))}
         </Wrapper>
       </Flex>
-      <BlankArea height={[170, 170]} />
+      <BlankArea height={[135, 170]} />
     </SectionLayout>
   );
 }

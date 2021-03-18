@@ -16,7 +16,6 @@ export default function QuestionItem(props: { question: FaqQnaItem }) {
     <Flex flexDirection="column">
       <QueryHeader
         width="100%"
-        height="32px"
         alignItems="center"
         justifyContent="space-between"
         mb={["40px", "36px", "36px", "28px"]}

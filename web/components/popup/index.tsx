@@ -60,8 +60,8 @@ const Popup = (props: PopupProps) => {
       }}
     >
       <Modal
-        width={info.width || "90%"}
-        height={(info.height as string) || "90%"}
+        width={info.width || ""}
+        height={(info.height as string) || ""}
         onClick={onModalInnerClick}
       >
         {info.message && (
@@ -108,7 +108,8 @@ const Modal = styled(Flex)`
   top: 50%;
   left: 50%;
   max-width: 1240px;
-  max-height: 690px;
+  min-width: 280px;
+  max-height: 80vh;
   /* max-height: ${props => (props.height ? "initial" : "70%")}; */
   overflow-y: scroll;
   /* border: 1px solid; */

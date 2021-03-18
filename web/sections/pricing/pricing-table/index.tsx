@@ -8,56 +8,30 @@ import { media } from "utils/styled/media";
 import defaultTheme, { ThemeInterface } from "utils/styled/theme";
 import { usePopupContext } from "utils/context/PopupContext";
 import { useWindowWidth } from "utils/hooks/use-window-width";
+import Link from "next/link";
+import { LandingpageUrls } from "utils/landingpage/constants";
+import LandingpageText from "components/landingpage/text";
+import PricingCard from "components/pricing-card";
 
-const forYouTitleList = [
-  {
-    title: "Private git integration",
-  },
-  {
-    title: "Design linting",
-  },
-  {
-    title: "0.5GB Asset Storage",
-  },
-  {
-    title: "Code export",
-  },
-  {
-    title: "Unlimited public projects",
-  },
-  {
-    title: "Up to 5000 Objects",
-  },
-  {
-    title: "1M Code blocks",
-  },
+const PersonalPlanList = [
+  "Private git integration",
+  "Design linting",
+  "0.5GB Asset Storage",
+  "Code export",
+  "Unlimited public projects",
+  "Up to 5000 Objects",
+  "1M Code blocks",
 ];
 
-const forTeamTitleList = [
-  {
-    title: "Unlimited Long-lived hosting",
-  },
-  {
-    title: "Unlimited Private projects",
-  },
-  {
-    title: "30GB Asset Storage",
-  },
-  {
-    title: "Code generation with full-engine capability",
-  },
-  {
-    title: "Unlimited Projects",
-  },
-  {
-    title: "Custom Domain",
-  },
-  {
-    title: "1M Cloud objects",
-  },
-  {
-    title: "Unlimited Code blocks",
-  },
+const TeamPlanList = [
+  "Unlimited Long-lived hosting",
+  "Unlimited Private projects",
+  "30GB Asset Storage",
+  "Code generation with full-engine capability",
+  "Unlimited Projects",
+  "Custom Domain",
+  "1M Cloud objects",
+  "Unlimited Code blocks",
 ];
 
 function replaceStylePxToNumber(stylePx: string) {
@@ -72,168 +46,104 @@ export default function PlanList() {
     addPopup({
       title: "",
       element: (
-        <SectionLayout>
-          <FreePlanPopup
-            width="100%"
-            alignItems="center"
-            px="48px"
-            pt="48px"
-            pb="96px"
-          >
-            {width > replaceStylePxToNumber(defaultTheme.breakpoints[0]) && (
-              <Icon
-                name="faqClose"
-                ml="auto"
-                onClick={() => removePopup()}
-                style={{ cursor: "pointer" }}
-              />
-            )}
+        <FreePlanPopup width="100%" alignItems="center" px="25px" pb="60px">
+          {width >= replaceStylePxToNumber(defaultTheme.breakpoints[0]) && (
+            <Icon
+              name="faqClose"
+              ml="auto"
+              onClick={() => removePopup()}
+              style={{ cursor: "pointer" }}
+              mb="30px"
+              mt="20px"
+            />
+          )}
 
-            <Flex
-              width="100%"
-              alignItems="center"
-              px={["20px", "96px", "96px", "96px"]}
-              flexDirection="column"
-            >
-              <Heading mb="48px" fontWeight="bold" fontSize="36px">
-                What are the limitations of free plan?
-              </Heading>
-              <Text
-                color="#686868"
-                textAlign="center"
-                lineHeight="43px"
-                letterSpacing="0em"
-                fontWeight="400"
-                fontSize={["18px", "24px", "24px", "24px"]}
-              >
-                To build an enterprise level application, you’ll need a paid
-                plan. Paid plan includes extra default storage and unlimited
-                projects count. Also cloud objects such as translation token can
-                be stored up to 1 million. The extra usage will be charged as
-                Standard Cloud Fee.
-              </Text>
-            </Flex>
-          </FreePlanPopup>
-        </SectionLayout>
+          <Flex width="100%" alignItems="center" flexDirection="column">
+            <LandingpageText textAlign="center" variant="h4">
+              What are the limitations of free plan?
+            </LandingpageText>
+            <PopupDescription textAlign="center" variant="body1">
+              To build an enterprise level application, you’ll need a paid plan.
+              Paid plan includes extra default storage and unlimited projects
+              count. Also cloud objects such as translation token can be stored
+              up to 1 million. The extra usage will be charged as Standard Cloud
+              Fee.
+            </PopupDescription>
+          </Flex>
+        </FreePlanPopup>
       ),
-      height: "50vw",
+    });
+  }, []);
+
+  const handleClickPaidPlan = useCallback(() => {
+    addPopup({
+      title: "",
+      element: (
+        <FreePlanPopup
+          width="100%"
+          alignItems="center"
+          px="24px"
+          pt="24px"
+          pb="48px"
+        >
+          {width >= replaceStylePxToNumber(defaultTheme.breakpoints[0]) && (
+            <Icon
+              name="faqClose"
+              ml="auto"
+              onClick={() => removePopup()}
+              style={{ cursor: "pointer" }}
+              mb="30px"
+            />
+          )}
+
+          <Flex width="100%" alignItems="center" flexDirection="column">
+            <LandingpageText textAlign="center" variant="h4">
+              Woopsy.
+            </LandingpageText>
+            <PopupDescription textAlign="center" variant="body1">
+              Bridged paid plans are disabled temporarily. Meanwhile, you can
+              use our free plan which basically does the same.
+              <Link href={LandingpageUrls.signup}>
+                <span
+                  className="cursor"
+                  style={{ color: "#172AD7", margin: "0px 5px" }}
+                >
+                  Sign up
+                </span>
+              </Link>
+              here.
+            </PopupDescription>
+          </Flex>
+        </FreePlanPopup>
+      ),
     });
   }, []);
 
   return (
     <SectionLayout alignContent="center">
-      <BlankArea height={[331, 331]} />
       <Title mb="43px">Pay as you grow</Title>
       <Desc mb={["69px", "185px", "145px", "159px"]}>
         Start small, pay when you’re ready.
       </Desc>
       <Wrapper
         width="100%"
-        height="841px"
+        height="100%"
         alignItems="center"
         justifyContent={["space-between", "center", "center", "center"]}
         flexDirection={["column", "row", "row", "row"]}
       >
-        <ForYou
-          width="388px"
-          height="567px"
-          justifyContent="center"
-          alignItems="center"
-          mr={["0px", "27px", "27px", "27px"]}
-          mb={["24px", "0px", "0px", "0px"]}
-          backgroundColor="#fcfcfc"
-        >
-          <CardWrapper width="85%" height="90%" flexDirection="column">
-            <CardTitle justifyContent="space-between" alignItems="center">
-              For you
-              <Icon
-                onClick={handleClickQuestionMark}
-                name="questionMark"
-                isVerticalMiddle
-                style={{ cursor: "pointer" }}
-              />
-            </CardTitle>
-            <Text
-              mb="33px"
-              letterSpacing="0em"
-              mt="24px"
-              color="#000000"
-              fontSize="36px"
-            >
-              $0
-            </Text>
-            {forYouTitleList.map((item, ix) => (
-              <Flex fontSize="18px" color="#535353" mb="19px" key={ix}>
-                <Icon mr="11px" name="check" />
-                {item.title}
-              </Flex>
-            ))}
-            <Button
-              fontWeight="bold"
-              mt="auto"
-              width="100%"
-              height="46px"
-              variant="secondary"
-            >
-              Start now
-            </Button>
-          </CardWrapper>
-        </ForYou>
-
-        <ForTeam
-          width="518px"
-          height="761px"
-          justifyContent="center"
-          ml={["0px", "27px", "27px", "27px"]}
-          backgroundColor="#ffffff"
-        >
-          <CardWrapper
-            mt={["20px", "40px", "40px", "40px"]}
-            height="90%"
-            width="85%"
-            flexDirection="column"
-          >
-            <CardTitle>For your team</CardTitle>
-            <Flex
-              mt={["16px", "36px", "36px", "36px"]}
-              mb={["36px", "74px", "74px", "74px"]}
-              alignItems="center"
-            >
-              <Text
-                mr="7px"
-                letterSpacing="0em"
-                color="#000000"
-                fontSize="36px"
-                lineHeight="135%"
-              >
-                $24
-              </Text>
-              <Text color="rgba(109, 109, 109, 0.83);" fontSize="21px">
-                per seats/mo
-              </Text>
-            </Flex>
-            {forTeamTitleList.map((item, ix) => (
-              <Flex fontSize="18px" color="#535353" mb="19px" key={ix}>
-                <Icon mr="11px" name="check" />
-                {item.title}
-              </Flex>
-            ))}
-            <Button
-              fontWeight="bold"
-              mt="auto"
-              width="100%"
-              height="46px"
-              variant="secondary"
-            >
-              Start 14 Day Trial
-            </Button>
-          </CardWrapper>
-        </ForTeam>
+        <PricingCard type="none-paid" planList={PersonalPlanList} />
+        <PricingCard type="paid" planList={TeamPlanList} />
       </Wrapper>
-      <BlankArea height={[264, 264]} />
+      <BlankArea height={[182, 264]} />
     </SectionLayout>
   );
 }
+
+const PopupDescription = styled(LandingpageText)`
+  margin-top: 45px;
+  text-align: center;
+`;
 
 const FreePlanPopup = styled(Flex)`
   flex-direction: column;
@@ -262,39 +172,10 @@ const Desc = styled(Text)`
 `;
 
 const Wrapper = styled(Flex)`
+  max-height: 800px;
+  height: 200vh;
+
   ${props => media("0px", (props.theme as ThemeInterface).breakpoints[0])} {
-    height: 1128px;
+    max-height: 1300px;
   }
-`;
-
-const ForYou = styled(Flex)`
-  ${props => media("0px", (props.theme as ThemeInterface).breakpoints[0])} {
-    width: 90%;
-    height: 527px;
-  }
-  border: 1px solid #f7f7f7;
-  border-radius: 8px;
-`;
-
-const CardWrapper = styled(Flex)`
-  ${props => media("0px", (props.theme as ThemeInterface).breakpoints[0])} {
-    height: 95%;
-  }
-`;
-
-const CardTitle = styled(Flex)`
-  font-size: 24px;
-  line-height: 135%;
-
-  color: #000000;
-`;
-
-const ForTeam = styled(Flex)`
-  ${props => media("0px", (props.theme as ThemeInterface).breakpoints[0])} {
-    width: 90%;
-    height: 577px;
-  }
-
-  box-shadow: 0px 4px 128px 32px rgba(0, 0, 0, 0.08);
-  border-radius: 8px;
 `;

@@ -6,6 +6,8 @@ import { Flex } from "rebass";
 import { DesktopView } from "utils/styled/styles";
 import { media } from "utils/styled/media";
 import { ThemeInterface } from "utils/styled/theme";
+import SectionLayout from "layout/section";
+import BlankArea from "components/blank-area";
 
 const featureDataList = [
   {
@@ -102,19 +104,16 @@ const featureDataList = [
 
 const FeatureList: React.FC = () => {
   return (
-    <Flex
-      width="100%"
-      mb={["176px", "146px", "146px", "146px"]}
-      justifyContent="center"
-    >
-      <DesktopView style={{ position: "relative" }}>
+    <SectionLayout variant="content-default">
+      <DesktopView style={{ position: "relative", width: "100%" }}>
         <FeatureListDesktopView data={featureDataList} />
       </DesktopView>
 
       <Mobile>
         <FeatureListMobileView data={featureDataList} />
       </Mobile>
-    </Flex>
+      <BlankArea height={[195, 334]} />
+    </SectionLayout>
   );
 };
 

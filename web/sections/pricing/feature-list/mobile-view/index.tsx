@@ -13,7 +13,7 @@ const choice = ["Free", "Team", "Extra Usage"];
 
 const FeatureListMobileView: React.FC<FeatureProps> = ({ data }) => {
   return (
-    <SectionLayout>
+    <Flex flexDirection="column">
       <Heading fontSize="32px" mb="25px">
         Features
       </Heading>
@@ -26,7 +26,7 @@ const FeatureListMobileView: React.FC<FeatureProps> = ({ data }) => {
           <FeatureChoice titleList={i} featureData={data} key={i} />
         ))}
       </Wrapper>
-    </SectionLayout>
+    </Flex>
   );
 };
 

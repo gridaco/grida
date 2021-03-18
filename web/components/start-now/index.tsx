@@ -23,6 +23,7 @@ const descList = [
   },
 ];
 
+// FUCKING NOT READY RESPONSIVE
 const StartNow: React.FC = () => {
   return (
     <Card
