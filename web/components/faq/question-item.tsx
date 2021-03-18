@@ -8,43 +8,47 @@ export default function QuestionItem(props: { question: FaqQnaItem }) {
   const { question } = props;
   const [isOpen, setIsOpen] = useState(false);
 
-  const handleIconClick = () => {
+  const handleQueryHeaderClick = () => {
     setIsOpen(!isOpen);
   };
 
   return (
     <Flex flexDirection="column">
-      <Flex
+      <QueryHeader
         width="100%"
+        height="32px"
         alignItems="center"
         justifyContent="space-between"
         mb={["40px", "36px", "36px", "28px"]}
+        onClick={handleQueryHeaderClick}
       >
-        <Title mr={["51px", 0, 0, 0]}>{question.query}</Title>
+        <Query mr={["51px", 0, 0, 0]}>{question.query}</Query>
         <Icon
-          onClick={handleIconClick}
           name={isOpen ? "faqClose" : "plus"}
           className="cursor"
           mr={!isOpen ? "9px" : "0px"}
         />
-      </Flex>
-
+      </QueryHeader>
       {isOpen && (
-        <Desc width="95%" mb={["89px", "39px", "43px", "48px"]}>
+        <Answer width="95%" mb={["89px", "39px", "43px", "48px"]}>
           {question.answer}
-        </Desc>
+        </Answer>
       )}
     </Flex>
   );
 }
 
-const Title = styled(Text)`
+const QueryHeader = styled(Flex)`
+  cursor: pointer;
+`;
+
+const Query = styled(Text)`
   font-size: 20px;
   letter-spacing: 0em;
   text-align: left;
 `;
 
-const Desc = styled(Flex)`
+const Answer = styled(Flex)`
   font-size: 20px;
   line-height: 133%;
 
