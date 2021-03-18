@@ -38,10 +38,11 @@ function ElevatedVideoPlayer() {
     addPopup({
       title: "",
       element: (
-        <VideoContainer width="100%" height="100%">
+        <VideoContainer width="calc(100vw - 40px)" height="100%">
           <ReactPlayer
             url="https://www.youtube.com/watch?v=RIZjZFoDhRc&ab_channel=Bridged"
             width="100%"
+            height="100%"
             playing
             loop
             muted

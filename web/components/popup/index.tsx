@@ -107,6 +107,7 @@ const Modal = styled(Flex)`
   justify-content: center;
   top: 50%;
   left: 50%;
+  background-color: #fff;
   max-width: 1240px;
   min-width: 280px;
   max-height: 80vh;
