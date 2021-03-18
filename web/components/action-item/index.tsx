@@ -9,7 +9,7 @@ import { motion } from "framer-motion";
 const ActionItem = ({ label, href }) => {
   return (
     <Link href={href}>
-      <Text whileHover={{ color: "#1c1c1c" }}>
+      <Text className="cursor" whileHover={{ color: "#1c1c1c" }}>
         {label}
         <Icon
           name="arrowDown"
@@ -22,7 +22,6 @@ const ActionItem = ({ label, href }) => {
 };
 
 const Text = styled(motion.span)`
-  cursor: pointer;
   max-width: calc(100vw - 40px);
   width: 100vw;
   margin-right: auto;

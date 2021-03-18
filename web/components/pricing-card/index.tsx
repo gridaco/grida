@@ -6,7 +6,6 @@ import Link from "next/link";
 import React, { useCallback } from "react";
 import { Button, Flex, Text } from "rebass";
 import { usePopupContext } from "utils/context/PopupContext";
-import { useWindowWidth } from "utils/hooks/use-window-width";
 import { LandingpageUrls } from "utils/landingpage/constants";
 import { media } from "utils/styled/media";
 import { ThemeInterface } from "utils/styled/theme";
@@ -16,7 +15,6 @@ function PricingCard(props: {
   planList: string[];
 }) {
   const { addPopup, removePopup } = usePopupContext();
-  const width = useWindowWidth();
 
   const handleClickQuestionMark = useCallback(() => {
     addPopup({
@@ -173,7 +171,6 @@ const CardCTAButton = styled(Button)`
   margin-top: auto;
   border-radius: 4px;
   margin-top: 40px;
-  cursor: pointer;
   ${p => {
     if (p.type === "paid") {
       return {

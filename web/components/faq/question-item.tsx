@@ -14,7 +14,8 @@ export default function QuestionItem(props: { question: FaqQnaItem }) {
 
   return (
     <Flex flexDirection="column">
-      <QueryHeader
+      <Flex
+        className="cursor"
         width="100%"
         alignItems="center"
         justifyContent="space-between"
@@ -27,7 +28,7 @@ export default function QuestionItem(props: { question: FaqQnaItem }) {
           className="cursor"
           mr={!isOpen ? "9px" : "0px"}
         />
-      </QueryHeader>
+      </Flex>
       {isOpen && (
         <Answer width="95%" mb={["89px", "39px", "43px", "48px"]}>
           {question.answer}
@@ -36,10 +37,6 @@ export default function QuestionItem(props: { question: FaqQnaItem }) {
     </Flex>
   );
 }
-
-const QueryHeader = styled(Flex)`
-  cursor: pointer;
-`;
 
 const Query = styled(Text)`
   font-size: 20px;

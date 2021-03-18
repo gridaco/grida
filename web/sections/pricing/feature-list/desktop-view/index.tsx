@@ -7,6 +7,7 @@ import { usePopupContext } from "utils/context/PopupContext";
 import { defaultTheme } from "utils/styled";
 import { useWindowWidth } from "utils/hooks/use-window-width";
 import LandingpageText from "components/landingpage/text";
+import BlankArea from "components/blank-area";
 
 interface FeatureProps {
   data: {
@@ -20,44 +21,37 @@ interface FeatureProps {
   }[];
 }
 
-function replaceStylePxToNumber(stylePx: string) {
-  return parseInt(stylePx.replace("px", ""));
-}
-
 const FeatureListDesktopView: React.FC<FeatureProps> = ({ data }) => {
   const { addPopup, removePopup } = usePopupContext();
-  const width = useWindowWidth();
 
   const handleClickQuestionMark = useCallback(() => {
     addPopup({
       title: "",
       element: (
-        <Popup width="100%" alignItems="center" px="48px" pt="48px" pb="96px">
-          {width > replaceStylePxToNumber(defaultTheme.breakpoints[0]) && (
-            <Icon
-              name="faqClose"
-              ml="auto"
-              onClick={() => removePopup()}
-              style={{ cursor: "pointer" }}
-            />
-          )}
-
-          <Flex
-            width="100%"
-            alignItems="center"
-            px={["20px", "96px", "96px", "96px"]}
-            flexDirection="column"
-          >
-            <LandingpageText textAlign="center" variant="h4">
+        <Flex
+          width="calc(100vw - 40px)"
+          alignItems="center"
+          flexDirection="column"
+          p="48px"
+        >
+          <Icon
+            className="cursor"
+            name="headerClose"
+            ml="auto"
+            onClick={() => removePopup()}
+          />
+          <Flex width="80%" flexDirection="column" alignItems="center">
+            <LandingpageText variant="h4" textAlign="center">
               What is extra usage fee?
             </LandingpageText>
-            <LandingpageText variant="body1">
+            <BlankArea height={[48, 48]} />
+            <LandingpageText variant="body1" textAlign="center">
               Extre usage fee is only for team plan. For free plan users, there
               are no ways to access more than capacity provided by default.
               You’ll need to change your plan to Team or above.
             </LandingpageText>
           </Flex>
-        </Popup>
+        </Flex>
       ),
     });
   }, []);
@@ -80,6 +74,7 @@ const FeatureListDesktopView: React.FC<FeatureProps> = ({ data }) => {
           <Content flex="1" alignItems="center">
             Extra usage
             <Icon
+              className="cursor"
               onClick={handleClickQuestionMark}
               name="questionMark"
               ml="5px"

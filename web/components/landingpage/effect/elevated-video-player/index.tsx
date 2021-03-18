@@ -68,6 +68,7 @@ function ElevatedVideoPlayer() {
       </div>
       {/* play button click motion */}
       <PlayButtonFrame
+        className="cursor"
         whileTap={{ scale: 0.9 }}
         whileHover={{ scale: 1.1 }}
         onClick={handleClickLogin}
@@ -108,7 +109,6 @@ const Frame = styled(motion.div)`
 `;
 
 const PlayButtonFrame = styled(motion.div)`
-  cursor: pointer;
   position: relative;
   width: 112px;
   height: 112px;
