@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import styled from "@emotion/styled";
-import { Flex, Text } from "rebass";
+import { Box, Flex, Text } from "rebass";
 import Icon from "components/icon";
 import { FaqQnaItem } from "./interface";
 
@@ -23,11 +23,17 @@ export default function QuestionItem(props: { question: FaqQnaItem }) {
         onClick={handleQueryHeaderClick}
       >
         <Query mr={["51px", 0, 0, 0]}>{question.query}</Query>
-        <Icon
-          name={isOpen ? "faqClose" : "plus"}
-          className="cursor"
-          mr={!isOpen ? "9px" : "0px"}
-        />
+        <Flex
+          width="24px"
+          height="24px"
+          alignItems="center"
+          justifyContent="center"
+        >
+          <Icon
+            name={isOpen ? "faqClose" : "plus"}
+            className="cursor"
+          />
+        </Flex>
       </Flex>
       {isOpen && (
         <Answer width="95%" mb={["89px", "39px", "43px", "48px"]}>
