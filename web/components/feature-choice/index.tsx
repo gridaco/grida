@@ -94,9 +94,9 @@ const FeatureChoice: React.FC<FeatureChoiceProps> = props => {
           </Item>
         ))}
 
-        <Text className="cursor" fontSize="16px" fontWeight="bold">
+        {/* <Text className="cursor" fontSize="16px" fontWeight="bold">
           View all <Icon name="arrowDown" isVerticalMiddle />
-        </Text>
+        </Text> */}
       </Flex>
     </Flex>
   );

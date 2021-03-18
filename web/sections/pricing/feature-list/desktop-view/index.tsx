@@ -106,10 +106,10 @@ const FeatureListDesktopView: React.FC<FeatureProps> = ({ data }) => {
             </Flex>
           </Flex>
         ))}
-        <Text mb="24px" color="#000000" fontSize="16px" fontWeight="bold">
+        {/* <Text mb="24px" color="#000000" fontSize="16px" fontWeight="bold">
           View all
           <Icon name="arrowDown" ml="10px" isVerticalMiddle />
-        </Text>
+        </Text> */}
       </Flex>
     </Flex>
   );
