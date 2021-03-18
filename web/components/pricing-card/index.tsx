@@ -1,8 +1,13 @@
 import styled from "@emotion/styled";
+import BlankArea from "components/blank-area";
 import Icon from "components/icon";
 import LandingpageText from "components/landingpage/text";
-import React from "react";
+import Link from "next/link";
+import React, { useCallback } from "react";
 import { Button, Flex, Text } from "rebass";
+import { usePopupContext } from "utils/context/PopupContext";
+import { useWindowWidth } from "utils/hooks/use-window-width";
+import { LandingpageUrls } from "utils/landingpage/constants";
 import { media } from "utils/styled/media";
 import { ThemeInterface } from "utils/styled/theme";
 
@@ -10,6 +15,78 @@ function PricingCard(props: {
   type: "paid" | "none-paid";
   planList: string[];
 }) {
+  const { addPopup, removePopup } = usePopupContext();
+  const width = useWindowWidth();
+
+  const handleClickQuestionMark = useCallback(() => {
+    addPopup({
+      title: "",
+      element: (
+        <Flex
+          width="calc(100vw - 40px)"
+          alignItems="center"
+          flexDirection="column"
+          p="48px"
+        >
+          <Icon
+            className="cursor"
+            name="headerClose"
+            ml="auto"
+            onClick={() => removePopup()}
+          />
+          <Flex width="80%" flexDirection="column" alignItems="center">
+            <LandingpageText variant="h4" textAlign="center">
+              What are the limitations of free plan?
+            </LandingpageText>
+            <BlankArea height={[48, 48]} />
+            <LandingpageText variant="body1" textAlign="center">
+              To build an enterprise level application, you’ll need a paid plan.
+              Paid plan includes extra default storage and unlimited projects
+              count. Also cloud objects such as translation token can be stored
+              up to 1 million. The extra usage will be charged as Standard Cloud
+              Fee.
+            </LandingpageText>
+          </Flex>
+        </Flex>
+      ),
+    });
+  }, []);
+
+  const handleClickPaidPlan = useCallback(() => {
+    addPopup({
+      title: "",
+      element: (
+        <Flex
+          width="calc(100vw - 40px)"
+          alignItems="center"
+          flexDirection="column"
+          p="48px"
+        >
+          <Icon
+            className="cursor"
+            name="headerClose"
+            ml="auto"
+            onClick={() => removePopup()}
+          />
+          <Flex width="80%" flexDirection="column" alignItems="center">
+            <LandingpageText variant="h4" textAlign="center">
+              Woopsy.
+            </LandingpageText>
+            <BlankArea height={[48, 48]} />
+            <LandingpageText variant="body1" textAlign="center">
+              Bridged paid plans are disabled temporarily. Meanwhile, you can
+              use our free plan which basically does the same.
+              <Link href={LandingpageUrls.signup}>
+                <span style={{ margin: "0px 5px", color: "#172AD7"}}>Sign up</span>
+              </Link>
+              here.
+            </LandingpageText>
+          </Flex>
+        </Flex>
+      ),
+    });
+  }, []);
+
   return (
     <Wrapper type={props.type}>
       <Heading>
@@ -17,7 +94,11 @@ function PricingCard(props: {
           {props.type != "none-paid" ? "For you team" : "For you"}
         </LandingpageText>
         {props.type === "none-paid" && (
-          <Icon className="cursor" name="questionMark" />
+          <Icon
+            className="cursor"
+            name="questionMark"
+            onClick={handleClickQuestionMark}
+          />
         )}
       </Heading>
       <PlanPricing>
@@ -36,7 +117,11 @@ function PricingCard(props: {
           </div>
         ))}
       </PlanDescription>
-      <CardCTAButton className="cursor" type={props.type}>
+      <CardCTAButton
+        className="cursor"
+        type={props.type}
+        onClick={() => props.type != "none-paid" && handleClickPaidPlan()}
+      >
         {props.type === "none-paid" ? "Start now" : "Start 14 Day Trial"}
       </CardCTAButton>
     </Wrapper>
