@@ -4,6 +4,7 @@ import { Flex, Text, Heading, Button } from "rebass";
 import Icon from "components/icon";
 import { media } from "utils/styled/media";
 import { ThemeInterface } from "utils/styled/theme";
+import PricingCTAButton from "components/pricing-cta-button";
 
 const descList = [
   {
@@ -62,7 +63,7 @@ const StartNow: React.FC = () => {
           <Heading fontSize="56px" letterSpacing="0em" color="#000000">$0</Heading>
           <Text color="#636363" letterSpacing="0em" fontSize="42px" ml="4px">/mo</Text>
         </Flex>
-        <Button
+        <PricingCTAButton
           width={["232px", "337px", "337px", "337px"]}
           height="46px"
           fontSize="18px"
@@ -73,7 +74,7 @@ const StartNow: React.FC = () => {
           mb="40px"
         >
           Start now
-        </Button>
+        </PricingCTAButton>
         <NoCredit fontSize="18px" color="#575757">No credit card required</NoCredit>
       </RightWrapper>
     </Card>
