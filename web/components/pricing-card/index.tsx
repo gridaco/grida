@@ -9,6 +9,7 @@ import { usePopupContext } from "utils/context/PopupContext";
 import { LandingpageUrls } from "utils/landingpage/constants";
 import { media } from "utils/styled/media";
 import { ThemeInterface } from "utils/styled/theme";
+import PricingCTAButton from "components/pricing-cta-button";
 
 function PricingCard(props: {
   type: "paid" | "none-paid";
@@ -75,7 +76,9 @@ function PricingCard(props: {
               Bridged paid plans are disabled temporarily. Meanwhile, you can
               use our free plan which basically does the same.
               <Link href={LandingpageUrls.signup}>
-                <span style={{ margin: "0px 5px", color: "#172AD7"}}>Sign up</span>
+                <span style={{ margin: "0px 5px", color: "#172AD7" }}>
+                  Sign up
+                </span>
               </Link>
               here.
             </LandingpageText>
@@ -115,13 +118,19 @@ function PricingCard(props: {
           </div>
         ))}
       </PlanDescription>
-      <CardCTAButton
-        className="cursor"
-        type={props.type}
-        onClick={() => props.type != "none-paid" && handleClickPaidPlan()}
-      >
-        {props.type === "none-paid" ? "Start now" : "Start 14 Day Trial"}
-      </CardCTAButton>
+      {props.type === "none-paid" ? (
+        <PricingCTAButton mt="auto" style={{ borderRadius: 4, marginTop: 40 }}>
+          Start now
+        </PricingCTAButton>
+      ) : (
+        <CardCTAButton
+          className="cursor"
+          type={props.type}
+          onClick={() => props.type != "none-paid" && handleClickPaidPlan()}
+        >
+          Start 14 Day Trial
+        </CardCTAButton>
+      )}
     </Wrapper>
   );
 }
@@ -129,7 +138,6 @@ function PricingCard(props: {
 export default PricingCard;
 
 const Wrapper = styled(Flex)`
-  border-radius: 8px;
   border-radius: 8px;
   margin: 27px;
   padding: 40px;
