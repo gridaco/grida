@@ -111,7 +111,7 @@ const Header = () => {
                     onMouseOver={() => onClickExpandHeader("")}
                     className="cursor"
                     mx="12px"
-                    color="#8B8B8B"
+                    color={currentRouter === i.href ? "#000" : "#888"}
                     fontWeight="bold"
                     fontSize="16px"
                   >
