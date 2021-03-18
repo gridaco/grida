@@ -57,9 +57,9 @@ const Header = () => {
     setCurrentRouter(router.asPath);
 
     if (currentRouter != router.asPath && currentRouter != "") {
-      setIsOpenMenu(false)
+      setIsOpenMenu(false);
     }
-  }, [router])
+  }, [router]);
 
   return (
     <HeaderWrapper>
@@ -166,7 +166,7 @@ const Header = () => {
                   <Item
                     className="cursor"
                     my="12px"
-                    color="#8B8B8B"
+                    color={currentRouter === i.href ? "#000" : "#888"}
                     fontWeight="bold"
                     fontSize="16px"
                   >
@@ -203,9 +203,14 @@ const Header = () => {
               style={center}
               onClick={handleSigninClick}
             >
-              {cookie[COOKIE_ACCESS_TOKEN_KEY] != null
-                ? "Go to console"
-                : <Icon name="lock" isVerticalMiddle mr="6px" /> + "Sign in"}
+              {cookie[COOKIE_ACCESS_TOKEN_KEY] != null ? (
+                "Go to console"
+              ) : (
+                <React.Fragment>
+                  <Icon name="lock" isVerticalMiddle mr="6px" />
+                  Sign in
+                </React.Fragment>
+              )}
             </Button>
           </Box>
         </ResponsiveMenu>
