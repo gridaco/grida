@@ -45,7 +45,7 @@ module.exports = withVideos(
       },
       transpileModules: ["lodash-es"],
       images: {
-        domains: ["img.youtube.com"],
+        domains: ["img.youtube.com", "via.placeholder.com"],
       },
       env: {
         ...FIREBASE_ENV_VARS,
