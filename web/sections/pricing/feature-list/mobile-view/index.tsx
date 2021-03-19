@@ -5,6 +5,7 @@ import Icon from "components/icon";
 import SectionLayout from "layout/section";
 import FeatureChoice from "components/feature-choice";
 
+// TODO
 interface FeatureProps {
   data: any;
 }

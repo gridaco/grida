@@ -11,92 +11,94 @@ import BlankArea from "components/blank-area";
 
 const featureDataList = [
   {
-    id: 1,
-    title: "Authentication",
+    id: "features/code-generation",
+    title: "Code generation",
     feature: [
       {
-        id: 1,
-        name: "Phone Auth - US, Canada, and India (by requests)",
-        price: ["100 / Mo", "50,000 / Mo", "$1 / 2K"],
+        name: "Unlimited platforms support - Flutter, React, Vue and more",
+        price: [true, true, null],
       },
       {
-        id: 2,
-        name: "Phone Auth - All other countries",
-        price: ["100 / Mo", "50,000 / Mo", "$1 / 2K"],
+        name: "Supported platforms per project",
+        price: ["1", "Unlimited", null],
       },
       {
-        id: 3,
-        name: "Other Authentication services",
-        price: ["Free", "Free", "Free"],
+        name: "Max requests per hour",
+        price: ["100", "10,000", "$0.001 / 1K"],
       },
     ],
   },
   {
-    id: 2,
+    id: "features/projects",
+    title: "Projects",
+    feature: [
+      {
+        name: "Unlimited public projects",
+        price: [true, true, null],
+      },
+      {
+        name: "Unlimited private projects",
+        price: [false, true, null],
+      },
+      {
+        name: "Collaborators per project",
+        price: ["2 / project", "Unlimited", null],
+      },
+    ],
+  },
+  {
+    id: "features/handoff",
+    title: "Handoff",
+    feature: [
+      {
+        name: "Unlimited handoff",
+        price: [true, true, null],
+      },
+    ],
+  },
+  {
+    id: "features/asset-storage",
     title: "Asset Storage",
     feature: [
       {
-        id: 1,
         name: "Storage Capacity",
         price: ["0.5 GiB", "30 GiB", "$0.023/GiB"],
       },
       {
-        id: 2,
         name: "Read Access",
-        price: ["$999/GB", "$999/GB", "$999/GB"],
+        price: ["20,000 / Mo", "200,000 / Mo", "$0.005 / 1K"],
       },
       {
-        id: 3,
         name: "Multiple buckets per project",
-        price: ["X", "$999/GB", "Free"],
+        price: [false, true, null],
       },
     ],
   },
   {
-    id: 3,
-    title: "Database",
-    feature: [
-      {
-        id: 1,
-        name: "feature",
-        price: ["$999/GB", "$999/GB", "$999/GB"],
-      },
-      {
-        id: 2,
-        name: "feature",
-        price: ["$999/GB", "$999/GB", "$999/GB"],
-      },
-    ],
-  },
-  {
-    id: 4,
+    id: "features/objects",
     title: "Capacity - Objects",
     feature: [
       {
-        id: 1,
         name: "objects such as design screen, component, or layer.",
         price: ["5000", "100,000", "$1/1M"],
       },
       {
-        id: 2,
-        name: "feature",
-        price: ["$999/GB", "$999/GB", "$999/GB"],
+        name: "Objects version management",
+        price: ["5 Versions", "Unlimited", null],
       },
     ],
   },
   {
-    id: 5,
+    id: "features/code-blocks",
     title: "Code blocks",
     feature: [
       {
-        id: 1,
         name: "code blocks",
-        price: ["100,000", "Unlimited", "X"],
+        price: ["100,000", "Unlimited", null],
       },
       {
-        id: 2,
-        name: "feature",
-        price: ["$999/GB", "$999/GB", "$999/GB"],
+        name: "code block version management",
+        price: ["5 Versions", "Unlimited", null],
       },
     ],
   },

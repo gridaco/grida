@@ -11,12 +11,11 @@ import BlankArea from "components/blank-area";
 
 interface FeatureProps {
   data: {
-    id: number;
+    id: string;
     title: string;
     feature: {
-      id: number;
       name: string;
-      price: string[];
+      price: Array<string | boolean>;
     }[];
   }[];
 }
