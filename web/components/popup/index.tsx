@@ -1,10 +1,17 @@
 import styled from "@emotion/styled";
-import React, { useCallback, useEffect, useRef, Children } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useRef,
+  Children,
+  useState,
+} from "react";
 import { Flex, Text, Button } from "rebass";
 import { borderColor, height } from "styled-system";
 
 import Icon from "components/icon";
 import { usePopupContext, PopupInfo } from "utils/context/PopupContext";
+import { motion } from "framer-motion";
 
 interface PopupChildrenProps {
   popupId?: number;
@@ -17,8 +24,7 @@ interface PopupProps {
 const Popup = (props: PopupProps) => {
   const { info } = props;
   const { removePopup } = usePopupContext();
-
-  const buttonRef = useRef<HTMLButtonElement>();
+  const [closing, setClosing] = useState(false);
 
   const clonedElement = info.element
     ? React.cloneElement(info.element, {
@@ -27,28 +33,15 @@ const Popup = (props: PopupProps) => {
     : undefined;
 
   useEffect(() => {
-    if (!info.showOnlyBody && !info.withoutConfirm) {
-      buttonRef.current.focus();
-    }
-
-    document.getElementsByTagName("html")[0].style.overflowY = "hidden"
+    document.getElementsByTagName("html")[0].style.overflowY = "hidden";
 
     return () => {
-      document.getElementsByTagName("html")[0].style.overflowY = "auto"
+      document.getElementsByTagName("html")[0].style.overflowY = "auto";
     };
   }, []);
 
-  const onConfirm = useCallback(() => {
-    if (info.confirmAction) {
-      info.confirmAction();
-    }
-    removePopup(info.id);
-  }, [info, removePopup]);
-
   const onClose = useCallback(() => {
-    if (info.closeAction) {
-      info.closeAction();
-    }
+    setClosing(true);
     removePopup(info.id);
   }, [info, removePopup]);
 
@@ -57,26 +50,20 @@ const Popup = (props: PopupProps) => {
   }, []);
 
   return (
-    <ModalBackground onClick={onClose}>
+    <ModalBackground
+      onClick={onClose}
+      animate={closing ? "closing" : "default"}
+      initial={{ opacity: 0 }}
+      variants={{
+        default: { opacity: 1 },
+        closing: { opacity: 0 },
+      }}
+    >
       <Modal
-        width={info.width || "90%"}
-        height={info.height as string || "90%"}
-        // p={["10px", "10px", "15px 30px"]}
-        // bg="white"
-        // borderColor="gray30"
+        width={info.width || ""}
+        height={(info.height as string) || ""}
         onClick={onModalInnerClick}
       >
-        {!info.showOnlyBody && (
-          <ModalHeader
-            pb="10px"
-            fontSize="18px"
-            color="primary"
-            borderColor="gray40"
-          >
-            {info.title}
-            <CloseIcon mr="10px" name="close" color="gray80" onClick={onClose} />
-          </ModalHeader>
-        )}
         {info.message && (
           <Text
             pt="25px"
@@ -90,20 +77,6 @@ const Popup = (props: PopupProps) => {
           </Text>
         )}
         {clonedElement}
-        {!info.showOnlyBody && (
-          <Text textAlign="center">
-            {info.closeAction && (
-              <Button variant="popup" bg="gray80" mr="10px" onClick={onClose}>
-                {info.closeLabel || "취소"}
-              </Button>
-            )}
-            {!info.withoutConfirm && (
-              <Button variant="popup" onClick={onConfirm} ref={buttonRef}>
-                {info.confirmLabel || "확인"}
-              </Button>
-            )}
-          </Text>
-        )}
       </Modal>
     </ModalBackground>
   );
@@ -116,7 +89,7 @@ const CloseIcon = styled(Icon)`
   right: -10px;
 `;
 
-const ModalBackground = styled.div`
+const ModalBackground = styled(motion.div)`
   position: fixed;
   top: 0;
   left: 0;
@@ -134,13 +107,15 @@ const Modal = styled(Flex)`
   justify-content: center;
   top: 50%;
   left: 50%;
+  background-color: #fff;
   max-width: 1240px;
-  max-height: 690px;
+  min-width: 280px;
+  max-height: 80vh;
   /* max-height: ${props => (props.height ? "initial" : "70%")}; */
   overflow-y: scroll;
   /* border: 1px solid; */
   border-radius: 7px;
-  box-shadow: 4px 6px 20px 0 rgba(0, 0, 0, 0.09);
+  /* box-shadow: 4px 6px 20px 0 rgba(0, 0, 0, 0.09); */
   transform: translate(-50%, -50%);
   ${borderColor}
 `;

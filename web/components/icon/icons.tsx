@@ -27,6 +27,14 @@ export interface IconList {
   play: IconListProps;
   gradient: IconListProps;
   close: IconListProps;
+  question: IconListProps;
+  plus: IconListProps;
+  faqClose: IconListProps;
+  okaySign: IconListProps;
+  questionMark: IconListProps;
+  check: IconListProps;
+  thumbsup: IconListProps;
+  thumbsdown: IconListProps;
 }
 
 const icons: IconList = {
@@ -325,109 +333,404 @@ const icons: IconList = {
   mockIcon: {
     width: 24,
     height: 24,
-    svg: <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <rect width="24" height="24" rx="4" fill="#F1F1F1" />
-    </svg>
+    svg: (
+      <svg
+        width="24"
+        height="24"
+        viewBox="0 0 24 24"
+        fill="none"
+        xmlns="http://www.w3.org/2000/svg"
+      >
+        <rect width="24" height="24" rx="4" fill="#F1F1F1" />
+      </svg>
+    ),
   },
   headerClose: {
     width: 32,
     height: 32,
-    svg: <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <circle cx="16" cy="16" r="16" fill="#ECECEC" />
-      <path d="M22.7188 10.5946L21.3088 9.18457L15.7188 14.7746L10.1287 9.18457L8.71875 10.5946L14.3088 16.1846L8.71875 21.7746L10.1287 23.1846L15.7188 17.5946L21.3088 23.1846L22.7188 21.7746L17.1287 16.1846L22.7188 10.5946Z" fill="#686868" />
-    </svg>
+    svg: (
+      <svg
+        width="32"
+        height="32"
+        viewBox="0 0 32 32"
+        fill="none"
+        xmlns="http://www.w3.org/2000/svg"
+      >
+        <circle cx="16" cy="16" r="16" fill="#ECECEC" />
+        <path
+          d="M22.7188 10.5946L21.3088 9.18457L15.7188 14.7746L10.1287 9.18457L8.71875 10.5946L14.3088 16.1846L8.71875 21.7746L10.1287 23.1846L15.7188 17.5946L21.3088 23.1846L22.7188 21.7746L17.1287 16.1846L22.7188 10.5946Z"
+          fill="#686868"
+        />
+      </svg>
+    ),
   },
   lock: {
     width: 16,
     height: 16,
-    svg: <svg width="17" height="16" viewBox="0 0 17 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <path d="M12.5003 5.33317H11.8337V3.99984C11.8337 2.15984 10.3403 0.666504 8.50033 0.666504C6.66033 0.666504 5.16699 2.15984 5.16699 3.99984V5.33317H4.50033C3.76699 5.33317 3.16699 5.93317 3.16699 6.6665V13.3332C3.16699 14.0665 3.76699 14.6665 4.50033 14.6665H12.5003C13.2337 14.6665 13.8337 14.0665 13.8337 13.3332V6.6665C13.8337 5.93317 13.2337 5.33317 12.5003 5.33317ZM8.50033 11.3332C7.76699 11.3332 7.16699 10.7332 7.16699 9.99984C7.16699 9.2665 7.76699 8.6665 8.50033 8.6665C9.23366 8.6665 9.83366 9.2665 9.83366 9.99984C9.83366 10.7332 9.23366 11.3332 8.50033 11.3332ZM10.567 5.33317H6.43366V3.99984C6.43366 2.85984 7.36033 1.93317 8.50033 1.93317C9.64033 1.93317 10.567 2.85984 10.567 3.99984V5.33317Z" fill="#323232" />
-    </svg>
+    svg: (
+      <svg
+        width="17"
+        height="16"
+        viewBox="0 0 17 16"
+        fill="none"
+        xmlns="http://www.w3.org/2000/svg"
+      >
+        <path
+          d="M12.5003 5.33317H11.8337V3.99984C11.8337 2.15984 10.3403 0.666504 8.50033 0.666504C6.66033 0.666504 5.16699 2.15984 5.16699 3.99984V5.33317H4.50033C3.76699 5.33317 3.16699 5.93317 3.16699 6.6665V13.3332C3.16699 14.0665 3.76699 14.6665 4.50033 14.6665H12.5003C13.2337 14.6665 13.8337 14.0665 13.8337 13.3332V6.6665C13.8337 5.93317 13.2337 5.33317 12.5003 5.33317ZM8.50033 11.3332C7.76699 11.3332 7.16699 10.7332 7.16699 9.99984C7.16699 9.2665 7.76699 8.6665 8.50033 8.6665C9.23366 8.6665 9.83366 9.2665 9.83366 9.99984C9.83366 10.7332 9.23366 11.3332 8.50033 11.3332ZM10.567 5.33317H6.43366V3.99984C6.43366 2.85984 7.36033 1.93317 8.50033 1.93317C9.64033 1.93317 10.567 2.85984 10.567 3.99984V5.33317Z"
+          fill="#323232"
+        />
+      </svg>
+    ),
   },
   loading: {
     width: 84,
     height: 84,
-    svg: <svg width="84" height="84" viewBox="0 0 84 84" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <path fillRule="evenodd" clipRule="evenodd" d="M41.8026 74.7602C51.7701 74.7602 60.6979 70.3088 66.7064 63.2854L57.3797 57.9006C53.3649 61.8344 47.8665 64.2599 41.8017 64.2599C32.6414 64.2599 24.7734 58.7267 21.3576 50.8203H23.9587C26.5452 50.8203 28.1618 48.0203 26.8685 45.7803L17.4115 29.4003C16.1183 27.1603 12.8851 27.1603 11.5919 29.4003L2.13486 45.7803C0.841591 48.0203 2.45817 50.8203 5.0447 50.8203H10.2436C14.0948 64.6291 26.7656 74.7602 41.8026 74.7602ZM62.2461 33.1802H59.6449C57.0584 33.1802 55.4418 35.9802 56.7351 38.2202L66.1921 54.6002C67.4854 56.8402 70.7185 56.8402 72.0118 54.6002L81.4688 38.2202C82.762 35.9802 81.1455 33.1802 78.5589 33.1802H73.3616C69.5105 19.3714 56.8396 9.24023 41.8026 9.24023C32.1599 9.24023 23.4903 13.4063 17.4954 20.0367L26.8979 25.4652C30.8437 21.9064 36.0697 19.7399 41.8017 19.7399C50.9623 19.7399 58.8305 25.2734 62.2461 33.1802Z" fill="url(#paint0_linear)" />
-      <defs>
-        <linearGradient id="paint0_linear" x1="41.8018" y1="9.24023" x2="41.8018" y2="74.7602" gradientUnits="userSpaceOnUse">
-          <stop stopColor="#5873FF" />
-          <stop offset="1" stopColor="#4DA0CE" />
-        </linearGradient>
-      </defs>
-    </svg>
+    svg: (
+      <svg
+        width="84"
+        height="84"
+        viewBox="0 0 84 84"
+        fill="none"
+        xmlns="http://www.w3.org/2000/svg"
+      >
+        <path
+          fillRule="evenodd"
+          clipRule="evenodd"
+          d="M41.8026 74.7602C51.7701 74.7602 60.6979 70.3088 66.7064 63.2854L57.3797 57.9006C53.3649 61.8344 47.8665 64.2599 41.8017 64.2599C32.6414 64.2599 24.7734 58.7267 21.3576 50.8203H23.9587C26.5452 50.8203 28.1618 48.0203 26.8685 45.7803L17.4115 29.4003C16.1183 27.1603 12.8851 27.1603 11.5919 29.4003L2.13486 45.7803C0.841591 48.0203 2.45817 50.8203 5.0447 50.8203H10.2436C14.0948 64.6291 26.7656 74.7602 41.8026 74.7602ZM62.2461 33.1802H59.6449C57.0584 33.1802 55.4418 35.9802 56.7351 38.2202L66.1921 54.6002C67.4854 56.8402 70.7185 56.8402 72.0118 54.6002L81.4688 38.2202C82.762 35.9802 81.1455 33.1802 78.5589 33.1802H73.3616C69.5105 19.3714 56.8396 9.24023 41.8026 9.24023C32.1599 9.24023 23.4903 13.4063 17.4954 20.0367L26.8979 25.4652C30.8437 21.9064 36.0697 19.7399 41.8017 19.7399C50.9623 19.7399 58.8305 25.2734 62.2461 33.1802Z"
+          fill="url(#paint0_linear)"
+        />
+        <defs>
+          <linearGradient
+            id="paint0_linear"
+            x1="41.8018"
+            y1="9.24023"
+            x2="41.8018"
+            y2="74.7602"
+            gradientUnits="userSpaceOnUse"
+          >
+            <stop stopColor="#5873FF" />
+            <stop offset="1" stopColor="#4DA0CE" />
+          </linearGradient>
+        </defs>
+      </svg>
+    ),
   },
   home: {
     width: 42,
     height: 42,
-    svg: <svg width="42" height="43" viewBox="0 0 42 43" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <path d="M17.6191 35.4596V25.1076H24.5204V35.4596H33.1471V21.6569H38.3231L21.0697 6.12891L3.81641 21.6569H8.99241V35.4596H17.6191Z" fill="black" />
-    </svg>
+    svg: (
+      <svg
+        width="42"
+        height="43"
+        viewBox="0 0 42 43"
+        fill="none"
+        xmlns="http://www.w3.org/2000/svg"
+      >
+        <path
+          d="M17.6191 35.4596V25.1076H24.5204V35.4596H33.1471V21.6569H38.3231L21.0697 6.12891L3.81641 21.6569H8.99241V35.4596H17.6191Z"
+          fill="black"
+        />
+      </svg>
+    ),
   },
   graph: {
     width: 42,
     height: 42,
-    svg: <svg width="43" height="43" viewBox="0 0 43 43" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <path d="M6.83409 32.8538L17.1861 22.4846L24.0874 29.3859L38.7528 12.8917L36.32 10.459L24.0874 24.2099L17.1861 17.3086L4.24609 30.2658L6.83409 32.8538Z" fill="#8F8F8F" />
-    </svg>
+    svg: (
+      <svg
+        width="43"
+        height="43"
+        viewBox="0 0 43 43"
+        fill="none"
+        xmlns="http://www.w3.org/2000/svg"
+      >
+        <path
+          d="M6.83409 32.8538L17.1861 22.4846L24.0874 29.3859L38.7528 12.8917L36.32 10.459L24.0874 24.2099L17.1861 17.3086L4.24609 30.2658L6.83409 32.8538Z"
+          fill="#8F8F8F"
+        />
+      </svg>
+    ),
   },
   play: {
     width: 42,
     height: 42,
-    svg: <svg width="42" height="43" viewBox="0 0 42 43" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <g opacity="0.2" filter="url(#filter0_b)">
-        <circle cx="20.7763" cy="21.6796" r="20.704" fill="black" />
-      </g>
-      <path d="M13.875 9.60254V33.7572L32.8537 21.6799L13.875 9.60254Z" fill="black" />
-      <defs>
-        <filter id="filter0_b" x="-27.5331" y="-26.6297" width="96.6187" height="96.6187" filterUnits="userSpaceOnUse" colorInterpolationFilters="sRGB">
-          <feFlood floodOpacity="0" result="BackgroundImageFix" />
-          <feGaussianBlur in="BackgroundImage" stdDeviation="13.8027" />
-          <feComposite in2="SourceAlpha" operator="in" result="effect1_backgroundBlur" />
-          <feBlend mode="normal" in="SourceGraphic" in2="effect1_backgroundBlur" result="shape" />
-        </filter>
-      </defs>
-    </svg>
+    svg: (
+      <svg
+        width="42"
+        height="43"
+        viewBox="0 0 42 43"
+        fill="none"
+        xmlns="http://www.w3.org/2000/svg"
+      >
+        <g opacity="0.2" filter="url(#filter0_b)">
+          <circle cx="20.7763" cy="21.6796" r="20.704" fill="black" />
+        </g>
+        <path
+          d="M13.875 9.60254V33.7572L32.8537 21.6799L13.875 9.60254Z"
+          fill="black"
+        />
+        <defs>
+          <filter
+            id="filter0_b"
+            x="-27.5331"
+            y="-26.6297"
+            width="96.6187"
+            height="96.6187"
+            filterUnits="userSpaceOnUse"
+            colorInterpolationFilters="sRGB"
+          >
+            <feFlood floodOpacity="0" result="BackgroundImageFix" />
+            <feGaussianBlur in="BackgroundImage" stdDeviation="13.8027" />
+            <feComposite
+              in2="SourceAlpha"
+              operator="in"
+              result="effect1_backgroundBlur"
+            />
+            <feBlend
+              mode="normal"
+              in="SourceGraphic"
+              in2="effect1_backgroundBlur"
+              result="shape"
+            />
+          </filter>
+        </defs>
+      </svg>
+    ),
   },
   gradient: {
     width: 2080,
     height: 1765,
-    svg: <svg width="2080" height="1765" viewBox="0 0 2080 1765" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <g clipPath="url(#clip0)">
-        <g filter="url(#filter0_f)">
-          <path d="M671.05 363.565C486.945 351.244 420.471 543.482 410.247 641.14C381.027 810.91 293.548 821.057 327.85 1002.6C362.151 1184.15 739.835 1187.77 938.931 1345.41C1138.03 1503.04 1695.75 1295.58 1724.97 1216.76C1754.19 1137.95 1805.73 810.729 1675.24 805.656C1544.75 800.583 1304.45 584.611 1242.75 480.067C1181.04 375.523 901.181 378.966 671.05 363.565Z" fill="url(#paint0_linear)" />
-          <path d="M671.05 363.565C486.945 351.244 420.471 543.482 410.247 641.14C381.027 810.91 293.548 821.057 327.85 1002.6C362.151 1184.15 739.835 1187.77 938.931 1345.41C1138.03 1503.04 1695.75 1295.58 1724.97 1216.76C1754.19 1137.95 1805.73 810.729 1675.24 805.656C1544.75 800.583 1304.45 584.611 1242.75 480.067C1181.04 375.523 901.181 378.966 671.05 363.565Z" fill="url(#paint1_radial)" />
+    svg: (
+      <svg
+        width="2080"
+        height="1765"
+        viewBox="0 0 2080 1765"
+        fill="none"
+        xmlns="http://www.w3.org/2000/svg"
+      >
+        <g clipPath="url(#clip0)">
+          <g filter="url(#filter0_f)">
+            <path
+              d="M671.05 363.565C486.945 351.244 420.471 543.482 410.247 641.14C381.027 810.91 293.548 821.057 327.85 1002.6C362.151 1184.15 739.835 1187.77 938.931 1345.41C1138.03 1503.04 1695.75 1295.58 1724.97 1216.76C1754.19 1137.95 1805.73 810.729 1675.24 805.656C1544.75 800.583 1304.45 584.611 1242.75 480.067C1181.04 375.523 901.181 378.966 671.05 363.565Z"
+              fill="url(#paint0_linear)"
+            />
+            <path
+              d="M671.05 363.565C486.945 351.244 420.471 543.482 410.247 641.14C381.027 810.91 293.548 821.057 327.85 1002.6C362.151 1184.15 739.835 1187.77 938.931 1345.41C1138.03 1503.04 1695.75 1295.58 1724.97 1216.76C1754.19 1137.95 1805.73 810.729 1675.24 805.656C1544.75 800.583 1304.45 584.611 1242.75 480.067C1181.04 375.523 901.181 378.966 671.05 363.565Z"
+              fill="url(#paint1_radial)"
+            />
+          </g>
         </g>
-      </g>
-      <defs>
-        <filter id="filter0_f" x="-280" y="-237" width="2640" height="2240" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
-          <feFlood floodOpacity="0" result="BackgroundImageFix" />
-          <feBlend mode="normal" in="SourceGraphic" in2="BackgroundImageFix" result="shape" />
-          <feGaussianBlur stdDeviation="300" result="effect1_foregroundBlur" />
-        </filter>
-        <linearGradient id="paint0_linear" x1="423.995" y1="636.408" x2="1723.97" y2="1237.26" gradientUnits="userSpaceOnUse">
-          <stop stopColor="#FB9090" stopOpacity="0" />
-          <stop offset="0.450625" stopColor="#FB9090" stopOpacity="0.549375" />
-          <stop offset="1" stopColor="#FB9090" stopOpacity="0" />
-        </linearGradient>
-        <radialGradient id="paint1_radial" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(1303.5 658.001) rotate(120.895) scale(397.297 549.613)">
-          <stop stopColor="#5E77FF" />
-          <stop offset="1" stopColor="#AC85FF" stopOpacity="0" />
-        </radialGradient>
-        <clipPath id="clip0">
-          <rect width="2080" height="1765" fill="white" />
-        </clipPath>
-      </defs>
-    </svg>
+        <defs>
+          <filter
+            id="filter0_f"
+            x="-280"
+            y="-237"
+            width="2640"
+            height="2240"
+            filterUnits="userSpaceOnUse"
+            color-interpolation-filters="sRGB"
+          >
+            <feFlood floodOpacity="0" result="BackgroundImageFix" />
+            <feBlend
+              mode="normal"
+              in="SourceGraphic"
+              in2="BackgroundImageFix"
+              result="shape"
+            />
+            <feGaussianBlur
+              stdDeviation="300"
+              result="effect1_foregroundBlur"
+            />
+          </filter>
+          <linearGradient
+            id="paint0_linear"
+            x1="423.995"
+            y1="636.408"
+            x2="1723.97"
+            y2="1237.26"
+            gradientUnits="userSpaceOnUse"
+          >
+            <stop stopColor="#FB9090" stopOpacity="0" />
+            <stop
+              offset="0.450625"
+              stopColor="#FB9090"
+              stopOpacity="0.549375"
+            />
+            <stop offset="1" stopColor="#FB9090" stopOpacity="0" />
+          </linearGradient>
+          <radialGradient
+            id="paint1_radial"
+            cx="0"
+            cy="0"
+            r="1"
+            gradientUnits="userSpaceOnUse"
+            gradientTransform="translate(1303.5 658.001) rotate(120.895) scale(397.297 549.613)"
+          >
+            <stop stopColor="#5E77FF" />
+            <stop offset="1" stopColor="#AC85FF" stopOpacity="0" />
+          </radialGradient>
+          <clipPath id="clip0">
+            <rect width="2080" height="1765" fill="white" />
+          </clipPath>
+        </defs>
+      </svg>
+    ),
   },
   close: {
     width: 19,
     height: 19,
-    svg: <g>
-      <path strokeLinecap="round" stroke="currentColor" d="M18 18L0 0" />
-      <path strokeLinecap="round" stroke="currentColor" d="M18 0L0 18" />
-    </g>
-  }
+    svg: (
+      <g>
+        <path strokeLinecap="round" stroke="currentColor" d="M18 18L0 0" />
+        <path strokeLinecap="round" stroke="currentColor" d="M18 0L0 18" />
+      </g>
+    ),
+  },
+  question: {
+    width: 18,
+    height: 18,
+    svg: (
+      <svg
+        width="18"
+        height="18"
+        viewBox="0 0 18 18"
+        fill="none"
+        xmlns="http://www.w3.org/2000/svg"
+      >
+        <path
+          d="M8.83203 0.25C4.00203 0.25 0.0820312 4.17 0.0820312 9C0.0820312 13.83 4.00203 17.75 8.83203 17.75C13.662 17.75 17.582 13.83 17.582 9C17.582 4.17 13.662 0.25 8.83203 0.25ZM9.70703 15.125H7.95703V13.375H9.70703V15.125ZM11.5183 8.34375L10.7308 9.14875C10.1008 9.7875 9.70703 10.3125 9.70703 11.625H7.95703V11.1875C7.95703 10.225 8.35078 9.35 8.98078 8.71125L10.0658 7.60875C10.3895 7.29375 10.582 6.85625 10.582 6.375C10.582 5.4125 9.79453 4.625 8.83203 4.625C7.86953 4.625 7.08203 5.4125 7.08203 6.375H5.33203C5.33203 4.44125 6.89828 2.875 8.83203 2.875C10.7658 2.875 12.332 4.44125 12.332 6.375C12.332 7.145 12.017 7.845 11.5183 8.34375Z"
+          fill="#E1E1E1"
+        />
+      </svg>
+    ),
+  },
+  plus: {
+    width: 14,
+    height: 14,
+    svg: (
+      <svg
+        width="14"
+        height="14"
+        viewBox="0 0 14 14"
+        fill="none"
+        xmlns="http://www.w3.org/2000/svg"
+      >
+        <path d="M14 8H8V14H6V8H0V6H6V0H8V6H14V8Z" fill="#D7D7D7" />
+      </svg>
+    ),
+  },
+  faqClose: {
+    width: 32,
+    height: 32,
+    svg: (
+      <svg
+        width="32"
+        height="32"
+        viewBox="0 0 32 32"
+        fill="none"
+        xmlns="http://www.w3.org/2000/svg"
+      >
+        <circle cx="16" cy="16" r="16" fill="#D7D7D7" />
+        <path
+          d="M23.3437 10.41L21.9337 9L16.3437 14.59L10.7537 9L9.34375 10.41L14.9337 16L9.34375 21.59L10.7537 23L16.3437 17.41L21.9337 23L23.3437 21.59L17.7537 16L23.3437 10.41Z"
+          fill="white"
+        />
+      </svg>
+    ),
+  },
+  okaySign: {
+    width: 24,
+    height: 24,
+    svg: (
+      <svg
+        width="24"
+        height="24"
+        viewBox="0 0 24 24"
+        fill="none"
+        xmlns="http://www.w3.org/2000/svg"
+      >
+        <circle cx="12" cy="12" r="12" fill="#2562FF" />
+        <path
+          d="M10.0001 14.7799L7.2201 11.9999L6.27344 12.9399L10.0001 16.6666L18.0001 8.66656L17.0601 7.72656L10.0001 14.7799Z"
+          fill="white"
+        />
+      </svg>
+    ),
+  },
+  questionMark: {
+    width: 24,
+    height: 24,
+    svg: (
+      <svg
+        width="24"
+        height="24"
+        viewBox="0 0 24 24"
+        fill="none"
+        xmlns="http://www.w3.org/2000/svg"
+      >
+        <path
+          d="M12 2C6.48 2 2 6.48 2 12C2 17.52 6.48 22 12 22C17.52 22 22 17.52 22 12C22 6.48 17.52 2 12 2ZM13 19H11V17H13V19ZM15.07 11.25L14.17 12.17C13.45 12.9 13 13.5 13 15H11V14.5C11 13.4 11.45 12.4 12.17 11.67L13.41 10.41C13.78 10.05 14 9.55 14 9C14 7.9 13.1 7 12 7C10.9 7 10 7.9 10 9H8C8 6.79 9.79 5 12 5C14.21 5 16 6.79 16 9C16 9.88 15.64 10.68 15.07 11.25Z"
+          fill="#E1E1E1"
+        />
+      </svg>
+    ),
+  },
+  check: {
+    width: 17,
+    height: 13,
+    svg: (
+      <svg
+        width="18"
+        height="14"
+        viewBox="0 0 18 14"
+        fill="none"
+        xmlns="http://www.w3.org/2000/svg"
+      >
+        <path
+          d="M6.00016 11.1698L1.83016 6.99984L0.410156 8.40984L6.00016 13.9998L18.0002 1.99984L16.5902 0.589844L6.00016 11.1698Z"
+          fill="#A9A9A9"
+        />
+      </svg>
+    ),
+  },
+  thumbsup: {
+    width: 36,
+    height: 36,
+    svg: (
+      <svg
+        width="36"
+        height="36"
+        viewBox="0 0 36 36"
+        fill="none"
+        xmlns="http://www.w3.org/2000/svg"
+      >
+        <circle cx="18" cy="18" r="18" fill="#F7F7F7" />
+        <path
+          d="M19.11 11.72L18.54 14.61C18.42 15.2 18.58 15.81 18.96 16.27C19.34 16.73 19.9 17 20.5 17H26V18.08L23.43 24H15.34C15.16 24 15 23.84 15 23.66V15.82L19.11 11.72ZM20 8L13.59 14.41C13.21 14.79 13 15.3 13 15.83V23.66C13 24.95 14.05 26 15.34 26H23.44C24.15 26 24.8 25.63 25.16 25.03L27.83 18.88C27.94 18.63 28 18.36 28 18.08V17C28 15.9 27.1 15 26 15H20.5L21.42 10.35C21.47 10.13 21.44 9.89 21.34 9.69C21.11 9.24 20.82 8.83 20.46 8.47L20 8ZM10 15H8V26H10C10.55 26 11 25.55 11 25V16C11 15.45 10.55 15 10 15Z"
+          fill="#686868"
+        />
+      </svg>
+    ),
+  },
+  thumbsdown: {
+    width: 36,
+    height: 36,
+    svg: (
+      <svg
+        width="36"
+        height="36"
+        viewBox="0 0 36 36"
+        fill="none"
+        xmlns="http://www.w3.org/2000/svg"
+      >
+        <circle cx="18" cy="18" r="18" fill="#F7F7F7" />
+        <path
+          d="M16.89 24.28L17.46 21.39C17.58 20.8 17.42 20.19 17.04 19.73C16.66 19.27 16.1 19 15.5 19H10V17.92L12.57 12H20.66C20.84 12 21 12.16 21 12.34V20.18L16.89 24.28ZM16 28L22.41 21.59C22.79 21.21 23 20.7 23 20.17V12.34C23 11.05 21.95 10 20.66 10H12.56C11.85 10 11.2 10.37 10.84 10.97L8.17 17.12C8.06 17.37 8 17.64 8 17.92V19C8 20.1 8.9 21 10 21H15.5L14.58 25.65C14.53 25.87 14.56 26.11 14.66 26.31C14.89 26.76 15.18 27.17 15.54 27.53L16 28ZM26 21H28V10H26C25.45 10 25 10.45 25 11V20C25 20.55 25.45 21 26 21Z"
+          fill="#686868"
+        />
+      </svg>
+    ),
+  },
 };
 
 export default icons;

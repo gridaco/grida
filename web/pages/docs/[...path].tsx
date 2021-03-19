@@ -8,6 +8,9 @@ import PostTitle from "../../components/docs-mdx/post-title";
 import Head from "next/head";
 import markdownToHtml from "../../utils/docs/md-to-html";
 import DocsNavigation from "layout/docs-navigation";
+import styled from "@emotion/styled";
+import { media } from "utils/styled/media";
+import { ThemeInterface } from "utils/styled/theme";
 
 export default function Post({ post, preview }) {
   const router = useRouter();
@@ -21,7 +24,7 @@ export default function Post({ post, preview }) {
         <PostTitle>Loading…</PostTitle>
       ) : (
         <>
-          <article >
+          <article style={{ width: "calc(100% - 40px)", margin: "0px 20px"}}>
             <Head>
               <title>{post.title}</title>
               {post.ogImage && (
@@ -43,13 +46,11 @@ export async function getStaticProps({
 }) {
   const post = getPostByPath(params.path);
 
-  const content = await markdownToHtml(post.content || "");
-
   return {
     props: {
       post: {
         ...post,
-        content,
+        content: post.content,
       },
     },
   };

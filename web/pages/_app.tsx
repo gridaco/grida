@@ -3,20 +3,27 @@ import { ThemeProvider } from "emotion-theming";
 import { AppProps } from "next/app";
 import Head from "next/head";
 import React, { useEffect } from "react";
-import { CookiesProvider } from "react-cookie"
+import { CookiesProvider } from "react-cookie";
 
 import Footer from "components/footer";
 import Header from "components/header";
 import { defaultTheme } from "utils/styled";
 import { useRouter } from "next/router";
-import { Box } from "rebass";
-import { PopupConsumer, PopupInfo, PopupProvider } from "utils/context/PopupContext";
+import {
+  PopupConsumer,
+  PopupInfo,
+  PopupProvider,
+} from "utils/context/PopupContext";
 import Popup from "components/popup";
 import { analytics } from "utils/firebase";
 import { BodyCustomStyleInAbosulteSectionLayout } from "utils/styled/styles";
 import "../utils/styled/fonts.css";
+import { MDXProvider } from "@mdx-js/react";
+import { _MDX_COMPONENTS } from "components/mdx";
+import { SEO_DEFAULTS } from "utils/seo";
+import makeKeywords from "utils/seo/make-keywords";
 
-const MyApp = ({ Component, pageProps }: AppProps) => {
+const App = ({ Component, pageProps }: AppProps) => {
   const router = useRouter();
 
   useEffect(() => {
@@ -29,7 +36,6 @@ const MyApp = ({ Component, pageProps }: AppProps) => {
       );
     }
     // endregion set firebase analytics
-
   }, [router.events, router.pathname]);
 
   const renderPopups = () => {
@@ -42,7 +48,7 @@ const MyApp = ({ Component, pageProps }: AppProps) => {
         }
       </PopupConsumer>
     );
-  }
+  };
 
   return (
     <Providers>
@@ -59,7 +65,7 @@ const MyApp = ({ Component, pageProps }: AppProps) => {
             overflow-x: hidden;
             scroll-behavior: smooth;
             @media (prefers-reduced-motion: reduce) {
-                scroll-behavior: auto;
+              scroll-behavior: auto;
             }
           }
 
@@ -68,7 +74,7 @@ const MyApp = ({ Component, pageProps }: AppProps) => {
           }
 
           .no-drag {
-            user-select:none;
+            user-select: none;
           }
 
           input {
@@ -101,19 +107,16 @@ const MyApp = ({ Component, pageProps }: AppProps) => {
         `}
       />
       <Head>
-        <title>bridged.xyz</title>
-        <meta
-          name="description"
-          content="designs that are meant to be implemented. automate your frontend development process. no more boring."
-        />
-        <meta
-          name="keywords"
-          content="flutter, design to code, figma to code, flutter code generation, design handoff, design linting, code generation"
-        />
-        <meta
-          name="author"
-          content="bridged.xyz team and community collaborators"
-        />
+        <title>{SEO_DEFAULTS.title}</title>
+        <meta name="description" content={SEO_DEFAULTS.description} />
+        <meta name="keywords" content={makeKeywords(SEO_DEFAULTS.keywords)} />
+        <meta name="author" content={SEO_DEFAULTS.author} />
+
+        <meta property="og:title" content={SEO_DEFAULTS.og.title} />
+        <meta property="og:type" content={SEO_DEFAULTS.og.type} />
+        <meta property="og:url" content={SEO_DEFAULTS.og.url} />
+        <meta property="og:image" content={SEO_DEFAULTS.og.image} />
+
         <link rel="icon" href="/favicon.png" />
       </Head>
       <div
@@ -124,7 +127,10 @@ const MyApp = ({ Component, pageProps }: AppProps) => {
         `}
       >
         <Header />
-        <BodyCustomStyleInAbosulteSectionLayout mt="60px" style={{ position: "relative" }}>
+        <BodyCustomStyleInAbosulteSectionLayout
+          mt="60px"
+          style={{ position: "relative" }}
+        >
           <Component {...pageProps} />
         </BodyCustomStyleInAbosulteSectionLayout>
         <Footer />
@@ -134,18 +140,16 @@ const MyApp = ({ Component, pageProps }: AppProps) => {
   );
 };
 
-const Providers = ({
-  children,
-}: {
-  children: React.ReactNode;
-}) => {
+const Providers = ({ children }: { children: React.ReactNode }) => {
   return (
     <PopupProvider>
       <CookiesProvider>
-        <ThemeProvider theme={defaultTheme}>{children}</ThemeProvider>
+        <MDXProvider components={_MDX_COMPONENTS}>
+          <ThemeProvider theme={defaultTheme}>{children}</ThemeProvider>
+        </MDXProvider>
       </CookiesProvider>
     </PopupProvider>
   );
 };
 
-export default MyApp;
+export default App;
