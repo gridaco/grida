@@ -44,6 +44,7 @@ const Collaborate = () => {
         <BackgroundImage>
           <div className="background-img">
             <Image
+              loading="eager"
               src="/assets/collaborate-background-img.png"
               width="100%"
               height="100%"
@@ -58,6 +59,7 @@ const Collaborate = () => {
                 style={{ right: 10 * ix, bottom: 10 * ix }}
               >
                 <Image
+                  loading="eager"
                   key="notification"
                   src="/assets/notification.png"
                   width="auto"
@@ -70,6 +72,7 @@ const Collaborate = () => {
           <div className="application-ui">
             <Image
               src="/assets/application-image-view.png"
+              loading="eager"
               width="auto"
               height="auto"
               alt="bridged collaboration for app developers"
