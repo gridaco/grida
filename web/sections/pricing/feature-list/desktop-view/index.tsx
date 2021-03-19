@@ -8,6 +8,7 @@ import { defaultTheme } from "utils/styled";
 import { useWindowWidth } from "utils/hooks/use-window-width";
 import LandingpageText from "components/landingpage/text";
 import BlankArea from "components/blank-area";
+import ResponsivePricingCell from "../pricing-cell";
 
 interface FeatureProps {
   data: {
@@ -68,9 +69,9 @@ const FeatureListDesktopView: React.FC<FeatureProps> = ({ data }) => {
           Features
         </Heading>
         <Flex flex="1">
-          <Content flex="1">Free</Content>
-          <Content flex="1">Team</Content>
-          <Content flex="1" alignItems="center">
+          <HeaderContent flex="1">Free</HeaderContent>
+          <HeaderContent flex="1">Team</HeaderContent>
+          <HeaderContent flex="1" alignItems="center">
             Extra usage
             <Icon
               className="cursor"
@@ -81,7 +82,7 @@ const FeatureListDesktopView: React.FC<FeatureProps> = ({ data }) => {
               width={17.5}
               height={17.5}
             />
-          </Content>
+          </HeaderContent>
         </Flex>
       </Header>
 
@@ -97,9 +98,9 @@ const FeatureListDesktopView: React.FC<FeatureProps> = ({ data }) => {
                   <Flex fontSize="18px" color="#2b2b2b" flex="3">
                     {item.name}
                   </Flex>
-                  <Content flex="1">{item.price[0]}</Content>
-                  <Content flex="1">{item.price[1]}</Content>
-                  <Content flex="1">{item.price[2]}</Content>
+                  <ResponsivePricingCell flex="1" price={item.price[0]} />
+                  <ResponsivePricingCell flex="1" price={item.price[1]} />
+                  <ResponsivePricingCell flex="1" price={item.price[2]} />
                 </ContentsWrapper>
               ))}
             </Flex>
@@ -118,7 +119,7 @@ const Header = styled(Flex)`
   border-bottom: 1px solid #f8f8f8;
 `;
 
-const Content = styled(Flex)`
+const HeaderContent = styled(Flex)`
   font-weight: normal;
   font-size: 18px;
   text-align: center;
