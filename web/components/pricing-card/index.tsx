@@ -111,7 +111,7 @@ function PricingCard(props: {
       <Flex alignItems="center" height="100%" my="30px">
         <PlanDescription>
           {props.planList.map(i => (
-            <div className="planlist">
+            <div className="planlist" key={i}>
               <div className="icon">
                 <Icon name="check" />
               </div>
