@@ -106,20 +106,25 @@ function PricingCard(props: {
         <LandingpageText variant="h4">
           {props.type != "none-paid" ? "$20" : "$0"}
         </LandingpageText>
-        {props.type != "none-paid" && <Seat variant="body1">per seats/mo</Seat>}
+        {props.type != "none-paid" && <Seat variant="body1">per seat/mo</Seat>}
       </PlanPricing>
-      <PlanDescription>
-        {props.planList.map(i => (
-          <div className="planlist">
-            <div className="icon">
-              <Icon name="check" />
+      <Flex alignItems="center" height="100%" my="30px">
+        <PlanDescription>
+          {props.planList.map(i => (
+            <div className="planlist">
+              <div className="icon">
+                <Icon name="check" />
+              </div>
+              <span className="desc">{i}</span>
             </div>
-            <span className="desc">{i}</span>
-          </div>
-        ))}
-      </PlanDescription>
+          ))}
+        </PlanDescription>
+      </Flex>
       {props.type === "none-paid" ? (
-        <PricingCTAButton mt="auto" style={{ borderRadius: 4, marginTop: 40 }}>
+        <PricingCTAButton
+          mt="auto"
+          style={{ borderRadius: 4, marginTop: "auto" }}
+        >
           Start now
         </PricingCTAButton>
       ) : (
@@ -178,7 +183,6 @@ const Seat = styled(LandingpageText)`
 const CardCTAButton = styled(Button)`
   margin-top: auto;
   border-radius: 4px;
-  margin-top: 40px;
   ${p => {
     if (p.type === "paid") {
       return {
@@ -190,9 +194,9 @@ const CardCTAButton = styled(Button)`
 
 const PlanDescription = styled(Flex)`
   flex-direction: column;
-  height: 100%;
+
   .planlist {
-    flex: 1;
+    margin: 8px 0px;
     display: flex;
     align-items: center;
 
