@@ -46,10 +46,21 @@ const StartNow: React.FC = () => {
           justifyContent="space-between"
         >
           {descList.map((item, ix) => (
-            <Desc ml="10px" width="90%" color="#5e5e5e" fontSize="18px" key={ix}>
-              <Icon mr="16px" name="okaySign" />
-              {item.title}
-            </Desc>
+            <Flex mr="auto" ml="20px">
+              <div>
+                <Icon flex={1} name="okaySign" />
+              </div>
+              <Desc
+                flex={3}
+                ml="10px"
+                width="90%"
+                color="#5e5e5e"
+                fontSize="18px"
+                key={ix}
+              >
+                {item.title}
+              </Desc>
+            </Flex>
           ))}
         </Flex>
       </LeftWrapper>
@@ -60,8 +71,12 @@ const StartNow: React.FC = () => {
         justifyContent="center"
       >
         <Flex alignItems="baseline" mb="24px">
-          <Heading fontSize="56px" letterSpacing="0em" color="#000000">$0</Heading>
-          <Text color="#636363" letterSpacing="0em" fontSize="42px" ml="4px">/mo</Text>
+          <Heading fontSize="56px" letterSpacing="0em" color="#000000">
+            $0
+          </Heading>
+          <Text color="#636363" letterSpacing="0em" fontSize="42px" ml="4px">
+            /mo
+          </Text>
         </Flex>
         <PricingCTAButton
           width={["232px", "337px", "337px", "337px"]}
@@ -75,7 +90,9 @@ const StartNow: React.FC = () => {
         >
           Start now
         </PricingCTAButton>
-        <NoCredit fontSize="18px" color="#575757">No credit card required</NoCredit>
+        <NoCredit fontSize="18px" color="#575757">
+          No credit card required
+        </NoCredit>
       </RightWrapper>
     </Card>
   );
