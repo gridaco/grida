@@ -3,10 +3,18 @@ import React from "react";
 import { Button, Box } from "rebass";
 import { motion } from "framer-motion";
 import { URLS } from "utils/landingpage/constants";
+import { useCookies } from "react-cookie";
+
+const COOKIE_ACCESS_TOKEN_KEY = "_token";
 
 export default function LandingMainCtaButton() {
+  const [cookie, ] = useCookies([COOKIE_ACCESS_TOKEN_KEY]);
   const handleCta = () => {
-    open(URLS.downloads.download_figma_plugin);
+    if (cookie[COOKIE_ACCESS_TOKEN_KEY] != null) {
+      window.location.href = "/docs/getting-started";
+    } else {
+      window.location.href = URLS.landing.signup;
+    }
   };
   return (
     <Box
