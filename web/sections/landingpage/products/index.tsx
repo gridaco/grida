@@ -123,6 +123,13 @@ const Products = () => {
             loop
             playing
             muted
+            config={{
+              file: {
+                attributes: {
+                  preload: "auto",
+                },
+              },
+            }}
           />
         </motion.div>
       </VideoWrapper>

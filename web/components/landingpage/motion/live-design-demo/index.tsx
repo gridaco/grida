@@ -47,6 +47,13 @@ export default function LiveDesignDemoFrame() {
         loop
         playing
         muted
+        config={{
+          file: {
+            attributes: {
+              preload: "auto",
+            },
+          },
+        }}
       />
     </DesignFramePreview>
   );

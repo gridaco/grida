@@ -48,6 +48,13 @@ function ElevatedVideoPlayer() {
             muted
             onStart={handleOnYoutubePlayStart}
             onEnded={handleOnYoutubePlayEnd}
+            config={{
+              file: {
+                attributes: {
+                  preload: "auto",
+                },
+              },
+            }}
           />
         </VideoContainer>
       ),
@@ -63,6 +70,13 @@ function ElevatedVideoPlayer() {
           loop
           playing={!actualVideoPlaying}
           muted
+          config={{
+            file: {
+              attributes: {
+                preload: "auto",
+              },
+            },
+          }}
         />
       </div>
       {/* play button click motion */}
