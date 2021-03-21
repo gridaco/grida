@@ -19,12 +19,13 @@ export default function GlobalizationQuickDemoSayHiSection() {
       <SectionLayout variant="full-width" inherit={false}>
         {/* todo: sizing */}
         <Image
+          loading="eager"
           src="https://via.placeholder.com/1440"
           height="800px"
           width="100%"
         />
       </SectionLayout>
-      <BlankArea height={[150, 300]}/>
+      <BlankArea height={[150, 300]} />
     </SectionLayout>
   );
 }

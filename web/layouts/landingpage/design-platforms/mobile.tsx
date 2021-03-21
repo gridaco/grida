@@ -14,6 +14,7 @@ const DesignPlatformsMobile = () => {
     <Positoner>
       <div className="platform-preview">
         <Image
+          loading="eager"
           alt="bridged supported design platforms"
           src={`/assets/design-platforms/${currentPlatform}.png`}
           width="auto"
@@ -25,6 +26,7 @@ const DesignPlatformsMobile = () => {
         <div className="platforms">
           {renderPlatforms.map(i => (
             <Image
+              loading="eager"
               alt="bridged supported platfrom icons"
               key={i}
               className="cursor"

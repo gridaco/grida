@@ -31,6 +31,20 @@ Join slack via link on README, contact maintaners for rapid contribution. otherw
 - XS
   - 320 (iPhone SE)
 
+### Interactive checkist
+- css `cursor: pointer` for clickable elements
+- hover state (color or scale or underline) for dynamic link elements
+
+### Component checklist
+- component on storyboard
+- primative component as state indepandent (primative component shall not contain state for itself)
+- mdx component compatibility (general components should have in-mdx-usage capabilities)
+
+### Code quality checklist
+- no style related constant in jsx (constant such like color and px shall not be inlined in jsx)
+- comment design links to visual component files or provide README
+
+
 ## Techniques
 
 **Animations / Motioons**

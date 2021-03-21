@@ -22,6 +22,7 @@ import { MDXProvider } from "@mdx-js/react";
 import { _MDX_COMPONENTS } from "components/mdx";
 import { SEO_DEFAULTS } from "utils/seo";
 import makeKeywords from "utils/seo/make-keywords";
+import { Box } from "rebass";
 
 const App = ({ Component, pageProps }: AppProps) => {
   const router = useRouter();
@@ -119,12 +120,8 @@ const App = ({ Component, pageProps }: AppProps) => {
 
         <link rel="icon" href="/favicon.png" />
       </Head>
-      <div
-        css={css`
-          display: flex;
-          flex-direction: column;
-          min-height: 100vh;
-        `}
+      <Box
+        style={{ display: "flex", flexDirection: "column", minHeight: "100vh" }}
       >
         <Header />
         <BodyCustomStyleInAbosulteSectionLayout
@@ -134,7 +131,7 @@ const App = ({ Component, pageProps }: AppProps) => {
           <Component {...pageProps} />
         </BodyCustomStyleInAbosulteSectionLayout>
         <Footer />
-      </div>
+      </Box>
       {renderPopups()}
     </Providers>
   );

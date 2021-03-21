@@ -89,6 +89,7 @@ const CodePreview = () => {
               <Platforms className="platforms">
                 {DEV_FRAMEWORKS.map(i => (
                   <Image
+                    loading="eager"
                     alt="bridged supported design platforms"
                     key={i.name}
                     className="cursor"

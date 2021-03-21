@@ -48,6 +48,13 @@ function ElevatedVideoPlayer() {
             muted
             onStart={handleOnYoutubePlayStart}
             onEnded={handleOnYoutubePlayEnd}
+            config={{
+              file: {
+                attributes: {
+                  preload: "auto",
+                },
+              },
+            }}
           />
         </VideoContainer>
       ),
@@ -59,10 +66,17 @@ function ElevatedVideoPlayer() {
     <Frame style={{ scale }}>
       <div className="youtube-thumbnail">
         <ReactPlayer
-          url={require("public/videos/promotion-video-preview.fast.mp4")}
+          url={require("public/videos/promotion-video-preview.fast.webm")}
           loop
           playing={!actualVideoPlaying}
           muted
+          config={{
+            file: {
+              attributes: {
+                preload: "auto",
+              },
+            },
+          }}
         />
       </div>
       {/* play button click motion */}

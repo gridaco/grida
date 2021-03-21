@@ -63,6 +63,7 @@ const CodePreviewMobile = () => {
       <Platforms className="platforms">
         {DEV_FRAMEWORKS.map(i => (
           <Image
+            loading="eager"
             alt="bridged supported platforms icon"
             key={i.name}
             className="cursor"
