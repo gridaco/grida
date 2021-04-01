@@ -111,6 +111,7 @@ function SceneExplorer() {
         type="file"
         style={{ display: "none" }}
         onChange={onFileUpload}
+        accept=".json"
       />
       <div className="scene-tab">
         <span>SCENE</span>
