@@ -11,9 +11,9 @@ function HienrachyItem(props: {
   onExpand: () => void;
 }) {
   const {
-    struct: { title, child, type, id },
+    struct: { title, child, type },
     level,
-    onExpand
+    onExpand,
   } = props;
   return (
     <Wrapper ml={25 + 14 * level} onClick={onExpand}>
@@ -34,6 +34,7 @@ const Wrapper = styled.div<{ ml: number }>`
   padding-left: ${(p) => p.ml}px;
   height: 30px;
   cursor: pointer;
+  margin-right: 9px;
 
   span {
     color: #fff;

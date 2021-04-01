@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import styled from "@emotion/styled";
 import HierachyItem from "../components/hienrarchy-item";
 import HienrarchyItems from "../components/hienrarchy-items";
@@ -89,16 +89,32 @@ const mockSceneStruct: Struct[] = [
 
 function SceneExplorer() {
   const [expandIds, setExpandIds] = useState([]);
+  const fileInput = useRef(null);
 
   const onExpandStruct = (id: string) => {
-    setExpandIds(d => [...d, id]);
+    setExpandIds((d) => [...d, id]);
+  };
+
+  const onFileUpload = (e) => {
+    const reader = new FileReader();
+    e.preventDefault();
+    reader.onload = function () {
+      console.log(reader.result);
+    };
+    reader.readAsText(e.target.files[0], "UTF-8");
   };
 
   return (
     <Wrapper>
+      <input
+        ref={fileInput}
+        type="file"
+        style={{ display: "none" }}
+        onChange={onFileUpload}
+      />
       <div className="scene-tab">
         <span>SCENE</span>
-        <span>FILES</span>
+        <span onClick={() => fileInput.current.click()}>FILES</span>
       </div>
       <HienrarchyItems
         expandIds={expandIds}
