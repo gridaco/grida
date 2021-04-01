@@ -1,8 +1,8 @@
-import React, { useEffect, useState } from "react";
+import React from "react";
 import { Global, css } from "@emotion/react";
 import styled from "@emotion/styled";
 import Head from "next/head";
-import FileExplorer from "../layout/file-explorer";
+import SceneExplorer from "../layout/scene-explorer";
 import DevTools from "../layout/dev-tools";
 
 function MyApp({ Component, pageProps }) {
@@ -26,7 +26,7 @@ function MyApp({ Component, pageProps }) {
         />
       </Head>
       <Template>
-        <FileExplorer />
+        <SceneExplorer />
         <ContentWrapper>
           <RenderComponentWrapper>
             <Component {...pageProps} />
@@ -58,7 +58,7 @@ const Template = styled.div`
 const ContentWrapper = styled.div`
   display: flex;
   flex-direction: column;
-  flex: 5;
+  flex: 6;
 `;
 
 const RenderComponentWrapper = styled.div`
