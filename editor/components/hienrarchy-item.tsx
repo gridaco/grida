@@ -2,6 +2,9 @@ import React from "react";
 import styled from "@emotion/styled";
 import { Struct } from "../layout/scene-explorer";
 
+/**
+ * @description NEED MIGRATE EDITOR-X REPO, THIS IS EDITOR-X DESIGN SYSTEM
+ */
 function HienrachyItem(props: {
   struct: Struct;
   level: number;

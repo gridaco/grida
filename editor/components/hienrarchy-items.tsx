@@ -3,6 +3,9 @@ import styled from "@emotion/styled";
 import { Struct } from "../layout/scene-explorer";
 import HierachyItem from "./hienrarchy-item";
 
+/**
+ * @description NEED MIGRATE EDITOR-X REPO, THIS IS EDITOR-X DESIGN SYSTEM
+ */
 function HienrarchyItems(props: {
   level?: number;
   expandIds?: Array<string>;
