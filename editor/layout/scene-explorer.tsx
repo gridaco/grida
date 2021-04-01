@@ -101,7 +101,11 @@ function SceneExplorer() {
     reader.onload = function () {
       console.log(reader.result);
     };
-    reader.readAsText(e.target.files[0], "UTF-8");
+    try {
+      reader.readAsText(e.target.files[0], "UTF-8");
+    } catch(e) {
+      console.error(`ERROR : import ( json ... + etc )\ndetail : ${e}`)
+    }
   };
 
   return (
