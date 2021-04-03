@@ -1,3 +1,9 @@
 [submodule "packages/console.bridged.xyz"]
 	path = packages/console.bridged.xyz
 	url = https://github.com/bridgedxyz/console.bridged.xyz
+[submodule "packages/editor-ui"]
+	path = packages/editor-ui
+	url = https://github.com/bridgedxyz/reflect-editor-ui
+[submodule "packages/nothing"]
+	path = packages/nothing
+	url = https://github.com/bridgedxyz/nothing
