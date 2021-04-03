@@ -9,11 +9,25 @@ const ButtonVariant = ["Frame", "Rect", "Circle", "Text"];
 const addSturctObjectUseId = (
   id: string,
   currentStruct: Struct[],
-  struct: Struct,
-  level?: number
+  struct: Struct
 ) => {
+  return currentStruct.map((i) => {
+    if (i.id === id) {
+      return {
+        ...i,
+        child: [...i?.child, struct],
+      };
+    }
 
-  
+    if (i.child) {
+      return {
+        ...i,
+        child: addSturctObjectUseId(id, i.child, struct),
+      };
+    }
+
+    return i;
+  });
 };
 
 const structStateSelector = selector({
@@ -34,13 +48,13 @@ const structStateSelector = selector({
         },
       ];
     } else {
-      console.log(
-        addSturctObjectUseId(currentId, currentStruct, {
-          id: v,
-          type: "layout",
-          title: v,
-        })
-      );
+      structs = addSturctObjectUseId(currentId, currentStruct, {
+        id: v,
+        type: "layout",
+        title: v,
+      });
+
+      console.log(structs);
     }
 
     set(structState, structs);
