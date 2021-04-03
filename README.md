@@ -1,3 +1,7 @@
+<div style="text-align:center"><img src="./branding/bridged-2020-type-logo.png"/></div>
+
+
+
 # Bridged (Bridged 2022 - opensource collaborative realtime ui editor)
 
 > an opensource wasm application explicitly designed for service application design/development
