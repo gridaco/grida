@@ -25,6 +25,10 @@ module.exports = ({
             test: /\.md$/,
             use: 'raw-loader',
         })
+        config.module.rules.push({
+            test: /\.ts(x?)$/,
+            use: 'babel-loader',
+        })
         return config;
     },
     env: {

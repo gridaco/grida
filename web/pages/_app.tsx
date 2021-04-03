@@ -12,6 +12,7 @@ function MyApp({ Component, pageProps }) {
           body {
             margin: 0px !important;
             background-color: #212121;
+            font-family: "Roboto", sans-serif;
           }
         `}
       />
