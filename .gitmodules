@@ -7,3 +7,6 @@
 [submodule "packages/nothing"]
 	path = packages/nothing
 	url = https://github.com/bridgedxyz/nothing
+[submodule "packages/design-server"]
+	path = packages/design-server
+	url = https://github.com/bridgedxyz/design-server
