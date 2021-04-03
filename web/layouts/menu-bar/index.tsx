@@ -2,10 +2,13 @@ import React, { useState } from "react";
 import styled from "@emotion/styled";
 import Hirachy from "../../../packages/editor-ui/lib/hirachy/hirachy";
 import { MockStructData } from "./mock";
+import { useRecoilState, useRecoilValue } from "recoil";
+import { currentSelectedIdState, structState } from "state/demo";
 
 function Menubar() {
   const [expandIds, setExpandIds] = useState([]);
-  const [currentIdx, setCurrentIdx] = useState("");
+  const [selectId, setSelectId] = useRecoilState(currentSelectedIdState)
+  const struct = useRecoilValue(structState);
 
   const onExpand = (id: string) => {
     if (expandIds.includes(id)) {
@@ -22,15 +25,15 @@ function Menubar() {
     } else {
       setExpandIds((d) => [...d, id]);
     }
-    setCurrentIdx(id)
+    setSelectId(id === selectId ? "" : id)
   };
 
   return (
     <Wrapper>
       <Hirachy
-        structs={MockStructData}
+        structs={struct}
         expandIds={expandIds}
-        currentId={currentIdx}
+        currentId={selectId}
         onExpand={onExpand}
       />
     </Wrapper>

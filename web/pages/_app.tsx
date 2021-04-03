@@ -1,12 +1,13 @@
 import Head from "next/head";
 import React from "react";
 import styled from "@emotion/styled";
-import { Menubar } from "layouts";
+import { Menubar, Header } from "layouts";
 import { css, Global } from "@emotion/react";
+import { RecoilRoot } from "recoil";
 
 function MyApp({ Component, pageProps }) {
   return (
-    <React.Fragment>
+    <RecoilRoot>
       <Global
         styles={css`
           body {
@@ -25,7 +26,7 @@ function MyApp({ Component, pageProps }) {
           <Right_PropertyList />
         </Content>
       </Wrapper>
-    </React.Fragment>
+    </RecoilRoot>
   );
 }
 
@@ -61,13 +62,6 @@ const SeoMeta = () => {
 const Wrapper = styled.div`
   width: 100vw;
   height: 100vh;
-`;
-
-const Header = styled.div`
-  width: 100%;
-  height: 55px;
-  background-color: #121212;
-  border-bottom: 1px solid #212121;
 `;
 
 const Content = styled.div`
