@@ -5,9 +5,24 @@ import { MockStructData } from "./mock";
 
 function Menubar() {
   const [expandIds, setExpandIds] = useState([]);
+  const [currentIdx, setCurrentIdx] = useState("");
 
   const onExpand = (id: string) => {
-    setExpandIds((d) => [...d, id]);
+    if (expandIds.includes(id)) {
+      setExpandIds((d) => {
+        return d.reduce((acc, v, ix) => {
+          if (ix === d.indexOf(id)) {
+            return acc;
+          } else {
+            acc.push(v);
+            return acc;
+          }
+        }, []);
+      });
+    } else {
+      setExpandIds((d) => [...d, id]);
+    }
+    setCurrentIdx(id)
   };
 
   return (
@@ -15,6 +30,7 @@ function Menubar() {
       <Hirachy
         structs={MockStructData}
         expandIds={expandIds}
+        currentId={currentIdx}
         onExpand={onExpand}
       />
     </Wrapper>
