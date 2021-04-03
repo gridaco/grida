@@ -9,7 +9,6 @@
   },
   "dependencies": {
     "@emotion/babel-preset-css-prop": "^11.2.0",
-    "@emotion/core": "^11.0.0",
     "@emotion/react": "^11.1.5",
     "@emotion/styled": "^11.1.5",
     "babel-plugin-module-resolver": "^4.1.0",

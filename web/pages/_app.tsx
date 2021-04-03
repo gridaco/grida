@@ -1,12 +1,29 @@
 import Head from "next/head";
 import React from "react";
-import "../styles/globals.css";
+import styled from "@emotion/styled";
+import { Menubar } from "layouts";
+import { css, Global } from "@emotion/react";
 
 function MyApp({ Component, pageProps }) {
   return (
     <React.Fragment>
+      <Global
+        styles={css`
+          body {
+            margin: 0px !important;
+            background-color: #212121;
+          }
+        `}
+      />
       <SeoMeta />
-      <Component {...pageProps} />
+      <Wrapper>
+        <Header />
+        <Content>
+          <Menubar />
+          <Component {...pageProps} />
+          <Right_PropertyList />
+        </Content>
+      </Wrapper>
     </React.Fragment>
   );
 }
@@ -39,3 +56,29 @@ const SeoMeta = () => {
     </Head>
   );
 };
+
+const Wrapper = styled.div`
+  width: 100vw;
+  height: 100vh;
+`;
+
+const Header = styled.div`
+  width: 100%;
+  height: 55px;
+  background-color: #121212;
+  border-bottom: 1px solid #212121;
+`;
+
+const Content = styled.div`
+  display: flex;
+  justify-content: space-between;
+  width: 100%;
+  height: 100%;
+`;
+
+const Right_PropertyList = styled.div`
+  max-width: 250px;
+  width: 100%;
+  height: 100%;
+  background-color: #121212;
+`;
