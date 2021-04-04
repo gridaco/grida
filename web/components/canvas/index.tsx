@@ -1,17 +1,11 @@
-import React, { useCallback } from "react";
+import React, { CSSProperties, useCallback, useRef } from "react";
 // import { Stage } from "../../../packages/nothing/packages/skia-backend";
 import styled from "@emotion/styled";
+import { useRecoilValue } from "recoil";
+import { currentInsetLayer } from "state/demo";
 
 interface CanvasStyledProps {
-  cursor?:
-    | "grabbing"
-    | "grab"
-    | "crosshair"
-    | "default"
-    | "ew-resize"
-    | "ns-resize"
-    | "nesw-resize"
-    | "nwse-resize";
+  cursor?: CSSProperties["cursor"];
 }
 
 function SkiaComposition() {
@@ -19,9 +13,31 @@ function SkiaComposition() {
 }
 
 function Canvas() {
-  const mouseHandler = useCallback((e) => console.log(e), []);
+  const wrapperRef = useRef(null);
+  const currentLayer = useRecoilValue(currentInsetLayer);
+
+  const cursorType = useCallback((): CSSProperties["cursor"] => {
+    switch (currentLayer) {
+      case "insert-frame":
+      case "insert-rect":
+      case "insert-circle":
+      case "insert-text":
+        return "crosshair";
+    }
+    return "zoom-out";
+  }, [currentLayer]);
+
+  const mouseHandler = useCallback(
+    (e) => {
+      wrapperRef.current?.releasePointerCapture(e.pointerId);
+    },
+    [currentLayer]
+  );
+
   return (
     <Wrapper
+      ref={wrapperRef}
+      cursor={cursorType()}
       onPointerDown={mouseHandler}
       onPointerMove={mouseHandler}
       onPointerUp={mouseHandler}

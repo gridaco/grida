@@ -13,3 +13,8 @@ export const currentSelectedIdState = atom<string>({
   key: "currentSelectedIdState",
   default: "",
 });
+
+export const currentInsetLayer = atom<string>({
+  key: "currentInsertLayerState",
+  default: null,
+});
