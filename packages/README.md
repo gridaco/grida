@@ -4,6 +4,8 @@
 
 - [editor-ui](https://github.com/bridgedxyz/reflect-editor-ui)
 - [reflect-ui](https://github.com/bridgedxyz/reflect-ui-react)
+- [reflect-core](https://github.com/bridgedxyz/reflect-core-ts)
+- [uiutils](https://github.com/bridgedxyz/uiutils)
 - [nothing](https://github.com/bridgedxyz/nothing)
 - [design-server](https://github.com/bridgedxyz/design-server)
 - [design-git](https://github.com/bridgedxyz/design-git)

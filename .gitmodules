@@ -19,3 +19,9 @@
 [submodule "packages/bridged-format"]
 	path = packages/bridged-format
 	url = https://github.com/bridgedxyz/.bridged
+[submodule "packages/uiutils"]
+	path = packages/uiutils
+	url = https://github.com/bridgedxyz/uiutils
+[submodule "packages/reflect-core"]
+	path = packages/reflect-core
+	url = https://github.com/bridgedxyz/reflect-core-ts
