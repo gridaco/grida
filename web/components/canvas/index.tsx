@@ -1,5 +1,5 @@
 import React, { CSSProperties, useCallback, useRef } from "react";
-// import { Stage } from "../../../packages/nothing/packages/skia-backend";
+import { Stage } from "../../../packages/nothing/packages/skia-backend";
 import styled from "@emotion/styled";
 import { useRecoilValue } from "recoil";
 import { currentInsetLayer } from "state/demo";
@@ -9,7 +9,9 @@ interface CanvasStyledProps {
 }
 
 function SkiaComposition() {
-  // return <cg-canvas></cg-canvas>;
+  return <cg-canvas>
+    <cg-rect fBottom={50} fLeft={50} fRight={0} fTop={0} />
+  </cg-canvas>;
 }
 
 function Canvas() {
@@ -42,9 +44,9 @@ function Canvas() {
       onPointerMove={mouseHandler}
       onPointerUp={mouseHandler}
     >
-      {/* <Stage width={0} height={0}>
+      <Stage width={600} height={600}>
         <SkiaComposition />
-      </Stage> */}
+      </Stage>
     </Wrapper>
   );
 }
@@ -55,4 +57,5 @@ const Wrapper = styled.div<CanvasStyledProps>`
   flex: 1;
   position: relative;
   cursor: ${(p) => p.cursor};
+  background-color: #fff;
 `;

@@ -5,7 +5,7 @@
     "workspaces": [
         "app",
         "web",
-        "packages/*"
+        "packages/**/*"
     ],
     "scripts": {
         "web": "yarn workspace web run dev",

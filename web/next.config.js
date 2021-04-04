@@ -10,7 +10,9 @@ const FIREBASE_ENV_VARS = {
 }
 
 module.exports = ({
-    webpack: function(config) {
+    webpack: function(config, {
+        isServer
+    }) {
         config.module.rules.push({
             test: /\.(eot|woff|woff2|ttf|svg|png|jpg|gif)$/,
             use: {
@@ -29,15 +31,16 @@ module.exports = ({
             test: /\.ts(x?)$/,
             use: 'babel-loader',
         })
+
+        if (!isServer) {
+            config.node = {
+                fs: 'empty'
+            }
+        }
+
         return config;
     },
     env: {
         ...FIREBASE_ENV_VARS
-    },
-
-    // USE WEBPACK5, 
-    // ref : https://nextjs.org/docs/messages/webpack5
-    future: {
-        webpack5: true,
     },
 });
