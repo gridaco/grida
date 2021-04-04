@@ -68,7 +68,7 @@ const Content = styled.div`
   display: flex;
   justify-content: space-between;
   width: 100%;
-  height: 100%;
+  height: calc(100% - 55px);
 `;
 
 const Right_PropertyList = styled.div`

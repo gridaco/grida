@@ -1,21 +1,23 @@
-import React, { CSSProperties, useCallback, useRef } from "react";
+import React, { CSSProperties, useCallback, useEffect, useRef } from "react";
 import { Stage } from "../../../packages/nothing/packages/skia-backend";
 import styled from "@emotion/styled";
 import { useRecoilValue } from "recoil";
 import { currentInsetLayer } from "state/demo";
-
 interface CanvasStyledProps {
   cursor?: CSSProperties["cursor"];
+  left?: CSSProperties["left"];
 }
 
 function SkiaComposition() {
-  return <cg-canvas>
-    <cg-rect fBottom={50} fLeft={50} fRight={0} fTop={0} />
-  </cg-canvas>;
+  return (
+    <cg-canvas>
+      <cg-rect fTop={0} fRight={0} fBottom={50} fLeft={50} paint={{ color: "#fff" }} />
+    </cg-canvas>
+  );
 }
 
 function Canvas() {
-  const wrapperRef = useRef(null);
+  const wrapperRef = useRef(undefined);
   const currentLayer = useRecoilValue(currentInsetLayer);
 
   const cursorType = useCallback((): CSSProperties["cursor"] => {
@@ -26,10 +28,23 @@ function Canvas() {
       case "insert-text":
         return "crosshair";
     }
-    return "zoom-out";
   }, [currentLayer]);
 
-  const mouseHandler = useCallback(
+  const mouseUp = useCallback(
+    (e) => {
+      wrapperRef.current?.releasePointerCapture(e.pointerId);
+    },
+    [currentLayer]
+  );
+
+  const mouseDown = useCallback(
+    (e) => {
+      wrapperRef.current?.releasePointerCapture(e.pointerId);
+    },
+    [currentLayer]
+  );
+
+  const mouseMove = useCallback(
     (e) => {
       wrapperRef.current?.releasePointerCapture(e.pointerId);
     },
@@ -40,13 +55,13 @@ function Canvas() {
     <Wrapper
       ref={wrapperRef}
       cursor={cursorType()}
-      onPointerDown={mouseHandler}
-      onPointerMove={mouseHandler}
-      onPointerUp={mouseHandler}
+      onPointerDown={mouseDown}
+      onPointerMove={mouseMove}
+      onPointerUp={mouseUp}
     >
-      <Stage width={600} height={600}>
+      <SkiaCanvas width={1000} height={100}>
         <SkiaComposition />
-      </Stage>
+      </SkiaCanvas>
     </Wrapper>
   );
 }
@@ -57,5 +72,10 @@ const Wrapper = styled.div<CanvasStyledProps>`
   flex: 1;
   position: relative;
   cursor: ${(p) => p.cursor};
-  background-color: #fff;
+`;
+
+const SkiaCanvas = styled(Stage)<CanvasStyledProps>`
+  position: absolute;
+  top: 0;
+  left: -250px;
 `;
