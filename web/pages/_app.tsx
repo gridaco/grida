@@ -1,13 +1,32 @@
 import Head from "next/head";
 import React from "react";
-import "../styles/globals.css";
+import styled from "@emotion/styled";
+import { Menubar, Header } from "layouts";
+import { css, Global } from "@emotion/react";
+import { RecoilRoot } from "recoil";
 
 function MyApp({ Component, pageProps }) {
   return (
-    <React.Fragment>
+    <RecoilRoot>
+      <Global
+        styles={css`
+          body {
+            margin: 0px !important;
+            background-color: #212121;
+            font-family: "Roboto", sans-serif;
+          }
+        `}
+      />
       <SeoMeta />
-      <Component {...pageProps} />
-    </React.Fragment>
+      <Wrapper>
+        <Header />
+        <Content>
+          <Menubar />
+          <Component {...pageProps} />
+          <Right_PropertyList />
+        </Content>
+      </Wrapper>
+    </RecoilRoot>
   );
 }
 
@@ -39,3 +58,22 @@ const SeoMeta = () => {
     </Head>
   );
 };
+
+const Wrapper = styled.div`
+  width: 100vw;
+  height: 100vh;
+`;
+
+const Content = styled.div`
+  display: flex;
+  justify-content: space-between;
+  width: 100%;
+  height: 100%;
+`;
+
+const Right_PropertyList = styled.div`
+  max-width: 250px;
+  width: 100%;
+  height: 100%;
+  background-color: #121212;
+`;
