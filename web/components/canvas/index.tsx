@@ -5,14 +5,10 @@ import React, {
   useRef,
   useState,
 } from "react";
-import {
-  CkSurface,
-  Stage,
-} from "../../../packages/nothing/packages/skia-backend";
+import { Stage } from "../../../packages/nothing/packages/skia-backend";
 import styled from "@emotion/styled";
 import { useRecoilValue } from "recoil";
 import { currentInsetLayer } from "state/demo";
-import { toSkPaint } from "../../../packages/nothing/packages/skia-backend/src/skia-element-mapping";
 interface CanvasStyledProps {
   cursor?: CSSProperties["cursor"];
   left?: CSSProperties["left"];
@@ -31,12 +27,12 @@ function useWindowSize() {
         height: window.innerHeight,
       });
     }
-    
+
     window.addEventListener("resize", handleResize);
 
     handleResize();
     return () => window.removeEventListener("resize", handleResize);
-  }, []); 
+  }, []);
 
   return windowSize;
 }
@@ -100,7 +96,7 @@ function Canvas() {
 
   const mouseMove = (e) => {
     const XYLocation = getXYLocation(e.nativeEvent);
-    
+
     wrapperRef.current?.setPointerCapture(e.pointerId);
     isClicked && setCursorRect(createRect(startLocation, XYLocation));
   };
