@@ -108,6 +108,22 @@ scripting built in with js/ts sdk and add-on plugin
 design of bridged editor on [figma](https://www.figma.com/file/Y0Gh77AqBoHH7dG1GtK3xF/bridged?node-id=0%3A1)
 
 
+## Bridging the gap between design and development
+Here are some concepts that do not exist on current design tools, but only at implementation.
+- Theme support
+- Responsive layout
+- Linting
+- Grid
+- List
+- Slots (Not swapping components)
+- States
+- Git
+- Variables
+- Data layer
+- Logic layer
+- Design to code
+- Built in base design system (Reflect - a universal design system built for design systems)
+
 
 ## Key features / modes
 
@@ -119,7 +135,7 @@ design of bridged editor on [figma](https://www.figma.com/file/Y0Gh77AqBoHH7dG1G
 - product mode
 - prototype mode
 - documentation mode
-- diagram mode
+- diagram mode (EDR)
 - live collaborative editing
 - version control in-the-box
 - responsive mode (responsive components)
