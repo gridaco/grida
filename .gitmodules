@@ -10,3 +10,12 @@
 [submodule "packages/design-server"]
 	path = packages/design-server
 	url = https://github.com/bridgedxyz/design-server
+[submodule "packages/design-git"]
+	path = packages/design-git
+	url = https://github.com/bridgedxyz/design-git
+[submodule "packages/design-sdk"]
+	path = packages/design-sdk
+	url = https://github.com/bridgedxyz/design-sdk
+[submodule "packages/bridged-format"]
+	path = packages/bridged-format
+	url = https://github.com/bridgedxyz/.bridged

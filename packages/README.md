@@ -6,6 +6,11 @@
 - [reflect-ui](https://github.com/bridgedxyz/reflect-ui-react)
 - [nothing](https://github.com/bridgedxyz/nothing)
 - [design-server](https://github.com/bridgedxyz/design-server)
+- [design-git](https://github.com/bridgedxyz/design-git)
+- [design-sdk](https://github.com/bridgedxyz/design-sdk)
+- [boring](https://github.com/bridgedxyz/boring)
+- [shortcuts](./pakcages/shortcuts)
+- [events](./packages/events)
 
 ## Submodule pacakages
 
