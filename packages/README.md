@@ -10,6 +10,7 @@
 - [design-server](https://github.com/bridgedxyz/design-server)
 - [design-git](https://github.com/bridgedxyz/design-git)
 - [design-sdk](https://github.com/bridgedxyz/design-sdk)
+- [design-lint](https://github.com/bridgedxyz/lint)
 - [boring](https://github.com/bridgedxyz/boring)
 - [shortcuts](./pakcages/shortcuts)
 - [events](./packages/events)
