@@ -2,6 +2,7 @@ import React, {
   CSSProperties,
   useCallback,
   useEffect,
+  useLayoutEffect,
   useRef,
   useState,
 } from "react";
@@ -89,7 +90,6 @@ function Canvas() {
 
   const mouseDown = (e) => {
     const XYLocation = getXYLocation(e.nativeEvent);
-    console.log("D", XYLocation);
     startLocation = XYLocation;
     setIsClicked(true);
   };
@@ -98,7 +98,12 @@ function Canvas() {
     const XYLocation = getXYLocation(e.nativeEvent);
 
     wrapperRef.current?.setPointerCapture(e.pointerId);
-    isClicked && setCursorRect(createRect(startLocation, XYLocation));
+    e.preventDefault();
+
+    if (isClicked) {
+      setCursorRect(createRect(startLocation, XYLocation));
+    }
+
   };
 
   return (
@@ -110,18 +115,14 @@ function Canvas() {
       onPointerUp={mouseUp}
     >
       <SkiaCanvas width={width} height={height - 55}>
-        {/* <cg-canvas>
-          <SkiaComposition />
-        </cg-canvas> */}
         <cg-canvas>
-          {cursorRect && (
-            <cg-rect
-              fBottom={cursorRect.width + cursorRect.y}
-              fTop={cursorRect.y}
-              fLeft={cursorRect.x}
-              fRight={cursorRect.height + cursorRect.x}
-            />
-          )}
+          <cg-rect
+            fBottom={cursorRect?.width + cursorRect?.y ?? 0}
+            fTop={cursorRect?.y ?? 0}
+            fLeft={cursorRect?.x ?? 0}
+            fRight={cursorRect?.height + cursorRect?.x ?? 0}
+            paint={{ color: "#fff" }}
+          />
         </cg-canvas>
       </SkiaCanvas>
     </Wrapper>
