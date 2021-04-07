@@ -5,10 +5,15 @@
     "workspaces": [
         "app",
         "web",
+        "dev",
         "packages/**/*"
     ],
     "scripts": {
         "web": "yarn workspace web run dev",
         "app": "yarn workspace app run start"
+    },
+    "resolutions": {
+        "react": "^17.0.1",
+        "react-dom": "^17.0.1"
     }
 }
