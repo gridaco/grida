@@ -1,6 +1,5 @@
 import React from "react";
 import { Suspense, StrictMode } from "react";
-import App from "components/app";
 import { RecoilRoot } from "recoil";
 
 // enable SPA mode, supports react.Suspense; if you don't want to use Suspense, you can use NextJS' dynamic import instead. - on SSR mode
@@ -19,7 +18,10 @@ function BridgedRootWebApp() {
       <StrictMode>
         <Suspense fallback="Loading...">
           <RecoilRoot>
-            <App />
+            <div>
+              This project is under development please visit{" "}
+              <a href="https://nothing.app">nothign.app</a>
+            </div>
           </RecoilRoot>
         </Suspense>
       </StrictMode>
