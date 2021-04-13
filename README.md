@@ -2,8 +2,11 @@
 
 
 
-# Bridged (Bridged 2022 - opensource collaborative realtime ui editor)
+# Opensource Design Tool for the world.
+*For whom eager to create, design, develop and share with the world.*
 
+> **Bridged (Bridged 2022 - opensource collaborative realtime ui editor)**
+> 
 > an opensource wasm application explicitly designed for service application design/development
 
 - developer first
