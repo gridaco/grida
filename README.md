@@ -25,6 +25,12 @@ This project, A.K.A `Bridged Studiio` is under development with foundation techn
 
 
 
+## Docs
+
+Read the bridged usage docs [here](./docs)
+
+
+
 ## Workspace
 
 artboard workspace
