@@ -22,20 +22,26 @@ export function figmaPersonalAccessToken_safe(): string | undefined {
 const __FIGMA_PERSONAL_ACCESS_TOKEN_DANGER_LOCAL_DEV =
   "__NOT_SECURE_FIGMA_PERSONAL_ACCESS_TOKEN_DANGER_LOCAL_DEV";
 export function setFigmaPersonalAccessToken_LocalDev(token: string) {
-  window.localStorage.setItem(
-    __FIGMA_PERSONAL_ACCESS_TOKEN_DANGER_LOCAL_DEV,
-    token
-  );
+  if (process.browser) {
+    window.localStorage.setItem(
+      __FIGMA_PERSONAL_ACCESS_TOKEN_DANGER_LOCAL_DEV,
+      token
+    );
+  }
 }
 
 export function clearToken() {
-  window.localStorage.removeItem(
-    __FIGMA_PERSONAL_ACCESS_TOKEN_DANGER_LOCAL_DEV
-  );
+  if (process.browser) {
+    window.localStorage.removeItem(
+      __FIGMA_PERSONAL_ACCESS_TOKEN_DANGER_LOCAL_DEV
+    );
+  }
 }
 
 function _getFigmaPersonalAccessToken_LocalDev() {
-  return window.localStorage.getItem(
-    __FIGMA_PERSONAL_ACCESS_TOKEN_DANGER_LOCAL_DEV
-  );
+  if (process.browser) {
+    return window.localStorage.getItem(
+      __FIGMA_PERSONAL_ACCESS_TOKEN_DANGER_LOCAL_DEV
+    );
+  }
 }
