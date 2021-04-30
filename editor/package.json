@@ -10,7 +10,9 @@
   "dependencies": {
     "@emotion/react": "^11.1.5",
     "@emotion/styled": "^11.1.5",
+    "@material-ui/core": "^4.11.4",
     "cuid": "^2.1.8",
+    "idb": "^6.0.0",
     "next": "10.0.9",
     "react": "17.0.1",
     "react-dom": "17.0.1"

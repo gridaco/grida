@@ -1,91 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
 import styled from "@emotion/styled";
-import HierachyItem from "../components/hienrarchy-item";
-import HienrarchyItems from "../components/hienrarchy-items";
-import cuid from "cuid";
-
-type SceneType = "layout" | "text" | "icon" | "image";
-
-export interface Struct {
-  id: string;
-  title: string;
-  type: SceneType;
-  child?: Struct[];
-}
-
-const mockSceneStruct: Struct[] = [
-  {
-    id: cuid(),
-    title: "Horizontal List",
-    type: "layout",
-    child: [
-      {
-        id: cuid(),
-        title: "Component",
-        type: "layout",
-        child: [
-          {
-            id: cuid(),
-            title: "Layout",
-            type: "layout",
-            child: [
-              {
-                id: cuid(),
-                title: "Image",
-                type: "image",
-              },
-              {
-                id: cuid(),
-                title: "Icon Button",
-                type: "layout",
-              },
-            ],
-          },
-          {
-            id: cuid(),
-            title: "Text",
-            type: "text",
-          },
-        ],
-      },
-    ],
-  },
-  {
-    id: cuid(),
-    title: "Section",
-    type: "layout",
-    child: [
-      {
-        id: cuid(),
-        title: "Text",
-        type: "text",
-        child: [],
-      },
-      {
-        id: cuid(),
-        title: "Vertical List",
-        type: "layout",
-        child: [
-          {
-            id: cuid(),
-            title: "Component",
-            type: "layout",
-          },
-          {
-            id: cuid(),
-            title: "Component",
-            type: "layout",
-          },
-          {
-            id: cuid(),
-            title: "Component",
-            type: "layout",
-          },
-        ],
-      },
-    ],
-  },
-];
 
 function SceneExplorer() {
   const [expandIds, setExpandIds] = useState([]);
@@ -103,8 +17,8 @@ function SceneExplorer() {
     };
     try {
       reader.readAsText(e.target.files[0], "UTF-8");
-    } catch(e) {
-      console.error(`ERROR : import ( json ... + etc )\ndetail : ${e}`)
+    } catch (e) {
+      console.error(`ERROR : import ( json ... + etc )\ndetail : ${e}`);
     }
   };
 
@@ -121,11 +35,6 @@ function SceneExplorer() {
         <span>SCENE</span>
         <span onClick={() => fileInput.current.click()}>FILES</span>
       </div>
-      <HienrarchyItems
-        expandIds={expandIds}
-        struct={mockSceneStruct}
-        onExpand={onExpandStruct}
-      />
     </Wrapper>
   );
 }
