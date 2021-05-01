@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { figmacomp, canvas, code, runner } from "../../components";
 import dynamic from "next/dynamic";
-import { flutter } from "@designto.codes/core";
+import { flutter } from "@designto/codes";
 import { composeAppWithHome } from "@bridged.xyz/flutter-builder/dist/lib/composer";
 import { utils_dart } from "../../utils";
 import styled from "@emotion/styled";
