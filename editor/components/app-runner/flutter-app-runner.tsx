@@ -5,14 +5,35 @@ import {
 import { nanoid } from "nanoid";
 import { useEffect, useState } from "react";
 
+const MAX_URL_LENGTH = 2048;
+const DUE_TO_MAX_URL_LENGHT_THE_MAX_LENGTH_ACCEPTED_FOR_SRC = 1800;
+
 export function FlutterAppRunner(props: {
   q: FlutterFrameQuery;
   width: number;
   height: number;
 }) {
-  const frameUrl = buildFlutterFrameUrl(props.q);
+  const [frameUrl, setFrameUrl] = useState<string>();
 
-  return (
+  useEffect(() => {
+    if (
+      props.q.src.length > DUE_TO_MAX_URL_LENGHT_THE_MAX_LENGTH_ACCEPTED_FOR_SRC
+    ) {
+      const id = nanoid();
+      buildHostedSrcFrameUrl({
+        id: id,
+        src: props.q.src,
+      }).then((r) => {
+        setFrameUrl(r);
+      });
+    } else {
+      // use the efficient non-hosting option if possible
+      const _frameUrl = buildFlutterFrameUrl(props.q);
+      setFrameUrl(_frameUrl);
+    }
+  }, [props.q.src]);
+
+  return frameUrl ? (
     <iframe
       src={frameUrl}
       style={{
@@ -20,52 +41,23 @@ export function FlutterAppRunner(props: {
         height: props.height,
       }}
     />
-  );
-}
-
-///// run app using console
-///// leave this for future dev perpose
-
-function HostedFlutterAppRunner(props: {
-  q: {
-    src: string;
-  };
-}) {
-  const [frameUrl, setFrameUrl] = useState<string>();
-  const id = nanoid();
-  useEffect(() => {
-    buildUrlFromSrc({
-      id: id,
-      src: props.q.src,
-    }).then((r) => {
-      setFrameUrl(r);
-    });
-  }, []);
-
-  return frameUrl ? (
-    <>
-      <iframe src={frameUrl} />
-    </>
   ) : (
-    <></>
+    <>App is not ready</>
   );
 }
 
-import { buildConsoleQuicklookUrl } from "@bridged.xyz/base-sdk/dist/lib/projects/quicklook";
-import { types, hosting } from "@bridged.xyz/base-sdk";
+import { hosting } from "@bridged.xyz/base-sdk";
 
-async function buildUrlFromSrc(params: { id: string; src: string }) {
+async function buildHostedSrcFrameUrl(params: { id: string; src: string }) {
   const srcHosted = await hosting.upload({
     file: params.src,
     name: params.id,
   });
 
-  const url = buildConsoleQuicklookUrl({
-    id: params.id,
-    name: "example",
-    language: types.AppLanguage.dart,
-    framework: types.AppFramework.flutter,
-    url: srcHosted.url,
+  const url = buildFlutterFrameUrl({
+    mode: "url",
+    src: srcHosted.url,
+    language: "dart",
   });
 
   return url;
