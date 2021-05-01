@@ -6,4 +6,15 @@ const withTM = require("next-transpile-modules")([
   "@reflect-ui/detection",
 ]);
 
-module.exports = withTM();
+const withCSS = require("@zeit/next-css");
+module.exports = withTM(
+  withCSS({
+    webpack: (config) => {
+      config.node = {
+        fs: "empty",
+      };
+
+      return config;
+    },
+  })
+);

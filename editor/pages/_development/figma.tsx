@@ -4,7 +4,11 @@ import { figmacomp } from "../../components";
 import dynamic from "next/dynamic";
 
 // const MonacoEditor = dynamic(import("@monaco-editor/react"), { ssr: false });
-import MonacoEditor from "@monaco-editor/react";
+// import MonacoEditor from "@monaco-editor/react";
+// import { UnControlled as CodeMirror } from "react-codemirror2";
+const CodeWithCodemirror = dynamic(import("../../components/code-mirror"), {
+  ssr: false,
+});
 
 // const DynamicComponentWithNoSSR = dynamic(
 //   () => import("@monaco-editor/react"),
@@ -15,22 +19,12 @@ export default function FigmaDeveloperPage() {
   return (
     <>
       <figmacomp.FigmaScreenImporter />
-      {/* <DynamicComponentWithNoSSR
-        width={500}
-        height={800}
-        defaultLanguage="javascript"
-        defaultValue="// some comment"
-        onMount={(d) => {
-          console.log("d", d);
-        }}
-      /> */}
-      <MonacoEditor
-        language="dart"
-        theme="vs-dark"
-        value={"//source"}
-        options={{ unusualLineTerminators: "off" }}
-        onChange={(value: string) => {
-          // editingSource = value;
+      <CodeWithCodemirror
+        value="console.log(0, d);"
+        options={{
+          mode: "javascript",
+          theme: "monokai",
+          lineNumbers: true,
         }}
       />
     </>
