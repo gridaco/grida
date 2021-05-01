@@ -20,12 +20,14 @@ export default function CodeMirror(props: IUnControlledCodeMirror) {
     <div
       style={{
         height: "100vh",
+        width: "50vw",
+        overflow: "scroll",
       }}
     >
       <_CodeMirror
         {...props}
         editorDidMount={(editor: codemirror.Editor) => {
-          editor.setSize("", "100%");
+          editor.setSize("50%", "100%");
         }}
       />
     </div>

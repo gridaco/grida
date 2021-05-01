@@ -2,14 +2,25 @@ import {
   buildFlutterFrameUrl,
   FlutterFrameQuery,
 } from "@bridged.xyz/base-sdk/dist/lib/frame-embed";
-
 import { nanoid } from "nanoid";
 import { useEffect, useState } from "react";
 
-export function FlutterAppRunner(props: { q: FlutterFrameQuery }) {
+export function FlutterAppRunner(props: {
+  q: FlutterFrameQuery;
+  width: number;
+  height: number;
+}) {
   const frameUrl = buildFlutterFrameUrl(props.q);
 
-  return <iframe src={frameUrl} />;
+  return (
+    <iframe
+      src={frameUrl}
+      style={{
+        width: props.width,
+        height: props.height,
+      }}
+    />
+  );
 }
 
 ///// run app using console

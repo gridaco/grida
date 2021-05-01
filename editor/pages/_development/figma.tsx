@@ -56,6 +56,8 @@ export default function FigmaDeveloperPage() {
               mode: "content",
               language: "dart",
             }}
+            width={375}
+            height={812}
           />
         )}
       </ContentWrap>
@@ -66,4 +68,5 @@ export default function FigmaDeveloperPage() {
 const ContentWrap = styled.div`
   display: flex;
   flex-direction: row;
+  align-items: stretch;
 `;
