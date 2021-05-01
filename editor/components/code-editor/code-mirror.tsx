@@ -27,7 +27,7 @@ export default function CodeMirror(props: IUnControlledCodeMirror) {
       <_CodeMirror
         {...props}
         editorDidMount={(editor: codemirror.Editor) => {
-          editor.setSize("50%", "100%");
+          editor.setSize("100%", "100%");
         }}
       />
     </div>

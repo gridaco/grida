@@ -4,8 +4,26 @@ import { TextField } from "@material-ui/core";
 import { utils_figma } from "../../utils";
 import { convert } from "@bridged.xyz/design-sdk";
 import { mapFigmaRemoteToFigma } from "@bridged.xyz/design-sdk/lib/figma-remote/mapper";
-import { flutter } from "@designto.codes/core";
 import { ReflectSceneNode } from "@bridged.xyz/design-sdk/lib/nodes";
+import { utils } from "@bridged.xyz/design-sdk";
+
+export type OnImportedCallback = (reflect: ReflectSceneNode) => void;
+
+async function fetchTarget(file: string, node: string) {
+  const client = FigmaApi.Client({
+    personalAccessToken: utils_figma.figmaPersonalAccessToken(),
+  });
+
+  const nodesRes = await client.fileNodes(file, {
+    ids: [node],
+  });
+  const nodes = nodesRes.data.nodes;
+
+  const demoEntryNode = nodes[node];
+
+  return demoEntryNode.document;
+}
+
 async function fetchDemo() {
   const _nid = utils_figma.FIGMA_BRIDGED_DEMO_APP_ENTRY_NODE_ID;
   const client = FigmaApi.Client({
@@ -26,19 +44,13 @@ async function fetchDemo() {
   return demoEntryNode.document;
 }
 
-export function FigmaScreenImporter(props: {
-  onImported: (reflect: ReflectSceneNode) => void;
-}) {
+export function FigmaScreenImporter(props: { onImported: OnImportedCallback }) {
   const [reflect, setReflect] = useState<ReflectSceneNode>();
 
-  useEffect(() => {
-    fetchDemo().then((d) => {
-      // it's okay to force cast here. since the typings are the same (following official figma remote api spec)
-      const smi = mapFigmaRemoteToFigma(d as any);
-      const cvted = convert.intoReflectNode(smi);
-      setReflect(cvted);
-    });
-  }, []);
+  const handleLocalDataLoad = (d: ReflectSceneNode) => {
+    setReflect(d);
+  };
+
   return (
     <>
       {reflect ? (
@@ -49,12 +61,64 @@ export function FigmaScreenImporter(props: {
               props.onImported(reflect);
             }}
           >
-            use this
+            use loaded node "{reflect.name}"
           </button>
         </>
       ) : (
-        <>NO DESIGN LOADED</>
+        <>
+          <_DefaultImporterSegment onImported={handleLocalDataLoad} />
+          <_UrlImporterSegment onImported={handleLocalDataLoad} />
+        </>
       )}
     </>
+  );
+}
+
+function _DefaultImporterSegment(props: { onImported: OnImportedCallback }) {
+  const handleOnLoadDefaultDesignClick = () => {
+    fetchDemo().then((d) => {
+      // it's okay to force cast here. since the typings are the same (following official figma remote api spec)
+      const smi = mapFigmaRemoteToFigma(d as any);
+      const cvted = convert.intoReflectNode(smi);
+      props.onImported(cvted);
+    });
+  };
+
+  return (
+    <button
+      onClick={() => {
+        handleOnLoadDefaultDesignClick();
+      }}
+    >
+      Load default design
+    </button>
+  );
+}
+
+function _UrlImporterSegment(props: { onImported: OnImportedCallback }) {
+  const handleEnter = () => {
+    const q = utils.figmaApi.parseFileAndNodeIdFromUrl_Figma(urlInput);
+    fetchTarget(q.file, q.node).then((d) => {
+      const smi = mapFigmaRemoteToFigma(d as any);
+      const cvted = convert.intoReflectNode(smi);
+      props.onImported(cvted);
+    });
+  };
+
+  let urlInput: string;
+  return (
+    <div>
+      <p>you must have access to the target file</p>
+      <input
+        onChange={(e) => {
+          urlInput = e.target.value;
+        }}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") {
+            handleEnter();
+          }
+        }}
+      />
+    </div>
   );
 }
