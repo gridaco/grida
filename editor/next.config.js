@@ -1,5 +1,8 @@
 const withTM = require("next-transpile-modules")([
-  "@designto/codes",
+  "@designto/code",
+  "@designto/token",
+  "@designto/flutter",
+  "@designto/react",
   "@bridged.xyz/flutter-builder",
   "@bridged.xyz/design-sdk",
   "@reflect-ui/core",
