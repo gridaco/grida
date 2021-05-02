@@ -9,7 +9,7 @@
   },
   "dependencies": {
     "@babel/runtime": "^7.14.0",
-    "@designto/codes": "0.0.1",
+    "@designto/code": "0.0.1",
     "@emotion/react": "^11.1.5",
     "@emotion/styled": "^11.1.5",
     "@material-ui/core": "^4.11.4",
