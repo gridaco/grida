@@ -1,11 +1,9 @@
 import React, { useEffect, useState } from "react";
-import * as FigmaApi from "figma-js";
-import { TextField } from "@material-ui/core";
+import { api } from "@bridged.xyz/design-sdk/lib/figma-remote";
 import { utils_figma } from "../../utils";
-import { convert } from "@bridged.xyz/design-sdk";
+import { utils, convert } from "@bridged.xyz/design-sdk";
 import { mapFigmaRemoteToFigma } from "@bridged.xyz/design-sdk/lib/figma-remote/mapper";
 import { ReflectSceneNode } from "@bridged.xyz/design-sdk/lib/nodes";
-import { utils } from "@bridged.xyz/design-sdk";
 import { UserInputCache } from "../../utils/user-input-value-cache";
 import * as figrem from "@bridged.xyz/design-sdk/lib/figma-remote/types";
 
@@ -13,7 +11,7 @@ export type OnImportedCallback = (reflect: ReflectSceneNode) => void;
 type _OnRemoteLoadedCallback = (reflect: figrem.Node) => void;
 
 async function fetchTarget(file: string, node: string) {
-  const client = FigmaApi.Client({
+  const client = api.Client({
     personalAccessToken: utils_figma.figmaPersonalAccessToken(),
   });
 
@@ -29,7 +27,7 @@ async function fetchTarget(file: string, node: string) {
 
 async function fetchDemo() {
   const _nid = utils_figma.FIGMA_BRIDGED_DEMO_APP_ENTRY_NODE_ID;
-  const client = FigmaApi.Client({
+  const client = api.Client({
     personalAccessToken: utils_figma.figmaPersonalAccessToken(),
   });
 
