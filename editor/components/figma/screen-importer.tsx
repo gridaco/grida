@@ -6,8 +6,11 @@ import { convert } from "@bridged.xyz/design-sdk";
 import { mapFigmaRemoteToFigma } from "@bridged.xyz/design-sdk/lib/figma-remote/mapper";
 import { ReflectSceneNode } from "@bridged.xyz/design-sdk/lib/nodes";
 import { utils } from "@bridged.xyz/design-sdk";
+import { UserInputCache } from "../../utils/user-input-value-cache";
+import * as figrem from "@bridged.xyz/design-sdk/lib/figma-remote/types";
 
 export type OnImportedCallback = (reflect: ReflectSceneNode) => void;
+type _OnRemoteLoadedCallback = (reflect: figrem.Node) => void;
 
 async function fetchTarget(file: string, node: string) {
   const client = FigmaApi.Client({
@@ -47,8 +50,13 @@ async function fetchDemo() {
 export function FigmaScreenImporter(props: { onImported: OnImportedCallback }) {
   const [reflect, setReflect] = useState<ReflectSceneNode>();
 
-  const handleLocalDataLoad = (d: ReflectSceneNode) => {
-    setReflect(d);
+  const handleLocalDataLoad = (d: figrem.Node) => {
+    console.log("api raw", d);
+    const _mapped = mapFigmaRemoteToFigma(d as any);
+    console.log("mapped", _mapped);
+    const _converted = convert.intoReflectNode(_mapped);
+    console.log("converted", _converted);
+    setReflect(_converted);
   };
 
   return (
@@ -58,6 +66,7 @@ export function FigmaScreenImporter(props: { onImported: OnImportedCallback }) {
           {reflect.name}{" "}
           <button
             onClick={() => {
+              console.log(`using reflect node "${reflect.name}"`, reflect);
               props.onImported(reflect);
             }}
           >
@@ -66,21 +75,19 @@ export function FigmaScreenImporter(props: { onImported: OnImportedCallback }) {
         </>
       ) : (
         <>
-          <_DefaultImporterSegment onImported={handleLocalDataLoad} />
-          <_UrlImporterSegment onImported={handleLocalDataLoad} />
+          <_DefaultImporterSegment onLoaded={handleLocalDataLoad} />
+          <_UrlImporterSegment onLoaded={handleLocalDataLoad} />
         </>
       )}
     </>
   );
 }
 
-function _DefaultImporterSegment(props: { onImported: OnImportedCallback }) {
+function _DefaultImporterSegment(props: { onLoaded: _OnRemoteLoadedCallback }) {
   const handleOnLoadDefaultDesignClick = () => {
     fetchDemo().then((d) => {
       // it's okay to force cast here. since the typings are the same (following official figma remote api spec)
-      const smi = mapFigmaRemoteToFigma(d as any);
-      const cvted = convert.intoReflectNode(smi);
-      props.onImported(cvted);
+      props.onLoaded(d as figrem.Node);
     });
   };
 
@@ -95,21 +102,26 @@ function _DefaultImporterSegment(props: { onImported: OnImportedCallback }) {
   );
 }
 
-function _UrlImporterSegment(props: { onImported: OnImportedCallback }) {
+const _FIGMA_FILE_URL_IMPORT_INPUT_CACHE_KEY =
+  "_FIGMA_FILE_URL_IMPORT_INPUT_CACHE_KEY";
+function _UrlImporterSegment(props: { onLoaded: _OnRemoteLoadedCallback }) {
+  let urlInput: string = UserInputCache.load(
+    _FIGMA_FILE_URL_IMPORT_INPUT_CACHE_KEY
+  );
+
   const handleEnter = () => {
+    UserInputCache.set(_FIGMA_FILE_URL_IMPORT_INPUT_CACHE_KEY, urlInput);
     const q = utils.figmaApi.parseFileAndNodeIdFromUrl_Figma(urlInput);
     fetchTarget(q.file, q.node).then((d) => {
-      const smi = mapFigmaRemoteToFigma(d as any);
-      const cvted = convert.intoReflectNode(smi);
-      props.onImported(cvted);
+      props.onLoaded(d as figrem.Node);
     });
   };
 
-  let urlInput: string;
   return (
     <div>
       <p>you must have access to the target file</p>
       <input
+        defaultValue={urlInput}
         onChange={(e) => {
           urlInput = e.target.value;
         }}
