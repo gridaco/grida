@@ -8,6 +8,11 @@ import { features, types, hosting } from "@bridged.xyz/base-sdk";
 import { ReflectSceneNode } from "@design-sdk/core/nodes";
 import { utils_dart } from "../../utils";
 import { nanoid } from "nanoid";
+import { MainImageRepository } from "@design-sdk/core/assets-repository";
+import { ImageRepositories } from "@design-sdk/figma/asset-repository";
+
+// set image repo for figma platform
+MainImageRepository.instance = new ImageRepositories();
 
 const CodemirrorEditor = dynamic(
   import("../../components/code-editor/code-mirror"),
