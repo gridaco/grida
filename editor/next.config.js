@@ -5,7 +5,10 @@ const withTM = require("next-transpile-modules")([
   "@designto/web",
   "@designto/react",
   "@bridged.xyz/flutter-builder",
-  "@bridged.xyz/design-sdk",
+  "@design-sdk/core",
+  "@design-sdk/universal",
+  "@design-sdk/figma",
+  "@design-sdk/sketch",
   "@reflect-ui/core",
   "@reflect-ui/detection",
 ]);

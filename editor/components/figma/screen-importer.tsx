@@ -1,17 +1,14 @@
-import React, { useEffect, useState } from "react";
-import { api } from "@bridged.xyz/design-sdk/lib/figma-remote";
+import React, { useState } from "react";
+import { remote, utils, nodes } from "@design-sdk/figma";
+import { convert } from "@design-sdk/figma";
 import { utils_figma } from "../../utils";
-import { utils, convert } from "@bridged.xyz/design-sdk";
-import { mapFigmaRemoteToFigma } from "@bridged.xyz/design-sdk/lib/figma-remote/mapper";
-import { ReflectSceneNode } from "@bridged.xyz/design-sdk/lib/nodes";
 import { UserInputCache } from "../../utils/user-input-value-cache";
-import * as figrem from "@bridged.xyz/design-sdk/lib/figma-remote/types";
 
-export type OnImportedCallback = (reflect: ReflectSceneNode) => void;
-type _OnRemoteLoadedCallback = (reflect: figrem.Node) => void;
+export type OnImportedCallback = (reflect: nodes.ReflectSceneNode) => void;
+type _OnRemoteLoadedCallback = (reflect: remote.types.Node) => void;
 
 async function fetchTarget(file: string, node: string) {
-  const client = api.Client({
+  const client = remote.api.Client({
     personalAccessToken: utils_figma.figmaPersonalAccessToken(),
   });
 
@@ -27,7 +24,7 @@ async function fetchTarget(file: string, node: string) {
 
 async function fetchDemo() {
   const _nid = utils_figma.FIGMA_BRIDGED_DEMO_APP_ENTRY_NODE_ID;
-  const client = api.Client({
+  const client = remote.api.Client({
     personalAccessToken: utils_figma.figmaPersonalAccessToken(),
   });
 
@@ -46,11 +43,11 @@ async function fetchDemo() {
 }
 
 export function FigmaScreenImporter(props: { onImported: OnImportedCallback }) {
-  const [reflect, setReflect] = useState<ReflectSceneNode>();
+  const [reflect, setReflect] = useState<nodes.ReflectSceneNode>();
 
-  const handleLocalDataLoad = (d: figrem.Node) => {
+  const handleLocalDataLoad = (d: remote.types.Node) => {
     console.log("api raw", d);
-    const _mapped = mapFigmaRemoteToFigma(d as any);
+    const _mapped = remote.mapper.mapFigmaRemoteToFigma(d as any);
     console.log("mapped", _mapped);
     const _converted = convert.intoReflectNode(_mapped);
     console.log("converted", _converted);
@@ -85,7 +82,7 @@ function _DefaultImporterSegment(props: { onLoaded: _OnRemoteLoadedCallback }) {
   const handleOnLoadDefaultDesignClick = () => {
     fetchDemo().then((d) => {
       // it's okay to force cast here. since the typings are the same (following official figma remote api spec)
-      props.onLoaded(d as figrem.Node);
+      props.onLoaded(d as remote.types.Node);
     });
   };
 
@@ -111,7 +108,7 @@ function _UrlImporterSegment(props: { onLoaded: _OnRemoteLoadedCallback }) {
     UserInputCache.set(_FIGMA_FILE_URL_IMPORT_INPUT_CACHE_KEY, urlInput);
     const q = utils.figmaApi.parseFileAndNodeIdFromUrl_Figma(urlInput);
     fetchTarget(q.file, q.node).then((d) => {
-      props.onLoaded(d as figrem.Node);
+      props.onLoaded(d as remote.types.Node);
     });
   };
 

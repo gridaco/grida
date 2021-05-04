@@ -1,13 +1,18 @@
-import React, { useEffect, useState } from "react";
-import { figmacomp, canvas, code, runner } from "../../components";
 import dynamic from "next/dynamic";
-import { flutter } from "@designto/code";
-import { composeAppWithHome } from "@bridged.xyz/flutter-builder/dist/lib/composer";
-import { utils_dart } from "../../utils";
+import React, { useEffect, useState } from "react";
 import styled from "@emotion/styled";
+import { figmacomp, canvas, runner } from "../../components";
+import { flutter } from "@designto/code";
+import { composeAppWithHome } from "@bridged.xyz/flutter-builder";
 import { features, types, hosting } from "@bridged.xyz/base-sdk";
-import { ReflectSceneNode } from "@bridged.xyz/design-sdk/lib/nodes";
+import { ReflectSceneNode } from "@design-sdk/core/nodes";
+import { utils_dart } from "../../utils";
 import { nanoid } from "nanoid";
+import { MainImageRepository } from "@design-sdk/core/assets-repository";
+import { ImageRepositories } from "@design-sdk/figma/asset-repository";
+
+// set image repo for figma platform
+MainImageRepository.instance = new ImageRepositories();
 
 const CodemirrorEditor = dynamic(
   import("../../components/code-editor/code-mirror"),
