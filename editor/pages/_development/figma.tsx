@@ -5,8 +5,10 @@ import { flutter } from "@designto/code";
 import { composeAppWithHome } from "@bridged.xyz/flutter-builder/dist/lib/composer";
 import { utils_dart } from "../../utils";
 import styled from "@emotion/styled";
-
+import { features, types, hosting } from "@bridged.xyz/base-sdk";
 import { ReflectSceneNode } from "@bridged.xyz/design-sdk/lib/nodes";
+import { nanoid } from "nanoid";
+
 const CodemirrorEditor = dynamic(
   import("../../components/code-editor/code-mirror"),
   {
@@ -50,15 +52,40 @@ export default function FigmaDeveloperPage() {
           }}
         />
         {widgetCode && (
-          <runner.FlutterAppRunner
-            q={{
-              src: rootAppCode,
-              mode: "content",
-              language: "dart",
-            }}
-            width={375}
-            height={812}
-          />
+          <>
+            <runner.FlutterAppRunner
+              q={{
+                src: rootAppCode,
+                mode: "content",
+                language: "dart",
+              }}
+              width={375}
+              height={812}
+            />
+            <br />
+            <button
+              onClick={() => {
+                const _name = "fluttercodefromdesigntocode";
+                hosting
+                  .upload({
+                    file: rootAppCode,
+                    name: `${_name}.dart`,
+                  })
+                  .then((r) => {
+                    const qlurl = features.quicklook.buildConsoleQuicklookUrl({
+                      id: nanoid(),
+                      framework: types.AppFramework.flutter,
+                      language: types.AppLanguage.dart,
+                      url: r.url,
+                      name: _name,
+                    });
+                    open(qlurl);
+                  });
+              }}
+            >
+              open in console
+            </button>
+          </>
         )}
       </ContentWrap>
     </>
