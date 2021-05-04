@@ -52,7 +52,7 @@ export default function FigmaDeveloperPage() {
           }}
         />
         {widgetCode && (
-          <>
+          <div>
             <runner.FlutterAppRunner
               q={{
                 src: rootAppCode,
@@ -85,7 +85,7 @@ export default function FigmaDeveloperPage() {
             >
               open in console
             </button>
-          </>
+          </div>
         )}
       </ContentWrap>
     </>
