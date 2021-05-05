@@ -28,6 +28,7 @@ export default function FigmaToReflectWidgetTokenPage() {
         onImported={handleOnDesignImported}
         onUrlEnter={handleFigmaUrlEnter}
       />
+
       <JSONTree hideRoot data={tokenTree} />
     </>
   );
