@@ -15,6 +15,20 @@ function MyApp({ Component, pageProps }) {
             font-family: "Roboto", sans-serif;
             background-color: #181a22;
           }
+
+          h1,
+          h2,
+          h3,
+          h4,
+          h5,
+          h6,
+          p {
+            color: white;
+          }
+
+          a {
+            color: grey;
+          }
         `}
       />
       <Head>
