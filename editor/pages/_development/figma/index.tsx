@@ -12,6 +12,10 @@ export default function FigmaDemoIndexPage() {
       <Link href="./figma/to-flutter">Flutter demo</Link>
       <br />
       <Link href="./figma/to-react">React demo</Link>
+      <br />
+      <Link href="./figma/to-reflect">Figma To Reflect Design Nodes</Link>
+      <br />
+      <Link href="./figma/to-token">Figma design to Reflect Widget Tokens</Link>
     </>
   );
 }
