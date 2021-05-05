@@ -118,6 +118,24 @@ const App = ({ Component, pageProps }: AppProps) => {
         <meta property="og:url" content={SEO_DEFAULTS.og.url} />
         <meta property="og:image" content={SEO_DEFAULTS.og.image} />
 
+        {/* region Google analytics */}
+        {/* https://stackoverflow.com/a/62552263 */}
+        <script
+          async
+          src="https://www.googletagmanager.com/gtag/js?id=UA-196372205-1"
+        />
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+            window.dataLayer = window.dataLayer || [];
+            function gtag(){dataLayer.push(arguments);}
+            gtag('js', new Date());
+            gtag('config', 'UA-196372205-1');
+        `,
+          }}
+        />
+        {/* end region */}
+
         <link rel="icon" href="/favicon.png" />
       </Head>
       <Box
