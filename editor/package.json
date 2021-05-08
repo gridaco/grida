@@ -19,6 +19,7 @@
     "@visx/hierarchy": "^1.7.0",
     "@visx/shape": "^1.8.0",
     "codemirror": "^5.61.0",
+    "codesandbox": "^2.2.3",
     "cuid": "^2.1.8",
     "dart-style": "^1.3.2-dev",
     "idb": "^6.0.0",
@@ -26,7 +27,8 @@
     "react": "17.0.1",
     "react-codemirror2": "^7.2.1",
     "react-dom": "17.0.1",
-    "react-json-tree": "^0.15.0"
+    "react-json-tree": "^0.15.0",
+    "recoil": "^0.2.0"
   },
   "devDependencies": {
     "@babel/core": "^7.14.0",

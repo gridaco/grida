@@ -4,13 +4,16 @@ const withTM = require("next-transpile-modules")([
   "@designto/flutter",
   "@designto/web",
   "@designto/react",
-  "@bridged.xyz/flutter-builder",
   "@design-sdk/core",
   "@design-sdk/universal",
   "@design-sdk/figma",
   "@design-sdk/sketch",
   "@reflect-ui/core",
   "@reflect-ui/detection",
+  "@bridged.xyz/flutter-builder",
+  "@coli.codes/web-builder",
+  "@coli.codes/web-builder-core",
+  "@coli.codes/react-builder",
 ]);
 
 const withCSS = require("@zeit/next-css");

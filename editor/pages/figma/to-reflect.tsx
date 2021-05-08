@@ -1,9 +1,9 @@
 import React, { useState } from "react";
-import { figmacomp, canvas } from "../../../components";
+import { figmacomp, canvas } from "../../components";
 import { ReflectSceneNode } from "@design-sdk/core/nodes";
 import JSONTree from "react-json-tree";
 
-import { visualize_node } from "../../../components/visualization";
+import { visualize_node } from "../../components/visualization";
 
 export default function FigmaToReflectNodePage() {
   const [reflect, setReflect] = useState<ReflectSceneNode>();

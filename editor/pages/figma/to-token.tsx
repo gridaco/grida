@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { figmacomp, canvas } from "../../../components";
+import { figmacomp, canvas } from "../../components";
 import { ReflectSceneNode } from "@design-sdk/core/nodes";
 import JSONTree from "react-json-tree";
 import { tokenize } from "@designto/token";
