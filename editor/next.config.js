@@ -10,10 +10,14 @@ const withTM = require("next-transpile-modules")([
   "@design-sdk/sketch",
   "@reflect-ui/core",
   "@reflect-ui/detection",
-  "@bridged.xyz/flutter-builder",
+
+  // region coli
+  "coli",
   "@coli.codes/web-builder",
   "@coli.codes/web-builder-core",
   "@coli.codes/react-builder",
+  "@bridged.xyz/flutter-builder",
+  // endregion coli
 ]);
 
 const withCSS = require("@zeit/next-css");

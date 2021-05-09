@@ -16,9 +16,14 @@ export function CodeSandBoxView(props: { source: string }) {
       files: {
         "index.js": {
           content: props.source,
-          isBinary: true,
+          isBinary: false,
         },
+        // "package.json": {
+        //   content: "",
+        //   isBinary: false,
+        // },
       },
+      template: "create-react-app-typescript",
     });
 
     const {

@@ -35,10 +35,11 @@ export default function FigmaToReactDemoPage() {
   if (reflect) {
     const _reflectWidget = tokenize(reflect);
     const _reactWidget = react.buildReactWidget(_reflectWidget);
-    console.log("_reactWidget", _reactWidget);
+    const _stringfiedReactwidget = react.buildReactApp(_reactWidget, {
+      template: "cra",
+    });
 
-    // todo
-    widgetCode = JSON.stringify(_reactWidget);
+    widgetCode = _stringfiedReactwidget;
   }
 
   return (
@@ -56,7 +57,7 @@ export default function FigmaToReactDemoPage() {
               : "// No input design provided to be converted.."
           }
           options={{
-            mode: "dart",
+            mode: "javascript",
             theme: "monokai",
             lineNumbers: true,
           }}
