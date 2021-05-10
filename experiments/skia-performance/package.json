@@ -2,9 +2,7 @@
     "name": "@labs.bridged.xyz/skia-performance",
     "private": false,
     "dependencies": {
-        "canvaskit-wasm": "0.25.1"
+        "canvaskit-wasm": "0.25.0"
     },
-    "devDependencies": {
-        "@types/canvaskit-wasm": "0.9.0"
-    }
+    "devDependencies": {}
 }

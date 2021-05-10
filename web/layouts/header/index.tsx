@@ -1,10 +1,10 @@
 import React from "react";
 import styled from "@emotion/styled";
 import { selector, useRecoilState, useSetRecoilState } from "recoil";
-import { currentSelectedIdState, structState } from "state/demo";
+import { currentInsetLayer, currentSelectedIdState, structState } from "state/demo";
 import { Struct } from "../../../packages/editor-ui/lib";
 
-const ButtonVariant = ["Frame", "Rect", "Circle", "Text"];
+const ButtonVariant = ["insert-frame", "insert-rect", "insert-circle", "insert-text"];
 
 const addSturctObjectUseId = (
   id: string,
@@ -63,11 +63,12 @@ const structStateSelector = selector({
 
 function Header() {
   const setSturct = useSetRecoilState(structStateSelector);
-
+  const setLayer = useSetRecoilState(currentInsetLayer);
+  
   return (
     <Wrapper>
-      {ButtonVariant.map((i) => (
-        <button onClick={() => setSturct(i)}>{i}</button>
+      {ButtonVariant.map((i : string) => (
+        <button onClick={() => setLayer(i)}>{i}</button>
       ))}
     </Wrapper>
   );

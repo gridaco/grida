@@ -1,10 +1,10 @@
-import React from "react";
+import React, { memo } from "react";
 import styled from "@emotion/styled";
 import Hirachy from "../../../packages/editor-ui/lib/hirachy/hirachy";
 import { useRecoilState, useRecoilValue } from "recoil";
 import { currentSelectedIdState, structState } from "state/demo";
 
-function Menubar() {
+export default memo(function Menubar() {
   const [selectId, setSelectId] = useRecoilState(currentSelectedIdState);
   const struct = useRecoilValue(structState);
 
@@ -19,9 +19,7 @@ function Menubar() {
       </div>
     </Wrapper>
   );
-}
-
-export default Menubar;
+})
 
 const Wrapper = styled.div`
   display: flex;
