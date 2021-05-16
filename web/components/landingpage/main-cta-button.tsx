@@ -8,12 +8,12 @@ import { useCookies } from "react-cookie";
 const COOKIE_ACCESS_TOKEN_KEY = "_token";
 
 export default function LandingMainCtaButton() {
-  const [cookie, ] = useCookies([COOKIE_ACCESS_TOKEN_KEY]);
+  const [cookie] = useCookies([COOKIE_ACCESS_TOKEN_KEY]);
   const handleCta = () => {
     if (cookie[COOKIE_ACCESS_TOKEN_KEY] != null) {
       window.location.href = "/docs/getting-started";
     } else {
-      window.location.href = URLS.landing.signup;
+      window.location.href = URLS.landing.signup_with_return;
     }
   };
   return (

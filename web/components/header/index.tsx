@@ -41,7 +41,7 @@ const Header = () => {
     if (cookie[COOKIE_ACCESS_TOKEN_KEY] != null) {
       window.location.href = URLS.landing.try_the_demo_1;
     } else {
-      window.location.href = URLS.landing.signup;
+      window.location.href = URLS.landing.signup_with_return;
     }
   };
 
