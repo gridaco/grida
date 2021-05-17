@@ -5,6 +5,10 @@ import { motion } from "framer-motion";
 import { URLS } from "utils/landingpage/constants";
 import { useCookies } from "react-cookie";
 
+/**
+ * DO NOT CHANGE KEY - this key is set by accounts.bridged.xyz
+ * @todo - change key value. the key value is not managed and Ambiguous.
+ */
 const COOKIE_ACCESS_TOKEN_KEY = "_token";
 
 export default function LandingMainCtaButton() {

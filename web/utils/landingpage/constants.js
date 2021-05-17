@@ -1,16 +1,22 @@
 const MVP_SIGNUP_TYPEFORM_URL = "https://woojooj.typeform.com/to/uyTSms5Q";
 
-function redirect_uri() {
+function signup_callback_redirect_uri() {
   const LOCAL = "http://localhost:3000/";
   const PRODUCT = "https://bridged.xyz/";
   return process.env.NODE_ENV !== "production" ? LOCAL : PRODUCT;
 }
 
 export const LandingpageUrls = {
-  signin: `https://accounts.bridged.xyz/signin?redirect_uri=${redirect_uri()}`,
+  /**
+   * return to home after signin
+   */
+  signin_with_return: `https://accounts.bridged.xyz/signin?redirect_uri=${signup_callback_redirect_uri()}`,
 
   // todo region swap sign up when ready
-  signup_with_return: `https://accounts.bridged.xyz/signup?redirect_uri=${redirect_uri()}`,
+  /**
+   * return to home after signup
+   */
+  signup_with_return: `https://accounts.bridged.xyz/signup?redirect_uri=${signup_callback_redirect_uri()}`,
   signup: "https://accounts.bridged.xyz/signup",
   // todo endregion swap sign up when ready
 
