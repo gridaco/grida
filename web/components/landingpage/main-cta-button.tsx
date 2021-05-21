@@ -5,15 +5,19 @@ import { motion } from "framer-motion";
 import { URLS } from "utils/landingpage/constants";
 import { useCookies } from "react-cookie";
 
+/**
+ * DO NOT CHANGE KEY - this key is set by accounts.bridged.xyz
+ * @todo - change key value. the key value is not managed and Ambiguous.
+ */
 const COOKIE_ACCESS_TOKEN_KEY = "_token";
 
 export default function LandingMainCtaButton() {
-  const [cookie, ] = useCookies([COOKIE_ACCESS_TOKEN_KEY]);
+  const [cookie] = useCookies([COOKIE_ACCESS_TOKEN_KEY]);
   const handleCta = () => {
     if (cookie[COOKIE_ACCESS_TOKEN_KEY] != null) {
       window.location.href = "/docs/getting-started";
     } else {
-      window.location.href = URLS.landing.signup;
+      window.location.href = URLS.landing.signup_with_return;
     }
   };
   return (

@@ -12,12 +12,16 @@ import { media } from "utils/styled/media";
 import { useCookies } from "react-cookie";
 import { useRouter } from "next/router";
 
-const COOKIE_ACCESS_TOKEN_KEY = "_token";
+/**
+ * DO NOT CHANGE KEY - this key is set by accounts.bridged.xyz
+ * @todo - change key value. the key value is not managed and Ambiguous.
+ */
+const ACCESS_TOKEN_KEY = "_token";
 
 const Header = () => {
   const [currentExpandHeader, setCurrentExpandHeader] = useState("");
   const [isOpenMenu, setIsOpenMenu] = useState(false);
-  const [cookie, setCookie] = useCookies([COOKIE_ACCESS_TOKEN_KEY]);
+  const [cookie, setCookie] = useCookies([ACCESS_TOKEN_KEY]);
   const [currentRouter, setCurrentRouter] = useState("");
   const router = useRouter();
   useEffect(() => {
@@ -38,18 +42,18 @@ const Header = () => {
   );
 
   const handleSignupClick = () => {
-    if (cookie[COOKIE_ACCESS_TOKEN_KEY] != null) {
+    if (cookie[ACCESS_TOKEN_KEY] != null) {
       window.location.href = URLS.landing.try_the_demo_1;
     } else {
-      window.location.href = URLS.landing.signup;
+      window.location.href = URLS.landing.signup_with_return;
     }
   };
 
   const handleSigninClick = () => {
-    if (cookie[COOKIE_ACCESS_TOKEN_KEY] != null) {
+    if (cookie[ACCESS_TOKEN_KEY] != null) {
       window.location.href = URLS.landing.try_the_demo_1;
     } else {
-      !isOpenMenu && (window.location.href = URLS.landing.signin);
+      !isOpenMenu && (window.location.href = URLS.landing.signin_with_return);
     }
   };
 
@@ -130,9 +134,7 @@ const Header = () => {
           p={["6px 10px", "6px 10px", "9px 20px", "9px 20px"]}
           variant="noShadow"
         >
-          {cookie[COOKIE_ACCESS_TOKEN_KEY] != null
-            ? "Go to console"
-            : "Sign up"}
+          {cookie[ACCESS_TOKEN_KEY] != null ? "Go to console" : "Sign up"}
         </SignupButton>
       </Flex>
 
@@ -185,9 +187,9 @@ const Header = () => {
               height="35px"
               fontSize="13px"
               mb="12px"
-              disabled={cookie[COOKIE_ACCESS_TOKEN_KEY] != null}
+              disabled={cookie[ACCESS_TOKEN_KEY] != null}
               style={{
-                opacity: cookie[COOKIE_ACCESS_TOKEN_KEY] != null ? 0 : 1,
+                opacity: cookie[ACCESS_TOKEN_KEY] != null ? 0 : 1,
               }}
               onClick={handleSignupClick}
             >
@@ -203,7 +205,7 @@ const Header = () => {
               style={center}
               onClick={handleSigninClick}
             >
-              {cookie[COOKIE_ACCESS_TOKEN_KEY] != null ? (
+              {cookie[ACCESS_TOKEN_KEY] != null ? (
                 "Go to console"
               ) : (
                 <React.Fragment>
