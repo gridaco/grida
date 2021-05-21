@@ -1,16 +1,22 @@
-const MVP_SIGNUP_TYPEFORM_URL = "https://woojooj.typeform.com/to/uyTSms5Q";
-
 function signup_callback_redirect_uri() {
   const LOCAL = "http://localhost:3000/";
-  const PRODUCT = "https://bridged.xyz/";
+
+  const PRODUCT = "https://www.figma.com/community/plugin/896445082033423994";
+  // Todo - the flow shall be as below. above is just temporary.
+  // signup > move to console > download plugin > upload design.
+
   return process.env.NODE_ENV !== "production" ? LOCAL : PRODUCT;
+}
+
+function signin_callback_redirect_uri() {
+  return "https://bridged.xyz/";
 }
 
 export const LandingpageUrls = {
   /**
    * return to home after signin
    */
-  signin_with_return: `https://accounts.bridged.xyz/signin?redirect_uri=${signup_callback_redirect_uri()}`,
+  signin_with_return: `https://accounts.bridged.xyz/signin?redirect_uri=${signin_callback_redirect_uri()}`,
 
   // todo region swap sign up when ready
   /**
