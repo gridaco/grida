@@ -8,6 +8,9 @@ if (dependencies) {
   const nativeDeps = fs
     .readdirSync('node_modules')
     .filter((folder) => fs.existsSync(`node_modules/${folder}/binding.gyp`));
+  if (nativeDeps.length === 0) {
+    process.exit(0);
+  }
   try {
     // Find the reason for why the dependency is installed. If it is installed
     // because of a devDependency then that is okay. Warn when it is installed
@@ -27,7 +30,7 @@ if (dependencies) {
  )}
 ${chalk.bold(filteredRootDependencies.join(', '))} ${
         plural ? 'are native dependencies' : 'is a native dependency'
-      } and should be installed inside of the "./app" folder.
+      } and should be installed inside of the "./src" folder.
  First, uninstall the packages from "./package.json":
 ${chalk.whiteBright.bgGreen.bold('yarn remove your-package')}
  ${chalk.bold(
@@ -35,7 +38,7 @@ ${chalk.whiteBright.bgGreen.bold('yarn remove your-package')}
  )}
 ${chalk.whiteBright.bgRed.bold('yarn add your-package')}
  ${chalk.bold('Install the package to "./src/package.json"')}
-${chalk.whiteBright.bgGreen.bold('cd ./app && yarn add your-package')}
+${chalk.whiteBright.bgGreen.bold('cd ./src && yarn add your-package')}
  Read more about native dependencies at:
 ${chalk.bold(
   'https://electron-react-boilerplate.js.org/docs/adding-dependencies/#module-structure'

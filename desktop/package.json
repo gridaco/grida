@@ -1,21 +1,20 @@
 {
   "name": "@bridged.xyz/desktop",
   "productName": "Bridged",
-  "description": "Bridged is develop using Electron",
+  "description": "The final, Opensource design & development tool",
   "scripts": {
     "build": "concurrently \"yarn build:main\" \"yarn build:renderer\"",
     "build:main": "cross-env NODE_ENV=production webpack --config ./.erb/configs/webpack.config.main.prod.babel.js",
     "build:renderer": "cross-env NODE_ENV=production webpack --config ./.erb/configs/webpack.config.renderer.prod.babel.js",
     "rebuild": "electron-rebuild --parallel --types prod,dev,optional --module-dir src",
     "lint": "cross-env NODE_ENV=development eslint . --cache --ext .js,.jsx,.ts,.tsx",
-    "package": "yarn build && electron-builder build --publish never",
+    "package": "rm -rf src/dist && yarn build && electron-builder build --publish never",
     "postinstall": "node -r @babel/register .erb/scripts/CheckNativeDep.js && electron-builder install-app-deps && yarn cross-env NODE_ENV=development webpack --config ./.erb/configs/webpack.config.renderer.dev.dll.babel.js && opencollective-postinstall && yarn-deduplicate yarn.lock",
-    "start": "node -r @babel/register ./.erb/scripts/CheckPortInUse.js && cross-env yarn start:renderer",
+    "start": "node -r @babel/register ./.erb/scripts/CheckPortInUse.js && yarn start:renderer",
     "start:main": "cross-env NODE_ENV=development electron -r ./.erb/scripts/BabelRegister ./src/main.dev.ts",
     "start:renderer": "cross-env NODE_ENV=development webpack serve --config ./.erb/configs/webpack.config.renderer.dev.babel.js",
     "test": "jest"
   },
-  "license": "MIT",
   "lint-staged": {
     "*.{js,jsx,ts,tsx}": [
       "cross-env NODE_ENV=development eslint --cache"
@@ -32,7 +31,7 @@
   },
   "build": {
     "productName": "Bridged",
-    "appId": "xyz.bridged.client",
+    "appId": "xyz.bridged.desktop",
     "files": [
       "dist/",
       "node_modules/",
@@ -91,6 +90,36 @@
       "repo": "bridged"
     }
   },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/bridgedxyz/bridged.git"
+  },
+  "author": {
+    "name": "Bridged Maintainers",
+    "email": "founder@bridged.xyz",
+    "url": "https://bridged.xyz"
+  },
+  "contributors": [
+    {
+      "name": "softmarshmallow",
+      "email": "woojoo@softmarshmallow.com",
+      "url": "https://github.com/softmarshmallow"
+    }
+  ],
+  "license": "Apache 2.0",
+  "bugs": {
+    "url": "https://github.com/bridgedxyz/bridged/issues"
+  },
+  "keywords": [
+    "electron",
+    "react",
+    "typescript",
+    "ts",
+    "webpack",
+    "design-tool",
+    "design-to-code"
+  ],
+  "homepage": "https://bridged.xyz/",
   "jest": {
     "testURL": "http://localhost/",
     "moduleNameMapper": {
@@ -145,8 +174,8 @@
     "@types/history": "4.7.6",
     "@types/jest": "^26.0.15",
     "@types/node": "14.14.10",
-    "@types/react": "^17.0.0",
-    "@types/react-dom": "^17.0.0",
+    "@types/react": "^16.9.44",
+    "@types/react-dom": "^16.9.9",
     "@types/react-router-dom": "^5.1.6",
     "@types/react-test-renderer": "^16.9.3",
     "@types/webpack-env": "^1.15.2",
@@ -163,9 +192,10 @@
     "core-js": "^3.6.5",
     "cross-env": "^7.0.2",
     "css-loader": "^5.0.1",
+    "css-minimizer-webpack-plugin": "^1.1.5",
     "detect-port": "^1.3.0",
     "electron": "^11.0.1",
-    "electron-builder": "^22.3.6",
+    "electron-builder": "^22.10.5",
     "electron-devtools-installer": "^3.1.1",
     "electron-notarize": "^1.0.0",
     "electron-rebuild": "^2.3.2",
@@ -194,7 +224,6 @@
     "mini-css-extract-plugin": "^1.3.1",
     "node-sass": "^5.0.0",
     "opencollective-postinstall": "^2.0.3",
-    "optimize-css-assets-webpack-plugin": "^5.0.3",
     "prettier": "^2.0.5",
     "react-refresh": "^0.9.0",
     "react-test-renderer": "^17.0.1",
@@ -226,6 +255,9 @@
     "node": ">=10.x",
     "npm": ">=6.x",
     "yarn": ">=1.21.3"
+  },
+  "collective": {
+    "url": "https://opencollective.com/bridged"
   },
   "browserslist": [],
   "prettier": {

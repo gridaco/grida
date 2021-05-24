@@ -1,1 +1,1 @@
-# Bridged Desktop App wrapped with electron
+# Bridged Desktop build

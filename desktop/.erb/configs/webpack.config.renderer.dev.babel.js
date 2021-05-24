@@ -31,7 +31,7 @@ if (!requiredByDLLConfig && !(fs.existsSync(dllDir) && fs.existsSync(manifest)))
       'The DLL files are missing. Sit back while we build them for you with "yarn build-dll"'
     )
   );
-  execSync('yarn build-dll');
+  execSync('yarn postinstall');
 }
 
 export default merge(baseConfig, {
@@ -162,6 +162,17 @@ export default merge(baseConfig, {
           options: {
             limit: 10000,
             mimetype: 'application/font-woff',
+          },
+        },
+      },
+      // OTF Font
+      {
+        test: /\.otf(\?v=\d+\.\d+\.\d+)?$/,
+        use: {
+          loader: 'url-loader',
+          options: {
+            limit: 10000,
+            mimetype: 'font/otf',
           },
         },
       },
