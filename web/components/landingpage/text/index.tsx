@@ -23,6 +23,7 @@ export default function LandingpageText(props: {
     case "h1":
       return (
         <Heading
+          as="h1"
           className={className}
           color={color}
           textAlign={textAlign}
@@ -36,6 +37,7 @@ export default function LandingpageText(props: {
     case "h2":
       return (
         <Heading
+          as="h2"
           className={className}
           letterSpacing={"0em"}
           lineHeight={"98.1%"}
@@ -49,6 +51,7 @@ export default function LandingpageText(props: {
     case "h4":
       return (
         <Heading
+          as="h4"
           className={className}
           letterSpacing={"0em"}
           color={color}
@@ -61,6 +64,7 @@ export default function LandingpageText(props: {
     case "body1":
       return (
         <Text
+          as="p"
           fontWeight={400}
           lineHeight={"38px"}
           letterSpacing={"0em"}

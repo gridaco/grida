@@ -8,6 +8,7 @@ import { ThemeInterface } from "utils/styled/theme";
 import LandingMainCtaButton from "components/landingpage/main-cta-button";
 import LandingpageText from "components/landingpage/text";
 
+// SEO IMPORTANT
 const Hero = () => {
   return (
     <SectionLayout alignContent="center">
