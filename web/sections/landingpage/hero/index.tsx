@@ -14,11 +14,14 @@ const Hero = () => {
     <SectionLayout alignContent="center">
       <BlankArea height={[101, 198]} />
       <HeroText variant="h1" textAlign="center">
-        Designs that are meant to be implemented.
+        Your Figma Designs to
+        <br />
+        Flutter Code.
       </HeroText>
       <Description variant="body1" textAlign="center">
-        Make twice no more. All you’ll ever need for frontend development. A
-        hackable tool designed for hackers.
+        Don’t waste time repeating yourself.
+        <br />
+        UI Development? - We’ve got it. Sit back and relax.
       </Description>
       <LandingMainCtaButton />
 

@@ -9,49 +9,45 @@ Container(
           child: Row(
             children: [
               Text(
-                "LO\nFI",
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 60.480003356933594,
-                  fontWeight: FontWeight.w700,
-                  fontFamily: "Helvetica",
-                ),
+                "LO\\nFI",
+                style: Theme.of(context).textTheme.headline6
+                  .copyWith(color:Colors.white),
               ),
               SizedBox(
-                width: 92.18,
+                width: 92,
               ),
               Container(
                 child: Container(
                   child: Opacity(
                     opacity: 0.5,
                     child: Container(
-                      width: 18.48,
-                      height: 23.52,
+                      width: 18,
+                      height: 24,
                       decoration: BoxDecoration(
                         color: Colors.white,
                       ),
                     ),
                   ),
-                  width: 40.32,
-                  height: 40.32,
+                  width: 40,
+                  height: 40,
                   padding: EdgeInsets.only(
                     left: 13,
                     right: 8,
                   ),
                 ),
-                width: 40.32,
-                height: 40.32,
+                width: 40,
+                height: 40,
               ),
             ],
             mainAxisAlignment: MainAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
           ),
           width: 252,
-          height: 233.52,
+          height: 232,
           padding: EdgeInsets.only(
             left: 18,
-            right: 17,
-            top: 106,
+            right: 18,
+            top: 108,
             bottom: 20,
           ),
           decoration: BoxDecoration(
@@ -59,25 +55,18 @@ Container(
           ),
         ),
         SizedBox(
-          height: 11.76,
+          height: 12,
         ),
         SizedBox(
           child: Text(
             "Morning Slowbeats - LoFi",
-            style: TextStyle(
-              color: Color(
-                0xffa3a3a3,
-              ),
-              fontSize: 23.520000457763672,
-              fontWeight: FontWeight.w400,
-              fontFamily: "Roboto",
-            ),
+            style: Theme.of(context).textTheme.subtitle1
+              .copyWith(color:0xffa3a3a3),
           ),
-          width: 252.00001525878906,
+          width: 252,
         ),
       ],
     ),
-    width: MediaQuery.of(context).size.width,
   );
 `;
 
