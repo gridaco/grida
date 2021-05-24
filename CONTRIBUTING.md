@@ -6,6 +6,15 @@ As our all other engines, products this Bridged as well is a opensource project.
 
 This documentation is "Work in progress", you may find this page not helpful. meanwhile please join our slack via [link here](https://together.bridged.xyz). Talk to us directly, work with other contributors / users.
 
+## Building
+
+```
+git clone --recurse-submodule https://github.com/bridgedxyz/bridged
+cd bridged
+yarn
+yarn desktop # or `yarn web`
+```
+
 ## Must before making large scale PR
 
 - [working with submodule packages](https://github.com/bridgedxyz/.github/blob/main/contributing/working-with-submodules.md)
