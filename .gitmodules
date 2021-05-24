@@ -28,3 +28,6 @@
 [submodule "ui/editor-ui"]
 	path = ui/editor-ui
 	url = https://github.com/bridgedxyz/reflect-editor-ui
+[submodule "packages/base-sdk"]
+	path = packages/base-sdk
+	url = https://github.com/bridgedxyz/base-sdk
