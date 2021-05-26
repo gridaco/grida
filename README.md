@@ -17,6 +17,10 @@
 
 This project, A.K.A `Bridged Studiio` is under development with foundation technologies. We are looking forward that Bridged will change the industry design/development standard by this piece of OSS Project. For updates, please subscribe our news letter on [bridged.xyz](https://bridged.xyz)
 
+- [Assistant](https://github.com/bridgedxyz/assistant) - A plugin fro figma that allows to import designs to bridged.
+- [Console](https://github.com/bridgedxyz/console.bridged.xyz) - A Bridged console for content management used for both design & development
+
+
 ## Engine & Foundation
 
 - studio is built uppon skia graphics library
