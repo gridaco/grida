@@ -15,7 +15,7 @@ const DesignToCode = () => {
     <SectionLayout alignContent="start" backgroundColor="rgba(0,0,0,0)">
       <Flex width="100%" flexDirection={["column", "row", "row", "row"]}>
         <Flex className="text-platform" flexDirection="column">
-          <Title variant="h1">
+          <Title variant="h2">
             Designs, <br />
             come to live.
           </Title>
