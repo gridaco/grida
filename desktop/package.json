@@ -1,5 +1,5 @@
 {
-  "name": "@bridged.xyz/desktop",
+  "name": "desktop",
   "productName": "Bridged",
   "description": "The final, Opensource design & development tool",
   "scripts": {

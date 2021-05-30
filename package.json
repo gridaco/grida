@@ -4,13 +4,15 @@
     "license": "Apache 2.0",
     "workspaces": [
         "app",
+        "desktop",
         "web",
-        "dev",
+        "ui/editor-ui",
+        "ui/reflect-ui/packages/*",
         "packages/**/*"
     ],
     "scripts": {
         "web": "yarn workspace web run dev",
-        "app": "yarn workspace app run start"
+        "desktop": "yarn workspace desktop run start"
     },
     "resolutions": {
         "react": "^17.0.1",
