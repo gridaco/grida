@@ -1,12 +1,11 @@
 <div style="text-align:center"><img src="./branding/bridged-2020-type-logo.png"/></div>
 
-
-
 # Opensource Design Tool for the world.
-*For whom eager to create, design, develop and share with the world.*
+
+_For whom eager to create, design, develop and share with the world._
 
 > **Bridged (Bridged 2022 - opensource collaborative realtime ui editor)**
-> 
+>
 > an opensource wasm application explicitly designed for service application design/development
 
 - developer first
@@ -20,20 +19,15 @@ This project, A.K.A `Bridged Studiio` is under development with foundation techn
 - [Assistant](https://github.com/bridgedxyz/assistant) - A plugin fro figma that allows to import designs to bridged.
 - [Console](https://github.com/bridgedxyz/console.bridged.xyz) - A Bridged console for content management used for both design & development
 
-
 ## Engine & Foundation
 
 - studio is built uppon skia graphics library
 - the core component used is followed by _[reflect design system](https://github.com/bridgedxyz/reflect.bridged.xyz)_
 - studio's surface is built on react
 
-
-
 ## Docs
 
 Read the bridged usage docs [here](./docs)
-
-
 
 ## Workspace
 
@@ -43,13 +37,9 @@ artboard workspace
 
 scripting built in with js/ts sdk and add-on plugin
 
-
-
 ## Backend
 
 [Bridged Design Server](https://github.com/bridgedxyz/design-server)
-
-
 
 ## Structure - Packages & Modules
 
@@ -96,9 +86,9 @@ scripting built in with js/ts sdk and add-on plugin
 
 **WYSIWYG**
 
-* **boring** - 😶 A very boring text editor engine like notion. yet free and open to use
-  * [github](https://github.com/bridgedxyz/boring)
-  * [website](https://boring.so/)
+- **boring** - 😶 A very boring text editor engine like notion. yet free and open to use
+  - [github](https://github.com/bridgedxyz/boring)
+  - [website](https://boring.so/)
 
 **DESIGN TO CODE**
 
@@ -108,21 +98,20 @@ scripting built in with js/ts sdk and add-on plugin
 
 **BUILT-IN SERVICES**
 
-* **accounts.bridged.xyz** - (PRIVATE) accounts & payments web / server
-  * [website](https://accounts.bridged.xyz) (source is closed due to security reasons)
-* **console.bridged.xyz** - Bridged console for managing your designs, asset, translations with collaboration.
-  * [github](https://github.com/bridgedxyz/console.bridged.xyz)
-  * [website](https://console.bridged.xyz)
-
-
+- **accounts.bridged.xyz** - (PRIVATE) accounts & payments web / server
+  - [website](https://accounts.bridged.xyz) (source is closed due to security reasons)
+- **console.bridged.xyz** - Bridged console for managing your designs, asset, translations with collaboration.
+  - [github](https://github.com/bridgedxyz/console.bridged.xyz)
+  - [website](https://console.bridged.xyz)
 
 ## The design
 
 design of bridged editor on [figma](https://www.figma.com/file/Y0Gh77AqBoHH7dG1GtK3xF/bridged?node-id=0%3A1)
 
-
 ## Bridging the gap between design and development
+
 Here are some concepts that do not exist on current design tools, but only at implementation.
+
 - Theme support
 - Responsive layout
 - Linting
@@ -136,7 +125,6 @@ Here are some concepts that do not exist on current design tools, but only at im
 - Logic layer
 - Design to code
 - Built in base design system (Reflect - a universal design system built for design systems)
-
 
 ## Key features / modes
 
@@ -162,6 +150,18 @@ We'de love to have you change the industry together. _Read below documentations 
 - [contributing.md](./CONTRIBUTING.md)
 - [working with submodule packages](https://github.com/bridgedxyz/.github/blob/main/contributing/working-with-submodules.md)
 - [how Bridged repo `/packages` are structured](./packages)
+
+### Building
+
+```sh
+git clone --recurse-submodules https://github.com/bridgedxyz/bridged.git
+cd bridged
+
+yarn
+yarn desktop
+```
+
+update pulling - `git submodule update --init --recursive`
 
 ## References
 
