@@ -3,7 +3,7 @@ import React, { useEffect, useState } from "react";
 import { MainImageRepository } from "@design-sdk/core/assets-repository";
 import { ImageRepositories } from "@design-sdk/figma/asset-repository";
 import { figmacomp, canvas, runner } from "../../components";
-import { react } from "@designto/code";
+import * as react from "@designto/react";
 import { nanoid } from "nanoid";
 import { ReflectSceneNode } from "@design-sdk/core/nodes";
 import styled from "@emotion/styled";

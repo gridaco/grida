@@ -4,7 +4,7 @@ import styled from "@emotion/styled";
 import { figmacomp, canvas, runner } from "../../components";
 import { flutter } from "@designto/code";
 import { composeAppWithHome } from "@bridged.xyz/flutter-builder";
-import { features, types, hosting } from "@bridged.xyz/base-sdk";
+import { features, types, hosting } from "@base-sdk/base";
 import { ReflectSceneNode } from "@design-sdk/core/nodes";
 import { utils_dart } from "../../utils";
 import { nanoid } from "nanoid";

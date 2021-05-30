@@ -2,7 +2,7 @@ import React from "react";
 import {
   buildFlutterFrameUrl,
   FlutterFrameQuery,
-} from "@bridged.xyz/base-sdk/dist/lib/frame-embed";
+} from "@base-sdk/base/dist/frame-embed";
 import { nanoid } from "nanoid";
 import { useEffect, useState } from "react";
 
@@ -47,7 +47,7 @@ export function FlutterAppRunner(props: {
   );
 }
 
-import { hosting } from "@bridged.xyz/base-sdk";
+import { hosting } from "@base-sdk/base";
 
 async function buildHostedSrcFrameUrl(params: { id: string; src: string }) {
   const srcHosted = await hosting.upload({

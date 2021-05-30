@@ -11,6 +11,13 @@ const withTM = require("next-transpile-modules")([
   "@reflect-ui/core",
   "@reflect-ui/detection",
 
+  // base sdk
+  "@base-sdk/core",
+  "@base-sdk/base",
+  "@base-sdk/url",
+  "@base-sdk/hosting",
+  "@base-sdk/resources",
+
   // region coli
   "coli",
   "@coli.codes/web-builder",
