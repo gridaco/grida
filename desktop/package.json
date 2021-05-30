@@ -1,6 +1,8 @@
 {
-  "name": "desktop",
+  "name": "@bridged.xyz/desktop",
   "productName": "Bridged",
+  "version": "0.0.0",
+  "private": false,
   "description": "The final, Opensource design & development tool",
   "scripts": {
     "build": "concurrently \"yarn build:main\" \"yarn build:renderer\"",
@@ -112,9 +114,9 @@
   },
   "keywords": [
     "electron",
+    "free-design-tool",
     "react",
     "typescript",
-    "ts",
     "webpack",
     "design-tool",
     "design-to-code"
@@ -241,12 +243,13 @@
     "yarn-deduplicate": "^3.1.0"
   },
   "dependencies": {
+    "@bridged.xyz/app": "0.0.0",
     "electron-debug": "^3.1.0",
     "electron-log": "^4.2.4",
     "electron-updater": "^4.3.4",
     "history": "^5.0.0",
-    "react": "^17.0.1",
-    "react-dom": "^17.0.1",
+    "react": "^17.0.2",
+    "react-dom": "^17.0.2",
     "react-router-dom": "^5.2.0",
     "regenerator-runtime": "^0.13.5",
     "source-map-support": "^0.5.19"

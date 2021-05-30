@@ -54,17 +54,17 @@ export default class MenuBuilder {
 
   buildDarwinTemplate(): MenuItemConstructorOptions[] {
     const subMenuAbout: DarwinMenuItemConstructorOptions = {
-      label: 'Electron',
+      label: 'Bridged',
       submenu: [
         {
-          label: 'About ElectronReact',
+          label: 'About Bridged',
           selector: 'orderFrontStandardAboutPanel:',
         },
         { type: 'separator' },
         { label: 'Services', submenu: [] },
         { type: 'separator' },
         {
-          label: 'Hide ElectronReact',
+          label: 'Hide Bridged',
           accelerator: 'Command+H',
           selector: 'hide:',
         },
@@ -157,27 +157,25 @@ export default class MenuBuilder {
         {
           label: 'Learn More',
           click() {
-            shell.openExternal('https://electronjs.org');
+            shell.openExternal('https://bridged.xyz');
           },
         },
         {
           label: 'Documentation',
           click() {
-            shell.openExternal(
-              'https://github.com/electron/electron/tree/master/docs#readme'
-            );
+            shell.openExternal('https://bridged.xyz/docs');
           },
         },
         {
           label: 'Community Discussions',
           click() {
-            shell.openExternal('https://www.electronjs.org/community');
+            shell.openExternal('https://github.com/bridgedxyz/bridged');
           },
         },
         {
           label: 'Search Issues',
           click() {
-            shell.openExternal('https://github.com/electron/electron/issues');
+            shell.openExternal('https://github.com/bridgedxyz/bridged/issues');
           },
         },
       ],
@@ -258,27 +256,27 @@ export default class MenuBuilder {
           {
             label: 'Learn More',
             click() {
-              shell.openExternal('https://electronjs.org');
+              shell.openExternal('https://bridged.xyz');
             },
           },
           {
             label: 'Documentation',
             click() {
-              shell.openExternal(
-                'https://github.com/electron/electron/tree/master/docs#readme'
-              );
+              shell.openExternal('https://bridged.xyz/docs');
             },
           },
           {
             label: 'Community Discussions',
             click() {
-              shell.openExternal('https://www.electronjs.org/community');
+              shell.openExternal('https://github.com/bridgedxyz/bridged');
             },
           },
           {
             label: 'Search Issues',
             click() {
-              shell.openExternal('https://github.com/electron/electron/issues');
+              shell.openExternal(
+                'https://github.com/bridgedxyz/bridged/issues'
+              );
             },
           },
         ],
