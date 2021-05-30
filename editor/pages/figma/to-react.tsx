@@ -8,6 +8,7 @@ import { nanoid } from "nanoid";
 import { ReflectSceneNode } from "@design-sdk/core/nodes";
 import styled from "@emotion/styled";
 import { tokenize } from "@designto/token";
+import JSONTree from "react-json-tree";
 
 // set image repo for figma platform
 MainImageRepository.instance = new ImageRepositories();
@@ -32,10 +33,11 @@ export default function FigmaToReactDemoPage() {
   };
 
   let widgetCode: string;
+  let widgetTree;
   if (reflect) {
     const _reflectWidget = tokenize(reflect);
-    const _reactWidget = react.buildReactWidget(_reflectWidget);
-    const _stringfiedReactwidget = react.buildReactApp(_reactWidget, {
+    widgetTree = react.buildReactWidget(_reflectWidget);
+    const _stringfiedReactwidget = react.buildReactApp(widgetTree, {
       template: "cra",
     });
 
@@ -50,6 +52,7 @@ export default function FigmaToReactDemoPage() {
         onUrlEnter={handleDesignUrlLoad}
       />
       <ContentWrap>
+        <JSONTree data={widgetTree} />
         <CodemirrorEditor
           value={
             widgetCode
