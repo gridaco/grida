@@ -6,6 +6,8 @@
         "app",
         "desktop",
         "web",
+        "boring/packages/*",
+        "nothing/packages/*",
         "ui/editor-ui",
         "ui/reflect-ui/packages/*",
         "packages/**/*"
