@@ -109,6 +109,10 @@ function _UrlImporterSegment(props: {
   onLoaded: _OnRemoteLoadedCallback;
   onUrlEnter?: (url: string) => void;
 }) {
+  const [loadState, setLoadState] = useState<
+    "none" | "loading" | "failed" | "complete"
+  >("none");
+
   let urlInput: string = UserInputCache.load(
     _FIGMA_FILE_URL_IMPORT_INPUT_CACHE_KEY
   );
@@ -117,14 +121,34 @@ function _UrlImporterSegment(props: {
     props.onUrlEnter?.(urlInput);
     UserInputCache.set(_FIGMA_FILE_URL_IMPORT_INPUT_CACHE_KEY, urlInput);
     const q = utils.figmaApi.parseFileAndNodeIdFromUrl_Figma(urlInput);
-    fetchTarget(q.file, q.node).then((d) => {
-      props.onLoaded(d as remote.types.Node);
-    });
+    setLoadState("loading");
+    fetchTarget(q.file, q.node)
+      .then((d) => {
+        setLoadState("complete");
+        props.onLoaded(d as remote.types.Node);
+      })
+      .catch((_) => {
+        setLoadState("failed");
+        console.error(_);
+      });
+  };
+
+  const makeMessage = () => {
+    switch (loadState) {
+      case "failed":
+        return "failed to fetch the design. check if you have set the personal access token.";
+      case "loading":
+        return "fetching design...";
+      case "none":
+        return "Tip: you must have access to the target file";
+      case "complete":
+        return "fetched";
+    }
   };
 
   return (
     <div>
-      <p>you must have access to the target file</p>
+      <p>{makeMessage()}</p>
       <input
         defaultValue={urlInput}
         onChange={(e) => {
