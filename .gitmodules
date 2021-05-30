@@ -31,3 +31,6 @@
 [submodule "packages/base-sdk"]
 	path = packages/base-sdk
 	url = https://github.com/bridgedxyz/base-sdk
+[submodule "ui/reflect-ui"]
+	path = ui/reflect-ui
+	url = https://github.com/bridgedxyz/reflect-ui-react
