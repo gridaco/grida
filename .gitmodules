@@ -37,3 +37,6 @@
 [submodule "nothing"]
 	path = nothing
 	url = https://github.com/bridgedxyz/nothing
+[submodule "packages/design-to-code"]
+	path = packages/design-to-code
+	url = http://github.com/bridgedxyz/design-to-code
