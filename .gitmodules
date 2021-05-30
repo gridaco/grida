@@ -34,3 +34,6 @@
 [submodule "ui/reflect-ui"]
 	path = ui/reflect-ui
 	url = https://github.com/bridgedxyz/reflect-ui-react
+[submodule "boring"]
+	path = boring
+	url = https://github.com/bridgedxyz/boring
