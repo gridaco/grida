@@ -34,3 +34,6 @@
 [submodule "boring"]
 	path = boring
 	url = https://github.com/bridgedxyz/boring
+[submodule "nothing"]
+	path = nothing
+	url = https://github.com/bridgedxyz/nothing
