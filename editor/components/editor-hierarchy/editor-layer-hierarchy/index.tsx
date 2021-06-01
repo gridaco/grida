@@ -1,7 +1,14 @@
 import React, { useEffect, useRef, useState } from "react";
 import styled from "@emotion/styled";
 
-function SceneExplorer() {
+interface LayerTree {
+  id: string;
+  type: string;
+  name: string;
+  children?: Array<LayerTree>;
+}
+
+export function LayerHierarchy(props: { data: LayerTree }) {
   const [expandIds, setExpandIds] = useState([]);
   const fileInput = useRef(null);
 
@@ -39,10 +46,9 @@ function SceneExplorer() {
   );
 }
 
-export default SceneExplorer;
-
 const Wrapper = styled.div`
   flex: 1;
+  min-width: 200px;
   background-color: #2a2e39;
 
   .scene-tab {
