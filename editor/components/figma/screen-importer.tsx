@@ -3,6 +3,7 @@ import { remote, utils, nodes } from "@design-sdk/figma";
 import { convert } from "@design-sdk/figma";
 import { utils_figma } from "../../utils";
 import { UserInputCache } from "../../utils/user-input-value-cache";
+import { FigmaTargetNodeConfig } from "@design-sdk/core/utils/figma-api-utils";
 
 export type OnImportedCallback = (reflect: nodes.ReflectSceneNode) => void;
 type _OnRemoteLoadedCallback = (reflect: remote.types.Node) => void;
@@ -44,7 +45,7 @@ async function fetchDemo() {
 
 export function FigmaScreenImporter(props: {
   onImported: OnImportedCallback;
-  onUrlEnter?: (url: string) => void;
+  onTargetEnter?: (target: FigmaTargetNodeConfig) => void;
 }) {
   const [reflect, setReflect] = useState<nodes.ReflectSceneNode>();
 
@@ -76,7 +77,12 @@ export function FigmaScreenImporter(props: {
           <_DefaultImporterSegment onLoaded={handleLocalDataLoad} />
           <_UrlImporterSegment
             onLoaded={handleLocalDataLoad}
-            onUrlEnter={props.onUrlEnter}
+            onUrlEnter={(url: string) => {
+              const nodeconfig = utils.figmaApi.parseFileAndNodeIdFromUrl_Figma(
+                url
+              );
+              props.onTargetEnter(nodeconfig);
+            }}
           />
         </>
       )}
@@ -117,12 +123,15 @@ function _UrlImporterSegment(props: {
     _FIGMA_FILE_URL_IMPORT_INPUT_CACHE_KEY
   );
 
+  const figmaTargetConfig = utils.figmaApi.parseFileAndNodeIdFromUrl_Figma(
+    urlInput
+  );
+
   const handleEnter = () => {
     props.onUrlEnter?.(urlInput);
     UserInputCache.set(_FIGMA_FILE_URL_IMPORT_INPUT_CACHE_KEY, urlInput);
-    const q = utils.figmaApi.parseFileAndNodeIdFromUrl_Figma(urlInput);
     setLoadState("loading");
-    fetchTarget(q.file, q.node)
+    fetchTarget(figmaTargetConfig.file, figmaTargetConfig.node)
       .then((d) => {
         setLoadState("complete");
         props.onLoaded(d as remote.types.Node);

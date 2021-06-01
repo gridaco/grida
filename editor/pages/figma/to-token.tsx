@@ -23,10 +23,10 @@ export default function FigmaToReflectWidgetTokenPage() {
 
   return (
     <>
-      <canvas.FigmaEmbedCanvas url={figmaNodeUrl} />
+      <canvas.FigmaEmbedCanvas src={{ url: figmaNodeUrl }} />
       <figmacomp.FigmaScreenImporter
         onImported={handleOnDesignImported}
-        onUrlEnter={handleFigmaUrlEnter}
+        onTargetEnter={handleFigmaUrlEnter}
       />
 
       <JSONTree hideRoot data={tokenTree} />

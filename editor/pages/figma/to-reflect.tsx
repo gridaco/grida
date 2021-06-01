@@ -4,25 +4,29 @@ import { ReflectSceneNode } from "@design-sdk/core/nodes";
 import JSONTree from "react-json-tree";
 
 import { visualize_node } from "../../components/visualization";
+import { FigmaTargetNodeConfig } from "@design-sdk/core/utils/figma-api-utils";
 
 export default function FigmaToReflectNodePage() {
   const [reflect, setReflect] = useState<ReflectSceneNode>();
-  const [figmaNodeUrl, setFigmaNodeUrl] = useState<string>();
+  const [
+    targetnodeConfig,
+    setTargetnodeConfig,
+  ] = useState<FigmaTargetNodeConfig>();
 
   const handleOnDesignImported = (reflect: ReflectSceneNode) => {
     setReflect(reflect);
   };
 
-  const handleFigmaUrlEnter = (url: string) => {
-    setFigmaNodeUrl(url);
+  const handleFigmaUrlEnter = (targetconfig: FigmaTargetNodeConfig) => {
+    setTargetnodeConfig(targetconfig);
   };
 
   return (
     <>
-      <canvas.FigmaEmbedCanvas url={figmaNodeUrl} />
+      <canvas.FigmaEmbedCanvas src={{ url: targetnodeConfig.url }} />
       <figmacomp.FigmaScreenImporter
         onImported={handleOnDesignImported}
-        onUrlEnter={handleFigmaUrlEnter}
+        onTargetEnter={handleFigmaUrlEnter}
       />
       <visualize_node.HorizontalHierarchyTreeVisualization
         key={reflect?.id}

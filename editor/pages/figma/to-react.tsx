@@ -10,6 +10,8 @@ import { tokenize } from "@designto/token";
 import JSONTree from "react-json-tree";
 import { DefaultEditorWorkspaceLayout } from "../../layout/default-editor-workspace-layout";
 import { LayerHierarchy } from "../../components/editor-hierarchy";
+import { PreviewAndRunPanel } from "../../components/preview-and-run";
+import { FigmaTargetNodeConfig } from "@design-sdk/core/utils/figma-api-utils";
 
 // set image repo for figma platform
 MainImageRepository.instance = new ImageRepositories();
@@ -23,14 +25,17 @@ const CodemirrorEditor = dynamic(
 
 export default function FigmaToReactDemoPage() {
   const [reflect, setReflect] = useState<ReflectSceneNode>();
-  const [figmaDesignUrl, setFigmaDesignUrl] = useState<string>();
+  const [
+    targetnodeConfig,
+    setTargetnodeConfig,
+  ] = useState<FigmaTargetNodeConfig>();
 
   const handleOnDesignImported = (reflect: ReflectSceneNode) => {
     setReflect(reflect);
   };
 
-  const handleDesignUrlLoad = (url: string) => {
-    setFigmaDesignUrl(url);
+  const handleTargetAquired = (target: FigmaTargetNodeConfig) => {
+    setTargetnodeConfig(target);
   };
 
   let widgetCode: string;
@@ -48,10 +53,21 @@ export default function FigmaToReactDemoPage() {
   return (
     <>
       <DefaultEditorWorkspaceLayout leftbar={<LayerHierarchy data={reflect} />}>
-        <canvas.FigmaEmbedCanvas url={figmaDesignUrl} />
+        <PreviewAndRunPanel
+          config={{
+            src: widgetCode,
+            platform: "web",
+            sceneSize: {
+              w: reflect?.width,
+              h: reflect?.height,
+            },
+            fileid: targetnodeConfig?.file,
+            sceneid: targetnodeConfig?.node,
+          }}
+        />
         <figmacomp.FigmaScreenImporter
           onImported={handleOnDesignImported}
-          onUrlEnter={handleDesignUrlLoad}
+          onTargetEnter={handleTargetAquired}
         />
         <ContentWrap>
           <JSONTree data={widgetTree} />

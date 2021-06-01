@@ -9,13 +9,17 @@ import { useAsyncEffect } from "../../hooks";
  * @param props
  * @returns
  */
-export function CodeSandBoxView(props: { source: string }) {
+export function CodeSandBoxView(props: {
+  src: string;
+  width: number | string;
+  height: number | string;
+}) {
   const [iframeUrl, setIframeUrl] = useState("");
   useAsyncEffect(async () => {
     const parameters = getParameters({
       files: {
         "index.js": {
-          content: props.source,
+          content: props.src,
           isBinary: false,
         },
         // "package.json": {
@@ -40,18 +44,23 @@ export function CodeSandBoxView(props: { source: string }) {
   }, []);
 
   return (
-    <Wrapper>
+    <Wrapper width={props.width} height={props.height}>
       <iframe src={iframeUrl} />
     </Wrapper>
   );
 }
 
-const Wrapper = styled.div`
+interface WrapperProps {
+  width: string | number;
+  height: string | number;
+}
+
+const Wrapper = styled.div<WrapperProps>`
   iframe {
     position: absolute;
     right: 0;
-    width: 50%;
-    height: 100%;
+    width: ${(props) => props.width};
+    height: ${(props) => props.width};
     border: none;
   }
 `;

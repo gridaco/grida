@@ -11,8 +11,8 @@ const DUE_TO_MAX_URL_LENGHT_THE_MAX_LENGTH_ACCEPTED_FOR_SRC = 1800;
 
 export function FlutterAppRunner(props: {
   q: FlutterFrameQuery;
-  width: number;
-  height: number;
+  width: number | string;
+  height: number | string;
 }) {
   const [frameUrl, setFrameUrl] = useState<string>();
 
