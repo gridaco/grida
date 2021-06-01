@@ -7,23 +7,25 @@ export function DefaultEditorWorkspaceLayout(props: {
 }) {
   return (
     <>
-      <Template>
-        {props.leftbar}
-        <ContentWrapper>
+      <WorkspaceRoot>
+        <PanelLeftSideWrap>{props.leftbar}</PanelLeftSideWrap>
+        <ChildrenContainerRoot>
           <RenderComponentWrapper>{props.children}</RenderComponentWrapper>
-        </ContentWrapper>
-      </Template>
+        </ChildrenContainerRoot>
+      </WorkspaceRoot>
     </>
   );
 }
 
-const Template = styled.div`
+const PanelLeftSideWrap = styled.div``;
+
+const WorkspaceRoot = styled.div`
   display: flex;
   width: 100vw;
   height: 100vh;
 `;
 
-const ContentWrapper = styled.div`
+const ChildrenContainerRoot = styled.div`
   display: flex;
   flex-direction: column;
   flex: 6;

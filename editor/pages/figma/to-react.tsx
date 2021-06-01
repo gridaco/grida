@@ -47,9 +47,7 @@ export default function FigmaToReactDemoPage() {
 
   return (
     <>
-      <DefaultEditorWorkspaceLayout
-        leftbar={<LayerHierarchy data={undefined} />}
-      >
+      <DefaultEditorWorkspaceLayout leftbar={<LayerHierarchy data={reflect} />}>
         <canvas.FigmaEmbedCanvas url={figmaDesignUrl} />
         <figmacomp.FigmaScreenImporter
           onImported={handleOnDesignImported}

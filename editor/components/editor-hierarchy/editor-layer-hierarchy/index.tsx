@@ -1,5 +1,9 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useState } from "react";
 import styled from "@emotion/styled";
+import TreeView from "@material-ui/lab/TreeView";
+import ExpandMoreIcon from "@material-ui/icons/ExpandMore";
+import ChevronRightIcon from "@material-ui/icons/ChevronRight";
+import TreeItem from "@material-ui/lab/TreeItem";
 
 interface LayerTree {
   id: string;
@@ -8,40 +12,61 @@ interface LayerTree {
   children?: Array<LayerTree>;
 }
 
-export function LayerHierarchy(props: { data: LayerTree }) {
-  const [expandIds, setExpandIds] = useState([]);
-  const fileInput = useRef(null);
+export function LayerHierarchy(props: {
+  data: LayerTree;
+  onLayerSelect?: {
+    single?: (id: string) => void;
+    multi?: (ids: string[]) => void;
+  };
+}) {
+  // make mode
+  const selectionmode = props.onLayerSelect?.multi ? "multi" : "single";
+  const [selections, setSelections] = useState<string[]>();
 
-  const onExpandStruct = (id: string) => {
-    setExpandIds((d) => [...d, id]);
+  const handleLayerClick = (id: string) => {
+    if (selectionmode == "single") {
+      props.onLayerSelect?.single?.(id);
+    } else {
+      setSelections([id, ...selections]);
+      props.onLayerSelect?.multi?.(selections);
+    }
   };
 
-  const onFileUpload = (e) => {
-    const reader = new FileReader();
-    e.preventDefault();
-    reader.onload = function () {
-      console.log(reader.result);
-    };
-    try {
-      reader.readAsText(e.target.files[0], "UTF-8");
-    } catch (e) {
-      console.error(`ERROR : import ( json ... + etc )\ndetail : ${e}`);
+  const data = props.data;
+
+  const renderTree = (nodes: LayerTree) => {
+    if (!nodes) {
+      return <>empty</>;
     }
+    return (
+      <TreeItem
+        key={nodes.id}
+        nodeId={nodes.id}
+        label={nodes.name}
+        onClick={() => handleLayerClick(nodes.id)}
+      >
+        {Array.isArray(nodes.children)
+          ? nodes.children.map((node) => renderTree(node))
+          : null}
+      </TreeItem>
+    );
   };
 
   return (
     <Wrapper>
-      <input
-        ref={fileInput}
-        type="file"
-        style={{ display: "none" }}
-        onChange={onFileUpload}
-        accept=".json"
-      />
       <div className="scene-tab">
         <span>SCENE</span>
-        <span onClick={() => fileInput.current.click()}>FILES</span>
+        <span>FILES</span>
       </div>
+      <>
+        <TreeView
+          defaultCollapseIcon={<ExpandMoreIcon />}
+          defaultExpanded={["root"]}
+          defaultExpandIcon={<ChevronRightIcon />}
+        >
+          {renderTree(data)}
+        </TreeView>
+      </>
     </Wrapper>
   );
 }
