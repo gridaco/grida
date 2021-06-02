@@ -37,8 +37,8 @@ export function PreviewAndRunPanel(props: { config: SceneRunnerConfig }) {
   };
 
   const TargetModePanel = () => {
-    const _width = "375px";
-    const _height = undefined;
+    const _width = "100%";
+    const _height = "100%";
     switch (mode) {
       case "preview":
         return (
