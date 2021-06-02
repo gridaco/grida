@@ -48,6 +48,7 @@ const Slot_Container = styled.div`
 
 const Slot_NonDockedContent = styled.div`
   flex: 1;
+  overflow: auto;
   display: flex;
   flex-direction: column;
   justify-content: center;
@@ -75,7 +76,7 @@ const DockedContentGridRoot = styled.div`
 
 const PrimaryContentGridRoot = styled.div`
   flex: 1;
-  overflow-y: scroll;
+  overflow: auto;
   justify-content: space-between;
   align-self: stretch;
   align-items: stretch;
