@@ -37,6 +37,8 @@ export function PreviewAndRunPanel(props: { config: SceneRunnerConfig }) {
   };
 
   const TargetModePanel = () => {
+    const _width = "375px";
+    const _height = "100%";
     switch (mode) {
       case "preview":
         return (
@@ -47,6 +49,8 @@ export function PreviewAndRunPanel(props: { config: SceneRunnerConfig }) {
               origin: "figma",
               displayAs: "embed",
             }}
+            width={_width}
+            height={_height}
           />
         );
       case "run":

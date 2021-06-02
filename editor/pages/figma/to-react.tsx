@@ -16,6 +16,7 @@ import {
   WorkspaceContentPanel,
   WorkspaceContentPanelGridLayout,
 } from "../../layout/panel";
+import { WorkspaceBottomPanelDockLayout } from "../../layout/panel/workspace-bottom-panel-dock-layout";
 
 // set image repo for figma platform
 MainImageRepository.instance = new ImageRepositories();
@@ -76,7 +77,6 @@ export default function FigmaToReactDemoPage() {
           </WorkspaceContentPanel>
           <WorkspaceContentPanel>
             <InspectionPanelContentWrap>
-              <JSONTree data={widgetTree} />
               <CodemirrorEditor
                 value={
                   widgetCode
@@ -89,14 +89,13 @@ export default function FigmaToReactDemoPage() {
                   lineNumbers: true,
                 }}
               />
-              {widgetCode && (
-                <div>
-                  <runner.ReactAppRunner source={widgetCode} />
-                  <br />
-                </div>
-              )}
             </InspectionPanelContentWrap>
           </WorkspaceContentPanel>
+          <WorkspaceBottomPanelDockLayout>
+            <WorkspaceContentPanel>
+              <JSONTree data={widgetTree} />
+            </WorkspaceContentPanel>
+          </WorkspaceBottomPanelDockLayout>
         </WorkspaceContentPanelGridLayout>
       </DefaultEditorWorkspaceLayout>
     </>

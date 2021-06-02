@@ -8,7 +8,11 @@ interface ScenePreviewConfig {
   displayAs: "embed" | "static" | "nothing";
 }
 
-export function ScenePreview(props: { config: ScenePreviewConfig }) {
+export function ScenePreview(props: {
+  config: ScenePreviewConfig;
+  width: number | string;
+  height: number | string;
+}) {
   const { config } = props;
   switch (config.origin) {
     case "figma":
@@ -20,6 +24,8 @@ export function ScenePreview(props: { config: ScenePreviewConfig }) {
                 fileid: config.fileid,
                 nodeid: config.sceneid, // scene id is node id here.
               }}
+              width={props.width}
+              height={props.height}
             />
           );
         case "static":
