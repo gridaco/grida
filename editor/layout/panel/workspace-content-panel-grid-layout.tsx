@@ -18,47 +18,49 @@ export function WorkspaceContentPanelGridLayout(props: {
     });
 
     return (
-      <Container>
+      <Slot_Container>
         {primaryContentPanels.length > 0 && (
-          <UpperContent>
+          <Slot_NonDockedContent>
             <PrimaryContentGridRoot>
               {primaryContentPanels}
             </PrimaryContentGridRoot>
-          </UpperContent>
+          </Slot_NonDockedContent>
         )}
         {bottomDockedPanels.length > 0 && (
-          <BottomDockedContent>
+          <Slot_BottomDockedContent>
             <DockedContentGridRoot>{bottomDockedPanels}</DockedContentGridRoot>
-          </BottomDockedContent>
+          </Slot_BottomDockedContent>
         )}
-      </Container>
+      </Slot_Container>
     );
   };
 
   return <>{onlyPanelChilds()}</>;
 }
 
-const Container = styled.div`
+const Slot_Container = styled.div`
   height: 100%;
   min-height: 100%;
   display: flex;
+  align-items: stretch;
   flex-direction: column;
-`;
-
-const UpperContent = styled.div`
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-
   flex: 1;
 `;
 
-const BottomDockedContent = styled.div`
+const Slot_NonDockedContent = styled.div`
+  flex: 1;
   display: flex;
   flex-direction: column;
   justify-content: center;
+`;
 
-  height: 60px;
+const Slot_BottomDockedContent = styled.div`
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  position: relative;
+  margin-top: auto;
+  height: 300px;
 `;
 
 const PanelLayoutItemsContainer = styled.div`
@@ -68,9 +70,8 @@ const PanelLayoutItemsContainer = styled.div`
 `;
 
 const DockedContentGridRoot = styled.div`
+  /* display: flex; */
   min-height: 300px;
-  bottom: 0px;
-  flex: 0;
 `;
 
 const PrimaryContentGridRoot = styled.div`

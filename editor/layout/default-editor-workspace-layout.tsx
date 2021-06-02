@@ -34,9 +34,11 @@ const AppBarMenuAndBelowContentWrap = styled.div`
 
 const AppBarWrap = styled.div`
   flex-grow: 0;
+  background: grey;
 `;
 
 const NonMenuContentZoneWrap = styled.div`
+  min-height: 100%;
   flex-grow: 1;
   display: flex;
   flex-direction: row;
@@ -50,5 +52,5 @@ const PanelLeftSideWrap = styled.div`
 
 const ChildrenContainerRoot = styled.div`
   flex: 1;
-  height: 100%;
+  min-height: 100%;
 `;

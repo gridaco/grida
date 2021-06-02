@@ -13,7 +13,7 @@ export default function WorkspaceDefaultLayoutPage_DEV() {
       >
         <WorkspaceContentPanelGridLayout>
           <WorkspaceContentPanel>
-            <p style={{ height: 1000 }}>Long content</p>
+            <p style={{ height: 200 }}>Long content</p>
           </WorkspaceContentPanel>
           <WorkspaceContentPanel>
             <p>2</p>
