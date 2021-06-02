@@ -17,16 +17,21 @@ import {
 } from "../../layout/panel";
 import { WorkspaceBottomPanelDockLayout } from "../../layout/panel/workspace-bottom-panel-dock-layout";
 import { JsonTree } from "../../components/visualization/json-visualization/json-tree";
+import { MonacoEditor, useMonaco } from "../../components/code-editor";
 
 // set image repo for figma platform
 MainImageRepository.instance = new ImageRepositories();
 
-const CodemirrorEditor = dynamic(
-  import("../../components/code-editor/code-mirror"),
-  {
-    ssr: false,
-  }
-);
+// const CodemirrorEditor = dynamic(
+//   import("../../components/code-editor/code-mirror"),
+//   {
+//     ssr: false,
+//   }
+// );
+
+// const MonacoEdotor = dynamic(import("@monaco-editor/react"), {
+//   ssr: false,
+// });
 
 export default function FigmaToReactDemoPage() {
   const [reflect, setReflect] = useState<ReflectSceneNode>();
@@ -40,6 +45,14 @@ export default function FigmaToReactDemoPage() {
   const handleTargetAquired = (target: FigmaTargetNodeConfig) => {
     setTargetnodeConfig(target);
   };
+
+  const monaco = useMonaco();
+
+  useEffect(() => {
+    if (monaco) {
+      // do something with editor
+    }
+  }, [monaco]);
 
   let widgetCode: string;
   let widgetTree;
@@ -77,17 +90,17 @@ export default function FigmaToReactDemoPage() {
           </WorkspaceContentPanel>
           <WorkspaceContentPanel>
             <InspectionPanelContentWrap>
-              <CodemirrorEditor
-                value={
+              <MonacoEditor
+                key={widgetCode}
+                height="100vh"
+                options={{
+                  automaticLayout: true,
+                }}
+                defaultValue={
                   widgetCode
                     ? widgetCode
                     : "// No input design provided to be converted.."
                 }
-                options={{
-                  mode: "javascript",
-                  theme: "monokai",
-                  lineNumbers: true,
-                }}
               />
             </InspectionPanelContentWrap>
           </WorkspaceContentPanel>
