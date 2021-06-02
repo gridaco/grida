@@ -11,6 +11,7 @@
     "@babel/runtime": "^7.14.0",
     "@base-sdk/base": "^0.1.0-5",
     "@designto/code": "0.0.1",
+    "@reflect-ui/editor-ui": "0.0.1",
     "@emotion/react": "^11.1.5",
     "@emotion/styled": "^11.1.5",
     "@material-ui/core": "^4.11.4",
