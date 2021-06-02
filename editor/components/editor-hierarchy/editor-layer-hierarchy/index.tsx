@@ -36,7 +36,7 @@ export function LayerHierarchy(props: {
 
   const renderTree = (nodes: LayerTree) => {
     if (!nodes) {
-      return <>empty</>;
+      return <div style={{ padding: 24 }}>empty</div>;
     }
     return (
       <TreeItem
@@ -72,9 +72,13 @@ export function LayerHierarchy(props: {
 }
 
 const Wrapper = styled.div`
-  flex: 1;
+  flex: 0;
   min-width: 200px;
   background-color: #2a2e39;
+  display: flex;
+  align-items: stretch;
+  flex-direction: column;
+  min-height: 100%;
 
   .scene-tab {
     margin: 30px 0px;

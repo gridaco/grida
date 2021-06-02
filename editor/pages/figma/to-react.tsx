@@ -7,28 +7,36 @@ import * as react from "@designto/react";
 import { ReflectSceneNode } from "@design-sdk/core/nodes";
 import styled from "@emotion/styled";
 import { tokenize } from "@designto/token";
-import JSONTree from "react-json-tree";
 import { DefaultEditorWorkspaceLayout } from "../../layout/default-editor-workspace-layout";
 import { LayerHierarchy } from "../../components/editor-hierarchy";
 import { PreviewAndRunPanel } from "../../components/preview-and-run";
 import { FigmaTargetNodeConfig } from "@design-sdk/core/utils/figma-api-utils";
+import {
+  WorkspaceContentPanel,
+  WorkspaceContentPanelGridLayout,
+} from "../../layout/panel";
+import { WorkspaceBottomPanelDockLayout } from "../../layout/panel/workspace-bottom-panel-dock-layout";
+import { JsonTree } from "../../components/visualization/json-visualization/json-tree";
+import { MonacoEditor, useMonaco } from "../../components/code-editor";
 
 // set image repo for figma platform
 MainImageRepository.instance = new ImageRepositories();
 
-const CodemirrorEditor = dynamic(
-  import("../../components/code-editor/code-mirror"),
-  {
-    ssr: false,
-  }
-);
+// const CodemirrorEditor = dynamic(
+//   import("../../components/code-editor/code-mirror"),
+//   {
+//     ssr: false,
+//   }
+// );
+
+// const MonacoEdotor = dynamic(import("@monaco-editor/react"), {
+//   ssr: false,
+// });
 
 export default function FigmaToReactDemoPage() {
   const [reflect, setReflect] = useState<ReflectSceneNode>();
-  const [
-    targetnodeConfig,
-    setTargetnodeConfig,
-  ] = useState<FigmaTargetNodeConfig>();
+  const [targetnodeConfig, setTargetnodeConfig] =
+    useState<FigmaTargetNodeConfig>();
 
   const handleOnDesignImported = (reflect: ReflectSceneNode) => {
     setReflect(reflect);
@@ -37,6 +45,14 @@ export default function FigmaToReactDemoPage() {
   const handleTargetAquired = (target: FigmaTargetNodeConfig) => {
     setTargetnodeConfig(target);
   };
+
+  const monaco = useMonaco();
+
+  useEffect(() => {
+    if (monaco) {
+      // do something with editor
+    }
+  }, [monaco]);
 
   let widgetCode: string;
   let widgetTree;
@@ -53,49 +69,53 @@ export default function FigmaToReactDemoPage() {
   return (
     <>
       <DefaultEditorWorkspaceLayout leftbar={<LayerHierarchy data={reflect} />}>
-        <PreviewAndRunPanel
-          config={{
-            src: widgetCode,
-            platform: "web",
-            sceneSize: {
-              w: reflect?.width,
-              h: reflect?.height,
-            },
-            fileid: targetnodeConfig?.file,
-            sceneid: targetnodeConfig?.node,
-          }}
-        />
         <figmacomp.FigmaScreenImporter
           onImported={handleOnDesignImported}
           onTargetEnter={handleTargetAquired}
         />
-        <ContentWrap>
-          <JSONTree data={widgetTree} />
-          <CodemirrorEditor
-            value={
-              widgetCode
-                ? widgetCode
-                : "// No input design provided to be converted.."
-            }
-            options={{
-              mode: "javascript",
-              theme: "monokai",
-              lineNumbers: true,
-            }}
-          />
-          {widgetCode && (
-            <div>
-              <runner.ReactAppRunner source={widgetCode} />
-              <br />
-            </div>
-          )}
-        </ContentWrap>
+        <WorkspaceContentPanelGridLayout>
+          <WorkspaceContentPanel>
+            <PreviewAndRunPanel
+              config={{
+                src: widgetCode,
+                platform: "web",
+                sceneSize: {
+                  w: reflect?.width,
+                  h: reflect?.height,
+                },
+                fileid: targetnodeConfig?.file,
+                sceneid: targetnodeConfig?.node,
+              }}
+            />
+          </WorkspaceContentPanel>
+          <WorkspaceContentPanel>
+            <InspectionPanelContentWrap>
+              <MonacoEditor
+                key={widgetCode}
+                height="100vh"
+                options={{
+                  automaticLayout: true,
+                }}
+                defaultValue={
+                  widgetCode
+                    ? widgetCode
+                    : "// No input design provided to be converted.."
+                }
+              />
+            </InspectionPanelContentWrap>
+          </WorkspaceContentPanel>
+          <WorkspaceBottomPanelDockLayout>
+            <WorkspaceContentPanel>
+              <JsonTree data={widgetTree} />
+            </WorkspaceContentPanel>
+          </WorkspaceBottomPanelDockLayout>
+        </WorkspaceContentPanelGridLayout>
       </DefaultEditorWorkspaceLayout>
     </>
   );
 }
 
-const ContentWrap = styled.div`
+const InspectionPanelContentWrap = styled.div`
   display: flex;
   flex-direction: row;
   align-items: stretch;

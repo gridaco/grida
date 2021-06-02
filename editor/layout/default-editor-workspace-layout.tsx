@@ -1,37 +1,68 @@
 import styled from "@emotion/styled";
 import React from "react";
+import { AppMenu } from "./app-menu";
 
 export function DefaultEditorWorkspaceLayout(props: {
-  leftbar: JSX.Element;
+  leftbar?: JSX.Element;
+  rightbar?: JSX.Element;
   children: JSX.Element | Array<JSX.Element>;
 }) {
   return (
-    <>
-      <WorkspaceRoot>
-        <PanelLeftSideWrap>{props.leftbar}</PanelLeftSideWrap>
-        <ChildrenContainerRoot>
-          <RenderComponentWrapper>{props.children}</RenderComponentWrapper>
-        </ChildrenContainerRoot>
-      </WorkspaceRoot>
-    </>
+    <WorkspaceRoot>
+      <AppBarMenuAndBelowContentWrap>
+        <AppBarWrap>
+          <AppMenu />
+        </AppBarWrap>
+        <NonMenuContentZoneWrap>
+          {props.leftbar && (
+            <PanelLeftSideWrap>{props.leftbar}</PanelLeftSideWrap>
+          )}
+          <ChildrenContainerRoot>{props.children}</ChildrenContainerRoot>
+          {props.rightbar && (
+            <PanelRightSideWrap>{props.rightbar}</PanelRightSideWrap>
+          )}
+        </NonMenuContentZoneWrap>
+      </AppBarMenuAndBelowContentWrap>
+    </WorkspaceRoot>
   );
 }
 
-const PanelLeftSideWrap = styled.div``;
-
 const WorkspaceRoot = styled.div`
-  display: flex;
   width: 100vw;
   height: 100vh;
 `;
 
-const ChildrenContainerRoot = styled.div`
+const AppBarMenuAndBelowContentWrap = styled.div`
+  min-height: 100%;
+  max-height: 100vh;
   display: flex;
   flex-direction: column;
-  flex: 6;
 `;
 
-const RenderComponentWrapper = styled.div`
-  overflow-y: hidden;
-  flex: 3;
+const AppBarWrap = styled.div`
+  flex-grow: 0;
+  background: grey;
+`;
+
+const NonMenuContentZoneWrap = styled.div`
+  min-height: 100%;
+  flex-grow: 1;
+  display: flex;
+  flex-direction: row;
+  align-items: stretch;
+`;
+
+const PanelLeftSideWrap = styled.div`
+  flex-grow: 0;
+  min-height: 100%;
+`;
+
+const PanelRightSideWrap = styled.div`
+  flex-grow: 0;
+  min-height: 100%;
+`;
+
+const ChildrenContainerRoot = styled.div`
+  flex: 1;
+  min-height: 100%;
 `;

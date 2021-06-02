@@ -10,8 +10,12 @@ function GlobalCss() {
       styles={css`
         body {
           margin: 0px;
+          padding: 0;
           font-family: "Roboto", sans-serif;
           background-color: #181a22;
+        }
+        iframe {
+          border: none;
         }
 
         h1,

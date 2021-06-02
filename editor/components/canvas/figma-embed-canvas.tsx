@@ -1,7 +1,11 @@
 import React from "react";
 
 type EmbedInput = { url: string } | { fileid: string; nodeid?: string };
-export function FigmaEmbedCanvas(props: { src: EmbedInput }) {
+export function FigmaEmbedCanvas(props: {
+  src: EmbedInput;
+  width?: string | number;
+  height?: string | number;
+}) {
   const url = builEmbedabledUrl(props.src);
 
   if (url) {
@@ -9,8 +13,13 @@ export function FigmaEmbedCanvas(props: { src: EmbedInput }) {
      * build embedding url. - https://www.figma.com/developers/embed
      */
     const _embed_url = `https://www.figma.com/embed?embed_host=astra&url=${url}`;
-    console.log("loading into figma embed preview - url is..", _embed_url, url);
-    return <iframe width={300} height={600} src={_embed_url} />;
+    return (
+      <iframe
+        width={props.width ?? 375}
+        height={props.height}
+        src={_embed_url}
+      />
+    );
   }
   return <>NO FIGMA URL PROVIDED</>;
 }

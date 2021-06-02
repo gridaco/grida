@@ -1,3 +1,4 @@
+import styled from "@emotion/styled";
 import { Tab } from "@material-ui/core";
 import React, { useEffect, useState } from "react";
 import { AppRunner } from "../app-runner";
@@ -36,6 +37,8 @@ export function PreviewAndRunPanel(props: { config: SceneRunnerConfig }) {
   };
 
   const TargetModePanel = () => {
+    const _width = "100%";
+    const _height = "100%";
     switch (mode) {
       case "preview":
         return (
@@ -46,6 +49,8 @@ export function PreviewAndRunPanel(props: { config: SceneRunnerConfig }) {
               origin: "figma",
               displayAs: "embed",
             }}
+            width={_width}
+            height={_height}
           />
         );
       case "run":
@@ -67,16 +72,22 @@ export function PreviewAndRunPanel(props: { config: SceneRunnerConfig }) {
     };
     return (
       <>
-        <Tab onClick={clicked("preview")}>Preview</Tab>
-        <Tab onClick={clicked("run")}>Run</Tab>
+        <button onClick={clicked("preview")}>Preview</button>
+        <button onClick={clicked("run")}>Run</button>
       </>
     );
   };
 
   return (
     <>
-      <ModeSelectionTab />
+      <StickyTab>
+        <ModeSelectionTab />
+      </StickyTab>
       <TargetModePanel />
     </>
   );
 }
+
+const StickyTab = styled.div`
+  position: absolute;
+`;

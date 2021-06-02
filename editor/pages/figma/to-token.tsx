@@ -1,8 +1,9 @@
 import React, { useState } from "react";
 import { figmacomp, canvas } from "../../components";
 import { ReflectSceneNode } from "@design-sdk/core/nodes";
-import JSONTree from "react-json-tree";
 import { tokenize } from "@designto/token";
+import { JsonTree } from "../../components/visualization/json-visualization/json-tree";
+import { FigmaTargetNodeConfig } from "@design-sdk/core/utils/figma-api-utils";
 
 export default function FigmaToReflectWidgetTokenPage() {
   const [reflect, setReflect] = useState<ReflectSceneNode>();
@@ -12,8 +13,8 @@ export default function FigmaToReflectWidgetTokenPage() {
     setReflect(reflect);
   };
 
-  const handleFigmaUrlEnter = (url: string) => {
-    setFigmaNodeUrl(url);
+  const handleFigmaUrlEnter = (target: FigmaTargetNodeConfig) => {
+    setFigmaNodeUrl(target.url);
   };
 
   let tokenTree;
@@ -29,7 +30,7 @@ export default function FigmaToReflectWidgetTokenPage() {
         onTargetEnter={handleFigmaUrlEnter}
       />
 
-      <JSONTree hideRoot data={tokenTree} />
+      <JsonTree hideRoot data={tokenTree} />
     </>
   );
 }

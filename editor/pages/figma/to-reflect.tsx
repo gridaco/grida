@@ -1,17 +1,15 @@
 import React, { useState } from "react";
 import { figmacomp, canvas } from "../../components";
 import { ReflectSceneNode } from "@design-sdk/core/nodes";
-import JSONTree from "react-json-tree";
 
 import { visualize_node } from "../../components/visualization";
 import { FigmaTargetNodeConfig } from "@design-sdk/core/utils/figma-api-utils";
+import { JsonTree } from "../../components/visualization/json-visualization/json-tree";
 
 export default function FigmaToReflectNodePage() {
   const [reflect, setReflect] = useState<ReflectSceneNode>();
-  const [
-    targetnodeConfig,
-    setTargetnodeConfig,
-  ] = useState<FigmaTargetNodeConfig>();
+  const [targetnodeConfig, setTargetnodeConfig] =
+    useState<FigmaTargetNodeConfig>();
 
   const handleOnDesignImported = (reflect: ReflectSceneNode) => {
     setReflect(reflect);
@@ -23,7 +21,7 @@ export default function FigmaToReflectNodePage() {
 
   return (
     <>
-      <canvas.FigmaEmbedCanvas src={{ url: targetnodeConfig.url }} />
+      <canvas.FigmaEmbedCanvas src={{ url: targetnodeConfig?.url }} />
       <figmacomp.FigmaScreenImporter
         onImported={handleOnDesignImported}
         onTargetEnter={handleFigmaUrlEnter}
@@ -34,7 +32,7 @@ export default function FigmaToReflectNodePage() {
         height={400}
         tree={nodeToTreeVisualData(reflect)}
       />
-      <JSONTree hideRoot data={reflect} />
+      <JsonTree hideRoot data={reflect} />
     </>
   );
 }
