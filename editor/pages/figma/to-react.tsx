@@ -17,6 +17,7 @@ import {
 } from "../../layout/panel";
 import { WorkspaceBottomPanelDockLayout } from "../../layout/panel/workspace-bottom-panel-dock-layout";
 import { JsonTree } from "../../components/visualization/json-visualization/json-tree";
+import Editor, { DiffEditor, useMonaco, loader } from "@monaco-editor/react";
 
 // set image repo for figma platform
 MainImageRepository.instance = new ImageRepositories();
@@ -77,6 +78,11 @@ export default function FigmaToReactDemoPage() {
           </WorkspaceContentPanel>
           <WorkspaceContentPanel>
             <InspectionPanelContentWrap>
+              <Editor
+                height="90vh"
+                defaultLanguage="javascript"
+                defaultValue="// some comment"
+              />
               <CodemirrorEditor
                 value={
                   widgetCode
