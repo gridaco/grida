@@ -3,6 +3,7 @@ import Editor, { useMonaco } from "@monaco-editor/react";
 import * as monaco from "monaco-editor/esm/vs/editor/editor.api";
 interface EditorProps {
   defaultValue?: string;
+  defaultLangiage?: string;
   width?: number | string;
   height?: number | string;
   options?: monaco.editor.IStandaloneEditorConstructionOptions;
@@ -51,7 +52,7 @@ export function MonacoEditor(props: EditorProps) {
     <Editor
       width={props.width}
       height={props.height}
-      defaultLanguage="typescript"
+      defaultLanguage={props.defaultLangiage ?? "typescript"}
       defaultValue={props.defaultValue ?? "// no content"}
       theme="vs-dark"
       options={props.options}

@@ -1,12 +1,9 @@
-import dynamic from "next/dynamic";
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
+import styled from "@emotion/styled";
 import { MainImageRepository } from "@design-sdk/core/assets-repository";
 import { ImageRepositories } from "@design-sdk/figma/asset-repository";
-import { figmacomp, canvas, runner } from "../../components";
-import * as react from "@designto/react";
+import { figmacomp } from "../../components";
 import { ReflectSceneNode } from "@design-sdk/core/nodes";
-import styled from "@emotion/styled";
-import { tokenize } from "@designto/token";
 import { DefaultEditorWorkspaceLayout } from "../../layout/default-editor-workspace-layout";
 import { LayerHierarchy } from "../../components/editor-hierarchy";
 import { PreviewAndRunPanel } from "../../components/preview-and-run";
@@ -17,21 +14,12 @@ import {
 } from "../../layout/panel";
 import { WorkspaceBottomPanelDockLayout } from "../../layout/panel/workspace-bottom-panel-dock-layout";
 import { JsonTree } from "../../components/visualization/json-visualization/json-tree";
-import { MonacoEditor, useMonaco } from "../../components/code-editor";
+import { MonacoEditor } from "../../components/code-editor";
+import { tokenize } from "@designto/token";
+import * as react from "@designto/react";
 
 // set image repo for figma platform
 MainImageRepository.instance = new ImageRepositories();
-
-// const CodemirrorEditor = dynamic(
-//   import("../../components/code-editor/code-mirror"),
-//   {
-//     ssr: false,
-//   }
-// );
-
-// const MonacoEdotor = dynamic(import("@monaco-editor/react"), {
-//   ssr: false,
-// });
 
 export default function FigmaToReactDemoPage() {
   const [reflect, setReflect] = useState<ReflectSceneNode>();
@@ -45,14 +33,6 @@ export default function FigmaToReactDemoPage() {
   const handleTargetAquired = (target: FigmaTargetNodeConfig) => {
     setTargetnodeConfig(target);
   };
-
-  const monaco = useMonaco();
-
-  useEffect(() => {
-    if (monaco) {
-      // do something with editor
-    }
-  }, [monaco]);
 
   let widgetCode: string;
   let widgetTree;
