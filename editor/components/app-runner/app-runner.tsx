@@ -15,8 +15,8 @@ export function AppRunner(props: {
     case "flutter":
       return (
         <FlutterAppRunner
-          width={sceneSize.w}
-          height={sceneSize.h}
+          width="300px"
+          height="100%"
           q={{
             language: "dart",
             src: src,
@@ -24,8 +24,6 @@ export function AppRunner(props: {
         />
       );
     case "web":
-      return (
-        <CodeSandBoxView width={sceneSize.w} height={sceneSize.h} src={src} />
-      );
+      return <CodeSandBoxView width="300px" height="100%" src={src} />;
   }
 }

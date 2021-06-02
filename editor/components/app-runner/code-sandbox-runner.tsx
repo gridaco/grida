@@ -43,24 +43,5 @@ export function CodeSandBoxView(props: {
     );
   }, []);
 
-  return (
-    <Wrapper width={props.width} height={props.height}>
-      <iframe src={iframeUrl} />
-    </Wrapper>
-  );
+  return <iframe width={props.width} height={props.height} src={iframeUrl} />;
 }
-
-interface WrapperProps {
-  width: string | number;
-  height: string | number;
-}
-
-const Wrapper = styled.div<WrapperProps>`
-  iframe {
-    position: absolute;
-    right: 0;
-    width: ${(props) => props.width};
-    height: ${(props) => props.width};
-    border: none;
-  }
-`;

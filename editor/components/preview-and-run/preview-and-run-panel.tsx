@@ -67,8 +67,8 @@ export function PreviewAndRunPanel(props: { config: SceneRunnerConfig }) {
     };
     return (
       <>
-        <Tab onClick={clicked("preview")}>Preview</Tab>
-        <Tab onClick={clicked("run")}>Run</Tab>
+        <button onClick={clicked("preview")}>Preview</button>
+        <button onClick={clicked("run")}>Run</button>
       </>
     );
   };

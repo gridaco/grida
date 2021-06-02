@@ -12,6 +12,10 @@ import { DefaultEditorWorkspaceLayout } from "../../layout/default-editor-worksp
 import { LayerHierarchy } from "../../components/editor-hierarchy";
 import { PreviewAndRunPanel } from "../../components/preview-and-run";
 import { FigmaTargetNodeConfig } from "@design-sdk/core/utils/figma-api-utils";
+import {
+  WorkspaceContentPanel,
+  WorkspaceContentPanelGridLayout,
+} from "../../layout/panel";
 
 // set image repo for figma platform
 MainImageRepository.instance = new ImageRepositories();
@@ -25,10 +29,8 @@ const CodemirrorEditor = dynamic(
 
 export default function FigmaToReactDemoPage() {
   const [reflect, setReflect] = useState<ReflectSceneNode>();
-  const [
-    targetnodeConfig,
-    setTargetnodeConfig,
-  ] = useState<FigmaTargetNodeConfig>();
+  const [targetnodeConfig, setTargetnodeConfig] =
+    useState<FigmaTargetNodeConfig>();
 
   const handleOnDesignImported = (reflect: ReflectSceneNode) => {
     setReflect(reflect);
@@ -53,49 +55,55 @@ export default function FigmaToReactDemoPage() {
   return (
     <>
       <DefaultEditorWorkspaceLayout leftbar={<LayerHierarchy data={reflect} />}>
-        <PreviewAndRunPanel
-          config={{
-            src: widgetCode,
-            platform: "web",
-            sceneSize: {
-              w: reflect?.width,
-              h: reflect?.height,
-            },
-            fileid: targetnodeConfig?.file,
-            sceneid: targetnodeConfig?.node,
-          }}
-        />
         <figmacomp.FigmaScreenImporter
           onImported={handleOnDesignImported}
           onTargetEnter={handleTargetAquired}
         />
-        <ContentWrap>
-          <JSONTree data={widgetTree} />
-          <CodemirrorEditor
-            value={
-              widgetCode
-                ? widgetCode
-                : "// No input design provided to be converted.."
-            }
-            options={{
-              mode: "javascript",
-              theme: "monokai",
-              lineNumbers: true,
-            }}
-          />
-          {widgetCode && (
-            <div>
-              <runner.ReactAppRunner source={widgetCode} />
-              <br />
-            </div>
-          )}
-        </ContentWrap>
+        <WorkspaceContentPanelGridLayout>
+          <WorkspaceContentPanel>
+            <PreviewAndRunPanel
+              config={{
+                src: widgetCode,
+                platform: "web",
+                sceneSize: {
+                  w: reflect?.width,
+                  h: reflect?.height,
+                },
+                fileid: targetnodeConfig?.file,
+                sceneid: targetnodeConfig?.node,
+              }}
+            />
+          </WorkspaceContentPanel>
+          <WorkspaceContentPanel>
+            <InspectionPanelContentWrap>
+              <JSONTree data={widgetTree} />
+              <CodemirrorEditor
+                value={
+                  widgetCode
+                    ? widgetCode
+                    : "// No input design provided to be converted.."
+                }
+                options={{
+                  mode: "javascript",
+                  theme: "monokai",
+                  lineNumbers: true,
+                }}
+              />
+              {widgetCode && (
+                <div>
+                  <runner.ReactAppRunner source={widgetCode} />
+                  <br />
+                </div>
+              )}
+            </InspectionPanelContentWrap>
+          </WorkspaceContentPanel>
+        </WorkspaceContentPanelGridLayout>
       </DefaultEditorWorkspaceLayout>
     </>
   );
 }
 
-const ContentWrap = styled.div`
+const InspectionPanelContentWrap = styled.div`
   display: flex;
   flex-direction: row;
   align-items: stretch;
