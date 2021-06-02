@@ -21,7 +21,7 @@ export default function FigmaToReflectNodePage() {
 
   return (
     <>
-      <canvas.FigmaEmbedCanvas src={{ url: targetnodeConfig.url }} />
+      <canvas.FigmaEmbedCanvas src={{ url: targetnodeConfig?.url }} />
       <figmacomp.FigmaScreenImporter
         onImported={handleOnDesignImported}
         onTargetEnter={handleFigmaUrlEnter}
