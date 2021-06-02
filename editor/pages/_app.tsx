@@ -13,6 +13,9 @@ function GlobalCss() {
           font-family: "Roboto", sans-serif;
           background-color: #181a22;
         }
+        iframe {
+          border: none;
+        }
 
         h1,
         h2,

@@ -1,3 +1,4 @@
+import styled from "@emotion/styled";
 import { Tab } from "@material-ui/core";
 import React, { useEffect, useState } from "react";
 import { AppRunner } from "../app-runner";
@@ -75,8 +76,14 @@ export function PreviewAndRunPanel(props: { config: SceneRunnerConfig }) {
 
   return (
     <>
-      <ModeSelectionTab />
+      <StickyTab>
+        <ModeSelectionTab />
+      </StickyTab>
       <TargetModePanel />
     </>
   );
 }
+
+const StickyTab = styled.div`
+  position: absolute;
+`;

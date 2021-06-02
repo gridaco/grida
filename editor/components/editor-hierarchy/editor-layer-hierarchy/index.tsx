@@ -74,6 +74,7 @@ export function LayerHierarchy(props: {
 const Wrapper = styled.div`
   flex: 1;
   min-width: 200px;
+  height: 100%;
   background-color: #2a2e39;
 
   .scene-tab {
