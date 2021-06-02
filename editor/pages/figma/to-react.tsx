@@ -7,7 +7,6 @@ import * as react from "@designto/react";
 import { ReflectSceneNode } from "@design-sdk/core/nodes";
 import styled from "@emotion/styled";
 import { tokenize } from "@designto/token";
-import JSONTree from "react-json-tree";
 import { DefaultEditorWorkspaceLayout } from "../../layout/default-editor-workspace-layout";
 import { LayerHierarchy } from "../../components/editor-hierarchy";
 import { PreviewAndRunPanel } from "../../components/preview-and-run";
@@ -17,6 +16,7 @@ import {
   WorkspaceContentPanelGridLayout,
 } from "../../layout/panel";
 import { WorkspaceBottomPanelDockLayout } from "../../layout/panel/workspace-bottom-panel-dock-layout";
+import { JsonTree } from "../../components/visualization/json-visualization/json-tree";
 
 // set image repo for figma platform
 MainImageRepository.instance = new ImageRepositories();
@@ -93,7 +93,7 @@ export default function FigmaToReactDemoPage() {
           </WorkspaceContentPanel>
           <WorkspaceBottomPanelDockLayout>
             <WorkspaceContentPanel>
-              <JSONTree data={widgetTree} />
+              <JsonTree data={widgetTree} />
             </WorkspaceContentPanel>
           </WorkspaceBottomPanelDockLayout>
         </WorkspaceContentPanelGridLayout>

@@ -60,7 +60,7 @@ const Slot_BottomDockedContent = styled.div`
   justify-content: center;
   position: relative;
   margin-top: auto;
-  height: 300px;
+  min-height: 150px;
 `;
 
 const PanelLayoutItemsContainer = styled.div`
@@ -71,7 +71,7 @@ const PanelLayoutItemsContainer = styled.div`
 
 const DockedContentGridRoot = styled.div`
   /* display: flex; */
-  min-height: 300px;
+  min-height: 150px;
 `;
 
 const PrimaryContentGridRoot = styled.div`
