@@ -43,5 +43,5 @@ export function AppMenu() {
 }
 
 const AppMenuRoot = styled.div`
-  max-height: 24px;
+  flex-grow: 0;
 `;

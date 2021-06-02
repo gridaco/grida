@@ -7,48 +7,48 @@ export function DefaultEditorWorkspaceLayout(props: {
   children: JSX.Element | Array<JSX.Element>;
 }) {
   return (
-    <>
-      <WorkspaceRoot>
-        <AppBarMenuAndBelowContentWrap>
+    <WorkspaceRoot>
+      <AppBarMenuAndBelowContentWrap>
+        <AppBarWrap>
           <AppMenu />
-          <NonMenuContentZoneWrap>
-            <PanelLeftSideWrap>{props.leftbar}</PanelLeftSideWrap>
-            <ChildrenContainerRoot>
-              <RenderComponentWrapper>{props.children}</RenderComponentWrapper>
-            </ChildrenContainerRoot>
-          </NonMenuContentZoneWrap>
-        </AppBarMenuAndBelowContentWrap>
-      </WorkspaceRoot>
-    </>
+        </AppBarWrap>
+        <NonMenuContentZoneWrap>
+          <PanelLeftSideWrap>{props.leftbar}</PanelLeftSideWrap>
+          <ChildrenContainerRoot>{props.children}</ChildrenContainerRoot>
+        </NonMenuContentZoneWrap>
+      </AppBarMenuAndBelowContentWrap>
+    </WorkspaceRoot>
   );
 }
-
-const NonMenuContentZoneWrap = styled.div`
-  display: flex;
-  flex-direction: row;
-`;
-
-const AppBarMenuAndBelowContentWrap = styled.div`
-  display: flex;
-  flex-direction: column;
-`;
-
-const PanelLeftSideWrap = styled.div`
-  height: 100vh;
-`;
 
 const WorkspaceRoot = styled.div`
   width: 100vw;
   height: 100vh;
 `;
 
-const ChildrenContainerRoot = styled.div`
+const AppBarMenuAndBelowContentWrap = styled.div`
+  min-height: 100%;
   display: flex;
   flex-direction: column;
-  flex: 6;
 `;
 
-const RenderComponentWrapper = styled.div`
-  overflow-y: hidden;
-  flex: 3;
+const AppBarWrap = styled.div`
+  flex-grow: 0;
+`;
+
+const NonMenuContentZoneWrap = styled.div`
+  flex-grow: 1;
+  display: flex;
+  flex-direction: row;
+  align-items: stretch;
+`;
+
+const PanelLeftSideWrap = styled.div`
+  flex-grow: 0;
+  min-height: 100%;
+`;
+
+const ChildrenContainerRoot = styled.div`
+  flex: 1;
+  height: 100%;
 `;

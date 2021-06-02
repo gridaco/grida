@@ -16,7 +16,7 @@ export function FigmaEmbedCanvas(props: {
     return (
       <iframe
         width={props.width ?? 375}
-        height={props.height ?? "100%"}
+        height={props.height}
         src={_embed_url}
       />
     );
