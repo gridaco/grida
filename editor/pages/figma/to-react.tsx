@@ -22,12 +22,16 @@ import Editor, { DiffEditor, useMonaco, loader } from "@monaco-editor/react";
 // set image repo for figma platform
 MainImageRepository.instance = new ImageRepositories();
 
-const CodemirrorEditor = dynamic(
-  import("../../components/code-editor/code-mirror"),
-  {
-    ssr: false,
-  }
-);
+// const CodemirrorEditor = dynamic(
+//   import("../../components/code-editor/code-mirror"),
+//   {
+//     ssr: false,
+//   }
+// );
+
+// const MonacoEdotor = dynamic(import("@monaco-editor/react"), {
+//   ssr: false,
+// });
 
 export default function FigmaToReactDemoPage() {
   const [reflect, setReflect] = useState<ReflectSceneNode>();
@@ -78,12 +82,22 @@ export default function FigmaToReactDemoPage() {
           </WorkspaceContentPanel>
           <WorkspaceContentPanel>
             <InspectionPanelContentWrap>
-              <Editor
+              {/* <Editor
                 height="90vh"
                 defaultLanguage="javascript"
                 defaultValue="// some comment"
+              /> */}
+              <Editor
+                height="90vh"
+                defaultLanguage="javascript"
+                theme="monokai"
+                defaultValue={
+                  widgetCode
+                    ? widgetCode
+                    : "// No input design provided to be converted.."
+                }
               />
-              <CodemirrorEditor
+              {/* <CodemirrorEditor
                 value={
                   widgetCode
                     ? widgetCode
@@ -94,7 +108,7 @@ export default function FigmaToReactDemoPage() {
                   theme: "monokai",
                   lineNumbers: true,
                 }}
-              />
+              /> */}
             </InspectionPanelContentWrap>
           </WorkspaceContentPanel>
           <WorkspaceBottomPanelDockLayout>
