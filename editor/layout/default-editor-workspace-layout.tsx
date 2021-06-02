@@ -3,7 +3,8 @@ import React from "react";
 import { AppMenu } from "./app-menu";
 
 export function DefaultEditorWorkspaceLayout(props: {
-  leftbar: JSX.Element;
+  leftbar?: JSX.Element;
+  rightbar?: JSX.Element;
   children: JSX.Element | Array<JSX.Element>;
 }) {
   return (
@@ -13,8 +14,13 @@ export function DefaultEditorWorkspaceLayout(props: {
           <AppMenu />
         </AppBarWrap>
         <NonMenuContentZoneWrap>
-          <PanelLeftSideWrap>{props.leftbar}</PanelLeftSideWrap>
+          {props.leftbar && (
+            <PanelLeftSideWrap>{props.leftbar}</PanelLeftSideWrap>
+          )}
           <ChildrenContainerRoot>{props.children}</ChildrenContainerRoot>
+          {props.rightbar && (
+            <PanelRightSideWrap>{props.rightbar}</PanelRightSideWrap>
+          )}
         </NonMenuContentZoneWrap>
       </AppBarMenuAndBelowContentWrap>
     </WorkspaceRoot>
@@ -46,6 +52,11 @@ const NonMenuContentZoneWrap = styled.div`
 `;
 
 const PanelLeftSideWrap = styled.div`
+  flex-grow: 0;
+  min-height: 100%;
+`;
+
+const PanelRightSideWrap = styled.div`
   flex-grow: 0;
   min-height: 100%;
 `;

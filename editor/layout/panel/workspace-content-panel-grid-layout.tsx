@@ -44,7 +44,6 @@ const Slot_Container = styled.div`
   display: flex;
   align-items: stretch;
   flex-direction: column;
-  flex: 1;
 `;
 
 const Slot_NonDockedContent = styled.div`
