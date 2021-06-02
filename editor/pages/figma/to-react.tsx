@@ -88,9 +88,12 @@ export default function FigmaToReactDemoPage() {
                 defaultValue="// some comment"
               /> */}
               <Editor
-                height="90vh"
+                height="100vh"
                 defaultLanguage="javascript"
                 theme="monokai"
+                options={{
+                  automaticLayout: true,
+                }}
                 defaultValue={
                   widgetCode
                     ? widgetCode
