@@ -17,7 +17,7 @@ import {
 } from "../../layout/panel";
 import { WorkspaceBottomPanelDockLayout } from "../../layout/panel/workspace-bottom-panel-dock-layout";
 import { JsonTree } from "../../components/visualization/json-visualization/json-tree";
-import Editor, { DiffEditor, useMonaco, loader } from "@monaco-editor/react";
+import { MonacoEditor, useMonaco } from "../../components/code-editor";
 
 // set image repo for figma platform
 MainImageRepository.instance = new ImageRepositories();
@@ -45,6 +45,14 @@ export default function FigmaToReactDemoPage() {
   const handleTargetAquired = (target: FigmaTargetNodeConfig) => {
     setTargetnodeConfig(target);
   };
+
+  const monaco = useMonaco();
+
+  useEffect(() => {
+    if (monaco) {
+      // do something with editor
+    }
+  }, [monaco]);
 
   let widgetCode: string;
   let widgetTree;
@@ -82,15 +90,9 @@ export default function FigmaToReactDemoPage() {
           </WorkspaceContentPanel>
           <WorkspaceContentPanel>
             <InspectionPanelContentWrap>
-              {/* <Editor
-                height="90vh"
-                defaultLanguage="javascript"
-                defaultValue="// some comment"
-              /> */}
-              <Editor
+              <MonacoEditor
+                key={widgetCode}
                 height="100vh"
-                defaultLanguage="javascript"
-                theme="monokai"
                 options={{
                   automaticLayout: true,
                 }}
@@ -100,18 +102,6 @@ export default function FigmaToReactDemoPage() {
                     : "// No input design provided to be converted.."
                 }
               />
-              {/* <CodemirrorEditor
-                value={
-                  widgetCode
-                    ? widgetCode
-                    : "// No input design provided to be converted.."
-                }
-                options={{
-                  mode: "javascript",
-                  theme: "monokai",
-                  lineNumbers: true,
-                }}
-              /> */}
             </InspectionPanelContentWrap>
           </WorkspaceContentPanel>
           <WorkspaceBottomPanelDockLayout>

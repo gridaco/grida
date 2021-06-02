@@ -1,7 +1,7 @@
 //// dynamic code editor. supports codemirror & monaco
 import React from "react";
 import CodeMirror from "./code-mirror";
-import { Monaco } from "./monaco";
+import { MonacoEditor } from "./monaco";
 
 interface DynamicEdotorProps {
   host?: _Host;
@@ -11,14 +11,14 @@ type _Host = "codemirror" | "monaco" | "auto";
 // uses monaco by default. when set auto or host not provided.
 const fallbackAutoHost = "monaco";
 
-export function CodeEdotor(props: DynamicEdotorProps) {
+export function CodeEditor(props: DynamicEdotorProps) {
   const _editorname = getTargetEditorName(props.host);
 
   switch (_editorname) {
     case "codemirror":
       return <CodeMirror />;
     case "monaco":
-      return <Monaco />;
+      return <MonacoEditor />;
   }
 }
 
