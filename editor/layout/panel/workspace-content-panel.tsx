@@ -15,5 +15,6 @@ const Container = styled.div`
   border-width: 1px;
   align-self: stretch;
   flex: 1;
+  overflow: auto;
   background: #2a2e39;
 `;
