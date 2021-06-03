@@ -8,6 +8,19 @@ import { FigmaTargetNodeConfig } from "@design-sdk/core/utils/figma-api-utils";
 export type OnImportedCallback = (reflect: nodes.ReflectSceneNode) => void;
 type _OnRemoteLoadedCallback = (reflect: remote.types.Node) => void;
 
+export async function fetchTargetAsReflect(
+  file: string,
+  node: string
+): Promise<nodes.ReflectSceneNode> {
+  const d = await fetchTarget(file, node);
+  console.log("api raw", d);
+  const _mapped = remote.mapper.mapFigmaRemoteToFigma(d as any);
+  console.log("mapped", _mapped);
+  const _converted = convert.intoReflectNode(_mapped);
+  console.log("converted", _converted);
+  return _converted;
+}
+
 async function fetchTarget(file: string, node: string) {
   const client = remote.api.Client({
     personalAccessToken: utils_figma.figmaPersonalAccessToken(),
@@ -78,9 +91,8 @@ export function FigmaScreenImporter(props: {
           <_UrlImporterSegment
             onLoaded={handleLocalDataLoad}
             onUrlEnter={(url: string) => {
-              const nodeconfig = utils.figmaApi.parseFileAndNodeIdFromUrl_Figma(
-                url
-              );
+              const nodeconfig =
+                utils.figmaApi.parseFileAndNodeIdFromUrl_Figma(url);
               props.onTargetEnter(nodeconfig);
             }}
           />
@@ -115,17 +127,15 @@ function _UrlImporterSegment(props: {
   onLoaded: _OnRemoteLoadedCallback;
   onUrlEnter?: (url: string) => void;
 }) {
-  const [loadState, setLoadState] = useState<
-    "none" | "loading" | "failed" | "complete"
-  >("none");
+  const [loadState, setLoadState] =
+    useState<"none" | "loading" | "failed" | "complete">("none");
 
   let urlInput: string = UserInputCache.load(
     _FIGMA_FILE_URL_IMPORT_INPUT_CACHE_KEY
   );
 
-  const figmaTargetConfig = utils.figmaApi.parseFileAndNodeIdFromUrl_Figma(
-    urlInput
-  );
+  const figmaTargetConfig =
+    utils.figmaApi.parseFileAndNodeIdFromUrl_Figma(urlInput);
 
   const handleEnter = () => {
     props.onUrlEnter?.(urlInput);

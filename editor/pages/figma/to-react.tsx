@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import styled from "@emotion/styled";
 import { MainImageRepository } from "@design-sdk/core/assets-repository";
 import { ImageRepositories } from "@design-sdk/figma/asset-repository";
@@ -7,7 +7,10 @@ import { ReflectSceneNode } from "@design-sdk/core/nodes";
 import { DefaultEditorWorkspaceLayout } from "../../layout/default-editor-workspace-layout";
 import { LayerHierarchy } from "../../components/editor-hierarchy";
 import { PreviewAndRunPanel } from "../../components/preview-and-run";
-import { FigmaTargetNodeConfig } from "@design-sdk/core/utils/figma-api-utils";
+import {
+  FigmaTargetNodeConfig,
+  parseFileAndNodeIdFromUrl_Figma,
+} from "@design-sdk/core/utils/figma-api-utils";
 import {
   WorkspaceContentPanel,
   WorkspaceContentPanelGridLayout,
@@ -17,20 +20,50 @@ import { JsonTree } from "../../components/visualization/json-visualization/json
 import { MonacoEditor } from "../../components/code-editor";
 import { tokenize } from "@designto/token";
 import * as react from "@designto/react";
-
+import { useRouter } from "next/router";
+import { fetchTargetAsReflect } from "../../components/figma/screen-importer";
 // set image repo for figma platform
 MainImageRepository.instance = new ImageRepositories();
+
+interface FigmaToReactRouterQueryParams {
+  figma_target_url: string;
+}
 
 export default function FigmaToReactDemoPage() {
   const [reflect, setReflect] = useState<ReflectSceneNode>();
   const [targetnodeConfig, setTargetnodeConfig] =
     useState<FigmaTargetNodeConfig>();
 
+  const router = useRouter();
+
+  useEffect(() => {
+    const targetUrl = (router.query as any as FigmaToReactRouterQueryParams)
+      ?.figma_target_url;
+    if (targetUrl) {
+      console.log("target url loaded from query parm", targetUrl);
+      const targetnodeconfig = parseFileAndNodeIdFromUrl_Figma(targetUrl);
+      setTargetnodeConfig(targetnodeconfig);
+      fetchTargetAsReflect(targetnodeconfig.file, targetnodeconfig.node).then(
+        (reflect) => {
+          console.log("setting reflect", reflect);
+          setReflect(reflect);
+        }
+      );
+    }
+  }, [router]);
+
   const handleOnDesignImported = (reflect: ReflectSceneNode) => {
     setReflect(reflect);
   };
 
   const handleTargetAquired = (target: FigmaTargetNodeConfig) => {
+    // update url query param
+    (router.query as any as FigmaToReactRouterQueryParams).figma_target_url =
+      target.url;
+    router.push(router);
+    //
+
+    // update config
     setTargetnodeConfig(target);
   };
 
@@ -46,16 +79,22 @@ export default function FigmaToReactDemoPage() {
     widgetCode = _stringfiedReactwidget;
   }
 
+  console.error("widgetCode", widgetCode);
+
   return (
-    <>
+    <div key={reflect?.id}>
       <DefaultEditorWorkspaceLayout leftbar={<LayerHierarchy data={reflect} />}>
-        <figmacomp.FigmaScreenImporter
-          onImported={handleOnDesignImported}
-          onTargetEnter={handleTargetAquired}
-        />
+        {!targetnodeConfig && (
+          <figmacomp.FigmaScreenImporter
+            onImported={handleOnDesignImported}
+            onTargetEnter={handleTargetAquired}
+          />
+        )}
+
         <WorkspaceContentPanelGridLayout>
           <WorkspaceContentPanel>
             <PreviewAndRunPanel
+              key={reflect?.id}
               config={{
                 src: widgetCode,
                 platform: "web",
@@ -91,7 +130,7 @@ export default function FigmaToReactDemoPage() {
           </WorkspaceBottomPanelDockLayout>
         </WorkspaceContentPanelGridLayout>
       </DefaultEditorWorkspaceLayout>
-    </>
+    </div>
   );
 }
 
