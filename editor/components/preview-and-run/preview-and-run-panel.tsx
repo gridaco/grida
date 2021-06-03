@@ -21,11 +21,6 @@ export function PreviewAndRunPanel(props: { config: SceneRunnerConfig }) {
   const [mode, setmode] = useState<Mode>("preview");
   const sceneConfig = props.config;
 
-  useEffect(() => {
-    // fetch scene config
-    // setSceneConfig();
-  }, []);
-
   const loadSource = () => {
     if (typeof props.config.src == "string") {
       return props.config.src;

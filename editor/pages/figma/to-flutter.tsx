@@ -1,15 +1,22 @@
 import dynamic from "next/dynamic";
 import React, { useEffect, useState } from "react";
-import styled from "@emotion/styled";
 import { figmacomp, canvas, runner } from "../../components";
 import { flutter } from "@designto/code";
 import { composeAppWithHome } from "@bridged.xyz/flutter-builder";
-import { features, types, hosting } from "@base-sdk/base";
 import { ReflectSceneNode } from "@design-sdk/core/nodes";
 import { utils_dart } from "../../utils";
-import { nanoid } from "nanoid";
 import { MainImageRepository } from "@design-sdk/core/assets-repository";
 import { ImageRepositories } from "@design-sdk/figma/asset-repository";
+// import { MonacoEditor } from "../../components/code-editor";
+import { DefaultEditorWorkspaceLayout } from "../../layout/default-editor-workspace-layout";
+import { LayerHierarchy } from "../../components/editor-hierarchy";
+import {
+  WorkspaceContentPanel,
+  WorkspaceContentPanelGridLayout,
+} from "../../layout/panel";
+import { PreviewAndRunPanel } from "../../components/preview-and-run";
+import { FigmaTargetNodeConfig } from "@design-sdk/core/utils/figma-api-utils";
+import styled from "@emotion/styled";
 
 // set image repo for figma platform
 MainImageRepository.instance = new ImageRepositories();
@@ -23,6 +30,7 @@ const CodemirrorEditor = dynamic(
 
 export default function FigmaDeveloperPage() {
   const [reflect, setReflect] = useState<ReflectSceneNode>();
+  const [target, setTarget] = useState<FigmaTargetNodeConfig>();
   const flutterAppBuild = reflect && flutter.buildApp(reflect);
   const widget = flutterAppBuild?.widget;
   const app =
@@ -39,65 +47,56 @@ export default function FigmaDeveloperPage() {
     setReflect(reflect);
   };
 
+  const handleTargetNodeSet = (target: FigmaTargetNodeConfig) => {
+    setTarget(target);
+  };
+
   return (
     <>
-      <canvas.DefaultCanvas />
-      <figmacomp.FigmaScreenImporter onImported={handleOnDesignImported} />
-      <ContentWrap>
-        <CodemirrorEditor
-          value={
-            widgetCode
-              ? widgetCode
-              : "// No input design provided to be converted.."
-          }
-          options={{
-            mode: "dart",
-            theme: "monokai",
-            lineNumbers: true,
-          }}
+      <DefaultEditorWorkspaceLayout leftbar={<LayerHierarchy data={reflect} />}>
+        <figmacomp.FigmaScreenImporter
+          onImported={handleOnDesignImported}
+          onTargetEnter={handleTargetNodeSet}
         />
-        {widgetCode && (
-          <div>
-            <runner.FlutterAppRunner
-              q={{
+        <WorkspaceContentPanelGridLayout>
+          <WorkspaceContentPanel>
+            <PreviewAndRunPanel
+              config={{
                 src: rootAppCode,
-                mode: "content",
-                language: "dart",
+                platform: "flutter",
+                sceneSize: {
+                  w: reflect?.width,
+                  h: reflect?.height,
+                },
+                fileid: target?.file,
+                sceneid: target?.node,
               }}
-              width={375}
-              height={812}
             />
-            <br />
-            <button
-              onClick={() => {
-                const _name = "fluttercodefromdesigntocode";
-                hosting
-                  .upload({
-                    file: rootAppCode,
-                    name: `${_name}.dart`,
-                  })
-                  .then((r) => {
-                    const qlurl = features.quicklook.buildConsoleQuicklookUrl({
-                      id: nanoid(),
-                      framework: types.AppFramework.flutter,
-                      language: types.AppLanguage.dart,
-                      url: r.url,
-                      name: _name,
-                    });
-                    open(qlurl);
-                  });
-              }}
-            >
-              open in console
-            </button>
-          </div>
-        )}
-      </ContentWrap>
+          </WorkspaceContentPanel>
+          <WorkspaceContentPanel>
+            <InspectionPanelContentWrap>
+              <CodemirrorEditor
+                key={widgetCode}
+                options={{
+                  lineNumbers: true,
+                  mode: "dart",
+                  theme: "monokai",
+                }}
+                value={
+                  widgetCode
+                    ? widgetCode
+                    : "// No input design provided to be converted.."
+                }
+              />
+            </InspectionPanelContentWrap>
+          </WorkspaceContentPanel>
+        </WorkspaceContentPanelGridLayout>
+      </DefaultEditorWorkspaceLayout>
     </>
   );
 }
 
-const ContentWrap = styled.div`
+const InspectionPanelContentWrap = styled.div`
   display: flex;
   flex-direction: row;
   align-items: stretch;

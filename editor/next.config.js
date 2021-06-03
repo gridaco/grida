@@ -26,6 +26,7 @@ const withTM = require("next-transpile-modules")([
   "@coli.codes/web-builder",
   "@coli.codes/web-builder-core",
   "@coli.codes/react-builder",
+  "@web-builder/styled",
   "@bridged.xyz/flutter-builder",
   // endregion coli
 ]);
