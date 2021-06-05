@@ -19,11 +19,8 @@ export async function fetchTargetAsReflect(
   node: string
 ): Promise<FigmaReflectImportPack> {
   const d = await fetchTarget(file, node);
-  console.log("api raw", d);
   const _mapped = remote.mapper.mapFigmaRemoteToFigma(d as any);
-  console.log("mapped", _mapped);
   const _converted = convert.intoReflectNode(_mapped);
-  console.log("converted", _converted);
   return {
     remote: d,
     figma: _mapped,
