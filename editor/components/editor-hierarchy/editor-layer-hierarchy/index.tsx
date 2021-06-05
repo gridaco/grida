@@ -22,12 +22,24 @@ export function LayerHierarchy(props: {
   // make mode
   const selectionmode = props.onLayerSelect?.multi ? "multi" : "single";
   const [selections, setSelections] = useState<string[]>();
+  const [expanded, setExpanded] = useState<string[]>([]);
+  const [selected, setSelected] = useState<string[]>([]);
 
-  const handleLayerClick = (id: string) => {
+  const handleToggle = (event: React.ChangeEvent<{}>, nodeIds: string[]) => {
+    setExpanded(nodeIds);
+  };
+
+  const handleSelect = (event: React.ChangeEvent<{}>, nodeIds: string[]) => {
+    setSelected(nodeIds);
+    handleLayerClick(nodeIds);
+  };
+
+  const handleLayerClick = (ids: string[]) => {
     if (selectionmode == "single") {
+      const id = ids[ids.length - 1];
       props.onLayerSelect?.single?.(id);
     } else {
-      setSelections([id, ...selections]);
+      setSelections(ids);
       props.onLayerSelect?.multi?.(selections);
     }
   };
@@ -39,12 +51,7 @@ export function LayerHierarchy(props: {
       return <div style={{ padding: 24 }}>empty</div>;
     }
     return (
-      <TreeItem
-        key={nodes.id}
-        nodeId={nodes.id}
-        label={nodes.name}
-        onClick={() => handleLayerClick(nodes.id)}
-      >
+      <TreeItem key={nodes.id} nodeId={nodes.id} label={nodes.name}>
         {Array.isArray(nodes.children)
           ? nodes.children.map((node) => renderTree(node))
           : null}
@@ -61,8 +68,12 @@ export function LayerHierarchy(props: {
       <>
         <TreeView
           defaultCollapseIcon={<ExpandMoreIcon />}
-          defaultExpanded={["root"]}
+          defaultExpanded={[props.data?.id]}
           defaultExpandIcon={<ChevronRightIcon />}
+          expanded={expanded}
+          selected={selected}
+          onNodeToggle={handleToggle}
+          onNodeSelect={handleSelect}
         >
           {renderTree(data)}
         </TreeView>

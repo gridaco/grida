@@ -22,6 +22,7 @@ import { tokenize } from "@designto/token";
 import * as react from "@designto/react";
 import { useRouter } from "next/router";
 import { fetchTargetAsReflect } from "../../components/figma/screen-importer";
+import { mapGrandchildren } from "@design-sdk/core/utils";
 // set image repo for figma platform
 MainImageRepository.instance = new ImageRepositories();
 
@@ -31,13 +32,16 @@ interface FigmaToReactRouterQueryParams {
 
 export default function FigmaToReactDemoPage() {
   const [reflect, setReflect] = useState<ReflectSceneNode>();
-  const [targetnodeConfig, setTargetnodeConfig] =
-    useState<FigmaTargetNodeConfig>();
+  const [targetSelectionNodeId, setTargetSelectionNodeId] = useState<string>();
+  const [
+    targetnodeConfig,
+    setTargetnodeConfig,
+  ] = useState<FigmaTargetNodeConfig>();
 
   const router = useRouter();
 
   useEffect(() => {
-    const targetUrl = (router.query as any as FigmaToReactRouterQueryParams)
+    const targetUrl = ((router.query as any) as FigmaToReactRouterQueryParams)
       ?.figma_target_url;
     if (targetUrl) {
       console.log("target url loaded from query parm", targetUrl);
@@ -58,13 +62,41 @@ export default function FigmaToReactDemoPage() {
 
   const handleTargetAquired = (target: FigmaTargetNodeConfig) => {
     // update url query param
-    (router.query as any as FigmaToReactRouterQueryParams).figma_target_url =
+    ((router.query as any) as FigmaToReactRouterQueryParams).figma_target_url =
       target.url;
     router.push(router);
     //
 
     // update config
     setTargetnodeConfig(target);
+  };
+
+  const handleOnSingleLayerSelect = (id: string) => {
+    const newTarget = mapGrandchildren(reflect).find((r) => r.id == id);
+    console.log("newTarget", id, newTarget);
+    if (newTarget) {
+      setTargetSelectionNodeId(id);
+      setReflect(newTarget);
+    }
+    // const searchForNodeWithIdInTree = (
+    //   r: ReflectSceneNode,
+    //   id: string
+    // ): ReflectSceneNode => {
+    //   if (r.id == id) {
+    //     return r;
+    //   } else {
+    //     r.children?.find((r) => {
+    //       return searchForNodeWithIdInTree(r, id);
+    //     });
+    //     return undefined;
+    //   }
+    // };
+    // const targetReflectSubset = searchForNodeWithIdInTree(reflect, id);
+    // if (targetReflectSubset) {
+    //   setReflect(targetReflectSubset);
+    // } else {
+    //   console.warn("selection is invalid");
+    // }
   };
 
   let widgetCode: string;
@@ -79,11 +111,16 @@ export default function FigmaToReactDemoPage() {
     widgetCode = _stringfiedReactwidget;
   }
 
-  console.error("widgetCode", widgetCode);
-
   return (
     <div key={reflect?.id}>
-      <DefaultEditorWorkspaceLayout leftbar={<LayerHierarchy data={reflect} />}>
+      <DefaultEditorWorkspaceLayout
+        leftbar={
+          <LayerHierarchy
+            data={reflect}
+            onLayerSelect={{ single: handleOnSingleLayerSelect }}
+          />
+        }
+      >
         {!targetnodeConfig && (
           <figmacomp.FigmaScreenImporter
             onImported={handleOnDesignImported}
@@ -94,7 +131,7 @@ export default function FigmaToReactDemoPage() {
         <WorkspaceContentPanelGridLayout>
           <WorkspaceContentPanel>
             <PreviewAndRunPanel
-              key={reflect?.id}
+              key={targetnodeConfig?.url ?? reflect?.id}
               config={{
                 src: widgetCode,
                 platform: "web",
