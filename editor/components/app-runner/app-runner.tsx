@@ -11,8 +11,9 @@ export function AppRunner(props: {
     h: number | string;
   };
   src: string;
+  componentName: string;
 }) {
-  const { platform, sceneSize, src } = props;
+  const { platform, sceneSize, src, componentName } = props;
   switch (platform) {
     case "flutter":
       return (
@@ -50,6 +51,13 @@ export function AppRunner(props: {
         </div>
       );
     case "web":
-      return <CodeSandBoxView width="300px" height="100%" src={src} />;
+      return (
+        <CodeSandBoxView
+          width="100%"
+          height="100%"
+          src={src}
+          componentName={componentName}
+        />
+      );
   }
 }

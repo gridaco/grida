@@ -16,12 +16,17 @@ import {
   WorkspaceContentPanelGridLayout,
 } from "../../layout/panel";
 import { WorkspaceBottomPanelDockLayout } from "../../layout/panel/workspace-bottom-panel-dock-layout";
-import { JsonTree } from "../../components/visualization/json-visualization/json-tree";
+import { WidgetTree } from "../../components/visualization/json-visualization/json-tree";
 import { MonacoEditor } from "../../components/code-editor";
 import { tokenize } from "@designto/token";
 import * as react from "@designto/react";
 import { useRouter } from "next/router";
 import { fetchTargetAsReflect } from "../../components/figma/screen-importer";
+import { mapGrandchildren } from "@design-sdk/core/utils";
+import { ReactWidget } from "@coli.codes/react-builder";
+import * as core from "@reflect-ui/core";
+import { ReactComponentExportResult } from "@coli.codes/react-builder/export/export-result";
+
 // set image repo for figma platform
 MainImageRepository.instance = new ImageRepositories();
 
@@ -31,13 +36,16 @@ interface FigmaToReactRouterQueryParams {
 
 export default function FigmaToReactDemoPage() {
   const [reflect, setReflect] = useState<ReflectSceneNode>();
-  const [targetnodeConfig, setTargetnodeConfig] =
-    useState<FigmaTargetNodeConfig>();
+  const [targetSelectionNodeId, setTargetSelectionNodeId] = useState<string>();
+  const [
+    targetnodeConfig,
+    setTargetnodeConfig,
+  ] = useState<FigmaTargetNodeConfig>();
 
   const router = useRouter();
 
   useEffect(() => {
-    const targetUrl = (router.query as any as FigmaToReactRouterQueryParams)
+    const targetUrl = ((router.query as any) as FigmaToReactRouterQueryParams)
       ?.figma_target_url;
     if (targetUrl) {
       console.log("target url loaded from query parm", targetUrl);
@@ -58,7 +66,7 @@ export default function FigmaToReactDemoPage() {
 
   const handleTargetAquired = (target: FigmaTargetNodeConfig) => {
     // update url query param
-    (router.query as any as FigmaToReactRouterQueryParams).figma_target_url =
+    ((router.query as any) as FigmaToReactRouterQueryParams).figma_target_url =
       target.url;
     router.push(router);
     //
@@ -67,23 +75,57 @@ export default function FigmaToReactDemoPage() {
     setTargetnodeConfig(target);
   };
 
-  let widgetCode: string;
-  let widgetTree;
+  const handleOnSingleLayerSelect = (id: string) => {
+    const newTarget = mapGrandchildren(reflect).find((r) => r.id == id);
+    console.log("newTarget", id, newTarget);
+    if (newTarget) {
+      setTargetSelectionNodeId(id);
+      setReflect(newTarget);
+    }
+    // const searchForNodeWithIdInTree = (
+    //   r: ReflectSceneNode,
+    //   id: string
+    // ): ReflectSceneNode => {
+    //   if (r.id == id) {
+    //     return r;
+    //   } else {
+    //     r.children?.find((r) => {
+    //       return searchForNodeWithIdInTree(r, id);
+    //     });
+    //     return undefined;
+    //   }
+    // };
+    // const targetReflectSubset = searchForNodeWithIdInTree(reflect, id);
+    // if (targetReflectSubset) {
+    //   setReflect(targetReflectSubset);
+    // } else {
+    //   console.warn("selection is invalid");
+    // }
+  };
+
+  let reactComponent: ReactComponentExportResult;
+  let reflectWidget: core.Widget;
+  let widgetTree: ReactWidget;
   if (reflect) {
-    const _reflectWidget = tokenize(reflect);
-    widgetTree = react.buildReactWidget(_reflectWidget);
+    reflectWidget = tokenize(reflect);
+    widgetTree = react.buildReactWidget(reflectWidget);
     const _stringfiedReactwidget = react.buildReactApp(widgetTree, {
       template: "cra",
     });
 
-    widgetCode = _stringfiedReactwidget;
+    reactComponent = _stringfiedReactwidget;
   }
-
-  console.error("widgetCode", widgetCode);
 
   return (
     <div key={reflect?.id}>
-      <DefaultEditorWorkspaceLayout leftbar={<LayerHierarchy data={reflect} />}>
+      <DefaultEditorWorkspaceLayout
+        leftbar={
+          <LayerHierarchy
+            data={reflect}
+            onLayerSelect={{ single: handleOnSingleLayerSelect }}
+          />
+        }
+      >
         {!targetnodeConfig && (
           <figmacomp.FigmaScreenImporter
             onImported={handleOnDesignImported}
@@ -94,10 +136,11 @@ export default function FigmaToReactDemoPage() {
         <WorkspaceContentPanelGridLayout>
           <WorkspaceContentPanel>
             <PreviewAndRunPanel
-              key={reflect?.id}
+              key={targetnodeConfig?.url ?? reflect?.id}
               config={{
-                src: widgetCode,
+                src: reactComponent?.code,
                 platform: "web",
+                componentName: reactComponent?.componentName,
                 sceneSize: {
                   w: reflect?.width,
                   h: reflect?.height,
@@ -107,17 +150,17 @@ export default function FigmaToReactDemoPage() {
               }}
             />
           </WorkspaceContentPanel>
-          <WorkspaceContentPanel>
+          <WorkspaceContentPanel key={targetnodeConfig?.node}>
             <InspectionPanelContentWrap>
               <MonacoEditor
-                key={widgetCode}
+                key={reactComponent?.code}
                 height="100vh"
                 options={{
                   automaticLayout: true,
                 }}
                 defaultValue={
-                  widgetCode
-                    ? widgetCode
+                  reactComponent?.code
+                    ? reactComponent?.code
                     : "// No input design provided to be converted.."
                 }
               />
@@ -125,7 +168,20 @@ export default function FigmaToReactDemoPage() {
           </WorkspaceContentPanel>
           <WorkspaceBottomPanelDockLayout>
             <WorkspaceContentPanel>
-              <JsonTree data={widgetTree} />
+              <div
+                style={{
+                  display: "flex",
+                  flexDirection: "row",
+                  alignItems: "stretch",
+                }}
+              >
+                <div style={{ flex: 1 }}>
+                  <WidgetTree data={reflectWidget} />
+                </div>
+                <div style={{ flex: 1 }}>
+                  <WidgetTree data={widgetTree} />
+                </div>
+              </div>
             </WorkspaceContentPanel>
           </WorkspaceBottomPanelDockLayout>
         </WorkspaceContentPanelGridLayout>

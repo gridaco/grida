@@ -55,6 +55,9 @@ const NonMenuContentZoneWrap = styled.div`
 const PanelLeftSideWrap = styled.div`
   flex-grow: 0;
   min-height: 100%;
+  max-height: 100%;
+  max-width: 400px;
+  overflow: auto;
 `;
 
 const PanelRightSideWrap = styled.div`

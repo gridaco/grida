@@ -61,6 +61,8 @@ const Slot_BottomDockedContent = styled.div`
   position: relative;
   margin-top: auto;
   min-height: 150px;
+  max-height: 400px;
+  overflow: auto;
 `;
 
 const PanelLayoutItemsContainer = styled.div`
