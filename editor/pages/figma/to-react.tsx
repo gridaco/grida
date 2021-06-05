@@ -16,7 +16,7 @@ import {
   WorkspaceContentPanelGridLayout,
 } from "../../layout/panel";
 import { WorkspaceBottomPanelDockLayout } from "../../layout/panel/workspace-bottom-panel-dock-layout";
-import { JsonTree } from "../../components/visualization/json-visualization/json-tree";
+import { WidgetTree } from "../../components/visualization/json-visualization/json-tree";
 import { MonacoEditor } from "../../components/code-editor";
 import { tokenize } from "@designto/token";
 import * as react from "@designto/react";
@@ -162,7 +162,7 @@ export default function FigmaToReactDemoPage() {
           </WorkspaceContentPanel>
           <WorkspaceBottomPanelDockLayout>
             <WorkspaceContentPanel>
-              <JsonTree data={widgetTree} />
+              <WidgetTree data={widgetTree} />
             </WorkspaceContentPanel>
           </WorkspaceBottomPanelDockLayout>
         </WorkspaceContentPanelGridLayout>

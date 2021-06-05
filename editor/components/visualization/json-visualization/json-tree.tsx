@@ -1,3 +1,5 @@
+import { Widget as WebWidget } from "@coli.codes/web-builder-core";
+import { Widget as ReflectWidget } from "@reflect-ui/core";
 import React from "react";
 import JSONTree from "react-json-tree";
 
@@ -24,5 +26,53 @@ const theme = {
 };
 
 export function JsonTree(props: { data: any; hideRoot?: boolean }) {
-  return <JSONTree data={props.data} theme={theme} hideRoot={props.hideRoot} />;
+  return (
+    <JSONTree
+      data={props.data}
+      theme={theme}
+      hideRoot={props.hideRoot}
+      getItemString={(type, data, itemType, itemString) => {
+        return (
+          <span>
+            {type} {itemType}
+          </span>
+        );
+      }}
+    />
+  );
+}
+
+type WidgetDataLike = WebWidget | ReflectWidget;
+export function WidgetTree(props: {
+  data: WidgetDataLike;
+  hideRoot?: boolean;
+}) {
+  const getname = (data: WidgetDataLike): string => {
+    if (data instanceof WebWidget) {
+      return data.key.name;
+    } else if (data instanceof ReflectWidget) {
+      return data.key.originName;
+    }
+    return undefined;
+  };
+
+  const gettype = (data: WidgetDataLike): string => {
+    return data._type;
+  };
+
+  return (
+    <JSONTree
+      data={props.data}
+      theme={theme}
+      hideRoot={props.hideRoot}
+      getItemString={(type, data: WidgetDataLike, itemType, itemString) => {
+        return (
+          <span>
+            {getname(data) && getname(data)} {gettype(data) && gettype(data)}{" "}
+            {itemType}
+          </span>
+        );
+      }}
+    />
+  );
 }
