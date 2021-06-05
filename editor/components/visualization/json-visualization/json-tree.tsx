@@ -1,4 +1,6 @@
 import { Widget as WebWidget } from "@coli.codes/web-builder-core";
+import { ReflectSceneNode } from "@design-sdk/core/nodes";
+import { Figma } from "@design-sdk/figma";
 import { Widget as ReflectWidget } from "@reflect-ui/core";
 import React from "react";
 import JSONTree from "react-json-tree";
@@ -42,7 +44,11 @@ export function JsonTree(props: { data: any; hideRoot?: boolean }) {
   );
 }
 
-type WidgetDataLike = WebWidget | ReflectWidget;
+type WidgetDataLike =
+  | WebWidget
+  | ReflectWidget
+  | Figma.SceneNode
+  | ReflectSceneNode;
 export function WidgetTree(props: {
   data: WidgetDataLike;
   hideRoot?: boolean;
@@ -58,7 +64,12 @@ export function WidgetTree(props: {
   };
 
   const gettype = (data: WidgetDataLike): string => {
-    return data._type;
+    if ("_type" in data) {
+      return data._type;
+    }
+    if ("type" in data) {
+      return data.type;
+    }
   };
 
   return (

@@ -26,15 +26,17 @@ import { mapGrandchildren } from "@design-sdk/core/utils";
 import { ReactWidget } from "@coli.codes/react-builder";
 import * as core from "@reflect-ui/core";
 import { ReactComponentExportResult } from "@coli.codes/react-builder/export/export-result";
+import { Figma } from "@design-sdk/figma";
+import {
+  extractFromFigmaQueryParams,
+  setFigmaTargetUrl,
+} from "../../query/from-figma";
 
 // set image repo for figma platform
 MainImageRepository.instance = new ImageRepositories();
 
-interface FigmaToReactRouterQueryParams {
-  figma_target_url: string;
-}
-
 export default function FigmaToReactDemoPage() {
+  const [figmaNode, setFigmaNode] = useState<Figma.SceneNode>();
   const [reflect, setReflect] = useState<ReflectSceneNode>();
   const [targetSelectionNodeId, setTargetSelectionNodeId] = useState<string>();
   const [
@@ -45,16 +47,16 @@ export default function FigmaToReactDemoPage() {
   const router = useRouter();
 
   useEffect(() => {
-    const targetUrl = ((router.query as any) as FigmaToReactRouterQueryParams)
-      ?.figma_target_url;
-    if (targetUrl) {
-      console.log("target url loaded from query parm", targetUrl);
-      const targetnodeconfig = parseFileAndNodeIdFromUrl_Figma(targetUrl);
+    const params = extractFromFigmaQueryParams(router);
+    if (params.figma_target_url) {
+      const targetnodeconfig = parseFileAndNodeIdFromUrl_Figma(
+        params.figma_target_url
+      );
       setTargetnodeConfig(targetnodeconfig);
       fetchTargetAsReflect(targetnodeconfig.file, targetnodeconfig.node).then(
-        (reflect) => {
-          console.log("setting reflect", reflect);
-          setReflect(reflect);
+        (res) => {
+          setReflect(res.reflect);
+          setFigmaNode(res.figma);
         }
       );
     }
@@ -66,9 +68,7 @@ export default function FigmaToReactDemoPage() {
 
   const handleTargetAquired = (target: FigmaTargetNodeConfig) => {
     // update url query param
-    ((router.query as any) as FigmaToReactRouterQueryParams).figma_target_url =
-      target.url;
-    router.push(router);
+    setFigmaTargetUrl(router, target.url);
     //
 
     // update config
@@ -175,6 +175,9 @@ export default function FigmaToReactDemoPage() {
                   alignItems: "stretch",
                 }}
               >
+                <div style={{ flex: 1 }}>
+                  <WidgetTree data={figmaNode} />
+                </div>
                 <div style={{ flex: 1 }}>
                   <WidgetTree data={reflectWidget} />
                 </div>
