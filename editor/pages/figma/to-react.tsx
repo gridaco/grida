@@ -23,6 +23,10 @@ import * as react from "@designto/react";
 import { useRouter } from "next/router";
 import { fetchTargetAsReflect } from "../../components/figma/screen-importer";
 import { mapGrandchildren } from "@design-sdk/core/utils";
+import { ReactWidget } from "@coli.codes/react-builder";
+import * as core from "@reflect-ui/core";
+import { ReactComponentExportResult } from "@coli.codes/react-builder/export/export-result";
+
 // set image repo for figma platform
 MainImageRepository.instance = new ImageRepositories();
 
@@ -99,16 +103,17 @@ export default function FigmaToReactDemoPage() {
     // }
   };
 
-  let widgetCode: string;
-  let widgetTree;
+  let reactComponent: ReactComponentExportResult;
+  let reflectWidget: core.Widget;
+  let widgetTree: ReactWidget;
   if (reflect) {
-    const _reflectWidget = tokenize(reflect);
-    widgetTree = react.buildReactWidget(_reflectWidget);
+    reflectWidget = tokenize(reflect);
+    widgetTree = react.buildReactWidget(reflectWidget);
     const _stringfiedReactwidget = react.buildReactApp(widgetTree, {
       template: "cra",
     });
 
-    widgetCode = _stringfiedReactwidget;
+    reactComponent = _stringfiedReactwidget;
   }
 
   return (
@@ -133,8 +138,9 @@ export default function FigmaToReactDemoPage() {
             <PreviewAndRunPanel
               key={targetnodeConfig?.url ?? reflect?.id}
               config={{
-                src: widgetCode,
+                src: reactComponent?.code,
                 platform: "web",
+                componentName: reactComponent?.componentName,
                 sceneSize: {
                   w: reflect?.width,
                   h: reflect?.height,
@@ -144,17 +150,17 @@ export default function FigmaToReactDemoPage() {
               }}
             />
           </WorkspaceContentPanel>
-          <WorkspaceContentPanel>
+          <WorkspaceContentPanel key={targetnodeConfig?.node}>
             <InspectionPanelContentWrap>
               <MonacoEditor
-                key={widgetCode}
+                key={reactComponent?.code}
                 height="100vh"
                 options={{
                   automaticLayout: true,
                 }}
                 defaultValue={
-                  widgetCode
-                    ? widgetCode
+                  reactComponent?.code
+                    ? reactComponent?.code
                     : "// No input design provided to be converted.."
                 }
               />
@@ -162,7 +168,20 @@ export default function FigmaToReactDemoPage() {
           </WorkspaceContentPanel>
           <WorkspaceBottomPanelDockLayout>
             <WorkspaceContentPanel>
-              <WidgetTree data={widgetTree} />
+              <div
+                style={{
+                  display: "flex",
+                  flexDirection: "row",
+                  alignItems: "stretch",
+                }}
+              >
+                <div style={{ flex: 1 }}>
+                  <WidgetTree data={reflectWidget} />
+                </div>
+                <div style={{ flex: 1 }}>
+                  <WidgetTree data={widgetTree} />
+                </div>
+              </div>
             </WorkspaceContentPanel>
           </WorkspaceBottomPanelDockLayout>
         </WorkspaceContentPanelGridLayout>

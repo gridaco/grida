@@ -47,13 +47,14 @@ export function WidgetTree(props: {
   data: WidgetDataLike;
   hideRoot?: boolean;
 }) {
-  const getname = (data: WidgetDataLike): string => {
+  const getname = (data: WidgetDataLike | any): string => {
     if (data instanceof WebWidget) {
       return data.key.name;
     } else if (data instanceof ReflectWidget) {
       return data.key.originName;
+    } else {
+      return data.constructor?.name ?? undefined;
     }
-    return undefined;
   };
 
   const gettype = (data: WidgetDataLike): string => {

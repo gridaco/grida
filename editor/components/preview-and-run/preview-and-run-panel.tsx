@@ -15,6 +15,7 @@ interface SceneRunnerConfig {
   };
   src: string | (() => string);
   platform: "web" | "flutter";
+  componentName: string;
 }
 
 export function PreviewAndRunPanel(props: { config: SceneRunnerConfig }) {
@@ -51,6 +52,7 @@ export function PreviewAndRunPanel(props: { config: SceneRunnerConfig }) {
       case "run":
         return (
           <AppRunner
+            componentName={sceneConfig.componentName}
             sceneSize={sceneConfig?.sceneSize}
             src={loadSource()}
             platform={sceneConfig?.platform}

@@ -63,6 +63,7 @@ export default function FigmaDeveloperPage() {
             <PreviewAndRunPanel
               config={{
                 src: rootAppCode,
+                componentName: "DemoComponent",
                 platform: "flutter",
                 sceneSize: {
                   w: reflect?.width,
