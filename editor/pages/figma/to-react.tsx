@@ -30,77 +30,30 @@ import { Figma } from "@design-sdk/figma";
 import {
   extractFromFigmaQueryParams,
   setFigmaTargetUrl,
+  useFigmaTargetNode,
+  useFigmaTargetUrl,
+  useReflectTargetNode,
 } from "../../query/from-figma";
 
 // set image repo for figma platform
 MainImageRepository.instance = new ImageRepositories();
 
 export default function FigmaToReactDemoPage() {
-  const [figmaNode, setFigmaNode] = useState<Figma.SceneNode>();
-  const [reflect, setReflect] = useState<ReflectSceneNode>();
   const [targetSelectionNodeId, setTargetSelectionNodeId] = useState<string>();
-  const [
-    targetnodeConfig,
-    setTargetnodeConfig,
-  ] = useState<FigmaTargetNodeConfig>();
 
-  const router = useRouter();
-
-  useEffect(() => {
-    const params = extractFromFigmaQueryParams(router);
-    if (params.figma_target_url) {
-      const targetnodeconfig = parseFileAndNodeIdFromUrl_Figma(
-        params.figma_target_url
-      );
-      setTargetnodeConfig(targetnodeconfig);
-      fetchTargetAsReflect(targetnodeconfig.file, targetnodeconfig.node).then(
-        (res) => {
-          setReflect(res.reflect);
-          setFigmaNode(res.figma);
-        }
-      );
-    }
-  }, [router]);
-
-  const handleOnDesignImported = (reflect: ReflectSceneNode) => {
-    setReflect(reflect);
-  };
-
-  const handleTargetAquired = (target: FigmaTargetNodeConfig) => {
-    // update url query param
-    setFigmaTargetUrl(router, target.url);
-    //
-
-    // update config
-    setTargetnodeConfig(target);
-  };
+  //
+  const targetNodeConfig = useReflectTargetNode();
+  const figmaNode = targetNodeConfig?.figma;
+  const reflect = targetNodeConfig?.reflect;
+  //
 
   const handleOnSingleLayerSelect = (id: string) => {
     const newTarget = mapGrandchildren(reflect).find((r) => r.id == id);
     console.log("newTarget", id, newTarget);
     if (newTarget) {
       setTargetSelectionNodeId(id);
-      setReflect(newTarget);
+      // setReflect(newTarget);
     }
-    // const searchForNodeWithIdInTree = (
-    //   r: ReflectSceneNode,
-    //   id: string
-    // ): ReflectSceneNode => {
-    //   if (r.id == id) {
-    //     return r;
-    //   } else {
-    //     r.children?.find((r) => {
-    //       return searchForNodeWithIdInTree(r, id);
-    //     });
-    //     return undefined;
-    //   }
-    // };
-    // const targetReflectSubset = searchForNodeWithIdInTree(reflect, id);
-    // if (targetReflectSubset) {
-    //   setReflect(targetReflectSubset);
-    // } else {
-    //   console.warn("selection is invalid");
-    // }
   };
 
   let reactComponent: ReactComponentExportResult;
@@ -126,17 +79,10 @@ export default function FigmaToReactDemoPage() {
           />
         }
       >
-        {!targetnodeConfig && (
-          <figmacomp.FigmaScreenImporter
-            onImported={handleOnDesignImported}
-            onTargetEnter={handleTargetAquired}
-          />
-        )}
-
         <WorkspaceContentPanelGridLayout>
           <WorkspaceContentPanel>
             <PreviewAndRunPanel
-              key={targetnodeConfig?.url ?? reflect?.id}
+              key={targetNodeConfig?.url ?? reflect?.id}
               config={{
                 src: reactComponent?.code,
                 platform: "web",
@@ -145,12 +91,12 @@ export default function FigmaToReactDemoPage() {
                   w: reflect?.width,
                   h: reflect?.height,
                 },
-                fileid: targetnodeConfig?.file,
-                sceneid: targetnodeConfig?.node,
+                fileid: targetNodeConfig?.file,
+                sceneid: targetNodeConfig?.node,
               }}
             />
           </WorkspaceContentPanel>
-          <WorkspaceContentPanel key={targetnodeConfig?.node}>
+          <WorkspaceContentPanel key={targetNodeConfig?.node}>
             <InspectionPanelContentWrap>
               <MonacoEditor
                 key={reactComponent?.code}

@@ -17,6 +17,7 @@ import {
 import { PreviewAndRunPanel } from "../../components/preview-and-run";
 import { FigmaTargetNodeConfig } from "@design-sdk/core/utils/figma-api-utils";
 import styled from "@emotion/styled";
+import { useReflectTargetNode } from "../../query/from-figma";
 
 // set image repo for figma platform
 MainImageRepository.instance = new ImageRepositories();
@@ -29,8 +30,12 @@ const CodemirrorEditor = dynamic(
 );
 
 export default function FigmaDeveloperPage() {
-  const [reflect, setReflect] = useState<ReflectSceneNode>();
-  const [target, setTarget] = useState<FigmaTargetNodeConfig>();
+  //
+  const targetNodeConfig = useReflectTargetNode();
+  const figmaNode = targetNodeConfig?.figma;
+  const reflect = targetNodeConfig?.reflect;
+  //
+
   const flutterAppBuild = reflect && flutter.buildApp(reflect);
   const widget = flutterAppBuild?.widget;
   const app =
@@ -43,21 +48,9 @@ export default function FigmaDeveloperPage() {
   const widgetCode = utils_dart.format(widget?.build()?.finalize());
   const rootAppCode = app && utils_dart.format(composeAppWithHome(app));
 
-  const handleOnDesignImported = (reflect: ReflectSceneNode) => {
-    setReflect(reflect);
-  };
-
-  const handleTargetNodeSet = (target: FigmaTargetNodeConfig) => {
-    setTarget(target);
-  };
-
   return (
     <>
       <DefaultEditorWorkspaceLayout leftbar={<LayerHierarchy data={reflect} />}>
-        <figmacomp.FigmaScreenImporter
-          onImported={handleOnDesignImported}
-          onTargetEnter={handleTargetNodeSet}
-        />
         <WorkspaceContentPanelGridLayout>
           <WorkspaceContentPanel>
             <PreviewAndRunPanel
@@ -69,8 +62,8 @@ export default function FigmaDeveloperPage() {
                   w: reflect?.width,
                   h: reflect?.height,
                 },
-                fileid: target?.file,
-                sceneid: target?.node,
+                fileid: targetNodeConfig?.file,
+                sceneid: targetNodeConfig?.node,
               }}
             />
           </WorkspaceContentPanel>

@@ -1,4 +1,11 @@
-import { NextRouter } from "next/router";
+import {
+  FigmaTargetNodeConfig,
+  parseFileAndNodeIdFromUrl_Figma,
+} from "@design-sdk/core/utils/figma-api-utils";
+import { Figma, nodes, remote, SceneNode } from "@design-sdk/figma";
+import { NextRouter, useRouter } from "next/router";
+import { useEffect, useState } from "react";
+import { fetchTargetAsReflect } from "../../components/figma/screen-importer";
 
 const P_FIGMA_TARGET_URL = "figma_target_url";
 
@@ -16,4 +23,60 @@ export function extractFromFigmaQueryParams(router: NextRouter) {
 export function setFigmaTargetUrl(router: NextRouter, url: string) {
   ((router.query as any) as FigmaToReactRouterQueryParams).figma_target_url = url;
   router.push(router);
+}
+
+/**
+ * NextJS Hook that retrieves query param "figma_target_url"
+ */
+export function useFigmaTargetUrl() {
+  const router = useRouter();
+  const [figma_target_url, set_figma_target_url] = useState<string>();
+  useEffect(() => {
+    const q: FigmaToReactRouterQueryParams = router.query as any;
+    const _figma_target_url = q.figma_target_url;
+    set_figma_target_url(_figma_target_url);
+  }, [router]);
+
+  return figma_target_url;
+}
+
+export function useFigmaTargetNode() {
+  const figmaTargetUrl = useFigmaTargetUrl();
+  const [targetNode, setTargetNode] = useState<FigmaTargetNodeConfig>();
+  useEffect(() => {
+    if (figmaTargetUrl) {
+      const targetnodeconfig = parseFileAndNodeIdFromUrl_Figma(figmaTargetUrl);
+      setTargetNode(targetnodeconfig);
+    }
+  }, [figmaTargetUrl]);
+
+  return targetNode;
+}
+
+export interface TargetNodeConfig {
+  remote: remote.api.Node;
+  figma: Figma.SceneNode;
+  reflect: nodes.ReflectSceneNode;
+  url: string;
+  file: string;
+  node: string;
+}
+
+export function useReflectTargetNode() {
+  const figmaTargetNode = useFigmaTargetNode();
+  const [targetNode, setTargetNode] = useState<TargetNodeConfig>();
+  useEffect(() => {
+    if (figmaTargetNode) {
+      fetchTargetAsReflect(figmaTargetNode.file, figmaTargetNode.node).then(
+        (res) => {
+          setTargetNode({
+            ...res,
+            ...figmaTargetNode,
+          });
+        }
+      );
+    }
+  }, [figmaTargetNode]);
+
+  return targetNode;
 }

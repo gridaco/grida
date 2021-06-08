@@ -5,27 +5,18 @@ import { ReflectSceneNode } from "@design-sdk/core/nodes";
 import { visualize_node } from "../../components/visualization";
 import { FigmaTargetNodeConfig } from "@design-sdk/core/utils/figma-api-utils";
 import { JsonTree } from "../../components/visualization/json-visualization/json-tree";
+import { useReflectTargetNode } from "../../query/from-figma";
 
 export default function FigmaToReflectNodePage() {
-  const [reflect, setReflect] = useState<ReflectSceneNode>();
-  const [targetnodeConfig, setTargetnodeConfig] =
-    useState<FigmaTargetNodeConfig>();
-
-  const handleOnDesignImported = (reflect: ReflectSceneNode) => {
-    setReflect(reflect);
-  };
-
-  const handleFigmaUrlEnter = (targetconfig: FigmaTargetNodeConfig) => {
-    setTargetnodeConfig(targetconfig);
-  };
+  //
+  const targetNodeConfig = useReflectTargetNode();
+  const figmaNode = targetNodeConfig?.figma;
+  const reflect = targetNodeConfig?.reflect;
+  //
 
   return (
     <>
-      <canvas.FigmaEmbedCanvas src={{ url: targetnodeConfig?.url }} />
-      <figmacomp.FigmaScreenImporter
-        onImported={handleOnDesignImported}
-        onTargetEnter={handleFigmaUrlEnter}
-      />
+      <canvas.FigmaEmbedCanvas src={{ url: targetNodeConfig?.url }} />
       <visualize_node.HorizontalHierarchyTreeVisualization
         key={reflect?.id}
         width={1000}
