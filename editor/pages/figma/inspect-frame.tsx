@@ -36,6 +36,16 @@ interface _LiteAutolayoutInspectionRepresentative {
   layoutAlign: string;
   layoutGrow: number;
   layoutMode: string;
+  primaryAxisSizingMode: string;
+  counterAxisSizingMode: string;
+  primaryAxisAlignItems: string;
+  counterAxisAlignItems: string;
+  padding: {
+    l: number;
+    b: number;
+    t: number;
+    r: number;
+  };
 }
 function extractOnlyAutolayoutProoperties(
   node: SceneNode
@@ -60,6 +70,16 @@ function extractOnlyAutolayoutProoperties(
       layoutAlign: node.layoutAlign,
       layoutGrow: node.layoutGrow,
       layoutMode: node.layoutMode,
+      primaryAxisSizingMode: node.primaryAxisSizingMode,
+      counterAxisSizingMode: node.counterAxisSizingMode,
+      primaryAxisAlignItems: node.primaryAxisAlignItems,
+      counterAxisAlignItems: node.counterAxisAlignItems,
+      padding: {
+        l: node.paddingLeft,
+        r: node.paddingRight,
+        b: node.paddingBottom,
+        t: node.paddingTop,
+      },
     };
   }
 }
