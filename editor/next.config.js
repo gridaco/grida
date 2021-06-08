@@ -23,6 +23,7 @@ const withTM = require("next-transpile-modules")([
 
   // region coli
   "coli",
+  "@coli.codes/escape-string",
   "@coli.codes/web-builder",
   "@coli.codes/web-builder-core",
   "@coli.codes/nodejs-builder",
