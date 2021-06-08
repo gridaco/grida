@@ -1,0 +1,65 @@
+import React from "react";
+import styled from "@emotion/styled";
+import { useReflectTargetNode } from "../../query/from-figma";
+import { MonacoEditor } from "../../components/code-editor";
+import { BaseFrameMixin, SceneNode } from "@design-sdk/figma";
+
+export default function InspectAutolayout() {
+  //
+  const targetNodeConfig = useReflectTargetNode();
+  const figmaNode = targetNodeConfig?.figma;
+  const reflect = targetNodeConfig?.reflect;
+  //
+
+  const inspectionTarget =
+    figmaNode && extractOnlyAutolayoutProoperties(figmaNode);
+
+  return (
+    <>
+      <MonacoEditor
+        key={figmaNode?.id}
+        height="100vh"
+        defaultLanguage="json"
+        defaultValue={JSON.stringify(inspectionTarget, null, 2)}
+      />
+    </>
+  );
+}
+
+interface _LiteAutolayoutInspectionRepresentative {
+  type: string;
+  id: string;
+  name: string;
+  width: number;
+  height: number;
+  children?: _LiteAutolayoutInspectionRepresentative[];
+  layoutAlign: string;
+  layoutGrow: number;
+  layoutMode: string;
+}
+function extractOnlyAutolayoutProoperties(
+  node: SceneNode
+): _LiteAutolayoutInspectionRepresentative {
+  if (
+    node.type == "FRAME" ||
+    node.type == "INSTANCE" ||
+    node.type == "COMPONENT"
+  ) {
+    let children: _LiteAutolayoutInspectionRepresentative[] = undefined;
+    if ("children" in node) {
+      children = node.children.map((c) => extractOnlyAutolayoutProoperties(c));
+    }
+
+    return {
+      type: node.type,
+      id: node.id,
+      name: node.name,
+      width: node.width,
+      height: node.height,
+      children: children,
+      layoutAlign: node.layoutAlign,
+      layoutGrow: node.layoutGrow,
+      layoutMode: node.layoutMode,
+    };
+  }
+}
