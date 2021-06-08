@@ -7,10 +7,7 @@
         "desktop",
         "web",
         "boring/packages/*",
-        "nothing/packages/*",
-        "ui/editor-ui",
-        "ui/reflect-ui/packages/*",
-        "packages/**/*"
+        "ui/editor-ui/packages/*"
     ],
     "scripts": {
         "web": "yarn workspace web run dev",
