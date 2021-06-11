@@ -1,13 +1,10 @@
 import dynamic from "next/dynamic";
 import React, { useEffect, useState } from "react";
-import { figmacomp, canvas, runner } from "../../components";
 import { flutter } from "@designto/code";
 import { composeAppWithHome } from "@bridged.xyz/flutter-builder";
-import { ReflectSceneNode } from "@design-sdk/core/nodes";
 import { utils_dart } from "../../utils";
 import { MainImageRepository } from "@design-sdk/core/assets-repository";
 import { ImageRepositories } from "@design-sdk/figma/asset-repository";
-// import { MonacoEditor } from "../../components/code-editor";
 import { DefaultEditorWorkspaceLayout } from "../../layout/default-editor-workspace-layout";
 import { LayerHierarchy } from "../../components/editor-hierarchy";
 import {
@@ -15,7 +12,6 @@ import {
   WorkspaceContentPanelGridLayout,
 } from "../../layout/panel";
 import { PreviewAndRunPanel } from "../../components/preview-and-run";
-import { FigmaTargetNodeConfig } from "@design-sdk/core/utils/figma-api-utils";
 import styled from "@emotion/styled";
 import { useReflectTargetNode } from "../../query/from-figma";
 
