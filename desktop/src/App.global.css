@@ -6,6 +6,8 @@ body {
   position: relative;
   color: white;
   height: 100vh;
+  margin: 0px;
+  padding: 0px;
   background: white;
   font-family: Helvetica, Helvetica sans-serif;
   overflow-y: hidden;

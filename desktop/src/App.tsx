@@ -1,11 +1,11 @@
 import React from 'react';
 import { BrowserRouter as Router, Switch, Route } from 'react-router-dom';
-import { Home } from '@bridged.xyz/app/home';
+import { AppRoot } from '@bridged.xyz/app/app';
 
 export default function App() {
   return (
     <Router>
-      <Home />
+      <AppRoot />
     </Router>
   );
 }

@@ -1,5 +1,6 @@
 import styled from "@emotion/styled";
 import React from "react";
+import { TopBar } from "../../components";
 
 export function HomeScaffold(props: {
   children: JSX.Element;
@@ -8,7 +9,10 @@ export function HomeScaffold(props: {
   return (
     <Root>
       <NavigationWrapper>{props.navigation}</NavigationWrapper>
-      <BodyWrapper>{props.children}</BodyWrapper>
+      <ContentAndTopBarFrame>
+        <TopBar />
+        <BodyWrapper>{props.children}</BodyWrapper>
+      </ContentAndTopBarFrame>
     </Root>
   );
 }
@@ -16,23 +20,32 @@ export function HomeScaffold(props: {
 const NAV_WIDTH = "200px";
 
 const Root = styled.div`
-  height: 100%;
-  width: 100%;
+  height: 100vh;
+  width: 100vw;
   display: flex;
   flex-direction: row;
+  overflow: auto;
+`;
+
+const ContentAndTopBarFrame = styled.div`
+  flex: none;
+  order: 1;
+  align-self: stretch;
+  flex-grow: 1;
+  margin: 0px 0px;
 `;
 
 const NavigationWrapper = styled.div`
   height: 100%;
   width: ${NAV_WIDTH};
-  position: fixed; /* Stay in place */
   z-index: 1; /* Stay on top */
   top: 0; /* Stay at the top */
   left: 0;
   background-color: #f6f6f6; /* Black*/
-  overflow-x: hidden; /* Disable horizontal scroll */
+  overflow-x: auto; /* Disable horizontal scroll */
 `;
 
 const BodyWrapper = styled.div`
-  margin-left: ${NAV_WIDTH};
+  overflow-x: scroll;
+  min-height: 100%;
 `;
