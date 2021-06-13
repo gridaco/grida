@@ -4,10 +4,13 @@ const withTM = require("next-transpile-modules")([
   "@designto/flutter",
   "@designto/web",
   "@designto/react",
+  // design-sdk
+  "@design-sdk/key-annotations",
   "@design-sdk/core",
   "@design-sdk/universal",
   "@design-sdk/figma",
   "@design-sdk/sketch",
+  // reflect-ui
   "@reflect-ui/core",
   "@reflect-ui/detection",
 
