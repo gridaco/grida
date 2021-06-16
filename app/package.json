@@ -2,7 +2,7 @@
     "name": "@bridged.xyz/app",
     "version": "0.0.0",
     "dependencies": {
-        "@boring-ui/embed": "3.3.3",
+        "@boring-ui/embed": "3.3.4",
         "@boringso/react-core": "0.0.0",
         "@emotion/react": "^11.1.5",
         "@emotion/styled": "^11.1.5",
