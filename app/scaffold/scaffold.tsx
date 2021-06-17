@@ -6,12 +6,24 @@ import { SideNavigation } from "../components";
 import { EditorThemeProvider } from "@editor-ui/theme";
 import { ThemeProvider, useTheme } from "@emotion/react";
 
-export function Home() {
-  const navigation = <SideNavigation />;
+export function Scaffold(props: {
+  mode: "desktop" | "browser";
+  controlDoubleClick: () => void;
+}) {
+  const navigation = (
+    <SideNavigation
+      // if desktop && mac, show top draggable
+      top={props.mode == "desktop"}
+      controlDoubleClick={props.controlDoubleClick}
+    />
+  );
   // const navigation = <></>;
   return (
     <EditorThemeProvider light>
-      <HomeScaffold navigation={navigation}>
+      <HomeScaffold
+        navigation={navigation}
+        controlDoubleClick={props.controlDoubleClick}
+      >
         <>
           <BoringScaffold />
         </>

@@ -1,11 +1,15 @@
 import { css, Global } from "@emotion/react";
 import React from "react";
 import { RecoilRoot } from "recoil";
-import { Home } from "../home/home";
+import { Scaffold } from "../scaffold/scaffold";
 
 const GlobalStyles = () => (
   <Global
     styles={css`
+      body {
+        margin: 0;
+      }
+
       h1,
       h2,
       h3,
@@ -19,12 +23,18 @@ const GlobalStyles = () => (
   />
 );
 
-export function AppRoot() {
+export function AppRoot(props: {
+  mode: "browser" | "desktop";
+  controlDoubleClick: () => void;
+}) {
   return (
     <>
       <GlobalStyles />
       <RecoilRoot>
-        <Home />
+        <Scaffold
+          mode={props.mode}
+          controlDoubleClick={props.controlDoubleClick}
+        />
       </RecoilRoot>
     </>
   );

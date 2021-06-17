@@ -5,12 +5,13 @@ import { TopBar } from "../../components";
 export function HomeScaffold(props: {
   children: JSX.Element;
   navigation: JSX.Element;
+  controlDoubleClick: () => void;
 }) {
   return (
     <Root>
       <NavigationWrapper>{props.navigation}</NavigationWrapper>
       <ContentAndTopBarFrame>
-        <TopBar />
+        <TopBar controlDoubleClick={props.controlDoubleClick} />
         <BodyWrapper>{props.children}</BodyWrapper>
       </ContentAndTopBarFrame>
     </Root>

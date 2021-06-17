@@ -88,7 +88,15 @@ type LayerListItem = {
   isLocked: boolean;
 };
 
-export function SideNavigation() {
+interface SideNavigationProps {
+  /**
+   * specifies rather to enable top draggable area for mac frameless app.
+   */
+  top: boolean;
+  controlDoubleClick: () => void;
+}
+
+export function SideNavigation(props: SideNavigationProps) {
   const selectedLayers = [];
 
   const highlightLayer = {};
@@ -282,6 +290,9 @@ export function SideNavigation() {
 
   return (
     <>
+      {props.top && (
+        <TopDraggableSection onDoubleClick={props.controlDoubleClick} />
+      )}
       <TreeView.Root
         scrollable
         onClick={
@@ -298,3 +309,10 @@ export function SideNavigation() {
     </>
   );
 }
+
+const TopDraggableSection = styled.div(
+  ({ theme }) => `
+  -webkit-app-region: drag;
+  height:${theme.sizes.desktopControlWindowBar.height}px;
+`
+);
