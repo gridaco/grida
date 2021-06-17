@@ -3,22 +3,26 @@ import React from "react";
 import { RecoilRoot } from "recoil";
 import { Home } from "../home/home";
 
+const GlobalStyles = () => (
+  <Global
+    styles={css`
+      h1,
+      h2,
+      h3,
+      h4,
+      h5,
+      h6,
+      span {
+        font-family: Arial, Helvetica, sans-serif;
+      }
+    `}
+  />
+);
+
 export function AppRoot() {
   return (
     <>
-      <Global
-        styles={css`
-          h1,
-          h2,
-          h3,
-          h4,
-          h5,
-          h6,
-          span {
-            font-family: Arial, Helvetica, sans-serif;
-          }
-        `}
-      />
+      <GlobalStyles />
       <RecoilRoot>
         <Home />
       </RecoilRoot>
