@@ -16,6 +16,7 @@ import {
 } from "./page-navigation-item";
 import "@editor-ui/theme";
 import * as ContextMenu from "@editor-ui/context-menu";
+import { BarDragArea } from "@editor-ui/desktop-titlebar";
 
 // export const dummyData: HierarchyData[] = [
 //   {
@@ -290,9 +291,10 @@ export function SideNavigation(props: SideNavigationProps) {
 
   return (
     <>
-      {props.top && (
-        <TopDraggableSection onDoubleClick={props.controlDoubleClick} />
-      )}
+      <BarDragArea
+        controlDoubleClick={props.controlDoubleClick}
+        enabled={props.top}
+      />
       <TreeView.Root
         scrollable
         onClick={
@@ -309,10 +311,3 @@ export function SideNavigation(props: SideNavigationProps) {
     </>
   );
 }
-
-const TopDraggableSection = styled.div(
-  ({ theme }) => `
-  -webkit-app-region: drag;
-  height:${theme.sizes.desktopControlWindowBar.height}px;
-`
-);

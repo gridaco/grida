@@ -1,14 +1,16 @@
 import styled from "@emotion/styled";
 import React from "react";
+import { BarDragArea } from "@editor-ui/desktop-titlebar";
 
 export function TopBar(props: { controlDoubleClick: () => void }) {
-  return <TopBarRoot onDoubleClick={props.controlDoubleClick}></TopBarRoot>;
+  return (
+    <BarDragArea controlDoubleClick={props.controlDoubleClick}>
+      <TopBarRoot onDoubleClick={props.controlDoubleClick}></TopBarRoot>
+    </BarDragArea>
+  );
 }
 
 const TopBarRoot = styled.div`
-  /** https://www.electronjs.org/docs/api/frameless-window#draggable-region - this is also present on side nav bar*/
-  -webkit-app-region: drag;
-
   background-color: grey; /** test bg */
 
   width: 100%;
