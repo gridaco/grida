@@ -10,8 +10,8 @@
 [submodule "packages/design-sdk"]
 	path = packages/design-sdk
 	url = https://github.com/bridgedxyz/design-sdk
-[submodule "packages/bridged-format"]
-	path = packages/bridged-format
+[submodule "packages/core-format"]
+	path = packages/core-format
 	url = https://github.com/bridgedxyz/.bridged
 [submodule "packages/uiutils"]
 	path = packages/uiutils
