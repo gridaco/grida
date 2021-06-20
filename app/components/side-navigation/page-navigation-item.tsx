@@ -1,10 +1,4 @@
-import React, {
-  ForwardedRef,
-  forwardRef,
-  memo,
-  useCallback,
-  useState,
-} from "react";
+import React, { forwardRef, memo, useCallback, useState } from "react";
 import styled from "@emotion/styled";
 import { useTheme } from "@emotion/react";
 import "@editor-ui/theme";
@@ -112,7 +106,7 @@ export const LayerRow = memo(
       onChangeVisible: (visible: boolean) => void;
       onChangeIsLocked: (isLocked: boolean) => void;
     },
-    forwardedRef: ForwardedRef<HTMLLIElement>
+    forwardedRef: any
   ) {
     const [hovered, setHovered] = useState(false);
 
