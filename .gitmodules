@@ -7,18 +7,12 @@
 [submodule "packages/design-git"]
 	path = packages/design-git
 	url = https://github.com/bridgedxyz/design-git
-[submodule "packages/design-sdk"]
-	path = packages/design-sdk
-	url = https://github.com/bridgedxyz/design-sdk
 [submodule "packages/core-format"]
 	path = packages/core-format
 	url = https://github.com/bridgedxyz/.bridged
 [submodule "packages/reflect-core"]
 	path = packages/reflect-core
 	url = https://github.com/bridgedxyz/reflect-core-ts
-[submodule "packages/design-lint"]
-	path = packages/design-lint
-	url = https://github.com/bridgedxyz/lint
 [submodule "ui/editor-ui"]
 	path = ui/editor-ui
 	url = https://github.com/bridgedxyz/reflect-editor-ui
