@@ -34,6 +34,10 @@ const ContentAndTopBarFrame = styled.div`
   align-self: stretch;
   flex-grow: 1;
   margin: 0px 0px;
+
+  /* flex root */
+  display: flex;
+  flex-direction: column;
 `;
 
 const NavigationWrapper = styled.div`
@@ -42,11 +46,17 @@ const NavigationWrapper = styled.div`
   z-index: 1; /* Stay on top */
   top: 0; /* Stay at the top */
   left: 0;
-  background-color: #f6f6f6; /* Black*/
+  background-color: #f6f6f6;
   overflow-x: auto; /* Disable horizontal scroll */
 `;
 
 const BodyWrapper = styled.div`
-  overflow-x: scroll;
-  min-height: 100%;
+  /* child of flex */
+  flex: 1;
+
+  overflow-x: hidden;
+  overflow-y: scroll;
+  max-height: 100%;
+  max-width: 100%;
+
 `;

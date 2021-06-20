@@ -19,7 +19,7 @@ export function TopBar(props: { controlDoubleClick: () => void }) {
 }
 
 const TopBarRoot = styled.div`
-  background-color: grey; /** test bg */
+  background-color: #FFFFFF;
 
   width: 100%;
   max-width: 100vw;
