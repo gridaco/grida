@@ -1,4 +1,8 @@
 import React from "react";
-export function ProviderSketchEmbed() {
-  return <></>;
+
+interface ProviderSketchEmbedProps {
+  url: string;
+}
+export function ProviderSketchEmbed(props: ProviderSketchEmbedProps) {
+  return <>SKETCH EMBED</>;
 }

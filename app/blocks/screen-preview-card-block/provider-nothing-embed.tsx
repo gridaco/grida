@@ -1,4 +1,6 @@
 import React from "react";
-export function ProviderNothingEmbed() {
+
+interface ProviderNothingEmbedProps {}
+export function ProviderNothingEmbed(props: ProviderNothingEmbedProps) {
   return <></>;
 }

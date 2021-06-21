@@ -1,4 +1,15 @@
 import React from "react";
-export function ProviderUnknownIframeEmbed() {
-  return <></>;
+
+interface ProviderUnknownIframeEmbedProps {
+  url: string;
+}
+
+export function ProviderUnknownIframeEmbed(
+  props: ProviderUnknownIframeEmbedProps
+) {
+  return (
+    <>
+      <iframe src={props.url} />
+    </>
+  );
 }
