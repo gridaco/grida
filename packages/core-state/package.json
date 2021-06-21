@@ -1,4 +1,7 @@
 {
     "name": "@core/state",
-    "version": "0.0.0"
+    "version": "0.0.0",
+    "dependencies": {
+        "immer": "^9.0.3"
+    }
 }

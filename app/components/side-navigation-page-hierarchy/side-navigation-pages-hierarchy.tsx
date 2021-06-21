@@ -57,6 +57,7 @@ export function SideNavigationPagesHierarchy() {
     return pages.map(
       ({ id, name, depth, type, expanded, selected, visible }, index) => {
         const onSelectMenuItem = () => {
+          //
           console.log("onSelectMenuItem");
         };
 
@@ -64,8 +65,8 @@ export function SideNavigationPagesHierarchy() {
           console.log("handleContextMenu");
         };
 
-        const handleClick = () => {
-          console.log("handleClick");
+        const handleClick = (page) => {
+          // dispatch('selectPage', page.do_objectID);
         };
 
         const handleHoverChange = () => {

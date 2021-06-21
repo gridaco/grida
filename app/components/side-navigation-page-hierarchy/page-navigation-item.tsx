@@ -48,7 +48,7 @@ export const PageRow = memo(
       selected,
       onHoverChange,
       ...props
-    }: TreeView.TreeRowProps<PageMenuItemType> & {
+    }: TreeView.TreeRowProps<string> & {
       name: string;
       selected: boolean;
     },
@@ -65,7 +65,7 @@ export const PageRow = memo(
     );
 
     return (
-      <TreeView.Row<PageMenuItemType>
+      <TreeView.Row
         ref={forwardedRef}
         onHoverChange={handleHoverChange}
         selected={selected}

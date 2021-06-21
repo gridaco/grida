@@ -1,10 +1,7 @@
 import React from "react";
-import { HomeScaffold } from "../layouts/home-scaffold";
-import { ContentCard } from "../cards";
-import { Scaffold as BoringScaffold } from "@boringso/react-core";
-import { SideNavigation } from "../components";
+import { HomeScaffold } from "@editor-ui/workspace";
+import { SideNavigation, TopBar } from "../components";
 import { EditorThemeProvider } from "@editor-ui/theme";
-import { ThemeProvider, useTheme } from "@emotion/react";
 import { BuiltIn_GettingStarted } from "../built-in-pages/getting-started/getting-started";
 
 export function Scaffold(props: {
@@ -18,17 +15,19 @@ export function Scaffold(props: {
       controlDoubleClick={props.controlDoubleClick}
     />
   );
-  // const navigation = <></>;
+
+  const topBar = <TopBar controlDoubleClick={props.controlDoubleClick} />;
+
   return (
     <EditorThemeProvider light>
       <HomeScaffold
         navigation={navigation}
+        topBar={topBar}
         controlDoubleClick={props.controlDoubleClick}
       >
         <>
-          {/* test */}
           <BuiltIn_GettingStarted />
-          {/* <BoringScaffold extensions={[]} /> */}
+          {/* <CurrentPage/> */}
         </>
       </HomeScaffold>
     </EditorThemeProvider>

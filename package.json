@@ -6,6 +6,7 @@
         "app",
         "desktop",
         "web",
+        "packages/core-*",
         "boring/packages/*",
         "ui/editor-ui/packages/*"
     ],

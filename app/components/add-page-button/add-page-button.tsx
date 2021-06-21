@@ -1,16 +1,17 @@
+import React, { useCallback } from "react";
 import styled from "@emotion/styled";
-import React from "react";
+import { useDispatch } from "@core/app-state";
 
 export function AddPageButton() {
-  return (
-    <Button
-      onClick={() => {
-        console.warn("todo >> implement add apge");
-      }}
-    >
-      + Add Page
-    </Button>
-  );
+  const dispatch = useDispatch();
+
+  const handleAddPage = useCallback(() => {
+    const name = prompt("New page Name");
+
+    if (name !== null) dispatch("addPage", name);
+  }, [dispatch]);
+
+  return <Button onClick={handleAddPage}>+ Add Page</Button>;
 }
 
 const Button = styled.button`
