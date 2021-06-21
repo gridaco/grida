@@ -31,3 +31,6 @@
 [submodule "packages/design-to-code"]
 	path = packages/design-to-code
 	url = http://github.com/bridgedxyz/design-to-code
+[submodule "packages/design-sdk"]
+	path = packages/design-sdk
+	url = https://github.com/bridgedxyz/design-sdk
