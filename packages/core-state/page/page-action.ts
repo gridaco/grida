@@ -7,13 +7,14 @@ export type PageAction =
   | DuplicateCurrentPageAction; //  [type: "duplicatePage"];
 
 export type PageId = string;
-export type PageParentId = PageId | "root";
+export const PageRoot: unique symbol = Symbol("page-root");
+export type PageParentId = PageId | typeof PageRoot;
 
 /**
  * add page action triggered by user
  */
 export interface AddPageAction {
-  type: "addPage";
+  type: "add-page";
   name: string;
   /**
    * parent page's id
@@ -22,7 +23,7 @@ export interface AddPageAction {
 }
 
 export interface MovePageAction {
-  type: "movePage";
+  type: "move-page";
   originOrder: number;
   targetOrder: number;
   originParent: PageParentId;
@@ -30,16 +31,16 @@ export interface MovePageAction {
 }
 
 export interface SelectPageAction {
-  type: "selectPage";
+  type: "select-page";
   page: PageId;
 }
 
 export interface DeleteCurrentPageAction {
-  type: "deletePage";
+  type: "delete-current-page";
 }
 
 export interface RenameCurrentPageAction {
-  type: "renamePage";
+  type: "rename-current-page";
   /**
    * new name of the page
    */
@@ -47,5 +48,5 @@ export interface RenameCurrentPageAction {
 }
 
 export interface DuplicateCurrentPageAction {
-  type: "duplicatePage";
+  type: "duplicate-current-page";
 }

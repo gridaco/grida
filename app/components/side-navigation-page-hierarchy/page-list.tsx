@@ -9,6 +9,7 @@ import { useApplicationState, useDispatch } from "@core/app-state";
 
 import { PageMenuItemType } from "./page-menu-item-type";
 import { PageRow } from "./page-row-item";
+import { PageParentId, PageRoot } from "@core/state";
 
 const Container = styled.div(({ theme }) => ({
   height: "200px",
@@ -61,32 +62,36 @@ const PageListContent = memo(function PageListContent({
 
           if (name)
             dispatch({
-              type: "renamePage",
+              type: "rename-current-page",
               name: name,
             });
           break;
         }
         case "duplicate": {
-          dispatch({ type: "duplicatePage" });
+          dispatch({ type: "duplicate-current-page" });
           break;
         }
         case "delete":
-          dispatch({ type: "deletePage" });
+          dispatch({ type: "delete-current-page" });
           break;
       }
     },
     [dispatch]
   );
 
-  const handleAddPage = useCallback(() => {
-    const name = prompt("New page Name");
+  const handleAddPage = useCallback(
+    (parent: PageParentId) => {
+      const name = prompt("New page Name");
 
-    if (name !== null)
-      dispatch({
-        type: "addPage",
-        name,
-      });
-  }, [dispatch]);
+      if (name !== null)
+        dispatch({
+          type: "add-page",
+          name,
+          parent: parent,
+        });
+    },
+    [dispatch]
+  );
 
   const pageElements = useMemo(() => {
     return pageInfo.map((page) => (
@@ -96,13 +101,15 @@ const PageListContent = memo(function PageListContent({
         id={page.id}
         key={page.id}
         selected={selectedPageId === page.id}
-        onAddClick={handleAddPage}
+        onAddClick={() => {
+          handleAddPage(page.id);
+        }}
         onMenuClick={() => {
           console.log("not implemented");
         }}
         onClick={() => {
           dispatch({
-            type: "selectPage",
+            type: "select-page",
             page: page.id,
           });
         }}
@@ -110,7 +117,7 @@ const PageListContent = memo(function PageListContent({
         onSelectMenuItem={handleSelectMenuItem}
         onContextMenu={() => {
           dispatch({
-            type: "selectPage",
+            type: "select-page",
             page: page.id,
           });
         }}
@@ -123,7 +130,13 @@ const PageListContent = memo(function PageListContent({
       <Header>
         Pages
         <Spacer.Horizontal />
-        <Button id="add-page" tooltip="Add a new page" onClick={handleAddPage}>
+        <Button
+          id="add-page"
+          tooltip="Add a new page"
+          onClick={() => {
+            handleAddPage(PageRoot);
+          }}
+        >
           <PlusIcon />
         </Button>
       </Header>
@@ -132,7 +145,7 @@ const PageListContent = memo(function PageListContent({
         onMoveItem={useCallback(
           (originOrder, targetOrder) => {
             dispatch({
-              type: "movePage",
+              type: "move-page",
               originOrder,
               targetOrder,
               originParent: "", // todo

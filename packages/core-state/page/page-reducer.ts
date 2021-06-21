@@ -1,7 +1,12 @@
 import produce from "immer";
 import { getCurrentPage, getCurrentPageIndex } from "./page-selector";
 import { ApplicationState } from "../application";
-import { PageAction } from "./page-action";
+import {
+  AddPageAction,
+  DuplicateCurrentPageAction,
+  PageAction,
+  RenameCurrentPageAction,
+} from "./page-action";
 import { Page } from "./page-model";
 
 import { nanoid } from "nanoid";
@@ -29,21 +34,21 @@ export function pageReducer(
   action: PageAction
 ): ApplicationState {
   switch (action.type) {
-    case "selectPage": {
+    case "select-page": {
       return produce(state, (draft) => {
         draft.selectedPage = action.page;
       });
     }
-    case "addPage": {
-      const { name } = action;
+    case "add-page": {
+      const { name } = <AddPageAction>action;
 
       return produce(state, (draft) => {
         const newPage = createPage(draft.pages, name);
         draft.selectedPage = newPage.id;
       });
     }
-    case "renamePage": {
-      const { name } = action;
+    case "rename-current-page": {
+      const { name } = <RenameCurrentPageAction>action;
       const pageIndex = getCurrentPageIndex(state);
 
       return produce(state, (draft) => {
@@ -56,7 +61,8 @@ export function pageReducer(
         });
       });
     }
-    case "duplicatePage": {
+    case "duplicate-current-page": {
+      <DuplicateCurrentPageAction>action;
       const pageIndex = getCurrentPageIndex(state);
 
       return produce(state, (draft) => {
@@ -74,7 +80,7 @@ export function pageReducer(
         draft.selectedPage = duplicatePage.id;
       });
     }
-    case "deletePage": {
+    case "delete-current-page": {
       const page = getCurrentPage(state);
       const pageIndex = getCurrentPageIndex(state);
 
@@ -87,8 +93,10 @@ export function pageReducer(
         draft.selectedPage = pages[newIndex].id;
       });
     }
-    case "movePage": {
-      const { originOrder, targetOrder } = action;
+    case "move-page": {
+      const { originOrder, targetOrder, originParent, targetParent } = action;
+
+      // @todo - add nested page support
 
       return produce(state, (draft) => {
         const sourceItem = draft.pages[originOrder];
