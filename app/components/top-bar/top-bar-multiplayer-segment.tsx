@@ -1,6 +1,9 @@
 import React from "react";
 import styled from "@emotion/styled";
-import { MultiplayerAvatar } from "@editor-ui/multiplayer";
+import {
+  MultiplayerAvatar,
+  MultiplayerAvatarGroup,
+} from "@editor-ui/multiplayer";
 
 interface Player {
   name: string;
@@ -32,7 +35,7 @@ export function TopBarMultiplayerSegment() {
   };
 
   return (
-    <>
+    <MultiplayerAvatarGroup spacing={-4}>
       {players.map((p) => {
         return (
           <MultiplayerAvatar
@@ -45,7 +48,7 @@ export function TopBarMultiplayerSegment() {
           />
         );
       })}
-    </>
+    </MultiplayerAvatarGroup>
   );
 }
 
