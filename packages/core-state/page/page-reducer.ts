@@ -64,6 +64,7 @@ export function pageReducer(
         const page = pages[pageIndex];
 
         const duplicatePage = produce<Page>(page, (page) => {
+          page.id = nanoid();
           page.name = `${page.name} Copy`;
 
           return page;
