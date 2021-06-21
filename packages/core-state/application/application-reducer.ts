@@ -6,7 +6,7 @@ export function applicationReducer(
   state: ApplicationState,
   action: Action
 ): ApplicationState {
-  switch (action[0]) {
+  switch (action.type) {
     case "selectPage":
     case "addPage":
     case "renamePage":

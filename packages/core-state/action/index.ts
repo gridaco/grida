@@ -1,17 +1,19 @@
 import { PageAction } from "../page/page-action";
 
 export type WorkspaceAction =
-  | [type: "newFile"]
+  | { type: "newFile" }
   //
   | HistoryAction;
 
 export type HistoryAction =
   //
-  | [type: "undo"]
+  | { type: "undo" }
   //
-  | [type: "redo"]
+  | { type: "redo" }
   | Action;
 
 export type Action =
   //
   PageAction;
+
+export type ActionType = Action["type"];

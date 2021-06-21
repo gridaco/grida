@@ -7,6 +7,9 @@ import { MenuItem } from "@editor-ui/context-menu";
 import styled from "@emotion/styled";
 import { useApplicationState, useDispatch } from "@core/app-state";
 
+import { PageMenuItemType } from "./page-menu-item-type";
+import { PageRow } from "./page-row-item";
+
 const Container = styled.div(({ theme }) => ({
   height: "200px",
   display: "flex",
@@ -26,8 +29,6 @@ const Header = styled.div(({ theme }) => ({
   alignItems: "center",
 }));
 
-type MenuItemType = "duplicate" | "rename" | "delete";
-
 interface Props {
   selectedPageId: string;
   pageInfo: { id: string; name: string }[];
@@ -41,32 +42,36 @@ const PageListContent = memo(function PageListContent({
 }: Props) {
   const dispatch = useDispatch();
 
-  const menuItems: MenuItem<MenuItemType>[] = useMemo(
+  const menuItems: MenuItem<PageMenuItemType>[] = useMemo(
     () => [
       { value: "duplicate", title: "Duplicate Page" },
       { value: "rename", title: "Rename Page" },
       ...(canDelete
-        ? [{ value: "delete" as MenuItemType, title: "Delete Page" }]
+        ? [{ value: "delete" as PageMenuItemType, title: "Delete Page" }]
         : []),
     ],
     [canDelete]
   );
 
   const handleSelectMenuItem = useCallback(
-    (value: MenuItemType) => {
+    (value: PageMenuItemType) => {
       switch (value) {
         case "rename": {
           const name = prompt("New page Name");
 
-          if (name) dispatch("renamePage", name);
+          if (name)
+            dispatch({
+              type: "renamePage",
+              name: name,
+            });
           break;
         }
         case "duplicate": {
-          dispatch("duplicatePage");
+          dispatch({ type: "duplicatePage" });
           break;
         }
         case "delete":
-          dispatch("deletePage");
+          dispatch({ type: "deletePage" });
           break;
       }
     },
@@ -76,27 +81,40 @@ const PageListContent = memo(function PageListContent({
   const handleAddPage = useCallback(() => {
     const name = prompt("New page Name");
 
-    if (name !== null) dispatch("addPage", name);
+    if (name !== null)
+      dispatch({
+        type: "addPage",
+        name,
+      });
   }, [dispatch]);
 
   const pageElements = useMemo(() => {
     return pageInfo.map((page) => (
-      <ListView.Row<MenuItemType>
+      <PageRow
+        name={page.name}
+        depth={0}
         id={page.id}
         key={page.id}
         selected={selectedPageId === page.id}
+        onAddClick={handleAddPage}
+        onMenuClick={() => {
+          console.log("not implemented");
+        }}
         onClick={() => {
-          dispatch("selectPage", page.id);
+          dispatch({
+            type: "selectPage",
+            page: page.id,
+          });
         }}
         menuItems={menuItems}
         onSelectMenuItem={handleSelectMenuItem}
         onContextMenu={() => {
-          dispatch("selectPage", page.id);
+          dispatch({
+            type: "selectPage",
+            page: page.id,
+          });
         }}
-      >
-        <Spacer.Horizontal size={6 + 15} />
-        {page.name}
-      </ListView.Row>
+      />
     ));
   }, [pageInfo, selectedPageId, menuItems, handleSelectMenuItem, dispatch]);
 
@@ -112,8 +130,14 @@ const PageListContent = memo(function PageListContent({
       <ListView.Root
         sortable={true}
         onMoveItem={useCallback(
-          (sourceIndex, destinationIndex) => {
-            dispatch("movePage", sourceIndex, destinationIndex);
+          (originOrder, targetOrder) => {
+            dispatch({
+              type: "movePage",
+              originOrder,
+              targetOrder,
+              originParent: "", // todo
+              targetParent: "", // todo
+            });
           },
           [dispatch]
         )}
@@ -127,18 +151,12 @@ const PageListContent = memo(function PageListContent({
 export function PageList() {
   const [state] = useApplicationState();
 
-  const pageInfo = state.pages;
-  // useDeepArray(
-  //   state.pages.map((page) => ({
-  //     do_objectID: page.id,
-  //     name: page.name,
-  //   }))
-  // );
+  const pages = state.pages;
 
   return (
     <PageListContent
       selectedPageId={state.selectedPage}
-      pageInfo={pageInfo}
+      pageInfo={pages}
       canDelete={state.pages.length > 1}
     />
   );

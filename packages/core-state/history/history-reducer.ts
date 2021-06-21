@@ -1,11 +1,11 @@
 import produce from "immer";
-import { Action, HistoryAction } from "../action";
+import { ActionType, HistoryAction } from "../action";
 import { ApplicationState, applicationReducer } from "../application";
 import { HistoryState, HistoryEntry } from "./history-state";
 
 export function historyReducer(state: HistoryState, action: HistoryAction) {
   const currentState = state.present;
-  switch (action[0]) {
+  switch (action.type) {
     case "undo":
       if (state.past.length === 0) {
         return state;
@@ -58,7 +58,7 @@ export function historyReducer(state: HistoryState, action: HistoryAction) {
 }
 
 function createHistoryEntry(
-  actionType: Action[0],
+  actionType: ActionType,
   state: ApplicationState
 ): HistoryEntry {
   return {
@@ -72,7 +72,7 @@ const CHANGE_DIFF_DURATION_MS = 300;
 
 function getMergableHistoryEntry(
   state: HistoryState,
-  actionType: Action[0]
+  actionType: ActionType
 ): HistoryEntry | undefined {
   if (state.past.length === 0) {
     return;

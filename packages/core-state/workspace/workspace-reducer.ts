@@ -7,7 +7,7 @@ export function workspaceReducer(
   state: WorkspaceState,
   action: WorkspaceAction
 ): WorkspaceState {
-  switch (action[0]) {
+  switch (action.type) {
     case "newFile": {
       return produce(state, (draft) => {
         draft.history = createInitialHistoryState();

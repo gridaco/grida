@@ -5,7 +5,7 @@ import { noop } from "../_utils";
 
 export type Dispatcher = (action: Action) => void;
 
-export type FlatDispatcher = (...args: Action) => void;
+export type FlatDispatcher = (action: Action) => void;
 
 export const DispatchContext = createContext<Dispatcher>(noop);
 
@@ -16,13 +16,13 @@ export const useDispatch = (): FlatDispatcher => {
 
   // Simplify the dispatch function by flattening our action tuple
   return useCallback(
-    (...args: Action) => {
+    (action: Action) => {
       // When changing selection, trigger any pending updates in input fields
-      if (args[0] === "selectPage") {
+      if (action.type === "selectPage") {
         blurTrigger();
       }
 
-      dispatch(args);
+      dispatch(action);
     },
     [dispatch, blurTrigger]
   );

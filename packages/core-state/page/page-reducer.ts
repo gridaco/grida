@@ -28,14 +28,14 @@ export function pageReducer(
   state: ApplicationState,
   action: PageAction
 ): ApplicationState {
-  switch (action[0]) {
+  switch (action.type) {
     case "selectPage": {
       return produce(state, (draft) => {
-        draft.selectedPage = action[1];
+        draft.selectedPage = action.page;
       });
     }
     case "addPage": {
-      const [, name] = action;
+      const { name } = action;
 
       return produce(state, (draft) => {
         const newPage = createPage(draft.pages, name);
@@ -43,7 +43,7 @@ export function pageReducer(
       });
     }
     case "renamePage": {
-      const [, name] = action;
+      const { name } = action;
       const pageIndex = getCurrentPageIndex(state);
 
       return produce(state, (draft) => {
@@ -88,13 +88,13 @@ export function pageReducer(
       });
     }
     case "movePage": {
-      const [, sourceIndex, destinationIndex] = action;
+      const { originOrder, targetOrder } = action;
 
       return produce(state, (draft) => {
-        const sourceItem = draft.pages[sourceIndex];
+        const sourceItem = draft.pages[originOrder];
 
-        draft.pages.splice(sourceIndex, 1);
-        draft.pages.splice(destinationIndex, 0, sourceItem);
+        draft.pages.splice(originOrder, 1);
+        draft.pages.splice(targetOrder, 0, sourceItem);
       });
     }
     default:
