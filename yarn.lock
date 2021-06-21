@@ -1148,6 +1148,64 @@
     "@babel/helper-validator-identifier" "^7.14.5"
     to-fast-properties "^2.0.0"
 
+"@base-sdk/base@0.1.0-5":
+  version "0.1.0-5"
+  resolved "https://registry.yarnpkg.com/@base-sdk/base/-/base-0.1.0-5.tgz#3a08c23586e61147075d4b214ecd1f7934cf1292"
+  integrity sha512-ZSvYdFXMt0ik9fSyXygH7eRkojPP39njVLiVuo4P3IYwZOKShX4IZoLEbFuBhasir0DVa+niwivxYXjLqBG9cQ==
+  dependencies:
+    "@base-sdk/build" "0.1.0-3"
+    "@base-sdk/core" "0.1.0"
+    "@base-sdk/hosting" "0.1.0-1"
+    "@base-sdk/resources" "0.1.0"
+    "@base-sdk/url" "0.1.0-1"
+
+"@base-sdk/build@0.1.0-3":
+  version "0.1.0-3"
+  resolved "https://registry.yarnpkg.com/@base-sdk/build/-/build-0.1.0-3.tgz#73363bb2c93361a87dc67abeb1c295faf4abbc0e"
+  integrity sha512-1+KdkIsriFT59+uIc8T5xSYupUCLBCX9Da3EAI5RLZsWgKsmKzhLiUgyRPhar3eH+zS12tFfc1NfYDczlmPbjQ==
+  dependencies:
+    "@base-sdk/core" "0.1.0"
+    "@base-sdk/hosting" "0.1.0-1"
+    "@base-sdk/url" "0.1.0"
+    dart-services "^0.2.3"
+
+"@base-sdk/core@0.1.0":
+  version "0.1.0"
+  resolved "https://registry.yarnpkg.com/@base-sdk/core/-/core-0.1.0.tgz#865eb7373b77d367dd57dc7660452a889d6bb139"
+  integrity sha512-JDSgW8OXIj9bpkCZiSZZ4vlDaN+8bZplvCgpkS5yFKbvYlxAFRsAF6AKTxfLu0bGZIxnwt7ZIgDLoPyz4rPtjg==
+  dependencies:
+    "@reflect-ui/core" "0.0.2-rc.7"
+    axios "^0.21.0"
+
+"@base-sdk/hosting@0.1.0-1":
+  version "0.1.0-1"
+  resolved "https://registry.yarnpkg.com/@base-sdk/hosting/-/hosting-0.1.0-1.tgz#bf16050cadd1c766f0813bc7bb14344b28e9910d"
+  integrity sha512-LX0A17LE0GWt8rozCPIe1cLDlFKojnciAqWeGaib+UvDttTXkxkCksLslch/gcmuzWtfDZtDLbgwNExo9Hvi5w==
+  dependencies:
+    "@base-sdk/core" "0.1.0"
+    form-data "^3.0.0"
+
+"@base-sdk/resources@0.1.0":
+  version "0.1.0"
+  resolved "https://registry.yarnpkg.com/@base-sdk/resources/-/resources-0.1.0.tgz#ea99550a53caa8e04c0735e16866d8a91001b319"
+  integrity sha512-Mi3P+zDd61N4iUTEvsXuHjN6MIJGz2Kzb09mlmYS5RL+vLtGAv12w4dkLFmKwo6JPzmtNss5R4erbSOfjOhyew==
+  dependencies:
+    "@base-sdk/core" "0.1.0"
+
+"@base-sdk/url@0.1.0":
+  version "0.1.0"
+  resolved "https://registry.yarnpkg.com/@base-sdk/url/-/url-0.1.0.tgz#893519151a63048cd5e6d795e8e63518ec717a32"
+  integrity sha512-L1icnTJSnDKJbxizdwxkEUxGh4G93rPUQSURn2e3WV6dt+VeT7cGX/zTCp5YBgXrWH5stBn6eKvuYLEIo9jrWw==
+  dependencies:
+    "@base-sdk/core" "0.1.0"
+
+"@base-sdk/url@0.1.0-1":
+  version "0.1.0-1"
+  resolved "https://registry.yarnpkg.com/@base-sdk/url/-/url-0.1.0-1.tgz#47ac3f50955e8df43c90f0efa3878a31e34cbd7c"
+  integrity sha512-39GSoHRiCerEEWtFYH60s4nWP124SEdJjdIarglZmZOsM2VUdEuv3VuOgdh8AK2z0/5jjLBL1n5Fe5n96eE1yg==
+  dependencies:
+    "@base-sdk/core" "0.1.0"
+
 "@bcoe/v8-coverage@^0.2.3":
   version "0.2.3"
   resolved "https://registry.yarnpkg.com/@bcoe/v8-coverage/-/v8-coverage-0.2.3.tgz#75a2e8b51cb758a7553d6804a5932d7aace75c39"
@@ -2483,6 +2541,16 @@
   version "0.0.3"
   resolved "https://registry.yarnpkg.com/@radix-ui/utils/-/utils-0.0.3.tgz#f20dfa8a5681d778a579ad695fe68fe6a2c0ee88"
   integrity sha512-ruWffd3JjN8r+j8+LOIzTNEHzJsFcHOiSnQfl8KeBs+sCHGQgaI9IaRWxsaNXgrOYgPdBlZCbYG3qsLww2WR+w==
+
+"@reflect-ui/core@0.0.2-rc.7":
+  version "0.0.2-rc.7"
+  resolved "https://registry.yarnpkg.com/@reflect-ui/core/-/core-0.0.2-rc.7.tgz#9d531f5a0b9caab31e7563020044b753700e2bbc"
+  integrity sha512-EqF4SRU57bfa5DOPET1rv5lROFyMVHLv1xTEIlN6N2gDpXt71QceImWfQp3z3Khqnb4R/p9OhNK6DXGUpozWKw==
+
+"@reflect-ui/namings@0.0.3":
+  version "0.0.3"
+  resolved "https://registry.yarnpkg.com/@reflect-ui/namings/-/namings-0.0.3.tgz#6e9fd4809dd5c9d2a996516236c71b99ea93fbcb"
+  integrity sha512-rNNW9nK8qhz+54pOL11MRUTjRhRHTL/rbM5kvtddDY2g7t/1XxGl7d3tLs/0LEoy2LFPtNf/fFZYEgQD/jyoFA==
 
 "@sindresorhus/is@^0.14.0":
   version "0.14.0"
@@ -4016,6 +4084,13 @@ axe-core@^4.0.2:
   version "4.2.2"
   resolved "https://registry.yarnpkg.com/axe-core/-/axe-core-4.2.2.tgz#0c987d82c8b82b4b9b7a945f1b5ef0d8fed586ed"
   integrity sha512-OKRkKM4ojMEZRJ5UNJHmq9tht7cEnRnqKG6KyB/trYws00Xtkv12mHtlJ0SK7cmuNbrU8dPUova3ELTuilfBbw==
+
+axios@^0.21.0:
+  version "0.21.1"
+  resolved "https://registry.yarnpkg.com/axios/-/axios-0.21.1.tgz#22563481962f4d6bde9a76d516ef0e5d3c09b2b8"
+  integrity sha512-dKQiRHxGD9PPRIUNIWvZhPTPpl1rf/OxTYKsqKUDjBwYylTvV7SjSHJb9ratfyzM6wCdLCOYLzs73qpg5c4iGA==
+  dependencies:
+    follow-redirects "^1.10.0"
 
 axobject-query@^2.2.0:
   version "2.2.0"
@@ -5619,6 +5694,13 @@ damerau-levenshtein@^1.0.6:
   version "1.0.7"
   resolved "https://registry.yarnpkg.com/damerau-levenshtein/-/damerau-levenshtein-1.0.7.tgz#64368003512a1a6992593741a09a9d31a836f55d"
   integrity sha512-VvdQIPGdWP0SqFXghj79Wf/5LArmreyMsGLa6FG6iC4t3j7j5s71TrwWmT/4akbDQIqjfACkLZmjXhA7g2oUZw==
+
+dart-services@^0.2.3:
+  version "0.2.3"
+  resolved "https://registry.yarnpkg.com/dart-services/-/dart-services-0.2.3.tgz#682bff8403c8f9005c3bb15bf5936714d00ac060"
+  integrity sha512-mZw/aewCePENcYNGEIyf1kthLsAmJ2CkAx6WBOYFhZwITxAx2Spj9jbKh3DO3wpBSx1aVPp4Y49ekDEtRgJhNQ==
+  dependencies:
+    axios "^0.21.0"
 
 dashdash@^1.12.0:
   version "1.14.1"
@@ -7250,7 +7332,7 @@ flatted@^3.1.0:
   resolved "https://registry.yarnpkg.com/flatted/-/flatted-3.1.1.tgz#c4b489e80096d9df1dfc97c79871aea7c617c469"
   integrity sha512-zAoAQiudy+r5SvnSw3KJy5os/oRJYHzrzja/tBDqrZtNhUw8bt6y8OBzMWcjWr+8liV8Eb6yOhw8WZ7VFZ5ZzA==
 
-follow-redirects@^1.0.0:
+follow-redirects@^1.0.0, follow-redirects@^1.10.0:
   version "1.14.1"
   resolved "https://registry.yarnpkg.com/follow-redirects/-/follow-redirects-1.14.1.tgz#d9114ded0a1cfdd334e164e6662ad02bfd91ff43"
   integrity sha512-HWqDgT7ZEkqRzBvc2s64vSZ/hfOceEol3ac/7tKwzuvEyWx3/4UegXh5oBOIotkGsObyk3xznnSRVADBgWSQVg==
@@ -13991,6 +14073,11 @@ typescript@^4.0.5, typescript@^4.3.2:
   version "4.3.3"
   resolved "https://registry.yarnpkg.com/typescript/-/typescript-4.3.3.tgz#5401db69bd3203daf1851a1a74d199cb3112c11a"
   integrity sha512-rUvLW0WtF7PF2b9yenwWUi9Da9euvDRhmH7BLyBG4DCFfOJ850LGNknmRpp8Z8kXNUPObdZQEfKOiHtXuQHHKA==
+
+typescript@^4.2.4:
+  version "4.3.4"
+  resolved "https://registry.yarnpkg.com/typescript/-/typescript-4.3.4.tgz#3f85b986945bcf31071decdd96cf8bfa65f9dcbc"
+  integrity sha512-uauPG7XZn9F/mo+7MrsRjyvbxFpzemRjKEZXS4AK83oP2KKOJPvb+9cO/gmnv8arWZvhnjVOXz7B49m1l0e9Ew==
 
 unbox-primitive@^1.0.1:
   version "1.0.1"

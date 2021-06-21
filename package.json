@@ -7,6 +7,7 @@
         "desktop",
         "web",
         "packages/core-*",
+        "packages/design-sdk/*",
         "boring/packages/*",
         "ui/editor-ui/packages/*"
     ],
