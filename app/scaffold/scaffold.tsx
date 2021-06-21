@@ -5,6 +5,7 @@ import { Scaffold as BoringScaffold } from "@boringso/react-core";
 import { SideNavigation } from "../components";
 import { EditorThemeProvider } from "@editor-ui/theme";
 import { ThemeProvider, useTheme } from "@emotion/react";
+import { BuiltIn_GettingStarted } from "../built-in-pages/getting-started/getting-started";
 
 export function Scaffold(props: {
   mode: "desktop" | "browser";
@@ -25,7 +26,9 @@ export function Scaffold(props: {
         controlDoubleClick={props.controlDoubleClick}
       >
         <>
-          <BoringScaffold />
+          {/* test */}
+          <BuiltIn_GettingStarted />
+          {/* <BoringScaffold extensions={[]} /> */}
         </>
       </HomeScaffold>
     </EditorThemeProvider>
