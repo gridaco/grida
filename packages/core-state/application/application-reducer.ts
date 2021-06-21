@@ -7,12 +7,12 @@ export function applicationReducer(
   action: Action
 ): ApplicationState {
   switch (action.type) {
-    case "selectPage":
-    case "addPage":
-    case "renamePage":
-    case "duplicatePage":
-    case "deletePage":
-    case "movePage": {
+    case "select-page":
+    case "add-page":
+    case "rename-current-page":
+    case "duplicate-current-page":
+    case "delete-current-page":
+    case "move-page": {
       return pageReducer(state, action);
     }
   }
