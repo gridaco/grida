@@ -9,18 +9,20 @@ function signup_callback_redirect_uri() {
 }
 
 function signin_callback_redirect_uri() {
-  return "https://bridged.xyz/";
+  return "https://grida.co/";
 }
 
 export const LandingpageUrls = {
   /**
    * return to home after signin
+   * @todo - CHORG reorganize with grida.co
    */
   signin_with_return: `https://accounts.bridged.xyz/signin?redirect_uri=${signin_callback_redirect_uri()}`,
 
   // todo region swap sign up when ready
   /**
    * return to home after signup
+   * @todo - CHORG reorganize with grida.co
    */
   signup_with_return: `https://accounts.bridged.xyz/signup?redirect_uri=${signup_callback_redirect_uri()}`,
   signup: "https://accounts.bridged.xyz/signup",
@@ -34,7 +36,10 @@ export const LandingpageUrls = {
   article_how_do_design_to_code_work: "/docs/concepts/design-to-code",
   article_how_engine_works: "/docs/concepts/detection",
 
-  // demo
+  /**
+   * demo
+   * @todo - CHORG reorganize with grida.co
+   */
   try_the_demo_1: "https://console.bridged.xyz",
 
   // misc
@@ -45,11 +50,11 @@ export const LandingpageUrls = {
 
 const DownloadUrls = {
   download_figma_plugin:
-    "https://www.figma.com/community/plugin/896445082033423994/Bridged",
-  download_sketch_plugin: "https://github.com/bridgedxyz/assistant/releases",
-  download_xd_plugin: "https://github.com/bridgedxyz/assistant/releases",
-  download_vscoode_extension: "https://github.com/bridgedxyz/vscode-extension/",
-  download_desktop_app: "https://github.com/bridgedxyz/bridged/releases",
+    "https://www.figma.com/community/plugin/896445082033423994",
+  download_sketch_plugin: "https://github.com/gridaco/assistant/releases",
+  download_xd_plugin: "https://github.com/gridaco/assistant/releases",
+  download_vscoode_extension: "https://github.com/gridaco/vscode-extension/",
+  download_desktop_app: "https://github.com/gridaco/grida/releases",
 };
 
 const SociallUrls = {
@@ -58,7 +63,7 @@ const SociallUrls = {
   facebook: "https://facebook.com/bridgedxyz",
   instagram: "https://instagram.com/bridged.xyz",
   twitter: "https://twitter.com/bridgedxyz",
-  github: "https://github.com/bridgedxyz",
+  github: "https://github.com/gridaco",
   dribbble: "https://dribbble.com/bridged",
   medium: "https://medium.com/bridgedxyz",
 };
@@ -74,7 +79,7 @@ export const PRODUCT_LIST = [
     title: "code",
     subTitle: "Instantly create code from your design",
     desc:
-      "With powerful Design2Code Engine, Bridged generates production ready code that can also easily be used for existing projects. Supprt for components, various code styles, naming conventions and fille/directory structures are supported.",
+      "With powerful Design2Code Engine, Grida generates production ready code that can also easily be used for existing projects. Supprt for components, various code styles, naming conventions and fille/directory structures are supported.",
     gradient: "linear-gradient(99.57deg, #6268FF 0%, #9039FF 100%)",
     type: "video",
     path: require("public/videos/your-design-is-your-code.webm"),
