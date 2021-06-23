@@ -14,7 +14,7 @@ const ApplicationPreview = () => {
         src="/assets/sample-app-as-image.png"
         width="390px"
         height="788px"
-        alt="bridged demo app - design to code"
+        alt="Grida demo app - design to code"
       />
       {/* <Preview>
         <AppUI />
