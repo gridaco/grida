@@ -11,25 +11,25 @@ const FEATURES: FeatureListupCardItemDisplayData[] = [
   {
     title: "git & branches",
     description:
-      "Bridged Globalization is desiged for developers inside and outside. With powerful Extensions and code generation tech, you’ll feel that everything is alright and comfortable.",
+      "Grida Globalization is desiged for developers inside and outside. With powerful Extensions and code generation tech, you’ll feel that everything is alright and comfortable.",
     artwork: undefined,
   },
   {
     title: "git & branches",
     description:
-      "Bridged Globalization is desiged for developers inside and outside. With powerful Extensions and code generation tech, you’ll feel that everything is alright and comfortable.",
+      "Grida Globalization is desiged for developers inside and outside. With powerful Extensions and code generation tech, you’ll feel that everything is alright and comfortable.",
     artwork: undefined,
   },
   {
     title: "git & branches",
     description:
-      "Bridged Globalization is desiged for developers inside and outside. With powerful Extensions and code generation tech, you’ll feel that everything is alright and comfortable.",
+      "Grida Globalization is desiged for developers inside and outside. With powerful Extensions and code generation tech, you’ll feel that everything is alright and comfortable.",
     artwork: undefined,
   },
   {
     title: "git & branches",
     description:
-      "Bridged Globalization is desiged for developers inside and outside. With powerful Extensions and code generation tech, you’ll feel that everything is alright and comfortable.",
+      "Grida Globalization is desiged for developers inside and outside. With powerful Extensions and code generation tech, you’ll feel that everything is alright and comfortable.",
     artwork: undefined,
   },
 ];

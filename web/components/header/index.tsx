@@ -95,7 +95,7 @@ const Header = () => {
               ml="8px"
               fontWeight="600"
             >
-              Bridged
+              Grida
             </ResponsiveTitle>
           </Link>
           <NavigationWrapper ml="60px" alignItems="center">

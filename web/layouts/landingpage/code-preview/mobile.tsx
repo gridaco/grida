@@ -64,7 +64,7 @@ const CodePreviewMobile = () => {
         {DEV_FRAMEWORKS.map(i => (
           <Image
             loading="eager"
-            alt="bridged supported platforms icon"
+            alt="Grida supported platforms icon"
             key={i.name}
             className="cursor"
             onClick={() => setCurrentPlatform(i)}
