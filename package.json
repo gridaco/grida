@@ -1,9 +1,9 @@
 {
-    "name": "bridged.xyz",
+    "name": "grida.co",
     "private": true,
-    "author": "bridged.xyz authors",
+    "author": "grida.co & bridged.xyz authors",
     "repository": {
-        "url": "https://github.com/bridgedxyz/bridged.xyz.git"
+        "url": "https://github.com/gridaco/grida.co"
     },
     "workspaces": [
         "web",
