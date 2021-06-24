@@ -10,8 +10,8 @@ interface ScenePreviewConfig {
 
 export function ScenePreview(props: {
   config: ScenePreviewConfig;
-  width: number | string;
-  height: number | string;
+  width: string;
+  height: string;
 }) {
   const { config } = props;
   switch (config.origin) {
