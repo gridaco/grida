@@ -6,6 +6,7 @@
         "app",
         "desktop",
         "web",
+        "packages/app-*",
         "packages/core-*",
         "packages/design-sdk/*",
         "boring/packages/*",
