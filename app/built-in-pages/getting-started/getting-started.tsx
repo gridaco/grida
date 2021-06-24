@@ -12,7 +12,6 @@ export function BuiltIn_GettingStarted() {
 <h1>Too much? - Quick start (30 Seconds)</h1>
 <p>Bridged App is an opensource software for Ultimate productivity for startups & application creation. With built-in powerful text editor engine and graphics engine based on Skia 2D Graphics library, we provide the most effecient way to design, to develop the app and to manage the contents Live.</p>
 <import-design-with-url/>
-
   `;
   return (
     <BoringScaffold
