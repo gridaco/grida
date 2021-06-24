@@ -2,7 +2,7 @@ import React from "react";
 import { HomeScaffold } from "@editor-ui/workspace";
 import { SideNavigation, TopBar } from "../components";
 import { EditorThemeProvider } from "@editor-ui/theme";
-import { BuiltIn_GettingStarted } from "../built-in-pages/getting-started/getting-started";
+import { CurrentPage } from "../built-in-pages/current";
 
 export function Scaffold(props: {
   mode: "desktop" | "browser";
@@ -26,8 +26,7 @@ export function Scaffold(props: {
         controlDoubleClick={props.controlDoubleClick}
       >
         <>
-          <BuiltIn_GettingStarted />
-          {/* <CurrentPage/> */}
+          <CurrentPage />
         </>
       </HomeScaffold>
     </EditorThemeProvider>
