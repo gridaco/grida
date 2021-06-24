@@ -1,5 +1,5 @@
 import React from "react";
-import { url as urlutil } from "@design-sdk/figma";
+import * as urlutil from "@design-sdk/figma-url";
 export function FigmaEmbedCanvas(props: {
   src: urlutil.FigmaEmbedInput;
   width?: string | number;

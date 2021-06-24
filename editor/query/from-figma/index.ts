@@ -1,8 +1,8 @@
 import {
   FigmaTargetNodeConfig,
-  parseFileAndNodeIdFromUrl_Figma,
-} from "@design-sdk/core/utils/figma-api-utils";
-import { Figma, nodes, remote, SceneNode } from "@design-sdk/figma";
+  parseFigmaFileAndNodeIdFromUrl,
+} from "@design-sdk/figma-url";
+import { Figma, nodes, remote } from "@design-sdk/figma";
 import { NextRouter, useRouter } from "next/router";
 import { useEffect, useState } from "react";
 import { fetchTargetAsReflect } from "../../components/figma/screen-importer";
@@ -45,7 +45,7 @@ export function useFigmaTargetNode() {
   const [targetNode, setTargetNode] = useState<FigmaTargetNodeConfig>();
   useEffect(() => {
     if (figmaTargetUrl) {
-      const targetnodeconfig = parseFileAndNodeIdFromUrl_Figma(figmaTargetUrl);
+      const targetnodeconfig = parseFigmaFileAndNodeIdFromUrl(figmaTargetUrl);
       setTargetNode(targetnodeconfig);
     }
   }, [figmaTargetUrl]);

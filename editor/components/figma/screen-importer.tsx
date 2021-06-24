@@ -1,9 +1,11 @@
 import React, { useState } from "react";
-import { remote, utils, nodes, Figma } from "@design-sdk/figma";
-import { convert } from "@design-sdk/figma";
+import { convert, remote, nodes, Figma } from "@design-sdk/figma";
 import { utils_figma } from "../../utils";
 import { UserInputCache } from "../../utils/user-input-value-cache";
-import { FigmaTargetNodeConfig } from "@design-sdk/core/utils/figma-api-utils";
+import {
+  parseFigmaFileAndNodeIdFromUrl,
+  FigmaTargetNodeConfig,
+} from "@design-sdk/figma-url";
 
 export type OnImportedCallback = (reflect: nodes.ReflectSceneNode) => void;
 type _OnRemoteLoadedCallback = (reflect: remote.types.Node) => void;
@@ -98,9 +100,7 @@ export function FigmaScreenImporter(props: {
           <_UrlImporterSegment
             onLoaded={handleLocalDataLoad}
             onUrlEnter={(url: string) => {
-              const nodeconfig = utils.figmaApi.parseFileAndNodeIdFromUrl_Figma(
-                url
-              );
+              const nodeconfig = parseFigmaFileAndNodeIdFromUrl(url);
               props.onTargetEnter(nodeconfig);
             }}
           />
@@ -143,9 +143,7 @@ function _UrlImporterSegment(props: {
     _FIGMA_FILE_URL_IMPORT_INPUT_CACHE_KEY
   );
 
-  const figmaTargetConfig = utils.figmaApi.parseFileAndNodeIdFromUrl_Figma(
-    urlInput
-  );
+  const figmaTargetConfig = parseFigmaFileAndNodeIdFromUrl(urlInput);
 
   const handleEnter = () => {
     props.onUrlEnter?.(urlInput);
