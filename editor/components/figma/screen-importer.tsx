@@ -3,7 +3,7 @@ import { convert, remote, nodes, Figma } from "@design-sdk/figma";
 import { utils_figma } from "../../utils";
 import { UserInputCache } from "../../utils/user-input-value-cache";
 import {
-  parseFigmaFileAndNodeIdFromUrl,
+  parseFileAndNodeId,
   FigmaTargetNodeConfig,
 } from "@design-sdk/figma-url";
 
@@ -100,7 +100,7 @@ export function FigmaScreenImporter(props: {
           <_UrlImporterSegment
             onLoaded={handleLocalDataLoad}
             onUrlEnter={(url: string) => {
-              const nodeconfig = parseFigmaFileAndNodeIdFromUrl(url);
+              const nodeconfig = parseFileAndNodeId(url);
               props.onTargetEnter(nodeconfig);
             }}
           />
@@ -143,7 +143,7 @@ function _UrlImporterSegment(props: {
     _FIGMA_FILE_URL_IMPORT_INPUT_CACHE_KEY
   );
 
-  const figmaTargetConfig = parseFigmaFileAndNodeIdFromUrl(urlInput);
+  const figmaTargetConfig = parseFileAndNodeId(urlInput);
 
   const handleEnter = () => {
     props.onUrlEnter?.(urlInput);

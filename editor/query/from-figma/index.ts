@@ -1,6 +1,6 @@
 import {
   FigmaTargetNodeConfig,
-  parseFigmaFileAndNodeIdFromUrl,
+  parseFileAndNodeId,
 } from "@design-sdk/figma-url";
 import { Figma, nodes, remote } from "@design-sdk/figma";
 import { NextRouter, useRouter } from "next/router";
@@ -45,7 +45,7 @@ export function useFigmaTargetNode() {
   const [targetNode, setTargetNode] = useState<FigmaTargetNodeConfig>();
   useEffect(() => {
     if (figmaTargetUrl) {
-      const targetnodeconfig = parseFigmaFileAndNodeIdFromUrl(figmaTargetUrl);
+      const targetnodeconfig = parseFileAndNodeId(figmaTargetUrl);
       setTargetNode(targetnodeconfig);
     }
   }, [figmaTargetUrl]);

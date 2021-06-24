@@ -1,11 +1,11 @@
 import React from "react";
-import * as urlutil from "@design-sdk/figma-url";
+import { embed, FigmaEmbedInput } from "@design-sdk/figma-url";
 export function FigmaEmbedCanvas(props: {
-  src: urlutil.FigmaEmbedInput;
+  src: FigmaEmbedInput;
   width?: string | number;
   height?: string | number;
 }) {
-  const url = urlutil.buildFigmaEmbedUrl(props.src);
+  const url = embed(props.src);
 
   if (url) {
     return (
