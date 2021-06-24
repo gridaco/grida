@@ -2,15 +2,9 @@ import React, { useEffect, useState } from "react";
 import styled from "@emotion/styled";
 import { MainImageRepository } from "@design-sdk/core/assets-repository";
 import { ImageRepositories } from "@design-sdk/figma/asset-repository";
-import { figmacomp } from "../../components";
-import { ReflectSceneNode } from "@design-sdk/core/nodes";
 import { DefaultEditorWorkspaceLayout } from "../../layout/default-editor-workspace-layout";
 import { LayerHierarchy } from "../../components/editor-hierarchy";
 import { PreviewAndRunPanel } from "../../components/preview-and-run";
-import {
-  FigmaTargetNodeConfig,
-  parseFileAndNodeIdFromUrl_Figma,
-} from "@design-sdk/core/utils/figma-api-utils";
 import {
   WorkspaceContentPanel,
   WorkspaceContentPanelGridLayout,
@@ -20,20 +14,11 @@ import { WidgetTree } from "../../components/visualization/json-visualization/js
 import { MonacoEditor } from "../../components/code-editor";
 import { tokenize } from "@designto/token";
 import * as react from "@designto/react";
-import { useRouter } from "next/router";
-import { fetchTargetAsReflect } from "../../components/figma/screen-importer";
 import { mapGrandchildren } from "@design-sdk/core/utils";
 import { ReactWidget } from "@coli.codes/react-builder";
 import * as core from "@reflect-ui/core";
 import { ReactComponentExportResult } from "@coli.codes/react-builder/export/export-result";
-import { Figma } from "@design-sdk/figma";
-import {
-  extractFromFigmaQueryParams,
-  setFigmaTargetUrl,
-  useFigmaTargetNode,
-  useFigmaTargetUrl,
-  useReflectTargetNode,
-} from "../../query/from-figma";
+import { useReflectTargetNode } from "../../query/from-figma";
 
 // set image repo for figma platform
 MainImageRepository.instance = new ImageRepositories();

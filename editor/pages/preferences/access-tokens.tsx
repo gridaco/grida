@@ -1,10 +1,11 @@
 import React, { useState } from "react";
+import styled from "@emotion/styled";
 import { TextField } from "@material-ui/core";
 import { utils_figma } from "../../utils";
 
 export default function AccessTokenConfigurationPage_Dev() {
   return (
-    <>
+    <_Root>
       <div>Figma:</div>
       <FigmaSection />
 
@@ -13,7 +14,7 @@ export default function AccessTokenConfigurationPage_Dev() {
         own caution. the source code manifesting this page can be found at
         <a href="https://github.com/bridgedxyz/design-to-code">github</a>
       </p>
-    </>
+    </_Root>
   );
 }
 
@@ -77,3 +78,7 @@ function FigmaSection() {
     </>
   );
 }
+
+const _Root = styled.div`
+  padding: 24px;
+`;
