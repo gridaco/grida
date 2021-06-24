@@ -1,9 +1,9 @@
 import { Node, mergeAttributes } from "@tiptap/core";
 import { ReactNodeViewRenderer } from "@tiptap/react";
 import { ImportDesignWithUrl } from "./import-design-with-url";
-
+const _key = "import-design-with-url";
 export const boring_extended_import_design_with_url = Node.create({
-  name: "import-design-with-url",
+  name: _key,
 
   group: "block",
 
@@ -20,13 +20,13 @@ export const boring_extended_import_design_with_url = Node.create({
   parseHTML() {
     return [
       {
-        tag: "import-design-with-url",
+        tag: _key,
       },
     ];
   },
 
   renderHTML({ HTMLAttributes }) {
-    return ["import-design-with-url", mergeAttributes(HTMLAttributes)];
+    return [_key, mergeAttributes(HTMLAttributes)];
   },
 
   addNodeView() {
