@@ -7,7 +7,7 @@ interface ProviderFigmaEmbedProps {
 export function ProviderFigmaEmbed(props: ProviderFigmaEmbedProps) {
   return (
     <>
-      <FigmaEmbed src={props.url} />
+      <FigmaEmbed src={props.url} width="315px" height="712px" />
     </>
   );
 }

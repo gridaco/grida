@@ -5,7 +5,7 @@ import { ProviderAnySnapshotView } from "./provider-any-snapshot-view";
 import { ProviderSketchEmbed } from "./provider-sketch-embed";
 import { ProviderUnknownIframeEmbed } from "./provider-unknown-iframe-embed";
 
-interface ScreenPreviewCardBlockProps {
+export interface ScreenPreviewCardBlockProps {
   url: string;
   /**
    * if set to true, preview will show snapshot of the design as png format.
@@ -53,11 +53,13 @@ function analyzeDesignUrl(url: string): DesignProvider {
        * https://figma.com/file/~
        */
       case "figma.com":
+      case "www.figma.com":
         return "figma";
         break;
       /**
        * https://sketch.com/s/~
        */
+      case "www.sketch.com":
       case "sketch.com":
         return "sketch";
         break;
@@ -65,11 +67,13 @@ function analyzeDesignUrl(url: string): DesignProvider {
       /**
        * powered by nothing graphics engine
        */
+      case "www.grida.co":
       case "grida.co":
+      case "www.nothing.app":
       case "nothing.app":
+      case "www.bridged.xyz":
       case "bridged.xyz":
         return "nothing";
-        break;
       default:
         return "unknown";
     }
