@@ -3,7 +3,6 @@ import { Scaffold as BoringScaffold } from "@boringso/react-core";
 import { BuiltIn_GettingStarted } from "../getting-started/getting-started";
 import { useApplicationState } from "@core/app-state";
 import { extensions } from "../../app-blocks";
-import { ImportedScreenPageTemplate } from "../../built-in-template-pages";
 
 export function CurrentPage() {
   const [state] = useApplicationState();
@@ -15,6 +14,5 @@ export function CurrentPage() {
   }
   // endregion - temporary static prebuilt-pages router
 
-  return <ImportedScreenPageTemplate />;
-  // return <BoringScaffold extensions={extensions} />;
+  return <BoringScaffold extensions={extensions} />;
 }

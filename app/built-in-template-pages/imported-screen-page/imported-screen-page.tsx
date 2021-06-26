@@ -1,37 +1,40 @@
-import React from "react";
-import { Scaffold as BoringScaffold } from "@boringso/react-core";
-import { extensions } from "../../app-blocks";
+import { Template } from "@boring.so/template-provider";
+import { BoringContent, BoringTitle } from "@boring.so/document-model";
 
-export function ImportedScreenPageTemplate() {
-  const initialContent = `
-<h1>this is imported screen</h1>
-
-<screen-preview-card-block url=""></screen-preview-card-block>
-
-<pre><code>
-import React from "react";
-import { Scaffold as BoringScaffold } from "@boringso/react-core";
-import { extensions } from "../../app-blocks";
-
-export function ImportedScreenPageTemplate() {
-  const initialTitle = \`New screen\`;
-  return (
-    """<BoringScaffold
-      extensions={extensions}
-      initialTitle={initialTitle}
-      initialContent={initialContent}
-    />"""
-  );
+interface ImportedScreenConfig {
+  /**
+   * design provider
+   */
+  provider: string;
+  /**
+   * source url
+   */
+  source: string;
 }
-</code></pre>
 
-`;
-  const initialTitle = `New screen`;
-  return (
-    <BoringScaffold
-      extensions={extensions}
-      initialTitle={initialTitle}
-      initialContent={initialContent}
-    />
-  );
+export class ImportedScreenTemplate extends Template<ImportedScreenConfig> {
+  title = new BoringTitle({
+    icon: "📱",
+    name: `New screen`,
+  });
+  content = new BoringContent(`
+  <screen-preview-card-block url=""></screen-preview-card-block>
+  
+  <pre><code>
+  import React from "react";
+  import { Scaffold as BoringScaffold } from "@boringso/react-core";
+  import { extensions } from "../../app-blocks";
+  
+  export function ImportedScreenPageTemplate() {
+    const initialTitle = \`New screen\`;
+    return (
+      <BoringScaffold
+        extensions={extensions}
+        initialTitle={initialTitle}
+        initialContent={initialContent}
+      />
+    );
+  }
+  </code></pre>
+  `);
 }

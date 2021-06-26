@@ -1,16 +1,17 @@
 import React, { useRef, useState } from "react";
 import { NodeViewWrapper } from "@boringso/react-core";
-import { useDispatch } from "@core/app-state";
+import { useAddPage, useDispatch } from "@core/app-state";
 import { RemoteSubmitForm } from "./remote-submit-form";
+import { TemplateInitial } from "@boring.so/loader";
 
 export function ImportDesignWithUrl() {
-  const dispatch = useDispatch();
+  const addPage = useAddPage();
 
   const onsubmit = () => {
     // create new page
-    dispatch({
-      type: "add-page",
+    addPage({
       name: "new component",
+      initial: new TemplateInitial(),
     });
   };
 

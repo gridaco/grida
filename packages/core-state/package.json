@@ -2,6 +2,8 @@
     "name": "@core/state",
     "version": "0.0.0",
     "dependencies": {
-        "immer": "^9.0.3"
+        "immer": "^9.0.3",
+        "@boring.so/action": "0.0.0",
+        "@boring.so/loader": "0.0.0"
     }
 }

@@ -1,3 +1,5 @@
+import { DocumentInitial } from "@boring.so/loader";
+
 export type PageAction =
   | MovePageAction //[type: "movePage", sourceIndex: number, destinationIndex: number]
   | SelectPageAction // [type: "selectPage", pageId: string]
@@ -13,13 +15,16 @@ export type PageParentId = PageId | typeof PageRoot;
 /**
  * add page action triggered by user
  */
-export interface AddPageAction {
-  type: "add-page";
+export interface IAddPageAction {
   name: string;
   /**
    * parent page's id
    */
   parent?: PageParentId;
+  initial?: DocumentInitial;
+}
+export interface AddPageAction extends IAddPageAction {
+  type: "add-page";
 }
 
 export interface MovePageAction {
