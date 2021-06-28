@@ -1,14 +1,16 @@
-import Icon from "components/icon";
+import styled from "@emotion/styled";
+import Link from "next/link";
 import React from "react";
 import { Box, Flex, Text } from "rebass";
-import styled from "@emotion/styled";
-import { Sitemap } from "./sitemap";
-import SitemapList from "components/sitemap-list";
+
+import Icon from "components/icon";
 import { IconList } from "components/icon/icons";
-import Link from "next/link";
+import SitemapList from "components/sitemap-list";
 import { URLS } from "utils/landingpage/constants";
 import { media } from "utils/styled/media";
 import { ThemeInterface } from "utils/styled/theme";
+
+import { Sitemap } from "./sitemap";
 
 const iconList: Array<{
   icon: keyof IconList;
