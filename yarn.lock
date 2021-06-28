@@ -1600,20 +1600,20 @@
   resolved "https://registry.yarnpkg.com/@firebase/webchannel-wrapper/-/webchannel-wrapper-0.4.1.tgz#600f2275ff54739ad5ac0102f1467b8963cd5f71"
   integrity sha512-0yPjzuzGMkW1GkrC8yWsiN7vt1OzkMIi9HgxRmKREZl2wnNPOKo/yScTjXf/O57HM8dltqxPF6jlNLFVtc2qdw==
 
-"@grida/link-downloads@^0.0.1":
-  version "0.0.1"
-  resolved "https://registry.yarnpkg.com/@grida/link-downloads/-/link-downloads-0.0.1.tgz#a66fbdc6067fe754b2444771bb872afff4384d26"
-  integrity sha512-364SdWmxVEoAMTh9W001TttuwzVm8yATSGUYGF0txJAMDeCjDRocSI3ymbtVlpaJbABrM7LEdGpRNIE+uuuLPw==
+"@grida/link-downloads@^0.0.2":
+  version "0.0.2"
+  resolved "https://registry.yarnpkg.com/@grida/link-downloads/-/link-downloads-0.0.2.tgz#18f8528389484d3c78adeb0dbb00084fd248882a"
+  integrity sha512-XkYWKuo+xKQBUQmjmSA5HKbZGBMoDzg9PPS5KHpRiIjDXwFL/e0x0lJxfUir3eZfh621bGUEOKzf28ZOWPSXPw==
 
-"@grida/link-promotions@^0.0.0":
-  version "0.0.0"
-  resolved "https://registry.yarnpkg.com/@grida/link-promotions/-/link-promotions-0.0.0.tgz#92a6d61ed1825eb22909005a4b2f6ded0dd471c4"
-  integrity sha512-xLBV5+3ceIjUyFBEjUfx8jYExqDPpc8xwK7esC8WqIFan28wNDiuKZj9pkNKLyhzXdysCsKw4wVftHru9nY6hg==
+"@grida/link-promotions@^0.0.2":
+  version "0.0.2"
+  resolved "https://registry.yarnpkg.com/@grida/link-promotions/-/link-promotions-0.0.2.tgz#7a3a2e291da6907961e09026d71bfe22ae5a6b49"
+  integrity sha512-NRXFbn/Ww2Kxq3yYam1G/j7WeekJ2xVTuy+QzshAcFIASssphIujya5y7CN70/6dDjFbA0UyjCXQXTRvEg5k3g==
 
-"@grida/link-social@^0.0.1":
-  version "0.0.1"
-  resolved "https://registry.yarnpkg.com/@grida/link-social/-/link-social-0.0.1.tgz#4549264a9a61c460cb052cd4a0ecd7a38f85bbc4"
-  integrity sha512-MRXjncWwvbTlFtOm014k9X4iaUlHj4CIjhAyG8Qm8KFyKs182ihSO67I+Dpv0D9gpIoXNbe3hfnnmCYlY1dZtw==
+"@grida/link-social@^0.0.2":
+  version "0.0.2"
+  resolved "https://registry.yarnpkg.com/@grida/link-social/-/link-social-0.0.2.tgz#89babb8d09a762743ec8c4f4390be390547951bb"
+  integrity sha512-99lOio3FjJcnzD5921xLCZrsDIIw3NGb6B6RVVa+zya9f4kIdgs3Hjr6cXgjAH0ctx9R+a2eutNP+nqk4XkSQw==
 
 "@grpc/grpc-js@^1.0.0":
   version "1.2.10"
