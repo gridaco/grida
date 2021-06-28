@@ -1600,6 +1600,21 @@
   resolved "https://registry.yarnpkg.com/@firebase/webchannel-wrapper/-/webchannel-wrapper-0.4.1.tgz#600f2275ff54739ad5ac0102f1467b8963cd5f71"
   integrity sha512-0yPjzuzGMkW1GkrC8yWsiN7vt1OzkMIi9HgxRmKREZl2wnNPOKo/yScTjXf/O57HM8dltqxPF6jlNLFVtc2qdw==
 
+"@grida/link-downloads@^0.0.2":
+  version "0.0.2"
+  resolved "https://registry.yarnpkg.com/@grida/link-downloads/-/link-downloads-0.0.2.tgz#18f8528389484d3c78adeb0dbb00084fd248882a"
+  integrity sha512-XkYWKuo+xKQBUQmjmSA5HKbZGBMoDzg9PPS5KHpRiIjDXwFL/e0x0lJxfUir3eZfh621bGUEOKzf28ZOWPSXPw==
+
+"@grida/link-promotions@^0.0.2":
+  version "0.0.2"
+  resolved "https://registry.yarnpkg.com/@grida/link-promotions/-/link-promotions-0.0.2.tgz#7a3a2e291da6907961e09026d71bfe22ae5a6b49"
+  integrity sha512-NRXFbn/Ww2Kxq3yYam1G/j7WeekJ2xVTuy+QzshAcFIASssphIujya5y7CN70/6dDjFbA0UyjCXQXTRvEg5k3g==
+
+"@grida/link-social@^0.0.2":
+  version "0.0.2"
+  resolved "https://registry.yarnpkg.com/@grida/link-social/-/link-social-0.0.2.tgz#89babb8d09a762743ec8c4f4390be390547951bb"
+  integrity sha512-99lOio3FjJcnzD5921xLCZrsDIIw3NGb6B6RVVa+zya9f4kIdgs3Hjr6cXgjAH0ctx9R+a2eutNP+nqk4XkSQw==
+
 "@grpc/grpc-js@^1.0.0":
   version "1.2.10"
   resolved "https://registry.yarnpkg.com/@grpc/grpc-js/-/grpc-js-1.2.10.tgz#f316d29a45fcc324e923d593cb849d292b1ed598"
