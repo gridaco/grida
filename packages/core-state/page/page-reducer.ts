@@ -4,6 +4,7 @@ import { ApplicationState } from "../application";
 import {
   AddPageAction,
   DuplicateCurrentPageAction,
+  IAddPageAction,
   PageAction,
   RenameCurrentPageAction,
 } from "./page-action";
@@ -11,10 +12,14 @@ import { Page } from "./page-model";
 
 import { nanoid } from "nanoid";
 
-export const createPage = (pages: Page[], name: string): Page => {
+export const createPage = (pages: Page[], params: IAddPageAction): Page => {
+  const { name, initial } = params;
+  // todo - handle content initialization
+
   const newPage = produce<Page>(
     {
       id: undefined,
+      type: "boring-document",
       name: undefined,
       content: undefined,
     },
@@ -40,10 +45,8 @@ export function pageReducer(
       });
     }
     case "add-page": {
-      const { name } = <AddPageAction>action;
-
       return produce(state, (draft) => {
-        const newPage = createPage(draft.pages, name);
+        const newPage = createPage(draft.pages, action);
         draft.selectedPage = newPage.id;
       });
     }

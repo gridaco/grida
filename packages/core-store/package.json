@@ -1,0 +1,7 @@
+{
+    "name": "@core/store",
+    "version": "0.0.0",
+    "dependencies": {
+        "idb": "^6.1.2"
+    }
+}

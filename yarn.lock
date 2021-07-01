@@ -1231,6 +1231,11 @@
     exec-sh "^0.3.2"
     minimist "^1.2.0"
 
+"@design-sdk/figma-url@^0.0.2":
+  version "0.0.2"
+  resolved "https://registry.yarnpkg.com/@design-sdk/figma-url/-/figma-url-0.0.2.tgz#6cdac717440def04f419efea080f95dae23e9d6f"
+  integrity sha512-BHxiY5OlX8OQNr/81NGo6pI8bm4c9M6s5vV+IJlQf9NFMKIoxv8fUZl0cuDvmQBloOC0HdVL09fPgIi0etVEvQ==
+
 "@develar/schema-utils@~2.6.5":
   version "2.6.5"
   resolved "https://registry.yarnpkg.com/@develar/schema-utils/-/schema-utils-2.6.5.tgz#3ece22c5838402419a6e0425f85742b961d9b6c6"
@@ -2542,6 +2547,13 @@
   resolved "https://registry.yarnpkg.com/@radix-ui/utils/-/utils-0.0.3.tgz#f20dfa8a5681d778a579ad695fe68fe6a2c0ee88"
   integrity sha512-ruWffd3JjN8r+j8+LOIzTNEHzJsFcHOiSnQfl8KeBs+sCHGQgaI9IaRWxsaNXgrOYgPdBlZCbYG3qsLww2WR+w==
 
+"@reflect-blocks/figma-embed@0.0.4":
+  version "0.0.4"
+  resolved "https://registry.yarnpkg.com/@reflect-blocks/figma-embed/-/figma-embed-0.0.4.tgz#c516711e41dc28453844db02b386603564fb815e"
+  integrity sha512-p2nysPzv+b3g4Qm5FSvGogeehm4qOBU81mbfb4ql0x+w4j91s4Vl/ev3aJ9QbtECmxzuEUlnQEsnOjChQh3LRQ==
+  dependencies:
+    "@design-sdk/figma-url" "^0.0.2"
+
 "@reflect-ui/core@0.0.2-rc.7":
   version "0.0.2-rc.7"
   resolved "https://registry.yarnpkg.com/@reflect-ui/core/-/core-0.0.2-rc.7.tgz#9d531f5a0b9caab31e7563020044b753700e2bbc"
@@ -2637,6 +2649,13 @@
   dependencies:
     "@babel/runtime" "^7.12.5"
     "@testing-library/dom" "^7.28.1"
+
+"@tippyjs/react@^4.2.5":
+  version "4.2.5"
+  resolved "https://registry.yarnpkg.com/@tippyjs/react/-/react-4.2.5.tgz#9b5837db93a1cac953962404df906aef1a18e80d"
+  integrity sha512-YBLgy+1zznBNbx4JOoOdFXWMLXjBh9hLPwRtq3s8RRdrez2l3tPBRt2m2909wZd9S1KUeKjOOYYsnitccI9I3A==
+  dependencies:
+    tippy.js "^6.3.1"
 
 "@tiptap/core@^2.0.0-beta.84":
   version "2.0.0-beta.84"
@@ -8148,6 +8167,11 @@ icss-utils@^5.0.0, icss-utils@^5.1.0:
   version "5.1.0"
   resolved "https://registry.yarnpkg.com/icss-utils/-/icss-utils-5.1.0.tgz#c6be6858abd013d768e98366ae47e25d5887b1ae"
   integrity sha512-soFhflCVWLfRNOPU3iv5Z9VUdT44xFRbzjLsEzSr5AQmgqPMTHdU3PMT1Cf1ssx8fLNJDA1juftYl+PUcv3MqA==
+
+idb@^6.1.2:
+  version "6.1.2"
+  resolved "https://registry.yarnpkg.com/idb/-/idb-6.1.2.tgz#82ef5c951b8e1f47875d36ccafa4bedafc62f2f1"
+  integrity sha512-1DNDVu3yDhAZkFDlJf0t7r+GLZ248F5pTAtA7V0oVG3yjmV125qZOx3g0XpAEkGZVYQiFDAsSOnGet2bhugc3w==
 
 identity-obj-proxy@^3.0.0:
   version "3.0.0"

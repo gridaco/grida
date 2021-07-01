@@ -1,0 +1,7 @@
+{
+    "name": "@app/blocks",
+    "version": "0.0.0",
+    "dependencies": {
+        "@reflect-blocks/figma-embed": "0.0.4"
+    }
+}

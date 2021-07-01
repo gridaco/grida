@@ -1,0 +1,1 @@
+# Boring document state

@@ -1,18 +1,18 @@
 import React, { useCallback } from "react";
 import styled from "@emotion/styled";
-import { useDispatch } from "@core/app-state";
+import { useAddPage, useDispatch } from "@core/app-state";
 import { PlusIcon } from "@radix-ui/react-icons";
 import { Spacer } from "@editor-ui/spacer";
 
 export function AddPageButton() {
   const dispatch = useDispatch();
+  const addPage = useAddPage();
 
   const handleAddPage = useCallback(() => {
     const name = prompt("New page Name");
 
     if (name !== null)
-      dispatch({
-        type: "add-page",
+      addPage({
         name,
       });
   }, [dispatch]);

@@ -64,7 +64,7 @@ function BridgedRootWebApp() {
       <SafeHydrate>
         <StrictMode>
           <Suspense fallback="Loading...">
-            <AppRoot />
+            <AppRoot mode="browser" controlDoubleClick={() => {}} />
           </Suspense>
         </StrictMode>
       </SafeHydrate>
