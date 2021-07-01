@@ -2,7 +2,7 @@ import { Action } from "../action";
 import { ApplicationState } from "../application";
 
 export type HistoryEntry = {
-  actionType: Action[0];
+  actionType: Action["type"];
   timestamp: number;
   state: ApplicationState;
 };

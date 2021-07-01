@@ -6,6 +6,7 @@ export function createInitialApplicationState(): ApplicationState {
     selectedObjects: [],
     pages: [
       {
+        type: "boring-document",
         id: "getting-started",
         name: "getting-started",
         content: "getting-started",
