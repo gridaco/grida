@@ -1,6 +1,6 @@
 import React from 'react';
 import { BrowserRouter as Router, Switch, Route } from 'react-router-dom';
-import { AppRoot } from '@bridged.xyz/app/app';
+import { AppRoot } from '@grida.co/app/app';
 import { remote } from 'electron';
 import styled from '@emotion/styled';
 

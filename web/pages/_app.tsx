@@ -1,6 +1,6 @@
 import React from "react";
 import { Suspense, StrictMode } from "react";
-import { AppRoot } from "@bridged.xyz/app/app";
+import { AppRoot } from "@grida.co/app/app";
 import Head from "next/head";
 import { Global, css } from "@emotion/react";
 
