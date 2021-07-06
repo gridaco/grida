@@ -158,7 +158,10 @@ git clone --recurse-submodules https://github.com/gridaco/grida.git
 cd grida
 
 yarn
-yarn desktop
+yarn desktop # to run as electron desktop app
+# .. or ..
+yarn web # to run as web app
+
 ```
 
 update pulling - `git submodule update --init --recursive`

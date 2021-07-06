@@ -1,6 +1,6 @@
 import React from "react";
 import { Suspense, StrictMode } from "react";
-import { AppRoot } from "@bridged.xyz/app/app";
+import { AppRoot } from "@grida.co/app/app";
 import Head from "next/head";
 import { Global, css } from "@emotion/react";
 
@@ -49,10 +49,15 @@ function HeadInjection() {
 }
 
 function SeoMeta() {
+  const meta = {
+    title: "Grida",
+    description: "Design, Code and Contents in one place.",
+  };
+
   return (
     <>
-      <meta property="title" content="Design to Codes" />
-      <meta property="description" content="Design to Codes description" />
+      <meta property="title" content={meta.title} />
+      <meta property="description" content={meta.description} />
     </>
   );
 }

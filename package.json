@@ -14,7 +14,7 @@
     ],
     "scripts": {
         "web": "yarn workspace web run dev",
-        "desktop": "yarn workspace @bridged.xyz/desktop run start"
+        "desktop": "yarn workspace @grida.co/desktop run start"
     },
     "resolutions": {
         "react": "^17.0.1",

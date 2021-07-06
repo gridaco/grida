@@ -1,6 +1,6 @@
 {
-  "name": "@bridged.xyz/desktop",
-  "productName": "Bridged",
+  "name": "@grida.co/desktop",
+  "productName": "Grida",
   "version": "0.0.0",
   "private": false,
   "description": "The final, Opensource design & development tool",
@@ -97,15 +97,20 @@
     "url": "git+https://github.com/bridgedxyz/bridged.git"
   },
   "author": {
-    "name": "Bridged Maintainers",
-    "email": "founder@bridged.xyz",
-    "url": "https://bridged.xyz"
+    "name": "Universe@Grida",
+    "email": "universe@grida.co",
+    "url": "https://grida.co"
   },
   "contributors": [
     {
       "name": "softmarshmallow",
       "email": "woojoo@softmarshmallow.com",
       "url": "https://github.com/softmarshmallow"
+    },
+    {
+      "name": "Bridged Maintainers",
+      "email": "founder@bridged.xyz",
+      "url": "https://bridged.xyz"
     }
   ],
   "license": "Apache 2.0",
@@ -121,7 +126,7 @@
     "design-tool",
     "design-to-code"
   ],
-  "homepage": "https://bridged.xyz/",
+  "homepage": "https://grida.co/",
   "jest": {
     "testURL": "http://localhost/",
     "moduleNameMapper": {
@@ -243,7 +248,7 @@
     "yarn-deduplicate": "^3.1.0"
   },
   "dependencies": {
-    "@bridged.xyz/app": "0.0.0",
+    "@grida.co/app": "0.0.0",
     "electron-debug": "^3.1.0",
     "electron-log": "^4.2.4",
     "electron-updater": "^4.3.4",
