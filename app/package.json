@@ -1,5 +1,5 @@
 {
-    "name": "@bridged.xyz/app",
+    "name": "@grida.co/app",
     "version": "0.0.0",
     "dependencies": {
         "@app/blocks": "0.0.0",

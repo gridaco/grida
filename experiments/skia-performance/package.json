@@ -1,5 +1,5 @@
 {
-    "name": "@labs.bridged.xyz/skia-performance",
+    "name": "@labs.grida.co/skia-performance",
     "private": false,
     "dependencies": {
         "canvaskit-wasm": "0.25.0"
