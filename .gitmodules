@@ -18,7 +18,7 @@
 	url = https://github.com/gridaco/nothing
 [submodule "packages/design-to-code"]
 	path = packages/design-to-code
-	url = http://github.com/gridaco/design-to-code
+	url = https://github.com/gridaco/designto-code
 [submodule "packages/design-sdk"]
 	path = packages/design-sdk
 	url = https://github.com/gridaco/design-sdk
