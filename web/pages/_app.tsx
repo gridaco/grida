@@ -49,10 +49,15 @@ function HeadInjection() {
 }
 
 function SeoMeta() {
+  const meta = {
+    title: "Grida",
+    description: "Design, Code and Contents in one place.",
+  };
+
   return (
     <>
-      <meta property="title" content="Design to Codes" />
-      <meta property="description" content="Design to Codes description" />
+      <meta property="title" content={meta.title} />
+      <meta property="description" content={meta.description} />
     </>
   );
 }
