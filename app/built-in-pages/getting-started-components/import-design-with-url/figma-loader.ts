@@ -1,5 +1,5 @@
 import { LoaderResult } from "./o";
-import { api } from "@design-sdk/figma-remote";
+import { fetch } from "@design-sdk/figma-remote";
 import { parseFileAndNodeId } from "@design-sdk/figma-url";
 
 export async function figmaloader(url: string): Promise<LoaderResult> {
@@ -8,21 +8,17 @@ export async function figmaloader(url: string): Promise<LoaderResult> {
   const n = f_n_n.node;
 
   const personal_acctok = process.env.FIGMA_PERSONAL_ACCESS_TOKEN;
-  console.log("figma personal access token", personal_acctok); // remote this line - for development.
-  const client = api.Client({
+
+  const pack = await fetch.fetchTargetAsReflect(f, n, {
     personalAccessToken: personal_acctok,
   });
-  const res = await client.fileNodes(f, {
-    ids: [n],
-  });
-
-  const node = res.data.nodes[n];
-  const { name: n_name, id: n_id } = node.document;
+  const { name: n_name, id: n_id } = pack.reflect;
 
   return {
     name: n_name,
     id: n_id,
     source: "figma",
-    node: undefined, // todo
+    url: url,
+    node: pack.reflect, // todo
   };
 }

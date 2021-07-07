@@ -2579,6 +2579,11 @@
   dependencies:
     "@design-sdk/figma-url" "^0.0.2"
 
+"@reflect-ui/core@0.0.2-rc.7":
+  version "0.0.2-rc.7"
+  resolved "https://registry.yarnpkg.com/@reflect-ui/core/-/core-0.0.2-rc.7.tgz#9d531f5a0b9caab31e7563020044b753700e2bbc"
+  integrity sha512-EqF4SRU57bfa5DOPET1rv5lROFyMVHLv1xTEIlN6N2gDpXt71QceImWfQp3z3Khqnb4R/p9OhNK6DXGUpozWKw==
+
 "@reflect-ui/namings@0.0.3":
   version "0.0.3"
   resolved "https://registry.yarnpkg.com/@reflect-ui/namings/-/namings-0.0.3.tgz#6e9fd4809dd5c9d2a996516236c71b99ea93fbcb"

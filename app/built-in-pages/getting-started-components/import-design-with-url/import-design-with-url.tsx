@@ -16,7 +16,7 @@ export function ImportDesignWithUrl() {
     return validurl && isFigmaAuthenticated;
   };
 
-  const onsubmitcomplete = (url: string, v: LoaderResult) => {
+  const onsubmitcomplete = (_, v: LoaderResult) => {
     // create new page
     addPage({
       name: `Screen : ${v.name}`,
