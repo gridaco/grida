@@ -17,6 +17,6 @@ export async function figmaloader(url: string): Promise<LoaderResult> {
   return {
     name: n_name,
     id: n_id,
-    source: "figma-remote",
+    source: "figma",
   };
 }

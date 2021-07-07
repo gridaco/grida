@@ -4,7 +4,8 @@ import { LoadingButton } from "@editor-ui/button";
 
 interface RemoteSubmitFormProps<T = any> {
   placeholder: string;
-  onSubmit: (value: string) => void;
+  onSubmit: (url: string) => void;
+  onSubmitComplete: (url: string, value: T) => void;
   actionName: string;
   loader: (url: string) => Promise<T>;
 }
@@ -28,6 +29,7 @@ export function RemoteSubmitForm<T = any>(props: RemoteSubmitFormProps<T>) {
     // start loading
     props.loader(value).then((d) => {
       setLoading(false);
+      props.onSubmitComplete(value, d);
     });
 
     // sync

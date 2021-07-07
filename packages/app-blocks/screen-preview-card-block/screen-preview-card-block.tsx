@@ -4,7 +4,7 @@ import { ProviderFigmaEmbed } from "./provider-figma-embed";
 import { ProviderAnySnapshotView } from "./provider-any-snapshot-view";
 import { ProviderSketchEmbed } from "./provider-sketch-embed";
 import { ProviderUnknownIframeEmbed } from "./provider-unknown-iframe-embed";
-
+import { DesignProvider, analyzeDesignUrl } from "@design-sdk/url-analysis";
 export interface ScreenPreviewCardBlockProps {
   url: string;
   /**
@@ -28,6 +28,7 @@ export function ScreenPreviewCardBlock(props: ScreenPreviewCardBlockProps) {
     case "unknown":
       return <ProviderUnknownIframeEmbed url={url} />;
     case "nothing":
+    case "grida":
       return <>nothing:TODO</>;
   }
 }
@@ -41,44 +42,5 @@ function analyzeDynamicPreviewUrl(url: string): DesignProvider | "snapshot" {
     return analyzeDesignUrl(url);
   } catch (_) {
     throw _;
-  }
-}
-
-type DesignProvider = "nothing" | "figma" | "sketch" | "unknown";
-function analyzeDesignUrl(url: string): DesignProvider {
-  try {
-    const u = new URL(url);
-    switch (u.hostname) {
-      /**
-       * https://figma.com/file/~
-       */
-      case "figma.com":
-      case "www.figma.com":
-        return "figma";
-        break;
-      /**
-       * https://sketch.com/s/~
-       */
-      case "www.sketch.com":
-      case "sketch.com":
-        return "sketch";
-        break;
-
-      /**
-       * powered by nothing graphics engine
-       */
-      case "www.grida.co":
-      case "grida.co":
-      case "www.nothing.app":
-      case "nothing.app":
-      case "www.bridged.xyz":
-      case "bridged.xyz":
-        return "nothing";
-      default:
-        return "unknown";
-    }
-  } catch (_) {
-    // console.warn(`failed analyzing url. the url "${url}" is not a valid url.`)
-    return "unknown";
   }
 }
