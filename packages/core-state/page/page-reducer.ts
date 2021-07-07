@@ -12,6 +12,7 @@ import { Page } from "@core/model";
 import { nanoid } from "nanoid";
 import { Template } from "@boring.so/template-provider";
 import { BoringContent, BoringTitleLike } from "@boring.so/document-model";
+import { PageStore } from "@core/store";
 
 export const createPage = (pages: Page[], params: IAddPageAction): Page => {
   const { name, initial } = params;
@@ -25,9 +26,10 @@ export const createPage = (pages: Page[], params: IAddPageAction): Page => {
     content = _r.content;
   }
 
+  const id = nanoid();
   const newPage = produce<Page>(
     {
-      id: nanoid(),
+      id: id,
       type: "boring-document",
       name: name,
       content: content,
@@ -36,6 +38,9 @@ export const createPage = (pages: Page[], params: IAddPageAction): Page => {
       return page;
     }
   );
+
+  // todo: incomplete save operation
+  new PageStore().add(newPage);
 
   pages.push(newPage);
   return newPage;
@@ -53,6 +58,7 @@ export function pageReducer(
     }
     case "add-page": {
       return produce(state, (draft) => {
+        <AddPageAction>action;
         const newPage = createPage(draft.pages, action);
         draft.selectedPage = newPage.id;
       });
