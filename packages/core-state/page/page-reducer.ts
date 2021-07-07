@@ -7,12 +7,16 @@ import {
   IAddPageAction,
   PageAction,
   RenameCurrentPageAction,
+  SelectPageAction,
 } from "./page-action";
 import { Page } from "@core/model";
 import { nanoid } from "nanoid";
 import { Template } from "@boring.so/template-provider";
 import { BoringContent, BoringTitleLike } from "@boring.so/document-model";
+
+// store
 import { PageStore } from "@core/store";
+import { setSelectedPage } from "@core/store/application";
 
 export const createPage = (pages: Page[], params: IAddPageAction): Page => {
   const { name, initial } = params;
@@ -52,8 +56,10 @@ export function pageReducer(
 ): ApplicationState {
   switch (action.type) {
     case "select-page": {
+      const { page } = <SelectPageAction>action;
       return produce(state, (draft) => {
         draft.selectedPage = action.page;
+        setSelectedPage(page);
       });
     }
     case "add-page": {

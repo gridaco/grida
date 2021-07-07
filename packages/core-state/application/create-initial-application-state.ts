@@ -1,8 +1,11 @@
 import { ApplicationState } from "./application-state";
+import { getSelectedPage } from "@core/store/application";
+
+const DEFAULT_EMPTYSTATE_STARTING_PAGE = "getting-started";
 
 export function createInitialApplicationState(): ApplicationState {
   return {
-    selectedPage: "getting-started",
+    selectedPage: getSelectedPage() ?? DEFAULT_EMPTYSTATE_STARTING_PAGE,
     selectedObjects: [],
     pages: [
       {
