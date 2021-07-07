@@ -23,5 +23,6 @@ export async function figmaloader(url: string): Promise<LoaderResult> {
     name: n_name,
     id: n_id,
     source: "figma",
+    node: undefined, // todo
   };
 }

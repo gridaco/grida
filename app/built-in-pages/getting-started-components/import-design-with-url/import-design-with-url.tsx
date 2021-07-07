@@ -12,7 +12,8 @@ export function ImportDesignWithUrl() {
 
   const onsubmit = (url: string) => {
     const validurl = analyzeDesignUrl(url) !== "unknown";
-    return validurl;
+    const isFigmaAuthenticated = true; // todo -> add figma authenticator between fetching. user need to authorized grida to access their' design.
+    return validurl && isFigmaAuthenticated;
   };
 
   const onsubmitcomplete = (url: string, v: LoaderResult) => {
