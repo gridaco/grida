@@ -1,4 +1,5 @@
-const _key = "application-state/selected-page";
+import { keys } from "./_keys";
+const _key = keys["selected-page"];
 export function getSelectedPage(): string | undefined {
   return window.localStorage.getItem(_key);
 }

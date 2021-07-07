@@ -8,7 +8,7 @@ import {
 } from "@core/state";
 import { RecoilRoot } from "recoil";
 import { Scaffold } from "../app-scaffold/scaffold";
-import { GlobalStyles } from "./global-override-style";
+import { GlobalStyles } from "./global-style-override";
 import { BrowserRouter as Router, Switch, Route } from "react-router-dom";
 
 type InitializationAction =
