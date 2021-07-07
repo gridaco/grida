@@ -2,7 +2,7 @@ import React from "react";
 import styled from "@emotion/styled";
 import { useReflectTargetNode } from "../../query/from-figma";
 import { MonacoEditor } from "../../components/code-editor";
-import { BaseFrameMixin, SceneNode } from "@design-sdk/figma";
+import { SceneNode } from "@design-sdk/figma-types";
 
 export default function InspectAutolayout() {
   //
