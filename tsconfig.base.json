@@ -8,6 +8,7 @@
     "noFallthroughCasesInSwitch": false,
     "noImplicitAny": false,
     "noUnusedParameters": false,
-    "noUnusedLocals": false
+    "noUnusedLocals": false,
+    "downlevelIteration": true
   }
 }

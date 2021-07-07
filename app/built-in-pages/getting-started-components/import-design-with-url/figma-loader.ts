@@ -16,7 +16,7 @@ export async function figmaloader(url: string): Promise<LoaderResult> {
     ids: [n],
   });
 
-  const node = res.data.nodes[0];
+  const node = res.data.nodes[n];
   const { name: n_name, id: n_id } = node.document;
 
   return {
