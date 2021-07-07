@@ -8,8 +8,8 @@ import {
 } from "../../components/visualization/json-visualization/json-tree";
 import {
   FigmaTargetNodeConfig,
-  parseFileAndNodeIdFromUrl_Figma,
-} from "@design-sdk/core/utils/figma-api-utils";
+  parseFileAndNodeId,
+} from "@design-sdk/figma-url";
 import { useRouter } from "next/router";
 import { extractFromFigmaQueryParams } from "../../query/from-figma";
 import { Figma } from "@design-sdk/figma";
@@ -35,9 +35,7 @@ export default function FigmaToReflectWidgetTokenPage() {
     const params = extractFromFigmaQueryParams(router);
     if (params.figma_target_url) {
       setFigmaNodeUrl(params.figma_target_url);
-      const targetnodeconfig = parseFileAndNodeIdFromUrl_Figma(
-        params.figma_target_url
-      );
+      const targetnodeconfig = parseFileAndNodeId(params.figma_target_url);
       setTargetnodeConfig(targetnodeconfig);
       fetchTargetAsReflect(targetnodeconfig.file, targetnodeconfig.node).then(
         (res) => {
