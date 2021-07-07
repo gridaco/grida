@@ -28,7 +28,10 @@ export async function fetchApplicationSnapshot(): Promise<ApplicationSnapshot> {
   const d: ApplicationSnapshot = {
     selectedPage: getSelectedPage() ?? DEFAULT_EMPTYSTATE_STARTING_PAGE,
     selectedObjects: getSelectedObjects() ?? [],
-    pages: _pages.length > 0 ? _pages : [GETTING_STARTED_PAGE_REFERENCE],
+    pages:
+      _pages.length > 0
+        ? [..._pages, GETTING_STARTED_PAGE_REFERENCE]
+        : [GETTING_STARTED_PAGE_REFERENCE],
   };
   return d;
 }

@@ -6,7 +6,9 @@ export async function figmaloader(url: string): Promise<LoaderResult> {
   const f_n_n = parseFileAndNodeId(url);
   const f = f_n_n.file;
   const n = f_n_n.node;
-  const client = api.Client({});
+  const client = api.Client({
+    personalAccessToken: process.env.FIGMA_PERSONAL_ACCESS_TOKEN,
+  });
   const res = await client.fileNodes(f, {
     ids: [n],
   });
