@@ -3,15 +3,18 @@ import { NodeViewWrapper } from "@boringso/react-core";
 import { useAddPage, useDispatch } from "@core/app-state";
 import { RemoteSubmitForm } from "./remote-submit-form";
 import { TemplateInitial } from "@boring.so/loader";
+import { ImportedScreenTemplate } from "../../built-in-template-pages";
 
 export function ImportDesignWithUrl() {
   const addPage = useAddPage();
 
   const onsubmit = () => {
+    // fetch design
+
     // create new page
     addPage({
       name: "new component",
-      initial: new TemplateInitial(),
+      initial: new ImportedScreenTemplate(),
     });
   };
 

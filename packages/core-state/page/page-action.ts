@@ -16,6 +16,9 @@ export type PageParentId = PageId | typeof PageRoot;
  * add page action triggered by user
  */
 export interface IAddPageAction {
+  /**
+   * name is required initially for adding. this will automatically change if title changes after initializing is done by template loader or other initilizer overrides.
+   **/
   name: string;
   /**
    * parent page's id

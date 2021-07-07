@@ -9,6 +9,7 @@ import {
 import { RecoilRoot } from "recoil";
 import { Scaffold } from "../app-scaffold/scaffold";
 import { GlobalStyles } from "./global-override-style";
+import { BrowserRouter as Router, Switch, Route } from "react-router-dom";
 
 type InitializationAction =
   | { type: "set"; value: any }
@@ -52,12 +53,14 @@ export function AppRoot(props: {
     <>
       <GlobalStyles />
       <RecoilRoot>
-        <StateProvider state={state} dispatch={handleDispatch}>
-          <Scaffold
-            mode={props.mode}
-            controlDoubleClick={props.controlDoubleClick}
-          />
-        </StateProvider>
+        <Router>
+          <StateProvider state={state} dispatch={handleDispatch}>
+            <Scaffold
+              mode={props.mode}
+              controlDoubleClick={props.controlDoubleClick}
+            />
+          </StateProvider>
+        </Router>
       </RecoilRoot>
     </>
   );

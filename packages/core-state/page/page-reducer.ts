@@ -9,23 +9,30 @@ import {
   RenameCurrentPageAction,
 } from "./page-action";
 import { Page } from "./page-model";
-
 import { nanoid } from "nanoid";
+import { Template } from "@boring.so/template-provider";
+import { BoringContent, BoringTitleLike } from "@boring.so/document-model";
 
 export const createPage = (pages: Page[], params: IAddPageAction): Page => {
   const { name, initial } = params;
   // todo - handle content initialization
 
+  let title: BoringTitleLike = name;
+  let content: BoringContent = undefined;
+  if (initial instanceof Template) {
+    const _r = initial.render();
+    title = _r.title;
+    content = _r.content;
+  }
+
   const newPage = produce<Page>(
     {
-      id: undefined,
+      id: nanoid(),
       type: "boring-document",
-      name: undefined,
-      content: undefined,
+      name: name,
+      content: content,
     },
     (page) => {
-      page.id = nanoid();
-      page.name = name;
       return page;
     }
   );

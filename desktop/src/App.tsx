@@ -1,5 +1,4 @@
 import React from 'react';
-import { BrowserRouter as Router, Switch, Route } from 'react-router-dom';
 import { AppRoot } from '@grida.co/app/app';
 import { remote } from 'electron';
 import styled from '@emotion/styled';
@@ -32,9 +31,7 @@ export default function App() {
 
   return (
     <DesktopAppRoot>
-      <Router>
-        <AppRoot mode="desktop" controlDoubleClick={handleWindowDoubleClick} />
-      </Router>
+      <AppRoot mode="desktop" controlDoubleClick={handleWindowDoubleClick} />
     </DesktopAppRoot>
   );
 }

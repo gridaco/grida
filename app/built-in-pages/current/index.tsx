@@ -3,6 +3,12 @@ import { Scaffold as BoringScaffold } from "@boringso/react-core";
 import { BuiltIn_GettingStarted } from "../getting-started/getting-started";
 import { useApplicationState } from "@core/app-state";
 import { extensions } from "../../app-blocks";
+import { DocumentInitial } from "../../../boring/packages/boring-loader";
+import {
+  BoringContent,
+  BoringDocument,
+  BoringTitle,
+} from "@boring.so/document-model";
 
 export function CurrentPage() {
   const [state] = useApplicationState();
@@ -14,5 +20,17 @@ export function CurrentPage() {
   }
   // endregion - temporary static prebuilt-pages router
 
-  return <BoringScaffold extensions={extensions} />;
+  // add routing.
+  return (
+    <BoringScaffold
+      initialDocument={
+        new BoringDocument({
+          // todo: implement router and load content
+          title: new BoringTitle("."),
+          content: new BoringContent(""),
+        })
+      }
+      extensions={extensions}
+    />
+  );
 }
