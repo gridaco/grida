@@ -11,7 +11,7 @@ import {
 } from "./page-action";
 import { Page, PageReference } from "@core/model";
 import { nanoid } from "nanoid";
-import { Template } from "@boring.so/template-provider";
+import { UnconstrainedTemplate } from "@boring.so/template-provider";
 import { BoringContent, BoringTitleLike } from "@boring.so/document-model";
 
 // store
@@ -27,7 +27,7 @@ export const createPage = (
 
   let title: BoringTitleLike = name;
   let content: BoringContent = undefined;
-  if (initial instanceof Template) {
+  if (initial instanceof UnconstrainedTemplate) {
     const _r = initial.render();
     title = _r.title;
     content = _r.content;

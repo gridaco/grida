@@ -1,6 +1,9 @@
 const path = require("path");
 const withTM = require("next-transpile-modules")(
   [
+    "@design-sdk/figma-remote",
+    "@design-sdk/figma-url",
+    "@design-sdk/figma-types",
     // "@nothing.app/react-core",
     // "@nothing.app/react-compact",
     // "@nothing.app/react",
