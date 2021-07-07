@@ -13,12 +13,13 @@ import {
 import { useRouter } from "next/router";
 import { extractFromFigmaQueryParams } from "../../query/from-figma";
 import { Figma } from "@design-sdk/figma";
-import { fetchTargetAsReflect } from "../../components/figma/screen-importer";
+import { fetch } from "@design-sdk/figma-remote";
 import { DefaultEditorWorkspaceLayout } from "../../layout/default-editor-workspace-layout";
 import { LayerHierarchy } from "../../components/editor-hierarchy";
 import { WorkspaceContentPanelGridLayout } from "../../layout/panel/workspace-content-panel-grid-layout";
 import { WorkspaceContentPanel } from "../../layout/panel";
 import { WorkspaceBottomPanelDockLayout } from "../../layout/panel/workspace-bottom-panel-dock-layout";
+import { utils_figma } from "../../utils";
 
 export default function FigmaToReflectWidgetTokenPage() {
   const [figmaNode, setFigmaNode] = useState<Figma.SceneNode>();
@@ -37,12 +38,14 @@ export default function FigmaToReflectWidgetTokenPage() {
       setFigmaNodeUrl(params.figma_target_url);
       const targetnodeconfig = parseFileAndNodeId(params.figma_target_url);
       setTargetnodeConfig(targetnodeconfig);
-      fetchTargetAsReflect(targetnodeconfig.file, targetnodeconfig.node).then(
-        (res) => {
+      fetch
+        .fetchTargetAsReflect(targetnodeconfig.file, targetnodeconfig.node, {
+          personalAccessToken: utils_figma.figmaPersonalAccessToken_safe(),
+        })
+        .then((res) => {
           setReflect(res.reflect);
           setFigmaNode(res.figma);
-        }
-      );
+        });
     }
   }, [router]);
 
