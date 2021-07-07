@@ -9,7 +9,7 @@ import {
   RenameCurrentPageAction,
   SelectPageAction,
 } from "./page-action";
-import { Page } from "@core/model";
+import { Page, PageReference } from "@core/model";
 import { nanoid } from "nanoid";
 import { Template } from "@boring.so/template-provider";
 import { BoringContent, BoringTitleLike } from "@boring.so/document-model";
@@ -18,7 +18,10 @@ import { BoringContent, BoringTitleLike } from "@boring.so/document-model";
 import { PageStore } from "@core/store";
 import { setSelectedPage } from "@core/store/application";
 
-export const createPage = (pages: Page[], params: IAddPageAction): Page => {
+export const createPage = (
+  pages: PageReference[],
+  params: IAddPageAction
+): Page => {
   const { name, initial } = params;
   // todo - handle content initialization
 
@@ -91,7 +94,7 @@ export function pageReducer(
         const pages = draft.pages;
         const page = pages[pageIndex];
 
-        const duplicatePage = produce<Page>(page, (page) => {
+        const duplicatePage = produce<PageReference>(page, (page) => {
           page.id = nanoid();
           page.name = `${page.name} Copy`;
 
