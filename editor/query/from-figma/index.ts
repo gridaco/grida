@@ -5,7 +5,8 @@ import {
 import { Figma, nodes, remote } from "@design-sdk/figma";
 import { NextRouter, useRouter } from "next/router";
 import { useEffect, useState } from "react";
-import { fetchTargetAsReflect } from "../../components/figma/screen-importer";
+import { fetch } from "@design-sdk/figma-remote";
+import { utils_figma } from "../../utils";
 
 const P_FIGMA_TARGET_URL = "figma_target_url";
 
@@ -67,14 +68,16 @@ export function useReflectTargetNode() {
   const [targetNode, setTargetNode] = useState<TargetNodeConfig>();
   useEffect(() => {
     if (figmaTargetNode) {
-      fetchTargetAsReflect(figmaTargetNode.file, figmaTargetNode.node).then(
-        (res) => {
-          setTargetNode({
+      fetch
+        .fetchTargetAsReflect(figmaTargetNode.file, figmaTargetNode.node, {
+          personalAccessToken: utils_figma.figmaPersonalAccessToken_safe(),
+        })
+        .then((res) => {
+          setTargetNode(<TargetNodeConfig>{
             ...res,
             ...figmaTargetNode,
           });
-        }
-      );
+        });
     }
   }, [figmaTargetNode]);
 
