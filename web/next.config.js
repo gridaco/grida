@@ -25,6 +25,10 @@ const FIREBASE_ENV_VARS = {
   FIREBASE_MEASUREMENT_ID: process.env.FIREBASE_MEASUREMENT_ID,
 };
 
+const LOCAL_DEVELOPMENT_ENV_VARS = {
+  FIGMA_PERSONAL_ACCESS_TOKEN: process.env.FIGMA_PERSONAL_ACCESS_TOKEN,
+};
+
 module.exports = withTM({
   webpack: function (config, { isServer }) {
     config.module.rules.push({
@@ -66,6 +70,7 @@ module.exports = withTM({
   },
   env: {
     ...FIREBASE_ENV_VARS,
+    ...LOCAL_DEVELOPMENT_ENV_VARS,
   },
 
   // enable SPA mode, disable SSR

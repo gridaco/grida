@@ -2579,11 +2579,6 @@
   dependencies:
     "@design-sdk/figma-url" "^0.0.2"
 
-"@reflect-ui/core@0.0.2-rc.7":
-  version "0.0.2-rc.7"
-  resolved "https://registry.yarnpkg.com/@reflect-ui/core/-/core-0.0.2-rc.7.tgz#9d531f5a0b9caab31e7563020044b753700e2bbc"
-  integrity sha512-EqF4SRU57bfa5DOPET1rv5lROFyMVHLv1xTEIlN6N2gDpXt71QceImWfQp3z3Khqnb4R/p9OhNK6DXGUpozWKw==
-
 "@reflect-ui/namings@0.0.3":
   version "0.0.3"
   resolved "https://registry.yarnpkg.com/@reflect-ui/namings/-/namings-0.0.3.tgz#6e9fd4809dd5c9d2a996516236c71b99ea93fbcb"
@@ -14141,7 +14136,7 @@ typescript@4.2.4:
   resolved "https://registry.yarnpkg.com/typescript/-/typescript-4.2.4.tgz#8610b59747de028fda898a8aef0e103f156d0961"
   integrity sha512-V+evlYHZnQkaz8TRBuxTA92yZBPotr5H+WhQ7bD3hZUndx5tGOa1fuCgeSjxAzM1RiN5IzvadIXTVefuuwZCRg==
 
-typescript@^4.0.5, typescript@^4.2.4, typescript@^4.3.2, typescript@^4.3.5:
+typescript@^4.0.5, typescript@^4.1.2, typescript@^4.2.4, typescript@^4.3.2, typescript@^4.3.5:
   version "4.3.5"
   resolved "https://registry.yarnpkg.com/typescript/-/typescript-4.3.5.tgz#4d1c37cc16e893973c45a06886b7113234f119f4"
   integrity sha512-DqQgihaQ9cUrskJo9kIyW/+g0Vxsk8cDtZ52a3NGh0YNTfpUSArXSohyUGnvbPazEPLu398C0UxmKSOrPumUzA==
