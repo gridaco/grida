@@ -11,7 +11,8 @@ export function ImportDesignWithUrl() {
   const addPage = useAddPage();
 
   const onsubmit = (url: string) => {
-    // skip
+    const validurl = analyzeDesignUrl(url) !== "unknown";
+    return validurl;
   };
 
   const onsubmitcomplete = (url: string, v: LoaderResult) => {
