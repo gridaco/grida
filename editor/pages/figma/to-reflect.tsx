@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { figmacomp, canvas } from "../../components";
+import { canvas } from "../../components";
 import { ReflectSceneNode } from "@design-sdk/core/nodes";
 import { visualize_node } from "../../components/visualization";
 import { JsonTree } from "../../components/visualization/json-visualization/json-tree";
