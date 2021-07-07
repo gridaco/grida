@@ -1,4 +1,4 @@
-import { Page } from "../page/page-model";
+import { Page } from "@core/model";
 
 export type ApplicationState = {
   selectedPage: string;
