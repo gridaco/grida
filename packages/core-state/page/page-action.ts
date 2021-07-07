@@ -1,4 +1,5 @@
 import { DocumentInitial } from "@boring.so/loader";
+import { PageId } from "@core/model";
 
 export type PageAction =
   | MovePageAction //[type: "movePage", sourceIndex: number, destinationIndex: number]
@@ -8,7 +9,6 @@ export type PageAction =
   | RenameCurrentPageAction // [type: "renamePage", name: string]
   | DuplicateCurrentPageAction; //  [type: "duplicatePage"];
 
-export type PageId = string;
 export const PageRoot: unique symbol = Symbol("page-root");
 export type PageParentId = PageId | typeof PageRoot;
 

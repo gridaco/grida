@@ -2,9 +2,11 @@ import React, { useEffect, useCallback, useReducer } from "react";
 import { StateProvider } from "@core/app-state";
 import {
   createInitialWorkspaceState,
+  fetchApplicationSnapshot,
   WorkspaceAction,
   WorkspaceState,
   workspaceReducer,
+  ApplicationSnapshot,
 } from "@core/state";
 import { RecoilRoot } from "recoil";
 import { Scaffold } from "../app-scaffold/scaffold";
@@ -12,7 +14,7 @@ import { GlobalStyles } from "./global-style-override";
 import { BrowserRouter as Router, Switch, Route } from "react-router-dom";
 
 type InitializationAction =
-  | { type: "set"; value: any }
+  | { type: "set"; value: ApplicationSnapshot }
   | { type: "update"; value: WorkspaceAction };
 
 function reducer(
@@ -21,7 +23,7 @@ function reducer(
 ): WorkspaceState {
   switch (action.type) {
     case "set":
-      return createInitialWorkspaceState();
+      return createInitialWorkspaceState(action.value);
     case "update":
       if (state) {
         return workspaceReducer(state, action.value);
@@ -38,7 +40,9 @@ export function AppRoot(props: {
   const [state, dispatch] = useReducer(reducer, undefined);
 
   useEffect(() => {
-    dispatch({ type: "set", value: undefined });
+    fetchApplicationSnapshot().then((d) => {
+      dispatch({ type: "set", value: d });
+    });
   }, []);
 
   const handleDispatch = useCallback((action: WorkspaceAction) => {

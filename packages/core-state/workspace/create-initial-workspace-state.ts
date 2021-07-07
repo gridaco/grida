@@ -1,9 +1,12 @@
+import { ApplicationSnapshot } from "../application";
 import { createInitialHistoryState } from "../history";
 import { WorkspaceState } from "./workspace-state";
 
-export function createInitialWorkspaceState(): WorkspaceState {
+export function createInitialWorkspaceState(
+  app: ApplicationSnapshot
+): WorkspaceState {
   return {
-    history: createInitialHistoryState(),
+    history: createInitialHistoryState(app),
     preferences: {
       showRulers: false,
     },

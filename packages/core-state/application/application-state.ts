@@ -1,7 +1,13 @@
-import { Page } from "@core/model";
+import { PageReference } from "@core/model";
 
-export type ApplicationState = {
+export interface ApplicationState {
   selectedPage: string;
   selectedObjects: string[];
-  pages: Page[];
-};
+  pages: PageReference[];
+}
+
+export interface ApplicationSnapshot {
+  selectedPage: string;
+  selectedObjects: string[];
+  pages: PageReference[];
+}

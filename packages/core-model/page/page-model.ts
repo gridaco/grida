@@ -1,8 +1,16 @@
+export type PageId = string;
+
+export interface PageReference {
+  id: PageId;
+  type: "boring-document" | "nothing-document";
+  name: string;
+}
+
 /**
  * Core Page model
  */
-export interface Page {
-  id: string;
+export interface Page extends PageReference {
+  id: PageId;
   type: "boring-document" | "nothing-document";
   name: string;
   content: Fetchable<any>;
