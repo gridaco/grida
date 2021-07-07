@@ -8,7 +8,7 @@ import {
   PageAction,
   RenameCurrentPageAction,
 } from "./page-action";
-import { Page } from "./page-model";
+import { Page } from "@core/model";
 import { nanoid } from "nanoid";
 import { Template } from "@boring.so/template-provider";
 import { BoringContent, BoringTitleLike } from "@boring.so/document-model";

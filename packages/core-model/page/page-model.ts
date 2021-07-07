@@ -1,3 +1,6 @@
+/**
+ * Core Page model
+ */
 export interface Page {
   id: string;
   type: "boring-document" | "nothing-document";
