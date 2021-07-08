@@ -3,10 +3,10 @@ import { getSelectedPage, getSelectedObjects } from "@core/store/application";
 import { PageReference } from "@core/model";
 import { PageStore } from "@core/store";
 
-const DEFAULT_EMPTYSTATE_STARTING_PAGE = "getting-started";
+const DEFAULT_EMPTYSTATE_STARTING_PAGE = "built-in/getting-started";
 const GETTING_STARTED_PAGE_REFERENCE: PageReference = {
   type: "boring-document",
-  id: "getting-started",
+  id: "built-in/getting-started",
   name: "Getting started",
 };
 

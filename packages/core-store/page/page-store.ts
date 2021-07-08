@@ -31,6 +31,8 @@ const DB_PAGE_V = 1;
 export class PageStore extends BaseSimpleModelIdbStore<Page, PageStoreModel> {
   readonly service_boringdocument: BoringDocumentsStore;
 
+  readonly tmpstore = new Map<string, Page | PageStoreModel>();
+
   constructor() {
     super({
       dbname: DB_PAGE_N,
@@ -42,13 +44,19 @@ export class PageStore extends BaseSimpleModelIdbStore<Page, PageStoreModel> {
   }
 
   async get(id: string): Promise<Page> {
-    const stored = await (await this.db()).get(STORE_PAGES, id);
-    return await this.map_o(stored);
+    const stored = this.tmpstore.has(id)
+      ? this.tmpstore.get(id)
+      : await (await this.db()).get(STORE_PAGES, id);
+    if (stored) {
+      return await this.map_o(stored);
+    }
   }
 
   async add(page: Page | PageStoreModel) {
-    const storable = this.map_i(page);
+    this.tmpstore.set(page.id, page);
+    const storable = await this.map_i(page);
     await (await this.db()).add(STORE_PAGES, storable);
+    this.tmpstore.delete(page.id);
   }
 
   async getAll(): Promise<PageStoreModel[]> {
@@ -60,8 +68,11 @@ export class PageStore extends BaseSimpleModelIdbStore<Page, PageStoreModel> {
 
   // explicit member methods
   private async map_i(p: Page | PageStoreModel): Promise<PageStoreModel> {
-    // 1. save document if needed.
+    if (!p.document) {
+      throw "document cannot be empty for page store input";
+    }
 
+    // 1. save document if needed.
     const docid = async () => {
       let documentid;
       if (p.document instanceof BoringDocument) {
@@ -85,7 +96,7 @@ export class PageStore extends BaseSimpleModelIdbStore<Page, PageStoreModel> {
 
   private async map_o(p: PageStoreModel): Promise<Page> {
     const doc = async (id: string): Promise<BoringDocument> => {
-      const _d = await this.service_boringdocument.get(p.document);
+      const _d = await this.service_boringdocument.get(id);
       return _d;
     };
 
