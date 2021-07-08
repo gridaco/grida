@@ -18,7 +18,9 @@
     ],
     "scripts": {
         "web": "yarn workspace web run dev",
-        "desktop": "yarn workspace @grida.co/desktop run start"
+        "desktop": "yarn workspace @grida.co/desktop run start",
+        "clean": "rimraf node_modules yarn.lock",
+        "clean:install": "yarn clean && yarn"
     },
     "resolutions": {
         "react": "^17.0.1",
