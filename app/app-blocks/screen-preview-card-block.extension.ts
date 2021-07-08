@@ -12,8 +12,8 @@ export const boring_extended_screen_preview_card_block = Node.create({
 
   addAttributes() {
     return {
-      count: {
-        default: 0,
+      url: {
+        default: undefined,
       },
     };
   },

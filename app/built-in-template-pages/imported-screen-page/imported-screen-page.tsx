@@ -14,6 +14,9 @@ interface ImportedScreenConfig {
     source: DesignProvider;
     node: nodes.ReflectSceneNode;
   };
+  code: {
+    raw: string;
+  };
 }
 
 export class ImportedScreenTemplate extends UnconstrainedTemplate<ImportedScreenConfig> {
@@ -38,16 +41,7 @@ export class ImportedScreenTemplate extends UnconstrainedTemplate<ImportedScreen
   <screen-preview-card-block url="{{design.url}}"></screen-preview-card-block>
   
   <pre><code>
-  export function ImportedScreenPageTemplate() {
-    const initialTitle = \`New screen\`;
-    return (
-      <BoringScaffold
-        extensions={extensions}
-        initialTitle={initialTitle}
-        initialContent={initialContent}
-      />
-    );
-  }
+  {{code.raw}}
   </code></pre>
   `,
       },
