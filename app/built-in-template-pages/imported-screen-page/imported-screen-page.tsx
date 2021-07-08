@@ -1,30 +1,43 @@
 import { UnconstrainedTemplate } from "@boring.so/template-provider";
 import { BoringContent, BoringTitle } from "@boring.so/document-model";
+import { DesignProvider } from "@design-sdk/url-analysis";
+import { nodes } from "@design-sdk/core";
 
 interface ImportedScreenConfig {
   /**
-   * design provider
-   */
-  provider: string;
-  /**
    * source url
    */
-  source: string;
+  name: string;
+  design: {
+    id: string;
+    url: string;
+    source: DesignProvider;
+    node: nodes.ReflectSceneNode;
+  };
 }
 
 export class ImportedScreenTemplate extends UnconstrainedTemplate<ImportedScreenConfig> {
-  title = new BoringTitle({
-    icon: "📱",
-    name: `New screen`,
-  });
-  content = new BoringContent(`
-  <screen-preview-card-block url=""></screen-preview-card-block>
+  constructor(p: { screen: ImportedScreenConfig }) {
+    super({
+      templateProps: {
+        props: p.screen,
+      },
+      templateTitleSource: {
+        default: new BoringTitle({
+          icon: "📱",
+          name: `New screen`,
+        }).raw,
+        template: new BoringTitle({
+          icon: "📱",
+          name: `(Screen) {{name}}`,
+        }).raw,
+      },
+      templateContentSource: {
+        default: "",
+        template: `
+  <screen-preview-card-block url="{{design.url}}"></screen-preview-card-block>
   
   <pre><code>
-  import React from "react";
-  import { Scaffold as BoringScaffold } from "@boringso/react-core";
-  import { extensions } from "../../app-blocks";
-  
   export function ImportedScreenPageTemplate() {
     const initialTitle = \`New screen\`;
     return (
@@ -36,5 +49,8 @@ export class ImportedScreenTemplate extends UnconstrainedTemplate<ImportedScreen
     );
   }
   </code></pre>
-  `);
+  `,
+      },
+    });
+  }
 }

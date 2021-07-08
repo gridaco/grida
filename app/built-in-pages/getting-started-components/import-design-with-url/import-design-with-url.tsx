@@ -5,7 +5,7 @@ import { RemoteSubmitForm } from "../remote-submit-form";
 import { TemplateInitial } from "@boring.so/loader";
 import { ImportedScreenTemplate } from "../../../built-in-template-pages";
 import { figmaloader } from "./figma-loader";
-import { LoaderResult } from "./o";
+import { DesignImporterLoaderResult } from "./o";
 import { analyzeDesignUrl } from "@design-sdk/url-analysis";
 export function ImportDesignWithUrl() {
   const addPage = useAddPage();
@@ -16,11 +16,13 @@ export function ImportDesignWithUrl() {
     return validurl && isFigmaAuthenticated;
   };
 
-  const onsubmitcomplete = (_, v: LoaderResult) => {
+  const onsubmitcomplete = (_, v: DesignImporterLoaderResult) => {
     // create new page
     addPage({
       name: `Screen : ${v.name}`,
-      initial: new ImportedScreenTemplate(),
+      initial: new ImportedScreenTemplate({
+        screen: v,
+      }),
     });
   };
 
@@ -35,7 +37,7 @@ export function ImportDesignWithUrl() {
 
   return (
     <NodeViewWrapper>
-      <RemoteSubmitForm<LoaderResult>
+      <RemoteSubmitForm<DesignImporterLoaderResult>
         actionName="Load from Url"
         placeholder="https://figma.com/files/1234/app?node-id=5678"
         onSubmit={onsubmit}

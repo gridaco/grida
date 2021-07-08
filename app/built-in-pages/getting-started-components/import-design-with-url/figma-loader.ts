@@ -1,8 +1,10 @@
-import { LoaderResult } from "./o";
+import { DesignImporterLoaderResult } from "./o";
 import { fetch } from "@design-sdk/figma-remote";
 import { parseFileAndNodeId } from "@design-sdk/figma-url";
 
-export async function figmaloader(url: string): Promise<LoaderResult> {
+export async function figmaloader(
+  url: string
+): Promise<DesignImporterLoaderResult> {
   const f_n_n = parseFileAndNodeId(url);
   const f = f_n_n.file;
   const n = f_n_n.node;
