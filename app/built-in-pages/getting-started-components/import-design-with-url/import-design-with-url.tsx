@@ -8,6 +8,13 @@ import { DesignImporterLoaderResult } from "./o";
 import { analyzeDesignUrl } from "@design-sdk/url-analysis";
 import { flutter } from "@designto/code";
 
+// temporary image repository setup.
+import { MainImageRepository } from "@design-sdk/core/assets-repository";
+import { ImageRepositories } from "@design-sdk/figma/asset-repository";
+// temporary image repository setup.
+
+MainImageRepository.instance = new ImageRepositories();
+
 export function ImportDesignWithUrl() {
   const addPage = useAddPage();
 
