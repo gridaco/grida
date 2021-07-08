@@ -7,28 +7,57 @@ import {
   IAddPageAction,
   PageAction,
   RenameCurrentPageAction,
+  SelectPageAction,
 } from "./page-action";
-import { Page } from "./page-model";
-
+import { Page, PageReference } from "@core/model";
 import { nanoid } from "nanoid";
+import { UnconstrainedTemplate } from "@boring.so/template-provider";
+import {
+  BoringContent,
+  BoringDocument,
+  BoringTitleLike,
+  boringTitleLikeAsBoringTitle,
+} from "@boring.so/document-model";
 
-export const createPage = (pages: Page[], params: IAddPageAction): Page => {
+// store
+import { PageStore } from "@core/store";
+import { setSelectedPage } from "@core/store/application";
+
+export const createPage = (
+  pages: PageReference[],
+  params: IAddPageAction
+): Page => {
   const { name, initial } = params;
   // todo - handle content initialization
 
+  let title: BoringTitleLike = name;
+  let document: BoringDocument;
+  // let content: BoringContent = undefined;
+  if (initial instanceof UnconstrainedTemplate) {
+    const _r = initial.render();
+    title = _r.title;
+    document = new BoringDocument({
+      title: boringTitleLikeAsBoringTitle(_r.title),
+      content: _r.content,
+    });
+    // content = _r.content;
+  }
+
+  const id = nanoid();
   const newPage = produce<Page>(
     {
-      id: undefined,
+      id: id,
       type: "boring-document",
-      name: undefined,
-      content: undefined,
+      name: name,
+      document: document,
     },
     (page) => {
-      page.id = nanoid();
-      page.name = name;
       return page;
     }
   );
+
+  // todo: incomplete save operation
+  new PageStore().add(newPage);
 
   pages.push(newPage);
   return newPage;
@@ -40,12 +69,15 @@ export function pageReducer(
 ): ApplicationState {
   switch (action.type) {
     case "select-page": {
+      const { page } = <SelectPageAction>action;
       return produce(state, (draft) => {
         draft.selectedPage = action.page;
+        setSelectedPage(page);
       });
     }
     case "add-page": {
       return produce(state, (draft) => {
+        <AddPageAction>action;
         const newPage = createPage(draft.pages, action);
         draft.selectedPage = newPage.id;
       });
@@ -72,7 +104,7 @@ export function pageReducer(
         const pages = draft.pages;
         const page = pages[pageIndex];
 
-        const duplicatePage = produce<Page>(page, (page) => {
+        const duplicatePage = produce<PageReference>(page, (page) => {
           page.id = nanoid();
           page.name = `${page.name} Copy`;
 

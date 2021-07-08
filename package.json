@@ -8,6 +8,7 @@
         "web",
         "packages/app-*",
         "packages/core-*",
+        "packages/reflect-core/packages/*",
         "packages/design-sdk/*",
         "boring/packages/*",
         "ui/editor-ui/packages/*"

@@ -1,6 +1,8 @@
 const path = require("path");
 const withTM = require("next-transpile-modules")(
   [
+    "@design-sdk/figma-remote",
+    "@design-sdk/figma-types",
     // "@nothing.app/react-core",
     // "@nothing.app/react-compact",
     // "@nothing.app/react",
@@ -21,6 +23,10 @@ const FIREBASE_ENV_VARS = {
   FIREBASE_MESSAGING_SENDER_ID: process.env.FIREBASE_MESSAGING_SENDER_ID,
   FIREBASE_APP_ID: process.env.FIREBASE_APP_ID,
   FIREBASE_MEASUREMENT_ID: process.env.FIREBASE_MEASUREMENT_ID,
+};
+
+const LOCAL_DEVELOPMENT_ENV_VARS = {
+  FIGMA_PERSONAL_ACCESS_TOKEN: process.env.FIGMA_PERSONAL_ACCESS_TOKEN,
 };
 
 module.exports = withTM({
@@ -64,6 +70,7 @@ module.exports = withTM({
   },
   env: {
     ...FIREBASE_ENV_VARS,
+    ...LOCAL_DEVELOPMENT_ENV_VARS,
   },
 
   // enable SPA mode, disable SSR

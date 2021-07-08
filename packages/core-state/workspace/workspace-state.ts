@@ -1,8 +1,5 @@
 import { HistoryState } from "../history";
-
-export type WorkspaceState = {
+import { Workspace } from "@core/model";
+export interface WorkspaceState extends Workspace {
   history: HistoryState;
-  preferences: {
-    // add preference here
-  };
-};
+}

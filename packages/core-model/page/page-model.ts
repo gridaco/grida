@@ -1,8 +1,24 @@
-export interface Page {
-  id: string;
+import { BoringDocument } from "@boring.so/document-model";
+
+export type PageId = string;
+
+export interface PageReference {
+  id: PageId;
   type: "boring-document" | "nothing-document";
   name: string;
-  content: Fetchable<any>;
+}
+
+type NothingDocument = never; // change this when nothing engine is complete.
+export type PageDocumentType = "boring-document" | "nothing-document";
+export type PageDocumentLike = BoringDocument | NothingDocument;
+/**
+ * Core Page model
+ */
+export interface Page extends PageReference {
+  id: PageId;
+  type: PageDocumentType;
+  name: string;
+  document: PageDocumentLike;
 }
 
 type ObjectLike = object | string;
@@ -34,5 +50,5 @@ type Fetchable<T extends ObjectLike> = T | (() => Promise<T>);
 
 export interface BoringDocumentPage extends Page {
   type: "boring-document";
-  content: Fetchable<string>;
+  document: PageDocumentLike;
 }

@@ -1,4 +1,4 @@
-import { Template } from "@boring.so/template-provider";
+import { UnconstrainedTemplate } from "@boring.so/template-provider";
 import { BoringContent, BoringTitle } from "@boring.so/document-model";
 
 interface ImportedScreenConfig {
@@ -12,7 +12,7 @@ interface ImportedScreenConfig {
   source: string;
 }
 
-export class ImportedScreenTemplate extends Template<ImportedScreenConfig> {
+export class ImportedScreenTemplate extends UnconstrainedTemplate<ImportedScreenConfig> {
   title = new BoringTitle({
     icon: "📱",
     name: `New screen`,

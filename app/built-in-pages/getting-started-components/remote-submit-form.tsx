@@ -4,7 +4,8 @@ import { LoadingButton } from "@editor-ui/button";
 
 interface RemoteSubmitFormProps<T = any> {
   placeholder: string;
-  onSubmit: (value: string) => void;
+  onSubmit?: (url: string) => void | boolean | Promise<boolean>;
+  onSubmitComplete: (url: string, value: T) => void;
   actionName: string;
   loader: (url: string) => Promise<T>;
 }
@@ -24,15 +25,21 @@ export function RemoteSubmitForm<T = any>(props: RemoteSubmitFormProps<T>) {
     submit();
   };
 
-  const submit = () => {
+  const submit = async () => {
+    setLoading(true);
+    const prevalidaton = await props.onSubmit?.(value);
+    if (prevalidaton === false) {
+      // pass on undefined or true
+      setLoading(false);
+      return;
+    }
+
+    // sync
     // start loading
     props.loader(value).then((d) => {
       setLoading(false);
+      props.onSubmitComplete(value, d);
     });
-
-    // sync
-    setLoading(true);
-    props.onSubmit(value);
   };
 
   return (

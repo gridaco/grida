@@ -1,4 +1,5 @@
 import { DocumentInitial } from "@boring.so/loader";
+import { PageId } from "@core/model";
 
 export type PageAction =
   | MovePageAction //[type: "movePage", sourceIndex: number, destinationIndex: number]
@@ -8,7 +9,6 @@ export type PageAction =
   | RenameCurrentPageAction // [type: "renamePage", name: string]
   | DuplicateCurrentPageAction; //  [type: "duplicatePage"];
 
-export type PageId = string;
 export const PageRoot: unique symbol = Symbol("page-root");
 export type PageParentId = PageId | typeof PageRoot;
 
@@ -16,6 +16,9 @@ export type PageParentId = PageId | typeof PageRoot;
  * add page action triggered by user
  */
 export interface IAddPageAction {
+  /**
+   * name is required initially for adding. this will automatically change if title changes after initializing is done by template loader or other initilizer overrides.
+   **/
   name: string;
   /**
    * parent page's id

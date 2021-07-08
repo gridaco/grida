@@ -7,6 +7,8 @@
         "@boringso/react-core": "0.0.0",
         "@core/app-state": "0.0.0",
         "@design-sdk/universal": "0.0.0",
+        "@design-sdk/figma-remote": "0.0.0",
+        "@design-sdk/url-analysis": "0.0.0",
         "@editor-ui/editor": "0.0.0",
         "@editor-ui/workspace": "0.0.0",
         "@emotion/core": "^11.0.0",
