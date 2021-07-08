@@ -1,8 +1,7 @@
 import React from "react";
-import { Scaffold as BoringScaffold } from "@boringso/react-core";
-import { boring_extended_import_design_with_url } from "../getting-started-components";
+import { BoringScaffold } from "../../boring-scaffold";
+
 export function BuiltIn_GettingStarted() {
-  const extensions = [boring_extended_import_design_with_url];
   const initialTitle = `Getting Started`;
   const initialContent = `
 <h1>Upload your first design</h1>
@@ -15,9 +14,10 @@ export function BuiltIn_GettingStarted() {
   `;
   return (
     <BoringScaffold
-      extensions={extensions}
-      initialTitle={initialTitle}
-      initialContent={initialContent}
+      initial={{
+        title: initialTitle,
+        content: initialContent,
+      }}
     />
   );
 }

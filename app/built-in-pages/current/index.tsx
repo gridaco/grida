@@ -1,9 +1,8 @@
 import React from "react";
-import { Scaffold as BoringScaffold } from "@boringso/react-core";
+import { BoringScaffold } from "../../boring-scaffold";
 import { BuiltIn_GettingStarted } from "../getting-started/getting-started";
 import { useApplicationState } from "@core/app-state";
-import { extensions } from "../../app-blocks";
-import { DocumentInitial } from "../../../boring/packages/boring-loader";
+
 import {
   BoringContent,
   BoringDocument,
@@ -23,14 +22,13 @@ export function CurrentPage() {
   // add routing.
   return (
     <BoringScaffold
-      initialDocument={
+      initial={
         new BoringDocument({
           // todo: implement router and load content
           title: new BoringTitle("."),
           content: new BoringContent(""),
         })
       }
-      extensions={extensions}
     />
   );
 }
