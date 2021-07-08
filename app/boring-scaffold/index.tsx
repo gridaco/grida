@@ -8,5 +8,6 @@ const extensions = [
 ];
 
 export function BoringScaffold(props: { initial: InitialDocumentProp }) {
+  //@ts-ignore (todo: inspect warning)
   return <Scaffold {...props} extensions={extensions} />;
 }
