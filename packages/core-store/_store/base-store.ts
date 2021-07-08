@@ -5,7 +5,7 @@ type ID = string;
 /**
  * Simple model storage on indexed db
  */
-export abstract class BaseSimpleModelIdbStore<Model> {
+export abstract class BaseSimpleModelIdbStore<Model, StoreModel> {
   readonly store: string;
   readonly dbname: string;
 
@@ -60,5 +60,5 @@ export abstract class BaseSimpleModelIdbStore<Model> {
    * add (save) object @Model to main store
    * @param id
    */
-  abstract add(record: Model);
+  abstract add(record: StoreModel | Model);
 }

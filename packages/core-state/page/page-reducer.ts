@@ -12,7 +12,12 @@ import {
 import { Page, PageReference } from "@core/model";
 import { nanoid } from "nanoid";
 import { UnconstrainedTemplate } from "@boring.so/template-provider";
-import { BoringContent, BoringTitleLike } from "@boring.so/document-model";
+import {
+  BoringContent,
+  BoringDocument,
+  BoringTitleLike,
+  boringTitleLikeAsBoringTitle,
+} from "@boring.so/document-model";
 
 // store
 import { PageStore } from "@core/store";
@@ -26,11 +31,16 @@ export const createPage = (
   // todo - handle content initialization
 
   let title: BoringTitleLike = name;
-  let content: BoringContent = undefined;
+  let document: BoringDocument;
+  // let content: BoringContent = undefined;
   if (initial instanceof UnconstrainedTemplate) {
     const _r = initial.render();
     title = _r.title;
-    content = _r.content;
+    document = new BoringDocument({
+      title: boringTitleLikeAsBoringTitle(_r.title),
+      content: _r.content,
+    });
+    // content = _r.content;
   }
 
   const id = nanoid();
@@ -39,7 +49,7 @@ export const createPage = (
       id: id,
       type: "boring-document",
       name: name,
-      content: content,
+      document: document,
     },
     (page) => {
       return page;
