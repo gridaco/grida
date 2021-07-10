@@ -6,7 +6,7 @@ import { ImportedScreenTemplate } from "../../../built-in-template-pages";
 import { figmaloader } from "./figma-loader";
 import { DesignImporterLoaderResult } from "./o";
 import { analyzeDesignUrl } from "@design-sdk/url-analysis";
-import { flutter } from "@designto/code";
+import { flutter, react, token } from "@designto/code";
 
 // temporary image repository setup.
 import { MainImageRepository } from "@design-sdk/core/assets-repository";
@@ -26,9 +26,19 @@ export function ImportDesignWithUrl() {
 
   const onsubmitcomplete = (_, v: DesignImporterLoaderResult) => {
     const _design = v;
+    const _token = token.tokenize(v.node);
     const _flutterwidget = flutter.buildApp(v.node);
+    const _reactwidget = react.buildReactWidget(_token);
+    const _reactapp = react.buildReactApp(_reactwidget, {
+      template: "cra",
+    });
     const _code = {
-      raw: _flutterwidget.widget.build().finalize(),
+      flutter: {
+        raw: _flutterwidget.widget.build().finalize(),
+      },
+      react: {
+        raw: _reactapp.code,
+      },
     };
     const template = new ImportedScreenTemplate({
       screen: {

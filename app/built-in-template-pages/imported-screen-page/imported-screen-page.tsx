@@ -3,6 +3,10 @@ import { BoringContent, BoringTitle } from "@boring.so/document-model";
 import { DesignProvider } from "@design-sdk/url-analysis";
 import { nodes } from "@design-sdk/core";
 
+interface PlatformCode {
+  raw: string;
+}
+
 interface ImportedScreenConfig {
   /**
    * source url
@@ -15,7 +19,8 @@ interface ImportedScreenConfig {
     node: nodes.ReflectSceneNode;
   };
   code: {
-    raw: string;
+    flutter?: PlatformCode;
+    react?: PlatformCode;
   };
 }
 
@@ -41,7 +46,15 @@ export class ImportedScreenTemplate extends UnconstrainedTemplate<ImportedScreen
   <screen-preview-card-block url="{{design.url}}"></screen-preview-card-block>
   
   <pre><code>
-  {{code.raw}}
+  {{#with code.flutter}}
+    {{raw}}
+  {{/with}}
+  </code></pre>
+
+  <pre><code>
+  {{#with code.react}}
+    {{raw}}
+  {{/with}}
   </code></pre>
   `,
       },
