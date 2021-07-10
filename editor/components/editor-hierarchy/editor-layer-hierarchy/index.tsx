@@ -4,6 +4,7 @@ import TreeView from "@material-ui/lab/TreeView";
 import ExpandMoreIcon from "@material-ui/icons/ExpandMore";
 import ChevronRightIcon from "@material-ui/icons/ChevronRight";
 import TreeItem from "@material-ui/lab/TreeItem";
+import { SideNavigation } from "../../side-navigation";
 
 interface LayerTree {
   id: string;
@@ -60,35 +61,35 @@ export function LayerHierarchy(props: {
   };
 
   return (
-    <Wrapper>
-      <div className="scene-tab">
-        <span>SCENE</span>
-        <span>FILES</span>
-      </div>
-      <>
-        <TreeView
-          defaultCollapseIcon={<ExpandMoreIcon />}
-          defaultExpanded={[props.data?.id]}
-          defaultExpandIcon={<ChevronRightIcon />}
-          expanded={expanded}
-          selected={selected}
-          onNodeToggle={handleToggle}
-          onNodeSelect={handleSelect}
-        >
-          {renderTree(data)}
-        </TreeView>
-      </>
-    </Wrapper>
+    <SideNavigation>
+      <Wrapper>
+        <div className="scene-tab">
+          <span>SCENE</span>
+          <span>FILES</span>
+        </div>
+        <>
+          <TreeView
+            defaultCollapseIcon={<ExpandMoreIcon />}
+            defaultExpanded={[props.data?.id]}
+            defaultExpandIcon={<ChevronRightIcon />}
+            expanded={expanded}
+            selected={selected}
+            onNodeToggle={handleToggle}
+            onNodeSelect={handleSelect}
+          >
+            {renderTree(data)}
+          </TreeView>
+        </>
+      </Wrapper>
+    </SideNavigation>
   );
 }
 
 const Wrapper = styled.div`
   flex: 0;
-  min-width: 200px;
   display: flex;
   align-items: stretch;
   flex-direction: column;
-  min-height: 100%;
 
   .scene-tab {
     margin: 30px 0px;
