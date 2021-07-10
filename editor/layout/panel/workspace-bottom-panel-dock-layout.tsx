@@ -15,9 +15,8 @@ export function WorkspaceBottomPanelDockLayout(props: {
 
 const DockRootWrap = styled.div`
   min-height: 100%;
-  border: solid #181a22;
+  border: solid #d2d2d2;
   align-self: stretch;
-  background: #2a2e39;
   border-width: 1px;
   display: flex;
   flex-direction: row;

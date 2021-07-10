@@ -41,7 +41,6 @@ const AppBarMenuAndBelowContentWrap = styled.div`
 
 const AppBarWrap = styled.div`
   flex-grow: 0;
-  background: grey;
 `;
 
 const NonMenuContentZoneWrap = styled.div`

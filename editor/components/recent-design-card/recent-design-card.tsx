@@ -10,7 +10,10 @@ export function RecentDesignCard(props: { data: RecentDesign }) {
   const { name, id, provider, previewUrl, lastUpdatedAt } = props.data;
   return (
     <Container>
-      <PreviewHolder src={_safe_previewurl(previewUrl)} />
+      <PreviewImage
+        src={_safe_previewurl(previewUrl)}
+        alt={`${_str_alt(name)}`}
+      />
       <NameText>{name}</NameText>
       <LastUpdateText>{_str_lastUpdatedAt(lastUpdatedAt)}</LastUpdateText>
     </Container>
@@ -27,14 +30,28 @@ function _safe_previewurl(previewUrl: string): string {
 }
 
 function _str_lastUpdatedAt(lastUpdatedAt: Date) {
-  return moment(lastUpdatedAt).toLocaleString();
+  return moment(lastUpdatedAt).toString();
 }
 
-const Container = styled.div``;
+function _str_alt(name: string) {
+  return `${name} Design`;
+}
 
-const PreviewHolder = styled.img`
-  height: 100%;
+const Container = styled.div`
+  display: flex;
+  flex-direction: column;
+  max-width: 240px;
+  max-height: 360px;
+
+  &:hover {
+    cursor: pointer;
+  }
+`;
+
+const PreviewImage = styled.img`
+  height: 120px;
   width: 100%;
+  max-width: 100%;
   background-size: cover;
   background-position: center center;
 `;
@@ -43,4 +60,7 @@ const NameText = styled.h6`
   font-size: 14px;
 `;
 
-const LastUpdateText = styled.h6``;
+const LastUpdateText = styled.h6`
+  font-size: 11px;
+  font-weight: normal;
+`;

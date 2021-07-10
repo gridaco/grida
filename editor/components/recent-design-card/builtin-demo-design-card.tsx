@@ -1,3 +1,4 @@
+import React from "react";
 import { RecentDesign } from "../../store";
 import { RecentDesignCard } from "./recent-design-card";
 import moment from "moment";

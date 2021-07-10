@@ -1,33 +1,36 @@
 import React from "react";
 import Link from "next/link";
-// import styled from "@emotion/styled";
+import styled from "@emotion/styled";
+import { RecentDesignCardList } from "../components/recent-design-card";
 
 export default function Home() {
   return (
-    <>
-      {/* <RootContainer> */}
-      {/* <BodyContainer /> */}
+    <RootContainer>
+      <BodyContainer />
       <Link href="/figma">from figma</Link>
       <br />
       <br />
       <Link href="/preferences">Preferences (set access token)</Link>
-      {/* </RootContainer> */}
+    </RootContainer>
+  );
+}
+
+const RootContainer = styled.div`
+  padding: 24px;
+`;
+
+function BodyContainer() {
+  return (
+    <>
+      <RecentDesignSection />
     </>
   );
 }
 
-// const RootContainer = styled.div`
-//   padding: 24px;
-// `;
-
-// function BodyContainer() {
-//   return (
-//     <>
-//       <RecentDesignSection />
-//     </>
-//   );
-// }
-
-// function RecentDesignSection() {
-//   return <>A?</>;
-// }
+function RecentDesignSection() {
+  return (
+    <>
+      <RecentDesignCardList />
+    </>
+  );
+}

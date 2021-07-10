@@ -85,7 +85,6 @@ export function LayerHierarchy(props: {
 const Wrapper = styled.div`
   flex: 0;
   min-width: 200px;
-  background-color: #2a2e39;
   display: flex;
   align-items: stretch;
   flex-direction: column;
@@ -97,7 +96,6 @@ const Wrapper = styled.div`
     span {
       cursor: pointer;
       margin-left: 16px;
-      color: #fff;
       font-size: 12px;
     }
   }
