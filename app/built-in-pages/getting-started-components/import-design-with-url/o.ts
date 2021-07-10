@@ -1,6 +1,6 @@
 import { DesignProvider } from "@design-sdk/url-analysis";
 import { nodes } from "@design-sdk/core";
-export interface LoaderResult {
+export interface DesignImporterLoaderResult {
   id: string;
   name: string;
   url: string;

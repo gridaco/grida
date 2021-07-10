@@ -10,12 +10,17 @@
         "packages/core-*",
         "packages/reflect-core/packages/*",
         "packages/design-sdk/*",
+        "packages/design-to-code/packages/*",
+        "packages/design-to-code/packages/coli/packages/*",
+        "packages/design-to-code/packages/coli-web-builder/*",
         "boring/packages/*",
         "ui/editor-ui/packages/*"
     ],
     "scripts": {
         "web": "yarn workspace web run dev",
-        "desktop": "yarn workspace @grida.co/desktop run start"
+        "desktop": "yarn workspace @grida.co/desktop run start",
+        "clean": "rimraf node_modules yarn.lock",
+        "clean:install": "yarn clean && yarn"
     },
     "resolutions": {
         "react": "^17.0.1",

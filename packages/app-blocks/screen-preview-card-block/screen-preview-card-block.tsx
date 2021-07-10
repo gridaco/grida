@@ -16,6 +16,11 @@ export interface ScreenPreviewCardBlockProps {
 
 export function ScreenPreviewCardBlock(props: ScreenPreviewCardBlockProps) {
   const { url } = props;
+
+  if (!url) {
+    return <>loading..</>;
+  }
+
   const designprovider = analyzeDynamicPreviewUrl(url);
 
   switch (designprovider) {
@@ -41,6 +46,7 @@ function analyzeDynamicPreviewUrl(url: string): DesignProvider | "snapshot" {
     }
     return analyzeDesignUrl(url);
   } catch (_) {
-    throw _;
+    console.error(_);
+    throw `invalid url ${url}`;
   }
 }
