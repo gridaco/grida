@@ -14,6 +14,7 @@ export function RecentDesignCardList() {
   }, []);
 
   const oncardclick = (id: string, d: RecentDesign) => {
+    console.log("click", id);
     router.push(`/to-code/${id}`); // fixme id is not a param
     //
   };
