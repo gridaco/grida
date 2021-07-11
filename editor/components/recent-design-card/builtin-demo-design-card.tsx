@@ -11,7 +11,8 @@ const defaultdemodesign: RecentDesign = {
   provider: "figma",
   addedAt: moment("2021-01-01T00:00:00.000Z").toDate(),
   lastUpdatedAt: moment("2021-01-01T00:00:00.000Z").toDate(),
-  previewUrl: "",
+  previewUrl:
+    "https://example-project-manifest.s3.us-west-1.amazonaws.com/app-wnv/cover.png",
 };
 
 export function BuiltinDemoDesignCard() {

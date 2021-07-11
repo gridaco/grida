@@ -46,6 +46,7 @@ function _str_alt(name: string) {
 }
 
 const Container = styled.div`
+  padding: 8px;
   display: flex;
   flex-direction: column;
   max-width: 240px;
@@ -53,6 +54,7 @@ const Container = styled.div`
 
   &:hover {
     cursor: pointer;
+    background-color: #f4f4f4;
   }
 `;
 
@@ -60,6 +62,7 @@ const PreviewImage = styled.img`
   height: 120px;
   width: 100%;
   max-width: 100%;
+  object-fit: cover;
   background-size: cover;
   background-position: center center;
 `;
