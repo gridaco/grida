@@ -11,6 +11,13 @@ import {
 import { WorkspaceBottomPanelDockLayout } from "../../layout/panel/workspace-bottom-panel-dock-layout";
 import { MonacoEditor } from "../../components/code-editor";
 
+// region
+import { MainImageRepository } from "@design-sdk/core/assets-repository";
+import { ImageRepositories } from "@design-sdk/figma/asset-repository";
+// set image repo for figma platform
+MainImageRepository.instance = new ImageRepositories();
+// endregion
+
 export default function DesignToCodeUniversalPage() {
   const design = useDesign();
   console.log("design", design);
@@ -19,10 +26,20 @@ export default function DesignToCodeUniversalPage() {
   }
 
   const { reflect, url, node, file } = design;
-  const code = "//none"; // todo
-  const componentName = "none"; // todo
+  const { id, name } = reflect;
 
-  designToCode(design); // fixme
+  const result = designToCode(
+    {
+      id: id,
+      name: name,
+      design: reflect,
+    },
+    { framework: "react" }
+  ); // fixme
+
+  //@ts-ignore // FIXME: no ignore
+  const { code, componentName } = result; // todo
+
   return (
     <>
       <DefaultEditorWorkspaceLayout
@@ -85,8 +102,6 @@ export default function DesignToCodeUniversalPage() {
           </WorkspaceBottomPanelDockLayout>
         </WorkspaceContentPanelGridLayout>
       </DefaultEditorWorkspaceLayout>
-      {"design = " + design}
-      {/*  */}
     </>
   );
 }

@@ -47,7 +47,7 @@ export function useDesign() {
           break;
       }
     }
-  }, []);
+  }, [router]);
   return design;
 }
 
