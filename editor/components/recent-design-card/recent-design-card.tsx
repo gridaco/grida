@@ -3,13 +3,21 @@ import { RecentDesign } from "../../store";
 import moment from "moment";
 import styled from "@emotion/styled";
 
+export type OnCardClickCallback = (id: string, data?: RecentDesign) => void;
+
 /**
  * create recent design card component
  **/
-export function RecentDesignCard(props: { data: RecentDesign }) {
+export function RecentDesignCard(props: {
+  data: RecentDesign;
+  onclick?: OnCardClickCallback;
+}) {
   const { name, id, provider, previewUrl, lastUpdatedAt } = props.data;
+  const onclick = (e) => {
+    props.onclick?.(id, props.data);
+  };
   return (
-    <Container>
+    <Container onClick={onclick}>
       <PreviewImage
         src={_safe_previewurl(previewUrl)}
         alt={`${_str_alt(name)}`}
