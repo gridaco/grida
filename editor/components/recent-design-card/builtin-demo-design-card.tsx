@@ -3,6 +3,7 @@ import { RecentDesign } from "../../store";
 import { RecentDesignCard } from "./recent-design-card";
 import moment from "moment";
 import router from "next/router";
+import { formToCodeUrl } from "../../url";
 
 const _id = "demo/1";
 const defaultdemodesign: RecentDesign = {
@@ -17,7 +18,10 @@ const defaultdemodesign: RecentDesign = {
 
 export function BuiltinDemoDesignCard() {
   const onclick = () => {
-    router.push("/to-code");
+    const _path = formToCodeUrl({
+      design: _id,
+    });
+    router.push(_path);
   };
   return (
     <>
