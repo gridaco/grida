@@ -1,13 +1,17 @@
 import { useRouter } from "next/router";
 import { useEffect, useState } from "react";
 import { DesignProvider, analyzeDesignUrl } from "@design-sdk/url-analysis";
+import { parseFileAndNodeId } from "@design-sdk/figma-url";
+import { fetch } from "@design-sdk/figma-remote";
+import { utils_figma } from "../../utils";
+import { TargetNodeConfig } from "../target-node";
 /**
  * query param for design input
  */
 const P_DESIGN = "design";
 
 export function useDesign() {
-  const [design, setDesign] = useState<string>(null);
+  const [design, setDesign] = useState<TargetNodeConfig>(null);
   const router = useRouter();
   useEffect(() => {
     const designparam: string = router.query[P_DESIGN] as string;
@@ -17,12 +21,26 @@ export function useDesign() {
         case "id":
           // todo
           // load design from local storage
-          setDesign(designparam);
+          // setDesign(designparam);
           break;
         case "figma":
-          // todo
           // load design from local storage or remote figma
-          setDesign(designparam);
+          const targetnodeconfig = parseFileAndNodeId(designparam);
+          fetch
+            .fetchTargetAsReflect(
+              targetnodeconfig.file,
+              targetnodeconfig.node,
+              {
+                personalAccessToken: utils_figma.figmaPersonalAccessToken_safe(),
+              }
+            )
+            .then((res) => {
+              setDesign(<TargetNodeConfig>{
+                ...res,
+                ...targetnodeconfig,
+              });
+            });
+
           break;
         default:
           // other platforms are not supported yet

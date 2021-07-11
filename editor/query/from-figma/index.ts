@@ -7,6 +7,7 @@ import { NextRouter, useRouter } from "next/router";
 import { useEffect, useState } from "react";
 import { fetch } from "@design-sdk/figma-remote";
 import { utils_figma } from "../../utils";
+import { TargetNodeConfig as _TargetNodeConfig } from "../target-node";
 
 const P_FIGMA_TARGET_URL = "figma_target_url";
 
@@ -54,7 +55,8 @@ export function useFigmaTargetNode() {
   return targetNode;
 }
 
-export interface TargetNodeConfig {
+export interface TargetNodeConfig
+  extends _TargetNodeConfig<remote.api.Node, Figma.SceneNode> {
   remote: remote.api.Node;
   figma: Figma.SceneNode;
   reflect: nodes.ReflectSceneNode;

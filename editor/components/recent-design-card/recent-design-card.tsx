@@ -38,7 +38,7 @@ function _safe_previewurl(previewUrl: string): string {
 }
 
 function _str_lastUpdatedAt(lastUpdatedAt: Date) {
-  return moment(lastUpdatedAt).toString();
+  return moment(lastUpdatedAt).format("MM/dd/yyyy");
 }
 
 function _str_alt(name: string) {
