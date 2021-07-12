@@ -11,13 +11,6 @@ import {
 import { WorkspaceBottomPanelDockLayout } from "../../layout/panel/workspace-bottom-panel-dock-layout";
 import { MonacoEditor } from "../../components/code-editor";
 
-// region
-import { MainImageRepository } from "@design-sdk/core/assets-repository";
-import { ImageRepositories } from "@design-sdk/figma/asset-repository";
-// set image repo for figma platform
-MainImageRepository.instance = new ImageRepositories();
-// endregion
-
 export default function DesignToCodeUniversalPage() {
   const design = useDesign();
   console.log("design", design);
@@ -56,7 +49,7 @@ export default function DesignToCodeUniversalPage() {
             <PreviewAndRunPanel
               key={url ?? reflect?.id}
               config={{
-                src: code,
+                src: code.raw,
                 platform: "web",
                 componentName: componentName,
                 sceneSize: {
@@ -71,13 +64,15 @@ export default function DesignToCodeUniversalPage() {
           <WorkspaceContentPanel key={node}>
             <InspectionPanelContentWrap>
               <MonacoEditor
-                key={code}
+                key={code.raw}
                 height="100vh"
                 options={{
                   automaticLayout: true,
                 }}
                 defaultValue={
-                  code ? code : "// No input design provided to be converted.."
+                  code
+                    ? code.raw
+                    : "// No input design provided to be converted.."
                 }
               />
             </InspectionPanelContentWrap>

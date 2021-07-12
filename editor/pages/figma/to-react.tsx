@@ -17,7 +17,7 @@ import * as react from "@designto/react";
 import { mapGrandchildren } from "@design-sdk/core/utils";
 import { ReactWidget } from "@coli.codes/react-builder";
 import * as core from "@reflect-ui/core";
-import { ReactComponentExportResult } from "@coli.codes/react-builder/export/export-result";
+import { react as reactconfig } from "@designto/config";
 import { useReflectTargetNode } from "../../query/from-figma";
 
 // set image repo for figma platform
@@ -41,7 +41,7 @@ export default function FigmaToReactDemoPage() {
     }
   };
 
-  let reactComponent: ReactComponentExportResult;
+  let reactComponent: reactconfig.ReactComponentOutput;
   let reflectWidget: core.Widget;
   let widgetTree: ReactWidget;
   if (reflect) {
@@ -69,9 +69,9 @@ export default function FigmaToReactDemoPage() {
             <PreviewAndRunPanel
               key={targetNodeConfig?.url ?? reflect?.id}
               config={{
-                src: reactComponent?.code,
+                src: reactComponent?.code.raw,
                 platform: "web",
-                componentName: reactComponent?.componentName,
+                componentName: reactComponent?.name,
                 sceneSize: {
                   w: reflect?.width,
                   h: reflect?.height,
@@ -84,14 +84,14 @@ export default function FigmaToReactDemoPage() {
           <WorkspaceContentPanel key={targetNodeConfig?.node}>
             <InspectionPanelContentWrap>
               <MonacoEditor
-                key={reactComponent?.code}
+                key={reactComponent?.code.raw}
                 height="100vh"
                 options={{
                   automaticLayout: true,
                 }}
                 defaultValue={
                   reactComponent?.code
-                    ? reactComponent?.code
+                    ? reactComponent?.code.raw
                     : "// No input design provided to be converted.."
                 }
               />

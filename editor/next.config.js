@@ -1,4 +1,5 @@
 const withTM = require("next-transpile-modules")([
+  "@designto/config",
   "@designto/code",
   "@designto/token",
   "@designto/flutter",
