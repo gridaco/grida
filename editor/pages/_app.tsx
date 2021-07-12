@@ -12,7 +12,6 @@ function GlobalCss() {
           margin: 0px;
           padding: 0;
           font-family: "Roboto", sans-serif;
-          background-color: #181a22;
         }
         iframe {
           border: none;
@@ -25,11 +24,11 @@ function GlobalCss() {
         h5,
         h6,
         p {
-          color: white;
+          color: black;
         }
 
         a {
-          color: grey;
+          color: blue;
         }
       `}
     />
