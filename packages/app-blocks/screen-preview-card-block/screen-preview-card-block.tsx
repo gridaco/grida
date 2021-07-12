@@ -4,7 +4,8 @@ import { ProviderFigmaEmbed } from "./provider-figma-embed";
 import { ProviderAnySnapshotView } from "./provider-any-snapshot-view";
 import { ProviderSketchEmbed } from "./provider-sketch-embed";
 import { ProviderUnknownIframeEmbed } from "./provider-unknown-iframe-embed";
-import { DesignProvider, analyzeDesignUrl } from "@design-sdk/url-analysis";
+import { analyzeDesignUrl } from "@design-sdk/url-analysis";
+import { DesignProvider } from "@design-sdk/core-types";
 export interface ScreenPreviewCardBlockProps {
   url: string;
   /**

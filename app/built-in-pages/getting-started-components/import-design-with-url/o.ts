@@ -1,4 +1,4 @@
-import { DesignProvider } from "@design-sdk/url-analysis";
+import { DesignProvider } from "@design-sdk/core-types";
 import { nodes } from "@design-sdk/core";
 export interface DesignImporterLoaderResult {
   id: string;

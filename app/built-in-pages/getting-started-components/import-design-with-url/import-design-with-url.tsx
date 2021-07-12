@@ -6,14 +6,8 @@ import { ImportedScreenTemplate } from "../../../built-in-template-pages";
 import { figmaloader } from "./figma-loader";
 import { DesignImporterLoaderResult } from "./o";
 import { analyzeDesignUrl } from "@design-sdk/url-analysis";
-import { flutter, react, token } from "@designto/code";
-
-// temporary image repository setup.
-import { MainImageRepository } from "@design-sdk/core/assets-repository";
-import { ImageRepositories } from "@design-sdk/figma/asset-repository";
-// temporary image repository setup.
-
-MainImageRepository.instance = new ImageRepositories();
+import { designToCode } from "@designto/code";
+import { input } from "@designto/config";
 
 export function ImportDesignWithUrl() {
   const addPage = useAddPage();
@@ -26,18 +20,26 @@ export function ImportDesignWithUrl() {
 
   const onsubmitcomplete = (_, v: DesignImporterLoaderResult) => {
     const _design = v;
-    const _token = token.tokenize(v.node);
-    const _flutterwidget = flutter.buildApp(v.node);
-    const _reactwidget = react.buildReactWidget(_token);
-    const _reactapp = react.buildReactApp(_reactwidget, {
-      template: "cra",
-    });
+    const _res_flutter = designToCode(
+      input.DesignInput.fromDesign(_design.node),
+      {
+        framework: "flutter",
+      }
+    );
+
+    const _res_react = designToCode(
+      input.DesignInput.fromDesign(_design.node),
+      {
+        framework: "react",
+      }
+    );
+
     const _code = {
       flutter: {
-        raw: _flutterwidget.widget.build().finalize(),
+        raw: _res_flutter.code.raw,
       },
       react: {
-        raw: _reactapp.code,
+        raw: _res_react.code.raw,
       },
     };
     const template = new ImportedScreenTemplate({

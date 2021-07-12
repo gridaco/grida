@@ -1,6 +1,6 @@
 import { UnconstrainedTemplate } from "@boring.so/template-provider";
 import { BoringContent, BoringTitle } from "@boring.so/document-model";
-import { DesignProvider } from "@design-sdk/url-analysis";
+import { DesignProvider } from "@design-sdk/core-types";
 import { nodes } from "@design-sdk/core";
 
 interface PlatformCode {
