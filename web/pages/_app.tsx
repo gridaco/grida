@@ -62,13 +62,14 @@ function SeoMeta() {
   );
 }
 
-function BridgedRootWebApp() {
+function BridgedRootWebApp({ Component, pageProps }) {
   return (
     <>
       <HeadInjection />
       <SafeHydrate>
         <StrictMode>
           <Suspense fallback="Loading...">
+            {/* <Component {...pageProps} /> */}
             <AppRoot mode="browser" controlDoubleClick={() => {}} />
           </Suspense>
         </StrictMode>
