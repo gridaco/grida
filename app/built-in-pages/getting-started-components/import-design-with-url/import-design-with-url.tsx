@@ -12,7 +12,12 @@ import { input } from "@designto/config";
 export function ImportDesignWithUrl() {
   const addPage = useAddPage();
 
-  const onsubmit = (url: string) => {
+  const validation = (url: string) => {
+    // authenticate user
+    window.location.href = "http://localhost:3302/";
+    // open("http://localhost:3302/");
+    // --
+    // load with url
     const validurl = analyzeDesignUrl(url) !== "unknown";
     const isFigmaAuthenticated = true; // todo -> add figma authenticator between fetching. user need to authorized grida to access their' design.
     return validurl && isFigmaAuthenticated;
@@ -70,7 +75,7 @@ export function ImportDesignWithUrl() {
       <RemoteSubmitForm<DesignImporterLoaderResult>
         actionName="Load from Url"
         placeholder="https://figma.com/files/1234/app?node-id=5678"
-        onSubmit={onsubmit}
+        validation={validation}
         onSubmitComplete={onsubmitcomplete}
         loader={loader}
       />
