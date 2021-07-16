@@ -15,7 +15,7 @@
 - [shortcuts](./pakcages/shortcuts)
 - [events](./packages/events)
 
-## Submodule pacakages
+## Submodule pacakages ([Externals](../externals))
 
 - [editor-ui](https://github.com/bridgedxyz/reflect-editor-ui) - A reflect-ui based ui framework for building editor-like applications
 - [reflect-ui](https://github.com/bridgedxyz/reflect-ui-react) - A reflect-ui. The standard & universal design framework / system that Bridged develops and uses.
