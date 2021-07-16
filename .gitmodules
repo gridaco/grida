@@ -31,3 +31,6 @@
 [submodule "ui/reflect-ui"]
 	path = ui/reflect-ui
 	url = https://github.com/reflect-ui/reflect-ui-react
+[submodule "externals/externals/reflect-core"]
+	path = externals/externals/reflect-core
+	url = https://github.com/reflect-ui/reflect-core-ts
