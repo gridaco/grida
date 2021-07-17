@@ -2377,12 +2377,47 @@
   dependencies:
     "@babel/runtime" "^7.13.10"
 
+"@radix-ui/react-dialog@^0.0.19":
+  version "0.0.19"
+  resolved "https://registry.yarnpkg.com/@radix-ui/react-dialog/-/react-dialog-0.0.19.tgz#5a76fa380142a7a97c15c585ab071f63fba5297d"
+  integrity sha512-7FbWaj/C/TDpfJ+VJ4wNAQIjENDNfwAqNvAfeb+TEtBjgjmsfRDgA1AMenlA5N1QuRtAokRMTHUs3ukW49oQ+g==
+  dependencies:
+    "@babel/runtime" "^7.13.10"
+    "@radix-ui/primitive" "0.0.5"
+    "@radix-ui/react-compose-refs" "0.0.5"
+    "@radix-ui/react-context" "0.0.5"
+    "@radix-ui/react-dismissable-layer" "0.0.14"
+    "@radix-ui/react-focus-guards" "0.0.7"
+    "@radix-ui/react-focus-scope" "0.0.14"
+    "@radix-ui/react-id" "0.0.6"
+    "@radix-ui/react-polymorphic" "0.0.12"
+    "@radix-ui/react-portal" "0.0.14"
+    "@radix-ui/react-presence" "0.0.14"
+    "@radix-ui/react-primitive" "0.0.14"
+    "@radix-ui/react-slot" "0.0.12"
+    "@radix-ui/react-use-controllable-state" "0.0.6"
+    aria-hidden "^1.1.1"
+    react-remove-scroll "^2.4.0"
+
 "@radix-ui/react-dismissable-layer@0.0.13":
   version "0.0.13"
   resolved "https://registry.yarnpkg.com/@radix-ui/react-dismissable-layer/-/react-dismissable-layer-0.0.13.tgz#7c4be6170a14d8a66c48680a8a8c987bc29bcf05"
   integrity sha512-g0zhxdZzCJhVeRumaU8ODptRFhYorSRPsLwD30sz9slYaW0yg6lHvMQicRNtgFX0WnsbmrUVY6NMrwWpSHJXbg==
   dependencies:
     "@babel/runtime" "^7.13.10"
+    "@radix-ui/react-use-body-pointer-events" "0.0.6"
+    "@radix-ui/react-use-callback-ref" "0.0.5"
+    "@radix-ui/react-use-escape-keydown" "0.0.6"
+
+"@radix-ui/react-dismissable-layer@0.0.14":
+  version "0.0.14"
+  resolved "https://registry.yarnpkg.com/@radix-ui/react-dismissable-layer/-/react-dismissable-layer-0.0.14.tgz#9d8a3415a2830688070c6596dec18b43c33df7b2"
+  integrity sha512-0pmRuGYYvWlEaED1igGFLjic0+hD0OqvsnrZaN3n1nDOkoCd7H5CA2geaShSrlBF5riI2Dr9jIZPGLbDRhs4DA==
+  dependencies:
+    "@babel/runtime" "^7.13.10"
+    "@radix-ui/primitive" "0.0.5"
+    "@radix-ui/react-polymorphic" "0.0.12"
+    "@radix-ui/react-primitive" "0.0.14"
     "@radix-ui/react-use-body-pointer-events" "0.0.6"
     "@radix-ui/react-use-callback-ref" "0.0.5"
     "@radix-ui/react-use-escape-keydown" "0.0.6"
@@ -2415,6 +2450,17 @@
   integrity sha512-PelAuc+7HSGruBraSzuHogwaKqCvmO288ecIm3cCAkrJqPQ7hoKSd/LfLfoa/EvjqK9azmm7NQ6LSPoteQvOGQ==
   dependencies:
     "@babel/runtime" "^7.13.10"
+    "@radix-ui/react-use-callback-ref" "0.0.5"
+
+"@radix-ui/react-focus-scope@0.0.14":
+  version "0.0.14"
+  resolved "https://registry.yarnpkg.com/@radix-ui/react-focus-scope/-/react-focus-scope-0.0.14.tgz#778e2a3ea607621d82e0139616d7ea6d517d9533"
+  integrity sha512-D3v6Tw8vzpIBNd2I32Q2G4LCiXMIlmc6Pl2VV9CZjSatDOjkV/ckGbhkQyQ7QxnD/0CmiSxNo5hTeGRmZDjwmA==
+  dependencies:
+    "@babel/runtime" "^7.13.10"
+    "@radix-ui/react-compose-refs" "0.0.5"
+    "@radix-ui/react-polymorphic" "0.0.12"
+    "@radix-ui/react-primitive" "0.0.14"
     "@radix-ui/react-use-callback-ref" "0.0.5"
 
 "@radix-ui/react-icons@^1.0.3":
@@ -2612,6 +2658,14 @@
   version "0.0.11"
   resolved "https://registry.yarnpkg.com/@radix-ui/react-slot/-/react-slot-0.0.11.tgz#d0121018ae20d86683d527b7011b7f21465dffbd"
   integrity sha512-H/l58Aqoyi9Jq5Jcny5v6HeMNelOivm2NUdaIvMBJzysbbwWhc78VEmpOpfQ6H+y/Fsx6aLprHbfmxPd/66PxQ==
+  dependencies:
+    "@babel/runtime" "^7.13.10"
+    "@radix-ui/react-compose-refs" "0.0.5"
+
+"@radix-ui/react-slot@0.0.12":
+  version "0.0.12"
+  resolved "https://registry.yarnpkg.com/@radix-ui/react-slot/-/react-slot-0.0.12.tgz#c4d8a75fffca561aeeca2ed9603384d86757f60a"
+  integrity sha512-Em8P/xYyh3O/32IhrmARJNH+J/XCAVnw6h2zGu6oeReliIX7ktU67pMSeyyIZiU2hNXzaXYB/xDdixizQe/DGA==
   dependencies:
     "@babel/runtime" "^7.13.10"
     "@radix-ui/react-compose-refs" "0.0.5"
@@ -3011,6 +3065,11 @@
   integrity sha512-JDjwRSEWFTgdx0ob4zKjfzKcRxkiQTyPEGEZ2uIcTeXTPD0B0j2ysuWIWnqgwtpFdYfv1wOCU59kNLQx+a5JmA==
   dependencies:
     prosemirror-state "^1.3.4"
+
+"@tiptap/extension-image@^2.0.0-beta.14":
+  version "2.0.0-beta.14"
+  resolved "https://registry.yarnpkg.com/@tiptap/extension-image/-/extension-image-2.0.0-beta.14.tgz#31eae69cce3d81af81a1c0fbd253beca3c253429"
+  integrity sha512-OguktQVJ8D0wFm8jrnct16Pu+T5J0N+rzMNk5kguJJCMiFjhQZ4USZw5jHU6BIAKwulupXmZ/PUBIYCx02LhIA==
 
 "@tiptap/extension-italic@^2.0.0-beta.14":
   version "2.0.0-beta.14"
