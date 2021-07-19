@@ -5,8 +5,8 @@ import {
   parseFileAndNodeId,
   FigmaTargetNodeConfig,
 } from "@design-sdk/figma-url";
-import { utils_figma } from "../../utils";
 import { UserInputCache } from "../../utils/user-input-value-cache";
+import { personal } from "@design-sdk/figma-auth-store";
 
 export type OnImportedCallback = (reflect: nodes.ReflectSceneNode) => void;
 type _OnPartiallyLoadedCallback = (pack: fetch.FigmaRemoteImportPack) => void;
@@ -58,7 +58,7 @@ function _DefaultImporterSegment(props: {
   const handleOnLoadDefaultDesignClick = () => {
     fetch
       .fetchDemo({
-        personalAccessToken: utils_figma.figmaPersonalAccessToken_safe(),
+        personalAccessToken: personal.get_safe(),
       })
       .then((d) => {
         // it's okay to force cast here. since the typings are the same (following official figma remote api spec)
@@ -99,7 +99,7 @@ function _UrlImporterSegment(props: {
     setLoadState("loading");
     fetch
       .fetchTarget(figmaTargetConfig.file, figmaTargetConfig.node, {
-        personalAccessToken: utils_figma.figmaPersonalAccessToken_safe(),
+        personalAccessToken: personal.get_safe(),
       })
       .then((d) => {
         setLoadState("complete");

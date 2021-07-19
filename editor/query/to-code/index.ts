@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { DesignProvider, analyzeDesignUrl } from "@design-sdk/url-analysis";
 import { parseFileAndNodeId } from "@design-sdk/figma-url";
 import { fetch } from "@design-sdk/figma-remote";
-import { utils_figma } from "../../utils";
+import { personal } from "@design-sdk/figma-auth-store";
 import { TargetNodeConfig } from "../target-node";
 /**
  * query param for design input
@@ -31,7 +31,7 @@ export function useDesign() {
               targetnodeconfig.file,
               targetnodeconfig.node,
               {
-                personalAccessToken: utils_figma.figmaPersonalAccessToken_safe(),
+                personalAccessToken: personal.get_safe(),
               }
             )
             .then((res) => {
