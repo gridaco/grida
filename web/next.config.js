@@ -10,7 +10,7 @@ const withTM = require("next-transpile-modules")(
   ],
   {
     // resolveSymlinks: true,
-    debug: true,
+    debug: process.env === "development",
   }
 );
 
