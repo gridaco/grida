@@ -1,6 +1,8 @@
 import React, { useState } from "react";
 import { Dialog, DialogTrigger, DialogContent } from "@editor-ui/dialog";
 import { Button } from "@editor-ui/button";
+import { tunnel } from "@app/fapi";
+
 export function ImportFigmaDesignAfterAuthentication_Modal(props: {
   open?: boolean;
 }) {
@@ -50,19 +52,10 @@ export function ImportFigmaDesignAfterAuthentication_Body() {
   );
 }
 
-function makeurl(): string {
-  const _host =
-    process.env.NODE_ENV !== "production"
-      ? "http://localhost:3302"
-      : "https://accounts.grida.co";
-  const url = `${_host}/tunnel?command=connect-figma`;
-  return url;
-}
-
 function InitialStateBody(props: { onNext: () => void }) {
   const onconnectclick = () => {
     // authenticate user
-    const url = makeurl();
+    const url = tunnel.makeurl.connect_figma();
     open(url);
     props.onNext();
   };
@@ -99,7 +92,7 @@ function LoadingStateBody() {
         </a>
         <br />
         Are you lost? -{" "}
-        <a target="_blank" href={makeurl()}>
+        <a target="_blank" href={tunnel.makeurl.connect_figma()}>
           open link again
         </a>
       </p>

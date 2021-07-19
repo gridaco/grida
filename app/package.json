@@ -3,6 +3,7 @@
     "version": "0.0.0",
     "dependencies": {
         "@app/blocks": "0.0.0",
+        "@app/fapi": "0.0.0",
         "@boring-ui/embed": "3.3.4",
         "@boringso/react-core": "0.0.0",
         "@core/app-state": "0.0.0",
