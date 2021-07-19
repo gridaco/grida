@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import styled from "@emotion/styled";
 import { TextField } from "@material-ui/core";
-import { utils_figma } from "../../utils";
+import { personal } from "@design-sdk/figma-auth-store";
 
 export default function AccessTokenConfigurationPage_Dev() {
   return (
@@ -19,7 +19,7 @@ export default function AccessTokenConfigurationPage_Dev() {
 }
 
 function FigmaSection() {
-  const initialToken = utils_figma.figmaPersonalAccessToken_safe();
+  const initialToken = personal.get_safe();
   const [token, setToken] = useState(initialToken);
 
   // this get set by input later
@@ -39,7 +39,7 @@ function FigmaSection() {
       </button>
       <button
         onClick={() => {
-          utils_figma.clearToken();
+          personal.clear();
           setToken(undefined);
         }}
       >
@@ -62,7 +62,7 @@ function FigmaSection() {
         />
         <button
           onClick={() => {
-            utils_figma.setFigmaPersonalAccessToken_LocalDev(tokenInput);
+            personal.set(tokenInput);
             setToken(tokenInput);
           }}
         >

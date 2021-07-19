@@ -6,7 +6,7 @@ import { Figma, nodes, remote } from "@design-sdk/figma";
 import { NextRouter, useRouter } from "next/router";
 import { useEffect, useState } from "react";
 import { fetch } from "@design-sdk/figma-remote";
-import { utils_figma } from "../../utils";
+import { personal } from "@design-sdk/figma-auth-store"
 import { TargetNodeConfig as _TargetNodeConfig } from "../target-node";
 
 const P_FIGMA_TARGET_URL = "figma_target_url";
@@ -72,7 +72,7 @@ export function useReflectTargetNode() {
     if (figmaTargetNode) {
       fetch
         .fetchTargetAsReflect(figmaTargetNode.file, figmaTargetNode.node, {
-          personalAccessToken: utils_figma.figmaPersonalAccessToken_safe(),
+          personalAccessToken: personal.get_safe(),
         })
         .then((res) => {
           setTargetNode(<TargetNodeConfig>{
