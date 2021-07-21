@@ -11,12 +11,12 @@ const FreePlan = () => {
       <BlankArea height={[221, 221]} />
       <FreeText mb="43px">Free for dreamers</FreeText>
       <Desc width="80%" mb="132px">
-        Unlock your possibility, express your ideas faster then ever. Bridged is
+        Unlock your possibility, express your ideas faster then ever. Grida is
         free forever.
       </Desc>
 
       <StartNow />
-      <BlankArea height={[195 ,331]} />
+      <BlankArea height={[195, 331]} />
     </SectionLayout>
   );
 };

@@ -1,4 +1,4 @@
-# [bridged.xyz](https://bridged.xyz/)
+# [grida.co](https://grida.co/)
 
 ![](./readme/images/web-landing-main-example.png)
 
@@ -10,7 +10,7 @@
 
 ## Design
 
-The design of bridged.xyz website is oppenned and shared, can be found [here](https://www.figma.com/file/Gaznaw1QHppxvs9UkqNOb0/bridged.xyz?node-id=0%3A1)
+The design of grida.co website is oppenned and shared, can be found [here](https://www.figma.com/file/Gaznaw1QHppxvs9UkqNOb0/bridged.xyz?node-id=0%3A1)
 
 > This is a [Next.js](https://nextjs.org/) project bootstrapped with [`create-next-app`](https://github.com/vercel/next.js/tree/canary/packages/create-next-app).
 
@@ -48,22 +48,22 @@ Check out our [Next.js deployment documentation](https://nextjs.org/docs/deploym
 
 ## Sitemap
 
-- [code.bridged.xyz](https://code.bridged.xyz)
-- [design.bridged.xyz](https://design.bridged.xyz)
-- [console.bridged.xyz](https://console.bridged.xyz)
-- [labs.bridged.xyz](https://labs.bridged.xyz)
-- [bridged.xyz/roadmap](https://bridged.xyz/roadmap)
-- [bridged.xyz/github](https://bridged.xyz/github)
-- [bridged.xyz/products](https://bridged.xyz/products)
-- [bridged.xyz/products/dynamic](https://bridged.xyz/products/dynamic)
-- [bridged.xyz/products/inappbridge](https://bridged.xyz/products/inappbridge)
-- [bridged.xyz/products/schema-studio](https://bridged.xyz/tools/schema-studio)
-- [bridged.xyz/products/react](https://bridged.xyz/products/react)
-- [bridged.xyz/platforms/flutter](https://bridged.xyz/platforms/flutter)
-- [bridged.xyz/plugins](https://bridged.xyz/plugins)
-- [bridged.xyz/plugins/figma](https://bridged.xyz/plugins/figma)
-- [bridged.xyz/plugins/sketch](https://bridged.xyz/plugins/sketch)
-- [bridged.xyz/tools](https://bridged.xyz/tools)
+- [code.grida.co](https://code.grida.co)
+- [design.grida.co](https://design.grida.co)
+- [console.grida.co](https://console.grida.co)
+- [labs.grida.co](https://labs.grida.co)
+- [grida.co/roadmap](https://grida.co/roadmap)
+- [grida.co/github](https://grida.co/github)
+- [grida.co/products](https://grida.co/products)
+- [grida.co/products/dynamic](https://grida.co/products/dynamic)
+- [grida.co/products/inappbridge](https://grida.co/products/inappbridge)
+- [grida.co/products/schema-studio](https://grida.co/tools/schema-studio)
+- [grida.co/products/react](https://grida.co/products/react)
+- [grida.co/platforms/flutter](https://grida.co/platforms/flutter)
+- [grida.co/plugins](https://grida.co/plugins)
+- [grida.co/plugins/figma](https://grida.co/plugins/figma)
+- [grida.co/plugins/sketch](https://grida.co/plugins/sketch)
+- [grida.co/tools](https://grida.co/tools)
 
 ### Sitemap Generate Shell Script
 
@@ -96,5 +96,5 @@ printf "\n"
 cd ..
 
 # Send update request to Google based on sitemap uploaded to server
-curl http://google.com/ping?sitemap=http://bridged.xyz/sitemap.xml
+curl http://google.com/ping?sitemap=http://grida.co/sitemap.xml
 ```

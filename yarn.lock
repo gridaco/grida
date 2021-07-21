@@ -1600,6 +1600,21 @@
   resolved "https://registry.yarnpkg.com/@firebase/webchannel-wrapper/-/webchannel-wrapper-0.4.1.tgz#600f2275ff54739ad5ac0102f1467b8963cd5f71"
   integrity sha512-0yPjzuzGMkW1GkrC8yWsiN7vt1OzkMIi9HgxRmKREZl2wnNPOKo/yScTjXf/O57HM8dltqxPF6jlNLFVtc2qdw==
 
+"@grida/link-downloads@^0.0.2":
+  version "0.0.2"
+  resolved "https://registry.yarnpkg.com/@grida/link-downloads/-/link-downloads-0.0.2.tgz#18f8528389484d3c78adeb0dbb00084fd248882a"
+  integrity sha512-XkYWKuo+xKQBUQmjmSA5HKbZGBMoDzg9PPS5KHpRiIjDXwFL/e0x0lJxfUir3eZfh621bGUEOKzf28ZOWPSXPw==
+
+"@grida/link-promotions@^0.0.2":
+  version "0.0.2"
+  resolved "https://registry.yarnpkg.com/@grida/link-promotions/-/link-promotions-0.0.2.tgz#7a3a2e291da6907961e09026d71bfe22ae5a6b49"
+  integrity sha512-NRXFbn/Ww2Kxq3yYam1G/j7WeekJ2xVTuy+QzshAcFIASssphIujya5y7CN70/6dDjFbA0UyjCXQXTRvEg5k3g==
+
+"@grida/link-social@^0.0.2":
+  version "0.0.2"
+  resolved "https://registry.yarnpkg.com/@grida/link-social/-/link-social-0.0.2.tgz#89babb8d09a762743ec8c4f4390be390547951bb"
+  integrity sha512-99lOio3FjJcnzD5921xLCZrsDIIw3NGb6B6RVVa+zya9f4kIdgs3Hjr6cXgjAH0ctx9R+a2eutNP+nqk4XkSQw==
+
 "@grpc/grpc-js@^1.0.0":
   version "1.2.10"
   resolved "https://registry.yarnpkg.com/@grpc/grpc-js/-/grpc-js-1.2.10.tgz#f316d29a45fcc324e923d593cb849d292b1ed598"
@@ -1824,6 +1839,11 @@
   version "1.1.0"
   resolved "https://registry.yarnpkg.com/@protobufjs/utf8/-/utf8-1.1.0.tgz#a777360b5b39a1a2e5106f8e858f2fd2d060c570"
   integrity sha1-p3c2C1s5oaLlEG+OhY8v0tBgxXA=
+
+"@reflect-ui/core@^0.0.2-rc.5":
+  version "0.0.2-rc.7"
+  resolved "https://registry.yarnpkg.com/@reflect-ui/core/-/core-0.0.2-rc.7.tgz#9d531f5a0b9caab31e7563020044b753700e2bbc"
+  integrity sha512-EqF4SRU57bfa5DOPET1rv5lROFyMVHLv1xTEIlN6N2gDpXt71QceImWfQp3z3Khqnb4R/p9OhNK6DXGUpozWKw==
 
 "@rollup/plugin-babel@^5.2.3":
   version "5.3.0"
@@ -9803,11 +9823,6 @@ typescript@^3.2.1, typescript@^3.6.3:
   version "3.9.9"
   resolved "https://registry.yarnpkg.com/typescript/-/typescript-3.9.9.tgz#e69905c54bc0681d0518bd4d587cc6f2d0b1a674"
   integrity sha512-kdMjTiekY+z/ubJCATUPlRDl39vXYiMV9iyeMuEuXZh2we6zz80uovNN2WlAxmmdE/Z/YQe+EbOEXB5RHEED3w==
-
-typescript@^4.1.2:
-  version "4.2.3"
-  resolved "https://registry.yarnpkg.com/typescript/-/typescript-4.2.3.tgz#39062d8019912d43726298f09493d598048c1ce3"
-  integrity sha512-qOcYwxaByStAWrBf4x0fibwZvMRG+r4cQoTjbPtUlrWjBHbmCAww1i448U0GJ+3cNNEtebDteo/cHOR3xJ4wEw==
 
 typescript@~4.1.5:
   version "4.1.5"

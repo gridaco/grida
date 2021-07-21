@@ -29,10 +29,10 @@ const Collaborate = () => {
         </LandingpageText>
       </Flex>
       <Description variant="body1">
-        With Bridged’s super intuitive workflow, you’ll find out how
-        blazing-fast the collaborating can get. Create your products as the way
-        it make sense. When the cycle gets shorter, the good thing happens.
-        Forget all the time you’ve spent repeating yourself.
+        With Grida’s super intuitive workflow, you’ll find out how blazing-fast
+        the collaborating can get. Create your products as the way it make
+        sense. When the cycle gets shorter, the good thing happens. Forget all
+        the time you’ve spent repeating yourself.
       </Description>
       <BlankArea height={[0, 50]} />
       <SectionLayout
@@ -64,7 +64,7 @@ const Collaborate = () => {
                   src="/assets/notification.png"
                   width="auto"
                   height="auto"
-                  alt="bridged collaboration slack notification"
+                  alt="Grida collaboration slack notification"
                 />
               </div>
             ))}
@@ -75,7 +75,7 @@ const Collaborate = () => {
               loading="eager"
               width="auto"
               height="auto"
-              alt="bridged collaboration for app developers"
+              alt="Grida collaboration for app developers"
             />
           </div>
         </BackgroundImage>

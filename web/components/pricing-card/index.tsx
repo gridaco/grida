@@ -73,8 +73,8 @@ function PricingCard(props: {
             </LandingpageText>
             <BlankArea height={[48, 48]} />
             <LandingpageText variant="body1" textAlign="center">
-              Bridged paid plans are disabled temporarily. Meanwhile, you can
-              use our free plan which basically does the same.
+              Grida paid plans are disabled temporarily. Meanwhile, you can use
+              our free plan which basically does the same.
               <Link href={LandingpageUrls.signup_with_return}>
                 <span style={{ margin: "0px 5px", color: "#172AD7" }}>
                   Sign up

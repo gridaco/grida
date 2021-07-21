@@ -1,28 +1,25 @@
-import Icon from "components/icon";
-import Link from "next/link";
-import React, { useState, useEffect, useCallback } from "react";
 import styled from "@emotion/styled";
-import { center } from "utils/styled/styles";
+import Link from "next/link";
+import { useRouter } from "next/router";
+import React, { useState, useEffect, useCallback } from "react";
+import { useCookies } from "react-cookie";
 import { Box, Flex, Text, Button } from "rebass";
+
+import Icon from "components/icon";
+import { useLoginState } from "utils/hooks/use-auth-state";
+import { URLS } from "utils/landingpage/constants";
+import { media } from "utils/styled/media";
+import { center } from "utils/styled/styles";
+import { ThemeInterface } from "utils/styled/theme";
+
 import ExpandHeaderItem from "./expand-header-item";
 import { HeaderMap } from "./headermap";
-import { URLS } from "utils/landingpage/constants";
-import { ThemeInterface } from "utils/styled/theme";
-import { media } from "utils/styled/media";
-import { useCookies } from "react-cookie";
-import { useRouter } from "next/router";
-
-/**
- * DO NOT CHANGE KEY - this key is set by accounts.bridged.xyz
- * @todo - change key value. the key value is not managed and Ambiguous.
- */
-const ACCESS_TOKEN_KEY = "_token";
 
 const Header = () => {
   const [currentExpandHeader, setCurrentExpandHeader] = useState("");
   const [isOpenMenu, setIsOpenMenu] = useState(false);
-  const [cookie, setCookie] = useCookies([ACCESS_TOKEN_KEY]);
   const [currentRouter, setCurrentRouter] = useState("");
+  const loginstate = useLoginState();
   const router = useRouter();
   useEffect(() => {
     if (isOpenMenu) {
@@ -42,7 +39,7 @@ const Header = () => {
   );
 
   const handleSignupClick = () => {
-    if (cookie[ACCESS_TOKEN_KEY] != null) {
+    if (loginstate == "signedin") {
       window.location.href = URLS.landing.try_the_demo_1;
     } else {
       window.location.href = URLS.landing.signup_with_return;
@@ -50,7 +47,7 @@ const Header = () => {
   };
 
   const handleSigninClick = () => {
-    if (cookie[ACCESS_TOKEN_KEY] != null) {
+    if (loginstate == "signedin") {
       window.location.href = URLS.landing.try_the_demo_1;
     } else {
       !isOpenMenu && (window.location.href = URLS.landing.signin_with_return);
@@ -95,7 +92,7 @@ const Header = () => {
               ml="8px"
               fontWeight="600"
             >
-              Bridged
+              Grida
             </ResponsiveTitle>
           </Link>
           <NavigationWrapper ml="60px" alignItems="center">
@@ -134,7 +131,7 @@ const Header = () => {
           p={["6px 10px", "6px 10px", "9px 20px", "9px 20px"]}
           variant="noShadow"
         >
-          {cookie[ACCESS_TOKEN_KEY] != null ? "Go to console" : "Sign up"}
+          {loginstate == "signedin" ? "Go to console" : "Sign up"}
         </SignupButton>
       </Flex>
 
@@ -187,9 +184,9 @@ const Header = () => {
               height="35px"
               fontSize="13px"
               mb="12px"
-              disabled={cookie[ACCESS_TOKEN_KEY] != null}
+              disabled={loginstate == "signedin"}
               style={{
-                opacity: cookie[ACCESS_TOKEN_KEY] != null ? 0 : 1,
+                opacity: (loginstate == "signedin") != null ? 0 : 1,
               }}
               onClick={handleSignupClick}
             >
@@ -205,7 +202,7 @@ const Header = () => {
               style={center}
               onClick={handleSigninClick}
             >
-              {cookie[ACCESS_TOKEN_KEY] != null ? (
+              {loginstate == "signedin" ? (
                 "Go to console"
               ) : (
                 <React.Fragment>
