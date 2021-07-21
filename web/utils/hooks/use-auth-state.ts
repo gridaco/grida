@@ -28,7 +28,13 @@ export function useLoginState() {
 
   useEffect(() => {
     __verifyBorwserAuth()
-      .then(() => setIsLoggedIn("signedin"))
+      .then(r => {
+        if (r) {
+          setIsLoggedIn("signedin");
+        } else {
+          setIsLoggedIn("expired");
+        }
+      })
       .catch(() => setIsLoggedIn("unauthorized"))
       .finally();
   }, []);
