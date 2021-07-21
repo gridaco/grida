@@ -40,9 +40,8 @@ export const LandingpageUrls = {
 
   /**
    * demo
-   * @todo - CHORG reorganize with grida.co
    */
-  try_the_demo_1: "https://console.bridged.xyz",
+  try_the_demo_1: "https://console.grida.co",
 
   // misc
   privacy_policy: "/docs/support/privacy-policy",
