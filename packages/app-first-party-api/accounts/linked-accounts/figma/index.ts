@@ -3,7 +3,7 @@ import Axios from "axios";
 const _host =
   process.env.NODE_ENV === "development"
     ? "http://localhost:9002"
-    : "https://accounts.grida.co";
+    : "https://accounts.services.grida.co";
 
 const restclient = Axios.create({
   baseURL: `${_host}/linked-accounts/figma`,

@@ -5,7 +5,7 @@ export const getting_started_document = new BoringDocument({
   title: `Getting Started`,
   content: `
 <h1>Upload your first design</h1>
-<p>You can upload design from figma via running the plugin on it. Or the quick handy way is to use below link importer.</p>
+<p>You can upload design from figma via running the plugin on it. Or the quick handy way is to use the link importer below.</p>
 <br/>
 <br/>
 <h1>Too much? - Quick start (30 Seconds)</h1>
