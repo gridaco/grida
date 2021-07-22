@@ -8,22 +8,16 @@ import { DesignImporterLoaderResult } from "./o";
 import { analyzeDesignUrl } from "@design-sdk/url-analysis";
 import { designToCode } from "@designto/code";
 import { input } from "@designto/config";
+import { hasLinkedFigmaAccount } from "@app/fapi/accounts/linked-accounts";
+import { show_dialog_import_figma_design_after_authentication } from "../../../modals/import-figma-design-after-authentication";
 
 export function ImportDesignWithUrl() {
   const addPage = useAddPage();
 
-  const validation = (url: string) => {
-    // authenticate user
-    window.location.href = "http://localhost:3302/";
-    // open("http://localhost:3302/");
-    // --
-    // load with url
-    const validurl = analyzeDesignUrl(url) !== "unknown";
-    const isFigmaAuthenticated = true; // todo -> add figma authenticator between fetching. user need to authorized grida to access their' design.
-    return validurl && isFigmaAuthenticated;
-  };
+  /** pass if design url is defined and parsable (recognized as one of the supported platforms) */
+  const validation = (url: string) => analyzeDesignUrl(url) !== "unknown";
 
-  const onsubmitcomplete = (_, v: DesignImporterLoaderResult) => {
+  const onsubmitcomplete = async (_, v: DesignImporterLoaderResult) => {
     const _design = v;
     const _res_flutter = designToCode(
       input.DesignInput.fromDesign(_design.node),
@@ -64,6 +58,20 @@ export function ImportDesignWithUrl() {
   const loader = async (url: string) => {
     switch (analyzeDesignUrl(url)) {
       case "figma":
+        const cancontinue = await hasLinkedFigmaAccount();
+        if (cancontinue) {
+          // load the design
+        } else {
+          const explicitfigmaauthentication =
+            await show_dialog_import_figma_design_after_authentication();
+          // const explicitfigmaauthentication = await showDialog(
+          //   undefined
+          // );
+          console.log(
+            "explicitfigmaauthentication",
+            explicitfigmaauthentication
+          );
+        }
         return await figmaloader(url);
       default:
         throw "not ready";

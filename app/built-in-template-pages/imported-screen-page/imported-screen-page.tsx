@@ -45,17 +45,15 @@ export class ImportedScreenTemplate extends UnconstrainedTemplate<ImportedScreen
         template: `
   <screen-preview-card-block url="{{design.url}}"></screen-preview-card-block>
   
-  <pre><code>
   {{#with code.flutter}}
-    {{raw}}
+    <scaffold-code-block source="{{raw}}" lang="dart">
+    </scaffold-code-block>
   {{/with}}
-  </code></pre>
 
-  <pre><code>
   {{#with code.react}}
-    {{raw}}
+    <scaffold-code-block source="{{raw}}" lang="ts">
+    </scaffold-code-block>
   {{/with}}
-  </code></pre>
   `,
       },
     });

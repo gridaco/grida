@@ -2,6 +2,7 @@
     "name": "@app/blocks",
     "version": "0.0.0",
     "dependencies": {
+        "@base-sdk/functions-code-format": "^0.0.0",
         "@reflect-blocks/figma-embed": "0.0.4"
     }
 }

@@ -3,6 +3,7 @@ import { HomeScaffold } from "@editor-ui/workspace";
 import { SideNavigation, TopBar } from "../components";
 import { EditorThemeProvider } from "@editor-ui/theme";
 import { CurrentPage } from "../built-in-pages/current";
+import { ModalContextProvider } from "@editor-ui/dialog";
 
 export function Scaffold(props: {
   mode: "desktop" | "browser";
@@ -20,15 +21,17 @@ export function Scaffold(props: {
 
   return (
     <EditorThemeProvider light>
-      <HomeScaffold
-        navigation={navigation}
-        topBar={topBar}
-        controlDoubleClick={props.controlDoubleClick}
-      >
-        <>
-          <CurrentPage />
-        </>
-      </HomeScaffold>
+      <ModalContextProvider>
+        <HomeScaffold
+          navigation={navigation}
+          topBar={topBar}
+          controlDoubleClick={props.controlDoubleClick}
+        >
+          <>
+            <CurrentPage />
+          </>
+        </HomeScaffold>
+      </ModalContextProvider>
     </EditorThemeProvider>
   );
 }
