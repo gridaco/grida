@@ -13,6 +13,6 @@ export const getting_started_document = new BoringDocument({
 <p>Here, you can copy & paste <a href="https://www.figma.com/file/x7RRK6RwWtZuNakmbMLTVH/examples?node-id=1%3A120" target="_blank">this url</a> if you don't have your figma design yet.</p>
 <import-design-with-url></import-design-with-url>
 <br/>
-<img src="https://grida-app-builtin-pages.s3.us-west-1.amazonaws.com/getting-started/resources/how-to-copy-link-from-figma.png" />
+<img src="https://grida-app-builtin-pages.s3.us-west-1.amazonaws.com/getting-started/resources/how-to-copy-link-of-design-in-figma.min.gif" />
   `,
 });
