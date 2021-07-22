@@ -2,8 +2,8 @@ import { Node, mergeAttributes } from "@tiptap/core";
 import { ReactNodeViewRenderer } from "@tiptap/react";
 import { ScaffoldCodeBlock_Boring } from "./scaffold-code-block.boring";
 
-const _key = "scaffold-code";
-export const boring_extended_screen_preview_card_block = Node.create({
+const _key = "scaffold-code-block";
+export const boring_extended_screen_scaffold_code_block = Node.create({
   name: _key,
 
   group: "block",
@@ -12,7 +12,10 @@ export const boring_extended_screen_preview_card_block = Node.create({
 
   addAttributes() {
     return {
-      url: {
+      source: {
+        default: undefined,
+      },
+      lang: {
         default: undefined,
       },
     };

@@ -1187,6 +1187,14 @@
     "@reflect-ui/core" "0.0.2-rc.7"
     axios "^0.21.0"
 
+"@base-sdk/functions-code-format@^0.0.0":
+  version "0.0.0"
+  resolved "https://registry.yarnpkg.com/@base-sdk/functions-code-format/-/functions-code-format-0.0.0.tgz#9758170fa8541cba5510c27d7a315fda628f1f95"
+  integrity sha512-+riF6kvswzBJgMcY8sCQkuDJHmMHNU1nUKixAz3l0JAeRmLYRVRgOci2KKahahgtIb99heqEviFR1jh9inLsZg==
+  dependencies:
+    "@base-sdk/core" "0.1.0"
+    axios "^0.21.1"
+
 "@base-sdk/hosting@0.1.0-1":
   version "0.1.0-1"
   resolved "https://registry.yarnpkg.com/@base-sdk/hosting/-/hosting-0.1.0-1.tgz#bf16050cadd1c766f0813bc7bb14344b28e9910d"
@@ -4411,7 +4419,7 @@ axe-core@^4.0.2:
   resolved "https://registry.yarnpkg.com/axe-core/-/axe-core-4.2.3.tgz#2a3afc332f0031b42f602f4a3de03c211ca98f72"
   integrity sha512-pXnVMfJKSIWU2Ml4JHP7pZEPIrgBO1Fd3WGx+fPBsS+KRGhE4vxooD8XBGWbQOIVSZsVK7pUDBBkCicNu80yzQ==
 
-axios@^0.21.0:
+axios@^0.21.0, axios@^0.21.1:
   version "0.21.1"
   resolved "https://registry.yarnpkg.com/axios/-/axios-0.21.1.tgz#22563481962f4d6bde9a76d516ef0e5d3c09b2b8"
   integrity sha512-dKQiRHxGD9PPRIUNIWvZhPTPpl1rf/OxTYKsqKUDjBwYylTvV7SjSHJb9ratfyzM6wCdLCOYLzs73qpg5c4iGA==
