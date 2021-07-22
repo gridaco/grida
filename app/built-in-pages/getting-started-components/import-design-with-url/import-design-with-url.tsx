@@ -8,13 +8,11 @@ import { DesignImporterLoaderResult } from "./o";
 import { analyzeDesignUrl } from "@design-sdk/url-analysis";
 import { designToCode } from "@designto/code";
 import { input } from "@designto/config";
-import { showModal } from "@editor-ui/dialog";
-import { ImportFigmaDesignAfterAuthentication_Modal } from "../../../modals/import-figma-design-after-authentication";
+import { hasLinkedFigmaAccount } from "@app/fapi/accounts/linked-accounts";
+import { show_dialog_import_figma_design_after_authentication } from "../../../modals/import-figma-design-after-authentication";
 
 export function ImportDesignWithUrl() {
   const addPage = useAddPage();
-
-  const [dialogOpen, setDialogOpen] = useState(false);
 
   /** pass if design url is defined and parsable (recognized as one of the supported platforms) */
   const validation = (url: string) => analyzeDesignUrl(url) !== "unknown";
@@ -60,22 +58,20 @@ export function ImportDesignWithUrl() {
   const loader = async (url: string) => {
     switch (analyzeDesignUrl(url)) {
       case "figma":
-        // -- TODO
-        // todo - use hook - need authentication state hook
-        const isFigmaAuthenticated = false; // todo -> add figma authenticator between fetching. user need to authorized grida to access their' design.
-        //
-
-        if (!isFigmaAuthenticated) {
-          //
-          setDialogOpen(true);
-
-          const explicitfigmaauthentication = await showModal(
-            undefined
-            // <ImportFigmaDesignAfterAuthenticationModal />
+        const cancontinue = await hasLinkedFigmaAccount();
+        if (cancontinue) {
+          // load the design
+        } else {
+          const explicitfigmaauthentication =
+            await show_dialog_import_figma_design_after_authentication();
+          // const explicitfigmaauthentication = await showDialog(
+          //   undefined
+          // );
+          console.log(
+            "explicitfigmaauthentication",
+            explicitfigmaauthentication
           );
         }
-        // -- TODO
-        //
         return await figmaloader(url);
       default:
         throw "not ready";
@@ -84,7 +80,6 @@ export function ImportDesignWithUrl() {
 
   return (
     <NodeViewWrapper>
-      <ImportFigmaDesignAfterAuthentication_Modal open={undefined} />
       <RemoteSubmitForm<DesignImporterLoaderResult>
         actionName="Load from Url"
         placeholder="https://figma.com/files/1234/app?node-id=5678"

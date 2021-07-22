@@ -3,18 +3,22 @@ import { Dialog, DialogTrigger, DialogContent } from "@editor-ui/dialog";
 import { Button } from "@editor-ui/button";
 import { setOauthToken } from "../../3rd-party-api/figma";
 import { tunnel, linkedaccounts } from "@app/fapi";
+import { create } from "@editor-ui/dialog";
+export const show_dialog_import_figma_design_after_authentication = create(
+  ImportFigmaDesignAfterAuthentication_Modal
+);
 
 export function ImportFigmaDesignAfterAuthentication_Modal(props: {
-  open?: boolean;
+  isOpen: boolean;
+  onResolve: () => void;
+  onReject: () => void;
 }) {
   return (
     <>
-      <Dialog
-        open={props.open}
-        onPointerDownOutside={() => {} /* prevent close */}
-      >
-        <DialogTrigger>Dialog trigger</DialogTrigger>
-        <ImportFigmaDesignAfterAuthentication_Body />
+      <Dialog open={props.isOpen}>
+        <ImportFigmaDesignAfterAuthentication_Body
+          onComplete={props.onResolve}
+        />
       </Dialog>
     </>
   );
@@ -26,7 +30,9 @@ type AuthenticationProcessState =
   | "complete"
   | "cancel"
   | "error";
-export function ImportFigmaDesignAfterAuthentication_Body() {
+export function ImportFigmaDesignAfterAuthentication_Body(props: {
+  onComplete: () => void;
+}) {
   const [procState, setProcState] =
     useState<AuthenticationProcessState>("initial");
 
@@ -43,7 +49,7 @@ export function ImportFigmaDesignAfterAuthentication_Body() {
       case "loading":
         return (
           <LoadingStateBody
-            onNext={() => {}}
+            onNext={props.onComplete}
             onCancel={() => {}}
             onError={() => {}}
           />
@@ -95,7 +101,7 @@ function LoadingStateBody(props: {
 
     // set the auth token to local storage (not secure)
     setOauthToken(plfa.accessToken);
-
+    props.onNext();
     // then call the next function to load the design.
   };
 
