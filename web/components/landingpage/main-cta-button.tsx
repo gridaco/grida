@@ -3,11 +3,11 @@ import { motion } from "framer-motion";
 import React from "react";
 import { Button, Box } from "rebass";
 
-import { useLoginState } from "utils/hooks/use-auth-state";
+import { useAuthState } from "utils/hooks/use-auth-state";
 import { URLS } from "utils/landingpage/constants";
 
 export default function LandingMainCtaButton() {
-  const loginstate = useLoginState();
+  const loginstate = useAuthState();
 
   const handleCta = () => {
     switch (loginstate) {
