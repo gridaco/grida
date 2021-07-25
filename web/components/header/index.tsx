@@ -6,7 +6,7 @@ import { useCookies } from "react-cookie";
 import { Box, Flex, Text, Button } from "rebass";
 
 import Icon from "components/icon";
-import { useLoginState } from "utils/hooks/use-auth-state";
+import { useAuthState } from "utils/hooks/use-auth-state";
 import { URLS } from "utils/landingpage/constants";
 import { media } from "utils/styled/media";
 import { center } from "utils/styled/styles";
@@ -19,7 +19,7 @@ const Header = () => {
   const [currentExpandHeader, setCurrentExpandHeader] = useState("");
   const [isOpenMenu, setIsOpenMenu] = useState(false);
   const [currentRouter, setCurrentRouter] = useState("");
-  const loginstate = useLoginState();
+  const loginstate = useAuthState();
   const router = useRouter();
   useEffect(() => {
     if (isOpenMenu) {
