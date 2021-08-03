@@ -1,39 +1,24 @@
 service:
-  name: project
+  name: workspace-service
+
+useDotenv: true
 
 plugins:
   - serverless-dotenv-plugin
-  - '@hewmen/serverless-plugin-typescript'
+  - "@hewmen/serverless-plugin-typescript"
   - serverless-plugin-optimize
   - serverless-offline
-  - serverless-dynamodb-local
   - serverless-domain-manager
 
 custom:
   customDomain:
     domainName: g11n.bridged.cc
     hostedZoneId: us-west-1
-    basePath: ''
+    basePath: ""
     stage: ${self:provider.stage}
     createRoute53Record: true
   serverless-offline:
     httpPort: 4007
-
-resources:
-  Resources:
-    projectsTable:
-      Type: AWS::DynamoDB::Table
-      Properties:
-        TableName: '${self:provider.environment.DYNAMODB_TABLE}'
-        KeySchema:
-          - AttributeName: id
-            KeyType: HASH
-        AttributeDefinitions:
-          - AttributeName: id
-            AttributeType: S
-        ProvisionedThroughput:
-          ReadCapacityUnits: 1
-          WriteCapacityUnits: 1
 
 provider:
   name: aws
@@ -42,18 +27,7 @@ provider:
   apiGateway:
     minimumCompressionSize: 1024
   environment:
-    AWS_NODEJS_CONNECTION_REUSE_ENABLED: '1'
-    DYNAMODB_TABLE: '${self:service}-${opt:stage, self:provider.stage}'
-  iamRoleStatements:
-    - Effect: Allow
-      Action:
-        - dynamodb:Query
-        - dynamodb:Scan
-        - dynamodb:GetItem
-        - dynamodb:PutItem
-        - dynamodb:UpdateItem
-        - dynamodb:DeleteItem
-      Resource: 'arn:aws:dynamodb:${opt:region, self:provider.region}:*:table/${self:provider.environment.DYNAMODB_TABLE}'
+    AWS_NODEJS_CONNECTION_REUSE_ENABLED: "1"
 
 package:
   individually: true

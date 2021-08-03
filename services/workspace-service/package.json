@@ -4,7 +4,7 @@
   "description": "g11n asset linker service for bridged systems",
   "author": "Girda & bridged.xyz authors",
   "private": true,
-  "license": "MIT",
+  "license": "Apache 2.0",
   "scripts": {
     "prebuild": "rimraf dist",
     "build": "nest build",
@@ -28,7 +28,6 @@
     "aws-lambda": "^1.0.6",
     "aws-sdk": "^2.783.0",
     "aws-serverless-express": "^3.3.8",
-    "dynamoose": "^2.4.1",
     "nanoid": "^3.1.16",
     "reflect-metadata": "^0.1.13",
     "rimraf": "^3.0.2",

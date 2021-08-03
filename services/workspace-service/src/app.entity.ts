@@ -1,4 +1,4 @@
-import * as dynamoose from 'dynamoose';
+import * as dynamoose from "dynamoose";
 
 export interface ProjectRecord {
   /**
@@ -9,7 +9,7 @@ export interface ProjectRecord {
   /**
    * the name of this project set by editor
    */
-  projectName: string;
+  name: string;
 
   /**
    * the preview (cover) image set by eidtor, if non set, showing the default screen's perview, or bridged's default asset
@@ -44,51 +44,3 @@ export interface ProjectRecord {
    */
   accessorName: string;
 }
-
-const TABLE = process.env.DYNAMODB_TABLE;
-
-export const SceneScheam = new dynamoose.Schema(
-  {
-    id: String,
-    projectId: String,
-    fileId: String,
-    nodeId: String,
-    sdkVersion: String,
-    //DesignPlatformType
-    designPlatform: {
-      type: String,
-      enum: [
-        'com.figma.Desktop',
-        'com.bohemiancoding.sketch3',
-        'xyz.bridged.bridged',
-      ],
-    },
-    cachedPreview: String,
-    // SceneType
-    sceneType: {
-      type: String,
-      enum: ['SCREEN', 'COMPONENT', 'DOCS'],
-    },
-    route: String,
-    path: String,
-    name: String,
-    description: String,
-    tags: {
-      type: Set,
-      schema: [String],
-    },
-    alias: String,
-    variant: String,
-    width: Number,
-    height: Number,
-    background: String,
-  },
-  {
-    // https://github.com/dynamoose/dynamoose/pull/1050
-    saveUnknown: true,
-  },
-);
-
-export const Scene = dynamoose.model(TABLE, SceneScheam, {
-  create: false,
-});
