@@ -6,6 +6,8 @@ export interface PageReference {
   id: PageId;
   type: "boring-document" | "nothing-document";
   name: string;
+  // here
+  depth?: number;
 }
 
 type NothingDocument = never; // change this when nothing engine is complete.
@@ -19,6 +21,8 @@ export interface Page extends PageReference {
   type: PageDocumentType;
   name: string;
   document: PageDocumentLike;
+  depth?: number;
+
 }
 
 type ObjectLike = object | string;

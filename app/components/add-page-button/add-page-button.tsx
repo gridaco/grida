@@ -14,6 +14,7 @@ export function AddPageButton() {
     if (name !== null)
       addPage({
         name,
+        depth: 0,
       });
   }, [dispatch]);
 

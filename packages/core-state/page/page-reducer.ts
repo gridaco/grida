@@ -27,7 +27,7 @@ export const createPage = (
   pages: PageReference[],
   params: IAddPageAction
 ): Page => {
-  const { name, initial } = params;
+  const { name, initial, depth } = params;
   // todo - handle content initialization
 
   let title: BoringTitleLike = name;
@@ -49,6 +49,7 @@ export const createPage = (
       id: id,
       type: "boring-document",
       name: name,
+      depth: depth,
       document: document,
     },
     (page) => {
