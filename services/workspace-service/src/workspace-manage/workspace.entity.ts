@@ -1,6 +1,4 @@
-import * as dynamoose from "dynamoose";
-
-export interface ProjectRecord {
+export interface WorkspaceRecord {
   /**
    * the db recird id of this project
    */

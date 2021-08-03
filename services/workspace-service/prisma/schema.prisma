@@ -11,12 +11,12 @@ generator client {
 }
 
 
-model Project {
+model Workspace {
   // the db recird id of this project
-  id                String   @id @default(uuid())
+  id String @id @default(uuid())
 
   // the name of this project set by editor
-  name     String
+  name String
 
   // the preview (cover) image set by eidtor, if non set, showing the default screen's perview, or bridged's default asset
   previewImage String
@@ -40,4 +40,21 @@ model Project {
   //* "Hello ! {BRIDGED.SOME_SHARED_KEY}, great to use shared variables.")
   accessorName String
 
+
+  // region = relations
+  accessLogs UserWorkspaceAccessLog[]
+
+}
+
+
+model UserWorkspaceAccessLog{
+  id String @id @default(uuid())
+  userId String
+  workspace Workspace @relation(fields: [workspaceId], references: [id])
+  workspaceId String
+  signinAt DateTime @default(now())
+  lastActiveAt DateTime @updatedAt
+  active Boolean @default(true) // defaults to true since the creation happens on signin.
+  ip String?
+  ua String?
 }
