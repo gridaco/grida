@@ -1,9 +1,10 @@
 import Axios from "axios";
+import { _is_internal_dev, __internal_dev_hosts } from "../../../internal-dev";
 
-const _host =
-  process.env.NODE_ENV === "development"
-    ? "http://localhost:9002"
-    : "https://accounts.services.grida.co";
+const _host = _is_internal_dev()
+  ? //// if internal dev mode, return localhost environment for calling account services
+    __internal_dev_hosts.__INTERNAL_DEV_ACCOUNTS_SERVICES_HOST
+  : "https://accounts.services.grida.co";
 
 const restclient = Axios.create({
   baseURL: `${_host}/linked-accounts/figma`,

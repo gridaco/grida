@@ -59,19 +59,10 @@ export function ImportDesignWithUrl() {
     switch (analyzeDesignUrl(url)) {
       case "figma":
         const cancontinue = await hasLinkedFigmaAccount();
-        if (cancontinue) {
-          // load the design
-        } else {
-          const explicitfigmaauthentication =
-            await show_dialog_import_figma_design_after_authentication();
-          // const explicitfigmaauthentication = await showDialog(
-          //   undefined
-          // );
-          console.log(
-            "explicitfigmaauthentication",
-            explicitfigmaauthentication
-          );
+        if (!cancontinue) {
+          await show_dialog_import_figma_design_after_authentication();
         }
+        // load the design
         return await figmaloader(url);
       default:
         throw "not ready";
