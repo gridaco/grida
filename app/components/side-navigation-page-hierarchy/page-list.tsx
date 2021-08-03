@@ -165,7 +165,6 @@ const PageListContent = memo(function PageListContent({
 export function PageList() {
   const [state] = useApplicationState();
   const pages = state.pages;
-  console.log(pages)
 
   return (
     <PageListContent

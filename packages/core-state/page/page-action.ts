@@ -23,7 +23,6 @@ export interface IAddPageAction {
   /**
    * parent page's id
    */
-  depth: number,
   parent?: PageParentId;
   initial?: DocumentInitial;
 }
