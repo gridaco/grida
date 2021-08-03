@@ -32,7 +32,7 @@ const Header = styled.div(({ theme }) => ({
 
 interface Props {
   selectedPageId: string;
-  pageInfo: { id: string; name: string, depth?:number }[];
+  pageInfo: { id: string; name: string }[];
   canDelete: boolean;
 }
 
@@ -80,15 +80,14 @@ const PageListContent = memo(function PageListContent({
   );
 
   const handleAddPage = useCallback(
-    (parent: PageParentId, depth?: number) => {
-      // here
-      const name = prompt("New page Name!");
+    (parent: PageParentId) => {
+      
+      const name = prompt("New page Name");
 
       if (name !== null)
         dispatch({
           type: "add-page",
           name,
-          depth: depth + 1,
           parent: parent,
         });
     },
@@ -99,12 +98,12 @@ const PageListContent = memo(function PageListContent({
     return pageInfo.map((page) => (
       <PageRow
         name={page.name}
-        depth={page.depth}
+        depth={0}
         id={page.id}
         key={page.id}
         selected={selectedPageId === page.id}
         onAddClick={() => {
-          handleAddPage(page.id, page.depth);
+          handleAddPage(page.id);
         }}
         onMenuClick={() => {
           console.log("not implemented");

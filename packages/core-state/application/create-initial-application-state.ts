@@ -7,7 +7,6 @@ const DEFAULT_EMPTYSTATE_STARTING_PAGE = "built-in/getting-started";
 const GETTING_STARTED_PAGE_REFERENCE: PageReference = {
   type: "boring-document",
   id: "built-in/getting-started",
-  depth: 0,
   name: "Getting started",
 };
 
