@@ -37,6 +37,12 @@ interface IPageInfo{
   parent?: string
 }
 
+interface IPageInfoObj{
+  id: string;
+  name: string;
+  childrend: IPageInfoObj[]
+}
+
 interface Props {
   selectedPageId: string;
   pageInfo: IPageInfo[];
@@ -49,8 +55,32 @@ const PageListContent = memo(function PageListContent({
   canDelete,
 }: Props) {
   const dispatch = useDispatch();
+  
+  const pageInfoTree:IPageInfoObj[] = useMemo(()=>{
+    
+    function createTree (nodes: IPageInfo[], parentId:string) {
+      const _tree =  nodes
+      .filter((node) => node.parent === parentId)
+      .reduce(
+        (tree, node) => [
+          ...tree,
+          {
+            ...node,
+            child: createTree(nodes, node.id),
+          },
+        ],
+        [],
+      )
+      return _tree
+    }
+    const tree = createTree(pageInfo, pageInfo[0].parent)
+    return tree
 
- const menuItems: MenuItem<PageMenuItemType>[] = useMemo(
+  },[pageInfo, dispatch])
+
+
+
+  const menuItems: MenuItem<PageMenuItemType>[] = useMemo(
     () => [
       { value: "duplicate", title: "Duplicate Page" },
       { value: "rename", title: "Rename Page" },
@@ -100,27 +130,37 @@ const PageListContent = memo(function PageListContent({
     [dispatch]
   );
 
+  function getpage(id) : IPageInfo{
+    return pageInfo.find(p => p.id == id)
+  }
 
+  function absDepth(page: IPageInfo, abs_i: number): number{
+      
+    let depth = 0;
+    let parentArr = abs_i
+    let _pageParent = page.parent
+    while(abs_i !== 0) {
+      const res = pageInfo.slice(0, parentArr).find(_page => _page.id === _pageParent)
+      if(!res) {
+        break;
+      }
+      depth++
+      parentArr = pageInfo.indexOf(res)
+      _pageParent = pageInfo[parentArr].parent
+    }
+    return depth
+
+  }
+ 
   const pageElements = useMemo(() => {
     return pageInfo.map((page, i) => 
     {
-      let depth = 0;
-      let parentArr = i
-      let _pageParent = page.parent
-      while(i !== 0) {
-        const res = pageInfo.slice(0, parentArr).find(_page => _page.id === _pageParent)
-        if(!res) {
-          break;
-        }
-        depth++
-        parentArr = pageInfo.indexOf(res)
-        _pageParent = pageInfo[parentArr].parent
-      }
-  
+      const _depth = absDepth(page, i)
+
       return (
         <PageRow
         name={page.name}
-        depth={depth} 
+        depth={_depth} 
         id={page.id}
         key={page.id}
         expanded={true}
@@ -151,7 +191,6 @@ const PageListContent = memo(function PageListContent({
     );
   }, [pageInfo, selectedPageId, menuItems, handleSelectMenuItem, dispatch]);
 
-  
   return (
     <Container>
       <Header>
@@ -175,11 +214,11 @@ const PageListContent = memo(function PageListContent({
               type: "move-page",
               originOrder,
               targetOrder,
-              originParent: "", // todo
-              targetParent: "", // todo
+              originParent: pageInfo[originOrder].parent, //todo
+              targetParent: pageInfo[targetOrder].parent, // todo
             });
           },
-          [dispatch]
+          [pageInfo, dispatch]
         )}
       >
         {pageElements}

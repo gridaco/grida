@@ -140,8 +140,8 @@ export function pageReducer(
         
         draft.pages.splice(originOrder, 1);
         draft.pages.splice(targetOrder, 0, sourceItem);
-        // draft.pages[originOrder].parent = originParent
-        // draft.pages[targetOrder].parent = targetParent
+        //@ts-ignore
+        draft.pages[originOrder].parent = targetParent
       });
     }
     default:
