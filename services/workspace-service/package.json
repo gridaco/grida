@@ -1,7 +1,7 @@
 {
-  "name": "project-service",
+  "name": "@backend/workspace-service",
   "version": "0.0.0",
-  "description": "g11n asset linker service for bridged systems",
+  "description": "Workspace service",
   "author": "Girda & bridged.xyz authors",
   "private": true,
   "license": "Apache 2.0",
