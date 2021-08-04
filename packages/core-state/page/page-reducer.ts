@@ -25,6 +25,7 @@ import { setSelectedPage } from "@core/store/application";
 
 export const createPage = (
   pages: PageReference[],
+  selectedPage: string,
   params: IAddPageAction
 ): Page => {
   const { name, initial } = params;
@@ -50,6 +51,7 @@ export const createPage = (
       type: "boring-document",
       name: name,
       document: document,
+      parent: selectedPage,
     },
     (page) => {
       return page;
@@ -78,7 +80,7 @@ export function pageReducer(
     case "add-page": {
       return produce(state, (draft) => {
         <AddPageAction>action;
-        const newPage = createPage(draft.pages, action);
+        const newPage = createPage(draft.pages,draft.selectedPage, action);
         draft.selectedPage = newPage.id;
       });
     }
@@ -135,9 +137,11 @@ export function pageReducer(
 
       return produce(state, (draft) => {
         const sourceItem = draft.pages[originOrder];
-
+        
         draft.pages.splice(originOrder, 1);
         draft.pages.splice(targetOrder, 0, sourceItem);
+        // draft.pages[originOrder].parent = originParent
+        // draft.pages[targetOrder].parent = targetParent
       });
     }
     default:

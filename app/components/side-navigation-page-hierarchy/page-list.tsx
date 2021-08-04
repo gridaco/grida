@@ -30,9 +30,16 @@ const Header = styled.div(({ theme }) => ({
   alignItems: "center",
 }));
 
+
+interface IPageInfo{
+  id: string;
+  name: string
+  parent?: string
+}
+
 interface Props {
   selectedPageId: string;
-  pageInfo: { id: string; name: string }[];
+  pageInfo: IPageInfo[];
   canDelete: boolean;
 }
 
@@ -43,7 +50,7 @@ const PageListContent = memo(function PageListContent({
 }: Props) {
   const dispatch = useDispatch();
 
-  const menuItems: MenuItem<PageMenuItemType>[] = useMemo(
+ const menuItems: MenuItem<PageMenuItemType>[] = useMemo(
     () => [
       { value: "duplicate", title: "Duplicate Page" },
       { value: "rename", title: "Rename Page" },
@@ -81,26 +88,42 @@ const PageListContent = memo(function PageListContent({
 
   const handleAddPage = useCallback(
     (parent: PageParentId) => {
-      
       const name = prompt("New page Name");
-
+      
       if (name !== null)
         dispatch({
           type: "add-page",
           name,
-          parent: parent,
+          parent,
         });
     },
     [dispatch]
   );
 
+
   const pageElements = useMemo(() => {
-    return pageInfo.map((page) => (
-      <PageRow
+    return pageInfo.map((page, i) => 
+    {
+      let depth = 0;
+      let parentArr = i
+      let _pageParent = page.parent
+      while(i !== 0) {
+        const res = pageInfo.slice(0, parentArr).find(_page => _page.id === _pageParent)
+        if(!res) {
+          break;
+        }
+        depth++
+        parentArr = pageInfo.indexOf(res)
+        _pageParent = pageInfo[parentArr].parent
+      }
+  
+      return (
+        <PageRow
         name={page.name}
-        depth={0}
+        depth={depth} 
         id={page.id}
         key={page.id}
+        expanded={true}
         selected={selectedPageId === page.id}
         onAddClick={() => {
           handleAddPage(page.id);
@@ -123,9 +146,12 @@ const PageListContent = memo(function PageListContent({
           });
         }}
       />
-    ));
+        );
+      }
+    );
   }, [pageInfo, selectedPageId, menuItems, handleSelectMenuItem, dispatch]);
 
+  
   return (
     <Container>
       <Header>
