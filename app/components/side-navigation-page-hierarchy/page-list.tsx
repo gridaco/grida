@@ -105,11 +105,11 @@ const PageListContent = memo(function PageListContent({
     [dispatch]
   );
 
-  function absDepth(page: IPageInfo, abs_i: number): number {
+  function getRowDepth(page: IPageInfo, pageIndex: number): number {
     let depth = 0;
-    let parentArr = abs_i;
+    let parentArr = pageIndex;
     let _pageParent = page.parent;
-    while (abs_i !== 0) {
+    while (pageIndex !== 0) {
       const res = pageInfo
         .slice(0, parentArr)
         .find((_page) => _page.id === _pageParent);
@@ -125,7 +125,7 @@ const PageListContent = memo(function PageListContent({
 
   const pageElements = useMemo(() => {
     return pageInfo.map((page, i) => {
-      const _depth = absDepth(page, i);
+      const _depth = getRowDepth(page, i);
 
       return (
         <PageRow
