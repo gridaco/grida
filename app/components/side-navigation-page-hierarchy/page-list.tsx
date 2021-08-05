@@ -30,17 +30,16 @@ const Header = styled.div(({ theme }) => ({
   alignItems: "center",
 }));
 
-
-interface IPageInfo{
-  id: string;
-  name: string
-  parent?: string
-}
-
-interface IPageInfoObj{
+interface IPageInfo {
   id: string;
   name: string;
-  childrend: IPageInfoObj[]
+  parent?: string;
+}
+
+interface IPageInfoObj {
+  id: string;
+  name: string;
+  children: IPageInfoObj[];
 }
 
 interface Props {
@@ -55,30 +54,6 @@ const PageListContent = memo(function PageListContent({
   canDelete,
 }: Props) {
   const dispatch = useDispatch();
-  
-  const pageInfoTree:IPageInfoObj[] = useMemo(()=>{
-    
-    function createTree (nodes: IPageInfo[], parentId:string) {
-      const _tree =  nodes
-      .filter((node) => node.parent === parentId)
-      .reduce(
-        (tree, node) => [
-          ...tree,
-          {
-            ...node,
-            child: createTree(nodes, node.id),
-          },
-        ],
-        [],
-      )
-      return _tree
-    }
-    const tree = createTree(pageInfo, pageInfo[0].parent)
-    return tree
-
-  },[pageInfo, dispatch])
-
-
 
   const menuItems: MenuItem<PageMenuItemType>[] = useMemo(
     () => [
@@ -119,7 +94,7 @@ const PageListContent = memo(function PageListContent({
   const handleAddPage = useCallback(
     (parent: PageParentId) => {
       const name = prompt("New page Name");
-      
+
       if (name !== null)
         dispatch({
           type: "add-page",
@@ -130,65 +105,59 @@ const PageListContent = memo(function PageListContent({
     [dispatch]
   );
 
-  function getpage(id) : IPageInfo{
-    return pageInfo.find(p => p.id == id)
-  }
-
-  function absDepth(page: IPageInfo, abs_i: number): number{
-      
+  function absDepth(page: IPageInfo, abs_i: number): number {
     let depth = 0;
-    let parentArr = abs_i
-    let _pageParent = page.parent
-    while(abs_i !== 0) {
-      const res = pageInfo.slice(0, parentArr).find(_page => _page.id === _pageParent)
-      if(!res) {
+    let parentArr = abs_i;
+    let _pageParent = page.parent;
+    while (abs_i !== 0) {
+      const res = pageInfo
+        .slice(0, parentArr)
+        .find((_page) => _page.id === _pageParent);
+      if (!res) {
         break;
       }
-      depth++
-      parentArr = pageInfo.indexOf(res)
-      _pageParent = pageInfo[parentArr].parent
+      depth++;
+      parentArr = pageInfo.indexOf(res);
+      _pageParent = pageInfo[parentArr].parent;
     }
-    return depth
-
+    return depth;
   }
- 
+
   const pageElements = useMemo(() => {
-    return pageInfo.map((page, i) => 
-    {
-      const _depth = absDepth(page, i)
+    return pageInfo.map((page, i) => {
+      const _depth = absDepth(page, i);
 
       return (
         <PageRow
-        name={page.name}
-        depth={_depth} 
-        id={page.id}
-        key={page.id}
-        expanded={true}
-        selected={selectedPageId === page.id}
-        onAddClick={() => {
-          handleAddPage(page.id);
-        }}
-        onMenuClick={() => {
-          console.log("not implemented");
-        }}
-        onClick={() => {
-          dispatch({
-            type: "select-page",
-            page: page.id,
-          });
-        }}
-        menuItems={menuItems}
-        onSelectMenuItem={handleSelectMenuItem}
-        onContextMenu={() => {
-          dispatch({
-            type: "select-page",
-            page: page.id,
-          });
-        }}
-      />
-        );
-      }
-    );
+          name={page.name}
+          depth={_depth}
+          id={page.id}
+          key={page.id}
+          expanded={true}
+          selected={selectedPageId === page.id}
+          onAddClick={() => {
+            handleAddPage(page.id);
+          }}
+          onMenuClick={() => {
+            console.log("not implemented");
+          }}
+          onClick={() => {
+            dispatch({
+              type: "select-page",
+              page: page.id,
+            });
+          }}
+          menuItems={menuItems}
+          onSelectMenuItem={handleSelectMenuItem}
+          onContextMenu={() => {
+            dispatch({
+              type: "select-page",
+              page: page.id,
+            });
+          }}
+        />
+      );
+    });
   }, [pageInfo, selectedPageId, menuItems, handleSelectMenuItem, dispatch]);
 
   return (
@@ -231,10 +200,42 @@ export function PageList() {
   const [state] = useApplicationState();
   const pages = state.pages;
 
+  const pagesSort: IPageInfo[] = useMemo(() => {
+    function createTree(nodes: IPageInfo[], parentId: string) {
+      const _tree = nodes
+        .filter((node) => node.parent === parentId)
+        .reduce(
+          (tree, node) => [
+            ...tree,
+            {
+              ...node,
+              children: createTree(nodes, node.id),
+            },
+          ],
+          []
+        );
+      return _tree;
+    }
+
+    const tree = createTree(pages, pages[0].parent);
+    let _arr = [];
+
+    function treeArray(_tree: IPageInfoObj[]) {
+      _tree.map((page) => {
+        _arr.push(page);
+        if (page.children.length > 0) {
+          treeArray(page.children);
+        }
+      });
+    }
+    treeArray(tree);
+    return _arr;
+  }, [pages]);
+
   return (
     <PageListContent
       selectedPageId={state.selectedPage}
-      pageInfo={pages}
+      pageInfo={pagesSort}
       canDelete={state.pages.length > 1}
     />
   );
