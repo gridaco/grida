@@ -13,6 +13,7 @@ generator client {
 
 model Document{
   id  String  @id @default(dbgenerated()) @map("_id") @db.ObjectId
+  workspace String
 
   title String
   content String
