@@ -1,5 +1,5 @@
 import { DocumentInitial } from "@boring.so/loader";
-import { PageId } from "@core/model";
+import type { PageId } from "@core/model";
 
 export type PageAction =
   | MovePageAction //[type: "movePage", sourceIndex: number, destinationIndex: number]
@@ -29,6 +29,7 @@ export interface IAddPageAction {
    */
   parent?: PageParentId;
   initial?: DocumentInitial;
+  sort: number;
 }
 export interface AddPageAction extends IAddPageAction {
   type: "add-page";

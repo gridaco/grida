@@ -9,7 +9,15 @@ import { useApplicationState, useDispatch } from "@core/app-state";
 
 import { PageMenuItemType } from "./page-menu-item-type";
 import { PageRow } from "./page-row-item";
-import { PageParentId, PageRoot } from "@core/state";
+import {
+  isOnRoot,
+  PageParentId,
+  PageReference,
+  PageRoot,
+  PageRootKey,
+} from "@core/state";
+import { groupbyPageParent, sortAsGroupping } from "./tree-handle";
+import { dummy_2_as_arr } from "./__test__/dummy-data";
 
 const Container = styled.div(({ theme }) => ({
   height: "200px",
@@ -30,21 +38,16 @@ const Header = styled.div(({ theme }) => ({
   alignItems: "center",
 }));
 
-interface IPageInfo {
+interface IPageData<T = any> {
   id: string;
   name: string;
-  parent?: string;
+  parent?: PageParentId;
+  children?: IPageData[];
 }
 
-interface IPageInfoObj {
-  id: string;
-  name: string;
-  children: IPageInfoObj[];
-}
-
-interface Props {
+interface PageListContentProps {
   selectedPageId: string;
-  pageInfo: IPageInfo[];
+  pageInfo?: IPageData[];
   canDelete: boolean;
 }
 
@@ -52,7 +55,7 @@ const PageListContent = memo(function PageListContent({
   selectedPageId,
   pageInfo,
   canDelete,
-}: Props) {
+}: PageListContentProps) {
   const dispatch = useDispatch();
 
   const menuItems: MenuItem<PageMenuItemType>[] = useMemo(
@@ -94,38 +97,36 @@ const PageListContent = memo(function PageListContent({
   const handleAddPage = useCallback(
     (parent: PageParentId) => {
       const name = prompt("New page Name");
-
+      const parnetInfo = getpage(parent).children;
+      const childLength = parnetInfo.length;
+      const sort = 100 * childLength;
       if (name !== null)
         dispatch({
           type: "add-page",
           name,
           parent,
+          sort,
         });
     },
     [dispatch]
   );
 
-  function getRowDepth(page: IPageInfo, pageIndex: number): number {
-    let depth = 0;
-    let parentArr = pageIndex;
-    let _pageParent = page.parent;
-    while (pageIndex !== 0) {
-      const res = pageInfo
-        .slice(0, parentArr)
-        .find((_page) => _page.id === _pageParent);
-      if (!res) {
-        break;
-      }
+  function getpage(id): IPageData {
+    return pageInfo.find((p) => p.id == id);
+  }
+  function getRowDepth(page: IPageData, depth: number): number {
+    if (!isOnRoot(page)) {
       depth++;
-      parentArr = pageInfo.indexOf(res);
-      _pageParent = pageInfo[parentArr].parent;
+      const parentArr = getpage(page.parent);
+      depth = getRowDepth(parentArr, depth);
     }
     return depth;
   }
 
   const pageElements = useMemo(() => {
     return pageInfo.map((page, i) => {
-      const _depth = getRowDepth(page, i);
+      let initDepth = 0;
+      const _depth = getRowDepth(page, initDepth);
 
       return (
         <PageRow
@@ -200,42 +201,15 @@ export function PageList() {
   const [state] = useApplicationState();
   const pages = state.pages;
 
-  const pagesSort: IPageInfo[] = useMemo(() => {
-    function createTree(nodes: IPageInfo[], parentId: string) {
-      const _tree = nodes
-        .filter((node) => node.parent === parentId)
-        .reduce(
-          (tree, node) => [
-            ...tree,
-            {
-              ...node,
-              children: createTree(nodes, node.id),
-            },
-          ],
-          []
-        );
-      return _tree;
-    }
+  console.log(dummy_2_as_arr);
+  const test1 = groupbyPageParent(dummy_2_as_arr);
 
-    const tree = createTree(pages, pages[0].parent);
-    let _arr = [];
-
-    function treeArray(_tree: IPageInfoObj[]) {
-      _tree.map((page) => {
-        _arr.push(page);
-        if (page.children.length > 0) {
-          treeArray(page.children);
-        }
-      });
-    }
-    treeArray(tree);
-    return _arr;
-  }, [pages]);
+  const test2 = sortAsGroupping(test1);
 
   return (
     <PageListContent
       selectedPageId={state.selectedPage}
-      pageInfo={pagesSort}
+      pageInfo={test2}
       canDelete={state.pages.length > 1}
     />
   );
