@@ -14,6 +14,7 @@ export function useCurrentPage() {
         id: _pageid,
         name: undefined,
         document: undefined,
+        sort: 0, // fixme
         type: "boring-document",
       });
     } else {

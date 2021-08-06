@@ -50,6 +50,7 @@ export const createPage = (
       id: id,
       type: "boring-document",
       name: name,
+      sort: 0, // FIXME: - sort = parent.children => lowestSort - 1
       document: document,
       parent: selectedPage,
     },
@@ -80,7 +81,7 @@ export function pageReducer(
     case "add-page": {
       return produce(state, (draft) => {
         <AddPageAction>action;
-        const newPage = createPage(draft.pages,draft.selectedPage, action);
+        const newPage = createPage(draft.pages, draft.selectedPage, action);
         draft.selectedPage = newPage.id;
       });
     }
@@ -137,11 +138,11 @@ export function pageReducer(
 
       return produce(state, (draft) => {
         const sourceItem = draft.pages[originOrder];
-        
+
         draft.pages.splice(originOrder, 1);
         draft.pages.splice(targetOrder, 0, sourceItem);
         //@ts-ignore
-        draft.pages[originOrder].parent = targetParent
+        draft.pages[originOrder].parent = targetParent;
       });
     }
     default:
