@@ -63,6 +63,13 @@ const _root_page_1 = {
   // children: [_1, _2, _3],
   sort: 0,
 };
+const _root_page_2 = {
+  id: "built-in/getting",
+  name: "_root_page_1",
+  parent: undefined,
+  // children: [_1, _2, _3],
+  sort: 0,
+};
 
 /// ====
 export const dummy_2_as_arr = [
@@ -119,118 +126,3 @@ const dummy_1_as_tree = [_root_page_1];
 //
 
 //
-
-const dummy2 = [
-  {
-    type: "boring-document",
-    id: "built-in/getting-started",
-    name: "Getting started",
-    children: [
-      {
-        id: "l7SItWWP5oPxU0NfFfdQZ",
-        type: "boring-document",
-        name: "543-1",
-        parent: "built-in/getting-started",
-        children: [
-          {
-            id: "5uKNIP5B96Fzm9cfkcGGO",
-            type: "boring-document",
-            name: "2453d",
-            parent: "l7SItWWP5oPxU0NfFfdQZ",
-            children: [
-              {
-                id: "d-LzaRm0DZ3ZRf50_ZCtx",
-                type: "boring-document",
-                name: "asf",
-                parent: "5uKNIP5B96Fzm9cfkcGGO",
-                children: [],
-              },
-            ],
-          },
-        ],
-      },
-      {
-        id: "Zkn66ll31HLlJ2ogi025G",
-        type: "boring-document",
-        name: "123d",
-        parent: "built-in/getting-started",
-        children: [
-          {
-            id: "yAUigOk68LtwpeK8tFqkm",
-            type: "boring-document",
-            name: "3213f",
-            parent: "Zkn66ll31HLlJ2ogi025G",
-            children: [],
-          },
-        ],
-      },
-    ],
-  },
-  {
-    id: "l7SItWWP5oPxU0NfFfdQZ",
-    type: "boring-document",
-    name: "543-1",
-    parent: "built-in/getting-started",
-    children: [
-      {
-        id: "5uKNIP5B96Fzm9cfkcGGO",
-        type: "boring-document",
-        name: "2453d",
-        parent: "l7SItWWP5oPxU0NfFfdQZ",
-        children: [
-          {
-            id: "d-LzaRm0DZ3ZRf50_ZCtx",
-            type: "boring-document",
-            name: "asf",
-            parent: "5uKNIP5B96Fzm9cfkcGGO",
-            children: [],
-          },
-        ],
-      },
-    ],
-  },
-  {
-    id: "5uKNIP5B96Fzm9cfkcGGO",
-    type: "boring-document",
-    name: "2453d",
-    parent: "l7SItWWP5oPxU0NfFfdQZ",
-    children: [
-      {
-        id: "d-LzaRm0DZ3ZRf50_ZCtx",
-        type: "boring-document",
-        name: "asf",
-        parent: "5uKNIP5B96Fzm9cfkcGGO",
-        children: [],
-      },
-    ],
-  },
-  {
-    id: "d-LzaRm0DZ3ZRf50_ZCtx",
-    type: "boring-document",
-    name: "asf",
-    parent: "5uKNIP5B96Fzm9cfkcGGO",
-    children: [],
-  },
-  {
-    id: "Zkn66ll31HLlJ2ogi025G",
-    type: "boring-document",
-    name: "123d",
-    parent: "built-in/getting-started",
-    children: [
-      {
-        id: "yAUigOk68LtwpeK8tFqkm",
-        type: "boring-document",
-        name: "3213f",
-        parent: "Zkn66ll31HLlJ2ogi025G",
-        children: [],
-      },
-    ],
-  },
-  {
-    id: "yAUigOk68LtwpeK8tFqkm",
-    type: "boring-document",
-    name: "3213f",
-    parent: "Zkn66ll31HLlJ2ogi025G",
-    children: [],
-  },
-];

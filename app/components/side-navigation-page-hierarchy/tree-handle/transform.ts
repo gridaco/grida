@@ -1,23 +1,19 @@
-import { PageTree } from "./model";
 import _, { Dictionary } from "lodash";
-import {
-  isOnRoot,
-  PageId,
-  PageParentId,
-  PageReference,
-  PageRootKey,
-} from "@core/state";
+import { isOnRoot, PageId, PageRootKey } from "@core/state";
 
-interface IPage {
-  id: string;
-  parent?: string;
+interface pageInfo {
+  id: PageId;
+  name: string;
+  parent?: string; // fixme
+  children?: pageInfo[];
 }
 
-export function groupbyPageParent(
-  arr: PageReference[]
-): Dictionary<PageReference[]> {
-  const _arr: PageReference[] = [];
-  var grouped: Dictionary<PageReference[]> = _.groupBy(arr, (item) => {
+/**
+ *
+ * groupbyPageParent is for grouping based on the parent value and sorting with the same depth .
+ */
+export function groupbyPageParent(arr: pageInfo[]): _.Dictionary<pageInfo[]> {
+  var grouped: Dictionary<pageInfo[]> = _.groupBy(arr, (item) => {
     if (isOnRoot(item)) {
       return PageRootKey;
     }
@@ -34,59 +30,36 @@ export function groupbyPageParent(
       }
       return 0;
     });
-    grouped[key].map((row: PageReference) => {
-      _arr.push(row);
-    });
   });
-
-  _arr.map((row: PageReference, i: number) => {
-    const isParentRow = !!grouped[row.id];
-    const hasChildArr = _arr[i].children;
-
-    if (isParentRow) {
-      console.log(grouped[row.id]);
-      grouped[row.id].map((_row) => {
-        if (hasChildArr) {
-          _arr[i].children.push(_row);
-        } else {
-          _arr[i].children[0] = _row;
-        }
-      });
-    }
-    return row;
-  });
-  console.log(_arr);
 
   return grouped;
 }
 
-export function sortAsGroupping(groupByKey: PageReference[]): PageTree {
-  const arr: PageTree = [];
-  //   const rootArr = groupByKey[PageRootKey];
-  const _arr: PageReference[] = [];
+/**
+ * sortAsGroupping is for sorting the order (only arr's index) in which the treeview is rendered.
+ **/
+export function sortAsGroupping(
+  groupByKey: _.Dictionary<pageInfo[]>
+): pageInfo[] {
+  const arr: pageInfo[] = [];
+  const rootArr = groupByKey[PageRootKey];
 
-  Object.keys(groupByKey).map((key: string, i: number) => {
-    groupByKey[key].map((row: PageReference) => {
-      _arr.push(row);
+  /**
+   * When calling for the first time,
+   * put rootId as @param _arr  and add the root row sorted
+   * through A to the array first.
+   */
+  function addChildAsArr(_arr: pageInfo[]) {
+    _arr.forEach((row) => {
+      arr.push(row);
+      const rowChild = groupByKey[row.id];
+      if (rowChild !== undefined) {
+        addChildAsArr(rowChild);
+      }
     });
-  });
-  //   console.log(_arr);
-
-  //   _arr.map((t:PageReference)=>{
-  //     if()
-  //   })
-
-  function pushArr(_arr: PageTree) {
-    // _arr.map((row, i) => {
-    //   arr.push(row);
-    //   if (row.children) {
-    //     pushArr(row.children);
-    //   }
-    // });
   }
-  //   pushArr(groupByKey);
 
-  //   console.log(arr);
+  addChildAsArr(rootArr);
 
   return arr;
 }
