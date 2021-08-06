@@ -1,4 +1,4 @@
-import React, { memo, useCallback, useMemo } from "react";
+import React, { memo, useCallback, useMemo, useState } from "react";
 import { PlusIcon } from "@radix-ui/react-icons";
 import { Spacer } from "@editor-ui/spacer";
 import { Button } from "@editor-ui/button";
@@ -201,15 +201,14 @@ export function PageList() {
   const [state] = useApplicationState();
   const pages = state.pages;
 
-  console.log(dummy_2_as_arr);
-  const test1 = groupbyPageParent(dummy_2_as_arr);
+  const grounpAsPages = groupbyPageParent(pages);
 
-  const test2 = sortAsGroupping(test1);
+  const sortAsPages = sortAsGroupping(grounpAsPages);
 
   return (
     <PageListContent
       selectedPageId={state.selectedPage}
-      pageInfo={test2}
+      pageInfo={sortAsPages}
       canDelete={state.pages.length > 1}
     />
   );
