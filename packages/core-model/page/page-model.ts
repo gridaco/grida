@@ -2,7 +2,7 @@ import { BoringDocument } from "@boring.so/document-model";
 
 export type PageId = string;
 
-export interface PageReference {
+export interface PageReference extends IPageHierarchyReference {
   id: PageId;
   type: "boring-document" | "nothing-document";
   name: string;
