@@ -1,9 +1,12 @@
-export interface ISortGroup {
+export interface IIdentifier {
+  id: string;
+}
+export interface ISortGroup extends IIdentifier {
   id: string; // as in id of this group. (parent)
   children: ISortItem[];
 }
 
-export interface ISortItem {
+export interface ISortItem extends IIdentifier {
   id: string;
   sort: number;
 }
@@ -19,7 +22,7 @@ export function movementDiff({
     smallstep: 1,
   },
 }: {
-  item: ISortItem;
+  item: IIdentifier;
   prevgroup: ISortGroup;
   postgroup: ISortGroup;
   prevorder: number;
@@ -67,6 +70,7 @@ export function movementDiff({
 
   const _moved: SingleSortItemMoveResult = {
     id: item.id,
+    sort: post.insert.sort,
     originParent: prevgroup.id,
     originOrder: prevorder,
     targetParent: postgroup.id,
@@ -88,7 +92,10 @@ export function movementDiff({
   };
 }
 
-interface __InsertResult<T extends ISortItem = any, O = any> {
+interface __InsertResult<
+  T extends ISortItem = any,
+  O extends ISortItem = ISortItem
+> {
   insert: O;
   data: (T | O)[];
   shifted: T[];
@@ -106,7 +113,7 @@ export function __insert<T extends ISortItem = any, O = any>({
   insert: O;
   insertat: number;
   data: T[];
-}): __InsertResult<T, O> {
+}): __InsertResult<T, any> {
   if (insertat < 0 || insertat == undefined) {
     throw "`insertat` cannot be negative value or empty";
   }
@@ -181,6 +188,7 @@ export interface MoveSortItemDiffResult {
 
 export interface SingleSortItemMoveResult {
   id: string;
+  sort: number;
   originParent: string;
   originOrder: number;
   targetParent: string;

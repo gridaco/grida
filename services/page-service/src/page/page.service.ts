@@ -1,7 +1,9 @@
 import { Injectable } from '@nestjs/common';
 import { DocumentService } from '../document/document.service';
 import { PrismaService } from '../_prisma/prisma.service';
-import { MoveSortItemDiffResult } from 'treearray';
+import { movementDiff, MoveSortItemDiffResult } from 'treearray';
+
+const _DEFAULT_PERFORMANCE_BOOST_STEP = 1000;
 
 @Injectable()
 export class PageService {
@@ -81,23 +83,59 @@ export class PageService {
   }): Promise<MoveSortItemDiffResult> {
     // list all pages under parent.
     // alias (parent's children) previously before target (this page) is being moved.
-    const prev_alias = await this.prisma.page.findMany({
+    const prevgroup = await this.prisma.page.findMany({
       select: {
         id: true,
         sort: true,
       },
       where: {
-        parentId: p.targetParent,
+        parentId: p.originParent, // ORIGIN PARENT
         workspace: p.workspace, // this field is required since root pages' parent are shared.
       },
     });
 
-    prev_alias.forEach((p) => {
-      //
+    const postgroup = await this.prisma.page.findMany({
+      select: {
+        id: true,
+        sort: true,
+      },
+      where: {
+        parentId: p.targetParent, // TARGET PARENT
+        workspace: p.workspace, // this field is required since root pages' parent are shared.
+      },
     });
 
+    const diff = movementDiff({
+      options: {
+        bigstep: _DEFAULT_PERFORMANCE_BOOST_STEP,
+      },
+      item: { id: p.id },
+      prevgroup: {
+        id: p.originParent,
+        children: prevgroup,
+      },
+      postgroup: {
+        id: p.targetParent,
+        children: postgroup,
+      },
+      prevorder: p.originOrder,
+      postorder: p.targetOrder,
+    });
+
+    // update shifted pages
+    for (const shifting of diff.post.updates) {
+      await this.prisma.page.update({
+        where: {
+          id: shifting.id,
+        },
+        data: {
+          sort: shifting.sort,
+        },
+      });
+    }
+
     // update target selected page
-    const moved = await this.prisma.page.update({
+    await this.prisma.page.update({
       where: {
         id: p.id,
       },
@@ -107,18 +145,10 @@ export class PageService {
             id: p.targetParent,
           },
         },
-        sort: 0,
+        sort: diff.post.moved.sort,
       },
     });
-    return <MoveSortItemDiffResult>{
-      parent: p.targetParent,
-      updates: [
-        /* add here */
-      ],
-      moved: {
-        ...moved,
-        ...p,
-      },
-    };
+
+    return diff.post;
   }
 }
