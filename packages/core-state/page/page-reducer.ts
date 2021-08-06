@@ -6,6 +6,8 @@ import {
   DuplicateCurrentPageAction,
   IAddPageAction,
   PageAction,
+  PageRoot,
+  PageRootKey,
   RenameCurrentPageAction,
   SelectPageAction,
 } from "./page-action";
@@ -17,6 +19,7 @@ import {
   BoringDocument,
   BoringTitleLike,
   boringTitleLikeAsBoringTitle,
+  EmptyDocument,
 } from "@boring.so/document-model";
 
 // store
@@ -25,6 +28,7 @@ import { setSelectedPage } from "@core/store/application";
 
 export const createPage = (
   pages: PageReference[],
+  selectedPage: string,
   params: IAddPageAction
 ): Page => {
   const { name, initial } = params;
@@ -41,6 +45,8 @@ export const createPage = (
       content: _r.content,
     });
     // content = _r.content;
+  } else {
+    document = new EmptyDocument();
   }
 
   const id = nanoid();
@@ -49,7 +55,9 @@ export const createPage = (
       id: id,
       type: "boring-document",
       name: name,
+      sort: 0, // FIXME: - sort = parent.children => lowestSort - 1
       document: document,
+      parent: selectedPage,
     },
     (page) => {
       return page;
@@ -78,7 +86,7 @@ export function pageReducer(
     case "add-page": {
       return produce(state, (draft) => {
         <AddPageAction>action;
-        const newPage = createPage(draft.pages, action);
+        const newPage = createPage(draft.pages, draft.selectedPage, action);
         draft.selectedPage = newPage.id;
       });
     }
@@ -131,13 +139,77 @@ export function pageReducer(
     case "move-page": {
       const { originOrder, targetOrder, originParent, targetParent } = action;
 
-      // @todo - add nested page support
-
       return produce(state, (draft) => {
-        const sourceItem = draft.pages[originOrder];
+        const _id = getCurrentPage(state).id;
+        const movingPage = draft.pages.find((p) => p.id === _id);
 
-        draft.pages.splice(originOrder, 1);
-        draft.pages.splice(targetOrder, 0, sourceItem);
+        // region handle parent change
+        // change of parent is optional.
+        // if parent changed
+        if (originParent !== targetParent) {
+          let newParent;
+          if (targetParent == PageRoot) {
+            newParent = PageRootKey;
+          } else {
+            newParent = targetParent;
+          }
+          draft.pages[originOrder].parent = newParent;
+        }
+        const parent = draft.pages[originOrder].parent;
+        // endregion handle parent change
+
+        const itemsOnSameHierarchy = draft.pages
+          .filter((p) => p.parent == parent && p.id !== _id)
+          .sort((p1, p2) => p1.sort - p2.sort);
+
+        /**
+         * index of next/prev items on same hierarchy
+         * [0, 1, | target-order:2 | 2, 3, 4] -> item's index (next, prev)  = (2, 1)
+         * [0, 1, 2, 3, 4 | target-order:5 | ] -> item's index (next, prev)  = (-1, 4)
+         **/
+        const indexOfItemOnSameHierarchy__next =
+          targetOrder === draft.pages.length ? -1 : targetOrder;
+        const indexOfItemOnSameHierarchy__prev =
+          targetOrder !== draft.pages.length ? targetOrder - 1 : targetOrder;
+
+        /**
+         * sort of next/prev items on same hierarchy
+         * - `[{s:0}, {s:1}, | target-order:2 | {s:2}, {s:3}, {s:4}]` -> `(1, 2)`
+         * - `[ | target-order:0 | {s:0}, {s:1}, {s:2}, {s:3}, {s:4}]` -> `(undefined, 0)`
+         * - `[{s:0}, {s:1}, {s:2}, {s:3}, {s:4}, | target-order:2 |]` -> `(4, undefined)`
+         **/
+        const sortOfItemOnSameHierarchy__next =
+          itemsOnSameHierarchy[indexOfItemOnSameHierarchy__next]?.sort;
+        const sortOfItemOnSameHierarchy__prev =
+          itemsOnSameHierarchy[indexOfItemOnSameHierarchy__prev]?.sort;
+        const isMovingToFirst = sortOfItemOnSameHierarchy__prev === undefined;
+        const isMovingToLast = sortOfItemOnSameHierarchy__next === undefined;
+
+        // region assign sort
+        let newSort;
+        // is moving to first
+        if (isMovingToFirst) {
+          // in this case, we have two optoins.
+          // 1. move to first via (n - 1)
+          // 2. move others to back via (n + 1)
+          newSort = sortOfItemOnSameHierarchy__next - 1;
+        }
+        // is adding to last
+        else if (isMovingToLast) {
+          newSort = sortOfItemOnSameHierarchy__prev + 1;
+        }
+        // is insering middle of array
+        else {
+          console.log("sourceItem", movingPage);
+          movingPage.sort = sortOfItemOnSameHierarchy__prev + 1;
+          itemsOnSameHierarchy.forEach((p, i) => {
+            if (p.sort > sortOfItemOnSameHierarchy__prev) {
+              // push each forward after the inserted index
+              p.sort = p.sort + 1;
+            }
+          });
+        }
+        // endregion
       });
     }
     default:

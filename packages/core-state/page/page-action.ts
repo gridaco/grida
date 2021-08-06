@@ -9,7 +9,11 @@ export type PageAction =
   | RenameCurrentPageAction // [type: "renamePage", name: string]
   | DuplicateCurrentPageAction; //  [type: "duplicatePage"];
 
-export const PageRoot: unique symbol = Symbol("page-root");
+/**
+ * !!DO NOT CHANGE VALUE!! key string indicating that the page is under root.
+ * */
+export const PageRootKey = "page-root";
+export const PageRoot: unique symbol = Symbol(PageRootKey);
 export type PageParentId = PageId | typeof PageRoot;
 
 /**
@@ -32,7 +36,9 @@ export interface AddPageAction extends IAddPageAction {
 
 export interface MovePageAction {
   type: "move-page";
+  /** origin order. this is not a sort value. sort value will be assigned on this action's handler. this is a absolute order (index) under its parent, calculated on view side. */
   originOrder: number;
+  /** target order. this is not a sort value. sort value will be assigned on this action's handler. this is a absolute order (index) under its parent, calculated on view side. */
   targetOrder: number;
   originParent: PageParentId;
   targetParent: PageParentId;

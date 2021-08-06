@@ -35,7 +35,6 @@ type LayerListItem = {
   type: LayerType;
   id: string;
   name: string;
-  depth: number;
   expanded: boolean;
   selected: boolean;
   visible: boolean;

@@ -11,6 +11,11 @@ import { BoringDocument } from "@boring.so/document-model";
    * linked page document id
    */
   document: string;
+
+  /** parent page id of this page */
+  parent?: string;
+  /** sorting under parent */
+  sort: number;
 }
 
 /**
@@ -103,6 +108,7 @@ export class PageStore extends BaseSimpleModelIdbStore<Page, PageStoreModel> {
     return {
       id: p.id,
       name: p.name,
+      sort: p.sort,
       document: await doc(p.document),
       type: p.type,
     };

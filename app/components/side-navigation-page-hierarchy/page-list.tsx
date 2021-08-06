@@ -30,9 +30,21 @@ const Header = styled.div(({ theme }) => ({
   alignItems: "center",
 }));
 
+interface IPageInfo {
+  id: string;
+  name: string;
+  parent?: string;
+}
+
+interface IPageInfoObj {
+  id: string;
+  name: string;
+  children: IPageInfoObj[];
+}
+
 interface Props {
   selectedPageId: string;
-  pageInfo: { id: string; name: string }[];
+  pageInfo: IPageInfo[];
   canDelete: boolean;
 }
 
@@ -87,42 +99,65 @@ const PageListContent = memo(function PageListContent({
         dispatch({
           type: "add-page",
           name,
-          parent: parent,
+          parent,
         });
     },
     [dispatch]
   );
 
+  function getRowDepth(page: IPageInfo, pageIndex: number): number {
+    let depth = 0;
+    let parentArr = pageIndex;
+    let _pageParent = page.parent;
+    while (pageIndex !== 0) {
+      const res = pageInfo
+        .slice(0, parentArr)
+        .find((_page) => _page.id === _pageParent);
+      if (!res) {
+        break;
+      }
+      depth++;
+      parentArr = pageInfo.indexOf(res);
+      _pageParent = pageInfo[parentArr].parent;
+    }
+    return depth;
+  }
+
   const pageElements = useMemo(() => {
-    return pageInfo.map((page) => (
-      <PageRow
-        name={page.name}
-        depth={0}
-        id={page.id}
-        key={page.id}
-        selected={selectedPageId === page.id}
-        onAddClick={() => {
-          handleAddPage(page.id);
-        }}
-        onMenuClick={() => {
-          console.log("not implemented");
-        }}
-        onClick={() => {
-          dispatch({
-            type: "select-page",
-            page: page.id,
-          });
-        }}
-        menuItems={menuItems}
-        onSelectMenuItem={handleSelectMenuItem}
-        onContextMenu={() => {
-          dispatch({
-            type: "select-page",
-            page: page.id,
-          });
-        }}
-      />
-    ));
+    return pageInfo.map((page, i) => {
+      const _depth = getRowDepth(page, i);
+
+      return (
+        <PageRow
+          name={page.name}
+          depth={_depth}
+          id={page.id}
+          key={page.id}
+          expanded={true}
+          selected={selectedPageId === page.id}
+          onAddClick={() => {
+            handleAddPage(page.id);
+          }}
+          onMenuClick={() => {
+            console.log("not implemented");
+          }}
+          onClick={() => {
+            dispatch({
+              type: "select-page",
+              page: page.id,
+            });
+          }}
+          menuItems={menuItems}
+          onSelectMenuItem={handleSelectMenuItem}
+          onContextMenu={() => {
+            dispatch({
+              type: "select-page",
+              page: page.id,
+            });
+          }}
+        />
+      );
+    });
   }, [pageInfo, selectedPageId, menuItems, handleSelectMenuItem, dispatch]);
 
   return (
@@ -148,11 +183,11 @@ const PageListContent = memo(function PageListContent({
               type: "move-page",
               originOrder,
               targetOrder,
-              originParent: "", // todo
-              targetParent: "", // todo
+              originParent: pageInfo[originOrder].parent, //todo
+              targetParent: pageInfo[targetOrder].parent, // todo
             });
           },
-          [dispatch]
+          [pageInfo, dispatch]
         )}
       >
         {pageElements}
@@ -163,13 +198,44 @@ const PageListContent = memo(function PageListContent({
 
 export function PageList() {
   const [state] = useApplicationState();
-
   const pages = state.pages;
+
+  const pagesSort: IPageInfo[] = useMemo(() => {
+    function createTree(nodes: IPageInfo[], parentId: string) {
+      const _tree = nodes
+        .filter((node) => node.parent === parentId)
+        .reduce(
+          (tree, node) => [
+            ...tree,
+            {
+              ...node,
+              children: createTree(nodes, node.id),
+            },
+          ],
+          []
+        );
+      return _tree;
+    }
+
+    const tree = createTree(pages, pages[0].parent);
+    let _arr = [];
+
+    function treeArray(_tree: IPageInfoObj[]) {
+      _tree.map((page) => {
+        _arr.push(page);
+        if (page.children.length > 0) {
+          treeArray(page.children);
+        }
+      });
+    }
+    treeArray(tree);
+    return _arr;
+  }, [pages]);
 
   return (
     <PageListContent
       selectedPageId={state.selectedPage}
-      pageInfo={pages}
+      pageInfo={pagesSort}
       canDelete={state.pages.length > 1}
     />
   );
