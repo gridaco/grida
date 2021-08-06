@@ -123,26 +123,53 @@ export function movePreview({
   };
 }
 
-export function __insert<T extends { sort: number }, O = T>(
+export function __insert<T extends ISortItem = any, O = any>({
+  step: { big, small = 1 },
+  insert,
+  insertat,
+  data,
+}: {
   step: {
     big: number;
     small?: number;
-  },
-  insert: O,
-  insertat: number,
-  data: T[]
-): { insert: O; data: (T | O)[] } {
+  };
+  insert: O;
+  insertat: number;
+  data: T[];
+}): { insert: O; data: (T | O)[]; shifted: T[] } {
+  if (insertat < 0 || insertat == undefined) {
+    throw "`insertat` cannot be negative value or empty";
+  }
+
+  const _len = data.length;
+  const _is_insert_at_last = _len < insertat;
+  /* polish insertat */ insertat = _is_insert_at_last ? _len : insertat;
+
   /* sorting is required before running loop (for slicing) */ const sorted =
     data
       .sort((d1, d2) => d1.sort - d2.sort)
       .slice(insertat, data.length); /* from cursor to end of the data */
 
+  const cursorSort = data[_is_insert_at_last ? insertat - 1 : insertat].sort;
+  const insertingSort = _is_insert_at_last ? cursorSort + 1 : cursorSort;
+  const shifted = [];
   sorted.map((item, i) => {
     let newsort = item.sort;
     let s = 1;
     // .slice(i, data.length)
-    while (newsort <= item.sort || sorted.some((d) => d.sort == newsort)) {
-      newsort = step.big * s;
+    const mustShift = () => {
+      return (
+        newsort < item.sort ||
+        newsort <= cursorSort ||
+        sorted.filter((d) => d.id !== item.id).some((d) => d.sort == newsort)
+      );
+    };
+    if (mustShift()) {
+      shifted.push(item);
+    }
+    while (mustShift()) {
+      newsort += small;
+      // newsort = big * s;
       s++;
     }
     item.sort = newsort;
@@ -152,10 +179,10 @@ export function __insert<T extends { sort: number }, O = T>(
 
   const _insert: O = {
     ...insert,
-    sort: 0,
+    sort: insertingSort,
   };
   (data as (T | O)[]).splice(insertat, 0, _insert); // insert
-  return { data, insert: _insert };
+  return { data, insert: _insert, shifted };
 }
 
 export type MoveBetweenGroupType = "moved-between-group" | "moved-in-group";
