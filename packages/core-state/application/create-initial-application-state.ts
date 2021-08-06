@@ -2,12 +2,15 @@ import { ApplicationState, ApplicationSnapshot } from "./application-state";
 import { getSelectedPage, getSelectedObjects } from "@core/store/application";
 import { PageReference } from "@core/model";
 import { PageStore } from "@core/store";
+import { PageRootKey } from "../page";
 
 const DEFAULT_EMPTYSTATE_STARTING_PAGE = "built-in/getting-started";
 const GETTING_STARTED_PAGE_REFERENCE: PageReference = {
   type: "boring-document",
   id: "built-in/getting-started",
   name: "Getting started",
+  sort: 0,
+  parent: PageRootKey,
 };
 
 export function createInitialApplicationState(
