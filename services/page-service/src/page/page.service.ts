@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { DocumentService } from '../document/document.service';
 import { PrismaService } from '../_prisma/prisma.service';
+import { MoveSortItemDiffResult } from 'treearray';
 
 @Injectable()
 export class PageService {
@@ -8,6 +9,24 @@ export class PageService {
     private readonly prisma: PrismaService,
     private readonly docservice: DocumentService,
   ) {}
+
+  async listPages(p: { workspace: string }) {
+    //
+    return await this.prisma.page.findMany({
+      where: {
+        workspace: p.workspace,
+      },
+      select: {
+        id: true,
+        name: true,
+        type: true,
+        workspace: true,
+        document: true,
+        parentId: true,
+        children: false, // do not include children
+      },
+    });
+  }
 
   async createPage(p: {
     name: string;
@@ -49,7 +68,17 @@ export class PageService {
     });
   }
 
-  async movePage(p: { workspace: string; id: string; targetParent: string }) {
+  async movePage(p: {
+    /**
+     * id of target page to be moved
+     */
+    id: string;
+    workspace: string;
+    originOrder: number;
+    originParent: string;
+    targetParent: string;
+    targetOrder: number;
+  }): Promise<MoveSortItemDiffResult> {
     // list all pages under parent.
     // alias (parent's children) previously before target (this page) is being moved.
     const prev_alias = await this.prisma.page.findMany({
@@ -68,7 +97,7 @@ export class PageService {
     });
 
     // update target selected page
-    await this.prisma.page.update({
+    const moved = await this.prisma.page.update({
       where: {
         id: p.id,
       },
@@ -81,10 +110,15 @@ export class PageService {
         sort: 0,
       },
     });
+    return <MoveSortItemDiffResult>{
+      parent: p.targetParent,
+      updates: [
+        /* add here */
+      ],
+      moved: {
+        ...moved,
+        ...p,
+      },
+    };
   }
-
-  // async sortNewPage(): Promise<number> {
-  //   //
-  //   return 0;
-  // }
 }
