@@ -150,32 +150,39 @@ export function __insert<T extends ISortItem = any, O = any>({
       .sort((d1, d2) => d1.sort - d2.sort)
       .slice(insertat, data.length); /* from cursor to end of the data */
 
-  const cursorSort = data[_is_insert_at_last ? insertat - 1 : insertat].sort;
-  const insertingSort = _is_insert_at_last ? cursorSort + 1 : cursorSort;
+  const cursorItem = data[_is_insert_at_last ? insertat - 1 : insertat];
+  const cursorSort = cursorItem.sort;
+  let insertingSort = cursorSort;
   const shifted = [];
-  sorted.map((item, i) => {
-    let newsort = item.sort;
-    let s = 1;
-    // .slice(i, data.length)
-    const mustShift = () => {
+
+  if (_is_insert_at_last) {
+    insertingSort = Math.ceil((cursorSort + 1) / big) * big;
+  } else {
+    const mustShift = (newsort: number, item: T) => {
       return (
         newsort < item.sort ||
         newsort <= cursorSort ||
         sorted.filter((d) => d.id !== item.id).some((d) => d.sort == newsort)
       );
     };
-    if (mustShift()) {
+
+    const shiftUntil = (item: T) => {
+      let i = 0;
+      let _newsort = item.sort;
+      while (mustShift(_newsort, item)) {
+        _newsort += small;
+        i++;
+      }
+      return i;
+    };
+
+    const _shiftUntil = shiftUntil(cursorItem);
+    sorted.slice(0, _shiftUntil).map((item, i) => {
+      let newsort = item.sort + small;
       shifted.push(item);
-    }
-    while (mustShift()) {
-      newsort += small;
-      // newsort = big * s;
-      s++;
-    }
-    item.sort = newsort;
-    return item;
-  });
-  //
+      item.sort = newsort;
+    });
+  }
 
   const _insert: O = {
     ...insert,
@@ -184,6 +191,23 @@ export function __insert<T extends ISortItem = any, O = any>({
   (data as (T | O)[]).splice(insertat, 0, _insert); // insert
   return { data, insert: _insert, shifted };
 }
+
+const test = __insert({
+  step: {
+    big: 1000,
+  },
+  insert: { id: "new" },
+  insertat: 0,
+  data: [
+    { id: "0", sort: 1 }, // 2
+    { id: "1", sort: 2 }, // 3
+    { id: "2", sort: 3 }, // 4
+    { id: "3", sort: 1000 }, // 1000
+    { id: "4", sort: 1001 }, // 1001
+    { id: "5", sort: 1002 }, // 1002
+    { id: "6", sort: 3000 }, // 3000
+  ],
+});
 
 export type MoveBetweenGroupType = "moved-between-group" | "moved-in-group";
 
