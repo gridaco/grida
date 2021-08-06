@@ -1,0 +1,7 @@
+{
+    "name": "treearray",
+    "version": "0.0.0",
+    "description": "simple package for sorting tree data as in array form of data",
+    "author": "Grida.co",
+    "license": "MIT"
+}
