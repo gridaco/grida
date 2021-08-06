@@ -3,5 +3,8 @@
     "version": "0.0.0",
     "description": "simple package for sorting tree data as in array form of data",
     "author": "Grida.co",
-    "license": "MIT"
+    "license": "MIT",
+    "devDependencies": {
+        "typescript": "^4.3.5"
+    }
 }
