@@ -20,7 +20,7 @@ model Page {
   parent    Page     @relation(fields: [parentId], references: [id])
   parentId  String
   children  Page[]   @relation("PageToPage")
-  sort      Int      @db.SmallInt
+  sort      Int      @db.SmallInt @default(autoincrement())
   
   // defaults
   createdAt DateTime @default(now())
