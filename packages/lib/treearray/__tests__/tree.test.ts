@@ -16,6 +16,7 @@ test("", () => {
       { id: "6", sort: 3000 }, // 3000
     ]
   );
+  console.log(test);
 
   expect("").toBe(""); // dummy
 });
