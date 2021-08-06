@@ -6,7 +6,8 @@
     "license": "MIT",
     "private": false,
     "scripts": {
-        "test": "jest"
+        "test": "jest",
+        "prepack": "yarn test && tsc"
     },
     "devDependencies": {
         "@types/jest": "^26.0.24",
@@ -16,5 +17,13 @@
     },
     "publishConfig": {
         "access": "public"
-    }
+    },
+    "files": [
+        "dist/index.js",
+        "dist/index.d.ts",
+        "dist/**/*.js",
+        "dist/**/*.d.ts",
+        "LICENSE",
+        "README.md"
+    ]
 }

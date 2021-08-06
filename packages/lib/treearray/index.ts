@@ -1,5 +1,3 @@
-//
-
 export interface ISortGroup {
   id: string; // as in id of this group. (parent)
   children: ISortItem[];
@@ -10,7 +8,7 @@ export interface ISortItem {
   sort: number;
 }
 
-export function movePreview({
+export function movementDiff({
   item,
   prevgroup,
   postgroup,
@@ -34,71 +32,38 @@ export function movePreview({
   const movementType: MoveBetweenGroupType =
     prevgroup.id === postgroup.id ? "moved-in-group" : "moved-between-group";
 
-  const diffPrevList = [];
+  let post: __InsertResult;
   switch (movementType) {
     case "moved-in-group":
       //
-      prevgroup.children.forEach((c) => {
-        //
+      const movingDirection = prevorder < postorder ? 0 : -1;
+      const itemexcludedGroup = prevgroup.children.filter(
+        (c) => c.id !== item.id
+      );
+      const postmove = __insert<ISortItem>({
+        step: {
+          big: options.bigstep,
+          small: options.smallstep,
+        },
+        insert: item,
+        insertat: postorder + movingDirection,
+        data: itemexcludedGroup,
       });
+      post = postmove;
       break;
     case "moved-between-group":
-      //
+      const postinsert = __insert<ISortItem>({
+        step: {
+          big: options.bigstep,
+          small: options.smallstep,
+        },
+        insert: item,
+        insertat: postorder,
+        data: postgroup.children,
+      });
+      post = postinsert;
       break;
   }
-
-  const itemsOnSameHierarchy = postgroup.children
-    .filter((p) => p.id !== item.id) // the list shall not include target item for calculation. (?)
-    .sort((p1, p2) => p1.sort - p2.sort);
-
-  /**
-   * index of next/prev items on same hierarchy
-   * [0, 1, | target-order:2 | 2, 3, 4] -> item's index (next, prev)  = (2, 1)
-   * [0, 1, 2, 3, 4 | target-order:5 | ] -> item's index (next, prev)  = (-1, 4)
-   **/
-  const indexOfItemOnSameHierarchy__next =
-    postorder === postgroup.children.length ? -1 : postorder;
-  const indexOfItemOnSameHierarchy__prev =
-    postorder !== postgroup.children.length ? postorder - 1 : postorder;
-
-  /**
-   * sort of next/prev items on same hierarchy
-   * - `[{s:0}, {s:1}, | target-order:2 | {s:2}, {s:3}, {s:4}]` -> `(1, 2)`
-   * - `[ | target-order:0 | {s:0}, {s:1}, {s:2}, {s:3}, {s:4}]` -> `(undefined, 0)`
-   * - `[{s:0}, {s:1}, {s:2}, {s:3}, {s:4}, | target-order:2 |]` -> `(4, undefined)`
-   **/
-  const sortOfItemOnSameHierarchy__next =
-    itemsOnSameHierarchy[indexOfItemOnSameHierarchy__next]?.sort;
-  const sortOfItemOnSameHierarchy__prev =
-    itemsOnSameHierarchy[indexOfItemOnSameHierarchy__prev]?.sort;
-  const isMovingToFirst = sortOfItemOnSameHierarchy__prev === undefined;
-  const isMovingToLast = sortOfItemOnSameHierarchy__next === undefined;
-
-  // region assign sort
-  let newSort;
-  // is moving to first
-  if (isMovingToFirst) {
-    // in this case, we have two optoins.
-    // 1. move to first via (n - 1)
-    // 2. move others to back via (n + 1)
-    newSort = sortOfItemOnSameHierarchy__next - 1;
-  }
-  // is adding to last
-  else if (isMovingToLast) {
-    newSort = sortOfItemOnSameHierarchy__prev + 1;
-  }
-  // is insering middle of array
-  else {
-    console.log("sourceItem", item);
-    item.sort = sortOfItemOnSameHierarchy__prev + 1;
-    itemsOnSameHierarchy.forEach((p, i) => {
-      if (p.sort > sortOfItemOnSameHierarchy__prev) {
-        // push each forward after the inserted index
-        p.sort = p.sort + 1;
-      }
-    });
-  }
-  // endregion
 
   const _moved: SingleSortItemMoveResult = {
     id: item.id,
@@ -117,12 +82,17 @@ export function movePreview({
     },
     post: {
       parent: postgroup.id,
-      updates: [_moved], // FIXME:
-      moved: _moved, // FIXME:
+      updates: post.shifted,
+      moved: _moved,
     },
   };
 }
 
+interface __InsertResult<T extends ISortItem = any, O = any> {
+  insert: O;
+  data: (T | O)[];
+  shifted: T[];
+}
 export function __insert<T extends ISortItem = any, O = any>({
   step: { big, small = 1 },
   insert,
@@ -136,7 +106,7 @@ export function __insert<T extends ISortItem = any, O = any>({
   insert: O;
   insertat: number;
   data: T[];
-}): { insert: O; data: (T | O)[]; shifted: T[] } {
+}): __InsertResult<T, O> {
   if (insertat < 0 || insertat == undefined) {
     throw "`insertat` cannot be negative value or empty";
   }
@@ -191,23 +161,6 @@ export function __insert<T extends ISortItem = any, O = any>({
   (data as (T | O)[]).splice(insertat, 0, _insert); // insert
   return { data, insert: _insert, shifted };
 }
-
-const test = __insert({
-  step: {
-    big: 1000,
-  },
-  insert: { id: "new" },
-  insertat: 0,
-  data: [
-    { id: "0", sort: 1 }, // 2
-    { id: "1", sort: 2 }, // 3
-    { id: "2", sort: 3 }, // 4
-    { id: "3", sort: 1000 }, // 1000
-    { id: "4", sort: 1001 }, // 1001
-    { id: "5", sort: 1002 }, // 1002
-    { id: "6", sort: 3000 }, // 3000
-  ],
-});
 
 export type MoveBetweenGroupType = "moved-between-group" | "moved-in-group";
 

@@ -1,3 +1,9 @@
 {
-  "exclude": ["__test__", "dist", "node_modules"]
+  "extends": "../tsconfig.build.json",
+  "compilerOptions": {
+    "outDir": "dist",
+    "rootDir": "."
+  },
+  "exclude": ["__test__", "dist", "node_modules"],
+  "files": ["index.ts"]
 }
