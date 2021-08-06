@@ -94,16 +94,22 @@ export class PageService {
       },
     });
 
-    const postgroup = await this.prisma.page.findMany({
-      select: {
-        id: true,
-        sort: true,
-      },
-      where: {
-        parentId: p.targetParent, // TARGET PARENT
-        workspace: p.workspace, // this field is required since root pages' parent are shared.
-      },
-    });
+    let postgroup;
+    if (p.originParent == p.targetParent) {
+      postgroup = prevgroup;
+    } else {
+      // only fetch when moving between target
+      postgroup = await this.prisma.page.findMany({
+        select: {
+          id: true,
+          sort: true,
+        },
+        where: {
+          parentId: p.targetParent, // TARGET PARENT
+          workspace: p.workspace, // this field is required since root pages' parent are shared.
+        },
+      });
+    }
 
     const diff = movementDiff({
       options: {
