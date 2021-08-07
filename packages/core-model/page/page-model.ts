@@ -86,3 +86,11 @@ export function isOnRoot(p: { parent?: PageParentId }): boolean {
     p.parent === PageRoot || p.parent === PageRootKey || p.parent === undefined
   );
 }
+
+export function parentPageIdToString(p: PageParentId): string {
+  if (isOnRoot({ parent: p })) {
+    return PageRootKey;
+  } else {
+    return p as string;
+  }
+}

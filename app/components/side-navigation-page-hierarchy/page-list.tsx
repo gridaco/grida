@@ -91,8 +91,6 @@ const PageListContent = memo(function PageListContent({
   const handleAddPage = useCallback(
     (parent: PageParentId) => {
       const name = prompt("New page Name");
-      const parnetInfo = getpage(parent).children;
-      const childLength = parnetInfo.length;
       if (name !== null)
         dispatch({
           type: "add-page",
@@ -171,13 +169,25 @@ const PageListContent = memo(function PageListContent({
       <ListView.Root
         sortable={true}
         onMoveItem={useCallback(
-          (originOrder, targetOrder) => {
+          (originindex, targetindex) => {
+            console.log(originindex, targetindex);
+            const movingitem = pageInfo[originindex];
+            console.log("movingitem", movingitem);
+            const originorder = pageInfo
+              .filter((p) => movingitem.parent === p.parent)
+              .indexOf(movingitem);
+
+            const targetteditem = pageInfo[targetindex]; // FIXME:
+            const targetorder = pageInfo
+              .filter((p) => targetteditem.parent === p.parent)
+              .indexOf(targetteditem);
+
             dispatch({
               type: "move-page",
-              originOrder,
-              targetOrder,
-              originParent: pageInfo[originOrder].parent, //todo
-              targetParent: pageInfo[targetOrder].parent, // todo
+              originOrder: originorder,
+              targetOrder: targetorder,
+              originParent: movingitem.parent,
+              targetParent: targetteditem.parent,
             });
           },
           [pageInfo, dispatch]
@@ -194,6 +204,7 @@ export function PageList() {
   const pages = state.pages;
 
   const grounpAsPages = groupbyPageParent(pages);
+  console.log(pages, grounpAsPages);
 
   const sortAsPages = sortAsGroupping(grounpAsPages);
 

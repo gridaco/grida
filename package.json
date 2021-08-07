@@ -15,7 +15,6 @@
         "externals/design-to-code/packages/coli/packages/*",
         "externals/design-to-code/packages/coli-web-builder/*",
         "boring/packages/*",
-        "services/*-service",
         "ui/editor-ui/packages/*"
     ],
     "scripts": {

@@ -39,7 +39,7 @@ export function movementDiff({
   switch (movementType) {
     case "moved-in-group":
       //
-      const movingDirection = prevorder < postorder ? 0 : -1;
+      // const movingDirection = prevorder < postorder ? 0 : -1;
       const itemexcludedGroup = prevgroup.children.filter(
         (c) => c.id !== item.id
       );
@@ -49,7 +49,7 @@ export function movementDiff({
           small: options.smallstep,
         },
         insert: item,
-        insertat: postorder + movingDirection,
+        insertat: postorder, // + movingDirection,
         data: itemexcludedGroup,
       });
       post = postmove;
@@ -62,7 +62,7 @@ export function movementDiff({
         },
         insert: item,
         insertat: postorder,
-        data: postgroup.children,
+        data: postgroup.children ?? [],
       });
       post = postinsert;
       break;
@@ -115,20 +115,19 @@ export function __insert<T extends ISortItem = any, O = any>({
   data: T[];
 }): __InsertResult<T, any> {
   if (insertat < 0 || insertat == undefined) {
-    throw "`insertat` cannot be negative value or empty";
+    throw `\`insertat\` cannot be negative value or empty. givven was ${insertat}`;
   }
 
-  const _len = data.length;
+  const _len = data?.length ?? 0;
   const _is_insert_at_last = _len < insertat;
   /* polish insertat */ insertat = _is_insert_at_last ? _len : insertat;
 
   /* sorting is required before running loop (for slicing) */ const sorted =
-    data
-      .sort((d1, d2) => d1.sort - d2.sort)
-      .slice(insertat, data.length); /* from cursor to end of the data */
+    data?.sort((d1, d2) => d1.sort - d2.sort)?.slice(insertat, data.length) ??
+    []; /* from cursor to end of the data */
 
-  const cursorItem = data[_is_insert_at_last ? insertat - 1 : insertat];
-  const cursorSort = cursorItem.sort;
+  const cursorItem = data?.[_is_insert_at_last ? insertat - 1 : insertat];
+  const cursorSort = cursorItem?.sort ?? 0;
   let insertingSort = cursorSort;
   const shifted = [];
 
@@ -137,7 +136,7 @@ export function __insert<T extends ISortItem = any, O = any>({
   } else {
     const mustShift = (newsort: number, item: T) => {
       return (
-        newsort < item.sort ||
+        newsort < (item?.sort ?? 0) ||
         newsort <= cursorSort ||
         sorted.filter((d) => d.id !== item.id).some((d) => d.sort == newsort)
       );
@@ -145,7 +144,7 @@ export function __insert<T extends ISortItem = any, O = any>({
 
     const shiftUntil = (item: T) => {
       let i = 0;
-      let _newsort = item.sort;
+      let _newsort = item?.sort ?? 0;
       while (mustShift(_newsort, item)) {
         _newsort += small;
         i++;
