@@ -76,7 +76,7 @@ export const createPage = (
           .filter((p) => p.parent === linkparent)
           .sort((a, b) => a.sort - b.sort)
           .pop();
-        return last.sort + 1;
+        return last?.sort ?? 0 + 1;
       })(), // sort = parent.children => lowestSort + 1
       document: document,
       parent: linkparent,
