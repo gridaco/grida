@@ -29,7 +29,6 @@ export interface IAddPageAction {
    */
   parent?: PageParentId;
   initial?: DocumentInitial;
-  sort: number;
 }
 export interface AddPageAction extends IAddPageAction {
   type: "add-page";

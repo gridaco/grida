@@ -9,15 +9,9 @@ import { useApplicationState, useDispatch } from "@core/app-state";
 
 import { PageMenuItemType } from "./page-menu-item-type";
 import { PageRow } from "./page-row-item";
-import {
-  isOnRoot,
-  PageParentId,
-  PageReference,
-  PageRoot,
-  PageRootKey,
-} from "@core/state";
+import { PageParentId, PageRoot } from "@core/state";
+import { isOnRoot } from "@core/model/page";
 import { groupbyPageParent, sortAsGroupping } from "./tree-handle";
-import { dummy_2_as_arr } from "./__test__/dummy-data";
 
 const Container = styled.div(({ theme }) => ({
   height: "200px",
@@ -99,13 +93,11 @@ const PageListContent = memo(function PageListContent({
       const name = prompt("New page Name");
       const parnetInfo = getpage(parent).children;
       const childLength = parnetInfo.length;
-      const sort = 100 * childLength;
       if (name !== null)
         dispatch({
           type: "add-page",
           name,
           parent,
-          sort,
         });
     },
     [dispatch]
