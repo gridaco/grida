@@ -11,6 +11,7 @@ import { input } from "@designto/config";
 import { hasLinkedFigmaAccount } from "@app/fapi/accounts/linked-accounts";
 import { show_dialog_import_figma_design_after_authentication } from "../../../modals/import-figma-design-after-authentication";
 import { isOneOfDemoDesignUrl, loadDemoDesign } from "../../../built-in-demos";
+import { add_on_current } from "@core/state";
 
 export function ImportDesignWithUrl() {
   const addPage = useAddPage();
@@ -53,6 +54,7 @@ export function ImportDesignWithUrl() {
     addPage({
       name: `Screen : ${v.name}`,
       initial: template,
+      parent: add_on_current,
     });
   };
 

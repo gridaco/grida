@@ -16,6 +16,8 @@ export const PageRootKey = "page-root";
 export const PageRoot: unique symbol = Symbol(PageRootKey);
 export type PageParentId = PageId | typeof PageRoot;
 
+export const add_on_root: unique symbol = Symbol("add_on_root");
+export const add_on_current: unique symbol = Symbol("add_on_current");
 /**
  * add page action triggered by user
  */
@@ -27,7 +29,7 @@ export interface IAddPageAction {
   /**
    * parent page's id
    */
-  parent?: PageParentId;
+  parent?: PageParentId | typeof add_on_root | typeof add_on_current;
   initial?: DocumentInitial;
 }
 export interface AddPageAction extends IAddPageAction {

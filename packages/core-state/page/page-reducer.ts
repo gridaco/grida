@@ -3,6 +3,8 @@ import { getCurrentPage, getCurrentPageIndex } from "./page-selector";
 import { ApplicationState } from "../application";
 import {
   AddPageAction,
+  add_on_current,
+  add_on_root,
   DuplicateCurrentPageAction,
   IAddPageAction,
   PageAction,
@@ -15,7 +17,6 @@ import { Page, PageReference } from "@core/model";
 import { nanoid } from "nanoid";
 import { UnconstrainedTemplate } from "@boring.so/template-provider";
 import {
-  BoringContent,
   BoringDocument,
   BoringTitleLike,
   boringTitleLikeAsBoringTitle,
@@ -31,7 +32,7 @@ export const createPage = (
   selectedPage: string,
   params: IAddPageAction
 ): Page => {
-  const { name, initial } = params;
+  const { name, initial, parent } = params;
   // todo - handle content initialization
 
   let title: BoringTitleLike = name;
@@ -49,15 +50,36 @@ export const createPage = (
     document = new EmptyDocument();
   }
 
+  let linkparent: string;
+  switch (parent) {
+    case add_on_current:
+      linkparent = selectedPage;
+      break;
+    case add_on_root:
+    case PageRootKey:
+    case PageRoot:
+      linkparent = PageRootKey;
+      break;
+    default:
+      linkparent = parent as string;
+      break;
+  }
+
   const id = nanoid();
   const newPage = produce<Page>(
     {
       id: id,
       type: "boring-document",
       name: name,
-      sort: 0, // FIXME: - sort = parent.children => lowestSort - 1
+      sort: (() => {
+        const last = pages
+          .filter((p) => p.parent === linkparent)
+          .sort((a, b) => a.sort - b.sort)
+          .pop();
+        return last.sort + 1;
+      })(), // sort = parent.children => lowestSort + 1
       document: document,
-      parent: selectedPage,
+      parent: linkparent,
     },
     (page) => {
       return page;
