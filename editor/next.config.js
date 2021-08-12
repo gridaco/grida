@@ -1,5 +1,7 @@
 const withTM = require("next-transpile-modules")([
   "@designto/config",
+  "@grida/builder-config-preset",
+  "@grida/builder-platform-types",
   "@designto/code",
   "@designto/token",
   "@designto/flutter",

@@ -10,10 +10,10 @@ import {
 } from "../../layout/panel";
 import { WorkspaceBottomPanelDockLayout } from "../../layout/panel/workspace-bottom-panel-dock-layout";
 import { MonacoEditor } from "../../components/code-editor";
-
+import { react_presets } from "@grida/builder-config-preset";
 export default function DesignToCodeUniversalPage() {
   const design = useDesign();
-  console.log("design", design);
+
   if (!design) {
     return <>Loading..</>;
   }
@@ -27,7 +27,7 @@ export default function DesignToCodeUniversalPage() {
       name: name,
       design: reflect,
     },
-    { framework: "react" }
+    react_presets.react_default
   ); // fixme
 
   //@ts-ignore // FIXME: no ignore
