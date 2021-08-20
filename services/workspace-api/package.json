@@ -1,0 +1,9 @@
+{
+    "name": "@services/workspace",
+    "description": "Grida Workspace Backend services api wrapper for client",
+    "authors": "Grida.co",
+    "version": "0.0.0",
+    "peerDependencies": {
+        "axios": "^0.21.1"
+    }
+}

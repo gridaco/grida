@@ -1,4 +1,10 @@
-import React, { forwardRef, memo, useCallback, useState } from "react";
+import React, {
+  forwardRef,
+  memo,
+  useCallback,
+  useState,
+  ReactNode,
+} from "react";
 import styled from "@emotion/styled";
 import { useTheme } from "@emotion/react";
 import "@editor-ui/theme";
@@ -50,12 +56,14 @@ export const PageRow = memo(
       onHoverChange,
       onAddClick,
       onMenuClick,
+      children,
       ...props
     }: TreeView.TreeRowProps<PageMenuItemType> & {
       name: string;
       selected: boolean;
       onAddClick: () => void;
       onMenuClick: () => void;
+      children?: ReactNode;
     },
     forwardedRef: any
   ) {
@@ -91,6 +99,7 @@ export const PageRow = memo(
           ],
           <Spacer.Horizontal size={6} />
         )}
+        {children}
       </TreeView.Row>
     );
   })

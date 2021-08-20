@@ -1,11 +1,14 @@
 import { BoringDocument } from "@boring.so/document-model";
+import { PageParentId, PageRoot, PageRootKey } from "@core/state";
 
 export type PageId = string;
 
-export interface PageReference {
+export interface PageReference extends IPageHierarchyReference {
   id: PageId;
   type: "boring-document" | "nothing-document";
   name: string;
+  parent?: string; // fixme
+  children?: PageReference[];
 }
 
 /**
@@ -17,7 +20,7 @@ export interface IPageHierarchyReference {
   /** parent page of this page. if on root, it's undefined, also can be `"root"` or `0` */
   parent?: PageId;
   /** index under parent 0 is up (lower is upper in visual tree) */
-  index: string;
+  sort: number;
 }
 
 export type TPageMeta<T = any, V = any> = { [key: string]: V } | T;
@@ -43,7 +46,7 @@ export interface Page<Meta = any>
   parent?: PageId;
 
   /** index under parent 0 is up (lower is upper in visual tree) */
-  index: string;
+  sort: number;
 }
 
 type ObjectLike = object | string;
@@ -76,4 +79,18 @@ type Fetchable<T extends ObjectLike> = T | (() => Promise<T>);
 export interface BoringDocumentPage extends Page {
   type: "boring-document";
   document: PageDocumentLike;
+}
+
+export function isOnRoot(p: { parent?: PageParentId }): boolean {
+  return (
+    p.parent === PageRoot || p.parent === PageRootKey || p.parent === undefined
+  );
+}
+
+export function parentPageIdToString(p: PageParentId): string {
+  if (isOnRoot({ parent: p })) {
+    return PageRootKey;
+  } else {
+    return p as string;
+  }
 }

@@ -3,6 +3,7 @@ import styled from "@emotion/styled";
 import { useAddPage, useDispatch } from "@core/app-state";
 import { PlusIcon } from "@radix-ui/react-icons";
 import { Spacer } from "@editor-ui/spacer";
+import { add_on_root } from "@core/state";
 
 export function AddPageButton() {
   const dispatch = useDispatch();
@@ -14,6 +15,7 @@ export function AddPageButton() {
     if (name !== null)
       addPage({
         name,
+        parent: add_on_root,
       });
   }, [dispatch]);
 

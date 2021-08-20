@@ -8,6 +8,7 @@
         "web",
         "packages/app-*",
         "packages/core-*",
+        "packages/lib/*",
         "externals/base-sdk/*",
         "externals/base-sdk/_firstparty/*",
         "externals/reflect-core/packages/*",
@@ -16,7 +17,6 @@
         "externals/design-to-code/packages/coli/packages/*",
         "externals/design-to-code/packages/coli-web-builder/*",
         "boring/packages/*",
-        "services/*-service",
         "ui/editor-ui/packages/*"
     ],
     "scripts": {

@@ -1,0 +1,13 @@
+version: "3"
+services:
+  database:
+    image: "postgres" # use latest official postgres version
+    command: postgres -c 'max_connections=50' # increase max connections
+    env_file:
+      - database.env # configure postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - database-data:/var/lib/postgresql/data/ # persist data even if container shuts down
+volumes:
+  database-data: # named volumes can be managed easier using docker-compose

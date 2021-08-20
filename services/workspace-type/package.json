@@ -1,0 +1,9 @@
+{
+    "name": "@types/workspace",
+    "description": "Grida Workspace Backend types",
+    "authors": "Grida.co",
+    "version": "0.0.0",
+    "peerDependencies": {
+        "axios": "^0.21.1"
+    }
+}

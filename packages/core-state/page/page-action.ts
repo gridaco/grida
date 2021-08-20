@@ -1,5 +1,5 @@
 import { DocumentInitial } from "@boring.so/loader";
-import { PageId } from "@core/model";
+import type { PageId } from "@core/model";
 
 export type PageAction =
   | MovePageAction //[type: "movePage", sourceIndex: number, destinationIndex: number]
@@ -9,9 +9,15 @@ export type PageAction =
   | RenameCurrentPageAction // [type: "renamePage", name: string]
   | DuplicateCurrentPageAction; //  [type: "duplicatePage"];
 
-export const PageRoot: unique symbol = Symbol("page-root");
+/**
+ * !!DO NOT CHANGE VALUE!! key string indicating that the page is under root.
+ * */
+export const PageRootKey = "page-root";
+export const PageRoot: unique symbol = Symbol(PageRootKey);
 export type PageParentId = PageId | typeof PageRoot;
 
+export const add_on_root: unique symbol = Symbol("add_on_root");
+export const add_on_current: unique symbol = Symbol("add_on_current");
 /**
  * add page action triggered by user
  */
@@ -23,7 +29,7 @@ export interface IAddPageAction {
   /**
    * parent page's id
    */
-  parent?: PageParentId;
+  parent?: PageParentId | typeof add_on_root | typeof add_on_current;
   initial?: DocumentInitial;
 }
 export interface AddPageAction extends IAddPageAction {
@@ -32,7 +38,9 @@ export interface AddPageAction extends IAddPageAction {
 
 export interface MovePageAction {
   type: "move-page";
+  /** origin order. this is not a sort value. sort value will be assigned on this action's handler. this is a absolute order (index) under its parent, calculated on view side. */
   originOrder: number;
+  /** target order. this is not a sort value. sort value will be assigned on this action's handler. this is a absolute order (index) under its parent, calculated on view side. */
   targetOrder: number;
   originParent: PageParentId;
   targetParent: PageParentId;
