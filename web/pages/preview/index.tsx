@@ -86,12 +86,12 @@ export default function Frame() {
       <Wrapper>
         <SideContainer>
           <Background>
-            {/* {appFrame({
+            {appFrame({
               id: query.id,
               framework: query.framework,
               source: source!!,
               language: query.language,
-            })} */}
+            })}
           </Background>
         </SideContainer>
         <SideContainer style={{ width: "45vw" }}>
@@ -145,7 +145,7 @@ export default function Frame() {
     </>
   );
 }
-/*
+
 function appFrame(props: {
   id: string;
   source: string;
@@ -166,21 +166,29 @@ function appFrame(props: {
     case "flutter":
       if (props.language == "js") {
         return (
-          <FrameFlutter
+          <iframe
             id={props.id}
-            src={props.source}
-            language="js"
-            mode={mode}
-          ></FrameFlutter>
+            src={`https://frames-appbox.vercel.app/flutter?src=${props.source}&mode=${mode}&language=js`}
+          />
+          // <FrameFlutter
+          //   id={props.id}
+          //   src={props.source}
+          //   language="js"
+          //   mode={mode}
+          // ></FrameFlutter>
         );
       } else if (props.language == "dart") {
         return (
-          <FrameFlutter
-            key={props.source}
+          <iframe
             id={props.id}
-            src={props.source}
-            language={"dart"}
-          ></FrameFlutter>
+            src={`https://frames-appbox.vercel.app/flutter?src=${props.source}&mode=${mode}&language=dart`}
+          />
+          // <FrameFlutter
+          //   key={props.source}
+          //   id={props.id}
+          //   src={props.source}
+          //   language={"dart"}
+          // ></FrameFlutter>
         );
       }
       return loading;
@@ -190,7 +198,6 @@ function appFrame(props: {
       return loading;
   }
 }
-*/
 
 // opens vs code; code editor for editing this source on developer's local environment.
 const openVSCode = () => {
