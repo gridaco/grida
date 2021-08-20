@@ -3,6 +3,11 @@
     "version": "0.0.0",
     "dependencies": {
         "@base-sdk/functions-code-format": "^0.0.0",
-        "@reflect-blocks/figma-embed": "0.0.4"
+        "@monaco-editor/react": "^4.2.2",
+        "@reflect-blocks/figma-embed": "0.0.4",
+        "monaco-editor": "^0.26.1"
+    },
+    "peerDependencies": {
+        "@types/node": "^16.4.13"
     }
 }
