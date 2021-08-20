@@ -1,0 +1,41 @@
+service:
+  name: workspace-service
+
+useDotenv: true
+
+plugins:
+  - serverless-dotenv-plugin
+  - "@hewmen/serverless-plugin-typescript"
+  - serverless-plugin-optimize
+  - serverless-offline
+  - serverless-domain-manager
+
+custom:
+  customDomain:
+    domainName: g11n.bridged.cc
+    hostedZoneId: us-west-1
+    basePath: ""
+    stage: ${self:provider.stage}
+    createRoute53Record: true
+  serverless-offline:
+    httpPort: 4007
+
+provider:
+  name: aws
+  runtime: nodejs12.x
+  region: us-west-1
+  apiGateway:
+    minimumCompressionSize: 1024
+  environment:
+    AWS_NODEJS_CONNECTION_REUSE_ENABLED: "1"
+
+package:
+  individually: true
+
+functions:
+  main:
+    handler: src/lambda.handler
+    events:
+      - http:
+          method: any
+          path: /{proxy+}
