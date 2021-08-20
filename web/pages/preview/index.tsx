@@ -16,6 +16,8 @@ import Toolbar from "components/toolbar";
 import { checkFrameSourceMode } from "@base-sdk/base/frame-embed";
 import { AppFramework, AppLanguage } from "@base-sdk/base/types";
 import Background from "components/canves/background";
+import { TopBar } from "components/top-bar";
+import { EditorThemeProvider } from "../../../ui/editor-ui/packages/editor-ui-theme";
 
 // const MonacoEditor = dynamic(import("react-monaco-editor"), { ssr: false });
 
@@ -78,70 +80,73 @@ export default function Frame() {
 
   return (
     <>
-      <DashboardAppbar
+      <EditorThemeProvider light>
+        {/* <DashboardAppbar
         title={query.name || "No Name"}
         backButton="DASHBOARD"
         onClickPlay={run}
-      />
-      <Wrapper>
-        <SideContainer>
-          <Background>
-            {appFrame({
-              id: query.id,
-              framework: query.framework,
-              source: source!!,
-              language: query.language,
-            })}
-          </Background>
-        </SideContainer>
-        <SideContainer style={{ width: "45vw" }}>
-          <Toolbar toGlobalization={query.globalizationRedirect}>
-            <ButtonList>
-              <Button
-                style={{
-                  backgroundColor: "#151617",
-                }}
-                onClick={openVSCode}
-              >
-                <ButtonIconImage src="/assets/icons/bridged_brand_icons_vscode_white.svg" />
-                <span>VS CODE</span>
-              </Button>
-              <div style={{ marginLeft: 12 }}></div>
-              <Button
-                style={{
-                  backgroundColor: "#2562FF",
-                }}
-                onClick={run}
-              >
-                <ButtonIconImage src="/assets/icons/mdi_play_circle_filled_round.svg" />
-                <span>Run</span>
-              </Button>
-            </ButtonList>
-          </Toolbar>
-          <Editor
-            language="dart"
-            theme="vs-dark"
-            value={source}
-            options={{ unusualLineTerminators: "off" }}
-            onChange={(value: string) => {
-              editingSource = value;
-            }}
-            // editorDidMount={(
-            //   editor: monacoEditor.editor.IStandaloneCodeEditor
-            // ) => {
-            //   // @ts-ignore
-            //   window.MonacoEnvironment.getWorkerUrl = (moduleId, label) => {
-            //     if (label === "json") return "/_next/static/json.worker.js";
-            //     if (label === "css") return "/_next/static/css.worker.js";
-            //     if (label === "html") return "/_next/static/html.worker.js";
-            //     if (label === "typescript" || label === "javascript")
-            //       return "/_next/static/ts.worker.js";
-            //     return "/_next/static/editor.worker.js";
-            //   };
-            // }}
-          />
-        </SideContainer>
-      </Wrapper>
+      /> */}
+        <TopBar controlDoubleClick={() => {}} title={query.name || "No Name"} />
+        <Wrapper>
+          <SideContainer>
+            <Background>
+              {appFrame({
+                id: query.id,
+                framework: query.framework,
+                source: source!!,
+                language: query.language,
+              })}
+            </Background>
+          </SideContainer>
+          <SideContainer style={{ width: "45vw" }}>
+            <Toolbar toGlobalization={query.globalizationRedirect}>
+              <ButtonList>
+                <Button
+                  style={{
+                    backgroundColor: "#151617",
+                  }}
+                  onClick={openVSCode}
+                >
+                  <ButtonIconImage src="/assets/icons/bridged_brand_icons_vscode_white.svg" />
+                  <span>VS CODE</span>
+                </Button>
+                <div style={{ marginLeft: 12 }}></div>
+                <Button
+                  style={{
+                    backgroundColor: "#2562FF",
+                  }}
+                  onClick={run}
+                >
+                  <ButtonIconImage src="/assets/icons/mdi_play_circle_filled_round.svg" />
+                  <span>Run</span>
+                </Button>
+              </ButtonList>
+            </Toolbar>
+            <Editor
+              language="dart"
+              theme="vs-dark"
+              value={source}
+              options={{ unusualLineTerminators: "off" }}
+              onChange={(value: string) => {
+                editingSource = value;
+              }}
+              // editorDidMount={(
+              //   editor: monacoEditor.editor.IStandaloneCodeEditor
+              // ) => {
+              //   // @ts-ignore
+              //   window.MonacoEnvironment.getWorkerUrl = (moduleId, label) => {
+              //     if (label === "json") return "/_next/static/json.worker.js";
+              //     if (label === "css") return "/_next/static/css.worker.js";
+              //     if (label === "html") return "/_next/static/html.worker.js";
+              //     if (label === "typescript" || label === "javascript")
+              //       return "/_next/static/ts.worker.js";
+              //     return "/_next/static/editor.worker.js";
+              //   };
+              // }}
+            />
+          </SideContainer>
+        </Wrapper>
+      </EditorThemeProvider>
     </>
   );
 }
@@ -208,7 +213,7 @@ const openVSCode = () => {
 };
 
 const Wrapper = styled.div`
-  margin-top: 56px;
+  /* margin-top: 56px; */
   display: flex;
   justify-content: space-between;
   align-items: stretch;

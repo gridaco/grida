@@ -10,7 +10,7 @@ interface ISearchFormBox extends React.InputHTMLAttributes<HTMLInputElement> {
 
 export default function SearchFormBox({
   containerStyle,
-  placeholder = "Search your stuff",
+  placeholder = "Search here screen",
   ...inputProps
 }: ISearchFormBox) {
   const inputRef = useRef<HTMLInputElement>(null);
@@ -37,9 +37,14 @@ export default function SearchFormBox({
 const Form = styled.form``;
 
 const InputWrapper = styled.div`
-  background: #f4f4f4;
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: 0;
+  margin: 0 auto;
   border-radius: 8px;
-  padding: 14px 16px;
+  padding: 12px 16px;
+  /* padding: 14px 16px; */
   width: 400px;
   display: flex;
   align-items: center;

@@ -4,6 +4,9 @@ import DashboardAppbar, {
   IDashboardAppBar,
 } from "../../components/appbar/dashboard.appbar";
 import { DashboardSideNavigationBar } from "../../components/side-navigation-bar/dashboard.side-navigation-bar";
+import { TopBar } from "components/top-bar";
+import { HomeScaffold } from "../../../ui/editor-ui/packages/editor-ui-workspace";
+import { EditorThemeProvider } from "../../../ui/editor-ui/packages/editor-ui-theme";
 
 interface IDashboardLayout extends IDashboardAppBar {
   children?: React.ReactNode;
@@ -15,20 +18,23 @@ export default function DashboardLayout({
   rightChildren,
   ...dashboardProps
 }: IDashboardLayout) {
+  const topBar = <TopBar controlDoubleClick={() => {}} />;
   return (
-    <Wrapper>
-      <DashboardAppbar {...dashboardProps} />
-      <ContentWrapper>
-        <DashboardSideNavigationBar />
+    <EditorThemeProvider light>
+      <Wrapper>
+        {/* <DashboardAppbar {...dashboardProps} /> */}
+        <TopBar controlDoubleClick={() => {}} />
         <ContentPage>{children}</ContentPage>
-      </ContentWrapper>
-      {rightChildren}
-    </Wrapper>
+        <ContentWrapper>{/* <DashboardSideNavigationBar /> */}</ContentWrapper>
+        {/* {rightChildren} */}
+      </Wrapper>
+    </EditorThemeProvider>
   );
 }
 
 const Wrapper = styled.div`
   display: flex;
+  flex-direction: column;
 `;
 
 const ContentWrapper = styled.div`
@@ -41,5 +47,5 @@ const ContentPage = styled.main`
   padding: 0 72px;
   padding-top: 80px;
   padding-bottom: 55px;
-  margin-left: 200px;
+  /* margin-left: 200px; */
 `;
