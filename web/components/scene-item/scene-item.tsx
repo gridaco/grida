@@ -50,7 +50,10 @@ export const SceneItem = ({
           onMouseLeave={handleMouseLeave}
         >
           <PreviewImageWrapper>
-            <PreviewImage src={preview} data-selected={isSelected && "true"} />
+            <PreviewImage
+              src={preview}
+              data-selected={isSelected && "true"}
+            ></PreviewImage>
           </PreviewImageWrapper>
           <Name>{name}</Name>
         </ItemContainer>
