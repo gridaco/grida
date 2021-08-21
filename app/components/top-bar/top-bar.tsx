@@ -1,8 +1,9 @@
 import React from "react";
 import styled from "@emotion/styled";
-import { BarDragArea } from "@editor-ui/desktop-titlebar";
 import { TopBarRightMenu } from "./top-bar-right-menu";
 import { TopBarLeftBreadcrumb } from "./top-bar-left-breadcrumb";
+import { BarDragArea } from "../bar-drag-area";
+
 export function TopBar(props: {
   controlDoubleClick: () => void;
   title?: string;
@@ -24,14 +25,12 @@ export function TopBar(props: {
 
 const TopBarRoot = styled.div`
   /* background-color: #ffffff; */
-
-  /* width: 100%; */
-  /* max-width: 100vw; */
+  /* width: 100%;
+  max-width: 100vw; */
   height: 56px;
   padding: 0 12px;
   opacity: 1;
   transition: opacity 700ms ease 0s, color 700ms ease 0s;
-  position: relative;
 
   /* flex */
   display: flex;

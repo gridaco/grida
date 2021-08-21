@@ -4,7 +4,7 @@ import styled from "@emotion/styled";
 // TO BE UPDATED LATER ON @editor-ui/button
 
 export const StyledButton = styled.button`
-  background: white;
+  background: rgba(255, 255, 255, 0);
   padding: 5px;
   font-style: normal;
   font-weight: normal;

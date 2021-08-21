@@ -98,7 +98,9 @@ export default function Frame() {
               })}
             </Background>
           </SideContainer>
-          <SideContainer style={{ width: "45vw" }}>
+          <SideContainer
+            style={{ width: "45vw", background: "#1e1e1e", paddingTop: "70px" }}
+          >
             <Toolbar toGlobalization={query.globalizationRedirect}>
               <ButtonList>
                 <Button
@@ -126,10 +128,13 @@ export default function Frame() {
               language="dart"
               theme="vs-dark"
               value={source}
-              options={{ unusualLineTerminators: "off" }}
+              options={{
+                unusualLineTerminators: "off",
+              }}
               onChange={(value: string) => {
                 editingSource = value;
               }}
+
               // editorDidMount={(
               //   editor: monacoEditor.editor.IStandaloneCodeEditor
               // ) => {
@@ -171,7 +176,7 @@ function appFrame(props: {
     case "flutter":
       if (props.language == "js") {
         return (
-          <iframe
+          <IFrame
             id={props.id}
             src={`https://frames-appbox.vercel.app/flutter?src=${props.source}&mode=${mode}&language=js`}
           />
@@ -184,7 +189,7 @@ function appFrame(props: {
         );
       } else if (props.language == "dart") {
         return (
-          <iframe
+          <IFrame
             id={props.id}
             src={`https://frames-appbox.vercel.app/flutter?src=${props.source}&mode=${mode}&language=dart`}
           />
@@ -213,7 +218,6 @@ const openVSCode = () => {
 };
 
 const Wrapper = styled.div`
-  /* margin-top: 56px; */
   display: flex;
   justify-content: space-between;
   align-items: stretch;
@@ -225,6 +229,13 @@ const SideContainer = styled.div`
   display: flex;
   flex-direction: column;
   flex: 1;
+`;
+
+const IFrame = styled.iframe`
+  background: #ffffff;
+  box-shadow: 0px 0px 4px rgba(222, 222, 222, 0.25),
+    0px 0px 32px 4px rgba(220, 220, 220, 0.12);
+  border-radius: 2px;
 `;
 
 const ButtonList = styled.div`
