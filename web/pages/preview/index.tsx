@@ -16,8 +16,8 @@ import Toolbar from "components/toolbar";
 import { checkFrameSourceMode } from "@base-sdk/base/frame-embed";
 import { AppFramework, AppLanguage } from "@base-sdk/base/types";
 import Background from "components/canves/background";
-import { TopBar } from "components/top-bar";
 import { EditorThemeProvider } from "../../../ui/editor-ui/packages/editor-ui-theme";
+import { TopBar } from "../../../app/components";
 
 // const MonacoEditor = dynamic(import("react-monaco-editor"), { ssr: false });
 

@@ -4,9 +4,9 @@ import DashboardAppbar, {
   IDashboardAppBar,
 } from "../../components/appbar/dashboard.appbar";
 import { DashboardSideNavigationBar } from "../../components/side-navigation-bar/dashboard.side-navigation-bar";
-import { TopBar } from "components/top-bar";
 import { HomeScaffold } from "../../../ui/editor-ui/packages/editor-ui-workspace";
 import { EditorThemeProvider } from "../../../ui/editor-ui/packages/editor-ui-theme";
+import { TopBar } from "../../../app/components";
 
 interface IDashboardLayout extends IDashboardAppBar {
   children?: React.ReactNode;
@@ -18,7 +18,6 @@ export default function DashboardLayout({
   rightChildren,
   ...dashboardProps
 }: IDashboardLayout) {
-  const topBar = <TopBar controlDoubleClick={() => {}} />;
   return (
     <EditorThemeProvider light>
       <Wrapper>

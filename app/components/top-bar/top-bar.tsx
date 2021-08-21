@@ -3,11 +3,15 @@ import styled from "@emotion/styled";
 import { BarDragArea } from "@editor-ui/desktop-titlebar";
 import { TopBarRightMenu } from "./top-bar-right-menu";
 import { TopBarLeftBreadcrumb } from "./top-bar-left-breadcrumb";
-export function TopBar(props: { controlDoubleClick: () => void }) {
+export function TopBar(props: {
+  controlDoubleClick: () => void;
+  title?: string;
+}) {
   return (
     <BarDragArea controlDoubleClick={props.controlDoubleClick}>
       <TopBarRoot onDoubleClick={props.controlDoubleClick}>
         <TopBarLeftArea>
+          <Title>{props.title}</Title>
           <TopBarLeftBreadcrumb />
         </TopBarLeftArea>
         <TopBarRightArea>
@@ -19,11 +23,12 @@ export function TopBar(props: { controlDoubleClick: () => void }) {
 }
 
 const TopBarRoot = styled.div`
-  background-color: #FFFFFF;
+  /* background-color: #ffffff; */
 
-  width: 100%;
-  max-width: 100vw;
-  height: 45px;
+  /* width: 100%; */
+  /* max-width: 100vw; */
+  height: 56px;
+  padding: 0 12px;
   opacity: 1;
   transition: opacity 700ms ease 0s, color 700ms ease 0s;
   position: relative;
@@ -37,6 +42,15 @@ const TopBarRoot = styled.div`
 `;
 
 const TopBarLeftArea = styled.div``;
+
+const Title = styled.p`
+  font-size: 14px;
+  line-height: 17px;
+  margin: 15px 0;
+  margin-left: 21px;
+  color: #7b7b7b;
+`;
+
 const TopBarRightArea = styled.div`
   align-self: center;
 `;
