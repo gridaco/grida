@@ -46,9 +46,10 @@ const Header = () => {
     }
   };
 
-  const handleSigninClick = () => {
+  const handleSigninOrMoveAppClick = () => {
     if (loginstate == "signedin") {
-      window.location.href = URLS.landing.try_the_demo_1;
+      // move to app
+      window.location.href = URLS.landing.app;
     } else {
       !isOpenMenu && (window.location.href = URLS.landing.signin_with_return);
     }
@@ -200,10 +201,10 @@ const Header = () => {
               height="35px"
               fontSize="13px"
               style={center}
-              onClick={handleSigninClick}
+              onClick={handleSigninOrMoveAppClick}
             >
               {loginstate == "signedin" ? (
-                "Go to console"
+                "Go to App"
               ) : (
                 <React.Fragment>
                   <Icon name="lock" isVerticalMiddle mr="6px" />

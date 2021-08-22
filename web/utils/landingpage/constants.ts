@@ -42,6 +42,7 @@ export const LandingpageUrls = {
    * demo
    */
   try_the_demo_1: "https://console.grida.co",
+  app: "https://app.grida.co",
 
   // misc
   privacy_policy: "/docs/support/privacy-policy",
