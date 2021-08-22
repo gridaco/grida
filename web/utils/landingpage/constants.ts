@@ -18,17 +18,15 @@ function signin_callback_redirect_uri() {
 export const LandingpageUrls = {
   /**
    * return to home after signin
-   * @todo - CHORG reorganize with grida.co
    */
-  signin_with_return: `https://accounts.bridged.xyz/signin?redirect_uri=${signin_callback_redirect_uri()}`,
+  signin_with_return: `https://accounts.grida.co/signin?redirect_uri=${signin_callback_redirect_uri()}`,
 
   // todo region swap sign up when ready
   /**
    * return to home after signup
-   * @todo - CHORG reorganize with grida.co
    */
-  signup_with_return: `https://accounts.bridged.xyz/signup?redirect_uri=${signup_callback_redirect_uri()}`,
-  signup: "https://accounts.bridged.xyz/signup",
+  signup_with_return: `https://accounts.grida.co/signup?redirect_uri=${signup_callback_redirect_uri()}`,
+  signup: "https://accounts.grida.co/signup",
   // todo endregion swap sign up when ready
 
   // video

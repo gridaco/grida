@@ -40,7 +40,7 @@ const Header = () => {
 
   const handleSignupClick = () => {
     if (loginstate == "signedin") {
-      window.location.href = URLS.landing.try_the_demo_1;
+      window.location.href = URLS.landing.app;
     } else {
       window.location.href = URLS.landing.signup_with_return;
     }
