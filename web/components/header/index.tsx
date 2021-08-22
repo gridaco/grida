@@ -132,7 +132,7 @@ const Header = () => {
           p={["6px 10px", "6px 10px", "9px 20px", "9px 20px"]}
           variant="noShadow"
         >
-          {loginstate == "signedin" ? "Go to console" : "Sign up"}
+          {loginstate == "signedin" ? "Go to App" : "Sign up"}
         </SignupButton>
       </Flex>
 
