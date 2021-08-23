@@ -6,6 +6,7 @@ import { TopBarMoreButton } from "./top-bar-more-button";
 
 interface Props {
   isScenes?: boolean;
+  contorlModal?: () => void;
 }
 
 export function TopBarRightMenu(props: Props) {
@@ -16,7 +17,7 @@ export function TopBarRightMenu(props: Props) {
       {!props.isScenes && (
         <>
           <MarginRight size={24} />
-          <TopBarShareButton />
+          <TopBarShareButton contorlModal={props.contorlModal} />
           <MarginRight size={19} />
 
           <TopBarMoreButton />

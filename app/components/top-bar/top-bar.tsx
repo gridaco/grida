@@ -7,6 +7,7 @@ import { css } from "@emotion/react";
 
 export function TopBar(props: {
   controlDoubleClick: () => void;
+  contorlModal?: () => void;
   title?: string;
   isMain?: boolean;
   isScenes?: boolean;
@@ -25,7 +26,10 @@ export function TopBar(props: {
           <TopBarLeftBreadcrumb />
         </TopBarLeftArea>
         <TopBarRightArea>
-          <TopBarRightMenu isScenes={props.isScenes} />
+          <TopBarRightMenu
+            isScenes={props.isScenes}
+            contorlModal={props.contorlModal}
+          />
         </TopBarRightArea>
       </TopBarRoot>
     </BarDragArea>
