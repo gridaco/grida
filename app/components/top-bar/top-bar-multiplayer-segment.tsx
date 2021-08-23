@@ -11,6 +11,10 @@ interface Player {
   id: string;
 }
 
+interface Props {
+  isScenes?: boolean;
+}
+
 const players: Player[] = [
   {
     id: "1",
@@ -29,14 +33,16 @@ const players: Player[] = [
   },
 ];
 
-export function TopBarMultiplayerSegment() {
+export function TopBarMultiplayerSegment(props: Props) {
   const handleOnAvatarItemClick = (id: string) => {
     console.log("avatar item click", id);
   };
 
+  const _players = props.isScenes ? players.slice(0, 1) : players;
+
   return (
     <MultiplayerAvatarGroup spacing={-4}>
-      {players.map((p) => {
+      {_players.map((p) => {
         return (
           <MultiplayerAvatar
             key={p.id}

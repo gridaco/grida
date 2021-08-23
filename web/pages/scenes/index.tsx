@@ -8,6 +8,7 @@ import { SceneItem } from "@app/scene-view/components/scene-item";
 import SearchFormBox from "@app/scene-view/components/search/search-form-box";
 
 /** dev only */ import { mocks } from "@app/scene-view";
+import { ScenesTopBar, TopBar } from "../../../app/components";
 
 interface IScreen {
   name: string;
@@ -57,29 +58,30 @@ export default function ScreensPage() {
 
   return (
     <Background>
-      <DashboardLayout title="Overview">
-        <SearchFormBox
+      {/* <DashboardLayout title="Overview" isScenes={true}> */}
+      {/* <SearchFormBox
           containerStyle={{
             margin: "0 auto",
             marginBottom: 24,
           }}
-        />
-        <Grid>
-          {screens.map(({ source, ...d }, i) => {
-            const id = i.toString();
-            return (
-              <SceneItem
-                key={id}
-                id={id}
-                onSelected={handleSelection}
-                onDoubleClick={() => handleDoubleClick(source)}
-                isSelected={focusedScreenId === id}
-                data={d}
-              />
-            );
-          })}
-        </Grid>
-      </DashboardLayout>
+        /> */}
+      <ScenesTopBar controlDoubleClick={() => {}} />
+      <Grid>
+        {screens.map(({ source, ...d }, i) => {
+          const id = i.toString();
+          return (
+            <SceneItem
+              key={id}
+              id={id}
+              onSelected={handleSelection}
+              onDoubleClick={() => handleDoubleClick(source)}
+              isSelected={focusedScreenId === id}
+              data={d}
+            />
+          );
+        })}
+      </Grid>
+      {/* </DashboardLayout> */}
     </Background>
   );
 }
@@ -97,6 +99,8 @@ const Grid = styled.div`
   display: grid;
   grid-template-columns: repeat(4, minmax(224px, 240px));
   grid-gap: 1.5rem;
+  /* 56 is topbar size */
+  padding-top: 56px;
   margin: 0 auto;
   /* place-content: start space-evenly; */
 
