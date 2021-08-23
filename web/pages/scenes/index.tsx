@@ -89,6 +89,7 @@ const Background = styled.div`
   // TO BE UPDATED LATER ON @editor-ui/theme
   // reset DashboardLayout theme
   background: #fcfcfc;
+  height: 100vh;
 `;
 
 const Grid = styled.div`
