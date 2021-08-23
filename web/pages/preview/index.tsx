@@ -217,7 +217,7 @@ const Wrapper = styled.div`
   display: flex;
   justify-content: space-between;
   align-items: stretch;
-  min-height: calc(100vh - 56px);
+  height: 100vh;
   overflow-y: hidden;
 `;
 
