@@ -93,7 +93,22 @@ const Background = styled.div`
 `;
 
 const Grid = styled.div`
+  width: fit-content;
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(224px, 1fr));
+  grid-template-columns: repeat(4, minmax(224px, 240px));
   grid-gap: 1.5rem;
+  margin: 0 auto;
+  /* place-content: start space-evenly; */
+
+  @media (max-width: 1280px) {
+    grid-template-columns: repeat(3, minmax(224px, 1fr));
+  }
+
+  @media (max-width: 1024px) {
+    grid-template-columns: repeat(2, minmax(224px, 1fr));
+  }
+
+  @media (max-width: 768px) {
+    grid-template-columns: repeat(1, minmax(224px, 1fr));
+  }
 `;
