@@ -17,7 +17,9 @@ export function Scaffold(props: {
     />
   );
 
-  const topBar = <TopBar controlDoubleClick={props.controlDoubleClick} />;
+  const topBar = (
+    <TopBar controlDoubleClick={props.controlDoubleClick} isMain={true} />
+  );
 
   return (
     <EditorThemeProvider light>
