@@ -11,6 +11,11 @@ import { BoringDocument } from "@boring.so/document-model";
    * linked page document id
    */
   document: string;
+
+  /** parent page id of this page */
+  parent: string;
+  /** sorting under parent */
+  sort: number;
 }
 
 /**
@@ -86,9 +91,7 @@ export class PageStore extends BaseSimpleModelIdbStore<Page, PageStoreModel> {
 
     // 2. save with previously set document's reference via id.
     const storable = <PageStoreModel>{
-      id: p.id,
-      type: p.type,
-      name: p.name,
+      ...p,
       document: await docid(),
     };
     return storable;
@@ -101,10 +104,8 @@ export class PageStore extends BaseSimpleModelIdbStore<Page, PageStoreModel> {
     };
 
     return {
-      id: p.id,
-      name: p.name,
+      ...p,
       document: await doc(p.document),
-      type: p.type,
     };
   }
 }

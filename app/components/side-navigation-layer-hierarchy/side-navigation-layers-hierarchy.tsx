@@ -164,7 +164,7 @@ export function SideNavigationLayersHierarchy() {
         const isSymbolClass =
           type === "symbolInstance" || type === "symbolMaster";
         const isArtboardClass = type === "artboard" || type === "symbolMaster";
-        const isGroupClass = isArtboardClass || type === "group";
+        const isGroupCass = isArtboardClass || type === "group";
 
         return (
           <LayerRow

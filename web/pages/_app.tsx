@@ -1,6 +1,5 @@
 import React from "react";
 import { Suspense, StrictMode } from "react";
-import { AppRoot } from "@grida.co/app/app";
 import Head from "next/head";
 import { Global, css } from "@emotion/react";
 
@@ -69,8 +68,7 @@ function BridgedRootWebApp({ Component, pageProps }) {
       <SafeHydrate>
         <StrictMode>
           <Suspense fallback="Loading...">
-            {/* <Component {...pageProps} /> */}
-            <AppRoot mode="browser" controlDoubleClick={() => {}} />
+            <Component {...pageProps} />
           </Suspense>
         </StrictMode>
       </SafeHydrate>

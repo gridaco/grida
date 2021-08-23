@@ -1,12 +1,12 @@
 const path = require("path");
+const withPlugins = require("next-compose-plugins");
+const withImages = require("next-images");
 const withTM = require("next-transpile-modules")(
   [
+    "@app/scene-view",
     "@design-sdk/figma-remote",
     "@design-sdk/figma-types",
-    // "@nothing.app/react-core",
-    // "@nothing.app/react-compact",
-    // "@nothing.app/react",
-    // "@nothing.app/react-state",
+    //
   ],
   {
     // resolveSymlinks: true,
@@ -29,7 +29,7 @@ const LOCAL_DEVELOPMENT_ENV_VARS = {
   FIGMA_PERSONAL_ACCESS_TOKEN: process.env.FIGMA_PERSONAL_ACCESS_TOKEN,
 };
 
-module.exports = withTM({
+module.exports = withPlugins([withTM, withImages], {
   webpack: function (config, { isServer }) {
     config.module.rules.push({
       test: /\.(eot|woff|woff2|ttf|svg|png|jpg|gif)$/,
@@ -78,10 +78,10 @@ module.exports = withTM({
   async rewrites() {
     return [
       // Rewrite everything to `pages/index`
-      {
-        source: "/:any*",
-        destination: "/",
-      },
+      // {
+      //   source: "/:any*",
+      //   destination: "/",
+      // },
     ];
   },
 });

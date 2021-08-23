@@ -1,0 +1,375 @@
+{
+  "id": "1:120",
+  "name": "entry",
+  "type": "FRAME",
+  "blendMode": "PASS_THROUGH",
+  "children": [
+    {
+      "id": "1:121",
+      "name": "2021",
+      "type": "TEXT",
+      "blendMode": "PASS_THROUGH",
+      "absoluteBoundingBox": {
+        "x": -1481.3103027343750,
+        "y": -1435.5418701171875,
+        "width": 672.0,
+        "height": 263.0
+      },
+      "constraints": {
+        "vertical": "TOP",
+        "horizontal": "LEFT"
+      },
+      "fills": [
+        {
+          "blendMode": "NORMAL",
+          "type": "SOLID",
+          "color": {
+            "r": 0.0,
+            "g": 0.0,
+            "b": 0.0,
+            "a": 1.0
+          }
+        }
+      ],
+      "strokes": [],
+      "strokeWeight": 1.0147783756256104,
+      "strokeAlign": "OUTSIDE",
+      "effects": [],
+      "characters": "2021",
+      "style": {
+        "fontFamily": "Sen",
+        "fontPostScriptName": "Sen-ExtraBold",
+        "fontWeight": 800,
+        "textAutoResize": "WIDTH_AND_HEIGHT",
+        "fontSize": 292.25616455078125,
+        "textAlignHorizontal": "CENTER",
+        "textAlignVertical": "TOP",
+        "letterSpacing": -4.3838424682617188,
+        "lineHeightPx": 263.03054809570312,
+        "lineHeightPercent": 76.800003051757812,
+        "lineHeightPercentFontSize": 90.0,
+        "lineHeightUnit": "FONT_SIZE_%"
+      },
+      "characterStyleOverrides": [],
+      "styleOverrideTable": {}
+    },
+    {
+      "id": "1:122",
+      "name": "Newest World Vibes",
+      "type": "TEXT",
+      "blendMode": "PASS_THROUGH",
+      "absoluteBoundingBox": {
+        "x": -1214.4235839843750,
+        "y": -1608.054199218750,
+        "width": 296.31527709960938,
+        "height": 132.0
+      },
+      "constraints": {
+        "vertical": "TOP",
+        "horizontal": "LEFT"
+      },
+      "fills": [
+        {
+          "blendMode": "NORMAL",
+          "type": "SOLID",
+          "color": {
+            "r": 0.0,
+            "g": 0.0,
+            "b": 0.0,
+            "a": 1.0
+          }
+        }
+      ],
+      "strokes": [],
+      "strokeWeight": 1.0147783756256104,
+      "strokeAlign": "OUTSIDE",
+      "effects": [],
+      "characters": "Newest\nWorld\nVibes",
+      "style": {
+        "fontFamily": "Sen",
+        "fontPostScriptName": "Sen-ExtraBold",
+        "fontWeight": 800,
+        "textAutoResize": "HEIGHT",
+        "fontSize": 48.709362030029297,
+        "textAlignHorizontal": "LEFT",
+        "textAlignVertical": "TOP",
+        "letterSpacing": -0.73064043045043947,
+        "lineHeightPx": 43.838428497314453,
+        "lineHeightPercent": 76.800003051757812,
+        "lineHeightPercentFontSize": 90.0,
+        "lineHeightUnit": "FONT_SIZE_%"
+      },
+      "characterStyleOverrides": [],
+      "styleOverrideTable": {}
+    },
+    {
+      "id": "1:123",
+      "name": "Vibes More than 30,000 + All around the world. Stay tuned, Stay updated.",
+      "type": "TEXT",
+      "blendMode": "PASS_THROUGH",
+      "absoluteBoundingBox": {
+        "x": -1214.4235839843750,
+        "y": -1076.3103027343750,
+        "width": 296.31527709960938,
+        "height": 34.0
+      },
+      "constraints": {
+        "vertical": "TOP",
+        "horizontal": "LEFT"
+      },
+      "fills": [
+        {
+          "blendMode": "NORMAL",
+          "type": "SOLID",
+          "color": {
+            "r": 0.64166665077209473,
+            "g": 0.64166665077209473,
+            "b": 0.64166665077209473,
+            "a": 1.0
+          }
+        }
+      ],
+      "strokes": [],
+      "strokeWeight": 1.0147783756256104,
+      "strokeAlign": "OUTSIDE",
+      "effects": [],
+      "characters": "Vibes More than 30,000 + All around the world. Stay tuned, Stay updated.",
+      "style": {
+        "fontFamily": "Roboto",
+        "fontPostScriptName": null,
+        "fontWeight": 400,
+        "textAutoResize": "HEIGHT",
+        "fontSize": 14.206897735595703,
+        "textAlignHorizontal": "CENTER",
+        "textAlignVertical": "TOP",
+        "letterSpacing": -0.21310346603393554,
+        "lineHeightPx": 16.648708343505859,
+        "lineHeightPercent": 100.0,
+        "lineHeightUnit": "INTRINSIC_%"
+      },
+      "characterStyleOverrides": [],
+      "styleOverrideTable": {}
+    },
+    {
+      "id": "1:124",
+      "name": "Group 517",
+      "type": "GROUP",
+      "blendMode": "PASS_THROUGH",
+      "children": [
+        {
+          "id": "105:3",
+          "name": "Rectangle 827",
+          "type": "RECTANGLE",
+          "blendMode": "PASS_THROUGH",
+          "absoluteBoundingBox": {
+            "x": -1214.0,
+            "y": -985.0,
+            "width": 296.0,
+            "height": 54.0
+          },
+          "constraints": {
+            "vertical": "TOP",
+            "horizontal": "LEFT"
+          },
+          "fills": [
+            {
+              "blendMode": "NORMAL",
+              "type": "SOLID",
+              "color": {
+                "r": 0.0,
+                "g": 0.0,
+                "b": 0.0,
+                "a": 1.0
+              }
+            }
+          ],
+          "strokes": [],
+          "strokeWeight": 1.0,
+          "strokeAlign": "INSIDE",
+          "effects": [],
+          "cornerRadius": 4.0,
+          "rectangleCornerRadii": [
+            4.0,
+            4.0,
+            4.0,
+            4.0
+          ]
+        },
+        {
+          "id": "1:126",
+          "name": "Get started",
+          "type": "TEXT",
+          "blendMode": "PASS_THROUGH",
+          "absoluteBoundingBox": {
+            "x": -1105.842285156250,
+            "y": -967.729003906250,
+            "width": 80.0,
+            "height": 19.0
+          },
+          "constraints": {
+            "vertical": "TOP",
+            "horizontal": "LEFT"
+          },
+          "fills": [
+            {
+              "blendMode": "NORMAL",
+              "type": "SOLID",
+              "color": {
+                "r": 1.0,
+                "g": 1.0,
+                "b": 1.0,
+                "a": 1.0
+              }
+            }
+          ],
+          "strokes": [],
+          "strokeWeight": 1.0147783756256104,
+          "strokeAlign": "OUTSIDE",
+          "effects": [],
+          "characters": "Get started",
+          "style": {
+            "fontFamily": "Roboto",
+            "fontPostScriptName": "Roboto-Bold",
+            "fontWeight": 700,
+            "textAutoResize": "WIDTH_AND_HEIGHT",
+            "fontSize": 16.236454010009766,
+            "textAlignHorizontal": "CENTER",
+            "textAlignVertical": "TOP",
+            "letterSpacing": -0.24354681015014648,
+            "lineHeightPx": 19.027093887329102,
+            "lineHeightPercent": 100.0,
+            "lineHeightUnit": "INTRINSIC_%"
+          },
+          "characterStyleOverrides": [],
+          "styleOverrideTable": {}
+        }
+      ],
+      "absoluteBoundingBox": {
+        "x": -1214.0,
+        "y": -985.0,
+        "width": 296.0,
+        "height": 54.0
+      },
+      "constraints": {
+        "vertical": "TOP",
+        "horizontal": "LEFT"
+      },
+      "clipsContent": false,
+      "background": [],
+      "fills": [],
+      "strokes": [],
+      "rectangleCornerRadii": [
+        4.0,
+        4.0,
+        4.0,
+        4.0
+      ],
+      "strokeWeight": 1.0147783756256104,
+      "strokeAlign": "INSIDE",
+      "backgroundColor": {
+        "r": 0.0,
+        "g": 0.0,
+        "b": 0.0,
+        "a": 0.0
+      },
+      "effects": []
+    },
+    {
+      "id": "1:127",
+      "name": "NWV",
+      "type": "TEXT",
+      "blendMode": "PASS_THROUGH",
+      "absoluteBoundingBox": {
+        "x": -960.729003906250,
+        "y": -1200.113281250,
+        "width": 59.0,
+        "height": 22.0
+      },
+      "constraints": {
+        "vertical": "TOP",
+        "horizontal": "LEFT"
+      },
+      "fills": [
+        {
+          "blendMode": "NORMAL",
+          "type": "SOLID",
+          "color": {
+            "r": 0.0,
+            "g": 0.0,
+            "b": 0.0,
+            "a": 1.0
+          }
+        }
+      ],
+      "strokes": [],
+      "strokeWeight": 1.0147783756256104,
+      "strokeAlign": "OUTSIDE",
+      "effects": [],
+      "characters": "NWV",
+      "style": {
+        "fontFamily": "Sen",
+        "fontPostScriptName": "Sen-ExtraBold",
+        "fontWeight": 800,
+        "textAutoResize": "WIDTH_AND_HEIGHT",
+        "fontSize": 24.354681015014648,
+        "textAlignHorizontal": "LEFT",
+        "textAlignVertical": "TOP",
+        "letterSpacing": -0.36532021522521974,
+        "lineHeightPx": 21.919214248657227,
+        "lineHeightPercent": 76.800003051757812,
+        "lineHeightPercentFontSize": 90.0,
+        "lineHeightUnit": "FONT_SIZE_%"
+      },
+      "characterStyleOverrides": [],
+      "styleOverrideTable": {}
+    }
+  ],
+  "absoluteBoundingBox": {
+    "x": -1254.0,
+    "y": -1673.0,
+    "width": 380.54190063476562,
+    "height": 824.00006103515625
+  },
+  "constraints": {
+    "vertical": "TOP",
+    "horizontal": "LEFT"
+  },
+  "clipsContent": true,
+  "background": [
+    {
+      "blendMode": "NORMAL",
+      "type": "SOLID",
+      "color": {
+        "r": 1.0,
+        "g": 1.0,
+        "b": 1.0,
+        "a": 1.0
+      }
+    }
+  ],
+  "fills": [
+    {
+      "blendMode": "NORMAL",
+      "type": "SOLID",
+      "color": {
+        "r": 1.0,
+        "g": 1.0,
+        "b": 1.0,
+        "a": 1.0
+      }
+    }
+  ],
+  "strokes": [],
+  "strokeWeight": 1.0147783756256104,
+  "strokeAlign": "INSIDE",
+  "backgroundColor": {
+    "r": 1.0,
+    "g": 1.0,
+    "b": 1.0,
+    "a": 1.0
+  },
+  "effects": [],
+  "transitionNodeID": "1:180",
+  "transitionDuration": 300.0,
+  "transitionEasing": "EASE_OUT"
+}

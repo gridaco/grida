@@ -1,11 +1,12 @@
 import Reaact from "react";
 import { Button } from "@editor-ui/button";
 import { DotsHorizontalIcon } from "@radix-ui/react-icons";
+import { StyledButton } from "./button-style";
 
 export function TopBarMoreButton() {
   return (
-    <Button id="more">
+    <StyledButton id="more">
       <DotsHorizontalIcon />
-    </Button>
+    </StyledButton>
   );
 }

@@ -3,31 +3,37 @@ import { getCurrentPage, getCurrentPageIndex } from "./page-selector";
 import { ApplicationState } from "../application";
 import {
   AddPageAction,
+  add_on_current,
+  add_on_root,
   DuplicateCurrentPageAction,
   IAddPageAction,
   PageAction,
+  PageRoot,
+  PageRootKey,
   RenameCurrentPageAction,
   SelectPageAction,
 } from "./page-action";
-import { Page, PageReference } from "@core/model";
+import { Page, PageReference, parentPageIdToString } from "@core/model";
 import { nanoid } from "nanoid";
 import { UnconstrainedTemplate } from "@boring.so/template-provider";
 import {
-  BoringContent,
   BoringDocument,
   BoringTitleLike,
   boringTitleLikeAsBoringTitle,
+  EmptyDocument,
 } from "@boring.so/document-model";
 
 // store
 import { PageStore } from "@core/store";
 import { setSelectedPage } from "@core/store/application";
+import { movementDiff } from "treearray";
 
 export const createPage = (
   pages: PageReference[],
+  selectedPage: string,
   params: IAddPageAction
 ): Page => {
-  const { name, initial } = params;
+  const { name, initial, parent } = params;
   // todo - handle content initialization
 
   let title: BoringTitleLike = name;
@@ -41,6 +47,23 @@ export const createPage = (
       content: _r.content,
     });
     // content = _r.content;
+  } else {
+    document = new EmptyDocument();
+  }
+
+  let linkparent: string;
+  switch (parent) {
+    case add_on_current:
+      linkparent = selectedPage;
+      break;
+    case add_on_root:
+    case PageRootKey:
+    case PageRoot:
+      linkparent = PageRootKey;
+      break;
+    default:
+      linkparent = parent as string;
+      break;
   }
 
   const id = nanoid();
@@ -49,7 +72,15 @@ export const createPage = (
       id: id,
       type: "boring-document",
       name: name,
+      sort: (() => {
+        const last = pages
+          .filter((p) => p.parent === linkparent)
+          .sort((a, b) => a.sort - b.sort)
+          .pop();
+        return last?.sort ?? 0 + 1;
+      })(), // sort = parent.children => lowestSort + 1
       document: document,
+      parent: linkparent,
     },
     (page) => {
       return page;
@@ -78,7 +109,7 @@ export function pageReducer(
     case "add-page": {
       return produce(state, (draft) => {
         <AddPageAction>action;
-        const newPage = createPage(draft.pages, action);
+        const newPage = createPage(draft.pages, draft.selectedPage, action);
         draft.selectedPage = newPage.id;
       });
     }
@@ -131,13 +162,34 @@ export function pageReducer(
     case "move-page": {
       const { originOrder, targetOrder, originParent, targetParent } = action;
 
-      // @todo - add nested page support
-
+      console.log(action);
       return produce(state, (draft) => {
-        const sourceItem = draft.pages[originOrder];
+        const _id = getCurrentPage(state).id; // since it needs to be selected inorder to move (in case: movement by user)
+        const movingPage = draft.pages.find((p) => p.id === _id);
+        const prevs = draft.pages.filter((p) => p.parent === originParent);
+        const posts = draft.pages.filter((p) => p.parent === targetParent);
+        const diff = movementDiff({
+          options: {
+            bigstep: 1000,
+          },
+          item: movingPage,
+          prevgroup: {
+            id: parentPageIdToString(originParent),
+            children: prevs,
+          },
+          postgroup: {
+            id: parentPageIdToString(targetParent),
+            children: posts,
+          },
+          prevorder: originOrder,
+          postorder: targetOrder,
+        });
 
-        draft.pages.splice(originOrder, 1);
-        draft.pages.splice(targetOrder, 0, sourceItem);
+        movingPage.parent = diff.post.moved.targetParent;
+        movingPage.sort = diff.post.moved.sort;
+        diff.post.updates.forEach((u) => {
+          draft.pages.find((p) => p.id == u.id).sort = u.sort;
+        });
       });
     }
     default:

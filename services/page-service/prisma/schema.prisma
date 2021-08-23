@@ -1,0 +1,51 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model Page {
+  id         String   @id @default(uuid())
+  type       String
+  name       String
+  workspace  String
+  document   Document?
+
+  parent    Page     @relation(fields: [parentId], references: [id])
+  parentId  String
+  children  Page[]   @relation("PageToPage")
+  sort      Int      @db.SmallInt @default(autoincrement())
+  
+  // defaults
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // meta
+  meta Json?
+
+  // indexes
+  @@unique([parentId, sort], name: "sorting_in_parent_unique_constraint")
+}
+
+
+model Document {
+  id     String @id @default(uuid())
+  pageId String
+  page   Page @relation(fields: [pageId], references: [id])
+  provider   DocumentEngine // extenal provider's namespace
+  documentId String // id of external provider's document
+
+  @@unique([provider, documentId], name: "unique_external_document_id_per_provider_constraint")
+}
+
+
+enum DocumentEngine {
+  FIRSTPARTY_BORING
+  FIRSTPARTY_NOTHING
+}

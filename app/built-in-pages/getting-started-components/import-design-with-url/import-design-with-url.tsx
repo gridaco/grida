@@ -5,11 +5,13 @@ import { RemoteSubmitForm } from "../remote-submit-form";
 import { ImportedScreenTemplate } from "../../../built-in-template-pages";
 import { figmaloader } from "./figma-loader";
 import { DesignImporterLoaderResult } from "./o";
-import { analyzeDesignUrl } from "@design-sdk/url-analysis";
+import { analyzeDesignUrl, DesignProvider } from "@design-sdk/url-analysis";
 import { designToCode } from "@designto/code";
 import { input } from "@designto/config";
 import { hasLinkedFigmaAccount } from "@app/fapi/accounts/linked-accounts";
 import { show_dialog_import_figma_design_after_authentication } from "../../../modals/import-figma-design-after-authentication";
+import { isOneOfDemoDesignUrl, loadDemoDesign } from "../../../built-in-demos";
+import { add_on_current } from "@core/state";
 
 export function ImportDesignWithUrl() {
   const addPage = useAddPage();
@@ -52,10 +54,16 @@ export function ImportDesignWithUrl() {
     addPage({
       name: `Screen : ${v.name}`,
       initial: template,
+      parent: add_on_current,
     });
   };
 
-  const loader = async (url: string) => {
+  const loader = async (url: string): Promise<DesignImporterLoaderResult> => {
+    // handle demo design. demo design is designed to be imported without any third party authentications. so it will be loaded from static file / first party no-auth api.
+    if (isOneOfDemoDesignUrl(url)) {
+      return loadDemoDesign(url);
+    }
+
     switch (analyzeDesignUrl(url)) {
       case "figma":
         const cancontinue = await hasLinkedFigmaAccount();
