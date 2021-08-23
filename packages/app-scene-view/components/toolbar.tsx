@@ -3,9 +3,6 @@ import { useRouter } from "next/router";
 import Link from "next/link";
 import styled from "@emotion/styled";
 
-// import CodeRoundSVG from "../assets/icons/mdi_code_round.svg";
-// import LanguageRoundSVG from "../assets/icons/mdi_language_round.svg";
-
 interface IToolbar {
   toQuicklook?: string;
   toGlobalization?: string;

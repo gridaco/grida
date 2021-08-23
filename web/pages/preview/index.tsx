@@ -3,23 +3,19 @@ import styled from "@emotion/styled";
 import Axios from "axios";
 
 import { useRouter } from "next/router";
-import dynamic from "next/dynamic";
 
 import { QuicklookQueryParams } from "@base-sdk/base/features/quicklook";
-// import * as monacoEditor from "monaco-editor/esm/vs/editor/editor.api";
 import Editor, { useMonaco } from "@monaco-editor/react";
 import CircularProgress from "@material-ui/core/CircularProgress";
 
 // import FrameFlutter from "../../components/frame-flutter";
-import DashboardAppbar from "../../components/appbar/dashboard.appbar";
-import Toolbar from "components/toolbar";
+import DashboardAppbar from "@app/scene-view/components/appbar/dashboard.appbar";
+import Toolbar from "@app/scene-view/components/toolbar";
 import { checkFrameSourceMode } from "@base-sdk/base/frame-embed";
 import { AppFramework, AppLanguage } from "@base-sdk/base/types";
-import Background from "components/canves/background";
+import Background from "@app/scene-view/components/canves/background";
 import { EditorThemeProvider } from "../../../ui/editor-ui/packages/editor-ui-theme";
 import { TopBar } from "../../../app/components";
-
-// const MonacoEditor = dynamic(import("react-monaco-editor"), { ssr: false });
 
 interface IQuicklookQueries extends QuicklookQueryParams {
   globalizationRedirect?: string;

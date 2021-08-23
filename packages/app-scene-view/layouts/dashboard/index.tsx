@@ -4,9 +4,9 @@ import DashboardAppbar, {
   IDashboardAppBar,
 } from "../../components/appbar/dashboard.appbar";
 import { DashboardSideNavigationBar } from "../../components/side-navigation-bar/dashboard.side-navigation-bar";
-import { HomeScaffold } from "../../../ui/editor-ui/packages/editor-ui-workspace";
-import { EditorThemeProvider } from "../../../ui/editor-ui/packages/editor-ui-theme";
-import { TopBar } from "../../../app/components";
+import { HomeScaffold } from "@editor-ui/workspace";
+import { EditorThemeProvider } from "@editor-ui/theme";
+import { TopBar } from "@grida.co/app/components";
 
 interface IDashboardLayout extends IDashboardAppBar {
   children?: React.ReactNode;

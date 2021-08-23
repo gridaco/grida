@@ -1,13 +1,12 @@
 import React, { useState } from "react";
 import Link from "next/link";
 import styled from "@emotion/styled";
+import ShareModal from "../modals/share";
 
-import ShareModal from "../../components/modals/share";
-
-import logoImage from "../../assets/brand/logo.png";
-import IconButton from "components/icon-button";
+import IconButton from "@app/scene-view/components/icon-button";
 
 export interface IDashboardAppBar {
+  logo?: JSX.Element | string;
   title?: string;
   backButton?: string;
   onClickShare?: () => void;
@@ -15,6 +14,7 @@ export interface IDashboardAppBar {
 }
 
 export default function DashboardAppbar({
+  logo,
   title,
   backButton,
   onClickShare,
@@ -36,7 +36,11 @@ export default function DashboardAppbar({
               <span>{backButton}</span>
             </BackButton>
           ) : (
-            <LogoImage src={logoImage} />
+            <>
+              {logo && (
+                <>{typeof logo == "string" ? <LogoImage src={logo} /> : logo}</>
+              )}
+            </>
           )}
         </Link>
         {title && <Title>{title}</Title>}

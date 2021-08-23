@@ -3,12 +3,10 @@ const withPlugins = require("next-compose-plugins");
 const withImages = require("next-images");
 const withTM = require("next-transpile-modules")(
   [
+    "@app/scene-view",
     "@design-sdk/figma-remote",
     "@design-sdk/figma-types",
-    // "@nothing.app/react-core",
-    // "@nothing.app/react-compact",
-    // "@nothing.app/react",
-    // "@nothing.app/react-state",
+    //
   ],
   {
     // resolveSymlinks: true,

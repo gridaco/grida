@@ -3,7 +3,7 @@ import styled from "@emotion/styled";
 
 import Modal, { IModal } from "../atom.modal";
 import ShareMemberItem, { IShareMemberItem } from "./share-member-item";
-import { writeToClipboard } from "../../../utils/clipboard";
+import copy from "copy-to-clipboard";
 
 const exampleManagers: IShareMemberItem[] = [
   {
@@ -21,7 +21,7 @@ interface IShareModal extends IModal {}
 
 const ShareModal: React.FC<IShareModal> = ({ isOpen, onClose }) => {
   const onClickShareLink = () => {
-    writeToClipboard(window.location.href);
+    copy(window.location.href);
     alert("Copied to clipboard!");
   };
 

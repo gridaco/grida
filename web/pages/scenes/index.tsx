@@ -1,13 +1,13 @@
 import React, { useEffect, useState } from "react";
 import { useRouter } from "next/router";
-import styled from "@emotion/styled";
 import axios from "axios";
+import styled from "@emotion/styled";
 
-import DashboardLayout from "../../layouts/dashboard";
-import { SceneItem } from "../../components/scene-item";
-import SearchFormBox from "../../components/search/search-form-box";
+import DashboardLayout from "@app/scene-view/layouts/dashboard";
+import { SceneItem } from "@app/scene-view/components/scene-item";
+import SearchFormBox from "@app/scene-view/components/search/search-form-box";
 
-import mockups from "../../mockups/screens";
+/** dev only */ import { mocks } from "@app/scene-view";
 
 interface IScreen {
   name: string;
@@ -37,7 +37,7 @@ export default function ScreensPage() {
 
     const fetchData = async () => {
       if (!query.src) {
-        updateScreens(mockups);
+        updateScreens(mocks.scenes);
         return;
       }
       const { data } = await axios.get(query.src);
@@ -51,12 +51,8 @@ export default function ScreensPage() {
     setFocusedScreenId(id);
   };
 
-  // const handleDoubleClick = (id: string) => {
-  //   router.push(`/globalization/?scene=${id}`);
-  // };
-
   const handleDoubleClick = (source: string) => {
-    window.location.href = source;
+    router.replace(source);
   };
 
   return (
