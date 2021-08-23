@@ -11,7 +11,10 @@ export function TopBar(props: {
   isMain?: boolean;
 }) {
   return (
-    <BarDragArea controlDoubleClick={props.controlDoubleClick}>
+    <BarDragArea
+      controlDoubleClick={props.controlDoubleClick}
+      isMain={props.isMain}
+    >
       <TopBarRoot
         isMain={props.isMain}
         onDoubleClick={props.controlDoubleClick}
@@ -29,21 +32,28 @@ export function TopBar(props: {
 }
 
 const TopBarRoot = styled.div<{ isMain?: boolean }>`
-  /* background-color: #ffffff; */
-  /* width: 100%; */
-  /* max-width: 100vw; */
   height: 56px;
   padding: 0 12px;
   opacity: 1;
+  max-width: 100vw;
   transition: opacity 700ms ease 0s, color 700ms ease 0s;
 
-  /*  200 is main navigation width*/
+  /* isMain is contorl top bar style (use only top-bar and bar-drag-area) */
   ${(props) =>
     !!props.isMain
       ? css`
-          max-width: calc(100vw - 200px);
+          width: 100%;
+          position: relative;
+          margin: 0 12px;
+          background-color: #ffffff;
         `
-      : css``}
+      : css`
+          position: absolute;
+          top: 0;
+          right: 0;
+          z-index: 999;
+          padding: 0 12px;
+        `}
 
   /* flex */
   display: flex;
