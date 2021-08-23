@@ -84,6 +84,7 @@ const PreviewImageWrapper = styled.div`
 `;
 
 const PreviewImage = styled.img`
+  border-radius: 2px;
   max-height: 500px;
   display: flex;
   width: inherit;
