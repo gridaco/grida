@@ -46,6 +46,7 @@ const TopBarRoot = styled.div<{ isMain?: boolean }>`
           background-color: #ffffff;
         `
       : css`
+          width: 100%;
           position: absolute;
           top: 0;
           right: 0;

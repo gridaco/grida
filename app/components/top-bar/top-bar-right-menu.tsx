@@ -20,6 +20,8 @@ const _Root = styled.div`
   padding: 16px;
   display: flex;
   flex-direction: row;
+  justify-content: center;
+  align-items: center;
 `;
 
 const MarginRight = styled.div<{ size: number }>`
