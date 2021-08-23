@@ -7,16 +7,21 @@ export function TopBarRightMenu() {
   return (
     <_Root>
       <TopBarMultiplayerSegment />
-      <div style={{ marginLeft: 8 }} />
+      <MarginRight size={24} />
       <TopBarShareButton />
-      <div style={{ marginLeft: 8 }} />
+      <MarginRight size={19} />
+
       <TopBarMoreButton />
     </_Root>
   );
 }
 
 const _Root = styled.div`
-  padding: 12px;
+  padding: 16px;
   display: flex;
   flex-direction: row;
+`;
+
+const MarginRight = styled.div<{ size: number }>`
+  margin-right: ${(props) => `${props.size}px`};
 `;

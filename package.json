@@ -9,6 +9,8 @@
         "packages/app-*",
         "packages/core-*",
         "packages/lib/*",
+        "externals/base-sdk/*",
+        "externals/base-sdk/_firstparty/*",
         "externals/reflect-core/packages/*",
         "externals/design-sdk/*",
         "externals/design-to-code/packages/*",
