@@ -92,8 +92,14 @@ const PreviewImage = styled.img`
   background-color: #f5f5f5;
   user-select: none;
   -webkit-user-drag: none;
+  border: 1px solid #f5f5f5;
+
+  &:hover {
+    border: 1px solid #cdcdcd;
+  }
 
   &[data-selected="true"] {
+    border: 1px solid #f5f5f5;
     outline: 2px solid #2f80ed;
   }
 `;
