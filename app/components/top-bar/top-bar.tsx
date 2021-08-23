@@ -33,7 +33,6 @@ export function TopBar(props: {
 
 const TopBarRoot = styled.div<{ isMain?: boolean }>`
   height: 56px;
-  padding: 0 12px;
   opacity: 1;
   max-width: 100vw;
   transition: opacity 700ms ease 0s, color 700ms ease 0s;
@@ -44,7 +43,6 @@ const TopBarRoot = styled.div<{ isMain?: boolean }>`
       ? css`
           width: 100%;
           position: relative;
-          margin: 0 12px;
           background-color: #ffffff;
         `
       : css`
@@ -52,7 +50,6 @@ const TopBarRoot = styled.div<{ isMain?: boolean }>`
           top: 0;
           right: 0;
           z-index: 999;
-          padding: 0 12px;
         `}
 
   /* flex */
@@ -75,4 +72,5 @@ const Title = styled.p`
 
 const TopBarRightArea = styled.div`
   align-self: center;
+  padding: 0 12px;
 `;
