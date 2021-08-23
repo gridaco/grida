@@ -1,1 +1,1 @@
-export * as scenes from "./scenes";
+export { default as scenes } from "./scenes";
