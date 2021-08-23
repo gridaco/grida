@@ -9,6 +9,7 @@ export function TopBar(props: {
   controlDoubleClick: () => void;
   title?: string;
   isMain?: boolean;
+  isScenes?: boolean;
 }) {
   return (
     <BarDragArea
@@ -24,7 +25,7 @@ export function TopBar(props: {
           <TopBarLeftBreadcrumb />
         </TopBarLeftArea>
         <TopBarRightArea>
-          <TopBarRightMenu />
+          <TopBarRightMenu isScenes={props.isScenes} />
         </TopBarRightArea>
       </TopBarRoot>
     </BarDragArea>

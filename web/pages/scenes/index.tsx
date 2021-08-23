@@ -8,7 +8,7 @@ import { SceneItem } from "@app/scene-view/components/scene-item";
 import SearchFormBox from "@app/scene-view/components/search/search-form-box";
 
 /** dev only */ import { mocks } from "@app/scene-view";
-import { ScenesTopBar, TopBar } from "../../../app/components";
+import { TopBar } from "../../../app/components";
 
 interface IScreen {
   name: string;
@@ -65,7 +65,7 @@ export default function ScreensPage() {
             marginBottom: 24,
           }}
         /> */}
-      <ScenesTopBar controlDoubleClick={() => {}} />
+      <TopBar controlDoubleClick={() => {}} isScenes={true} />
       <Grid>
         {screens.map(({ source, ...d }, i) => {
           const id = i.toString();

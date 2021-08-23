@@ -3,15 +3,25 @@ import styled from "@emotion/styled";
 import { TopBarMultiplayerSegment } from "./top-bar-multiplayer-segment";
 import { TopBarShareButton } from "./top-bar-share-button";
 import { TopBarMoreButton } from "./top-bar-more-button";
-export function TopBarRightMenu() {
+
+interface Props {
+  isScenes?: boolean;
+}
+
+export function TopBarRightMenu(props: Props) {
   return (
     <_Root>
-      <TopBarMultiplayerSegment />
-      <MarginRight size={24} />
-      <TopBarShareButton />
-      <MarginRight size={19} />
+      <TopBarMultiplayerSegment isScenes={props.isScenes} />
 
-      <TopBarMoreButton />
+      {!props.isScenes && (
+        <>
+          <MarginRight size={24} />
+          <TopBarShareButton />
+          <MarginRight size={19} />
+
+          <TopBarMoreButton />
+        </>
+      )}
     </_Root>
   );
 }
