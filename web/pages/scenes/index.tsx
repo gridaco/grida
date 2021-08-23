@@ -56,31 +56,40 @@ export default function ScreensPage() {
   };
 
   return (
-    <DashboardLayout title="Overview">
-      <SearchFormBox
-        containerStyle={{
-          margin: "0 auto",
-          marginBottom: 24,
-        }}
-      />
-      <Grid>
-        {screens.map(({ source, ...d }, i) => {
-          const id = i.toString();
-          return (
-            <SceneItem
-              key={id}
-              id={id}
-              onSelected={handleSelection}
-              onDoubleClick={() => handleDoubleClick(source)}
-              isSelected={focusedScreenId === id}
-              data={d}
-            />
-          );
-        })}
-      </Grid>
-    </DashboardLayout>
+    <Background>
+      <DashboardLayout title="Overview">
+        <SearchFormBox
+          containerStyle={{
+            margin: "0 auto",
+            marginBottom: 24,
+          }}
+        />
+        <Grid>
+          {screens.map(({ source, ...d }, i) => {
+            const id = i.toString();
+            return (
+              <SceneItem
+                key={id}
+                id={id}
+                onSelected={handleSelection}
+                onDoubleClick={() => handleDoubleClick(source)}
+                isSelected={focusedScreenId === id}
+                data={d}
+              />
+            );
+          })}
+        </Grid>
+      </DashboardLayout>
+    </Background>
   );
 }
+
+const Background = styled.div`
+  // TEMPORARY STYLE!!!
+  // TO BE UPDATED LATER ON @editor-ui/theme
+  // reset DashboardLayout theme
+  background: #fcfcfc;
+`;
 
 const Grid = styled.div`
   display: grid;
