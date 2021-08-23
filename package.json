@@ -6,6 +6,7 @@
         "app",
         "desktop",
         "web",
+        "site",
         "packages/app-*",
         "packages/core-*",
         "packages/lib/*",
@@ -22,6 +23,7 @@
     "scripts": {
         "web": "yarn workspace web run dev",
         "desktop": "yarn workspace @grida.co/desktop run start",
+        "site": "yarn workspace grida.site run dev",
         "clean": "rimraf node_modules yarn.lock",
         "clean:install": "yarn clean && yarn"
     },
