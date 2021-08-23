@@ -100,8 +100,10 @@ const PreviewImage = styled.img`
 
 const Name = styled.h6`
   margin: 0;
-  margin-top: 12px;
-  font-size: 16px;
+  margin-top: 7px;
   font-weight: normal;
-  line-height: 1.2;
+  font-size: 12px;
+  line-height: 14px;
+
+  color: #747474;
 `;
