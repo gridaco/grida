@@ -38,6 +38,7 @@ export default function ScenesId() {
   const [data, setData] = useState<SceneRecord>();
   const [isShareModalOpen, setIsShareModalOpen] = useState<boolean>(false);
   const [isPublic, setIsPublic] = useState<boolean>();
+  const [sharedLink, setSharedLink] = useState<string>("");
 
   const service = makeService();
 
@@ -47,11 +48,17 @@ export default function ScenesId() {
     const fetchData = async () => {
       const sid = await router.query.sid;
       const _sid = "" + sid;
-      const _data = await service.get(_sid);
-      setData(_data);
-      setSource(_data.raw[""]);
-      const _isPublic = _data.sharing.policy === "*" ? true : false;
-      setIsPublic(_isPublic);
+      await service
+        .get(_sid)
+        .then((_data) => {
+          setData(_data);
+          setSource(_data.raw[""]);
+          const _isPublic = _data.sharing.policy === "*" ? true : false;
+          setIsPublic(_isPublic);
+        })
+        .catch((error) => {
+          console.log("Get Error!", error);
+        });
     };
 
     if (router.query.sid !== undefined) {
@@ -64,24 +71,15 @@ export default function ScenesId() {
     setIsPublic(_policy === "*" ? true : false);
 
     const fetchData = async () => {
-      await service.updateSharing(data.id, {
-        sharingPolicy: { policy: _policy },
-      });
+      await service
+        .updateSharing(data.id, {
+          sharingPolicy: { policy: _policy },
+        })
+        .catch((error) => {
+          setIsPublic(!isPublic);
+          console.log("Update Sharing Error!", error);
+        });
     };
-    fetchData();
-  }
-
-  function onGetShared() {
-    const fetchData = async () => {
-      const result = await service.getShared(data.id);
-      if (result) {
-        const slicePoint = window.location.href.indexOf("/scenes");
-        const baseUrl = window.location.href.substring(0, slicePoint);
-        copy(`${baseUrl}/preview?scene=${result.id}`);
-        alert("Copied to clipboard!");
-      }
-    };
-
     fetchData();
   }
 
@@ -115,7 +113,6 @@ export default function ScenesId() {
           onClose={() => setIsShareModalOpen(false)}
           isPublic={isPublic}
           publicContorl={onSharePublicControl}
-          getSharedLink={onGetShared}
         />
         <Wrapper>
           <SideContainer>

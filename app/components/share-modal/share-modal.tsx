@@ -3,13 +3,13 @@ import styled from "@emotion/styled";
 import { Modal, Switch } from "@material-ui/core";
 import { StyledButton } from "../top-bar/button-style";
 import copy from "copy-to-clipboard";
+import { css } from "@emotion/react";
 
 interface Props {
   isOpen: boolean;
   onClose: () => void;
   isPublic: boolean;
   publicContorl: () => void;
-  getSharedLink: () => void;
 }
 
 function onClickCopyLink() {
@@ -29,18 +29,31 @@ export function ShareModalContents(props: Props) {
             color="default"
           />
         </Row>
+
         <SubTitle>
-          Anyone with the link can view this
-          <br />
-          scene
+          {props.isPublic ? (
+            <>
+              Anyone with the link can view this
+              <br />
+              scene
+            </>
+          ) : (
+            <>Only you can view this scene</>
+          )}
         </SubTitle>
-        <CopLink onClick={props.getSharedLink}>Copy</CopLink>
-        <Row>
+        <Field>
+          <Input value={window.location.href} />
+          <CopLink isDisaible={!props.isPublic} onClick={onClickCopyLink}>
+            Copy
+          </CopLink>
+        </Field>
+
+        {/* <Row>
           <StyledHref href="/" target={"_blank"}>
             Learn about sharing
           </StyledHref>
           <CopLink onClick={onClickCopyLink}>Copy Link</CopLink>
-        </Row>
+        </Row> */}
       </Wrapper>
     </Modal>
   );
@@ -48,10 +61,9 @@ export function ShareModalContents(props: Props) {
 
 const Wrapper = styled.div`
   width: 395px;
-  height: 222px;
+  /* height: 222px; */
   background: #fdfdfd;
-  padding: 28px 29px;
-  padding-top: 12px;
+  padding: 32px 24px;
   box-shadow: 0px 4px 32px rgba(0, 0, 0, 0.25), 0px 0px 2px rgba(0, 0, 0, 0.25);
   border-radius: 2px;
   position: absolute;
@@ -86,6 +98,26 @@ const SubTitle = styled.h6`
   line-height: 14px;
   color: #929292;
 `;
+const Field = styled(Row)`
+  background: #f8f8f8;
+  border-radius: 2px;
+  color: #bbbbbb;
+  padding: 13px 8px;
+  margin-top: 37px;
+`;
+
+const Input = styled.input`
+  width: 100%;
+  border: 0;
+  outline: 0;
+  background: #f8f8f8;
+  color: #bbbbbb;
+  margin-right: auto;
+
+  &:disabled {
+    color: #e7e7e7;
+  }
+`;
 
 const StyledHref = styled.a`
   font-style: normal;
@@ -97,15 +129,23 @@ const StyledHref = styled.a`
   text-decoration: none;
 `;
 
-const CopLink = styled.button`
+const CopLink = styled.button<{ isDisaible: boolean }>`
   font-size: 14px;
   border-radius: 4px;
   box-sizing: border-box;
-  padding-top: 16px;
-  padding-bottom: 16px;
   cursor: pointer;
   outline: none;
   border: 0;
-  background: rgba(255, 255, 255, 0);
-  margin-left: auto;
+  padding: 10px;
+  background: #ffffff;
+  border-radius: 2px;
+  margin-left: 12px;
+
+  ${(props) =>
+    props.isDisaible
+      ? css`
+          color: #dfdfdf;
+          background: #f8f8f8;
+        `
+      : ""}
 `;
