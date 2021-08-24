@@ -1,9 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useRouter } from "next/router";
-import axios from "axios";
 import styled from "@emotion/styled";
-
-import DashboardLayout from "@app/scene-view/layouts/dashboard";
 import { SceneItem } from "@app/scene-view/components/scene-item";
 import SearchFormBox from "@app/scene-view/components/search/search-form-box";
 import { SceneStoreService } from "@base-sdk/scene-store";
