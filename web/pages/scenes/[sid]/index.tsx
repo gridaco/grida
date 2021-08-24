@@ -20,6 +20,7 @@ import { ShareModalContents } from "../../../../app/components/share-modal";
 import { makeService } from "services/scenes-store";
 import { SceneRecord } from "@base-sdk/scene-store";
 import { __PutSharingPolicy } from "@base-sdk/scene-store/dist/__api/server-types";
+import { FrameFlutter } from "../../../../app/components";
 
 interface IQuicklookQueries extends QuicklookQueryParams {
   globalizationRedirect?: string;
@@ -116,6 +117,8 @@ export default function ScenesId() {
                     source: source!!,
                     preview: data.preview,
                     language: _language(data.customdata_1p),
+                    width: data.width,
+                    height: data.height,
                   })}
                 </>
               )}
@@ -148,6 +151,8 @@ function appFrame(props: {
   preview: string;
   framework: AppFramework;
   language: AppLanguage;
+  width: number;
+  height: number;
 }) {
   // region check mode
   const mode = checkFrameSourceMode(props.framework, props.source);
@@ -161,11 +166,9 @@ function appFrame(props: {
 
   return (
     <>
-      {/* <IFrame
-        id={props.id}
-        src={`https://frames-appbox.vercel.app/flutter?src=${props.preview}&mode=${mode}&language=${props.language}`}
-      /> */}
-      <IFrame id={props.id} src={props.preview} />
+      <FrameFlutter width={props.width} height={props.height}>
+        <IFrame id={props.id} src={props.preview} />
+      </FrameFlutter>
     </>
   );
 }
@@ -197,6 +200,8 @@ const IFrame = styled.iframe`
   box-shadow: 0px 0px 4px rgba(222, 222, 222, 0.25),
     0px 0px 32px 4px rgba(220, 220, 220, 0.12);
   border-radius: 2px;
+  width: 100%;
+  height: 100%;
 `;
 
 const ButtonList = styled.div`

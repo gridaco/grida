@@ -27,8 +27,7 @@ export function ShareModalContents(props: Props) {
           <StyledSwitch
             checked={props.isPublic}
             onChange={props.publicContorl}
-            name="checkedB"
-            color="primary"
+            color="default"
           />
         </Row>
         <SubTitle>
