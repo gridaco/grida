@@ -7,14 +7,19 @@ import copy from "copy-to-clipboard";
 interface Props {
   isOpen: boolean;
   onClose: () => void;
-  copyLink: string;
   isPublic: boolean;
   publicContorl: () => void;
+  getSharedLink: () => void;
 }
 
 function onClickCopyLink() {
   copy(window.location.href);
   alert("Copied to clipboard!");
+}
+
+function onClickShared(data) {
+  copy(data.result);
+  console.log(data);
 }
 
 export function ShareModalContents(props: Props) {
@@ -35,13 +40,18 @@ export function ShareModalContents(props: Props) {
           <br />
           scene
         </SubTitle>
-        <p>{props.copyLink}</p>
         <CopLink onClick={onClickCopyLink}>Copy</CopLink>
         <Row>
           <StyledHref href="/" target={"_blank"}>
             Learn about sharing
           </StyledHref>
-          <CopLink onClick={onClickCopyLink}>Copy Link</CopLink>
+          <CopLink
+            onClick={() => {
+              onClickShared(props.getSharedLink);
+            }}
+          >
+            Copy Link
+          </CopLink>
         </Row>
       </Wrapper>
     </Modal>

@@ -38,8 +38,6 @@ export default function ScenesId() {
   const [isShareModalOpen, setIsShareModalOpen] = useState<boolean>(false);
   const [isPublic, setIsPublic] = useState<boolean>();
 
-  const onClickShare = (isViaible) => setIsShareModalOpen(isViaible);
-
   const service = makeService();
 
   let editingSource: string;
@@ -72,6 +70,14 @@ export default function ScenesId() {
     fetchData();
   }
 
+  function onGetShared() {
+    const fetchData = async () => {
+      await service.getShared(data.id);
+    };
+
+    fetchData();
+  }
+
   function _framework(code) {
     if (!!code.flutter) {
       return AppFramework.flutter;
@@ -100,9 +106,9 @@ export default function ScenesId() {
         <ShareModalContents
           isOpen={isShareModalOpen}
           onClose={() => setIsShareModalOpen(false)}
-          copyLink="123"
           isPublic={isPublic}
           publicContorl={onSharePublicControl}
+          getSharedLink={onGetShared}
         />
         <Wrapper>
           <SideContainer>
@@ -172,14 +178,6 @@ function appFrame(props: {
     </>
   );
 }
-
-// opens vs code; code editor for editing this source on developer's local environment.
-const openVSCode = () => {
-  // todo -- pass params for rerouting on the editor
-  window.location.href = "vscode://file";
-  // not using this line since its purpose on oppening app on same window.
-  // open('vscode://file')
-};
 
 const Wrapper = styled.div`
   display: flex;
