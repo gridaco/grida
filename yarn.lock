@@ -1181,10 +1181,10 @@
     "@base-sdk/core" "0.1.0"
     axios "^0.21.1"
 
-"@base-sdk/scene-store@^0.0.5":
-  version "0.0.5"
-  resolved "https://registry.yarnpkg.com/@base-sdk/scene-store/-/scene-store-0.0.5.tgz#36a693fb157810c8e580965badfb4b4e7c1ab238"
-  integrity sha512-DLdxtt34NCHOaGadOccl4QopYVD+DUcJZAry3zcSyqYGzDQP8wFNEkisVuCtZ7wBwbEVLSJ3nWk9q/pqrbnGKQ==
+"@base-sdk/scene-store@^0.0.6":
+  version "0.0.6"
+  resolved "https://registry.yarnpkg.com/@base-sdk/scene-store/-/scene-store-0.0.6.tgz#bc0e6cb2a9b5b3c7c5e0959f5a2092c53aa2867e"
+  integrity sha512-IeuH7PzenPwH8GndVuWQGSAq8xuNelMO1wkOodaoQV0wjvYdJnNcTPJmq60L9v9lo4A2uGvmvUFiqWj8JV1JTg==
   dependencies:
     "@base-sdk/core" "0.1.0"
 
@@ -13183,7 +13183,7 @@ react-contextmenu@^2.14.0:
     classnames "^2.2.5"
     object-assign "^4.1.0"
 
-react-dom@17.0.2, react-dom@^17.0.2:
+react-dom@17.0.2, react-dom@^17.0.1, react-dom@^17.0.2:
   version "17.0.2"
   resolved "https://registry.yarnpkg.com/react-dom/-/react-dom-17.0.2.tgz#ecffb6845e3ad8dbfcdc498f0d0a939736502c23"
   integrity sha512-s4h96KtLDUQlsENhMn1ar8t2bEa+q/YAtj8pPPdIjPDGBDIVNsrD9aXNWqspUe6AzKCIG0C1HZZLqLV7qpOBGA==
@@ -13385,7 +13385,7 @@ react-youtube@^7.13.1:
     prop-types "15.7.2"
     youtube-player "5.5.2"
 
-react@17.0.2, react@^17.0.2:
+react@17.0.2, react@^17.0.1, react@^17.0.2:
   version "17.0.2"
   resolved "https://registry.yarnpkg.com/react/-/react-17.0.2.tgz#d0b5cc516d29eb3eee383f75b62864cfb6800037"
   integrity sha512-gnhPt75i/dq/z3/6q/0asP78D0u592D5L1pd7M8P+dck6Fu/jJeL6iVVK23fptSUZj8Vjf++7wXA8UNclGQcbA==
