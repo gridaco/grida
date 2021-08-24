@@ -9,7 +9,7 @@ import Editor, { useMonaco } from "@monaco-editor/react";
 import CircularProgress from "@material-ui/core/CircularProgress";
 
 // import FrameFlutter from "../../components/frame-flutter";
-import DashboardAppbar from "@app/scene-view/components/appbar/dashboard.appbar";
+
 import Toolbar from "@app/scene-view/components/toolbar";
 import { checkFrameSourceMode } from "@base-sdk/base/frame-embed";
 import { AppFramework, AppLanguage } from "@base-sdk/base/types";

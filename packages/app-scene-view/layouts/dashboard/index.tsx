@@ -1,8 +1,6 @@
 import React from "react";
 import styled from "@emotion/styled";
-import DashboardAppbar, {
-  IDashboardAppBar,
-} from "../../components/appbar/dashboard.appbar";
+import { IDashboardAppBar } from "../../components/appbar/dashboard.appbar";
 import { DashboardSideNavigationBar } from "../../components/side-navigation-bar/dashboard.side-navigation-bar";
 import { HomeScaffold } from "@editor-ui/workspace";
 import { EditorThemeProvider } from "@editor-ui/theme";
