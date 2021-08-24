@@ -17,18 +17,12 @@ function onClickCopyLink() {
   alert("Copied to clipboard!");
 }
 
-function onClickShared(data) {
-  console.log(data);
-  copy(data.id);
-}
-
 export function ShareModalContents(props: Props) {
   return (
     <Modal open={props.isOpen} onClose={props.onClose}>
       <Wrapper>
         <Row>
           <Title>Share to web</Title>
-
           <StyledSwitch
             checked={props.isPublic}
             onChange={props.publicContorl}

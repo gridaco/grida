@@ -78,6 +78,7 @@ export default function ScenesId() {
         const slicePoint = window.location.href.indexOf("/scenes");
         const baseUrl = window.location.href.substring(0, slicePoint);
         copy(`${baseUrl}/preview?scene=${result.id}`);
+        alert("Copied to clipboard!");
       }
     };
 
