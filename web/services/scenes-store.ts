@@ -9,8 +9,7 @@ export function makeService() {
     });
   } else {
     return new SceneStoreService({
-      type: "token",
-      token: localStorage.getItem("jwt"),
+      type: "auto-browser-otp",
     });
   }
 }
