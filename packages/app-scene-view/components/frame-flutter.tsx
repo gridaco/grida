@@ -89,9 +89,9 @@ export class FrameFlutter extends React.Component<Props, State> {
           //   height: 812,
           // }}
           onResize={this.onResize}
-          handleComponent={{
-            bottomRight: BottomRightHandle(),
-          }}
+          // handleComponent={{
+          //   bottomRight: BottomRightHandle(),
+          // }}
         >
           <div
             style={{
