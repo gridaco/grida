@@ -5,16 +5,16 @@ import { TopBarShareButton } from "./top-bar-share-button";
 import { TopBarMoreButton } from "./top-bar-more-button";
 
 interface Props {
-  isScenes?: boolean;
+  isSimple?: boolean;
   contorlModal?: () => void;
 }
 
 export function TopBarRightMenu(props: Props) {
   return (
     <_Root>
-      <TopBarMultiplayerSegment isScenes={props.isScenes} />
+      <TopBarMultiplayerSegment isSimple={props.isSimple} />
 
-      {!props.isScenes && (
+      {!props.isSimple && (
         <>
           <MarginRight size={24} />
           <TopBarShareButton contorlModal={props.contorlModal} />

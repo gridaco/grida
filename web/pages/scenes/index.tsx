@@ -68,7 +68,7 @@ export default function ScreensPage() {
             marginBottom: 24,
           }}
         /> */}
-      <TopBar controlDoubleClick={() => {}} isScenes={true} />
+      <TopBar controlDoubleClick={() => {}} isSimple={true} />
       <Grid>
         {screens.map(({ id, rawname, newname, ...d }, i) => {
           return (

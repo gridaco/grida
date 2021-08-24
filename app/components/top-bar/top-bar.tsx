@@ -10,7 +10,7 @@ export function TopBar(props: {
   contorlModal?: () => void;
   title?: string;
   isMain?: boolean;
-  isScenes?: boolean;
+  isSimple?: boolean;
 }) {
   return (
     <BarDragArea
@@ -27,7 +27,7 @@ export function TopBar(props: {
         </TopBarLeftArea>
         <TopBarRightArea>
           <TopBarRightMenu
-            isScenes={props.isScenes}
+            isSimple={props.isSimple}
             contorlModal={props.contorlModal}
           />
         </TopBarRightArea>

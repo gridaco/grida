@@ -12,7 +12,7 @@ interface Player {
 }
 
 interface Props {
-  isScenes?: boolean;
+  isSimple?: boolean;
 }
 
 const players: Player[] = [
@@ -38,7 +38,7 @@ export function TopBarMultiplayerSegment(props: Props) {
     console.log("avatar item click", id);
   };
 
-  const _players = props.isScenes ? players.slice(0, 1) : players;
+  const _players = props.isSimple ? players.slice(0, 1) : players;
 
   return (
     <MultiplayerAvatarGroup spacing={-4}>

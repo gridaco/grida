@@ -82,7 +82,11 @@ export default function Frame() {
         backButton="DASHBOARD"
         onClickPlay={run}
       /> */}
-        <TopBar controlDoubleClick={() => {}} title={query.name || "No Name"} />
+        <TopBar
+          controlDoubleClick={() => {}}
+          title={query.name || "No Name"}
+          isSimple={true}
+        />
         <Wrapper>
           <SideContainer>
             <Background>
