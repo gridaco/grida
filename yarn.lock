@@ -1181,10 +1181,10 @@
     "@base-sdk/core" "0.1.0"
     axios "^0.21.1"
 
-"@base-sdk/scene-store@^0.0.7":
-  version "0.0.7"
-  resolved "https://registry.yarnpkg.com/@base-sdk/scene-store/-/scene-store-0.0.7.tgz#fa263c47623241a7bd57795cb7e6c8673cbd7dd9"
-  integrity sha512-Q014cBp/N/RB1k1VziuiYBUsgAvWvSGTPEwNTDTWR7/vhYSbIev+LHo8PU07R0Po/wfKETQihUBlCfGON6OW7w==
+"@base-sdk/scene-store@^0.0.8":
+  version "0.0.8"
+  resolved "https://registry.yarnpkg.com/@base-sdk/scene-store/-/scene-store-0.0.8.tgz#d9182150235304ca4c39ebdbe21cfa36453e983e"
+  integrity sha512-51yaFfGjzZY3iJRbtw3LopGAUpryUDcRm0hdrLJdGLkr4QZ2VwgTSJALEez0ilGLzluo7ozivlMSSVMsaClB9g==
   dependencies:
     "@base-sdk/core" "0.1.0"
 

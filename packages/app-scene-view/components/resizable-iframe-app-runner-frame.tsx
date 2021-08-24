@@ -10,11 +10,6 @@ import { NumberSize, Resizable } from "re-resizable";
 import { Direction } from "re-resizable/lib/resizer";
 import React from "react";
 import styled from "@emotion/styled";
-import { compileFlutterApp } from "@base-sdk/build/flutter";
-import {
-  FlutterLoadingState,
-  FlutterFrameQuery,
-} from "@base-sdk/base/frame-embed";
 
 interface State {
   viewportWidth: number;
@@ -31,7 +26,10 @@ interface Props {
   children: React.ReactNode;
 }
 
-export class FrameFlutter extends React.Component<Props, State> {
+export class ResizableIframeAppRunnerFrame extends React.Component<
+  Props,
+  State
+> {
   constructor(props: Props) {
     super(props);
     this.state = {
@@ -39,22 +37,6 @@ export class FrameFlutter extends React.Component<Props, State> {
       viewportWidth: this.props.width,
     };
   }
-
-  componentDidMount() {}
-
-  onIframeLoaded = () => {
-    let iframe = document.getElementById("frame") as HTMLIFrameElement;
-
-    iframe.contentWindow!.onerror = (
-      event: Event | string,
-      source?: string,
-      lineno?: number,
-      colno?: number,
-      error?: Error
-    ) => {
-      console.error("error from flutter js", source);
-    };
-  };
 
   onResize = (
     event: MouseEvent | TouchEvent,
@@ -84,14 +66,7 @@ export class FrameFlutter extends React.Component<Props, State> {
           ref={(c) => {
             this.resizable = c;
           }}
-          // defaultSize={{
-          //   width: 375,
-          //   height: 812,
-          // }}
           onResize={this.onResize}
-          handleComponent={{
-            bottomRight: BottomRightHandle(),
-          }}
         >
           <div
             style={{
@@ -119,36 +94,7 @@ const SouthEastArrow = () => (
   </svg>
 );
 
-const BottomRightHandle = () => (
-  <CustomHandle>
-    <SouthEastArrow />
-  </CustomHandle>
-);
-
-const CustomHandle = (props: any) => (
-  <div
-    style={{
-      background: "#fff",
-      borderRadius: "2px",
-      border: "1px solid #ddd",
-      height: "100%",
-      width: "100%",
-      padding: 0,
-    }}
-    className={"SomeCustomHandle"}
-    {...props}
-  />
-);
-
 const ResizableWrapper = styled.div`
   display: flex;
   flex-direction: column;
-`;
-
-const Iframe = styled.iframe`
-  border: 0;
-`;
-
-const MessageWrapper = styled.div`
-  margin-top: 12px;
 `;

@@ -1,23 +1,23 @@
 import React from "react";
 import styled from "@emotion/styled";
 import { Modal, Switch } from "@material-ui/core";
-import { StyledButton } from "../top-bar/button-style";
 import copy from "copy-to-clipboard";
 import { css } from "@emotion/react";
 
-interface Props {
+interface IShareModalContentsProps {
   isOpen: boolean;
+  sharableLink: string;
   onClose: () => void;
   isPublic: boolean;
-  publicContorl: () => void;
+  onSharingPolicyChange: (v: boolean) => void;
 }
 
-function onClickCopyLink() {
-  copy(window.location.href);
-  alert("Copied to clipboard!");
-}
+export function ShareModalContents(props: IShareModalContentsProps) {
+  const onClickCopyLink = () => {
+    copy(props.sharableLink);
+    alert("sharable link copied.");
+  };
 
-export function ShareModalContents(props: Props) {
   return (
     <Modal open={props.isOpen} onClose={props.onClose}>
       <Wrapper>
@@ -25,7 +25,9 @@ export function ShareModalContents(props: Props) {
           <Title>Share to web</Title>
           <StyledSwitch
             checked={props.isPublic}
-            onChange={props.publicContorl}
+            onChange={(e, v) => {
+              props.onSharingPolicyChange(v);
+            }}
             color="default"
           />
         </Row>
@@ -42,18 +44,11 @@ export function ShareModalContents(props: Props) {
           )}
         </SubTitle>
         <Field>
-          <Input value={window.location.href} />
-          <CopLink isDisaible={!props.isPublic} onClick={onClickCopyLink}>
+          <Input value={props.sharableLink} />
+          <CopLink isDisaibled={!props.isPublic} onClick={onClickCopyLink}>
             Copy
           </CopLink>
         </Field>
-
-        {/* <Row>
-          <StyledHref href="/" target={"_blank"}>
-            Learn about sharing
-          </StyledHref>
-          <CopLink onClick={onClickCopyLink}>Copy Link</CopLink>
-        </Row> */}
       </Wrapper>
     </Modal>
   );
@@ -129,7 +124,7 @@ const StyledHref = styled.a`
   text-decoration: none;
 `;
 
-const CopLink = styled.button<{ isDisaible: boolean }>`
+const CopLink = styled.button<{ isDisaibled: boolean }>`
   font-size: 14px;
   border-radius: 4px;
   box-sizing: border-box;
@@ -142,7 +137,7 @@ const CopLink = styled.button<{ isDisaible: boolean }>`
   margin-left: 12px;
 
   ${(props) =>
-    props.isDisaible
+    props.isDisaibled
       ? css`
           color: #dfdfdf;
           background: #f8f8f8;
