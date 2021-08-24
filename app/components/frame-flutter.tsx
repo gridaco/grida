@@ -23,8 +23,8 @@ interface State {
 
 interface Props {
   children: React.ReactNode;
-  height: number;
-  width: number;
+  height?: number;
+  width?: number;
 }
 
 interface Props {
