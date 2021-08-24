@@ -12,6 +12,11 @@ interface Props {
   publicContorl: () => void;
 }
 
+function onClickCopyLink() {
+  copy(window.location.href);
+  alert("Copied to clipboard!");
+}
+
 export function ShareModalContents(props: Props) {
   return (
     <Modal open={props.isOpen} onClose={props.onClose}>
@@ -33,7 +38,7 @@ export function ShareModalContents(props: Props) {
         </SubTitle>
         <p>{props.copyLink}</p>
         <Row>
-          <CopLink onClick={() => {}}>Copy link</CopLink>
+          <CopLink onClick={onClickCopyLink}>Copy link</CopLink>
         </Row>
       </Wrapper>
     </Modal>

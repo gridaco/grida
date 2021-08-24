@@ -1,1 +1,1 @@
-export * from "./share-modeal";
+export * from "./share-modal";

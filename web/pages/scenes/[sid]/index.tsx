@@ -17,7 +17,6 @@ import Background from "@app/scene-view/components/canves/background";
 import { EditorThemeProvider } from "../../../../ui/editor-ui/packages/editor-ui-theme";
 import { TopBar } from "../../../../app/components";
 import { ShareModalContents } from "../../../../app/components/share-modal";
-import ShareModal from "../../../../packages/app-scene-view/components/modals/share";
 import { makeService } from "services/scenes-store";
 import { SceneRecord } from "@base-sdk/scene-store";
 
@@ -131,6 +130,8 @@ export default function ScenesId() {
           isOpen={isShareModalOpen}
           onClose={() => setIsShareModalOpen(false)}
           copyLink="123"
+          isPublic={true}
+          publicContorl={() => {}}
         />
         <Wrapper>
           <SideContainer>
