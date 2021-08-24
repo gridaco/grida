@@ -9,7 +9,7 @@ interface IShareModalContentsProps {
   sharableLink: string;
   onClose: () => void;
   isPublic: boolean;
-  publicContorl: (v: boolean) => void;
+  onSharingPolicyChange: (v: boolean) => void;
 }
 
 export function ShareModalContents(props: IShareModalContentsProps) {
@@ -26,7 +26,7 @@ export function ShareModalContents(props: IShareModalContentsProps) {
           <StyledSwitch
             checked={props.isPublic}
             onChange={(e, v) => {
-              props.publicContorl(v);
+              props.onSharingPolicyChange(v);
             }}
             color="default"
           />

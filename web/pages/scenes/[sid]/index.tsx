@@ -38,9 +38,10 @@ export default function ScenesId() {
       await service
         .get(sid)
         .then((scene) => {
+          console.log(scene);
           setScene(scene);
-          setSource("scene."); // TODO:
-          setIsPublic(isSharingPolicyPublic(scene.sharing.policy));
+          setSource(extractSource____temporary(scene));
+          setIsPublic(isSharingPolicyPublic(scene.sharing));
         })
         .catch((error) => {
           console.log("error while fetching scnene data", error);
@@ -94,11 +95,11 @@ export default function ScenesId() {
           contorlModal={() => setIsShareModalOpen(!isShareModalOpen)}
         />
         <ShareModalContents
-          sharableLink={makeSharableLink(scene.id)}
+          sharableLink={makeSharableLink(scene?.id ?? "")}
           isOpen={isShareModalOpen}
           onClose={() => setIsShareModalOpen(false)}
           isPublic={isPublic}
-          publicContorl={onSharingPolicyUpdate}
+          onSharingPolicyChange={onSharingPolicyUpdate}
         />
         <Wrapper>
           <SideContainer>
@@ -139,6 +140,11 @@ export default function ScenesId() {
       </EditorThemeProvider>
     </>
   );
+}
+
+function extractSource____temporary(scene: SceneRecord) {
+  /** we use customdata_1p temporarily. this is configured on upload from assistant. */
+  return (scene.customdata_1p as any).code.flutter.raw;
 }
 
 function makeSharableLink(id: string): string {
