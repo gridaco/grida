@@ -1,16 +1,10 @@
 import React, { useEffect, useState } from "react";
 import styled from "@emotion/styled";
-import Axios from "axios";
-
 import { useRouter } from "next/router";
 
 import { QuicklookQueryParams } from "@base-sdk/base/features/quicklook";
 import Editor, { useMonaco } from "@monaco-editor/react";
 import CircularProgress from "@material-ui/core/CircularProgress";
-import copy from "copy-to-clipboard";
-
-import DashboardAppbar from "@app/scene-view/components/appbar/dashboard.appbar";
-import Toolbar from "@app/scene-view/components/toolbar";
 import { checkFrameSourceMode } from "@base-sdk/base/frame-embed";
 import { AppFramework, AppLanguage } from "@base-sdk/base/types";
 import Background from "@app/scene-view/components/canves/background";
@@ -22,10 +16,6 @@ import { SceneRecord } from "@base-sdk/scene-store";
 import { __PutSharingPolicy } from "@base-sdk/scene-store/dist/__api/server-types";
 import { FrameFlutter } from "@app/scene-view/components";
 
-interface IQuicklookQueries extends QuicklookQueryParams {
-  globalizationRedirect?: string;
-}
-
 /**
  * frame or url is required
  * @param frame the frame id of selected node, which uploaded to default bridged quicklook s3 buket.
@@ -34,9 +24,9 @@ interface IQuicklookQueries extends QuicklookQueryParams {
 export default function ScenesId() {
   const router = useRouter();
   const [source, setSource] = useState<string>();
-  const [data, setData] = useState<SceneRecord>();
+  const [scene, setScene] = useState<SceneRecord>();
   const [isShareModalOpen, setIsShareModalOpen] = useState<boolean>(false);
-  const [isPublic, setIsPublic] = useState<boolean>();
+  const [isPublic, setIsPublic] = useState<boolean>(false);
 
   const service = makeService();
 
@@ -44,45 +34,38 @@ export default function ScenesId() {
 
   useEffect(() => {
     const fetchData = async () => {
-      const sid = await router.query.sid;
-      const _sid = "" + sid;
+      const sid = router.query.sid as string;
       await service
-        .get(_sid)
-        .then((_data) => {
-          setData(_data);
-          setSource(_data.raw[""]);
-          console.log(_data.sharing);
-          const _isPublic = _data.sharing.policy === "none" ? false : true;
-          setIsPublic(_isPublic);
+        .get(sid)
+        .then((scene) => {
+          setScene(scene);
+          setSource("scene."); // TODO:
+          setIsPublic(isSharingPolicyPublic(scene.sharing.policy));
         })
         .catch((error) => {
-          console.log("Get Error!", error);
+          console.log("error while fetching scnene data", error);
         });
     };
 
-    if (router.query.sid !== undefined) {
+    if (router.query.sid) {
       fetchData();
     }
   }, [router.query]);
 
-  function onSharePublicControl() {
-    const _policy = !isPublic ? "*" : "none";
-    setIsPublic(_policy === "*" ? true : false);
-
-    const fetchData = async () => {
-      await service
-        .updateSharing(data.id, {
-          sharingPolicy: { policy: _policy },
-        })
-        .then(() => {
-          setIsPublic(!isPublic);
-        })
-        .catch((error) => {
-          setIsPublic(!isPublic);
-          console.log("Update Sharing Error!", error);
-        });
-    };
-    fetchData();
+  async function onSharingPolicyUpdate(isPublic: boolean) {
+    setIsPublic(isPublic);
+    const newPolicyBasedOnUserControl = isPublic ? "*" : "none";
+    await service
+      .updateSharing(scene.id, {
+        sharingPolicy: { policy: newPolicyBasedOnUserControl },
+      })
+      .then(() => {
+        setIsPublic(isPublic);
+      })
+      .catch((error) => {
+        setIsPublic(!isPublic); // revert to previous.
+        console.log("Update Sharing policy failed", error);
+      });
   }
 
   function _framework(code) {
@@ -111,26 +94,27 @@ export default function ScenesId() {
           contorlModal={() => setIsShareModalOpen(!isShareModalOpen)}
         />
         <ShareModalContents
+          sharableLink={makeSharableLink(scene.id)}
           isOpen={isShareModalOpen}
           onClose={() => setIsShareModalOpen(false)}
           isPublic={isPublic}
-          publicContorl={onSharePublicControl}
+          publicContorl={onSharingPolicyUpdate}
         />
         <Wrapper>
           <SideContainer>
             <Background>
-              {!data ? (
+              {!scene ? (
                 <CircularProgress />
               ) : (
                 <>
-                  {appFrame({
-                    id: data.id,
-                    framework: _framework(data.customdata_1p),
+                  {AppRunnerFrame({
+                    id: scene.id,
+                    framework: _framework(scene.customdata_1p),
                     source: source!!,
-                    preview: data.preview,
-                    language: _language(data.customdata_1p),
-                    width: data.width,
-                    height: data.height,
+                    preview: scene.preview,
+                    language: _language(scene.customdata_1p),
+                    width: scene.width,
+                    height: scene.height,
                   })}
                 </>
               )}
@@ -157,7 +141,22 @@ export default function ScenesId() {
   );
 }
 
-function appFrame(props: {
+function makeSharableLink(id: string): string {
+  return `https://app.grida.co/preview?scene=${id}`;
+}
+
+function isSharingPolicyPublic(sharing: "*" | "none"): boolean {
+  switch (sharing) {
+    case "*":
+      return true;
+    case "none":
+      return false;
+    default:
+      return false;
+  }
+}
+
+function AppRunnerFrame(props: {
   id: string;
   source: string;
   preview: string;
