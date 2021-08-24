@@ -16,6 +16,7 @@ import { AppFramework, AppLanguage } from "@base-sdk/base/types";
 import Background from "@app/scene-view/components/canves/background";
 import { EditorThemeProvider } from "../../../ui/editor-ui/packages/editor-ui-theme";
 import { TopBar } from "../../../app/components";
+import { FrameFlutter } from "@app/scene-view/components";
 
 interface IQuicklookQueries extends QuicklookQueryParams {
   globalizationRedirect?: string;
@@ -82,7 +83,11 @@ export default function Frame() {
         backButton="DASHBOARD"
         onClickPlay={run}
       /> */}
-        <TopBar controlDoubleClick={() => {}} title={query.name || "No Name"} />
+        <TopBar
+          controlDoubleClick={() => {}}
+          title={query.name || "No Name"}
+          isSimple={true}
+        />
         <Wrapper>
           <SideContainer>
             <Background>
@@ -157,6 +162,8 @@ function appFrame(props: {
   source: string;
   framework: AppFramework;
   language: AppLanguage;
+  widht?: number;
+  height?: number;
 }) {
   // region check mode
   const mode = checkFrameSourceMode(props.framework, props.source);
@@ -172,29 +179,21 @@ function appFrame(props: {
     case "flutter":
       if (props.language == "js") {
         return (
-          <IFrame
-            id={props.id}
-            src={`https://frames-appbox.vercel.app/flutter?src=${props.source}&mode=${mode}&language=js`}
-          />
-          // <FrameFlutter
-          //   id={props.id}
-          //   src={props.source}
-          //   language="js"
-          //   mode={mode}
-          // ></FrameFlutter>
+          <FrameFlutter width={props.widht} height={props.height}>
+            <IFrame
+              id={props.id}
+              src={`https://frames-appbox.vercel.app/flutter?src=${props.source}&mode=${mode}&language=js`}
+            />
+          </FrameFlutter>
         );
       } else if (props.language == "dart") {
         return (
-          <IFrame
-            id={props.id}
-            src={`https://frames-appbox.vercel.app/flutter?src=${props.source}&mode=${mode}&language=dart`}
-          />
-          // <FrameFlutter
-          //   key={props.source}
-          //   id={props.id}
-          //   src={props.source}
-          //   language={"dart"}
-          // ></FrameFlutter>
+          <FrameFlutter width={props.widht} height={props.height}>
+            <IFrame
+              id={props.id}
+              src={`https://frames-appbox.vercel.app/flutter?src=${props.source}&mode=${mode}&language=dart`}
+            />
+          </FrameFlutter>
         );
       }
       return loading;

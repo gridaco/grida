@@ -30,6 +30,7 @@ export default function ScreensPage() {
   const [focusedScreenId, setFocusedScreenId] = useState<string>();
   const [screens, setScreens] = useState<SceneRecord[]>([]);
   const service = makeService();
+
   useEffect(() => {
     const updateScreens = (screens: any) =>
       setScreens(
@@ -67,7 +68,7 @@ export default function ScreensPage() {
             marginBottom: 24,
           }}
         /> */}
-      <TopBar controlDoubleClick={() => {}} isScenes={true} />
+      <TopBar controlDoubleClick={() => {}} isSimple={true} />
       <Grid>
         {screens.map(({ id, rawname, newname, ...d }, i) => {
           return (
