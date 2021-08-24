@@ -37,8 +37,12 @@ export function ShareModalContents(props: Props) {
           scene
         </SubTitle>
         <p>{props.copyLink}</p>
+        <CopLink onClick={onClickCopyLink}>Copy</CopLink>
         <Row>
-          <CopLink onClick={onClickCopyLink}>Copy link</CopLink>
+          <StyledHref href="/" target={"_blank"}>
+            Learn about sharing
+          </StyledHref>
+          <CopLink onClick={onClickCopyLink}>Copy Link</CopLink>
         </Row>
       </Wrapper>
     </Modal>
@@ -84,6 +88,16 @@ const SubTitle = styled.h6`
   font-size: 12px;
   line-height: 14px;
   color: #929292;
+`;
+
+const StyledHref = styled.a`
+  font-style: normal;
+  font-weight: normal;
+  font-size: 12px;
+  line-height: 14px;
+
+  color: #000000;
+  text-decoration: none;
 `;
 
 const CopLink = styled.button`

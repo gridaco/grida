@@ -19,6 +19,7 @@ import { TopBar } from "../../../../app/components";
 import { ShareModalContents } from "../../../../app/components/share-modal";
 import { makeService } from "services/scenes-store";
 import { SceneRecord } from "@base-sdk/scene-store";
+import { __PutSharingPolicy } from "@base-sdk/scene-store/dist/__api/server-types";
 
 interface IQuicklookQueries extends QuicklookQueryParams {
   globalizationRedirect?: string;
@@ -34,46 +35,13 @@ export default function ScenesId() {
   const [source, setSource] = useState<string>();
   const [data, setData] = useState<SceneRecord>();
   const [isShareModalOpen, setIsShareModalOpen] = useState<boolean>(false);
+  const [isPublic, setIsPublic] = useState<boolean>();
+
   const onClickShare = (isViaible) => setIsShareModalOpen(isViaible);
 
   const service = makeService();
 
   let editingSource: string;
-  // const query: IQuicklookQueries = {
-  //   id: (router.query.sid as string) ?? "",
-  //   framework: (router.query.framework as AppFramework) ?? AppFramework.flutter,
-  //   language: (router.query.language as AppLanguage) ?? AppLanguage.dart,
-  //   url: router.query.url as string,
-  //   name: router.query.name as string,
-  //   w: Number.parseInt(router.query.w as string) ?? 375,
-  //   h: Number.parseInt(router.query.h as string) ?? 812,
-  //   globalizationRedirect:
-  //     (router.query["globalization-redirect"] as string) ?? "#",
-  // };
-  // console.info("query for quicklook: ", query);
-
-  // useEffect(() => {
-  //   switch (query.framework) {
-  //     case "flutter":
-  //       if (query.url) {
-  //         if (query.language == "js") {
-  //           setSource(query.url);
-  //         } else if (query.language == "dart") {
-  //           // fetch dart file and set as source
-  //           Axios.get(query.url).then((r) => {
-  //             const dartSource = r.data;
-  //             editingSource = dartSource;
-  //             setSource(dartSource);
-  //           });
-  //         }
-  //       }
-  //       break;
-  //     default:
-  //       throw new Error(
-  //         `the framework ${query.framework} is not supported yet.`
-  //       );
-  //   }
-  // }, [query.url]);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -82,6 +50,8 @@ export default function ScenesId() {
       const _data = await service.get(_sid);
       setData(_data);
       setSource(_data.raw[""]);
+      const _isPublic = _data.sharing.policy === "*" ? true : false;
+      setIsPublic(_isPublic);
     };
 
     if (router.query.sid !== undefined) {
@@ -89,17 +59,17 @@ export default function ScenesId() {
     }
   }, [router.query]);
 
-  // const run = () => {
-  //   if (editingSource) {
-  //     setSource(editingSource);
-  //   } else {
-  //     alert("your code has no changes");
-  //   }
-  // };
+  function onSharePublicControl() {
+    const _policy = !isPublic ? "*" : "none";
+    setIsPublic(_policy === "*" ? true : false);
 
-  // if (!data) {
-  //   return <CircularProgress />;
-  // }
+    const fetchData = async () => {
+      await service.updateSharing(data.id, {
+        sharingPolicy: { policy: _policy },
+      });
+    };
+    fetchData();
+  }
 
   function _framework(code) {
     if (!!code.flutter) {
@@ -123,15 +93,15 @@ export default function ScenesId() {
         <TopBar
           controlDoubleClick={() => {}}
           // title={query.name || "No Name"}
-          title={"No Name"}
+          title={""}
           contorlModal={() => setIsShareModalOpen(!isShareModalOpen)}
         />
         <ShareModalContents
           isOpen={isShareModalOpen}
           onClose={() => setIsShareModalOpen(false)}
           copyLink="123"
-          isPublic={true}
-          publicContorl={() => {}}
+          isPublic={isPublic}
+          publicContorl={onSharePublicControl}
         />
         <Wrapper>
           <SideContainer>
