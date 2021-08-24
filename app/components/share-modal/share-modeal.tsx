@@ -1,11 +1,15 @@
 import React from "react";
 import styled from "@emotion/styled";
-import { Modal } from "@material-ui/core";
+import { Modal, Switch } from "@material-ui/core";
+import { StyledButton } from "../top-bar/button-style";
+import copy from "copy-to-clipboard";
 
 interface Props {
   isOpen: boolean;
   onClose: () => void;
   copyLink: string;
+  isPublic: boolean;
+  publicContorl: () => void;
 }
 
 export function ShareModalContents(props: Props) {
@@ -14,6 +18,13 @@ export function ShareModalContents(props: Props) {
       <Wrapper>
         <Row>
           <Title>Share to web</Title>
+
+          <StyledSwitch
+            checked={props.isPublic}
+            onChange={props.publicContorl}
+            name="checkedB"
+            color="primary"
+          />
         </Row>
         <SubTitle>
           Anyone with the link can view this
@@ -21,6 +32,9 @@ export function ShareModalContents(props: Props) {
           scene
         </SubTitle>
         <p>{props.copyLink}</p>
+        <Row>
+          <CopLink onClick={() => {}}>Copy link</CopLink>
+        </Row>
       </Wrapper>
     </Modal>
   );
@@ -31,6 +45,7 @@ const Wrapper = styled.div`
   height: 222px;
   background: #fdfdfd;
   padding: 28px 29px;
+  padding-top: 12px;
   box-shadow: 0px 4px 32px rgba(0, 0, 0, 0.25), 0px 0px 2px rgba(0, 0, 0, 0.25);
   border-radius: 2px;
   position: absolute;
@@ -49,7 +64,13 @@ const Title = styled.h1`
   font-size: 14px;
   line-height: 17px;
   color: #000000;
+  margin-top: 12px;
   margin-bottom: 10px;
+`;
+
+const StyledSwitch = styled(Switch)`
+  text-align: right;
+  margin-left: auto;
 `;
 
 const SubTitle = styled.h6`
@@ -58,4 +79,17 @@ const SubTitle = styled.h6`
   font-size: 12px;
   line-height: 14px;
   color: #929292;
+`;
+
+const CopLink = styled.button`
+  font-size: 14px;
+  border-radius: 4px;
+  box-sizing: border-box;
+  padding-top: 16px;
+  padding-bottom: 16px;
+  cursor: pointer;
+  outline: none;
+  border: 0;
+  background: rgba(255, 255, 255, 0);
+  margin-left: auto;
 `;

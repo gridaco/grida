@@ -71,6 +71,7 @@ module.exports = withPlugins([withTM, withImages], {
   env: {
     ...FIREBASE_ENV_VARS,
     ...LOCAL_DEVELOPMENT_ENV_VARS,
+    NEXT_PUBLIC_SCENES_STORE_TOKEN: process.env.NEXT_PUBLIC_SCENES_STORE_TOKEN,
   },
 
   // enable SPA mode, disable SSR

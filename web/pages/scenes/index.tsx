@@ -6,16 +6,19 @@ import styled from "@emotion/styled";
 import DashboardLayout from "@app/scene-view/layouts/dashboard";
 import { SceneItem } from "@app/scene-view/components/scene-item";
 import SearchFormBox from "@app/scene-view/components/search/search-form-box";
+import { SceneStoreService } from "@base-sdk/scene-store";
 
 /** dev only */ import { mocks } from "@app/scene-view";
 import { TopBar } from "../../../app/components";
+import { SceneRecord } from "@base-sdk/scene-store";
+import { makeService } from "services/scenes-store";
 
-interface IScreen {
-  name: string;
-  source: string;
-  preview: string;
-  updatedAt: string;
-}
+// interface IScreen {
+//   name: string;
+//   source: string;
+//   preview: string;
+//   updatedAt: string;
+// }
 
 export default function ScreensPage() {
   const router = useRouter();
@@ -25,8 +28,8 @@ export default function ScreensPage() {
   };
 
   const [focusedScreenId, setFocusedScreenId] = useState<string>();
-  const [screens, setScreens] = useState<IScreen[]>([]);
-
+  const [screens, setScreens] = useState<SceneRecord[]>([]);
+  const service = makeService();
   useEffect(() => {
     const updateScreens = (screens: any) =>
       setScreens(
@@ -37,12 +40,11 @@ export default function ScreensPage() {
       );
 
     const fetchData = async () => {
-      if (!query.src) {
-        updateScreens(mocks.scenes);
-        return;
-      }
-      const { data } = await axios.get(query.src);
+      const data = await service.list();
       updateScreens(data);
+      if (!data) {
+        updateScreens(mocks.scenes);
+      }
     };
 
     fetchData();
@@ -52,8 +54,8 @@ export default function ScreensPage() {
     setFocusedScreenId(id);
   };
 
-  const handleDoubleClick = (source: string) => {
-    router.replace(source);
+  const handleDoubleClick = (id: string) => {
+    router.push(`/scenes/${id}`);
   };
 
   return (
@@ -67,16 +69,19 @@ export default function ScreensPage() {
         /> */}
       <TopBar controlDoubleClick={() => {}} isScenes={true} />
       <Grid>
-        {screens.map(({ source, ...d }, i) => {
-          const id = i.toString();
+        {screens.map(({ id, rawname, newname, ...d }, i) => {
           return (
             <SceneItem
               key={id}
               id={id}
               onSelected={handleSelection}
-              onDoubleClick={() => handleDoubleClick(source)}
+              onDoubleClick={() => handleDoubleClick(id)}
               isSelected={focusedScreenId === id}
-              data={d}
+              data={{
+                ...d,
+                name: newname ?? rawname,
+                updatedAt: "now", // TODO:
+              }}
             />
           );
         })}

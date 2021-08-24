@@ -18,7 +18,8 @@ import { EditorThemeProvider } from "../../../../ui/editor-ui/packages/editor-ui
 import { TopBar } from "../../../../app/components";
 import { ShareModalContents } from "../../../../app/components/share-modal";
 import ShareModal from "../../../../packages/app-scene-view/components/modals/share";
-// import { SceneStoreService, Configure } from "@base-sdk/scene-store";
+import { makeService } from "services/scenes-store";
+import { SceneRecord } from "@base-sdk/scene-store";
 
 interface IQuicklookQueries extends QuicklookQueryParams {
   globalizationRedirect?: string;
@@ -32,60 +33,98 @@ interface IQuicklookQueries extends QuicklookQueryParams {
 export default function ScenesId() {
   const router = useRouter();
   const [source, setSource] = useState<string>();
-  const [isShareModalOpen, setIsShareModalOpen] = useState<boolean>(true);
+  const [data, setData] = useState<SceneRecord>();
+  const [isShareModalOpen, setIsShareModalOpen] = useState<boolean>(false);
   const onClickShare = (isViaible) => setIsShareModalOpen(isViaible);
 
+  const service = makeService();
+
   let editingSource: string;
-  const query: IQuicklookQueries = {
-    id: (router.query.id as string) ?? "",
-    framework: (router.query.framework as AppFramework) ?? AppFramework.flutter,
-    language: (router.query.language as AppLanguage) ?? AppLanguage.dart,
-    url: router.query.url as string,
-    name: router.query.name as string,
-    w: Number.parseInt(router.query.w as string) ?? 375,
-    h: Number.parseInt(router.query.h as string) ?? 812,
-    globalizationRedirect:
-      (router.query["globalization-redirect"] as string) ?? "#",
-  };
-  console.info("query for quicklook: ", query);
+  // const query: IQuicklookQueries = {
+  //   id: (router.query.sid as string) ?? "",
+  //   framework: (router.query.framework as AppFramework) ?? AppFramework.flutter,
+  //   language: (router.query.language as AppLanguage) ?? AppLanguage.dart,
+  //   url: router.query.url as string,
+  //   name: router.query.name as string,
+  //   w: Number.parseInt(router.query.w as string) ?? 375,
+  //   h: Number.parseInt(router.query.h as string) ?? 812,
+  //   globalizationRedirect:
+  //     (router.query["globalization-redirect"] as string) ?? "#",
+  // };
+  // console.info("query for quicklook: ", query);
+
+  // useEffect(() => {
+  //   switch (query.framework) {
+  //     case "flutter":
+  //       if (query.url) {
+  //         if (query.language == "js") {
+  //           setSource(query.url);
+  //         } else if (query.language == "dart") {
+  //           // fetch dart file and set as source
+  //           Axios.get(query.url).then((r) => {
+  //             const dartSource = r.data;
+  //             editingSource = dartSource;
+  //             setSource(dartSource);
+  //           });
+  //         }
+  //       }
+  //       break;
+  //     default:
+  //       throw new Error(
+  //         `the framework ${query.framework} is not supported yet.`
+  //       );
+  //   }
+  // }, [query.url]);
 
   useEffect(() => {
-    switch (query.framework) {
-      case "flutter":
-        if (query.url) {
-          if (query.language == "js") {
-            setSource(query.url);
-          } else if (query.language == "dart") {
-            // fetch dart file and set as source
-            Axios.get(query.url).then((r) => {
-              const dartSource = r.data;
-              editingSource = dartSource;
-              setSource(dartSource);
-            });
-          }
-        }
-        break;
-      default:
-        throw new Error(
-          `the framework ${query.framework} is not supported yet.`
-        );
-    }
-  }, [query.url]);
+    const fetchData = async () => {
+      const sid = await router.query.sid;
+      const _sid = "" + sid;
+      const _data = await service.get(_sid);
+      setData(_data);
+      setSource(_data.raw[""]);
+    };
 
-  const run = () => {
-    if (editingSource) {
-      setSource(editingSource);
-    } else {
-      alert("your code has no changes");
+    if (router.query.sid !== undefined) {
+      fetchData();
     }
-  };
+  }, [router.query]);
+
+  // const run = () => {
+  //   if (editingSource) {
+  //     setSource(editingSource);
+  //   } else {
+  //     alert("your code has no changes");
+  //   }
+  // };
+
+  // if (!data) {
+  //   return <CircularProgress />;
+  // }
+
+  function _framework(code) {
+    if (!!code.flutter) {
+      return AppFramework.flutter;
+    } else if (!!code.react) {
+      return AppFramework.react;
+    }
+  }
+
+  function _language(code) {
+    if (!!code.flutter) {
+      return AppLanguage.dart;
+    } else if (!!code.react) {
+      return AppLanguage.js;
+    }
+  }
 
   return (
     <>
       <EditorThemeProvider light>
         <TopBar
           controlDoubleClick={() => {}}
-          title={query.name || "No Name"}
+          // title={query.name || "No Name"}
+          title={"No Name"}
           contorlModal={() => setIsShareModalOpen(!isShareModalOpen)}
         />
         <ShareModalContents
@@ -96,12 +135,19 @@ export default function ScenesId() {
         <Wrapper>
           <SideContainer>
             <Background>
-              {appFrame({
-                id: query.id,
-                framework: query.framework,
-                source: source!!,
-                language: query.language,
-              })}
+              {!data ? (
+                <CircularProgress />
+              ) : (
+                <>
+                  {appFrame({
+                    id: data.id,
+                    framework: _framework(data.customdata_1p),
+                    source: source!!,
+                    preview: data.preview,
+                    language: _language(data.customdata_1p),
+                  })}
+                </>
+              )}
             </Background>
           </SideContainer>
           <SideContainer
@@ -128,6 +174,7 @@ export default function ScenesId() {
 function appFrame(props: {
   id: string;
   source: string;
+  preview: string;
   framework: AppFramework;
   language: AppLanguage;
 }) {
@@ -137,33 +184,19 @@ function appFrame(props: {
 
   const loading = <CircularProgress />;
 
-  if (!props.source) {
+  if (!props.source && !props.id) {
     return loading;
   }
 
-  switch (props.framework) {
-    case "flutter":
-      if (props.language == "js") {
-        return (
-          <IFrame
-            id={props.id}
-            src={`https://frames-appbox.vercel.app/flutter?src=${props.source}&mode=${mode}&language=js`}
-          />
-        );
-      } else if (props.language == "dart") {
-        return (
-          <IFrame
-            id={props.id}
-            src={`https://frames-appbox.vercel.app/flutter?src=${props.source}&mode=${mode}&language=dart`}
-          />
-        );
-      }
-      return loading;
-    case "react":
-      return <p>react framework is not yet supported.</p>;
-    default:
-      return loading;
-  }
+  return (
+    <>
+      {/* <IFrame
+        id={props.id}
+        src={`https://frames-appbox.vercel.app/flutter?src=${props.preview}&mode=${mode}&language=${props.language}`}
+      /> */}
+      <IFrame id={props.id} src={props.preview} />
+    </>
+  );
 }
 
 // opens vs code; code editor for editing this source on developer's local environment.
