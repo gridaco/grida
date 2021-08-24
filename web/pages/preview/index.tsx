@@ -16,7 +16,7 @@ import { AppFramework, AppLanguage } from "@base-sdk/base/types";
 import Background from "@app/scene-view/components/canves/background";
 import { EditorThemeProvider } from "../../../ui/editor-ui/packages/editor-ui-theme";
 import { TopBar } from "../../../app/components";
-import { FrameFlutter } from "@app/scene-view/components";
+import { ResizableIframeAppRunnerFrame } from "@app/scene-view/components";
 
 /**
  * frame or url is required
@@ -148,21 +148,27 @@ function appFrame(props: {
     case "flutter":
       if (props.language == "js") {
         return (
-          <FrameFlutter width={props.widht} height={props.height}>
+          <ResizableIframeAppRunnerFrame
+            width={props.widht}
+            height={props.height}
+          >
             <IFrame
               id={props.id}
               src={`https://frames-appbox.vercel.app/flutter?src=${props.source}&mode=${mode}&language=js`}
             />
-          </FrameFlutter>
+          </ResizableIframeAppRunnerFrame>
         );
       } else if (props.language == "dart") {
         return (
-          <FrameFlutter width={props.widht} height={props.height}>
+          <ResizableIframeAppRunnerFrame
+            width={props.widht}
+            height={props.height}
+          >
             <IFrame
               id={props.id}
               src={`https://frames-appbox.vercel.app/flutter?src=${props.source}&mode=${mode}&language=dart`}
             />
-          </FrameFlutter>
+          </ResizableIframeAppRunnerFrame>
         );
       }
       return loading;

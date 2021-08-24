@@ -1,11 +1,7 @@
 import React, { useEffect, useState } from "react";
 import styled from "@emotion/styled";
 import { useRouter } from "next/router";
-import {
-  buildFlutterFrameUrl,
-  FlutterFrameQuery,
-} from "@base-sdk/base/frame-embed";
-import { QuicklookQueryParams } from "@base-sdk/base/features/quicklook";
+import { buildFlutterFrameUrl } from "@base-sdk/base/frame-embed";
 import Editor, { useMonaco } from "@monaco-editor/react";
 import CircularProgress from "@material-ui/core/CircularProgress";
 import { checkFrameSourceMode } from "@base-sdk/base/frame-embed";
@@ -17,7 +13,7 @@ import { ShareModalContents } from "@app/scene-view";
 import { makeService } from "services/scenes-store";
 import { SceneRecord } from "@base-sdk/scene-store";
 import { __PutSharingPolicy } from "@base-sdk/scene-store/dist/__api/server-types";
-import { FrameFlutter } from "@app/scene-view/components";
+import { ResizableIframeAppRunnerFrame } from "@app/scene-view/components";
 
 /**
  * frame or url is required
@@ -226,9 +222,10 @@ function AppRunnerFrame(props: {
   });
   return (
     <>
-      <FrameFlutter width={props.width} height={props.height}>
+      {/* TODO: add max width & initial height based on aspect ratio = w/h */}
+      <ResizableIframeAppRunnerFrame width={props.width} height={props.height}>
         <IFrame id={props.id} src={_emb_url} />
-      </FrameFlutter>
+      </ResizableIframeAppRunnerFrame>
     </>
   );
 }
