@@ -40,12 +40,12 @@ export function ShareModalContents(props: Props) {
           <br />
           scene
         </SubTitle>
-        <CopLink onClick={onClickCopyLink}>Copy</CopLink>
+        <CopLink onClick={props.getSharedLink}>Copy</CopLink>
         <Row>
           <StyledHref href="/" target={"_blank"}>
             Learn about sharing
           </StyledHref>
-          <CopLink onClick={props.getSharedLink}>Copy Link</CopLink>
+          <CopLink onClick={onClickCopyLink}>Copy Link</CopLink>
         </Row>
       </Wrapper>
     </Modal>
