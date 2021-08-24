@@ -23,7 +23,7 @@ import { FrameFlutter } from "@app/scene-view/components";
  */
 export default function ScenesId() {
   const router = useRouter();
-  const [source, setSource] = useState<string>();
+  const [source, setSource] = useState<__TMP_CodeData>();
   const [scene, setScene] = useState<SceneRecord>();
   const [isShareModalOpen, setIsShareModalOpen] = useState<boolean>(false);
   const [isPublic, setIsPublic] = useState<boolean>(false);
@@ -111,7 +111,7 @@ export default function ScenesId() {
                   {AppRunnerFrame({
                     id: scene.id,
                     framework: _framework(scene.customdata_1p),
-                    source: source!!,
+                    source: scene.preview, // TODO:
                     preview: scene.preview,
                     language: _language(scene.customdata_1p),
                     width: scene.width,
@@ -127,7 +127,7 @@ export default function ScenesId() {
             <Editor
               language="dart"
               theme="vs-dark"
-              value={source}
+              value={source?.flutter?.widget.raw}
               options={{
                 unusualLineTerminators: "off",
               }}
@@ -142,9 +142,42 @@ export default function ScenesId() {
   );
 }
 
-function extractSource____temporary(scene: SceneRecord) {
+interface __TMP_PlatformCode {
+  widget: {
+    raw: string;
+    url: string;
+  };
+  executable: {
+    raw: string;
+    url: string;
+  };
+}
+interface __TMP_CodeData {
+  flutter?: __TMP_PlatformCode;
+  react?: __TMP_PlatformCode;
+}
+
+interface __TMP_1stparty_custom_data_shape {
+  code: __TMP_CodeData;
+}
+function extractSource____temporary(scene: SceneRecord): __TMP_CodeData {
   /** we use customdata_1p temporarily. this is configured on upload from assistant. */
-  return (scene.customdata_1p as any).code.flutter.raw;
+  return (
+    scene.customdata_1p as {
+      code: {
+        flutter: {
+          widget: {
+            raw: string;
+            url: string;
+          };
+          executable: {
+            raw: string;
+            url: string;
+          };
+        };
+      };
+    }
+  ).code;
 }
 
 function makeSharableLink(id: string): string {
