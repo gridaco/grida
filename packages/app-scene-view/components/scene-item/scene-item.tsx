@@ -84,23 +84,29 @@ const PreviewImageWrapper = styled.div`
 `;
 
 const PreviewImage = styled.img`
+  border-radius: 2px;
   max-height: 500px;
   display: flex;
   width: inherit;
   object-fit: cover;
   background-color: #f5f5f5;
+  border: 1px solid #f5f5f5;
+
   user-select: none;
   -webkit-user-drag: none;
 
-  &[data-selected="true"] {
-    outline: 2px solid #2f80ed;
+  &[data-selected="true"],
+  &:hover {
+    outline: 1px solid #cdcdcd;
   }
 `;
 
 const Name = styled.h6`
   margin: 0;
-  margin-top: 12px;
-  font-size: 16px;
+  margin-top: 7px;
   font-weight: normal;
-  line-height: 1.2;
+  font-size: 12px;
+  line-height: 14px;
+
+  color: #747474;
 `;

@@ -3,15 +3,26 @@ import styled from "@emotion/styled";
 import { TopBarMultiplayerSegment } from "./top-bar-multiplayer-segment";
 import { TopBarShareButton } from "./top-bar-share-button";
 import { TopBarMoreButton } from "./top-bar-more-button";
-export function TopBarRightMenu() {
+
+interface Props {
+  isScenes?: boolean;
+  contorlModal?: () => void;
+}
+
+export function TopBarRightMenu(props: Props) {
   return (
     <_Root>
-      <TopBarMultiplayerSegment />
-      <MarginRight size={24} />
-      <TopBarShareButton />
-      <MarginRight size={19} />
+      <TopBarMultiplayerSegment isScenes={props.isScenes} />
 
-      <TopBarMoreButton />
+      {!props.isScenes && (
+        <>
+          <MarginRight size={24} />
+          <TopBarShareButton contorlModal={props.contorlModal} />
+          <MarginRight size={19} />
+
+          <TopBarMoreButton />
+        </>
+      )}
     </_Root>
   );
 }
@@ -20,6 +31,8 @@ const _Root = styled.div`
   padding: 16px;
   display: flex;
   flex-direction: row;
+  justify-content: center;
+  align-items: center;
 `;
 
 const MarginRight = styled.div<{ size: number }>`

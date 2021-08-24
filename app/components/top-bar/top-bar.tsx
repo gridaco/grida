@@ -7,11 +7,16 @@ import { css } from "@emotion/react";
 
 export function TopBar(props: {
   controlDoubleClick: () => void;
+  contorlModal?: () => void;
   title?: string;
   isMain?: boolean;
+  isScenes?: boolean;
 }) {
   return (
-    <BarDragArea controlDoubleClick={props.controlDoubleClick}>
+    <BarDragArea
+      controlDoubleClick={props.controlDoubleClick}
+      isMain={props.isMain}
+    >
       <TopBarRoot
         isMain={props.isMain}
         onDoubleClick={props.controlDoubleClick}
@@ -21,7 +26,10 @@ export function TopBar(props: {
           <TopBarLeftBreadcrumb />
         </TopBarLeftArea>
         <TopBarRightArea>
-          <TopBarRightMenu />
+          <TopBarRightMenu
+            isScenes={props.isScenes}
+            contorlModal={props.contorlModal}
+          />
         </TopBarRightArea>
       </TopBarRoot>
     </BarDragArea>
@@ -29,21 +37,26 @@ export function TopBar(props: {
 }
 
 const TopBarRoot = styled.div<{ isMain?: boolean }>`
-  /* background-color: #ffffff; */
-  /* width: 100%; */
-  /* max-width: 100vw; */
   height: 56px;
-  padding: 0 12px;
   opacity: 1;
+  max-width: 100vw;
   transition: opacity 700ms ease 0s, color 700ms ease 0s;
 
-  /*  200 is main navigation width*/
+  /* isMain is contorl top bar style (use only top-bar and bar-drag-area) */
   ${(props) =>
     !!props.isMain
       ? css`
-          max-width: calc(100vw - 200px);
+          width: 100%;
+          position: relative;
+          background-color: #ffffff;
         `
-      : css``}
+      : css`
+          width: 100%;
+          position: absolute;
+          top: 0;
+          right: 0;
+          z-index: 999;
+        `}
 
   /* flex */
   display: flex;
@@ -65,4 +78,5 @@ const Title = styled.p`
 
 const TopBarRightArea = styled.div`
   align-self: center;
+  padding: 0 12px;
 `;
