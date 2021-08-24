@@ -6,6 +6,7 @@ const Background = styled.div`
   align-items: center;
   justify-content: center;
   background-size: 24px 24px;
+  padding: 15px;
 `;
 
 export default Background;

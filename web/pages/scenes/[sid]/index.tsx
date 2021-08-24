@@ -101,7 +101,9 @@ export default function ScenesId() {
           onSharingPolicyChange={onSharingPolicyUpdate}
         />
         <Wrapper>
-          <SideContainer>
+          <SideContainer
+            style={{ width: "calc(55vw - 30px)", padding: "15px" }}
+          >
             <Background>
               {!scene ? (
                 <CircularProgress />
