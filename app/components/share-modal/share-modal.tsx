@@ -18,8 +18,8 @@ function onClickCopyLink() {
 }
 
 function onClickShared(data) {
-  copy(data.result);
   console.log(data);
+  copy(data.id);
 }
 
 export function ShareModalContents(props: Props) {
@@ -45,13 +45,7 @@ export function ShareModalContents(props: Props) {
           <StyledHref href="/" target={"_blank"}>
             Learn about sharing
           </StyledHref>
-          <CopLink
-            onClick={() => {
-              onClickShared(props.getSharedLink);
-            }}
-          >
-            Copy Link
-          </CopLink>
+          <CopLink onClick={props.getSharedLink}>Copy Link</CopLink>
         </Row>
       </Wrapper>
     </Modal>

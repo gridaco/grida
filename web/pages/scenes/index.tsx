@@ -30,6 +30,7 @@ export default function ScreensPage() {
   const [focusedScreenId, setFocusedScreenId] = useState<string>();
   const [screens, setScreens] = useState<SceneRecord[]>([]);
   const service = makeService();
+
   useEffect(() => {
     const updateScreens = (screens: any) =>
       setScreens(

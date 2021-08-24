@@ -7,6 +7,7 @@ import { useRouter } from "next/router";
 import { QuicklookQueryParams } from "@base-sdk/base/features/quicklook";
 import Editor, { useMonaco } from "@monaco-editor/react";
 import CircularProgress from "@material-ui/core/CircularProgress";
+import copy from "copy-to-clipboard";
 
 // import FrameFlutter from "../../components/frame-flutter";
 import DashboardAppbar from "@app/scene-view/components/appbar/dashboard.appbar";
@@ -72,7 +73,12 @@ export default function ScenesId() {
 
   function onGetShared() {
     const fetchData = async () => {
-      await service.getShared(data.id);
+      const result = await service.getShared(data.id);
+      if (result) {
+        const slicePoint = window.location.href.indexOf("/scenes");
+        const baseUrl = window.location.href.substring(0, slicePoint);
+        copy(`${baseUrl}/preview?scene=${result.id}`);
+      }
     };
 
     fetchData();
