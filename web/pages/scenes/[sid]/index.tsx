@@ -1,7 +1,10 @@
 import React, { useEffect, useState } from "react";
 import styled from "@emotion/styled";
 import { useRouter } from "next/router";
-
+import {
+  buildFlutterFrameUrl,
+  FlutterFrameQuery,
+} from "@base-sdk/base/frame-embed";
 import { QuicklookQueryParams } from "@base-sdk/base/features/quicklook";
 import Editor, { useMonaco } from "@monaco-editor/react";
 import CircularProgress from "@material-ui/core/CircularProgress";
@@ -111,7 +114,8 @@ export default function ScenesId() {
                   {AppRunnerFrame({
                     id: scene.id,
                     framework: _framework(scene.customdata_1p),
-                    source: scene.preview, // TODO:
+                    source:
+                      extractSource____temporary(scene).flutter.executable.url, // TODO:
                     preview: scene.preview,
                     language: _language(scene.customdata_1p),
                     width: scene.width,
@@ -214,10 +218,16 @@ function AppRunnerFrame(props: {
     return loading;
   }
 
+  const _emb_url = buildFlutterFrameUrl({
+    id: props.id,
+    src: props.source,
+    mode: "url",
+    language: "dart",
+  });
   return (
     <>
       <FrameFlutter width={props.width} height={props.height}>
-        <IFrame id={props.id} src={props.preview} />
+        <IFrame id={props.id} src={_emb_url} />
       </FrameFlutter>
     </>
   );
