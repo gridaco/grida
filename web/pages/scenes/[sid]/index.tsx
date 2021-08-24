@@ -16,7 +16,7 @@ import { AppFramework, AppLanguage } from "@base-sdk/base/types";
 import Background from "@app/scene-view/components/canves/background";
 import { EditorThemeProvider } from "../../../../ui/editor-ui/packages/editor-ui-theme";
 import { TopBar } from "../../../../app/components";
-import { ShareModalContents } from "../../../../app/components/share-modal";
+import { ShareModalContents } from "@app/scene-view";
 import { makeService } from "services/scenes-store";
 import { SceneRecord } from "@base-sdk/scene-store";
 import { __PutSharingPolicy } from "@base-sdk/scene-store/dist/__api/server-types";

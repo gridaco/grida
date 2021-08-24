@@ -1,7 +1,6 @@
 import React from "react";
 import styled from "@emotion/styled";
 import { Modal, Switch } from "@material-ui/core";
-import { StyledButton } from "../top-bar/button-style";
 import copy from "copy-to-clipboard";
 import { css } from "@emotion/react";
 
