@@ -9,7 +9,6 @@ import Editor, { useMonaco } from "@monaco-editor/react";
 import CircularProgress from "@material-ui/core/CircularProgress";
 import copy from "copy-to-clipboard";
 
-// import FrameFlutter from "../../components/frame-flutter";
 import DashboardAppbar from "@app/scene-view/components/appbar/dashboard.appbar";
 import Toolbar from "@app/scene-view/components/toolbar";
 import { checkFrameSourceMode } from "@base-sdk/base/frame-embed";
@@ -21,7 +20,7 @@ import { ShareModalContents } from "../../../../app/components/share-modal";
 import { makeService } from "services/scenes-store";
 import { SceneRecord } from "@base-sdk/scene-store";
 import { __PutSharingPolicy } from "@base-sdk/scene-store/dist/__api/server-types";
-import { FrameFlutter } from "../../../../app/components";
+import { FrameFlutter } from "@app/scene-view/components";
 
 interface IQuicklookQueries extends QuicklookQueryParams {
   globalizationRedirect?: string;
@@ -38,7 +37,6 @@ export default function ScenesId() {
   const [data, setData] = useState<SceneRecord>();
   const [isShareModalOpen, setIsShareModalOpen] = useState<boolean>(false);
   const [isPublic, setIsPublic] = useState<boolean>();
-  const [sharedLink, setSharedLink] = useState<string>("");
 
   const service = makeService();
 
@@ -53,7 +51,8 @@ export default function ScenesId() {
         .then((_data) => {
           setData(_data);
           setSource(_data.raw[""]);
-          const _isPublic = _data.sharing.policy === "*" ? true : false;
+          console.log(_data.sharing);
+          const _isPublic = _data.sharing.policy === "none" ? false : true;
           setIsPublic(_isPublic);
         })
         .catch((error) => {
@@ -74,6 +73,9 @@ export default function ScenesId() {
       await service
         .updateSharing(data.id, {
           sharingPolicy: { policy: _policy },
+        })
+        .then(() => {
+          setIsPublic(!isPublic);
         })
         .catch((error) => {
           setIsPublic(!isPublic);

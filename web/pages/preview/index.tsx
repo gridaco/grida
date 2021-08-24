@@ -15,7 +15,8 @@ import { checkFrameSourceMode } from "@base-sdk/base/frame-embed";
 import { AppFramework, AppLanguage } from "@base-sdk/base/types";
 import Background from "@app/scene-view/components/canves/background";
 import { EditorThemeProvider } from "../../../ui/editor-ui/packages/editor-ui-theme";
-import { FrameFlutter, TopBar } from "../../../app/components";
+import { TopBar } from "../../../app/components";
+import { FrameFlutter } from "@app/scene-view/components";
 
 interface IQuicklookQueries extends QuicklookQueryParams {
   globalizationRedirect?: string;
