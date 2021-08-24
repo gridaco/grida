@@ -18,10 +18,6 @@ import { EditorThemeProvider } from "../../../ui/editor-ui/packages/editor-ui-th
 import { TopBar } from "../../../app/components";
 import { FrameFlutter } from "@app/scene-view/components";
 
-interface IQuicklookQueries extends QuicklookQueryParams {
-  globalizationRedirect?: string;
-}
-
 /**
  * frame or url is required
  * @param frame the frame id of selected node, which uploaded to default bridged quicklook s3 buket.
@@ -31,7 +27,7 @@ export default function Frame() {
   const router = useRouter();
   const [source, setSource] = useState<string>();
   let editingSource: string;
-  const query: IQuicklookQueries = {
+  const query: QuicklookQueryParams = {
     id: (router.query.id as string) ?? "",
     framework: (router.query.framework as AppFramework) ?? AppFramework.flutter,
     language: (router.query.language as AppLanguage) ?? AppLanguage.dart,
@@ -39,10 +35,7 @@ export default function Frame() {
     name: router.query.name as string,
     w: Number.parseInt(router.query.w as string) ?? 375,
     h: Number.parseInt(router.query.h as string) ?? 812,
-    globalizationRedirect:
-      (router.query["globalization-redirect"] as string) ?? "#",
   };
-  console.info("query for quicklook: ", query);
 
   useEffect(() => {
     switch (query.framework) {
@@ -102,18 +95,8 @@ export default function Frame() {
           <SideContainer
             style={{ width: "45vw", background: "#1e1e1e", paddingTop: "70px" }}
           >
-            <Toolbar toGlobalization={query.globalizationRedirect}>
+            <Toolbar>
               <ButtonList>
-                <Button
-                  style={{
-                    backgroundColor: "#151617",
-                  }}
-                  onClick={openVSCode}
-                >
-                  <ButtonIconImage src="/assets/icons/bridged_brand_icons_vscode_white.svg" />
-                  <span>VS CODE</span>
-                </Button>
-                <div style={{ marginLeft: 12 }}></div>
                 <Button
                   style={{
                     backgroundColor: "#2562FF",
@@ -135,20 +118,6 @@ export default function Frame() {
               onChange={(value: string) => {
                 editingSource = value;
               }}
-
-              // editorDidMount={(
-              //   editor: monacoEditor.editor.IStandaloneCodeEditor
-              // ) => {
-              //   // @ts-ignore
-              //   window.MonacoEnvironment.getWorkerUrl = (moduleId, label) => {
-              //     if (label === "json") return "/_next/static/json.worker.js";
-              //     if (label === "css") return "/_next/static/css.worker.js";
-              //     if (label === "html") return "/_next/static/html.worker.js";
-              //     if (label === "typescript" || label === "javascript")
-              //       return "/_next/static/ts.worker.js";
-              //     return "/_next/static/editor.worker.js";
-              //   };
-              // }}
             />
           </SideContainer>
         </Wrapper>
@@ -203,14 +172,6 @@ function appFrame(props: {
       return loading;
   }
 }
-
-// opens vs code; code editor for editing this source on developer's local environment.
-const openVSCode = () => {
-  // todo -- pass params for rerouting on the editor
-  window.location.href = "vscode://file";
-  // not using this line since its purpose on oppening app on same window.
-  // open('vscode://file')
-};
 
 const Wrapper = styled.div`
   display: flex;
