@@ -16,7 +16,9 @@ import { __PutSharingPolicy } from "@base-sdk/scene-store/dist/__api/server-type
 import { ResizableIframeAppRunnerFrame } from "@app/scene-view/components";
 import { useAuthState } from "@base-sdk-fp/auth-components-react";
 import { redirectionSignin } from "util/auth";
-
+import { getUserProfile } from "services/user-profile";
+/** dev only */ import { profile_mockup } from "__test__/mockfile";
+import { UserProfile } from "../../../../packages/type";
 /**
  * frame or url is required
  * @param frame the frame id of selected node, which uploaded to default bridged quicklook s3 buket.
@@ -29,6 +31,7 @@ export default function ScenesId() {
   const [scene, setScene] = useState<SceneRecord>();
   const [isShareModalOpen, setIsShareModalOpen] = useState<boolean>(false);
   const [isPublic, setIsPublic] = useState<boolean>(false);
+  const [profile, setProfile] = useState<UserProfile>();
 
   const service = makeService();
 
@@ -96,6 +99,7 @@ export default function ScenesId() {
           // title={query.name || "No Name"}
           title={""}
           contorlModal={() => setIsShareModalOpen(!isShareModalOpen)}
+          profile={profile}
         />
         <ShareModalContents
           sharableLink={makeSharableLink(scene?.id ?? "")}

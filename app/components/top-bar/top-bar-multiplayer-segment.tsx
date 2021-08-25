@@ -4,41 +4,47 @@ import {
   MultiplayerAvatar,
   MultiplayerAvatarGroup,
 } from "@editor-ui/multiplayer";
+import { UserProfile } from "../../../packages/type";
 
-interface Player {
-  name: string;
-  image: string;
-  id: string;
-}
+// interface Player {
+//   name: string;
+//   image: string;
+//   id: string;
+// }
 
 interface Props {
   isSimple?: boolean;
+  players?: UserProfile;
 }
 
-const players: Player[] = [
-  {
-    id: "1",
-    name: "Albert",
-    image: "",
-  },
-  {
-    id: "2",
-    name: "Albert",
-    image: "",
-  },
-  {
-    id: "3",
-    name: "Albert",
-    image: "",
-  },
-];
+// const players: Player[] = [
+//   {
+//     id: "1",
+//     name: "Albert",
+//     image:
+//       "https://s3-us-west-1.amazonaws.com/accounts.bridged.xyz/default-images/user-profile-image/default-profile-image.png",
+//   },
+//   {
+//     id: "2",
+//     name: "Albert",
+//     image: "",
+//   },
+//   {
+//     id: "3",
+//     name: "Albert",
+//     image: "",
+//   },
+// ];
 
 export function TopBarMultiplayerSegment(props: Props) {
+  const _players: UserProfile[] = [];
+  if (props.players) {
+    _players.push(props.players);
+  }
+
   const handleOnAvatarItemClick = (id: string) => {
     console.log("avatar item click", id);
   };
-
-  const _players = props.isSimple ? players.slice(0, 1) : players;
 
   return (
     <MultiplayerAvatarGroup spacing={-4}>
@@ -47,10 +53,12 @@ export function TopBarMultiplayerSegment(props: Props) {
           <MultiplayerAvatar
             key={p.id}
             id={p.id}
-            image={p.image}
-            chars={charsFromName(p.name)}
+            image={p.profileImage}
+            chars={"U"}
+            // chars={charsFromName(p.name)}
             online
-            onClick={handleOnAvatarItemClick}
+            // onClick={handleOnAvatarItemClick}
+            onClick={() => {}}
           />
         );
       })}

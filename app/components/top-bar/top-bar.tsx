@@ -4,6 +4,7 @@ import { TopBarRightMenu } from "./top-bar-right-menu";
 import { TopBarLeftBreadcrumb } from "./top-bar-left-breadcrumb";
 import { BarDragArea } from "../bar-drag-area";
 import { css } from "@emotion/react";
+import { UserProfile } from "../../../packages/type";
 
 export function TopBar(props: {
   controlDoubleClick: () => void;
@@ -11,6 +12,7 @@ export function TopBar(props: {
   title?: string;
   isMain?: boolean;
   isSimple?: boolean;
+  profile?: UserProfile;
 }) {
   return (
     <BarDragArea
@@ -29,6 +31,7 @@ export function TopBar(props: {
           <TopBarRightMenu
             isSimple={props.isSimple}
             contorlModal={props.contorlModal}
+            profile={props.profile}
           />
         </TopBarRightArea>
       </TopBarRoot>

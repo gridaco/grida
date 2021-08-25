@@ -17,6 +17,9 @@ import Background from "@app/scene-view/components/canves/background";
 import { EditorThemeProvider } from "../../../ui/editor-ui/packages/editor-ui-theme";
 import { TopBar } from "../../../app/components";
 import { ResizableIframeAppRunnerFrame } from "@app/scene-view/components";
+/** dev only */ import { profile_mockup } from "__test__/mockfile";
+import { UserProfile } from "../../../packages/type";
+import { getUserProfile } from "services/user-profile";
 
 /**
  * frame or url is required
@@ -26,7 +29,10 @@ import { ResizableIframeAppRunnerFrame } from "@app/scene-view/components";
 export default function Frame() {
   const router = useRouter();
   const [source, setSource] = useState<string>();
+  const [profile, setProfile] = useState<UserProfile>();
+
   let editingSource: string;
+
   const query: QuicklookQueryParams = {
     id: (router.query.id as string) ?? "",
     framework: (router.query.framework as AppFramework) ?? AppFramework.flutter,
@@ -38,6 +44,10 @@ export default function Frame() {
   };
 
   useEffect(() => {
+    // const profileData = await getUserProfile();
+    const profileData = profile_mockup;
+    setProfile(profileData);
+
     switch (query.framework) {
       case "flutter":
         if (query.url) {
@@ -80,6 +90,7 @@ export default function Frame() {
           controlDoubleClick={() => {}}
           title={query.name || "No Name"}
           isSimple={true}
+          profile={profile}
         />
         <Wrapper>
           <SideContainer

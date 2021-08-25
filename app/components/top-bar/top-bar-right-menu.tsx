@@ -3,16 +3,21 @@ import styled from "@emotion/styled";
 import { TopBarMultiplayerSegment } from "./top-bar-multiplayer-segment";
 import { TopBarShareButton } from "./top-bar-share-button";
 import { TopBarMoreButton } from "./top-bar-more-button";
+import { UserProfile } from "../../../packages/type";
 
 interface Props {
   isSimple?: boolean;
+  profile?: UserProfile;
   contorlModal?: () => void;
 }
 
 export function TopBarRightMenu(props: Props) {
   return (
     <_Root>
-      <TopBarMultiplayerSegment isSimple={props.isSimple} />
+      <TopBarMultiplayerSegment
+        isSimple={props.isSimple}
+        players={props.profile}
+      />
 
       {!props.isSimple && (
         <>
