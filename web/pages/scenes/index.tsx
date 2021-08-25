@@ -9,6 +9,8 @@ import { SceneStoreService } from "@base-sdk/scene-store";
 import { TopBar } from "../../../app/components";
 import { SceneRecord } from "@base-sdk/scene-store";
 import { makeService } from "services/scenes-store";
+import { useAuthState } from "@base-sdk-fp/auth-components-react";
+import { redirectionSignin } from "util/auth";
 
 // interface IScreen {
 //   name: string;
@@ -23,12 +25,14 @@ export default function ScreensPage() {
     src: router.query.src as string,
     screenRedirect: (router.query.screenRedirect as string) || "",
   };
+  const authState = useAuthState();
 
   const [focusedScreenId, setFocusedScreenId] = useState<string>();
   const [screens, setScreens] = useState<SceneRecord[]>([]);
   const service = makeService();
 
   useEffect(() => {
+    redirectionSignin(authState);
     const updateScreens = (screens: any) =>
       setScreens(
         screens.map(({ onclick, ...screen }) => ({
@@ -38,15 +42,19 @@ export default function ScreensPage() {
       );
 
     const fetchData = async () => {
-      const data = await service.list();
-      updateScreens(data);
-      if (!data) {
-        updateScreens(mocks.scenes);
-      }
+      const data = await service
+        .list()
+        .then((data) => {
+          updateScreens(data);
+        })
+        .catch((error) => {
+          // updateScreens(mocks.scenes);
+          console.log("Error in fetch", error);
+        });
     };
 
     fetchData();
-  }, [query.src]);
+  }, [query.src, authState]);
 
   const handleSelection = (id: string) => {
     setFocusedScreenId(id);
