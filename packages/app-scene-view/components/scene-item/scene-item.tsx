@@ -50,11 +50,8 @@ export const SceneItem = ({
             onMouseEnter={handleMouseEnter}
             onMouseLeave={handleMouseLeave}
           >
-            <PreviewImageWrapper>
-              <PreviewImage
-                src={preview}
-                data-selected={isSelected && "true"}
-              ></PreviewImage>
+            <PreviewImageWrapper data-selected={isSelected && "true"}>
+              <PreviewImage src={preview}></PreviewImage>
             </PreviewImageWrapper>
             <Name>{name}</Name>
           </ItemContainer>
@@ -86,10 +83,19 @@ const ItemContainer = styled.div`
 `;
 
 const PreviewImageWrapper = styled.div`
-  border: 1px solid #e7e7e7;
+  background: #f5f5f5;
+  border: 1px solid #f5f5f5;
+  border-radius: 2px;
+
+  &[data-selected="true"],
+  &:hover {
+    border: 1px solid #cdcdcd;
+    border-radius: 2px;
+  }
 `;
 
 const PreviewImage = styled.img`
+  display: block;
   border-radius: 2px;
   max-width: inherit;
   width: 100%;
@@ -102,11 +108,6 @@ const PreviewImage = styled.img`
 
   user-select: none;
   -webkit-user-drag: none;
-
-  &[data-selected="true"],
-  &:hover {
-    outline: 2px solid #cdcdcd;
-  }
 `;
 
 const Name = styled.h6`
