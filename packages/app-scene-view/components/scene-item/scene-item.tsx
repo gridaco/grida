@@ -98,14 +98,14 @@ const PreviewImage = styled.img`
   display: flex;
   object-fit: cover;
   background-color: #f5f5f5;
-  border: 1px solid #f5f5f5;
+  /* border: 2px solid #f5f5f5; */
 
   user-select: none;
   -webkit-user-drag: none;
 
   &[data-selected="true"],
   &:hover {
-    outline: 1px solid #cdcdcd;
+    outline: 2px solid #cdcdcd;
   }
 `;
 
