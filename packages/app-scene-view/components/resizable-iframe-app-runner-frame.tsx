@@ -60,6 +60,8 @@ export class ResizableIframeAppRunnerFrame extends React.Component<
   resizable: Resizable | null = null;
 
   render() {
+    const aspectRatio = this.state.viewportWidth / this.state.viewportHeight;
+    const _aspectRatio = aspectRatio.toString();
     return (
       <ResizableWrapper>
         <Resizable
@@ -72,6 +74,10 @@ export class ResizableIframeAppRunnerFrame extends React.Component<
             style={{
               width: this.state.viewportWidth,
               height: this.state.viewportHeight,
+              aspectRatio: _aspectRatio,
+              paddingTop: `calc( ${this.state.viewportWidth} / ${aspectRatio})`,
+              maxWidth: "calc(55vw - 30px)",
+              maxHeight: "calc(100vh - 30px)",
             }}
           >
             {this.props.children}
@@ -97,4 +103,5 @@ const SouthEastArrow = () => (
 const ResizableWrapper = styled.div`
   display: flex;
   flex-direction: column;
+  width: 55vw;
 `;

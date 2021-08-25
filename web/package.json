@@ -9,6 +9,7 @@
   },
   "dependencies": {
     "@app/scene-view": "0.0.0",
+    "@base-sdk-fp/auth-components-react": "^0.0.1",
     "@base-sdk/scene-store": "^0.0.8",
     "@emotion/babel-preset-css-prop": "^11.2.0",
     "@grida.co/app": "0.0.0",

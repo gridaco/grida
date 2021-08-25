@@ -14,6 +14,8 @@ import { makeService } from "services/scenes-store";
 import { SceneRecord } from "@base-sdk/scene-store";
 import { __PutSharingPolicy } from "@base-sdk/scene-store/dist/__api/server-types";
 import { ResizableIframeAppRunnerFrame } from "@app/scene-view/components";
+import { useAuthState } from "@base-sdk-fp/auth-components-react";
+import { redirectionSignin } from "util/auth";
 
 /**
  * frame or url is required
@@ -22,6 +24,7 @@ import { ResizableIframeAppRunnerFrame } from "@app/scene-view/components";
  */
 export default function ScenesId() {
   const router = useRouter();
+  const authState = useAuthState();
   const [source, setSource] = useState<__TMP_CodeData>();
   const [scene, setScene] = useState<SceneRecord>();
   const [isShareModalOpen, setIsShareModalOpen] = useState<boolean>(false);
@@ -32,6 +35,7 @@ export default function ScenesId() {
   let editingSource: string;
 
   useEffect(() => {
+    redirectionSignin(authState);
     const fetchData = async () => {
       const sid = router.query.sid as string;
       await service
@@ -50,7 +54,7 @@ export default function ScenesId() {
     if (router.query.sid) {
       fetchData();
     }
-  }, [router.query]);
+  }, [router.query, authState]);
 
   async function onSharingPolicyUpdate(isPublic: boolean) {
     setIsPublic(isPublic);
@@ -101,7 +105,9 @@ export default function ScenesId() {
           onSharingPolicyChange={onSharingPolicyUpdate}
         />
         <Wrapper>
-          <SideContainer>
+          <SideContainer
+            style={{ width: "calc(55vw - 30px)", padding: "15px" }}
+          >
             <Background>
               {!scene ? (
                 <CircularProgress />

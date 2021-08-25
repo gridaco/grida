@@ -82,7 +82,9 @@ export default function Frame() {
           isSimple={true}
         />
         <Wrapper>
-          <SideContainer>
+          <SideContainer
+            style={{ width: "calc(55vw - 30px)", padding: "15px" }}
+          >
             <Background>
               {appFrame({
                 id: query.id,

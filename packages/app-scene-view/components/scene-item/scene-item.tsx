@@ -42,25 +42,24 @@ export const SceneItem = ({
 
   return (
     <Wrapper>
-      <ContextMenuTrigger id={id}>
-        <ItemContainer
-          onClick={handleClick}
-          onDoubleClick={handleDoubleClick}
-          onMouseEnter={handleMouseEnter}
-          onMouseLeave={handleMouseLeave}
-        >
-          <PreviewImageWrapper>
-            <PreviewImage
-              src={preview}
-              data-selected={isSelected && "true"}
-            ></PreviewImage>
-          </PreviewImageWrapper>
-          <Name>{name}</Name>
-        </ItemContainer>
-      </ContextMenuTrigger>
-      <ContextMenu id={id}>
-        <SceneItemContextMenu />
-      </ContextMenu>
+      <Inner>
+        <ContextMenuTrigger id={id}>
+          <ItemContainer
+            onClick={handleClick}
+            onDoubleClick={handleDoubleClick}
+            onMouseEnter={handleMouseEnter}
+            onMouseLeave={handleMouseLeave}
+          >
+            <PreviewImageWrapper data-selected={isSelected && "true"}>
+              <PreviewImage src={preview}></PreviewImage>
+            </PreviewImageWrapper>
+            <Name>{name}</Name>
+          </ItemContainer>
+        </ContextMenuTrigger>
+        <ContextMenu id={id}>
+          <SceneItemContextMenu />
+        </ContextMenu>
+      </Inner>
     </Wrapper>
   );
 };
@@ -69,36 +68,46 @@ const Wrapper = styled.div`
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
+  /* justify-content: center; */
   cursor: pointer;
 `;
 
+const Inner = styled.div`
+  width: 100%;
+`;
+
 const ItemContainer = styled.div`
-  max-width: 360px;
-  max-height: 800px;
+  /* max-width: 240px;
+  max-height: 516px; */
   margin: 5px;
 `;
 
 const PreviewImageWrapper = styled.div`
-  border: 1px solid #e7e7e7;
-`;
-
-const PreviewImage = styled.img`
-  border-radius: 2px;
-  max-height: 500px;
-  display: flex;
-  width: inherit;
-  object-fit: cover;
-  background-color: #f5f5f5;
+  background: #f5f5f5;
   border: 1px solid #f5f5f5;
-
-  user-select: none;
-  -webkit-user-drag: none;
+  border-radius: 2px;
 
   &[data-selected="true"],
   &:hover {
-    outline: 1px solid #cdcdcd;
+    border: 1px solid #cdcdcd;
+    border-radius: 2px;
   }
+`;
+
+const PreviewImage = styled.img`
+  display: block;
+  border-radius: 1px;
+  max-width: inherit;
+  width: 100%;
+  max-width: 240px;
+  max-height: 516px;
+  display: flex;
+  object-fit: cover;
+  background-color: #f5f5f5;
+  /* border: 2px solid #f5f5f5; */
+
+  user-select: none;
+  -webkit-user-drag: none;
 `;
 
 const Name = styled.h6`
