@@ -42,25 +42,27 @@ export const SceneItem = ({
 
   return (
     <Wrapper>
-      <ContextMenuTrigger id={id}>
-        <ItemContainer
-          onClick={handleClick}
-          onDoubleClick={handleDoubleClick}
-          onMouseEnter={handleMouseEnter}
-          onMouseLeave={handleMouseLeave}
-        >
-          <PreviewImageWrapper>
-            <PreviewImage
-              src={preview}
-              data-selected={isSelected && "true"}
-            ></PreviewImage>
-          </PreviewImageWrapper>
-          <Name>{name}</Name>
-        </ItemContainer>
-      </ContextMenuTrigger>
-      <ContextMenu id={id}>
-        <SceneItemContextMenu />
-      </ContextMenu>
+      <Inner>
+        <ContextMenuTrigger id={id}>
+          <ItemContainer
+            onClick={handleClick}
+            onDoubleClick={handleDoubleClick}
+            onMouseEnter={handleMouseEnter}
+            onMouseLeave={handleMouseLeave}
+          >
+            <PreviewImageWrapper>
+              <PreviewImage
+                src={preview}
+                data-selected={isSelected && "true"}
+              ></PreviewImage>
+            </PreviewImageWrapper>
+            <Name>{name}</Name>
+          </ItemContainer>
+        </ContextMenuTrigger>
+        <ContextMenu id={id}>
+          <SceneItemContextMenu />
+        </ContextMenu>
+      </Inner>
     </Wrapper>
   );
 };
@@ -69,13 +71,17 @@ const Wrapper = styled.div`
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
+  /* justify-content: center; */
   cursor: pointer;
 `;
 
+const Inner = styled.div`
+  width: 100%;
+`;
+
 const ItemContainer = styled.div`
-  max-width: 360px;
-  max-height: 800px;
+  /* max-width: 240px;
+  max-height: 516px; */
   margin: 5px;
 `;
 
@@ -87,6 +93,8 @@ const PreviewImage = styled.img`
   border-radius: 2px;
   max-width: inherit;
   width: 100%;
+  max-width: 240px;
+  max-height: 516px;
   display: flex;
   object-fit: cover;
   background-color: #f5f5f5;

@@ -102,8 +102,8 @@ const Grid = styled.div`
   display: grid;
   grid-template-columns: repeat(4, minmax(224px, 240px));
   grid-gap: 1.5rem;
-  /* 56 is topbar size */
-  padding-top: 56px;
+  padding-top: 108px;
+  padding-bottom: 89px;
   margin: 0 auto;
   /* place-content: start space-evenly; */
 
