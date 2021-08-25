@@ -85,9 +85,9 @@ const PreviewImageWrapper = styled.div`
 
 const PreviewImage = styled.img`
   border-radius: 2px;
-  max-height: 500px;
+  max-width: inherit;
+  width: 100%;
   display: flex;
-  width: inherit;
   object-fit: cover;
   background-color: #f5f5f5;
   border: 1px solid #f5f5f5;
