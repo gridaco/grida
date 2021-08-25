@@ -96,7 +96,7 @@ const PreviewImageWrapper = styled.div`
 
 const PreviewImage = styled.img`
   display: block;
-  border-radius: 2px;
+  border-radius: 1px;
   max-width: inherit;
   width: 100%;
   max-width: 240px;
