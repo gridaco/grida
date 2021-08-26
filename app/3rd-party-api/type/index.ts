@@ -1,1 +1,1 @@
-export * from "./type-profile";
+export * from "./type-player";
