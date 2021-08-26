@@ -19,6 +19,7 @@ import { redirectionSignin } from "util/auth";
 import { getUserProfile } from "services/user-profile";
 /** dev only */ import { profile_mockup } from "__test__/mockfile";
 import { UserProfile } from "../../../../packages/type";
+import { ScaffoldSceneView } from "@app/scene-view/components/scaffold";
 /**
  * frame or url is required
  * @param frame the frame id of selected node, which uploaded to default bridged quicklook s3 buket.
@@ -117,7 +118,8 @@ export default function ScenesId() {
                 <CircularProgress />
               ) : (
                 <>
-                  {AppRunnerFrame({
+                  <ScaffoldSceneView scene={scene} mode="design" />
+                  {/* {AppRunnerFrame({
                     id: scene.id,
                     framework: _framework(scene.customdata_1p),
                     source:
@@ -126,7 +128,7 @@ export default function ScenesId() {
                     language: _language(scene.customdata_1p),
                     width: scene.width,
                     height: scene.height,
-                  })}
+                  })} */}
                 </>
               )}
             </Background>
@@ -137,7 +139,7 @@ export default function ScenesId() {
             <Editor
               language="dart"
               theme="vs-dark"
-              value={source?.flutter?.widget.raw}
+              value={""}
               options={{
                 unusualLineTerminators: "off",
               }}

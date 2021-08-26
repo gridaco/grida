@@ -22,6 +22,10 @@ export function ScreenPreviewCardBlock(props: ScreenPreviewCardBlockProps) {
     return <>loading..</>;
   }
 
+  if (props.snapshot) {
+    return <ProviderAnySnapshotView snapshot={url} />;
+  }
+
   const designprovider = analyzeDynamicPreviewUrl(url);
 
   switch (designprovider) {
