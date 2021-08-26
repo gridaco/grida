@@ -9,15 +9,14 @@ import React from "react";
 import styled from "@emotion/styled";
 import { ResizableIframeAppRunnerFrame } from "@app/scene-view/components";
 import CircularProgress from "@material-ui/core/CircularProgress";
-import { appRunnerConfig } from "..";
+import { AppRunnerConfig } from "..";
 
 interface Props {
-  data: appRunnerConfig;
+  data: AppRunnerConfig;
 }
 
 export function ScaffoldSceneappRunnerView(props: Props) {
   const data = props.data;
-
   return (
     <>
       {AppRunnerFrame({

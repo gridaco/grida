@@ -2,22 +2,20 @@ import { SceneRecord } from "@base-sdk/scene-store";
 import { QuicklookQueryParams } from "@base-sdk/base/features/quicklook";
 import React, { useEffect } from "react";
 import { ScaffoldSceneSnapshotView } from "../scaffold-scene-snapshot-view";
-import { ScaffoldSceneappRunnerView, appRunnerConfig } from "..";
+import { ScaffoldSceneappRunnerView, AppRunnerConfig } from "..";
 
 interface Props {
   scene: SceneRecord;
   mode: "design" | "run";
-  appRunnerConfig?: appRunnerConfig;
+  appRunnerConfig?: AppRunnerConfig;
 }
 
 export function ScaffoldSceneView(props: Props) {
-  useEffect(() => {
-    if (props.mode === "run" && !!props.appRunnerConfig) {
-      throw "mode is run but config is empty";
-    }
-  }, []);
+  if (props.mode === "run" && !!!props.appRunnerConfig) {
+    throw "mode is run but config is empty";
+  }
 
-  function designMode() {
+  function DesignMode() {
     return (
       <>
         <ScaffoldSceneSnapshotView
@@ -29,7 +27,7 @@ export function ScaffoldSceneView(props: Props) {
     );
   }
 
-  function runMode() {
+  function RunMode() {
     return (
       <>
         <ScaffoldSceneappRunnerView data={props.appRunnerConfig} />
@@ -37,5 +35,5 @@ export function ScaffoldSceneView(props: Props) {
     );
   }
 
-  return <>{props.mode === "design" ? designMode() : runMode()}</>;
+  return <>{props.mode === "design" ? DesignMode() : RunMode()}</>;
 }

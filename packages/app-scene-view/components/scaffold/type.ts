@@ -1,5 +1,5 @@
 import { QuicklookQueryParams } from "@base-sdk/base/features/quicklook";
 
-export interface appRunnerConfig extends QuicklookQueryParams {
+export interface AppRunnerConfig extends QuicklookQueryParams {
   source: string;
 }

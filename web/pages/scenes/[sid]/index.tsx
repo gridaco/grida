@@ -21,7 +21,7 @@ import { getUserProfile } from "services/user-profile";
 import { UserProfile } from "../../../../packages/type";
 import {
   ScaffoldSceneView,
-  appRunnerConfig,
+  AppRunnerConfig,
 } from "@app/scene-view/components/scaffold";
 import { ElevatedSceneWrap } from "@app/scene-view/components/elevated-scene-wrapper";
 /**
@@ -37,7 +37,7 @@ export default function ScenesId() {
   const [isShareModalOpen, setIsShareModalOpen] = useState<boolean>(false);
   const [isPublic, setIsPublic] = useState<boolean>(false);
   const [profile, setProfile] = useState<UserProfile>();
-  const [_appRunnerConfig, _setAppRunnerConfig] = useState<appRunnerConfig>();
+  const [_appRunnerConfig, _setAppRunnerConfig] = useState<AppRunnerConfig>();
 
   const service = makeService();
 
@@ -49,22 +49,23 @@ export default function ScenesId() {
       const sid = router.query.sid as string;
       await service
         .get(sid)
-        .then((scene) => {
-          console.log(scene.id);
-          setScene(scene);
-          setSource(extractSource____temporary(scene));
-          setIsPublic(isSharingPolicyPublic(scene.sharing));
+        .then((_scene) => {
+          const _appConfig: AppRunnerConfig = {
+            framework: _framework(_scene.customdata_1p),
+            source: extractSource____temporary(_scene).flutter.executable.url,
+            url: _scene.preview,
+            language: _language(_scene.customdata_1p),
+            name: _scene.rawname || "No Name",
+            w: _scene.width,
+            h: _scene.height,
+            id: _scene.id,
+          };
           _setAppRunnerConfig({
-            ..._appRunnerConfig,
-            framework: _framework(scene.customdata_1p),
-            source: extractSource____temporary(scene).flutter.executable.url,
-            url: scene.preview,
-            language: _language(scene.customdata_1p),
-            name: scene.rawname || "No Name",
-            w: scene.width,
-            h: scene.height,
-            id: scene.id,
+            ..._appConfig,
           });
+          setScene(_scene);
+          setSource(extractSource____temporary(_scene));
+          setIsPublic(isSharingPolicyPublic(_scene.sharing));
         })
         .catch((error) => {
           console.log("error while fetching scnene data", error);
@@ -96,17 +97,17 @@ export default function ScenesId() {
   }
 
   function _framework(code) {
-    if (!!code.flutter) {
+    if (!!typeof code.flutter) {
       return AppFramework.flutter;
-    } else if (!!code.react) {
+    } else if (!!typeof code.react) {
       return AppFramework.react;
     }
   }
 
   function _language(code) {
-    if (!!code.flutter) {
+    if (!!typeof code.flutter) {
       return AppLanguage.dart;
-    } else if (!!code.react) {
+    } else if (!!typeof code.react) {
       return AppLanguage.js;
     }
   }
@@ -135,24 +136,13 @@ export default function ScenesId() {
               ) : (
                 <>
                   <ElevatedSceneWrap>
-                    <ScaffoldSceneView
+                    {/* <ScaffoldSceneView
                       scene={scene}
                       mode="run"
                       appRunnerConfig={_appRunnerConfig}
-                    />
-                    {/* <ScaffoldSceneView scene={scene} mode="run" /> */}
+                    /> */}
+                    <ScaffoldSceneView scene={scene} mode="design" />
                   </ElevatedSceneWrap>
-
-                  {/* {AppRunnerFrame({
-                    id: scene.id,
-                    framework: _framework(scene.customdata_1p),
-                    source:
-                      extractSource____temporary(scene).flutter.executable.url, // TODO:
-                    preview: scene.preview,
-                    language: _language(scene.customdata_1p),
-                    width: scene.width,
-                    height: scene.height,
-                  })} */}
                 </>
               )}
             </Background>
