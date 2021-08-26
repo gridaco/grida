@@ -15,11 +15,9 @@ import { checkFrameSourceMode } from "@base-sdk/base/frame-embed";
 import { AppFramework, AppLanguage } from "@base-sdk/base/types";
 import Background from "@app/scene-view/components/canves/background";
 import { EditorThemeProvider } from "../../../ui/editor-ui/packages/editor-ui-theme";
-import { TopBar } from "../../../app/components";
+import { IPlayer, TopBar } from "../../../app/components";
 import { ResizableIframeAppRunnerFrame } from "@app/scene-view/components";
 /** dev only */ import { profile_mockup } from "__test__/mockfile";
-import { UserProfile } from "../../../packages/type";
-import { getUserProfile } from "services/user-profile";
 
 /**
  * frame or url is required
@@ -29,7 +27,7 @@ import { getUserProfile } from "services/user-profile";
 export default function Frame() {
   const router = useRouter();
   const [source, setSource] = useState<string>();
-  const [profile, setProfile] = useState<UserProfile>();
+  const [players, setPlayers] = useState<IPlayer[]>();
 
   let editingSource: string;
 
@@ -44,9 +42,12 @@ export default function Frame() {
   };
 
   useEffect(() => {
-    // const profileData = await getUserProfile();
-    const profileData = profile_mockup;
-    setProfile(profileData);
+    // const { id, profileImage, username } = await getUserProfile();
+    const { id, profileImage, username } = profile_mockup;
+    const _player: IPlayer = { name: username, image: profileImage, id };
+    // TEMPORAY!!
+    // Since there is no players information except for profile, only profile is put in the array.
+    setPlayers([_player]);
 
     switch (query.framework) {
       case "flutter":
@@ -86,16 +87,15 @@ export default function Frame() {
         backButton="DASHBOARD"
         onClickPlay={run}
       /> */}
+        {/* FIXME: add signin btn  */}
         <TopBar
           controlDoubleClick={() => {}}
           title={query.name || "No Name"}
           isSimple={true}
-          profile={profile}
+          players={players}
         />
         <Wrapper>
-          <SideContainer
-            style={{ width: "calc(55vw - 30px)", padding: "15px" }}
-          >
+          <SideContainer style={{ width: "55vw" }}>
             <Background>
               {appFrame({
                 id: query.id,

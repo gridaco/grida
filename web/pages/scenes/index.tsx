@@ -13,7 +13,7 @@ import { useAuthState } from "@base-sdk-fp/auth-components-react";
 import { redirectionSignin } from "util/auth";
 import { getUserProfile } from "services/user-profile";
 import { profile_mockup } from "__test__/mockfile";
-import { UserProfile } from "../../../packages/type";
+import { IPlayer } from "../../../app/components/top-bar/player-type";
 
 // interface IScreen {
 //   name: string;
@@ -33,7 +33,7 @@ export default function ScreensPage() {
   const [focusedScreenId, setFocusedScreenId] = useState<string>();
   const [screens, setScreens] = useState<SceneRecord[]>([]);
   const service = makeService();
-  const [profile, setProfile] = useState<UserProfile>();
+  const [players, setPlayers] = useState<IPlayer[]>();
 
   useEffect(() => {
     redirectionSignin(authState);
@@ -55,9 +55,13 @@ export default function ScreensPage() {
           // updateScreens(mocks.scenes);
           console.log("Error in fetch", error);
         });
-      const profileData = await getUserProfile();
-      // const profileData = profile_mockup;
-      setProfile(profileData);
+      // const { id, profileImage, username } = await getUserProfile();
+      const { id, profileImage, username } = profile_mockup;
+      const _player: IPlayer = { name: username, image: profileImage, id };
+
+      // TEMPORAY!!
+      // Since there is no players information except for profile, only profile is put in the array.
+      setPlayers([_player]);
     };
 
     fetchData();
@@ -80,7 +84,7 @@ export default function ScreensPage() {
             marginBottom: 24,
           }}
         /> */}
-      <TopBar controlDoubleClick={() => {}} isSimple={true} profile={profile} />
+      <TopBar controlDoubleClick={() => {}} isSimple={true} players={players} />
       <Grid>
         {screens.map(({ id, rawname, newname, ...d }, i) => {
           return (

@@ -18,11 +18,12 @@ import { useAuthState } from "@base-sdk-fp/auth-components-react";
 import { redirectionSignin } from "util/auth";
 import { getUserProfile } from "services/user-profile";
 /** dev only */ import { profile_mockup } from "__test__/mockfile";
-import { UserProfile } from "../../../../packages/type";
+import { UserProfile } from "../../../../app/3rd-party-api/type";
+
 import { ScaffoldSceneView } from "@app/scene-view/components/scaffold";
 import { ElevatedSceneWrap } from "@app/scene-view/components/elevated-scene-wrapper";
 import { QuicklookQueryParams } from "@base-sdk/base/features/quicklook";
-
+import { IPlayer } from "../../../../app/components/top-bar/player-type";
 /**
  * frame or url is required
  * @param frame the frame id of selected node, which uploaded to default bridged quicklook s3 buket.
@@ -35,7 +36,7 @@ export default function ScenesId() {
   const [scene, setScene] = useState<SceneRecord>();
   const [isShareModalOpen, setIsShareModalOpen] = useState<boolean>(false);
   const [isPublic, setIsPublic] = useState<boolean>(false);
-  const [profile, setProfile] = useState<UserProfile>();
+  const [players, setPlayers] = useState<IPlayer[]>();
   const [_appRunnerConfig, _setAppRunnerConfig] =
     useState<QuicklookQueryParams>();
 
@@ -44,7 +45,7 @@ export default function ScenesId() {
   let editingSource: string;
 
   useEffect(() => {
-    redirectionSignin(authState);
+    // redirectionSignin(authState);
     const fetchData = async () => {
       const sid = router.query.sid as string;
       await service
@@ -69,9 +70,13 @@ export default function ScenesId() {
         .catch((error) => {
           console.log("error while fetching scnene data", error);
         });
-      const profileData = await getUserProfile();
-      // const profileData = profile_mockup;
-      setProfile(profileData);
+      // const { id, profileImage, username } = await getUserProfile();
+      const { id, profileImage, username } = profile_mockup;
+      const _player: IPlayer = { name: username, image: profileImage, id };
+
+      // TEMPORAY!!
+      // Since there is no players information except for profile, only profile is put in the array.
+      setPlayers([_player]);
     };
 
     if (router.query.sid) {
@@ -96,17 +101,17 @@ export default function ScenesId() {
   }
 
   function _framework(code) {
-    if (!!typeof code.flutter) {
+    if (code.flutter !== "undefined") {
       return AppFramework.flutter;
-    } else if (!!typeof code.react) {
+    } else if (code.react !== "undefined") {
       return AppFramework.react;
     }
   }
 
   function _language(code) {
-    if (!!typeof code.flutter) {
+    if (code.flutter !== "undefined") {
       return AppLanguage.dart;
-    } else if (!!typeof code.react) {
+    } else if (code.react !== "undefined") {
       return AppLanguage.js;
     }
   }
@@ -118,7 +123,7 @@ export default function ScenesId() {
           controlDoubleClick={() => {}}
           // title={query.name || "No Name"}
           contorlModal={() => setIsShareModalOpen(!isShareModalOpen)}
-          profile={profile}
+          players={players}
         />
         <ShareModalContents
           sharableLink={makeSharableLink(scene?.id ?? "")}

@@ -28,19 +28,21 @@ export function ScaffoldSceneSnapshotView(props: Props) {
 }
 
 const Wrapper = styled.div<IWrapper>`
-  width: ${(props) => `${props.size.width}px`};
-  height: ${(props) => `${props.size.height}px`};
+  width: fit-content;
+  height: fit-content;
+  /* width: ${(props) => `${props.size.width}px`};
+  height: ${(props) => `${props.size.height}px`}; */
   position: relative;
   display: inline-block;
   overflow: hidden;
   margin: 0;
   max-width: 100%;
   img {
-    display: block;
-    position: absolute;
-    top: 50%;
-    left: 50%;
+    /* display: block; */
+    /* position: absolute; */
+    /* top: 50%; */
+    /* left: 50%; */
     width: 100%;
-    transform: translate(-50%, -50%);
+    /* transform: translate(-50%, -50%); */
   }
 `;
