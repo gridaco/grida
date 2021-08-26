@@ -53,6 +53,9 @@ export default function ScenesId() {
         .catch((error) => {
           console.log("error while fetching scnene data", error);
         });
+      const profileData = await getUserProfile();
+      // const profileData = profile_mockup;
+      setProfile(profileData);
     };
 
     if (router.query.sid) {
