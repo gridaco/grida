@@ -6,12 +6,22 @@ import { BarDragArea } from "../bar-drag-area";
 import { css } from "@emotion/react";
 import { IPlayer } from "./player-type";
 
+/**
+ *
+ * invisible is
+ * determines right menu visiable according to context
+ */
 export function TopBar(props: {
   controlDoubleClick: () => void;
   contorlModal?: () => void;
   title?: string;
   isMain?: boolean;
   players?: IPlayer[];
+  invisible?: {
+    playerSegment?: boolean;
+    share?: boolean;
+    more?: boolean;
+  };
 }) {
   return (
     <BarDragArea
@@ -31,6 +41,7 @@ export function TopBar(props: {
             isMain={props.isMain}
             contorlModal={props.contorlModal}
             players={props.players}
+            invisible={props.invisible}
           />
         </TopBarRightArea>
       </TopBarRoot>

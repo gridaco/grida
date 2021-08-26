@@ -91,7 +91,7 @@ export default function Frame() {
         <TopBar
           controlDoubleClick={() => {}}
           title={query.name || "No Name"}
-          players={players}
+          // players={players}
         />
         <Wrapper>
           <SideContainer style={{ width: "55vw" }}>
