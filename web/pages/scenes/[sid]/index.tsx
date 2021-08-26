@@ -45,7 +45,7 @@ export default function ScenesId() {
   let editingSource: string;
 
   useEffect(() => {
-    // redirectionSignin(authState);
+    redirectionSignin(authState);
     const fetchData = async () => {
       const sid = router.query.sid as string;
       await service
@@ -70,13 +70,22 @@ export default function ScenesId() {
         .catch((error) => {
           console.log("error while fetching scnene data", error);
         });
-      // const { id, profileImage, username } = await getUserProfile();
-      const { id, profileImage, username } = profile_mockup;
-      const _player: IPlayer = { name: username, image: profileImage, id };
 
-      // TEMPORAY!!
-      // Since there is no players information except for profile, only profile is put in the array.
-      setPlayers([_player]);
+      const { id, profileImage, username } = await getUserProfile();
+      await getUserProfile()
+        .then((_profile) => {
+          const _player: IPlayer = {
+            name: _profile.username,
+            image: _profile.profileImage,
+            id: _profile.id,
+          };
+          // TEMPORAY!!
+          // Since there is no players information except for profile, only profile is put in the array.
+          setPlayers([_player]);
+        })
+        .catch((error) => {
+          console.log(error);
+        });
     };
 
     if (router.query.sid) {

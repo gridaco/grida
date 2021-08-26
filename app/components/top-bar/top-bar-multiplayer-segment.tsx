@@ -7,7 +7,6 @@ import {
 import { IPlayer } from "./player-type";
 
 interface Props {
-  isSimple?: boolean;
   players?: IPlayer[];
 }
 

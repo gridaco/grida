@@ -55,13 +55,20 @@ export default function ScreensPage() {
           // updateScreens(mocks.scenes);
           console.log("Error in fetch", error);
         });
-      // const { id, profileImage, username } = await getUserProfile();
-      const { id, profileImage, username } = profile_mockup;
-      const _player: IPlayer = { name: username, image: profileImage, id };
-
-      // TEMPORAY!!
-      // Since there is no players information except for profile, only profile is put in the array.
-      setPlayers([_player]);
+      await getUserProfile()
+        .then((_profile) => {
+          const _player: IPlayer = {
+            name: _profile.username,
+            image: _profile.profileImage,
+            id: _profile.id,
+          };
+          // TEMPORAY!!
+          // Since there is no players information except for profile, only profile is put in the array.
+          setPlayers([_player]);
+        })
+        .catch((error) => {
+          console.log(error);
+        });
     };
 
     fetchData();
@@ -84,7 +91,7 @@ export default function ScreensPage() {
             marginBottom: 24,
           }}
         /> */}
-      <TopBar controlDoubleClick={() => {}} isSimple={true} players={players} />
+      <TopBar controlDoubleClick={() => {}} players={players} />
       <Grid>
         {screens.map(({ id, rawname, newname, ...d }, i) => {
           return (

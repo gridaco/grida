@@ -11,7 +11,6 @@ export function TopBar(props: {
   contorlModal?: () => void;
   title?: string;
   isMain?: boolean;
-  isSimple?: boolean; // TODO: rename
   players?: IPlayer[];
 }) {
   return (
@@ -29,7 +28,7 @@ export function TopBar(props: {
         </TopBarLeftArea>
         <TopBarRightArea>
           <TopBarRightMenu
-            isSimple={props.isSimple}
+            isMain={props.isMain}
             contorlModal={props.contorlModal}
             players={props.players}
           />

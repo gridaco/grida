@@ -91,7 +91,6 @@ export default function Frame() {
         <TopBar
           controlDoubleClick={() => {}}
           title={query.name || "No Name"}
-          isSimple={true}
           players={players}
         />
         <Wrapper>
