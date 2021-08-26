@@ -2,11 +2,12 @@ import { SceneRecord } from "@base-sdk/scene-store";
 import { QuicklookQueryParams } from "@base-sdk/base/features/quicklook";
 import React, { useEffect } from "react";
 import { ScaffoldSceneSnapshotView } from "../scaffold-scene-snapshot-view";
+import { ScaffoldSceneappRunnerView, appRunnerConfig } from "..";
 
 interface Props {
   scene: SceneRecord;
   mode: "design" | "run";
-  appRunnerConfig?: QuicklookQueryParams;
+  appRunnerConfig?: appRunnerConfig;
 }
 
 export function ScaffoldSceneView(props: Props) {
@@ -29,7 +30,11 @@ export function ScaffoldSceneView(props: Props) {
   }
 
   function runMode() {
-    return <></>;
+    return (
+      <>
+        <ScaffoldSceneappRunnerView data={props.appRunnerConfig} />
+      </>
+    );
   }
 
   return <>{props.mode === "design" ? designMode() : runMode()}</>;

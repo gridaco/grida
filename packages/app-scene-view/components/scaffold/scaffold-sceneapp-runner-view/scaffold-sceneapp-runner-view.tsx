@@ -9,9 +9,10 @@ import React from "react";
 import styled from "@emotion/styled";
 import { ResizableIframeAppRunnerFrame } from "@app/scene-view/components";
 import CircularProgress from "@material-ui/core/CircularProgress";
+import { appRunnerConfig } from "..";
 
 interface Props {
-  data: QuicklookQueryParams;
+  data: appRunnerConfig;
 }
 
 export function ScaffoldSceneappRunnerView(props: Props) {
@@ -19,15 +20,15 @@ export function ScaffoldSceneappRunnerView(props: Props) {
 
   return (
     <>
-      {/* {AppRunnerFrame({
-        id: scene.id,
-        framework: _framework(scene.customdata_1p),
-        source: extractSource____temporary(scene).flutter.executable.url, // TODO:
-        preview: scene.preview,
-        language: _language(scene.customdata_1p),
-        width: scene.width,
-        height: scene.height,
-      })} */}
+      {AppRunnerFrame({
+        id: data.id,
+        framework: data.framework,
+        source: data.source, // TODO:
+        preview: data.url,
+        language: data.language,
+        width: data.w,
+        height: data.h,
+      })}
     </>
   );
 }

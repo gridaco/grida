@@ -19,7 +19,10 @@ import { redirectionSignin } from "util/auth";
 import { getUserProfile } from "services/user-profile";
 /** dev only */ import { profile_mockup } from "__test__/mockfile";
 import { UserProfile } from "../../../../packages/type";
-import { ScaffoldSceneView } from "@app/scene-view/components/scaffold";
+import {
+  ScaffoldSceneView,
+  appRunnerConfig,
+} from "@app/scene-view/components/scaffold";
 import { ElevatedSceneWrap } from "@app/scene-view/components/elevated-scene-wrapper";
 /**
  * frame or url is required
@@ -34,6 +37,7 @@ export default function ScenesId() {
   const [isShareModalOpen, setIsShareModalOpen] = useState<boolean>(false);
   const [isPublic, setIsPublic] = useState<boolean>(false);
   const [profile, setProfile] = useState<UserProfile>();
+  const [_appRunnerConfig, _setAppRunnerConfig] = useState<appRunnerConfig>();
 
   const service = makeService();
 
@@ -46,16 +50,27 @@ export default function ScenesId() {
       await service
         .get(sid)
         .then((scene) => {
-          console.log(scene);
+          console.log(scene.id);
           setScene(scene);
           setSource(extractSource____temporary(scene));
           setIsPublic(isSharingPolicyPublic(scene.sharing));
+          _setAppRunnerConfig({
+            ..._appRunnerConfig,
+            framework: _framework(scene.customdata_1p),
+            source: extractSource____temporary(scene).flutter.executable.url,
+            url: scene.preview,
+            language: _language(scene.customdata_1p),
+            name: scene.rawname || "No Name",
+            w: scene.width,
+            h: scene.height,
+            id: scene.id,
+          });
         })
         .catch((error) => {
           console.log("error while fetching scnene data", error);
         });
-      // const profileData = await getUserProfile();
-      const profileData = profile_mockup;
+      const profileData = await getUserProfile();
+      // const profileData = profile_mockup;
       setProfile(profileData);
     };
 
@@ -120,7 +135,12 @@ export default function ScenesId() {
               ) : (
                 <>
                   <ElevatedSceneWrap>
-                    <ScaffoldSceneView scene={scene} mode="design" />
+                    <ScaffoldSceneView
+                      scene={scene}
+                      mode="run"
+                      appRunnerConfig={_appRunnerConfig}
+                    />
+                    {/* <ScaffoldSceneView scene={scene} mode="run" /> */}
                   </ElevatedSceneWrap>
 
                   {/* {AppRunnerFrame({
@@ -144,7 +164,6 @@ export default function ScenesId() {
               language="dart"
               theme="vs-dark"
               value={source?.flutter?.widget.raw}
-              // value={""}
               options={{
                 unusualLineTerminators: "off",
               }}
