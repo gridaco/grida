@@ -9,10 +9,9 @@ import React from "react";
 import styled from "@emotion/styled";
 import { ResizableIframeAppRunnerFrame } from "@app/scene-view/components";
 import CircularProgress from "@material-ui/core/CircularProgress";
-import { AppRunnerConfig } from "..";
 
 interface Props {
-  data: AppRunnerConfig;
+  data: QuicklookQueryParams;
 }
 
 export function ScaffoldSceneappRunnerView(props: Props) {
@@ -22,7 +21,7 @@ export function ScaffoldSceneappRunnerView(props: Props) {
       {AppRunnerFrame({
         id: data.id,
         framework: data.framework,
-        source: data.source, // TODO:
+        url: data.url, // TODO:
         preview: data.url,
         language: data.language,
         width: data.w,
@@ -34,7 +33,7 @@ export function ScaffoldSceneappRunnerView(props: Props) {
 
 function AppRunnerFrame(props: {
   id: string;
-  source: string;
+  url: string;
   preview: string;
   framework: AppFramework;
   language: AppLanguage;
@@ -42,18 +41,18 @@ function AppRunnerFrame(props: {
   height: number;
 }) {
   // region check mode
-  const mode = checkFrameSourceMode(props.framework, props.source);
+  // const mode = checkFrameSourceMode(props.framework, props.url);
   // endregion check mode
 
   const loading = <CircularProgress />;
 
-  if (!props.source && !props.id) {
+  if (!props.url && !props.id) {
     return loading;
   }
 
   const _emb_url = buildFlutterFrameUrl({
     id: props.id,
-    src: props.source,
+    src: props.url,
     mode: "url",
     language: "dart",
   });

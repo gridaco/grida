@@ -19,11 +19,10 @@ import { redirectionSignin } from "util/auth";
 import { getUserProfile } from "services/user-profile";
 /** dev only */ import { profile_mockup } from "__test__/mockfile";
 import { UserProfile } from "../../../../packages/type";
-import {
-  ScaffoldSceneView,
-  AppRunnerConfig,
-} from "@app/scene-view/components/scaffold";
+import { ScaffoldSceneView } from "@app/scene-view/components/scaffold";
 import { ElevatedSceneWrap } from "@app/scene-view/components/elevated-scene-wrapper";
+import { QuicklookQueryParams } from "@base-sdk/base/features/quicklook";
+
 /**
  * frame or url is required
  * @param frame the frame id of selected node, which uploaded to default bridged quicklook s3 buket.
@@ -37,7 +36,8 @@ export default function ScenesId() {
   const [isShareModalOpen, setIsShareModalOpen] = useState<boolean>(false);
   const [isPublic, setIsPublic] = useState<boolean>(false);
   const [profile, setProfile] = useState<UserProfile>();
-  const [_appRunnerConfig, _setAppRunnerConfig] = useState<AppRunnerConfig>();
+  const [_appRunnerConfig, _setAppRunnerConfig] =
+    useState<QuicklookQueryParams>();
 
   const service = makeService();
 
@@ -50,10 +50,9 @@ export default function ScenesId() {
       await service
         .get(sid)
         .then((_scene) => {
-          const _appConfig: AppRunnerConfig = {
+          const _appConfig: QuicklookQueryParams = {
             framework: _framework(_scene.customdata_1p),
-            source: extractSource____temporary(_scene).flutter.executable.url,
-            url: _scene.preview,
+            url: extractSource____temporary(_scene).flutter.executable.url,
             language: _language(_scene.customdata_1p),
             name: _scene.rawname || "No Name",
             w: _scene.width,
