@@ -91,7 +91,12 @@ export default function Frame() {
         <TopBar
           controlDoubleClick={() => {}}
           title={query.name || "No Name"}
-          // players={players}
+          players={players}
+          invisible={{
+            playerSegment: true,
+            share: true,
+            more: true,
+          }}
         />
         <Wrapper>
           <SideContainer style={{ width: "55vw" }}>
