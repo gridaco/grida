@@ -4,13 +4,14 @@ import { TopBarRightMenu } from "./top-bar-right-menu";
 import { TopBarLeftBreadcrumb } from "./top-bar-left-breadcrumb";
 import { BarDragArea } from "../bar-drag-area";
 import { css } from "@emotion/react";
+import { IPlayer } from "./player-type";
 
 export function TopBar(props: {
   controlDoubleClick: () => void;
   contorlModal?: () => void;
   title?: string;
   isMain?: boolean;
-  isSimple?: boolean;
+  players?: IPlayer[];
 }) {
   return (
     <BarDragArea
@@ -27,8 +28,9 @@ export function TopBar(props: {
         </TopBarLeftArea>
         <TopBarRightArea>
           <TopBarRightMenu
-            isSimple={props.isSimple}
+            isMain={props.isMain}
             contorlModal={props.contorlModal}
+            players={props.players}
           />
         </TopBarRightArea>
       </TopBarRoot>

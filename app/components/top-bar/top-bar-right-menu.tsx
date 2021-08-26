@@ -3,26 +3,33 @@ import styled from "@emotion/styled";
 import { TopBarMultiplayerSegment } from "./top-bar-multiplayer-segment";
 import { TopBarShareButton } from "./top-bar-share-button";
 import { TopBarMoreButton } from "./top-bar-more-button";
+import { IPlayer } from "./player-type";
 
 interface Props {
-  isSimple?: boolean;
+  isMain: boolean;
+  players?: IPlayer[];
   contorlModal?: () => void;
 }
 
 export function TopBarRightMenu(props: Props) {
   return (
     <_Root>
-      <TopBarMultiplayerSegment isSimple={props.isSimple} />
+      {/* <TopBarMultiplayerSegment players={props.players} /> */}
 
-      {!props.isSimple && (
-        <>
-          <MarginRight size={24} />
-          <TopBarShareButton contorlModal={props.contorlModal} />
-          <MarginRight size={19} />
+      {/**
+         * temporary!
+        1. Currently, only your profile is entered
+        2. Some right menus should not be visible only in scenes.
+        */}
+      {/* {props.players.length === 1 && ( */}
+      <>
+        <MarginRight size={24} />
+        <TopBarShareButton contorlModal={props.contorlModal} />
+        <MarginRight size={19} />
 
-          <TopBarMoreButton />
-        </>
-      )}
+        <TopBarMoreButton />
+      </>
+      {/* )} */}
     </_Root>
   );
 }

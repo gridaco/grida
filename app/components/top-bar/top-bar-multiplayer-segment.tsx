@@ -4,18 +4,13 @@ import {
   MultiplayerAvatar,
   MultiplayerAvatarGroup,
 } from "@editor-ui/multiplayer";
-
-interface Player {
-  name: string;
-  image: string;
-  id: string;
-}
+import { IPlayer } from "./player-type";
 
 interface Props {
-  isSimple?: boolean;
+  players?: IPlayer[];
 }
 
-const players: Player[] = [
+const players: IPlayer[] = [
   {
     id: "1",
     name: "Albert",
@@ -35,20 +30,18 @@ const players: Player[] = [
 
 export function TopBarMultiplayerSegment(props: Props) {
   const handleOnAvatarItemClick = (id: string) => {
-    console.log("avatar item click", id);
+    // console.log("avatar item click", id);
   };
-
-  const _players = props.isSimple ? players.slice(0, 1) : players;
 
   return (
     <MultiplayerAvatarGroup spacing={-4}>
-      {_players.map((p) => {
+      {props.players.map((p) => {
         return (
           <MultiplayerAvatar
             key={p.id}
             id={p.id}
             image={p.image}
-            chars={charsFromName(p.name)}
+            chars={charsFromName(p.name) ?? "U"}
             online
             onClick={handleOnAvatarItemClick}
           />
