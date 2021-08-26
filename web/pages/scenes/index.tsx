@@ -71,14 +71,6 @@ export default function ScreensPage() {
         });
     };
 
-    const _player: IPlayer = {
-      name: profile_mockup.username,
-      image: profile_mockup.profileImage,
-      id: profile_mockup.id,
-    };
-
-    setPlayers([_player]);
-
     fetchData();
   }, [query.src, authState]);
 

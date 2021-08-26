@@ -85,18 +85,7 @@ export default function ScenesId() {
         .catch((error) => {
           console.log(error);
         });
-
-      //   // for develop
     };
-
-    // const _player: IPlayer = {
-    //   name: profile_mockup.username,
-    //   image: profile_mockup.profileImage,
-    //   id: profile_mockup.id,
-    // };
-
-    // const playerArray = [_player];
-    // setPlayers(playerArray);
 
     if (router.query.sid) {
       fetchData();
