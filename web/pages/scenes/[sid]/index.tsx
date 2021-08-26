@@ -20,6 +20,7 @@ import { getUserProfile } from "services/user-profile";
 /** dev only */ import { profile_mockup } from "__test__/mockfile";
 import { UserProfile } from "../../../../packages/type";
 import { ScaffoldSceneView } from "@app/scene-view/components/scaffold";
+import { ElevatedSceneWrap } from "@app/scene-view/components/elevated-scene-wrapper";
 /**
  * frame or url is required
  * @param frame the frame id of selected node, which uploaded to default bridged quicklook s3 buket.
@@ -101,7 +102,6 @@ export default function ScenesId() {
         <TopBar
           controlDoubleClick={() => {}}
           // title={query.name || "No Name"}
-          title={""}
           contorlModal={() => setIsShareModalOpen(!isShareModalOpen)}
           profile={profile}
         />
@@ -119,7 +119,10 @@ export default function ScenesId() {
                 <CircularProgress />
               ) : (
                 <>
-                  <ScaffoldSceneView scene={scene} mode="design" />
+                  <ElevatedSceneWrap>
+                    <ScaffoldSceneView scene={scene} mode="design" />
+                  </ElevatedSceneWrap>
+
                   {/* {AppRunnerFrame({
                     id: scene.id,
                     framework: _framework(scene.customdata_1p),
@@ -140,7 +143,8 @@ export default function ScenesId() {
             <Editor
               language="dart"
               theme="vs-dark"
-              value={""}
+              value={source?.flutter?.widget.raw}
+              // value={""}
               options={{
                 unusualLineTerminators: "off",
               }}
