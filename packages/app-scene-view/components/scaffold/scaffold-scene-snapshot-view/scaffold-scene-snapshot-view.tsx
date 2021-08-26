@@ -34,6 +34,7 @@ const Wrapper = styled.div<IWrapper>`
   display: inline-block;
   overflow: hidden;
   margin: 0;
+  max-width: 100%;
   img {
     display: block;
     position: absolute;
