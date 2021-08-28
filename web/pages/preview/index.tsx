@@ -42,13 +42,6 @@ export default function Frame() {
   };
 
   useEffect(() => {
-    // const { id, profileImage, username } = await getUserProfile();
-    const { id, profileImage, username } = profile_mockup;
-    const _player: IPlayer = { name: username, image: profileImage, id };
-    // TEMPORAY!!
-    // Since there is no players information except for profile, only profile is put in the array.
-    setPlayers([_player]);
-
     switch (query.framework) {
       case "flutter":
         if (query.url) {
@@ -92,6 +85,11 @@ export default function Frame() {
           controlDoubleClick={() => {}}
           title={query.name || "No Name"}
           players={players}
+          invisible={{
+            playerSegment: true,
+            share: true,
+            more: true,
+          }}
         />
         <Wrapper>
           <SideContainer style={{ width: "55vw" }}>

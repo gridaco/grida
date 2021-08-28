@@ -33,7 +33,7 @@ export default function ScreensPage() {
   const [focusedScreenId, setFocusedScreenId] = useState<string>();
   const [screens, setScreens] = useState<SceneRecord[]>([]);
   const service = makeService();
-  const [players, setPlayers] = useState<IPlayer[]>();
+  const [players, setPlayers] = useState<IPlayer[]>([]);
 
   useEffect(() => {
     redirectionSignin(authState);
@@ -91,7 +91,11 @@ export default function ScreensPage() {
             marginBottom: 24,
           }}
         /> */}
-      <TopBar controlDoubleClick={() => {}} players={players} />
+      <TopBar
+        controlDoubleClick={() => {}}
+        players={players}
+        invisible={{ share: true, more: true }}
+      />
       <Grid>
         {screens.map(({ id, rawname, newname, ...d }, i) => {
           return (

@@ -9,27 +9,40 @@ interface Props {
   isMain: boolean;
   players?: IPlayer[];
   contorlModal?: () => void;
+  invisible?: {
+    playerSegment?: boolean;
+    share?: boolean;
+    more?: boolean;
+  };
 }
 
 export function TopBarRightMenu(props: Props) {
+  const invisible = props.invisible;
+  {
+    /**
+     * temporary!
+      1. Currently, only your profile is entered
+      2. Some right menus should not be visible only in scenes.
+    */
+  }
   return (
     <_Root>
-      {/* <TopBarMultiplayerSegment players={props.players} /> */}
+      {!invisible?.playerSegment && (
+        <TopBarMultiplayerSegment players={props.players} />
+      )}
+      {!invisible?.share && (
+        <>
+          <MarginRight size={24} />
+          <TopBarShareButton contorlModal={props.contorlModal} />
+        </>
+      )}
+      {!invisible?.more && (
+        <>
+          <MarginRight size={19} />
 
-      {/**
-         * temporary!
-        1. Currently, only your profile is entered
-        2. Some right menus should not be visible only in scenes.
-        */}
-      {/* {props.players.length === 1 && ( */}
-      <>
-        <MarginRight size={24} />
-        <TopBarShareButton contorlModal={props.contorlModal} />
-        <MarginRight size={19} />
-
-        <TopBarMoreButton />
-      </>
-      {/* )} */}
+          <TopBarMoreButton />
+        </>
+      )}
     </_Root>
   );
 }

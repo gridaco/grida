@@ -36,7 +36,7 @@ export default function ScenesId() {
   const [scene, setScene] = useState<SceneRecord>();
   const [isShareModalOpen, setIsShareModalOpen] = useState<boolean>(false);
   const [isPublic, setIsPublic] = useState<boolean>(false);
-  const [players, setPlayers] = useState<IPlayer[]>();
+  const [players, setPlayers] = useState<IPlayer[]>([]);
   const [_appRunnerConfig, _setAppRunnerConfig] =
     useState<QuicklookQueryParams>();
 
@@ -71,7 +71,6 @@ export default function ScenesId() {
           console.log("error while fetching scnene data", error);
         });
 
-      const { id, profileImage, username } = await getUserProfile();
       await getUserProfile()
         .then((_profile) => {
           const _player: IPlayer = {
