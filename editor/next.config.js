@@ -13,7 +13,11 @@ const withTM = require("next-transpile-modules")([
   "@design-sdk/core-types",
   "@design-sdk/universal",
   "@design-sdk/figma",
+  "@design-sdk/figma-types",
   "@design-sdk/figma-url",
+  "@design-sdk/figma-remote",
+  "@design-sdk/figma-remote-api",
+  // "@design-sdk/figma-remote-types",
   "@design-sdk/url-analysis",
   "@design-sdk/sketch",
   // reflect-ui

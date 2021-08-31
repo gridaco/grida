@@ -2,11 +2,11 @@ import {
   FigmaTargetNodeConfig,
   parseFileAndNodeId,
 } from "@design-sdk/figma-url";
-import { Figma, nodes, remote } from "@design-sdk/figma";
+import { Figma, nodes, api } from "@design-sdk/figma";
 import { NextRouter, useRouter } from "next/router";
 import { useEffect, useState } from "react";
 import { fetch } from "@design-sdk/figma-remote";
-import { personal } from "@design-sdk/figma-auth-store"
+import { personal } from "@design-sdk/figma-auth-store";
 import { TargetNodeConfig as _TargetNodeConfig } from "../target-node";
 
 const P_FIGMA_TARGET_URL = "figma_target_url";
@@ -56,8 +56,8 @@ export function useFigmaTargetNode() {
 }
 
 export interface TargetNodeConfig
-  extends _TargetNodeConfig<remote.api.Node, Figma.SceneNode> {
-  remote: remote.api.Node;
+  extends _TargetNodeConfig<api.Node, Figma.SceneNode> {
+  remote: api.Node;
   figma: Figma.SceneNode;
   reflect: nodes.ReflectSceneNode;
   url: string;
