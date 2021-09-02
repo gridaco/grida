@@ -30,13 +30,27 @@ export class TreeArray {
   }
 
   asArray() {
-    //
+    return this.asTree().flat(Infinity);
   }
 
   asTreeArray(): TreeNodeAsArrayItem[] {
-    // this.seed.map((d) => {
-    //   //
+    const deepflat = (arr: IDeepTreeItemLike[]) => {
+      const flat = [];
+      for (const item of arr) {
+        const children = deepflat(item.children);
+        const _nochild_item = delete item.children && item;
+        flat.push(_nochild_item);
+        if (children.length > 0) {
+          flat.push(children);
+        }
+      }
+      return flat;
+    };
 
-    return [];
+    return deepflat(this.asTree()).flat(Infinity);
   }
 }
+
+type IDeepTreeItemLike = {
+  children: IDeepTreeItemLike[];
+};

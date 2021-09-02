@@ -9,10 +9,15 @@ export function nest(
   items: any[],
   id = null,
   link = "parent",
-  sort: (a, b) => number = (a, b) => 0
+  sort: (a, b) => number = (a, b) => 0,
+  depth = 0
 ) {
   return items
     .filter((item) => item[link] === id)
-    .map((item) => ({ ...item, children: nest(items, item.id, link, sort) }))
+    .map((item) => ({
+      ...item,
+      depth: depth,
+      children: nest(items, item.id, link, sort, depth + 1),
+    }))
     .sort(sort);
 }
