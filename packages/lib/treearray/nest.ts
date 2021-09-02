@@ -1,3 +1,5 @@
+// type KeyMatcherLike = (item, item) => boolean | null;
+
 /**
  * from - https://stackoverflow.com/a/55241491/5463235
  * @param items

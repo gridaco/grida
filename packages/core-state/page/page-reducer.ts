@@ -67,18 +67,20 @@ export const createPage = (
   }
 
   const id = nanoid();
+  const _get_new_max_sort_value = () => {
+    const last = pages
+      .filter((p) => p.parent === linkparent)
+      .sort((a, b) => a.sort - b.sort)
+      .pop();
+    return last ? last.sort + 1 : 0;
+  };
+
   const newPage = produce<Page>(
     {
       id: id,
       type: "boring-document",
       name: name,
-      sort: (() => {
-        const last = pages
-          .filter((p) => p.parent === linkparent)
-          .sort((a, b) => a.sort - b.sort)
-          .pop();
-        return last?.sort ?? 0 + 1;
-      })(), // sort = parent.children => lowestSort + 1
+      sort: _get_new_max_sort_value(), // sort = parent.children => lowestSort + 1
       document: document,
       parent: linkparent,
     },
@@ -160,14 +162,21 @@ export function pageReducer(
       });
     }
     case "move-page": {
-      const { originOrder, targetOrder, originParent, targetParent } = action;
+      const {
+        id,
+        originOrder,
+        targetOrder,
+        originParent,
+        targetParent,
+        movingPositon,
+      } = action;
 
-      console.log(action);
       return produce(state, (draft) => {
-        const _id = getCurrentPage(state).id; // since it needs to be selected inorder to move (in case: movement by user)
+        const _id = id;
         const movingPage = draft.pages.find((p) => p.id === _id);
         const prevs = draft.pages.filter((p) => p.parent === originParent);
         const posts = draft.pages.filter((p) => p.parent === targetParent);
+
         const diff = movementDiff({
           options: {
             bigstep: 1000,
@@ -177,6 +186,7 @@ export function pageReducer(
             id: parentPageIdToString(originParent),
             children: prevs,
           },
+          movingPosition: movingPositon,
           postgroup: {
             id: parentPageIdToString(targetParent),
             children: posts,

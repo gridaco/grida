@@ -1,6 +1,6 @@
 import React, { memo, useCallback, useMemo, useState } from "react";
 import { PlusIcon } from "@radix-ui/react-icons";
-import { Spacer } from "@editor-ui/spacer";
+import { Spacer, TreeView } from "@editor-ui/editor";
 import { Button } from "@editor-ui/button";
 import { ListView } from "@editor-ui/listview";
 import { MenuItem } from "@editor-ui/context-menu";
@@ -11,7 +11,7 @@ import { PageMenuItemType } from "./page-menu-item-type";
 import { PageRow } from "./page-row-item";
 import { PageParentId, PageRoot } from "@core/state";
 import { isOnRoot } from "@core/model/page";
-import { groupbyPageParent, sortAsGroupping } from "./tree-handle";
+import { transform } from "./tree-handle";
 
 const Container = styled.div(({ theme }) => ({
   height: "200px",
@@ -35,14 +35,30 @@ const Header = styled.div(({ theme }) => ({
 interface IPageData<T = any> {
   id: string;
   name: string;
+  depth: number;
   parent?: PageParentId;
   children?: IPageData[];
+  data?: T;
 }
 
 interface PageListContentProps {
   selectedPageId: string;
   pageInfo?: IPageData[];
   canDelete: boolean;
+}
+
+function AddPageButton(props: { callbck }) {
+  return (
+    <Button
+      id="add-page"
+      tooltip="Add a new page"
+      onClick={() => {
+        props.callbck(PageRoot);
+      }}
+    >
+      <PlusIcon />
+    </Button>
+  );
 }
 
 const PageListContent = memo(function PageListContent({
@@ -104,73 +120,63 @@ const PageListContent = memo(function PageListContent({
   function getpage(id): IPageData {
     return pageInfo.find((p) => p.id == id);
   }
-  function getRowDepth(page: IPageData, depth: number): number {
-    if (!isOnRoot(page)) {
-      depth++;
-      const parentArr = getpage(page.parent);
-      depth = getRowDepth(parentArr, depth);
-    }
-    return depth;
-  }
 
-  const pageElements = useMemo(() => {
-    return pageInfo.map((page, i) => {
-      let initDepth = 0;
-      const _depth = getRowDepth(page, initDepth);
-
+  const renderItem = useCallback(
+    (
+      { id, name, depth }: IPageData,
+      index: number,
+      { isDragging }: ListView.ItemInfo
+    ) => {
       return (
         <PageRow
-          name={page.name}
-          depth={_depth}
-          id={page.id}
-          key={page.id}
-          expanded={true}
-          selected={selectedPageId === page.id}
+          name={name}
+          depth={depth}
+          id={id}
+          key={id}
+          expanded={false}
+          selected={selectedPageId === id}
           onAddClick={() => {
-            handleAddPage(page.id);
+            handleAddPage(id);
           }}
           onMenuClick={() => {
             console.log("not implemented");
           }}
-          onClick={() => {
+          onDoubleClick={() => {
+            console.log("on double click");
+          }}
+          onPress={() => {
             dispatch({
               type: "select-page",
-              page: page.id,
+              page: id,
             });
           }}
-          menuItems={menuItems}
+          // menuItems={menuItems}
           onSelectMenuItem={handleSelectMenuItem}
           onContextMenu={() => {
             dispatch({
               type: "select-page",
-              page: page.id,
+              page: id,
             });
           }}
         />
       );
-    });
-  }, [pageInfo, selectedPageId, menuItems, handleSelectMenuItem, dispatch]);
+    },
+    [dispatch, menuItems, selectedPageId]
+  );
 
   return (
     <Container>
       <Header>
-        Pages
-        <Spacer.Horizontal />
-        <Button
-          id="add-page"
-          tooltip="Add a new page"
-          onClick={() => {
-            handleAddPage(PageRoot);
-          }}
-        >
-          <PlusIcon />
-        </Button>
+        <AddPageButton callbck={handleAddPage} />
       </Header>
-      <ListView.Root
+      <TreeView.Root
         sortable={true}
+        data={pageInfo}
+        // pressEventName="onClick"
+        keyExtractor={useCallback((item: any) => item.id, [])}
         onMoveItem={useCallback(
-          (originindex, targetindex) => {
-            console.log(originindex, targetindex);
+          (originindex, targetindex, pos) => {
+            console.log(originindex, targetindex, pos);
             const movingitem = pageInfo[originindex];
             console.log("movingitem", movingitem);
             const originorder = pageInfo
@@ -184,35 +190,33 @@ const PageListContent = memo(function PageListContent({
 
             dispatch({
               type: "move-page",
+              id: movingitem.id,
               originOrder: originorder,
               targetOrder: targetorder,
               originParent: movingitem.parent,
               targetParent: targetteditem.parent,
+              movingPositon: pos,
             });
           },
           [pageInfo, dispatch]
         )}
-      >
-        {pageElements}
-      </ListView.Root>
+        acceptsDrop={() => true}
+        // @ts-ignore
+        renderItem={renderItem}
+      ></TreeView.Root>
     </Container>
   );
 });
 
 export function PageList() {
   const [state] = useApplicationState();
-  const pages = state.pages;
-
-  const grounpAsPages = groupbyPageParent(pages);
-  console.log(pages, grounpAsPages);
-
-  const sortAsPages = sortAsGroupping(grounpAsPages);
-
+  const tree = transform(state.pages);
   return (
     <PageListContent
       selectedPageId={state.selectedPage}
-      pageInfo={sortAsPages}
-      canDelete={state.pages.length > 1}
+      // @ts-ignore
+      pageInfo={tree}
+      canDelete={tree.length > 1}
     />
   );
 }

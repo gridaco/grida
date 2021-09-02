@@ -1,6 +1,6 @@
 import { nest } from "./nest";
 type Key = string;
-export const RootSymbol = Symbol("__root");
+export const RootSymbol = Symbol("page-root");
 type ParentKey = Key | null | typeof RootSymbol;
 
 function isKeyRoot(key: ParentKey) {
@@ -21,10 +21,13 @@ interface TreeNodeWithUnevenSortDataArrayItem {
 }
 
 export class TreeArray {
-  constructor(readonly seed: TreeNodeWithUnevenSortDataArrayItem[]) {}
+  constructor(
+    readonly seed: TreeNodeWithUnevenSortDataArrayItem[],
+    readonly rootKey: string = null
+  ) {}
 
   asTree() {
-    return nest(this.seed, null, "parent", (a, b) => {
+    return nest(this.seed, this.rootKey, "parent", (a, b) => {
       return a.sort - b.sort;
     });
   }

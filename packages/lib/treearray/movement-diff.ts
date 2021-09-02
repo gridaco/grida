@@ -7,6 +7,7 @@ export function movementDiff({
   postgroup,
   prevorder,
   postorder,
+  movingPosition,
   options = {
     bigstep: 1,
     smallstep: 1,
@@ -17,6 +18,7 @@ export function movementDiff({
   postgroup: ISortGroup;
   prevorder: number;
   postorder: number;
+  movingPosition: "above" | "below" | "inside";
   options?: {
     bigstep?: number;
     smallstep?: number;
