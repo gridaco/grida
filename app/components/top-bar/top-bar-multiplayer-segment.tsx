@@ -10,24 +10,6 @@ interface Props {
   players?: IPlayer[];
 }
 
-const players: IPlayer[] = [
-  {
-    id: "1",
-    name: "Albert",
-    image: "",
-  },
-  {
-    id: "2",
-    name: "Albert",
-    image: "",
-  },
-  {
-    id: "3",
-    name: "Albert",
-    image: "",
-  },
-];
-
 export function TopBarMultiplayerSegment(props: Props) {
   const handleOnAvatarItemClick = (id: string) => {
     // console.log("avatar item click", id);
@@ -35,7 +17,7 @@ export function TopBarMultiplayerSegment(props: Props) {
 
   return (
     <MultiplayerAvatarGroup spacing={-4}>
-      {props.players.map((p) => {
+      {props.players?.map((p) => {
         return (
           <MultiplayerAvatar
             key={p.id}
