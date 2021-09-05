@@ -48,33 +48,52 @@ export class TreeArray<
     const __targetted_item = arr[to];
 
     // region prevalidation
-    const _reject_parent_moving_inner = reject_parent_moving_inner({
-      data: arr,
-      moving: movingitem,
-      target: __targetted_item,
-    });
-    if (_reject_parent_moving_inner) {
-      throw "cannot move self to inner self.";
+    if (type == "inside") {
+      const _reject_parent_moving_inner = reject_parent_moving_inner({
+        data: arr,
+        moving: movingitem,
+        target: __targetted_item,
+      });
+      if (_reject_parent_moving_inner) {
+        throw "cannot move self to inner self.";
+      }
     }
     // endregion prevalidation
 
     let _target_parrent = undefined;
     let _target_order = undefined;
     switch (type) {
+      // TODO: fixme - this is assuming that all the items are in a expended state. (if collapsed, we should handle that case)
       case "above":
-        _target_parrent = arr[to].parent;
-        _target_order = arr
-          .filter((p) => __targetted_item.parent === p.parent)
-          .indexOf(__targetted_item);
-      case "below":
-        _target_parrent = arr[to].parent;
+        _target_parrent = __targetted_item.parent;
         _target_order = arr
           .filter((p) => __targetted_item.parent === p.parent)
           .indexOf(__targetted_item);
         break;
+      // TODO: fixme - this is assuming that all the items are in a expended state. (if collapsed, we should handle that case)
+      case "below":
+        const __children_of_target = arr.filter(
+          (p) => __targetted_item.id === p.parent
+        );
+
+        if (__children_of_target.length > 0) {
+          // if target item has children, the moving item's new parent is target item since it is a expanded tree.
+          _target_parrent = __targetted_item.id;
+          // place it at the top of under this parent.
+          _target_order = 0; // the lowest value. (place it on top)
+        } else {
+          // otherwise, the parent is target item's parent.
+          _target_parrent = __targetted_item.parent;
+          _target_order =
+            this.childrenOf(__targetted_item.parent, arr).indexOf(
+              __targetted_item
+            ) + 1;
+        }
+        break;
       case "inside":
         _target_parrent = arr[to].id;
-        _target_order = arr.filter((p) => _target_parrent === p.parent).length;
+        // if moving inside, place it on the end of the children arr. (wich is .length)
+        _target_order = this.childrenOf(_target_parrent, arr).length;
         break;
     }
 
@@ -83,8 +102,8 @@ export class TreeArray<
       .indexOf(movingitem);
 
     const item = arr[from];
-    const prevs = arr.filter((p) => p.parent === _origin_parent);
-    const posts = arr.filter((p) => p.parent === _target_parrent);
+    const prevs = this.childrenOf(_origin_parent, arr);
+    const posts = this.childrenOf(_target_parrent, arr);
 
     //
     return movementDiff({
@@ -103,6 +122,13 @@ export class TreeArray<
         bigstep: 1000,
       },
     });
+  }
+
+  private childrenOf<T extends { parent?: string }>(
+    parent: string,
+    arr: T[]
+  ): T[] {
+    return arr.filter((p) => parent === p.parent);
   }
 
   private _as_tree_array_cache: (T & { depth: number })[];
