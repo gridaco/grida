@@ -1,26 +1,15 @@
 import { nest } from "./nest";
-type Key = string;
-export const RootSymbol = Symbol("page-root");
-type ParentKey = Key | null | typeof RootSymbol;
+import { movementDiff } from "./movement-diff";
+import { reject_parent_moving_inner } from "./validators";
+import { TreeNodeWithUnevenSortDataArrayItem } from "./sortable";
 
-function isKeyRoot(key: ParentKey) {
-  return key === null || key === RootSymbol;
-}
+type IDeepTreeItemLike = {
+  children: IDeepTreeItemLike[];
+};
 
-interface TreeNodeAsArrayItem {
-  id: Key;
-  index: number;
-  parent: ParentKey;
-  children: Key[];
-}
-
-interface TreeNodeWithUnevenSortDataArrayItem {
-  id: Key;
-  sort: number;
-  parent?: ParentKey;
-}
-
-export class TreeArray {
+export class TreeArray<
+  T extends TreeNodeWithUnevenSortDataArrayItem = TreeNodeWithUnevenSortDataArrayItem
+> {
   constructor(
     readonly seed: TreeNodeWithUnevenSortDataArrayItem[],
     readonly rootKey: string = null
@@ -33,10 +22,94 @@ export class TreeArray {
   }
 
   asArray() {
+    throw "method `asArray` is not ready to use";
     return this.asTree().flat(Infinity);
   }
 
-  asTreeArray(): TreeNodeAsArrayItem[] {
+  move({
+    from,
+    to,
+    type,
+  }: {
+    /**
+     * index of origin position
+     */
+    from: number;
+    /**
+     * index of target position
+     */
+    to: number;
+    type: "above" | "below" | "inside";
+  }) {
+    // assuming that movement is bassed on tree-array structure
+    const arr = this.asTreeArray();
+    const movingitem = arr[from];
+    const _origin_parent = arr[from].parent;
+    const __targetted_item = arr[to];
+
+    // region prevalidation
+    const _reject_parent_moving_inner = reject_parent_moving_inner({
+      data: arr,
+      moving: movingitem,
+      target: __targetted_item,
+    });
+    if (_reject_parent_moving_inner) {
+      throw "cannot move self to inner self.";
+    }
+    // endregion prevalidation
+
+    let _target_parrent = undefined;
+    let _target_order = undefined;
+    switch (type) {
+      case "above":
+        _target_parrent = arr[to].parent;
+        _target_order = arr
+          .filter((p) => __targetted_item.parent === p.parent)
+          .indexOf(__targetted_item);
+      case "below":
+        _target_parrent = arr[to].parent;
+        _target_order = arr
+          .filter((p) => __targetted_item.parent === p.parent)
+          .indexOf(__targetted_item);
+        break;
+      case "inside":
+        _target_parrent = arr[to].id;
+        _target_order = arr.filter((p) => _target_parrent === p.parent).length;
+        break;
+    }
+
+    const _origin_order = arr
+      .filter((p) => movingitem.parent === p.parent)
+      .indexOf(movingitem);
+
+    const item = arr[from];
+    const prevs = arr.filter((p) => p.parent === _origin_parent);
+    const posts = arr.filter((p) => p.parent === _target_parrent);
+
+    //
+    return movementDiff({
+      item: item,
+      prevgroup: {
+        id: _origin_parent,
+        children: prevs,
+      },
+      postgroup: {
+        id: _target_parrent,
+        children: posts,
+      },
+      prevorder: _origin_order,
+      postorder: _target_order,
+      options: {
+        bigstep: 1000,
+      },
+    });
+  }
+
+  private _as_tree_array_cache: (T & { depth: number })[];
+  asTreeArray(): (T & { depth: number })[] {
+    if (this._as_tree_array_cache) {
+      return this._as_tree_array_cache;
+    }
     const deepflat = (arr: IDeepTreeItemLike[]) => {
       const flat = [];
       for (const item of arr) {
@@ -50,10 +123,8 @@ export class TreeArray {
       return flat;
     };
 
-    return deepflat(this.asTree()).flat(Infinity);
+    const res = deepflat(this.asTree()).flat(Infinity);
+    this._as_tree_array_cache = res;
+    return res;
   }
 }
-
-type IDeepTreeItemLike = {
-  children: IDeepTreeItemLike[];
-};
