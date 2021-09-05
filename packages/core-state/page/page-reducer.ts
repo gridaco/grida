@@ -7,6 +7,7 @@ import {
   add_on_root,
   DuplicateCurrentPageAction,
   IAddPageAction,
+  MovePageAction,
   PageAction,
   PageRoot,
   PageRootKey,
@@ -26,7 +27,7 @@ import {
 // store
 import { PageStore } from "@core/store";
 import { setSelectedPage } from "@core/store/application";
-import { movementDiff } from "treearray";
+import { movementDiff, TreeArray } from "treearray";
 
 export const createPage = (
   pages: PageReference[],
@@ -162,44 +163,23 @@ export function pageReducer(
       });
     }
     case "move-page": {
-      const {
-        id,
-        originOrder,
-        targetOrder,
-        originParent,
-        targetParent,
-        movingPositon,
-      } = action;
+      const { id, from, to, movingPositon } = <MovePageAction>action;
 
       return produce(state, (draft) => {
-        const _id = id;
-        const movingPage = draft.pages.find((p) => p.id === _id);
-        const prevs = draft.pages.filter((p) => p.parent === originParent);
-        const posts = draft.pages.filter((p) => p.parent === targetParent);
-
-        const diff = movementDiff({
-          options: {
-            bigstep: 1000,
-          },
-          item: movingPage,
-          prevgroup: {
-            id: parentPageIdToString(originParent),
-            children: prevs,
-          },
-          movingPosition: movingPositon,
-          postgroup: {
-            id: parentPageIdToString(targetParent),
-            children: posts,
-          },
-          prevorder: originOrder,
-          postorder: targetOrder,
+        const ta = new TreeArray(draft.pages, PageRootKey);
+        const diff = ta.move({
+          from: from,
+          to: to,
+          type: movingPositon,
         });
 
+        const movingPage = draft.pages.find((p) => p.id === id);
         movingPage.parent = diff.post.moved.targetParent;
         movingPage.sort = diff.post.moved.sort;
         diff.post.updates.forEach((u) => {
           draft.pages.find((p) => p.id == u.id).sort = u.sort;
         });
+        // TODO: sync the diff (to localstorage & server).
       });
     }
     default:

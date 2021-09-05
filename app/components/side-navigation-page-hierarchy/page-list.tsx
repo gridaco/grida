@@ -176,31 +176,22 @@ const PageListContent = memo(function PageListContent({
         keyExtractor={useCallback((item: any) => item.id, [])}
         onMoveItem={useCallback(
           (originindex, targetindex, pos) => {
-            console.log(originindex, targetindex, pos);
+            console.log("on move item", originindex, targetindex, pos);
             const movingitem = pageInfo[originindex];
-            console.log("movingitem", movingitem);
-            const originorder = pageInfo
-              .filter((p) => movingitem.parent === p.parent)
-              .indexOf(movingitem);
-
-            const targetteditem = pageInfo[targetindex]; // FIXME:
-            const targetorder = pageInfo
-              .filter((p) => targetteditem.parent === p.parent)
-              .indexOf(targetteditem);
-
             dispatch({
               type: "move-page",
               id: movingitem.id,
-              originOrder: originorder,
-              targetOrder: targetorder,
-              originParent: movingitem.parent,
-              targetParent: targetteditem.parent,
+              from: originindex,
+              to: targetindex,
               movingPositon: pos,
             });
           },
           [pageInfo, dispatch]
         )}
-        acceptsDrop={() => true}
+        acceptsDrop={
+          () => true
+          // TODO: add handling
+        }
         // @ts-ignore
         renderItem={renderItem}
       ></TreeView.Root>

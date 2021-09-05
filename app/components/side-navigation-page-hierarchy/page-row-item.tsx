@@ -56,6 +56,10 @@ export const PageRow = memo(
       onHoverChange,
       onAddClick,
       onMenuClick,
+      onClickChevron,
+      onPress,
+      onDoubleClick,
+      onClick,
       children,
       ...props
     }: TreeView.TreeRowProps<PageMenuItemType> & {
@@ -84,6 +88,9 @@ export const PageRow = memo(
         onHoverChange={handleHoverChange}
         selected={selected}
         disabled={false}
+        onPress={onPress}
+        onClick={onClick}
+        onDoubleClick={onDoubleClick}
         {...props}
       >
         {withSeparatorElements(

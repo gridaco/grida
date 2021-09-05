@@ -41,12 +41,8 @@ export interface MovePageAction {
   /** the moving target */
   id: string;
   movingPositon: "above" | "below" | "inside";
-  /** origin order. this is not a sort value. sort value will be assigned on this action's handler. this is a absolute order (index) under its parent, calculated on view side. */
-  originOrder: number;
-  /** target order. this is not a sort value. sort value will be assigned on this action's handler. this is a absolute order (index) under its parent, calculated on view side. */
-  targetOrder: number;
-  originParent: PageParentId;
-  targetParent: PageParentId;
+  from: number;
+  to: number;
 }
 
 export interface SelectPageAction {
