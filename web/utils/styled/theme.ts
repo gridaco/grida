@@ -6,8 +6,8 @@ export interface ThemeInterface extends Theme {
   };
   breakpoints: string[];
   buttons: {
-    primary: object,
-    noShadow: object
+    primary: object;
+    noShadow: object;
   };
 }
 
@@ -19,9 +19,9 @@ const defaultButtonProps = {
   fontWeight: 500,
   cursor: "pointer",
   display: "flex",
-  alignItems: 'center',
+  alignItems: "center",
   justifyContent: "center",
-  boxShadow: '0px 4px 16px rgba(0, 0, 0, 0.12)'
+  boxShadow: "0px 4px 16px rgba(0, 0, 0, 0.12)",
 };
 
 const defaultTheme: ThemeInterface = {
@@ -35,8 +35,8 @@ const defaultTheme: ThemeInterface = {
     },
     noShadow: {
       ...defaultButtonProps,
-      boxShadow: ""
-    }
+      boxShadow: "",
+    },
   },
 };
 

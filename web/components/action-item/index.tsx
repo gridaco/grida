@@ -1,10 +1,11 @@
-import React from "react";
-import Link from "next/link";
-import Icon from "components/icon";
 import styled from "@emotion/styled";
+import { motion } from "framer-motion";
+import Link from "next/link";
+import React from "react";
+
+import Icon from "components/icon";
 import { media } from "utils/styled/media";
 import { ThemeInterface } from "utils/styled/theme";
-import { motion } from "framer-motion";
 
 const ActionItem = ({ label, href }) => {
   return (

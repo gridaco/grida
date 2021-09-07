@@ -1,12 +1,13 @@
-import React, { useEffect } from "react";
 import styled from "@emotion/styled";
-import { Flex, Heading } from "rebass";
-import SectionLayout from "layouts/section";
-import BlankArea from "components/blank-area";
-import { useWindowWidth } from "utils/hooks/use-window-width";
-import { defaultTheme } from "utils/styled";
-import { LandingpageUrls } from "utils/landingpage/constants";
 import Link from "next/link";
+import React, { useEffect } from "react";
+import { Flex, Heading } from "rebass";
+
+import BlankArea from "components/blank-area";
+import SectionLayout from "layouts/section";
+import { useWindowWidth } from "utils/hooks/use-window-width";
+import { LandingpageUrls } from "utils/landingpage/constants";
+import { defaultTheme } from "utils/styled";
 
 function replaceStylePxToNumber(stylePx: string) {
   return parseInt(stylePx.replace("px", ""));
