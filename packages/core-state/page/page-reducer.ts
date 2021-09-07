@@ -7,6 +7,7 @@ import {
   add_on_root,
   DuplicateCurrentPageAction,
   IAddPageAction,
+  MovePageAction,
   PageAction,
   PageRoot,
   PageRootKey,
@@ -26,7 +27,7 @@ import {
 // store
 import { PageStore } from "@core/store";
 import { setSelectedPage } from "@core/store/application";
-import { movementDiff } from "treearray";
+import { movementDiff, TreeArray } from "treearray";
 
 export const createPage = (
   pages: PageReference[],
@@ -67,18 +68,20 @@ export const createPage = (
   }
 
   const id = nanoid();
+  const _get_new_max_sort_value = () => {
+    const last = pages
+      .filter((p) => p.parent === linkparent)
+      .sort((a, b) => a.sort - b.sort)
+      .pop();
+    return last ? last.sort + 1 : 0;
+  };
+
   const newPage = produce<Page>(
     {
       id: id,
       type: "boring-document",
       name: name,
-      sort: (() => {
-        const last = pages
-          .filter((p) => p.parent === linkparent)
-          .sort((a, b) => a.sort - b.sort)
-          .pop();
-        return last?.sort ?? 0 + 1;
-      })(), // sort = parent.children => lowestSort + 1
+      sort: _get_new_max_sort_value(), // sort = parent.children => lowestSort + 1
       document: document,
       parent: linkparent,
     },
@@ -160,36 +163,23 @@ export function pageReducer(
       });
     }
     case "move-page": {
-      const { originOrder, targetOrder, originParent, targetParent } = action;
+      const { id, from, to, movingPositon } = <MovePageAction>action;
 
-      console.log(action);
       return produce(state, (draft) => {
-        const _id = getCurrentPage(state).id; // since it needs to be selected inorder to move (in case: movement by user)
-        const movingPage = draft.pages.find((p) => p.id === _id);
-        const prevs = draft.pages.filter((p) => p.parent === originParent);
-        const posts = draft.pages.filter((p) => p.parent === targetParent);
-        const diff = movementDiff({
-          options: {
-            bigstep: 1000,
-          },
-          item: movingPage,
-          prevgroup: {
-            id: parentPageIdToString(originParent),
-            children: prevs,
-          },
-          postgroup: {
-            id: parentPageIdToString(targetParent),
-            children: posts,
-          },
-          prevorder: originOrder,
-          postorder: targetOrder,
+        const ta = new TreeArray(draft.pages, PageRootKey);
+        const diff = ta.move({
+          from: from,
+          to: to,
+          type: movingPositon,
         });
 
+        const movingPage = draft.pages.find((p) => p.id === id);
         movingPage.parent = diff.post.moved.targetParent;
         movingPage.sort = diff.post.moved.sort;
         diff.post.updates.forEach((u) => {
           draft.pages.find((p) => p.id == u.id).sort = u.sort;
         });
+        // TODO: sync the diff (to localstorage & server).
       });
     }
     default:

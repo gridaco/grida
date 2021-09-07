@@ -38,12 +38,11 @@ export interface AddPageAction extends IAddPageAction {
 
 export interface MovePageAction {
   type: "move-page";
-  /** origin order. this is not a sort value. sort value will be assigned on this action's handler. this is a absolute order (index) under its parent, calculated on view side. */
-  originOrder: number;
-  /** target order. this is not a sort value. sort value will be assigned on this action's handler. this is a absolute order (index) under its parent, calculated on view side. */
-  targetOrder: number;
-  originParent: PageParentId;
-  targetParent: PageParentId;
+  /** the moving target */
+  id: string;
+  movingPositon: "above" | "below" | "inside";
+  from: number;
+  to: number;
 }
 
 export interface SelectPageAction {
