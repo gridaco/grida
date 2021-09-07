@@ -1221,12 +1221,7 @@
     exec-sh "^0.3.2"
     minimist "^1.2.0"
 
-"@design-sdk/figma-auth-store@^0.0.2":
-  version "0.0.2"
-  resolved "https://registry.yarnpkg.com/@design-sdk/figma-auth-store/-/figma-auth-store-0.0.2.tgz#2657bed0cf97b8ed424a2d0935e2dfce878ccac4"
-  integrity sha512-3gd9K44yQ8AgV2WYkJ4vLTkBAGtEXi/KVdSYYslXDADKos08qXKq1vADfn6Wu2l7K2GQZPYrMRpGN2x8JkrTlA==
-
-"@design-sdk/figma-remote-api@^0.0.0":
+"@design-sdk/figma-remote-api@0.0.0", "@design-sdk/figma-remote-api@^0.0.0":
   version "0.0.0"
   resolved "https://registry.yarnpkg.com/@design-sdk/figma-remote-api/-/figma-remote-api-0.0.0.tgz#c1937575bbf824ca8fc45141db5327dd98d789ff"
   integrity sha512-AA+LelJSudE2fEIvrecgcc7nmXTeRZy8WEdqhqZV4SuvgqZUH8i+t2m3dw/L/NmbxxdduRmltzTuX78MxwGntA==
@@ -3219,7 +3214,7 @@
   resolved "https://registry.yarnpkg.com/@reflect-ui/namings/-/namings-0.0.3.tgz#6e9fd4809dd5c9d2a996516236c71b99ea93fbcb"
   integrity sha512-rNNW9nK8qhz+54pOL11MRUTjRhRHTL/rbM5kvtddDY2g7t/1XxGl7d3tLs/0LEoy2LFPtNf/fFZYEgQD/jyoFA==
 
-"@reflect-ui/uiutils@^0.1.2-1":
+"@reflect-ui/uiutils@0.1.2-1", "@reflect-ui/uiutils@^0.1.2-1":
   version "0.1.2-1"
   resolved "https://registry.yarnpkg.com/@reflect-ui/uiutils/-/uiutils-0.1.2-1.tgz#b88d08223eb19ab5e6dd5ecf4a03075a41bb89c1"
   integrity sha512-fv3mITNqM6U7DEpOr5B6c9lmmkj22r3114aR8Tvp2izMIndLbFJBzLnYEVA07bHiglic1POWCePwYVhB+bAF1Q==
