@@ -3,36 +3,39 @@ title: "Getting started with Grida"
 excerpt: "Convert your design to code to any platforms, learn how to make design work with Grida."
 ---
 
-<Title>Welcome to Grida</Title>
+<Title>Getting started with Grida - with Figma</Title>
 
-> Grida is a opensource framework for design, front-end development, serverless computing best fit for startup products.
+Let’s start building single source of truth for Design & Development. Grida is an [open-source](https://github.com/gridaco) Design2Code softare. You can combine design & development environment along with UI Development automation.
 
-## Quickstart
+## Importing your Design
 
-> this quickstart guide is based on Figma and Flutter.
+Before we start, you need a prepared design. If you don’t have one, you can duplicate [this file](https://www.figma.com/community/file/1017001872116348231/Grida-starter-kit). (Figma account is required, You can duplicate by pressing “Duplicate” button on top right corner)
 
-Get the Figma Assistant plugin [here](https://www.figma.com/community/plugin/896445082033423994)
+**Option1. Importing via Plugin**
 
-## Getting started by Frontend frameworks
+There are 2 ways importing your design. The first is to use Grida plugin named “Assistant”. You can install the plugin [here](https://www.figma.com/community/plugin/896445082033423994). (Figma account is required)
+Once you install, navigate to Plugins - Assistant by Grida to run the plugin.
 
-- [Flutter](platforms/flutter)
-  - Supported coding styles for flutter
-- React
-  - React with styled components
-  - React with typescript
-  - React with functional components
-  - React with class components
+![getting-started-install-grida-plugin-for-figma](https://docs-artworks.s3.us-west-1.amazonaws.com/getting-started-install-grida-plugin-for-figma.gif)
 
-## Getting started by Design tools
+> Can’t run the plugin? Figma requires write access to the file in order to run the plugin. You can request your team manager to assign editor role to you. Otherwise, you can always duplicate above example file to make your own file.
 
-- [Figma](platforms/figma)
-- [Sketch](platforms/sketch)
-- [Adobe XD](platforms/xd)
-- [Photoshop](platforms/photoshop)
+After you run the plugin, select the design you want to import, and press Next. Signin required on this step.
 
-## Nice combination that works together
+---
 
-- Figma with Flutter (Figma to flutter)
-- Figma with React (Figma to React)
-- Figma with
-- Sketch with Vanilla HTML/CSS
+**Option 2. Import directly from Grida**
+
+The second option is to import your desifn directly from Grida. First, visit [app.grida.co](https://app.grida.co).
+
+You’ll see Getting started Page. Enter the URL of the design, hit Load.
+(Figma Account authorization is required)
+
+> Can’t import the design? Check if the Figma account you’ve authorized have the read permission to the design url. Even if you can view the file, you still need write permission to import it via the URL. (Figma Won’t allow it)
+
+**Congrats. You’ve imported your first design.**
+In the future, You can import new deisign or update the design with the same way.
+
+## Next - Improve the quality
+
+Do you see the Lint warning? This is because usually new design requires to be polished before we can generate high quality code. Importing design without ant linting will give you poor-quality-code; you won’t be able to use for the production.
