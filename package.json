@@ -17,5 +17,8 @@
         "web": "yarn workspace web dev",
         "build:web": "yarn workspace web build",
         "sitemap-gen": "./scripts/sitemap-gen/runner.sh"
+    },
+    "devDependencies": {
+        "typescript": "^4.4.2"
     }
 }
