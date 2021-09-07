@@ -1,9 +1,9 @@
 {
-    "name": "bridged.xyz",
+    "name": "grida.co",
     "private": true,
-    "author": "bridged.xyz authors",
+    "author": "grida.co & bridged.xyz authors",
     "repository": {
-        "url": "https://github.com/bridgedxyz/bridged.xyz.git"
+        "url": "https://github.com/gridaco/grida.co"
     },
     "workspaces": [
         "web",
@@ -17,19 +17,5 @@
         "web": "yarn workspace web dev",
         "build:web": "yarn workspace web build",
         "sitemap-gen": "./scripts/sitemap-gen/runner.sh"
-    },
-    "dependencies": {
-        "cookie": "^0.4.1",
-        "firebase": "^8.2.10",
-        "framer-motion": "^3.10.0",
-        "next-videos": "^1.4.0",
-        "prism-react-renderer": "^1.2.0",
-        "react-cookie": "^4.0.3",
-        "react-lottie": "^1.2.3",
-        "react-player": "^2.9.0",
-        "react-syntax-highlighter": "^15.4.3",
-        "react-youtube": "^7.13.1",
-        "remark-html": "^13.0.1",
-        "smoothscroll-polyfill": "^0.4.4"
     }
 }

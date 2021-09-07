@@ -6,26 +6,29 @@ const OG_IMAGE_GIF =
   "https://bridged-service-static.s3-us-west-1.amazonaws.com/opengraph/og-image-gif.gif";
 
 export const SEO_OG_DEFAULTS: OpenGraphMeta = {
-  title: "Designs, come to live | Bridged",
+  title: "Figma to Flutter | Grida",
   type: "website",
-  url: "https://bridged.xyz",
+  url: "https://grida.co",
   image: OG_IMAGE_GIF,
 };
 
 export const SEO_DEFAULTS: PageSeoMeta = {
   route: "/",
-  title: "Bridged",
+  title: "Grida",
   description:
-    "Designs, come to live | automate your frontend development. Instantly convert your design to production ready code.",
+    "Figma to Flutter | automate your frontend development. Instantly convert your design to production ready code.",
   keywords: [
     "figma to flutter",
     "design to code",
     "figma to code",
+    "design nocode",
+    "flutter studio",
+    "flutter tools",
     "flutter code generation",
     "design handoff",
     "design linting",
     "code generation",
   ],
-  author: "bridged.xyz team and community collaborators",
+  author: "grida.co team and community collaborators",
   og: SEO_OG_DEFAULTS,
 };

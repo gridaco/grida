@@ -89,7 +89,8 @@ const CodePreview = () => {
               <Platforms className="platforms">
                 {DEV_FRAMEWORKS.map(i => (
                   <Image
-                    alt="bridged supported design platforms"
+                    loading="eager"
+                    alt="Grida supported design platforms"
                     key={i.name}
                     className="cursor"
                     onClick={() => setCurrentPlatform(i)}

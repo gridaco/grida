@@ -9,7 +9,7 @@ export default function() {
   }
   return (
     <div style={{ textAlign: "center", margin: 120 }}>
-      <h1>Welcome to Bridged Docs</h1>
+      <h1>Welcome to Grida Docs</h1>
       <h2>You are now being redirected</h2>
     </div>
   );

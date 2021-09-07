@@ -19,8 +19,8 @@ const Slogan = () => {
         my={["120px", "300px"]}
         style={{ zIndex: 5 }}
       >
-        <SloganText variant="h1">Focus on the Core</SloganText>
-        <SloganText variant="h1">
+        <SloganText variant="h2">Focus on the Core</SloganText>
+        <SloganText variant="h2">
           <Icon
             name="bridged"
             width={[32, 64]}

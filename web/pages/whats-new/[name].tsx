@@ -1,14 +1,17 @@
-import React, { useState } from 'react';
-import { useRouter } from 'next/router';
-import useAsyncEffect from 'utils/hooks/use-async-effect';
-import axios from 'axios';
-import Head from 'next/head';
-import { GithubReleaseNote, getGithubReleaseNote } from 'utils/methods/getGithubReleaseNote';
-import { Flex } from 'rebass';
-import WhatsNewHeaderLabel from 'sections/whats-new/header-label';
-import WhatsNewReleaseNote from 'sections/whats-new/release-note';
-import { center } from 'utils/styled/styles';
-const githubName = 'bridgedxyz';
+import React, { useState } from "react";
+import { useRouter } from "next/router";
+import useAsyncEffect from "utils/hooks/use-async-effect";
+import axios from "axios";
+import Head from "next/head";
+import {
+  GithubReleaseNote,
+  getGithubReleaseNote,
+} from "utils/methods/getGithubReleaseNote";
+import { Flex } from "rebass";
+import WhatsNewHeaderLabel from "sections/whats-new/header-label";
+import WhatsNewReleaseNote from "sections/whats-new/release-note";
+import { center } from "utils/styled/styles";
+const githubName = "gridaco";
 
 const UpdateNoteDetail = () => {
   const {
@@ -17,13 +20,14 @@ const UpdateNoteDetail = () => {
   const [releases, setReleases] = useState<Array<GithubReleaseNote>>([]);
 
   useAsyncEffect(async () => {
-    name !== undefined && setReleases(await getGithubReleaseNote(githubName, name as string))
+    name !== undefined &&
+      setReleases(await getGithubReleaseNote(githubName, name as string));
   }, [name]);
 
   return (
     <React.Fragment>
       <Head>
-        <title>Bridged {name} Release Notes</title>
+        <title>Grida {name} Release Notes</title>
         <meta
           name="description"
           content="designs that are meant to be implemented. automate your frontend development process. no more boring."
@@ -34,7 +38,7 @@ const UpdateNoteDetail = () => {
         />
         <meta
           name="author"
-          content="bridged.xyz team and community collaborators"
+          content="grida.co and bridged.xyz team and community collaborators"
         />
         <link rel="icon" href="/favicon.png" />
         <link
@@ -44,9 +48,19 @@ const UpdateNoteDetail = () => {
         />
       </Head>
       <Flex style={center}>
-        <Flex width={["320px", "730px", "985px", "1040px"]} flexDirection="column" mx="20px" mb="20px">
-          <WhatsNewHeaderLabel installUrl={releases[0]?.html_url} label={name} />
-          {releases.map(i => <WhatsNewReleaseNote release={i} key={i.id} />)}
+        <Flex
+          width={["320px", "730px", "985px", "1040px"]}
+          flexDirection="column"
+          mx="20px"
+          mb="20px"
+        >
+          <WhatsNewHeaderLabel
+            installUrl={releases[0]?.html_url}
+            label={name}
+          />
+          {releases.map(i => (
+            <WhatsNewReleaseNote release={i} key={i.id} />
+          ))}
         </Flex>
       </Flex>
     </React.Fragment>

@@ -1,24 +1,25 @@
-import Icon from "components/icon";
-import Link from "next/link";
-import React, { useState, useEffect, useCallback } from "react";
 import styled from "@emotion/styled";
-import { center } from "utils/styled/styles";
+import Link from "next/link";
+import { useRouter } from "next/router";
+import React, { useState, useEffect, useCallback } from "react";
+import { useCookies } from "react-cookie";
 import { Box, Flex, Text, Button } from "rebass";
+
+import Icon from "components/icon";
+import { useAuthState } from "utils/hooks/use-auth-state";
+import { URLS } from "utils/landingpage/constants";
+import { media } from "utils/styled/media";
+import { center } from "utils/styled/styles";
+import { ThemeInterface } from "utils/styled/theme";
+
 import ExpandHeaderItem from "./expand-header-item";
 import { HeaderMap } from "./headermap";
-import { URLS } from "utils/landingpage/constants";
-import { ThemeInterface } from "utils/styled/theme";
-import { media } from "utils/styled/media";
-import { useCookies } from "react-cookie";
-import { useRouter } from "next/router";
-
-const COOKIE_ACCESS_TOKEN_KEY = "_token";
 
 const Header = () => {
   const [currentExpandHeader, setCurrentExpandHeader] = useState("");
   const [isOpenMenu, setIsOpenMenu] = useState(false);
-  const [cookie, setCookie] = useCookies([COOKIE_ACCESS_TOKEN_KEY]);
   const [currentRouter, setCurrentRouter] = useState("");
+  const loginstate = useAuthState();
   const router = useRouter();
   useEffect(() => {
     if (isOpenMenu) {
@@ -38,18 +39,19 @@ const Header = () => {
   );
 
   const handleSignupClick = () => {
-    if (cookie[COOKIE_ACCESS_TOKEN_KEY] != null) {
-      window.location.href = URLS.landing.try_the_demo_1;
+    if (loginstate == "signedin") {
+      window.location.href = URLS.landing.app;
     } else {
-      window.location.href = URLS.landing.signup;
+      window.location.href = URLS.landing.signup_with_return;
     }
   };
 
-  const handleSigninClick = () => {
-    if (cookie[COOKIE_ACCESS_TOKEN_KEY] != null) {
-      window.location.href = URLS.landing.try_the_demo_1;
+  const handleSigninOrMoveAppClick = () => {
+    if (loginstate == "signedin") {
+      // move to app
+      window.location.href = URLS.landing.app;
     } else {
-      !isOpenMenu && (window.location.href = URLS.landing.signin);
+      !isOpenMenu && (window.location.href = URLS.landing.signin_with_return);
     }
   };
 
@@ -91,7 +93,7 @@ const Header = () => {
               ml="8px"
               fontWeight="600"
             >
-              Bridged
+              Grida
             </ResponsiveTitle>
           </Link>
           <NavigationWrapper ml="60px" alignItems="center">
@@ -130,9 +132,7 @@ const Header = () => {
           p={["6px 10px", "6px 10px", "9px 20px", "9px 20px"]}
           variant="noShadow"
         >
-          {cookie[COOKIE_ACCESS_TOKEN_KEY] != null
-            ? "Go to console"
-            : "Sign up"}
+          {loginstate == "signedin" ? "Go to App" : "Sign up"}
         </SignupButton>
       </Flex>
 
@@ -185,9 +185,9 @@ const Header = () => {
               height="35px"
               fontSize="13px"
               mb="12px"
-              disabled={cookie[COOKIE_ACCESS_TOKEN_KEY] != null}
+              disabled={loginstate == "signedin"}
               style={{
-                opacity: cookie[COOKIE_ACCESS_TOKEN_KEY] != null ? 0 : 1,
+                opacity: (loginstate == "signedin") != null ? 0 : 1,
               }}
               onClick={handleSignupClick}
             >
@@ -201,10 +201,10 @@ const Header = () => {
               height="35px"
               fontSize="13px"
               style={center}
-              onClick={handleSigninClick}
+              onClick={handleSigninOrMoveAppClick}
             >
-              {cookie[COOKIE_ACCESS_TOKEN_KEY] != null ? (
-                "Go to console"
+              {loginstate == "signedin" ? (
+                "Go to App"
               ) : (
                 <React.Fragment>
                   <Icon name="lock" isVerticalMiddle mr="6px" />

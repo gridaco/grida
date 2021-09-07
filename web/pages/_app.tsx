@@ -22,6 +22,7 @@ import { MDXProvider } from "@mdx-js/react";
 import { _MDX_COMPONENTS } from "components/mdx";
 import { SEO_DEFAULTS } from "utils/seo";
 import makeKeywords from "utils/seo/make-keywords";
+import { Box } from "rebass";
 
 const App = ({ Component, pageProps }: AppProps) => {
   const router = useRouter();
@@ -97,7 +98,10 @@ const App = ({ Component, pageProps }: AppProps) => {
           textarea,
           h1,
           h2,
-          h3 {
+          h3,
+          h4,
+          h5,
+          h6 {
             font-family: HelveticaNeue, sans-serif !important;
           }
 
@@ -117,14 +121,28 @@ const App = ({ Component, pageProps }: AppProps) => {
         <meta property="og:url" content={SEO_DEFAULTS.og.url} />
         <meta property="og:image" content={SEO_DEFAULTS.og.image} />
 
+        {/* region Google analytics */}
+        {/* https://stackoverflow.com/a/62552263 */}
+        <script
+          async
+          src="https://www.googletagmanager.com/gtag/js?id=UA-196372205-1"
+        />
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+            window.dataLayer = window.dataLayer || [];
+            function gtag(){dataLayer.push(arguments);}
+            gtag('js', new Date());
+            gtag('config', 'UA-196372205-1');
+        `,
+          }}
+        />
+        {/* end region */}
+
         <link rel="icon" href="/favicon.png" />
       </Head>
-      <div
-        css={css`
-          display: flex;
-          flex-direction: column;
-          min-height: 100vh;
-        `}
+      <Box
+        style={{ display: "flex", flexDirection: "column", minHeight: "100vh" }}
       >
         <Header />
         <BodyCustomStyleInAbosulteSectionLayout
@@ -134,7 +152,7 @@ const App = ({ Component, pageProps }: AppProps) => {
           <Component {...pageProps} />
         </BodyCustomStyleInAbosulteSectionLayout>
         <Footer />
-      </div>
+      </Box>
       {renderPopups()}
     </Providers>
   );

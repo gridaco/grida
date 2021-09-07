@@ -6,7 +6,7 @@ function PricingCTAButton(props) {
   const { ...style } = props;
 
   const handleSignupClick = () => {
-    window.location.href = LandingpageUrls.signup;
+    window.location.href = LandingpageUrls.signup_with_return;
   };
 
   return (

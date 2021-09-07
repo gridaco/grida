@@ -1,19 +1,23 @@
 import styled from "@emotion/styled";
+import { motion } from "framer-motion";
 import React from "react";
 import { Button, Box } from "rebass";
-import { motion } from "framer-motion";
-import { URLS } from "utils/landingpage/constants";
-import { useCookies } from "react-cookie";
 
-const COOKIE_ACCESS_TOKEN_KEY = "_token";
+import { useAuthState } from "utils/hooks/use-auth-state";
+import { URLS } from "utils/landingpage/constants";
 
 export default function LandingMainCtaButton() {
-  const [cookie, ] = useCookies([COOKIE_ACCESS_TOKEN_KEY]);
+  const loginstate = useAuthState();
+
   const handleCta = () => {
-    if (cookie[COOKIE_ACCESS_TOKEN_KEY] != null) {
-      window.location.href = "/docs/getting-started";
-    } else {
-      window.location.href = URLS.landing.signup;
+    switch (loginstate) {
+      case "expired":
+      case "unauthorized":
+      case "loading": // loading also fallbacks as singup since there is no better way to handle this is ux perspective. - althoug, we will have enough time for the authstate from remote to bn loaded.
+        window.location.href = URLS.landing.signup_with_return;
+      case "signedin":
+        window.location.href = "/docs/getting-started";
+        break;
     }
   };
   return (

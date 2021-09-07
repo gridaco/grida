@@ -88,7 +88,7 @@ const Products = () => {
       >
         <Container>
           <RowFrame animate={{ x: x }} transition={spring}>
-            <LandingpageText variant="h1" className="no-drag">
+            <LandingpageText variant="h2" className="no-drag">
               {PRODUCT_LIST.map((item, i) => {
                 return (
                   <List
@@ -123,6 +123,13 @@ const Products = () => {
             loop
             playing
             muted
+            config={{
+              file: {
+                attributes: {
+                  preload: "auto",
+                },
+              },
+            }}
           />
         </motion.div>
       </VideoWrapper>
