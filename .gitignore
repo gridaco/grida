@@ -11,6 +11,9 @@
 # Thumbnails
 ._*
 
+## Local dev env
+--ignoreme
+
 # generated sitemaps
 **/sitemap*.xml
 **/sitemap*.gz
