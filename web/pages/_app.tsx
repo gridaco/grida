@@ -61,7 +61,6 @@ const App = ({ Component, pageProps }: AppProps) => {
             padding: 0;
             margin: 0;
             word-break: keep-all;
-            letter-spacing: -0.65px;
             min-height: 100vh;
             overflow-x: hidden;
             scroll-behavior: smooth;
