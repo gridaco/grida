@@ -105,6 +105,10 @@ const Wrap = styled.div`
   margin-bottom: calc(1.25rem * var(--space-y-reverse));
   line-height: 1.5;
 
+  img {
+    width: 100%;
+  }
+
   p {
     ${textBased}
   }
