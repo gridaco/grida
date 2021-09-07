@@ -8,6 +8,7 @@ import { DesignImporterLoaderResult } from "./o";
 import { analyzeDesignUrl, DesignProvider } from "@design-sdk/url-analysis";
 import { designToCode } from "@designto/code";
 import { input } from "@designto/config";
+import { Language } from "@grida/builder-platform-types";
 import { hasLinkedFigmaAccount } from "@app/fapi/accounts/linked-accounts";
 import { show_dialog_import_figma_design_after_authentication } from "../../../modals/import-figma-design-after-authentication";
 import { isOneOfDemoDesignUrl, loadDemoDesign } from "../../../built-in-demos";
@@ -25,6 +26,7 @@ export function ImportDesignWithUrl() {
       input.DesignInput.fromDesign(_design.node),
       {
         framework: "flutter",
+        language: Language.dart,
       }
     );
 
@@ -32,6 +34,8 @@ export function ImportDesignWithUrl() {
       input.DesignInput.fromDesign(_design.node),
       {
         framework: "react",
+        language: Language.tsx,
+        styling: "styled-components",
       }
     );
 
