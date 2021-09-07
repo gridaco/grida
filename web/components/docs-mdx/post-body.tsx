@@ -1,12 +1,16 @@
+import styled from "@emotion/styled";
 import { MDXProvider } from "@mdx-js/react";
 import hydrate from "next-mdx-remote/hydrate";
-import { useState } from "react";
 import renderToString from "next-mdx-remote/render-to-string";
-import useAsyncEffect from "utils/hooks/use-async-effect";
-import CodeBlock from "components/code";
-import styled from "@emotion/styled";
+import { useState } from "react";
 import { Flex, Text } from "rebass";
+
+import CodeBlock from "components/code";
 import Icon from "components/icon";
+import useAsyncEffect from "utils/hooks/use-async-effect";
+import { media } from "utils/styled/media";
+import { ThemeInterface } from "utils/styled/theme";
+import { css } from "@emotion/core";
 
 const components = {
   pre: props => <div {...props} />,
@@ -33,7 +37,7 @@ export default function PostBody({ content }) {
           <CustomIcon
             name="arrowDown"
             isVerticalMiddle
-            style={{ transform: "rotate(90deg)" }}
+            style={{ transform: "rotate(90deg)", marginRight: "12px" }}
           />
           <Text fontSize="16px" color="#2562FF">
             Prev
@@ -47,7 +51,7 @@ export default function PostBody({ content }) {
           <CustomIcon
             name="arrowDown"
             isVerticalMiddle
-            style={{ transform: "rotate(270deg)" }}
+            style={{ transform: "rotate(270deg)", marginLeft: "12px" }}
           />
         </Flex>
       </Flex>
@@ -57,7 +61,7 @@ export default function PostBody({ content }) {
         mt="60px"
         flexDirection="column"
       >
-        <Text fontSize="18px" fontWeight="bold" color="#686868">
+        <Text fontSize="18px" fontWeight="500" color="#686868">
           Was this page helpful?
         </Text>
         <Flex mt="16px">
@@ -86,6 +90,12 @@ const CustomIcon = styled(Icon)`
   }
 `;
 
+const textBased = css`
+  font-size: 16px;
+  line-height: 139%;
+  color: #686868;
+`;
+
 const Wrap = styled.div`
   width: 100%;
   display: flex;
@@ -94,20 +104,149 @@ const Wrap = styled.div`
   margin-top: calc(1.25rem * calc(1 - var(--space-y-reverse)));
   margin-bottom: calc(1.25rem * var(--space-y-reverse));
   line-height: 1.5;
+
+  img {
+    width: 100%;
+  }
+
+  p {
+    ${textBased}
+  }
+
   a {
+    ${textBased};
     text-decoration: underline;
   }
+
   blockquote {
-    padding-left: 0.5rem;
-    border-left: 2px solid #9ca3af;
+    ${textBased};
+    padding-left: 8px;
+    border-left: 7px solid #ededed;
+    // 2px is border size
+    margin-inline-start: 7px;
+    margin-block-start: 0;
+    color: #5a5a5a;
   }
   code {
     padding: 3px;
     margin: 1px;
     border-radius: 2px;
     background-color: #e5e7eb;
+    // FIXME: why red?
     color: red;
     font-family: FiraCode;
-    font-size: 0.8rem;
+  }
+  ul {
+    padding-left: 0;
+
+    font-size: 16px;
+    ${textBased};
+    ul {
+      padding-left: 20px;
+    }
+  }
+
+  li {
+    list-style-position: inside;
+    text-indent: 5px;
+    ${textBased};
+
+    &::marker {
+      color: #686868;
+      font-size: 23px;
+    }
+  }
+
+  // figma design : ~ breakpoints[3] screen
+  ${props => media((props.theme as ThemeInterface).breakpoints[2], null)} {
+    h1 {
+      font-size: 64px;
+      line-height: 88.19%;
+      /* or 56px */
+
+      letter-spacing: -0.02em;
+    }
+    h2 {
+      font-size: 48px;
+      line-height: 59px;
+    }
+    h3 {
+      font-size: 36px;
+      line-height: 44px;
+    }
+  }
+
+  ${props => media(null, (props.theme as ThemeInterface).breakpoints[2])} {
+    h1 {
+      font-size: 64px;
+      line-height: 64px;
+    }
+    h2 {
+      font-size: 48px;
+      line-height: 56px;
+    }
+    h3 {
+      font-size: 36px;
+      line-height: 44px;
+    }
+  }
+
+  ${props => media(null, (props.theme as ThemeInterface).breakpoints[1])} {
+    h1 {
+      font-size: 64px;
+      line-height: 88.19%;
+      /* or 56px */
+
+      letter-spacing: -0.02em;
+    }
+    h2 {
+      font-size: 48px;
+      line-height: 59px;
+    }
+    h3 {
+      font-size: 36px;
+      line-height: 44px;
+    }
+  }
+  ${props => media(null, (props.theme as ThemeInterface).breakpoints[0])} {
+    h1 {
+      font-size: 64px;
+      line-height: 88.19%;
+
+      letter-spacing: -0.02em;
+    }
+    h2 {
+      font-size: 48px;
+      line-height: 59px;
+    }
+    h3 {
+      font-size: 36px;
+      line-height: 44px;
+    }
+  }
+
+  ${media(null, "320px")} {
+    h1 {
+      font-size: 36px;
+      line-height: 100.69%;
+    }
+    h2 {
+      font-size: 48px;
+      line-height: 59px;
+    }
+    h3 {
+      font-size: 36px;
+      line-height: 44px;
+    }
+    p,
+    ul,
+    li {
+      font-size: 14px;
+      line-height: 139%;
+    }
+    blockquote {
+      font-size: 14px;
+      line-height: 16px;
+    }
   }
 `;

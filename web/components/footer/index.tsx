@@ -67,7 +67,7 @@ const Footer = () => {
           ))}
         </Box>
         <FooterBottom justifyContent="space-between" my="24px">
-          <Text>Copyright © 2021 Grida, Inc.</Text>
+          <Text>Copyright © 2021 Grida.co</Text>
           <Flex className="policys">
             <Link href={URLS.landing.cookies_policy}>
               <span className="cursor">Cookies</span>
