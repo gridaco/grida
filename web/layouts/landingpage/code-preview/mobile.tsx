@@ -1,14 +1,15 @@
+import styled from "@emotion/styled";
 import Image from "next/image";
 import React, { useState } from "react";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
-import { a11yDark } from "react-syntax-highlighter/dist/cjs/styles/prism";
+import { vscDarkPlus as colorscheme } from "react-syntax-highlighter/dist/cjs/styles/prism";
+import { Box } from "rebass";
+
 import {
   FLUTTER_COMPONENT_FULL_SOURCE,
   REACT_JSCSS_COMPONENT_FULL_SOURCE,
   HTML_COMPONENT_FULL_SOURCE,
 } from "./snippets";
-import styled from "@emotion/styled";
-import { Box } from "rebass";
 
 interface DevFrameworkDemoConfig {
   name: string;
@@ -55,7 +56,10 @@ const CodePreviewMobile = () => {
           <span />
         </header>
         <div className="body">
-          <SyntaxHighlighter language={currentPlatform.lang} style={a11yDark}>
+          <SyntaxHighlighter
+            language={currentPlatform.lang}
+            style={colorscheme}
+          >
             {currentPlatform.source}
           </SyntaxHighlighter>
         </div>
