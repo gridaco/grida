@@ -1,24 +1,26 @@
 {
-    "name": "grida.co",
-    "private": true,
-    "author": "grida.co & bridged.xyz authors",
-    "repository": {
-        "url": "https://github.com/gridaco/grida.co"
-    },
-    "workspaces": [
-        "web",
-        "packages/reflect-ui/packages/*"
-    ],
-    "scripts": {
-        "setup": "git submodule update --init --recursive",
-        "vercel:setup": "yarn setup",
-        "vercel:install": "yarn vercel:setup & yarn install",
-        "vercel:build": "yarn workspace web vercel:build",
-        "web": "yarn workspace web dev",
-        "build:web": "yarn workspace web build",
-        "sitemap-gen": "./scripts/sitemap-gen/runner.sh"
-    },
-    "devDependencies": {
-        "typescript": "^4.4.2"
-    }
+  "name": "grida.co",
+  "private": true,
+  "author": "grida.co & bridged.xyz authors",
+  "repository": {
+    "url": "https://github.com/gridaco/grida.co"
+  },
+  "workspaces": [
+    "web",
+    "packages/reflect-ui/packages/*"
+  ],
+  "scripts": {
+    "setup": "git submodule update --init --recursive",
+    "vercel:setup": "yarn setup",
+    "vercel:install": "yarn vercel:setup & yarn install",
+    "vercel:build": "yarn workspace web vercel:build",
+    "web": "yarn workspace web dev",
+    "build:web": "yarn workspace web build",
+    "sitemap-gen": "./scripts/sitemap-gen/runner.sh",
+    "storybook": "yarn workspace web run storybook"
+  },
+  "devDependencies": {
+    "typescript": "^4.4.2"
+  },
+  "dependencies": {}
 }
