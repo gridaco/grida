@@ -133,9 +133,13 @@ const Wrap = styled.div`
     font-family: FiraCode;
   }
   ul {
-    padding: 0;
+    padding-left: 0;
+
     font-size: 16px;
     ${textBased};
+    ul {
+      padding-left: 20px;
+    }
   }
 
   li {
@@ -145,7 +149,7 @@ const Wrap = styled.div`
 
     &::marker {
       color: #686868;
-      content: "\\2022";
+      font-size: 23px;
     }
   }
 

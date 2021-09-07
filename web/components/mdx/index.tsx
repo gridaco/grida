@@ -20,3 +20,5 @@ const Mdx = {
   SectionLayout,
   Title,
 };
+
+export default Mdx;
