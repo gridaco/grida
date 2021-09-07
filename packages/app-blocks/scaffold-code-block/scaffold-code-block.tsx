@@ -120,7 +120,7 @@ export function ScaffoldCodeBlock(props: ScaffoldCodeBlockProps) {
       {/* <pre>
         <code>{source}</code>
       </pre> */}
-      <FormatButton onClick={onformat} />
+      {/* <FormatButton onClick={onformat} /> */}
     </RootWrap>
   );
 }
