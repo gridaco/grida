@@ -10,9 +10,10 @@ import { SectionLayout } from "./layout";
 import { Title } from "./title";
 
 export const _MDX_COMPONENTS = {
-  div: props => <h1 {...props} />,
+  Button,
+  SectionLayout,
+  Title,
 };
-export const H1 = props => <h2 style={{ color: "red" }} {...props} />;
 
 // add Title
 const Mdx = {
