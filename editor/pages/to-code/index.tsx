@@ -30,8 +30,7 @@ export default function DesignToCodeUniversalPage() {
     react_presets.react_default
   ); // fixme
 
-  //@ts-ignore // FIXME: no ignore
-  const { code, componentName } = result; // todo
+  const { code, name: componentName } = result; // todo
 
   return (
     <>

@@ -51,12 +51,14 @@ export function PreviewAndRunPanel(props: { config: SceneRunnerConfig }) {
         );
       case "run":
         return (
-          <AppRunner
-            componentName={sceneConfig.componentName}
-            sceneSize={sceneConfig?.sceneSize}
-            src={loadSource()}
-            platform={sceneConfig?.platform}
-          />
+          <>
+            <AppRunner
+              componentName={sceneConfig.componentName}
+              sceneSize={sceneConfig?.sceneSize}
+              src={loadSource()}
+              platform={sceneConfig?.platform}
+            />
+          </>
         );
     }
   };

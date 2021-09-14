@@ -5,7 +5,7 @@ export function ReactAppRunner(props: {
   source: string;
   width: string | number;
   height: string | number;
-  componentName;
+  componentName: string;
 }) {
   return (
     <>
