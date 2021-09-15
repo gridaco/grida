@@ -78,15 +78,15 @@ export function PreviewAndRunPanel(props: { config: SceneRunnerConfig }) {
   };
 
   return (
-    <>
+    <div style={{ height: "100%" }}>
       <StickyTab>
         <ModeSelectionTab />
       </StickyTab>
       <TargetModePanel />
-    </>
+    </div>
   );
 }
 
 const StickyTab = styled.div`
-  position: absolute;
+  position: relative;
 `;
