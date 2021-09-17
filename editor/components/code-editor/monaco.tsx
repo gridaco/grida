@@ -1,6 +1,8 @@
 import React, { useEffect } from "react";
 import Editor, { useMonaco } from "@monaco-editor/react";
 import * as monaco from "monaco-editor/esm/vs/editor/editor.api";
+import _react_type_def_txt from "./react.d.ts.txt";
+
 interface EditorProps {
   defaultValue?: string;
   defaultLanguage?: string;
@@ -25,7 +27,6 @@ export function MonacoEditor(props: EditorProps) {
         jsx: monaco.languages.typescript.JsxEmit.React,
         reactNamespace: "React",
         allowJs: true,
-        typeRoots: ["node_modules/@types"],
       });
 
       monaco.languages.typescript.typescriptDefaults.setDiagnosticsOptions({
@@ -34,17 +35,8 @@ export function MonacoEditor(props: EditorProps) {
       });
 
       monaco.languages.typescript.typescriptDefaults.addExtraLib(
-        "https://cdn.jsdelivr.net/npm/@types/react@16.9.41/index.d.ts"
+        _react_type_def_txt
       );
-
-      // monaco.languages.typescript.typescriptDefaults.setCompilerOptions({
-      //   jsx: monaco.languages.typescript.JsxEmit.ReactJSX,
-      // });
-
-      // monaco.languages.typescript.typescriptDefaults.setDiagnosticsOptions({
-      //   noSemanticValidation: false,
-      //   noSyntaxValidation: false,
-      // });
     }
   }, [monaco]);
 
@@ -52,12 +44,25 @@ export function MonacoEditor(props: EditorProps) {
     <Editor
       width={props.width}
       height={props.height}
-      defaultLanguage={props.defaultLanguage ?? "typescript"}
+      defaultLanguage={
+        pollyfill_language(props.defaultLanguage) ?? "typescript"
+      }
       defaultValue={props.defaultValue ?? "// no content"}
       theme="vs-dark"
       options={props.options}
     />
   );
 }
+
+const pollyfill_language = (lang: string) => {
+  switch (lang) {
+    case "tsx":
+      return "typescript";
+    case "jsx":
+      return "javascript";
+    default:
+      return lang;
+  }
+};
 
 export { useMonaco } from "@monaco-editor/react";
