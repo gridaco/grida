@@ -8,6 +8,9 @@ const withTM = require("next-transpile-modules")([
   "@designto/flutter",
   "@designto/web",
   "@designto/react",
+
+  "@code-features/assets",
+
   // design-sdk
   "@design-sdk/key-annotations",
   "@design-sdk/core",

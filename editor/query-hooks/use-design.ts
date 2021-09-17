@@ -1,10 +1,20 @@
 import { useRouter } from "next/router";
 import { useEffect, useState } from "react";
 import { DesignProvider, analyzeDesignUrl } from "@design-sdk/url-analysis";
-import { parseFileAndNodeId } from "@design-sdk/figma-url";
+import {
+  FigmaTargetNodeConfig,
+  parseFileAndNodeId,
+} from "@design-sdk/figma-url";
 import { fetch } from "@design-sdk/figma-remote";
 import { personal } from "@design-sdk/figma-auth-store";
-import { TargetNodeConfig } from "../target-node";
+import { configure_auth_credentials } from "@design-sdk/figma-remote";
+import { TargetNodeConfig } from "../query/target-node";
+
+// globally configure auth credentials for interacting with `@design-sdk/figma-remote`
+configure_auth_credentials({
+  personalAccessToken: personal.get_safe(),
+});
+
 /**
  * query param for design input
  */
@@ -15,6 +25,7 @@ export function useDesign() {
   const router = useRouter();
   useEffect(() => {
     const designparam: string = router.query[P_DESIGN] as string;
+    let targetnodeconfig: FigmaTargetNodeConfig;
     if (designparam) {
       const _r = analyze(designparam);
       switch (_r) {
@@ -25,7 +36,7 @@ export function useDesign() {
           break;
         case "figma":
           // load design from local storage or remote figma
-          const targetnodeconfig = parseFileAndNodeId(designparam);
+          targetnodeconfig = parseFileAndNodeId(designparam);
           fetch
             .fetchTargetAsReflect(
               targetnodeconfig.file,
@@ -43,7 +54,6 @@ export function useDesign() {
 
           break;
         default:
-          // other platforms are not supported yet
           break;
       }
     }

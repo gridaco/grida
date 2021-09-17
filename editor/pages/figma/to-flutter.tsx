@@ -1,9 +1,6 @@
 import React, { useEffect, useState } from "react";
-import { flutter } from "@designto/code";
-import { composeAppWithHome } from "@bridged.xyz/flutter-builder";
+import { designTo } from "@designto/code";
 import { utils_dart } from "../../utils";
-import { MainImageRepository } from "@design-sdk/core/assets-repository";
-import { ImageRepositories } from "@design-sdk/figma/asset-repository";
 import { DefaultEditorWorkspaceLayout } from "../../layout/default-editor-workspace-layout";
 import { LayerHierarchy } from "../../components/editor-hierarchy";
 import {
@@ -12,25 +9,55 @@ import {
 } from "../../layout/panel";
 import { PreviewAndRunPanel } from "../../components/preview-and-run";
 import styled from "@emotion/styled";
-import { useDesign } from "../../query/to-code";
+import { useDesign } from "../../query-hooks";
 import { MonacoEditor } from "../../components/code-editor";
-// set image repo for figma platform
-MainImageRepository.instance = new ImageRepositories();
+import { RemoteImageRepositories } from "@design-sdk/figma-remote/lib/asset-repository/image-repository";
+import {
+  ImageRepository,
+  MainImageRepository,
+} from "@design-sdk/core/assets-repository";
+import { output } from "@designto/config";
 
 export default function FigmaToFlutterPage() {
   const design = useDesign();
+  const [result, setResult] = useState<output.ICodeOutput>();
 
-  const flutterAppBuild = design && flutter.buildApp(design.reflect);
-  const widget = flutterAppBuild?.widget;
-  const app =
-    widget &&
-    flutter.makeApp({
-      widget: widget,
-      scrollable: flutterAppBuild.scrollable,
-    });
+  useEffect(() => {
+    if (design) {
+      const { reflect, url, node, file } = design;
+      const { id, name } = reflect;
 
-  const widgetCode = utils_dart.format(widget?.build()?.finalize());
-  const rootAppCode = app && utils_dart.format(composeAppWithHome(app));
+      // ------------------------------------------------------------
+      // other platforms are not supported yet
+      // set image repo for figma platform
+      MainImageRepository.instance = new RemoteImageRepositories(design.file);
+      MainImageRepository.instance.register(
+        new ImageRepository(
+          "fill-later-assets",
+          "grida://assets-reservation/images/"
+        )
+      );
+      // ------------------------------------------------------------
+
+      designTo
+        .flutter({
+          input: {
+            id: id,
+            name: name,
+            design: reflect,
+          },
+          asset_repository: MainImageRepository.instance,
+        })
+        .then(setResult);
+    }
+  }, [design]);
+
+  if (!result) {
+    return <>Loading..</>;
+  }
+
+  const widgetCode = utils_dart.format(result.code.raw);
+  const rootAppCode = utils_dart.format(result.scaffold.raw);
 
   return (
     <>

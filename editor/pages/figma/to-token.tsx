@@ -10,7 +10,7 @@ import { LayerHierarchy } from "../../components/editor-hierarchy";
 import { WorkspaceContentPanelGridLayout } from "../../layout/panel/workspace-content-panel-grid-layout";
 import { WorkspaceContentPanel } from "../../layout/panel";
 import { WorkspaceBottomPanelDockLayout } from "../../layout/panel/workspace-bottom-panel-dock-layout";
-import { useDesign } from "../../query/to-code";
+import { useDesign } from "../../query-hooks";
 
 export default function FigmaToReflectWidgetTokenPage() {
   const design = useDesign();

@@ -20,9 +20,6 @@ import * as core from "@reflect-ui/core";
 import { react as reactconfig } from "@designto/config";
 import { useReflectTargetNode } from "../../query/from-figma";
 
-// set image repo for figma platform
-MainImageRepository.instance = new ImageRepositories();
-
 export default function FigmaToReactDemoPage() {
   const [targetSelectionNodeId, setTargetSelectionNodeId] = useState<string>();
 
