@@ -1,5 +1,5 @@
-import { Widget as WebWidget } from "../../../../packages/builder-web-core";
-import { ReflectSceneNode } from "@design-sdk/core/nodes";
+import { Widget as WebWidget } from "@web-builder/core";
+import { ReflectSceneNode } from "@design-sdk/core";
 import { Figma } from "@design-sdk/figma";
 import { Widget as ReflectWidget } from "@reflect-ui/core";
 import React from "react";

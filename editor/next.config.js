@@ -14,6 +14,7 @@ const withTM = require("next-transpile-modules")([
   "@design-sdk/core-types",
   "@design-sdk/universal",
   "@design-sdk/figma",
+  "@design-sdk/figma-node",
   "@design-sdk/figma-types",
   "@design-sdk/figma-url",
   "@design-sdk/figma-node-conversion",
