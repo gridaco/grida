@@ -1,4 +1,4 @@
-import { Widget as WebWidget } from "@coli.codes/web-builder-core";
+import { Widget as WebWidget } from "../../../../packages/builder-web-core";
 import { ReflectSceneNode } from "@design-sdk/core/nodes";
 import { Figma } from "@design-sdk/figma";
 import { Widget as ReflectWidget } from "@reflect-ui/core";

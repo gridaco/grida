@@ -37,15 +37,21 @@ const withTM = require("next-transpile-modules")([
   // region coli
   "coli",
   "@coli.codes/escape-string",
-  "@coli.codes/web-builder",
   "@coli.codes/core-syntax-kind",
-  "@coli.codes/web-builder-core",
+  // endregion coli
+
+  // region flutter builder
+  "@bridged.xyz/flutter-builder",
+  // endregion flutter builder
+
+  // region web builders
   "@coli.codes/nodejs-builder",
-  "@coli.codes/react-builder",
+  "@web-builder/core",
+  "@web-builder/react",
+  "@web-builder/reflect-ui",
   "@web-builder/styled",
   "@web-builder/styles",
-  "@bridged.xyz/flutter-builder",
-  // endregion coli
+  // endregion web builders
 ]);
 
 const withCSS = require("@zeit/next-css");

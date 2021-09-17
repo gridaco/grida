@@ -27,8 +27,8 @@ export default function DesignToCodeUniversalPage() {
       name: name,
       design: reflect,
     },
-    flutter_presets.flutter_default
-    // react_presets.react_default
+    // flutter_presets.flutter_default
+    react_presets.react_default
   ); // fixme
 
   const { code, name: componentName } = result; // todo
