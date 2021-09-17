@@ -1,4 +1,3 @@
-import dynamic from "next/dynamic";
 import React, { useEffect, useState } from "react";
 import { flutter } from "@designto/code";
 import { composeAppWithHome } from "@bridged.xyz/flutter-builder";
@@ -13,26 +12,15 @@ import {
 } from "../../layout/panel";
 import { PreviewAndRunPanel } from "../../components/preview-and-run";
 import styled from "@emotion/styled";
-import { useReflectTargetNode } from "../../query/from-figma";
-
+import { useDesign } from "../../query/to-code";
+import { MonacoEditor } from "../../components/code-editor";
 // set image repo for figma platform
 MainImageRepository.instance = new ImageRepositories();
 
-const CodemirrorEditor = dynamic(
-  import("../../components/code-editor/code-mirror"),
-  {
-    ssr: false,
-  }
-);
+export default function FigmaToFlutterPage() {
+  const design = useDesign();
 
-export default function FigmaDeveloperPage() {
-  //
-  const targetNodeConfig = useReflectTargetNode();
-  const figmaNode = targetNodeConfig?.figma;
-  const reflect = targetNodeConfig?.reflect;
-  //
-
-  const flutterAppBuild = reflect && flutter.buildApp(reflect);
+  const flutterAppBuild = design && flutter.buildApp(design.reflect);
   const widget = flutterAppBuild?.widget;
   const app =
     widget &&
@@ -46,7 +34,9 @@ export default function FigmaDeveloperPage() {
 
   return (
     <>
-      <DefaultEditorWorkspaceLayout leftbar={<LayerHierarchy data={reflect} />}>
+      <DefaultEditorWorkspaceLayout
+        leftbar={<LayerHierarchy data={design?.reflect} />}
+      >
         <WorkspaceContentPanelGridLayout>
           <WorkspaceContentPanel>
             <PreviewAndRunPanel
@@ -55,24 +45,24 @@ export default function FigmaDeveloperPage() {
                 componentName: "DemoComponent",
                 platform: "flutter",
                 sceneSize: {
-                  w: reflect?.width,
-                  h: reflect?.height,
+                  w: design?.reflect?.width,
+                  h: design?.reflect?.height,
                 },
-                fileid: targetNodeConfig?.file,
-                sceneid: targetNodeConfig?.node,
+                fileid: design?.file,
+                sceneid: design?.node,
               }}
             />
           </WorkspaceContentPanel>
           <WorkspaceContentPanel>
             <InspectionPanelContentWrap>
-              <CodemirrorEditor
+              <MonacoEditor
                 key={widgetCode}
+                height="100vh"
                 options={{
-                  lineNumbers: true,
-                  mode: "dart",
-                  theme: "monokai",
+                  automaticLayout: true,
                 }}
-                value={
+                defaultLanguage="dart"
+                defaultValue={
                   widgetCode
                     ? widgetCode
                     : "// No input design provided to be converted.."
