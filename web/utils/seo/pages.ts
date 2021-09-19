@@ -2,14 +2,14 @@ import { PageSeoMeta } from "./interface";
 
 const PRICING_META: PageSeoMeta = {
   route: "/pricing",
-  title: "Pricing | Bridged",
-  description: "Bridged is free to use",
-  keywords: "Bridged pricing",
+  title: "Pricing | Grida",
+  description: "Grida is free to use",
+  keywords: "Grida pricing",
 };
 
 const GLOBALIZATION_META: PageSeoMeta = {
   route: "/globalizatin",
-  title: "Bridged | Globalization",
+  title: "Globalization | Grida",
   description: "Globalize your design",
   keywords: [
     "figma translation",
