@@ -11,6 +11,11 @@ import { WorkspaceContentPanelGridLayout } from "../../layout/panel/workspace-co
 import { WorkspaceContentPanel } from "../../layout/panel";
 import { WorkspaceBottomPanelDockLayout } from "../../layout/panel/workspace-bottom-panel-dock-layout";
 import { useDesign } from "../../query-hooks";
+import {
+  ImageRepository,
+  MainImageRepository,
+} from "@design-sdk/core/assets-repository";
+import { RemoteImageRepositories } from "@design-sdk/figma-remote/lib/asset-repository/image-repository";
 
 export default function FigmaToReflectWidgetTokenPage() {
   const design = useDesign();
@@ -19,10 +24,29 @@ export default function FigmaToReflectWidgetTokenPage() {
     return <>Loading..</>;
   }
 
+  //
+  //
+  MainImageRepository.instance = new RemoteImageRepositories(design.file);
+  MainImageRepository.instance.register(
+    new ImageRepository(
+      "fill-later-assets",
+      "grida://assets-reservation/images/"
+    )
+  );
+  //
+  //
+
   let tokenTree;
   if (design.reflect) {
     tokenTree = tokenize(design.reflect);
   }
+
+  console.clear();
+  console.info("=".repeat(24), "tokenize result", "=".repeat(24));
+  console.info();
+  console.info("tokenize result >> design.figma", design.figma);
+  console.info("tokenize result >> design.reflect", design.reflect);
+  console.info("tokenize result >> tokenTree", tokenTree);
 
   return (
     <>
