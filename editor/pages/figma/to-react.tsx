@@ -15,7 +15,7 @@ import { MonacoEditor } from "../../components/code-editor";
 import { tokenize } from "@designto/token";
 import * as react from "@designto/react";
 import { mapGrandchildren } from "@design-sdk/core/utils";
-import { ReactWidget } from "../../../packages/builder-react";
+import { ReactWidget } from "@web-builder/react";
 import * as core from "@reflect-ui/core";
 import { react as reactconfig } from "@designto/config";
 import { useReflectTargetNode } from "../../query/from-figma";

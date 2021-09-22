@@ -140,18 +140,18 @@ async function post_create_sandbox(
   parameters: string,
   mode: "large" | "moderate" = "moderate"
 ) {
-  if (parameters.length > 2083 /*max url len*/) {
-    mode = "large";
-  }
-
   switch (mode) {
     case "moderate": {
-      return (
-        await axios.post<{ sandbox_id }>(
-          // api docs https://codesandbox.io/docs/api
-          `https://codesandbox.io/api/v1/sandboxes/define?json=1&parameters=${parameters}`
-        )
-      ).data;
+      try {
+        return (
+          await axios.post<{ sandbox_id }>(
+            // api docs https://codesandbox.io/docs/api
+            `https://codesandbox.io/api/v1/sandboxes/define?json=1&parameters=${parameters}`
+          )
+        ).data;
+      } catch (_) {
+        return "large";
+      }
     }
     case "large": {
       await Promise.resolve();
