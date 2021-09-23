@@ -54,12 +54,15 @@ export function WidgetTree(props: {
   hideRoot?: boolean;
 }) {
   const getname = (data: WidgetDataLike | any): string => {
+    if (data.name) {
+      return data.name.substring(0, 20);
+    }
     if (data instanceof WebWidget) {
       return data.key.name;
     } else if (data instanceof ReflectWidget) {
       return data.key.originName;
     } else {
-      return data.constructor?.name ?? undefined;
+      return data.constructor?.name ?? "";
     }
   };
 
