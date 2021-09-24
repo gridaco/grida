@@ -1,7 +1,5 @@
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import styled from "@emotion/styled";
-import { MainImageRepository } from "@design-sdk/core/assets-repository";
-import { ImageRepositories } from "@design-sdk/figma/asset-repository";
 import { DefaultEditorWorkspaceLayout } from "../../layout/default-editor-workspace-layout";
 import { LayerHierarchy } from "../../components/editor-hierarchy";
 import { PreviewAndRunPanel } from "../../components/preview-and-run";
@@ -15,7 +13,7 @@ import { MonacoEditor } from "../../components/code-editor";
 import { tokenize } from "@designto/token";
 import * as react from "@designto/react";
 import { mapGrandchildren } from "@design-sdk/core/utils";
-import { ReactWidget } from "@web-builder/react";
+import { WidgetTree as WebWidgetTree } from "@web-builder/core";
 import * as core from "@reflect-ui/core";
 import { react as reactconfig } from "@designto/config";
 import { useReflectTargetNode } from "../../query/from-figma";
@@ -40,7 +38,7 @@ export default function FigmaToReactDemoPage() {
 
   let reactComponent: reactconfig.ReactComponentOutput;
   let reflectWidget: core.Widget;
-  let widgetTree: ReactWidget;
+  let widgetTree: WebWidgetTree;
   if (reflect) {
     reflectWidget = tokenize(reflect);
     widgetTree = react.buildReactWidget(reflectWidget);
