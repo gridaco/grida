@@ -67,7 +67,7 @@ export default function FigmaToReactDemoPage() {
               key={targetNodeConfig?.url ?? reflect?.id}
               config={{
                 src: reactComponent?.code.raw,
-                platform: "web",
+                platform: "react",
                 componentName: reactComponent?.name,
                 sceneSize: {
                   w: reflect?.width,

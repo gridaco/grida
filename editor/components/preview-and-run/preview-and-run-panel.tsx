@@ -14,7 +14,7 @@ interface SceneRunnerConfig {
     h: number;
   };
   src: string | (() => string);
-  platform: "web" | "flutter";
+  platform: "react" | "flutter" | "vanilla" | "vue" | "svelte";
   componentName: string;
 }
 

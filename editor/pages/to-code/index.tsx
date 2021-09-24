@@ -10,7 +10,11 @@ import {
 } from "../../layout/panel";
 import { WorkspaceBottomPanelDockLayout } from "../../layout/panel/workspace-bottom-panel-dock-layout";
 import { MonacoEditor } from "../../components/code-editor";
-import { react_presets, flutter_presets } from "@grida/builder-config-preset";
+import {
+  react_presets,
+  flutter_presets,
+  vanilla_presets,
+} from "@grida/builder-config-preset";
 import { useRouter } from "next/router";
 import { ParsedUrlQuery } from "querystring";
 import { FrameworkConfig, output } from "@designto/config";
@@ -145,6 +149,10 @@ function get_framework_config_from_query(query: ParsedUrlQuery) {
     case "flutter-default":
     case "flutter.default":
       return flutter_presets.flutter_default;
+    case "vanilla":
+    case "vanilla-default":
+    case "vanilla.default":
+      return vanilla_presets.vanilla_default;
     default:
       return react_presets.react_default;
   }
@@ -153,11 +161,15 @@ function get_framework_config_from_query(query: ParsedUrlQuery) {
 function get_runner_platform(config: FrameworkConfig) {
   switch (config.framework) {
     case "react":
-      return "web";
+      return "react";
     case "flutter":
       return "flutter";
+    case "flutter":
+      return "flutter";
+    case "vanilla":
+      return "vanilla";
     default:
-      return "web";
+      return "vanilla";
   }
 }
 

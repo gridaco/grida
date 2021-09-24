@@ -1,11 +1,12 @@
 import React from "react";
-import { CodeSandBoxView } from "./code-sandbox-runner";
 import { FlutterAppRunner } from "./flutter-app-runner";
 import { features, types, hosting } from "@base-sdk/base";
 import { nanoid } from "nanoid";
+import { ReactAppRunner } from "./react-app-runner";
+import { VanillaRunner } from "./vanilla-app-runner";
 
 export function AppRunner(props: {
-  platform: "flutter" | "web";
+  platform: "flutter" | "react" | "vanilla" | "vue" | "svelte";
   sceneSize: {
     w: number | string;
     h: number | string;
@@ -50,12 +51,21 @@ export function AppRunner(props: {
           </button>
         </div>
       );
-    case "web":
+    case "react":
       return (
-        <CodeSandBoxView
+        <ReactAppRunner
           width="100%"
           height="100%"
-          src={src}
+          source={src}
+          componentName={componentName}
+        />
+      );
+    case "vanilla":
+      return (
+        <VanillaRunner
+          width="100%"
+          height="100%"
+          source={src}
           componentName={componentName}
         />
       );

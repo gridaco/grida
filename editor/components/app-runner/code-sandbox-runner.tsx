@@ -1,8 +1,37 @@
 import React, { useEffect, useState } from "react";
 import styled from "@emotion/styled";
 import { getParameters } from "codesandbox/lib/api/define";
+import { IFiles } from "codesandbox-import-utils/lib/api/define";
 import axios from "axios";
 import { useAsyncEffect } from "../../hooks";
+
+type CSB_Template =
+  | "adonis"
+  | "vue-cli"
+  | "preact-cli"
+  | "svelte"
+  | "create-react-app-typescript"
+  | "create-react-app"
+  | "angular-cli"
+  | "parcel"
+  | "@dojo/cli-create-app"
+  | "cxjs"
+  | "gatsby"
+  | "nuxt"
+  | "next"
+  | "reason"
+  | "apollo"
+  | "sapper"
+  | "ember"
+  | "nest"
+  | "static"
+  | "styleguidist"
+  | "gridsome"
+  | "vuepress"
+  | "mdx-deck"
+  | "quasar"
+  | "docusaurus"
+  | "node";
 
 /**
  * Codesandbox view on iframe for development result view purpose
@@ -10,90 +39,13 @@ import { useAsyncEffect } from "../../hooks";
  * @returns
  */
 export function CodeSandBoxView(props: {
-  src: string;
-  componentName: string;
+  sandbox: { files: IFiles; template: CSB_Template };
   width: number | string;
   height: number | string;
 }) {
+  const sandbox_params = props.sandbox;
   const [iframeUrl, setIframeUrl] = useState("");
-  const parameters = getParameters({
-    files: {
-      "App.tsx": {
-        content: props.src,
-        isBinary: false,
-      },
-      "index.tsx": {
-        content: `
-import React from "react";
-import { render } from "react-dom";
-
-import ${props.componentName} from "./App";
-
-const rootElement = document.getElementById("root");
-render(<${props.componentName} />, rootElement);
-`,
-        isBinary: false,
-      },
-      "tsconfig.json": {
-        content: `
-{
-    "include": [
-        "./src/**/*"
-    ],
-    "compilerOptions": {
-        "strict": true,
-        "esModuleInterop": true,
-        "lib": [
-            "dom",
-            "es2015"
-        ],
-        "jsx": "react-jsx"
-    }
-}`,
-        isBinary: false,
-      },
-      "package.json": {
-        content: `
-{
-  "name": "react-typescript",
-  "version": "1.0.0",
-  "description": "React and TypeScript example starter project",
-  "keywords": [
-    "typescript",
-    "react",
-    "starter"
-  ],
-  "main": "src/index.tsx",
-  "dependencies": {
-    "react": "17.0.2",
-    "react-dom": "17.0.2",
-    "react-scripts": "4.0.0",
-    "@emotion/react": "^11.1.5",
-    "@emotion/styled": "^11.1.5"
-  },
-  "devDependencies": {
-    "@types/react": "17.0.0",
-    "@types/react-dom": "17.0.0",
-    "typescript": "4.1.3"
-  },
-  "scripts": {
-    "start": "react-scripts start",
-    "build": "react-scripts build",
-    "test": "react-scripts test --env=jsdom",
-    "eject": "react-scripts eject"
-  },
-  "browserslist": [
-    ">0.2%",
-    "not dead",
-    "not ie <= 11",
-    "not op_mini all"
-  ]
-}`,
-        isBinary: false,
-      },
-    },
-    template: "create-react-app-typescript",
-  });
+  const parameters = getParameters(sandbox_params);
 
   useAsyncEffect(async () => {
     const data = await post_create_sandbox(parameters);
