@@ -41,12 +41,11 @@ export default function FigmaToReflectWidgetTokenPage() {
     tokenTree = tokenize(design.reflect);
   }
 
-  console.clear();
   console.info("=".repeat(24), "tokenize result", "=".repeat(24));
-  console.info();
   console.info("tokenize result >> design.figma", design.figma);
   console.info("tokenize result >> design.reflect", design.reflect);
   console.info("tokenize result >> tokenTree", tokenTree);
+  console.info("=".repeat(64));
 
   return (
     <>
