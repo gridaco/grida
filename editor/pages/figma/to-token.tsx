@@ -16,12 +16,13 @@ import {
   MainImageRepository,
 } from "@design-sdk/core/assets-repository";
 import { RemoteImageRepositories } from "@design-sdk/figma-remote/lib/asset-repository/image-repository";
+import LoadingLayout from "../../layout/loading-overlay";
 
 export default function FigmaToReflectWidgetTokenPage() {
   const design = useDesign();
 
   if (!design) {
-    return <>Loading..</>;
+    return <LoadingLayout />;
   }
 
   //

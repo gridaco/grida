@@ -17,6 +17,7 @@ import {
   MainImageRepository,
 } from "@design-sdk/core/assets-repository";
 import { output } from "@designto/config";
+import LoadingLayout from "../../layout/loading-overlay";
 
 export default function FigmaToFlutterPage() {
   const design = useDesign();
@@ -53,7 +54,7 @@ export default function FigmaToFlutterPage() {
   }, [design]);
 
   if (!result) {
-    return <>Loading..</>;
+    return <LoadingLayout />;
   }
 
   const widgetCode = utils_dart.format(result.code.raw);

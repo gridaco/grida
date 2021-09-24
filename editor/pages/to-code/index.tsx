@@ -23,6 +23,7 @@ import {
   ImageRepository,
   MainImageRepository,
 } from "@design-sdk/core/assets-repository";
+import LoadingLayout from "../../layout/loading-overlay";
 
 export default function DesignToCodeUniversalPage() {
   const router = useRouter();
@@ -61,7 +62,7 @@ export default function DesignToCodeUniversalPage() {
   }, [design]);
 
   if (!result) {
-    return <>Loading..</>;
+    return <LoadingLayout />;
   }
 
   const { code, name: componentName } = result;
