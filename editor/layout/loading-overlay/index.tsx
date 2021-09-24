@@ -1,51 +1,72 @@
 import React from "react";
 import styled from "@emotion/styled";
 
+/**
+ * [design](https://www.figma.com/file/HSozKEVWhh8saZa2vr1Nxd/design-to-code?node-id=554%3A6162)
+ * @returns
+ */
 function LoadingLayout() {
   return (
     <RootWrapperLoadingLayout>
-      <Container>
-        <Loading>Loading</Loading>
-        <WeAreNowLoadingDesignRemotely>
-          We are now loading design remotely..
-        </WeAreNowLoadingDesignRemotely>
-      </Container>
+      <Frame61>
+        <Frame5>
+          <Loading>Loading</Loading>
+          <WeAreNowLoadingDesignRemotely>
+            We are now loading design remotely..
+          </WeAreNowLoadingDesignRemotely>
+        </Frame5>
+      </Frame61>
     </RootWrapperLoadingLayout>
   );
 }
 
 const RootWrapperLoadingLayout = styled.div`
-  min-height: 900px;
+  display: flex;
+  justify-content: flex-start;
+  flex-direction: row;
+  align-items: start;
+  gap: 10px;
+  min-height: 100vh;
   background-color: rgba(255, 255, 255, 1);
-  position: relative;
 `;
 
-const Container = styled.div`
+const Frame61 = styled.div`
   display: flex;
   justify-content: center;
   flex-direction: column;
   align-items: start;
-  gap: 24px;
-  padding-bottom: 200px;
-  padding-top: 200px;
-  padding-left: 48px;
+  flex: 1;
+  gap: 10px;
+  align-self: stretch;
+  padding-bottom: 100px;
+  padding-top: 100px;
+  padding-left: 40px;
+  padding-right: 10px;
+`;
+
+const Frame5 = styled.div`
+  display: flex;
+  justify-content: flex-start;
+  flex-direction: column;
+  align-items: start;
+  gap: 9px;
 `;
 
 const Loading = styled.span`
   color: rgba(82, 82, 82, 1);
   text-overflow: ellipsis;
-  font-size: 36px;
+  font-size: 24px;
   font-family: Helvetica Neue;
   font-weight: 500;
   text-align: left;
 `;
 
 const WeAreNowLoadingDesignRemotely = styled.span`
-  color: rgba(154, 154, 154, 1);
+  color: rgba(190, 190, 190, 1);
   text-overflow: ellipsis;
-  font-size: 18px;
+  font-size: 12px;
   font-family: Helvetica Neue;
-  font-weight: 500;
+  font-weight: 400;
   text-align: left;
 `;
 
