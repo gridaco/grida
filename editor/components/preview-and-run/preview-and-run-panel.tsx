@@ -1,6 +1,5 @@
 import styled from "@emotion/styled";
-import { Tab } from "@material-ui/core";
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import { AppRunner } from "../app-runner";
 import { ScenePreview } from "../scene-preview";
 
@@ -16,10 +15,13 @@ interface SceneRunnerConfig {
   src: string | (() => string);
   platform: "react" | "flutter" | "vanilla" | "vue" | "svelte";
   componentName: string;
+  initialMode?: Mode;
 }
 
 export function PreviewAndRunPanel(props: { config: SceneRunnerConfig }) {
-  const [mode, setmode] = useState<Mode>("preview");
+  const [mode, setmode] = useState<Mode>(
+    props.config?.initialMode || "preview"
+  );
   const sceneConfig = props.config;
 
   const loadSource = () => {

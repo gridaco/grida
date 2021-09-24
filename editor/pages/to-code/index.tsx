@@ -90,6 +90,7 @@ export default function DesignToCodeUniversalPage() {
                   w: design.reflect?.width,
                   h: design.reflect?.height,
                 },
+                initialMode: "run",
                 fileid: design.file,
                 sceneid: design.node,
               }}

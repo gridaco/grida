@@ -43,8 +43,8 @@ export function AppRunner(props: {
           });
         }}
         initialSize={{
-          width: sceneSize.w,
-          height: sceneSize.h,
+          width: viewportsize.width,
+          height: viewportsize.height,
         }}
       >
         <div
