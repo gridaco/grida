@@ -7,6 +7,7 @@ const withTM = require("next-transpile-modules")([
   "@designto/token",
   "@designto/flutter",
   "@designto/web",
+  "@designto/vanilla",
   "@designto/react",
 
   "@code-features/assets",
@@ -53,6 +54,7 @@ const withTM = require("next-transpile-modules")([
   // region web builders
   "@coli.codes/nodejs-builder",
   "@web-builder/core",
+  "@web-builder/vanilla",
   "@web-builder/react",
   "@web-builder/reflect-ui",
   "@web-builder/styled",
