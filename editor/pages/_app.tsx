@@ -45,6 +45,17 @@ function HeadInjection() {
         rel="stylesheet"
         type="text/css"
       />
+      {/* safari 15 color */}
+      <meta
+        name="theme-color"
+        content="white"
+        media="(prefers-color-scheme: light)"
+      />
+      <meta
+        name="theme-color"
+        content="#1e1e1e"
+        media="(prefers-color-scheme: dark)"
+      />
     </Head>
   );
 }
