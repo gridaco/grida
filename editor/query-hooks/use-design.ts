@@ -50,6 +50,10 @@ export function useDesign() {
                 ...res,
                 ...targetnodeconfig,
               });
+            })
+            .catch((err) => {
+              // unauthorized
+              router.push("/preferences/access-tokens");
             });
 
           break;
