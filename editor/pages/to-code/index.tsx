@@ -54,7 +54,7 @@ export default function DesignToCodeUniversalPage() {
           design: reflect,
         },
         framework: framework_config,
-        asset_repository: MainImageRepository.instance,
+        asset_config: { asset_repository: MainImageRepository.instance },
       }).then((result) => {
         setResult(result);
       });

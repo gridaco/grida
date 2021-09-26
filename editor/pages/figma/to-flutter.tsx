@@ -47,7 +47,7 @@ export default function FigmaToFlutterPage() {
             name: name,
             design: reflect,
           },
-          asset_repository: MainImageRepository.instance,
+          asset_config: { asset_repository: MainImageRepository.instance },
         })
         .then(setResult);
     }
