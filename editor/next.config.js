@@ -1,4 +1,6 @@
 const withTM = require("next-transpile-modules")([
+  // -----------------------------
+  // region @designto-code
   "@designto/config",
   "@grida/builder-config-preset",
   "@grida/builder-platform-types",
@@ -11,8 +13,10 @@ const withTM = require("next-transpile-modules")([
   "@designto/react",
 
   "@code-features/assets",
+  // -----------------------------
 
-  // design-sdk
+  // -----------------------------
+  // region @design-sdk
   "@design-sdk/key-annotations",
   "@design-sdk/core",
   "@design-sdk/core-types",
@@ -27,26 +31,36 @@ const withTM = require("next-transpile-modules")([
   // "@design-sdk/figma-remote-types",
   "@design-sdk/url-analysis",
   "@design-sdk/sketch",
-  // reflect-ui
+  // -----------------------------
+
+  // -----------------------------
+  // region @reflect-ui types & utils
   "@reflect-ui/core",
   "@reflect-ui/detection",
+  // -----------------------------
 
+  // -----------------------------
   // base sdk
   "@base-sdk/core",
   "@base-sdk/base",
   "@base-sdk/url",
   "@base-sdk/hosting",
   "@base-sdk/resources",
+  // -----------------------------
 
-  // reflect-ui
+  // reflect-ui ui framework
   "@reflect-ui/editor-ui",
 
+  // -----------------------------
   // region coli
   "coli",
   "@coli.codes/escape-string",
   "@coli.codes/core-syntax-kind",
   // endregion coli
+  // -----------------------------
 
+  // -----------------------------
+  // region builders - part of designto-code / coli
   // region flutter builder
   "@bridged.xyz/flutter-builder",
   // endregion flutter builder
@@ -60,6 +74,7 @@ const withTM = require("next-transpile-modules")([
   "@web-builder/styled",
   "@web-builder/styles",
   // endregion web builders
+  // -----------------------------
 ]);
 
 const withCSS = require("@zeit/next-css");
