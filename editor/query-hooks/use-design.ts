@@ -52,7 +52,7 @@ export function useDesign() {
               });
             })
             .catch((err) => {
-              if (err.status == 401) {
+              if (err.status == 401 || err.status == 403) {
                 // unauthorized
                 router.push("/preferences/access-tokens");
                 console.info(`(ignored) error while fetching design`, err);
