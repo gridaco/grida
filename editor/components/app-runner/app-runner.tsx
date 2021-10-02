@@ -77,15 +77,12 @@ function DedicatedFrameworkRunner({
   switch (platform) {
     case "flutter":
       return (
-        <div>
-          <FlutterAppRunner
-            width="100%"
-            height="100%"
-            q={{
-              language: "dart",
-              src: src,
-            }}
-          />
+        <div
+          style={{
+            width: "100%",
+            height: "100%",
+          }}
+        >
           <button
             onClick={() => {
               const _name = "fluttercodefromdesigntocode";
@@ -108,6 +105,14 @@ function DedicatedFrameworkRunner({
           >
             open in console
           </button>
+          <FlutterAppRunner
+            width="100%"
+            height="100%"
+            q={{
+              language: "dart",
+              src: src,
+            }}
+          />
         </div>
       );
     case "react":
