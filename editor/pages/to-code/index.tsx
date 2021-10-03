@@ -65,7 +65,7 @@ export default function DesignToCodeUniversalPage() {
     return <LoadingLayout />;
   }
 
-  const { code, name: componentName } = result;
+  const { code, scaffold, name: componentName } = result;
 
   const runner_platform = get_runner_platform(framework_config);
   return (
@@ -84,7 +84,7 @@ export default function DesignToCodeUniversalPage() {
             <PreviewAndRunPanel
               key={design.url ?? design.reflect?.id}
               config={{
-                src: code.raw,
+                src: scaffold.raw,
                 platform: runner_platform,
                 componentName: componentName,
                 sceneSize: {

@@ -1,5 +1,13 @@
 import React, { useEffect, useState } from "react";
 import { designTo } from "@designto/code";
+import styled from "@emotion/styled";
+import { RemoteImageRepositories } from "@design-sdk/figma-remote/lib/asset-repository/image-repository";
+import {
+  ImageRepository,
+  MainImageRepository,
+} from "@design-sdk/core/assets-repository";
+import { output } from "@designto/config";
+import { tokenize } from "@designto/token";
 import { utils_dart } from "../../utils";
 import { DefaultEditorWorkspaceLayout } from "../../layout/default-editor-workspace-layout";
 import { LayerHierarchy } from "../../components/editor-hierarchy";
@@ -8,15 +16,8 @@ import {
   WorkspaceContentPanelGridLayout,
 } from "../../layout/panel";
 import { PreviewAndRunPanel } from "../../components/preview-and-run";
-import styled from "@emotion/styled";
 import { useDesign } from "../../query-hooks";
 import { MonacoEditor } from "../../components/code-editor";
-import { RemoteImageRepositories } from "@design-sdk/figma-remote/lib/asset-repository/image-repository";
-import {
-  ImageRepository,
-  MainImageRepository,
-} from "@design-sdk/core/assets-repository";
-import { output } from "@designto/config";
 import LoadingLayout from "../../layout/loading-overlay";
 
 export default function FigmaToFlutterPage() {
@@ -26,7 +27,6 @@ export default function FigmaToFlutterPage() {
   useEffect(() => {
     if (design) {
       const { reflect, url, node, file } = design;
-      const { id, name } = reflect;
 
       // ------------------------------------------------------------
       // other platforms are not supported yet
@@ -39,13 +39,10 @@ export default function FigmaToFlutterPage() {
         )
       );
       // ------------------------------------------------------------
-
       designTo
         .flutter({
           input: {
-            id: id,
-            name: name,
-            design: reflect,
+            widget: tokenize(reflect),
           },
           asset_config: { asset_repository: MainImageRepository.instance },
         })
