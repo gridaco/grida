@@ -56,6 +56,7 @@ export default function FigmaToFlutterPage() {
 
   const widgetCode = utils_dart.format(result.code.raw);
   const rootAppCode = utils_dart.format(result.scaffold.raw);
+  console.log("flutter result", result);
 
   return (
     <>

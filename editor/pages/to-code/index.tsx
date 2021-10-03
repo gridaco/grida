@@ -66,6 +66,7 @@ export default function DesignToCodeUniversalPage() {
   }
 
   const { code, scaffold, name: componentName } = result;
+  console.log("design to code result::", result);
 
   const runner_platform = get_runner_platform(framework_config);
   return (
