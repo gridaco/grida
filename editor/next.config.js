@@ -17,7 +17,7 @@ const withTM = require("next-transpile-modules")([
 
   // -----------------------------
   // region @design-sdk
-  "@design-sdk/key-annotations",
+  "@design-sdk/flags",
   "@design-sdk/core",
   "@design-sdk/core-types",
   "@design-sdk/universal",
