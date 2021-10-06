@@ -13,6 +13,7 @@ const withTM = require("next-transpile-modules")([
   "@designto/react",
 
   "@code-features/assets",
+  "@code-features/flags",
   // -----------------------------
 
   // -----------------------------
