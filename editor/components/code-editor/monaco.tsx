@@ -3,7 +3,7 @@ import Editor, { useMonaco, Monaco } from "@monaco-editor/react";
 import * as monaco from "monaco-editor/esm/vs/editor/editor.api";
 import _react_type_def_txt from "./react.d.ts.txt";
 
-export interface EditorProps {
+export interface MonacoEditorProps {
   defaultValue?: string;
   defaultLanguage?: string;
   width?: number | string;
@@ -11,7 +11,7 @@ export interface EditorProps {
   options?: monaco.editor.IStandaloneEditorConstructionOptions;
 }
 
-export function MonacoEditor(props: EditorProps) {
+export function MonacoEditor(props: MonacoEditorProps) {
   const monaco: Monaco = useMonaco();
   useEffect(() => {
     if (monaco) {
