@@ -29,8 +29,10 @@ export default function DesignToCodeUniversalPage() {
   const router = useRouter();
   const design = useDesign();
   const [result, setResult] = useState<output.ICodeOutput>();
+  const [preview, setPreview] = useState<output.ICodeOutput>();
 
   const framework_config = get_framework_config_from_query(router.query);
+  const preview_runner_framework = get_preview_runner_framework(router.query);
 
   useEffect(() => {
     if (design) {
@@ -57,11 +59,28 @@ export default function DesignToCodeUniversalPage() {
         asset_config: { asset_repository: MainImageRepository.instance },
       }).then((result) => {
         setResult(result);
+        if (framework_config.framework == preview_runner_framework.framework) {
+          setPreview(result);
+        }
       });
+      // ----- for preview -----
+      if (framework_config.framework !== preview_runner_framework.framework) {
+        designToCode({
+          input: {
+            id: id,
+            name: name,
+            design: reflect,
+          },
+          framework: preview_runner_framework,
+          asset_config: { asset_repository: MainImageRepository.instance },
+        }).then((result) => {
+          setPreview(result);
+        });
+      }
     }
   }, [design]);
 
-  if (!result) {
+  if (!result || !preview) {
     return <LoadingLayout />;
   }
 
@@ -85,8 +104,8 @@ export default function DesignToCodeUniversalPage() {
             <PreviewAndRunPanel
               key={design.url ?? design.reflect?.id}
               config={{
-                src: scaffold.raw,
-                platform: runner_platform,
+                src: preview.scaffold.raw,
+                platform: preview_runner_framework.framework,
                 componentName: componentName,
                 sceneSize: {
                   w: design.reflect?.width,
@@ -144,6 +163,10 @@ export default function DesignToCodeUniversalPage() {
 
 function get_framework_config_from_query(query: ParsedUrlQuery) {
   const framework = query.framework as string;
+  return get_framework_config(framework);
+}
+
+function get_framework_config(framework: string) {
   switch (framework) {
     case "react":
     case "react_default":
@@ -162,6 +185,13 @@ function get_framework_config_from_query(query: ParsedUrlQuery) {
     default:
       return react_presets.react_default;
   }
+}
+
+function get_preview_runner_framework(query: ParsedUrlQuery) {
+  const preview = query.preview as string;
+  return get_framework_config(
+    preview || get_framework_config_from_query(query).framework
+  );
 }
 
 function get_runner_platform(config: FrameworkConfig) {
