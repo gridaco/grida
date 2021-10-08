@@ -15,5 +15,5 @@ export default function CodeEditorDevPage() {
     },
   };
 
-  return <CodeEditor files={files} />;
+  return <CodeEditor height="100vh" files={files} />;
 }

@@ -1,7 +1,9 @@
 import React, { useState } from "react";
-import { MonacoEditor } from "./monaco";
+import { MonacoEditor, EditorProps as MonacoEditorProps } from "./monaco";
 import { Tabs, Tab } from "@material-ui/core";
 
+export interface EditorProps
+  extends Omit<MonacoEditorProps, "defaultValue" | "defaultLanguage"> {}
 export interface IFile {
   name: string;
   language: string;
@@ -10,7 +12,12 @@ export interface IFile {
 
 export type Files = { [name: string]: IFile };
 
-export function CodeEditor({ files }: { files: Files }) {
+export function CodeEditor({
+  files,
+  ...editor_props
+}: {
+  files: Files;
+} & EditorProps) {
   const keys = Object.keys(files);
   const [filekey, setFilekey] = useState<string>(keys[0]);
   const getfile = (key: string) => files[key];
@@ -37,7 +44,7 @@ export function CodeEditor({ files }: { files: Files }) {
       )}
       <MonacoEditor
         key={filekey}
-        height="100vh"
+        {...editor_props}
         defaultLanguage={file.language}
         defaultValue={file.raw}
       />

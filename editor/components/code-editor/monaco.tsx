@@ -3,7 +3,7 @@ import Editor, { useMonaco, Monaco } from "@monaco-editor/react";
 import * as monaco from "monaco-editor/esm/vs/editor/editor.api";
 import _react_type_def_txt from "./react.d.ts.txt";
 
-interface EditorProps {
+export interface EditorProps {
   defaultValue?: string;
   defaultLanguage?: string;
   width?: number | string;
