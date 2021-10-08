@@ -9,7 +9,7 @@ import {
 } from "../../layout/panel";
 import { WorkspaceBottomPanelDockLayout } from "../../layout/panel/workspace-bottom-panel-dock-layout";
 import { WidgetTree } from "../../components/visualization/json-visualization/json-tree";
-import { MonacoEditor } from "../../components/code-editor";
+import { CodeEditor } from "../../components/code-editor";
 import { tokenize } from "@designto/token";
 import * as react from "@designto/react";
 import { mapGrandchildren } from "@design-sdk/core/utils";
@@ -78,17 +78,21 @@ export default function FigmaToReactDemoPage() {
           </WorkspaceContentPanel>
           <WorkspaceContentPanel key={targetNodeConfig?.node}>
             <InspectionPanelContentWrap>
-              <MonacoEditor
+              <CodeEditor
                 key={reactComponent?.code.raw}
                 height="100vh"
                 options={{
                   automaticLayout: true,
                 }}
-                defaultValue={
-                  reactComponent?.code
-                    ? reactComponent?.code.raw
-                    : "// No input design provided to be converted.."
-                }
+                files={{
+                  "index.tsx": {
+                    raw: reactComponent?.code
+                      ? reactComponent?.code.raw
+                      : "// No input design provided to be converted..",
+                    language: "typescript",
+                    name: "index.tsx",
+                  },
+                }}
               />
             </InspectionPanelContentWrap>
           </WorkspaceContentPanel>

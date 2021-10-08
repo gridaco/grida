@@ -9,7 +9,7 @@ import {
   WorkspaceContentPanelGridLayout,
 } from "../../layout/panel";
 import { WorkspaceBottomPanelDockLayout } from "../../layout/panel/workspace-bottom-panel-dock-layout";
-import { MonacoEditor } from "../../components/code-editor";
+import { CodeEditor } from "../../components/code-editor";
 import {
   react_presets,
   flutter_presets,
@@ -100,18 +100,21 @@ export default function DesignToCodeUniversalPage() {
           </WorkspaceContentPanel>
           <WorkspaceContentPanel key={design.node}>
             <InspectionPanelContentWrap>
-              <MonacoEditor
-                key={code.raw}
+              <CodeEditor
+                // key={code.raw}
                 height="100vh"
                 options={{
                   automaticLayout: true,
                 }}
-                defaultLanguage={framework_config.language}
-                defaultValue={
-                  code
-                    ? code.raw
-                    : "// No input design provided to be converted.."
-                }
+                files={{
+                  "index.tsx": {
+                    raw: code
+                      ? code.raw
+                      : "// No input design provided to be converted..",
+                    language: framework_config.language,
+                    name: "index.tsx",
+                  },
+                }}
               />
             </InspectionPanelContentWrap>
           </WorkspaceContentPanel>

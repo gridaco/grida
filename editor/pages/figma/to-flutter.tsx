@@ -17,7 +17,7 @@ import {
 } from "../../layout/panel";
 import { PreviewAndRunPanel } from "../../components/preview-and-run";
 import { useDesign } from "../../query-hooks";
-import { MonacoEditor } from "../../components/code-editor";
+import { CodeEditor, MonacoEditor } from "../../components/code-editor";
 import LoadingLayout from "../../layout/loading-overlay";
 
 export default function FigmaToFlutterPage() {
@@ -81,18 +81,21 @@ export default function FigmaToFlutterPage() {
           </WorkspaceContentPanel>
           <WorkspaceContentPanel>
             <InspectionPanelContentWrap>
-              <MonacoEditor
-                key={widgetCode}
+              <CodeEditor
+                // key={widgetCode}
                 height="100vh"
                 options={{
                   automaticLayout: true,
                 }}
-                defaultLanguage="dart"
-                defaultValue={
-                  widgetCode
-                    ? widgetCode
-                    : "// No input design provided to be converted.."
-                }
+                files={{
+                  "index.tsx": {
+                    raw: widgetCode
+                      ? widgetCode
+                      : "// No input design provided to be converted..",
+                    language: "dart",
+                    name: "index.tsx",
+                  },
+                }}
               />
             </InspectionPanelContentWrap>
           </WorkspaceContentPanel>
