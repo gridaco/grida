@@ -9,6 +9,7 @@ import { fetch } from "@design-sdk/figma-remote";
 import { personal } from "@design-sdk/figma-auth-store";
 import { configure_auth_credentials } from "@design-sdk/figma-remote";
 import { TargetNodeConfig } from "../query/target-node";
+import { FigmaRemoteErrors } from "@design-sdk/figma-remote/lib/fetch";
 
 // globally configure auth credentials for interacting with `@design-sdk/figma-remote`
 configure_auth_credentials({
@@ -51,13 +52,17 @@ export function useDesign() {
                 ...targetnodeconfig,
               });
             })
-            .catch((err) => {
-              if (err.status == 401 || err.status == 403) {
-                // unauthorized
-                router.push("/preferences/access-tokens");
-                console.info(`(ignored) error while fetching design`, err);
+            .catch((err: FigmaRemoteErrors) => {
+              switch (err.type) {
+                case "UnauthorizedError": {
+                  // unauthorized
+                  router.push("/preferences/access-tokens");
+                  console.info(`(ignored) error while fetching design`, err);
+                  break;
+                }
+                default:
+                  throw err;
               }
-              throw err;
             });
 
           break;
