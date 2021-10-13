@@ -3,9 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "next dev -p 6626",
     "build": "next build",
-    "start": "next start"
+    "start": "next start -p 6626"
   },
   "dependencies": {
     "@babel/runtime": "^7.14.0",
