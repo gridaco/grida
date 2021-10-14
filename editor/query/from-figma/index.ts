@@ -71,8 +71,12 @@ export function useReflectTargetNode() {
   useEffect(() => {
     if (figmaTargetNode) {
       fetch
-        .fetchTargetAsReflect(figmaTargetNode.file, figmaTargetNode.node, {
-          personalAccessToken: personal.get_safe(),
+        .fetchTargetAsReflect({
+          file: figmaTargetNode.file,
+          node: figmaTargetNode.node,
+          auth: {
+            personalAccessToken: personal.get_safe(),
+          },
         })
         .then((res) => {
           setTargetNode(<TargetNodeConfig>{
