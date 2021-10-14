@@ -7,4 +7,5 @@ export interface TargetNodeConfig<R = any, P = any> {
   url: string;
   file: string;
   node: string;
+  raw: any;
 }

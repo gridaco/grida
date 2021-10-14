@@ -39,13 +39,13 @@ export function useDesign() {
           // load design from local storage or remote figma
           targetnodeconfig = parseFileAndNodeId(designparam);
           fetch
-            .fetchTargetAsReflect(
-              targetnodeconfig.file,
-              targetnodeconfig.node,
-              {
+            .fetchTargetAsReflect({
+              file: targetnodeconfig.file,
+              node: targetnodeconfig.node,
+              auth: {
                 personalAccessToken: personal.get_safe(),
-              }
-            )
+              },
+            })
             .then((res) => {
               setDesign(<TargetNodeConfig>{
                 ...res,
