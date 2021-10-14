@@ -43,6 +43,7 @@ export default function FigmaToReflectWidgetTokenPage() {
   }
 
   console.info("=".repeat(24), "tokenize result", "=".repeat(24));
+  console.info("tokenize result >> design.remote", design.remote);
   console.info("tokenize result >> design.figma", design.figma);
   console.info("tokenize result >> design.reflect", design.reflect);
   console.info("tokenize result >> tokenTree", tokenTree);
