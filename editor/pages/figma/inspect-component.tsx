@@ -95,12 +95,12 @@ export default function InspectComponent() {
                 </div>
                 <div style={{ flex: 1 }}>
                   <WidgetTreeLegend title="Component Meta" />
-                  <WidgetTree data={tokenTree} />
-                </div>
-                <div style={{ flex: 1 }}>
-                  <WidgetTreeLegend title="Component tokens" />
                   <WidgetTree data={componentMetaTree as any} />
                 </div>
+                {/* <div style={{ flex: 1 }}>
+                  <WidgetTreeLegend title="Component tokens" />
+                  <WidgetTree data={componentMetaTree as any} />
+                </div> */}
                 {/* <div style={{ flex: 1 }}>
                   <WidgetTreeLegend title="Reflect" />
                   <WidgetTree data={design.reflect} />
