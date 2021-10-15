@@ -18,6 +18,7 @@ import {
 } from "../../layout/panel";
 import { WorkspaceBottomPanelDockLayout } from "../../layout/panel/workspace-bottom-panel-dock-layout";
 import { useDesign } from "../../query-hooks";
+import { make_instance_component_meta } from "@code-features/component";
 
 export default function InspectComponent() {
   //
@@ -44,10 +45,11 @@ export default function InspectComponent() {
   const { node, reflect, raw, remote, figma, url } = design;
   //
 
-  let tokenTree;
-  if (design.reflect) {
-    tokenTree = tokenize(design.reflect);
-  }
+  const tokenTree = tokenize(design.reflect);
+  const componentMetaTree = make_instance_component_meta({
+    entry: design.figma,
+    components: design.raw.components,
+  });
 
   return (
     <>
@@ -92,9 +94,17 @@ export default function InspectComponent() {
                   />
                 </div>
                 <div style={{ flex: 1 }}>
+                  <WidgetTreeLegend title="Component Meta" />
+                  <WidgetTree data={tokenTree} />
+                </div>
+                <div style={{ flex: 1 }}>
+                  <WidgetTreeLegend title="Component tokens" />
+                  <WidgetTree data={componentMetaTree as any} />
+                </div>
+                {/* <div style={{ flex: 1 }}>
                   <WidgetTreeLegend title="Reflect" />
                   <WidgetTree data={design.reflect} />
-                </div>
+                </div> */}
                 <div style={{ flex: 1 }}>
                   <WidgetTreeLegend title="Tokens" />
                   <JsonTree hideRoot data={tokenTree} />
@@ -121,10 +131,11 @@ function json_only_component_related_fields(
     .filter(Boolean);
 
   return {
+    id: node.id,
     type: node.type,
     name: node.name,
-    main_component: node["mainComponent"] ?? node["mainComponentId"],
-    id: node.id,
+    mainComponentId: node["mainComponentId"],
+    parentId: node.parentId,
     children: fields,
   };
 }

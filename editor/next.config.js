@@ -13,6 +13,7 @@ const withTM = require("next-transpile-modules")([
   "@designto/react",
 
   "@code-features/assets",
+  "@code-features/component",
   "@code-features/flags",
   // -----------------------------
 
@@ -22,6 +23,7 @@ const withTM = require("next-transpile-modules")([
   "@design-sdk/core",
   "@design-sdk/core-types",
   "@design-sdk/universal",
+  "@design-sdk/diff",
   "@design-sdk/figma",
   "@design-sdk/figma-node",
   "@design-sdk/figma-types",
