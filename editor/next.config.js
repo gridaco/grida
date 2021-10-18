@@ -80,18 +80,25 @@ const withTM = require("next-transpile-modules")([
   // -----------------------------
 ]);
 
-const withCSS = require("@zeit/next-css");
-module.exports = withTM(
-  withCSS({
-    webpack: (config) => {
-      config.node = {
-        fs: "empty",
-      };
-      config.module.rules.push({
-        test: /\.txt$/,
-        use: "raw-loader",
-      });
-      return config;
-    },
-  })
-);
+module.exports = withTM({
+  webpack: (config) => {
+    config.node = {
+      fs: "empty",
+    };
+    config.module.rules.push({
+      test: /\.txt$/,
+      use: "raw-loader",
+    });
+    return config;
+  },
+  async redirects() {
+    return [
+      {
+        // typo gaurd
+        source: "/preference",
+        destination: "/preferences",
+        permanent: true,
+      },
+    ];
+  },
+});
