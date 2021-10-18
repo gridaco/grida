@@ -14,11 +14,21 @@ const lightpurple = "#374469";
 const white = "#ffffff";
 export const background = "#272b4d";
 
+/**
+ * Tree data input for representing component-instance referencing data.
+ * @deprecated not implemented
+ */
+export interface TreeNodeWithComponents {
+  type: "tree-node-with-components";
+  entry: TreeNode;
+  components: TreeNode[];
+}
+
 export interface TreeNode {
   name: string;
   id?: string;
   type?: string;
-  children?: this[];
+  children?: TreeNode[];
 }
 
 type HierarchyNode = HierarchyPointNode<TreeNode>;
@@ -61,6 +71,16 @@ function Node({ node }: { node: HierarchyNode }) {
         style={{ pointerEvents: "none" }}
       >
         {node.data.name}
+      </text>
+      <text
+        dy="-2em"
+        fontSize={4}
+        fontFamily="Arial"
+        textAnchor="middle"
+        style={{ pointerEvents: "none" }}
+        fill={white}
+      >
+        {node.data.id}
       </text>
       <text
         dy="-1.5em"
@@ -112,6 +132,16 @@ function ParentNode({ node }: { node: HierarchyNode }) {
         strokeWidth={1}
         onClick={() => {}}
       />
+      <text
+        dy="-3.3em"
+        fontSize={4}
+        fontFamily="Arial"
+        textAnchor="middle"
+        style={{ pointerEvents: "none" }}
+        fill={white}
+      >
+        {node.data.id}
+      </text>
       <text
         dy=".33em"
         fontSize={9}
