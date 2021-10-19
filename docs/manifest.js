@@ -80,10 +80,10 @@ export default {
         {
           title: "Design to code",
           routes: [
-            {
-              title: "Introduction",
-              path: "/docs/@designto-code/index",
-            },
+            // {
+            //   title: "Introduction",
+            //   path: "/docs/@designto-code/index",
+            // },
             {
               title: "Components allowed property",
               path: "/docs/@designto-code/component-allowed-property",
@@ -201,10 +201,6 @@ export default {
               ],
             },
             {
-              title: "Flags",
-              path: "/docs/@designto-code/flags",
-            },
-            {
               title: "Flutter",
               routes: [
                 {
@@ -230,6 +226,10 @@ export default {
                     "/docs/@designto-code/flutter-when-to-use-constrainedbox",
                 },
               ],
+            },
+            {
+              title: "Flags",
+              path: "/docs/@designto-code/flags",
             },
             {
               title: "Icons",
@@ -385,150 +385,150 @@ export default {
         },
       ],
     },
-    {
-      title: "API Reference",
-      heading: true,
-      routes: [
-        {
-          title: "CLI",
-          path: "/docs/api-reference/cli.md",
-        },
-        {
-          title: "Create Next App",
-          path: "/docs/api-reference/create-next-app.md",
-        },
-        {
-          title: "next/router",
-          path: "/docs/api-reference/next/router.md",
-        },
-        {
-          title: "next/link",
-          path: "/docs/api-reference/next/link.md",
-        },
-        {
-          title: "next/image",
-          path: "/docs/api-reference/next/image.md",
-        },
-        {
-          title: "next/head",
-          path: "/docs/api-reference/next/head.md",
-        },
-        {
-          title: "next/amp",
-          path: "/docs/api-reference/next/amp.md",
-        },
-        {
-          title: "Data Fetching",
-          routes: [
-            {
-              title: "getInitialProps",
-              path: "/docs/api-reference/data-fetching/getInitialProps.md",
-            },
-          ],
-        },
-        {
-          title: "Static Optimization Indicator",
-          path:
-            "/docs/api-reference/next.config.js/static-optimization-indicator.md",
-        },
-        {
-          title: "next.config.js",
-          routes: [
-            {
-              title: "Introduction",
-              path: "/docs/api-reference/next.config.js/introduction.md",
-            },
-            {
-              title: "Environment Variables",
-              path:
-                "/docs/api-reference/next.config.js/environment-variables.md",
-            },
-            {
-              title: "Base Path",
-              path: "/docs/api-reference/next.config.js/basepath.md",
-            },
-            {
-              title: "Rewrites",
-              path: "/docs/api-reference/next.config.js/rewrites.md",
-            },
-            {
-              title: "Redirects",
-              path: "/docs/api-reference/next.config.js/redirects.md",
-            },
-            {
-              title: "Custom Headers",
-              path: "/docs/api-reference/next.config.js/headers.md",
-            },
-            {
-              title: "Custom Page Extensions",
-              path:
-                "/docs/api-reference/next.config.js/custom-page-extensions.md",
-            },
-            {
-              title: "CDN Support with Asset Prefix",
-              path:
-                "/docs/api-reference/next.config.js/cdn-support-with-asset-prefix.md",
-            },
-            {
-              title: "Custom Webpack Config",
-              path:
-                "/docs/api-reference/next.config.js/custom-webpack-config.md",
-            },
-            {
-              title: "Compression",
-              path: "/docs/api-reference/next.config.js/compression.md",
-            },
-            {
-              title: "Runtime Configuration",
-              path:
-                "/docs/api-reference/next.config.js/runtime-configuration.md",
-            },
-            {
-              title: "Disabling x-powered-by",
-              path:
-                "/docs/api-reference/next.config.js/disabling-x-powered-by.md",
-            },
-            {
-              title: "Disabling ETag Generation",
-              path:
-                "/docs/api-reference/next.config.js/disabling-etag-generation.md",
-            },
-            {
-              title: "Setting a custom build directory",
-              path:
-                "/docs/api-reference/next.config.js/setting-a-custom-build-directory.md",
-            },
-            {
-              title: "Configuring the Build ID",
-              path:
-                "/docs/api-reference/next.config.js/configuring-the-build-id.md",
-            },
-            {
-              title: "Configuring onDemandEntries",
-              path:
-                "/docs/api-reference/next.config.js/configuring-onDemandEntries.md",
-            },
-            {
-              title: "Ignoring TypeScript Errors",
-              path:
-                "/docs/api-reference/next.config.js/ignoring-typescript-errors.md",
-            },
-            {
-              title: "exportPathMap",
-              path: "/docs/api-reference/next.config.js/exportPathMap.md",
-            },
-            {
-              title: "Trailing Slash",
-              path: "/docs/api-reference/next.config.js/trailing-slash.md",
-            },
-            {
-              title: "React Strict Mode",
-              path: "/docs/api-reference/next.config.js/react-strict-mode.md",
-            },
-          ],
-        },
-      ],
-    },
+    // {
+    //   title: "API Reference",
+    //   heading: true,
+    //   routes: [
+    //     {
+    //       title: "CLI",
+    //       path: "/docs/api-reference/cli.md",
+    //     },
+    //     {
+    //       title: "Create Next App",
+    //       path: "/docs/api-reference/create-next-app.md",
+    //     },
+    //     {
+    //       title: "next/router",
+    //       path: "/docs/api-reference/next/router.md",
+    //     },
+    //     {
+    //       title: "next/link",
+    //       path: "/docs/api-reference/next/link.md",
+    //     },
+    //     {
+    //       title: "next/image",
+    //       path: "/docs/api-reference/next/image.md",
+    //     },
+    //     {
+    //       title: "next/head",
+    //       path: "/docs/api-reference/next/head.md",
+    //     },
+    //     {
+    //       title: "next/amp",
+    //       path: "/docs/api-reference/next/amp.md",
+    //     },
+    //     {
+    //       title: "Data Fetching",
+    //       routes: [
+    //         {
+    //           title: "getInitialProps",
+    //           path: "/docs/api-reference/data-fetching/getInitialProps.md",
+    //         },
+    //       ],
+    //     },
+    //     {
+    //       title: "Static Optimization Indicator",
+    //       path:
+    //         "/docs/api-reference/next.config.js/static-optimization-indicator.md",
+    //     },
+    //     {
+    //       title: "next.config.js",
+    //       routes: [
+    //         {
+    //           title: "Introduction",
+    //           path: "/docs/api-reference/next.config.js/introduction.md",
+    //         },
+    //         {
+    //           title: "Environment Variables",
+    //           path:
+    //             "/docs/api-reference/next.config.js/environment-variables.md",
+    //         },
+    //         {
+    //           title: "Base Path",
+    //           path: "/docs/api-reference/next.config.js/basepath.md",
+    //         },
+    //         {
+    //           title: "Rewrites",
+    //           path: "/docs/api-reference/next.config.js/rewrites.md",
+    //         },
+    //         {
+    //           title: "Redirects",
+    //           path: "/docs/api-reference/next.config.js/redirects.md",
+    //         },
+    //         {
+    //           title: "Custom Headers",
+    //           path: "/docs/api-reference/next.config.js/headers.md",
+    //         },
+    //         {
+    //           title: "Custom Page Extensions",
+    //           path:
+    //             "/docs/api-reference/next.config.js/custom-page-extensions.md",
+    //         },
+    //         {
+    //           title: "CDN Support with Asset Prefix",
+    //           path:
+    //             "/docs/api-reference/next.config.js/cdn-support-with-asset-prefix.md",
+    //         },
+    //         {
+    //           title: "Custom Webpack Config",
+    //           path:
+    //             "/docs/api-reference/next.config.js/custom-webpack-config.md",
+    //         },
+    //         {
+    //           title: "Compression",
+    //           path: "/docs/api-reference/next.config.js/compression.md",
+    //         },
+    //         {
+    //           title: "Runtime Configuration",
+    //           path:
+    //             "/docs/api-reference/next.config.js/runtime-configuration.md",
+    //         },
+    //         {
+    //           title: "Disabling x-powered-by",
+    //           path:
+    //             "/docs/api-reference/next.config.js/disabling-x-powered-by.md",
+    //         },
+    //         {
+    //           title: "Disabling ETag Generation",
+    //           path:
+    //             "/docs/api-reference/next.config.js/disabling-etag-generation.md",
+    //         },
+    //         {
+    //           title: "Setting a custom build directory",
+    //           path:
+    //             "/docs/api-reference/next.config.js/setting-a-custom-build-directory.md",
+    //         },
+    //         {
+    //           title: "Configuring the Build ID",
+    //           path:
+    //             "/docs/api-reference/next.config.js/configuring-the-build-id.md",
+    //         },
+    //         {
+    //           title: "Configuring onDemandEntries",
+    //           path:
+    //             "/docs/api-reference/next.config.js/configuring-onDemandEntries.md",
+    //         },
+    //         {
+    //           title: "Ignoring TypeScript Errors",
+    //           path:
+    //             "/docs/api-reference/next.config.js/ignoring-typescript-errors.md",
+    //         },
+    //         {
+    //           title: "exportPathMap",
+    //           path: "/docs/api-reference/next.config.js/exportPathMap.md",
+    //         },
+    //         {
+    //           title: "Trailing Slash",
+    //           path: "/docs/api-reference/next.config.js/trailing-slash.md",
+    //         },
+    //         {
+    //           title: "React Strict Mode",
+    //           path: "/docs/api-reference/next.config.js/react-strict-mode.md",
+    //         },
+    //       ],
+    //     },
+    //   ],
+    // },
     {
       title: "Support",
       heading: true,

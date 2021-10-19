@@ -1,4 +1,5 @@
 export interface DocsPost {
+  title: string;
   content?;
   date?;
   slug?;
