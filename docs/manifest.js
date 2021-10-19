@@ -86,17 +86,183 @@ export default {
               path: "/docs/@designto-code/index",
             },
             {
-              title: "Naming conventions",
+              title: "Components allowed property",
+              path: "/docs/@designto-code/component-allowed-property",
+            },
+            {
+              title: "Components multi proxied property",
+              path: "/docs/@designto-code/component-multi-proxied-property",
+            },
+            {
+              title: "Nested Components",
+              path: "/docs/@designto-code/component-nested",
+            },
+            {
+              title: "Components property defaults",
+              path: "/docs/@designto-code/component-property-default-value",
+            },
+            {
+              title: "Components Interfacing",
               routes: [
                 {
-                  title: "Routes",
-                  path: "/docs/conventions/routes",
-                },
-                {
-                  title: "Dynamic Routes",
-                  path: "/docs/conventions/dynamic-routes",
+                  title: "Automatic interfacing strategy",
+                  path:
+                    "/docs/@designto-code/component-property-interfacing-auto",
                 },
               ],
+            },
+            {
+              title: "CSS",
+              routes: [
+                {
+                  title: "Introduction",
+                  path: "/docs/@designto-code/css",
+                },
+                {
+                  title: "Box Sizing",
+                  path: "/docs/@designto-code/css-box-sizing",
+                },
+                {
+                  title: "Clip path",
+                  path: "/docs/@designto-code/css-clip-path",
+                },
+                {
+                  title: "Mask",
+                  path: "/docs/@designto-code/css-mask",
+                },
+                {
+                  title: "Positioning",
+                  path: "/docs/@designto-code/css-position-absolute-vs-fixed",
+                },
+              ],
+            },
+            {
+              title: "Figma",
+              routes: [
+                {
+                  title: "Autolayout",
+                  path: "/docs/@designto-code/figma-autolayout",
+                },
+                {
+                  title: "Blur effects",
+                  path: "/docs/@designto-code/figma-blur-effects",
+                },
+                {
+                  title: "Boolean Operation",
+                  path: "/docs/@designto-code/figma-boolean-operation",
+                },
+                {
+                  title: "Constraints - center",
+                  path: "/docs/@designto-code/figma-constraint-center",
+                },
+                {
+                  title: "Constraints - scale",
+                  path: "/docs/@designto-code/figma-constraint-scale",
+                },
+                {
+                  title: "Constraints - stretch",
+                  path: "/docs/@designto-code/figma-constraint-stretch",
+                },
+                {
+                  title: "Line height",
+                  path: "/docs/@designto-code/figma-line-height",
+                },
+                {
+                  title: "Line",
+                  path: "/docs/@designto-code/figma-line",
+                },
+                {
+                  title: "Masking layer",
+                  path: "/docs/@designto-code/figma-mask-layer",
+                },
+                {
+                  title: "Rotation",
+                  path: "/docs/@designto-code/figma-rotation",
+                },
+                {
+                  title: "Scale",
+                  path: "/docs/@designto-code/figma-scale",
+                },
+                {
+                  title: "Strokes",
+                  path: "/docs/@designto-code/figma-strokes",
+                },
+                {
+                  title: "Text auto resize",
+                  path: "/docs/@designto-code/figma-text-autoresize",
+                },
+                {
+                  title: "Vector",
+                  path: "/docs/@designto-code/figma-vector",
+                },
+                {
+                  title: "Visibility",
+                  path: "/docs/@designto-code/figma-visibility",
+                },
+              ],
+            },
+            {
+              title: "Flags",
+              path: "/docs/@designto-code/flags",
+            },
+            {
+              title: "Flutter",
+              routes: [
+                {
+                  title: "Multiple decoration Boxdecoration",
+                  path:
+                    "/docs/@designto-code/flutter-box-decoration-multiple-visuals",
+                },
+                {
+                  title: "Multiple gradients",
+                  path: "/docs/@designto-code/flutter-multiple-gradients",
+                },
+                {
+                  title: "Positioned vs Align",
+                  path: "/docs/@designto-code/flutter-positioned-vs-align",
+                },
+                {
+                  title: "SVG Support",
+                  path: "/docs/@designto-code/flutter-svg-support",
+                },
+                {
+                  title: "ConstrainedBox",
+                  path:
+                    "/docs/@designto-code/flutter-when-to-use-constrainedbox",
+                },
+              ],
+            },
+            {
+              title: "Icons",
+              path: "/docs/@designto-code/icons",
+            },
+            {
+              title: "Item order",
+              path: "/docs/@designto-code/item-order",
+            },
+            {
+              title: "Item overflow",
+              path: "/docs/@designto-code/item-overflow",
+            },
+            {
+              title: "Scrolling on Overflow",
+              path: "/docs/@designto-code/overflow-layout-scroll",
+            },
+            {
+              title: "Item spacing",
+              path: "/docs/@designto-code/item-spacing",
+            },
+            {
+              title: "Knwon issues",
+              path: "/docs/@designto-code/known-issues",
+            },
+            {
+              title: "JSX line break",
+              path: "/docs/@designto-code/react-jsx-css-line-break",
+            },
+            {
+              title: "Multi styles on Text",
+              path: "/docs/@designto-code/text-multi-style",
             },
           ],
         },

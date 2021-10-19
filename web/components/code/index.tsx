@@ -7,7 +7,7 @@ import {
 import vsdark from "prism-react-renderer/themes/vsDark";
 
 export default function CodeBlock({ children, className }) {
-  const language = className.replace(/language-/, "");
+  const language = className?.replace(/language-/, "");
 
   return (
     <PrismHighlight

@@ -8,6 +8,7 @@ const { readdir } = require("fs").promises;
 
 const DOCS_ROOT_DIR = join(process.cwd(), "../docs");
 const MDX_EXT = ".mdx";
+const MD_EXT = ".md";
 
 async function getFilesIn(dir: string): Promise<readonly string[]> {
   const dirents = await readdir(dir, { withFileTypes: true });
@@ -28,7 +29,15 @@ export async function makeDocsConfig(): Promise<DocsConfig> {
   }
   const allFiles = await getFilesIn(DOCS_ROOT_DIR);
   const allMdxPaths = allFiles
-    .filter(f => f.includes(MDX_EXT))
+    .filter(
+      f =>
+        //ignore README.md
+        !f.includes("README.md") &&
+        //mdx
+        (f.includes(MDX_EXT) ||
+          //md
+          f.includes(MD_EXT)),
+    )
     .map(f => f.replace(DOCS_ROOT_DIR, ""));
 
   const routes = [];
@@ -64,6 +73,7 @@ export function getPostByPath(path: string | string[]): DocsPost {
 
   path = path.replace(DOCS_ROOT_DIR, "");
   path = path.replace(MDX_EXT, "");
+  path = path.replace(MD_EXT, "");
   const splits = path.split("/").filter(Boolean);
   const realSlug = splits[splits.length - 1];
 
@@ -76,8 +86,12 @@ export function getPostByPath(path: string | string[]): DocsPost {
   let fileContents;
   if (fs.existsSync(`${fullPath}${MDX_EXT}`)) {
     fileContents = fs.readFileSync(`${fullPath}${MDX_EXT}`, "utf8");
+  } else if (fs.existsSync(`${fullPath}${MD_EXT}`)) {
+    fileContents = fs.readFileSync(`${fullPath}${MD_EXT}`, "utf8");
   } else if (fs.existsSync(`${fullPath}/index.mdx`)) {
     fileContents = fs.readFileSync(`${fullPath}/index.mdx`, "utf8");
+  } else if (fs.existsSync(`${fullPath}/index.md`)) {
+    fileContents = fs.readFileSync(`${fullPath}/index.md`, "utf8");
   }
 
   const { data, content } = matter(fileContents);
