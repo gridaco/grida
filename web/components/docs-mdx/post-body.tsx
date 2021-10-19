@@ -1,8 +1,8 @@
+import { css } from "@emotion/core";
 import styled from "@emotion/styled";
-import { MDXProvider } from "@mdx-js/react";
-import hydrate from "next-mdx-remote/hydrate";
 import renderToString from "next-mdx-remote/render-to-string";
-import { useState } from "react";
+import Link from "next/link";
+import React, { useState } from "react";
 import { Flex, Text } from "rebass";
 
 import CodeBlock from "components/code";
@@ -10,7 +10,8 @@ import Icon from "components/icon";
 import useAsyncEffect from "utils/hooks/use-async-effect";
 import { media } from "utils/styled/media";
 import { ThemeInterface } from "utils/styled/theme";
-import { css } from "@emotion/core";
+
+import { WasThisPostHelpful } from "./was-this-post-helpful";
 
 const components = {
   pre: props => <div {...props} />,
@@ -55,28 +56,18 @@ export default function PostBody({ content }) {
           />
         </Flex>
       </Flex>
-      <Flex
-        alignItems="center"
-        justifyContent="center"
-        mt="60px"
-        flexDirection="column"
-      >
-        <Text fontSize="18px" fontWeight="500" color="#686868">
-          Was this page helpful?
-        </Text>
-        <Flex mt="16px">
-          <Icon className="cursor" name="thumbsup" mx="16px" />
-          <Icon className="cursor" name="thumbsdown" mx="16px" />
-        </Flex>
-      </Flex>
+      {/* temporarily disabled */}
+      {/* <WasThisPostHelpful /> */}
       <Flex
         mt="40px"
         justifyContent="flex-end"
         style={{ borderTop: "1px solid #F8F8F8" }}
       >
-        <Text className="cursor" pt="24px" fontSize="16px" color="#2562FF">
-          Edit this page on Github
-        </Text>
+        <Link href="https://github.com/gridaco/grida.co">
+          <Text className="cursor" pt="24px" fontSize="16px" color="#2562FF">
+            Edit this page on Github
+          </Text>
+        </Link>
       </Flex>
     </div>
   );
