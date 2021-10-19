@@ -13,69 +13,68 @@ export default {
           open: true,
           routes: [
             {
-              title: "Introduction",
-              path: "/docs/assistant/index",
-            },
-            {
               title: "Design Assistant",
               path: "/docs/assistant/design-assistant",
-            },
-            {
-              title: "Design Assistant",
-              path: "/docs/assistant/design-assistant/icons-loader",
-            },
-            {
-              title: "Components View",
-              path: "/docs/assistant/components-view",
-            },
-            {
-              title: "Code View",
-              path: "/docs/assistant/code-view",
-            },
-            {
-              title: "Quick look",
-              path: "/docs/assistant/quicklook",
-            },
-            {
-              title: "Click to copy",
-              path: "/docs/assistant/click-to-copy",
-            },
-            {
-              title: "Design Linting",
-              path: "/docs/assistant/linter",
-            },
-            {
-              title: "Preferences",
-              path: "/docs/assistant/preferences",
-            },
-            {
-              title: "Environment Variables",
-              path: "/docs/assistant/environment-variables",
-            },
-          ],
-        },
-        {
-          title: "Conventions",
-          routes: [
-            {
-              title: "Introduction",
-              path: "/docs/conventions/index",
-            },
-            {
-              title: "Naming conventions",
               routes: [
                 {
-                  title: "Routes",
-                  path: "/docs/conventions/routes",
-                },
-                {
-                  title: "Dynamic Routes",
-                  path: "/docs/conventions/dynamic-routes",
+                  title: "Icons loader",
+                  path:
+                    "https://blog.grida.co/bridged-assistant-update-2021-0-1f1-meet-powerful-bridged-design-assistants-icon-loader-552b452396a4",
                 },
               ],
             },
+            // {
+            //   title: "Components View",
+            //   path: "/docs/assistant/components-view",
+            // },
+            // {
+            //   title: "Code View",
+            //   path: "/docs/assistant/code-view",
+            // },
+            // {
+            //   title: "Quick look",
+            //   path: "/docs/assistant/quicklook",
+            // },
+            // {
+            //   title: "Click to copy",
+            //   path: "/docs/assistant/click-to-copy",
+            // },
+            // {
+            //   title: "Design Linting",
+            //   path: "/docs/assistant/linter",
+            // },
+            // {
+            //   title: "Preferences",
+            //   path: "/docs/assistant/preferences",
+            // },
+            // {
+            //   title: "Environment Variables",
+            //   path: "/docs/assistant/environment-variables",
+            // },
           ],
         },
+        // {
+        //   title: "Conventions",
+        //   routes: [
+        //     {
+        //       title: "Introduction",
+        //       path: "/docs/conventions/index",
+        //     },
+        //     {
+        //       title: "Naming conventions",
+        //       routes: [
+        //         {
+        //           title: "Routes",
+        //           path: "/docs/conventions/routes",
+        //         },
+        //         {
+        //           title: "Dynamic Routes",
+        //           path: "/docs/conventions/dynamic-routes",
+        //         },
+        //       ],
+        //     },
+        //   ],
+        // },
 
         // @designto-code
         {
