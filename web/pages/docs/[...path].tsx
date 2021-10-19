@@ -1,16 +1,13 @@
-import React from "react";
-import { useRouter } from "next/router";
-import ErrorPage from "next/error";
-import PostBody from "../../components/docs-mdx/post-body";
-import Layout from "../../components/docs-mdx/layout";
-import { getPostByPath, getAllPosts } from "../../utils/docs/api";
-import PostTitle from "../../components/docs-mdx/post-title";
-import Head from "next/head";
-import markdownToHtml from "../../utils/docs/md-to-html";
 import DocsNavigation from "layout/docs-navigation";
-import styled from "@emotion/styled";
-import { media } from "utils/styled/media";
-import { ThemeInterface } from "utils/styled/theme";
+import ErrorPage from "next/error";
+import Head from "next/head";
+import { useRouter } from "next/router";
+import React from "react";
+
+import Layout from "../../components/docs-mdx/layout";
+import PostBody from "../../components/docs-mdx/post-body";
+import PostTitle from "../../components/docs-mdx/post-title";
+import { getPostByPath, getAllPosts } from "../../utils/docs/api";
 
 export default function Post({ post, preview }) {
   const router = useRouter();
@@ -24,7 +21,7 @@ export default function Post({ post, preview }) {
         <PostTitle>Loading…</PostTitle>
       ) : (
         <>
-          <article style={{ width: "calc(100% - 40px)", margin: "0px 20px"}}>
+          <article style={{ width: "calc(100% - 40px)", margin: "0px 20px" }}>
             <Head>
               <title>{post.title}</title>
               {post.ogImage && (

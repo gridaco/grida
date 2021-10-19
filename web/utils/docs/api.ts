@@ -1,8 +1,10 @@
-import fs from "fs";
-import { join, resolve } from "path";
 import matter from "gray-matter";
-const { readdir } = require("fs").promises;
+import { join, resolve } from "path";
+
 import { DocsPost, DocsConfig } from "./model";
+
+import fs from "fs";
+const { readdir } = require("fs").promises;
 
 const DOCS_ROOT_DIR = join(process.cwd(), "../docs");
 const MDX_EXT = ".mdx";
