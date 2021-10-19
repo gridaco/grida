@@ -1,3 +1,9 @@
+---
+title: Css mask and why we don't support it
+version: 0.1.0
+revision: 1
+---
+
 # Css masking is not supported due to lack of major browser support.
 
 https://developer.mozilla.org/en-US/docs/Web/CSS/mask

@@ -1,3 +1,9 @@
+---
+title: Figma blur effects
+version: 0.1.0
+revision: 1
+---
+
 # Figma blur effects
 
 ![](https://static.figma.com/uploads/9def6cce093b164306328ee228028155d13d72d0)

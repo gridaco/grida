@@ -1,3 +1,9 @@
+---
+title: Flutter does not have a SVG support.
+version: 0.1.0
+revision: 1
+---
+
 # Flutter does not have a SVG support.
 
 **Use `flutter_svg`**

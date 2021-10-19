@@ -1,3 +1,9 @@
+---
+title: Figma mask (not frame)
+version: 0.1.0
+revision: 1
+---
+
 # Figma mask (not frame)
 
 ![](./assets/how-fogma-masking-works.png)

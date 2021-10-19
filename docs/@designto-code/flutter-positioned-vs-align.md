@@ -1,3 +1,9 @@
+---
+title: Flutter positioning - when to use Positioned vs Align
+version: 0.1.0
+revision: 1
+---
+
 # Flutter - positioning - when to use `Positioned` vs `Align`
 
 **Bullet points**

@@ -1,3 +1,9 @@
+---
+title: Css color vs background-color
+version: 0.1.0
+revision: 1
+---
+
 # Css `color` vs `background-color`
 
 > Before we start, this document lists the obvious content for web developers.

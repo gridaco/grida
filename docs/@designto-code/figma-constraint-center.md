@@ -1,3 +1,9 @@
+---
+title: Constraints - CENTER
+version: 0.1.0
+revision: 1
+---
+
 # Constraints - CENTER
 
 > This document is based on horizontally centered element. (which applies the same to vertically centered.)

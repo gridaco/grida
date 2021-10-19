@@ -1,3 +1,9 @@
+---
+title: Figma Constraints - SCALE
+version: 0.1.0
+revision: 1
+---
+
 # Figma Constraints - `SCALE`
 
 Before we start, we recommand you to read [Figma Constraint docs](https://www.figma.com/plugin-docs/api/Constraints/). in this document, we only handle `STRETCH`

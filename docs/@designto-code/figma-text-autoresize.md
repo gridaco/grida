@@ -1,3 +1,9 @@
+---
+title: Figma Text AutoResize
+version: 0.1.0
+revision: 1
+---
+
 # Figma Text AutoResize
 
 ![Understanding Figma's Text Auto resize](./assets/figma-text-autoresize-example.gif)

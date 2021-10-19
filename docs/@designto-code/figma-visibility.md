@@ -1,3 +1,9 @@
+---
+title: Figma Visibility
+version: 0.1.0
+revision: 1
+---
+
 # Figma Visibility
 
 > `visible` property is a global property rather defines if the node should be visible or not. By default, setting `visible = false` for figma not will act like the node never existed. I.e. item under autolayout, if the item's visibility is off, than the item will not only invisible, but act like it does not exist, triggering re-arrangement of other items.

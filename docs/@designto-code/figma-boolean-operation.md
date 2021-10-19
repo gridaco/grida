@@ -1,3 +1,9 @@
+---
+title: Figma Boolean operation and how to handle it.
+version: 0.1.0
+revision: 1
+---
+
 # Figma Boolean operation and how to handle it.
 
 > **Theoretically, svg support for boolean operation is possible.** But, we don't support this on remote version of design to code.

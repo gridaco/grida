@@ -1,3 +1,9 @@
+---
+title: Css box sizing
+version: 0.1.0
+revision: 1
+---
+
 # Css box sizing
 
 ## When both width (or height) and padding is specified.

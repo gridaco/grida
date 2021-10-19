@@ -1,3 +1,9 @@
+---
+title: Flags (Proposal)
+version: 0.1.0
+revision: 1
+---
+
 # Flags (Proposal)
 
 > Flag feature is not ready to use

@@ -1,3 +1,9 @@
+---
+title: How item order works & sanitizing options
+version: 0.1.0
+revision: 1
+---
+
 # How item order works & sanitizing options
 
 **The order in editor's hierarchy (on design tools)**
