@@ -1,5 +1,9 @@
-import React from "react";
 import { useRouter } from "next/router";
+import React from "react";
+
+// this page is not used
+// this page is redirected by next.conf.js
+// below code is obsolete
 
 export default function() {
   // temporary redirection

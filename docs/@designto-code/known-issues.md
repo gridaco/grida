@@ -1,0 +1,1 @@
+- constaints are not supported inside a clip. - technically imposible.

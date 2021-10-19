@@ -1,17 +1,19 @@
-import React, { useEffect, useState } from "react";
 import styled from "@emotion/styled";
-import { Box, Flex, Text } from "rebass";
-import DocsSearchBar from "components/docs-search-bar";
-import DocsNavigationSection from "components/docs-navigation-section";
-import { DocsManifest, DocsRoute } from "../../utils/docs/model";
-import { media } from "utils/styled/media";
-import { ThemeInterface } from "utils/styled/theme";
-import DocsNavigationMobile from "components/docs-navigation-mobile";
-import Icon from "components/icon";
-import { center } from "utils/styled/styles";
 import { useRouter } from "next/router";
-const manifestJson = import("../../../docs/manifest.json");
+import React, { useEffect, useState } from "react";
+import { Box, Flex, Text } from "rebass";
 
+import DocsNavigationMobile from "components/docs-navigation-mobile";
+import DocsNavigationSection from "components/docs-navigation-section";
+import DocsSearchBar from "components/docs-search-bar";
+import Icon from "components/icon";
+import { media } from "utils/styled/media";
+import { center } from "utils/styled/styles";
+import { ThemeInterface } from "utils/styled/theme";
+
+import { DocsManifest, DocsRoute } from "../../utils/docs/model";
+
+const docsmanifest = import("../../../docs/manifest");
 function DocsNavigation() {
   const [manifest, setManifest] = useState<DocsManifest>();
   const [isOpen, setIsOpen] = useState(false);
@@ -19,8 +21,8 @@ function DocsNavigation() {
   const router = useRouter();
 
   useEffect(() => {
-    manifestJson.then(d => {
-      const newmanifest: DocsManifest = d.routes as any;
+    docsmanifest.then(d => {
+      const newmanifest: DocsManifest = d.default.routes as any;
       setManifest(newmanifest);
     });
   }, []);
@@ -29,9 +31,9 @@ function DocsNavigation() {
     setCurrentRouter(router.asPath);
 
     if (currentRouter != router.asPath && currentRouter != "") {
-      router.reload()
+      router.reload();
     }
-  }, [router])
+  }, [router]);
 
   const docs = manifest ? manifest[0] : undefined;
   return (
