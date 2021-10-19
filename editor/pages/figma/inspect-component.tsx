@@ -48,7 +48,7 @@ export default function InspectComponent() {
   const tokenTree = tokenize(design.reflect);
   const componentMetaTree = make_instance_component_meta({
     entry: design.figma,
-    components: design.raw.components,
+    components: design.raw.components as any,
   });
 
   return (
@@ -84,7 +84,7 @@ export default function InspectComponent() {
                 <div style={{ flex: 1 }}>
                   <div>
                     <WidgetTreeLegend title="Raw" />
-                    <WidgetTree data={design.raw} />
+                    <WidgetTree data={design.raw as any} />
                   </div>
                 </div>
                 <div style={{ flex: 1 }}>
@@ -92,6 +92,12 @@ export default function InspectComponent() {
                   <WidgetTree
                     data={json_only_component_related_fields(design.figma)}
                   />
+                </div>
+                <div style={{ flex: 1 }}>
+                  <div>
+                    <WidgetTreeLegend title="Reflect" />
+                    <WidgetTree data={design.reflect} />
+                  </div>
                 </div>
                 <div style={{ flex: 1 }}>
                   <WidgetTreeLegend title="Component Meta" />

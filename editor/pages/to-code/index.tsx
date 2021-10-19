@@ -17,13 +17,14 @@ import {
 } from "@grida/builder-config-preset";
 import { useRouter } from "next/router";
 import { ParsedUrlQuery } from "querystring";
-import { FrameworkConfig, output } from "@designto/config";
+import { config, FrameworkConfig, output } from "@designto/config";
 import { RemoteImageRepositories } from "@design-sdk/figma-remote/lib/asset-repository/image-repository";
 import {
   ImageRepository,
   MainImageRepository,
 } from "@design-sdk/core/assets-repository";
 import LoadingLayout from "../../layout/loading-overlay";
+import { DesignInput } from "@designto/config/input";
 
 export default function DesignToCodeUniversalPage() {
   const router = useRouter();
@@ -36,7 +37,7 @@ export default function DesignToCodeUniversalPage() {
 
   useEffect(() => {
     if (design) {
-      const { reflect } = design;
+      const { reflect, raw } = design;
       const { id, name } = reflect;
       // ------------------------------------------------------------
       // other platforms are not supported yet
@@ -50,11 +51,7 @@ export default function DesignToCodeUniversalPage() {
       );
       // ------------------------------------------------------------
       designToCode({
-        input: {
-          id: id,
-          name: name,
-          design: reflect,
-        },
+        input: DesignInput.fromApiResponse({ entry: reflect, raw }),
         framework: framework_config,
         asset_config: { asset_repository: MainImageRepository.instance },
       }).then((result) => {
@@ -69,7 +66,11 @@ export default function DesignToCodeUniversalPage() {
           input: {
             id: id,
             name: name,
-            design: reflect,
+            entry: reflect,
+          },
+          build_config: {
+            ...config.default_build_configuration,
+            disable_components: true,
           },
           framework: preview_runner_framework,
           asset_config: { asset_repository: MainImageRepository.instance },
