@@ -1,5 +1,5 @@
 ---
-title: Component Property Default value
+title: "Component Property Default value"
 version: 0.1.0
 revision: 1
 ---

@@ -1,5 +1,5 @@
 ---
-title: Css color vs background-color
+title: "CSS color vs background-color"
 version: 0.1.0
 revision: 1
 ---

@@ -1,5 +1,5 @@
 ---
-title: Understanding Nested Components
+title: "Understanding Nested Components"
 version: 0.1.0
 revision: 1
 ---

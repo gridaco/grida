@@ -1,5 +1,5 @@
 ---
-title: Figma Text AutoResize
+title: "Figma Text AutoResize"
 version: 0.1.0
 revision: 1
 ---

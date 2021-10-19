@@ -1,5 +1,5 @@
 ---
-title: Figma Auto layout
+title: "Figma Auto layout"
 version: 0.1.0
 revision: 1
 ---

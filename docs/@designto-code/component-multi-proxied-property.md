@@ -1,5 +1,5 @@
 ---
-title: Multi Proxied Property on components
+title: "Multi Proxied Property on components"
 version: 0.1.0
 revision: 1
 ---

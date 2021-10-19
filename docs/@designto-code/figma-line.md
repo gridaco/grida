@@ -1,5 +1,5 @@
 ---
-title: Figma Line
+title: "Figma Line"
 version: 0.1.0
 revision: 1
 ---

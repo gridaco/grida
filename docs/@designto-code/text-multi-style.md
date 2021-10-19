@@ -1,5 +1,5 @@
 ---
-title: Text with multiple styles (WIP)
+title: "Text with multiple styles (WIP)"
 version: 0.1.0
 revision: 1
 ---

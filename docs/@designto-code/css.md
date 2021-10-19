@@ -1,5 +1,5 @@
 ---
-title: CSS Strategy
+title: "CSS Strategy"
 version: 0.1.0
 revision: 1
 ---

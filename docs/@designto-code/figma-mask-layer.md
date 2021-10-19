@@ -1,5 +1,5 @@
 ---
-title: Figma mask (not frame)
+title: "Figma mask (not frame)"
 version: 0.1.0
 revision: 1
 ---

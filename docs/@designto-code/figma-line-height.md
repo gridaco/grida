@@ -1,5 +1,5 @@
 ---
-title: Figma line-height
+title: "Figma line-height"
 version: 0.1.0
 revision: 1
 ---

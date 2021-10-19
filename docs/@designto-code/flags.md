@@ -1,5 +1,5 @@
 ---
-title: Flags (Proposal)
+title: "Flags (Proposal)"
 version: 0.1.0
 revision: 1
 ---
