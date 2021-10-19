@@ -4,7 +4,7 @@ version: 0.1.0
 revision: 1
 ---
 
-# Flutter: When to use - ConstrainedBox VS (SizedBox, Container, Column, Row)
+# [Flutter] When to use - ConstrainedBox VS (SizedBox, Container, Column, Row)
 
 > this describes when to use ConstrainedBox instead of listed above, and how we handle relative layout scenarios in design-to-code-standard.
 
