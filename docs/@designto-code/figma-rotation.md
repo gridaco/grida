@@ -1,3 +1,9 @@
+---
+title: Figma rotation
+version: 0.1.0
+revision: 1
+---
+
 # Figma rotation
 
 ![](./assets/figma-rotation-example.png)
@@ -182,6 +188,10 @@ node.name = "--animated-rotation";
 ```css
 /* WIP */
 ```
+
+## Note for assistant
+
+On assistant, on a plugin version, the assets are exported as-is including the rotated snapshot. which means having rotation on already rotated image will cause incorrect visualization. i.e having 30 rotated triangle vector, the graphics exports as-is, in total 60 rotated visually.
 
 ## Read Also
 

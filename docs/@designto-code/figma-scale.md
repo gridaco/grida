@@ -1,16 +1,16 @@
-
+---
+title: Figma scale
+version: 0.1.0
+revision: 1
+---
 
 # Figma scale
 
 > This document is incomplete.
 
-
-
 How Figma scale works - Figma SCALE is a representation of responsive scaling (not a static scaling)
 
 - https://css-tricks.com/scaled-proportional-blocks-with-css-and-javascript/
-
-
 
 ## Transform?
 
@@ -87,10 +87,6 @@ Transform(
   child: node
 )
 ```
-
-
-
-
 
 ## Read Also
 

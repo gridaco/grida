@@ -1,3 +1,9 @@
+---
+title: Css When to use css position absolute or fixed
+version: 0.1.0
+revision: 1
+---
+
 # When to use css position:`absolute | fixed`
 
 The difference between absolute and fixed happens when thier is more than 1 dpeth level of hierarchy.

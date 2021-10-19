@@ -1,3 +1,9 @@
+---
+title: How to determine if flexbox should have overflow porperty?
+version: 0.1.0
+revision: 1
+---
+
 # How to determine if flexbox should have overflow porperty?
 
 > To make flexbox scroll, we have to put `overflow: auto` property. E.g. flexbox under root (screen) shoyld be scrolled.

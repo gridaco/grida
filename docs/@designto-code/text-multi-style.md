@@ -1,3 +1,9 @@
+---
+title: Text with multiple styles (WIP)
+version: 0.1.0
+revision: 1
+---
+
 <!-- WIP - this doecument is incomplete -->
 
 # Text with multiple styles (WIP)

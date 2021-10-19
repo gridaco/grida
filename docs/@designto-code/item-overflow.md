@@ -1,3 +1,9 @@
+---
+title: Item overflowing scenarios (static, no-scroll)
+version: 0.1.0
+revision: 1
+---
+
 # Item overflowing scenarios (static, no-scroll)
 
 This is not a document for overflowing layout, a scroll. ([Go here for overflowing layout scroll docs](./overflow-layout-scroll.md))

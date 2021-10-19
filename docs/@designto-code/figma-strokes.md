@@ -1,3 +1,9 @@
+---
+title: Figma strokes
+version: 0.1.0
+revision: 1
+---
+
 # Figma strokes
 
 Fimga storkes can be a array just like fills. as well as gradient & image as a paint.

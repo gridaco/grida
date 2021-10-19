@@ -1,3 +1,9 @@
+---
+title: Figma Constraints - STRETCH
+version: 0.1.0
+revision: 1
+---
+
 # Constraints - STRETCH
 
 > This document is based on horizontally stretched element. (which applies the same to vertically stretched.)

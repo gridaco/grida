@@ -1,6 +1,8 @@
-# Documentations landingpage (for github)
+# This directory is copied from [gridaco/designto-code](https://github.com/gridaco/designto-code)
 
-For entry, goto [index.md](./index.md)
+> Documentations landingpage (for github)
+
+For entry, goto [grida.co/docs/@designto-code](grida.co/docs/)
 
 ## Workflows (**Important!**)
 

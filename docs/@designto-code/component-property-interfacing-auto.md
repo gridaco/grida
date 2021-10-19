@@ -1,3 +1,9 @@
+---
+title: Automatic property interfacing strategy for Components
+version: 0.1.0
+revision: 1
+---
+
 # Automatic property interfacing strategy for Components
 
 > Learn more at [support-components](../packages/support-components/README.md)

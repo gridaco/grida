@@ -1,3 +1,9 @@
+---
+title: Component Property Default value
+version: 0.1.0
+revision: 1
+---
+
 # Component Property Default value
 
 This document demonstrates how assigning a default value differes by frameworks and languages

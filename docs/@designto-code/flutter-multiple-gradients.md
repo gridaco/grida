@@ -1,3 +1,9 @@
+---
+title: Flutter multiple gradients
+version: 0.1.0
+revision: 1
+---
+
 # Flutter multiple gradients
 
 How to apply multiple gradients as a background?

@@ -1,3 +1,9 @@
+---
+title: Flutter box decoration mutiple visuals
+version: 0.1.0
+revision: 1
+---
+
 # Flutter box decoration mutiple visuals
 
 ## Color + Gradient

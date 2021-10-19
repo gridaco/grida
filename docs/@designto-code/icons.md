@@ -1,3 +1,9 @@
+---
+title: Icons
+version: 0.1.0
+revision: 1
+---
+
 # Icons
 
 ## Detecion

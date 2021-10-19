@@ -1,3 +1,9 @@
+---
+title: Figma Auto layout
+version: 0.1.0
+revision: 1
+---
+
 # Figma Auto layout
 
 > These are the figma frame's property effecting to auto layouyt (flexbox) behaiviour

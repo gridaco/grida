@@ -1,3 +1,9 @@
+---
+title: Understanding Nested Components
+version: 0.1.0
+revision: 1
+---
+
 # Understanding Nested Components
 
 ![](./assets/component-nested-simple-example-with-numbers.png)
