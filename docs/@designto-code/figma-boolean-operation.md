@@ -1,5 +1,5 @@
 ---
-title: Figma Boolean operation and how to handle it.
+title: "Figma Boolean operation and how to handle it."
 version: 0.1.0
 revision: 1
 ---

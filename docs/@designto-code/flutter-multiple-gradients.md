@@ -1,5 +1,5 @@
 ---
-title: Flutter multiple gradients
+title: "Flutter multiple gradients"
 version: 0.1.0
 revision: 1
 ---

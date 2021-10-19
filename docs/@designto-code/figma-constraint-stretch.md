@@ -1,5 +1,5 @@
 ---
-title: Figma Constraints - STRETCH
+title: "Figma Constraints - STRETCH"
 version: 0.1.0
 revision: 1
 ---

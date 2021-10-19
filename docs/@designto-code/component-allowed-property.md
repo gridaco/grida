@@ -1,5 +1,5 @@
 ---
-title: Allowed properties for components
+title: "Allowed properties for components"
 version: 0.1.0
 revision: 1
 ---

@@ -1,5 +1,5 @@
 ---
-title: Break lines in jsx
+title: "Break-lines in jsx"
 version: 0.1.0
 revision: 1
 ---

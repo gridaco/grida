@@ -1,5 +1,5 @@
 ---
-title: Figma rotation
+title: "Figma rotation"
 version: 0.1.0
 revision: 1
 ---

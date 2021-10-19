@@ -1,5 +1,5 @@
 ---
-title: Figma Vectors
+title: "Figma Vectors"
 version: 0.1.0
 revision: 1
 ---

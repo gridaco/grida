@@ -1,5 +1,5 @@
 ---
-title: Automatic property interfacing strategy for Components
+title: "Automatic property interfacing strategy for Components"
 version: 0.1.0
 revision: 1
 ---

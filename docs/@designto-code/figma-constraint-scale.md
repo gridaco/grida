@@ -1,5 +1,5 @@
 ---
-title: Figma Constraints - SCALE
+title: "Figma Constraints - SCALE"
 version: 0.1.0
 revision: 1
 ---

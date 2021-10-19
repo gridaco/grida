@@ -1,5 +1,5 @@
 ---
-title: Constraints - CENTER
+title: "Constraints - CENTER"
 version: 0.1.0
 revision: 1
 ---

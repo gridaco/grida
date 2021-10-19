@@ -1,5 +1,5 @@
 ---
-title: Known issues
+title: "Known issues"
 version: 0.1.0
 revision: 1
 ---

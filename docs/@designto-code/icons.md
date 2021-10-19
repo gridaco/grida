@@ -1,5 +1,5 @@
 ---
-title: Icons
+title: "Icons"
 version: 0.1.0
 revision: 1
 ---

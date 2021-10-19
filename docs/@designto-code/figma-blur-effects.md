@@ -1,5 +1,5 @@
 ---
-title: Figma blur effects
+title: "Figma blur effects"
 version: 0.1.0
 revision: 1
 ---

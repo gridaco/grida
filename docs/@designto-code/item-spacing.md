@@ -1,5 +1,5 @@
 ---
-title: Multiple item spacing concepts & implementations by platforms
+title: "Multiple item spacing concepts & implementations by platforms"
 version: 0.1.0
 revision: 1
 ---
