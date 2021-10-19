@@ -14,22 +14,18 @@ import { ThemeInterface } from "utils/styled/theme";
 import { DocsManifest, DocsRoute } from "../../utils/docs/model";
 
 const docsmanifest = import("../../../docs/manifest");
-let docsmanifest_cache: DocsManifest;
 
 function DocsNavigation() {
-  const [manifest, setManifest] = useState<DocsManifest>(docsmanifest_cache);
+  const [manifest, setManifest] = useState<DocsManifest>();
   const [isOpen, setIsOpen] = useState(false);
   const [currentRouter, setCurrentRouter] = useState("");
   const router = useRouter();
 
   useEffect(() => {
-    if (!docsmanifest_cache) {
-      docsmanifest.then(d => {
-        const newmanifest: DocsManifest = d.default.routes as any;
-        docsmanifest_cache = newmanifest;
-        setManifest(newmanifest);
-      });
-    }
+    docsmanifest.then(d => {
+      const newmanifest: DocsManifest = d.default.routes as any;
+      setManifest(newmanifest);
+    });
   }, []);
 
   useEffect(() => {
