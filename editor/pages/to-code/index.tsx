@@ -174,6 +174,10 @@ function get_framework_config(framework: string) {
     case "react-default":
     case "react.default":
       return react_presets.react_default;
+    case "react-with-styled-components":
+      return react_presets.react_with_styled_components;
+    case "react-with-emotion-styled":
+      return react_presets.react_with_emotion_styled;
     case "flutter":
     case "flutter_default":
     case "flutter-default":
