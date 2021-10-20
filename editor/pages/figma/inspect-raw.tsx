@@ -15,7 +15,6 @@ export default function InspectRaw() {
   }
   const { node, reflect, raw, remote, figma } = design;
   //
-
   return (
     <>
       <MonacoEditor
