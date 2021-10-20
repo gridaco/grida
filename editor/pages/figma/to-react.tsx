@@ -17,6 +17,7 @@ import { WidgetTree as WebWidgetTree } from "@web-builder/core";
 import * as core from "@reflect-ui/core";
 import { react as reactconfig } from "@designto/config";
 import { useReflectTargetNode } from "../../query/from-figma";
+import { react_presets } from "@grida/builder-config-preset";
 
 export default function FigmaToReactDemoPage() {
   const [targetSelectionNodeId, setTargetSelectionNodeId] = useState<string>();
@@ -42,9 +43,10 @@ export default function FigmaToReactDemoPage() {
   if (reflect) {
     reflectWidget = tokenize(reflect);
     widgetTree = react.buildReactWidget(reflectWidget);
-    const _stringfiedReactwidget = react.buildReactApp(widgetTree, {
-      template: "cra",
-    });
+    const _stringfiedReactwidget = react.buildReactApp(
+      widgetTree,
+      react_presets.react_default
+    );
 
     reactComponent = _stringfiedReactwidget;
   }
