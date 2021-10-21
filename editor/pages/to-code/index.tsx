@@ -34,6 +34,9 @@ export default function DesignToCodeUniversalPage() {
 
   const framework_config = get_framework_config_from_query(router.query);
   const preview_runner_framework = get_preview_runner_framework(router.query);
+  const enable_components = get_enable_components_config_from_query(
+    router.query
+  );
 
   useEffect(() => {
     if (design) {
@@ -54,6 +57,10 @@ export default function DesignToCodeUniversalPage() {
         input: DesignInput.fromApiResponse({ entry: reflect, raw }),
         framework: framework_config,
         asset_config: { asset_repository: MainImageRepository.instance },
+        build_config: {
+          ...config.default_build_configuration,
+          disable_components: !enable_components,
+        },
       }).then((result) => {
         setResult(result);
         if (framework_config.framework == preview_runner_framework.framework) {
@@ -162,6 +169,16 @@ export default function DesignToCodeUniversalPage() {
   );
 }
 
+function get_enable_components_config_from_query(
+  query: ParsedUrlQuery
+): boolean {
+  const enable_components = query["components"];
+  if (enable_components) {
+    return enable_components === "true";
+  }
+  return false;
+}
+
 function get_framework_config_from_query(query: ParsedUrlQuery) {
   const framework = query.framework as string;
   return get_framework_config(framework);
@@ -174,6 +191,10 @@ function get_framework_config(framework: string) {
     case "react-default":
     case "react.default":
       return react_presets.react_default;
+    case "react-with-styled-components":
+      return react_presets.react_with_styled_components;
+    case "react-with-emotion-styled":
+      return react_presets.react_with_emotion_styled;
     case "flutter":
     case "flutter_default":
     case "flutter-default":
