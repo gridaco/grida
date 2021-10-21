@@ -151,14 +151,28 @@ export default function DesignToCodeUniversalPage() {
               <div
                 style={{
                   display: "flex",
-                  flexDirection: "row",
-                  alignItems: "stretch",
+                  flexDirection: "column",
+                  alignItems: "start",
                 }}
               >
                 <ClearRemoteDesignSessionCache
                   key={design.url}
                   url={design.url}
                 />
+                <br />
+                {(design.reflect.origin === "INSTANCE" ||
+                  design.reflect.origin === "COMPONENT") && (
+                  <button
+                    onClick={() => {
+                      router.push({
+                        pathname: "/figma/inspect-component",
+                        query: router.query,
+                      });
+                    }}
+                  >
+                    inspect component
+                  </button>
+                )}
                 {/* <div style={{ flex: 1 }}>
                   <WidgetTree data={reflectWidget} />
                 </div>
