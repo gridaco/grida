@@ -25,6 +25,7 @@ import {
 } from "@design-sdk/core/assets-repository";
 import LoadingLayout from "../../layout/loading-overlay";
 import { DesignInput } from "@designto/config/input";
+import { ClearRemoteDesignSessionCache } from "../../components/clear-remote-design-session-cache";
 
 export default function DesignToCodeUniversalPage() {
   const router = useRouter();
@@ -154,6 +155,10 @@ export default function DesignToCodeUniversalPage() {
                   alignItems: "stretch",
                 }}
               >
+                <ClearRemoteDesignSessionCache
+                  key={design.url}
+                  url={design.url}
+                />
                 {/* <div style={{ flex: 1 }}>
                   <WidgetTree data={reflectWidget} />
                 </div>
