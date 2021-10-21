@@ -13,7 +13,7 @@ import { CodeEditor } from "../../components/code-editor";
 import { tokenize } from "@designto/token";
 import * as react from "@designto/react";
 import { mapGrandchildren } from "@design-sdk/core/utils";
-import { WidgetTree as WebWidgetTree } from "@web-builder/core";
+import { StylableJsxWidget } from "@web-builder/core";
 import * as core from "@reflect-ui/core";
 import { react as reactconfig } from "@designto/config";
 import { useReflectTargetNode } from "../../query/from-figma";
@@ -39,7 +39,7 @@ export default function FigmaToReactDemoPage() {
 
   let reactComponent: reactconfig.ReactComponentOutput;
   let reflectWidget: core.Widget;
-  let widgetTree: WebWidgetTree;
+  let widgetTree: StylableJsxWidget;
   if (reflect) {
     reflectWidget = tokenize(reflect);
     widgetTree = react.buildReactWidget(reflectWidget);
