@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { designToCode } from "@designto/code";
+import { designToCode, Result } from "@designto/code";
 import { useDesign } from "../../query-hooks";
 import styled from "@emotion/styled";
 import { DefaultEditorWorkspaceLayout } from "../../layout/default-editor-workspace-layout";
@@ -25,12 +25,14 @@ import {
 } from "@design-sdk/core/assets-repository";
 import LoadingLayout from "../../layout/loading-overlay";
 import { DesignInput } from "@designto/config/input";
+import { ClearRemoteDesignSessionCache } from "../../components/clear-remote-design-session-cache";
+import { WidgetTree } from "../../components/visualization/json-visualization/json-tree";
 
 export default function DesignToCodeUniversalPage() {
   const router = useRouter();
   const design = useDesign();
-  const [result, setResult] = useState<output.ICodeOutput>();
-  const [preview, setPreview] = useState<output.ICodeOutput>();
+  const [result, setResult] = useState<Result>();
+  const [preview, setPreview] = useState<Result>();
 
   const framework_config = get_framework_config_from_query(router.query);
   const preview_runner_framework = get_preview_runner_framework(router.query);
@@ -145,7 +147,7 @@ export default function DesignToCodeUniversalPage() {
               />
             </InspectionPanelContentWrap>
           </WorkspaceContentPanel>
-          <WorkspaceBottomPanelDockLayout>
+          <WorkspaceBottomPanelDockLayout resizable>
             <WorkspaceContentPanel>
               <div
                 style={{
@@ -154,12 +156,33 @@ export default function DesignToCodeUniversalPage() {
                   alignItems: "stretch",
                 }}
               >
-                {/* <div style={{ flex: 1 }}>
-                  <WidgetTree data={reflectWidget} />
-                </div>
                 <div style={{ flex: 1 }}>
-                  <WidgetTree data={widgetTree} />
-                </div> */}
+                  <ClearRemoteDesignSessionCache
+                    key={design.url}
+                    url={design.url}
+                  />
+                  <br />
+                  {(design.reflect.origin === "INSTANCE" ||
+                    design.reflect.origin === "COMPONENT") && (
+                    <button
+                      onClick={() => {
+                        router.push({
+                          pathname: "/figma/inspect-component",
+                          query: router.query,
+                        });
+                      }}
+                    >
+                      inspect component
+                    </button>
+                  )}
+                </div>
+
+                <div style={{ flex: 2 }}>
+                  <WidgetTree data={design.reflect} />
+                </div>
+                <div style={{ flex: 2 }}>
+                  <WidgetTree data={result.widget} />
+                </div>
               </div>
             </WorkspaceContentPanel>
           </WorkspaceBottomPanelDockLayout>

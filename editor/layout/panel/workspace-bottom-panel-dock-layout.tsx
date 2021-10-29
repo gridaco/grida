@@ -1,5 +1,6 @@
 import styled from "@emotion/styled";
-import React from "react";
+import React, { useState } from "react";
+import { Resizable } from "re-resizable";
 
 /**
  * bottom docked layout. its content displays as row
@@ -9,12 +10,36 @@ import React from "react";
  */
 export function WorkspaceBottomPanelDockLayout(props: {
   children: JSX.Element | JSX.Element[];
+  resizable?: boolean;
 }) {
-  return <DockRootWrap>{props.children}</DockRootWrap>;
+  const [height, setHeight] = useState(300);
+
+  const body = props.children;
+  return props.resizable ? (
+    <Resizable
+      size={{
+        height: height,
+        width: "100%",
+      }}
+      enable={{
+        top: true,
+        bottom: false,
+        left: false,
+        right: false,
+      }}
+      defaultSize={{ height: height, width: "100%" }}
+      onResize={(e, direction, ref, d) => {
+        setHeight(height + d.height);
+      }}
+    >
+      <DockRootWrap>{body}</DockRootWrap>
+    </Resizable>
+  ) : (
+    <DockRootWrap>{body}</DockRootWrap>
+  );
 }
 
 const DockRootWrap = styled.div`
-  min-height: 100%;
   border: solid #d2d2d2;
   align-self: stretch;
   border-width: 1px;

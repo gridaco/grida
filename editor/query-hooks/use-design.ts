@@ -56,6 +56,7 @@ export function useDesign(
               _1_converted_to_figma
             );
             setDesign(<TargetNodeConfig>{
+              ...targetnodeconfig,
               raw: last_response,
               figma: _1_converted_to_figma,
               reflect: _2_converted_to_reflect,
