@@ -111,7 +111,7 @@ function LoadingStateBody(props: {
       <p>
         You need to complete "connect with figma" to complete importing your
         desing. Otherwise{" "}
-        <a target="_blank" href="https://grida.co/docs/howto-import-desing">
+        <a target="_blank" href="https://grida.co/docs/howto-import-design">
           Read this.
         </a>
         <br />
