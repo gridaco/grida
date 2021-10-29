@@ -1158,6 +1158,15 @@
     "@babel/helper-validator-identifier" "^7.14.9"
     to-fast-properties "^2.0.0"
 
+"@base-sdk-fp/auth@0.1.0-2":
+  version "0.1.0-2"
+  resolved "https://registry.yarnpkg.com/@base-sdk-fp/auth/-/auth-0.1.0-2.tgz#9932e76d4aa7b88c8eed23cfdf0e949b581d16d4"
+  integrity sha512-1cnAftih+EOfE+h7QqiMDCNZfSiRfVTKQPDPeSyCIxlJVKuKDJPCuGJOJfRlQ165u3pU61saeC7ni6Q8ARuWOA==
+  dependencies:
+    "@base-sdk/core" "0.1.0-1"
+    axios-retry "^3.1.9"
+    otplib "^12.0.1"
+
 "@base-sdk/core@0.1.0":
   version "0.1.0"
   resolved "https://registry.yarnpkg.com/@base-sdk/core/-/core-0.1.0.tgz#865eb7373b77d367dd57dc7660452a889d6bb139"
@@ -1173,13 +1182,6 @@
   dependencies:
     "@base-sdk/core" "0.1.0"
     axios "^0.21.1"
-
-"@base-sdk/scene-store@^0.0.8":
-  version "0.0.8"
-  resolved "https://registry.yarnpkg.com/@base-sdk/scene-store/-/scene-store-0.0.8.tgz#d9182150235304ca4c39ebdbe21cfa36453e983e"
-  integrity sha512-51yaFfGjzZY3iJRbtw3LopGAUpryUDcRm0hdrLJdGLkr4QZ2VwgTSJALEez0ilGLzluo7ozivlMSSVMsaClB9g==
-  dependencies:
-    "@base-sdk/core" "0.1.0"
 
 "@base-sdk/url@0.1.0":
   version "0.1.0"

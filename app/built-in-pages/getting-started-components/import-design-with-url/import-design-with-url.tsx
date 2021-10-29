@@ -8,8 +8,7 @@ import { DesignImporterLoaderResult } from "./o";
 import { analyzeDesignUrl, DesignProvider } from "@design-sdk/url-analysis";
 import { designToCode } from "@designto/code";
 import { input } from "@designto/config";
-import { Language } from "@grida/builder-platform-types";
-import { hasLinkedFigmaAccount } from "@app/fapi/accounts/linked-accounts";
+import { linkedaccounts } from "@base-sdk-fp/accounts";
 import { show_dialog_import_figma_design_after_authentication } from "../../../modals/import-figma-design-after-authentication";
 import { isOneOfDemoDesignUrl, loadDemoDesign } from "../../../built-in-demos";
 import { add_on_current } from "@core/state";
@@ -76,7 +75,7 @@ export function ImportDesignWithUrl() {
 
     switch (analyzeDesignUrl(url)) {
       case "figma":
-        const cancontinue = await hasLinkedFigmaAccount();
+        const cancontinue = await linkedaccounts.hasLinkedFigmaAccount();
         if (!cancontinue) {
           await show_dialog_import_figma_design_after_authentication();
         }

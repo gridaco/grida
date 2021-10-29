@@ -1,8 +1,9 @@
 import React, { useState } from "react";
-import { Dialog, DialogTrigger, DialogContent } from "@editor-ui/dialog";
+import { Dialog, DialogContent } from "@editor-ui/dialog";
 import { Button } from "@editor-ui/button";
 import { setOauthToken } from "../../3rd-party-api/figma";
-import { tunnel, linkedaccounts } from "@app/fapi";
+import { tunnel } from "@base-sdk-fp/auth";
+import { linkedaccounts } from "@base-sdk-fp/accounts";
 import { create } from "@editor-ui/dialog";
 export const show_dialog_import_figma_design_after_authentication = create(
   ImportFigmaDesignAfterAuthentication_Modal
