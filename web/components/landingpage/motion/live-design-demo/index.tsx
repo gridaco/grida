@@ -47,6 +47,7 @@ export default function LiveDesignDemoFrame() {
         loop
         playing
         muted
+        playsinline
         config={{
           file: {
             attributes: {
