@@ -1,4 +1,7 @@
 const withTM = require("next-transpile-modules")([
+  // region @editor-app
+  "@editor-app/live-session",
+
   // -----------------------------
   // region @designto-code
   "@designto/config",
