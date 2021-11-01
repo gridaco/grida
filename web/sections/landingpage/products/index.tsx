@@ -123,6 +123,7 @@ const Products = () => {
             loop
             playing
             muted
+            playsinline
             config={{
               file: {
                 attributes: {
