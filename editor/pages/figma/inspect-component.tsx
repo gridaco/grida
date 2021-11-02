@@ -22,7 +22,7 @@ import { make_instance_component_meta } from "@code-features/component";
 
 export default function InspectComponent() {
   //
-  const design = useDesign();
+  const design = useDesign({ type: "use-router" });
   if (!design) {
     return <LoadingLayout />;
   }

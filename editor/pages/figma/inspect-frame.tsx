@@ -10,7 +10,7 @@ import LoadingLayout from "../../layout/loading-overlay";
  */
 export default function InspectAutolayout() {
   //
-  const design = useDesign();
+  const design = useDesign({ type: "use-router" });
   if (!design) {
     return <LoadingLayout />;
   }

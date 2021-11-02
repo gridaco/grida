@@ -21,7 +21,7 @@ import { CodeEditor, MonacoEditor } from "../../components/code-editor";
 import LoadingLayout from "../../layout/loading-overlay";
 
 export default function FigmaToFlutterPage() {
-  const design = useDesign();
+  const design = useDesign({ type: "use-router" });
   const [result, setResult] = useState<output.ICodeOutput>();
 
   useEffect(() => {

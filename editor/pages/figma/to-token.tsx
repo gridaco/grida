@@ -19,7 +19,7 @@ import { RemoteImageRepositories } from "@design-sdk/figma-remote/lib/asset-repo
 import LoadingLayout from "../../layout/loading-overlay";
 
 export default function FigmaToReflectWidgetTokenPage() {
-  const design = useDesign();
+  const design = useDesign({ type: "use-router" });
 
   if (!design) {
     return <LoadingLayout />;

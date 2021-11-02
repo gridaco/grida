@@ -30,7 +30,7 @@ import { WidgetTree } from "../../components/visualization/json-visualization/js
 
 export default function DesignToCodeUniversalPage() {
   const router = useRouter();
-  const design = useDesign();
+  const design = useDesign({ type: "use-router", router: router });
   const [result, setResult] = useState<Result>();
   const [preview, setPreview] = useState<Result>();
 
