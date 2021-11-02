@@ -1,12 +1,21 @@
 import { RawNodeResponse } from "@design-sdk/figma-remote";
+import { parseFileAndNodeId } from "@design-sdk/figma-url";
 
 /**
  * Session cache for remote design. it works based on target url.
  */
 export class RemoteDesignSessionCacheStore {
-  readonly url: string;
-  constructor({ url }: { url: string }) {
-    this.url = url;
+  readonly config: {
+    file: string;
+    node: string;
+  };
+
+  constructor(props: { url: string } | { file: string; node: string }) {
+    if ("url" in props) {
+      this.config = parseFileAndNodeId(props.url);
+    } else {
+      this.config = props;
+    }
   }
 
   set(raw: RawNodeResponse) {
@@ -27,6 +36,8 @@ export class RemoteDesignSessionCacheStore {
   }
 
   private get key() {
-    return `remote-design-session-cache-${this.url}`;
+    return `remote-design-session-cache-${
+      this.config.file + "-" + this.config.node
+    }`;
   }
 }

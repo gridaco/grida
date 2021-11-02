@@ -1,7 +1,7 @@
 import React from "react";
 import { MonacoEditor } from "../../components/code-editor";
 import { SceneNode } from "@design-sdk/figma-types";
-import { useDesign } from "../../query-hooks";
+import { useDesign } from "../../hooks";
 import LoadingLayout from "../../layout/loading-overlay";
 
 /**
@@ -10,7 +10,7 @@ import LoadingLayout from "../../layout/loading-overlay";
  */
 export default function InspectAutolayout() {
   //
-  const design = useDesign();
+  const design = useDesign({ type: "use-router" });
   if (!design) {
     return <LoadingLayout />;
   }

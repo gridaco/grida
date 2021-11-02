@@ -5,14 +5,20 @@ import styled from "@emotion/styled";
  * [design](https://www.figma.com/file/HSozKEVWhh8saZa2vr1Nxd/design-to-code?node-id=554%3A6162)
  * @returns
  */
-function LoadingLayout() {
+function LoadingLayout({
+  title = "Loading",
+  content = "We are now loading design remotely..",
+}: {
+  title?: string;
+  content?: string;
+}) {
   return (
     <RootWrapperLoadingLayout>
       <Frame61>
         <Frame5>
-          <Loading>Loading</Loading>
+          <Loading>{title}</Loading>
           <WeAreNowLoadingDesignRemotely>
-            We are now loading design remotely..
+            {content}
           </WeAreNowLoadingDesignRemotely>
         </Frame5>
       </Frame61>

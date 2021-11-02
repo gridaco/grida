@@ -17,12 +17,12 @@ import {
   WorkspaceContentPanelGridLayout,
 } from "../../layout/panel";
 import { WorkspaceBottomPanelDockLayout } from "../../layout/panel/workspace-bottom-panel-dock-layout";
-import { useDesign } from "../../query-hooks";
+import { useDesign } from "../../hooks";
 import { make_instance_component_meta } from "@code-features/component";
 
 export default function InspectComponent() {
   //
-  const design = useDesign();
+  const design = useDesign({ type: "use-router" });
   if (!design) {
     return <LoadingLayout />;
   }
