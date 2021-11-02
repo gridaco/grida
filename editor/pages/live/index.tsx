@@ -3,10 +3,13 @@ import Pusher from "pusher-js";
 import { useState } from "react";
 import { useEffect } from "react";
 
+const _base_url =
+  "https://ahzdf5x4q3.execute-api.us-west-1.amazonaws.com/production"; // "https://assistant-live-session.grida.cc";
+
 const pusher = new Pusher(process.env.NEXT_PUBLIC_PUSHER_KEY, {
   // 'live-session-from-assistant'
   cluster: "us3",
-  authEndpoint: "https://assistant-live-session.grida.cc/pusher/auth",
+  authEndpoint: _base_url + "/pusher/auth",
 });
 
 export default function LiveSessionPage() {
