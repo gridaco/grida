@@ -6,12 +6,18 @@ import React from "react";
  * @param props
  * @returns
  */
-export function WorkspaceContentPanel(props: { children: JSX.Element }) {
-  return <Container>{props.children}</Container>;
+export function WorkspaceContentPanel({
+  children,
+  disableBorder = false,
+}: {
+  children: JSX.Element;
+  disableBorder?: boolean;
+}) {
+  return <Container disableBorder={disableBorder}>{children}</Container>;
 }
 
-const Container = styled.div`
-  border: solid #d2d2d2;
+const Container = styled.div<{ disableBorder: boolean }>`
+  border: ${(p) => (p.disableBorder ? "none" : "solid #d2d2d2")};
   border-width: 1px;
   align-self: stretch;
   flex: 1;
