@@ -1,6 +1,6 @@
 import React from "react";
 import { MonacoEditor } from "../../components/code-editor";
-import { useDesign } from "../../query-hooks";
+import { useDesign } from "../../hooks";
 import LoadingLayout from "../../layout/loading-overlay";
 
 /**

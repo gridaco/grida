@@ -1,7 +1,7 @@
 import React from "react";
 import { MonacoEditor } from "../../components/code-editor";
 import { SceneNode } from "@design-sdk/figma-types";
-import { useDesign } from "../../query-hooks";
+import { useDesign } from "../../hooks";
 import LoadingLayout from "../../layout/loading-overlay";
 
 /**

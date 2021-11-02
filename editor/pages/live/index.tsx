@@ -3,7 +3,7 @@ import Pusher from "pusher-js";
 import { useState } from "react";
 import { useEffect } from "react";
 import LoadingLayout from "../../layout/loading-overlay";
-import { useDesign } from "../../query-hooks";
+import { useDesign } from "../../hooks";
 
 const _base_url =
   "https://ahzdf5x4q3.execute-api.us-west-1.amazonaws.com/production"; // "https://assistant-live-session.grida.cc";

@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { designToCode, Result } from "@designto/code";
-import { useDesign } from "../../query-hooks";
+import { useDesign } from "../../hooks";
 import styled from "@emotion/styled";
 import { DefaultEditorWorkspaceLayout } from "../../layout/default-editor-workspace-layout";
 import { PreviewAndRunPanel } from "../../components/preview-and-run";

@@ -11,8 +11,8 @@ import { configure_auth_credentials } from "@design-sdk/figma-remote";
 import { TargetNodeConfig } from "../query/target-node";
 import { FigmaRemoteErrors } from "@design-sdk/figma-remote/lib/fetch";
 import { RemoteDesignSessionCacheStore } from "../store";
-import { convert } from "../../packages/design-sdk/figma-node-conversion";
-import { mapFigmaRemoteToFigma } from "../../packages/design-sdk/figma-remote/lib/mapper";
+import { convert } from "@design-sdk/figma-node-conversion";
+import { mapFigmaRemoteToFigma } from "@design-sdk/figma-remote/lib/mapper";
 
 // globally configure auth credentials for interacting with `@design-sdk/figma-remote`
 configure_auth_credentials({

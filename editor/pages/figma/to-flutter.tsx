@@ -16,7 +16,7 @@ import {
   WorkspaceContentPanelGridLayout,
 } from "../../layout/panel";
 import { PreviewAndRunPanel } from "../../components/preview-and-run";
-import { useDesign } from "../../query-hooks";
+import { useDesign } from "../../hooks";
 import { CodeEditor, MonacoEditor } from "../../components/code-editor";
 import LoadingLayout from "../../layout/loading-overlay";
 
