@@ -38,6 +38,3 @@ Below is an example used.
 ```
 
 So, until the video problem is stable in ios 15 safari, the problematic video from `live-design-demo` is replaced with pure html5 `video` tag.
-
-<!--
-그리하여 ios 15 safari에서 비디오 문제가 안정되기 전까지는 문제가 있는 live-design-demo 의 비디오는 순수 html5 비디오 태그로 대치합니다. -->
