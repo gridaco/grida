@@ -118,7 +118,6 @@ function ResultProxyPage({ design }: { design: TargetNodeConfig }) {
       },
     }).then((result) => {
       setResult(result);
-      setPreview(result);
     });
     // ----- for preview -----
     designToCode({
@@ -143,7 +142,7 @@ function ResultProxyPage({ design }: { design: TargetNodeConfig }) {
   }
 
   const { code, scaffold, name: componentName } = result;
-
+  console.log("preview", preview);
   return (
     <WorkspaceContentPanelGridLayout>
       <WorkspaceContentPanel disableBorder>
