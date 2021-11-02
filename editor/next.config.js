@@ -67,9 +67,6 @@ const withTM = require("next-transpile-modules")([
 
   // -----------------------------
   // region builders - part of designto-code / coli
-  // region flutter builder
-  "@flutter-builder/flutter",
-  // endregion flutter builder
 
   // region web builders
   "@coli.codes/nodejs-builder",
@@ -85,13 +82,6 @@ const withTM = require("next-transpile-modules")([
 
 module.exports = withTM({
   webpack: (config) => {
-    config.node = {
-      fs: "empty",
-    };
-    config.module.rules.push({
-      test: /\.txt$/,
-      use: "raw-loader",
-    });
     return config;
   },
   async redirects() {
