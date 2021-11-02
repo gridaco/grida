@@ -1,7 +1,6 @@
 import React, { useEffect } from "react";
 import Editor, { useMonaco, Monaco } from "@monaco-editor/react";
 import * as monaco from "monaco-editor/esm/vs/editor/editor.api";
-import _react_type_def_txt from "./react.d.ts.txt";
 
 export interface MonacoEditorProps {
   defaultValue?: string;
@@ -63,10 +62,6 @@ function setup_react_support(monaco: Monaco) {
     noSemanticValidation: false,
     noSyntaxValidation: false,
   });
-
-  monaco.languages.typescript.typescriptDefaults.addExtraLib(
-    _react_type_def_txt
-  );
 }
 
 export { useMonaco } from "@monaco-editor/react";
