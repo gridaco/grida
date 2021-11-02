@@ -42,7 +42,8 @@ export default function LiveDesignDemoFrame() {
           }
         }}
       /> */}
-      <ReactPlayer
+
+      {/* <ReactPlayer
         url={require("public/videos/landingpage-section2-live-design-demo.min.mp4")}
         loop
         playing
@@ -55,6 +56,14 @@ export default function LiveDesignDemoFrame() {
             },
           },
         }}
+      /> */}
+      <video
+        src={require("public/videos/landingpage-section2-live-design-demo.min.mp4")}
+        autoPlay
+        muted
+        loop
+        playsInline
+        preload="auto"
       />
     </DesignFramePreview>
   );
