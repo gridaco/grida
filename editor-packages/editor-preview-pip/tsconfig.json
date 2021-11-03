@@ -1,0 +1,10 @@
+{
+  "compilerOptions": {
+    "esModuleInterop": true,
+    "sourceMap": false,
+    "jsx": "react",
+    "outDir": "dist",
+    "baseUrl": "./lib"
+  },
+  "exclude": ["node_modules", "**/*.spec.ts", "dist"]
+}
