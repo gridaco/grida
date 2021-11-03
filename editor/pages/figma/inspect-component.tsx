@@ -10,13 +10,13 @@ import {
   WidgetTree,
   WidgetTreeLegend,
 } from "../../components/visualization/json-visualization/json-tree";
-import { DefaultEditorWorkspaceLayout } from "../../layout/default-editor-workspace-layout";
-import LoadingLayout from "../../layout/loading-overlay";
+import { DefaultEditorWorkspaceLayout } from "../../layouts/default-editor-workspace-layout";
+import LoadingLayout from "../../layouts/loading-overlay";
 import {
   WorkspaceContentPanel,
   WorkspaceContentPanelGridLayout,
-} from "../../layout/panel";
-import { WorkspaceBottomPanelDockLayout } from "../../layout/panel/workspace-bottom-panel-dock-layout";
+} from "../../layouts/panel";
+import { WorkspaceBottomPanelDockLayout } from "../../layouts/panel/workspace-bottom-panel-dock-layout";
 import { useDesign } from "../../hooks";
 import { make_instance_component_meta } from "@code-features/component";
 

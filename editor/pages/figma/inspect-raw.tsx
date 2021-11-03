@@ -1,7 +1,7 @@
 import React from "react";
 import { MonacoEditor } from "../../components/code-editor";
 import { useDesign } from "../../hooks";
-import LoadingLayout from "../../layout/loading-overlay";
+import LoadingLayout from "../../layouts/loading-overlay";
 
 /**
  * shows full node data as json in a monaco editor

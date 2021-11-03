@@ -2,13 +2,13 @@ import React, { useEffect, useState } from "react";
 import { designToCode, Result } from "@designto/code";
 import { useDesign } from "../../hooks";
 import styled from "@emotion/styled";
-import { DefaultEditorWorkspaceLayout } from "../../layout/default-editor-workspace-layout";
+import { DefaultEditorWorkspaceLayout } from "../../layouts/default-editor-workspace-layout";
 import { PreviewAndRunPanel } from "../../components/preview-and-run";
 import {
   WorkspaceContentPanel,
   WorkspaceContentPanelGridLayout,
-} from "../../layout/panel";
-import { WorkspaceBottomPanelDockLayout } from "../../layout/panel/workspace-bottom-panel-dock-layout";
+} from "../../layouts/panel";
+import { WorkspaceBottomPanelDockLayout } from "../../layouts/panel/workspace-bottom-panel-dock-layout";
 import { CodeEditor } from "../../components/code-editor";
 import {
   react_presets,
@@ -23,7 +23,7 @@ import {
   ImageRepository,
   MainImageRepository,
 } from "@design-sdk/core/assets-repository";
-import LoadingLayout from "../../layout/loading-overlay";
+import LoadingLayout from "../../layouts/loading-overlay";
 import { DesignInput } from "@designto/config/input";
 import { ClearRemoteDesignSessionCache } from "../../components/clear-remote-design-session-cache";
 import { WidgetTree } from "../../components/visualization/json-visualization/json-tree";

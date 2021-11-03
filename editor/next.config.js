@@ -2,6 +2,10 @@ const withTM = require("next-transpile-modules")([
   // region @editor-app
   "@editor-app/live-session",
 
+  // region editor-submodule deps
+  "@base-sdk-fp/auth",
+  "@base-sdk-fp/auth-components-react",
+
   // -----------------------------
   // region @designto-code
   "@designto/config",
