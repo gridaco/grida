@@ -1,5 +1,5 @@
 import React from "react";
-import PIP from "./PIP";
+import PIP from "./pip";
 import { ResizableBox } from "react-resizable";
 import type { ResizableBoxProps as RawResizableBoxProps } from "react-resizable";
 import styled from "@emotion/styled";
