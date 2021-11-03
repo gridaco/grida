@@ -1,10 +1,15 @@
 {
   "compilerOptions": {
-    "esModuleInterop": true,
-    "sourceMap": false,
+    "lib": ["DOM", "DOM.Iterable", "ES2019"],
+    "target": "ES6",
+    "module": "commonjs",
     "jsx": "react",
+    "esModuleInterop": true,
+    "declaration": true,
     "outDir": "dist",
-    "baseUrl": "./lib"
+    "experimentalDecorators": true,
+    "noUnusedLocals": false,
+    "sourceMap": false
   },
   "exclude": ["node_modules", "**/*.spec.ts", "dist"]
 }

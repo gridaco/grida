@@ -1,6 +1,6 @@
 {
   "name": "@code-editor/preview-pip",
-  "version": "0.1.1",
+  "version": "0.0.1",
   "private": false,
   "description": "A Resizable Picture-in-Picture component.",
   "keywords": [
@@ -44,10 +44,7 @@
   "scripts": {
     "clean": "rimraf dist",
     "prepack": "yarn clean && tsc",
-    "start": "react-scripts start",
-    "build": "rm -rf dist && set NODE_ENV=production && babel lib --out-dir dist --copy-files",
-    "test": "react-scripts test",
-    "eject": "react-scripts eject"
+    "start": "react-scripts start"
   },
   "browserslist": {
     "production": [
@@ -71,5 +68,8 @@
     "@testing-library/user-event": "^12.8.3",
     "typescript": "^4.4.4",
     "web-vitals": "^1.1.2"
+  },
+  "publishConfig": {
+    "access": "public"
   }
 }
