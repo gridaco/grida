@@ -1,13 +1,7 @@
 import React from "react";
-import Link from "next/link";
-import styled from "@emotion/styled";
-import { RecentDesignCardList } from "../components/recent-design-card";
-import {
-  WorkspaceContentPanel,
-  WorkspaceContentPanelGridLayout,
-} from "../layouts/panel";
-import { DefaultEditorWorkspaceLayout } from "../layouts/default-editor-workspace-layout";
-import { SideNavigation } from "../components/side-navigation";
+import { RecentDesignCardList } from "components/recent-design-card";
+import { DefaultEditorWorkspaceLayout } from "layouts/default-editor-workspace-layout";
+import { SideNavigation } from "components/side-navigation";
 
 export default function Home() {
   return (

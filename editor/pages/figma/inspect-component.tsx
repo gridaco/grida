@@ -2,22 +2,22 @@ import { ReflectSceneNode } from "@design-sdk/figma-node";
 import { Figma } from "@design-sdk/figma-types";
 import { tokenize } from "@designto/token";
 import React from "react";
-import { canvas } from "../../components";
-import { LayerHierarchy } from "../../components/editor-hierarchy";
-import { visualize_node } from "../../components/visualization";
+import { canvas } from "components";
+import { LayerHierarchy } from "components/editor-hierarchy";
+import { visualize_node } from "components/visualization";
 import {
   JsonTree,
   WidgetTree,
   WidgetTreeLegend,
-} from "../../components/visualization/json-visualization/json-tree";
-import { DefaultEditorWorkspaceLayout } from "../../layouts/default-editor-workspace-layout";
-import LoadingLayout from "../../layouts/loading-overlay";
+} from "components/visualization/json-visualization/json-tree";
+import { DefaultEditorWorkspaceLayout } from "layouts/default-editor-workspace-layout";
+import LoadingLayout from "layouts/loading-overlay";
 import {
   WorkspaceContentPanel,
   WorkspaceContentPanelGridLayout,
-} from "../../layouts/panel";
-import { WorkspaceBottomPanelDockLayout } from "../../layouts/panel/workspace-bottom-panel-dock-layout";
-import { useDesign } from "../../hooks";
+} from "layouts/panel";
+import { WorkspaceBottomPanelDockLayout } from "layouts/panel/workspace-bottom-panel-dock-layout";
+import { useDesign } from "hooks";
 import { make_instance_component_meta } from "@code-features/component";
 
 export default function InspectComponent() {

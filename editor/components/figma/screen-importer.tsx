@@ -1,11 +1,7 @@
 import React, { useState } from "react";
 import { nodes } from "@design-sdk/figma";
-import { types, fetch } from "@design-sdk/figma-remote";
-import {
-  parseFileAndNodeId,
-  FigmaTargetNodeConfig,
-} from "@design-sdk/figma-url";
-import { UserInputCache } from "../../utils/user-input-value-cache";
+import { fetch } from "@design-sdk/figma-remote";
+import { FigmaTargetNodeConfig } from "@design-sdk/figma-url";
 import { personal } from "@design-sdk/figma-auth-store";
 
 export type OnImportedCallback = (reflect: nodes.ReflectSceneNode) => void;
