@@ -1,5 +1,5 @@
 import React from "react";
-import { CodeEditor, Files } from "../../../components/code-editor";
+import { CodeEditor, Files } from "components/code-editor";
 
 export default function CodeEditorDevPage() {
   const files: Files = {

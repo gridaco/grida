@@ -1,7 +1,7 @@
 import styled from "@emotion/styled";
 import React, { useState } from "react";
-import { AppRunner } from "../app-runner";
-import { ScenePreview } from "../scene-preview";
+import { AppRunner } from "components/app-runner";
+import { ScenePreview } from "components/scene-preview";
 
 type Mode = "preview" | "run";
 

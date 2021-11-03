@@ -1,5 +1,5 @@
 import React from "react";
-import { useAuthState } from "../../hooks";
+import { useAuthState } from "hooks";
 import { useRouter } from "next/router";
 
 export default function AuthenticationPage() {

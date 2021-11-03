@@ -1,22 +1,22 @@
 import React, { useEffect, useState } from "react";
-import { canvas } from "../../components";
+import { canvas } from "components";
 import { tokenize } from "@designto/token";
 import {
   JsonTree,
   WidgetTree,
-} from "../../components/visualization/json-visualization/json-tree";
-import { DefaultEditorWorkspaceLayout } from "../../layouts/default-editor-workspace-layout";
-import { LayerHierarchy } from "../../components/editor-hierarchy";
-import { WorkspaceContentPanelGridLayout } from "../../layouts/panel/workspace-content-panel-grid-layout";
-import { WorkspaceContentPanel } from "../../layouts/panel";
-import { WorkspaceBottomPanelDockLayout } from "../../layouts/panel/workspace-bottom-panel-dock-layout";
-import { useDesign } from "../../hooks";
+} from "components/visualization/json-visualization/json-tree";
+import { DefaultEditorWorkspaceLayout } from "layouts/default-editor-workspace-layout";
+import { LayerHierarchy } from "components/editor-hierarchy";
+import { WorkspaceContentPanelGridLayout } from "layouts/panel/workspace-content-panel-grid-layout";
+import { WorkspaceContentPanel } from "layouts/panel";
+import { WorkspaceBottomPanelDockLayout } from "layouts/panel/workspace-bottom-panel-dock-layout";
+import { useDesign } from "hooks";
 import {
   ImageRepository,
   MainImageRepository,
 } from "@design-sdk/core/assets-repository";
 import { RemoteImageRepositories } from "@design-sdk/figma-remote/lib/asset-repository/image-repository";
-import LoadingLayout from "../../layouts/loading-overlay";
+import LoadingLayout from "layouts/loading-overlay";
 
 export default function FigmaToReflectWidgetTokenPage() {
   const design = useDesign({ type: "use-router" });
