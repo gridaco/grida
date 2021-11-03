@@ -2,7 +2,7 @@ import React from "react";
 import { MonacoEditor } from "../../components/code-editor";
 import { SceneNode } from "@design-sdk/figma-types";
 import { useDesign } from "../../hooks";
-import LoadingLayout from "../../layout/loading-overlay";
+import LoadingLayout from "../../layouts/loading-overlay";
 
 /**
  * shows layout related data as json in a monaco editor

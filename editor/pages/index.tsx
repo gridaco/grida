@@ -5,8 +5,8 @@ import { RecentDesignCardList } from "../components/recent-design-card";
 import {
   WorkspaceContentPanel,
   WorkspaceContentPanelGridLayout,
-} from "../layout/panel";
-import { DefaultEditorWorkspaceLayout } from "../layout/default-editor-workspace-layout";
+} from "../layouts/panel";
+import { DefaultEditorWorkspaceLayout } from "../layouts/default-editor-workspace-layout";
 import { SideNavigation } from "../components/side-navigation";
 
 export default function Home() {
