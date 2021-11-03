@@ -14,7 +14,7 @@ export default function AuthenticationPage() {
       );
     }
     case "signedin": {
-      router.replace("/");
+      router.back();
       break;
     }
     case "expired":
