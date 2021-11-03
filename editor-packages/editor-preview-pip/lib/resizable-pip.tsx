@@ -1,6 +1,7 @@
 import React from "react";
 import PIP from "./pip";
 import { ResizableBox } from "react-resizable";
+import "react-resizable/css/styles.css";
 import type { ResizableBoxProps as RawResizableBoxProps } from "react-resizable";
 import styled from "@emotion/styled";
 
@@ -52,6 +53,11 @@ function ResizablePIP({
   return (
     <PIP>
       <StyledResizableBox
+        draggableOpts={{
+          onMouseDown: (e) => {
+            e.stopPropagation();
+          },
+        }}
         {...otherResizableProps}
         axis={axis}
         handle={resizeHandle}
@@ -68,10 +74,6 @@ function ResizablePIP({
 
 const StyledResizableBox = styled(ResizableBox)`
   overflow: auto;
-
-  :hover {
-    cursor: default;
-  }
 `;
 
 export default ResizablePIP;

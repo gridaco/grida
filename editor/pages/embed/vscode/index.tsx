@@ -1,7 +1,35 @@
 import React from "react";
-import { ResizablePIP } from "@code-editor/preview-pip";
+import {
+  ResizablePIP,
+  VanillaFrameContextManuProvider,
+} from "@code-editor/preview-pip";
 import { CodeEditor } from "components/code-editor";
 import styled from "@emotion/styled";
+
+function Preview() {
+  return (
+    <VanillaFrameContextManuProvider>
+      <div
+        style={{
+          width: "100%",
+          height: "100%",
+        }}
+        onMouseEnter={(e) => {}}
+        onMouseLeave={(e) => {}}
+      >
+        <iframe
+          style={{
+            pointerEvents: "none",
+          }}
+          width="100%"
+          height="100%"
+          srcDoc={dummy_vanilla_src}
+        />
+      </div>
+    </VanillaFrameContextManuProvider>
+  );
+}
+
 export default function EmbedForVSCodeExtensionPage() {
   return (
     <>
@@ -12,7 +40,7 @@ export default function EmbedForVSCodeExtensionPage() {
         minConstraints={[100, 100]}
         maxConstraints={[500, 500]}
       >
-        <iframe width="100%" height="100%" srcDoc={dummy_vanilla_src} />
+        <Preview />
       </ResizablePIP>
       <CodeEditor
         options={{
