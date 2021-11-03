@@ -1,41 +1,72 @@
 import React from "react";
 import PIP from "./PIP";
 import { ResizableBox } from "react-resizable";
+import type { ResizableBoxProps as RawResizableBoxProps } from "react-resizable";
 import styled from "@emotion/styled";
+
+interface ResizableBoxProps
+  extends Omit<RawResizableBoxProps, "width" | "height"> {
+  /**
+   * axis to allow resize to
+   * @default "both"
+   */
+  axis?: "x" | "y" | "both" | "none";
+
+  /**
+   * resize handle to display - a react component
+   * @default none
+   */
+  resizeHandle?: React.ReactNode;
+  /**
+   * @default 500
+   */
+  width?: number;
+  /**
+   * @default 500
+   */
+  height?: number;
+  /**
+   * @default [300, 300]
+   */
+  minConstraints?: [number, number];
+  /**
+   * @default [800, 800]
+   */
+  maxConstraints?: [number, number];
+}
+
+type ResizablePIPProps = {
+  children?: React.ReactNode;
+} & ResizableBoxProps;
 
 function ResizablePIP({
   children,
+  axis = "both",
+  resizeHandle,
   width = 500,
   height = 500,
   minConstraints = [300, 300],
   maxConstraints = [800, 800],
-}: {
-  children?: React.ReactNode;
-  width?: number;
-  height?: number;
-  minConstraints?: [number, number];
-  maxConstraints?: [number, number];
-}) {
+  ...otherResizableProps
+}: ResizablePIPProps) {
   return (
-    <div>
-      <PIP>
-        <StyledResizableBox
-          width={width}
-          height={height}
-          minConstraints={minConstraints}
-          maxConstraints={maxConstraints}
-        >
-          {children}
-        </StyledResizableBox>
-      </PIP>
-    </div>
+    <PIP>
+      <StyledResizableBox
+        {...otherResizableProps}
+        axis={axis}
+        handle={resizeHandle}
+        width={width}
+        height={height}
+        minConstraints={minConstraints}
+        maxConstraints={maxConstraints}
+      >
+        {children}
+      </StyledResizableBox>
+    </PIP>
   );
 }
 
 const StyledResizableBox = styled(ResizableBox)`
-  background: #202429;
-  margin: 20px;
-  border-radius: 0.28571429rem;
   overflow: auto;
 
   :hover {
