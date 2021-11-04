@@ -62,7 +62,7 @@ export const PRODUCT_LIST = [
       "With powerful Design2Code Engine, Grida generates production ready code that can also easily be used for existing projects. Supprt for components, various code styles, naming conventions and fille/directory structures are supported.",
     gradient: "linear-gradient(99.57deg, #6268FF 0%, #9039FF 100%)",
     type: "video",
-    path: require("public/videos/your-design-is-your-code.webm"),
+    path: require("public/videos/your-design-is-your-code.mp4"),
   },
   // {
   // title: "server",
@@ -77,7 +77,7 @@ export const PRODUCT_LIST = [
       "Intuitive content management for your app. Translations support is included. No more excel based text managin tools - we all know that just doesn’t work. With Bridged Globalization, translate where your deisgns are at and update your contents with no update time. Go live with a click.",
     gradient: "linear-gradient(99.57deg, #FBA33C 0%, #FFC700 100%)",
     type: "video",
-    path: require("public/videos/your-design-is-your-transation.webm"),
+    path: require("public/videos/your-design-is-your-transation.mp4"),
   },
   // {
   //     title: "insight",
@@ -93,7 +93,7 @@ export const PRODUCT_LIST = [
       "Built-in git support enables you to integrate your design as a pure component into your existing project. Experience all-in-sync workflow. Keep your code synced as a design. Finally, the code generation tool that supports git.",
     gradient: "linear-gradient(99.57deg, #0E1279 0%, #632655 100%)",
     type: "video",
-    path: require("public/videos/your-design-is-your-git.webm"),
+    path: require("public/videos/your-design-is-your-git.mp4"),
   },
   //  {
   //     title: "everything",
