@@ -132,7 +132,6 @@ const Documentation = styled.div`
     padding: 2px 4px;
     margin: 1px;
     border-radius: 2px;
-    background-color: #e5e7eb;
   }
 
   ul {
