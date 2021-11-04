@@ -43,6 +43,16 @@ export default function LiveDesignDemoFrame() {
         }}
       /> */}
 
+      {/* READ ./ios-15-safari-video-issue.md */}
+      {/* https://github.com/cookpete/react-player/issues/1344 */}
+      <video
+        src={require("public/videos/landingpage-section2-live-design-demo.min.mp4")}
+        autoPlay
+        muted
+        loop
+        playsInline
+        preload="auto"
+      />
       {/* <ReactPlayer
         url={require("public/videos/landingpage-section2-live-design-demo.min.mp4")}
         loop
@@ -57,14 +67,6 @@ export default function LiveDesignDemoFrame() {
           },
         }}
       /> */}
-      <video
-        src={require("public/videos/landingpage-section2-live-design-demo.min.mp4")}
-        autoPlay
-        muted
-        loop
-        playsInline
-        preload="auto"
-      />
     </DesignFramePreview>
   );
 }
