@@ -1,8 +1,6 @@
 import React from "react";
 import { Global, css } from "@emotion/react";
-import styled from "@emotion/styled";
 import Head from "next/head";
-import DevTools from "../layout/dev-tools";
 
 function GlobalCss() {
   return (
@@ -11,7 +9,7 @@ function GlobalCss() {
         body {
           margin: 0px;
           padding: 0;
-          font-family: "Roboto", sans-serif;
+          font-family: "Helvetica Nueue", "Roboto", sans-serif;
         }
         iframe {
           border: none;

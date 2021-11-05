@@ -1,0 +1,9 @@
+{
+    "name": "@editor-app/live-session",
+    "version": "0.0.0",
+    "private": false,
+    "main": "index.ts",
+    "dependencies": {
+        "pusher-js": "^7.0.3"
+    }
+}

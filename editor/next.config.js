@@ -1,4 +1,12 @@
 const withTM = require("next-transpile-modules")([
+  // region @editor-app
+  "@editor-app/live-session",
+  "@code-editor/preview-pip", // TODO: remove me. this is for development. for production, use npm ver instead.
+
+  // region editor-submodule deps
+  "@base-sdk-fp/auth",
+  "@base-sdk-fp/auth-components-react",
+
   // -----------------------------
   // region @designto-code
   "@designto/config",
@@ -64,9 +72,6 @@ const withTM = require("next-transpile-modules")([
 
   // -----------------------------
   // region builders - part of designto-code / coli
-  // region flutter builder
-  "@flutter-builder/flutter",
-  // endregion flutter builder
 
   // region web builders
   "@coli.codes/nodejs-builder",
@@ -82,13 +87,6 @@ const withTM = require("next-transpile-modules")([
 
 module.exports = withTM({
   webpack: (config) => {
-    config.node = {
-      fs: "empty",
-    };
-    config.module.rules.push({
-      test: /\.txt$/,
-      use: "raw-loader",
-    });
     return config;
   },
   async redirects() {

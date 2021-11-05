@@ -10,6 +10,7 @@
   "dependencies": {
     "@babel/runtime": "^7.14.0",
     "@base-sdk/base": "^0.1.0-5",
+    "@code-editor/preview-pip": "^0.0.2",
     "@design-sdk/figma-auth-store": "^0.0.2",
     "@designto/code": "0.0.1",
     "@emotion/core": "^11.0.0",
@@ -18,6 +19,7 @@
     "@material-ui/core": "^4.12.3",
     "@material-ui/icons": "^4.11.2",
     "@material-ui/lab": "^4.0.0-alpha.60",
+    "@modulz/design-system": "^0.6.1",
     "@monaco-editor/react": "^4.1.3",
     "@reflect-blocks/figma-embed": "^0.0.5",
     "@reflect-ui/editor-ui": "0.0.1",

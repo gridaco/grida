@@ -1,5 +1,5 @@
 import React from "react";
-import { FigmaEmbedCanvas } from "../canvas";
+import { FigmaEmbedCanvas } from "components/canvas";
 
 interface ScenePreviewConfig {
   fileid: string;

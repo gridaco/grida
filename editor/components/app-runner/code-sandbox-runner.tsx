@@ -1,9 +1,8 @@
-import React, { useEffect, useState } from "react";
-import styled from "@emotion/styled";
+import React, { useState } from "react";
 import { getParameters } from "codesandbox/lib/api/define";
 import { IFiles } from "codesandbox-import-utils/lib/api/define";
 import axios from "axios";
-import { useAsyncEffect } from "../../hooks";
+import { useAsyncEffect } from "hooks";
 
 type CSB_Template =
   | "adonis"

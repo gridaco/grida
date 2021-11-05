@@ -1,15 +1,15 @@
 import React, { useState } from "react";
 import styled from "@emotion/styled";
-import { DefaultEditorWorkspaceLayout } from "../../layout/default-editor-workspace-layout";
-import { LayerHierarchy } from "../../components/editor-hierarchy";
-import { PreviewAndRunPanel } from "../../components/preview-and-run";
+import { DefaultEditorWorkspaceLayout } from "layouts/default-editor-workspace-layout";
+import { LayerHierarchy } from "components/editor-hierarchy";
+import { PreviewAndRunPanel } from "components/preview-and-run";
 import {
   WorkspaceContentPanel,
   WorkspaceContentPanelGridLayout,
-} from "../../layout/panel";
-import { WorkspaceBottomPanelDockLayout } from "../../layout/panel/workspace-bottom-panel-dock-layout";
-import { WidgetTree } from "../../components/visualization/json-visualization/json-tree";
-import { CodeEditor } from "../../components/code-editor";
+} from "layouts/panel";
+import { WorkspaceBottomPanelDockLayout } from "layouts/panel/workspace-bottom-panel-dock-layout";
+import { WidgetTree } from "components/visualization/json-visualization/json-tree";
+import { CodeEditor } from "components/code-editor";
 import { tokenize } from "@designto/token";
 import * as react from "@designto/react";
 import { mapGrandchildren } from "@design-sdk/core/utils";

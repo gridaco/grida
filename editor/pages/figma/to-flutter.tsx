@@ -8,20 +8,20 @@ import {
 } from "@design-sdk/core/assets-repository";
 import { output } from "@designto/config";
 import { tokenize } from "@designto/token";
-import { utils_dart } from "../../utils";
-import { DefaultEditorWorkspaceLayout } from "../../layout/default-editor-workspace-layout";
-import { LayerHierarchy } from "../../components/editor-hierarchy";
+import { utils_dart } from "utils";
+import { DefaultEditorWorkspaceLayout } from "layouts/default-editor-workspace-layout";
+import { LayerHierarchy } from "components/editor-hierarchy";
 import {
   WorkspaceContentPanel,
   WorkspaceContentPanelGridLayout,
-} from "../../layout/panel";
-import { PreviewAndRunPanel } from "../../components/preview-and-run";
-import { useDesign } from "../../query-hooks";
-import { CodeEditor, MonacoEditor } from "../../components/code-editor";
-import LoadingLayout from "../../layout/loading-overlay";
+} from "layouts/panel";
+import { PreviewAndRunPanel } from "components/preview-and-run";
+import { useDesign } from "hooks";
+import { CodeEditor } from "components/code-editor";
+import LoadingLayout from "layouts/loading-overlay";
 
 export default function FigmaToFlutterPage() {
-  const design = useDesign();
+  const design = useDesign({ type: "use-router" });
   const [result, setResult] = useState<output.ICodeOutput>();
 
   useEffect(() => {

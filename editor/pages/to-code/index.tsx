@@ -1,15 +1,15 @@
 import React, { useEffect, useState } from "react";
 import { designToCode, Result } from "@designto/code";
-import { useDesign } from "../../query-hooks";
+import { useDesign } from "hooks";
 import styled from "@emotion/styled";
-import { DefaultEditorWorkspaceLayout } from "../../layout/default-editor-workspace-layout";
-import { PreviewAndRunPanel } from "../../components/preview-and-run";
+import { DefaultEditorWorkspaceLayout } from "layouts/default-editor-workspace-layout";
+import { PreviewAndRunPanel } from "components/preview-and-run";
 import {
   WorkspaceContentPanel,
   WorkspaceContentPanelGridLayout,
-} from "../../layout/panel";
-import { WorkspaceBottomPanelDockLayout } from "../../layout/panel/workspace-bottom-panel-dock-layout";
-import { CodeEditor } from "../../components/code-editor";
+} from "layouts/panel";
+import { WorkspaceBottomPanelDockLayout } from "layouts/panel/workspace-bottom-panel-dock-layout";
+import { CodeEditor } from "components/code-editor";
 import {
   react_presets,
   flutter_presets,
@@ -17,20 +17,20 @@ import {
 } from "@grida/builder-config-preset";
 import { useRouter } from "next/router";
 import { ParsedUrlQuery } from "querystring";
-import { config, FrameworkConfig, output } from "@designto/config";
+import { config, FrameworkConfig } from "@designto/config";
 import { RemoteImageRepositories } from "@design-sdk/figma-remote/lib/asset-repository/image-repository";
 import {
   ImageRepository,
   MainImageRepository,
 } from "@design-sdk/core/assets-repository";
-import LoadingLayout from "../../layout/loading-overlay";
+import LoadingLayout from "layouts/loading-overlay";
 import { DesignInput } from "@designto/config/input";
-import { ClearRemoteDesignSessionCache } from "../../components/clear-remote-design-session-cache";
-import { WidgetTree } from "../../components/visualization/json-visualization/json-tree";
+import { ClearRemoteDesignSessionCache } from "components/clear-remote-design-session-cache";
+import { WidgetTree } from "components/visualization/json-visualization/json-tree";
 
 export default function DesignToCodeUniversalPage() {
   const router = useRouter();
-  const design = useDesign();
+  const design = useDesign({ type: "use-router", router: router });
   const [result, setResult] = useState<Result>();
   const [preview, setPreview] = useState<Result>();
 

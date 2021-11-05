@@ -1,7 +1,7 @@
 import React from "react";
-import { MonacoEditor } from "../../components/code-editor";
-import { useDesign } from "../../query-hooks";
-import LoadingLayout from "../../layout/loading-overlay";
+import { MonacoEditor } from "components/code-editor";
+import { useDesign } from "hooks";
+import LoadingLayout from "layouts/loading-overlay";
 
 /**
  * shows full node data as json in a monaco editor
@@ -9,7 +9,7 @@ import LoadingLayout from "../../layout/loading-overlay";
  */
 export default function InspectRaw() {
   //
-  const design = useDesign();
+  const design = useDesign({ type: "use-router" });
   if (!design) {
     return <LoadingLayout />;
   }
