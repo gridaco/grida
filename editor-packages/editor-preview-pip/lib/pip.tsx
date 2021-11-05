@@ -61,8 +61,10 @@ function PIP({
   backgroundColor?: string;
 }) {
   return (
-    <Draggable>
+    <Draggable handle=".handle" bounds="parent">
       <PipWindow
+        className="handle"
+        id="handle"
         borderRadius={borderRadius}
         boxShadow={boxShadow}
         zIndex={zIndex}

@@ -11,5 +11,10 @@
     "noUnusedLocals": false,
     "sourceMap": false
   },
-  "exclude": ["node_modules", "**/*.spec.ts", "dist"]
+  "exclude": [
+    "node_modules",
+    "**/*.spec.ts",
+    "dist",
+    "index.ts" // index.ts is for monorepo use
+  ]
 }
