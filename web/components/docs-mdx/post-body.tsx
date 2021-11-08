@@ -28,11 +28,13 @@ export default function PostBody({ content }) {
 
   return (
     <div className="max-w-2xl mx-auto">
-      <Documentation
-        dangerouslySetInnerHTML={{
-          __html: docs,
-        }}
-      />
+      <Documentation>
+        <div
+          dangerouslySetInnerHTML={{
+            __html: docs,
+          }}
+        />
+      </Documentation>
       <Flex justifyContent="space-between" mt="90px">
         <Flex className="cursor" alignItems="center">
           <CustomIcon
