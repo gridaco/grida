@@ -28,6 +28,7 @@ export default function PostBody({ content }) {
 
   return (
     <div className="max-w-2xl mx-auto">
+      {/* width: calc(100% - 310px - 40px); */}
       <Documentation>
         <div
           dangerouslySetInnerHTML={{
