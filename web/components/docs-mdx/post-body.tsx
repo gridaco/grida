@@ -28,13 +28,11 @@ export default function PostBody({ content }) {
 
   return (
     <div className="max-w-2xl mx-auto">
-      <Documentation>
-        <div
-          dangerouslySetInnerHTML={{
-            __html: docs,
-          }}
-        />
-      </Documentation>
+      <Documentation
+        dangerouslySetInnerHTML={{
+          __html: docs,
+        }}
+      ></Documentation>
       <Flex justifyContent="space-between" mt="90px">
         <Flex className="cursor" alignItems="center">
           <CustomIcon
@@ -74,12 +72,6 @@ export default function PostBody({ content }) {
     </div>
   );
 }
-
-const Wrapper = styled.div`
-  /* max-width: 42rem; */
-  /* margin-left: auto;
-  margin-right: auto; */
-`;
 
 const CustomIcon = styled(Icon)`
   svg {
