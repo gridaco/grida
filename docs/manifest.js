@@ -191,6 +191,10 @@ export default {
                   path: "/docs/@designto-code/figma-text-autoresize",
                 },
                 {
+                  title: "Text shadow",
+                  path: "/docs/@designto-code/figma-text-shadow",
+                },
+                {
                   title: "Vector",
                   path: "/docs/@designto-code/figma-vector",
                 },

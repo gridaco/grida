@@ -14,6 +14,7 @@ This is based on diff checking of master `A` and instance `A'`, supporting below
 
 - text data
 - color on **single fill**
+- image as src uri on **single image fill**
 - item spacing
 - margin / padding
 
