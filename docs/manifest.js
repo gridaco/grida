@@ -256,7 +256,7 @@ export default {
               path: "/docs/@designto-code/item-spacing",
             },
             {
-              title: "Knwon issues",
+              title: "Known issues",
               path: "/docs/@designto-code/known-issues",
             },
             {

@@ -1,3 +1,4 @@
+import styled from "@emotion/styled";
 import DocsNavigation from "layout/docs-navigation";
 import ErrorPage from "next/error";
 import Head from "next/head";
@@ -21,7 +22,7 @@ export default function Post({ post, preview }) {
         <PostTitle>Loading…</PostTitle>
       ) : (
         <>
-          <article style={{ width: "calc(100% - 40px)", margin: "0px 20px" }}>
+          <Article>
             <Head>
               <title>{post.title}</title>
               {post.ogImage && (
@@ -29,7 +30,7 @@ export default function Post({ post, preview }) {
               )}
             </Head>
             <PostBody content={post.content} />
-          </article>
+          </Article>
         </>
       )}
     </Layout>
@@ -68,3 +69,14 @@ export async function getStaticPaths() {
     fallback: true,
   };
 }
+
+const Article = styled.article`
+  width: calc(100% - 40px);
+  margin: 0px 20px;
+
+  @media screen and (min-width: 768px) {
+    width: calc(100% - 320px - 40px);
+    /* TEMPORARY! */
+    /* 320px is sidebar 250px + sidebar margin 70px */
+  }
+`;

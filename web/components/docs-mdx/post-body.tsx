@@ -32,7 +32,7 @@ export default function PostBody({ content }) {
         dangerouslySetInnerHTML={{
           __html: docs,
         }}
-      />
+      ></Documentation>
       <Flex justifyContent="space-between" mt="90px">
         <Flex className="cursor" alignItems="center">
           <CustomIcon
