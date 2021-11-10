@@ -31,7 +31,7 @@ export interface ResponsiveContentIframeProps {
    *
    * @default 12
    */
-  margin: number;
+  margin?: number;
 
   /**
    * border radius of iframe container
