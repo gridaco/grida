@@ -17,7 +17,6 @@ export default function VSCodeEmbedGridaExplorerPreview() {
   useEffect(() => {
     // subscribes to user's message
     const listener = (e) => {
-      console.log("received message from client", e.data);
       if (e.data.__signature === __eventfromclient__signature) {
         const event = e.data as EventFromClient;
         switch (event.payload.type) {
@@ -48,7 +47,7 @@ export default function VSCodeEmbedGridaExplorerPreview() {
 }
 
 function __lifecycle_event_page_loaded() {
-  window.postMessage({ __signature: "event-from-page", type: "loaded" });
+  window.postMessage({ __signature: "event-from-host", type: "page-loaded" });
 }
 
 function EmptyState({ message = "Nothing is selected" }: { message?: string }) {
