@@ -1,2 +1,4 @@
 export * from "./lib";
-export { default as VanillaPreview } from "./lib";
+// --------------------
+import { default as VanillaPreview } from "./lib";
+export default VanillaPreview;
