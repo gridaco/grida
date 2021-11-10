@@ -1,5 +1,7 @@
 # Vanilla preview
 
+> Executable web view of the design (vanilla)
+
 ![](./docs/assets/example-of-vanilla-preview-on-grida-assistant.png)
 
 ## Installation
@@ -11,7 +13,7 @@ yarn add @code-editor/vanilla-preview
 ## Usage
 
 ```tsx
-import { VanillaPreview } from "@code-editor/vanilla-preview";
+import VanillaPreview from "@code-editor/vanilla-preview";
 
 export default function () {
   return <VanillaPreview />;
