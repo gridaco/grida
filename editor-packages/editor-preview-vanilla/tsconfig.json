@@ -1,0 +1,20 @@
+{
+  "compilerOptions": {
+    "lib": ["DOM", "DOM.Iterable", "ES2019"],
+    "target": "ES6",
+    "module": "commonjs",
+    "jsx": "react",
+    "esModuleInterop": true,
+    "declaration": true,
+    "outDir": "dist",
+    "experimentalDecorators": true,
+    "noUnusedLocals": false,
+    "sourceMap": false
+  },
+  "exclude": [
+    "node_modules",
+    "**/*.spec.ts",
+    "dist",
+    "index.ts" // index.ts is for monorepo use
+  ]
+}
