@@ -1,5 +1,24 @@
 {
   "name": "@code-editor/vanilla-preview",
   "version": "0.0.0",
-  "private": "false"
+  "private": "false",
+  "scripts": {
+    "prepack": "tsc"
+  },
+  "files": [
+    "dist",
+    "LICENSE",
+    "README.md"
+  ],
+  "peerDependencies": {
+    "@emotion/styled": "^11.3.0",
+    "react": "^17.0.2"
+  },
+  "devDependencies": {
+    "@types/node": "^16.11.7",
+    "typescript": "^4.4.4"
+  },
+  "dependencies": {
+    "react-use-size": "^2.0.4"
+  }
 }
