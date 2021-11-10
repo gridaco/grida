@@ -1,9 +1,11 @@
 {
   "name": "@code-editor/vanilla-preview",
   "version": "0.0.0",
-  "private": "false",
+  "private": false,
+  "main": "dist/index.js",
   "scripts": {
-    "prepack": "tsc"
+    "clean": "rimraf dist",
+    "prepack": "yarn clean && tsc"
   },
   "files": [
     "dist",
@@ -20,5 +22,8 @@
   },
   "dependencies": {
     "react-use-size": "^2.0.4"
+  },
+  "publishConfig": {
+    "access": "public"
   }
 }
