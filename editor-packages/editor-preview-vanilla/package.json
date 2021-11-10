@@ -1,8 +1,9 @@
 {
   "name": "@code-editor/vanilla-preview",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "private": false,
   "main": "dist/index.js",
+  "repository": "https://github.com/gridaco/designto-code",
   "scripts": {
     "clean": "rimraf dist",
     "prepack": "yarn clean && tsc"
