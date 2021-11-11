@@ -82,7 +82,14 @@ module.exports = withBundleAnalyzer(
             },
             {
               source: "/assistant",
-              destination: "/",
+              destination:
+                "https://www.figma.com/community/plugin/896445082033423994",
+              permanent: false,
+            },
+            {
+              source: "/vscode",
+              destination:
+                "https://marketplace.visualstudio.com/items?itemName=grida.grida-vscode",
               permanent: false,
             },
           ];
