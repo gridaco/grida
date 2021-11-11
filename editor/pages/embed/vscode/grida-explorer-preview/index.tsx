@@ -24,6 +24,7 @@ export default function VSCodeEmbedGridaExplorerPreview() {
         switch (event.payload.type) {
           case "clear-preview": {
             setPreview(undefined);
+            setLoading(false);
             break;
           }
           case "update-preview": {
@@ -46,7 +47,7 @@ export default function VSCodeEmbedGridaExplorerPreview() {
   }, []);
 
   if (isEmpty) {
-    return <EmptyState />;
+    return <EmptyState loading={loading} />;
   }
 
   return <PreviewState {...preview} loading={loading} />;
@@ -56,10 +57,16 @@ function __lifecycle_event_page_loaded() {
   window.postMessage({ __signature: "event-from-host", type: "page-loaded" });
 }
 
-function EmptyState({ message = "Nothing is selected" }: { message?: string }) {
+function EmptyState({
+  message = "Nothing is selected",
+  loading,
+}: {
+  message?: string;
+  loading: boolean;
+}) {
   return (
     <EmptyStateContainer>
-      <NothingIsSelected>{message}</NothingIsSelected>
+      <NothingIsSelected>{loading ? "Loading..." : message}</NothingIsSelected>
     </EmptyStateContainer>
   );
 }
