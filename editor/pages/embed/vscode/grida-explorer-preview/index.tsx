@@ -34,6 +34,7 @@ export default function VSCodeEmbedGridaExplorerPreview() {
           }
           case "set-loading": {
             setLoading(event.payload.isLoading);
+            break;
           }
         }
       }
