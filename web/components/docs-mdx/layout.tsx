@@ -1,10 +1,12 @@
-import Meta from "./meta";
-import { Flex } from "rebass";
 import styled from "@emotion/styled";
+import { Flex } from "rebass";
+
 import { media } from "utils/styled/media";
 import { ThemeInterface } from "utils/styled/theme";
 
-export default function Layout({ preview, children }) {
+import Meta from "./meta";
+
+export default function Layout({ children }) {
   return (
     <>
       <Meta />
