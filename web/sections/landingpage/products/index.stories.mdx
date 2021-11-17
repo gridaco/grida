@@ -1,0 +1,29 @@
+import { Meta, Story, Preview, Props } from "@storybook/addon-docs/blocks";
+import { motion } from "framer-motion";
+import SectionLayout from "layout/section";
+import Link from "next/link";
+import ReactPlayer from "react-player";
+import { Flex, Heading, Text } from "rebass";
+
+import BlankArea from "components/blank-area";
+import LandingpageText from "components/landingpage/text";
+import { PRODUCT_LIST } from "utils/landingpage/constants";
+import { media } from "utils/styled/media";
+import { ThemeInterface } from "utils/styled/theme";
+
+import Products from "./";
+
+<Meta title="section/products" />
+
+# Preview
+
+<Preview>
+  <Story name="default">
+    <Products />
+  </Story>
+  <Story name="video">
+    <div>
+      <p>123</p>
+    </div>
+  </Story>
+</Preview>
