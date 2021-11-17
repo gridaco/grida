@@ -1,12 +1,13 @@
-import React from "react";
-import SectionLayout from "layout/section";
 import styled from "@emotion/styled";
+import SectionLayout from "layout/section";
+import React from "react";
+
 import BlankArea from "components/blank-area";
 import { ElevatedVideoPlayer } from "components/landingpage/effect";
-import { media } from "utils/styled/media";
-import { ThemeInterface } from "utils/styled/theme";
 import LandingMainCtaButton from "components/landingpage/main-cta-button";
 import LandingpageText from "components/landingpage/text";
+import { media } from "utils/styled/media";
+import { ThemeInterface } from "utils/styled/theme";
 
 // SEO IMPORTANT
 const Hero = () => {
