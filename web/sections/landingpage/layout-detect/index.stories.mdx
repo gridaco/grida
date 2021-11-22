@@ -1,0 +1,41 @@
+import { Meta, Story, Preview, Props } from "@storybook/addon-docs/blocks";
+import LayoutDetect from "./";
+import ButtonDetectDemo from "components/landingpage/motion/button-detect-demo";
+import LandingpageText from "components/landingpage/text";
+
+
+
+
+<Meta title="section/layout-detect" />
+
+section-layout
+
+# Preview
+
+<Preview>
+  <Story name="default">
+    <SectionLayout alignContent="start">
+      <LandingpageText variant="h2">Yeah, we know.</LandingpageText>
+      <DetectTitle variant="h2">
+        <span>That's a</span>
+        
+      </DetectTitle>
+      <Description variant="body1">
+        Finally, the tool understands your design. More inteligence means less
+        modification. Which leads us to blazing fast workflow. Just design it.
+        We’ll know.
+      </Description>
+      
+    </SectionLayout>
+  </Story>
+  <Story name="button-detect-demo">
+    <SectionLayout
+      className="button-detect-lottie-motion"
+      variant="content-overflow-1"
+      inherit={false}
+      // notAutoAllocateHeight
+    >
+      <ButtonDetectDemo />
+    </SectionLayout>
+  </Story>
+</Preview>

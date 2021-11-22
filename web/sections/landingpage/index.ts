@@ -1,8 +1,8 @@
-import Hero from "./hero";
-import OnlineApp from "./online-app";
-import LayoutDetect from "./layout-detect";
-import Products from "./products";
 import Collaborate from "./collaborate";
+import Hero from "./hero";
+import LayoutDetect from "./layout-detect";
+import OnlineApp from "./online-app";
+import Products from "./products";
 import Slogan from "./slogan";
 
 export default {

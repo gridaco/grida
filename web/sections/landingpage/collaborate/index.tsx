@@ -1,13 +1,14 @@
-import React from "react";
-import SectionLayout from "layout/section";
-import { Flex, Heading, Text } from "rebass";
 import styled from "@emotion/styled";
-import Icon from "components/icon";
-import { ThemeInterface } from "utils/styled/theme";
-import { media } from "utils/styled/media";
-import BlankArea from "components/blank-area";
+import SectionLayout from "layout/section";
 import Image from "next/image";
+import React from "react";
+import { Flex, Heading, Text } from "rebass";
+
+import BlankArea from "components/blank-area";
+import Icon from "components/icon";
 import LandingpageText from "components/landingpage/text";
+import { media } from "utils/styled/media";
+import { ThemeInterface } from "utils/styled/theme";
 
 const Collaborate = () => {
   return (
@@ -86,7 +87,7 @@ const Collaborate = () => {
 
 export default Collaborate;
 
-const SyncIcon = styled(Icon)`
+export const SyncIcon = styled(Icon)`
   ${props => media("0px", (props.theme as ThemeInterface).breakpoints[0])} {
     width: 32px;
     height: 32px;
@@ -102,7 +103,7 @@ const SyncIcon = styled(Icon)`
   }
 `;
 
-const Description = styled(LandingpageText)`
+export const Description = styled(LandingpageText)`
   margin-top: 36px;
   margin-left: 120px;
   max-width: 655px;

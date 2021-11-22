@@ -1,14 +1,15 @@
-import React from "react";
-import SectionLayout from "layout/section";
-import { Box, Flex, Heading, Text } from "rebass";
+import { css } from "@emotion/core";
 import styled from "@emotion/styled";
+import CodePreview from "layout/landingpage/code-preview";
+import DesignPlatforms from "layout/landingpage/design-platforms";
+import SectionLayout from "layout/section";
+import React from "react";
+import { Box, Flex, Heading, Text } from "rebass";
+
+import BlankArea from "components/blank-area";
+import LandingpageText from "components/landingpage/text";
 import { media } from "utils/styled/media";
 import { ThemeInterface } from "utils/styled/theme";
-import DesignPlatforms from "layout/landingpage/design-platforms";
-import CodePreview from "layout/landingpage/code-preview";
-import BlankArea from "components/blank-area";
-import { css } from "@emotion/core";
-import LandingpageText from "components/landingpage/text";
 
 const DesignToCode = () => {
   return (
@@ -52,7 +53,7 @@ const DesignToCode = () => {
 
 export default DesignToCode;
 
-const Title = styled(LandingpageText)`
+export const Title = styled(LandingpageText)`
   margin-bottom: 10px;
   z-index: 99;
 `;
