@@ -1,9 +1,9 @@
-import React, { useCallback, useState, useEffect } from "react";
-import { NextPage, NextPageContext } from "next";
-import CookieAccept from "components/cookie-accept";
-import { useCookies } from "react-cookie";
 import { motion } from "framer-motion";
+import { NextPage, NextPageContext } from "next";
+import React, { useCallback, useState, useEffect } from "react";
+import { useCookies } from "react-cookie";
 
+import CookieAccept from "components/cookie-accept";
 import Sections from "sections/landingpage";
 
 interface MainPageAppProps {

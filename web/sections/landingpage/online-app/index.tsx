@@ -3,7 +3,7 @@ import ApplicationPreview from "layout/landingpage/application-preview";
 import SectionLayout from "layout/section";
 import Image from "next/image";
 import React, { useEffect, useState } from "react";
-import { Box, Flex, Heading, Text } from "rebass";
+import { Flex, Text } from "rebass";
 
 import ActionItem from "components/action-item";
 import BlankArea from "components/blank-area";
