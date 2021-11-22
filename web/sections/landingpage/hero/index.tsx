@@ -2,6 +2,7 @@ import styled from "@emotion/styled";
 import SectionLayout from "layout/section";
 import React from "react";
 
+import AnimatedBlurGradientBg from "components/animated-blur-gradient-bg";
 import BlankArea from "components/blank-area";
 import { ElevatedVideoPlayer } from "components/landingpage/effect";
 import LandingMainCtaButton from "components/landingpage/main-cta-button";
