@@ -98,11 +98,10 @@ const DesignPlatforms = () => {
 export default DesignPlatforms;
 
 const PlatformView = styled.div`
-  position: absolute;
+  position: relative;
   z-index: 950;
   border-radius: 12px;
-  top: 24%;
-  transform: translateY(-23.5%);
+  top: -500px;
   margin-left: auto;
   height: 580px;
 
@@ -114,22 +113,6 @@ const PlatformView = styled.div`
 
   .platforms {
     margin-top: 20px;
-  }
-
-  ${props =>
-    media(
-      (props.theme as ThemeInterface).breakpoints[0],
-      (props.theme as ThemeInterface).breakpoints[1],
-    )} {
-    transform: translateY(-27.5%);
-  }
-
-  ${props =>
-    media(
-      (props.theme as ThemeInterface).breakpoints[1],
-      (props.theme as ThemeInterface).breakpoints[2],
-    )} {
-    transform: translateY(-24%);
   }
 `;
 

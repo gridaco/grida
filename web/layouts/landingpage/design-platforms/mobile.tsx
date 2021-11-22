@@ -67,9 +67,8 @@ const PlatformView = styled.div`
   position: absolute;
   z-index: 950;
   border-radius: 12px;
-  top: 24%;
-  transform: translateY(-23.5%);
-  margin-left: auto;
+  margin-top: 72px;
+  margin-left: 50px;
   height: 580px;
 
   .platforms > div {
@@ -80,9 +79,5 @@ const PlatformView = styled.div`
 
   .platforms {
     margin-top: 20px;
-  }
-
-  ${props => media("0px", (props.theme as ThemeInterface).breakpoints[0])} {
-    transform: translateY(-10%);
   }
 `;

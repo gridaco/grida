@@ -50,6 +50,7 @@
     "react-dom": "^16.10.2",
     "react-lottie": "^1.2.3",
     "react-player": "^2.9.0",
+    "react-responsive": "^9.0.0-beta.4",
     "react-syntax-highlighter": "^15.4.4",
     "rebass": "^4.0.3",
     "refractor": "^4.2.1",
