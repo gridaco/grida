@@ -1,18 +1,20 @@
-import React, { useEffect, useState } from "react";
-import SectionLayout from "layout/section";
-import { Box, Flex, Heading, Text } from "rebass";
 import styled from "@emotion/styled";
-import BlankArea from "components/blank-area";
-import { media } from "utils/styled/media";
-import { ThemeInterface } from "utils/styled/theme";
-import ActionItem from "components/action-item";
-import { LandingpageUrls } from "utils/landingpage/constants";
-import OnairButton from "components/landingpage/effect/onair-button";
 import ApplicationPreview from "layout/landingpage/application-preview";
-import { DesktopView, MobileView } from "utils/styled/styles";
-import DesignToCode from "./design-code";
+import SectionLayout from "layout/section";
 import Image from "next/image";
+import React, { useEffect, useState } from "react";
+import { Flex, Text } from "rebass";
+
+import ActionItem from "components/action-item";
+import BlankArea from "components/blank-area";
+import OnairButton from "components/landingpage/effect/onair-button";
 import LandingpageText from "components/landingpage/text";
+import { LandingpageUrls } from "utils/landingpage/constants";
+import { media } from "utils/styled/media";
+import { DesktopView, MobileView } from "utils/styled/styles";
+import { ThemeInterface } from "utils/styled/theme";
+
+import DesignToCode from "./design-code";
 
 interface OnlineAppProps {
   isMobile?: boolean;
