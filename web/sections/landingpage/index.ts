@@ -1,5 +1,6 @@
 import Section__BornToBeHeadLess from "./born-to-be-headless";
 import Collaborate from "./collaborate";
+import Section__CTASeeTheMagic from "./cta-see-the-magic";
 import Hero from "./hero";
 import LayoutDetect from "./layout-detect";
 import OnlineApp from "./online-app";
@@ -13,5 +14,6 @@ export default {
   Section4_features_tab: Products,
   Section5_collaboration: Collaborate,
   Section__BornToBeHeadLess: Section__BornToBeHeadLess,
+  Section__CTASeeTheMagic: Section__CTASeeTheMagic,
   FinalCta: Slogan,
 };
