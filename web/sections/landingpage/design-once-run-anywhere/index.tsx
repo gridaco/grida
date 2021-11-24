@@ -7,7 +7,7 @@ import SM from "./sm";
 import XL from "./xl";
 import XS from "./xs";
 
-const Hero = () => (
+const DesignOnceRunAnywhere = () => (
   <>
     <BreakPoints.xl>
       <XL />
@@ -27,4 +27,4 @@ const Hero = () => (
   </>
 );
 
-export default Hero;
+export default DesignOnceRunAnywhere;

@@ -41,8 +41,9 @@ const MainPage: NextPage<MainPageAppProps> = ({ isMobileView }) => {
   return (
     <React.Fragment>
       <Sections.Hero />
-      <Sections.Section2_design_to_code isMobile={isMobileView} />
-      <Sections.Section3_how_engine_works />
+      <Sections.DesignOnceRunAnywhere />
+      {/* <Sections.Section2_design_to_code isMobile={isMobileView} /> */}
+      {/* <Sections.Section3_how_engine_works /> */}
       <Sections.Section__BornToBeHeadLess />
       <Sections.Section__CTASeeTheMagic />
       {/* <Sections.Section4_features_tab /> */}
