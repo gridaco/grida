@@ -35,7 +35,7 @@ export default function Hero320SizeXs() {
 }
 
 const RootWrapperHero320SizeXs = styled.div`
-  min-height: 100vh;
+  min-height: 603px;
   background-color: rgba(255, 255, 255, 1);
   position: relative;
 `;

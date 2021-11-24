@@ -1,6 +1,8 @@
 import styled from "@emotion/styled";
 import React from "react";
 
+import { HeroPrimaryInput } from "./components/hero-primary-input";
+
 export default function Hero1440SizeXl() {
   return (
     <RootWrapperHero1440SizeXl>
@@ -18,9 +20,7 @@ export default function Hero1440SizeXl() {
           </DescriptionHolder>
         </HeroTextAndBody>
         <CtaArea>
-          <HeroPrimaryInput>
-            <HelpText>Enter your Figma design url</HelpText>
-          </HeroPrimaryInput>
+          <HeroPrimaryInput />
           <HeroPrimaryButton>
             <ToCode>To Code</ToCode>
           </HeroPrimaryButton>
@@ -33,7 +33,7 @@ export default function Hero1440SizeXl() {
 }
 
 const RootWrapperHero1440SizeXl = styled.div`
-  min-height: 100vh;
+  height: 1033px;
   background-color: rgba(255, 255, 255, 1);
   position: relative;
 `;
@@ -119,38 +119,6 @@ const CtaArea = styled.div`
   height: 66px;
   box-sizing: border-box;
 `;
-
-const HeroPrimaryInput = styled.div`
-  display: flex;
-  justify-content: flex-start;
-  flex-direction: row;
-  align-items: center;
-  flex: none;
-  gap: 10px;
-  box-shadow: 0px 4px 48px rgba(0, 0, 0, 0.12);
-  border-left: solid 1px rgba(210, 210, 210, 1);
-  border-top: solid 1px rgba(210, 210, 210, 1);
-  border-bottom: solid 1px rgba(210, 210, 210, 1);
-  border-right: solid 1px rgba(210, 210, 210, 1);
-  border-radius: 4px;
-  width: 322px;
-  height: 66px;
-  background-color: rgba(255, 255, 255, 1);
-  box-sizing: border-box;
-  padding: 24px 24px;
-`;
-
-const HelpText = styled.span`
-  color: rgba(181, 181, 181, 1);
-  text-overflow: ellipsis;
-  font-size: 18px;
-  font-family: "Helvetica Neue", sans-serif;
-  font-weight: 400;
-  letter-spacing: -1px;
-  line-height: 98%;
-  text-align: left;
-`;
-
 const HeroPrimaryButton = styled.div`
   display: flex;
   justify-content: center;

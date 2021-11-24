@@ -96,7 +96,8 @@ export default function DesignOnceRunAnywhere320SizeXs() {
 }
 
 const RootWrapperDesignOnceRunAnywhere320SizeXs = styled.div`
-  min-height: 100vh;
+  overflow: hidden;
+  height: 929px;
   background: linear-gradient(180deg, rgba(0, 0, 0, 1), rgba(0, 87, 255, 0));
   position: relative;
 `;

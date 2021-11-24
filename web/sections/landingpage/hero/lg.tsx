@@ -35,7 +35,7 @@ export default function Hero1280SizeLg() {
 }
 
 const RootWrapperHero1280SizeLg = styled.div`
-  min-height: 100vh;
+  height: 1033px;
   background-color: rgba(255, 255, 255, 1);
   position: relative;
 `;

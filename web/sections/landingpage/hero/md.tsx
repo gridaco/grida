@@ -42,7 +42,7 @@ const RootWrapperHero1024SizeMd = styled.div`
   flex-direction: column;
   align-items: start;
   gap: 1px;
-  min-height: 100vh;
+  height: 1033px;
   background-color: rgba(255, 255, 255, 1);
   box-sizing: border-box;
 `;

@@ -159,12 +159,12 @@ export default function DesignOnceRunAnywhere1440SizeXl() {
 }
 
 const RootWrapperDesignOnceRunAnywhere1440SizeXl = styled.div`
+  overflow: hidden;
   display: flex;
   justify-content: flex-start;
   flex-direction: column;
   align-items: start;
-  gap: 1px;
-  min-height: 100vh;
+  height: 929px;
   background-color: rgba(255, 255, 255, 1);
   box-sizing: border-box;
 `;

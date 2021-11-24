@@ -157,7 +157,8 @@ export default function DesignOnceRunAnywhere1024SizeMd() {
 }
 
 const RootWrapperDesignOnceRunAnywhere1024SizeMd = styled.div`
-  min-height: 100vh;
+  overflow: hidden;
+  height: 929px;
   background: linear-gradient(180deg, rgba(0, 0, 0, 1), rgba(0, 87, 255, 0));
   position: relative;
 `;
