@@ -1,13 +1,19 @@
 import styled from "@emotion/styled";
 import React from "react";
+import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
+import { vscDarkPlus as colorscheme } from "react-syntax-highlighter/dist/cjs/styles/prism";
 
-import { TabsHeader } from "./tabs-header";
+import TabsHeader from "./tabs-header";
 
-export function Panel() {
+export default function Panel({ code = "// hello" }: { code?: string }) {
   return (
     <RootWrapperEditor>
       <TabsHeader></TabsHeader>
-      <Editor></Editor>
+      <Editor>
+        <SyntaxHighlighter language="typescript" style={colorscheme}>
+          {code}
+        </SyntaxHighlighter>
+      </Editor>
     </RootWrapperEditor>
   );
 }

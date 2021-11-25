@@ -17,8 +17,9 @@ const DesignToCode = () => {
       <Flex width="100%" flexDirection={["column", "row", "row", "row"]}>
         <Flex className="text-platform" flexDirection="column">
           <Title variant="h2">
-            Designs, <br />
-            come to live.
+            Everything
+            <br />
+            Instant.
           </Title>
           <Description variant="body1">
             Keep your design live. Not as a prototype, but as a ready product.

@@ -1,9 +1,12 @@
 import styled from "@emotion/styled";
 import React from "react";
 
+import DemoApp from "../demo-app";
+import { CtaArea } from "./components/cta-area";
+
 export default function Hero768SizeSm() {
   return (
-    <RootWrapperHero768SizeSm>
+    <RootWrapperHero768SizeSm key="section-hero">
       <_1440SizeXl>
         <HeroGradientBgArtwork
           src="https://s3-us-west-2.amazonaws.com/figma-alpha-api/img/65cf/e84e/76efd4a87a6cdf0f109ad871ad15bff0"
@@ -20,17 +23,12 @@ export default function Hero768SizeSm() {
               </DescriptionHolder>
             </HeroTextAreaWithCta_0001>
           </HeroTextAndBody>
-          <CtaArea>
-            <HeroPrimaryInput>
-              <HelpText>Enter your Figma design url</HelpText>
-            </HeroPrimaryInput>
-            <HeroPrimaryButton>
-              <ToCode>To Code</ToCode>
-            </HeroPrimaryButton>
-          </CtaArea>
+          <CtaArea></CtaArea>
         </HeroTextAreaWithCta>
         <DesignToolExampleContainer></DesignToolExampleContainer>
-        <IPhoneXFrame></IPhoneXFrame>
+        <IPhoneXFrame>
+          <DemoApp scale={0.753} />
+        </IPhoneXFrame>
       </_1440SizeXl>
     </RootWrapperHero768SizeSm>
   );
@@ -72,7 +70,7 @@ const HeroTextAreaWithCta = styled.div`
   gap: 62px;
   box-sizing: border-box;
   position: absolute;
-  left: 24px;
+  left: calc((calc((50% + -145px)) - 216px));
   top: 342px;
   width: 431px;
   height: 362px;
@@ -137,79 +135,6 @@ const HeroBodyText = styled.span`
   width: 319px;
 `;
 
-const CtaArea = styled.div`
-  display: flex;
-  justify-content: flex-start;
-  flex-direction: row;
-  align-items: start;
-  flex: none;
-  gap: 14px;
-  width: 431px;
-  height: 58px;
-  box-sizing: border-box;
-`;
-
-const HeroPrimaryInput = styled.div`
-  display: flex;
-  justify-content: flex-start;
-  flex-direction: row;
-  align-items: center;
-  flex: none;
-  gap: 10px;
-  box-shadow: 0px 4px 48px rgba(0, 0, 0, 0.12);
-  border-left: solid 1px rgba(210, 210, 210, 1);
-  border-top: solid 1px rgba(210, 210, 210, 1);
-  border-bottom: solid 1px rgba(210, 210, 210, 1);
-  border-right: solid 1px rgba(210, 210, 210, 1);
-  border-radius: 4px;
-  width: 266px;
-  height: 58px;
-  background-color: rgba(255, 255, 255, 1);
-  box-sizing: border-box;
-  padding: 20px 20px;
-`;
-
-const HelpText = styled.span`
-  color: rgba(181, 181, 181, 1);
-  text-overflow: ellipsis;
-  font-size: 18px;
-  font-family: "Helvetica Neue", sans-serif;
-  font-weight: 400;
-  letter-spacing: -1px;
-  line-height: 98%;
-  text-align: left;
-`;
-
-const HeroPrimaryButton = styled.div`
-  display: flex;
-  justify-content: center;
-  flex-direction: column;
-  align-items: center;
-  flex: 1;
-  gap: 10px;
-  box-shadow: 0px 4px 48px rgba(0, 0, 0, 0.12);
-  border-left: solid 1px rgba(37, 98, 255, 0.5);
-  border-top: solid 1px rgba(37, 98, 255, 0.5);
-  border-bottom: solid 1px rgba(37, 98, 255, 0.5);
-  border-right: solid 1px rgba(37, 98, 255, 0.5);
-  border-radius: 4px;
-  align-self: stretch;
-  background-color: rgba(37, 98, 255, 1);
-  box-sizing: border-box;
-  padding: 12px 12px;
-`;
-
-const ToCode = styled.span`
-  color: rgba(255, 255, 255, 1);
-  text-overflow: ellipsis;
-  font-size: 18px;
-  font-family: "Helvetica Neue", sans-serif;
-  font-weight: 500;
-  letter-spacing: -1px;
-  line-height: 98%;
-  text-align: left;
-`;
-
 const DesignToolExampleContainer = styled.div`
   width: 907px;
   height: 571px;
@@ -217,7 +142,7 @@ const DesignToolExampleContainer = styled.div`
   border-radius: 4px;
   position: absolute;
   box-shadow: 0px 4px 128px 32px rgba(0, 0, 0, 0.2);
-  left: 576px;
+  left: calc((calc((50% + 646px)) - 454px));
   top: 173px;
   opacity: 0.7;
 `;
@@ -230,7 +155,7 @@ const IPhoneXFrame = styled.div`
   border-radius: 4px;
   position: absolute;
   box-shadow: 0px 3px 103px 26px rgba(0, 0, 0, 0.2);
-  left: 536px;
+  left: calc((calc((50% + 293px)) - 141px));
   top: 240px;
   opacity: 0.9;
 `;

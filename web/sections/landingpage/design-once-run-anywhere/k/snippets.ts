@@ -1,4 +1,4 @@
-import styled from "@emotion/styled";
+export const _DEMO_APP_SRC_TSX = `import styled from "@emotion/styled";
 import React from "react";
 
 export default function DemoApp({ scale = 1 }: { scale?: number }) {
@@ -200,7 +200,7 @@ export default function DemoApp({ scale = 1 }: { scale?: number }) {
 
 const RootWrapperDemoApp = styled.div<{
   scale: number;
-}>`
+}>\`
   width: 375px;
   height: 812px;
   background-color: rgba(255, 255, 255, 1);
@@ -208,9 +208,9 @@ const RootWrapperDemoApp = styled.div<{
   transform: scale(${p => p.scale});
   transform-origin: left top;
   overflow: hidden;
-`;
+\`;
 
-const FriendsMusicSection = styled.div`
+const FriendsMusicSection = styled.div\`
   display: flex;
   justify-content: flex-start;
   flex-direction: column;
@@ -222,9 +222,9 @@ const FriendsMusicSection = styled.div`
   top: 459px;
   right: 28px;
   height: 311px;
-`;
+\`;
 
-const FriendListeningHeaderText = styled.span`
+const FriendListeningHeaderText = styled.span\`
   color: rgba(58, 58, 58, 1);
   text-overflow: ellipsis;
   font-size: 24px;
@@ -233,9 +233,9 @@ const FriendListeningHeaderText = styled.span`
   line-height: 90%;
   text-align: left;
   width: 232px;
-`;
+\`;
 
-const MusicSecondaryList = styled.div`
+const MusicSecondaryList = styled.div\`
   display: flex;
   justify-content: flex-start;
   flex-direction: column;
@@ -244,9 +244,9 @@ const MusicSecondaryList = styled.div`
   gap: 12px;
   align-self: stretch;
   box-sizing: border-box;
-`;
+\`;
 
-const Primary = styled.div`
+const Primary = styled.div\`
   display: flex;
   justify-content: flex-start;
   flex-direction: row;
@@ -258,24 +258,24 @@ const Primary = styled.div`
   align-self: stretch;
   background-color: rgba(255, 255, 255, 1);
   box-sizing: border-box;
-`;
+\`;
 
-const Cover = styled.div`
+const Cover = styled.div\`
   width: 81px;
   position: relative;
   align-self: stretch;
-`;
+\`;
 
-const Rectangle825 = styled.img`
+const Rectangle825 = styled.img\`
   object-fit: cover;
   position: absolute;
   left: 0px;
   top: 0px;
   right: 0px;
   bottom: 0px;
-`;
+\`;
 
-const TrpLve = styled.span`
+const TrpLve = styled.span\`
   color: rgba(255, 255, 255, 1);
   text-overflow: ellipsis;
   font-size: 18px;
@@ -288,9 +288,9 @@ const TrpLve = styled.span`
   top: 24px;
   right: 21px;
   bottom: 24px;
-`;
+\`;
 
-const NonGraphicsArea = styled.div`
+const NonGraphicsArea = styled.div\`
   display: flex;
   justify-content: flex-start;
   flex-direction: column;
@@ -300,9 +300,9 @@ const NonGraphicsArea = styled.div`
   align-self: stretch;
   box-sizing: border-box;
   padding: 10px 10px;
-`;
+\`;
 
-const InnerFrame = styled.div`
+const InnerFrame = styled.div\`
   display: flex;
   justify-content: flex-end;
   flex-direction: row;
@@ -312,9 +312,9 @@ const InnerFrame = styled.div`
   align-self: stretch;
   box-sizing: border-box;
   padding-right: 12px;
-`;
+\`;
 
-const TextInfo = styled.div`
+const TextInfo = styled.div\`
   display: flex;
   justify-content: flex-start;
   flex-direction: column;
@@ -324,9 +324,9 @@ const TextInfo = styled.div`
   width: 158px;
   height: 59px;
   box-sizing: border-box;
-`;
+\`;
 
-const Trippe = styled.span`
+const Trippe = styled.span\`
   color: rgba(0, 0, 0, 1);
   text-overflow: ellipsis;
   font-size: 18px;
@@ -335,9 +335,9 @@ const Trippe = styled.span`
   line-height: 90%;
   text-align: left;
   align-self: stretch;
-`;
+\`;
 
-const MorningSlowbeatsLoFi = styled.span`
+const MorningSlowbeatsLoFi = styled.span\`
   color: rgba(0, 0, 0, 0.6);
   text-overflow: ellipsis;
   font-size: 12px;
@@ -345,15 +345,15 @@ const MorningSlowbeatsLoFi = styled.span`
   font-weight: 400;
   text-align: left;
   align-self: stretch;
-`;
+\`;
 
-const MusicPlayButton = styled.img`
+const MusicPlayButton = styled.img\`
   width: 24px;
   height: 24px;
   object-fit: cover;
-`;
+\`;
 
-const Card1 = styled.div`
+const Card1 = styled.div\`
   display: flex;
   justify-content: flex-start;
   flex-direction: column;
@@ -365,9 +365,9 @@ const Card1 = styled.div`
   background-color: rgba(255, 255, 255, 1);
   box-sizing: border-box;
   padding: 8px 8px;
-`;
+\`;
 
-const Contents = styled.div`
+const Contents = styled.div\`
   display: flex;
   justify-content: flex-start;
   flex-direction: row;
@@ -376,33 +376,33 @@ const Contents = styled.div`
   gap: 20px;
   align-self: stretch;
   box-sizing: border-box;
-`;
+\`;
 
-const Cover_0001 = styled.div`
+const Cover_0001 = styled.div\`
   width: 65px;
   height: 65px;
   position: relative;
-`;
+\`;
 
-const Rectangle825_0001 = styled.img`
+const Rectangle825_0001 = styled.img\`
   object-fit: cover;
   position: absolute;
   left: 0px;
   top: 0px;
   right: 0px;
   bottom: 0px;
-`;
+\`;
 
-const Union = styled.img`
+const Union = styled.img\`
   object-fit: cover;
   position: absolute;
   left: 9px;
   top: 9px;
   right: 10px;
   bottom: 9px;
-`;
+\`;
 
-const NonGraphicArea = styled.div`
+const NonGraphicArea = styled.div\`
   display: flex;
   justify-content: flex-end;
   flex-direction: row;
@@ -412,9 +412,9 @@ const NonGraphicArea = styled.div`
   align-self: stretch;
   box-sizing: border-box;
   padding-right: 8px;
-`;
+\`;
 
-const TextInfo_0001 = styled.div`
+const TextInfo_0001 = styled.div\`
   display: flex;
   justify-content: flex-start;
   flex-direction: column;
@@ -423,9 +423,9 @@ const TextInfo_0001 = styled.div`
   gap: 5px;
   align-self: stretch;
   box-sizing: border-box;
-`;
+\`;
 
-const Sweet = styled.span`
+const Sweet = styled.span\`
   color: rgba(0, 0, 0, 1);
   text-overflow: ellipsis;
   font-size: 18px;
@@ -433,9 +433,9 @@ const Sweet = styled.span`
   font-weight: 900;
   line-height: 90%;
   text-align: left;
-`;
+\`;
 
-const MorningSlowbeatsLoFi_0001 = styled.span`
+const MorningSlowbeatsLoFi_0001 = styled.span\`
   color: rgba(0, 0, 0, 0.6);
   text-overflow: ellipsis;
   font-size: 12px;
@@ -443,15 +443,15 @@ const MorningSlowbeatsLoFi_0001 = styled.span`
   font-weight: 400;
   text-align: left;
   align-self: stretch;
-`;
+\`;
 
-const MusicPlayButton_0001 = styled.img`
+const MusicPlayButton_0001 = styled.img\`
   width: 24px;
   height: 24px;
   object-fit: cover;
-`;
+\`;
 
-const Card2 = styled.div`
+const Card2 = styled.div\`
   display: flex;
   justify-content: flex-start;
   flex-direction: column;
@@ -463,9 +463,9 @@ const Card2 = styled.div`
   background-color: rgba(255, 255, 255, 1);
   box-sizing: border-box;
   padding: 8px 8px;
-`;
+\`;
 
-const Contents_0001 = styled.div`
+const Contents_0001 = styled.div\`
   display: flex;
   justify-content: flex-start;
   flex-direction: row;
@@ -474,15 +474,15 @@ const Contents_0001 = styled.div`
   gap: 20px;
   align-self: stretch;
   box-sizing: border-box;
-`;
+\`;
 
-const DemoAppAlbumCover1 = styled.div`
+const DemoAppAlbumCover1 = styled.div\`
   width: 65px;
   height: 65px;
   position: relative;
-`;
+\`;
 
-const Rectangle813 = styled.div`
+const Rectangle813 = styled.div\`
   background-color: rgba(0, 0, 0, 1);
   border-radius: 8px;
   position: absolute;
@@ -490,9 +490,9 @@ const Rectangle813 = styled.div`
   top: 0px;
   right: 0px;
   bottom: 0px;
-`;
+\`;
 
-const LoFi = styled.span`
+const LoFi = styled.span\`
   color: rgba(255, 255, 255, 1);
   text-overflow: ellipsis;
   font-size: 36px;
@@ -506,9 +506,9 @@ const LoFi = styled.span`
   top: 33px;
   right: 11px;
   bottom: -32px;
-`;
+\`;
 
-const NonGraphicArea_0001 = styled.div`
+const NonGraphicArea_0001 = styled.div\`
   display: flex;
   justify-content: flex-end;
   flex-direction: row;
@@ -518,9 +518,9 @@ const NonGraphicArea_0001 = styled.div`
   align-self: stretch;
   box-sizing: border-box;
   padding-right: 8px;
-`;
+\`;
 
-const TextInfo_0002 = styled.div`
+const TextInfo_0002 = styled.div\`
   display: flex;
   justify-content: flex-start;
   flex-direction: column;
@@ -529,9 +529,9 @@ const TextInfo_0002 = styled.div`
   gap: 5px;
   align-self: stretch;
   box-sizing: border-box;
-`;
+\`;
 
-const Sweet_0001 = styled.span`
+const Sweet_0001 = styled.span\`
   color: rgba(0, 0, 0, 1);
   text-overflow: ellipsis;
   font-size: 18px;
@@ -539,9 +539,9 @@ const Sweet_0001 = styled.span`
   font-weight: 900;
   line-height: 90%;
   text-align: left;
-`;
+\`;
 
-const MorningSlowbeatsLoFi_0002 = styled.span`
+const MorningSlowbeatsLoFi_0002 = styled.span\`
   color: rgba(0, 0, 0, 0.6);
   text-overflow: ellipsis;
   font-size: 12px;
@@ -549,15 +549,15 @@ const MorningSlowbeatsLoFi_0002 = styled.span`
   font-weight: 400;
   text-align: left;
   align-self: stretch;
-`;
+\`;
 
-const MusicPlayButton_0002 = styled.img`
+const MusicPlayButton_0002 = styled.img\`
   width: 24px;
   height: 24px;
   object-fit: cover;
-`;
+\`;
 
-const HeaderSection = styled.div`
+const HeaderSection = styled.div\`
   display: flex;
   justify-content: flex-start;
   flex-direction: column;
@@ -569,9 +569,9 @@ const HeaderSection = styled.div`
   top: 64px;
   right: 28px;
   height: 128px;
-`;
+\`;
 
-const TitleAndAvatar = styled.div`
+const TitleAndAvatar = styled.div\`
   display: flex;
   justify-content: space-between;
   flex-direction: row;
@@ -580,9 +580,9 @@ const TitleAndAvatar = styled.div`
   gap: 16px;
   align-self: stretch;
   box-sizing: border-box;
-`;
+\`;
 
-const Title = styled.span`
+const Title = styled.span\`
   color: rgba(0, 0, 0, 1);
   text-overflow: ellipsis;
   font-size: 36px;
@@ -592,15 +592,15 @@ const Title = styled.span`
   line-height: 90%;
   text-align: left;
   width: 251px;
-`;
+\`;
 
-const AvatarSource = styled.img`
+const AvatarSource = styled.img\`
   width: 48px;
   height: 48px;
   object-fit: cover;
-`;
+\`;
 
-const Subtitle = styled.span`
+const Subtitle = styled.span\`
   color: rgba(164, 164, 164, 1);
   text-overflow: ellipsis;
   font-size: 14px;
@@ -608,17 +608,17 @@ const Subtitle = styled.span`
   font-weight: 400;
   text-align: left;
   width: 315px;
-`;
+\`;
 
-const Group523 = styled.div`
+const Group523 = styled.div\`
   width: 315px;
   height: 81px;
   position: absolute;
   left: 28px;
   top: 778px;
-`;
+\`;
 
-const Rectangle819 = styled.div`
+const Rectangle819 = styled.div\`
   width: 315px;
   height: 81px;
   background-color: rgba(255, 255, 255, 1);
@@ -626,18 +626,18 @@ const Rectangle819 = styled.div`
   position: absolute;
   left: 0px;
   top: 0px;
-`;
+\`;
 
-const Group519 = styled.img`
+const Group519 = styled.img\`
   width: 24px;
   height: 24px;
   object-fit: cover;
   position: absolute;
   left: 263px;
   top: 29px;
-`;
+\`;
 
-const MorningSlowbeatsLoFi_0003 = styled.span`
+const MorningSlowbeatsLoFi_0003 = styled.span\`
   color: rgba(0, 0, 0, 0.6);
   text-overflow: ellipsis;
   font-size: 12px;
@@ -648,9 +648,9 @@ const MorningSlowbeatsLoFi_0003 = styled.span`
   position: absolute;
   left: 82px;
   top: 32px;
-`;
+\`;
 
-const Trippe_0001 = styled.span`
+const Trippe_0001 = styled.span\`
   color: rgba(0, 0, 0, 1);
   text-overflow: ellipsis;
   font-size: 18px;
@@ -661,9 +661,9 @@ const Trippe_0001 = styled.span`
   position: absolute;
   left: 82px;
   top: 11px;
-`;
+\`;
 
-const Rectangle825_0002 = styled.div`
+const Rectangle825_0002 = styled.div\`
   width: 60px;
   height: 60px;
   background-color: rgba(0, 0, 0, 1);
@@ -671,17 +671,17 @@ const Rectangle825_0002 = styled.div`
   position: absolute;
   left: 10px;
   top: 11px;
-`;
+\`;
 
-const DemoAppTabBar = styled.div`
+const DemoAppTabBar = styled.div\`
   height: 97px;
   position: absolute;
   left: 0px;
   right: 0px;
   bottom: -2px;
-`;
+\`;
 
-const Rectangle815 = styled.div`
+const Rectangle815 = styled.div\`
   box-shadow: 0px 0px 4px rgba(0, 0, 0, 0.25);
   background-color: rgba(255, 255, 255, 1);
   position: absolute;
@@ -689,9 +689,9 @@ const Rectangle815 = styled.div`
   top: 0px;
   right: 0px;
   bottom: 0px;
-`;
+\`;
 
-const Tabs = styled.div`
+const Tabs = styled.div\`
   display: flex;
   justify-content: space-between;
   flex-direction: row;
@@ -703,27 +703,27 @@ const Tabs = styled.div`
   top: 29px;
   right: 46px;
   bottom: 44px;
-`;
+\`;
 
-const IconsMdiHome = styled.img`
+const IconsMdiHome = styled.img\`
   width: 24px;
   height: 24px;
   object-fit: cover;
-`;
+\`;
 
-const IconsMdiShowChart = styled.img`
+const IconsMdiShowChart = styled.img\`
   width: 24px;
   height: 24px;
   object-fit: cover;
-`;
+\`;
 
-const IconsMdiSearch = styled.img`
+const IconsMdiSearch = styled.img\`
   width: 24px;
   height: 24px;
   object-fit: cover;
-`;
+\`;
 
-const PrimaryMusicCardsList = styled.div`
+const PrimaryMusicCardsList = styled.div\`
   display: flex;
   justify-content: flex-start;
   flex-direction: row;
@@ -735,9 +735,9 @@ const PrimaryMusicCardsList = styled.div`
   top: 234px;
   width: 447px;
   height: 180px;
-`;
+\`;
 
-const Card1_0001 = styled.div`
+const Card1_0001 = styled.div\`
   display: flex;
   justify-content: flex-start;
   flex-direction: column;
@@ -747,23 +747,23 @@ const Card1_0001 = styled.div`
   width: 138px;
   height: 180px;
   box-sizing: border-box;
-`;
+\`;
 
-const Frame305 = styled.div`
+const Frame305 = styled.div\`
   height: 144px;
   position: relative;
   align-self: stretch;
-`;
+\`;
 
-const DemoAppAlbumCover1_0001 = styled.div`
+const DemoAppAlbumCover1_0001 = styled.div\`
   position: absolute;
   left: 0px;
   top: 0px;
   right: 0px;
   bottom: 0px;
-`;
+\`;
 
-const Rectangle813_0001 = styled.div`
+const Rectangle813_0001 = styled.div\`
   background-color: rgba(0, 0, 0, 1);
   border-radius: 8px;
   position: absolute;
@@ -771,9 +771,9 @@ const Rectangle813_0001 = styled.div`
   top: 0px;
   right: 0px;
   bottom: 0px;
-`;
+\`;
 
-const LoFi_0001 = styled.span`
+const LoFi_0001 = styled.span\`
   color: rgba(255, 255, 255, 1);
   text-overflow: ellipsis;
   font-size: 36px;
@@ -787,18 +787,18 @@ const LoFi_0001 = styled.span`
   top: 72px;
   right: 81px;
   bottom: 8px;
-`;
+\`;
 
-const MusicPlayButton_0003 = styled.img`
+const MusicPlayButton_0003 = styled.img\`
   width: 28px;
   height: 28px;
   object-fit: cover;
   position: absolute;
   right: 16px;
   bottom: 14px;
-`;
+\`;
 
-const MorningSlowbeatsLoFi_0004 = styled.span`
+const MorningSlowbeatsLoFi_0004 = styled.span\`
   color: rgba(164, 164, 164, 1);
   text-overflow: ellipsis;
   font-size: 14px;
@@ -806,9 +806,9 @@ const MorningSlowbeatsLoFi_0004 = styled.span`
   font-weight: 400;
   text-align: left;
   align-self: stretch;
-`;
+\`;
 
-const Card2_0001 = styled.div`
+const Card2_0001 = styled.div\`
   display: flex;
   justify-content: flex-start;
   flex-direction: column;
@@ -818,50 +818,50 @@ const Card2_0001 = styled.div`
   width: 138px;
   height: 180px;
   box-sizing: border-box;
-`;
+\`;
 
-const Frame305_0001 = styled.div`
+const Frame305_0001 = styled.div\`
   height: 144px;
   position: relative;
   align-self: stretch;
-`;
+\`;
 
-const DemoAppAlbumCover3 = styled.div`
+const DemoAppAlbumCover3 = styled.div\`
   position: absolute;
   left: 0px;
   top: 0px;
   right: 0px;
   bottom: 0px;
-`;
+\`;
 
-const Rectangle825_0003 = styled.img`
+const Rectangle825_0003 = styled.img\`
   object-fit: cover;
   position: absolute;
   left: 0px;
   top: 0px;
   right: 0px;
   bottom: 0px;
-`;
+\`;
 
-const Union_0001 = styled.img`
+const Union_0001 = styled.img\`
   object-fit: cover;
   position: absolute;
   left: 17px;
   top: 19px;
   right: 19px;
   bottom: 22px;
-`;
+\`;
 
-const MusicPlayButton_0004 = styled.img`
+const MusicPlayButton_0004 = styled.img\`
   width: 28px;
   height: 28px;
   object-fit: cover;
   position: absolute;
   right: 16px;
   bottom: 14px;
-`;
+\`;
 
-const MorningSlowbeatsLoFi_0005 = styled.span`
+const MorningSlowbeatsLoFi_0005 = styled.span\`
   color: rgba(164, 164, 164, 1);
   text-overflow: ellipsis;
   font-size: 14px;
@@ -869,9 +869,9 @@ const MorningSlowbeatsLoFi_0005 = styled.span`
   font-weight: 400;
   text-align: left;
   align-self: stretch;
-`;
+\`;
 
-const Card3 = styled.div`
+const Card3 = styled.div\`
   display: flex;
   justify-content: flex-start;
   flex-direction: column;
@@ -881,32 +881,32 @@ const Card3 = styled.div`
   width: 138px;
   height: 180px;
   box-sizing: border-box;
-`;
+\`;
 
-const Frame305_0002 = styled.div`
+const Frame305_0002 = styled.div\`
   height: 144px;
   position: relative;
   align-self: stretch;
-`;
+\`;
 
-const DemoAppAlbumCover2 = styled.div`
+const DemoAppAlbumCover2 = styled.div\`
   position: absolute;
   left: 0px;
   top: 0px;
   right: 0px;
   bottom: 0px;
-`;
+\`;
 
-const Rectangle825_0004 = styled.img`
+const Rectangle825_0004 = styled.img\`
   object-fit: cover;
   position: absolute;
   left: 0px;
   top: 0px;
   right: 0px;
   bottom: 0px;
-`;
+\`;
 
-const TrpLve_0001 = styled.span`
+const TrpLve_0001 = styled.span\`
   color: rgba(255, 255, 255, 1);
   text-overflow: ellipsis;
   font-size: 32px;
@@ -919,18 +919,18 @@ const TrpLve_0001 = styled.span`
   top: 43px;
   right: 36px;
   bottom: 43px;
-`;
+\`;
 
-const MusicPlayButton_0005 = styled.img`
+const MusicPlayButton_0005 = styled.img\`
   width: 28px;
   height: 28px;
   object-fit: cover;
   position: absolute;
   right: 16px;
   bottom: 14px;
-`;
+\`;
 
-const MorningSlowbeatsLoFi_0006 = styled.span`
+const MorningSlowbeatsLoFi_0006 = styled.span\`
   color: rgba(164, 164, 164, 1);
   text-overflow: ellipsis;
   font-size: 14px;
@@ -938,4 +938,5 @@ const MorningSlowbeatsLoFi_0006 = styled.span`
   font-weight: 400;
   text-align: left;
   align-self: stretch;
+\`;
 `;

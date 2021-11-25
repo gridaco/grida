@@ -46,6 +46,7 @@ const MainPage: NextPage<MainPageAppProps> = ({ isMobileView }) => {
       <Sections.Section2_design_to_code isMobile={isMobileView} />
       <Sections.Section3_how_engine_works />
       <Sections.Section__BornToBeHeadLess />
+      <Sections.Section__Opensource />
       <Sections.Section__CTASeeTheMagic />
       {/* <Sections.Section4_features_tab /> */}
       {/* <Sections.Section5_collaboration /> */}

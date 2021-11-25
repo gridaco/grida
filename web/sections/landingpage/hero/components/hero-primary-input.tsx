@@ -21,6 +21,7 @@ const RootWrapperHeroPrimaryInput = styled.input`
   border-radius: 4px;
   background-color: rgba(255, 255, 255, 1);
   box-sizing: border-box;
+  align-self: stretch;
   padding: 24px 24px;
   ::placeholder {
     color: rgba(181, 181, 181, 1);

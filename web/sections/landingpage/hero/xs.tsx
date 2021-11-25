@@ -1,9 +1,11 @@
 import styled from "@emotion/styled";
 import React from "react";
 
+import { CtaArea } from "./components/cta-area";
+
 export default function Hero320SizeXs() {
   return (
-    <RootWrapperHero320SizeXs>
+    <RootWrapperHero320SizeXs key="section-hero">
       <_1440SizeXl>
         <HeroGradientBgArtwork
           src="https://s3-us-west-2.amazonaws.com/figma-alpha-api/img/209d/e4a2/57f702bfc430d87427a5225fa94a6d54"
@@ -20,14 +22,7 @@ export default function Hero320SizeXs() {
               </DescriptionHolder>
             </HeroTextAreaWithCta_0001>
           </HeroTextAndBody>
-          <CtaArea>
-            <HeroPrimaryInput>
-              <HelpText>Enter your Figma design url</HelpText>
-            </HeroPrimaryInput>
-            <HeroPrimaryButton>
-              <ToCode>To Code</ToCode>
-            </HeroPrimaryButton>
-          </CtaArea>
+          <CtaArea></CtaArea>
         </HeroTextAreaWithCta>
       </_1440SizeXl>
     </RootWrapperHero320SizeXs>
@@ -128,17 +123,6 @@ const HeroBodyText = styled.span`
   line-height: 160%;
   text-align: left;
   align-self: stretch;
-`;
-
-const CtaArea = styled.div`
-  display: flex;
-  justify-content: flex-start;
-  flex-direction: column;
-  align-items: start;
-  flex: 1;
-  gap: 14px;
-  align-self: stretch;
-  box-sizing: border-box;
 `;
 
 const HeroPrimaryInput = styled.div`

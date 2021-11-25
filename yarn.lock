@@ -1583,6 +1583,13 @@
     exec-sh "^0.3.2"
     minimist "^1.2.0"
 
+"@code-editor/vanilla-preview@^0.0.2":
+  version "0.0.2"
+  resolved "https://registry.yarnpkg.com/@code-editor/vanilla-preview/-/vanilla-preview-0.0.2.tgz#b199a605f988294fa46e18513482d696a2b26116"
+  integrity sha512-bDDx4KvV8+lYX/QzIOMERFiwf9KVA59Ht68fwtJvnP3cIK12x8l30YazXSiF591Ks5yRrRU4NauFrwjFmOUX+w==
+  dependencies:
+    react-use-size "^2.0.4"
+
 "@discoveryjs/json-ext@^0.5.3":
   version "0.5.3"
   resolved "https://registry.yarnpkg.com/@discoveryjs/json-ext/-/json-ext-0.5.3.tgz#90420f9f9c6d3987f176a19a7d8e764271a2f55d"
@@ -11928,6 +11935,11 @@ react-textarea-autosize@^8.3.0:
     "@babel/runtime" "^7.10.2"
     use-composed-ref "^1.0.0"
     use-latest "^1.0.0"
+
+react-use-size@^2.0.4:
+  version "2.0.4"
+  resolved "https://registry.yarnpkg.com/react-use-size/-/react-use-size-2.0.4.tgz#14f513e310d8962a30919e64fdd746b8211a3f0d"
+  integrity sha512-vMfResvkZwkXngdbytZbDNkDySJqXrEdPa882kTqIQZylxHA6PSf2NC67wJJIMpmZjGyTwV7wyG5YY1SwId1xw==
 
 react@^16.10.2:
   version "16.14.0"

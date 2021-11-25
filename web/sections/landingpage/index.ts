@@ -5,6 +5,7 @@ import Hero from "./hero";
 import LayoutDetect from "./layout-detect";
 import OnlineApp from "./online-app";
 import Products from "./products";
+import SectionOpensource from "./section-opensource";
 import Slogan from "./slogan";
 
 export default {
@@ -14,6 +15,7 @@ export default {
   Section3_how_engine_works: LayoutDetect,
   Section4_features_tab: Products,
   Section__BornToBeHeadLess: Section__BornToBeHeadLess,
+  Section__Opensource: SectionOpensource,
   Section__CTASeeTheMagic: Section__CTASeeTheMagic,
   FinalCta: Slogan,
 };

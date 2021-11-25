@@ -1,6 +1,7 @@
 import styled from "@emotion/styled";
 import React from "react";
 
+import { BackgroundGradient } from "./styles/background";
 import { HeadingGradient } from "./styles/heading";
 
 export default function DesignOnceRunAnywhere320SizeXs() {
@@ -101,7 +102,8 @@ const RootWrapperDesignOnceRunAnywhere320SizeXs = styled.div`
   align-items: start;
   gap: 10px;
   min-height: 100vh;
-  background: linear-gradient(180deg, rgba(0, 0, 0, 1), rgba(0, 87, 255, 0));
+  overflow: hidden;
+  ${BackgroundGradient}
   box-sizing: border-box;
 `;
 
