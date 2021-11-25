@@ -1,6 +1,9 @@
 import styled from "@emotion/styled";
 import React from "react";
 
+import { BackgroundGradient } from "./styles/background";
+import { HeadingGradient } from "./styles/heading";
+
 export default function DesignOnceRunAnywhere320SizeXs() {
   return (
     <RootWrapperDesignOnceRunAnywhere320SizeXs>
@@ -98,7 +101,7 @@ export default function DesignOnceRunAnywhere320SizeXs() {
 const RootWrapperDesignOnceRunAnywhere320SizeXs = styled.div`
   overflow: hidden;
   height: 929px;
-  background: linear-gradient(180deg, rgba(0, 0, 0, 1), rgba(0, 87, 255, 0));
+  ${BackgroundGradient}
   position: relative;
 `;
 
@@ -174,6 +177,7 @@ const Heading1 = styled.span`
   position: absolute;
   left: calc((calc((50% + 0px)) - 140px));
   top: 56px;
+  ${HeadingGradient}
 `;
 
 const Blank = styled.div`

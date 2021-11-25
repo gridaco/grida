@@ -1,6 +1,8 @@
 import styled from "@emotion/styled";
 import React from "react";
 
+import DemoApp from "../demo-app";
+
 export default function Hero1280SizeLg() {
   return (
     <RootWrapperHero1280SizeLg>
@@ -29,7 +31,9 @@ export default function Hero1280SizeLg() {
         </CtaArea>
       </HeroTextAreaWithCta>
       <DesignToolExampleContainer></DesignToolExampleContainer>
-      <IPhoneXFrame></IPhoneXFrame>
+      <IPhoneXFrame>
+        <DemoApp />
+      </IPhoneXFrame>
     </RootWrapperHero1280SizeLg>
   );
 }
