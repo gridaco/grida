@@ -1,4 +1,4 @@
-import css from "@emotion/css";
+import { css } from "@emotion/css";
 
 export const HeadingGradient = css`
   background: linear-gradient(269.61deg, #e6f2f0 0.33%, #f3fafa 100%);
