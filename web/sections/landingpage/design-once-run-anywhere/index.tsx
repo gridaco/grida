@@ -8,7 +8,7 @@ import XL from "./xl";
 import XS from "./xs";
 
 const DesignOnceRunAnywhere = () => (
-  <>
+  <div>
     <BreakPoints.xl>
       <XL />
     </BreakPoints.xl>
@@ -24,7 +24,7 @@ const DesignOnceRunAnywhere = () => (
     <BreakPoints.xs>
       <XS />
     </BreakPoints.xs>
-  </>
+  </div>
 );
 
 export default DesignOnceRunAnywhere;
