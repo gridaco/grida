@@ -222,7 +222,7 @@ const Header = () => {
 export default Header;
 
 const HeaderWrapper = styled(Flex)`
-  position: fixed;
+  /* position: fixed; */
   background-color: #fff;
   z-index: 999;
   border-bottom: 1px solid #f8f8f8;
