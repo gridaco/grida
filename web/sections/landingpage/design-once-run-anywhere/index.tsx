@@ -1,4 +1,8 @@
+/* eslint-disable import-helpers/order-imports */
+import styled from "@emotion/styled";
 import React from "react";
+
+import { BackgroundGradient } from "./styles/background";
 
 import { BreakPoints } from "../_breakpoints";
 import LG from "./lg";
@@ -8,7 +12,7 @@ import XL from "./xl";
 import XS from "./xs";
 
 const DesignOnceRunAnywhere = () => (
-  <div>
+  <Container>
     <BreakPoints.xl>
       <XL />
     </BreakPoints.xl>
@@ -24,7 +28,11 @@ const DesignOnceRunAnywhere = () => (
     <BreakPoints.xs>
       <XS />
     </BreakPoints.xs>
-  </div>
+  </Container>
 );
+
+const Container = styled.div`
+  ${BackgroundGradient}
+`;
 
 export default DesignOnceRunAnywhere;

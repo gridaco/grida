@@ -1,4 +1,4 @@
-import { css } from "@emotion/css";
+import { css } from "@emotion/react";
 
 export const BackgroundGradient = css`
   background: linear-gradient(

@@ -1,168 +1,126 @@
 import styled from "@emotion/styled";
 import React from "react";
 
-import { BackgroundGradient } from "./styles/background";
 import { HeadingGradient } from "./styles/heading";
 
 export default function DesignOnceRunAnywhere320SizeXs() {
   return (
     <RootWrapperDesignOnceRunAnywhere320SizeXs>
-      <Group532>
-        <Line64></Line64>
-        <Line67></Line67>
-        <Line65></Line65>
-        <Line66></Line66>
-      </Group532>
-      <Heading1>Design once, Run anywhere.</Heading1>
-      <Blank>
-        <Frame608>
-          <Frame607>
-            <Ellipse60></Ellipse60>
-            <Ellipse61></Ellipse61>
-            <Ellipse62></Ellipse62>
-          </Frame607>
-        </Frame608>
-        <Container>
-          <Sidebar>
-            <IPhone11ProX1></IPhone11ProX1>
-          </Sidebar>
-          <Editor>
-            <TabsHeader>
-              <TabsHeader_0001>
-                <Tabs>
-                  <VscodeTab>
-                    <BaseVscodeTab>
-                      <Frame565>
-                        <PlatformIconsReactDefault
-                          src="https://s3-us-west-2.amazonaws.com/figma-alpha-api/img/b46a/1396/35aa8c273ddaf01bcfbbfe0e9bca7052"
-                          alt="icon"
-                        ></PlatformIconsReactDefault>
-                        <FileNameTxt>React.tsx</FileNameTxt>
-                      </Frame565>
-                    </BaseVscodeTab>
-                  </VscodeTab>
-                  <VscodeTab_0001>
-                    <BaseVscodeTab_0001>
-                      <Frame565_0001>
-                        <PlatformIconsFlutterGrey>
-                          <Image73
-                            src="https://s3-us-west-2.amazonaws.com/figma-alpha-api/img/071c/39a6/1f73ef26c0bfc2009e19504d359b2b9b"
-                            alt="image of Image73"
-                          ></Image73>
-                        </PlatformIconsFlutterGrey>
-                        <FileNameTxt_0001>Flutter.dart</FileNameTxt_0001>
-                      </Frame565_0001>
-                    </BaseVscodeTab_0001>
-                  </VscodeTab_0001>
-                  <VscodeTab_0002>
-                    <BaseVscodeTab_0002>
-                      <Frame565_0002>
-                        <PlatformIconsHtmlGrey>
-                          <Image76
-                            src="https://s3-us-west-2.amazonaws.com/figma-alpha-api/img/e1a2/daa4/941e1391d393346fa179752b9a86be99"
-                            alt="image of Image76"
-                          ></Image76>
-                        </PlatformIconsHtmlGrey>
-                        <FileNameTxt_0002>vanilla.html</FileNameTxt_0002>
-                      </Frame565_0002>
-                    </BaseVscodeTab_0002>
-                  </VscodeTab_0002>
-                </Tabs>
-              </TabsHeader_0001>
-            </TabsHeader>
-            <Editor_0001></Editor_0001>
-          </Editor>
-        </Container>
-        <StatusBar>
-          <StatusBar_0001>
-            <Rectangle105></Rectangle105>
-            <Left>
-              <Item>
-                <ItemBase>
-                  <Icon></Icon>
-                  <Text>main</Text>
-                </ItemBase>
-              </Item>
-              <Item_0001>
-                <ItemBase_0001>
-                  <Icon_0001></Icon_0001>
-                  <Text_0001>0↓ 1↑</Text_0001>
-                </ItemBase_0001>
-              </Item_0001>
-            </Left>
-            <Right></Right>
-          </StatusBar_0001>
-        </StatusBar>
-      </Blank>
+      <Contents>
+        <Spacer></Spacer>
+        <Heading1>Design once, Run anywhere.</Heading1>
+        <VscodeDemo>
+          <Container>
+            <WindowHandle>
+              <Controls>
+                <Close></Close>
+                <Minimize></Minimize>
+                <Fullscreen></Fullscreen>
+              </Controls>
+            </WindowHandle>
+            <Sidebar>
+              <IPhone11ProX1></IPhone11ProX1>
+            </Sidebar>
+            <Editor>
+              <TabsHeader>
+                <TabsHeader_0001>
+                  <Tabs>
+                    <VscodeTab>
+                      <BaseVscodeTab>
+                        <Frame565>
+                          <PlatformIconsReactDefault
+                            src="https://s3-us-west-2.amazonaws.com/figma-alpha-api/img/b46a/1396/35aa8c273ddaf01bcfbbfe0e9bca7052"
+                            alt="icon"
+                          ></PlatformIconsReactDefault>
+                          <FileNameTxt>React.tsx</FileNameTxt>
+                        </Frame565>
+                      </BaseVscodeTab>
+                    </VscodeTab>
+                    <VscodeTab_0001>
+                      <BaseVscodeTab_0001>
+                        <Frame565_0001>
+                          <PlatformIconsFlutterGrey>
+                            <Image73
+                              src="https://s3-us-west-2.amazonaws.com/figma-alpha-api/img/071c/39a6/1f73ef26c0bfc2009e19504d359b2b9b"
+                              alt="image of Image73"
+                            ></Image73>
+                          </PlatformIconsFlutterGrey>
+                          <FileNameTxt_0001>Flutter.dart</FileNameTxt_0001>
+                        </Frame565_0001>
+                      </BaseVscodeTab_0001>
+                    </VscodeTab_0001>
+                    <VscodeTab_0002>
+                      <BaseVscodeTab_0002>
+                        <Frame565_0002>
+                          <PlatformIconsHtmlGrey>
+                            <Image76
+                              src="https://s3-us-west-2.amazonaws.com/figma-alpha-api/img/e1a2/daa4/941e1391d393346fa179752b9a86be99"
+                              alt="image of Image76"
+                            ></Image76>
+                          </PlatformIconsHtmlGrey>
+                          <FileNameTxt_0002>vanilla.html</FileNameTxt_0002>
+                        </Frame565_0002>
+                      </BaseVscodeTab_0002>
+                    </VscodeTab_0002>
+                  </Tabs>
+                </TabsHeader_0001>
+              </TabsHeader>
+              <Editor_0001></Editor_0001>
+            </Editor>
+          </Container>
+          <StatusBar>
+            <StatusBar_0001>
+              <Rectangle105></Rectangle105>
+              <Left>
+                <Item>
+                  <ItemBase>
+                    <Icon></Icon>
+                    <Text>main</Text>
+                  </ItemBase>
+                </Item>
+                <Item_0001>
+                  <ItemBase_0001>
+                    <Icon_0001></Icon_0001>
+                    <Text_0001>0↓ 1↑</Text_0001>
+                  </ItemBase_0001>
+                </Item_0001>
+              </Left>
+              <Right></Right>
+            </StatusBar_0001>
+          </StatusBar>
+        </VscodeDemo>
+      </Contents>
     </RootWrapperDesignOnceRunAnywhere320SizeXs>
   );
 }
 
 const RootWrapperDesignOnceRunAnywhere320SizeXs = styled.div`
-  overflow: hidden;
-  height: 929px;
-  ${BackgroundGradient}
-  position: relative;
+  display: flex;
+  justify-content: center;
+  flex-direction: row;
+  align-items: start;
+  gap: 10px;
+  min-height: 100vh;
+  background: linear-gradient(180deg, rgba(0, 0, 0, 1), rgba(0, 87, 255, 0));
+  box-sizing: border-box;
 `;
 
-const Group532 = styled.div`
-  width: 1582px;
-  height: 1071px;
-  position: absolute;
-  left: -151px;
-  top: -34px;
+const Contents = styled.div`
+  display: flex;
+  justify-content: flex-start;
+  flex-direction: column;
+  align-items: center;
+  flex: none;
+  gap: 55px;
+  width: 320px;
+  height: 897px;
+  box-sizing: border-box;
+  padding: 0px 20px 24px;
 `;
 
-const Line64 = styled.div`
-  width: 1020px;
-  height: 1020px;
-  border-left: solid 1px rgba(79, 71, 136, 0.3);
-  border-top: solid 1px rgba(79, 71, 136, 0.3);
-  border-bottom: solid 1px rgba(79, 71, 136, 0.3);
-  border-right: solid 1px rgba(79, 71, 136, 0.3);
-  position: absolute;
-  left: 562px;
-  top: 51px;
-  transform: rotate(225deg);
-`;
-
-const Line67 = styled.div`
-  width: 1020px;
-  height: 1020px;
-  border-left: solid 1px rgba(79, 71, 136, 0.3);
-  border-top: solid 1px rgba(79, 71, 136, 0.3);
-  border-bottom: solid 1px rgba(79, 71, 136, 0.3);
-  border-right: solid 1px rgba(79, 71, 136, 0.3);
-  position: absolute;
-  left: 117px;
-  top: 21px;
-  transform: rotate(225deg);
-`;
-
-const Line65 = styled.div`
-  width: 1014px;
-  height: 1014px;
-  border-left: solid 1px rgba(79, 71, 136, 0.3);
-  border-top: solid 1px rgba(79, 71, 136, 0.3);
-  border-bottom: solid 1px rgba(79, 71, 136, 0.3);
-  border-right: solid 1px rgba(79, 71, 136, 0.3);
-  position: absolute;
-  left: 518px;
-  top: 0px;
-  transform: rotate(135deg);
-`;
-
-const Line66 = styled.div`
-  width: 1014px;
-  height: 1014px;
-  border-left: solid 1px rgba(79, 71, 136, 0.3);
-  border-top: solid 1px rgba(79, 71, 136, 0.3);
-  border-bottom: solid 1px rgba(79, 71, 136, 0.3);
-  border-right: solid 1px rgba(79, 71, 136, 0.3);
-  position: absolute;
-  left: 0px;
-  top: 0px;
-  transform: rotate(135deg);
+const Spacer = styled.div`
+  width: 1px;
+  height: 1px;
 `;
 
 const Heading1 = styled.span`
@@ -171,83 +129,24 @@ const Heading1 = styled.span`
   font-family: "Helvetica Neue", sans-serif;
   font-weight: 700;
   letter-spacing: -1px;
-  line-height: 98%;
+  ${HeadingGradient}
   text-align: center;
   width: 280px;
-  position: absolute;
-  left: calc((calc((50% + 0px)) - 140px));
-  top: 56px;
-  ${HeadingGradient}
 `;
 
-const Blank = styled.div`
+const VscodeDemo = styled.div`
   display: flex;
   justify-content: flex-start;
-  flex-direction: column;
-  align-items: start;
-  gap: 0;
-  box-shadow: 0px 12px 32px 2px rgba(0, 0, 0, 0.48);
-  border-left: solid 1px rgba(69, 69, 69, 1);
-  border-top: solid 1px rgba(69, 69, 69, 1);
-  border-bottom: solid 1px rgba(69, 69, 69, 1);
-  border-right: solid 1px rgba(69, 69, 69, 1);
-  border-radius: 10px;
-  background-color: rgba(37, 37, 38, 1);
-  box-sizing: border-box;
-  position: absolute;
-  left: 20px;
-  top: 172px;
-  right: 20px;
-  height: 726px;
-`;
-
-const Frame608 = styled.div`
-  display: flex;
-  justify-content: center;
   flex-direction: column;
   align-items: start;
   flex: 1;
-  gap: 10px;
+  gap: 0;
+  box-shadow: 0px 12px 32px 2px rgba(0, 0, 0, 0.48);
+  border: solid 1px rgba(69, 69, 69, 1);
+  border-radius: 10px;
   align-self: stretch;
-  background-color: rgba(60, 60, 60, 1);
+  background-color: rgba(37, 37, 38, 1);
   box-sizing: border-box;
-  padding-bottom: 8px;
-  padding-top: 6px;
-  padding-left: 9px;
-  padding-right: 56px;
-`;
-
-const Frame607 = styled.div`
-  display: flex;
-  justify-content: flex-start;
-  flex-direction: row;
-  align-items: start;
-  flex: none;
-  gap: 7px;
-  width: 50px;
-  height: 12px;
-  box-sizing: border-box;
-`;
-
-const Ellipse60 = styled.div`
-  width: 12px;
-  height: 12px;
-  background-color: rgba(236, 106, 95, 1);
-  border-radius: 6px;
-`;
-
-const Ellipse61 = styled.div`
-  width: 12px;
-  height: 12px;
-  background-color: rgba(245, 191, 79, 1);
-  border-radius: 6px;
-`;
-
-const Ellipse62 = styled.div`
-  width: 12px;
-  height: 12px;
-  background-color: rgba(98, 198, 85, 1);
-  border-radius: 6px;
 `;
 
 const Container = styled.div`
@@ -259,6 +158,56 @@ const Container = styled.div`
   gap: 0;
   align-self: stretch;
   box-sizing: border-box;
+`;
+
+const WindowHandle = styled.div`
+  display: flex;
+  justify-content: center;
+  flex-direction: column;
+  align-items: start;
+  flex: 1;
+  gap: 10px;
+  border-radius: 10px;
+  align-self: stretch;
+  background-color: rgba(60, 60, 60, 1);
+  box-sizing: border-box;
+  padding-bottom: 8px;
+  padding-top: 6px;
+  padding-left: 9px;
+  padding-right: 56px;
+`;
+
+const Controls = styled.div`
+  display: flex;
+  justify-content: flex-start;
+  flex-direction: row;
+  align-items: start;
+  flex: none;
+  gap: 7px;
+  width: 50px;
+  height: 12px;
+  box-sizing: border-box;
+`;
+
+const Close = styled.div`
+  width: 12px;
+  height: 12px;
+  background-color: rgba(236, 106, 95, 1);
+  border-radius: 6px;
+`;
+
+const Minimize = styled.div`
+  width: 12px;
+  height: 12px;
+  background-color: rgba(245, 191, 79, 1);
+  border-radius: 6px;
+`;
+
+const Fullscreen = styled.div`
+  width: 12px;
+  height: 12px;
+  background-color: rgba(98, 198, 85, 1);
+  border-radius: 6px;
 `;
 
 const Sidebar = styled.div`
@@ -279,10 +228,7 @@ const IPhone11ProX1 = styled.div`
   height: 501px;
   overflow: hidden;
   background-color: rgba(255, 255, 255, 1);
-  border-left: solid 1px rgba(235, 235, 235, 1);
-  border-top: solid 1px rgba(235, 235, 235, 1);
-  border-bottom: solid 1px rgba(235, 235, 235, 1);
-  border-right: solid 1px rgba(235, 235, 235, 1);
+  border: solid 1px rgba(235, 235, 235, 1);
   position: relative;
   box-shadow: 0px 2px 39px 5px rgba(146, 146, 146, 0.12);
 `;

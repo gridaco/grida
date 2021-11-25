@@ -7,21 +7,17 @@ import { HeadingGradient } from "./styles/heading";
 export default function DesignOnceRunAnywhere1024SizeMd() {
   return (
     <RootWrapperDesignOnceRunAnywhere1024SizeMd>
-      <LinesArtwork
-        src="https://s3-us-west-2.amazonaws.com/figma-alpha-api/img/e0a7/d6d4/c0924b1674a8dc145938c9a4e9ef918e"
-        alt="image of LinesArtwork"
-      ></LinesArtwork>
       <Contents>
         <Spacer></Spacer>
         <Heading1>Design once, Run anywhere.</Heading1>
         <VscodeDemo>
-          <Frame608>
-            <Frame607>
-              <Ellipse60></Ellipse60>
-              <Ellipse61></Ellipse61>
-              <Ellipse62></Ellipse62>
-            </Frame607>
-          </Frame608>
+          <WindowHandle>
+            <Controls>
+              <Close></Close>
+              <Minimize></Minimize>
+              <Fullscreen></Fullscreen>
+            </Controls>
+          </WindowHandle>
           <Container>
             <ActivityBar>
               <Bottom>
@@ -160,19 +156,14 @@ export default function DesignOnceRunAnywhere1024SizeMd() {
 }
 
 const RootWrapperDesignOnceRunAnywhere1024SizeMd = styled.div`
-  overflow: hidden;
-  height: 929px;
+  display: flex;
+  justify-content: flex-start;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  min-height: 100vh;
   ${BackgroundGradient}
-  position: relative;
-`;
-
-const LinesArtwork = styled.img`
-  width: 1582px;
-  height: 1071px;
-  object-fit: cover;
-  position: absolute;
-  left: -151px;
-  top: -34px;
+  box-sizing: border-box;
 `;
 
 const Contents = styled.div`
@@ -180,14 +171,11 @@ const Contents = styled.div`
   justify-content: flex-start;
   flex-direction: column;
   align-items: center;
+  flex: 1;
   gap: 68px;
+  align-self: stretch;
   box-sizing: border-box;
-  padding: 0px 48px;
-  position: absolute;
-  left: 0px;
-  top: 0px;
-  right: 0px;
-  bottom: 0px;
+  padding: 0px 48px 48px;
 `;
 
 const Spacer = styled.div`
@@ -200,9 +188,8 @@ const Heading1 = styled.span`
   font-size: 64px;
   font-family: "Helvetica Neue", sans-serif;
   font-weight: 700;
-  line-height: 98%;
-  text-align: center;
   ${HeadingGradient}
+  text-align: center;
 `;
 
 const VscodeDemo = styled.div`
@@ -213,23 +200,21 @@ const VscodeDemo = styled.div`
   flex: 1;
   gap: 0;
   box-shadow: 0px 12px 32px 2px rgba(0, 0, 0, 0.48);
-  border-left: solid 1px rgba(69, 69, 69, 1);
-  border-top: solid 1px rgba(69, 69, 69, 1);
-  border-bottom: solid 1px rgba(69, 69, 69, 1);
-  border-right: solid 1px rgba(69, 69, 69, 1);
+  border: solid 1px rgba(69, 69, 69, 1);
   border-radius: 10px;
   align-self: stretch;
   background-color: rgba(37, 37, 38, 1);
   box-sizing: border-box;
 `;
 
-const Frame608 = styled.div`
+const WindowHandle = styled.div`
   display: flex;
   justify-content: center;
   flex-direction: column;
   align-items: start;
   flex: 1;
   gap: 10px;
+  border-radius: 10px;
   align-self: stretch;
   background-color: rgba(60, 60, 60, 1);
   box-sizing: border-box;
@@ -239,7 +224,7 @@ const Frame608 = styled.div`
   padding-right: 56px;
 `;
 
-const Frame607 = styled.div`
+const Controls = styled.div`
   display: flex;
   justify-content: flex-start;
   flex-direction: row;
@@ -251,21 +236,21 @@ const Frame607 = styled.div`
   box-sizing: border-box;
 `;
 
-const Ellipse60 = styled.div`
+const Close = styled.div`
   width: 12px;
   height: 12px;
   background-color: rgba(236, 106, 95, 1);
   border-radius: 6px;
 `;
 
-const Ellipse61 = styled.div`
+const Minimize = styled.div`
   width: 12px;
   height: 12px;
   background-color: rgba(245, 191, 79, 1);
   border-radius: 6px;
 `;
 
-const Ellipse62 = styled.div`
+const Fullscreen = styled.div`
   width: 12px;
   height: 12px;
   background-color: rgba(98, 198, 85, 1);
@@ -540,10 +525,7 @@ const IPhone11ProX1 = styled.div`
   height: 812px;
   overflow: hidden;
   background-color: rgba(255, 255, 255, 1);
-  border-left: solid 1px rgba(235, 235, 235, 1);
-  border-top: solid 1px rgba(235, 235, 235, 1);
-  border-bottom: solid 1px rgba(235, 235, 235, 1);
-  border-right: solid 1px rgba(235, 235, 235, 1);
+  border: solid 1px rgba(235, 235, 235, 1);
   position: absolute;
   box-shadow: 0px 4px 64px 8px rgba(146, 146, 146, 0.12);
   left: 45px;

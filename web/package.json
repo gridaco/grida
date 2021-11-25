@@ -23,6 +23,7 @@
     "@emotion/babel-preset-css-prop": "^10",
     "@emotion/core": "^10.0.16",
     "@emotion/css": "^11.5.0",
+    "@emotion/react": "^11.6.0",
     "@emotion/styled": "^10.0.15",
     "@grida/link-downloads": "^0.0.2",
     "@grida/link-promotions": "^0.0.2",

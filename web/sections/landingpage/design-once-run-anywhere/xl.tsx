@@ -7,186 +7,163 @@ import { HeadingGradient } from "./styles/heading";
 export default function DesignOnceRunAnywhere1440SizeXl() {
   return (
     <RootWrapperDesignOnceRunAnywhere1440SizeXl>
-      <DesignOnceRunAnywhere>
-        <LinesArtwork
-          src="https://s3-us-west-2.amazonaws.com/figma-alpha-api/img/e0a7/d6d4/c0924b1674a8dc145938c9a4e9ef918e"
-          alt="image of LinesArtwork"
-        ></LinesArtwork>
-        <Contents>
-          <Spacer></Spacer>
-          <Heading1>Design once, Run anywhere.</Heading1>
-          <VscodeDemo>
-            <WindowHandle>
-              <Controls>
-                <Close></Close>
-                <Minimize></Minimize>
-                <Fullscreen></Fullscreen>
-              </Controls>
-            </WindowHandle>
-            <Container>
-              <ActivityBar>
-                <Bottom>
-                  <Item>
-                    <Base>
-                      <Icon></Icon>
-                    </Base>
-                  </Item>
-                  <Item_0001>
-                    <Base_0001>
-                      <Icon_0001></Icon_0001>
-                    </Base_0001>
-                  </Item_0001>
-                </Bottom>
-                <Top>
-                  <Item_0002>
-                    <Base_0002>
-                      <Icon_0002></Icon_0002>
-                    </Base_0002>
-                  </Item_0002>
-                  <Item_0003>
-                    <Base_0003>
-                      <Icon_0003></Icon_0003>
-                    </Base_0003>
-                  </Item_0003>
-                  <Item_0004>
-                    <Base_0004>
-                      <Icon_0004></Icon_0004>
-                    </Base_0004>
-                  </Item_0004>
-                  <ActivityBarItemGrida>
-                    <Item_0005>
-                      <Base_0005>
-                        <ActiveBorder></ActiveBorder>
-                      </Base_0005>
-                    </Item_0005>
-                    <SideBarLogo>
-                      <LogoShapeOnly>
-                        <Union
-                          src="https://s3-us-west-2.amazonaws.com/figma-alpha-api/img/66bf/5811/054c28e0ad638fa236da8f161d334772"
-                          alt="image of Union"
-                        ></Union>
-                        <Union_0001
-                          src="https://s3-us-west-2.amazonaws.com/figma-alpha-api/img/27cf/e46e/f7771b92fc41bcf5be68e49443a54ee1"
-                          alt="image of Union"
-                        ></Union_0001>
-                      </LogoShapeOnly>
-                    </SideBarLogo>
-                  </ActivityBarItemGrida>
-                </Top>
-              </ActivityBar>
-              <Sidebar>
-                <IPhone11ProX1></IPhone11ProX1>
-              </Sidebar>
-              <Editor>
-                <TabsHeader>
-                  <Tabs>
-                    <VscodeTab>
-                      <BaseVscodeTab>
-                        <Frame565>
-                          <PlatformIconsReactDefault
-                            src="https://s3-us-west-2.amazonaws.com/figma-alpha-api/img/b46a/1396/35aa8c273ddaf01bcfbbfe0e9bca7052"
-                            alt="icon"
-                          ></PlatformIconsReactDefault>
-                          <FileNameTxt>React.tsx</FileNameTxt>
-                        </Frame565>
-                      </BaseVscodeTab>
-                    </VscodeTab>
-                    <VscodeTab_0001>
-                      <BaseVscodeTab_0001>
-                        <Frame565_0001>
-                          <PlatformIconsFlutterGrey>
-                            <Image73
-                              src="https://s3-us-west-2.amazonaws.com/figma-alpha-api/img/071c/39a6/1f73ef26c0bfc2009e19504d359b2b9b"
-                              alt="image of Image73"
-                            ></Image73>
-                          </PlatformIconsFlutterGrey>
-                          <FileNameTxt_0001>Flutter.dart</FileNameTxt_0001>
-                        </Frame565_0001>
-                      </BaseVscodeTab_0001>
-                    </VscodeTab_0001>
-                    <VscodeTab_0002>
-                      <BaseVscodeTab_0002>
-                        <Frame565_0002>
-                          <PlatformIconsHtmlGrey>
-                            <Image76
-                              src="https://s3-us-west-2.amazonaws.com/figma-alpha-api/img/e1a2/daa4/941e1391d393346fa179752b9a86be99"
-                              alt="image of Image76"
-                            ></Image76>
-                          </PlatformIconsHtmlGrey>
-                          <FileNameTxt_0002>vanilla.html</FileNameTxt_0002>
-                        </Frame565_0002>
-                      </BaseVscodeTab_0002>
-                    </VscodeTab_0002>
-                  </Tabs>
-                  <Toolbar>
-                    <Actions>
-                      <Actions_0001>
-                        <Icon_0005></Icon_0005>
-                      </Actions_0001>
-                    </Actions>
-                    <Actions_0002>
-                      <Actions_0003>
-                        <Icon_0006></Icon_0006>
-                      </Actions_0003>
-                    </Actions_0002>
-                  </Toolbar>
-                </TabsHeader>
-                <Editor_0001></Editor_0001>
-              </Editor>
-            </Container>
-            <StatusBar>
-              <StatusBar_0001>
-                <Rectangle105></Rectangle105>
-                <Left>
-                  <Item_0006>
-                    <ItemBase>
-                      <Icon_0007></Icon_0007>
-                      <Text>main</Text>
-                    </ItemBase>
-                  </Item_0006>
-                  <Item_0007>
-                    <ItemBase_0001>
-                      <Icon_0008></Icon_0008>
-                      <Text_0001>0↓ 1↑</Text_0001>
-                    </ItemBase_0001>
-                  </Item_0007>
-                </Left>
-                <Right></Right>
-              </StatusBar_0001>
-            </StatusBar>
-          </VscodeDemo>
-        </Contents>
-      </DesignOnceRunAnywhere>
+      <Contents>
+        <Spacer></Spacer>
+        <Heading1>Design once, Run anywhere.</Heading1>
+        <VscodeDemo>
+          <WindowHandle>
+            <Controls>
+              <Close></Close>
+              <Minimize></Minimize>
+              <Fullscreen></Fullscreen>
+            </Controls>
+          </WindowHandle>
+          <Container>
+            <ActivityBar>
+              <Bottom>
+                <Item>
+                  <Base>
+                    <Icon></Icon>
+                  </Base>
+                </Item>
+                <Item_0001>
+                  <Base_0001>
+                    <Icon_0001></Icon_0001>
+                  </Base_0001>
+                </Item_0001>
+              </Bottom>
+              <Top>
+                <Item_0002>
+                  <Base_0002>
+                    <Icon_0002></Icon_0002>
+                  </Base_0002>
+                </Item_0002>
+                <Item_0003>
+                  <Base_0003>
+                    <Icon_0003></Icon_0003>
+                  </Base_0003>
+                </Item_0003>
+                <Item_0004>
+                  <Base_0004>
+                    <Icon_0004></Icon_0004>
+                  </Base_0004>
+                </Item_0004>
+                <ActivityBarItemGrida>
+                  <Item_0005>
+                    <Base_0005>
+                      <ActiveBorder></ActiveBorder>
+                    </Base_0005>
+                  </Item_0005>
+                  <SideBarLogo>
+                    <LogoShapeOnly>
+                      <Union
+                        src="https://s3-us-west-2.amazonaws.com/figma-alpha-api/img/66bf/5811/054c28e0ad638fa236da8f161d334772"
+                        alt="image of Union"
+                      ></Union>
+                      <Union_0001
+                        src="https://s3-us-west-2.amazonaws.com/figma-alpha-api/img/27cf/e46e/f7771b92fc41bcf5be68e49443a54ee1"
+                        alt="image of Union"
+                      ></Union_0001>
+                    </LogoShapeOnly>
+                  </SideBarLogo>
+                </ActivityBarItemGrida>
+              </Top>
+            </ActivityBar>
+            <Sidebar>
+              <IPhone11ProX1></IPhone11ProX1>
+            </Sidebar>
+            <Editor>
+              <TabsHeader>
+                <Tabs>
+                  <VscodeTab>
+                    <BaseVscodeTab>
+                      <Frame565>
+                        <PlatformIconsReactDefault
+                          src="https://s3-us-west-2.amazonaws.com/figma-alpha-api/img/b46a/1396/35aa8c273ddaf01bcfbbfe0e9bca7052"
+                          alt="icon"
+                        ></PlatformIconsReactDefault>
+                        <FileNameTxt>React.tsx</FileNameTxt>
+                      </Frame565>
+                    </BaseVscodeTab>
+                  </VscodeTab>
+                  <VscodeTab_0001>
+                    <BaseVscodeTab_0001>
+                      <Frame565_0001>
+                        <PlatformIconsFlutterGrey>
+                          <Image73
+                            src="https://s3-us-west-2.amazonaws.com/figma-alpha-api/img/071c/39a6/1f73ef26c0bfc2009e19504d359b2b9b"
+                            alt="image of Image73"
+                          ></Image73>
+                        </PlatformIconsFlutterGrey>
+                        <FileNameTxt_0001>Flutter.dart</FileNameTxt_0001>
+                      </Frame565_0001>
+                    </BaseVscodeTab_0001>
+                  </VscodeTab_0001>
+                  <VscodeTab_0002>
+                    <BaseVscodeTab_0002>
+                      <Frame565_0002>
+                        <PlatformIconsHtmlGrey>
+                          <Image76
+                            src="https://s3-us-west-2.amazonaws.com/figma-alpha-api/img/e1a2/daa4/941e1391d393346fa179752b9a86be99"
+                            alt="image of Image76"
+                          ></Image76>
+                        </PlatformIconsHtmlGrey>
+                        <FileNameTxt_0002>vanilla.html</FileNameTxt_0002>
+                      </Frame565_0002>
+                    </BaseVscodeTab_0002>
+                  </VscodeTab_0002>
+                </Tabs>
+                <Toolbar>
+                  <Actions>
+                    <Actions_0001>
+                      <Icon_0005></Icon_0005>
+                    </Actions_0001>
+                  </Actions>
+                  <Actions_0002>
+                    <Actions_0003>
+                      <Icon_0006></Icon_0006>
+                    </Actions_0003>
+                  </Actions_0002>
+                </Toolbar>
+              </TabsHeader>
+              <Editor_0001></Editor_0001>
+            </Editor>
+          </Container>
+          <StatusBar>
+            <StatusBar_0001>
+              <Rectangle105></Rectangle105>
+              <Left>
+                <Item_0006>
+                  <ItemBase>
+                    <Icon_0007></Icon_0007>
+                    <Text>main</Text>
+                  </ItemBase>
+                </Item_0006>
+                <Item_0007>
+                  <ItemBase_0001>
+                    <Icon_0008></Icon_0008>
+                    <Text_0001>0↓ 1↑</Text_0001>
+                  </ItemBase_0001>
+                </Item_0007>
+              </Left>
+              <Right></Right>
+            </StatusBar_0001>
+          </StatusBar>
+        </VscodeDemo>
+      </Contents>
     </RootWrapperDesignOnceRunAnywhere1440SizeXl>
   );
 }
 
 const RootWrapperDesignOnceRunAnywhere1440SizeXl = styled.div`
-  overflow: hidden;
   display: flex;
   justify-content: flex-start;
   flex-direction: column;
-  align-items: start;
-  height: 929px;
-  background-color: rgba(255, 255, 255, 1);
-  box-sizing: border-box;
-`;
-
-const DesignOnceRunAnywhere = styled.div`
-  height: 929px;
-  overflow: hidden;
+  align-items: center;
+  gap: 0;
+  /* min-height: 100vh; */
   ${BackgroundGradient}
-  position: relative;
-  align-self: stretch;
-`;
-
-const LinesArtwork = styled.img`
-  width: 1582px;
-  height: 1071px;
-  object-fit: cover;
-  position: absolute;
-  left: -151px;
-  top: -34px;
+  box-sizing: border-box;
 `;
 
 const Contents = styled.div`
@@ -194,13 +171,11 @@ const Contents = styled.div`
   justify-content: flex-start;
   flex-direction: column;
   align-items: center;
+  flex: 1;
   gap: 68px;
+  align-self: stretch;
   box-sizing: border-box;
-  position: absolute;
-  left: 0px;
-  top: 0px;
-  right: 0px;
-  bottom: 0px;
+  padding: 0px 0px 48px;
 `;
 
 const Spacer = styled.div`
@@ -214,8 +189,8 @@ const Heading1 = styled.span`
   font-family: "Helvetica Neue", sans-serif;
   font-weight: 700;
   line-height: 98%;
-  text-align: center;
   ${HeadingGradient}
+  text-align: center;
 `;
 
 const VscodeDemo = styled.div`
@@ -226,10 +201,7 @@ const VscodeDemo = styled.div`
   flex: none;
   gap: 0;
   box-shadow: 0px 12px 32px 2px rgba(0, 0, 0, 0.48);
-  border-left: solid 1px rgba(69, 69, 69, 1);
-  border-top: solid 1px rgba(69, 69, 69, 1);
-  border-bottom: solid 1px rgba(69, 69, 69, 1);
-  border-right: solid 1px rgba(69, 69, 69, 1);
+  border: solid 1px rgba(69, 69, 69, 1);
   border-radius: 10px;
   width: 1238px;
   height: 710px;
@@ -555,10 +527,7 @@ const IPhone11ProX1 = styled.div`
   height: 812px;
   overflow: hidden;
   background-color: rgba(255, 255, 255, 1);
-  border-left: solid 1px rgba(235, 235, 235, 1);
-  border-top: solid 1px rgba(235, 235, 235, 1);
-  border-bottom: solid 1px rgba(235, 235, 235, 1);
-  border-right: solid 1px rgba(235, 235, 235, 1);
+  border: solid 1px rgba(235, 235, 235, 1);
   position: absolute;
   box-shadow: 0px 4px 64px 8px rgba(146, 146, 146, 0.12);
   left: 45px;
