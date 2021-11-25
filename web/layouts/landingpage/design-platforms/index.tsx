@@ -171,6 +171,7 @@ const Mobile = styled.div`
 
 const Desktop = styled.div`
   display: block;
+  height: 700px;
   ${props => media("0px", (props.theme as ThemeInterface).breakpoints[0])} {
     display: none;
   }

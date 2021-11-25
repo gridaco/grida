@@ -1,5 +1,4 @@
 import Section__BornToBeHeadLess from "./born-to-be-headless";
-import Collaborate from "./collaborate";
 import Section__CTASeeTheMagic from "./cta-see-the-magic";
 import DesignOnceRunAnywhere from "./design-once-run-anywhere";
 import Hero from "./hero";
@@ -14,7 +13,6 @@ export default {
   Section2_design_to_code: OnlineApp,
   Section3_how_engine_works: LayoutDetect,
   Section4_features_tab: Products,
-  Section5_collaboration: Collaborate,
   Section__BornToBeHeadLess: Section__BornToBeHeadLess,
   Section__CTASeeTheMagic: Section__CTASeeTheMagic,
   FinalCta: Slogan,
