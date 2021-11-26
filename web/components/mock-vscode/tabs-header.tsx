@@ -3,13 +3,37 @@ import React from "react";
 
 import VSCodeTab from "./vscode-tab";
 
-export default function TabsHeader() {
+export default function TabsHeader({
+  activeTab,
+  onTabClick,
+}: {
+  activeTab: string;
+  onTabClick: (tab: string) => void;
+}) {
   return (
     <RootWrapperTabsHeader>
       <Tabs>
-        <VSCodeTab selected label="React.tsx" />
-        <VSCodeTab label="Flutter.dart" />
-        <VSCodeTab label="vanilla.html" />
+        <VSCodeTab
+          selected={activeTab === "react"}
+          label="React.tsx"
+          onClick={() => {
+            onTabClick("react");
+          }}
+        />
+        <VSCodeTab
+          selected={activeTab === "flutter"}
+          label="Flutter.dart"
+          onClick={() => {
+            onTabClick("flutter");
+          }}
+        />
+        <VSCodeTab
+          selected={activeTab === "vanilla"}
+          label="vanilla.html"
+          onClick={() => {
+            onTabClick("vanilla");
+          }}
+        />
       </Tabs>
       <Toolbar>
         <Actions>

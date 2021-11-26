@@ -9,13 +9,15 @@ export default function VSCodeTab({
   selected = false,
   label = DEFAULT_LABEL_TEXT,
   icon = "dummy",
+  onClick,
 }: {
   selected?: boolean;
   icon?: NamedCodeIcons;
   label?: string;
+  onClick?: () => void;
 }) {
   return (
-    <Wrapper>
+    <Wrapper onClick={onClick}>
       <BaseVscodeTab
         color={selected ? BaseColors.selected : BaseColors.unselected}
       >

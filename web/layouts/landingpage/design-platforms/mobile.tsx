@@ -66,7 +66,7 @@ const Positoner = styled(Flex)`
 const PlatformView = styled.div`
   position: absolute;
   z-index: 950;
-  border-radius: 12px;
+  border-radius: 8px;
   margin-top: 72px;
   margin-left: 50px;
   height: 580px;

@@ -1,4 +1,5 @@
 import styled from "@emotion/styled";
+import { motion } from "framer-motion";
 import React, { useState } from "react";
 
 import { media } from "utils/styled/media";
@@ -19,14 +20,21 @@ export function CtaArea() {
   };
 
   return (
-    <Container key="cta-area">
+    <Container
+      key="cta-area"
+      whileHover={{
+        scale: 1.03,
+      }}
+    >
       <HeroPrimaryInput onChange={onchange} />
       <HeroPrimaryButton onClick={onclick} />
     </Container>
   );
 }
 
-const Container = styled.div`
+const Container = styled(motion.div)`
+  padding-top: 24px;
+  padding-bottom: 24px;
   align-self: stretch;
   justify-content: flex-start;
   display: flex;

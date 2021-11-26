@@ -8,7 +8,7 @@ import {
   Panel,
 } from "components/mock-vscode";
 
-import { snippets } from "./k";
+import DemoApp from "../demo-app";
 import { BackgroundGradient } from "./styles/background";
 import { HeadingGradient } from "./styles/heading";
 
@@ -23,9 +23,11 @@ export default function DesignOnceRunAnywhere1440SizeXl() {
           <Container>
             <ActivityBar></ActivityBar>
             <Sidebar>
-              <IPhone11ProX1></IPhone11ProX1>
+              <IPhone11ProX1>
+                <DemoApp />
+              </IPhone11ProX1>
             </Sidebar>
-            <Panel code={snippets._DEMO_APP_SRC_TSX} />
+            <Panel />
           </Container>
           <StatusBar></StatusBar>
         </VscodeDemo>

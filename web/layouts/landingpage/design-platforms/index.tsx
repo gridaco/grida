@@ -100,7 +100,7 @@ export default DesignPlatforms;
 const PlatformView = styled.div`
   position: relative;
   z-index: 950;
-  border-radius: 12px;
+  border-radius: 8px;
   top: -500px;
   margin-left: auto;
   height: 580px;

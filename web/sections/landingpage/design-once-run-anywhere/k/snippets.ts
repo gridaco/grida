@@ -1,69 +1,29 @@
-export const _DEMO_APP_SRC_TSX = `import styled from "@emotion/styled";
-import React from "react";
+export const _DEMO_APP_SRC_TSX = `import React from "react";
+import styled from "@emotion/styled";
 
-export default function DemoApp({ scale = 1 }: { scale?: number }) {
+function DemoApp() {
   return (
-    <RootWrapperDemoApp scale={scale}>
-      <FriendsMusicSection>
-        <FriendListeningHeaderText>
-          Lauren is listening
-        </FriendListeningHeaderText>
-        <MusicSecondaryList>
-          <Primary>
-            <Cover>
-              <Rectangle825
-                src="https://s3-us-west-2.amazonaws.com/figma-alpha-api/img/0cf0/7836/f073708c3ceb92d2504f0a572048367b"
-                alt="image of Rectangle825"
-              ></Rectangle825>
-              <TrpLve>
-                TRP
-                <br />
-                LVE
-              </TrpLve>
-            </Cover>
-            <NonGraphicsArea>
-              <InnerFrame>
-                <TextInfo>
-                  <Trippe>TRIPPE</Trippe>
-                  <MorningSlowbeatsLoFi>
-                    Morning Slowbeats - LoFi
-                  </MorningSlowbeatsLoFi>
-                </TextInfo>
-                <MusicPlayButton
-                  src="https://s3-us-west-2.amazonaws.com/figma-alpha-api/img/56fc/4c35/733e07dee25b0dce8c66a2fb86ef998f"
-                  alt="icon"
-                ></MusicPlayButton>
-              </InnerFrame>
-            </NonGraphicsArea>
-          </Primary>
+    <RootWrapperDemoApp>
+      <Body>
+        <TopSpacer></TopSpacer>
+        <SectionHeader>
+          <HeaderSection>
+            <TitleAndAvatar>
+              <Title>Saturday Morning Mix</Title>
+              <AvatarSource
+                src="grida://assets-reservation/images/1:11"
+                alt="image of AvatarSource"
+              ></AvatarSource>
+            </TitleAndAvatar>
+            <Subtitle>
+              Here are some tunes for you to start your morning. Mostly quiet
+              and slow-beat, some of them are mood changer.
+            </Subtitle>
+          </HeaderSection>
+        </SectionHeader>
+        <PrimaryMusicCardsList>
           <Card1>
-            <Contents>
-              <Cover_0001>
-                <Rectangle825_0001
-                  src="https://s3-us-west-2.amazonaws.com/figma-alpha-api/img/26c1/ce4d/c339eeaa7bbbdad0c83e2ab036fbfecb"
-                  alt="image of Rectangle825"
-                ></Rectangle825_0001>
-                <Union
-                  src="https://s3-us-west-2.amazonaws.com/figma-alpha-api/img/6cd5/7710/811330309e1aeaea91da25f5cac2adfd"
-                  alt="image of Union"
-                ></Union>
-              </Cover_0001>
-              <NonGraphicArea>
-                <TextInfo_0001>
-                  <Sweet>Sweet</Sweet>
-                  <MorningSlowbeatsLoFi_0001>
-                    Morning Slowbeats - LoFi
-                  </MorningSlowbeatsLoFi_0001>
-                </TextInfo_0001>
-                <MusicPlayButton_0001
-                  src="https://s3-us-west-2.amazonaws.com/figma-alpha-api/img/e80e/fc39/da9065547bba86fc0f83f31a4310271c"
-                  alt="icon"
-                ></MusicPlayButton_0001>
-              </NonGraphicArea>
-            </Contents>
-          </Card1>
-          <Card2>
-            <Contents_0001>
+            <Frame305>
               <DemoAppAlbumCover1>
                 <Rectangle813></Rectangle813>
                 <LoFi>
@@ -72,142 +32,465 @@ export default function DemoApp({ scale = 1 }: { scale?: number }) {
                   FI
                 </LoFi>
               </DemoAppAlbumCover1>
-              <NonGraphicArea_0001>
-                <TextInfo_0002>
-                  <Sweet_0001>Falling</Sweet_0001>
-                  <MorningSlowbeatsLoFi_0002>
-                    Morning Slowbeats - LoFi
-                  </MorningSlowbeatsLoFi_0002>
-                </TextInfo_0002>
-                <MusicPlayButton_0002
-                  src="https://s3-us-west-2.amazonaws.com/figma-alpha-api/img/e80e/fc39/da9065547bba86fc0f83f31a4310271c"
-                  alt="icon"
-                ></MusicPlayButton_0002>
-              </NonGraphicArea_0001>
-            </Contents_0001>
+              <MusicPlayButton
+                src="grida://assets-reservation/images/I1:24;1:103"
+                alt="icon"
+              ></MusicPlayButton>
+            </Frame305>
+            <MorningSlowbeatsLoFi>
+              Morning Slowbeats - LoFi
+            </MorningSlowbeatsLoFi>
+          </Card1>
+          <Card2>
+            <Frame305_0001>
+              <DemoAppAlbumCover3>
+                <Rectangle825
+                  src="grida://assets-reservation/images/I1:25;1:101;1:113"
+                  alt="image of Rectangle825"
+                ></Rectangle825>
+                <Union
+                  src="grida://assets-reservation/images/I1:25;1:101;1:114"
+                  alt="image of Union"
+                ></Union>
+              </DemoAppAlbumCover3>
+              <MusicPlayButton_0001
+                src="grida://assets-reservation/images/I1:25;1:103"
+                alt="icon"
+              ></MusicPlayButton_0001>
+            </Frame305_0001>
+            <MorningSlowbeatsLoFi_0001>
+              Morning Slowbeats - LoFi
+            </MorningSlowbeatsLoFi_0001>
           </Card2>
-        </MusicSecondaryList>
-      </FriendsMusicSection>
-      <HeaderSection>
-        <TitleAndAvatar>
-          <Title>Saturday Morning Mix</Title>
-          <AvatarSource
-            src="https://s3-us-west-2.amazonaws.com/figma-alpha-api/img/4f6b/36d5/17d6b783005c459c272ce5fb879a9e9f"
-            alt="image of AvatarSource"
-          ></AvatarSource>
-        </TitleAndAvatar>
-        <Subtitle>
-          Here are some tunes for you to start your morning. Mostly quiet and
-          slow-beat, some of them are mood changer.
-        </Subtitle>
-      </HeaderSection>
-      <Group523>
-        <Rectangle819></Rectangle819>
-        <Group519
-          src="https://s3-us-west-2.amazonaws.com/figma-alpha-api/img/9562/c646/ed1c906b14016ebf915140b81c0638ce"
-          alt="icon"
-        ></Group519>
-        <MorningSlowbeatsLoFi_0003>
-          Morning Slowbeats - LoFi
-        </MorningSlowbeatsLoFi_0003>
-        <Trippe_0001>TRIPPE</Trippe_0001>
-        <Rectangle825_0002></Rectangle825_0002>
-      </Group523>
-      <DemoAppTabBar>
+          <Card3>
+            <Frame305_0002>
+              <DemoAppAlbumCover2>
+                <Rectangle825_0001
+                  src="grida://assets-reservation/images/I1:26;1:101;1:110"
+                  alt="image of Rectangle825"
+                ></Rectangle825_0001>
+                <TrpLve>
+                  TRP
+                  <br />
+                  LVE
+                </TrpLve>
+              </DemoAppAlbumCover2>
+              <MusicPlayButton_0002
+                src="grida://assets-reservation/images/I1:26;1:103"
+                alt="icon"
+              ></MusicPlayButton_0002>
+            </Frame305_0002>
+            <MorningSlowbeatsLoFi_0002>
+              Morning Slowbeats - LoFi
+            </MorningSlowbeatsLoFi_0002>
+          </Card3>
+        </PrimaryMusicCardsList>
+        <FriendsMusicSection>
+          <FriendListeningHeaderText>
+            Lauren is listening
+          </FriendListeningHeaderText>
+          <MusicSecondaryList>
+            <Primary>
+              <Cover>
+                <Rectangle825_0002
+                  src="grida://assets-reservation/images/I1:22;1:78;1:110"
+                  alt="image of Rectangle825"
+                ></Rectangle825_0002>
+                <TrpLve_0001>
+                  TRP
+                  <br />
+                  LVE
+                </TrpLve_0001>
+              </Cover>
+              <NonGraphicsArea>
+                <InnerFrame>
+                  <TextInfo>
+                    <Trippe>TRIPPE</Trippe>
+                    <MorningSlowbeatsLoFi_0003>
+                      Morning Slowbeats - LoFi
+                    </MorningSlowbeatsLoFi_0003>
+                  </TextInfo>
+                  <MusicPlayButton_0003
+                    src="grida://assets-reservation/images/I1:22;1:74"
+                    alt="icon"
+                  ></MusicPlayButton_0003>
+                </InnerFrame>
+              </NonGraphicsArea>
+            </Primary>
+            <Card1_0001>
+              <Contents>
+                <Cover_0001>
+                  <Rectangle825_0003
+                    src="grida://assets-reservation/images/I1:27;1:70;1:113"
+                    alt="image of Rectangle825"
+                  ></Rectangle825_0003>
+                  <Union_0001
+                    src="grida://assets-reservation/images/I1:27;1:70;1:114"
+                    alt="image of Union"
+                  ></Union_0001>
+                </Cover_0001>
+                <NonGraphicArea>
+                  <TextInfo_0001>
+                    <Sweet>Sweet</Sweet>
+                    <MorningSlowbeatsLoFi_0004>
+                      Morning Slowbeats - LoFi
+                    </MorningSlowbeatsLoFi_0004>
+                  </TextInfo_0001>
+                  <MusicPlayButton_0004
+                    src="grida://assets-reservation/images/I1:27;1:71"
+                    alt="icon"
+                  ></MusicPlayButton_0004>
+                </NonGraphicArea>
+              </Contents>
+            </Card1_0001>
+            <Card2_0001>
+              <Contents_0001>
+                <DemoAppAlbumCover1_0001>
+                  <Rectangle813_0001></Rectangle813_0001>
+                  <LoFi_0001>
+                    LO
+                    <br />
+                    FI
+                  </LoFi_0001>
+                </DemoAppAlbumCover1_0001>
+                <NonGraphicArea_0001>
+                  <TextInfo_0002>
+                    <Sweet_0001>Falling</Sweet_0001>
+                    <MorningSlowbeatsLoFi_0005>
+                      Morning Slowbeats - LoFi
+                    </MorningSlowbeatsLoFi_0005>
+                  </TextInfo_0002>
+                  <MusicPlayButton_0005
+                    src="grida://assets-reservation/images/I1:7;1:71"
+                    alt="icon"
+                  ></MusicPlayButton_0005>
+                </NonGraphicArea_0001>
+              </Contents_0001>
+            </Card2_0001>
+          </MusicSecondaryList>
+        </FriendsMusicSection>
+      </Body>
+      <Footer>
         <Rectangle815></Rectangle815>
         <Tabs>
           <IconsMdiHome
-            src="https://s3-us-west-2.amazonaws.com/figma-alpha-api/img/e350/9fb4/422697fd40f9d0f19a35ebbc5df11b57"
+            src="grida://assets-reservation/images/I1:23;1:54"
             alt="image of IconsMdiHome"
           ></IconsMdiHome>
           <IconsMdiShowChart
-            src="https://s3-us-west-2.amazonaws.com/figma-alpha-api/img/1436/9fa1/ba7653876dc7ca8fe523b354816f5319"
+            src="grida://assets-reservation/images/I1:23;1:57"
             alt="image of IconsMdiShowChart"
           ></IconsMdiShowChart>
           <IconsMdiSearch
-            src="https://s3-us-west-2.amazonaws.com/figma-alpha-api/img/5fda/b17b/6bdba2e87f84c133ad91b1f5c7da0785"
+            src="grida://assets-reservation/images/I1:23;1:60"
             alt="image of IconsMdiSearch"
           ></IconsMdiSearch>
         </Tabs>
-      </DemoAppTabBar>
-      <PrimaryMusicCardsList>
-        <Card1_0001>
-          <Frame305>
-            <DemoAppAlbumCover1_0001>
-              <Rectangle813_0001></Rectangle813_0001>
-              <LoFi_0001>
-                LO
-                <br />
-                FI
-              </LoFi_0001>
-            </DemoAppAlbumCover1_0001>
-            <MusicPlayButton_0003
-              src="https://s3-us-west-2.amazonaws.com/figma-alpha-api/img/5f4a/558c/5524bce036659c4f82d652b44961d944"
-              alt="icon"
-            ></MusicPlayButton_0003>
-          </Frame305>
-          <MorningSlowbeatsLoFi_0004>
-            Morning Slowbeats - LoFi
-          </MorningSlowbeatsLoFi_0004>
-        </Card1_0001>
-        <Card2_0001>
-          <Frame305_0001>
-            <DemoAppAlbumCover3>
-              <Rectangle825_0003
-                src="https://s3-us-west-2.amazonaws.com/figma-alpha-api/img/8a94/bb41/b26e2d09badc33fd87413d2d7cb4f2d6"
-                alt="image of Rectangle825"
-              ></Rectangle825_0003>
-              <Union_0001
-                src="https://s3-us-west-2.amazonaws.com/figma-alpha-api/img/c86a/b0ec/2cbaa0a2ffcf6665e30c288e0a09bbc4"
-                alt="image of Union"
-              ></Union_0001>
-            </DemoAppAlbumCover3>
-            <MusicPlayButton_0004
-              src="https://s3-us-west-2.amazonaws.com/figma-alpha-api/img/5f4a/558c/5524bce036659c4f82d652b44961d944"
-              alt="icon"
-            ></MusicPlayButton_0004>
-          </Frame305_0001>
-          <MorningSlowbeatsLoFi_0005>
-            Morning Slowbeats - LoFi
-          </MorningSlowbeatsLoFi_0005>
-        </Card2_0001>
-        <Card3>
-          <Frame305_0002>
-            <DemoAppAlbumCover2>
-              <Rectangle825_0004
-                src="https://s3-us-west-2.amazonaws.com/figma-alpha-api/img/b802/fe12/70b07a6592a33589a9350bb8a5295d9d"
-                alt="image of Rectangle825"
-              ></Rectangle825_0004>
-              <TrpLve_0001>
-                TRP
-                <br />
-                LVE
-              </TrpLve_0001>
-            </DemoAppAlbumCover2>
-            <MusicPlayButton_0005
-              src="https://s3-us-west-2.amazonaws.com/figma-alpha-api/img/5f4a/558c/5524bce036659c4f82d652b44961d944"
-              alt="icon"
-            ></MusicPlayButton_0005>
-          </Frame305_0002>
-          <MorningSlowbeatsLoFi_0006>
-            Morning Slowbeats - LoFi
-          </MorningSlowbeatsLoFi_0006>
-        </Card3>
-      </PrimaryMusicCardsList>
+      </Footer>
     </RootWrapperDemoApp>
   );
 }
 
-const RootWrapperDemoApp = styled.div<{
-  scale: number;
-}>\`
-  width: 375px;
-  height: 812px;
+const RootWrapperDemoApp = styled.div\`
+  display: flex;
+  justify-content: flex-start;
+  flex-direction: column;
+  align-items: start;
+  flex: none;
+  gap: 0;
+  min-height: 100vh;
   background-color: rgba(255, 255, 255, 1);
+  box-sizing: border-box;
+\`;
+
+const Body = styled.div\`
+  display: flex;
+  justify-content: flex-start;
+  flex-direction: column;
+  align-items: start;
+  flex: 1;
+  gap: 0;
+  align-self: stretch;
+  box-sizing: border-box;
+\`;
+
+const TopSpacer = styled.div\`
+  height: 64px;
+  align-self: stretch;
+\`;
+
+const SectionHeader = styled.div\`
+  display: flex;
+  justify-content: flex-start;
+  flex-direction: column;
+  align-items: start;
+  flex: 1;
+  gap: 10px;
+  align-self: stretch;
+  box-sizing: border-box;
+  padding: 28px 28px 14px;
+\`;
+
+const HeaderSection = styled.div\`
+  display: flex;
+  justify-content: flex-start;
+  flex-direction: column;
+  align-items: start;
+  flex: 1;
+  gap: 16px;
+  align-self: stretch;
+  box-sizing: border-box;
+\`;
+
+const TitleAndAvatar = styled.div\`
+  display: flex;
+  justify-content: flex-start;
+  flex-direction: row;
+  align-items: start;
+  flex: 1;
+  gap: 32px;
+  align-self: stretch;
+  box-sizing: border-box;
+\`;
+
+const Title = styled.span\`
+  color: rgba(0, 0, 0, 1);
+  text-overflow: ellipsis;
+  font-size: 36px;
+  font-family: Sen, sans-serif;
+  font-weight: 700;
+  line-height: 90%;
+  text-align: left;
+  width: 239px;
+\`;
+
+const AvatarSource = styled.img\`
+  width: 48px;
+  height: 48px;
+  object-fit: cover;
+\`;
+
+const Subtitle = styled.span\`
+  color: rgba(164, 164, 164, 1);
+  text-overflow: ellipsis;
+  font-size: 14px;
+  font-family: Roboto, sans-serif;
+  font-weight: 400;
+  text-align: left;
+  width: 315px;
+\`;
+
+const PrimaryMusicCardsList = styled.div\`
+  display: flex;
+  justify-content: flex-start;
+  flex-direction: row;
+  align-items: start;
+  flex: 1;
+  gap: 16px;
+  align-self: stretch;
+  box-sizing: border-box;
+  padding-bottom: 14px;
+  padding-top: 14px;
+  padding-left: 28px;
+\`;
+
+const Card1 = styled.div\`
+  display: flex;
+  justify-content: flex-start;
+  flex-direction: column;
+  align-items: start;
+  flex: none;
+  gap: 4px;
+  width: 138px;
+  height: 180px;
+  box-sizing: border-box;
+\`;
+
+const Frame305 = styled.div\`
+  height: 144px;
   position: relative;
-  transform: scale(${p => p.scale});
-  transform-origin: left top;
-  overflow: hidden;
+  align-self: stretch;
+\`;
+
+const DemoAppAlbumCover1 = styled.div\`
+  width: 138px;
+  height: 144px;
+  position: absolute;
+  left: 0px;
+  top: 0px;
+\`;
+
+const Rectangle813 = styled.div\`
+  width: 138px;
+  height: 144px;
+  background-color: rgba(0, 0, 0, 1);
+  border-radius: 8px;
+  position: absolute;
+  left: 0px;
+  top: 0px;
+\`;
+
+const LoFi = styled.span\`
+  color: rgba(255, 255, 255, 1);
+  text-overflow: ellipsis;
+  font-size: 36px;
+  font-family: Helvetica, sans-serif;
+  font-weight: 700;
+  line-height: 90%;
+  text-align: left;
+  position: absolute;
+  left: 8px;
+  top: 72px;
+\`;
+
+const MusicPlayButton = styled.img\`
+  width: 28px;
+  height: 28px;
+  object-fit: cover;
+  position: absolute;
+  right: 16px;
+  bottom: 14px;
+\`;
+
+const MorningSlowbeatsLoFi = styled.span\`
+  color: rgba(164, 164, 164, 1);
+  text-overflow: ellipsis;
+  font-size: 14px;
+  font-family: Roboto, sans-serif;
+  font-weight: 400;
+  text-align: left;
+  align-self: stretch;
+\`;
+
+const Card2 = styled.div\`
+  display: flex;
+  justify-content: flex-start;
+  flex-direction: column;
+  align-items: start;
+  flex: none;
+  gap: 4px;
+  width: 138px;
+  height: 180px;
+  box-sizing: border-box;
+\`;
+
+const Frame305_0001 = styled.div\`
+  height: 144px;
+  position: relative;
+  align-self: stretch;
+\`;
+
+const DemoAppAlbumCover3 = styled.div\`
+  width: 138px;
+  height: 144px;
+  position: absolute;
+  left: 0px;
+  top: 0px;
+\`;
+
+const Rectangle825 = styled.img\`
+  width: 138px;
+  height: 144px;
+  object-fit: cover;
+  position: absolute;
+  left: 0px;
+  top: 0px;
+\`;
+
+const Union = styled.img\`
+  width: 102px;
+  height: 104px;
+  object-fit: cover;
+  position: absolute;
+\`;
+
+const MusicPlayButton_0001 = styled.img\`
+  width: 28px;
+  height: 28px;
+  object-fit: cover;
+  position: absolute;
+  right: 16px;
+  bottom: 14px;
+\`;
+
+const MorningSlowbeatsLoFi_0001 = styled.span\`
+  color: rgba(164, 164, 164, 1);
+  text-overflow: ellipsis;
+  font-size: 14px;
+  font-family: Roboto, sans-serif;
+  font-weight: 400;
+  text-align: left;
+  align-self: stretch;
+\`;
+
+const Card3 = styled.div\`
+  display: flex;
+  justify-content: flex-start;
+  flex-direction: column;
+  align-items: start;
+  flex: none;
+  gap: 4px;
+  width: 138px;
+  height: 180px;
+  box-sizing: border-box;
+\`;
+
+const Frame305_0002 = styled.div\`
+  height: 144px;
+  position: relative;
+  align-self: stretch;
+\`;
+
+const DemoAppAlbumCover2 = styled.div\`
+  width: 138px;
+  height: 144px;
+  position: absolute;
+  left: 0px;
+  top: 0px;
+\`;
+
+const Rectangle825_0001 = styled.img\`
+  width: 138px;
+  height: 144px;
+  object-fit: cover;
+  position: absolute;
+  left: 0px;
+  top: 0px;
+\`;
+
+const TrpLve = styled.span\`
+  color: rgba(255, 255, 255, 1);
+  text-overflow: ellipsis;
+  font-size: 32px;
+  font-family: Roboto, sans-serif;
+  font-weight: 900;
+  line-height: 90%;
+  text-align: center;
+  min-height: 58px;
+  width: 64px;
+  position: absolute;
+  left: 38px;
+  top: 43px;
+  height: 58px;
+\`;
+
+const MusicPlayButton_0002 = styled.img\`
+  width: 28px;
+  height: 28px;
+  object-fit: cover;
+  position: absolute;
+  right: 16px;
+  bottom: 14px;
+\`;
+
+const MorningSlowbeatsLoFi_0002 = styled.span\`
+  color: rgba(164, 164, 164, 1);
+  text-overflow: ellipsis;
+  font-size: 14px;
+  font-family: Roboto, sans-serif;
+  font-weight: 400;
+  text-align: left;
+  align-self: stretch;
 \`;
 
 const FriendsMusicSection = styled.div\`
@@ -215,13 +498,11 @@ const FriendsMusicSection = styled.div\`
   justify-content: flex-start;
   flex-direction: column;
   align-items: start;
+  flex: 1;
   gap: 24px;
+  align-self: stretch;
   box-sizing: border-box;
-  position: absolute;
-  left: 28px;
-  top: 459px;
-  right: 28px;
-  height: 311px;
+  padding: 28px 28px;
 \`;
 
 const FriendListeningHeaderText = styled.span\`
@@ -253,7 +534,7 @@ const Primary = styled.div\`
   align-items: start;
   flex: 1;
   gap: 4px;
-  box-shadow: 0px 4px 24px 4px rgba(111, 111, 111, 0.08);
+  box-shadow: 0px 4px 24px rgba(111, 111, 111, 0.08);
   border-radius: 4px;
   align-self: stretch;
   background-color: rgba(255, 255, 255, 1);
@@ -266,16 +547,16 @@ const Cover = styled.div\`
   align-self: stretch;
 \`;
 
-const Rectangle825 = styled.img\`
+const Rectangle825_0002 = styled.img\`
+  width: 81px;
+  height: 79px;
   object-fit: cover;
   position: absolute;
   left: 0px;
   top: 0px;
-  right: 0px;
-  bottom: 0px;
 \`;
 
-const TrpLve = styled.span\`
+const TrpLve_0001 = styled.span\`
   color: rgba(255, 255, 255, 1);
   text-overflow: ellipsis;
   font-size: 18px;
@@ -283,11 +564,12 @@ const TrpLve = styled.span\`
   font-weight: 900;
   line-height: 90%;
   text-align: center;
+  min-height: 32px;
+  width: 37px;
   position: absolute;
   left: 22px;
   top: 24px;
-  right: 21px;
-  bottom: 24px;
+  height: 32px;
 \`;
 
 const NonGraphicsArea = styled.div\`
@@ -337,7 +619,7 @@ const Trippe = styled.span\`
   align-self: stretch;
 \`;
 
-const MorningSlowbeatsLoFi = styled.span\`
+const MorningSlowbeatsLoFi_0003 = styled.span\`
   color: rgba(0, 0, 0, 0.6);
   text-overflow: ellipsis;
   font-size: 12px;
@@ -347,13 +629,13 @@ const MorningSlowbeatsLoFi = styled.span\`
   align-self: stretch;
 \`;
 
-const MusicPlayButton = styled.img\`
+const MusicPlayButton_0003 = styled.img\`
   width: 24px;
   height: 24px;
   object-fit: cover;
 \`;
 
-const Card1 = styled.div\`
+const Card1_0001 = styled.div\`
   display: flex;
   justify-content: flex-start;
   flex-direction: column;
@@ -384,22 +666,20 @@ const Cover_0001 = styled.div\`
   position: relative;
 \`;
 
-const Rectangle825_0001 = styled.img\`
+const Rectangle825_0003 = styled.img\`
+  width: 65px;
+  height: 65px;
   object-fit: cover;
   position: absolute;
   left: 0px;
   top: 0px;
-  right: 0px;
-  bottom: 0px;
 \`;
 
-const Union = styled.img\`
+const Union_0001 = styled.img\`
+  width: 47px;
+  height: 47px;
   object-fit: cover;
   position: absolute;
-  left: 9px;
-  top: 9px;
-  right: 10px;
-  bottom: 9px;
 \`;
 
 const NonGraphicArea = styled.div\`
@@ -435,7 +715,7 @@ const Sweet = styled.span\`
   text-align: left;
 \`;
 
-const MorningSlowbeatsLoFi_0001 = styled.span\`
+const MorningSlowbeatsLoFi_0004 = styled.span\`
   color: rgba(0, 0, 0, 0.6);
   text-overflow: ellipsis;
   font-size: 12px;
@@ -445,13 +725,13 @@ const MorningSlowbeatsLoFi_0001 = styled.span\`
   align-self: stretch;
 \`;
 
-const MusicPlayButton_0001 = styled.img\`
+const MusicPlayButton_0004 = styled.img\`
   width: 24px;
   height: 24px;
   object-fit: cover;
 \`;
 
-const Card2 = styled.div\`
+const Card2_0001 = styled.div\`
   display: flex;
   justify-content: flex-start;
   flex-direction: column;
@@ -476,36 +756,33 @@ const Contents_0001 = styled.div\`
   box-sizing: border-box;
 \`;
 
-const DemoAppAlbumCover1 = styled.div\`
+const DemoAppAlbumCover1_0001 = styled.div\`
   width: 65px;
   height: 65px;
   position: relative;
 \`;
 
-const Rectangle813 = styled.div\`
+const Rectangle813_0001 = styled.div\`
+  width: 65px;
+  height: 65px;
   background-color: rgba(0, 0, 0, 1);
   border-radius: 8px;
   position: absolute;
   left: 0px;
   top: 0px;
-  right: 0px;
-  bottom: 0px;
 \`;
 
-const LoFi = styled.span\`
+const LoFi_0001 = styled.span\`
   color: rgba(255, 255, 255, 1);
   text-overflow: ellipsis;
   font-size: 36px;
   font-family: Helvetica, sans-serif;
   font-weight: 700;
-  letter-spacing: -1px;
   line-height: 90%;
   text-align: left;
   position: absolute;
   left: 4px;
-  top: 33px;
-  right: 11px;
-  bottom: -32px;
+  top: 32px;
 \`;
 
 const NonGraphicArea_0001 = styled.div\`
@@ -541,7 +818,7 @@ const Sweet_0001 = styled.span\`
   text-align: left;
 \`;
 
-const MorningSlowbeatsLoFi_0002 = styled.span\`
+const MorningSlowbeatsLoFi_0005 = styled.span\`
   color: rgba(0, 0, 0, 0.6);
   text-overflow: ellipsis;
   font-size: 12px;
@@ -551,144 +828,26 @@ const MorningSlowbeatsLoFi_0002 = styled.span\`
   align-self: stretch;
 \`;
 
-const MusicPlayButton_0002 = styled.img\`
+const MusicPlayButton_0005 = styled.img\`
   width: 24px;
   height: 24px;
   object-fit: cover;
 \`;
 
-const HeaderSection = styled.div\`
-  display: flex;
-  justify-content: flex-start;
-  flex-direction: column;
-  align-items: start;
-  gap: 16px;
-  box-sizing: border-box;
-  position: absolute;
-  left: 28px;
-  top: 64px;
-  right: 28px;
-  height: 128px;
-\`;
-
-const TitleAndAvatar = styled.div\`
-  display: flex;
-  justify-content: space-between;
-  flex-direction: row;
-  align-items: start;
-  flex: 1;
-  gap: 16px;
-  align-self: stretch;
-  box-sizing: border-box;
-\`;
-
-const Title = styled.span\`
-  color: rgba(0, 0, 0, 1);
-  text-overflow: ellipsis;
-  font-size: 36px;
-  font-family: Sen, sans-serif;
-  font-weight: 800;
-  letter-spacing: -1px;
-  line-height: 90%;
-  text-align: left;
-  width: 251px;
-\`;
-
-const AvatarSource = styled.img\`
-  width: 48px;
-  height: 48px;
-  object-fit: cover;
-\`;
-
-const Subtitle = styled.span\`
-  color: rgba(164, 164, 164, 1);
-  text-overflow: ellipsis;
-  font-size: 14px;
-  font-family: Roboto, sans-serif;
-  font-weight: 400;
-  text-align: left;
-  width: 315px;
-\`;
-
-const Group523 = styled.div\`
-  width: 315px;
-  height: 81px;
-  position: absolute;
-  left: 28px;
-  top: 778px;
-\`;
-
-const Rectangle819 = styled.div\`
-  width: 315px;
-  height: 81px;
-  background-color: rgba(255, 255, 255, 1);
-  border-radius: 4px;
-  position: absolute;
-  left: 0px;
-  top: 0px;
-\`;
-
-const Group519 = styled.img\`
-  width: 24px;
-  height: 24px;
-  object-fit: cover;
-  position: absolute;
-  left: 263px;
-  top: 29px;
-\`;
-
-const MorningSlowbeatsLoFi_0003 = styled.span\`
-  color: rgba(0, 0, 0, 0.6);
-  text-overflow: ellipsis;
-  font-size: 12px;
-  font-family: Roboto, sans-serif;
-  font-weight: 400;
-  text-align: left;
-  width: 150px;
-  position: absolute;
-  left: 82px;
-  top: 32px;
-\`;
-
-const Trippe_0001 = styled.span\`
-  color: rgba(0, 0, 0, 1);
-  text-overflow: ellipsis;
-  font-size: 18px;
-  font-family: Roboto, sans-serif;
-  font-weight: 900;
-  line-height: 90%;
-  text-align: left;
-  position: absolute;
-  left: 82px;
-  top: 11px;
-\`;
-
-const Rectangle825_0002 = styled.div\`
-  width: 60px;
-  height: 60px;
-  background-color: rgba(0, 0, 0, 1);
-  border-radius: 4px;
-  position: absolute;
-  left: 10px;
-  top: 11px;
-\`;
-
-const DemoAppTabBar = styled.div\`
+const Footer = styled.div\`
   height: 97px;
-  position: absolute;
-  left: 0px;
-  right: 0px;
-  bottom: -2px;
+  position: relative;
+  align-self: stretch;
 \`;
 
 const Rectangle815 = styled.div\`
+  width: 375px;
+  height: 97px;
   box-shadow: 0px 0px 4px rgba(0, 0, 0, 0.25);
   background-color: rgba(255, 255, 255, 1);
   position: absolute;
   left: 0px;
   top: 0px;
-  right: 0px;
-  bottom: 0px;
 \`;
 
 const Tabs = styled.div\`
@@ -696,13 +855,14 @@ const Tabs = styled.div\`
   justify-content: space-between;
   flex-direction: row;
   align-items: start;
+  flex: none;
   gap: 68px;
+  width: 283px;
+  height: 24px;
   box-sizing: border-box;
   position: absolute;
   left: 46px;
   top: 29px;
-  right: 46px;
-  bottom: 44px;
 \`;
 
 const IconsMdiHome = styled.img\`
@@ -723,220 +883,727 @@ const IconsMdiSearch = styled.img\`
   object-fit: cover;
 \`;
 
-const PrimaryMusicCardsList = styled.div\`
-  display: flex;
-  justify-content: flex-start;
-  flex-direction: row;
-  align-items: start;
-  gap: 16px;
-  box-sizing: border-box;
-  position: absolute;
-  left: 28px;
-  top: 234px;
-  width: 447px;
-  height: 180px;
-\`;
+export default DemoApp;
+`;
 
-const Card1_0001 = styled.div\`
-  display: flex;
-  justify-content: flex-start;
-  flex-direction: column;
-  align-items: start;
-  flex: none;
-  gap: 4px;
-  width: 138px;
-  height: 180px;
-  box-sizing: border-box;
-\`;
+export const _DEMO_APP_SRC_FLUTTER = `Column(
+  mainAxisSize: MainAxisSize.min,
+  crossAxisAlignment: CrossAxisAlignment.start,
+  children: [
+    SizedBox(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 375,
+            height: 64,
+            decoration: BoxDecoration(),
+          ),
+          SizedBox(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                SizedBox(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      SizedBox(
+                        child: Row(
+                          children: [
+                            Text(
+                              "Saturday Morning Mix",
+                              style: TextStyle(
+                                color: Color(
+                                  0xff000000,
+                                ),
+                                fontSize: 36,
+                                fontWeight: FontWeight.w700,
+                                fontFamily: "Sen",
+                              ),
+                            ),
+                            SizedBox(
+                              width: 32,
+                            ),
+                            Image.network(
+                              "grida://assets-reservation/images/1:11",
+                              width: 48,
+                              height: 48,
+                            ),
+                          ],
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                        ),
+                      ),
+                      SizedBox(
+                        height: 16,
+                      ),
+                      Text(
+                        "Here are some tunes for you to start your morning. Mostly quiet and slow-beat, some of them are mood changer.",
+                        style: TextStyle(
+                          color: Color(
+                            0xffa3a3a3,
+                          ),
+                          fontSize: 14,
+                          fontWeight: FontWeight.w400,
+                          fontFamily: "Roboto",
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          SizedBox(
+            child: Row(
+              children: [
+                Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      child: Stack(
+                        children: [
+                          Positioned(
+                            left: 0,
+                            top: 0,
+                            child: Container(
+                              child: Stack(
+                                children: [
+                                  Positioned(
+                                    left: 0,
+                                    top: 0,
+                                    child: Container(
+                                      width: 138.24,
+                                      height: 144,
+                                      decoration: BoxDecoration(
+                                        color: Color(
+                                          0xff000000,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                  Positioned(
+                                    left: 7.68,
+                                    top: 72,
+                                    child: Text(
+                                      "LO\nFI",
+                                      style: TextStyle(
+                                        color: Color(
+                                          0xffffffff,
+                                        ),
+                                        fontSize: 36,
+                                        fontWeight: FontWeight.w700,
+                                        fontFamily: "Helvetica",
+                                      ),
+                                    ),
+                                  ),
 
-const Frame305 = styled.div\`
-  height: 144px;
-  position: relative;
-  align-self: stretch;
-\`;
+                                  /// stack requires empty non positioned widget to work properly. refer: https://github.com/flutter/flutter/issues/49631#issuecomment-582090992
+                                  Container(),
+                                ],
+                              ),
+                              width: 138.24,
+                              height: 144,
+                            ),
+                          ),
+                          Positioned(
+                            right: 16.24,
+                            bottom: 14,
+                            child: Image.network(
+                              "grida://assets-reservation/images/I1:24;1:103",
+                              width: 28,
+                              height: 28,
+                              semanticLabel: "icon",
+                            ),
+                          ),
 
-const DemoAppAlbumCover1_0001 = styled.div\`
-  position: absolute;
-  left: 0px;
-  top: 0px;
-  right: 0px;
-  bottom: 0px;
-\`;
+                          /// stack requires empty non positioned widget to work properly. refer: https://github.com/flutter/flutter/issues/49631#issuecomment-582090992
+                          Container(),
+                        ],
+                      ),
+                      width: MediaQuery.of(context).size.width,
+                      height: MediaQuery.of(context).size.height,
+                    ),
+                    SizedBox(
+                      height: 4,
+                    ),
+                    SizedBox(
+                      child: Text(
+                        "Morning Slowbeats - LoFi",
+                        style: TextStyle(
+                          color: Color(
+                            0xffa3a3a3,
+                          ),
+                          fontSize: 14,
+                          fontWeight: FontWeight.w400,
+                          fontFamily: "Roboto",
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                SizedBox(
+                  width: 16,
+                ),
+                Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      child: Stack(
+                        children: [
+                          Positioned(
+                            left: 0,
+                            top: 0,
+                            child: Container(
+                              child: Stack(
+                                children: [
+                                  Positioned(
+                                    left: 0,
+                                    top: 0,
+                                    child: Image.network(
+                                      "grida://assets-reservation/images/I1:25;1:101;1:113",
+                                      width: 138.24,
+                                      height: 144,
+                                    ),
+                                  ),
+                                  Positioned(
+                                    child: Image.network(
+                                      "grida://assets-reservation/images/I1:25;1:101;1:114",
+                                      width: 101.61,
+                                      height: 103.93,
+                                    ),
+                                  ),
 
-const Rectangle813_0001 = styled.div\`
-  background-color: rgba(0, 0, 0, 1);
-  border-radius: 8px;
-  position: absolute;
-  left: 0px;
-  top: 0px;
-  right: 0px;
-  bottom: 0px;
-\`;
+                                  /// stack requires empty non positioned widget to work properly. refer: https://github.com/flutter/flutter/issues/49631#issuecomment-582090992
+                                  Container(),
+                                ],
+                              ),
+                              width: 138.24,
+                              height: 144,
+                            ),
+                          ),
+                          Positioned(
+                            right: 16.24,
+                            bottom: 14,
+                            child: Image.network(
+                              "grida://assets-reservation/images/I1:25;1:103",
+                              width: 28,
+                              height: 28,
+                              semanticLabel: "icon",
+                            ),
+                          ),
 
-const LoFi_0001 = styled.span\`
-  color: rgba(255, 255, 255, 1);
-  text-overflow: ellipsis;
-  font-size: 36px;
-  font-family: Helvetica, sans-serif;
-  font-weight: 700;
-  letter-spacing: -1px;
-  line-height: 90%;
-  text-align: left;
-  position: absolute;
-  left: 8px;
-  top: 72px;
-  right: 81px;
-  bottom: 8px;
-\`;
+                          /// stack requires empty non positioned widget to work properly. refer: https://github.com/flutter/flutter/issues/49631#issuecomment-582090992
+                          Container(),
+                        ],
+                      ),
+                      width: MediaQuery.of(context).size.width,
+                      height: MediaQuery.of(context).size.height,
+                    ),
+                    SizedBox(
+                      height: 4,
+                    ),
+                    SizedBox(
+                      child: Text(
+                        "Morning Slowbeats - LoFi",
+                        style: TextStyle(
+                          color: Color(
+                            0xffa3a3a3,
+                          ),
+                          fontSize: 14,
+                          fontWeight: FontWeight.w400,
+                          fontFamily: "Roboto",
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                SizedBox(
+                  width: 16,
+                ),
+                Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      child: Stack(
+                        children: [
+                          Positioned(
+                            left: 0,
+                            top: 0,
+                            child: Container(
+                              child: Stack(
+                                children: [
+                                  Positioned(
+                                    left: 0,
+                                    top: 0,
+                                    child: Image.network(
+                                      "grida://assets-reservation/images/I1:26;1:101;1:110",
+                                      width: 138.24,
+                                      height: 144,
+                                    ),
+                                  ),
+                                  Positioned(
+                                    left: 38.02,
+                                    top: 43.2,
+                                    child: Text(
+                                      "TRP\nLVE",
+                                      style: TextStyle(
+                                        color: Color(
+                                          0xffffffff,
+                                        ),
+                                        fontSize: 32.4,
+                                        fontWeight: FontWeight.w900,
+                                        fontFamily: "Roboto",
+                                      ),
+                                    ),
+                                  ),
 
-const MusicPlayButton_0003 = styled.img\`
-  width: 28px;
-  height: 28px;
-  object-fit: cover;
-  position: absolute;
-  right: 16px;
-  bottom: 14px;
-\`;
+                                  /// stack requires empty non positioned widget to work properly. refer: https://github.com/flutter/flutter/issues/49631#issuecomment-582090992
+                                  Container(),
+                                ],
+                              ),
+                              width: 138.24,
+                              height: 144,
+                            ),
+                          ),
+                          Positioned(
+                            right: 16.24,
+                            bottom: 14,
+                            child: Image.network(
+                              "grida://assets-reservation/images/I1:26;1:103",
+                              width: 28,
+                              height: 28,
+                              semanticLabel: "icon",
+                            ),
+                          ),
 
-const MorningSlowbeatsLoFi_0004 = styled.span\`
-  color: rgba(164, 164, 164, 1);
-  text-overflow: ellipsis;
-  font-size: 14px;
-  font-family: Roboto, sans-serif;
-  font-weight: 400;
-  text-align: left;
-  align-self: stretch;
-\`;
+                          /// stack requires empty non positioned widget to work properly. refer: https://github.com/flutter/flutter/issues/49631#issuecomment-582090992
+                          Container(),
+                        ],
+                      ),
+                      width: MediaQuery.of(context).size.width,
+                      height: MediaQuery.of(context).size.height,
+                    ),
+                    SizedBox(
+                      height: 4,
+                    ),
+                    SizedBox(
+                      child: Text(
+                        "Morning Slowbeats - LoFi",
+                        style: TextStyle(
+                          color: Color(
+                            0xffa3a3a3,
+                          ),
+                          fontSize: 14,
+                          fontWeight: FontWeight.w400,
+                          fontFamily: "Roboto",
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+              crossAxisAlignment: CrossAxisAlignment.start,
+            ),
+          ),
+          SizedBox(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  "Lauren is listening",
+                  style: TextStyle(
+                    color: Color(
+                      0xff3a3a3a,
+                    ),
+                    fontSize: 24,
+                    fontWeight: FontWeight.w900,
+                    fontFamily: "Roboto",
+                  ),
+                ),
+                SizedBox(
+                  height: 24,
+                ),
+                SizedBox(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      SizedBox(
+                        child: Row(
+                          children: [
+                            Container(
+                              child: Stack(
+                                children: [
+                                  Positioned(
+                                    left: 0,
+                                    top: 0,
+                                    child: Image.network(
+                                      "grida://assets-reservation/images/I1:22;1:78;1:110",
+                                      width: 81,
+                                      height: 79,
+                                    ),
+                                  ),
+                                  Positioned(
+                                    left: 22.28,
+                                    top: 23.7,
+                                    child: Text(
+                                      "TRP\nLVE",
+                                      style: TextStyle(
+                                        color: Color(
+                                          0xffffffff,
+                                        ),
+                                        fontSize: 18.22,
+                                        fontWeight: FontWeight.w900,
+                                        fontFamily: "Roboto",
+                                      ),
+                                    ),
+                                  ),
 
-const Card2_0001 = styled.div\`
-  display: flex;
-  justify-content: flex-start;
-  flex-direction: column;
-  align-items: start;
-  flex: none;
-  gap: 4px;
-  width: 138px;
-  height: 180px;
-  box-sizing: border-box;
-\`;
+                                  /// stack requires empty non positioned widget to work properly. refer: https://github.com/flutter/flutter/issues/49631#issuecomment-582090992
+                                  Container(),
+                                ],
+                              ),
+                              width: MediaQuery.of(context).size.width,
+                              height: MediaQuery.of(context).size.height,
+                            ),
+                            SizedBox(
+                              width: 4,
+                            ),
+                            SizedBox(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  SizedBox(
+                                    child: Row(
+                                      children: [
+                                        Column(
+                                          mainAxisSize: MainAxisSize.min,
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            SizedBox(
+                                              child: Text(
+                                                "TRIPPE",
+                                                style: TextStyle(
+                                                  color: Color(
+                                                    0xff000000,
+                                                  ),
+                                                  fontSize: 18,
+                                                  fontWeight: FontWeight.w900,
+                                                  fontFamily: "Roboto",
+                                                ),
+                                              ),
+                                            ),
+                                            SizedBox(
+                                              height: 5,
+                                            ),
+                                            SizedBox(
+                                              child: Text(
+                                                "Morning Slowbeats - LoFi",
+                                                style: TextStyle(
+                                                  color: Color(
+                                                    0x99000000,
+                                                  ),
+                                                  fontSize: 12,
+                                                  fontWeight: FontWeight.w400,
+                                                  fontFamily: "Roboto",
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                        SizedBox(
+                                          width: 20,
+                                        ),
+                                        Image.network(
+                                          "grida://assets-reservation/images/I1:22;1:74",
+                                          width: 24,
+                                          height: 24,
+                                          semanticLabel: "icon",
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                        ),
+                      ),
+                      SizedBox(
+                        height: 12,
+                      ),
+                      SizedBox(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            SizedBox(
+                              child: Row(
+                                children: [
+                                  Container(
+                                    child: Stack(
+                                      children: [
+                                        Positioned(
+                                          left: 0,
+                                          top: 0,
+                                          child: Image.network(
+                                            "grida://assets-reservation/images/I1:27;1:70;1:113",
+                                            width: 65,
+                                            height: 65,
+                                          ),
+                                        ),
+                                        Positioned(
+                                          child: Image.network(
+                                            "grida://assets-reservation/images/I1:27;1:70;1:114",
+                                            width: 46.57,
+                                            height: 47.04,
+                                          ),
+                                        ),
 
-const Frame305_0001 = styled.div\`
-  height: 144px;
-  position: relative;
-  align-self: stretch;
-\`;
+                                        /// stack requires empty non positioned widget to work properly. refer: https://github.com/flutter/flutter/issues/49631#issuecomment-582090992
+                                        Container(),
+                                      ],
+                                    ),
+                                    width: MediaQuery.of(context).size.width,
+                                    height: MediaQuery.of(context).size.height,
+                                  ),
+                                  SizedBox(
+                                    width: 20,
+                                  ),
+                                  SizedBox(
+                                    child: Row(
+                                      children: [
+                                        SizedBox(
+                                          child: Column(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
+                                            children: [
+                                              Text(
+                                                "Sweet",
+                                                style: TextStyle(
+                                                  color: Color(
+                                                    0xff000000,
+                                                  ),
+                                                  fontSize: 18,
+                                                  fontWeight: FontWeight.w900,
+                                                  fontFamily: "Roboto",
+                                                ),
+                                              ),
+                                              SizedBox(
+                                                height: 5,
+                                              ),
+                                              SizedBox(
+                                                child: Text(
+                                                  "Morning Slowbeats - LoFi",
+                                                  style: TextStyle(
+                                                    color: Color(
+                                                      0x99000000,
+                                                    ),
+                                                    fontSize: 12,
+                                                    fontWeight: FontWeight.w400,
+                                                    fontFamily: "Roboto",
+                                                  ),
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                        SizedBox(
+                                          width: 22,
+                                        ),
+                                        Image.network(
+                                          "grida://assets-reservation/images/I1:27;1:71",
+                                          width: 24,
+                                          height: 24,
+                                          semanticLabel: "icon",
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      SizedBox(
+                        height: 12,
+                      ),
+                      SizedBox(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            SizedBox(
+                              child: Row(
+                                children: [
+                                  Container(
+                                    child: Stack(
+                                      children: [
+                                        Positioned(
+                                          left: 0,
+                                          top: 0,
+                                          child: Container(
+                                            width: 65,
+                                            height: 65,
+                                            decoration: BoxDecoration(
+                                              color: Color(
+                                                0xff000000,
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                        Positioned(
+                                          left: 3.61,
+                                          top: 32.5,
+                                          child: Text(
+                                            "LO\nFI",
+                                            style: TextStyle(
+                                              color: Color(
+                                                0xffffffff,
+                                              ),
+                                              fontSize: 36,
+                                              fontWeight: FontWeight.w700,
+                                              fontFamily: "Helvetica",
+                                            ),
+                                          ),
+                                        ),
 
-const DemoAppAlbumCover3 = styled.div\`
-  position: absolute;
-  left: 0px;
-  top: 0px;
-  right: 0px;
-  bottom: 0px;
-\`;
+                                        /// stack requires empty non positioned widget to work properly. refer: https://github.com/flutter/flutter/issues/49631#issuecomment-582090992
+                                        Container(),
+                                      ],
+                                    ),
+                                    width: MediaQuery.of(context).size.width,
+                                    height: MediaQuery.of(context).size.height,
+                                  ),
+                                  SizedBox(
+                                    width: 20,
+                                  ),
+                                  SizedBox(
+                                    child: Row(
+                                      children: [
+                                        SizedBox(
+                                          child: Column(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
+                                            children: [
+                                              Text(
+                                                "Falling",
+                                                style: TextStyle(
+                                                  color: Color(
+                                                    0xff000000,
+                                                  ),
+                                                  fontSize: 18,
+                                                  fontWeight: FontWeight.w900,
+                                                  fontFamily: "Roboto",
+                                                ),
+                                              ),
+                                              SizedBox(
+                                                height: 5,
+                                              ),
+                                              SizedBox(
+                                                child: Text(
+                                                  "Morning Slowbeats - LoFi",
+                                                  style: TextStyle(
+                                                    color: Color(
+                                                      0x99000000,
+                                                    ),
+                                                    fontSize: 12,
+                                                    fontWeight: FontWeight.w400,
+                                                    fontFamily: "Roboto",
+                                                  ),
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                        SizedBox(
+                                          width: 22,
+                                        ),
+                                        Image.network(
+                                          "grida://assets-reservation/images/I1:7;1:71",
+                                          width: 24,
+                                          height: 24,
+                                          semanticLabel: "icon",
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    ),
+    Container(
+      child: Stack(
+        children: [
+          Positioned(
+            left: 0,
+            top: 0,
+            child: Container(
+              width: 375,
+              height: 97,
+              decoration: BoxDecoration(
+                color: Color(
+                  0xffffffff,
+                ),
+              ),
+            ),
+          ),
+          Positioned(
+            left: 46,
+            top: 29,
+            child: Row(
+              children: [
+                Image.network(
+                  "grida://assets-reservation/images/I1:23;1:54",
+                  width: 24,
+                  height: 24,
+                ),
+                SizedBox(
+                  width: 68,
+                ),
+                Image.network(
+                  "grida://assets-reservation/images/I1:23;1:57",
+                  width: 24,
+                  height: 24,
+                ),
+                SizedBox(
+                  width: 68,
+                ),
+                Image.network(
+                  "grida://assets-reservation/images/I1:23;1:60",
+                  width: 24,
+                  height: 24,
+                ),
+              ],
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+            ),
+          ),
 
-const Rectangle825_0003 = styled.img\`
-  object-fit: cover;
-  position: absolute;
-  left: 0px;
-  top: 0px;
-  right: 0px;
-  bottom: 0px;
-\`;
-
-const Union_0001 = styled.img\`
-  object-fit: cover;
-  position: absolute;
-  left: 17px;
-  top: 19px;
-  right: 19px;
-  bottom: 22px;
-\`;
-
-const MusicPlayButton_0004 = styled.img\`
-  width: 28px;
-  height: 28px;
-  object-fit: cover;
-  position: absolute;
-  right: 16px;
-  bottom: 14px;
-\`;
-
-const MorningSlowbeatsLoFi_0005 = styled.span\`
-  color: rgba(164, 164, 164, 1);
-  text-overflow: ellipsis;
-  font-size: 14px;
-  font-family: Roboto, sans-serif;
-  font-weight: 400;
-  text-align: left;
-  align-self: stretch;
-\`;
-
-const Card3 = styled.div\`
-  display: flex;
-  justify-content: flex-start;
-  flex-direction: column;
-  align-items: start;
-  flex: none;
-  gap: 4px;
-  width: 138px;
-  height: 180px;
-  box-sizing: border-box;
-\`;
-
-const Frame305_0002 = styled.div\`
-  height: 144px;
-  position: relative;
-  align-self: stretch;
-\`;
-
-const DemoAppAlbumCover2 = styled.div\`
-  position: absolute;
-  left: 0px;
-  top: 0px;
-  right: 0px;
-  bottom: 0px;
-\`;
-
-const Rectangle825_0004 = styled.img\`
-  object-fit: cover;
-  position: absolute;
-  left: 0px;
-  top: 0px;
-  right: 0px;
-  bottom: 0px;
-\`;
-
-const TrpLve_0001 = styled.span\`
-  color: rgba(255, 255, 255, 1);
-  text-overflow: ellipsis;
-  font-size: 32px;
-  font-family: Roboto, sans-serif;
-  font-weight: 900;
-  line-height: 90%;
-  text-align: center;
-  position: absolute;
-  left: 38px;
-  top: 43px;
-  right: 36px;
-  bottom: 43px;
-\`;
-
-const MusicPlayButton_0005 = styled.img\`
-  width: 28px;
-  height: 28px;
-  object-fit: cover;
-  position: absolute;
-  right: 16px;
-  bottom: 14px;
-\`;
-
-const MorningSlowbeatsLoFi_0006 = styled.span\`
-  color: rgba(164, 164, 164, 1);
-  text-overflow: ellipsis;
-  font-size: 14px;
-  font-family: Roboto, sans-serif;
-  font-weight: 400;
-  text-align: left;
-  align-self: stretch;
-\`;
+          /// stack requires empty non positioned widget to work properly. refer: https://github.com/flutter/flutter/issues/49631#issuecomment-582090992
+          Container(),
+        ],
+      ),
+      width: MediaQuery.of(context).size.width,
+      height: MediaQuery.of(context).size.height,
+    ),
+  ],
+);
 `;

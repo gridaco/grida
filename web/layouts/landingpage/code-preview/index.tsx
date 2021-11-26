@@ -120,6 +120,8 @@ const CodePreview = () => {
 export default CodePreview;
 
 const ViewWrapper = styled(Flex)`
+  position: relative;
+  top: 156px;
   ${props =>
     media(
       (props.theme as ThemeInterface).breakpoints[0],
@@ -140,15 +142,15 @@ const Platforms = styled.div`
 
 const CodeView = styled(Box)`
   bottom: 0%;
-  border-radius: 12px;
+  border-radius: 8px;
 
   header {
     display: flex;
     align-items: center;
     height: 50px;
     padding: 0px 20px;
-    border-top-left-radius: 12px;
-    border-top-right-radius: 12px;
+    border-top-left-radius: 8px;
+    border-top-right-radius: 8px;
 
     span {
       background-color: #3d3d3d;
@@ -165,15 +167,15 @@ const CodeView = styled(Box)`
     display: flex;
     align-items: center;
     justify-content: center;
-    border-bottom-left-radius: 12px;
-    border-bottom-right-radius: 12px;
+    border-bottom-left-radius: 8px;
+    border-bottom-right-radius: 8px;
 
     pre {
       width: 95%;
       height: 95%;
       padding: 0px !important;
-      border-bottom-left-radius: 12px;
-      border-bottom-right-radius: 12px;
+      border-bottom-left-radius: 8px;
+      border-bottom-right-radius: 8px;
     }
   }
 `;

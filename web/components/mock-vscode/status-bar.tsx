@@ -27,14 +27,14 @@ function StatusBar() {
 }
 
 const RootWrapperStatusBar = styled.div`
-  width: 1238px;
+  /* width: 1238px; */
   height: 22px;
   position: relative;
   align-self: stretch;
 `;
 
 const Content = styled.div`
-  width: 1238px;
+  /* width: 1238px; */
   height: 22px;
   position: absolute;
   left: 0px;
@@ -42,7 +42,7 @@ const Content = styled.div`
 `;
 
 const Rectangle105 = styled.div`
-  width: 1238px;
+  /* width: 1238px; */
   height: 22px;
   background-color: rgba(51, 51, 51, 1);
   position: absolute;
