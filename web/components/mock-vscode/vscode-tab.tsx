@@ -34,7 +34,19 @@ export default function VSCodeTab({
   );
 }
 
+const LabelColors = {
+  selected: `rgba(254, 254, 254, 1)`,
+  unselected: `rgba(119, 119, 119, 1)`,
+};
+
+const BaseColors = {
+  selected: `rgba(30, 30, 30, 1)`,
+  hover: `rgba(30, 30, 30, 1)`,
+  unselected: `rgba(45, 45, 45, 1)`,
+};
+
 const Wrapper = styled.div`
+  cursor: pointer;
   display: flex;
   justify-content: flex-start;
   flex-direction: column;
@@ -54,6 +66,9 @@ const BaseVscodeTab = styled.div<{ color: string }>`
   width: 135px;
   height: 36px;
   background-color: ${p => p.color};
+  :hover {
+    background-color: ${BaseColors.hover};
+  }
   box-sizing: border-box;
   padding: 14px 20px;
 `;
@@ -78,13 +93,3 @@ const Label = styled.span<{ color: string }>`
   font-weight: 400;
   text-align: left;
 `;
-
-const LabelColors = {
-  selected: `rgba(254, 254, 254, 1)`,
-  unselected: `rgba(119, 119, 119, 1)`,
-};
-
-const BaseColors = {
-  selected: `rgba(30, 30, 30, 1)`,
-  unselected: `rgba(45, 45, 45, 1)`,
-};

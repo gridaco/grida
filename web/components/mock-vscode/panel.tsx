@@ -35,7 +35,7 @@ const getsrc = (forDemo: Demos) => {
     case "flutter":
       return snippets._DEMO_APP_SRC_FLUTTER;
     case "vanilla":
-      return "// hello";
+      return snippets._DEMO_APP_SRC_HTML_ONLY;
     default:
       return "";
   }
@@ -53,6 +53,7 @@ const RootWrapperEditor = styled.div`
 `;
 
 const Editor = styled.div`
+  max-width: 722px;
   height: 626px;
   align-self: stretch;
   overflow: hidden;

@@ -67,7 +67,7 @@ const Tabs = styled.div`
   display: flex;
   justify-content: flex-start;
   flex-direction: row;
-  align-items: center;
+  align-items: flex-start;
   flex: 1;
   gap: 1px;
   align-self: stretch;

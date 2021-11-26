@@ -59,7 +59,7 @@ const HeroGradientBgArtwork = styled.img`
   position: absolute;
   left: calc((calc((50% + 328px)) - 393px));
   top: 185px;
-  filter: blur(426.44px);
+  /* filter: blur(426.44px); */
 `;
 
 const HeroTextAreaWithCta = styled.div`

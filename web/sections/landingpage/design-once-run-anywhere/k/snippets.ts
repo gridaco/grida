@@ -1607,3 +1607,181 @@ export const _DEMO_APP_SRC_FLUTTER = `Column(
   ],
 );
 `;
+
+export const _DEMO_APP_SRC_HTML_ONLY = `<!DOCTYPE html>
+<html>
+  <body>
+    <div id="RootWrapperDemoApp">
+		    <div id="Body">
+		      <div id="TopSpacer"></div>
+		    <div id="SectionHeader">
+		        <div id="HeaderSection">
+		          <div id="TitleAndAvatar">
+		            <span id="Title">
+		              Saturday Morning Mix
+		            </span>
+		          <img src="https://s3-us-west-2.amazonaws.com/figma-alpha-api/img/4f6b/36d5/17d6b783005c459c272ce5fb879a9e9f"
+		          	alt="image of AvatarSource"
+		          	id="AvatarSource"></img>
+		          </div>
+		        <span id="Subtitle">
+		            Here are some tunes for you to start your morning. Mostly quiet and slow-beat, some of them are mood changer.
+		          </span>
+		        </div>
+		      </div>
+		    <div id="PrimaryMusicCardsList">
+		        <div id="Card1">
+		          <div id="Frame305">
+		            <div id="DemoAppAlbumCover1">
+		              <div id="Rectangle813"></div>
+		            <span id="LoFi">
+		                LO<br/>
+		              FI
+		              </span>
+		            </div>
+		          <img src="https://s3-us-west-2.amazonaws.com/figma-alpha-api/img/5f4a/558c/5524bce036659c4f82d652b44961d944"
+		          	alt="icon"
+		          	id="MusicPlayButton"></img>
+		          </div>
+		        <span id="MorningSlowbeatsLoFi">
+		            Morning Slowbeats - LoFi
+		          </span>
+		        </div>
+		      <div id="Card2">
+		          <div id="Frame305_0001">
+		            <div id="DemoAppAlbumCover3">
+		              <img src="https://s3-us-west-2.amazonaws.com/figma-alpha-api/img/8a94/bb41/b26e2d09badc33fd87413d2d7cb4f2d6"
+		            	alt="image of Rectangle825"
+		            	id="Rectangle825"></img>
+		            <img src="https://s3-us-west-2.amazonaws.com/figma-alpha-api/img/c86a/b0ec/2cbaa0a2ffcf6665e30c288e0a09bbc4"
+		            	alt="image of Union"
+		            	id="Union"></img>
+		            </div>
+		          <img src="https://s3-us-west-2.amazonaws.com/figma-alpha-api/img/5f4a/558c/5524bce036659c4f82d652b44961d944"
+		          	alt="icon"
+		          	id="MusicPlayButton_0001"></img>
+		          </div>
+		        <span id="MorningSlowbeatsLoFi_0001">
+		            Morning Slowbeats - LoFi
+		          </span>
+		        </div>
+		      <div id="Card3">
+		          <div id="Frame305_0002">
+		            <div id="DemoAppAlbumCover2">
+		              <img src="https://s3-us-west-2.amazonaws.com/figma-alpha-api/img/b802/fe12/70b07a6592a33589a9350bb8a5295d9d"
+		            	alt="image of Rectangle825"
+		            	id="Rectangle825_0001"></img>
+		            <span id="TrpLve">
+		                TRP<br/>
+		              LVE
+		              </span>
+		            </div>
+		          <img src="https://s3-us-west-2.amazonaws.com/figma-alpha-api/img/5f4a/558c/5524bce036659c4f82d652b44961d944"
+		          	alt="icon"
+		          	id="MusicPlayButton_0002"></img>
+		          </div>
+		        <span id="MorningSlowbeatsLoFi_0002">
+		            Morning Slowbeats - LoFi
+		          </span>
+		        </div>
+		      </div>
+		    <div id="FriendsMusicSection">
+		        <span id="FriendListeningHeaderText">
+		          Lauren is listening
+		        </span>
+		      <div id="MusicSecondaryList">
+		          <div id="Primary">
+		            <div id="Cover">
+		              <img src="https://s3-us-west-2.amazonaws.com/figma-alpha-api/img/0cf0/7836/f073708c3ceb92d2504f0a572048367b"
+		            	alt="image of Rectangle825"
+		            	id="Rectangle825_0002"></img>
+		            <span id="TrpLve_0001">
+		                TRP<br/>
+		              LVE
+		              </span>
+		            </div>
+		          <div id="NonGraphicsArea">
+		              <div id="InnerFrame">
+		                <div id="TextInfo">
+		                  <span id="Trippe">
+		                    TRIPPE
+		                  </span>
+		                <span id="MorningSlowbeatsLoFi_0003">
+		                    Morning Slowbeats - LoFi
+		                  </span>
+		                </div>
+		              <img src="https://s3-us-west-2.amazonaws.com/figma-alpha-api/img/56fc/4c35/733e07dee25b0dce8c66a2fb86ef998f"
+		              	alt="icon"
+		              	id="MusicPlayButton_0003"></img>
+		              </div>
+		            </div>
+		          </div>
+		        <div id="Card1_0001">
+		            <div id="Contents">
+		              <div id="Cover_0001">
+		                <img src="https://s3-us-west-2.amazonaws.com/figma-alpha-api/img/26c1/ce4d/c339eeaa7bbbdad0c83e2ab036fbfecb"
+		              	alt="image of Rectangle825"
+		              	id="Rectangle825_0003"></img>
+		              <img src="https://s3-us-west-2.amazonaws.com/figma-alpha-api/img/6cd5/7710/811330309e1aeaea91da25f5cac2adfd"
+		              	alt="image of Union"
+		              	id="Union_0001"></img>
+		              </div>
+		            <div id="NonGraphicArea">
+		                <div id="TextInfo_0001">
+		                  <span id="Sweet">
+		                    Sweet
+		                  </span>
+		                <span id="MorningSlowbeatsLoFi_0004">
+		                    Morning Slowbeats - LoFi
+		                  </span>
+		                </div>
+		              <img src="https://s3-us-west-2.amazonaws.com/figma-alpha-api/img/e80e/fc39/da9065547bba86fc0f83f31a4310271c"
+		              	alt="icon"
+		              	id="MusicPlayButton_0004"></img>
+		              </div>
+		            </div>
+		          </div>
+		        <div id="Card2_0001">
+		            <div id="Contents_0001">
+		              <div id="DemoAppAlbumCover1_0001">
+		                <div id="Rectangle813_0001"></div>
+		              <span id="LoFi_0001">
+		                  LO<br/>
+		                FI
+		                </span>
+		              </div>
+		            <div id="NonGraphicArea_0001">
+		                <div id="TextInfo_0002">
+		                  <span id="Sweet_0001">
+		                    Falling
+		                  </span>
+		                <span id="MorningSlowbeatsLoFi_0005">
+		                    Morning Slowbeats - LoFi
+		                  </span>
+		                </div>
+		              <img src="https://s3-us-west-2.amazonaws.com/figma-alpha-api/img/e80e/fc39/da9065547bba86fc0f83f31a4310271c"
+		              	alt="icon"
+		              	id="MusicPlayButton_0005"></img>
+		              </div>
+		            </div>
+		          </div>
+		        </div>
+		      </div>
+		    </div>
+		  <div id="Footer">
+		      <div id="Rectangle815"></div>
+		    <div id="Tabs">
+		        <img src="https://s3-us-west-2.amazonaws.com/figma-alpha-api/img/e350/9fb4/422697fd40f9d0f19a35ebbc5df11b57"
+		      	alt="image of IconsMdiHome"
+		      	id="IconsMdiHome"></img>
+		      <img src="https://s3-us-west-2.amazonaws.com/figma-alpha-api/img/1436/9fa1/ba7653876dc7ca8fe523b354816f5319"
+		      	alt="image of IconsMdiShowChart"
+		      	id="IconsMdiShowChart"></img>
+		      <img src="https://s3-us-west-2.amazonaws.com/figma-alpha-api/img/5fda/b17b/6bdba2e87f84c133ad91b1f5c7da0785"
+		      	alt="image of IconsMdiSearch"
+		      	id="IconsMdiSearch"></img>
+		      </div>
+		    </div>
+		  </div>
+  </body>
+</html>`;
