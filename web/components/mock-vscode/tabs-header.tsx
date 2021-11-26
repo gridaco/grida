@@ -67,6 +67,7 @@ const Tabs = styled.div`
   display: flex;
   justify-content: flex-start;
   flex-direction: row;
+  overflow-x: scroll;
   align-items: flex-start;
   flex: 1;
   gap: 1px;
@@ -84,6 +85,10 @@ const Toolbar = styled.div`
   width: 64px;
   height: 36px;
   box-sizing: border-box;
+
+  @media (max-width: 767px) {
+    display: none;
+  }
 `;
 
 const Actions = styled.div`

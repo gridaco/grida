@@ -38,7 +38,6 @@ const RootWrapperHero320SizeXs = styled.div`
 const _1440SizeXl = styled.div`
   height: 657px;
   background-color: rgba(255, 255, 255, 1);
-  position: absolute;
   left: 0px;
   top: 0px;
   right: 0px;

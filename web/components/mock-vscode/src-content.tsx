@@ -13,7 +13,7 @@ export function SrcContent({
   children: React.ReactNode;
 }) {
   return (
-    <TypistWhenVisible>
+    <TypistWhenVisible isstatic>
       <SyntaxHighlighter language={language} style={colorscheme}>
         {children}
       </SyntaxHighlighter>
@@ -24,9 +24,11 @@ export function SrcContent({
 function TypistWhenVisible({
   children,
   onlyWhenVisible = true,
+  isstatic = false,
 }: {
   children: React.ReactNode;
   onlyWhenVisible?: boolean;
+  isstatic?: boolean;
 }) {
   const { ref, inView } = useInView({
     threshold: 0,
@@ -41,6 +43,9 @@ function TypistWhenVisible({
   }, [inView]);
 
   const Content = () => {
+    if (isstatic) {
+      return <>{children}</>;
+    }
     if (triggered) {
       return (
         <StyledTypist

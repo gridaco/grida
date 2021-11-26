@@ -39,7 +39,7 @@ const RootWrapperDesignOnceRunAnywhere1280SizeLg = styled.div`
   flex-direction: column;
   align-items: start;
   gap: 0;
-  min-height: 100vh;
+  /* min-height: 100vh; */
   ${BackgroundGradient}
   box-sizing: border-box;
 `;

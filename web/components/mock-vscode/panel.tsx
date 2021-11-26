@@ -53,8 +53,8 @@ const RootWrapperEditor = styled.div`
 `;
 
 const Editor = styled.div`
-  max-width: 722px;
-  height: 626px;
+  max-width: min(722px, 100vw);
+  max-height: 626px;
   align-self: stretch;
   overflow: hidden;
   background-color: rgba(30, 30, 30, 1);

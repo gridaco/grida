@@ -189,7 +189,6 @@ const RootWrapperSectionBornToBeHeadless320SizeXs = styled.div`
   flex-direction: column;
   align-items: start;
   gap: 86px;
-  min-height: 100vh;
   background-color: rgba(48, 50, 52, 1);
   box-sizing: border-box;
   padding: 100px 0px 140px;

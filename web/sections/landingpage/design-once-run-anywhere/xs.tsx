@@ -1,46 +1,28 @@
 import styled from "@emotion/styled";
 import React from "react";
 
-import {
-  ActivityBar,
-  WindowHandle,
-  StatusBar,
-  Panel,
-} from "components/mock-vscode";
+import { WindowHandle, StatusBar, Panel } from "components/mock-vscode";
 
 import { BackgroundGradient } from "./styles/background";
 import { HeadingGradient } from "./styles/heading";
 
 export default function DesignOnceRunAnywhere320SizeXs() {
   return (
-    <RootWrapperDesignOnceRunAnywhere320SizeXs>
-      <Contents>
-        <Heading1>Design once, Run anywhere.</Heading1>
-        <VscodeDemo>
-          <WindowHandle />
-          <Container>
-            {/* <Sidebar>
+    <Contents>
+      <Heading1>Design once, Run anywhere.</Heading1>
+      <VscodeDemo>
+        <WindowHandle />
+        <Container>
+          {/* <Sidebar>
               <IPhone11ProX1></IPhone11ProX1>
             </Sidebar> */}
-            <Panel />
-          </Container>
-          <StatusBar></StatusBar>
-        </VscodeDemo>
-      </Contents>
-    </RootWrapperDesignOnceRunAnywhere320SizeXs>
+          <Panel />
+        </Container>
+        <StatusBar></StatusBar>
+      </VscodeDemo>
+    </Contents>
   );
 }
-
-const RootWrapperDesignOnceRunAnywhere320SizeXs = styled.div`
-  display: flex;
-  justify-content: center;
-  flex-direction: row;
-  align-items: start;
-  gap: 10px;
-  /* overflow: hidden; */
-  ${BackgroundGradient}
-  box-sizing: border-box;
-`;
 
 const Contents = styled.div`
   display: flex;
@@ -48,6 +30,7 @@ const Contents = styled.div`
   flex-direction: column;
   align-items: center;
   flex: none;
+  align-self: stretch;
   gap: 55px;
   box-sizing: border-box;
   padding: 64px 20px 24px;
