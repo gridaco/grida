@@ -1,6 +1,12 @@
 import React from "react";
 
-export type NamedCodeIcons = "dummy" | "react" | "flutter" | "html";
+export type NamedCodeIcons =
+  | "dummy"
+  | "react"
+  | "flutter"
+  | "html"
+  | "vscode"
+  | "figma";
 
 export function CodeIcon({
   icon = "dummy",
