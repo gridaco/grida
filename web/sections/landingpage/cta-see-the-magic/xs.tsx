@@ -4,65 +4,69 @@ import React from "react";
 export default function SectionCtaLastSeeTheMagic320SizeXs() {
   return (
     <RootWrapperSectionCtaLastSeeTheMagic320SizeXs>
-      <Frame270>
-        <SeeTheMagic>See the magic</SeeTheMagic>
-        <SeeWhatYouTruleyDoWithYourPowerSupercharged>
-          See what you truley do with your power supercharged.
-        </SeeWhatYouTruleyDoWithYourPowerSupercharged>
-      </Frame270>
-      <Frame554>
-        <Frame549>
-          <Frame549_0001>
-            <HttpsWwwFigmaComFileXxxxXxxxNodeId12343A5678>
-              https://www.figma.com/file/xxxx/xxxx?node-id=1234%3A5678
-            </HttpsWwwFigmaComFileXxxxXxxxNodeId12343A5678>
-          </Frame549_0001>
-        </Frame549>
-        <Frame550>
-          <Frame551>
-            <Image97
-              src="https://s3-us-west-2.amazonaws.com/figma-alpha-api/img/9fb9/fd29/a112a9447d2fe6fecf2e915e92d02302"
-              alt="image of Image97"
-            ></Image97>
-            <Abracadabra>Abracadabra</Abracadabra>
-          </Frame551>
-        </Frame550>
-      </Frame554>
-      <ScribbleGuide>
-        <PasteYourFigmaDesignUrl>
-          Paste your figma design url.
-        </PasteYourFigmaDesignUrl>
-        <PointerArtwork
-          src="https://s3-us-west-2.amazonaws.com/figma-alpha-api/img/dbe2/a028/8f7b6ec0685e3ddcb2dba271ada4a56d"
-          alt="image of PointerArtwork"
-        ></PointerArtwork>
-      </ScribbleGuide>
+      <TextArea>
+        <Heading>See the magic</Heading>
+        <Desc>See what you truley do with your power supercharged.</Desc>
+      </TextArea>
+      <ActionArea>
+        <ScribbleGuideContainer>
+          <ScribbleGuide>
+            <ScribbleText>Paste your figma design url.</ScribbleText>
+            <PointerArtwork
+              src="https://s3-us-west-2.amazonaws.com/figma-alpha-api/img/dbe2/a028/8f7b6ec0685e3ddcb2dba271ada4a56d"
+              alt="image of PointerArtwork"
+            ></PointerArtwork>
+          </ScribbleGuide>
+          <Spacer></Spacer>
+        </ScribbleGuideContainer>
+        <FormArea>
+          <Input>
+            <Input_0001>
+              <Placeholder>
+                https://www.figma.com/file/xxxx/xxxx?node-id=1234%3A5678
+              </Placeholder>
+            </Input_0001>
+          </Input>
+          <Button>
+            <Texts>
+              <EmojiWond
+                src="https://s3-us-west-2.amazonaws.com/figma-alpha-api/img/9fb9/fd29/a112a9447d2fe6fecf2e915e92d02302"
+                alt="image of EmojiWond"
+              ></EmojiWond>
+              <Label>Abracadabra</Label>
+            </Texts>
+          </Button>
+        </FormArea>
+      </ActionArea>
     </RootWrapperSectionCtaLastSeeTheMagic320SizeXs>
   );
 }
 
 const RootWrapperSectionCtaLastSeeTheMagic320SizeXs = styled.div`
-  min-height: 100vh;
-  background-color: rgba(255, 255, 255, 1);
-  position: relative;
-`;
-
-const Frame270 = styled.div`
   display: flex;
   justify-content: flex-start;
   flex-direction: column;
   align-items: center;
-  gap: 36px;
+  gap: 74px;
+  min-height: 100vh;
+  background-color: rgba(255, 255, 255, 1);
   box-sizing: border-box;
-  padding: 0px 20px;
-  position: absolute;
-  left: calc((calc((50% + -1px)) - 161px));
-  top: 105px;
-  width: 321px;
-  height: 111px;
+  padding: 105px 0px;
 `;
 
-const SeeTheMagic = styled.span`
+const TextArea = styled.div`
+  display: flex;
+  justify-content: flex-start;
+  flex-direction: column;
+  align-items: center;
+  flex: 1;
+  gap: 36px;
+  align-self: stretch;
+  box-sizing: border-box;
+  padding: 0px 20px;
+`;
+
+const Heading = styled.span`
   color: rgba(0, 0, 0, 1);
   text-overflow: ellipsis;
   font-size: 32px;
@@ -74,7 +78,7 @@ const SeeTheMagic = styled.span`
   align-self: stretch;
 `;
 
-const SeeWhatYouTruleyDoWithYourPowerSupercharged = styled.span`
+const Desc = styled.span`
   color: rgba(68, 69, 69, 1);
   text-overflow: ellipsis;
   font-size: 18px;
@@ -84,22 +88,76 @@ const SeeWhatYouTruleyDoWithYourPowerSupercharged = styled.span`
   align-self: stretch;
 `;
 
-const Frame554 = styled.div`
+const ActionArea = styled.div`
   display: flex;
   justify-content: flex-start;
   flex-direction: column;
   align-items: start;
-  gap: 12px;
+  flex: 1;
+  gap: 32px;
+  align-self: stretch;
   box-sizing: border-box;
-  padding: 0px 20px;
-  position: absolute;
-  left: calc((calc((50% + 0px)) - 160px));
-  top: 431px;
-  width: 320px;
-  height: 120px;
 `;
 
-const Frame549 = styled.div`
+const ScribbleGuideContainer = styled.div`
+  display: flex;
+  justify-content: center;
+  flex-direction: row;
+  align-items: end;
+  flex: 1;
+  gap: 0;
+  align-self: stretch;
+  box-sizing: border-box;
+`;
+
+const ScribbleGuide = styled.div`
+  display: flex;
+  justify-content: center;
+  flex-direction: column;
+  align-items: end;
+  flex: none;
+  gap: 0;
+  width: 181px;
+  height: 109px;
+  box-sizing: border-box;
+`;
+
+const ScribbleText = styled.span`
+  color: rgba(164, 164, 164, 1);
+  text-overflow: ellipsis;
+  font-size: 18px;
+  font-family: "Nanum Pen Script", sans-serif;
+  font-weight: 400;
+  line-height: 98%;
+  text-align: left;
+  transform: rotate(7deg);
+`;
+
+const PointerArtwork = styled.img`
+  width: 55px;
+  height: 71px;
+  object-fit: cover;
+  transform: rotate(357deg);
+`;
+
+const Spacer = styled.div`
+  width: 100px;
+  height: 100px;
+`;
+
+const FormArea = styled.div`
+  display: flex;
+  justify-content: flex-start;
+  flex-direction: column;
+  align-items: start;
+  flex: 1;
+  gap: 12px;
+  align-self: stretch;
+  box-sizing: border-box;
+  padding: 0px 20px;
+`;
+
+const Input = styled.div`
   display: flex;
   justify-content: flex-start;
   flex-direction: row;
@@ -109,7 +167,7 @@ const Frame549 = styled.div`
   align-self: stretch;
 `;
 
-const Frame549_0001 = styled.div`
+const Input_0001 = styled.div`
   display: flex;
   justify-content: flex-start;
   flex-direction: row;
@@ -117,10 +175,7 @@ const Frame549_0001 = styled.div`
   flex: 1;
   gap: 10px;
   box-shadow: 0px 4px 48px rgba(0, 0, 0, 0.12);
-  border-left: solid 1px rgba(210, 210, 210, 1);
-  border-top: solid 1px rgba(210, 210, 210, 1);
-  border-bottom: solid 1px rgba(210, 210, 210, 1);
-  border-right: solid 1px rgba(210, 210, 210, 1);
+  border: solid 1px rgba(210, 210, 210, 1);
   border-radius: 4px;
   align-self: stretch;
   background-color: rgba(255, 255, 255, 1);
@@ -130,7 +185,7 @@ const Frame549_0001 = styled.div`
   padding-left: 24px;
 `;
 
-const HttpsWwwFigmaComFileXxxxXxxxNodeId12343A5678 = styled.span`
+const Placeholder = styled.span`
   color: rgba(210, 210, 210, 1);
   text-overflow: ellipsis;
   font-size: 18px;
@@ -139,7 +194,7 @@ const HttpsWwwFigmaComFileXxxxXxxxNodeId12343A5678 = styled.span`
   text-align: left;
 `;
 
-const Frame550 = styled.div`
+const Button = styled.div`
   display: flex;
   justify-content: center;
   flex-direction: column;
@@ -147,10 +202,7 @@ const Frame550 = styled.div`
   flex: 1;
   gap: 10px;
   box-shadow: 0px 4px 48px rgba(0, 0, 0, 0.12);
-  border-left: solid 1px rgba(210, 210, 210, 1);
-  border-top: solid 1px rgba(210, 210, 210, 1);
-  border-bottom: solid 1px rgba(210, 210, 210, 1);
-  border-right: solid 1px rgba(210, 210, 210, 1);
+  border: solid 1px rgba(210, 210, 210, 1);
   border-radius: 4px;
   align-self: stretch;
   background-color: rgba(0, 0, 0, 1);
@@ -158,7 +210,7 @@ const Frame550 = styled.div`
   padding: 16px 12px;
 `;
 
-const Frame551 = styled.div`
+const Texts = styled.div`
   display: flex;
   justify-content: center;
   flex-direction: row;
@@ -170,49 +222,17 @@ const Frame551 = styled.div`
   box-sizing: border-box;
 `;
 
-const Image97 = styled.img`
+const EmojiWond = styled.img`
   width: 22px;
   height: 22px;
   object-fit: cover;
 `;
 
-const Abracadabra = styled.span`
+const Label = styled.span`
   color: rgba(255, 255, 255, 1);
   text-overflow: ellipsis;
   font-size: 18px;
   font-family: "Helvetica Neue", sans-serif;
   font-weight: 500;
   text-align: left;
-`;
-
-const ScribbleGuide = styled.div`
-  width: 181px;
-  height: 109px;
-  position: absolute;
-  left: 11px;
-  top: 290px;
-`;
-
-const PasteYourFigmaDesignUrl = styled.span`
-  color: rgba(164, 164, 164, 1);
-  text-overflow: ellipsis;
-  font-size: 18px;
-  font-family: "Nanum Pen Script", sans-serif;
-  font-weight: 400;
-  line-height: 98%;
-  text-align: left;
-  position: absolute;
-  left: calc((calc((50% + 0px)) - 90px));
-  top: 0px;
-  transform: rotate(7deg);
-`;
-
-const PointerArtwork = styled.img`
-  width: 55px;
-  height: 71px;
-  object-fit: cover;
-  position: absolute;
-  left: calc((calc((50% + 56px)) - 28px));
-  top: 38px;
-  transform: rotate(357deg);
 `;
