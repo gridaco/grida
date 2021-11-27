@@ -1,6 +1,8 @@
 import styled from "@emotion/styled";
 import React from "react";
 
+import { MagicCtaForm } from "./components";
+
 export default function SectionCtaLastSeeTheMagic320SizeXs() {
   return (
     <RootWrapperSectionCtaLastSeeTheMagic320SizeXs>
@@ -19,24 +21,7 @@ export default function SectionCtaLastSeeTheMagic320SizeXs() {
           </ScribbleGuide>
           <Spacer></Spacer>
         </ScribbleGuideContainer>
-        <FormArea>
-          <Input>
-            <Input_0001>
-              <Placeholder>
-                https://www.figma.com/file/xxxx/xxxx?node-id=1234%3A5678
-              </Placeholder>
-            </Input_0001>
-          </Input>
-          <Button>
-            <Texts>
-              <EmojiWond
-                src="https://s3-us-west-2.amazonaws.com/figma-alpha-api/img/9fb9/fd29/a112a9447d2fe6fecf2e915e92d02302"
-                alt="image of EmojiWond"
-              ></EmojiWond>
-              <Label>Abracadabra</Label>
-            </Texts>
-          </Button>
-        </FormArea>
+        <MagicCtaForm />
       </ActionArea>
     </RootWrapperSectionCtaLastSeeTheMagic320SizeXs>
   );
@@ -95,6 +80,7 @@ const ActionArea = styled.div`
   align-items: start;
   flex: 1;
   gap: 32px;
+  padding: 20px;
   align-self: stretch;
   box-sizing: border-box;
 `;
@@ -143,96 +129,4 @@ const PointerArtwork = styled.img`
 const Spacer = styled.div`
   width: 100px;
   height: 100px;
-`;
-
-const FormArea = styled.div`
-  display: flex;
-  justify-content: flex-start;
-  flex-direction: column;
-  align-items: start;
-  flex: 1;
-  gap: 12px;
-  align-self: stretch;
-  box-sizing: border-box;
-  padding: 0px 20px;
-`;
-
-const Input = styled.div`
-  display: flex;
-  justify-content: flex-start;
-  flex-direction: row;
-  align-items: center;
-  flex: 1;
-  gap: 0;
-  align-self: stretch;
-`;
-
-const Input_0001 = styled.div`
-  display: flex;
-  justify-content: flex-start;
-  flex-direction: row;
-  align-items: center;
-  flex: 1;
-  gap: 10px;
-  box-shadow: 0px 4px 48px rgba(0, 0, 0, 0.12);
-  border: solid 1px rgba(210, 210, 210, 1);
-  border-radius: 4px;
-  align-self: stretch;
-  background-color: rgba(255, 255, 255, 1);
-  box-sizing: border-box;
-  padding-bottom: 16px;
-  padding-top: 16px;
-  padding-left: 24px;
-`;
-
-const Placeholder = styled.span`
-  color: rgba(210, 210, 210, 1);
-  text-overflow: ellipsis;
-  font-size: 18px;
-  font-family: "Helvetica Neue", sans-serif;
-  font-weight: 500;
-  text-align: left;
-`;
-
-const Button = styled.div`
-  display: flex;
-  justify-content: center;
-  flex-direction: column;
-  align-items: center;
-  flex: 1;
-  gap: 10px;
-  box-shadow: 0px 4px 48px rgba(0, 0, 0, 0.12);
-  border: solid 1px rgba(210, 210, 210, 1);
-  border-radius: 4px;
-  align-self: stretch;
-  background-color: rgba(0, 0, 0, 1);
-  box-sizing: border-box;
-  padding: 16px 12px;
-`;
-
-const Texts = styled.div`
-  display: flex;
-  justify-content: center;
-  flex-direction: row;
-  align-items: center;
-  flex: none;
-  gap: 8px;
-  width: 138px;
-  height: 22px;
-  box-sizing: border-box;
-`;
-
-const EmojiWond = styled.img`
-  width: 22px;
-  height: 22px;
-  object-fit: cover;
-`;
-
-const Label = styled.span`
-  color: rgba(255, 255, 255, 1);
-  text-overflow: ellipsis;
-  font-size: 18px;
-  font-family: "Helvetica Neue", sans-serif;
-  font-weight: 500;
-  text-align: left;
 `;

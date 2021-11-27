@@ -167,6 +167,7 @@ const Input = styled.div`
 const Placeholder = styled.span`
   color: rgba(210, 210, 210, 1);
   text-overflow: ellipsis;
+  white-space: nowrap;
   font-size: 21px;
   font-family: "Helvetica Neue", sans-serif;
   font-weight: 400;
