@@ -1590,6 +1590,11 @@
   dependencies:
     react-use-size "^2.0.4"
 
+"@design-sdk/figma-url@^0.0.6":
+  version "0.0.6"
+  resolved "https://registry.yarnpkg.com/@design-sdk/figma-url/-/figma-url-0.0.6.tgz#305e2c3b6bb6f6604f76eabd2c76f8fc06b749dc"
+  integrity sha512-Sa4NhaSvt0uK6C1OiVybSpMfDi0PXDQm3XeaBddqNC8OnHinvZ5nVcLOVKgIL30UGTY2auL8+LMX97pKeNTb2A==
+
 "@discoveryjs/json-ext@^0.5.3":
   version "0.5.3"
   resolved "https://registry.yarnpkg.com/@discoveryjs/json-ext/-/json-ext-0.5.3.tgz#90420f9f9c6d3987f176a19a7d8e764271a2f55d"

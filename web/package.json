@@ -21,6 +21,7 @@
   "dependencies": {
     "@base-sdk-fp/auth-components-react": "^0.0.1",
     "@code-editor/vanilla-preview": "^0.0.2",
+    "@design-sdk/figma-url": "^0.0.6",
     "@emotion/babel-preset-css-prop": "^10",
     "@emotion/core": "^10.0.16",
     "@emotion/css": "^11.5.0",
