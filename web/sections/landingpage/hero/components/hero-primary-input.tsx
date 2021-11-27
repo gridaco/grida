@@ -3,11 +3,20 @@ import React from "react";
 
 export function HeroPrimaryInput({
   onChange,
+  onSubmit,
 }: {
   onChange?: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  onSubmit?: (e: React.FormEvent<HTMLInputElement>) => void;
 }) {
+  const _handleKeyDown = e => {
+    if (e.key === "Enter") {
+      onSubmit?.(e);
+    }
+  };
+
   return (
     <RootWrapperHeroPrimaryInput
+      onKeyDown={_handleKeyDown}
       onChange={onChange}
       placeholder="Enter your Figma design url"
     />
