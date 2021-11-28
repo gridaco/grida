@@ -18,7 +18,6 @@ export function FeaturedMenuTab({
   iconsize?: number;
   onClick?: () => void;
 }) {
-  console.log("icon", icon);
   return (
     <RootWrapperBaseTabFeaturedMenu
       onClick={onClick}

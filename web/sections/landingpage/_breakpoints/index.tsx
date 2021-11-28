@@ -29,3 +29,19 @@ export const BreakPoints = {
   sm: _sm,
   xs: _xs,
 };
+
+const size = {
+  xs: "320px",
+  sm: "768px",
+  md: "1024px",
+  lg: "1280px",
+  xl: "1440px",
+};
+
+export const breakpoints = {
+  xs: `(max-width: 767px)`,
+  sm: `(min-width: ${size.sm}) and (max-width: 1023px)`,
+  md: `(min-width: ${size.md}) and (max-width: 1279px)`,
+  lg: `(min-width: ${size.lg}) and (max-width: 1439px)`,
+  xl: `(min-width: ${size.xl})`,
+};

@@ -3,13 +3,15 @@ import React from "react";
 import { BreakPoints } from "../_breakpoints";
 import LG from "./lg";
 import MD from "./md";
+import HeroResponsive from "./scaffold";
 import SM from "./sm";
 import XL from "./xl";
 import XS from "./xs";
 
 const Hero = () => (
   <div>
-    <BreakPoints.xl>
+    <HeroResponsive />
+    {/* <BreakPoints.xl>
       <XL />
     </BreakPoints.xl>
     <BreakPoints.lg>
@@ -23,7 +25,7 @@ const Hero = () => (
     </BreakPoints.sm>
     <BreakPoints.xs>
       <XS />
-    </BreakPoints.xs>
+    </BreakPoints.xs> */}
   </div>
 );
 
