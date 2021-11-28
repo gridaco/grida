@@ -1,6 +1,8 @@
 import styled from "@emotion/styled";
 import React from "react";
 
+import { breakpoints } from "sections/landingpage/_breakpoints";
+
 export function MagicButton() {
   return (
     <Button>
@@ -22,17 +24,32 @@ const Button = styled.button`
   flex-direction: column;
   align-items: center;
   flex: none;
+  align-self: stretch;
   gap: 10px;
   box-shadow: 0px 4px 48px rgba(0, 0, 0, 0.12);
   border: solid 1px rgba(210, 210, 210, 1);
   border-radius: 4px;
-  width: 251px;
   height: 83px;
   background-color: rgba(0, 0, 0, 1);
   box-sizing: border-box;
   padding: 12px 12px;
   :hover {
     opacity: 0.8;
+  }
+
+  @media ${breakpoints.xl} {
+    width: 251px;
+  }
+  @media ${breakpoints.lg} {
+    width: 251px;
+  }
+  @media ${breakpoints.md} {
+    width: 251px;
+  }
+  @media ${breakpoints.sm} {
+    width: 251px;
+  }
+  @media ${breakpoints.xs} {
   }
 `;
 

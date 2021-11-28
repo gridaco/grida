@@ -33,7 +33,6 @@ const RootWrapperSectionCtaLastSeeTheMagic768SizeSm = styled.div`
   flex-direction: column;
   align-items: center;
   gap: 65px;
-  min-height: 100vh;
   background-color: rgba(255, 255, 255, 1);
   box-sizing: border-box;
   padding: 105px 42px;

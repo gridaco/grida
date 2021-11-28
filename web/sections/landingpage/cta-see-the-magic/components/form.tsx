@@ -1,6 +1,8 @@
 import styled from "@emotion/styled";
 import React from "react";
 
+import { breakpoints } from "sections/landingpage/_breakpoints";
+
 import { MagicButton } from "./button";
 import { MagicInput } from "./input";
 
@@ -22,4 +24,16 @@ const FormArea = styled.div`
   gap: 24px;
   align-self: stretch;
   box-sizing: border-box;
+
+  @media ${breakpoints.xl} {
+  }
+  @media ${breakpoints.lg} {
+  }
+  @media ${breakpoints.md} {
+  }
+  @media ${breakpoints.sm} {
+  }
+  @media ${breakpoints.xs} {
+    flex-direction: column;
+  }
 `;

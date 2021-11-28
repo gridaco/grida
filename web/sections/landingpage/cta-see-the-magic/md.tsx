@@ -46,7 +46,6 @@ const RootWrapperSectionCtaLastSeeTheMagic1024SizeMd = styled.div`
   flex-direction: column;
   align-items: center;
   gap: 62px;
-  min-height: 100vh;
   background-color: rgba(255, 255, 255, 1);
   box-sizing: border-box;
   padding: 105px 65px;
