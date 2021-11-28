@@ -8,6 +8,7 @@ import { Box, Flex, Heading, Text } from "rebass";
 
 import BlankArea from "components/blank-area";
 import LandingpageText from "components/landingpage/text";
+import { k } from "sections";
 import { media } from "utils/styled/media";
 import { ThemeInterface } from "utils/styled/theme";
 
@@ -16,15 +17,9 @@ const DesignToCode = () => {
     <SectionLayout alignContent="start" backgroundColor="rgba(0,0,0,0)">
       <Flex width="100%" flexDirection={["column", "row", "row", "row"]}>
         <Flex className="text-platform" flexDirection="column">
-          <Title variant="h2">
-            Everything
-            <br />
-            Instant.
-          </Title>
+          <Title variant="h2">{k.contents.heading2_everything_instant}</Title>
           <Description variant="body1">
-            Keep your design live. Not as a prototype, but as a ready product.
-            Instantly convert your design to code, prototype and product within
-            a click. No coding required.
+            {k.contents.p_everything_instant_description}
           </Description>
           <DesignPlatforms />
         </Flex>

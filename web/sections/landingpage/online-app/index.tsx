@@ -46,9 +46,9 @@ const OnlineApp: React.FC<OnlineAppProps> = ({ isMobile }) => {
         width="100%"
       >
         <Flex flexDirection="column" width="100%" mr="40px">
-          <Text fontSize="24px" mb="15px" letterSpacing="0em">
+          {/* <Text fontSize="24px" mb="15px" letterSpacing="0em">
             What you’ve just sketched?
-          </Text>
+          </Text> */}
           <OnlineTitle variant="h4">
             <span style={{ letterSpacing: "0em" }}>That just got</span>
             <OnairButton />

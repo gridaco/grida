@@ -1,6 +1,8 @@
 import styled from "@emotion/styled";
 import React from "react";
 
+import { k } from "sections";
+
 export default function SectionBornToBeHeadless320SizeXs() {
   return (
     <RootWrapperSectionBornToBeHeadless320SizeXs>

@@ -2,6 +2,7 @@ import styled from "@emotion/styled";
 import React from "react";
 
 import { Tabs } from "components/landingpage/tab-featured-menu";
+import { k } from "sections";
 
 import { TabsList } from "./tabs";
 
@@ -9,7 +10,9 @@ export default function SectionBornToBeHeadless1440SizeXl() {
   return (
     <RootWrapperSectionBornToBeHeadless1440SizeXl>
       <Frame623>
-        <BornToBeHeadless>Born to be Headless</BornToBeHeadless>
+        <BornToBeHeadless>
+          {k.contents.heading2_born_to_be_headless}
+        </BornToBeHeadless>
         <WipToTruelyHelpYourProductivityWeAreDesignedHeadlessGridaSHeadlessDesignEnablesYouEvenFasterDevelopmentItSTheEndOfSwitchingTabs>
           WIP - To truely help your productivity, we are designed headless.
           Grida’s Headless design enables you even faster development. It’s the

@@ -1,6 +1,8 @@
 import styled from "@emotion/styled";
 import React from "react";
 
+import { k } from "sections";
+
 import DemoApp from "../demo-app";
 import { CtaArea } from "./components/cta-area";
 
@@ -15,11 +17,9 @@ export default function Hero768SizeSm() {
         <HeroTextAreaWithCta>
           <HeroTextAndBody>
             <HeroTextAreaWithCta_0001>
-              <Heading1>Figma to Code.</Heading1>
+              <Heading1>{k.contents.heading1_figma_to_code}</Heading1>
               <DescriptionHolder>
-                <HeroBodyText>
-                  The Final, Open-sourced Design to code solution.
-                </HeroBodyText>
+                <HeroBodyText>{k.contents.p_hero_description}</HeroBodyText>
               </DescriptionHolder>
             </HeroTextAreaWithCta_0001>
           </HeroTextAndBody>

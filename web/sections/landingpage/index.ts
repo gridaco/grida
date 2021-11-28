@@ -19,3 +19,5 @@ export default {
   Section__CTASeeTheMagic: Section__CTASeeTheMagic,
   FinalCta: Slogan,
 };
+
+export * as k from "./k"

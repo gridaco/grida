@@ -7,6 +7,7 @@ import {
   StatusBar,
   Panel,
 } from "components/mock-vscode";
+import { k } from "sections";
 
 import DemoApp from "../demo-app";
 import { BackgroundGradient } from "./styles/background";
@@ -17,7 +18,7 @@ export default function DesignOnceRunAnywhere1440SizeXl() {
     <RootWrapperDesignOnceRunAnywhere1440SizeXl>
       <Contents>
         <Spacer></Spacer>
-        <Heading1>Design once, Run anywhere.</Heading1>
+        <Heading1>{k.contents.heading2_design_once_run_anywhere}</Heading1>
         <VscodeDemo>
           <WindowHandle />
           <Container>

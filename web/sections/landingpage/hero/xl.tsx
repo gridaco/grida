@@ -1,6 +1,8 @@
 import styled from "@emotion/styled";
 import React from "react";
 
+import { k } from "sections";
+
 import DemoApp from "../demo-app";
 import { CtaArea } from "./components/cta-area";
 
@@ -13,11 +15,9 @@ export default function Hero1440SizeXl() {
       ></HeroGradientBgArtwork>
       <HeroTextAreaWithCta>
         <HeroTextAndBody>
-          <Heading1>Figma to Code.</Heading1>
+          <Heading1>{k.contents.heading1_figma_to_code}</Heading1>
           <DescriptionHolder>
-            <HeroBodyText>
-              The Final, Open-sourced Design to code solution.
-            </HeroBodyText>
+            <HeroBodyText>{k.contents.p_hero_description}</HeroBodyText>
           </DescriptionHolder>
         </HeroTextAndBody>
         <CtaArea></CtaArea>
@@ -72,7 +72,7 @@ const HeroTextAndBody = styled.div`
   box-sizing: border-box;
 `;
 
-const Heading1 = styled.span`
+const Heading1 = styled.h1`
   color: rgba(0, 0, 0, 0.9);
   text-overflow: ellipsis;
   font-size: 80px;

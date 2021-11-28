@@ -1,11 +1,15 @@
 import styled from "@emotion/styled";
 import React from "react";
 
+import { k } from "sections";
+
 export default function SectionBornToBeHeadless1280SizeLg() {
   return (
     <RootWrapperSectionBornToBeHeadless1280SizeLg>
       <Frame623>
-        <BornToBeHeadless>Born to be Headless</BornToBeHeadless>
+        <BornToBeHeadless>
+          {k.contents.heading2_born_to_be_headless}
+        </BornToBeHeadless>
         <WipToTruelyHelpYourProductivityWeAreDesignedHeadlessGridaSHeadlessDesignEnablesYouEvenFasterDevelopmentItSTheEndOfSwitchingTabs>
           WIP - To truely help your productivity, we are designed headless.
           Grida’s Headless design enables you even faster development. It’s the
