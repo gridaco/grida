@@ -190,7 +190,8 @@ function DemoApp() {
     </RootWrapperDemoApp>
   );
 }
-
+`;
+/*
 const RootWrapperDemoApp = styled.div\`
   display: flex;
   justify-content: flex-start;
@@ -885,6 +886,7 @@ const IconsMdiSearch = styled.img\`
 
 export default DemoApp;
 `;
+*/
 
 export const _DEMO_APP_SRC_FLUTTER = `Column(
   mainAxisSize: MainAxisSize.min,

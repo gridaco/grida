@@ -13,7 +13,7 @@ export function SrcContent({
   children: React.ReactNode;
 }) {
   return (
-    <TypistWhenVisible isstatic>
+    <TypistWhenVisible>
       <SyntaxHighlighter language={language} style={colorscheme}>
         {children}
       </SyntaxHighlighter>

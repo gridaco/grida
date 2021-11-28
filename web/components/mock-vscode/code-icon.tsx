@@ -1,35 +1,112 @@
+import Image from "next/image";
 import React from "react";
 
 export type NamedCodeIcons =
+  | "empty"
   | "dummy"
   | "react"
   | "flutter"
   | "html"
+  | "css"
+  | "figma"
+  | "webcomponents"
   | "vscode"
   | "figma";
 
 export function CodeIcon({
   icon = "dummy",
   size = 14,
-  color = "origin",
+  color = "default",
 }: {
   icon?: NamedCodeIcons;
   size?: number;
-  color?: "origin" | "grey";
+  color?: "default" | "grey";
 }) {
   switch (icon) {
     case "dummy": {
-      return <></>;
+      return (
+        <Image
+          width={size}
+          height={size}
+          src="/assets/platform-icons/dummy/default.png"
+        />
+      );
     }
     case "react": {
-      return <></>;
+      return (
+        <Image
+          width={size}
+          height={size}
+          src={`/assets/platform-icons/react/${color}.png`}
+        />
+      );
     }
     case "flutter": {
-      return <></>;
+      return (
+        <Image
+          width={size}
+          height={size}
+          src={`/assets/platform-icons/flutter/${color}.png`}
+        />
+      );
     }
     case "html": {
+      return (
+        <Image
+          width={size}
+          height={size}
+          src={`/assets/platform-icons/html/${color}.png`}
+        />
+      );
+    }
+    case "css": {
+      return (
+        <Image
+          width={size}
+          height={size}
+          src={`/assets/platform-icons/css/${color}.png`}
+        />
+      );
+    }
+    case "webcomponents": {
+      return (
+        <Image
+          width={size}
+          height={size}
+          src={`/assets/platform-icons/webcomponents/${color}.png`}
+        />
+      );
+    }
+    case "vscode": {
+      return (
+        <Image
+          width={size}
+          height={size}
+          src={`/assets/platform-icons/vscode/${color}.png`}
+        />
+      );
+    }
+    case "figma": {
+      return (
+        <Image
+          width={size}
+          height={size}
+          src={`/assets/platform-icons/figma/${color}.png`}
+        />
+      );
+    }
+    case "empty":
+    default: {
       return <></>;
     }
   }
-  return <></>;
+
+  // return dummy
+  return (
+    <Image
+      width={size}
+      height={size}
+      src="/assets/platform-icons/dummy/default.png"
+    />
+  );
 }

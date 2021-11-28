@@ -34,6 +34,7 @@ export function Tabs({
             }}
             key={id}
             icon={icon}
+            iconsize={32}
             title={title}
             theme={theme}
             selected={id == selection}

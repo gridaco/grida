@@ -20,8 +20,8 @@ export default function DemoScaffoldPanel() {
     <RootWrapperEditor>
       <TabsHeader onTabClick={onTabSelect} activeTab={activeDemo} />
       <Editor>
-        <SrcContent key={activeDemo} language="typescript">
-          {src}
+        <SrcContent key={activeDemo} language={src.lang}>
+          {src.raw}
         </SrcContent>
       </Editor>
     </RootWrapperEditor>
@@ -31,13 +31,16 @@ export default function DemoScaffoldPanel() {
 const getsrc = (forDemo: Demos) => {
   switch (forDemo) {
     case "react":
-      return snippets._DEMO_APP_SRC_TSX;
+      return {
+        raw: snippets._DEMO_APP_SRC_TSX,
+        lang: "typescript",
+      };
     case "flutter":
-      return snippets._DEMO_APP_SRC_FLUTTER;
+      return { raw: snippets._DEMO_APP_SRC_FLUTTER, lang: "dart" };
     case "vanilla":
-      return snippets._DEMO_APP_SRC_HTML_ONLY;
+      return { raw: snippets._DEMO_APP_SRC_HTML_ONLY, lang: "html" };
     default:
-      return "";
+      return { raw: "", lang: "" };
   }
 };
 

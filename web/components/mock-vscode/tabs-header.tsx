@@ -14,6 +14,7 @@ export default function TabsHeader({
     <RootWrapperTabsHeader>
       <Tabs>
         <VSCodeTab
+          icon="react"
           selected={activeTab === "react"}
           label="React.tsx"
           onClick={() => {
@@ -21,6 +22,7 @@ export default function TabsHeader({
           }}
         />
         <VSCodeTab
+          icon="flutter"
           selected={activeTab === "flutter"}
           label="Flutter.dart"
           onClick={() => {
@@ -28,6 +30,7 @@ export default function TabsHeader({
           }}
         />
         <VSCodeTab
+          icon="html"
           selected={activeTab === "vanilla"}
           label="vanilla.html"
           onClick={() => {

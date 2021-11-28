@@ -8,14 +8,17 @@ export function FeaturedMenuTab({
   theme = "light",
   selected = false,
   icon,
+  iconsize,
   onClick,
 }: {
   theme?: "light" | "dark";
   title?: string;
   selected?: boolean;
   icon?: NamedCodeIcons;
+  iconsize?: number;
   onClick?: () => void;
 }) {
+  console.log("icon", icon);
   return (
     <RootWrapperBaseTabFeaturedMenu
       onClick={onClick}
@@ -27,7 +30,11 @@ export function FeaturedMenuTab({
       shadow={BaseTheme[selected ? "selected" : "default"]["shadow"][theme]}
     >
       <Contents>
-        <CodeIcon icon={icon} color={selected ? "origin" : "grey"} />
+        <CodeIcon
+          size={iconsize}
+          icon={icon}
+          color={selected ? "default" : "grey"}
+        />
         <Title color={TitleTheme[selected ? "selected" : "default"][theme]}>
           {title}
         </Title>

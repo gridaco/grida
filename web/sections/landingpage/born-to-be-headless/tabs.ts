@@ -8,7 +8,7 @@ export const TabsList = [
   },
   {
     id: "assistant",
-    title: "Assistant",
+    title: "Figma Assistant",
     icon: <NamedCodeIcons>"figma",
   },
   {

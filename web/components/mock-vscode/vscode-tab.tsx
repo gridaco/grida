@@ -22,7 +22,7 @@ export default function VSCodeTab({
         color={selected ? BaseColors.selected : BaseColors.unselected}
       >
         <LabelArea>
-          <CodeIcon icon={icon} />
+          <CodeIcon icon={icon} color={selected ? "default" : "grey"} />
           <Label
             color={selected ? LabelColors.selected : LabelColors.unselected}
           >

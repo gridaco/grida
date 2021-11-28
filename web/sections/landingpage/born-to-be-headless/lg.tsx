@@ -1,7 +1,10 @@
 import styled from "@emotion/styled";
 import React from "react";
 
+import { Tabs } from "components/landingpage/tab-featured-menu";
 import { k } from "sections";
+
+import { TabsList } from "./tabs";
 
 export default function SectionBornToBeHeadless1280SizeLg() {
   return (
@@ -18,49 +21,7 @@ export default function SectionBornToBeHeadless1280SizeLg() {
       </Frame623>
       <DemoArea>
         <SwitchContainer>
-          <Switches>
-            <BaseTabFeaturedMenu>
-              <BaseTabFeaturedMenu_0001>
-                <Frame575>
-                  <PlatformIconsVscodeDefault>
-                    <Image105
-                      src="https://s3-us-west-2.amazonaws.com/figma-alpha-api/img/e3ff/831f/3cb3b4e0ed91094328836f91eedc0daa"
-                      alt="image of Image105"
-                    ></Image105>
-                  </PlatformIconsVscodeDefault>
-                  <Title>VSCode</Title>
-                </Frame575>
-              </BaseTabFeaturedMenu_0001>
-            </BaseTabFeaturedMenu>
-            <BaseTabFeaturedMenu_0002>
-              <BaseTabFeaturedMenu_0003>
-                <Frame575_0001>
-                  <PlatformIconsFigmaDefault>
-                    <Image71
-                      src="https://s3-us-west-2.amazonaws.com/figma-alpha-api/img/2157/072a/504a0c5562d01327a8222df5dc7f655e"
-                      alt="image of Image71"
-                    ></Image71>
-                  </PlatformIconsFigmaDefault>
-                  <Title_0001>Figma Assistant</Title_0001>
-                </Frame575_0001>
-              </BaseTabFeaturedMenu_0003>
-            </BaseTabFeaturedMenu_0002>
-            <BaseTabFeaturedMenu_0004>
-              {
-                'The input design was not handled. "(base) tab-featured-menu" type of "undefined" - {"id":"7298:72660","originName":"(base) tab-featured-menu"}'
-              }
-            </BaseTabFeaturedMenu_0004>
-            <BaseTabFeaturedMenu_0005>
-              {
-                'The input design was not handled. "(base) tab-featured-menu" type of "undefined" - {"id":"7298:72661","originName":"(base) tab-featured-menu"}'
-              }
-            </BaseTabFeaturedMenu_0005>
-            <BaseTabFeaturedMenu_0006>
-              {
-                'The input design was not handled. "(base) tab-featured-menu" type of "undefined" - {"id":"7298:72662","originName":"(base) tab-featured-menu"}'
-              }
-            </BaseTabFeaturedMenu_0006>
-          </Switches>
+          <Tabs theme="dark" tabs={TabsList} initialSelection="vscode" />
         </SwitchContainer>
         <DemoContentArea>
           <CodeFrame>
