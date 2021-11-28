@@ -10,10 +10,12 @@ import MD from "./md";
 import SM from "./sm";
 import XL from "./xl";
 import XS from "./xs";
+import DesignOnceRunAnywhereScaffold from "./scaffold";
 
 const DesignOnceRunAnywhere = () => (
   <Container>
-    <BreakPoints.xl>
+    <DesignOnceRunAnywhereScaffold />
+    {/* <BreakPoints.xl>
       <XL />
     </BreakPoints.xl>
     <BreakPoints.lg>
@@ -27,7 +29,7 @@ const DesignOnceRunAnywhere = () => (
     </BreakPoints.sm>
     <BreakPoints.xs>
       <XS />
-    </BreakPoints.xs>
+    </BreakPoints.xs> */}
   </Container>
 );
 
