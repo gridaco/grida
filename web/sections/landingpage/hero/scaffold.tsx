@@ -60,7 +60,7 @@ const HeroGradientBgArtwork = styled.img`
   position: absolute;
   left: calc((calc((50% + 328px)) - 393px));
   top: 185px;
-  transform: scale(3);
+  /* transform: scale(3); */
   /* filter: blur(426.44px); */
 
   @media ${breakpoints.xl} {
@@ -70,14 +70,10 @@ const HeroGradientBgArtwork = styled.img`
   @media ${breakpoints.md} {
   }
   @media ${breakpoints.sm} {
-    width: 1023px;
-    height: 739px;
     right: -739px;
     bottom: 161px;
   }
   @media ${breakpoints.xs} {
-    width: 236px;
-    height: 136px;
     right: -224px;
     bottom: 470px;
   }
@@ -135,20 +131,18 @@ const HeroTextAndBody = styled.div`
 
   @media ${breakpoints.xl} {
     flex: 1;
-    gap: 40px;
+    gap: 24px;
   }
   @media ${breakpoints.lg} {
-    gap: 40px;
-    height: 194px;
+    gap: 24px;
   }
   @media ${breakpoints.md} {
-    gap: 40px;
+    gap: 24px;
     width: 552px;
   }
   @media ${breakpoints.sm} {
     gap: 40px;
     width: 319px;
-    height: 242px;
   }
   @media ${breakpoints.xs} {
     flex: 1;
@@ -158,6 +152,7 @@ const HeroTextAndBody = styled.div`
 
 const Heading1 = styled.h1`
   color: rgba(0, 0, 0, 0.9);
+  margin-block: 0px;
   text-overflow: ellipsis;
   font-size: 80px;
   font-family: "Helvetica Neue", sans-serif;

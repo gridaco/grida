@@ -3,6 +3,7 @@ import React from "react";
 
 export type NamedCodeIcons =
   | "empty"
+  | "grida"
   | "dummy"
   | "react"
   | "flutter"
@@ -20,7 +21,7 @@ export function CodeIcon({
 }: {
   icon?: NamedCodeIcons;
   size?: number;
-  color?: "default" | "grey";
+  color?: "default" | "grey" | "white";
 }) {
   switch (icon) {
     case "dummy": {
@@ -92,6 +93,15 @@ export function CodeIcon({
           width={size}
           height={size}
           src={`/assets/platform-icons/figma/${color}.png`}
+        />
+      );
+    }
+    case "grida": {
+      return (
+        <Image
+          width={size}
+          height={size}
+          src={`/assets/platform-icons/grida/${color}.png`}
         />
       );
     }

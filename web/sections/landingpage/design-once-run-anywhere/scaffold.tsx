@@ -33,12 +33,14 @@ export default function DesignOnceRunAnywhereScaffold() {
 function DemoContents() {
   return (
     <Container>
-      <ResponsiveActivityBar />
-      <ResponsiveSidebar>
+      <ResponsiveActivityBar>
+        <ActivityBar></ActivityBar>
+      </ResponsiveActivityBar>
+      <Sidebar>
         <IPhone11ProX1>
           <DemoApp />
         </IPhone11ProX1>
-      </ResponsiveSidebar>
+      </Sidebar>
       <Panel />
     </Container>
   );
@@ -148,12 +150,13 @@ const VscodeDemo = styled.div`
   box-shadow: 0px 12px 32px 2px rgba(0, 0, 0, 0.48);
   border: solid 1px rgba(69, 69, 69, 1);
   border-radius: 10px;
-  width: 1238px;
   height: 710px;
   background-color: rgba(37, 37, 38, 1);
   box-sizing: border-box;
+  /* max-width: 1238px; */
 
   @media ${breakpoints.xl} {
+    width: 1238px;
   }
   @media ${breakpoints.lg} {
     flex: 1;
@@ -169,18 +172,22 @@ const VscodeDemo = styled.div`
     flex-direction: column;
     align-items: start;
     flex: none;
+    align-self: stretch;
     gap: 0;
-    width: 728px;
+    margin-left: 40px;
+    margin-right: 40px;
+    /* width: 728px; */
     height: 530px;
   }
   @media ${breakpoints.xs} {
     justify-content: flex-start;
     flex-direction: column;
     align-items: start;
-    flex: 1;
+    /* flex: 1; */
     gap: 0;
     border-radius: 10px;
     align-self: stretch;
+    height: 490px;
   }
 `;
 
@@ -201,7 +208,7 @@ const Container = styled.div`
   @media ${breakpoints.md} {
   }
   @media ${breakpoints.sm} {
-    width: 300px;
+    /* width: 300px; */
   }
   @media ${breakpoints.xs} {
     justify-content: flex-start;
@@ -249,13 +256,7 @@ const IPhone11ProX1 = styled.div`
   }
 `;
 
-const ResponsiveSidebar = styled(Sidebar)`
-  @media ${breakpoints.xs} {
-    display: none;
-  }
-`;
-
-const ResponsiveActivityBar = styled(ActivityBar)`
+const ResponsiveActivityBar = styled.div`
   @media ${breakpoints.xs} {
     display: none;
   }

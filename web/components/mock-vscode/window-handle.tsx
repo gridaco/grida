@@ -18,7 +18,6 @@ const RootWrapperWindowHandle = styled.div`
   justify-content: center;
   flex-direction: column;
   align-items: start;
-  flex: 1;
   gap: 10px;
   border-top-left-radius: 10px;
   border-top-right-radius: 10px;

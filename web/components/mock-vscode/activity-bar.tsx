@@ -1,6 +1,8 @@
 import styled from "@emotion/styled";
 import React from "react";
 
+import { CodeIcon } from "./code-icon";
+
 function ActivityBar() {
   return (
     <RootWrapperActivityBar>
@@ -40,14 +42,7 @@ function ActivityBar() {
           </Item_0005>
           <SideBarLogo>
             <LogoShapeOnly>
-              <Union
-                src="grida://assets-reservation/images/I7257:69155;257:21043;257:20984;1:25"
-                alt="image of Union"
-              ></Union>
-              <Union_0001
-                src="grida://assets-reservation/images/I7257:69155;257:21043;257:20984;1:28"
-                alt="image of Union"
-              ></Union_0001>
+              <CodeIcon size={32} color="white" icon="grida" />
             </LogoShapeOnly>
           </SideBarLogo>
         </ActivityBarItemGrida>
@@ -289,20 +284,6 @@ const LogoShapeOnly = styled.div`
   position: absolute;
   left: 0px;
   top: 0px;
-`;
-
-const Union = styled.img`
-  width: 7px;
-  height: 14px;
-  object-fit: cover;
-  position: absolute;
-`;
-
-const Union_0001 = styled.img`
-  width: 13px;
-  height: 21px;
-  object-fit: cover;
-  position: absolute;
 `;
 
 export default ActivityBar;
