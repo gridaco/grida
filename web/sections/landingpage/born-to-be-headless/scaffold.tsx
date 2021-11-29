@@ -272,6 +272,50 @@ const SwitchContainer = styled.div`
   height: 486px;
   box-sizing: border-box;
   padding: 24px 10px;
+
+  @media ${breakpoints.xl} {
+  }
+  @media ${breakpoints.lg} {
+    display: flex;
+    justify-content: flex-start;
+    flex-direction: row;
+    align-items: start;
+    flex: none;
+    gap: 10px;
+    width: 352px;
+    height: 486px;
+    padding: 24px 10px;
+  }
+  @media ${breakpoints.md} {
+    display: flex;
+    justify-content: flex-start;
+    flex-direction: row;
+    align-items: start;
+    flex: none;
+    gap: 10px;
+    width: 352px;
+    height: 486px;
+    padding: 24px 10px;
+  }
+  @media ${breakpoints.sm} {
+    justify-content: flex-start;
+    flex-direction: row;
+    align-items: start;
+    flex: none;
+    gap: 10px;
+    width: 1768px;
+    height: 66px;
+  }
+  @media ${breakpoints.xs} {
+    display: flex;
+    justify-content: flex-start;
+    flex-direction: row;
+    align-items: start;
+    flex: none;
+    gap: 10px;
+    width: 1768px;
+    height: 66px;
+  }
 `;
 
 const DemoContentArea = styled.div`

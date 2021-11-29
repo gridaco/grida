@@ -1,7 +1,7 @@
 export const contents = {
   // hero
   heading1_figma_to_code: "Figma to Code.",
-  p_hero_description: `Final, Open-sourced
+  p_hero_description: `Open-source
 Design to code solution.`,
   // design_once_run_anywhere
   heading2_design_once_run_anywhere: "Design once, Run anywhere.",
