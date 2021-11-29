@@ -3,13 +3,15 @@ import React from "react";
 import { BreakPoints } from "../_breakpoints";
 import LG from "./lg";
 import MD from "./md";
+import { SectionBornToBeHeadlessScaffold } from "./scaffold";
 import SM from "./sm";
 import XL from "./xl";
 import XS from "./xs";
 
 const Section__BornToBeHeadLess = () => (
   <div>
-    <BreakPoints.xl>
+    <SectionBornToBeHeadlessScaffold />
+    {/* <BreakPoints.xl>
       <XL />
     </BreakPoints.xl>
     <BreakPoints.lg>
@@ -23,7 +25,7 @@ const Section__BornToBeHeadLess = () => (
     </BreakPoints.sm>
     <BreakPoints.xs>
       <XS />
-    </BreakPoints.xs>
+    </BreakPoints.xs> */}
   </div>
 );
 

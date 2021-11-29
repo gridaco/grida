@@ -1,29 +1,27 @@
 import styled from "@emotion/styled";
 import React from "react";
 
-import { k } from "sections";
-
 export default function SectionBornToBeHeadless320SizeXs() {
   return (
     <RootWrapperSectionBornToBeHeadless320SizeXs>
-      <Frame623>
-        <BornToBeHeadless>
+      <HeaderArea>
+        <Heading>
           Born to be
           <br />
           Headless
-        </BornToBeHeadless>
-        <WipToTruelyHelpYourProductivityWeAreDesignedHeadlessGridaSHeadlessDesignEnablesYouEvenFasterDevelopmentItSTheEndOfSwitchingTabs>
+        </Heading>
+        <Desc>
           WIP - To truely help your productivity, we are designed headless.
           Grida’s Headless design enables you even faster development. It’s the
           end of switching tabs
-        </WipToTruelyHelpYourProductivityWeAreDesignedHeadlessGridaSHeadlessDesignEnablesYouEvenFasterDevelopmentItSTheEndOfSwitchingTabs>
-      </Frame623>
+        </Desc>
+      </HeaderArea>
       <DemoArea>
         <SwitchContainer>
           <Switches>
-            <BaseTabFeaturedMenu>
-              <BaseTabFeaturedMenu_0001>
-                <Frame575>
+            <TabFeaturedMenu>
+              <BaseTabFeaturedMenu>
+                <Contents>
                   <PlatformIconsVscodeDefault>
                     <Image105
                       src="https://s3-us-west-2.amazonaws.com/figma-alpha-api/img/e3ff/831f/3cb3b4e0ed91094328836f91eedc0daa"
@@ -31,12 +29,12 @@ export default function SectionBornToBeHeadless320SizeXs() {
                     ></Image105>
                   </PlatformIconsVscodeDefault>
                   <Title>VSCode</Title>
-                </Frame575>
-              </BaseTabFeaturedMenu_0001>
-            </BaseTabFeaturedMenu>
-            <BaseTabFeaturedMenu_0002>
-              <BaseTabFeaturedMenu_0003>
-                <Frame575_0001>
+                </Contents>
+              </BaseTabFeaturedMenu>
+            </TabFeaturedMenu>
+            <TabFeaturedMenu_0001>
+              <BaseTabFeaturedMenu_0001>
+                <Contents_0001>
                   <PlatformIconsFigmaDefault>
                     <Image71
                       src="https://s3-us-west-2.amazonaws.com/figma-alpha-api/img/2157/072a/504a0c5562d01327a8222df5dc7f655e"
@@ -44,138 +42,38 @@ export default function SectionBornToBeHeadless320SizeXs() {
                     ></Image71>
                   </PlatformIconsFigmaDefault>
                   <Title_0001>Figma Assistant</Title_0001>
-                </Frame575_0001>
-              </BaseTabFeaturedMenu_0003>
-            </BaseTabFeaturedMenu_0002>
-            <BaseTabFeaturedMenu_0004>
+                </Contents_0001>
+              </BaseTabFeaturedMenu_0001>
+            </TabFeaturedMenu_0001>
+            <TabFeaturedMenu_0002>
               {
-                'The input design was not handled. "(base) tab-featured-menu" type of "undefined" - {"id":"7298:73264","originName":"(base) tab-featured-menu"}'
+                'The input design was not handled. "tab-featured-menu" type of "undefined" - {"id":"7298:73264","originName":"tab-featured-menu"}'
               }
-            </BaseTabFeaturedMenu_0004>
-            <BaseTabFeaturedMenu_0005>
+            </TabFeaturedMenu_0002>
+            <TabFeaturedMenu_0003>
               {
-                'The input design was not handled. "(base) tab-featured-menu" type of "undefined" - {"id":"7298:73265","originName":"(base) tab-featured-menu"}'
+                'The input design was not handled. "tab-featured-menu" type of "undefined" - {"id":"7298:73265","originName":"tab-featured-menu"}'
               }
-            </BaseTabFeaturedMenu_0005>
-            <BaseTabFeaturedMenu_0006>
+            </TabFeaturedMenu_0003>
+            <TabFeaturedMenu_0004>
               {
-                'The input design was not handled. "(base) tab-featured-menu" type of "undefined" - {"id":"7298:73266","originName":"(base) tab-featured-menu"}'
+                'The input design was not handled. "tab-featured-menu" type of "undefined" - {"id":"7298:73266","originName":"tab-featured-menu"}'
               }
-            </BaseTabFeaturedMenu_0006>
+            </TabFeaturedMenu_0004>
           </Switches>
         </SwitchContainer>
         <DemoContentArea>
-          <CodeFrame>
-            <Frame566>
-              <BaseVscodeTab>
-                <Frame565>
-                  <PlatformIconsDummyDefault
-                    src="https://s3-us-west-2.amazonaws.com/figma-alpha-api/img/cecd/8d50/1f5569ac66c9ba6f70c1fb403ff58bfe"
-                    alt="icon"
-                  ></PlatformIconsDummyDefault>
-                  <FileNameTxt>React.tsx</FileNameTxt>
-                </Frame565>
-              </BaseVscodeTab>
-              <BaseVscodeTab_0001>
-                <Frame565_0001>
-                  <PlatformIconsDummyDefault_0001
-                    src="https://s3-us-west-2.amazonaws.com/figma-alpha-api/img/cecd/8d50/1f5569ac66c9ba6f70c1fb403ff58bfe"
-                    alt="icon"
-                  ></PlatformIconsDummyDefault_0001>
-                  <FileNameTxt_0001>Vue.vue</FileNameTxt_0001>
-                </Frame565_0001>
-              </BaseVscodeTab_0001>
-              <BaseVscodeTab_0002>
-                <Frame565_0002>
-                  <PlatformIconsDummyDefault_0002
-                    src="https://s3-us-west-2.amazonaws.com/figma-alpha-api/img/cecd/8d50/1f5569ac66c9ba6f70c1fb403ff58bfe"
-                    alt="icon"
-                  ></PlatformIconsDummyDefault_0002>
-                  <FileNameTxt_0002>Flutter.dart</FileNameTxt_0002>
-                </Frame565_0002>
-              </BaseVscodeTab_0002>
-              <BaseVscodeTab_0003>
-                <Frame565_0003>
-                  <PlatformIconsDummyDefault_0003
-                    src="https://s3-us-west-2.amazonaws.com/figma-alpha-api/img/cecd/8d50/1f5569ac66c9ba6f70c1fb403ff58bfe"
-                    alt="icon"
-                  ></PlatformIconsDummyDefault_0003>
-                  <FileNameTxt_0003>vanilla.html</FileNameTxt_0003>
-                </Frame565_0003>
-              </BaseVscodeTab_0003>
-              <BaseVscodeTab_0004>
-                <Frame565_0004>
-                  <PlatformIconsDummyDefault_0004
-                    src="https://s3-us-west-2.amazonaws.com/figma-alpha-api/img/cecd/8d50/1f5569ac66c9ba6f70c1fb403ff58bfe"
-                    alt="icon"
-                  ></PlatformIconsDummyDefault_0004>
-                  <FileNameTxt_0004>module.css</FileNameTxt_0004>
-                </Frame565_0004>
-              </BaseVscodeTab_0004>
-            </Frame566>
-            <_123456789101112131415161718192021222324252627282930>
-              1<br />
-              2<br />
-              3<br />
-              4<br />
-              5<br />
-              6<br />
-              7<br />
-              8<br />
-              9<br />
-              10
-              <br />
-              11
-              <br />
-              12
-              <br />
-              13
-              <br />
-              14
-              <br />
-              15
-              <br />
-              16
-              <br />
-              17
-              <br />
-              18
-              <br />
-              19
-              <br />
-              20
-              <br />
-              21
-              <br />
-              22
-              <br />
-              23
-              <br />
-              24
-              <br />
-              25
-              <br />
-              26
-              <br />
-              27
-              <br />
-              28
-              <br />
-              29
-              <br />
-              30
-            </_123456789101112131415161718192021222324252627282930>
-          </CodeFrame>
+          <Demo></Demo>
           <ActionArea>
             <ActionLink>
               <BaseActionLink>
-                <Frame245>
-                  <ActionLink_0001>Get the VSCode Extension</ActionLink_0001>
+                <Contents_0002>
+                  <Label>Get the VSCode Extension</Label>
                   <IconsMdiKeyboardArrowRight
                     src="https://s3-us-west-2.amazonaws.com/figma-alpha-api/img/d189/6a6e/14107ad4de73d24b574dcd43a88d2785"
                     alt="image of IconsMdiKeyboardArrowRight"
                   ></IconsMdiKeyboardArrowRight>
-                </Frame245>
+                </Contents_0002>
               </BaseActionLink>
             </ActionLink>
           </ActionArea>
@@ -189,14 +87,15 @@ const RootWrapperSectionBornToBeHeadless320SizeXs = styled.div`
   display: flex;
   justify-content: flex-start;
   flex-direction: column;
-  align-items: start;
+  align-items: center;
   gap: 86px;
+  min-height: 100vh;
   background-color: rgba(48, 50, 52, 1);
   box-sizing: border-box;
   padding: 100px 0px 140px;
 `;
 
-const Frame623 = styled.div`
+const HeaderArea = styled.div`
   display: flex;
   justify-content: flex-start;
   flex-direction: column;
@@ -208,7 +107,7 @@ const Frame623 = styled.div`
   padding: 0px 24px;
 `;
 
-const BornToBeHeadless = styled.span`
+const Heading = styled.span`
   color: rgba(222, 222, 222, 1);
   text-overflow: ellipsis;
   font-size: 32px;
@@ -220,7 +119,7 @@ const BornToBeHeadless = styled.span`
   align-self: stretch;
 `;
 
-const WipToTruelyHelpYourProductivityWeAreDesignedHeadlessGridaSHeadlessDesignEnablesYouEvenFasterDevelopmentItSTheEndOfSwitchingTabs = styled.span`
+const Desc = styled.span`
   color: rgba(161, 162, 162, 1);
   text-overflow: ellipsis;
   font-size: 18px;
@@ -266,7 +165,7 @@ const Switches = styled.div`
   box-sizing: border-box;
 `;
 
-const BaseTabFeaturedMenu = styled.div`
+const TabFeaturedMenu = styled.div`
   display: flex;
   justify-content: flex-start;
   flex-direction: column;
@@ -278,7 +177,7 @@ const BaseTabFeaturedMenu = styled.div`
   box-sizing: border-box;
 `;
 
-const BaseTabFeaturedMenu_0001 = styled.div`
+const BaseTabFeaturedMenu = styled.div`
   display: flex;
   justify-content: center;
   flex-direction: column;
@@ -286,10 +185,7 @@ const BaseTabFeaturedMenu_0001 = styled.div`
   flex: none;
   gap: 10px;
   box-shadow: 0px 4px 32px rgba(0, 0, 0, 0.04);
-  border-left: solid 1px rgba(58, 58, 58, 1);
-  border-top: solid 1px rgba(58, 58, 58, 1);
-  border-bottom: solid 1px rgba(58, 58, 58, 1);
-  border-right: solid 1px rgba(58, 58, 58, 1);
+  border: solid 1px rgba(58, 58, 58, 1);
   border-radius: 4px;
   width: 332px;
   height: 66px;
@@ -298,15 +194,14 @@ const BaseTabFeaturedMenu_0001 = styled.div`
   padding: 16px 21px;
 `;
 
-const Frame575 = styled.div`
+const Contents = styled.div`
   display: flex;
   justify-content: flex-start;
   flex-direction: row;
   align-items: center;
-  flex: none;
+  flex: 1;
   gap: 16px;
-  width: 126px;
-  height: 34px;
+  align-self: stretch;
   box-sizing: border-box;
 `;
 
@@ -326,7 +221,7 @@ const Image105 = styled.img`
 `;
 
 const Title = styled.span`
-  color: rgba(135, 135, 135, 1);
+  color: rgba(243, 243, 243, 1);
   text-overflow: ellipsis;
   font-size: 21px;
   font-family: "Helvetica Neue", sans-serif;
@@ -335,7 +230,7 @@ const Title = styled.span`
   text-align: left;
 `;
 
-const BaseTabFeaturedMenu_0002 = styled.div`
+const TabFeaturedMenu_0001 = styled.div`
   display: flex;
   justify-content: flex-start;
   flex-direction: column;
@@ -347,13 +242,14 @@ const BaseTabFeaturedMenu_0002 = styled.div`
   box-sizing: border-box;
 `;
 
-const BaseTabFeaturedMenu_0003 = styled.div`
+const BaseTabFeaturedMenu_0001 = styled.div`
   display: flex;
   justify-content: center;
   flex-direction: column;
   align-items: start;
   flex: none;
   gap: 10px;
+  box-shadow: 0px 4px 32px rgba(0, 0, 0, 0.04);
   border-radius: 4px;
   width: 332px;
   height: 66px;
@@ -362,15 +258,14 @@ const BaseTabFeaturedMenu_0003 = styled.div`
   padding: 16px 21px;
 `;
 
-const Frame575_0001 = styled.div`
+const Contents_0001 = styled.div`
   display: flex;
   justify-content: flex-start;
   flex-direction: row;
   align-items: center;
-  flex: none;
+  flex: 1;
   gap: 16px;
-  width: 198px;
-  height: 34px;
+  align-self: stretch;
   box-sizing: border-box;
 `;
 
@@ -400,15 +295,15 @@ const Title_0001 = styled.span`
   text-align: left;
 `;
 
-const BaseTabFeaturedMenu_0004 = styled.em`
+const TabFeaturedMenu_0002 = styled.em`
   color: red;
 `;
 
-const BaseTabFeaturedMenu_0005 = styled.em`
+const TabFeaturedMenu_0003 = styled.em`
   color: red;
 `;
 
-const BaseTabFeaturedMenu_0006 = styled.em`
+const TabFeaturedMenu_0004 = styled.em`
   color: red;
 `;
 
@@ -423,246 +318,15 @@ const DemoContentArea = styled.div`
   box-sizing: border-box;
 `;
 
-const CodeFrame = styled.div`
-  height: 567px;
-  overflow: hidden;
-  background-color: rgba(30, 30, 30, 1);
-  border-radius: 12px;
-  position: relative;
-  box-shadow: 0px 4px 24px rgba(0, 0, 0, 0.12);
-  align-self: stretch;
-`;
-
-const Frame566 = styled.div`
+const Demo = styled.div`
   display: flex;
   justify-content: flex-start;
   flex-direction: row;
   align-items: start;
-  gap: 0;
-  box-sizing: border-box;
-  position: absolute;
-  left: 0px;
-  top: 0px;
-  width: 600px;
-  height: 36px;
-`;
-
-const BaseVscodeTab = styled.div`
-  display: flex;
-  justify-content: center;
-  flex-direction: column;
-  align-items: start;
-  flex: none;
+  flex: 1;
   gap: 10px;
-  width: 116px;
-  height: 36px;
-  background-color: rgba(30, 30, 30, 1);
+  align-self: stretch;
   box-sizing: border-box;
-  padding: 14px 20px;
-`;
-
-const Frame565 = styled.div`
-  display: flex;
-  justify-content: center;
-  flex-direction: row;
-  align-items: center;
-  flex: none;
-  gap: 8px;
-  width: 76px;
-  height: 16px;
-  box-sizing: border-box;
-`;
-
-const PlatformIconsDummyDefault = styled.img`
-  width: 14px;
-  height: 14px;
-  object-fit: cover;
-`;
-
-const FileNameTxt = styled.span`
-  color: rgba(236, 236, 236, 1);
-  text-overflow: ellipsis;
-  font-size: 13px;
-  font-family: "Helvetica Neue", sans-serif;
-  font-weight: 400;
-  text-align: left;
-`;
-
-const BaseVscodeTab_0001 = styled.div`
-  display: flex;
-  justify-content: center;
-  flex-direction: column;
-  align-items: start;
-  flex: none;
-  gap: 10px;
-  width: 107px;
-  height: 36px;
-  background-color: rgba(30, 30, 30, 1);
-  box-sizing: border-box;
-  padding: 14px 20px;
-`;
-
-const Frame565_0001 = styled.div`
-  display: flex;
-  justify-content: center;
-  flex-direction: row;
-  align-items: center;
-  flex: none;
-  gap: 8px;
-  width: 67px;
-  height: 16px;
-  box-sizing: border-box;
-`;
-
-const PlatformIconsDummyDefault_0001 = styled.img`
-  width: 14px;
-  height: 14px;
-  object-fit: cover;
-`;
-
-const FileNameTxt_0001 = styled.span`
-  color: rgba(141, 142, 144, 1);
-  text-overflow: ellipsis;
-  font-size: 13px;
-  font-family: "Helvetica Neue", sans-serif;
-  font-weight: 400;
-  text-align: left;
-`;
-
-const BaseVscodeTab_0002 = styled.div`
-  display: flex;
-  justify-content: center;
-  flex-direction: column;
-  align-items: start;
-  flex: none;
-  gap: 10px;
-  width: 123px;
-  height: 36px;
-  background-color: rgba(30, 30, 30, 1);
-  box-sizing: border-box;
-  padding: 14px 20px;
-`;
-
-const Frame565_0002 = styled.div`
-  display: flex;
-  justify-content: center;
-  flex-direction: row;
-  align-items: center;
-  flex: none;
-  gap: 8px;
-  width: 83px;
-  height: 16px;
-  box-sizing: border-box;
-`;
-
-const PlatformIconsDummyDefault_0002 = styled.img`
-  width: 14px;
-  height: 14px;
-  object-fit: cover;
-`;
-
-const FileNameTxt_0002 = styled.span`
-  color: rgba(141, 142, 144, 1);
-  text-overflow: ellipsis;
-  font-size: 13px;
-  font-family: "Helvetica Neue", sans-serif;
-  font-weight: 400;
-  text-align: left;
-`;
-
-const BaseVscodeTab_0003 = styled.div`
-  display: flex;
-  justify-content: center;
-  flex-direction: column;
-  align-items: start;
-  flex: none;
-  gap: 10px;
-  width: 126px;
-  height: 36px;
-  background-color: rgba(30, 30, 30, 1);
-  box-sizing: border-box;
-  padding: 14px 20px;
-`;
-
-const Frame565_0003 = styled.div`
-  display: flex;
-  justify-content: center;
-  flex-direction: row;
-  align-items: center;
-  flex: none;
-  gap: 8px;
-  width: 86px;
-  height: 16px;
-  box-sizing: border-box;
-`;
-
-const PlatformIconsDummyDefault_0003 = styled.img`
-  width: 14px;
-  height: 14px;
-  object-fit: cover;
-`;
-
-const FileNameTxt_0003 = styled.span`
-  color: rgba(141, 142, 144, 1);
-  text-overflow: ellipsis;
-  font-size: 13px;
-  font-family: "Helvetica Neue", sans-serif;
-  font-weight: 400;
-  text-align: left;
-`;
-
-const BaseVscodeTab_0004 = styled.div`
-  display: flex;
-  justify-content: center;
-  flex-direction: column;
-  align-items: start;
-  flex: none;
-  gap: 10px;
-  width: 128px;
-  height: 36px;
-  background-color: rgba(30, 30, 30, 1);
-  box-sizing: border-box;
-  padding: 14px 20px;
-`;
-
-const Frame565_0004 = styled.div`
-  display: flex;
-  justify-content: center;
-  flex-direction: row;
-  align-items: center;
-  flex: none;
-  gap: 8px;
-  width: 88px;
-  height: 16px;
-  box-sizing: border-box;
-`;
-
-const PlatformIconsDummyDefault_0004 = styled.img`
-  width: 14px;
-  height: 14px;
-  object-fit: cover;
-`;
-
-const FileNameTxt_0004 = styled.span`
-  color: rgba(141, 142, 144, 1);
-  text-overflow: ellipsis;
-  font-size: 13px;
-  font-family: "Helvetica Neue", sans-serif;
-  font-weight: 400;
-  text-align: left;
-`;
-
-const _123456789101112131415161718192021222324252627282930 = styled.span`
-  color: rgba(160, 161, 166, 1);
-  text-overflow: ellipsis;
-  font-size: 16px;
-  font-family: Monaco, sans-serif;
-  font-weight: 400;
-  line-height: 24px;
-  text-align: right;
-  position: absolute;
-  left: 37px;
-  top: 63px;
 `;
 
 const ActionArea = styled.div`
@@ -699,18 +363,19 @@ const BaseActionLink = styled.div`
   box-sizing: border-box;
 `;
 
-const Frame245 = styled.div`
+const Contents_0002 = styled.div`
   display: flex;
   justify-content: flex-start;
   flex-direction: row;
   align-items: center;
-  flex: 1;
+  flex: none;
   gap: 4px;
-  align-self: stretch;
+  width: 322px;
+  height: 29px;
   box-sizing: border-box;
 `;
 
-const ActionLink_0001 = styled.span`
+const Label = styled.span`
   color: rgba(125, 125, 125, 1);
   text-overflow: ellipsis;
   font-size: 24px;

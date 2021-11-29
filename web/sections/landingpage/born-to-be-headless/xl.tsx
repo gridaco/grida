@@ -9,7 +9,7 @@ import { TabsList } from "./tabs";
 export default function SectionBornToBeHeadless1440SizeXl() {
   return (
     <RootWrapperSectionBornToBeHeadless1440SizeXl>
-      <Frame623>
+      <HeaderArea>
         <BornToBeHeadless>
           {k.contents.heading2_born_to_be_headless}
         </BornToBeHeadless>
@@ -18,7 +18,7 @@ export default function SectionBornToBeHeadless1440SizeXl() {
           Grida’s Headless design enables you even faster development. It’s the
           end of switching tabs
         </WipToTruelyHelpYourProductivityWeAreDesignedHeadlessGridaSHeadlessDesignEnablesYouEvenFasterDevelopmentItSTheEndOfSwitchingTabs>
-      </Frame623>
+      </HeaderArea>
       <DemoArea>
         <SwitchContainer>
           <Tabs theme="dark" tabs={TabsList} initialSelection="vscode" />
@@ -156,7 +156,7 @@ const RootWrapperSectionBornToBeHeadless1440SizeXl = styled.div`
   padding: 100px 0px 140px;
 `;
 
-const Frame623 = styled.div`
+const HeaderArea = styled.div`
   display: flex;
   justify-content: flex-start;
   flex-direction: column;
