@@ -2,15 +2,24 @@ import styled from "@emotion/styled";
 import React from "react";
 
 import { breakpoints } from "sections/landingpage/_breakpoints";
+import { signup_callback_redirect_uri } from "utils/landingpage/constants";
 
 import { MagicButton } from "./button";
 import { MagicInput } from "./input";
 
 export function MagicCtaForm() {
+  const [value, setValue] = React.useState(null);
+
+  const onsubmit = () => {
+    window.open(
+      `https://accounts.grida.co/signup?email=${value}&redirect_uri=${signup_callback_redirect_uri()}`,
+    );
+  };
+
   return (
     <FormArea>
-      <MagicInput />
-      <MagicButton />
+      <MagicInput onChange={setValue} />
+      <MagicButton onClick={onsubmit} />
     </FormArea>
   );
 }

@@ -3,9 +3,9 @@ import React from "react";
 
 import { breakpoints } from "sections/landingpage/_breakpoints";
 
-export function MagicButton() {
+export function MagicButton({ onClick }: { onClick?: () => void }) {
   return (
-    <Button>
+    <Button onClick={onClick}>
       <Texts>
         <EmojiWond
           src="https://s3-us-west-2.amazonaws.com/figma-alpha-api/img/4341/1554/128f94840d219df83cb481ca2ddd4a50"

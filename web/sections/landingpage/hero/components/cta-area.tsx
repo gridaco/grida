@@ -10,6 +10,7 @@ import React, { useCallback, useState } from "react";
 import { Flex } from "rebass";
 
 import { usePopupContext } from "utils/context/PopupContext";
+import { signup_callback_redirect_uri } from "utils/landingpage/constants";
 import { media } from "utils/styled/media";
 import { ThemeInterface } from "utils/styled/theme";
 
@@ -19,6 +20,22 @@ import { HeroPrimaryInput } from "./hero-primary-input";
 export function CtaArea() {
   const [input, setInput] = useState<string>(null);
   const { addPopup, removePopup } = usePopupContext();
+
+  const showErrorDialog = useCallback((msg: string) => {
+    addPopup({
+      title: "",
+      element: (
+        <Flex
+          width="calc(100vw - 40px)"
+          alignItems="center"
+          flexDirection="column"
+          p="48px"
+        >
+          {msg}
+        </Flex>
+      ),
+    });
+  }, []);
 
   const showInvalidUrlGuide = useCallback(() => {
     addPopup({
@@ -68,6 +85,18 @@ export function CtaArea() {
   }, []);
 
   const onSubmit = () => {
+    if (input == null) {
+      // TODO: change error msg
+      showErrorDialog("Oops. Not a valid email address");
+      return;
+    }
+
+    window.open(
+      `https://accounts.grida.co/signup?email=${input}&redirect_uri=${signup_callback_redirect_uri()}`,
+    );
+    return;
+
+    /// TODO:
     const ananysis = analyze(input);
     switch (ananysis) {
       case FigmaUrlType.empty: {

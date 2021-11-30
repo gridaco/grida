@@ -16,9 +16,12 @@ export function HeroPrimaryInput({
 
   return (
     <RootWrapperHeroPrimaryInput
+      type="email"
+      autoComplete="on"
       onKeyDown={_handleKeyDown}
       onChange={onChange}
-      placeholder="Enter your Figma design url"
+      // "Enter your Figma design url"
+      placeholder="Enter your Email address"
     />
   );
 }

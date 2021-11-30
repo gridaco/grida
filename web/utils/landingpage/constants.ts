@@ -1,7 +1,7 @@
 import { DownloadUrls } from "@grida/link-downloads";
 import { promotion_video_primary_demo_url } from "@grida/link-promotions";
 import { SociallUrls } from "@grida/link-social";
-function signup_callback_redirect_uri() {
+export function signup_callback_redirect_uri() {
   const LOCAL = "http://localhost:3000/";
 
   const PRODUCT = "https://www.figma.com/community/plugin/896445082033423994";

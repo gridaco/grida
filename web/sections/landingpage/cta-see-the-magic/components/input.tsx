@@ -3,9 +3,15 @@ import React from "react";
 
 import { breakpoints } from "sections/landingpage/_breakpoints";
 
-export function MagicInput({}: {}) {
+export function MagicInput({ onChange }: { onChange?: (d: string) => void }) {
   return (
-    <StyledInput placeholder="https://www.figma.com/file/xxxx/xxxx?node-id=1234%3A5678" />
+    // "https://www.figma.com/file/xxxx/xxxx?node-id=1234%3A5678"
+    <StyledInput
+      placeholder="Enter your email address"
+      onChange={e => {
+        onChange(e.target.value);
+      }}
+    />
   );
 }
 
