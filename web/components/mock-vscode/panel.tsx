@@ -61,6 +61,8 @@ const Editor = styled.div`
   height: 100%;
   align-self: stretch;
   overflow: hidden;
+  -ms-overflow-style: none; /* IE and Edge */
+  scrollbar-width: none; /* Firefox */
   background-color: rgba(30, 30, 30, 1);
   position: relative;
 `;

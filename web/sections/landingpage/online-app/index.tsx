@@ -14,6 +14,7 @@ import { media } from "utils/styled/media";
 import { DesktopView, MobileView } from "utils/styled/styles";
 import { ThemeInterface } from "utils/styled/theme";
 
+import { contents } from "../k";
 import DesignToCode from "./design-code";
 
 interface OnlineAppProps {
@@ -50,8 +51,8 @@ const OnlineApp: React.FC<OnlineAppProps> = ({ isMobile }) => {
             What you’ve just sketched?
           </Text> */}
           <OnlineTitle variant="h4">
-            <span style={{ letterSpacing: "0em" }}>That just got</span>
-            <OnairButton />
+            <span style={{ letterSpacing: "0em" }}>Less is more.</span>
+            {/* <OnairButton /> */}
           </OnlineTitle>
           <MobileView style={{ marginTop: 40, position: "relative" }}>
             <ApplicationPreview />
@@ -66,10 +67,7 @@ const OnlineApp: React.FC<OnlineAppProps> = ({ isMobile }) => {
             </div>
           </MobileView>
           <Description variant="body1">
-            Design to Code Feature supports Major design tools including Sketch,
-            Figma and Adobe XD. Code is converted to Major
-            Platforms/Languages/Frameworks with various coding styles. These
-            lines of code is ready to use. Design once, Run everywhere.
+            {contents.p_figma_onair_description}
           </Description>
 
           <BlankArea height={[48, 80]} />

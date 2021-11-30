@@ -20,6 +20,7 @@ export default function DesignOnceRunAnywhereScaffold() {
       <Contents>
         <Spacer></Spacer>
         <Heading1>{k.contents.heading2_design_once_run_anywhere}</Heading1>
+        {/* <p>Convert your figma design to React, Flutter, TS & HTML/CSS code.</p> */}
         <VscodeDemo>
           <WindowHandle />
           <DemoContents />
@@ -111,6 +112,7 @@ const Spacer = styled.div`
 `;
 
 const Heading1 = styled.h2`
+  margin-block: 0px;
   text-overflow: ellipsis;
   font-size: 64px;
   font-family: "Helvetica Neue", sans-serif;

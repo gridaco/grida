@@ -11,7 +11,6 @@ export function MagicButton() {
           src="https://s3-us-west-2.amazonaws.com/figma-alpha-api/img/4341/1554/128f94840d219df83cb481ca2ddd4a50"
           alt="image of EmojiWond"
         ></EmojiWond>
-        <Label>Abracadabra</Label>
       </Texts>
     </Button>
   );
@@ -38,16 +37,16 @@ const Button = styled.button`
   }
 
   @media ${breakpoints.xl} {
-    width: 251px;
+    width: 200px;
   }
   @media ${breakpoints.lg} {
-    width: 251px;
+    width: 200px;
   }
   @media ${breakpoints.md} {
-    width: 251px;
+    width: 200px;
   }
   @media ${breakpoints.sm} {
-    width: 251px;
+    width: 200px;
   }
   @media ${breakpoints.xs} {
   }

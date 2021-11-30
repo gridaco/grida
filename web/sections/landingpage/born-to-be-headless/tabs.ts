@@ -11,9 +11,9 @@ export const TabsList = [
     title: "Figma Assistant",
     icon: <NamedCodeIcons>"figma",
   },
-  {
-    id: "zero-deps",
-    title: "Zero Dependency",
-    icon: <NamedCodeIcons>"dummy",
-  },
+  // {
+  //   id: "zero-deps",
+  //   title: "Zero Dependency",
+  //   icon: <NamedCodeIcons>"dummy",
+  // },
 ];

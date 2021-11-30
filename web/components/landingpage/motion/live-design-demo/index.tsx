@@ -1,9 +1,10 @@
-import React, { useEffect, useRef, useState } from "react";
 import styled from "@emotion/styled";
-import { Flex } from "rebass";
-import useOnScreen from "utils/hooks/use-on-screen";
+import React, { useEffect, useRef, useState } from "react";
 import ReactPlayer from "react-player";
+import { Flex } from "rebass";
+
 import animationData from "public/animations/live-demo-app-design-motion/comp.json";
+import useOnScreen from "utils/hooks/use-on-screen";
 import { media } from "utils/styled/media";
 import { ThemeInterface } from "utils/styled/theme";
 

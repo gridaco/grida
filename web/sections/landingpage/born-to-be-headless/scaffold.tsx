@@ -13,11 +13,7 @@ export function SectionBornToBeHeadlessScaffold() {
     <Wrapper>
       <HeaderArea>
         <Heading>{k.contents.heading2_born_to_be_headless}</Heading>
-        <Desc>
-          WIP - To truely help your productivity, we are designed headless.
-          Grida’s Headless design enables you even faster development. It’s the
-          end of switching tabs
-        </Desc>
+        <Desc>{k.contents.p_born_to_be_headless_description}</Desc>
       </HeaderArea>
       <DemoArea>
         <SwitchContainer>
@@ -136,7 +132,7 @@ const Heading = styled.span`
   text-align: center;
 
   @media ${breakpoints.xl} {
-    width: 518px;
+    /* width: 518px; */
   }
   @media ${breakpoints.lg} {
     font-size: 64px;
@@ -179,7 +175,7 @@ const Desc = styled.span`
   text-align: center;
 
   @media ${breakpoints.xl} {
-    width: 780px;
+    /* width: 780px; */
   }
   @media ${breakpoints.lg} {
     font-size: 24px;
@@ -303,17 +299,16 @@ const SwitchContainer = styled.div`
     align-items: start;
     flex: none;
     gap: 10px;
-    width: 1768px;
     height: 66px;
   }
   @media ${breakpoints.xs} {
     display: flex;
-    justify-content: flex-start;
+    justify-content: start;
     flex-direction: row;
-    align-items: start;
+    align-items: flex-start;
     flex: none;
+    width: 100%;
     gap: 10px;
-    width: 1768px;
     height: 66px;
   }
 `;

@@ -49,7 +49,7 @@ const Wrapper = styled.div`
     height: 984px;
   }
   @media ${breakpoints.xs} {
-    height: 657px;
+    height: 860px;
   }
 `;
 
@@ -108,7 +108,7 @@ const HeroTextAreaWithCta = styled.div`
   @media ${breakpoints.sm} {
     gap: 62px;
     left: calc((calc((50% + -145px)) - 216px));
-    top: 342px;
+    top: 240px;
     width: 431px;
     height: 362px;
   }
@@ -199,11 +199,10 @@ const DescriptionHolder = styled.div`
   align-items: center;
   flex: none;
   gap: 24px;
-  width: 319px;
-  height: 76px;
   box-sizing: border-box;
 
   @media ${breakpoints.xl} {
+    width: 520px;
   }
   @media ${breakpoints.lg} {
     justify-content: center;
@@ -211,8 +210,7 @@ const DescriptionHolder = styled.div`
     align-items: center;
     flex: none;
     gap: 24px;
-    width: 319px;
-    height: 76px;
+    width: 520px;
   }
   @media ${breakpoints.md} {
     justify-content: center;
@@ -220,8 +218,7 @@ const DescriptionHolder = styled.div`
     align-items: center;
     flex: none;
     gap: 24px;
-    width: 319px;
-    height: 76px;
+    width: 520px;
   }
   @media ${breakpoints.sm} {
     justify-content: center;
@@ -229,8 +226,7 @@ const DescriptionHolder = styled.div`
     align-items: center;
     flex: none;
     gap: 24px;
-    width: 319px;
-    height: 76px;
+    width: 400px;
   }
   @media ${breakpoints.xs} {
     justify-content: center;
@@ -243,41 +239,32 @@ const DescriptionHolder = styled.div`
 `;
 
 const HeroBodyText = styled.span`
-  color: rgba(68, 69, 69, 1);
+  color: #727272;
   text-overflow: ellipsis;
   font-size: 24px;
   font-family: "Helvetica Neue", sans-serif;
-  font-weight: 500;
+  font-weight: 400;
   line-height: 160%;
   text-align: left;
-  width: 319px;
 
   @media ${breakpoints.xl} {
   }
   @media ${breakpoints.lg} {
-    font-size: 24px;
-    font-weight: 500;
     line-height: 160%;
     text-align: left;
-    width: 319px;
+    /* width: 319px; */
   }
   @media ${breakpoints.md} {
-    font-size: 24px;
-    font-weight: 500;
     line-height: 160%;
     text-align: left;
-    width: 319px;
+    /* width: 319px; */
   }
   @media ${breakpoints.sm} {
-    font-size: 24px;
-    font-weight: 500;
     line-height: 160%;
     text-align: left;
-    width: 319px;
+    /* width: 319px; */
   }
   @media ${breakpoints.xs} {
-    font-size: 24px;
-    font-weight: 500;
     line-height: 160%;
     text-align: left;
     align-self: stretch;
