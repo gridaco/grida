@@ -1,7 +1,8 @@
+import styled from "@emotion/styled";
 import Image from "next/image";
 import React, { useState } from "react";
-import styled from "@emotion/styled";
 import { Flex } from "rebass";
+
 import LiveDesignDemoFrame from "components/landingpage/motion/live-design-demo";
 import { media } from "utils/styled/media";
 import { ThemeInterface } from "utils/styled/theme";
@@ -65,10 +66,9 @@ const Positoner = styled(Flex)`
 const PlatformView = styled.div`
   position: absolute;
   z-index: 950;
-  border-radius: 12px;
-  top: 24%;
-  transform: translateY(-23.5%);
-  margin-left: auto;
+  border-radius: 8px;
+  margin-top: 72px;
+  margin-left: 50px;
   height: 580px;
 
   .platforms > div {
@@ -79,9 +79,5 @@ const PlatformView = styled.div`
 
   .platforms {
     margin-top: 20px;
-  }
-
-  ${props => media("0px", (props.theme as ThemeInterface).breakpoints[0])} {
-    transform: translateY(-10%);
   }
 `;

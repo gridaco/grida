@@ -1,28 +1,25 @@
-import React from "react";
-import SectionLayout from "layout/section";
-import { Box, Flex, Heading, Text } from "rebass";
+import { css } from "@emotion/core";
 import styled from "@emotion/styled";
+import CodePreview from "layout/landingpage/code-preview";
+import DesignPlatforms from "layout/landingpage/design-platforms";
+import SectionLayout from "layout/section";
+import React from "react";
+import { Box, Flex, Heading, Text } from "rebass";
+
+import BlankArea from "components/blank-area";
+import LandingpageText from "components/landingpage/text";
+import { k } from "sections";
 import { media } from "utils/styled/media";
 import { ThemeInterface } from "utils/styled/theme";
-import DesignPlatforms from "layout/landingpage/design-platforms";
-import CodePreview from "layout/landingpage/code-preview";
-import BlankArea from "components/blank-area";
-import { css } from "@emotion/core";
-import LandingpageText from "components/landingpage/text";
 
 const DesignToCode = () => {
   return (
     <SectionLayout alignContent="start" backgroundColor="rgba(0,0,0,0)">
       <Flex width="100%" flexDirection={["column", "row", "row", "row"]}>
         <Flex className="text-platform" flexDirection="column">
-          <Title variant="h2">
-            Designs, <br />
-            come to live.
-          </Title>
+          <Title variant="h2">{k.contents.heading2_everything_instant}</Title>
           <Description variant="body1">
-            Keep your design live. Not as a prototype, but as a ready product.
-            Instantly convert your design to code, prototype and product within
-            a click. No coding required.
+            {k.contents.p_everything_instant_description}
           </Description>
           <DesignPlatforms />
         </Flex>
@@ -52,7 +49,7 @@ const DesignToCode = () => {
 
 export default DesignToCode;
 
-const Title = styled(LandingpageText)`
+export const Title = styled(LandingpageText)`
   margin-bottom: 10px;
   z-index: 99;
 `;

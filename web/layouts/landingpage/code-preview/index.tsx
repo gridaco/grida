@@ -9,48 +9,17 @@ import { Flex, Box } from "rebass";
 import { media } from "utils/styled/media";
 import { ThemeInterface } from "utils/styled/theme";
 
-import CodePreviewMobile from "./mobile";
 import {
-  FLUTTER_COMPONENT_FULL_SOURCE,
-  REACT_JSCSS_COMPONENT_FULL_SOURCE,
-  HTML_COMPONENT_FULL_SOURCE,
-} from "./snippets";
-
-interface DevFrameworkDemoConfig {
-  name: string;
-  lang: string;
-  source: string;
-}
-
-const DEFAULT_DEMO_ITEM_FLUTTER = {
-  name: "flutter",
-  lang: "dart",
-  source: FLUTTER_COMPONENT_FULL_SOURCE,
-};
-
-const DEV_FRAMEWORKS: DevFrameworkDemoConfig[] = [
-  DEFAULT_DEMO_ITEM_FLUTTER,
-  {
-    name: "html",
-    lang: "html",
-    source: HTML_COMPONENT_FULL_SOURCE,
-  },
-  {
-    name: "react",
-    lang: "tsx",
-    source: REACT_JSCSS_COMPONENT_FULL_SOURCE,
-  },
-  {
-    name: "svelte",
-    lang: "svelte",
-    source: REACT_JSCSS_COMPONENT_FULL_SOURCE,
-  },
-];
+  DevFrameworkDemoConfig,
+  DEFAULT_DEMO_ITEM,
+  DEV_FRAMEWORKS,
+} from "./data";
+import CodePreviewMobile from "./mobile";
 
 const CodePreview = () => {
   const [currentPlatform, setCurrentPlatform] = useState<
     DevFrameworkDemoConfig
-  >(DEFAULT_DEMO_ITEM_FLUTTER);
+  >(DEFAULT_DEMO_ITEM);
 
   return (
     <React.Fragment>
@@ -73,7 +42,7 @@ const CodePreview = () => {
                 "flex-end",
               ]}
             >
-              <CodeView width="460px" height="770px" bg="#212121">
+              <CodeView width="460px" height="770px" bg="rgb(30, 30, 30)">
                 <header>
                   <span />
                   <span />
@@ -120,6 +89,8 @@ const CodePreview = () => {
 export default CodePreview;
 
 const ViewWrapper = styled(Flex)`
+  position: relative;
+  top: 156px;
   ${props =>
     media(
       (props.theme as ThemeInterface).breakpoints[0],
@@ -140,20 +111,20 @@ const Platforms = styled.div`
 
 const CodeView = styled(Box)`
   bottom: 0%;
-  border-radius: 12px;
+  border-radius: 8px;
 
   header {
     display: flex;
     align-items: center;
-    height: 50px;
+    height: 40px;
     padding: 0px 20px;
-    border-top-left-radius: 12px;
-    border-top-right-radius: 12px;
+    border-top-left-radius: 8px;
+    border-top-right-radius: 8px;
 
     span {
       background-color: #3d3d3d;
-      width: 16px;
-      height: 16px;
+      width: 12px;
+      height: 12px;
       margin-right: 10px;
       border-radius: 50%;
     }
@@ -161,19 +132,19 @@ const CodeView = styled(Box)`
 
   .body {
     width: 100%;
-    height: calc(100% - 50px);
+    height: calc(100% - 40px);
     display: flex;
     align-items: center;
     justify-content: center;
-    border-bottom-left-radius: 12px;
-    border-bottom-right-radius: 12px;
+    border-bottom-left-radius: 8px;
+    border-bottom-right-radius: 8px;
 
     pre {
       width: 95%;
       height: 95%;
       padding: 0px !important;
-      border-bottom-left-radius: 12px;
-      border-bottom-right-radius: 12px;
+      border-bottom-left-radius: 8px;
+      border-bottom-right-radius: 8px;
     }
   }
 `;

@@ -1,7 +1,6 @@
-import PageHead from "components/page-head";
-import Head from "next/head";
 import React from "react";
 
+import PageHead from "components/page-head";
 import Sections from "sections/pricing";
 import PAGES from "utils/seo/pages";
 export default function PricingPage() {
