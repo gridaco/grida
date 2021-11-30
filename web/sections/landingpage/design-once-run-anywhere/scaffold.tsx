@@ -10,7 +10,7 @@ import {
 import { k } from "sections";
 
 import { breakpoints } from "../_breakpoints";
-import DemoApp from "../demo-app";
+import MusicHome from "../demo-app";
 import { BackgroundGradient } from "./styles/background";
 import { HeadingGradient } from "./styles/heading";
 
@@ -39,7 +39,7 @@ function DemoContents() {
       </ResponsiveActivityBar>
       <Sidebar>
         <IPhone11ProX1>
-          <DemoApp />
+          <MusicHome />
         </IPhone11ProX1>
       </Sidebar>
       <Panel />

@@ -3,7 +3,7 @@ import React from "react";
 
 import { k } from "sections";
 
-import DemoApp from "../demo-app";
+import MusicHome from "../demo-app";
 import { CtaArea } from "./components/cta-area";
 
 export default function Hero1440SizeXl() {
@@ -24,7 +24,7 @@ export default function Hero1440SizeXl() {
       </HeroTextAreaWithCta>
       <DesignToolExampleContainer></DesignToolExampleContainer>
       <IPhoneXFrame>
-        <DemoApp scale={0.753} />
+        <MusicHome scale={0.753} />
       </IPhoneXFrame>
     </RootWrapperHero1440SizeXl>
   );

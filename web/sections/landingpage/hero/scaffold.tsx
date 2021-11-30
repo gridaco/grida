@@ -4,7 +4,7 @@ import React from "react";
 import { k } from "sections";
 
 import { breakpoints } from "../_breakpoints";
-import DemoApp from "../demo-app";
+import MusicHome from "../demo-app";
 import { CtaArea } from "./components/cta-area";
 
 export default function HeroResponsive() {
@@ -25,7 +25,7 @@ export default function HeroResponsive() {
       </HeroTextAreaWithCta>
       <DesignToolExampleContainer></DesignToolExampleContainer>
       <IPhoneXFrame>
-        <DemoApp scale={0.753} />
+        <MusicHome scale={0.753} />
       </IPhoneXFrame>
     </Wrapper>
   );

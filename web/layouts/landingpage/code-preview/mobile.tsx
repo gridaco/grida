@@ -7,7 +7,7 @@ import { Box } from "rebass";
 
 import {
   FLUTTER_COMPONENT_FULL_SOURCE,
-  REACT_JSCSS_COMPONENT_FULL_SOURCE,
+  REACT_TSX_STYLED_COMPONENTS_SOURCE,
   HTML_COMPONENT_FULL_SOURCE,
 } from "./snippets";
 
@@ -33,12 +33,12 @@ const DEV_FRAMEWORKS: DevFrameworkDemoConfig[] = [
   {
     name: "react",
     lang: "tsx",
-    source: REACT_JSCSS_COMPONENT_FULL_SOURCE,
+    source: REACT_TSX_STYLED_COMPONENTS_SOURCE,
   },
   {
     name: "svelte",
     lang: "svelte",
-    source: REACT_JSCSS_COMPONENT_FULL_SOURCE,
+    source: REACT_TSX_STYLED_COMPONENTS_SOURCE,
   },
 ];
 

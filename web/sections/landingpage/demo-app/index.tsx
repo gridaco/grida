@@ -1,197 +1,237 @@
 import styled from "@emotion/styled";
 import React from "react";
 
-export default function DemoApp({ scale = 1 }: { scale?: number }) {
+export default function MusicHome({ scale = 1 }: { scale?: number }) {
   return (
-    <RootWrapperDemoApp scale={scale}>
+    <Wrapper scale={scale}>
       <Body>
-        <TopSpacer></TopSpacer>
-        <SectionHeader>
-          <HeaderSection>
-            <TitleAndAvatar>
-              <Title>Saturday Morning Mix</Title>
-              <AvatarSource
-                src="https://s3-us-west-2.amazonaws.com/figma-alpha-api/img/4f6b/36d5/17d6b783005c459c272ce5fb879a9e9f"
-                alt="image of AvatarSource"
-              ></AvatarSource>
-            </TitleAndAvatar>
-            <Subtitle>
-              Here are some tunes for you to start your morning. Mostly quiet
-              and slow-beat, some of them are mood changer.
-            </Subtitle>
-          </HeaderSection>
-        </SectionHeader>
-        <PrimaryMusicCardsList>
-          <Card1>
-            <Frame305>
-              <DemoAppAlbumCover1>
-                <Rectangle813></Rectangle813>
-                <LoFi>
-                  LO
-                  <br />
-                  FI
-                </LoFi>
-              </DemoAppAlbumCover1>
-              <MusicPlayButton
-                src="https://s3-us-west-2.amazonaws.com/figma-alpha-api/img/5f4a/558c/5524bce036659c4f82d652b44961d944"
-                alt="icon"
-              ></MusicPlayButton>
-            </Frame305>
-            <MorningSlowbeatsLoFi>
-              Morning Slowbeats - LoFi
-            </MorningSlowbeatsLoFi>
-          </Card1>
-          <Card2>
-            <Frame305_0001>
-              <DemoAppAlbumCover3>
-                <Rectangle825
-                  src="https://s3-us-west-2.amazonaws.com/figma-alpha-api/img/8a94/bb41/b26e2d09badc33fd87413d2d7cb4f2d6"
-                  alt="image of Rectangle825"
-                ></Rectangle825>
-                <Union
-                  src="https://s3-us-west-2.amazonaws.com/figma-alpha-api/img/c86a/b0ec/2cbaa0a2ffcf6665e30c288e0a09bbc4"
-                  alt="image of Union"
-                ></Union>
-              </DemoAppAlbumCover3>
-              <MusicPlayButton_0001
-                src="https://s3-us-west-2.amazonaws.com/figma-alpha-api/img/5f4a/558c/5524bce036659c4f82d652b44961d944"
-                alt="icon"
-              ></MusicPlayButton_0001>
-            </Frame305_0001>
-            <MorningSlowbeatsLoFi_0001>
-              Morning Slowbeats - LoFi
-            </MorningSlowbeatsLoFi_0001>
-          </Card2>
-          <Card3>
-            <Frame305_0002>
-              <DemoAppAlbumCover2>
-                <Rectangle825_0001
-                  src="https://s3-us-west-2.amazonaws.com/figma-alpha-api/img/b802/fe12/70b07a6592a33589a9350bb8a5295d9d"
-                  alt="image of Rectangle825"
-                ></Rectangle825_0001>
-                <TrpLve>
-                  TRP
-                  <br />
-                  LVE
-                </TrpLve>
-              </DemoAppAlbumCover2>
-              <MusicPlayButton_0002
-                src="https://s3-us-west-2.amazonaws.com/figma-alpha-api/img/5f4a/558c/5524bce036659c4f82d652b44961d944"
-                alt="icon"
-              ></MusicPlayButton_0002>
-            </Frame305_0002>
-            <MorningSlowbeatsLoFi_0002>
-              Morning Slowbeats - LoFi
-            </MorningSlowbeatsLoFi_0002>
-          </Card3>
-        </PrimaryMusicCardsList>
-        <FriendsMusicSection>
-          <FriendListeningHeaderText>
-            Lauren is listening
-          </FriendListeningHeaderText>
-          <MusicSecondaryList>
-            <Primary>
-              <Cover>
-                <Rectangle825_0002
-                  src="https://s3-us-west-2.amazonaws.com/figma-alpha-api/img/0cf0/7836/f073708c3ceb92d2504f0a572048367b"
-                  alt="image of Rectangle825"
-                ></Rectangle825_0002>
-                <TrpLve_0001>
-                  TRP
-                  <br />
-                  LVE
-                </TrpLve_0001>
-              </Cover>
-              <NonGraphicsArea>
-                <InnerFrame>
-                  <TextInfo>
-                    <Trippe>TRIPPE</Trippe>
-                    <MorningSlowbeatsLoFi_0003>
-                      Morning Slowbeats - LoFi
-                    </MorningSlowbeatsLoFi_0003>
-                  </TextInfo>
-                  <MusicPlayButton_0003
-                    src="https://s3-us-west-2.amazonaws.com/figma-alpha-api/img/56fc/4c35/733e07dee25b0dce8c66a2fb86ef998f"
-                    alt="icon"
-                  ></MusicPlayButton_0003>
-                </InnerFrame>
-              </NonGraphicsArea>
-            </Primary>
-            <Card1_0001>
-              <Contents>
-                <Cover_0001>
-                  <Rectangle825_0003
-                    src="https://s3-us-west-2.amazonaws.com/figma-alpha-api/img/26c1/ce4d/c339eeaa7bbbdad0c83e2ab036fbfecb"
-                    alt="image of Rectangle825"
-                  ></Rectangle825_0003>
-                  <Union_0001
-                    src="https://s3-us-west-2.amazonaws.com/figma-alpha-api/img/6cd5/7710/811330309e1aeaea91da25f5cac2adfd"
-                    alt="image of Union"
-                  ></Union_0001>
-                </Cover_0001>
-                <NonGraphicArea>
-                  <TextInfo_0001>
-                    <Sweet>Sweet</Sweet>
-                    <MorningSlowbeatsLoFi_0004>
-                      Morning Slowbeats - LoFi
-                    </MorningSlowbeatsLoFi_0004>
-                  </TextInfo_0001>
-                  <MusicPlayButton_0004
-                    src="https://s3-us-west-2.amazonaws.com/figma-alpha-api/img/e80e/fc39/da9065547bba86fc0f83f31a4310271c"
-                    alt="icon"
-                  ></MusicPlayButton_0004>
-                </NonGraphicArea>
-              </Contents>
-            </Card1_0001>
-            <Card2_0001>
-              <Contents_0001>
-                <DemoAppAlbumCover1_0001>
-                  <Rectangle813_0001></Rectangle813_0001>
-                  <LoFi_0001>
-                    LO
-                    <br />
-                    FI
-                  </LoFi_0001>
-                </DemoAppAlbumCover1_0001>
-                <NonGraphicArea_0001>
-                  <TextInfo_0002>
-                    <Sweet_0001>Falling</Sweet_0001>
-                    <MorningSlowbeatsLoFi_0005>
-                      Morning Slowbeats - LoFi
-                    </MorningSlowbeatsLoFi_0005>
-                  </TextInfo_0002>
-                  <MusicPlayButton_0005
-                    src="https://s3-us-west-2.amazonaws.com/figma-alpha-api/img/e80e/fc39/da9065547bba86fc0f83f31a4310271c"
-                    alt="icon"
-                  ></MusicPlayButton_0005>
-                </NonGraphicArea_0001>
-              </Contents_0001>
-            </Card2_0001>
-          </MusicSecondaryList>
-        </FriendsMusicSection>
+        <TopSpacer />
+        <HeaderPart />
+        <PrimaryMusicCardsListPart />
+        <FriendsMusicSectionPart />
+        <TabBar />
       </Body>
-      <Footer>
-        <Rectangle815></Rectangle815>
-        <Tabs>
-          <IconsMdiHome
-            src="https://s3-us-west-2.amazonaws.com/figma-alpha-api/img/e350/9fb4/422697fd40f9d0f19a35ebbc5df11b57"
-            alt="image of IconsMdiHome"
-          ></IconsMdiHome>
-          <IconsMdiShowChart
-            src="https://s3-us-west-2.amazonaws.com/figma-alpha-api/img/1436/9fa1/ba7653876dc7ca8fe523b354816f5319"
-            alt="image of IconsMdiShowChart"
-          ></IconsMdiShowChart>
-          <IconsMdiSearch
-            src="https://s3-us-west-2.amazonaws.com/figma-alpha-api/img/5fda/b17b/6bdba2e87f84c133ad91b1f5c7da0785"
-            alt="image of IconsMdiSearch"
-          ></IconsMdiSearch>
-        </Tabs>
-      </Footer>
-    </RootWrapperDemoApp>
+    </Wrapper>
   );
 }
 
-const RootWrapperDemoApp = styled.div<{
+const HeaderPart = () => {
+  return (
+    <SectionHeader>
+      <HeaderSection>
+        <TitleAndAvatar>
+          <Title>Saturday Morning Mix</Title>
+          <AvatarSource
+            src="https://s3-us-west-2.amazonaws.com/figma-alpha-api/img/4f6b/36d5/17d6b783005c459c272ce5fb879a9e9f"
+            alt="image of AvatarSource"
+          ></AvatarSource>
+        </TitleAndAvatar>
+        <Subtitle>
+          Here are some tunes for you to start your morning. Mostly quiet and
+          slow-beat, some of them are mood changer.
+        </Subtitle>
+      </HeaderSection>
+    </SectionHeader>
+  );
+};
+
+const CardMusicItem = ({
+  artwork,
+  musicName,
+}: {
+  artwork: string | JSX.Element;
+  musicName: string;
+}) => {
+  return (
+    <CardWrapper>
+      <ArtworkContainer>
+        {artwork}
+        <MusicPlayButton
+          src="https://s3-us-west-2.amazonaws.com/figma-alpha-api/img/5f4a/558c/5524bce036659c4f82d652b44961d944"
+          alt="icon"
+        ></MusicPlayButton>
+      </ArtworkContainer>
+      <MusicName>{musicName}</MusicName>
+    </CardWrapper>
+  );
+};
+
+const PrimaryMusicCardsListPart = () => {
+  return (
+    <PrimaryMusicCardsList>
+      <CardMusicItem
+        musicName={"Morning Slowbeats - LoFi"}
+        artwork={
+          <DemoAppAlbumCover1>
+            <Rectangle813></Rectangle813>
+            <LoFi>
+              LO
+              <br />
+              FI
+            </LoFi>
+          </DemoAppAlbumCover1>
+        }
+      />
+      <CardMusicItem
+        musicName={"Sweet nothings"}
+        artwork={
+          <DemoAppAlbumCover3>
+            <Rectangle825
+              src="https://s3-us-west-2.amazonaws.com/figma-alpha-api/img/8a94/bb41/b26e2d09badc33fd87413d2d7cb4f2d6"
+              alt="image of Rectangle825"
+            ></Rectangle825>
+            <Union
+              src="https://s3-us-west-2.amazonaws.com/figma-alpha-api/img/c86a/b0ec/2cbaa0a2ffcf6665e30c288e0a09bbc4"
+              alt="image of Union"
+            ></Union>
+          </DemoAppAlbumCover3>
+        }
+      />
+      <CardMusicItem
+        musicName={"TRP LIVE"}
+        artwork={
+          <DemoAppAlbumCover2>
+            <Rectangle825_0001
+              src="https://s3-us-west-2.amazonaws.com/figma-alpha-api/img/b802/fe12/70b07a6592a33589a9350bb8a5295d9d"
+              alt="image of Rectangle825"
+            ></Rectangle825_0001>
+            <TrpLve>
+              TRP
+              <br />
+              LVE
+            </TrpLve>
+          </DemoAppAlbumCover2>
+        }
+      />
+    </PrimaryMusicCardsList>
+  );
+};
+
+const TileMusicItem = ({
+  primary = false,
+  cover,
+}: {
+  primary?: boolean;
+  cover: JSX.Element;
+}) => {
+  if (primary) {
+    return (
+      <Primary>
+        <Cover>{cover}</Cover>
+        <NonGraphicsArea>
+          <InnerFrame>
+            <TextInfo>
+              <Trippe>TRIPPE</Trippe>
+              <MorningSlowbeatsLoFi_0003>
+                Morning Slowbeats - LoFi
+              </MorningSlowbeatsLoFi_0003>
+            </TextInfo>
+            <MusicPlayButton_0003
+              src="https://s3-us-west-2.amazonaws.com/figma-alpha-api/img/56fc/4c35/733e07dee25b0dce8c66a2fb86ef998f"
+              alt="icon"
+            ></MusicPlayButton_0003>
+          </InnerFrame>
+        </NonGraphicsArea>
+      </Primary>
+    );
+  } else {
+    return (
+      <Card1_0001>
+        <Contents>
+          <Cover_0001>{cover}</Cover_0001>
+          <NonGraphicArea>
+            <TextInfo_0001>
+              <Sweet>Sweet</Sweet>
+              <MorningSlowbeatsLoFi_0004>
+                Morning Slowbeats - LoFi
+              </MorningSlowbeatsLoFi_0004>
+            </TextInfo_0001>
+            <MusicPlayButton_0004
+              src="https://s3-us-west-2.amazonaws.com/figma-alpha-api/img/e80e/fc39/da9065547bba86fc0f83f31a4310271c"
+              alt="icon"
+            ></MusicPlayButton_0004>
+          </NonGraphicArea>
+        </Contents>
+      </Card1_0001>
+    );
+  }
+};
+
+const FriendsMusicSectionPart = () => {
+  return (
+    <FriendsMusicSection>
+      <FriendListeningHeaderText>Lauren is listening</FriendListeningHeaderText>
+      <MusicSecondaryList>
+        <TileMusicItem
+          primary
+          cover={
+            <>
+              <Rectangle825_0002
+                src="https://s3-us-west-2.amazonaws.com/figma-alpha-api/img/0cf0/7836/f073708c3ceb92d2504f0a572048367b"
+                alt="image of Rectangle825"
+              ></Rectangle825_0002>
+              <TrpLve_0001>
+                TRP
+                <br />
+                LVE
+              </TrpLve_0001>
+            </>
+          }
+        />
+        <TileMusicItem
+          cover={
+            <>
+              <Rectangle825_0003
+                src="https://s3-us-west-2.amazonaws.com/figma-alpha-api/img/26c1/ce4d/c339eeaa7bbbdad0c83e2ab036fbfecb"
+                alt="image of Rectangle825"
+              ></Rectangle825_0003>
+              <Union_0001
+                src="https://s3-us-west-2.amazonaws.com/figma-alpha-api/img/6cd5/7710/811330309e1aeaea91da25f5cac2adfd"
+                alt="image of Union"
+              ></Union_0001>
+            </>
+          }
+        />
+        <TileMusicItem
+          cover={
+            <>
+              <Rectangle813_0001></Rectangle813_0001>
+              <LoFi_0001>
+                LO
+                <br />
+                FI
+              </LoFi_0001>
+            </>
+          }
+        />
+      </MusicSecondaryList>
+    </FriendsMusicSection>
+  );
+};
+
+const TabBar = () => {
+  return (
+    <Footer>
+      <TabBarBackground></TabBarBackground>
+      <Tabs>
+        <TabIcon
+          src="https://s3-us-west-2.amazonaws.com/figma-alpha-api/img/e350/9fb4/422697fd40f9d0f19a35ebbc5df11b57"
+          alt="image of IconsMdiHome"
+        ></TabIcon>
+        <TabIcon
+          src="https://s3-us-west-2.amazonaws.com/figma-alpha-api/img/1436/9fa1/ba7653876dc7ca8fe523b354816f5319"
+          alt="image of IconsMdiShowChart"
+        ></TabIcon>
+        <TabIcon
+          src="https://s3-us-west-2.amazonaws.com/figma-alpha-api/img/5fda/b17b/6bdba2e87f84c133ad91b1f5c7da0785"
+          alt="image of IconsMdiSearch"
+        ></TabIcon>
+      </Tabs>
+    </Footer>
+  );
+};
+
+const Wrapper = styled.div<{
   scale: number;
 }>`
   display: flex;
@@ -297,7 +337,7 @@ const PrimaryMusicCardsList = styled.div`
   padding-left: 28px;
 `;
 
-const Card1 = styled.div`
+const CardWrapper = styled.div`
   display: flex;
   justify-content: flex-start;
   flex-direction: column;
@@ -309,7 +349,7 @@ const Card1 = styled.div`
   box-sizing: border-box;
 `;
 
-const Frame305 = styled.div`
+const ArtworkContainer = styled.div`
   height: 144px;
   position: relative;
   align-self: stretch;
@@ -358,31 +398,13 @@ const MusicPlayButton = styled.img`
   bottom: 14px;
 `;
 
-const MorningSlowbeatsLoFi = styled.span`
+const MusicName = styled.span`
   color: rgba(164, 164, 164, 1);
   text-overflow: ellipsis;
   font-size: 14px;
   font-family: Roboto, sans-serif;
   font-weight: 400;
   text-align: left;
-  align-self: stretch;
-`;
-
-const Card2 = styled.div`
-  display: flex;
-  justify-content: flex-start;
-  flex-direction: column;
-  align-items: start;
-  flex: none;
-  gap: 4px;
-  width: 138px;
-  height: 180px;
-  box-sizing: border-box;
-`;
-
-const Frame305_0001 = styled.div`
-  height: 144px;
-  position: relative;
   align-self: stretch;
 `;
 
@@ -410,43 +432,6 @@ const Union = styled.img`
   top: 19px;
   right: 19px;
   bottom: 22px;
-`;
-
-const MusicPlayButton_0001 = styled.img`
-  width: 28px;
-  height: 28px;
-  object-fit: cover;
-  position: absolute;
-  right: 16px;
-  bottom: 14px;
-`;
-
-const MorningSlowbeatsLoFi_0001 = styled.span`
-  color: rgba(164, 164, 164, 1);
-  text-overflow: ellipsis;
-  font-size: 14px;
-  font-family: Roboto, sans-serif;
-  font-weight: 400;
-  text-align: left;
-  align-self: stretch;
-`;
-
-const Card3 = styled.div`
-  display: flex;
-  justify-content: flex-start;
-  flex-direction: column;
-  align-items: start;
-  flex: none;
-  gap: 4px;
-  width: 138px;
-  height: 180px;
-  box-sizing: border-box;
-`;
-
-const Frame305_0002 = styled.div`
-  height: 144px;
-  position: relative;
-  align-self: stretch;
 `;
 
 const DemoAppAlbumCover2 = styled.div`
@@ -738,37 +723,6 @@ const MusicPlayButton_0004 = styled.img`
   object-fit: cover;
 `;
 
-const Card2_0001 = styled.div`
-  display: flex;
-  justify-content: flex-start;
-  flex-direction: column;
-  align-items: start;
-  flex: 1;
-  gap: 10px;
-  border-radius: 4px;
-  align-self: stretch;
-  background-color: rgba(255, 255, 255, 1);
-  box-sizing: border-box;
-  padding: 8px 8px;
-`;
-
-const Contents_0001 = styled.div`
-  display: flex;
-  justify-content: flex-start;
-  flex-direction: row;
-  align-items: start;
-  flex: 1;
-  gap: 20px;
-  align-self: stretch;
-  box-sizing: border-box;
-`;
-
-const DemoAppAlbumCover1_0001 = styled.div`
-  width: 65px;
-  height: 65px;
-  position: relative;
-`;
-
 const Rectangle813_0001 = styled.div`
   background-color: rgba(0, 0, 0, 1);
   border-radius: 8px;
@@ -795,62 +749,13 @@ const LoFi_0001 = styled.span`
   bottom: -32px;
 `;
 
-const NonGraphicArea_0001 = styled.div`
-  display: flex;
-  justify-content: flex-end;
-  flex-direction: row;
-  align-items: center;
-  flex: 1;
-  gap: 22px;
-  align-self: stretch;
-  box-sizing: border-box;
-  padding-right: 8px;
-`;
-
-const TextInfo_0002 = styled.div`
-  display: flex;
-  justify-content: flex-start;
-  flex-direction: column;
-  align-items: start;
-  flex: 1;
-  gap: 5px;
-  align-self: stretch;
-  box-sizing: border-box;
-`;
-
-const Sweet_0001 = styled.span`
-  color: rgba(0, 0, 0, 1);
-  text-overflow: ellipsis;
-  font-size: 18px;
-  font-family: Roboto, sans-serif;
-  font-weight: 900;
-  line-height: 90%;
-  text-align: left;
-`;
-
-const MorningSlowbeatsLoFi_0005 = styled.span`
-  color: rgba(0, 0, 0, 0.6);
-  text-overflow: ellipsis;
-  font-size: 12px;
-  font-family: Roboto, sans-serif;
-  font-weight: 400;
-  text-align: left;
-  align-self: stretch;
-`;
-
-const MusicPlayButton_0005 = styled.img`
-  width: 24px;
-  height: 24px;
-  object-fit: cover;
-`;
-
 const Footer = styled.div`
   height: 97px;
   position: relative;
   align-self: stretch;
 `;
 
-const Rectangle815 = styled.div`
+const TabBarBackground = styled.div`
   box-shadow: 0px 0px 4px rgba(0, 0, 0, 0.25);
   background-color: rgba(255, 255, 255, 1);
   position: absolute;
@@ -874,19 +779,7 @@ const Tabs = styled.div`
   bottom: 44px;
 `;
 
-const IconsMdiHome = styled.img`
-  width: 24px;
-  height: 24px;
-  object-fit: cover;
-`;
-
-const IconsMdiShowChart = styled.img`
-  width: 24px;
-  height: 24px;
-  object-fit: cover;
-`;
-
-const IconsMdiSearch = styled.img`
+const TabIcon = styled.img`
   width: 24px;
   height: 24px;
   object-fit: cover;

@@ -70,21 +70,52 @@ Container(
   );
 `;
 
-export const REACT_JSCSS_COMPONENT_FULL_SOURCE = `
-// <Component description={"Morning Slowbeats - LoFi"}/>
-export function Component(props: {
-    description: string
-}){
-    return <>
-        <Wrapper>
-            <Typography>{props.description}</Typography>
-        </Wrapper>
-    </>;
-}
+export const REACT_TSX_STYLED_COMPONENTS_SOURCE = `function CardMusicItem({
+  artwork,
+  musicName,
+}: {
+  artwork: string | JSX.Element;
+  musicName: string;
+}) => {
+  return (
+    <CardWrapper>
+      <ArtworkContainer>
+        {artwork}
+        <MusicPlayButton icon={"play"} />
+      </ArtworkContainer>
+      <MusicName>{musicName}</MusicName>
+    </CardWrapper>
+  );
+};
 
-const Wrapper = styled.div\`
-    width: 60;
-\`
+const CardWrapper = styled.div\`
+  display: flex;
+  justify-content: flex-start;
+  flex-direction: column;
+  align-items: start;
+  flex: none;
+  gap: 4px;
+  width: 138px;
+  height: 180px;
+  box-sizing: border-box;
+\`;
+
+const ArtworkContainer = styled.div\`
+  height: 144px;
+  position: relative;
+  align-self: stretch;
+\`;
+
+
+const MusicName = styled.span\`
+  color: rgba(164, 164, 164, 1);
+  text-overflow: ellipsis;
+  font-size: 14px;
+  font-family: Roboto, sans-serif;
+  font-weight: 400;
+  text-align: left;
+  align-self: stretch;
+\`;
 
 `;
 

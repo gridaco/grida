@@ -12,7 +12,7 @@ import { ThemeInterface } from "utils/styled/theme";
 import CodePreviewMobile from "./mobile";
 import {
   FLUTTER_COMPONENT_FULL_SOURCE,
-  REACT_JSCSS_COMPONENT_FULL_SOURCE,
+  REACT_TSX_STYLED_COMPONENTS_SOURCE,
   HTML_COMPONENT_FULL_SOURCE,
 } from "./snippets";
 
@@ -22,35 +22,36 @@ interface DevFrameworkDemoConfig {
   source: string;
 }
 
-const DEFAULT_DEMO_ITEM_FLUTTER = {
-  name: "flutter",
-  lang: "dart",
-  source: FLUTTER_COMPONENT_FULL_SOURCE,
+const DEFAULT_DEMO_ITEM = {
+  name: "react",
+  lang: "tsx",
+  source: REACT_TSX_STYLED_COMPONENTS_SOURCE,
 };
 
 const DEV_FRAMEWORKS: DevFrameworkDemoConfig[] = [
-  DEFAULT_DEMO_ITEM_FLUTTER,
+  DEFAULT_DEMO_ITEM,
+  {
+    name: "flutter",
+    lang: "dart",
+    source: FLUTTER_COMPONENT_FULL_SOURCE,
+  },
   {
     name: "html",
     lang: "html",
     source: HTML_COMPONENT_FULL_SOURCE,
   },
-  {
-    name: "react",
-    lang: "tsx",
-    source: REACT_JSCSS_COMPONENT_FULL_SOURCE,
-  },
+
   {
     name: "svelte",
     lang: "svelte",
-    source: REACT_JSCSS_COMPONENT_FULL_SOURCE,
+    source: REACT_TSX_STYLED_COMPONENTS_SOURCE,
   },
 ];
 
 const CodePreview = () => {
   const [currentPlatform, setCurrentPlatform] = useState<
     DevFrameworkDemoConfig
-  >(DEFAULT_DEMO_ITEM_FLUTTER);
+  >(DEFAULT_DEMO_ITEM);
 
   return (
     <React.Fragment>

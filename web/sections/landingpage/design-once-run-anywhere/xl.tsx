@@ -9,7 +9,7 @@ import {
 } from "components/mock-vscode";
 import { k } from "sections";
 
-import DemoApp from "../demo-app";
+import MusicHome from "../demo-app";
 import { BackgroundGradient } from "./styles/background";
 import { HeadingGradient } from "./styles/heading";
 
@@ -25,7 +25,7 @@ export default function DesignOnceRunAnywhere1440SizeXl() {
             <ActivityBar></ActivityBar>
             <Sidebar>
               <IPhone11ProX1>
-                <DemoApp />
+                <MusicHome />
               </IPhone11ProX1>
             </Sidebar>
             <Panel />
