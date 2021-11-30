@@ -90,19 +90,17 @@ const HeroTextAreaWithCta = styled.div`
   @media ${breakpoints.xl} {
     gap: 62px;
     left: calc((calc((50% + -195px)) - 325px));
-    top: 342px;
-    height: 322px;
+    top: 300px;
   }
   @media ${breakpoints.lg} {
     gap: 62px;
     left: calc((calc((50% + -244px)) - 276px));
-    top: 342px;
-    height: 322px;
+    top: 300px;
   }
   @media ${breakpoints.md} {
     gap: 62px;
     left: calc((calc((50% + -212px)) - 276px));
-    top: 342px;
+    top: 280px;
     width: 552px;
   }
   @media ${breakpoints.sm} {
@@ -110,14 +108,12 @@ const HeroTextAreaWithCta = styled.div`
     left: calc((calc((50% + -145px)) - 216px));
     top: 240px;
     width: 431px;
-    height: 362px;
   }
   @media ${breakpoints.xs} {
     gap: 64px;
     left: 20px;
     top: 140px;
     right: 20px;
-    height: 404px;
   }
 `;
 
