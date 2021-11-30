@@ -6,50 +6,19 @@ import { vscDarkPlus as colorscheme } from "react-syntax-highlighter/dist/cjs/st
 import { Box } from "rebass";
 
 import {
-  FLUTTER_COMPONENT_FULL_SOURCE,
-  REACT_TSX_STYLED_COMPONENTS_SOURCE,
-  HTML_COMPONENT_FULL_SOURCE,
-} from "./snippets";
-
-interface DevFrameworkDemoConfig {
-  name: string;
-  lang: string;
-  source: string;
-}
-
-const DEFAULT_DEMO_ITEM_FLUTTER = {
-  name: "flutter",
-  lang: "dart",
-  source: FLUTTER_COMPONENT_FULL_SOURCE,
-};
-
-const DEV_FRAMEWORKS: DevFrameworkDemoConfig[] = [
-  DEFAULT_DEMO_ITEM_FLUTTER,
-  {
-    name: "html",
-    lang: "html",
-    source: HTML_COMPONENT_FULL_SOURCE,
-  },
-  {
-    name: "react",
-    lang: "tsx",
-    source: REACT_TSX_STYLED_COMPONENTS_SOURCE,
-  },
-  {
-    name: "svelte",
-    lang: "svelte",
-    source: REACT_TSX_STYLED_COMPONENTS_SOURCE,
-  },
-];
+  DevFrameworkDemoConfig,
+  DEFAULT_DEMO_ITEM,
+  DEV_FRAMEWORKS,
+} from "./data";
 
 const CodePreviewMobile = () => {
   const [currentPlatform, setCurrentPlatform] = useState<
     DevFrameworkDemoConfig
-  >(DEFAULT_DEMO_ITEM_FLUTTER);
+  >(DEFAULT_DEMO_ITEM);
 
   return (
     <div>
-      <CodeView height="420px" bg="#212121">
+      <CodeView height="420px" bg="rgb(30, 30, 30)">
         <header>
           <span />
           <span />
@@ -92,15 +61,15 @@ const CodeView = styled(Box)`
   header {
     display: flex;
     align-items: center;
-    height: 50px;
+    height: 40px;
     padding: 0px 20px;
     border-top-left-radius: 12px;
     border-top-right-radius: 12px;
 
     span {
       background-color: #3d3d3d;
-      width: 16px;
-      height: 16px;
+      width: 12px;
+      height: 12px;
       margin-right: 10px;
       border-radius: 50%;
     }
@@ -108,7 +77,7 @@ const CodeView = styled(Box)`
 
   .body {
     width: 100%;
-    height: calc(100% - 50px);
+    height: calc(100% - 40px);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -117,7 +86,7 @@ const CodeView = styled(Box)`
 
     pre {
       width: 95%;
-      height: 95%;
+      height: 100%;
       padding: 0px !important;
       border-bottom-left-radius: 12px;
       border-bottom-right-radius: 12px;

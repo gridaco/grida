@@ -9,44 +9,12 @@ import { Flex, Box } from "rebass";
 import { media } from "utils/styled/media";
 import { ThemeInterface } from "utils/styled/theme";
 
-import CodePreviewMobile from "./mobile";
 import {
-  FLUTTER_COMPONENT_FULL_SOURCE,
-  REACT_TSX_STYLED_COMPONENTS_SOURCE,
-  HTML_COMPONENT_FULL_SOURCE,
-} from "./snippets";
-
-interface DevFrameworkDemoConfig {
-  name: string;
-  lang: string;
-  source: string;
-}
-
-const DEFAULT_DEMO_ITEM = {
-  name: "react",
-  lang: "tsx",
-  source: REACT_TSX_STYLED_COMPONENTS_SOURCE,
-};
-
-const DEV_FRAMEWORKS: DevFrameworkDemoConfig[] = [
+  DevFrameworkDemoConfig,
   DEFAULT_DEMO_ITEM,
-  {
-    name: "flutter",
-    lang: "dart",
-    source: FLUTTER_COMPONENT_FULL_SOURCE,
-  },
-  {
-    name: "html",
-    lang: "html",
-    source: HTML_COMPONENT_FULL_SOURCE,
-  },
-
-  {
-    name: "svelte",
-    lang: "svelte",
-    source: REACT_TSX_STYLED_COMPONENTS_SOURCE,
-  },
-];
+  DEV_FRAMEWORKS,
+} from "./data";
+import CodePreviewMobile from "./mobile";
 
 const CodePreview = () => {
   const [currentPlatform, setCurrentPlatform] = useState<
@@ -74,7 +42,7 @@ const CodePreview = () => {
                 "flex-end",
               ]}
             >
-              <CodeView width="460px" height="770px" bg="#212121">
+              <CodeView width="460px" height="770px" bg="rgb(30, 30, 30)">
                 <header>
                   <span />
                   <span />
@@ -148,15 +116,15 @@ const CodeView = styled(Box)`
   header {
     display: flex;
     align-items: center;
-    height: 50px;
+    height: 40px;
     padding: 0px 20px;
     border-top-left-radius: 8px;
     border-top-right-radius: 8px;
 
     span {
       background-color: #3d3d3d;
-      width: 16px;
-      height: 16px;
+      width: 12px;
+      height: 12px;
       margin-right: 10px;
       border-radius: 50%;
     }
@@ -164,7 +132,7 @@ const CodeView = styled(Box)`
 
   .body {
     width: 100%;
-    height: calc(100% - 50px);
+    height: calc(100% - 40px);
     display: flex;
     align-items: center;
     justify-content: center;
