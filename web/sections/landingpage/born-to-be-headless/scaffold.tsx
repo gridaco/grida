@@ -1,6 +1,7 @@
 import styled from "@emotion/styled";
 import React from "react";
 
+import ActionItem from "components/action-item";
 import { Tabs } from "components/landingpage/tab-featured-menu";
 import { k } from "sections";
 
@@ -24,17 +25,12 @@ export function SectionBornToBeHeadlessScaffold() {
             <DemoVSCode />
           </Demo>
           <ActionArea>
-            <ActionLink>
-              <BaseActionLink>
-                <Contents_0002>
-                  <Label>Get the VSCode Extension</Label>
-                  <IconsMdiKeyboardArrowRight
-                    src="https://s3-us-west-2.amazonaws.com/figma-alpha-api/img/d189/6a6e/14107ad4de73d24b574dcd43a88d2785"
-                    alt="image of IconsMdiKeyboardArrowRight"
-                  ></IconsMdiKeyboardArrowRight>
-                </Contents_0002>
-              </BaseActionLink>
-            </ActionLink>
+            <ActionItem
+              theme="dark"
+              openInNewTab
+              label="Get the VSCode Extension?"
+              href={"https://grida.co/vscode"}
+            />
           </ActionArea>
         </DemoContentArea>
       </DemoArea>
@@ -320,11 +316,11 @@ const DemoContentArea = styled.div`
   align-items: start;
   flex: none;
   gap: 10px;
-  width: 928px;
   height: 626px;
   box-sizing: border-box;
 
   @media ${breakpoints.xl} {
+    width: 928px;
   }
   @media ${breakpoints.lg} {
     flex-direction: column;
@@ -363,10 +359,24 @@ const Demo = styled.div`
   justify-content: flex-start;
   flex-direction: column;
   align-items: start;
-  flex: 1;
-  gap: 10px;
+  /* flex: 1; */
+  /* gap: 10px; */
   align-self: stretch;
   box-sizing: border-box;
+  height: 567px;
+  @media ${breakpoints.xl} {
+    width: 1100px;
+  }
+  @media ${breakpoints.lg} {
+    width: 1100px;
+  }
+  @media ${breakpoints.md} {
+    width: 1100px;
+  }
+  @media ${breakpoints.sm} {
+  }
+  @media ${breakpoints.xs} {
+  }
 `;
 
 const ActionArea = styled.div`
@@ -379,55 +389,4 @@ const ActionArea = styled.div`
   align-self: stretch;
   box-sizing: border-box;
   padding: 10px 36px;
-`;
-
-const ActionLink = styled.div`
-  display: flex;
-  justify-content: flex-start;
-  flex-direction: column;
-  align-items: start;
-  flex: none;
-  gap: 0;
-  width: 322px;
-  height: 29px;
-  box-sizing: border-box;
-`;
-
-const BaseActionLink = styled.div`
-  display: flex;
-  justify-content: flex-start;
-  flex-direction: column;
-  align-items: start;
-  flex: none;
-  gap: 8px;
-  width: 322px;
-  height: 29px;
-  box-sizing: border-box;
-`;
-
-const Contents_0002 = styled.div`
-  display: flex;
-  justify-content: flex-start;
-  flex-direction: row;
-  align-items: center;
-  flex: none;
-  gap: 4px;
-  width: 322px;
-  height: 29px;
-  box-sizing: border-box;
-`;
-
-const Label = styled.span`
-  color: rgba(125, 125, 125, 1);
-  text-overflow: ellipsis;
-  font-size: 24px;
-  font-family: "Helvetica Neue", sans-serif;
-  font-weight: 500;
-  text-align: left;
-`;
-
-const IconsMdiKeyboardArrowRight = styled.img`
-  width: 24px;
-  height: 24px;
-  object-fit: cover;
 `;

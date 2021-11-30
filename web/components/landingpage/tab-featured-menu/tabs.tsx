@@ -63,6 +63,8 @@ const Switches = styled.div<{ gap: number }>`
   @media ${breakpoints.md} {
   }
   @media ${breakpoints.sm} {
+    flex-direction: row;
+    align-items: flex-start;
   }
   @media ${breakpoints.xs} {
     flex-direction: row;
