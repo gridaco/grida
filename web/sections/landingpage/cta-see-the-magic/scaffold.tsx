@@ -1,9 +1,10 @@
 import styled from "@emotion/styled";
+import Image from "next/image";
 import React from "react";
 
 import LandingpageText from "components/landingpage/text";
 
-import { breakpoints } from "../_breakpoints";
+import { breakpoints, BreakPoints } from "../_breakpoints";
 import { MagicCtaForm } from "./components";
 
 export default function SectionCtaLastSeeTheMagicScaffold() {
@@ -19,10 +20,7 @@ export default function SectionCtaLastSeeTheMagicScaffold() {
         <ScribbleGuideContainer>
           <ScribbleGuide>
             <ScribbleText>Paste your figma design url.</ScribbleText>
-            <PointerArtwork
-              src="https://s3-us-west-2.amazonaws.com/figma-alpha-api/img/7b17/c650/db733369042b3472677812747401cb55"
-              alt="image of PointerArtwork"
-            ></PointerArtwork>
+            <Pointer />
           </ScribbleGuide>
           <Spacer></Spacer>
         </ScribbleGuideContainer>
@@ -31,6 +29,42 @@ export default function SectionCtaLastSeeTheMagicScaffold() {
     </Wrapper>
   );
 }
+
+const Pointer = () => {
+  const Src = () => {
+    const xl2sm = (
+      <Image
+        width="60"
+        height="60"
+        src="/assets/magic-section-scribble/scribble-pointer-xl2sm.png"
+        alt="image of PointerArtwork"
+      />
+    );
+    const xs = (
+      <Image
+        width="60"
+        height="60"
+        src="/assets/magic-section-scribble/scribble-pointer-xs.png"
+        alt="image of PointerArtwork"
+      />
+    );
+    return (
+      <>
+        <BreakPoints.xl>{xl2sm}</BreakPoints.xl>
+        <BreakPoints.lg>{xl2sm}</BreakPoints.lg>
+        <BreakPoints.md>{xl2sm}</BreakPoints.md>
+        <BreakPoints.sm>{xl2sm}</BreakPoints.sm>
+        <BreakPoints.xs>{xs}</BreakPoints.xs>
+      </>
+    );
+  };
+
+  return (
+    <PointerArtwork>
+      <Src />
+    </PointerArtwork>
+  );
+};
 
 const Wrapper = styled.div`
   display: flex;
@@ -221,7 +255,7 @@ const ScribbleGuide = styled.div`
   flex-direction: column;
   align-items: end;
   flex: none;
-  gap: 0;
+  gap: 10px;
   width: 241px;
   height: 135px;
   box-sizing: border-box;
@@ -231,18 +265,17 @@ const ScribbleText = styled.span`
   color: rgba(164, 164, 164, 1);
   text-overflow: ellipsis;
   font-size: 24px;
-  font-family: "Nanum Pen Script", sans-serif;
+  font-family: "Nanum Pen Script", cursive;
   font-weight: 400;
   line-height: 98%;
   text-align: left;
   transform: rotate(7deg);
 `;
 
-const PointerArtwork = styled.img`
+const PointerArtwork = styled.div`
   width: 75px;
   height: 84px;
-  object-fit: cover;
-  transform: rotate(23deg);
+  /* transform: rotate(23deg); */
 `;
 
 const Spacer = styled.div`
