@@ -1,4 +1,5 @@
 import styled from "@emotion/styled";
+import Image from "next/image";
 import React from "react";
 
 import { k } from "sections";
@@ -10,10 +11,14 @@ import { CtaArea } from "./components/cta-area";
 export default function HeroResponsive() {
   return (
     <Wrapper key="section-hero">
-      <HeroGradientBgArtwork
-        src="https://s3-us-west-2.amazonaws.com/figma-alpha-api/img/65cf/e84e/76efd4a87a6cdf0f109ad871ad15bff0"
-        alt="image of HeroGradientBgArtwork"
-      ></HeroGradientBgArtwork>
+      <HeroGradientBgArtwork>
+        <Image
+          width="785px"
+          height="739px"
+          src="/assets/landingpage-hero/hero-gradient-bg.png"
+          alt="image of HeroGradientBgArtwork"
+        />
+      </HeroGradientBgArtwork>
       <HeroTextAreaWithCta>
         <HeroTextAndBody>
           <Heading1>{k.contents.heading1_figma_to_code}</Heading1>
@@ -23,7 +28,13 @@ export default function HeroResponsive() {
         </HeroTextAndBody>
         <CtaArea></CtaArea>
       </HeroTextAreaWithCta>
-      <DesignToolExampleContainer></DesignToolExampleContainer>
+      <DesignToolExampleContainer>
+        <Image
+          src="/assets/design-platforms/figma.png"
+          width="907px"
+          height="571px"
+        />
+      </DesignToolExampleContainer>
       <IPhoneXFrame>
         <MusicHome scale={0.753} />
       </IPhoneXFrame>
@@ -53,10 +64,9 @@ const Wrapper = styled.div`
   }
 `;
 
-const HeroGradientBgArtwork = styled.img`
+const HeroGradientBgArtwork = styled.div`
   width: 785px;
   height: 739px;
-  object-fit: cover;
   position: absolute;
   left: calc((calc((50% + 328px)) - 393px));
   top: 185px;
