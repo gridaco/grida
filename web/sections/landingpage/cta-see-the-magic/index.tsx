@@ -3,13 +3,14 @@ import React from "react";
 import { BreakPoints } from "../_breakpoints";
 import LG from "./lg";
 import MD from "./md";
+import SectionCtaLastSeeTheMagicScaffold from "./scaffold";
 import SM from "./sm";
 import XL from "./xl";
 import XS from "./xs";
 
 const Section__CTASeeTheMagic = () => (
   <div>
-    <BreakPoints.xl>
+    {/* <BreakPoints.xl>
       <XL />
     </BreakPoints.xl>
     <BreakPoints.lg>
@@ -23,7 +24,8 @@ const Section__CTASeeTheMagic = () => (
     </BreakPoints.sm>
     <BreakPoints.xs>
       <XS />
-    </BreakPoints.xs>
+    </BreakPoints.xs> */}
+    <SectionCtaLastSeeTheMagicScaffold />
   </div>
 );
 
