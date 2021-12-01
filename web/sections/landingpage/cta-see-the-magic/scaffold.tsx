@@ -5,16 +5,15 @@ import React from "react";
 import LandingpageText from "components/landingpage/text";
 
 import { breakpoints, BreakPoints } from "../_breakpoints";
+import { contents } from "../k";
 import { MagicCtaForm } from "./components";
 
 export default function SectionCtaLastSeeTheMagicScaffold() {
   return (
     <Wrapper>
       <TextArea>
-        <Heading variant="h2">See the magic</Heading>
-        <Desc variant="body1">
-          See what you truley do with your power supercharged.
-        </Desc>
+        <Heading variant="h2">{contents.heading2_see_the_magic}</Heading>
+        <Desc variant="body1">{contents.p_see_the_magic_description}</Desc>
       </TextArea>
       <ActionArea>
         <ScribbleGuideContainer>
