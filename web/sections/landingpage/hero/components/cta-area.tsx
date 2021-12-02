@@ -10,6 +10,7 @@ import React, { useCallback, useState } from "react";
 import { Flex } from "rebass";
 
 import { usePopupContext } from "utils/context/PopupContext";
+import { startAnonymousFigmaAccessTokenOneshot } from "utils/instant-demo/figma-anonymous-auth";
 import { signup_callback_redirect_uri } from "utils/landingpage/constants";
 import { media } from "utils/styled/media";
 import { ThemeInterface } from "utils/styled/theme";
@@ -18,10 +19,11 @@ import { HeroPrimaryButton } from "./hero-primary-button";
 import { HeroPrimaryInput } from "./hero-primary-input";
 
 export function CtaArea() {
+  const [hasOngoingAuthProc, setHasOngoingAuthProc] = useState(false);
   const [input, setInput] = useState<string>(null);
   const { addPopup, removePopup } = usePopupContext();
 
-  const showErrorDialog = useCallback((msg: string) => {
+  const showSimpleDialog = useCallback((msg: string | JSX.Element) => {
     addPopup({
       title: "",
       element: (
@@ -47,18 +49,29 @@ export function CtaArea() {
           flexDirection="column"
           p="48px"
         >
-          What is extra usage fee? Extre usage fee is only for team plan. For
-          free plan users, there are no ways to access more than capacity
-          provided by default. You’ll need to change your plan to Team or above.
+          <p style={{ textAlign: "center" }}>
+            Please Enter a valid figma file url.
+            {/* TODO: update docs url */}
+            <br />
+            <a href="https://grida.co/docs/" target="_blank">
+              How do i get one?
+            </a>
+          </p>
         </Flex>
       ),
     });
   }, []);
 
-  const oauthurl =
-    "https://www.figma.com/oauth?client_id=USz3HnKVO6Y2HUED98ZEzf&redirect_uri=http://localhost:3000/callback/figma-oauth&scope=file_read&state=:state&response_type=code";
+  // const _cb =
+  //   process.env.NODE_ENV === "development"
+  //     ? "http://localhost:3000/figma-instant-auth-callback"
+  //     : "https://grida.co/figma-instant-auth-callback";
+  // const oauthurl = `https://www.figma.com/oauth?client_id=USz3HnKVO6Y2HUED98ZEzf&redirect_uri=${_cb}&scope=file_read&state=:state&response_type=code`;
+  // const oauthurl = `https://accounts.grida.co/signin?redirect_uri=/tunnel?command=connect-figma`;
 
-  const showFigmaAuthModal = useCallback(() => {
+  const showFigmaAuthModal = useCallback(async () => {
+    setHasOngoingAuthProc(true);
+    const oauthurl = await (await startAnonymousFigmaAccessTokenOneshot()).url;
     addPopup({
       title: "",
       element: (
@@ -81,40 +94,47 @@ export function CtaArea() {
           </button>
         </Flex>
       ),
+      onDismiss: () => {
+        setHasOngoingAuthProc(false);
+      },
     });
   }, []);
 
   const onSubmit = () => {
     if (input == null) {
-      // TODO: change error msg
-      showErrorDialog("Oops. Not a valid email address");
+      showInvalidUrlGuide();
       return;
     }
 
-    window.open(
-      `https://accounts.grida.co/signup?email=${input}&redirect_uri=${signup_callback_redirect_uri()}`,
-    );
-    return;
-
     /// TODO:
-    const ananysis = analyze(input);
-    switch (ananysis) {
-      case FigmaUrlType.empty: {
-        showInvalidUrlGuide();
+    try {
+      const ananysis = analyze(input);
+      switch (ananysis) {
+        case FigmaUrlType.empty: {
+          showInvalidUrlGuide();
+        }
+        case FigmaUrlType.embed:
+        case FigmaUrlType.file:
+        case FigmaUrlType.node:
+        case FigmaFileOrNodeIdType.fileid:
+        case FigmaFileOrNodeIdType.nodeid:
+        case FigmaFileOrNodeIdType.maybe_fileid:
+        case FigmaFileOrNodeIdType.maybe_nodeid: {
+          validate(input);
+        }
+        default: {
+          showInvalidUrlGuide();
+        }
       }
-      case FigmaUrlType.embed:
-      case FigmaUrlType.file:
-      case FigmaUrlType.node:
-      case FigmaFileOrNodeIdType.fileid:
-      case FigmaFileOrNodeIdType.nodeid:
-      case FigmaFileOrNodeIdType.maybe_fileid:
-      case FigmaFileOrNodeIdType.maybe_nodeid: {
-        validate(input);
-      }
+    } catch (e) {
+      showInvalidUrlGuide();
     }
   };
 
   const validate = (url: string) => {
+    if (hasOngoingAuthProc) {
+      return;
+    }
     try {
       const parsed = parseFileAndNodeId(url);
       parsed.file;
@@ -124,7 +144,7 @@ export function CtaArea() {
   };
 
   const onchange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const val = e.target.value;
+    const val = e.target.value.replace(/(\r\n|\n|\r)/gm, ""); // remove all spaces
     validate(val);
     setInput(val);
   };
@@ -136,7 +156,11 @@ export function CtaArea() {
         scale: 1.03,
       }}
     >
-      <HeroPrimaryInput onChange={onchange} onSubmit={onSubmit} />
+      <HeroPrimaryInput
+        placeholder={"Enter your Figma design url"}
+        onChange={onchange}
+        onSubmit={onSubmit}
+      />
       <HeroPrimaryButton onClick={onSubmit} />
     </Container>
   );

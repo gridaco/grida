@@ -2,9 +2,11 @@ import styled from "@emotion/styled";
 import React from "react";
 
 export function HeroPrimaryInput({
+  placeholder,
   onChange,
   onSubmit,
 }: {
+  placeholder?: string;
   onChange?: (e: React.ChangeEvent<HTMLInputElement>) => void;
   onSubmit?: (e: React.FormEvent<HTMLInputElement>) => void;
 }) {
@@ -16,12 +18,10 @@ export function HeroPrimaryInput({
 
   return (
     <RootWrapperHeroPrimaryInput
-      type="email"
-      autoComplete="on"
       onKeyDown={_handleKeyDown}
       onChange={onChange}
       // "Enter your Figma design url"
-      placeholder="Enter your Email address"
+      placeholder={placeholder}
     />
   );
 }
