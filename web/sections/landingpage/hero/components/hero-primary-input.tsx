@@ -1,30 +1,36 @@
 import styled from "@emotion/styled";
 import React from "react";
 
-export function HeroPrimaryInput({
-  placeholder,
-  onChange,
-  onSubmit,
-}: {
-  placeholder?: string;
-  onChange?: (e: React.ChangeEvent<HTMLInputElement>) => void;
-  onSubmit?: (e: React.FormEvent<HTMLInputElement>) => void;
-}) {
-  const _handleKeyDown = e => {
-    if (e.key === "Enter") {
-      onSubmit?.(e);
-    }
-  };
+export const HeroPrimaryInput = React.forwardRef(
+  (
+    {
+      placeholder,
+      onChange,
+      onSubmit,
+    }: {
+      placeholder?: string;
+      onChange?: (e: React.ChangeEvent<HTMLInputElement>) => void;
+      onSubmit?: (e: React.FormEvent<HTMLInputElement>) => void;
+    },
+    ref?: React.RefObject<HTMLInputElement>,
+  ) => {
+    const _handleKeyDown = e => {
+      if (e.key === "Enter") {
+        onSubmit?.(e);
+      }
+    };
 
-  return (
-    <RootWrapperHeroPrimaryInput
-      onKeyDown={_handleKeyDown}
-      onChange={onChange}
-      // "Enter your Figma design url"
-      placeholder={placeholder}
-    />
-  );
-}
+    return (
+      <RootWrapperHeroPrimaryInput
+        ref={ref}
+        onKeyDown={_handleKeyDown}
+        onChange={onChange}
+        // "Enter your Figma design url"
+        placeholder={placeholder}
+      />
+    );
+  },
+);
 
 const RootWrapperHeroPrimaryInput = styled.input`
   flex: 3;
@@ -44,7 +50,6 @@ const RootWrapperHeroPrimaryInput = styled.input`
     line-height: 98%;
     text-align: left;
   }
-  text-overflow: ellipsis;
   font-size: 18px;
   font-family: "Helvetica Neue", sans-serif;
   font-weight: 400;

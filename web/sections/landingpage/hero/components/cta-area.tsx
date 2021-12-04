@@ -6,12 +6,15 @@ import {
 } from "@design-sdk/figma-url/dist";
 import styled from "@emotion/styled";
 import { motion } from "framer-motion";
-import React, { useCallback, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { Flex } from "rebass";
 
 import { usePopupContext } from "utils/context/PopupContext";
-import { startAnonymousFigmaAccessTokenOneshot } from "utils/instant-demo/figma-anonymous-auth";
-import { signup_callback_redirect_uri } from "utils/landingpage/constants";
+import {
+  getFigmaAccessToken__localstorage,
+  startAnonymousFigmaAccessTokenOneshot,
+  _FIGMA_ACCESS_TOKEN_STORAGE_KEY,
+} from "utils/instant-demo/figma-anonymous-auth";
 import { media } from "utils/styled/media";
 import { ThemeInterface } from "utils/styled/theme";
 
@@ -19,24 +22,38 @@ import { HeroPrimaryButton } from "./hero-primary-button";
 import { HeroPrimaryInput } from "./hero-primary-input";
 
 export function CtaArea() {
+  const inputRef = React.createRef<HTMLInputElement>();
+
   const [hasOngoingAuthProc, setHasOngoingAuthProc] = useState(false);
   const [input, setInput] = useState<string>(null);
   const { addPopup, removePopup } = usePopupContext();
+  const [isFigmaAccessProvided, setIsFigmaAccessProvided] = useState(false);
 
-  const showSimpleDialog = useCallback((msg: string | JSX.Element) => {
-    addPopup({
-      title: "",
-      element: (
-        <Flex
-          width="calc(100vw - 40px)"
-          alignItems="center"
-          flexDirection="column"
-          p="48px"
-        >
-          {msg}
-        </Flex>
-      ),
-    });
+  useEffect(() => {
+    const check = () => {
+      const tokeninfo = getFigmaAccessToken__localstorage();
+      const accesstoken = tokeninfo && tokeninfo.accessToken;
+      if (accesstoken) {
+        // console.log("got figma access token", accesstoken);
+        setIsFigmaAccessProvided(true);
+      }
+    };
+
+    const _ = e => {
+      if (e.key == _FIGMA_ACCESS_TOKEN_STORAGE_KEY) {
+        check();
+      }
+    };
+
+    // check once
+    check();
+
+    // check again when storage changes
+    window.addEventListener("storage", _);
+
+    return () => {
+      window.removeEventListener("storage", _);
+    };
   }, []);
 
   const showInvalidUrlGuide = useCallback(() => {
@@ -62,13 +79,6 @@ export function CtaArea() {
     });
   }, []);
 
-  // const _cb =
-  //   process.env.NODE_ENV === "development"
-  //     ? "http://localhost:3000/figma-instant-auth-callback"
-  //     : "https://grida.co/figma-instant-auth-callback";
-  // const oauthurl = `https://www.figma.com/oauth?client_id=USz3HnKVO6Y2HUED98ZEzf&redirect_uri=${_cb}&scope=file_read&state=:state&response_type=code`;
-  // const oauthurl = `https://accounts.grida.co/signin?redirect_uri=/tunnel?command=connect-figma`;
-
   const showFigmaAuthModal = useCallback(async () => {
     setHasOngoingAuthProc(true);
     const oauthurl = await (await startAnonymousFigmaAccessTokenOneshot()).url;
@@ -83,11 +93,12 @@ export function CtaArea() {
         >
           <button
             onClick={() => {
-              window.open(
+              const w = window.open(
                 oauthurl,
                 "authenticate",
                 "popup, location=no, status=no, menubar=no, width=620, height=600",
               );
+              w.focus();
             }}
           >
             Authenticate with figma
@@ -101,7 +112,7 @@ export function CtaArea() {
   }, []);
 
   const onSubmit = () => {
-    if (input == null) {
+    if (input == null || input.trim() === "") {
       showInvalidUrlGuide();
       return;
     }
@@ -137,10 +148,40 @@ export function CtaArea() {
     }
     try {
       const parsed = parseFileAndNodeId(url);
-      parsed.file;
-      parsed.node;
-      showFigmaAuthModal();
-    } catch (e) {}
+      if (parsed) {
+        // parsed.file;
+        // parsed.node;
+        inputRef?.current?.blur();
+        if (isFigmaAccessProvided) {
+          // TODO:
+          moveToCode({
+            figmaAccessToken: getFigmaAccessToken__localstorage().accessToken,
+            design: url,
+          });
+          // console.log("figma access token is already provided!", url);
+        } else {
+          showFigmaAuthModal();
+        }
+      }
+    } catch (e) {
+      console.error("error while validating figma url", e);
+    }
+  };
+
+  const moveToCode = (p: { figmaAccessToken: string; design: string }) => {
+    const q = {
+      fat: p.figmaAccessToken,
+      design: p.design,
+    };
+    const url = new URL("https://code.grida.co/to-code");
+    url.searchParams.append("design", q.design);
+    url.searchParams.append("fat", q.fat);
+
+    window.open(url.toString(), "_blank");
+    // after opening a new window, clear the input.
+
+    setInput("");
+    inputRef.current.value = "";
   };
 
   const onchange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -157,6 +198,7 @@ export function CtaArea() {
       }}
     >
       <HeroPrimaryInput
+        ref={inputRef}
         placeholder={"Enter your Figma design url"}
         onChange={onchange}
         onSubmit={onSubmit}

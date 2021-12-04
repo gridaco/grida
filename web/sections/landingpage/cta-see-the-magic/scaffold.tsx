@@ -19,8 +19,7 @@ export default function SectionCtaLastSeeTheMagicScaffold() {
       <ActionArea>
         <ScribbleGuideContainer>
           <ScribbleGuide>
-            <ScribbleText>Start free now</ScribbleText>
-            {/* <ScribbleText>Paste your figma design url.</ScribbleText> */}
+            <ScribbleText>Paste your figma design url.</ScribbleText>
             <Pointer />
           </ScribbleGuide>
           <Spacer></Spacer>

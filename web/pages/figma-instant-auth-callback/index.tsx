@@ -1,7 +1,10 @@
 import { useRouter } from "next/router";
 import React, { useEffect } from "react";
 
-import { getAnonymousFigmaAccessTokenOneshot } from "utils/instant-demo/figma-anonymous-auth";
+import {
+  getAnonymousFigmaAccessTokenOneshot,
+  saveFigmaAccessToken__localstorage,
+} from "utils/instant-demo/figma-anonymous-auth";
 
 export default function FigmaInstantAuthCallback() {
   const router = useRouter();
@@ -17,11 +20,7 @@ export default function FigmaInstantAuthCallback() {
         code: code as string,
         state: state as string,
       }).then(d => {
-        window.sessionStorage.setItem(
-          "figma-access-token-anonymous-for-session",
-          d.accessToken,
-        );
-        window.postMessage("figma-instnat-auth-callback-complete", "*");
+        saveFigmaAccessToken__localstorage(d);
         window.close();
       });
     }
