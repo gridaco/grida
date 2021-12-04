@@ -3,16 +3,33 @@ import React from "react";
 
 import { breakpoints } from "sections/landingpage/_breakpoints";
 
-export function MagicInput({ onChange }: { onChange?: (d: string) => void }) {
-  return (
-    <StyledInput
-      placeholder="https://www.figma.com/file/xxxx/xxxx?node-id=1234%3A5678"
-      onChange={e => {
-        onChange(e.target.value);
-      }}
-    />
-  );
-}
+export const MagicInput = React.forwardRef(
+  (
+    {
+      onChange,
+      onSubmit,
+    }: {
+      onChange?: (e: React.ChangeEvent<HTMLInputElement>) => void;
+      onSubmit?: (e: React.FormEvent<HTMLInputElement>) => void;
+    },
+    ref?: React.RefObject<HTMLInputElement>,
+  ) => {
+    const _handleKeyDown = e => {
+      if (e.key === "Enter") {
+        onSubmit?.(e);
+      }
+    };
+
+    return (
+      <StyledInput
+        ref={ref}
+        onKeyDown={_handleKeyDown}
+        placeholder="https://www.figma.com/file/xxxx/xxxx?node-id=1234%3A5678"
+        onChange={onChange}
+      />
+    );
+  },
+);
 
 export const StyledInput = styled.input`
   height: 80px;

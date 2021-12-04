@@ -4,8 +4,7 @@ import React from "react";
 export function HeroPrimaryButton({ onClick }: { onClick?: () => void }) {
   return (
     <Base onClick={onClick}>
-      {/* To Code */}
-      <ToCode>Get started</ToCode>
+      <ToCode>To Code</ToCode>
     </Base>
   );
 }

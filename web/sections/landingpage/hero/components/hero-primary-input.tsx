@@ -4,11 +4,9 @@ import React from "react";
 export const HeroPrimaryInput = React.forwardRef(
   (
     {
-      placeholder,
       onChange,
       onSubmit,
     }: {
-      placeholder?: string;
       onChange?: (e: React.ChangeEvent<HTMLInputElement>) => void;
       onSubmit?: (e: React.FormEvent<HTMLInputElement>) => void;
     },
@@ -25,8 +23,7 @@ export const HeroPrimaryInput = React.forwardRef(
         ref={ref}
         onKeyDown={_handleKeyDown}
         onChange={onChange}
-        // "Enter your Figma design url"
-        placeholder={placeholder}
+        placeholder="Enter your Figma design url"
       />
     );
   },

@@ -4,9 +4,7 @@ import {
   FigmaUrlType,
   FigmaFileOrNodeIdType,
 } from "@design-sdk/figma-url/dist";
-import styled from "@emotion/styled";
-import { motion } from "framer-motion";
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { Flex } from "rebass";
 
 import { usePopupContext } from "utils/context/PopupContext";
@@ -15,13 +13,19 @@ import {
   startAnonymousFigmaAccessTokenOneshot,
   _FIGMA_ACCESS_TOKEN_STORAGE_KEY,
 } from "utils/instant-demo/figma-anonymous-auth";
-import { media } from "utils/styled/media";
-import { ThemeInterface } from "utils/styled/theme";
 
-import { HeroPrimaryButton } from "./hero-primary-button";
-import { HeroPrimaryInput } from "./hero-primary-input";
+import {
+  MagicInput,
+  MagicButton,
+  MagicCtaContainer,
+} from "../cta-see-the-magic/components";
+import {
+  HeroCtaContainer,
+  HeroPrimaryButton,
+  HeroPrimaryInput,
+} from "../hero/components";
 
-export function CtaArea() {
+export function CtaArea({ mode }: { mode: "hero-cta" | "footer-cta" }) {
   const inputRef = React.createRef<HTMLInputElement>();
 
   const [hasOngoingAuthProc, setHasOngoingAuthProc] = useState(false);
@@ -190,65 +194,33 @@ export function CtaArea() {
     setInput(val);
   };
 
-  return (
-    <Container
-      key="cta-area"
-      whileHover={{
-        scale: 1.03,
-      }}
-    >
-      <HeroPrimaryInput
-        ref={inputRef}
-        placeholder={"Enter your Figma design url"}
-        onChange={onchange}
-        onSubmit={onSubmit}
-      />
-      <HeroPrimaryButton onClick={onSubmit} />
-    </Container>
-  );
+  switch (mode) {
+    case "hero-cta": {
+      return (
+        <>
+          <HeroCtaContainer
+            key="cta-area"
+            whileHover={{
+              scale: 1.03,
+            }}
+          >
+            <HeroPrimaryInput
+              ref={inputRef}
+              onChange={onchange}
+              onSubmit={onSubmit}
+            />
+            <HeroPrimaryButton onClick={onSubmit} />
+          </HeroCtaContainer>
+        </>
+      );
+    }
+    case "footer-cta": {
+      return (
+        <MagicCtaContainer>
+          <MagicInput ref={inputRef} onChange={onchange} onSubmit={onSubmit} />
+          <MagicButton onClick={onSubmit} />
+        </MagicCtaContainer>
+      );
+    }
+  }
 }
-
-const Container = styled(motion.div)`
-  padding-top: 24px;
-  padding-bottom: 24px;
-  align-self: stretch;
-  justify-content: flex-start;
-  display: flex;
-  align-items: start;
-  flex: none;
-  gap: 14px;
-
-  ${props => media((props.theme as ThemeInterface).breakpoints[3])} {
-    flex-direction: row;
-  }
-
-  ${props =>
-    media(
-      (props.theme as ThemeInterface).breakpoints[2],
-      (props.theme as ThemeInterface).breakpoints[3],
-    )} {
-    flex-direction: row;
-  }
-
-  ${props =>
-    media(
-      (props.theme as ThemeInterface).breakpoints[1],
-      (props.theme as ThemeInterface).breakpoints[2],
-    )} {
-    flex-direction: row;
-  }
-
-  ${props =>
-    media(
-      (props.theme as ThemeInterface).breakpoints[0],
-      (props.theme as ThemeInterface).breakpoints[1],
-    )} {
-    flex-direction: row;
-  }
-
-  ${props => media("0px", (props.theme as ThemeInterface).breakpoints[0])} {
-    flex-direction: column;
-    flex: 1;
-    align-self: stretch;
-  }
-`;

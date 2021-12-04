@@ -6,7 +6,7 @@ import { k } from "sections";
 
 import { breakpoints } from "../_breakpoints";
 import MusicHome from "../demo-app";
-import { CtaArea } from "./components/cta-area";
+import { CtaArea } from "../shared-cta-tocode";
 
 export default function HeroResponsive() {
   return (
@@ -26,7 +26,7 @@ export default function HeroResponsive() {
             <HeroBodyText>{k.contents.p_hero_description}</HeroBodyText>
           </DescriptionHolder>
         </HeroTextAndBody>
-        <CtaArea></CtaArea>
+        <CtaArea mode="hero-cta" />
       </HeroTextAreaWithCta>
       <DesignToolExampleContainer>
         <Image

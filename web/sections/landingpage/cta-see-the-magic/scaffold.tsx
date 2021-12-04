@@ -5,7 +5,7 @@ import React from "react";
 import LandingpageText from "components/landingpage/text";
 
 import { breakpoints, BreakPoints } from "../_breakpoints";
-import { MagicCtaForm } from "./components";
+import { CtaArea } from "../shared-cta-tocode";
 
 export default function SectionCtaLastSeeTheMagicScaffold() {
   return (
@@ -24,7 +24,7 @@ export default function SectionCtaLastSeeTheMagicScaffold() {
           </ScribbleGuide>
           <Spacer></Spacer>
         </ScribbleGuideContainer>
-        <MagicCtaForm />
+        <CtaArea mode="footer-cta" />
       </ActionArea>
     </Wrapper>
   );
