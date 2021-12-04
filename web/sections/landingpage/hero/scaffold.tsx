@@ -65,6 +65,10 @@ const Wrapper = styled.div`
 `;
 
 const HeroGradientBgArtwork = styled.div`
+  /* region disable dragging */
+  user-select: none;
+  -webkit-user-drag: none;
+  /* endregion disable dragging */
   width: 785px;
   height: 739px;
   position: absolute;
@@ -278,6 +282,11 @@ const HeroBodyText = styled.span`
 `;
 
 const DesignToolExampleContainer = styled.div`
+  /* region disable dragging */
+  user-select: none;
+  -webkit-user-drag: none;
+  /* endregion disable dragging */
+
   width: 907px;
   height: 571px;
   overflow: hidden;
