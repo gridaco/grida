@@ -1,3 +1,4 @@
+import styled from "@emotion/styled";
 import { useRouter } from "next/router";
 import React, { useEffect } from "react";
 
@@ -25,5 +26,24 @@ export default function FigmaInstantAuthCallback() {
       });
     }
   }, [router]);
-  return <>Authenticating...</>;
+  return (
+    <Wrapper>
+      <PrompText>Authenticating...</PrompText>
+    </Wrapper>
+  );
 }
+
+const Wrapper = styled.div`
+  width: 100vw;
+  height: 100vh;
+  display: flex;
+  align-items: center;
+  align-content: center;
+  justify-content: center;
+`;
+
+const PrompText = styled.p`
+  font-size: 1rem;
+  font-weight: 500;
+  color: #3333336e;
+`;

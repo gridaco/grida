@@ -24,6 +24,7 @@ import {
   HeroPrimaryButton,
   HeroPrimaryInput,
 } from "../hero/components";
+import { FigmaAuthModalContents } from "./modal-content-figma-auth-prompt";
 
 export function CtaArea({ mode }: { mode: "hero-cta" | "footer-cta" }) {
   const inputRef = React.createRef<HTMLInputElement>();
@@ -95,7 +96,7 @@ export function CtaArea({ mode }: { mode: "hero-cta" | "footer-cta" }) {
           flexDirection="column"
           p="48px"
         >
-          <button
+          <FigmaAuthModalContents
             onClick={() => {
               const w = window.open(
                 oauthurl,
@@ -104,9 +105,7 @@ export function CtaArea({ mode }: { mode: "hero-cta" | "footer-cta" }) {
               );
               w.focus();
             }}
-          >
-            Authenticate with figma
-          </button>
+          />
         </Flex>
       ),
       onDismiss: () => {
