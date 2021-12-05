@@ -24,6 +24,7 @@ import {
   HeroPrimaryButton,
   HeroPrimaryInput,
 } from "../hero/components";
+import { FigmaAuthDoneModalContents } from "./modal-content-figma-auth-done";
 import { FigmaAuthModalContents } from "./modal-content-figma-auth-prompt";
 
 export function CtaArea({ mode }: { mode: "hero-cta" | "footer-cta" }) {
@@ -32,34 +33,14 @@ export function CtaArea({ mode }: { mode: "hero-cta" | "footer-cta" }) {
   const [hasOngoingAuthProc, setHasOngoingAuthProc] = useState(false);
   const [input, setInput] = useState<string>(null);
   const { addPopup, removePopup } = usePopupContext();
-  const [isFigmaAccessProvided, setIsFigmaAccessProvided] = useState(false);
 
-  useEffect(() => {
-    const check = () => {
-      const tokeninfo = getFigmaAccessToken__localstorage();
-      const accesstoken = tokeninfo && tokeninfo.accessToken;
-      if (accesstoken) {
-        // console.log("got figma access token", accesstoken);
-        setIsFigmaAccessProvided(true);
-      }
-    };
-
-    const _ = e => {
-      if (e.key == _FIGMA_ACCESS_TOKEN_STORAGE_KEY) {
-        check();
-      }
-    };
-
-    // check once
-    check();
-
-    // check again when storage changes
-    window.addEventListener("storage", _);
-
-    return () => {
-      window.removeEventListener("storage", _);
-    };
-  }, []);
+  const isFigmaAccessTokenSet = () => {
+    const tokeninfo = getFigmaAccessToken__localstorage();
+    const accesstoken = tokeninfo && tokeninfo.accessToken;
+    if (accesstoken) {
+      return true;
+    }
+  };
 
   const showInvalidUrlGuide = useCallback(() => {
     addPopup({
@@ -84,35 +65,27 @@ export function CtaArea({ mode }: { mode: "hero-cta" | "footer-cta" }) {
     });
   }, []);
 
-  const showFigmaAuthModal = useCallback(async () => {
-    setHasOngoingAuthProc(true);
-    const oauthurl = await (await startAnonymousFigmaAccessTokenOneshot()).url;
-    addPopup({
-      title: "",
-      element: (
-        <Flex
-          width="calc(100vw - 40px)"
-          alignItems="center"
-          flexDirection="column"
-          p="48px"
-        >
-          <FigmaAuthModalContents
-            onClick={() => {
-              const w = window.open(
-                oauthurl,
-                "authenticate",
-                "popup, location=no, status=no, menubar=no, width=620, height=600",
-              );
-              w.focus();
+  const showFigmaAuthModal = useCallback(
+    async ({ afterurl }: { afterurl: string }) => {
+      setHasOngoingAuthProc(true);
+
+      addPopup({
+        title: "",
+        element: (
+          <FigmaAuthModal
+            onNextClick={() => {
+              setHasOngoingAuthProc(false);
+              validate(afterurl);
             }}
           />
-        </Flex>
-      ),
-      onDismiss: () => {
-        setHasOngoingAuthProc(false);
-      },
-    });
-  }, []);
+        ),
+        onDismiss: () => {
+          setHasOngoingAuthProc(false);
+        },
+      });
+    },
+    [],
+  );
 
   const onSubmit = () => {
     if (input == null || input.trim() === "") {
@@ -155,15 +128,13 @@ export function CtaArea({ mode }: { mode: "hero-cta" | "footer-cta" }) {
         // parsed.file;
         // parsed.node;
         inputRef?.current?.blur();
-        if (isFigmaAccessProvided) {
-          // TODO:
+        if (isFigmaAccessTokenSet()) {
           moveToCode({
             figmaAccessToken: getFigmaAccessToken__localstorage().accessToken,
             design: url,
           });
-          // console.log("figma access token is already provided!", url);
         } else {
-          showFigmaAuthModal();
+          showFigmaAuthModal({ afterurl: url });
         }
       }
     } catch (e) {
@@ -183,14 +154,14 @@ export function CtaArea({ mode }: { mode: "hero-cta" | "footer-cta" }) {
     window.open(url.toString(), "_blank");
     // after opening a new window, clear the input.
 
-    setInput("");
     inputRef.current.value = "";
+    setInput("");
   };
 
   const onchange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value.replace(/(\r\n|\n|\r)/gm, ""); // remove all spaces
-    validate(val);
     setInput(val);
+    validate(val);
   };
 
   switch (mode) {
@@ -223,3 +194,58 @@ export function CtaArea({ mode }: { mode: "hero-cta" | "footer-cta" }) {
     }
   }
 }
+
+const FigmaAuthModal = ({ onNextClick }: { onNextClick: () => void }) => {
+  const [isFigmaAccessProvided, setIsFigmaAccessProvided] = useState(false);
+  useEffect(() => {
+    const check = () => {
+      const tokeninfo = getFigmaAccessToken__localstorage();
+      const accesstoken = tokeninfo && tokeninfo.accessToken;
+      if (accesstoken) {
+        // console.log("got figma access token", accesstoken);
+        setIsFigmaAccessProvided(true);
+      }
+    };
+
+    const _ = e => {
+      if (e.key == _FIGMA_ACCESS_TOKEN_STORAGE_KEY) {
+        check();
+      }
+    };
+
+    // check once
+    check();
+
+    // check again when storage changes
+    window.addEventListener("storage", _);
+
+    return () => {
+      window.removeEventListener("storage", _);
+    };
+  }, []);
+
+  const onclick = async () => {
+    const oauthurl = await (await startAnonymousFigmaAccessTokenOneshot()).url;
+    const w = window.open(
+      oauthurl,
+      "authenticate",
+      "popup, location=no, status=no, menubar=no, width=620, height=600",
+    );
+    w.focus();
+  };
+
+  return (
+    <Flex
+      width="calc(100vw - 40px)"
+      alignItems="center"
+      flexDirection="column"
+      p="48px"
+    >
+      {isFigmaAccessProvided ? (
+        <FigmaAuthDoneModalContents onClick={onNextClick} />
+      ) : (
+        <FigmaAuthModalContents onClick={onclick} />
+      )}
+    </Flex>
+  );
+};

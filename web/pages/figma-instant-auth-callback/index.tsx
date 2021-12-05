@@ -1,6 +1,6 @@
 import styled from "@emotion/styled";
 import { useRouter } from "next/router";
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 
 import {
   getAnonymousFigmaAccessTokenOneshot,
@@ -9,6 +9,7 @@ import {
 
 export default function FigmaInstantAuthCallback() {
   const router = useRouter();
+  const [authenticated, setAuthenticated] = useState(false);
 
   // e.g http://localhost:3000/figma-instant-auth-callback?code=5HBd1JhxxxxjMHoLLCINTPJ&state=JHh9htGOmfXNdffsU-8
   const { code, state } = router.query;
@@ -22,13 +23,18 @@ export default function FigmaInstantAuthCallback() {
         state: state as string,
       }).then(d => {
         saveFigmaAccessToken__localstorage(d);
+        setAuthenticated(true);
         window.close();
       });
     }
   }, [router]);
   return (
     <Wrapper>
-      <PrompText>Authenticating...</PrompText>
+      <PrompText>
+        {!authenticated
+          ? "Authenticating..."
+          : "Authenticated: You can now close this window"}
+      </PrompText>
     </Wrapper>
   );
 }
