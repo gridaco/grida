@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { designToCode, Result } from "@designto/code";
-import { useDesign } from "hooks";
+import { useDesign, useFigmaAccessToken } from "hooks";
 import styled from "@emotion/styled";
 import { DefaultEditorWorkspaceLayout } from "layouts/default-editor-workspace-layout";
 import { PreviewAndRunPanel } from "components/preview-and-run";
@@ -27,6 +27,7 @@ import LoadingLayout from "layouts/loading-overlay";
 import { DesignInput } from "@designto/config/input";
 import { ClearRemoteDesignSessionCache } from "components/clear-remote-design-session-cache";
 import { WidgetTree } from "components/visualization/json-visualization/json-tree";
+import { personal } from "@design-sdk/figma-auth-store";
 
 export default function DesignToCodeUniversalPage() {
   const router = useRouter();
@@ -40,14 +41,20 @@ export default function DesignToCodeUniversalPage() {
     router.query
   );
 
-  useEffect(() => {
+  const fat = useFigmaAccessToken();
+  const pat = useEffect(() => {
     if (design) {
       const { reflect, raw } = design;
       const { id, name } = reflect;
       // ------------------------------------------------------------
       // other platforms are not supported yet
       // set image repo for figma platform
-      MainImageRepository.instance = new RemoteImageRepositories(design.file);
+      MainImageRepository.instance = new RemoteImageRepositories(design.file, {
+        authentication: {
+          accessToken: fat,
+          personalAccessToken: personal.get_safe(),
+        },
+      });
       MainImageRepository.instance.register(
         new ImageRepository(
           "fill-later-assets",
