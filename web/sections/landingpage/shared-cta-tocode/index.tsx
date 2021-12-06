@@ -26,6 +26,7 @@ import {
 } from "../hero/components";
 import { FigmaAuthDoneModalContents } from "./modal-content-figma-auth-done";
 import { FigmaAuthModalContents } from "./modal-content-figma-auth-prompt";
+import { ModalInvalidInputContentBody } from "./modal-content-invalid-input";
 
 export function CtaArea({ mode }: { mode: "hero-cta" | "footer-cta" }) {
   const inputRef = React.createRef<HTMLInputElement>();
@@ -52,14 +53,7 @@ export function CtaArea({ mode }: { mode: "hero-cta" | "footer-cta" }) {
           flexDirection="column"
           p="48px"
         >
-          <p style={{ textAlign: "center" }}>
-            Please Enter a valid figma file url.
-            {/* TODO: update docs url */}
-            <br />
-            <a href="https://grida.co/docs/" target="_blank">
-              How do i get one?
-            </a>
-          </p>
+          <ModalInvalidInputContentBody />
         </Flex>
       ),
     });
@@ -148,7 +142,9 @@ export function CtaArea({ mode }: { mode: "hero-cta" | "footer-cta" }) {
       design: p.design,
     };
     const url = new URL("https://code.grida.co/to-code");
+    // pass the design param
     url.searchParams.append("design", q.design);
+    // set figma access token (will be replaced with cookie)
     url.searchParams.append("fat", q.fat);
 
     window.open(url.toString(), "_blank");
