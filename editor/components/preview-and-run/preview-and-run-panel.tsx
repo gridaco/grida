@@ -81,7 +81,7 @@ export function PreviewAndRunPanel(props: { config: SceneRunnerConfig }) {
   };
 
   return (
-    <div style={{ height: "100%" }}>
+    <div>
       {props.config.hideModeChangeControls ? null : (
         <>
           <StickyTab>
@@ -89,11 +89,20 @@ export function PreviewAndRunPanel(props: { config: SceneRunnerConfig }) {
           </StickyTab>
         </>
       )}
-      <TargetModePanel />
+      <TargetModePanelWrap>
+        <TargetModePanel />
+      </TargetModePanelWrap>
     </div>
   );
 }
 
 const StickyTab = styled.div`
   position: relative;
+`;
+
+const TargetModePanelWrap = styled.div`
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
 `;
