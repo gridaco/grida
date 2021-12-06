@@ -10,11 +10,14 @@ export function WorkspaceContentPanelGridLayout(props: {
     const primaryContentPanels = [];
     const bottomDockedPanels = [];
     React.Children.forEach(props.children, (child) => {
-      if (child.type == WorkspaceContentPanel) {
-        primaryContentPanels.push(child);
-      } else if (child.type == WorkspaceBottomPanelDockLayout) {
-        bottomDockedPanels.push(child);
+      if (child) {
+        if (child.type == WorkspaceContentPanel) {
+          primaryContentPanels.push(child);
+        } else if (child.type == WorkspaceBottomPanelDockLayout) {
+          bottomDockedPanels.push(child);
+        }
       }
+      // else, it's empty framgents
     });
 
     return (

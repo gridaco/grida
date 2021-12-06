@@ -32,6 +32,7 @@ import { personal } from "@design-sdk/figma-auth-store";
 export default function DesignToCodeUniversalPage() {
   const router = useRouter();
   const design = useDesign({ type: "use-router", router: router });
+  const isDebug = router.query.debug;
   const [result, setResult] = useState<Result>();
   const [preview, setPreview] = useState<Result>();
 
@@ -42,7 +43,8 @@ export default function DesignToCodeUniversalPage() {
   );
 
   const fat = useFigmaAccessToken();
-  const pat = useEffect(() => {
+
+  useEffect(() => {
     if (design) {
       const { reflect, raw } = design;
       const { id, name } = reflect;
@@ -131,6 +133,7 @@ export default function DesignToCodeUniversalPage() {
                 initialMode: "run",
                 fileid: design.file,
                 sceneid: design.node,
+                hideModeChangeControls: true,
               }}
             />
           </WorkspaceContentPanel>
@@ -154,45 +157,47 @@ export default function DesignToCodeUniversalPage() {
               />
             </InspectionPanelContentWrap>
           </WorkspaceContentPanel>
-          <WorkspaceBottomPanelDockLayout resizable>
-            <WorkspaceContentPanel>
-              <div
-                style={{
-                  display: "flex",
-                  flexDirection: "row",
-                  alignItems: "stretch",
-                }}
-              >
-                <div style={{ flex: 1 }}>
-                  <ClearRemoteDesignSessionCache
-                    key={design.url}
-                    url={design.url}
-                  />
-                  <br />
-                  {(design.reflect.origin === "INSTANCE" ||
-                    design.reflect.origin === "COMPONENT") && (
-                    <button
-                      onClick={() => {
-                        router.push({
-                          pathname: "/figma/inspect-component",
-                          query: router.query,
-                        });
-                      }}
-                    >
-                      inspect component
-                    </button>
-                  )}
-                </div>
+          {isDebug && (
+            <WorkspaceBottomPanelDockLayout resizable>
+              <WorkspaceContentPanel>
+                <div
+                  style={{
+                    display: "flex",
+                    flexDirection: "row",
+                    alignItems: "stretch",
+                  }}
+                >
+                  <div style={{ flex: 1 }}>
+                    <ClearRemoteDesignSessionCache
+                      key={design.url}
+                      url={design.url}
+                    />
+                    <br />
+                    {(design.reflect.origin === "INSTANCE" ||
+                      design.reflect.origin === "COMPONENT") && (
+                      <button
+                        onClick={() => {
+                          router.push({
+                            pathname: "/figma/inspect-component",
+                            query: router.query,
+                          });
+                        }}
+                      >
+                        inspect component
+                      </button>
+                    )}
+                  </div>
 
-                <div style={{ flex: 2 }}>
-                  <WidgetTree data={design.reflect} />
+                  <div style={{ flex: 2 }}>
+                    <WidgetTree data={design.reflect} />
+                  </div>
+                  <div style={{ flex: 2 }}>
+                    <WidgetTree data={result.widget} />
+                  </div>
                 </div>
-                <div style={{ flex: 2 }}>
-                  <WidgetTree data={result.widget} />
-                </div>
-              </div>
-            </WorkspaceContentPanel>
-          </WorkspaceBottomPanelDockLayout>
+              </WorkspaceContentPanel>
+            </WorkspaceBottomPanelDockLayout>
+          )}
         </WorkspaceContentPanelGridLayout>
       </DefaultEditorWorkspaceLayout>
     </>

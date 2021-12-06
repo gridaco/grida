@@ -8,7 +8,7 @@ import React from "react";
  */
 export function WorkspaceContentPanel({
   children,
-  disableBorder = false,
+  disableBorder = true,
 }: {
   children: JSX.Element;
   disableBorder?: boolean;

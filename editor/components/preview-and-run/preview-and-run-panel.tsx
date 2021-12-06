@@ -16,6 +16,7 @@ interface SceneRunnerConfig {
   platform: "react" | "flutter" | "vanilla" | "vue" | "svelte";
   componentName: string;
   initialMode?: Mode;
+  hideModeChangeControls?: boolean;
 }
 
 export function PreviewAndRunPanel(props: { config: SceneRunnerConfig }) {
@@ -81,9 +82,13 @@ export function PreviewAndRunPanel(props: { config: SceneRunnerConfig }) {
 
   return (
     <div style={{ height: "100%" }}>
-      <StickyTab>
-        <ModeSelectionTab />
-      </StickyTab>
+      {props.config.hideModeChangeControls ? null : (
+        <>
+          <StickyTab>
+            <ModeSelectionTab />
+          </StickyTab>
+        </>
+      )}
       <TargetModePanel />
     </div>
   );
