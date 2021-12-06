@@ -10,7 +10,7 @@ export function ModalInvalidInputContentBody() {
         That’s not a valid figma design url.{" "}
         <u>
           <a
-            href="https://grida.co/docs/with-figma/guides/how-to-get-personal-access-token"
+            href="https://grida.co/docs/with-figma/guides/how-to-get-sharable-design-link"
             target="_blank"
           >
             How do i get one?
