@@ -6,7 +6,7 @@ import { k } from "sections";
 
 import { breakpoints } from "../_breakpoints";
 import MusicHome from "../demo-app";
-import { CtaArea } from "./components/cta-area";
+import { CtaArea } from "../shared-cta-tocode";
 
 export default function HeroResponsive() {
   return (
@@ -26,7 +26,7 @@ export default function HeroResponsive() {
             <HeroBodyText>{k.contents.p_hero_description}</HeroBodyText>
           </DescriptionHolder>
         </HeroTextAndBody>
-        <CtaArea></CtaArea>
+        <CtaArea mode="hero-cta" />
       </HeroTextAreaWithCta>
       <DesignToolExampleContainer>
         <Image
@@ -65,6 +65,10 @@ const Wrapper = styled.div`
 `;
 
 const HeroGradientBgArtwork = styled.div`
+  /* region disable dragging */
+  user-select: none;
+  -webkit-user-drag: none;
+  /* endregion disable dragging */
   width: 785px;
   height: 739px;
   position: absolute;
@@ -278,6 +282,11 @@ const HeroBodyText = styled.span`
 `;
 
 const DesignToolExampleContainer = styled.div`
+  /* region disable dragging */
+  user-select: none;
+  -webkit-user-drag: none;
+  /* endregion disable dragging */
+
   width: 907px;
   height: 571px;
   overflow: hidden;

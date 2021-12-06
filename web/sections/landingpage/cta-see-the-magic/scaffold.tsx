@@ -6,7 +6,7 @@ import LandingpageText from "components/landingpage/text";
 
 import { breakpoints, BreakPoints } from "../_breakpoints";
 import { contents } from "../k";
-import { MagicCtaForm } from "./components";
+import { CtaArea } from "../shared-cta-tocode";
 
 export default function SectionCtaLastSeeTheMagicScaffold() {
   return (
@@ -18,13 +18,12 @@ export default function SectionCtaLastSeeTheMagicScaffold() {
       <ActionArea>
         <ScribbleGuideContainer>
           <ScribbleGuide>
-            <ScribbleText>Start free now</ScribbleText>
-            {/* <ScribbleText>Paste your figma design url.</ScribbleText> */}
+            <ScribbleText>Paste your figma design url.</ScribbleText>
             <Pointer />
           </ScribbleGuide>
           <Spacer></Spacer>
         </ScribbleGuideContainer>
-        <MagicCtaForm />
+        <CtaArea mode="footer-cta" />
       </ActionArea>
     </Wrapper>
   );

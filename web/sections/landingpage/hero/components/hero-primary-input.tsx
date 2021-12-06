@@ -1,30 +1,33 @@
 import styled from "@emotion/styled";
 import React from "react";
 
-export function HeroPrimaryInput({
-  onChange,
-  onSubmit,
-}: {
-  onChange?: (e: React.ChangeEvent<HTMLInputElement>) => void;
-  onSubmit?: (e: React.FormEvent<HTMLInputElement>) => void;
-}) {
-  const _handleKeyDown = e => {
-    if (e.key === "Enter") {
-      onSubmit?.(e);
-    }
-  };
+export const HeroPrimaryInput = React.forwardRef(
+  (
+    {
+      onChange,
+      onSubmit,
+    }: {
+      onChange?: (e: React.ChangeEvent<HTMLInputElement>) => void;
+      onSubmit?: (e: React.FormEvent<HTMLInputElement>) => void;
+    },
+    ref?: React.RefObject<HTMLInputElement>,
+  ) => {
+    const _handleKeyDown = e => {
+      if (e.key === "Enter") {
+        onSubmit?.(e);
+      }
+    };
 
-  return (
-    <RootWrapperHeroPrimaryInput
-      type="email"
-      autoComplete="on"
-      onKeyDown={_handleKeyDown}
-      onChange={onChange}
-      // "Enter your Figma design url"
-      placeholder="Enter your Email address"
-    />
-  );
-}
+    return (
+      <RootWrapperHeroPrimaryInput
+        ref={ref}
+        onKeyDown={_handleKeyDown}
+        onChange={onChange}
+        placeholder="Enter your Figma design url"
+      />
+    );
+  },
+);
 
 const RootWrapperHeroPrimaryInput = styled.input`
   flex: 3;
@@ -44,7 +47,6 @@ const RootWrapperHeroPrimaryInput = styled.input`
     line-height: 98%;
     text-align: left;
   }
-  text-overflow: ellipsis;
   font-size: 18px;
   font-family: "Helvetica Neue", sans-serif;
   font-weight: 400;
