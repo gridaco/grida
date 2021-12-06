@@ -4,6 +4,7 @@ import {
   FigmaUrlType,
   FigmaFileOrNodeIdType,
 } from "@design-sdk/figma-url/dist";
+import { event_cta__to_code } from "analytics";
 import React, { useCallback, useEffect, useState } from "react";
 import { Flex } from "rebass";
 
@@ -28,7 +29,9 @@ import { FigmaAuthDoneModalContents } from "./modal-content-figma-auth-done";
 import { FigmaAuthModalContents } from "./modal-content-figma-auth-prompt";
 import { ModalInvalidInputContentBody } from "./modal-content-invalid-input";
 
-export function CtaArea({ mode }: { mode: "hero-cta" | "footer-cta" }) {
+type CtaOrigin = "hero-cta" | "footer-cta";
+
+export function CtaArea({ mode }: { mode: CtaOrigin }) {
   const inputRef = React.createRef<HTMLInputElement>();
 
   const [hasOngoingAuthProc, setHasOngoingAuthProc] = useState(false);
@@ -62,6 +65,13 @@ export function CtaArea({ mode }: { mode: "hero-cta" | "footer-cta" }) {
   const showFigmaAuthModal = useCallback(
     async ({ afterurl }: { afterurl: string }) => {
       setHasOngoingAuthProc(true);
+
+      // log event
+      event_cta__to_code({
+        step: "authenticate-with-figma",
+        input: afterurl,
+        origin: mode,
+      });
 
       addPopup({
         title: "",
@@ -116,11 +126,17 @@ export function CtaArea({ mode }: { mode: "hero-cta" | "footer-cta" }) {
     if (hasOngoingAuthProc) {
       return;
     }
+
     try {
       const parsed = parseFileAndNodeId(url);
       if (parsed) {
-        // parsed.file;
-        // parsed.node;
+        // log event
+        event_cta__to_code({
+          step: "input-and-validate",
+          input: url,
+          origin: mode,
+        });
+
         inputRef?.current?.blur();
         if (isFigmaAccessTokenSet()) {
           moveToCode({
@@ -128,7 +144,9 @@ export function CtaArea({ mode }: { mode: "hero-cta" | "footer-cta" }) {
             design: url,
           });
         } else {
-          showFigmaAuthModal({ afterurl: url });
+          showFigmaAuthModal({
+            afterurl: url,
+          });
         }
       }
     } catch (e) {
@@ -137,6 +155,12 @@ export function CtaArea({ mode }: { mode: "hero-cta" | "footer-cta" }) {
   };
 
   const moveToCode = (p: { figmaAccessToken: string; design: string }) => {
+    // log event
+    event_cta__to_code({
+      step: "submit-and-move",
+      input: p.design,
+      origin: mode,
+    });
     const q = {
       fat: p.figmaAccessToken,
       design: p.design,

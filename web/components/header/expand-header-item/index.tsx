@@ -1,10 +1,11 @@
-import Icon from "components/icon";
+import styled from "@emotion/styled";
 import React, { useCallback, useState } from "react";
 import { Text, Flex, Box } from "rebass";
-import styled from "@emotion/styled";
+
 import Product from "components/header/product";
-import { ThemeInterface } from "utils/styled/theme";
+import Icon from "components/icon";
 import { media } from "utils/styled/media";
+import { ThemeInterface } from "utils/styled/theme";
 
 const ExpandHeaderItem = ({
   item,

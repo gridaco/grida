@@ -1,8 +1,8 @@
 import styled from "@emotion/styled";
+import { event_click_header_menu } from "analytics";
 import Link from "next/link";
 import { useRouter } from "next/router";
 import React, { useState, useEffect, useCallback } from "react";
-import { useCookies } from "react-cookie";
 import { Box, Flex, Text, Button } from "rebass";
 
 import Icon from "components/icon";
@@ -110,6 +110,10 @@ const Header = () => {
               ) : (
                 <Link href={i.href} key={i.label}>
                   <Item
+                    onClick={() => {
+                      // log header menu click event
+                      event_click_header_menu({ menu: i.label });
+                    }}
                     onMouseOver={() => onClickExpandHeader("")}
                     className="cursor"
                     mx="12px"

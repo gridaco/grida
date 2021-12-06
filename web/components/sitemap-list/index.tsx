@@ -1,7 +1,9 @@
-import { Sitemap } from "components/footer/sitemap";
+import { event_click_footer_menu } from "analytics";
 import Link from "next/link";
 import React from "react";
 import { Flex, Text } from "rebass";
+
+import { Sitemap } from "components/footer/sitemap";
 
 interface SitemapListProps {
   sitemap: Sitemap;
@@ -29,6 +31,10 @@ const SitemapList: React.FC<SitemapListProps> = ({ sitemap }) => {
       {child.map(i => (
         <Link href={i.href} key={i.label}>
           <Text
+            onClick={() => {
+              // log footer menu item click
+              event_click_footer_menu({ menu: i.label });
+            }}
             className="cursor"
             fontSize="14px"
             mb="15px"

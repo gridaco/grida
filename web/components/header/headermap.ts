@@ -39,4 +39,8 @@ export const HeaderMap: HeaderMap[] = [
     label: "Github",
     href: URLS.social.github,
   },
+  {
+    label: "Slack",
+    href: "https://grida.co/join-slack",
+  },
 ];
