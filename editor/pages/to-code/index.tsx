@@ -245,7 +245,7 @@ function get_framework_config(framework: string) {
 }
 
 function get_preview_runner_framework(query: ParsedUrlQuery) {
-  const preview = query.preview as string;
+  const preview = (query.preview as string) ?? "vanilla"; // make vanilla as default preview if non provided.
   return get_framework_config(
     preview || get_framework_config_from_query(query).framework
   );
