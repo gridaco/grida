@@ -55,6 +55,24 @@ function HeadInjection() {
         content="#1e1e1e"
         media="(prefers-color-scheme: dark)"
       />
+
+      {/* region Google analytics */}
+      {/* https://stackoverflow.com/a/62552263 */}
+      <script
+        async
+        src="https://www.googletagmanager.com/gtag/js?id=G-7Y9DGWF5RT"
+      />
+      <script
+        dangerouslySetInnerHTML={{
+          __html: `
+            window.dataLayer = window.dataLayer || [];
+            function gtag(){dataLayer.push(arguments);}
+            gtag('js', new Date());
+            gtag('config', 'G-7Y9DGWF5RT');
+        `,
+        }}
+      />
+      {/* end region */}
     </Head>
   );
 }
