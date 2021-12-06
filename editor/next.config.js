@@ -97,6 +97,12 @@ module.exports = withTM({
         destination: "/preferences",
         permanent: true,
       },
+      {
+        // temporary landing page redirection
+        source: "/",
+        destination: "https://grida.co",
+        permanent: false,
+      },
     ];
   },
 });
