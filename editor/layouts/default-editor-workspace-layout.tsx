@@ -10,9 +10,9 @@ export function DefaultEditorWorkspaceLayout(props: {
   return (
     <WorkspaceRoot>
       <AppBarMenuAndBelowContentWrap>
-        <AppBarWrap>
+        {/* <AppBarWrap>
           <AppMenu />
-        </AppBarWrap>
+        </AppBarWrap> */}
         <NonMenuContentZoneWrap>
           {props.leftbar && (
             <PanelLeftSideWrap>{props.leftbar}</PanelLeftSideWrap>

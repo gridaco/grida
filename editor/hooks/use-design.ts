@@ -13,6 +13,7 @@ import { FigmaRemoteErrors } from "@design-sdk/figma-remote/lib/fetch";
 import { RemoteDesignSessionCacheStore } from "../store";
 import { convert } from "@design-sdk/figma-node-conversion";
 import { mapFigmaRemoteToFigma } from "@design-sdk/figma-remote/lib/mapper";
+import { useFigmaAccessToken } from ".";
 
 // globally configure auth credentials for interacting with `@design-sdk/figma-remote`
 configure_auth_credentials({
@@ -55,7 +56,10 @@ export function useDesign({
   ...props
 }: UseDesignProp) {
   const [design, setDesign] = useState<TargetNodeConfig>(null);
+  const figmaAccessToken = useFigmaAccessToken();
+  const personalAccessToken = personal.get_safe();
   const router = (type === "use-router" && props["router"]) ?? useRouter();
+
   useEffect(() => {
     let targetnodeconfig: FigmaTargetNodeConfig;
     console.log("type", type);
@@ -117,36 +121,49 @@ export function useDesign({
           reflect: _2_converted_to_reflect,
         });
       } else {
-        fetch
-          .fetchTargetAsReflect({
-            file: targetnodeconfig.file,
-            node: targetnodeconfig.node,
-            auth: {
-              personalAccessToken: personal.get_safe(),
-            },
-          })
-          .then((res) => {
-            cacheStore.set(res.raw); // setting cache does not need to be determined by `use_session_cache` option.
-            setDesign(<TargetNodeConfig>{
-              ...res,
-              ...targetnodeconfig,
-            });
-          })
-          .catch((err: FigmaRemoteErrors) => {
-            switch (err.type) {
-              case "UnauthorizedError": {
-                // unauthorized
-                router.push("/preferences/access-tokens");
-                console.info(`(ignored) error while fetching design`, err);
-                break;
+        if (figmaAccessToken || personalAccessToken) {
+          fetch
+            .fetchTargetAsReflect({
+              file: targetnodeconfig.file,
+              node: targetnodeconfig.node,
+              auth: {
+                personalAccessToken: personalAccessToken,
+                accessToken: figmaAccessToken,
+              },
+            })
+            .then((res) => {
+              cacheStore.set(res.raw); // setting cache does not need to be determined by `use_session_cache` option.
+              setDesign(<TargetNodeConfig>{
+                ...res,
+                ...targetnodeconfig,
+              });
+            })
+            .catch((err: FigmaRemoteErrors) => {
+              switch (err.type) {
+                case "UnauthorizedError": {
+                  // unauthorized
+                  router.push("/preferences/access-tokens");
+                  console.info(`(ignored) error while fetching design`, err);
+                  break;
+                }
+                default:
+                  if (figmaAccessToken) {
+                    // wait..
+                  } else {
+                    console.error(`error while fetching design`, err);
+                    throw err;
+                  }
               }
-              default:
-                throw err;
-            }
-          });
+            });
+        } else {
+          // wait..
+          // throw new Error(
+          //   "No valid figma access token provided. cannot read design."
+          // );
+        }
       }
     }
-  }, [router]);
+  }, [router, figmaAccessToken]);
   return design;
 }
 
