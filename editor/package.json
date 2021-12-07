@@ -12,6 +12,7 @@
     "@base-sdk/base": "^0.1.0-5",
     "@code-editor/preview-pip": "^0.0.2",
     "@code-editor/vanilla-preview": "^0.0.2",
+    "@code-ui/docstring": "^0.0.12",
     "@design-sdk/figma-auth-store": "^0.0.2",
     "@designto/code": "0.0.1",
     "@emotion/core": "^11.0.0",
