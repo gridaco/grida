@@ -1,8 +1,11 @@
-import { useAuthState as useGridaAuthState } from "@base-sdk-fp/auth-components-react";
+import {
+  useAuthState as useGridaAuthState,
+  LoginState,
+} from "@base-sdk-fp/auth-components-react";
 import { useEffect, useState } from "react";
 
 export function useAuthState() {
-  const [authState, setAuthState] = useState<any>();
+  const [authState, setAuthState] = useState<LoginState>();
   const gridaauthstate = useGridaAuthState();
 
   useEffect(() => {

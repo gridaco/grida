@@ -28,6 +28,8 @@ import { DesignInput } from "@designto/config/input";
 import { ClearRemoteDesignSessionCache } from "components/clear-remote-design-session-cache";
 import { WidgetTree } from "components/visualization/json-visualization/json-tree";
 import { personal } from "@design-sdk/figma-auth-store";
+import { CodeOptionsControl } from "components/codeui-code-options-control";
+import { SigninToContinueBannerPrmoptProvider } from "components/prompt-banner-signin-to-continue";
 
 export default function DesignToCodeUniversalPage() {
   const router = useRouter();
@@ -36,7 +38,9 @@ export default function DesignToCodeUniversalPage() {
   const [result, setResult] = useState<Result>();
   const [preview, setPreview] = useState<Result>();
 
-  const framework_config = get_framework_config_from_query(router.query);
+  const [framework_config, set_framework_config] = useState(
+    get_framework_config_from_query(router.query)
+  );
   const preview_runner_framework = get_preview_runner_framework(router.query);
   const enable_components = get_enable_components_config_from_query(
     router.query
@@ -78,6 +82,13 @@ export default function DesignToCodeUniversalPage() {
           setPreview(result);
         }
       });
+    }
+  }, [design, framework_config.framework]);
+
+  useEffect(() => {
+    if (design) {
+      const { reflect, raw } = design;
+      const { id, name } = reflect;
       // ----- for preview -----
       if (framework_config.framework !== preview_runner_framework.framework) {
         designToCode({
@@ -104,11 +115,11 @@ export default function DesignToCodeUniversalPage() {
   }
 
   const { code, scaffold, name: componentName } = result;
-  console.log("design to code result::", result);
 
-  const runner_platform = get_runner_platform(framework_config);
+  // const runner_platform = get_runner_platform(framework_config);
+
   return (
-    <>
+    <SigninToContinueBannerPrmoptProvider>
       <DefaultEditorWorkspaceLayout
         leftbar={
           <></>
@@ -139,8 +150,15 @@ export default function DesignToCodeUniversalPage() {
           </WorkspaceContentPanel>
           <WorkspaceContentPanel key={design.node}>
             <InspectionPanelContentWrap>
+              <CodeOptionsControl
+                initialPreset={router.query.framework as string}
+                fallbackPreset="react_default"
+                onUseroptionChange={(o) => {
+                  set_framework_config(get_framework_config(o.framework));
+                }}
+              />
               <CodeEditor
-                // key={code.raw}
+                key={code.raw}
                 height="100vh"
                 options={{
                   automaticLayout: true,
@@ -200,7 +218,7 @@ export default function DesignToCodeUniversalPage() {
           )}
         </WorkspaceContentPanelGridLayout>
       </DefaultEditorWorkspaceLayout>
-    </>
+    </SigninToContinueBannerPrmoptProvider>
   );
 }
 
@@ -211,6 +229,7 @@ function get_enable_components_config_from_query(
   if (enable_components) {
     return enable_components === "true";
   }
+  // disabled by default
   return false;
 }
 
@@ -268,6 +287,6 @@ function get_runner_platform(config: FrameworkConfig) {
 
 const InspectionPanelContentWrap = styled.div`
   display: flex;
-  flex-direction: row;
+  flex-direction: column;
   align-items: stretch;
 `;
