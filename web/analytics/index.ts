@@ -66,9 +66,16 @@ export function event_cta__to_code({
   origin: "hero-cta" | "footer-cta";
   step: "input-and-validate" | "authenticate-with-figma" | "submit-and-move";
 }) {
-  safelyLogEvent("cta__to_code", {
-    input: input,
-    origin: origin,
-    step: step,
-  });
+  // CONVERSION
+  safelyLogEvent(
+    "cta__to_code",
+    {
+      input: input,
+      origin: origin,
+      step: step,
+    },
+    {
+      global: true,
+    },
+  );
 }
