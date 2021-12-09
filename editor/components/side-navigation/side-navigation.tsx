@@ -9,7 +9,8 @@ export function SideNavigation(props: {
 
 const Wrapper = styled.div`
   flex: 0;
-  min-width: 200px;
+  width: 200px;
+  /* max-width: 320px; */
   display: flex;
   align-items: stretch;
   flex-direction: column;

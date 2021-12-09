@@ -1,3 +1,6 @@
+import type { ReflectSceneNode } from "@design-sdk/figma-node";
+import { DesignInput } from "@designto/config/input";
+
 export interface EditorState {
   selectedPage: string;
   selectedNodes: string[];
@@ -10,7 +13,13 @@ export interface EditorSnapshot {
   design: ReflectRepository;
 }
 
-// TODO:
 interface ReflectRepository {
+  /**
+   * fileid; filekey
+   */
+  key: string;
+
+  // TODO:
   pages: [];
+  current: DesignInput;
 }

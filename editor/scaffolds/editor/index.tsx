@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from "react";
-import { designToCode, Result } from "@designto/code";
-import { useDesign, useFigmaAccessToken } from "hooks";
 import styled from "@emotion/styled";
+import { useRouter } from "next/router";
 import { DefaultEditorWorkspaceLayout } from "layouts/default-editor-workspace-layout";
 import { PreviewAndRunPanel } from "components/preview-and-run";
 import {
@@ -10,62 +9,52 @@ import {
 } from "layouts/panel";
 import { WorkspaceBottomPanelDockLayout } from "layouts/panel/workspace-bottom-panel-dock-layout";
 import { CodeEditor } from "components/code-editor";
-import { useRouter } from "next/router";
-import { config } from "@designto/config";
+import { ClearRemoteDesignSessionCache } from "components/clear-remote-design-session-cache";
+import { WidgetTree } from "components/visualization/json-visualization/json-tree";
+import { EditorAppbarFragments, EditorSidebar } from "components/editor";
+import { useEditorState, useWorkspaceState } from "core/states";
+import { designToCode, Result } from "@designto/code";
 import { RemoteImageRepositories } from "@design-sdk/figma-remote/lib/asset-repository/image-repository";
+import { config } from "@designto/config";
 import {
   ImageRepository,
   MainImageRepository,
 } from "@design-sdk/core/assets-repository";
-import LoadingLayout from "layouts/loading-overlay";
-import { DesignInput } from "@designto/config/input";
-import { ClearRemoteDesignSessionCache } from "components/clear-remote-design-session-cache";
-import { WidgetTree } from "components/visualization/json-visualization/json-tree";
 import { personal } from "@design-sdk/figma-auth-store";
-import { CodeOptionsControl } from "components/codeui-code-options-control";
-
-import {
-  get_enable_components_config_from_query,
-  get_framework_config,
-  get_framework_config_from_query,
-  get_preview_runner_framework,
-} from "query/to-code-options-from-query";
-import {
-  EditorAppbar,
-  EditorAppbarFragments,
-  EditorSidebar,
-} from "components/editor";
+import { useFigmaAccessToken } from "hooks";
 
 export function Editor() {
   const router = useRouter();
-  const design = useDesign({ type: "use-router", router: router });
-  const isDebug = router.query.debug;
+  const wstate = useWorkspaceState();
+  const [state] = useEditorState();
+
+  const fat = useFigmaAccessToken();
   const [result, setResult] = useState<Result>();
   const [preview, setPreview] = useState<Result>();
 
-  const [framework_config, set_framework_config] = useState(
-    get_framework_config_from_query(router.query)
-  );
-  const preview_runner_framework = get_preview_runner_framework(router.query);
-  const enable_components = get_enable_components_config_from_query(
-    router.query
-  );
-
-  const fat = useFigmaAccessToken();
+  const framework_config = wstate.preferences.framework_config;
+  const preview_runner_framework =
+    wstate.preferences.preview_runner_framework_config;
+  const enable_components =
+    wstate.preferences.enable_preview_feature_components_support;
+  const design = state.design?.current;
 
   useEffect(() => {
     if (design) {
-      const { reflect, raw } = design;
-      const { id, name } = reflect;
+      // const { reflect, raw } = design;
+      const { id, name } = design.entry;
       // ------------------------------------------------------------
       // other platforms are not supported yet
       // set image repo for figma platform
-      MainImageRepository.instance = new RemoteImageRepositories(design.file, {
-        authentication: {
-          accessToken: fat,
-          personalAccessToken: personal.get_safe(),
-        },
-      });
+      MainImageRepository.instance = new RemoteImageRepositories(
+        state.design.key,
+        {
+          authentication: {
+            accessToken: fat,
+            personalAccessToken: personal.get_safe(),
+          },
+        }
+      );
       MainImageRepository.instance.register(
         new ImageRepository(
           "fill-later-assets",
@@ -74,7 +63,7 @@ export function Editor() {
       );
       // ------------------------------------------------------------
       designToCode({
-        input: DesignInput.fromApiResponse({ entry: reflect, raw }),
+        input: design,
         framework: framework_config,
         asset_config: { asset_repository: MainImageRepository.instance },
         build_config: {
@@ -88,19 +77,18 @@ export function Editor() {
         }
       });
     }
-  }, [design, framework_config.framework]);
+  }, [design, framework_config?.framework]);
 
   useEffect(() => {
     if (design) {
-      const { reflect, raw } = design;
-      const { id, name } = reflect;
+      const { id, name } = design.entry;
       // ----- for preview -----
       if (framework_config.framework !== preview_runner_framework.framework) {
         designToCode({
           input: {
             id: id,
             name: name,
-            entry: reflect,
+            entry: design.entry,
           },
           build_config: {
             ...config.default_build_configuration,
@@ -116,7 +104,7 @@ export function Editor() {
   }, [design]);
 
   const { code, scaffold, name: componentName } = result ?? {};
-  const _key_for_preview = design?.url ?? design?.reflect?.id;
+  const _key_for_preview = design?.id;
 
   return (
     <DefaultEditorWorkspaceLayout
@@ -135,12 +123,12 @@ export function Editor() {
                   platform: preview_runner_framework.framework,
                   componentName: componentName,
                   sceneSize: {
-                    w: design.reflect?.width,
-                    h: design.reflect?.height,
+                    w: design.entry?.width,
+                    h: design.entry?.height,
                   },
                   initialMode: "run",
-                  fileid: design.file,
-                  sceneid: design.node,
+                  fileid: state.design.key,
+                  sceneid: design.id,
                   hideModeChangeControls: true,
                 }}
               />
@@ -185,7 +173,7 @@ export function Editor() {
             />
           </CodeEditorContainer>
         </WorkspaceContentPanel>
-        {isDebug && (
+        {wstate.preferences.debug_mode && (
           <WorkspaceBottomPanelDockLayout resizable>
             <WorkspaceContentPanel>
               <div
@@ -197,12 +185,13 @@ export function Editor() {
               >
                 <div style={{ flex: 1 }}>
                   <ClearRemoteDesignSessionCache
-                    key={design.url}
-                    url={design.url}
+                    key={design.id}
+                    file={state.design.key}
+                    node={design.id}
                   />
                   <br />
-                  {(design.reflect.origin === "INSTANCE" ||
-                    design.reflect.origin === "COMPONENT") && (
+                  {(design.entry.origin === "INSTANCE" ||
+                    design.entry.origin === "COMPONENT") && (
                     <button
                       onClick={() => {
                         router.push({
@@ -217,7 +206,7 @@ export function Editor() {
                 </div>
 
                 <div style={{ flex: 2 }}>
-                  <WidgetTree data={design.reflect} />
+                  <WidgetTree data={design.entry} />
                 </div>
                 <div style={{ flex: 2 }}>
                   <WidgetTree data={result.widget} />

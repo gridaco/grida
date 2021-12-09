@@ -10,6 +10,7 @@ export function workspaceReducer(
   switch (action.type) {
     default: {
       return produce(state, (draft) => {
+        // @ts-ignore
         draft.history = historyReducer(state.history, action);
       });
     }

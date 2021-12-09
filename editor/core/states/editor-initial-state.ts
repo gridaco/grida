@@ -1,9 +1,17 @@
 import { EditorSnapshot, EditorState } from "./editor-state";
 
-export function createInitialEditorState(app: EditorSnapshot): EditorState {
+export function createInitialEditorState(editor: EditorSnapshot): EditorState {
   return {
-    selectedPage: app.selectedPage,
-    selectedNodes: app.selectedNodes,
-    design: app.design,
+    selectedPage: editor.selectedPage,
+    selectedNodes: editor.selectedNodes,
+    design: editor.design,
+  };
+}
+
+export function createPendingEditorState(): EditorState {
+  return {
+    selectedPage: null,
+    selectedNodes: [],
+    design: null,
   };
 }
