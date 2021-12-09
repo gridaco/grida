@@ -29,7 +29,7 @@ import {
   get_framework_config,
   get_framework_config_from_query,
   get_preview_runner_framework,
-} from "core/to-code-options-from-query";
+} from "query/to-code-options-from-query";
 import {
   EditorAppbar,
   EditorAppbarFragments,

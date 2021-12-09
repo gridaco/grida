@@ -12,6 +12,7 @@ module.exports = {
           layouts: "./layouts",
           scaffolds: "./scaffolds",
           utils: "./utils",
+          core: "./core",
           public: "./public",
           hooks: "./hooks",
         },

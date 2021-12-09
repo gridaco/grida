@@ -19,6 +19,7 @@
       "icons/*": ["./icons/*"],
       "layout/*": ["./layouts/*"],
       "scaffolds/*": ["./scaffolds/*"],
+      "core/*": ["./core/*"],
       "utils/*": ["./utils/*"],
       "public/*": ["./public/*"],
       "hooks/*": ["./hooks/*"]
