@@ -8,6 +8,7 @@ module.exports = {
         root: ["."],
         alias: {
           components: "./components",
+          icons: "./icons",
           layouts: "./layouts",
           utils: "./utils",
           public: "./public",

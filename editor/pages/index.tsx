@@ -1,32 +1,18 @@
+import { HomeInputLayout } from "layout/home-input";
+import { HomeLayout } from "layout/home";
 import React from "react";
-import { RecentDesignCardList } from "components/recent-design-card";
-import { DefaultEditorWorkspaceLayout } from "layouts/default-editor-workspace-layout";
-import { SideNavigation } from "components/side-navigation";
+import { useAuthState } from "hooks/use-auth-state";
 
 export default function Home() {
-  return (
-    <DefaultEditorWorkspaceLayout leftbar={<SideNavigation>{}</SideNavigation>}>
-      <BodyContainer />
-      {/* <Link href="/figma">from figma</Link>
-      <br />
-      <br />
-      <Link href="/preferences">Preferences (set access token)</Link> */}
-    </DefaultEditorWorkspaceLayout>
-  );
-}
+  const authstate = useAuthState();
 
-function BodyContainer() {
-  return (
-    <div style={{ padding: 24 }}>
-      <RecentDesignSection />
-    </div>
-  );
-}
-
-function RecentDesignSection() {
-  return (
-    <>
-      <RecentDesignCardList />
-    </>
-  );
+  switch (authstate) {
+    case "loading":
+    case "expired":
+    case "unauthorized":
+    default:
+      return <HomeInputLayout />;
+    case "signedin":
+      return <HomeLayout />;
+  }
 }

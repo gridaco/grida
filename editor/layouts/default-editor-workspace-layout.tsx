@@ -6,9 +6,10 @@ export function DefaultEditorWorkspaceLayout(props: {
   leftbar?: JSX.Element;
   rightbar?: JSX.Element;
   children: JSX.Element | Array<JSX.Element>;
+  backgroundColor?: string;
 }) {
   return (
-    <WorkspaceRoot>
+    <WorkspaceRoot backgroundColor={props.backgroundColor}>
       <AppBarMenuAndBelowContentWrap>
         {/* <AppBarWrap>
           <AppMenu />
@@ -27,9 +28,10 @@ export function DefaultEditorWorkspaceLayout(props: {
   );
 }
 
-const WorkspaceRoot = styled.div`
+const WorkspaceRoot = styled.div<{ backgroundColor: string }>`
   width: 100vw;
   height: 100vh;
+  background-color: ${(p) => p.backgroundColor ?? "transparent"};
 `;
 
 const AppBarMenuAndBelowContentWrap = styled.div`
