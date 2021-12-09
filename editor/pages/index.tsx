@@ -6,6 +6,10 @@ import { useAuthState } from "hooks/use-auth-state";
 export default function Home() {
   const authstate = useAuthState();
 
+  // region - dev injected
+  return <HomeLayout />;
+  // endregion
+
   switch (authstate) {
     case "loading":
     case "expired":

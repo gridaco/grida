@@ -24,7 +24,6 @@
     "@modulz/design-system": "^0.6.1",
     "@monaco-editor/react": "^4.1.3",
     "@reflect-blocks/figma-embed": "^0.0.5",
-    "@reflect-ui/editor-ui": "0.0.1",
     "@visx/gradient": "^1.7.0",
     "@visx/group": "^1.7.0",
     "@visx/hierarchy": "^1.7.0",

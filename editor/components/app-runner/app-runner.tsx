@@ -49,6 +49,8 @@ export function AppRunner(props: {
       >
         <div
           style={{
+            borderRadius: 4,
+            overflow: "hidden",
             width: viewportsize.width || sceneSize.w || "100%",
             height: viewportsize.height || sceneSize.h || "100%",
             boxShadow: "0px 0px 48px #63636328",
@@ -162,14 +164,7 @@ function ResizableContainer({
   };
 
   return (
-    <Resizable
-      ref={resizable}
-      defaultSize={initialSize}
-      onResize={_onResize}
-      handleComponent={{
-        bottomRight: ResizeKnob(),
-      }}
-    >
+    <Resizable ref={resizable} defaultSize={initialSize} onResize={_onResize}>
       {children}
     </Resizable>
   );

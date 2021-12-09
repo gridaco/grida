@@ -5,15 +5,14 @@ import { AppMenu } from "./app-menu";
 export function DefaultEditorWorkspaceLayout(props: {
   leftbar?: JSX.Element;
   rightbar?: JSX.Element;
+  appbar?: JSX.Element;
   children: JSX.Element | Array<JSX.Element>;
   backgroundColor?: string;
 }) {
   return (
     <WorkspaceRoot backgroundColor={props.backgroundColor}>
       <AppBarMenuAndBelowContentWrap>
-        {/* <AppBarWrap>
-          <AppMenu />
-        </AppBarWrap> */}
+        {props.appbar && <AppBarWrap>{props.appbar}</AppBarWrap>}
         <NonMenuContentZoneWrap>
           {props.leftbar && (
             <PanelLeftSideWrap>{props.leftbar}</PanelLeftSideWrap>

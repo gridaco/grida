@@ -1,15 +1,15 @@
 import React from "react";
 import { FigmaEmbedCanvas } from "components/canvas";
 
-interface ScenePreviewConfig {
+interface DesignPreviewConfig {
   fileid: string;
   sceneid: string;
   origin: "figma" | "sketch" | "xd" | "nothing";
   displayAs: "embed" | "static" | "nothing";
 }
 
-export function ScenePreview(props: {
-  config: ScenePreviewConfig;
+export function DesignPreview(props: {
+  config: DesignPreviewConfig;
   width: string;
   height: string;
 }) {
