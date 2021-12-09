@@ -10,6 +10,7 @@ module.exports = {
           components: "./components",
           icons: "./icons",
           layouts: "./layouts",
+          scaffolds: "./scaffolds",
           utils: "./utils",
           public: "./public",
           hooks: "./hooks",
