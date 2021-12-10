@@ -6,7 +6,7 @@ import { EditorLayerHierarchy } from "../editor-layer-hierarchy";
 export function EditorSidebar() {
   return (
     <SideNavigation>
-      <EditorAppbarFragments.Sidebar />
+      {/* <EditorAppbarFragments.Sidebar /> */}
       <EditorLayerHierarchy />
     </SideNavigation>
   );

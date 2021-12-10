@@ -53,7 +53,7 @@ export function AppRunner(props: {
             overflow: "hidden",
             width: viewportsize.width || sceneSize.w || "100%",
             height: viewportsize.height || sceneSize.h || "100%",
-            boxShadow: "0px 0px 48px #63636328",
+            boxShadow: "0px 0px 48px #00000020",
           }}
         >
           <DedicatedFrameworkRunner

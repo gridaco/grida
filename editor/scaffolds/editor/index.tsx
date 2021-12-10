@@ -22,6 +22,9 @@ import {
 } from "@design-sdk/core/assets-repository";
 import { personal } from "@design-sdk/figma-auth-store";
 import { useFigmaAccessToken } from "hooks";
+import { ReflectSceneNode } from "@design-sdk/figma-node";
+import { get_framework_config } from "query/to-code-options-from-query";
+import { CodeOptionsControl } from "components/codeui-code-options-control";
 
 export function Editor() {
   const router = useRouter();
@@ -32,20 +35,26 @@ export function Editor() {
   const [result, setResult] = useState<Result>();
   const [preview, setPreview] = useState<Result>();
 
-  const framework_config = wstate.preferences.framework_config;
+  const [framework_config, set_framework_config] = useState(
+    wstate.preferences.framework_config
+  );
   const preview_runner_framework =
     wstate.preferences.preview_runner_framework_config;
   const enable_components =
     wstate.preferences.enable_preview_feature_components_support;
   const design = state.design?.current;
+  const focusid =
+    state?.selectedNodes?.length === 1 ? state.selectedNodes[0] : null;
+  const focused =
+    find_node_by_id_under_entry(focusid, design?.entry) ?? design?.entry;
+
+  // const focusdesign = design?.nodes.find((n) => n.id === focusid);
 
   useEffect(() => {
-    if (design) {
-      // const { reflect, raw } = design;
-      const { id, name } = design.entry;
-      // ------------------------------------------------------------
-      // other platforms are not supported yet
-      // set image repo for figma platform
+    // ------------------------------------------------------------
+    // other platforms are not supported yet
+    // set image repo for figma platform
+    if (state.design) {
       MainImageRepository.instance = new RemoteImageRepositories(
         state.design.key,
         {
@@ -61,9 +70,20 @@ export function Editor() {
           "grida://assets-reservation/images/"
         )
       );
-      // ------------------------------------------------------------
+    }
+    // ------------------------------------------------------------
+  }, [state.design?.key, fat]);
+
+  useEffect(() => {
+    if (focused && framework_config) {
+      console.log("Editor: useEffect: focused");
       designToCode({
-        input: design,
+        input: {
+          id: focused.id,
+          name: focused.name,
+          entry: focused,
+          repository: design.repository,
+        },
         framework: framework_config,
         asset_config: { asset_repository: MainImageRepository.instance },
         build_config: {
@@ -77,13 +97,13 @@ export function Editor() {
         }
       });
     }
-  }, [design, framework_config?.framework]);
+  }, [focused?.id, framework_config?.framework]);
 
   useEffect(() => {
     if (design) {
       const { id, name } = design.entry;
       // ----- for preview -----
-      if (framework_config.framework !== preview_runner_framework.framework) {
+      if (framework_config?.framework !== preview_runner_framework.framework) {
         designToCode({
           input: {
             id: id,
@@ -101,7 +121,7 @@ export function Editor() {
         });
       }
     }
-  }, [design]);
+  }, [design?.id]);
 
   const { code, scaffold, name: componentName } = result ?? {};
   const _key_for_preview = design?.id;
@@ -139,14 +159,14 @@ export function Editor() {
         </WorkspaceContentPanel>
         <WorkspaceContentPanel backgroundColor={"rgba(30, 30, 30, 1)"}>
           <CodeEditorContainer>
-            <EditorAppbarFragments.CodeEditor />
-            {/* <CodeOptionsControl
+            {/* <EditorAppbarFragments.CodeEditor /> */}
+            <CodeOptionsControl
               initialPreset={router.query.framework as string}
               fallbackPreset="react_default"
               onUseroptionChange={(o) => {
                 set_framework_config(get_framework_config(o.framework));
               }}
-            /> */}
+            />
             <CodeEditor
               key={code?.raw}
               height="100vh"
@@ -231,3 +251,19 @@ const CodeEditorContainer = styled.div`
   flex-direction: column;
   align-items: stretch;
 `;
+
+const find_node_by_id_under_entry = (id: string, entry: ReflectSceneNode) => {
+  if (!entry) return null;
+  if (entry.id === id) {
+    return entry;
+  }
+  if (entry.children) {
+    for (const child of entry.children) {
+      const found = find_node_by_id_under_entry(id, child);
+      if (found) {
+        return found;
+      }
+    }
+  }
+  return null;
+};

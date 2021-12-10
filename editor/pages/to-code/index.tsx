@@ -78,6 +78,7 @@ export default function Page() {
         type: "set",
         value: {
           selectedNodes: [design.node],
+          selectedLayersOnPreview: [],
           selectedPage: null, // TODO:
           design: {
             pages: [], // TODO:

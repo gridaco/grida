@@ -14,6 +14,7 @@ export function historyReducer(state: HistoryState, action: HistoryAction) {
           const nextPresent = draft.past.pop();
           if (nextPresent) {
             draft.future.unshift(
+              // @ts-ignore
               createHistoryEntry(nextPresent.actionType, currentState)
             );
             draft.present = nextPresent.state;
@@ -28,6 +29,7 @@ export function historyReducer(state: HistoryState, action: HistoryAction) {
           const nextPresent = draft.future.shift();
           if (nextPresent) {
             draft.past.push(
+              // @ts-ignore
               createHistoryEntry(nextPresent.actionType, currentState)
             );
             draft.present = nextPresent.state;
@@ -46,12 +48,17 @@ export function historyReducer(state: HistoryState, action: HistoryAction) {
         if (mergableEntry) {
           draft.past[draft.past.length - 1] = {
             ...historyEntry,
+            // @ts-ignore
             state: mergableEntry.state,
           };
         } else {
-          draft.past.push(historyEntry);
+          draft.past.push(
+            // @ts-ignore
+            historyEntry
+          );
         }
         draft.future = [];
+        // @ts-ignore
         draft.present = nextState;
       });
   }

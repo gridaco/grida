@@ -1,10 +1,12 @@
 import React from "react";
 import styled from "@emotion/styled";
+import { useEditorState } from "core/states";
 
 export function AppbarFragmentForCanvas() {
+  const [state] = useEditorState();
   return (
     <RootWrapperAppbarFragmentForCanvas>
-      <MusicAppHomeScreen>@music-app / home-screen</MusicAppHomeScreen>
+      <Breadcrumbs>{state.design?.current?.name}</Breadcrumbs>
     </RootWrapperAppbarFragmentForCanvas>
   );
 }
@@ -22,7 +24,7 @@ const RootWrapperAppbarFragmentForCanvas = styled.div`
   padding: 10px 24px;
 `;
 
-const MusicAppHomeScreen = styled.span`
+const Breadcrumbs = styled.span`
   text-overflow: ellipsis;
   font-size: 14px;
   color: grey;

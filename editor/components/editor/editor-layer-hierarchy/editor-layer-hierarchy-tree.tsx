@@ -1,16 +1,16 @@
-import React, { memo, useCallback, useMemo, useState } from "react";
+import React, { memo, useCallback, useMemo, useReducer, useState } from "react";
 
 import styled from "@emotion/styled";
 import { TreeView } from "@editor-ui/editor";
-import { ListView } from "@editor-ui/listview";
 import { LayerRow } from "./editor-layer-hierarchy-item";
 import { useEditorState } from "core/states";
+import { useDispatch } from "core/dispatch";
 
 export function EditorLayerHierarchy() {
   const [state] = useEditorState();
+  const dispatch = useDispatch();
   const root = state.design?.current?.entry;
   const layers = root ? flatten(root) : [];
-  const [selected, setSelected] = useState<string | null>(null);
 
   const renderItem = useCallback(
     ({ id, name, depth }) => {
@@ -21,19 +21,19 @@ export function EditorLayerHierarchy() {
           id={id}
           expanded={haschildren(id) == true ? true : undefined}
           key={id}
-          selected={selected == id}
+          selected={state?.selectedNodes?.includes(id)}
           onAddClick={() => {}}
           onMenuClick={() => {}}
           onDoubleClick={() => {}}
           onPress={() => {
-            setSelected(id);
+            dispatch({ type: "select-node", node: id });
           }}
           onSelectMenuItem={() => {}}
           onContextMenu={() => {}}
         />
       );
     },
-    [selected]
+    [state?.selectedNodes]
   );
 
   const haschildren = useCallback((id: string) => {

@@ -4,12 +4,14 @@ import { DesignInput } from "@designto/config/input";
 export interface EditorState {
   selectedPage: string;
   selectedNodes: string[];
+  selectedLayersOnPreview: string[];
   design: ReflectRepository;
 }
 
 export interface EditorSnapshot {
   selectedPage: string;
   selectedNodes: string[];
+  selectedLayersOnPreview: string[];
   design: ReflectRepository;
 }
 
