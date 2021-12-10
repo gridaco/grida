@@ -135,9 +135,9 @@ export function Editor() {
         <WorkspaceContentPanel>
           <>
             <EditorAppbarFragments.Canvas />
-            {_key_for_preview && preview ? (
+            {preview ? (
               <PreviewAndRunPanel
-                key={_key_for_preview}
+                // key={_key_for_preview}
                 config={{
                   src: preview.scaffold.raw,
                   platform: preview_runner_framework.framework,
@@ -183,8 +183,8 @@ export function Editor() {
                       },
                     }
                   : {
-                      "loading.txt": {
-                        raw: "// No input design provided to be converted..",
+                      loading: {
+                        raw: "Reading design...",
                         language: "text",
                         name: "loading",
                       },
@@ -240,11 +240,26 @@ export function Editor() {
   );
 }
 
-const EditorCanvasSkeleton = styled.div`
-  width: 100%;
-  height: 100%;
-  color: red;
-`;
+const EditorCanvasSkeleton = () => {
+  return (
+    <PreviewAndRunPanel
+      // key={_key_for_preview}
+      config={{
+        src: "",
+        platform: "vanilla",
+        componentName: "loading",
+        sceneSize: {
+          w: 375,
+          h: 812,
+        },
+        initialMode: "run",
+        fileid: "loading",
+        sceneid: "loading",
+        hideModeChangeControls: true,
+      }}
+    />
+  );
+};
 
 const CodeEditorContainer = styled.div`
   display: flex;
