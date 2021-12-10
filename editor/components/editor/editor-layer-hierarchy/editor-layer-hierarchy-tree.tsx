@@ -36,9 +36,12 @@ export function EditorLayerHierarchy() {
     [state?.selectedNodes]
   );
 
-  const haschildren = useCallback((id: string) => {
-    return layers.some((layer) => layer.parent === id);
-  }, []);
+  const haschildren = useCallback(
+    (id: string) => {
+      return layers.some((layer) => layer.parent === id);
+    },
+    [layers.length]
+  );
 
   return (
     <TreeView.Root
