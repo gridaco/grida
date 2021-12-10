@@ -1,7 +1,7 @@
 import styled from "@emotion/styled";
 import React, { useState } from "react";
 import { AppRunner } from "components/app-runner";
-import { ScenePreview } from "components/scene-preview";
+import { DesignPreview } from "components/design-preview";
 
 type Mode = "preview" | "run";
 
@@ -41,7 +41,7 @@ export function PreviewAndRunPanel(props: { config: SceneRunnerConfig }) {
     switch (mode) {
       case "preview":
         return (
-          <ScenePreview
+          <DesignPreview
             config={{
               fileid: sceneConfig?.fileid,
               sceneid: sceneConfig?.sceneid,

@@ -10,7 +10,7 @@ export function VanillaRunner({
   source: string;
   componentName: string;
 }) {
-  const inlinesource = source || `<p>Hello world</p>`;
+  const inlinesource = source || `<div></div>`;
   return (
     <>
       <iframe

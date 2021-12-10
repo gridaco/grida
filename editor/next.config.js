@@ -60,7 +60,12 @@ const withTM = require("next-transpile-modules")([
   // -----------------------------
 
   // reflect-ui ui framework
-  "@reflect-ui/editor-ui",
+  // @editor-ui ui components
+  "@editor-ui/editor",
+  "@editor-ui/hierarchy",
+  "@editor-ui/spacer",
+  "@editor-ui/utils",
+  "@editor-ui/button",
 
   // -----------------------------
   // region coli
@@ -98,7 +103,7 @@ module.exports = withTM({
         permanent: true,
       },
       {
-        // temporary landing page redirection
+        // typo gaurd
         source: "/",
         destination: "https://grida.co",
         permanent: false,

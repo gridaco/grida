@@ -3,6 +3,8 @@ import React, { useEffect } from "react";
 import { useAuthState } from "hooks";
 import { useRouter } from "next/router";
 
+const __is_dev = process.env.NODE_ENV == "development";
+
 export function SigninToContinueBannerPrmoptProvider({
   children,
 }: {
@@ -15,7 +17,7 @@ export function SigninToContinueBannerPrmoptProvider({
   return (
     <>
       {children}
-      {shouldshow && <SigninToContinueBannerPrmopt />}
+      {!__is_dev && shouldshow && <SigninToContinueBannerPrmopt />}
     </>
   );
 }

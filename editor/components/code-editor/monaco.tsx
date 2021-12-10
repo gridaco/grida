@@ -26,6 +26,7 @@ export function MonacoEditor(props: MonacoEditorProps) {
       defaultLanguage={
         pollyfill_language(props.defaultLanguage) ?? "typescript"
       }
+      loading={<></>}
       defaultValue={props.defaultValue ?? "// no content"}
       theme="vs-dark"
       options={{ ...props.options }}

@@ -31,6 +31,11 @@ export function CodeOptionsControl(props: CodeOptionsControlProps) {
     all_preset_options_map__prod[__presetname]
   );
 
+  useEffect(() => {
+    // trigger initial value
+    props.onUseroptionChange(useroption);
+  }, []);
+
   // FIXME: this should be fixed on https://github.com/gridaco/code-like-ui (view CURSOR)
   const __dirty_sort_framework = (): Option<string>[] => {
     const presets = [

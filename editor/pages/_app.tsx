@@ -1,6 +1,7 @@
 import React from "react";
 import { Global, css } from "@emotion/react";
 import Head from "next/head";
+import { EditorThemeProvider } from "@editor-ui/theme";
 
 function GlobalCss() {
   return (
@@ -11,6 +12,7 @@ function GlobalCss() {
           padding: 0;
           font-family: "Helvetica Nueue", "Roboto", sans-serif;
         }
+
         iframe {
           border: none;
         }
@@ -38,7 +40,6 @@ function HeadInjection() {
     <Head>
       <GlobalCss />
       <SeoMeta />
-      <title>Grida: Design to Code</title>
       <link
         href="https://fonts.googleapis.com/css2?family=Roboto:ital,wght@0,100;0,300;0,400;0,500;0,700;0,900;1,100;1,300;1,400;1,500;1,700;1,900&"
         rel="stylesheet"
@@ -80,6 +81,7 @@ function HeadInjection() {
 function SeoMeta() {
   return (
     <>
+      <title>Grida: Design to Code</title>
       <meta property="title" content="Design to Codes" />
       <meta property="description" content="Design to Codes description" />
     </>
@@ -90,7 +92,9 @@ function EditorApp({ Component, pageProps }) {
   return (
     <React.Fragment>
       <HeadInjection />
-      <Component {...pageProps} />
+      <EditorThemeProvider dark>
+        <Component {...pageProps} />
+      </EditorThemeProvider>
     </React.Fragment>
   );
 }
