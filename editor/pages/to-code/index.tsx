@@ -17,7 +17,7 @@ import {
 import { WorkspaceAction } from "core/actions";
 import { createInitialWorkspaceState } from "core/states";
 import { workspaceReducer } from "core/reducers";
-import { useDesign, useDesignFile } from "hooks";
+import { P_DESIGN, useDesign, useDesignFile } from "hooks";
 import {
   get_enable_components_config_from_query,
   get_framework_config_from_query,
@@ -27,6 +27,7 @@ import { PendingState } from "core/utility-types";
 import { DesignInput } from "@designto/config/input";
 import { convert } from "@design-sdk/figma-node-conversion";
 import { mapper } from "@design-sdk/figma-remote";
+import { analyze, parseFileAndNodeId } from "@design-sdk/figma-url";
 
 const pending_workspace_state = createPendingWorkspaceState();
 //
@@ -104,11 +105,17 @@ export default function Page() {
   }, [design, router]);
 
   // background whole file fetching
-  const file = useDesignFile({ file: design?.file });
+  const designparam: string = router.query[P_DESIGN] as string;
+  const targetnodeconfig = parseFileAndNodeId(designparam);
+  const file = useDesignFile({ file: targetnodeconfig?.file });
   const prevstate =
     initialState.type == "success" && initialState.value.history.present;
   const selectedPage = useMemo(() => {
-    if (prevstate.selectedNodes && file?.document?.children) {
+    if (prevstate.selectedPage) {
+      return prevstate.selectedPage;
+    }
+
+    if (prevstate?.selectedNodes && file?.document?.children) {
       return prevstate.selectedNodes.length > 0
         ? file.document.children.find((page) => {
             return isChildrenOf(prevstate.selectedNodes[0], page);
@@ -116,27 +123,44 @@ export default function Page() {
         : // find page of current selection.
           null;
     }
-    return null;
+
+    return file?.document?.children?.[0].id ?? null; // otherwise, return first page.
   }, [file?.document?.children]);
 
   useEffect(() => {
-    if (file && prevstate) {
-      const val: EditorSnapshot = {
-        ...prevstate,
-        design: {
-          ...prevstate.design,
-          pages: file.document.children.map((page) => ({
-            id: page.id,
-            name: page.name,
-            children: page["children"]?.map((child) => {
-              const _mapped = mapper.mapFigmaRemoteToFigma(child);
-              return convert.intoReflectNode(_mapped);
-            }),
-            type: "design",
-          })),
-        },
-        selectedPage: selectedPage,
-      };
+    if (file) {
+      let val: EditorSnapshot;
+
+      const pages = file.document.children.map((page) => ({
+        id: page.id,
+        name: page.name,
+        children: page["children"]?.map((child) => {
+          const _mapped = mapper.mapFigmaRemoteToFigma(child);
+          return convert.intoReflectNode(_mapped);
+        }),
+        type: "design",
+      }));
+      if (prevstate) {
+        val = {
+          ...prevstate,
+          design: {
+            ...prevstate.design,
+            pages: pages,
+          },
+          selectedPage: selectedPage,
+        };
+      } else {
+        val = {
+          selectedNodes: [],
+          selectedLayersOnPreview: [],
+          design: {
+            input: null,
+            key: file.document.id, //?
+            pages: pages,
+          },
+          selectedPage: selectedPage,
+        };
+      }
 
       initialDispatcher({
         type: "set",

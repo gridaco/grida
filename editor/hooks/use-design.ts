@@ -24,7 +24,7 @@ configure_auth_credentials({
 /**
  * query param for design input
  */
-const P_DESIGN = "design";
+export const P_DESIGN = "design";
 
 type UseDesignProp =
   | (UseDesignFromRouter & UseDesingOptions)
