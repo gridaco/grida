@@ -90,11 +90,12 @@ export function Editor() {
   }, [state.design?.key, fat]);
 
   useEffect(() => {
-    if (targetted && framework_config) {
+    const __target = targetted;
+    if (__target && framework_config) {
       const _input = {
-        id: targetted.id,
-        name: targetted.name,
-        entry: targetted,
+        id: __target.id,
+        name: __target.name,
+        entry: __target,
         repository: root.repository,
       };
       const build_config = {
@@ -126,41 +127,45 @@ export function Editor() {
     }
   }, [targetted?.id, framework_config?.framework]);
 
-  useEffect(() => {
-    if (root) {
-      const { id, name } = root.entry;
-      const _input = {
-        id: id,
-        name: name,
-        entry: root.entry,
-      };
-      const build_config = {
-        ...config.default_build_configuration,
-        disable_components: true,
-      };
+  useEffect(
+    () => {
+      const __target = targetted; // root.entry;
+      if (__target) {
+        const _input = {
+          id: __target.id,
+          name: __target.name,
+          entry: __target,
+        };
+        const build_config = {
+          ...config.default_build_configuration,
+          disable_components: true,
+        };
 
-      const on_preview_result = (result: Result) => {
-        if (result.id == targetId) {
-          setPreview(result);
-        }
-      };
+        const on_preview_result = (result: Result) => {
+          if (result.id == targetId) {
+            setPreview(result);
+          }
+        };
 
-      // ----- for preview -----
-      designToCode({
-        input: _input,
-        build_config: build_config,
-        framework: vanilla_presets.vanilla_default,
-        asset_config: { skip_asset_replacement: true },
-      }).then(on_preview_result);
+        // ----- for preview -----
+        designToCode({
+          input: _input,
+          build_config: build_config,
+          framework: vanilla_presets.vanilla_default,
+          asset_config: { skip_asset_replacement: true },
+        }).then(on_preview_result);
 
-      designToCode({
-        input: root,
-        build_config: build_config,
-        framework: vanilla_presets.vanilla_default,
-        asset_config: { asset_repository: MainImageRepository.instance },
-      }).then(on_preview_result);
-    }
-  }, [root?.id]);
+        designToCode({
+          input: root,
+          build_config: build_config,
+          framework: vanilla_presets.vanilla_default,
+          asset_config: { asset_repository: MainImageRepository.instance },
+        }).then(on_preview_result);
+      }
+    },
+    [targetted?.id]
+    // [root?.id]
+  );
 
   const { code, scaffold, name: componentName } = result ?? {};
 
