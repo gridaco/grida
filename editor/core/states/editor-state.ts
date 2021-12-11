@@ -5,23 +5,23 @@ export interface EditorState {
   selectedPage: string;
   selectedNodes: string[];
   selectedLayersOnPreview: string[];
-  design: ReflectRepository;
+  design: FigmaReflectRepository;
 }
 
 export interface EditorSnapshot {
   selectedPage: string;
   selectedNodes: string[];
   selectedLayersOnPreview: string[];
-  design: ReflectRepository;
+  design: FigmaReflectRepository;
 }
 
-interface ReflectRepository {
+interface FigmaReflectRepository {
   /**
    * fileid; filekey
    */
   key: string;
 
   // TODO:
-  pages: [];
-  current: DesignInput;
+  pages: { id: string; name: string; children: ReflectSceneNode[] }[];
+  input: DesignInput;
 }

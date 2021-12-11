@@ -6,7 +6,7 @@ export function AppbarFragmentForCanvas() {
   const [state] = useEditorState();
   return (
     <RootWrapperAppbarFragmentForCanvas>
-      <Breadcrumbs>{state.design?.current?.name}</Breadcrumbs>
+      <Breadcrumbs>{state.design?.input?.name}</Breadcrumbs>
     </RootWrapperAppbarFragmentForCanvas>
   );
 }

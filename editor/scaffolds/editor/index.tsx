@@ -42,7 +42,7 @@ export function Editor() {
     wstate.preferences.preview_runner_framework_config;
   const enable_components =
     wstate.preferences.enable_preview_feature_components_support;
-  const design = state.design?.current;
+  const design = state.design?.input;
   const focusid =
     state?.selectedNodes?.length === 1 ? state.selectedNodes[0] : null;
   const focused =

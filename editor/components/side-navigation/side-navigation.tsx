@@ -15,4 +15,6 @@ const Wrapper = styled.div`
   align-items: stretch;
   flex-direction: column;
   min-height: 100%;
+  height: 100vh;
+  overflow-y: hidden;
 `;

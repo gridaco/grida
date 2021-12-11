@@ -1,5 +1,5 @@
 import produce from "immer";
-import { Action, SelectNodeAction } from "core/actions";
+import { Action, SelectNodeAction, SelectPageAction } from "core/actions";
 import { EditorState } from "core/states";
 
 export function editorReducer(state: EditorState, action: Action): EditorState {
@@ -12,8 +12,13 @@ export function editorReducer(state: EditorState, action: Action): EditorState {
       });
     }
     case "select-page": {
-      // return pageReducer(state, action);
+      const { page } = <SelectPageAction>action;
+      return produce(state, (draft) => {
+        draft.selectedPage = page;
+      });
     }
+    default:
+      throw new Error(`Unhandled action type: ${action["type"]}`);
   }
 
   return state;

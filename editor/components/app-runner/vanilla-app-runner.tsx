@@ -34,15 +34,11 @@ export function VanillaRunner({
               //@ts-ignore
               e.target.style.background = tint;
               //@ts-ignore
-              e.target.style.color = tint;
-              //@ts-ignore
               e.target.style.outline = `${tintl} solid 1px`;
             });
             el.addEventListener("mouseleave", (e) => {
               //@ts-ignore
               e.target.style.background = originstyle.background;
-              //@ts-ignore
-              e.target.style.color = originstyle.color;
               //@ts-ignore
               e.target.style.outline = originstyle.outline;
             });

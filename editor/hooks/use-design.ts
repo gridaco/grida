@@ -14,6 +14,7 @@ import { RemoteDesignSessionCacheStore } from "../store";
 import { convert } from "@design-sdk/figma-node-conversion";
 import { mapFigmaRemoteToFigma } from "@design-sdk/figma-remote/lib/mapper";
 import { useFigmaAccessToken } from ".";
+import { FileResponse } from "@design-sdk/figma-remote-types";
 
 // globally configure auth credentials for interacting with `@design-sdk/figma-remote`
 configure_auth_credentials({
@@ -165,6 +166,32 @@ export function useDesign({
     }
   }, [router, figmaAccessToken]);
   return design;
+}
+
+export function useDesignFile({ file }: { file: string }) {
+  const [designfile, setDesignFile] = useState<FileResponse>(null);
+  const figmaAccessToken = useFigmaAccessToken();
+  const figmaPersonalAccessToken = personal.get_safe();
+  useEffect(() => {
+    if (file && (figmaAccessToken || figmaPersonalAccessToken)) {
+      async function handle() {
+        const iterator = fetch.fetchFile({
+          file,
+          auth: {
+            personalAccessToken: figmaPersonalAccessToken,
+            accessToken: figmaAccessToken,
+          },
+        });
+        let next: IteratorResult<FileResponse>;
+        while ((next = await iterator.next()).done === false) {
+          setDesignFile(next.value);
+        }
+      }
+      handle();
+    }
+  }, [file, figmaAccessToken]);
+
+  return designfile;
 }
 
 const analyze = (query: string): "id" | DesignProvider => {
