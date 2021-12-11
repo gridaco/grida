@@ -52,7 +52,7 @@ interface UseDesignFromFileAndNode {
 }
 
 export function useDesign({
-  use_session_cache = true,
+  use_session_cache = false,
   type,
   ...props
 }: UseDesignProp) {

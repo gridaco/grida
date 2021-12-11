@@ -26,6 +26,7 @@ import {
 import { PendingState } from "core/utility-types";
 import { DesignInput } from "@designto/config/input";
 import { convert } from "@design-sdk/figma-node-conversion";
+import { mapper } from "@design-sdk/figma-remote";
 
 const pending_workspace_state = createPendingWorkspaceState();
 //
@@ -128,7 +129,8 @@ export default function Page() {
             id: page.id,
             name: page.name,
             children: page["children"]?.map((child) => {
-              return convert.intoReflectNode(child);
+              const _mapped = mapper.mapFigmaRemoteToFigma(child);
+              return convert.intoReflectNode(_mapped);
             }),
             type: "design",
           })),
