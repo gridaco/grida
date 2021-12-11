@@ -3,6 +3,8 @@ import styled from "@emotion/styled";
 import { PreviewAndRunPanel } from "components/preview-and-run";
 import { EditorAppbarFragments, EditorSidebar } from "components/editor";
 import { Result } from "@designto/code";
+import { InteractiveCanvas } from "components/canvas";
+import { VanillaRunner } from "components/app-runner/vanilla-app-runner";
 
 export function Canvas({
   preview,
@@ -18,7 +20,7 @@ export function Canvas({
   return (
     <>
       <EditorAppbarFragments.Canvas />
-      {preview ? (
+      {/* {preview ? (
         <PreviewAndRunPanel
           // key={_key_for_preview}
           config={{
@@ -37,7 +39,32 @@ export function Canvas({
         />
       ) : (
         <EditorCanvasSkeleton />
-      )}
+      )} */}
+      <InteractiveCanvas>
+        {preview ? (
+          <div
+            style={{
+              width: originsize.width,
+              height: originsize.height,
+            }}
+          >
+            <VanillaRunner
+              source={preview.scaffold.raw}
+              width={"100%"}
+              height={"100%"}
+              componentName={preview.name}
+            />
+          </div>
+        ) : (
+          <EditorCanvasSkeleton />
+        )}
+        {/* <div
+          style={{
+            height: 812,
+            background: "white",
+          }}
+        ></div> */}
+      </InteractiveCanvas>
     </>
   );
 }
