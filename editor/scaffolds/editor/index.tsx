@@ -76,44 +76,68 @@ export function Editor() {
 
   useEffect(() => {
     if (focused && framework_config) {
-      console.log("Editor: useEffect: focused");
-      designToCode({
-        input: {
-          id: focused.id,
-          name: focused.name,
-          entry: focused,
-          repository: design.repository,
-        },
-        framework: framework_config,
-        asset_config: { asset_repository: MainImageRepository.instance },
-        build_config: {
-          ...config.default_build_configuration,
-          disable_components: !enable_components,
-        },
-      }).then((result) => {
+      const input = {
+        id: focused.id,
+        name: focused.name,
+        entry: focused,
+        repository: design.repository,
+      };
+      const build_config = {
+        ...config.default_build_configuration,
+        disable_components: !enable_components,
+      };
+
+      const on_result = (result: Result) => {
         setResult(result);
         if (framework_config.framework == preview_runner_framework.framework) {
           setPreview(result);
         }
-      });
+      };
+
+      // build code without assets fetch
+      designToCode({
+        input: input,
+        framework: framework_config,
+        asset_config: { skip_asset_replacement: true },
+        build_config: build_config,
+      }).then(on_result);
+
+      // build final code with asset fetch
+      designToCode({
+        input: input,
+        framework: framework_config,
+        asset_config: { asset_repository: MainImageRepository.instance },
+        build_config: build_config,
+      }).then(on_result);
     }
   }, [focused?.id, framework_config?.framework]);
 
   useEffect(() => {
     if (design) {
       const { id, name } = design.entry;
+      const input = {
+        id: id,
+        name: name,
+        entry: design.entry,
+      };
+      const build_config = {
+        ...config.default_build_configuration,
+        disable_components: true,
+      };
       // ----- for preview -----
       if (framework_config?.framework !== preview_runner_framework.framework) {
         designToCode({
-          input: {
-            id: id,
-            name: name,
-            entry: design.entry,
-          },
-          build_config: {
-            ...config.default_build_configuration,
-            disable_components: true,
-          },
+          input: input,
+          build_config: build_config,
+          framework: preview_runner_framework,
+          asset_config: { skip_asset_replacement: true },
+        }).then((result) => {
+          setPreview(result);
+        });
+
+        designToCode({
+          input: input,
+          build_config: build_config,
           framework: preview_runner_framework,
           asset_config: { asset_repository: MainImageRepository.instance },
         }).then((result) => {
@@ -124,7 +148,6 @@ export function Editor() {
   }, [design?.id]);
 
   const { code, scaffold, name: componentName } = result ?? {};
-  const _key_for_preview = design?.id;
 
   return (
     <DefaultEditorWorkspaceLayout
