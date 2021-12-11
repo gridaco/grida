@@ -105,9 +105,9 @@ export default function Page() {
   }, [design, router]);
 
   // background whole file fetching
-  const designparam: string = router.query[P_DESIGN] as string;
-  const targetnodeconfig = parseFileAndNodeId(designparam);
-  const file = useDesignFile({ file: targetnodeconfig?.file });
+  const _design_param: string = router.query[P_DESIGN] as string;
+  const _file_key = parseFileAndNodeId(_design_param)?.file;
+  const file = useDesignFile({ file: _file_key });
   const prevstate =
     initialState.type == "success" && initialState.value.history.present;
   const selectedPage = useMemo(() => {
@@ -155,7 +155,7 @@ export default function Page() {
           selectedLayersOnPreview: [],
           design: {
             input: null,
-            key: file.document.id, //?
+            key: _file_key,
             pages: pages,
           },
           selectedPage: selectedPage,
