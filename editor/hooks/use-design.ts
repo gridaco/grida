@@ -63,7 +63,6 @@ export function useDesign({
 
   useEffect(() => {
     let targetnodeconfig: FigmaTargetNodeConfig;
-    console.log("type", type);
     switch (type) {
       case "use-file-node-id": {
         if (props["file"] && props["node"]) {

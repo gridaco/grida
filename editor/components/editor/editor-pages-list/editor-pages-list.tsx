@@ -34,6 +34,7 @@ export function EditorPagesList() {
             const selected = page.id === state.selectedPage;
             return (
               <EditorPageItem
+                key={page.id}
                 selected={selected}
                 id={page.id}
                 name={page.name}
