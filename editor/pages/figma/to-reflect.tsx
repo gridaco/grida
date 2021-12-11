@@ -14,7 +14,7 @@ export default function FigmaToReflectNodePage() {
 
   return (
     <>
-      <canvas.FigmaEmbedCanvas src={{ url: targetNodeConfig?.url }} />
+      <canvas.AsisPreviewFigmaEmbed src={{ url: targetNodeConfig?.url }} />
       <visualize_node.HorizontalHierarchyTreeVisualization
         key={reflect?.id}
         width={1000}

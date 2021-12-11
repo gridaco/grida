@@ -1,6 +1,6 @@
 import { k } from "@designto/react";
 import React from "react";
-import { CodeSandBoxView } from "./code-sandbox-runner";
+import { CodeSandBoxView } from "./csb-runner";
 
 export function ReactAppRunner(props: {
   source: string;
