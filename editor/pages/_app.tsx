@@ -7,6 +7,11 @@ function GlobalCss() {
   return (
     <Global
       styles={css`
+        html {
+          background-color: #252526;
+          touch-action: none;
+        }
+
         body {
           margin: 0px;
           padding: 0;
@@ -55,6 +60,17 @@ function HeadInjection() {
         name="theme-color"
         content="#1e1e1e"
         media="(prefers-color-scheme: dark)"
+      />
+
+      {/* disable zoom */}
+      <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
+      />
+      <script
+        dangerouslySetInnerHTML={{
+          __html: `function init() { document.body.addEventListener("wheel", (event) => {const { ctrlKey } = event; if (ctrlKey) { event.preventDefault(); return; }}, { passive: false });} window.addEventListener("DOMContentLoaded", init, false);`,
+        }}
       />
 
       {/* region Google analytics */}
