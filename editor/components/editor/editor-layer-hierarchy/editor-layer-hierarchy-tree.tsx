@@ -12,8 +12,13 @@ import { useDispatch } from "core/dispatch";
 export function EditorLayerHierarchy() {
   const [state] = useEditorState();
   const dispatch = useDispatch();
-  const root = state.design?.current?.entry;
-  const layers = root ? flatten(root, ["origin"]) : [];
+  const root = state.selectedPage
+    ? state.design.pages.find((p) => p.id == state.selectedPage).children
+    : [state.design?.input?.entry];
+
+  const layers: FlattenedNode[][] = root
+    ? root.filter((l) => !!l).map((layer) => flatten(layer))
+    : [];
 
   const renderItem = useCallback(
     ({ id, name, depth, type }) => {
@@ -48,14 +53,14 @@ export function EditorLayerHierarchy() {
 
   const haschildren = useCallback(
     (id: string) => {
-      return layers.some((layer) => layer.parent === id);
+      return layers.some((l) => l.some((layer) => layer.parent === id));
     },
-    [layers.length]
+    [layers]
   );
 
   return (
     <TreeView.Root
-      data={layers}
+      data={layers.flat()}
       keyExtractor={useCallback((item: any) => item.id, [])}
       renderItem={renderItem}
     />
@@ -79,11 +84,14 @@ interface FlattenedNode {
 
 const flatten = <T extends ITreeNode>(
   tree: T,
-  properties?: string[],
   parent?: string,
   depth: number = 0
 ): FlattenedNode[] => {
-  const convert = (node: T, properties, depth: number, parent?: string) => {
+  const convert = (node: T, depth: number, parent?: string) => {
+    if (!node) {
+      return;
+    }
+
     const result: FlattenedNode = {
       id: node.id,
       name: node.name,
@@ -92,17 +100,13 @@ const flatten = <T extends ITreeNode>(
       parent,
     };
 
-    properties?.forEach((property) => {
-      (result as object)[property] = node[property];
-    });
-
     return result;
   };
 
   const final = [];
-  final.push(convert(tree, properties, depth, parent));
-  for (const child of tree.children || []) {
-    final.push(...flatten(child, null, tree.id, depth + 1));
+  final.push(convert(tree, depth, parent));
+  for (const child of tree?.children || []) {
+    final.push(...flatten(child, tree.id, depth + 1));
   }
   return final;
 };

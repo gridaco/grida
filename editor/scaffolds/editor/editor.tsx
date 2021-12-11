@@ -11,7 +11,7 @@ import { WorkspaceBottomPanelDockLayout } from "layouts/panel/workspace-bottom-p
 import { CodeEditor } from "components/code-editor";
 import { ClearRemoteDesignSessionCache } from "components/clear-remote-design-session-cache";
 import { WidgetTree } from "components/visualization/json-visualization/json-tree";
-import { EditorAppbarFragments, EditorSidebar } from "components/editor";
+import { EditorSidebar } from "components/editor";
 import { useEditorState, useWorkspaceState } from "core/states";
 import { designToCode, Result } from "@designto/code";
 import { RemoteImageRepositories } from "@design-sdk/figma-remote/lib/asset-repository/image-repository";
@@ -22,9 +22,15 @@ import {
 } from "@design-sdk/core/assets-repository";
 import { personal } from "@design-sdk/figma-auth-store";
 import { useFigmaAccessToken } from "hooks";
-import { ReflectSceneNode } from "@design-sdk/figma-node";
 import { get_framework_config } from "query/to-code-options-from-query";
 import { CodeOptionsControl } from "components/codeui-code-options-control";
+import { DesignInput } from "@designto/config/input";
+import { Canvas } from "scaffolds/canvas";
+import {
+  find_node_by_id_under_entry,
+  find_node_by_id_under_inpage_nodes,
+} from "utils/design-query";
+import { vanilla_presets } from "@grida/builder-config-preset";
 
 export function Editor() {
   const router = useRouter();
@@ -38,17 +44,26 @@ export function Editor() {
   const [framework_config, set_framework_config] = useState(
     wstate.preferences.framework_config
   );
-  const preview_runner_framework =
-    wstate.preferences.preview_runner_framework_config;
+
   const enable_components =
     wstate.preferences.enable_preview_feature_components_support;
-  const design = state.design?.current;
-  const focusid =
-    state?.selectedNodes?.length === 1 ? state.selectedNodes[0] : null;
-  const focused =
-    find_node_by_id_under_entry(focusid, design?.entry) ?? design?.entry;
 
-  // const focusdesign = design?.nodes.find((n) => n.id === focusid);
+  const thisPageNodes = state.selectedPage
+    ? state.design.pages.find((p) => p.id == state.selectedPage).children
+    : null;
+
+  const targetId =
+    state?.selectedNodes?.length === 1 ? state.selectedNodes[0] : null;
+
+  const container_of_target =
+    find_node_by_id_under_inpage_nodes(targetId, thisPageNodes) || null;
+
+  const root = thisPageNodes
+    ? container_of_target && DesignInput.fromDesign(container_of_target)
+    : state.design?.input;
+
+  const targetted =
+    find_node_by_id_under_entry(targetId, root?.entry) ?? root?.entry;
 
   useEffect(() => {
     // ------------------------------------------------------------
@@ -75,12 +90,13 @@ export function Editor() {
   }, [state.design?.key, fat]);
 
   useEffect(() => {
-    if (focused && framework_config) {
-      const input = {
-        id: focused.id,
-        name: focused.name,
-        entry: focused,
-        repository: design.repository,
+    const __target = targetted;
+    if (__target && framework_config) {
+      const _input = {
+        id: __target.id,
+        name: __target.name,
+        entry: __target,
+        repository: root.repository,
       };
       const build_config = {
         ...config.default_build_configuration,
@@ -88,15 +104,14 @@ export function Editor() {
       };
 
       const on_result = (result: Result) => {
-        setResult(result);
-        if (framework_config.framework == preview_runner_framework.framework) {
-          setPreview(result);
+        if (result.id == targetted.id) {
+          setResult(result);
         }
       };
 
       // build code without assets fetch
       designToCode({
-        input: input,
+        input: _input,
         framework: framework_config,
         asset_config: { skip_asset_replacement: true },
         build_config: build_config,
@@ -104,48 +119,53 @@ export function Editor() {
 
       // build final code with asset fetch
       designToCode({
-        input: input,
+        input: root,
         framework: framework_config,
         asset_config: { asset_repository: MainImageRepository.instance },
         build_config: build_config,
       }).then(on_result);
     }
-  }, [focused?.id, framework_config?.framework]);
+  }, [targetted?.id, framework_config?.framework]);
 
-  useEffect(() => {
-    if (design) {
-      const { id, name } = design.entry;
-      const input = {
-        id: id,
-        name: name,
-        entry: design.entry,
-      };
-      const build_config = {
-        ...config.default_build_configuration,
-        disable_components: true,
-      };
-      // ----- for preview -----
-      if (framework_config?.framework !== preview_runner_framework.framework) {
+  useEffect(
+    () => {
+      const __target = targetted; // root.entry;
+      if (__target) {
+        const _input = {
+          id: __target.id,
+          name: __target.name,
+          entry: __target,
+        };
+        const build_config = {
+          ...config.default_build_configuration,
+          disable_components: true,
+        };
+
+        const on_preview_result = (result: Result) => {
+          if (result.id == targetId) {
+            setPreview(result);
+          }
+        };
+
+        // ----- for preview -----
         designToCode({
-          input: input,
+          input: _input,
           build_config: build_config,
-          framework: preview_runner_framework,
+          framework: vanilla_presets.vanilla_default,
           asset_config: { skip_asset_replacement: true },
-        }).then((result) => {
-          setPreview(result);
-        });
+        }).then(on_preview_result);
 
         designToCode({
-          input: input,
+          input: root,
           build_config: build_config,
-          framework: preview_runner_framework,
+          framework: vanilla_presets.vanilla_default,
           asset_config: { asset_repository: MainImageRepository.instance },
-        }).then((result) => {
-          setPreview(result);
-        });
+        }).then(on_preview_result);
       }
-    }
-  }, [design?.id]);
+    },
+    [targetted?.id]
+    // [root?.id]
+  );
 
   const { code, scaffold, name: componentName } = result ?? {};
 
@@ -156,29 +176,15 @@ export function Editor() {
     >
       <WorkspaceContentPanelGridLayout>
         <WorkspaceContentPanel>
-          <>
-            <EditorAppbarFragments.Canvas />
-            {preview ? (
-              <PreviewAndRunPanel
-                // key={_key_for_preview}
-                config={{
-                  src: preview.scaffold.raw,
-                  platform: preview_runner_framework.framework,
-                  componentName: componentName,
-                  sceneSize: {
-                    w: design.entry?.width,
-                    h: design.entry?.height,
-                  },
-                  initialMode: "run",
-                  fileid: state.design.key,
-                  sceneid: design.id,
-                  hideModeChangeControls: true,
-                }}
-              />
-            ) : (
-              <EditorCanvasSkeleton />
-            )}
-          </>
+          <Canvas
+            preview={preview}
+            fileid={state?.design?.key}
+            sceneid={root?.id}
+            originsize={{
+              width: root?.entry?.width,
+              height: root?.entry?.height,
+            }}
+          />
         </WorkspaceContentPanel>
         <WorkspaceContentPanel backgroundColor={"rgba(30, 30, 30, 1)"}>
           <CodeEditorContainer>
@@ -228,13 +234,13 @@ export function Editor() {
               >
                 <div style={{ flex: 1 }}>
                   <ClearRemoteDesignSessionCache
-                    key={design.id}
+                    key={root.id}
                     file={state.design.key}
-                    node={design.id}
+                    node={root.id}
                   />
                   <br />
-                  {(design.entry.origin === "INSTANCE" ||
-                    design.entry.origin === "COMPONENT") && (
+                  {(root.entry.origin === "INSTANCE" ||
+                    root.entry.origin === "COMPONENT") && (
                     <button
                       onClick={() => {
                         router.push({
@@ -249,7 +255,7 @@ export function Editor() {
                 </div>
 
                 <div style={{ flex: 2 }}>
-                  <WidgetTree data={design.entry} />
+                  <WidgetTree data={root.entry} />
                 </div>
                 <div style={{ flex: 2 }}>
                   <WidgetTree data={result.widget} />
@@ -263,45 +269,8 @@ export function Editor() {
   );
 }
 
-const EditorCanvasSkeleton = () => {
-  return (
-    <PreviewAndRunPanel
-      // key={_key_for_preview}
-      config={{
-        src: "",
-        platform: "vanilla",
-        componentName: "loading",
-        sceneSize: {
-          w: 375,
-          h: 812,
-        },
-        initialMode: "run",
-        fileid: "loading",
-        sceneid: "loading",
-        hideModeChangeControls: true,
-      }}
-    />
-  );
-};
-
 const CodeEditorContainer = styled.div`
   display: flex;
   flex-direction: column;
   align-items: stretch;
 `;
-
-const find_node_by_id_under_entry = (id: string, entry: ReflectSceneNode) => {
-  if (!entry) return null;
-  if (entry.id === id) {
-    return entry;
-  }
-  if (entry.children) {
-    for (const child of entry.children) {
-      const found = find_node_by_id_under_entry(id, child);
-      if (found) {
-        return found;
-      }
-    }
-  }
-  return null;
-};

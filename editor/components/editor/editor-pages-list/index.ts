@@ -1,1 +1,1 @@
-export const dummy = "";
+export { EditorPagesList } from "./editor-pages-list";
