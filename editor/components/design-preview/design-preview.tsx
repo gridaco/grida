@@ -1,5 +1,5 @@
 import React from "react";
-import { AsisPreviewFigmaEmbed } from "components/design-as-is-preview";
+import { AsisPreviewFigmaEmbed } from "components/design-preview-as-is";
 
 interface DesignPreviewConfig {
   fileid: string;
