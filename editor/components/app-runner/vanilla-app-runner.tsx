@@ -15,6 +15,29 @@ export function VanillaRunner({
   const ref = useRef<HTMLIFrameElement>();
 
   useEffect(() => {
+    if (ref.current) {
+      function disablezoom() {
+        ref.current.contentWindow.addEventListener(
+          "wheel",
+          (event) => {
+            const { ctrlKey } = event;
+            if (ctrlKey) {
+              event.preventDefault();
+              return;
+            }
+          },
+          { passive: false }
+        );
+      }
+      ref.current.contentWindow.addEventListener(
+        "DOMContentLoaded",
+        disablezoom,
+        false
+      );
+    }
+  }, [ref.current]);
+
+  useEffect(() => {
     if (ref.current && enableInspector) {
       ref.current.onload = () => {
         const matches = ref.current.contentDocument.querySelectorAll(

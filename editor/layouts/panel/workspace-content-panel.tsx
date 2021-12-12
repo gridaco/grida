@@ -16,13 +16,16 @@ export function WorkspaceContentPanel({
   disableBorder?: boolean;
 }) {
   return (
-    <Container backgroundColor={backgroundColor} disableBorder={disableBorder}>
+    <WorkspaceCPanel
+      backgroundColor={backgroundColor}
+      disableBorder={disableBorder}
+    >
       {children}
-    </Container>
+    </WorkspaceCPanel>
   );
 }
 
-const Container = styled.div<{
+const WorkspaceCPanel = styled.div<{
   backgroundColor: string;
   disableBorder: boolean;
 }>`

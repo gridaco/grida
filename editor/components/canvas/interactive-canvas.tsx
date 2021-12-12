@@ -1,7 +1,8 @@
 import React, { useRef, useState } from "react";
-import { useSpring, animated } from "react-spring";
+import styled from "@emotion/styled";
 import { usePinch } from "@use-gesture/react";
 import { Resizable } from "re-resizable";
+import { ZoomControl } from "./controller-zoom-control";
 
 export function InteractiveCanvas({
   children,
@@ -11,13 +12,42 @@ export function InteractiveCanvas({
   const [scale, setScale] = useState(1);
 
   return (
-    <div id="interactive-canvas" style={{ width: "100%", height: "100%" }}>
+    <InteractiveCanvasWrapper id="interactive-canvas">
       <ScalableFrame onRescale={setScale} scale={scale}>
-        <ResizableFrame scale={scale}>{children}</ResizableFrame>
+        <Controls>
+          <ZoomControl scale={scale} onChange={setScale} />
+        </Controls>
+        <ScalingAreaStaticRoot>
+          <ScalingArea scale={scale}>
+            <ResizableFrame scale={scale}>{children}</ResizableFrame>
+          </ScalingArea>
+        </ScalingAreaStaticRoot>
       </ScalableFrame>
-    </div>
+    </InteractiveCanvasWrapper>
   );
 }
+
+const InteractiveCanvasWrapper = styled.div`
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+`;
+
+const Controls = styled.div`
+  z-index: 2;
+  display: flex;
+  flex-direction: row;
+  justify-content: flex-end;
+`;
+
+const ScalingAreaStaticRoot = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  align-content: flex-start;
+  align-self: stretch;
+  flex: 1;
+`;
 
 function ScalableFrame({
   children,
@@ -28,14 +58,15 @@ function ScalableFrame({
   onRescale?: (scale: number) => void;
   children?: React.ReactNode;
 }) {
-  // const [{ xyzs }, set] = useSpring(() => ({ xyzs: [0, 0, 0, 100] }));
   const ref = useRef();
 
   usePinch(
     (state) => {
+      const prevscale = scale;
       const { offset } = state;
-      const [scale] = offset;
-      onRescale(scale);
+      const thisscale = offset[0];
+      // const newscale = thisscale - prevscale;
+      onRescale(thisscale);
     },
     { target: ref }
   );
@@ -45,25 +76,35 @@ function ScalableFrame({
       id="scale-event-listener"
       ref={ref}
       style={{
-        width: "100%",
-        height: "100%",
+        display: "flex",
+        flexDirection: "column",
+        flex: 1,
+        alignItems: "center",
+        alignContent: "center",
       }}
     >
-      <div
-        style={{
-          transform: `scale(${scale})`,
-          // xyzs
-          // .to((x, y, z, s): string => {
-          //   return `translate3D(${x}px, ${y}px, 0) scale(${s / 100})`;
-          // })
-          // .get(),
-        }}
-      >
-        {children}
-      </div>
+      {children}
     </div>
   );
 }
+
+const ScalingArea = ({
+  scale,
+  children,
+}: {
+  scale: number;
+  children: React.ReactNode;
+}) => {
+  return (
+    <div
+      style={{
+        transform: `scale(${scale})`,
+      }}
+    >
+      {children}
+    </div>
+  );
+};
 
 function ResizableFrame({
   scale,

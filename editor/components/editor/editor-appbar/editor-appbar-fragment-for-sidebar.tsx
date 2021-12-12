@@ -14,6 +14,7 @@ export function AppbarFragmentForSidebar() {
 }
 
 const RootWrapperAppbarFragmentForSidebar = styled.div`
+  z-index: 10;
   display: flex;
   justify-content: flex-start;
   flex-direction: row;

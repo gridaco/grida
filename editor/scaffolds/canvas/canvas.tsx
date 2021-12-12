@@ -18,7 +18,7 @@ export function Canvas({
   preview: Result;
 }) {
   return (
-    <>
+    <CanvasContainer id="canvas">
       <EditorAppbarFragments.Canvas />
       {/* {preview ? (
         <PreviewAndRunPanel
@@ -65,7 +65,7 @@ export function Canvas({
           }}
         ></div> */}
       </InteractiveCanvas>
-    </>
+    </CanvasContainer>
   );
 }
 
@@ -88,3 +88,9 @@ const EditorCanvasSkeleton = () => {
     />
   );
 };
+
+const CanvasContainer = styled.div`
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+`;
