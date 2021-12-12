@@ -15,7 +15,7 @@ export function ZoomControl({
 }) {
   const [isEditing, setIsEditing] = React.useState(false);
   const displayScale = (scale * 100).toFixed(0);
-  const mincontrol = 0.01;
+  const mincontrol = 0;
   return (
     <Wrapper>
       <Controls>

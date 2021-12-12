@@ -48,7 +48,8 @@ const Controls = styled.div`
 
 const ScalingAreaStaticRoot = styled.div`
   display: flex;
-  align-items: center;
+  align-items: flex-start; // when transform origin is top center.
+  padding-top: 20px;
   justify-content: center;
   align-content: flex-start;
   align-self: stretch;
@@ -106,6 +107,7 @@ const ScalingArea = ({
     <div
       style={{
         transform: `scale(${scale})`,
+        transformOrigin: "top center",
       }}
     >
       {children}
