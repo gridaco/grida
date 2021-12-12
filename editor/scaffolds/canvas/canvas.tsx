@@ -20,50 +20,22 @@ export function Canvas({
   return (
     <CanvasContainer id="canvas">
       <EditorAppbarFragments.Canvas />
-      {/* {preview ? (
-        <PreviewAndRunPanel
-          // key={_key_for_preview}
-          config={{
-            src: preview.scaffold.raw,
-            platform: "vanilla",
-            componentName: preview.name,
-            sceneSize: originsize && {
-              w: originsize.width,
-              h: originsize.height,
-            },
-            initialMode: "run",
-            fileid: fileid,
-            sceneid: sceneid,
-            hideModeChangeControls: true,
-          }}
-        />
-      ) : (
-        <EditorCanvasSkeleton />
-      )} */}
-      <InteractiveCanvas>
+      <InteractiveCanvas key={fileid + sceneid} defaultSize={originsize}>
         {preview ? (
-          <div
+          <VanillaRunner
+            key={preview.scaffold.raw}
             style={{
-              width: originsize.width,
-              height: originsize.height,
+              borderRadius: 4,
+              boxShadow: "0px 0px 48px #00000020",
             }}
-          >
-            <VanillaRunner
-              source={preview.scaffold.raw}
-              width={"100%"}
-              height={"100%"}
-              componentName={preview.name}
-            />
-          </div>
+            source={preview.scaffold.raw}
+            width="100%"
+            height="100%"
+            componentName={preview.name}
+          />
         ) : (
           <EditorCanvasSkeleton />
         )}
-        {/* <div
-          style={{
-            height: 812,
-            background: "white",
-          }}
-        ></div> */}
       </InteractiveCanvas>
     </CanvasContainer>
   );

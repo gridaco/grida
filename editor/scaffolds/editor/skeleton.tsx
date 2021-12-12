@@ -19,7 +19,7 @@ export function EditorSkeleton({ percent = 0 }: { percent?: number }) {
         <SidebarMock>
           <ListMock>
             {[1, 2, 3, 4, 5, 6, 7, 8].map((i) => (
-              <MockItem1>
+              <MockItem1 key={i.toString()}>
                 <BaseHierarchyItem>
                   <Frame55>
                     <Frame52></Frame52>

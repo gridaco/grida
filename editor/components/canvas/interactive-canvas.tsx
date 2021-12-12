@@ -6,7 +6,9 @@ import { ZoomControl } from "./controller-zoom-control";
 
 export function InteractiveCanvas({
   children,
+  defaultSize,
 }: {
+  defaultSize: { width: number; height: number };
   children?: React.ReactNode;
 }) {
   const [scale, setScale] = useState(1);
@@ -19,7 +21,9 @@ export function InteractiveCanvas({
         </Controls>
         <ScalingAreaStaticRoot>
           <ScalingArea scale={scale}>
-            <ResizableFrame scale={scale}>{children}</ResizableFrame>
+            <ResizableFrame defaultSize={defaultSize} scale={scale}>
+              {children}
+            </ResizableFrame>
           </ScalingArea>
         </ScalingAreaStaticRoot>
       </ScalableFrame>
@@ -109,15 +113,20 @@ const ScalingArea = ({
 function ResizableFrame({
   scale,
   children,
+  defaultSize,
 }: {
+  defaultSize?: { width: number; height: number };
   scale: number;
   children?: React.ReactNode;
 }) {
   return (
     <Resizable
-      style={{
-        overflow: "hidden",
-      }}
+      defaultSize={
+        defaultSize ?? {
+          width: 500,
+          height: 500,
+        }
+      }
       scale={scale}
     >
       {children}

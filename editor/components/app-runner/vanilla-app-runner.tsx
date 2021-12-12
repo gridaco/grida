@@ -5,12 +5,14 @@ export function VanillaRunner({
   height,
   source,
   enableInspector = true,
+  style,
 }: {
   width: string;
   height: string;
   source: string;
   componentName: string;
   enableInspector?: boolean;
+  style?: React.CSSProperties;
 }) {
   const ref = useRef<HTMLIFrameElement>();
 
@@ -79,6 +81,7 @@ export function VanillaRunner({
   return (
     <iframe
       ref={ref}
+      style={style}
       sandbox="allow-same-origin"
       srcDoc={inlinesource}
       width={width}
