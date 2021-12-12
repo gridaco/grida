@@ -20,6 +20,13 @@ export function Canvas({
   return (
     <CanvasContainer id="canvas">
       <EditorAppbarFragments.Canvas />
+      {/* <div
+        style={{
+          display: "flex",
+          justifyContent: "center",
+          flex: 1,
+        }}
+      > */}
       <InteractiveCanvas key={fileid + sceneid} defaultSize={originsize}>
         {preview ? (
           <VanillaRunner
@@ -37,6 +44,7 @@ export function Canvas({
           <EditorCanvasSkeleton />
         )}
       </InteractiveCanvas>
+      {/* </div> */}
     </CanvasContainer>
   );
 }
@@ -64,5 +72,6 @@ const EditorCanvasSkeleton = () => {
 const CanvasContainer = styled.div`
   display: flex;
   flex-direction: column;
+  max-width: calc((100vw - 200px) / 2); // TODO: make this dynamic
   height: 100%;
 `;

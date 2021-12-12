@@ -34,6 +34,8 @@ export function InteractiveCanvas({
 const InteractiveCanvasWrapper = styled.div`
   display: flex;
   flex-direction: column;
+  overflow-y: auto;
+  overflow-x: hidden;
   flex: 1;
 `;
 
@@ -51,6 +53,7 @@ const ScalingAreaStaticRoot = styled.div`
   align-content: flex-start;
   align-self: stretch;
   flex: 1;
+  max-height: 100vh; // TODO: make dynamic
 `;
 
 function ScalableFrame({
