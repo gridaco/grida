@@ -2,7 +2,6 @@ import React, { useEffect, useState } from "react";
 import styled from "@emotion/styled";
 import { useRouter } from "next/router";
 import { DefaultEditorWorkspaceLayout } from "layouts/default-editor-workspace-layout";
-import { PreviewAndRunPanel } from "components/preview-and-run";
 import {
   WorkspaceContentPanel,
   WorkspaceContentPanelGridLayout,
@@ -31,6 +30,7 @@ import {
   find_node_by_id_under_inpage_nodes,
 } from "utils/design-query";
 import { vanilla_presets } from "@grida/builder-config-preset";
+import { EditorSkeleton } from "./skeleton";
 
 export function Editor() {
   const router = useRouter();
@@ -168,104 +168,114 @@ export function Editor() {
   );
 
   const { code, scaffold, name: componentName } = result ?? {};
+  const _initially_loaded = state.design?.pages?.length > 0;
+  const _initial_load_progress =
+    [!!state.design?.input, !!result, state.design?.pages?.length > 0].filter(
+      Boolean
+    ).length / 3;
 
   return (
-    <DefaultEditorWorkspaceLayout
-      backgroundColor={"rgba(37, 37, 38, 1)"}
-      leftbar={<EditorSidebar />}
-    >
-      <WorkspaceContentPanelGridLayout>
-        <WorkspaceContentPanel>
-          <Canvas
-            preview={preview}
-            fileid={state?.design?.key}
-            sceneid={root?.id}
-            originsize={{
-              width: root?.entry?.width,
-              height: root?.entry?.height,
-            }}
-          />
-        </WorkspaceContentPanel>
-        <WorkspaceContentPanel backgroundColor={"rgba(30, 30, 30, 1)"}>
-          <CodeEditorContainer>
-            {/* <EditorAppbarFragments.CodeEditor /> */}
-            <CodeOptionsControl
-              initialPreset={router.query.framework as string}
-              fallbackPreset="react_default"
-              onUseroptionChange={(o) => {
-                set_framework_config(get_framework_config(o.framework));
+    <>
+      {!_initially_loaded && (
+        <EditorSkeleton percent={_initial_load_progress + 0.2} />
+      )}
+      <DefaultEditorWorkspaceLayout
+        backgroundColor={"rgba(37, 37, 38, 1)"}
+        leftbar={<EditorSidebar />}
+      >
+        <WorkspaceContentPanelGridLayout>
+          <WorkspaceContentPanel>
+            <Canvas
+              preview={preview}
+              fileid={state?.design?.key}
+              sceneid={root?.id}
+              originsize={{
+                width: root?.entry?.width,
+                height: root?.entry?.height,
               }}
             />
-            <CodeEditor
-              key={code?.raw}
-              height="100vh"
-              options={{
-                automaticLayout: true,
-              }}
-              files={
-                code
-                  ? {
-                      "index.tsx": {
-                        raw: code.raw,
-                        language: framework_config.language,
-                        name: "index.tsx",
-                      },
-                    }
-                  : {
-                      loading: {
-                        raw: "Reading design...",
-                        language: "text",
-                        name: "loading",
-                      },
-                    }
-              }
-            />
-          </CodeEditorContainer>
-        </WorkspaceContentPanel>
-        {wstate.preferences.debug_mode && (
-          <WorkspaceBottomPanelDockLayout resizable>
-            <WorkspaceContentPanel>
-              <div
-                style={{
-                  display: "flex",
-                  flexDirection: "row",
-                  alignItems: "stretch",
+          </WorkspaceContentPanel>
+          <WorkspaceContentPanel backgroundColor={"rgba(30, 30, 30, 1)"}>
+            <CodeEditorContainer>
+              {/* <EditorAppbarFragments.CodeEditor /> */}
+              <CodeOptionsControl
+                initialPreset={router.query.framework as string}
+                fallbackPreset="react_default"
+                onUseroptionChange={(o) => {
+                  set_framework_config(get_framework_config(o.framework));
                 }}
-              >
-                <div style={{ flex: 1 }}>
-                  <ClearRemoteDesignSessionCache
-                    key={root.id}
-                    file={state.design.key}
-                    node={root.id}
-                  />
-                  <br />
-                  {(root.entry.origin === "INSTANCE" ||
-                    root.entry.origin === "COMPONENT") && (
-                    <button
-                      onClick={() => {
-                        router.push({
-                          pathname: "/figma/inspect-component",
-                          query: router.query,
-                        });
-                      }}
-                    >
-                      inspect component
-                    </button>
-                  )}
-                </div>
+              />
+              <CodeEditor
+                key={code?.raw}
+                height="100vh"
+                options={{
+                  automaticLayout: true,
+                }}
+                files={
+                  code
+                    ? {
+                        "index.tsx": {
+                          raw: code.raw,
+                          language: framework_config.language,
+                          name: "index.tsx",
+                        },
+                      }
+                    : {
+                        loading: {
+                          raw: "Reading design...",
+                          language: "text",
+                          name: "loading",
+                        },
+                      }
+                }
+              />
+            </CodeEditorContainer>
+          </WorkspaceContentPanel>
+          {wstate.preferences.debug_mode && (
+            <WorkspaceBottomPanelDockLayout resizable>
+              <WorkspaceContentPanel>
+                <div
+                  style={{
+                    display: "flex",
+                    flexDirection: "row",
+                    alignItems: "stretch",
+                  }}
+                >
+                  <div style={{ flex: 1 }}>
+                    <ClearRemoteDesignSessionCache
+                      key={root.id}
+                      file={state.design.key}
+                      node={root.id}
+                    />
+                    <br />
+                    {(root.entry.origin === "INSTANCE" ||
+                      root.entry.origin === "COMPONENT") && (
+                      <button
+                        onClick={() => {
+                          router.push({
+                            pathname: "/figma/inspect-component",
+                            query: router.query,
+                          });
+                        }}
+                      >
+                        inspect component
+                      </button>
+                    )}
+                  </div>
 
-                <div style={{ flex: 2 }}>
-                  <WidgetTree data={root.entry} />
+                  <div style={{ flex: 2 }}>
+                    <WidgetTree data={root.entry} />
+                  </div>
+                  <div style={{ flex: 2 }}>
+                    <WidgetTree data={result.widget} />
+                  </div>
                 </div>
-                <div style={{ flex: 2 }}>
-                  <WidgetTree data={result.widget} />
-                </div>
-              </div>
-            </WorkspaceContentPanel>
-          </WorkspaceBottomPanelDockLayout>
-        )}
-      </WorkspaceContentPanelGridLayout>
-    </DefaultEditorWorkspaceLayout>
+              </WorkspaceContentPanel>
+            </WorkspaceBottomPanelDockLayout>
+          )}
+        </WorkspaceContentPanelGridLayout>
+      </DefaultEditorWorkspaceLayout>
+    </>
   );
 }
 
