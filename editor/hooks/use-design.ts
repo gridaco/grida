@@ -24,7 +24,7 @@ configure_auth_credentials({
 /**
  * query param for design input
  */
-const P_DESIGN = "design";
+export const P_DESIGN = "design";
 
 type UseDesignProp =
   | (UseDesignFromRouter & UseDesingOptions)
@@ -114,12 +114,14 @@ export function useDesign({
         const _2_converted_to_reflect = convert.intoReflectNode(
           _1_converted_to_figma
         );
-        setDesign(<TargetNodeConfig>{
+
+        const res = <TargetNodeConfig>{
           ...targetnodeconfig,
           raw: last_response,
           figma: _1_converted_to_figma,
           reflect: _2_converted_to_reflect,
-        });
+        };
+        setDesign(res);
       } else {
         if (figmaAccessToken || personalAccessToken) {
           fetch
@@ -163,7 +165,7 @@ export function useDesign({
         }
       }
     }
-  }, [router, figmaAccessToken]);
+  }, [router, figmaAccessToken, props["url"]]);
   return design;
 }
 

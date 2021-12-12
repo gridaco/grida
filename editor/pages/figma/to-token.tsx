@@ -56,7 +56,7 @@ export default function FigmaToReflectWidgetTokenPage() {
       >
         <WorkspaceContentPanelGridLayout>
           <WorkspaceContentPanel>
-            <canvas.FigmaEmbedCanvas
+            <canvas.AsisPreviewFigmaEmbed
               src={{ url: design.url }}
               width="100%"
               height="100%"

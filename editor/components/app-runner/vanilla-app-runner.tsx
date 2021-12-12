@@ -5,14 +5,39 @@ export function VanillaRunner({
   height,
   source,
   enableInspector = true,
+  style,
 }: {
   width: string;
   height: string;
   source: string;
   componentName: string;
   enableInspector?: boolean;
+  style?: React.CSSProperties;
 }) {
   const ref = useRef<HTMLIFrameElement>();
+
+  useEffect(() => {
+    if (ref.current) {
+      function disablezoom() {
+        ref.current.contentWindow.addEventListener(
+          "wheel",
+          (event) => {
+            const { ctrlKey } = event;
+            if (ctrlKey) {
+              event.preventDefault();
+              return;
+            }
+          },
+          { passive: false }
+        );
+      }
+      ref.current.contentWindow.addEventListener(
+        "DOMContentLoaded",
+        disablezoom,
+        false
+      );
+    }
+  }, [ref.current]);
 
   useEffect(() => {
     if (ref.current && enableInspector) {
@@ -56,6 +81,7 @@ export function VanillaRunner({
   return (
     <iframe
       ref={ref}
+      style={style}
       sandbox="allow-same-origin"
       srcDoc={inlinesource}
       width={width}

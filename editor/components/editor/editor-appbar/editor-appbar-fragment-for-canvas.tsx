@@ -12,11 +12,11 @@ export function AppbarFragmentForCanvas() {
 }
 
 const RootWrapperAppbarFragmentForCanvas = styled.div`
+  z-index: 10;
   display: flex;
   justify-content: center;
   flex-direction: row;
   align-items: center;
-  flex: 1;
   gap: 10px;
   align-self: stretch;
   background-color: rgba(37, 37, 38, 1);

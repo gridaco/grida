@@ -1,5 +1,5 @@
 import React from "react";
-import { FigmaEmbedCanvas } from "components/canvas";
+import { AsisPreviewFigmaEmbed } from "components/design-preview-as-is";
 
 interface DesignPreviewConfig {
   fileid: string;
@@ -19,7 +19,7 @@ export function DesignPreview(props: {
       switch (config.displayAs) {
         case "embed":
           return (
-            <FigmaEmbedCanvas
+            <AsisPreviewFigmaEmbed
               src={{
                 fileid: config.fileid,
                 nodeid: config.sceneid, // scene id is node id here.

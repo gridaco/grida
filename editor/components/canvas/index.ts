@@ -1,2 +1,1 @@
-export * from "./default-canvas";
-export * from "./figma-embed-canvas";
+export * from "./interactive-canvas";

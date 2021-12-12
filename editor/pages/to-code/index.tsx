@@ -1,10 +1,4 @@
-import React, {
-  useEffect,
-  useState,
-  useCallback,
-  useReducer,
-  useMemo,
-} from "react";
+import React, { useEffect, useCallback, useReducer } from "react";
 import { useRouter } from "next/router";
 import { SigninToContinueBannerPrmoptProvider } from "components/prompt-banner-signin-to-continue";
 import { Editor } from "scaffolds/editor";
@@ -17,7 +11,7 @@ import {
 import { WorkspaceAction } from "core/actions";
 import { createInitialWorkspaceState } from "core/states";
 import { workspaceReducer } from "core/reducers";
-import { useDesign, useDesignFile } from "hooks";
+import { P_DESIGN, useDesign, useDesignFile } from "hooks";
 import {
   get_enable_components_config_from_query,
   get_framework_config_from_query,
@@ -27,6 +21,8 @@ import { PendingState } from "core/utility-types";
 import { DesignInput } from "@designto/config/input";
 import { convert } from "@design-sdk/figma-node-conversion";
 import { mapper } from "@design-sdk/figma-remote";
+import { parseFileAndNodeId } from "@design-sdk/figma-url";
+import { TargetNodeConfig } from "query/target-node";
 
 const pending_workspace_state = createPendingWorkspaceState();
 //
@@ -69,81 +65,128 @@ export default function Page() {
   }, []);
   // endregion global state
 
-  const design = useDesign({ type: "use-router", router: router });
+  const _design_param: string = router.query[P_DESIGN] as string;
+  const _input = parseFileAndNodeId(_design_param);
+  const design = useDesign({ type: "use-url", url: _design_param });
 
   useEffect(() => {
-    if (initialState.type === "success") return;
-
-    if (design) {
-      // TODO: set preferences to workspace state.
-      const framework_config = get_framework_config_from_query(router.query);
-      const isDebug = router.query.debug;
-      const preview_runner_framework = get_preview_runner_framework(
-        router.query
-      );
-      const enable_components = get_enable_components_config_from_query(
-        router.query
-      );
-      initialDispatcher({
-        type: "set",
-        value: {
-          selectedNodes: [design.node],
-          selectedLayersOnPreview: [],
-          selectedPage: null, // TODO:
-          design: {
-            pages: [], // TODO:
-            key: design.file,
-            input: DesignInput.fromApiResponse({
-              ...design,
-              entry: design.reflect,
-            }),
-          },
-        },
-      });
-    }
-  }, [design, router]);
+    // TODO: set preferences to workspace state.
+    const framework_config = get_framework_config_from_query(router.query);
+    const isDebug = router.query.debug;
+    const preview_runner_framework = get_preview_runner_framework(router.query);
+    const enable_components = get_enable_components_config_from_query(
+      router.query
+    );
+  }, [router.query]);
 
   // background whole file fetching
-  const file = useDesignFile({ file: design?.file });
+  const file = useDesignFile({ file: _input?.file });
   const prevstate =
     initialState.type == "success" && initialState.value.history.present;
-  const selectedPage = useMemo(() => {
-    if (prevstate.selectedNodes && file?.document?.children) {
-      return prevstate.selectedNodes.length > 0
-        ? file.document.children.find((page) => {
-            return isChildrenOf(prevstate.selectedNodes[0], page);
+
+  const selectedPage = (pages: { id: string }[], selectedNodes: string[]) => {
+    if (prevstate.selectedPage) {
+      return prevstate.selectedPage;
+    }
+
+    if (selectedNodes && pages) {
+      return selectedNodes.length > 0
+        ? pages.find((page) => {
+            return isChildrenOf(selectedNodes[0], page);
           })?.id ?? null
         : // find page of current selection.
           null;
     }
-    return null;
-  }, [file?.document?.children]);
+
+    return file?.document?.children?.[0].id ?? null; // otherwise, return first page.
+  };
+
+  function initializeDesign(design: TargetNodeConfig): EditorSnapshot {
+    return {
+      selectedNodes: [design.node],
+      selectedLayersOnPreview: [],
+      selectedPage: null,
+      design: {
+        pages: [],
+        key: design.file,
+        input: DesignInput.fromApiResponse({
+          ...design,
+          entry: design.reflect,
+        }),
+      },
+    };
+  }
 
   useEffect(() => {
-    if (file && prevstate) {
-      const val: EditorSnapshot = {
-        ...prevstate,
-        design: {
-          ...prevstate.design,
-          pages: file.document.children.map((page) => ({
-            id: page.id,
-            name: page.name,
-            children: page["children"]?.map((child) => {
-              const _mapped = mapper.mapFigmaRemoteToFigma(child);
-              return convert.intoReflectNode(_mapped);
-            }),
-            type: "design",
-          })),
-        },
-        selectedPage: selectedPage,
-      };
+    if (design) {
+      if (initialState.type === "success") return;
+      initialDispatcher({
+        type: "set",
+        value: initializeDesign(design),
+      });
+    }
+  }, [design, router.query]);
+
+  useEffect(() => {
+    if (_input?.node) {
+      if (!design) {
+        // if target design is specified, whole file fetching should wait until design is loaded.
+        return;
+      }
+    }
+    if (file) {
+      let val: EditorSnapshot;
+
+      const pages = file.document.children.map((page) => ({
+        id: page.id,
+        name: page.name,
+        children: page["children"]?.map((child) => {
+          const _mapped = mapper.mapFigmaRemoteToFigma(child);
+          return convert.intoReflectNode(_mapped);
+        }),
+        type: "design",
+      }));
+
+      if (prevstate) {
+        val = {
+          ...prevstate,
+          design: {
+            ...prevstate.design,
+            pages: pages,
+          },
+          selectedPage: selectedPage(pages, prevstate.selectedNodes),
+        };
+      } else {
+        if (design) {
+          const initialState = initializeDesign(design);
+          val = {
+            ...initialState,
+            design: {
+              ...initialState.design,
+              pages: pages,
+            },
+            selectedPage: selectedPage(pages, initialState.selectedNodes),
+          };
+        } else {
+          val = {
+            selectedNodes: [],
+            selectedLayersOnPreview: [],
+            design: {
+              input: null,
+              key: _input.file,
+              pages: pages,
+            },
+            selectedPage: selectedPage(pages, null),
+          };
+        }
+      }
 
       initialDispatcher({
         type: "set",
         value: val,
       });
     }
-  }, [file?.document?.children]);
+  }, [_input?.url, design, file?.document?.children]);
   // endregion
 
   const safe_value =
@@ -166,6 +209,7 @@ type Tree = {
 };
 
 function isChildrenOf(child: string, parent: Tree) {
+  if (!parent) return false;
   if (child === parent.id) return true;
   if (parent.children?.length === 0) return false;
   return parent.children?.some((c) => isChildrenOf(child, c)) ?? false;

@@ -26,6 +26,7 @@ export function AppbarFragmentForCodeEditor() {
 }
 
 const RootWrapperAppbarFragmentForCodeEditor = styled.div`
+  z-index: 10;
   display: flex;
   justify-content: center;
   flex-direction: row;
