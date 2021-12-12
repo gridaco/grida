@@ -1,10 +1,4 @@
-import React, {
-  useEffect,
-  useState,
-  useCallback,
-  useReducer,
-  useMemo,
-} from "react";
+import React, { useEffect, useCallback, useReducer } from "react";
 import { useRouter } from "next/router";
 import { SigninToContinueBannerPrmoptProvider } from "components/prompt-banner-signin-to-continue";
 import { Editor } from "scaffolds/editor";
@@ -27,7 +21,8 @@ import { PendingState } from "core/utility-types";
 import { DesignInput } from "@designto/config/input";
 import { convert } from "@design-sdk/figma-node-conversion";
 import { mapper } from "@design-sdk/figma-remote";
-import { analyze, parseFileAndNodeId } from "@design-sdk/figma-url";
+import { parseFileAndNodeId } from "@design-sdk/figma-url";
+import { TargetNodeConfig } from "query/target-node";
 
 const pending_workspace_state = createPendingWorkspaceState();
 //
@@ -70,64 +65,75 @@ export default function Page() {
   }, []);
   // endregion global state
 
-  const design = useDesign({ type: "use-router", router: router });
+  const _design_param: string = router.query[P_DESIGN] as string;
+  const _input = parseFileAndNodeId(_design_param);
+  const design = useDesign({ type: "use-url", url: _design_param });
 
   useEffect(() => {
-    if (initialState.type === "success") return;
-
-    if (design) {
-      // TODO: set preferences to workspace state.
-      const framework_config = get_framework_config_from_query(router.query);
-      const isDebug = router.query.debug;
-      const preview_runner_framework = get_preview_runner_framework(
-        router.query
-      );
-      const enable_components = get_enable_components_config_from_query(
-        router.query
-      );
-      initialDispatcher({
-        type: "set",
-        value: {
-          selectedNodes: [design.node],
-          selectedLayersOnPreview: [],
-          selectedPage: null, // TODO:
-          design: {
-            pages: [], // TODO:
-            key: design.file,
-            input: DesignInput.fromApiResponse({
-              ...design,
-              entry: design.reflect,
-            }),
-          },
-        },
-      });
-    }
-  }, [design, router]);
+    // TODO: set preferences to workspace state.
+    const framework_config = get_framework_config_from_query(router.query);
+    const isDebug = router.query.debug;
+    const preview_runner_framework = get_preview_runner_framework(router.query);
+    const enable_components = get_enable_components_config_from_query(
+      router.query
+    );
+  }, [router.query]);
 
   // background whole file fetching
-  const _design_param: string = router.query[P_DESIGN] as string;
-  const _file_key = parseFileAndNodeId(_design_param)?.file;
-  const file = useDesignFile({ file: _file_key });
+  const file = useDesignFile({ file: _input?.file });
   const prevstate =
     initialState.type == "success" && initialState.value.history.present;
-  const selectedPage = useMemo(() => {
+
+  const selectedPage = (pages: { id: string }[], selectedNodes: string[]) => {
     if (prevstate.selectedPage) {
       return prevstate.selectedPage;
     }
 
-    if (prevstate?.selectedNodes && file?.document?.children) {
-      return prevstate.selectedNodes.length > 0
-        ? file.document.children.find((page) => {
-            return isChildrenOf(prevstate.selectedNodes[0], page);
+    if (selectedNodes && pages) {
+      return selectedNodes.length > 0
+        ? pages.find((page) => {
+            return isChildrenOf(selectedNodes[0], page);
           })?.id ?? null
         : // find page of current selection.
           null;
     }
 
     return file?.document?.children?.[0].id ?? null; // otherwise, return first page.
-  }, [file?.document?.children]);
+  };
+
+  function initializeDesign(design: TargetNodeConfig): EditorSnapshot {
+    return {
+      selectedNodes: [design.node],
+      selectedLayersOnPreview: [],
+      selectedPage: null,
+      design: {
+        pages: [],
+        key: design.file,
+        input: DesignInput.fromApiResponse({
+          ...design,
+          entry: design.reflect,
+        }),
+      },
+    };
+  }
 
   useEffect(() => {
+    if (design) {
+      if (initialState.type === "success") return;
+      initialDispatcher({
+        type: "set",
+        value: initializeDesign(design),
+      });
+    }
+  }, [design, router.query]);
+
+  useEffect(() => {
+    if (_input?.node) {
+      if (!design) {
+        // if target design is specified, whole file fetching should wait until design is loaded.
+        return;
+      }
+    }
     if (file) {
       let val: EditorSnapshot;
 
@@ -140,6 +146,7 @@ export default function Page() {
         }),
         type: "design",
       }));
+
       if (prevstate) {
         val = {
           ...prevstate,
@@ -147,19 +154,31 @@ export default function Page() {
             ...prevstate.design,
             pages: pages,
           },
-          selectedPage: selectedPage,
+          selectedPage: selectedPage(pages, prevstate.selectedNodes),
         };
       } else {
-        val = {
-          selectedNodes: [],
-          selectedLayersOnPreview: [],
-          design: {
-            input: null,
-            key: _file_key,
-            pages: pages,
-          },
-          selectedPage: selectedPage,
-        };
+        if (design) {
+          const initialState = initializeDesign(design);
+          val = {
+            ...initialState,
+            design: {
+              ...initialState.design,
+              pages: pages,
+            },
+            selectedPage: selectedPage(pages, initialState.selectedNodes),
+          };
+        } else {
+          val = {
+            selectedNodes: [],
+            selectedLayersOnPreview: [],
+            design: {
+              input: null,
+              key: _input.file,
+              pages: pages,
+            },
+            selectedPage: selectedPage(pages, null),
+          };
+        }
       }
 
       initialDispatcher({
@@ -167,7 +186,7 @@ export default function Page() {
         value: val,
       });
     }
-  }, [file?.document?.children]);
+  }, [_input?.url, design, file?.document?.children]);
   // endregion
 
   const safe_value =
@@ -190,6 +209,7 @@ type Tree = {
 };
 
 function isChildrenOf(child: string, parent: Tree) {
+  if (!parent) return false;
   if (child === parent.id) return true;
   if (parent.children?.length === 0) return false;
   return parent.children?.some((c) => isChildrenOf(child, c)) ?? false;
