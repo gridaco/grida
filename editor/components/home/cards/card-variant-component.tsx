@@ -1,10 +1,12 @@
+import React, { useEffect, useState } from "react";
 import { useRouter } from "next/router";
-import React from "react";
 import { BaseHomeSceneCard } from "./base-home-scene-card";
+import { fetch } from "@design-sdk/figma-remote";
+import { useFigmaAccessToken } from "hooks/use-figma-access-token";
 
 export function ComponentCard({
   label,
-  thumbnail,
+  thumbnail: initialThumbnail,
   data,
 }: {
   label: string;
@@ -15,6 +17,21 @@ export function ComponentCard({
   };
 }) {
   const router = useRouter();
+
+  const fat = useFigmaAccessToken();
+
+  const [thumbnail, setThumbnail] = useState(initialThumbnail);
+
+  useEffect(() => {
+    if (fat) {
+      if (!thumbnail) {
+        fetch.fetchNodeAsImage(data.file, fat, data.id).then((url) => {
+          setThumbnail(url.__default);
+        });
+      }
+    }
+  }, [fat]);
+
   return (
     <BaseHomeSceneCard
       onClick={() => {

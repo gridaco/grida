@@ -7,13 +7,13 @@ export function HomeCardGroup({
   anchor,
   cards,
 }: {
-  label: string;
+  label?: string;
   anchor?: string;
   cards: React.ReactNode[];
 }) {
   return (
     <RootWrapperGroup id={anchor?.replace("#", "")}>
-      <HomeSceneCardGoupHeader label={label} anchor={anchor} />
+      {label && <HomeSceneCardGoupHeader label={label} anchor={anchor} />}
       <Cards>{cards.map((card) => card)}</Cards>
     </RootWrapperGroup>
   );
@@ -32,6 +32,7 @@ const RootWrapperGroup = styled.section`
 
 const Cards = styled.div`
   display: flex;
+  flex-wrap: wrap;
   justify-content: flex-start;
   flex-direction: row;
   align-items: start;

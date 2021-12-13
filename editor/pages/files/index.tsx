@@ -1,6 +1,11 @@
 import React, { useEffect, useState } from "react";
 import { DefaultEditorWorkspaceLayout } from "layouts/default-editor-workspace-layout";
-import { Cards, HomeSidebar } from "components/home";
+import {
+  Cards,
+  HomeCardGroup,
+  HomeHeading,
+  HomeSidebar,
+} from "components/home";
 
 export default function FilesPage() {
   return (
@@ -10,15 +15,10 @@ export default function FilesPage() {
         leftbar={<HomeSidebar />}
       >
         <div style={{ padding: 80 }}>
-          <h1>Files</h1>
-          <div
-            style={{
-              display: "flex",
-              flexDirection: "row",
-              gap: 20,
-            }}
-          >
-            {[
+          <HomeHeading>Files</HomeHeading>
+          <HomeCardGroup
+            cards={[
+              "JRD2EdsbBlWgib8NzTXIGo",
               "HSozKEVWhh8saZa2vr1Nxd",
               "Gaznaw1QHppxvs9UkqNOb0",
               "Y0Gh77AqBoHH7dG1GtK3xF",
@@ -34,7 +34,7 @@ export default function FilesPage() {
                 thumbnail={null}
               />
             ))}
-          </div>
+          />
         </div>
       </DefaultEditorWorkspaceLayout>
     </>

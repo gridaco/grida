@@ -15,7 +15,7 @@ export function EditorSkeleton({ percent = 0 }: { percent?: number }) {
           percent={percent * 100}
         />
       </LoadingIndicatorContainer>
-      <Body>
+      {/* <Body>
         <SidebarMock>
           <ListMock>
             {[1, 2, 3, 4, 5, 6, 7, 8].map((i) => (
@@ -32,7 +32,7 @@ export function EditorSkeleton({ percent = 0 }: { percent?: number }) {
         </SidebarMock>
         <CanvasMock></CanvasMock>
         <CodeEditorMock></CodeEditorMock>
-      </Body>
+      </Body> */}
     </SkeletonWrap>
   );
 }
@@ -42,7 +42,7 @@ const SkeletonWrap = styled.div`
   height: 100vh;
   z-index: 99;
   position: absolute;
-  background-color: rgba(37, 37, 38, 1);
+  background-color: #0000004f;
 `;
 
 const LoadingIndicatorContainer = styled.div`

@@ -27,21 +27,24 @@ export class WorkspaceRepository {
   }
 
   async getRecentScenes() {
-    return [
+    const dummy = (id) => [
       {
-        id: "xxx",
+        id: id,
         name: "dummy scene 1",
         lastUsed: new Date("2021-01-01"),
       },
     ];
+    return Array.from(Array(20).keys()).map((i) => dummy(i));
   }
   async getRecentComponents() {
-    return [
-      {
-        id: "xxxx",
-        name: "dummy component 1",
-        lastUsed: new Date("2021-01-01"),
-      },
-    ];
+    const dummy = (id) => ({
+      id: id,
+      file: "x7RRK6RwWtZuNakmbMLTVH",
+      name: "dummy component " + id,
+      lastUsed: new Date("2021-01-01"),
+    });
+    return ["1:2", "2422:10181", "2422:10298", "1608:1308", "1608:1271"].map(
+      (i) => dummy(i)
+    );
   }
 }

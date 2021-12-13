@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import styled from "@emotion/styled";
 import { DefaultEditorWorkspaceLayout } from "layouts/default-editor-workspace-layout";
-import { HomeSidebar } from "components/home";
+import { HomeHeading, HomeSidebar } from "components/home";
 
 export default function IntegrationsPage() {
   return (
@@ -12,7 +12,7 @@ export default function IntegrationsPage() {
       >
         <div style={{ padding: 80 }}>
           <>
-            <h1>Integrations</h1>
+            <HomeHeading>Integrations</HomeHeading>
             <p>Import From URL</p>
             <p>Assistant</p>
             <p>VSCode</p>

@@ -1,7 +1,12 @@
 import React, { useEffect, useState } from "react";
 import styled from "@emotion/styled";
 import { DefaultEditorWorkspaceLayout } from "layouts/default-editor-workspace-layout";
-import { Cards, HomeCardGroup, HomeSidebar } from "components/home";
+import {
+  Cards,
+  HomeCardGroup,
+  HomeHeading,
+  HomeSidebar,
+} from "components/home";
 import { RecentDesignCardList } from "./recent-design-card-list";
 import { WorkspaceRepository } from "repository/workspace-repository";
 
@@ -9,14 +14,18 @@ export function HomeDashboard() {
   const repository = new WorkspaceRepository();
   const [recents, setRecents] = useState([]);
   const [files, setFiles] = useState([]);
-  const scenes = [];
-  const components = [];
+  const [components, setComponents] = useState([]);
+  const [scenes, setScenes] = useState([]);
+
   useEffect(() => {
     const recents = repository.getRecents({});
     recents.then(setRecents);
 
     const files = repository.getFiles();
     files.then(setFiles);
+
+    const scenes = repository.getRecentScenes();
+    scenes.then(setScenes);
   }, []);
 
   return (
@@ -26,7 +35,7 @@ export function HomeDashboard() {
     >
       <div style={{ height: "100vh", overflow: "scroll" }}>
         <div style={{ margin: 80 }}>
-          <h1>Home</h1>
+          <HomeHeading>Home</HomeHeading>
           <GroupsContainer>
             <RecentDesignSection recents={recents} />
             {files && !!files.length && <FilesSection files={files} />}
@@ -79,8 +88,13 @@ function ScenesSection({ scenes }: { scenes }) {
     <HomeCardGroup
       anchor={"#scenes"}
       label={"Scenes"}
-      cards={scenes.map((file) => (
-        <Cards.Scene label={file.name} thumbnail={file.thumbnail} />
+      cards={scenes.map((scene) => (
+        <Cards.Scene
+          key={scene.id}
+          data={scene}
+          label={scene.name}
+          thumbnail={scene.thumbnail}
+        />
       ))}
     />
   );
@@ -91,8 +105,13 @@ function ComponentsSection({ components }: { components }) {
     <HomeCardGroup
       anchor={"#components"}
       label={"Components"}
-      cards={components.map((file) => (
-        <Cards.Scene label={file.name} thumbnail={file.thumbnail} />
+      cards={components.map((c) => (
+        <Cards.Component
+          key={c.id}
+          data={c}
+          label={c.name}
+          thumbnail={c.thumbnail}
+        />
       ))}
     />
   );

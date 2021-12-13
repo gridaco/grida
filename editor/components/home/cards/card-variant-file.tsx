@@ -1,5 +1,5 @@
 import { useRouter } from "next/router";
-import React from "react";
+import React, { useEffect } from "react";
 import { BaseHomeSceneCard } from "./base-home-scene-card";
 
 export function FileCard({
@@ -14,6 +14,7 @@ export function FileCard({
   };
 }) {
   const router = useRouter();
+
   return (
     <BaseHomeSceneCard
       onClick={() => {

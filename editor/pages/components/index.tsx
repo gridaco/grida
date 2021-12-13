@@ -1,9 +1,23 @@
 import React, { useEffect, useState } from "react";
 import styled from "@emotion/styled";
 import { DefaultEditorWorkspaceLayout } from "layouts/default-editor-workspace-layout";
-import { Cards, HomeCardGroup, HomeSidebar } from "components/home";
+import {
+  Cards,
+  HomeCardGroup,
+  HomeHeading,
+  HomeSidebar,
+} from "components/home";
+import { WorkspaceRepository } from "repository";
 
 export default function ComponentsPage() {
+  const repository = new WorkspaceRepository();
+
+  const [components, setComponents] = useState([]);
+
+  useEffect(() => {
+    repository.getRecentComponents().then(setComponents);
+  }, []);
+
   return (
     <>
       <DefaultEditorWorkspaceLayout
@@ -11,26 +25,19 @@ export default function ComponentsPage() {
         leftbar={<HomeSidebar />}
       >
         <div style={{ padding: 80 }}>
-          <h1>Components</h1>
-          <div
-            style={{
-              display: "flex",
-              flexDirection: "row",
-              gap: 20,
-            }}
-          >
-            {[1, 2, 3, 4, 5].map((d) => (
-              <Cards.Component
-                data={{
-                  file: d.toString(),
-                  id: d.toString(),
-                }}
-                key={d}
-                label={"Component " + d}
-                thumbnail={null}
-              />
-            ))}
-          </div>
+          <HomeHeading>Components</HomeHeading>
+          <HomeCardGroup
+            cards={[
+              components.map((d) => (
+                <Cards.Component
+                  key={d.id}
+                  data={d}
+                  label={d.name}
+                  thumbnail={d.thumbnail}
+                />
+              )),
+            ]}
+          />
         </div>
       </DefaultEditorWorkspaceLayout>
     </>

@@ -57,8 +57,7 @@ export function useDesign({
   ...props
 }: UseDesignProp) {
   const [design, setDesign] = useState<TargetNodeConfig>(null);
-  const figmaAccessToken = useFigmaAccessToken();
-  const personalAccessToken = personal.get_safe();
+  const fat = useFigmaAccessToken();
   const router = (type === "use-router" && props["router"]) ?? useRouter();
 
   useEffect(() => {
@@ -123,15 +122,12 @@ export function useDesign({
         };
         setDesign(res);
       } else {
-        if (figmaAccessToken || personalAccessToken) {
+        if (fat.accessToken || fat.personalAccessToken) {
           fetch
             .fetchTargetAsReflect({
               file: targetnodeconfig.file,
               node: targetnodeconfig.node,
-              auth: {
-                personalAccessToken: personalAccessToken,
-                accessToken: figmaAccessToken,
-              },
+              auth: fat,
             })
             .then((res) => {
               cacheStore.set(res.raw); // setting cache does not need to be determined by `use_session_cache` option.
@@ -149,7 +145,7 @@ export function useDesign({
                   break;
                 }
                 default:
-                  if (figmaAccessToken) {
+                  if (fat.accessToken) {
                     // wait..
                   } else {
                     console.error(`error while fetching design`, err);
@@ -165,23 +161,19 @@ export function useDesign({
         }
       }
     }
-  }, [router, figmaAccessToken, props["url"]]);
+  }, [router, fat.accessToken, props["url"]]);
   return design;
 }
 
 export function useDesignFile({ file }: { file: string }) {
   const [designfile, setDesignFile] = useState<FileResponse>(null);
-  const figmaAccessToken = useFigmaAccessToken();
-  const figmaPersonalAccessToken = personal.get_safe();
+  const fat = useFigmaAccessToken();
   useEffect(() => {
-    if (file && (figmaAccessToken || figmaPersonalAccessToken)) {
+    if (file && (fat.accessToken || fat.personalAccessToken)) {
       async function handle() {
         const iterator = fetch.fetchFile({
           file,
-          auth: {
-            personalAccessToken: figmaPersonalAccessToken,
-            accessToken: figmaAccessToken,
-          },
+          auth: fat,
         });
         let next: IteratorResult<FileResponse>;
         while ((next = await iterator.next()).done === false) {
@@ -190,7 +182,7 @@ export function useDesignFile({ file }: { file: string }) {
       }
       handle();
     }
-  }, [file, figmaAccessToken]);
+  }, [file, fat.accessToken]);
 
   return designfile;
 }

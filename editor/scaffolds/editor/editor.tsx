@@ -31,6 +31,7 @@ import {
 } from "utils/design-query";
 import { vanilla_presets } from "@grida/builder-config-preset";
 import { EditorSkeleton } from "./skeleton";
+import { MonacoEmptyMock } from "components/code-editor/monaco-mock-empty";
 
 export function Editor() {
   const router = useRouter();
@@ -73,10 +74,7 @@ export function Editor() {
       MainImageRepository.instance = new RemoteImageRepositories(
         state.design.key,
         {
-          authentication: {
-            accessToken: fat,
-            personalAccessToken: personal.get_safe(),
-          },
+          authentication: fat,
         }
       );
       MainImageRepository.instance.register(
@@ -87,7 +85,7 @@ export function Editor() {
       );
     }
     // ------------------------------------------------------------
-  }, [state.design?.key, fat]);
+  }, [state.design?.key, fat.accessToken]);
 
   useEffect(() => {
     const __target = targetted;
@@ -222,7 +220,7 @@ export function Editor() {
                       }
                     : {
                         loading: {
-                          raw: "Reading design...",
+                          raw: "\n".repeat(100),
                           language: "text",
                           name: "loading",
                         },
