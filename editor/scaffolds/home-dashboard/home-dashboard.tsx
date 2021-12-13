@@ -24,16 +24,18 @@ export function HomeDashboard() {
       backgroundColor={"rgba(37, 37, 38, 1)"}
       leftbar={<HomeSidebar />}
     >
-      <div style={{ padding: 80 }}>
-        <h1>Home</h1>
-        <GroupsContainer>
-          <RecentDesignSection recents={recents} />
-          {files && !!files.length && <FilesSection files={files} />}
-          {scenes && !!scenes.length && <ScenesSection scenes={scenes} />}
-          {components && !!components.length && (
-            <ComponentsSection components={components} />
-          )}
-        </GroupsContainer>
+      <div style={{ height: "100vh", overflow: "scroll" }}>
+        <div style={{ margin: 80 }}>
+          <h1>Home</h1>
+          <GroupsContainer>
+            <RecentDesignSection recents={recents} />
+            {files && !!files.length && <FilesSection files={files} />}
+            {scenes && !!scenes.length && <ScenesSection scenes={scenes} />}
+            {components && !!components.length && (
+              <ComponentsSection components={components} />
+            )}
+          </GroupsContainer>
+        </div>
       </div>
     </DefaultEditorWorkspaceLayout>
   );
@@ -48,6 +50,7 @@ const GroupsContainer = styled.div`
 function RecentDesignSection({ recents }: { recents }) {
   return (
     <HomeCardGroup
+      anchor={"#recents"}
       label={"Recents"}
       cards={[<RecentDesignCardList recents={recents} />]}
     />
@@ -57,6 +60,7 @@ function RecentDesignSection({ recents }: { recents }) {
 function FilesSection({ files }: { files }) {
   return (
     <HomeCardGroup
+      anchor={"#files"}
       label={"Files"}
       cards={files.map((file) => (
         <Cards.File label={file.name} thumbnail={file.thumbnail} />
@@ -68,6 +72,7 @@ function FilesSection({ files }: { files }) {
 function ScenesSection({ scenes }: { scenes }) {
   return (
     <HomeCardGroup
+      anchor={"#scenes"}
       label={"Scenes"}
       cards={scenes.map((file) => (
         <Cards.Scene label={file.name} thumbnail={file.thumbnail} />
@@ -79,6 +84,7 @@ function ScenesSection({ scenes }: { scenes }) {
 function ComponentsSection({ components }: { components }) {
   return (
     <HomeCardGroup
+      anchor={"#components"}
       label={"Components"}
       cards={components.map((file) => (
         <Cards.Scene label={file.name} thumbnail={file.thumbnail} />

@@ -52,7 +52,6 @@ export const PageRow = memo(
       name,
       selected,
       onHoverChange,
-      onAddClick,
       onMenuClick,
       onClickChevron,
       onPress,
@@ -63,7 +62,6 @@ export const PageRow = memo(
     }: TreeView.TreeRowProps<""> & {
       name: string;
       selected: boolean;
-      onAddClick: () => void;
       onMenuClick: () => void;
       children?: ReactNode;
     },

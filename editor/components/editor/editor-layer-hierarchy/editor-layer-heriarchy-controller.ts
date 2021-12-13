@@ -1,7 +1,6 @@
 export interface ITreeNode {
   id: string;
   name: string;
-  type: string;
   children?: ITreeNode[];
 }
 
@@ -9,7 +8,6 @@ export interface FlattenedNode {
   id: string;
   name: string;
   depth: number;
-  type: string;
   parent: string;
 }
 
@@ -142,9 +140,7 @@ export const flatten = <T extends ITreeNode>(
     }
 
     const result: FlattenedNode = {
-      id: node.id,
-      name: node.name,
-      type: node.type,
+      ...node,
       depth: depth,
       parent,
     };

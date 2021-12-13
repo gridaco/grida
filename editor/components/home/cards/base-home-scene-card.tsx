@@ -18,9 +18,9 @@ export function BaseHomeSceneCard({
     <RootWrapperBaseHomeSceneCard onClick={onClick}>
       <Body>
         <ThumbnailArea>
-          <SceneCardPreviewThumbnailImage>
-            <ThumbnailImage src={thumbnail}></ThumbnailImage>
-          </SceneCardPreviewThumbnailImage>
+          <SceneCardPreviewThumbnail>
+            {thumbnail && <ThumbnailImage src={thumbnail}></ThumbnailImage>}
+          </SceneCardPreviewThumbnail>
         </ThumbnailArea>
         <ContentArea>
           <LabelDescContainer>
@@ -76,7 +76,7 @@ const ThumbnailArea = styled.div`
   box-sizing: border-box;
 `;
 
-const SceneCardPreviewThumbnailImage = styled.div`
+const SceneCardPreviewThumbnail = styled.div`
   height: 101px;
   position: relative;
   align-self: stretch;

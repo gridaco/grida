@@ -4,20 +4,22 @@ import { HomeSceneCardGoupHeader } from "./home-card-group-header";
 
 export function HomeCardGroup({
   label,
+  anchor,
   cards,
 }: {
   label: string;
+  anchor?: string;
   cards: React.ReactNode[];
 }) {
   return (
-    <RootWrapperGroup>
-      <HomeSceneCardGoupHeader label={label} />
+    <RootWrapperGroup id={anchor?.replace("#", "")}>
+      <HomeSceneCardGoupHeader label={label} anchor={anchor} />
       <Cards>{cards.map((card) => card)}</Cards>
     </RootWrapperGroup>
   );
 }
 
-const RootWrapperGroup = styled.div`
+const RootWrapperGroup = styled.section`
   display: flex;
   justify-content: flex-start;
   flex-direction: column;

@@ -1,24 +1,29 @@
 import React from "react";
 import styled from "@emotion/styled";
-
+import Link from "next/link";
 export function HomeSceneCardGoupHeader({
   label,
   action,
   onAction,
+  anchor,
 }: {
   label: string;
   onAction?: () => void;
   action?: string;
+  anchor?: string;
 }) {
-  return (
+  const Content = (
     <RootWrapperBaseHomeSceneCardGoupHeader>
       <Label>{label}</Label>
       {action && <Action onClick={onAction}>{action}</Action>}
     </RootWrapperBaseHomeSceneCardGoupHeader>
   );
+
+  return anchor ? <Link href={anchor}>{Content}</Link> : Content;
 }
 
 const RootWrapperBaseHomeSceneCardGoupHeader = styled.div`
+  cursor: pointer;
   display: flex;
   justify-content: flex-start;
   flex-direction: row;
