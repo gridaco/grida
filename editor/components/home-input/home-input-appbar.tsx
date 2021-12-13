@@ -1,7 +1,7 @@
 import React from "react";
 import styled from "@emotion/styled";
 
-export function HomeInputAppbar() {
+export function HomeInputAppbar({ show_signin }: { show_signin: boolean }) {
   return (
     <RootWrapperHomeInputAppbar>
       <GithubMenu>
@@ -13,9 +13,11 @@ export function HomeInputAppbar() {
       <DocsMenu>
         <Docs>Docs</Docs>
       </DocsMenu>
-      <SigninButton>
-        <SignIn>Sign in</SignIn>
-      </SigninButton>
+      {show_signin && (
+        <SigninButton>
+          <SignIn>Sign in</SignIn>
+        </SigninButton>
+      )}
     </RootWrapperHomeInputAppbar>
   );
 }

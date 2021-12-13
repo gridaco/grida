@@ -25,6 +25,7 @@ export function HomeDashboard() {
       leftbar={<HomeSidebar />}
     >
       <div style={{ padding: 80 }}>
+        <h1>Home</h1>
         <GroupsContainer>
           <RecentDesignSection recents={recents} />
           {files && !!files.length && <FilesSection files={files} />}

@@ -5,11 +5,15 @@ import {
   HomePrimaryInputNextButton,
 } from "components/home-input";
 import { HomeLogo } from "icons/home-logo";
+import { useAuthState } from "hooks/use-auth-state";
 
 export function HomeInput() {
+  const authstate = useAuthState();
+  const show_signin_button = authstate !== "signedin";
+
   return (
     <RootWrapper>
-      <HomeInputAppbar />
+      <HomeInputAppbar show_signin={show_signin_button} />
       <Body>
         <HomeLogo />
         <FormWrapper>

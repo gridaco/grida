@@ -89,6 +89,7 @@ export const PageRow = memo(
         onPress={onPress}
         onClick={onClick}
         onDoubleClick={onDoubleClick}
+        onClickChevron={onClickChevron}
         {...props}
       >
         {withSeparatorElements(
