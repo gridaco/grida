@@ -136,6 +136,11 @@ const ThisLabel = styled.span`
   font-weight: 400;
   text-align: left;
   width: 197px;
+  overflow: hidden;
+  word-wrap: break-word;
+  text-overflow: ellipsis;
+  -webkit-line-clamp: 1;
+  line-clamp: 1;
 `;
 
 const Description = styled.span`

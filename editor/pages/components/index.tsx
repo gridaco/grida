@@ -12,6 +12,25 @@ export default function ComponentsPage() {
       >
         <div style={{ padding: 80 }}>
           <h1>Components</h1>
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "row",
+              gap: 20,
+            }}
+          >
+            {[1, 2, 3, 4, 5].map((d) => (
+              <Cards.Component
+                data={{
+                  file: d.toString(),
+                  id: d.toString(),
+                }}
+                key={d}
+                label={"Component " + d}
+                thumbnail={null}
+              />
+            ))}
+          </div>
         </div>
       </DefaultEditorWorkspaceLayout>
     </>

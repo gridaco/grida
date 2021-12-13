@@ -63,7 +63,12 @@ function FilesSection({ files }: { files }) {
       anchor={"#files"}
       label={"Files"}
       cards={files.map((file) => (
-        <Cards.File label={file.name} thumbnail={file.thumbnail} />
+        <Cards.File
+          key={file.id}
+          data={file}
+          label={file.name}
+          thumbnail={file.thumbnail}
+        />
       ))}
     />
   );

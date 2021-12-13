@@ -100,7 +100,6 @@ export function HomeSidebarTree() {
   );
 
   const pages = preset_pages.map((pageroot) => flatten(pageroot)).flat();
-  console.log(pages);
   return (
     <TreeView.Root
       data={pages}
