@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from "react";
-import styled from "@emotion/styled";
 import { DefaultEditorWorkspaceLayout } from "layouts/default-editor-workspace-layout";
-import { Cards, HomeCardGroup, HomeSidebar } from "components/home";
+import { Cards, HomeSidebar } from "components/home";
 
 export default function FilesPage() {
   return (

@@ -43,6 +43,7 @@ const FigmaSceneNodeSchema: RxJsonSchema<SceneNode> = {
     separator: "|",
   },
   type: "object",
+  //@ts-ignore
   properties: {
     id: {
       type: "string",

@@ -8,5 +8,6 @@ export default function FileEntryEditor() {
 
   // 1. validate the file
   // 2. set up the editor
-  return <Editor />;
+  // return <Editor />;
+  return <></>;
 }
