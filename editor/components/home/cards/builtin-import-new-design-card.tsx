@@ -1,9 +1,9 @@
+import { useRouter } from "next/router";
 import React from "react";
-import { RecentDesign } from "../../store/recent-designs-store";
 import { RecentDesignCard } from "./recent-design-card";
 
 const _id = "--new--";
-const importnewdesingcarddata: RecentDesign = {
+const importnewdesingcarddata = {
   id: _id,
   name: "New Design",
   lastUpdatedAt: new Date(),
@@ -14,8 +14,9 @@ const importnewdesingcarddata: RecentDesign = {
 };
 
 export function ImportNewDesignCard() {
+  const router = useRouter();
   const onclick = () => {
-    // TODO: import design
+    router.push("/import");
   };
 
   return (

@@ -20,6 +20,8 @@
       "layout/*": ["./layouts/*"],
       "scaffolds/*": ["./scaffolds/*"],
       "core/*": ["./core/*"],
+      "store/*": ["./store/*"],
+      "repository/*": ["./repository/*"],
       "utils/*": ["./utils/*"],
       "public/*": ["./public/*"],
       "hooks/*": ["./hooks/*"]

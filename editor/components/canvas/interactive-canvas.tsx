@@ -34,7 +34,7 @@ export function InteractiveCanvas({
 const InteractiveCanvasWrapper = styled.div`
   display: flex;
   flex-direction: column;
-  overflow-y: auto;
+  /* overflow-y: auto; */
   overflow-x: hidden;
   flex: 1;
 `;

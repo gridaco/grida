@@ -13,6 +13,8 @@ module.exports = {
           scaffolds: "./scaffolds",
           utils: "./utils",
           core: "./core",
+          store: "./store",
+          repository: "./repository",
           public: "./public",
           hooks: "./hooks",
         },

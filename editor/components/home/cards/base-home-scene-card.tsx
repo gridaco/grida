@@ -1,7 +1,7 @@
 import React from "react";
 import styled from "@emotion/styled";
 
-export function HomeSceneCard({
+export function BaseHomeSceneCard({
   label,
   description,
   onClick,

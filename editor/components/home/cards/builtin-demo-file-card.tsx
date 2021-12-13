@@ -1,13 +1,12 @@
 import React from "react";
-import { RecentDesign } from "../../store";
 import { RecentDesignCard } from "./recent-design-card";
 import moment from "moment";
 import router from "next/router";
-import { formToCodeUrl } from "../../url";
+import { formToCodeUrl } from "../../../url";
 
 const _id =
   "https://www.figma.com/file/x7RRK6RwWtZuNakmbMLTVH/examples?node-id=1%3A120";
-const defaultdemodesign: RecentDesign = {
+const defaultdemodesign = {
   id: _id,
   name: "WNV Main screen",
   provider: "figma",
@@ -17,7 +16,7 @@ const defaultdemodesign: RecentDesign = {
     "https://example-project-manifest.s3.us-west-1.amazonaws.com/app-wnv/cover.png",
 };
 
-export function BuiltinDemoDesignCard() {
+export function BuiltinDemoFileCard() {
   const onclick = () => {
     const _path = formToCodeUrl({
       design: _id,

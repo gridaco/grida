@@ -1,16 +1,15 @@
 import React from "react";
-import { RecentDesign } from "../../store";
 import moment from "moment";
 import styled from "@emotion/styled";
-import { HomeSceneCard } from "components/home/card";
+import { BaseHomeSceneCard } from "components/home/cards/base-home-scene-card";
 
-export type OnCardClickCallback = (id: string, data?: RecentDesign) => void;
+export type OnCardClickCallback = (id: string, data?) => void;
 
 /**
  * create recent design card component
  **/
 export function RecentDesignCard(props: {
-  data: RecentDesign;
+  data;
   onclick?: OnCardClickCallback;
 }) {
   const { name, id, provider, previewUrl, lastUpdatedAt } = props.data;
@@ -18,7 +17,7 @@ export function RecentDesignCard(props: {
     props.onclick?.(id, props.data);
   };
   return (
-    <HomeSceneCard
+    <BaseHomeSceneCard
       onClick={onclick}
       label={name}
       thumbnail={previewUrl}

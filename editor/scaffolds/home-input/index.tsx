@@ -6,7 +6,7 @@ import {
 } from "components/home-input";
 import { HomeLogo } from "icons/home-logo";
 
-export function HomeInputLayout() {
+export function HomeInput() {
   return (
     <RootWrapper>
       <HomeInputAppbar />
@@ -15,7 +15,10 @@ export function HomeInputLayout() {
         <FormWrapper>
           <HomePrimaryInputForm>
             <BaseHomePrimaryInputFormHtmlTagInput>
-              <Placeholder placeholder={"Type your Figma design url"} />
+              <Placeholder
+                autoFocus
+                placeholder={"Type your Figma design url"}
+              />
               <HomePrimaryInputNextButton />
             </BaseHomePrimaryInputFormHtmlTagInput>
           </HomePrimaryInputForm>

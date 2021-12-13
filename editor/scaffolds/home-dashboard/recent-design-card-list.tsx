@@ -1,28 +1,25 @@
 import styled from "@emotion/styled";
 import router from "next/router";
 import React, { useEffect, useState } from "react";
-import { RecentDesignsStore, RecentDesign } from "../../store";
-import { BuiltinDemoDesignCard } from "./builtin-demo-design-card";
-import { ImportNewDesignCard } from "./import-new-design-card";
-import { RecentDesignCard } from "./recent-design-card";
+import { WorkspaceRepository } from "repository";
+import {
+  BuiltinDemoFileCard,
+  ImportNewDesignCard,
+  RecentDesignCard,
+} from "components/home/cards";
 
-export function RecentDesignCardList() {
-  const [recents, setRecents] = useState<RecentDesign[]>([]);
-  useEffect(() => {
-    const _loads = new RecentDesignsStore().load();
-    setRecents(_loads);
-  }, []);
-
-  const oncardclick = (id: string, d: RecentDesign) => {
+export function RecentDesignCardList({ recents }: { recents: any[] }) {
+  const oncardclick = (id: string, d) => {
     console.log("click", id);
     router.push(`/to-code/${id}`); // fixme id is not a param
-    //
   };
+
+  const also_show_demo = recents.length <= 2;
 
   return (
     <ListWrap>
       <ImportNewDesignCard />
-      <BuiltinDemoDesignCard />
+      {also_show_demo && <BuiltinDemoFileCard />}
       {recents.map((recentDesign) => {
         return (
           <RecentDesignCard
