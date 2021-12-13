@@ -8,6 +8,7 @@ import {
 } from "./editor-layer-hierarchy-item";
 import { useEditorState } from "core/states";
 import { useDispatch } from "core/dispatch";
+import { flatten, FlattenedNode } from "./editor-layer-heriarchy-controller";
 
 export function EditorLayerHierarchy() {
   const [state] = useEditorState();
@@ -66,47 +67,3 @@ export function EditorLayerHierarchy() {
     />
   );
 }
-
-interface ITreeNode {
-  id: string;
-  name: string;
-  type: string;
-  children?: ITreeNode[];
-}
-
-interface FlattenedNode {
-  id: string;
-  name: string;
-  depth: number;
-  type: string;
-  parent: string;
-}
-
-const flatten = <T extends ITreeNode>(
-  tree: T,
-  parent?: string,
-  depth: number = 0
-): FlattenedNode[] => {
-  const convert = (node: T, depth: number, parent?: string) => {
-    if (!node) {
-      return;
-    }
-
-    const result: FlattenedNode = {
-      id: node.id,
-      name: node.name,
-      type: node.type,
-      depth: depth,
-      parent,
-    };
-
-    return result;
-  };
-
-  const final = [];
-  final.push(convert(tree, depth, parent));
-  for (const child of tree?.children || []) {
-    final.push(...flatten(child, tree.id, depth + 1));
-  }
-  return final;
-};
