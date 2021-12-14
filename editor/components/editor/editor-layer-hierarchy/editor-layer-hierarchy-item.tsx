@@ -104,7 +104,6 @@ export const LayerRow = memo(
     }: TreeView.TreeRowProps<""> & {
       name: string;
       selected: boolean;
-      onAddClick: () => void;
       onMenuClick: () => void;
       children?: ReactNode;
     },

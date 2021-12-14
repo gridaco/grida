@@ -9,7 +9,7 @@ export function FileCard({
   onClick,
 }: {
   data: {
-    type: "file";
+    type?: "file";
     lastUsed?: Date;
     key: string;
     name: string;

@@ -27,7 +27,7 @@ export default function FilesPage() {
           <HomeHeading>Files</HomeHeading>
           <HomeCardGroup
             cards={files.map((d) => (
-              <Cards.File key={d.key} data={d} label={d.name} />
+              <Cards.File key={d.key} data={d} />
             ))}
           />
         </div>
