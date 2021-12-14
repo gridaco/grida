@@ -19,7 +19,7 @@ export function HomeInputAppbar({ show_signin }: { show_signin: boolean }) {
       </Menu>
       {show_signin && (
         <SigninButton
-          onclick={() => {
+          onClick={() => {
             router.push(
               "https://accounts.grida.co/signin?redirect_uri=" +
                 encodeURIComponent(router.asPath)
