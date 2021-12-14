@@ -31,18 +31,18 @@ const preset_pages: PresetPage[] = [
         path: "/#files",
         depth: 1,
       },
-      {
-        id: "/#scenes",
-        name: "Scenes",
-        path: "/#scenes",
-        depth: 1,
-      },
-      {
-        id: "/#components",
-        name: "Components",
-        path: "/#components",
-        depth: 1,
-      },
+      // {
+      //   id: "/#scenes",
+      //   name: "Scenes",
+      //   path: "/#scenes",
+      //   depth: 1,
+      // },
+      // {
+      //   id: "/#components",
+      //   name: "Components",
+      //   path: "/#components",
+      //   depth: 1,
+      // },
     ],
   },
   {
@@ -51,18 +51,18 @@ const preset_pages: PresetPage[] = [
     path: "/files",
     depth: 0,
   },
-  {
-    id: "/components",
-    name: "Components",
-    path: "/components",
-    depth: 0,
-  },
-  {
-    id: "/integrations",
-    name: "Import / Sync",
-    path: "/integrations",
-    depth: 0,
-  },
+  // {
+  //   id: "/components",
+  //   name: "Components",
+  //   path: "/components",
+  //   depth: 0,
+  // },
+  // {
+  //   id: "/integrations",
+  //   name: "Import / Sync",
+  //   path: "/integrations",
+  //   depth: 0,
+  // },
   {
     id: "help",
     name: "Help",
@@ -70,15 +70,21 @@ const preset_pages: PresetPage[] = [
     depth: 0,
     children: [
       {
-        id: "/docs",
+        id: "bug-report",
         name: "Bug report",
         path: "https://github.com/gridaco/designto-code/issues/new",
         depth: 1,
       },
       {
-        id: "/docs",
+        id: "Github",
+        name: "Github",
+        path: "https://github.com/gridaco/designto-code/",
+        depth: 1,
+      },
+      {
+        id: "docs",
         name: "Docs",
-        path: "/docs",
+        path: "https://github.com/gridaco/designto-code/tree/main/docs",
         depth: 1,
       },
     ],

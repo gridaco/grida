@@ -1,40 +1,39 @@
-import { FigmaFilesStore } from "store/fimga-file-store/figma-file-store";
+import {
+  FigmaFilesStore,
+  FileResponseRecord,
+} from "store/fimga-file-store/figma-file-store";
+
+export type LastUsedFileDisplay = FileResponseRecord & { type: "file" } & {
+  lastUsed: Date;
+};
+export type LastusedDisplayType = LastUsedFileDisplay;
 
 export class WorkspaceRepository {
   constructor() {}
 
   async getRecents({ count = 4 }: { count?: number }) {
-    const fetches = [];
-    fetches.push(this.getRecentFiles());
-    fetches.push(this.getRecentScenes());
-    fetches.push(this.getRecentComponents());
+    const fetches: LastusedDisplayType[] = [];
+    const files = (await this.getFiles()).map(
+      (f) =>
+        <LastusedDisplayType>{
+          ...f,
+          type: "file",
+        }
+    );
+    fetches.push(...files);
+    // fetches.push(this.getRecentScenes());
+    // fetches.push(this.getRecentComponents());
 
     const allRecents = await Promise.all(fetches);
-    const recents = allRecents.sort((r) => r.lastUsed).slice(0, count);
+    const recents = allRecents
+      .sort((r, r2) => (r2.lastUsed > r.lastUsed ? 1 : -1))
+      .slice(0, count);
+
     return recents;
   }
 
-  async getFiles(): Promise<any[]> {
+  async getFiles() {
     return FigmaFilesStore.all();
-    return [
-      "JRD2EdsbBlWgib8NzTXIGo",
-      "HSozKEVWhh8saZa2vr1Nxd",
-      "Gaznaw1QHppxvs9UkqNOb0",
-      "Y0Gh77AqBoHH7dG1GtK3xF",
-      "iypAHagtcSp3Osfo2a7EDz",
-      "x7RRK6RwWtZuNakmbMLTVH",
-    ].map((id) => {
-      return {
-        id: id,
-        file: id,
-        name: id,
-        lastUsed: new Date("2021-01-01"),
-      };
-    });
-  }
-
-  async getRecentFiles() {
-    return this.getFiles();
   }
 
   async getRecentScenes() {

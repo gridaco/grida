@@ -1,4 +1,3 @@
-export * from "./recent-design-card";
 export * from "./builtin-demo-file-card";
 export * from "./builtin-import-new-design-card";
 

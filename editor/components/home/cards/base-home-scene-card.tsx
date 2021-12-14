@@ -79,6 +79,7 @@ const ThumbnailArea = styled.div`
 
 const SceneCardPreviewThumbnail = styled.div`
   height: 101px;
+  background-color: #c1c1c1;
   position: relative;
   align-self: stretch;
 `;

@@ -23,9 +23,9 @@ export function HomeDashboard() {
 
     repository.getFiles().then(setFiles);
 
-    repository.getRecentScenes().then(setScenes);
+    // repository.getRecentScenes().then(setScenes);
 
-    repository.getRecentComponents().then(setComponents);
+    // repository.getRecentComponents().then(setComponents);
   }, []);
 
   return (

@@ -7,6 +7,7 @@ const __pk = "key";
 const __table = "files";
 export type FileResponseRecord = FileResponse & {
   [__pk]: string;
+  lastUsed: Date;
 };
 
 const db: Promise<IDBPDatabase<StorableFileResponse>> = new Promise(
@@ -49,6 +50,7 @@ export class FigmaFileStore {
       ).put(__table, <StorableFileResponse>{
         ...minimizeFileResponse(file),
         [__pk]: this.filekey,
+        lastUsed: new Date(),
       });
     } catch (e) {
       if (process.env.NODE_ENV === "development") {
@@ -77,10 +79,13 @@ type StorableFileResponse = {
   readonly schemaVersion: number;
   readonly thumbnailUrl: string;
   readonly version: string;
+  readonly lastUsed: Date;
 };
 
 type JSONString = string;
-function minimizeFileResponse(file: FileResponse): StorableFileResponse {
+function minimizeFileResponse(
+  file: FileResponse
+): Omit<StorableFileResponse, "lastUsed"> {
   return {
     components: JSON.stringify(file.components),
     styles: JSON.stringify(file.styles),
@@ -119,5 +124,6 @@ function unwrapStorableFileResponse(
     schemaVersion: stored.schemaVersion,
     thumbnailUrl: stored.thumbnailUrl,
     version: stored.version,
+    lastUsed: stored.lastUsed,
   };
 }
