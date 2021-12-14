@@ -9,8 +9,11 @@ export function EditorSkeleton({ percent = 0 }: { percent?: number }) {
   return (
     <SkeletonWrap>
       <LoadingIndicatorContainer>
-        <HomeLogo />
-        <ColoredLinearProgress />
+        <LogoAndLoading>
+          <HomeLogo />
+          <ColoredLinearProgress />
+        </LogoAndLoading>
+        <TipsContainer />
       </LoadingIndicatorContainer>
     </SkeletonWrap>
   );
@@ -26,11 +29,12 @@ const SkeletonWrap = styled.div`
 
 const LoadingIndicatorContainer = styled.div`
   z-index: 100;
+  user-select: none;
   display: flex;
   justify-content: flex-start;
   flex-direction: column;
   align-items: center;
-  gap: 40px;
+  gap: 20px;
   box-sizing: border-box;
   position: absolute;
   margin: auto;
@@ -38,10 +42,21 @@ const LoadingIndicatorContainer = styled.div`
   position: absolute;
   top: 50%;
   left: 50%;
-  margin-top: -44px;
+  margin-top: -80px;
   margin-left: -110px;
   width: 220px;
-  height: 88px;
+`;
+
+const LogoAndLoading = styled.div`
+  display: flex;
+  justify-content: flex-start;
+  flex-direction: column;
+  align-items: center;
+  flex: 1;
+  gap: 40px;
+  width: 100%;
+  align-self: stretch;
+  box-sizing: border-box;
 `;
 
 const styles = (props) => ({
@@ -68,3 +83,33 @@ const ColoredLinearProgress = withStyles(styles)(function (props) {
     </Box>
   );
 });
+
+export function TipsContainer() {
+  return (
+    <RootWrapperTipsContainer>
+      <Tip>First Loading might take a while depending on your file size.</Tip>
+    </RootWrapperTipsContainer>
+  );
+}
+
+const RootWrapperTipsContainer = styled.div`
+  display: flex;
+  justify-content: center;
+  flex-direction: row;
+  align-items: center;
+  flex: 1;
+  gap: 10px;
+  align-self: stretch;
+  box-sizing: border-box;
+  padding: 0px 8px;
+`;
+
+const Tip = styled.span`
+  color: rgba(255, 255, 255, 0.33);
+  text-overflow: ellipsis;
+  font-size: 14px;
+  font-family: Roboto, sans-serif;
+  font-weight: 400;
+  text-align: center;
+  width: 205px;
+`;
