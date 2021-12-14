@@ -19,7 +19,13 @@ export class RemoteDesignSessionCacheStore {
   }
 
   set(raw: RawNodeResponse) {
-    window.sessionStorage.setItem(this.key, JSON.stringify(raw));
+    try {
+      window.sessionStorage.setItem(this.key, JSON.stringify(raw));
+    } catch (e) {
+      if (e.name === "QuotaExceededError") {
+        window.sessionStorage.clear();
+      }
+    }
   }
 
   get(): null | RawNodeResponse {

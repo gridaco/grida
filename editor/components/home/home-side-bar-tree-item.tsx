@@ -52,7 +52,6 @@ export const PageRow = memo(
       name,
       selected,
       onHoverChange,
-      onAddClick,
       onMenuClick,
       onClickChevron,
       onPress,
@@ -63,7 +62,6 @@ export const PageRow = memo(
     }: TreeView.TreeRowProps<""> & {
       name: string;
       selected: boolean;
-      onAddClick: () => void;
       onMenuClick: () => void;
       children?: ReactNode;
     },
@@ -89,18 +87,19 @@ export const PageRow = memo(
         onPress={onPress}
         onClick={onClick}
         onDoubleClick={onDoubleClick}
+        onClickChevron={onClickChevron}
         {...props}
       >
         {withSeparatorElements(
           [
             <TreeView.RowTitle>{name}</TreeView.RowTitle>,
-            hovered && (
-              <>
-                <DotsHorizontalIcon onClick={onMenuClick} />
-                <Spacer.Horizontal size={12} />
-                {/* <PlusIcon onClick={onAddClick} /> */}
-              </>
-            ),
+            // hovered && (
+            //   <>
+            //     <DotsHorizontalIcon onClick={onMenuClick} />
+            //     <Spacer.Horizontal size={12} />
+            //     {/* <PlusIcon onClick={onAddClick} /> */}
+            //   </>
+            // ),
           ],
           <Spacer.Horizontal size={6} />
         )}

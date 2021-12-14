@@ -1,7 +1,8 @@
 import React from "react";
 import styled from "@emotion/styled";
+import { colors } from "theme";
 
-export function HomeSceneCard({
+export function BaseHomeSceneCard({
   label,
   description,
   onClick,
@@ -18,9 +19,9 @@ export function HomeSceneCard({
     <RootWrapperBaseHomeSceneCard onClick={onClick}>
       <Body>
         <ThumbnailArea>
-          <SceneCardPreviewThumbnailImage>
-            <ThumbnailImage src={thumbnail}></ThumbnailImage>
-          </SceneCardPreviewThumbnailImage>
+          <SceneCardPreviewThumbnail>
+            {thumbnail && <ThumbnailImage src={thumbnail}></ThumbnailImage>}
+          </SceneCardPreviewThumbnail>
         </ThumbnailArea>
         <ContentArea>
           <LabelDescContainer>
@@ -45,7 +46,7 @@ const RootWrapperBaseHomeSceneCard = styled.div`
   gap: 10px;
   border: solid 1px rgba(72, 72, 72, 1);
   border-radius: 2px;
-  background-color: rgba(37, 37, 38, 1);
+  background-color: ${colors.color_editor_bg_on_dark};
   box-sizing: border-box;
 
   :hover {
@@ -76,8 +77,9 @@ const ThumbnailArea = styled.div`
   box-sizing: border-box;
 `;
 
-const SceneCardPreviewThumbnailImage = styled.div`
+const SceneCardPreviewThumbnail = styled.div`
   height: 101px;
+  background-color: #c1c1c1;
   position: relative;
   align-self: stretch;
 `;
@@ -108,7 +110,6 @@ const LabelDescContainer = styled.div`
   flex: none;
   gap: 10px;
   width: 221px;
-  height: 48px;
   box-sizing: border-box;
 `;
 
@@ -117,7 +118,6 @@ const LabelArea = styled.div`
   justify-content: flex-start;
   flex-direction: row;
   align-items: center;
-  flex: 1;
   gap: 8px;
   align-self: stretch;
   box-sizing: border-box;
@@ -135,7 +135,11 @@ const ThisLabel = styled.span`
   font-family: "Helvetica Neue", sans-serif;
   font-weight: 400;
   text-align: left;
-  width: 197px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  -webkit-line-clamp: 1;
+  line-clamp: 1;
 `;
 
 const Description = styled.span`

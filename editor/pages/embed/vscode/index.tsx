@@ -8,25 +8,25 @@ import styled from "@emotion/styled";
 
 function Preview() {
   return (
-    <VanillaFrameContextManuProvider>
-      <div
+    // <VanillaFrameContextManuProvider>
+    <div
+      style={{
+        width: "100%",
+        height: "100%",
+      }}
+      onMouseEnter={(e) => {}}
+      onMouseLeave={(e) => {}}
+    >
+      <iframe
         style={{
-          width: "100%",
-          height: "100%",
+          pointerEvents: "none",
         }}
-        onMouseEnter={(e) => {}}
-        onMouseLeave={(e) => {}}
-      >
-        <iframe
-          style={{
-            pointerEvents: "none",
-          }}
-          width="100%"
-          height="100%"
-          srcDoc={dummy_vanilla_src}
-        />
-      </div>
-    </VanillaFrameContextManuProvider>
+        width="100%"
+        height="100%"
+        srcDoc={dummy_vanilla_src}
+      />
+    </div>
+    // </VanillaFrameContextManuProvider>
   );
 }
 

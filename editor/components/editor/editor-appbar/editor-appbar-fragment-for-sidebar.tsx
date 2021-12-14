@@ -1,15 +1,23 @@
 import React from "react";
 import styled from "@emotion/styled";
+import { ArrowBack } from "@material-ui/icons";
+import { useRouter } from "next/router";
+import { colors } from "theme";
 
 export function AppbarFragmentForSidebar() {
+  const router = useRouter();
+
   return (
     <RootWrapperAppbarFragmentForSidebar>
-      <div
+      <ArrowBack
         style={{
-          width: 24,
-          height: 24,
+          fontSize: "20px",
+          fill: "white",
         }}
-      ></div>
+        onClick={() => {
+          router.push("/");
+        }}
+      />
       {/* <IconsMdiMenu
         // TODO: replace resource
         src="https://s3-us-west-2.amazonaws.com/figma-alpha-api/img/333b/8550/4bdd6a7ceffe5b23b37bc68c1fb7a4ab"
@@ -28,7 +36,7 @@ const RootWrapperAppbarFragmentForSidebar = styled.div`
   gap: 10px;
   width: 200px;
   align-self: stretch;
-  background-color: rgba(37, 37, 38, 1);
+  background-color: ${colors.color_editor_bg_on_dark};
   box-sizing: border-box;
   padding: 14px 16px;
 `;

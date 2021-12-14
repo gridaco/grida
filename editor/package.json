@@ -41,6 +41,7 @@
     "moment": "^2.29.1",
     "monaco-editor": "^0.24.0",
     "next": "10.0.3",
+    "pouchdb-adapter-idb": "^7.2.2",
     "re-resizable": "^6.9.1",
     "react": "17.0.1",
     "react-codemirror2": "^7.2.1",
@@ -49,7 +50,10 @@
     "react-resizable": "^3.0.1",
     "react-spring": "^9.3.2",
     "recoil": "^0.2.0",
-    "styled-components": "^5.3.3"
+    "rxdb": "^10.5.4",
+    "rxjs": "^7.4.0",
+    "styled-components": "^5.3.3",
+    "tree-visit": "^0.1.0"
   },
   "devDependencies": {
     "@babel/core": "^7.14.0",

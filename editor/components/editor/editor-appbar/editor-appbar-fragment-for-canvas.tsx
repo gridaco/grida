@@ -1,6 +1,7 @@
 import React from "react";
 import styled from "@emotion/styled";
 import { useEditorState } from "core/states";
+import { colors } from "theme";
 
 export function AppbarFragmentForCanvas() {
   const [state] = useEditorState();
@@ -19,7 +20,7 @@ const RootWrapperAppbarFragmentForCanvas = styled.div`
   align-items: center;
   gap: 10px;
   align-self: stretch;
-  background-color: rgba(37, 37, 38, 1);
+  background-color: ${colors.color_editor_bg_on_dark};
   box-sizing: border-box;
   padding: 10px 24px;
 `;

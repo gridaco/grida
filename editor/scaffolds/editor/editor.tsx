@@ -31,6 +31,8 @@ import {
 } from "utils/design-query";
 import { vanilla_presets } from "@grida/builder-config-preset";
 import { EditorSkeleton } from "./skeleton";
+import { MonacoEmptyMock } from "components/code-editor/monaco-mock-empty";
+import { colors } from "theme";
 
 export function Editor() {
   const router = useRouter();
@@ -73,10 +75,7 @@ export function Editor() {
       MainImageRepository.instance = new RemoteImageRepositories(
         state.design.key,
         {
-          authentication: {
-            accessToken: fat,
-            personalAccessToken: personal.get_safe(),
-          },
+          authentication: fat,
         }
       );
       MainImageRepository.instance.register(
@@ -87,7 +86,7 @@ export function Editor() {
       );
     }
     // ------------------------------------------------------------
-  }, [state.design?.key, fat]);
+  }, [state.design?.key, fat.accessToken]);
 
   useEffect(() => {
     const __target = targetted;
@@ -152,7 +151,15 @@ export function Editor() {
           input: _input,
           build_config: build_config,
           framework: vanilla_presets.vanilla_default,
-          asset_config: { skip_asset_replacement: true },
+          asset_config: {
+            skip_asset_replacement: false,
+            asset_repository: MainImageRepository.instance,
+            custom_asset_replacement: {
+              type: "static",
+              resource:
+                "https://bridged-service-static.s3.us-west-1.amazonaws.com/placeholder-images/image-placeholder-bw-tile-100.png",
+            },
+          },
         }).then(on_preview_result);
 
         designToCode({
@@ -180,11 +187,11 @@ export function Editor() {
         <EditorSkeleton percent={_initial_load_progress + 0.2} />
       )}
       <DefaultEditorWorkspaceLayout
-        backgroundColor={"rgba(37, 37, 38, 1)"}
+        backgroundColor={colors.color_editor_bg_on_dark}
         leftbar={<EditorSidebar />}
       >
         <WorkspaceContentPanelGridLayout>
-          <WorkspaceContentPanel>
+          <WorkspaceContentPanel flex={6}>
             <Canvas
               preview={preview}
               fileid={state?.design?.key}
@@ -195,7 +202,7 @@ export function Editor() {
               }}
             />
           </WorkspaceContentPanel>
-          <WorkspaceContentPanel backgroundColor={"rgba(30, 30, 30, 1)"}>
+          <WorkspaceContentPanel flex={4}>
             <CodeEditorContainer>
               {/* <EditorAppbarFragments.CodeEditor /> */}
               <CodeOptionsControl
@@ -222,7 +229,7 @@ export function Editor() {
                       }
                     : {
                         loading: {
-                          raw: "Reading design...",
+                          raw: "\n".repeat(100),
                           language: "text",
                           name: "loading",
                         },

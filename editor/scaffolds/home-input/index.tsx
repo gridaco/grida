@@ -1,22 +1,60 @@
-import React from "react";
+import React, { useState } from "react";
 import styled from "@emotion/styled";
 import {
   HomeInputAppbar,
   HomePrimaryInputNextButton,
 } from "components/home-input";
 import { HomeLogo } from "icons/home-logo";
+import { useAuthState } from "hooks/use-auth-state";
+import { analyze, parseFileAndNodeId } from "@design-sdk/figma-url";
+import { useRouter } from "next/router";
+import { colors } from "theme";
 
-export function HomeInputLayout() {
+export function HomeInput() {
+  const router = useRouter();
+  const authstate = useAuthState();
+  const show_signin_button = authstate !== "signedin";
+  const [input, setInput] = useState<string>(null);
+  const valid = isValidInput(input);
+
+  const onSubmit = () => {
+    if (valid) {
+      const nodeconfig = parseFileAndNodeId(input);
+      if (nodeconfig) {
+        if (nodeconfig.node) {
+          router.push(
+            "/files/[key]/[node]",
+            `/files/${nodeconfig.file}/${nodeconfig.node}`
+          );
+        } else {
+          router.push("/files/[key]", `/files/${nodeconfig.file}`);
+        }
+      }
+    }
+  };
+
   return (
     <RootWrapper>
-      <HomeInputAppbar />
+      <HomeInputAppbar show_signin={show_signin_button} />
       <Body>
         <HomeLogo />
         <FormWrapper>
           <HomePrimaryInputForm>
             <BaseHomePrimaryInputFormHtmlTagInput>
-              <Placeholder placeholder={"Type your Figma design url"} />
-              <HomePrimaryInputNextButton />
+              <Placeholder
+                autoFocus
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    onSubmit();
+                  }
+                }}
+                onChange={(e) => setInput(e.target.value)}
+                placeholder={"Type your Figma design url"}
+              />
+              <HomePrimaryInputNextButton
+                onClick={onSubmit}
+                disabled={!valid}
+              />
             </BaseHomePrimaryInputFormHtmlTagInput>
           </HomePrimaryInputForm>
         </FormWrapper>
@@ -24,6 +62,29 @@ export function HomeInputLayout() {
     </RootWrapper>
   );
 }
+
+const isValidInput = (input) => {
+  if (!input) return false;
+  try {
+    const _ = analyze(input);
+    switch (_) {
+      case "empty":
+        return false;
+      case "embed":
+      case "file":
+      case "fileid":
+      case "maybe_fileid":
+      case "maybe_nodeid":
+      case "node":
+      case "nodeid":
+        return true;
+      default:
+        return false;
+    }
+  } catch (e) {
+    return false;
+  }
+};
 
 const RootWrapper = styled.div`
   overflow: hidden;
@@ -33,7 +94,7 @@ const RootWrapper = styled.div`
   align-items: start;
   gap: 0;
   min-height: 100vh;
-  background-color: rgba(37, 37, 38, 1);
+  background-color: ${colors.color_editor_bg_on_dark};
   box-sizing: border-box;
 `;
 

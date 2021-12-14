@@ -1,5 +1,5 @@
-import { HomeInputLayout } from "layout/home-input";
-import { HomeLayout } from "layout/home";
+import { HomeInput } from "scaffolds/home-input";
+import { HomeDashboard } from "scaffolds/home-dashboard";
 import React from "react";
 import { useAuthState } from "hooks/use-auth-state";
 
@@ -7,7 +7,7 @@ export default function Home() {
   const authstate = useAuthState();
 
   // region - dev injected
-  return <HomeLayout />;
+  return <HomeDashboard />;
   // endregion
 
   switch (authstate) {
@@ -15,8 +15,8 @@ export default function Home() {
     case "expired":
     case "unauthorized":
     default:
-      return <HomeInputLayout />;
+      return <HomeInput />;
     case "signedin":
-      return <HomeLayout />;
+      return <HomeDashboard />;
   }
 }

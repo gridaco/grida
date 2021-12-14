@@ -1,46 +1,129 @@
 import React, { memo, useCallback, useMemo, useState } from "react";
 import styled from "@emotion/styled";
 import { TreeView } from "@editor-ui/editor";
-import { ListView } from "@editor-ui/listview";
 import { PageRow } from "./home-side-bar-tree-item";
+import { useRouter } from "next/router";
+import { flatten } from "components/editor/editor-layer-hierarchy/editor-layer-heriarchy-controller";
+interface PresetPage {
+  id: string;
+  name: string;
+  path: string;
+  depth: number;
+  children?: PresetPage[];
+}
+
+const preset_pages: PresetPage[] = [
+  {
+    id: "/",
+    name: "Home",
+    path: "/",
+    depth: 0,
+    children: [
+      {
+        id: "/#recents",
+        name: "Recents",
+        path: "/#recents",
+        depth: 1,
+      },
+      {
+        id: "/#files",
+        name: "Files",
+        path: "/#files",
+        depth: 1,
+      },
+      // {
+      //   id: "/#scenes",
+      //   name: "Scenes",
+      //   path: "/#scenes",
+      //   depth: 1,
+      // },
+      // {
+      //   id: "/#components",
+      //   name: "Components",
+      //   path: "/#components",
+      //   depth: 1,
+      // },
+    ],
+  },
+  {
+    id: "/files",
+    name: "Files",
+    path: "/files",
+    depth: 0,
+  },
+  // {
+  //   id: "/components",
+  //   name: "Components",
+  //   path: "/components",
+  //   depth: 0,
+  // },
+  // {
+  //   id: "/integrations",
+  //   name: "Import / Sync",
+  //   path: "/integrations",
+  //   depth: 0,
+  // },
+  {
+    id: "help",
+    name: "Help",
+    path: "",
+    depth: 0,
+    children: [
+      {
+        id: "bug-report",
+        name: "Bug report",
+        path: "https://github.com/gridaco/designto-code/issues/new",
+        depth: 1,
+      },
+      {
+        id: "Github",
+        name: "Github",
+        path: "https://github.com/gridaco/designto-code/",
+        depth: 1,
+      },
+      {
+        id: "docs",
+        name: "Docs",
+        path: "https://github.com/gridaco/designto-code/tree/main/docs",
+        depth: 1,
+      },
+    ],
+  },
+];
 
 export function HomeSidebarTree() {
+  const router = useRouter();
+  const [selected, setSelected] = useState<string | null>(router.asPath);
+
   const renderItem = useCallback(
-    ({ id, name, depth }, index: number, { isDragging }: ListView.ItemInfo) => {
+    ({ id, name, path, depth, children }, index: number) => {
       return (
         <PageRow
-          name={name}
-          depth={depth}
           id={id}
+          name={name}
           key={id}
-          expanded={false}
-          selected={false}
-          onAddClick={() => {}}
+          depth={depth}
+          expanded={children?.length > 0 ? true : undefined}
+          selected={selected == path}
           onMenuClick={() => {}}
           onDoubleClick={() => {}}
-          onPress={() => {}}
-          onSelectMenuItem={() => {}}
+          onPress={() => {
+            setSelected(path);
+            router.push(path);
+          }}
+          onClickChevron={() => {}}
           onContextMenu={() => {}}
         />
       );
     },
-    []
+    [selected]
   );
 
-  const pageInfo = [
-    { id: "1", name: "Page 1", depth: 0 },
-    { id: "2", name: "Page 2", depth: 0 },
-    { id: "3", name: "Page 3", depth: 0 },
-    { id: "4", name: "Page 4", depth: 0 },
-    { id: "5", name: "Page 5", depth: 0 },
-  ];
+  const pages = preset_pages.map((pageroot) => flatten(pageroot)).flat();
   return (
     <TreeView.Root
-      sortable={true}
-      data={pageInfo}
+      data={pages}
       keyExtractor={useCallback((item: any) => item.id, [])}
-      // onMoveItem={}
-      acceptsDrop={() => false}
       renderItem={renderItem}
     />
   );

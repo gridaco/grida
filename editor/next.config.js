@@ -107,12 +107,12 @@ module.exports = withTM({
         destination: "/preferences",
         permanent: true,
       },
-      {
-        // typo gaurd
-        source: "/",
-        destination: "https://grida.co",
-        permanent: false,
-      },
+      // {
+      //   // typo gaurd
+      //   source: "/",
+      //   destination: "https://grida.co",
+      //   permanent: false,
+      // },
     ];
   },
 });

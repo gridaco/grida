@@ -94,7 +94,6 @@ export const LayerRow = memo(
       name,
       selected,
       onHoverChange,
-      onAddClick,
       onMenuClick,
       onClickChevron,
       onPress,
@@ -105,7 +104,6 @@ export const LayerRow = memo(
     }: TreeView.TreeRowProps<""> & {
       name: string;
       selected: boolean;
-      onAddClick: () => void;
       onMenuClick: () => void;
       children?: ReactNode;
     },
@@ -130,6 +128,7 @@ export const LayerRow = memo(
         disabled={false}
         onPress={onPress}
         onClick={onClick}
+        onClickChevron={onClickChevron}
         onDoubleClick={onDoubleClick}
         {...props}
       >

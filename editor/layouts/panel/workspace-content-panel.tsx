@@ -9,14 +9,17 @@ import React from "react";
 export function WorkspaceContentPanel({
   children,
   disableBorder = true,
+  flex = 1,
   backgroundColor = "none",
 }: {
   backgroundColor?: string;
   children: JSX.Element;
   disableBorder?: boolean;
+  flex?: number;
 }) {
   return (
     <WorkspaceCPanel
+      flex={flex}
       backgroundColor={backgroundColor}
       disableBorder={disableBorder}
     >
@@ -26,6 +29,7 @@ export function WorkspaceContentPanel({
 }
 
 const WorkspaceCPanel = styled.div<{
+  flex?: number;
   backgroundColor: string;
   disableBorder: boolean;
 }>`
@@ -33,6 +37,6 @@ const WorkspaceCPanel = styled.div<{
   background-color: ${(p) => p.backgroundColor};
   border-width: 1px;
   align-self: stretch;
-  flex: 1;
+  flex: ${(p) => p.flex};
   overflow: auto;
 `;

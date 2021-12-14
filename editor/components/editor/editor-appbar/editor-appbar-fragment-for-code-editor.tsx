@@ -34,7 +34,6 @@ const RootWrapperAppbarFragmentForCodeEditor = styled.div`
   flex: 1;
   gap: 10px;
   align-self: stretch;
-  background-color: rgba(30, 30, 30, 1);
   box-sizing: border-box;
   padding-bottom: 14px;
   padding-top: 14px;

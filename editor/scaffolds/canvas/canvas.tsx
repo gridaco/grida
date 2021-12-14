@@ -72,6 +72,6 @@ const EditorCanvasSkeleton = () => {
 const CanvasContainer = styled.div`
   display: flex;
   flex-direction: column;
-  max-width: calc((100vw - 200px) / 2); // TODO: make this dynamic
+  max-width: calc((100vw - 200px) * 0.6); // TODO: make this dynamic
   height: 100%;
 `;

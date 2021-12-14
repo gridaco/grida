@@ -1,23 +1,23 @@
 import React from "react";
-import { RecentDesign } from "../../store";
-import { RecentDesignCard } from "./recent-design-card";
 import moment from "moment";
 import router from "next/router";
-import { formToCodeUrl } from "../../url";
+import { formToCodeUrl } from "../../../url";
+import { FileCard } from "./card-variant-file";
 
 const _id =
   "https://www.figma.com/file/x7RRK6RwWtZuNakmbMLTVH/examples?node-id=1%3A120";
-const defaultdemodesign: RecentDesign = {
-  id: _id,
+const defaultdemodesign = {
+  type: "file" as "file",
+  key: "x7RRK6RwWtZuNakmbMLTVH",
   name: "WNV Main screen",
   provider: "figma",
-  addedAt: moment().toDate(),
+  lastUsed: moment().toDate(),
   lastUpdatedAt: moment().toDate(),
-  previewUrl:
+  thumbnailUrl:
     "https://example-project-manifest.s3.us-west-1.amazonaws.com/app-wnv/cover.png",
 };
 
-export function BuiltinDemoDesignCard() {
+export function BuiltinDemoFileCard() {
   const onclick = () => {
     const _path = formToCodeUrl({
       design: _id,
@@ -26,7 +26,7 @@ export function BuiltinDemoDesignCard() {
   };
   return (
     <>
-      <RecentDesignCard key={_id} onclick={onclick} data={defaultdemodesign} />
+      <FileCard key={_id} onClick={onclick} data={defaultdemodesign} />
     </>
   );
 }

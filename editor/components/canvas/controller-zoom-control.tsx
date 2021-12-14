@@ -1,6 +1,7 @@
 import React from "react";
 import styled from "@emotion/styled";
 import RefreshSharpIcon from "@material-ui/icons/RefreshSharp";
+import { colors } from "theme";
 
 export function ZoomControl({
   scale,
@@ -87,8 +88,8 @@ const Controls = styled.div`
   box-sizing: border-box;
   border-radius: 4px;
   padding: 4px;
-  background-color: #252526;
-  box-shadow: #25252650 0px 0px 0px 16px inset;
+  background-color: ${colors.color_editor_bg_on_dark};
+  box-shadow: ${colors.color_editor_bg_on_dark} 0px 0px 0px 16px inset;
 `;
 
 const ControlsContainer = styled.div`
