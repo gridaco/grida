@@ -7,10 +7,11 @@ import {
   HomeSidebar,
 } from "components/home";
 import { WorkspaceRepository } from "repository";
+import { FileResponseRecord } from "store/fimga-file-store/figma-file-store";
 
 export default function FilesPage() {
   const repository = new WorkspaceRepository();
-  const [files, setFiles] = useState([]);
+  const [files, setFiles] = useState<FileResponseRecord[]>([]);
   useEffect(() => {
     repository.getFiles().then(setFiles);
   }, []);
@@ -25,7 +26,7 @@ export default function FilesPage() {
           <HomeHeading>Files</HomeHeading>
           <HomeCardGroup
             cards={files.map((d) => (
-              <Cards.File key={d.id} data={d} label={d.name} thumbnail={null} />
+              <Cards.File key={d.key} data={d} label={d.name} />
             ))}
           />
         </div>

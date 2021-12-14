@@ -22,14 +22,14 @@ export function EditorLayerHierarchy() {
     : [];
 
   const renderItem = useCallback(
-    ({ id, name, depth, type }) => {
+    ({ id, name, depth, type, origin }) => {
       const selected = state?.selectedNodes?.includes(id);
 
       return (
         <LayerRow
           icon={
             <IconContainer>
-              <LayerIcon type={type} selected={selected} />
+              <LayerIcon type={origin} selected={selected} />
             </IconContainer>
           }
           name={name}

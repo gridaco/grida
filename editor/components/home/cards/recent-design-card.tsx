@@ -26,15 +26,6 @@ export function RecentDesignCard(props: {
   );
 }
 
-const _defaultpreview =
-  "https://s3.amazonaws.com/uifaces/faces/twitter/golovey/128.jpg";
-function _safe_previewurl(previewUrl: string): string {
-  if (!previewUrl) {
-    return _defaultpreview;
-  }
-  return previewUrl;
-}
-
 function _str_lastUpdatedAt(lastUpdatedAt: Date) {
   if (!lastUpdatedAt) return;
   return moment(lastUpdatedAt).format("MM/dd/yyyy");

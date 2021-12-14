@@ -4,13 +4,12 @@ import { BaseHomeSceneCard } from "./base-home-scene-card";
 
 export function FileCard({
   label,
-  thumbnail,
   data,
 }: {
   label: string;
-  thumbnail: string;
   data: {
-    file: string;
+    key: string;
+    thumbnailUrl: string;
   };
 }) {
   const router = useRouter();
@@ -18,10 +17,10 @@ export function FileCard({
   return (
     <BaseHomeSceneCard
       onClick={() => {
-        router.push(`/files/[file]`, `/files/${data.file}`);
+        router.push(`/files/[key]`, `/files/${data.key}`);
       }}
       label={label}
-      thumbnail={thumbnail}
+      thumbnail={data.thumbnailUrl}
     />
   );
 }

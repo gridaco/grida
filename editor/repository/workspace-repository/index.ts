@@ -1,3 +1,5 @@
+import { FigmaFilesStore } from "store/fimga-file-store/figma-file-store";
+
 export class WorkspaceRepository {
   constructor() {}
 
@@ -13,6 +15,7 @@ export class WorkspaceRepository {
   }
 
   async getFiles(): Promise<any[]> {
+    return FigmaFilesStore.all();
     return [
       "JRD2EdsbBlWgib8NzTXIGo",
       "HSozKEVWhh8saZa2vr1Nxd",

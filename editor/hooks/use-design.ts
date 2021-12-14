@@ -15,6 +15,7 @@ import { convert } from "@design-sdk/figma-node-conversion";
 import { mapFigmaRemoteToFigma } from "@design-sdk/figma-remote/lib/mapper";
 import { useFigmaAccessToken } from ".";
 import { FileResponse } from "@design-sdk/figma-remote-types";
+import { FigmaDesignRepository } from "repository/figma-design-repository";
 
 // globally configure auth credentials for interacting with `@design-sdk/figma-remote`
 configure_auth_credentials({
@@ -171,10 +172,8 @@ export function useDesignFile({ file }: { file: string }) {
   useEffect(() => {
     if (file && (fat.accessToken || fat.personalAccessToken)) {
       async function handle() {
-        const iterator = fetch.fetchFile({
-          file,
-          auth: fat,
-        });
+        const repo = new FigmaDesignRepository(fat);
+        const iterator = repo.fetchFile(file);
         let next: IteratorResult<FileResponse>;
         while ((next = await iterator.next()).done === false) {
           setDesignFile(next.value);
