@@ -10,6 +10,7 @@ import { Flex } from "rebass";
 
 import { usePopupContext } from "utils/context/PopupContext";
 import {
+  clearFigmaAccessToken__localstorage,
   getFigmaAccessToken__localstorage,
   startAnonymousFigmaAccessTokenOneshot,
   _FIGMA_ACCESS_TOKEN_STORAGE_KEY,
@@ -37,14 +38,6 @@ export function CtaArea({ mode }: { mode: CtaOrigin }) {
   const [hasOngoingAuthProc, setHasOngoingAuthProc] = useState(false);
   const [input, setInput] = useState<string>(null);
   const { addPopup, removePopup } = usePopupContext();
-
-  const isFigmaAccessTokenSet = () => {
-    const tokeninfo = getFigmaAccessToken__localstorage();
-    const accesstoken = tokeninfo && tokeninfo.accessToken;
-    if (accesstoken) {
-      return true;
-    }
-  };
 
   const showInvalidUrlGuide = useCallback(() => {
     addPopup({
@@ -138,16 +131,18 @@ export function CtaArea({ mode }: { mode: CtaOrigin }) {
         });
 
         inputRef?.current?.blur();
-        if (isFigmaAccessTokenSet()) {
-          moveToCode({
-            figmaAccessToken: getFigmaAccessToken__localstorage().accessToken,
-            design: url,
-          });
-        } else {
-          showFigmaAuthModal({
-            afterurl: url,
-          });
-        }
+        isAccessTokenValid().then(valid => {
+          if (valid) {
+            moveToCode({
+              figmaAccessToken: getFigmaAccessToken__localstorage().accessToken,
+              design: url,
+            });
+          } else {
+            showFigmaAuthModal({
+              afterurl: url,
+            });
+          }
+        });
       }
     } catch (e) {
       console.error("error while validating figma url", e);
@@ -174,7 +169,7 @@ export function CtaArea({ mode }: { mode: CtaOrigin }) {
     window.open(url.toString(), "_blank");
     // after opening a new window, clear the input.
 
-    inputRef.current.value = "";
+    inputRef?.current && (inputRef.current.value = "");
     setInput("");
   };
 
@@ -269,3 +264,33 @@ const FigmaAuthModal = ({ onNextClick }: { onNextClick: () => void }) => {
     </Flex>
   );
 };
+
+async function isAccessTokenValid() {
+  const clearExpired = () => {
+    clearFigmaAccessToken__localstorage();
+  };
+
+  const tokeninfo = getFigmaAccessToken__localstorage();
+  const accesstoken = tokeninfo && tokeninfo.accessToken;
+  if (accesstoken) {
+    try {
+      const res = await fetch(`https://api.figma.com/v1/me`, {
+        method: "GET",
+        headers: new Headers({
+          Authorization: "Bearer " + accesstoken,
+        }),
+      });
+
+      if (res.status >= 400) {
+        clearExpired();
+        return false;
+      }
+      return true;
+    } catch (e) {
+      clearExpired();
+      return false;
+    }
+  }
+  clearExpired();
+  return false;
+}
