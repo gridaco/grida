@@ -1,39 +1,17 @@
 import React from "react";
 import styled from "@emotion/styled";
 import { HomeLogo } from "icons/home-logo";
-import { AnimatedLineProgressBar } from "@frogress/line";
-import { colors } from "theme";
+import { withStyles } from "@material-ui/core/styles";
+import Box from "@material-ui/core/Box";
+import LinearProgress from "@material-ui/core/LinearProgress";
 
 export function EditorSkeleton({ percent = 0 }: { percent?: number }) {
   return (
     <SkeletonWrap>
       <LoadingIndicatorContainer>
         <HomeLogo />
-        <AnimatedLineProgressBar
-          containerColor="#838383"
-          progressColor="#fff"
-          defaultValue={0}
-          percent={percent * 100}
-        />
+        <ColoredLinearProgress />
       </LoadingIndicatorContainer>
-      {/* <Body>
-        <SidebarMock>
-          <ListMock>
-            {[1, 2, 3, 4, 5, 6, 7, 8].map((i) => (
-              <MockItem1 key={i.toString()}>
-                <BaseHierarchyItem>
-                  <Frame55>
-                    <Frame52></Frame52>
-                    <Frame324></Frame324>
-                  </Frame55>
-                </BaseHierarchyItem>
-              </MockItem1>
-            ))}
-          </ListMock>
-        </SidebarMock>
-        <CanvasMock></CanvasMock>
-        <CodeEditorMock></CodeEditorMock>
-      </Body> */}
     </SkeletonWrap>
   );
 }
@@ -65,3 +43,28 @@ const LoadingIndicatorContainer = styled.div`
   width: 220px;
   height: 88px;
 `;
+
+const styles = (props) => ({
+  colorPrimary: {
+    backgroundColor: "rgba(255, 255, 255, 0.3)",
+  },
+  barColorPrimary: {
+    backgroundColor: "#fff",
+  },
+});
+
+const ColoredLinearProgress = withStyles(styles)(function (props) {
+  //@ts-ignore
+  const { classes } = props;
+  return (
+    <Box sx={{ width: "100%" }}>
+      <LinearProgress
+        {...props}
+        classes={{
+          colorPrimary: classes.colorPrimary,
+          barColorPrimary: classes.barColorPrimary,
+        }}
+      />
+    </Box>
+  );
+});
