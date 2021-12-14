@@ -52,7 +52,8 @@
     "recoil": "^0.2.0",
     "rxdb": "^10.5.4",
     "rxjs": "^7.4.0",
-    "styled-components": "^5.3.3"
+    "styled-components": "^5.3.3",
+    "tree-visit": "^0.1.0"
   },
   "devDependencies": {
     "@babel/core": "^7.14.0",

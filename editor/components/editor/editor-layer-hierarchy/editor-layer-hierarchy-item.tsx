@@ -94,7 +94,6 @@ export const LayerRow = memo(
       name,
       selected,
       onHoverChange,
-      onAddClick,
       onMenuClick,
       onClickChevron,
       onPress,
@@ -130,6 +129,7 @@ export const LayerRow = memo(
         disabled={false}
         onPress={onPress}
         onClick={onClick}
+        onClickChevron={onClickChevron}
         onDoubleClick={onDoubleClick}
         {...props}
       >

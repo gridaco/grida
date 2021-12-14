@@ -8,22 +8,38 @@ import {
 } from "./editor-layer-hierarchy-item";
 import { useEditorState } from "core/states";
 import { useDispatch } from "core/dispatch";
-import { flatten, FlattenedNode } from "./editor-layer-heriarchy-controller";
+import {
+  flattenNodeTree,
+  FlattenedDisplayItemNode,
+} from "./editor-layer-heriarchy-controller";
 
 export function EditorLayerHierarchy() {
   const [state] = useEditorState();
   const dispatch = useDispatch();
+
+  const [expands, setExpands] = useState<string[]>(state?.selectedNodes ?? []);
+
   const root = state.selectedPage
     ? state.design.pages.find((p) => p.id == state.selectedPage).children
     : [state.design?.input?.entry];
 
-  const layers: FlattenedNode[][] = useMemo(() => {
-    return root ? root.filter((l) => !!l).map((layer) => flatten(layer)) : [];
-  }, [root]);
+  const layers: FlattenedDisplayItemNode[][] = useMemo(() => {
+    return root
+      ? root
+          .filter((l) => !!l)
+          .map((layer) => flattenNodeTree(layer, state.selectedNodes, expands))
+      : [];
+  }, [root, state?.selectedNodes, expands]);
 
   const renderItem = useCallback(
-    ({ id, name, depth, type, origin }) => {
-      const selected = state?.selectedNodes?.includes(id);
+    ({
+      id,
+      name,
+      expanded,
+      selected,
+      depth,
+      data,
+    }: FlattenedDisplayItemNode) => {
       // const _haschildren = useMemo(() => haschildren(id), [id, depth]);
       // const _haschildren = haschildren(id);
 
@@ -31,16 +47,22 @@ export function EditorLayerHierarchy() {
         <LayerRow
           icon={
             <IconContainer>
-              <LayerIcon type={origin} selected={selected} />
+              <LayerIcon type={data.origin} selected={selected} />
             </IconContainer>
           }
           name={name}
-          depth={depth}
+          depth={depth + 1} // because the root is not a layer. it's the page, the array of roots.
           id={id}
-          // expanded={_haschildren == true ? true : undefined}
+          expanded={expanded}
           key={id}
           selected={selected}
-          onAddClick={() => {}}
+          onClickChevron={() => {
+            if (expands.includes(id)) {
+              setExpands(expands.filter((e) => e !== id));
+            } else {
+              setExpands([...expands, id]);
+            }
+          }}
           onMenuClick={() => {}}
           onDoubleClick={() => {}}
           onPress={() => {
@@ -51,15 +73,15 @@ export function EditorLayerHierarchy() {
         />
       );
     },
-    [dispatch, state?.selectedNodes, layers]
+    [dispatch, state?.selectedNodes, layers, expands]
   );
 
-  const haschildren = useCallback(
-    (id: string) => {
-      return layers.some((l) => l.some((layer) => layer.parent === id));
-    },
-    [layers]
-  );
+  // const haschildren = useCallback(
+  //   (id: string) => {
+  //     return layers.some((l) => l.some((layer) => layer.parent === id));
+  //   },
+  //   [layers]
+  // );
 
   return (
     <TreeView.Root
