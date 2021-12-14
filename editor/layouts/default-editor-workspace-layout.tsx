@@ -57,7 +57,6 @@ const PanelLeftSideWrap = styled.div`
   min-height: 100%;
   max-height: 100%;
   max-width: 400px;
-  overflow: auto;
 `;
 
 const PanelRightSideWrap = styled.div`

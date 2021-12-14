@@ -9,17 +9,19 @@ export type FileResponseRecord = FileResponse & {
   [__pk]: string;
 };
 
-const db: Promise<IDBPDatabase<FileResponseRecord>> = new Promise((resolve) => {
-  openDB<FileResponseRecord>(__db_pref.name, __db_pref.version, {
-    upgrade(db) {
-      db.createObjectStore(__table, {
-        keyPath: __pk,
-      });
-    },
-  }).then((_db) => {
-    resolve(_db);
-  });
-});
+const db: Promise<IDBPDatabase<StorableFileResponse>> = new Promise(
+  (resolve) => {
+    openDB<StorableFileResponse>(__db_pref.name, __db_pref.version, {
+      upgrade(db) {
+        db.createObjectStore(__table, {
+          keyPath: __pk,
+        });
+      },
+    }).then((_db) => {
+      resolve(_db);
+    });
+  }
+);
 // #endregion
 
 export class FigmaFilesStore {
@@ -44,16 +46,68 @@ export class FigmaFileStore {
     try {
       await (
         await db
-      ).put(__table, <FileResponseRecord>{ ...file, [__pk]: this.filekey });
+      ).put(__table, <StorableFileResponse>{
+        ...minimizeFileResponse(file),
+        [__pk]: this.filekey,
+      });
     } catch (e) {
       if (process.env.NODE_ENV === "development") {
         console.error(e);
+        throw e;
       }
     }
   }
 
-  async get() {
+  async get(options?: { nounwrap?: boolean }): Promise<FileResponseRecord> {
     const rec = await (await db).get(__table, this.filekey);
-    return rec;
+    if (options?.nounwrap) {
+      return rec;
+    }
+    return unwrapStorableFileResponse(rec);
   }
+}
+
+type StorableFileResponse = {
+  readonly components: JSONString;
+  readonly styles: JSONString;
+  readonly document: JSONString;
+  readonly lastModified: string;
+  readonly name: string;
+  readonly role: string;
+  readonly schemaVersion: number;
+  readonly thumbnailUrl: string;
+  readonly version: string;
+};
+
+type JSONString = string;
+function minimizeFileResponse(file: FileResponse): StorableFileResponse {
+  return {
+    components: JSON.stringify(file.components),
+    styles: JSON.stringify(file.styles),
+    document: JSON.stringify(file.document),
+    lastModified: file.lastModified,
+    name: file.name,
+    role: file.role,
+    schemaVersion: file.schemaVersion,
+    thumbnailUrl: file.thumbnailUrl,
+    version: file.version,
+  };
+}
+
+function unwrapStorableFileResponse(
+  stored: StorableFileResponse | undefined | null
+): FileResponseRecord {
+  if (!stored) return;
+  return {
+    key: stored[__pk],
+    components: JSON.parse(stored.components),
+    styles: JSON.parse(stored.styles),
+    document: JSON.parse(stored.document),
+    lastModified: stored.lastModified,
+    name: stored.name,
+    role: stored.role as any,
+    schemaVersion: stored.schemaVersion,
+    thumbnailUrl: stored.thumbnailUrl,
+    version: stored.version,
+  };
 }

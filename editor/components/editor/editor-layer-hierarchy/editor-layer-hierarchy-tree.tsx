@@ -17,13 +17,15 @@ export function EditorLayerHierarchy() {
     ? state.design.pages.find((p) => p.id == state.selectedPage).children
     : [state.design?.input?.entry];
 
-  const layers: FlattenedNode[][] = root
-    ? root.filter((l) => !!l).map((layer) => flatten(layer))
-    : [];
+  const layers: FlattenedNode[][] = useMemo(() => {
+    return root ? root.filter((l) => !!l).map((layer) => flatten(layer)) : [];
+  }, [root]);
 
   const renderItem = useCallback(
     ({ id, name, depth, type, origin }) => {
       const selected = state?.selectedNodes?.includes(id);
+      // const _haschildren = useMemo(() => haschildren(id), [id, depth]);
+      // const _haschildren = haschildren(id);
 
       return (
         <LayerRow
@@ -35,7 +37,7 @@ export function EditorLayerHierarchy() {
           name={name}
           depth={depth}
           id={id}
-          expanded={haschildren(id) == true ? true : undefined}
+          // expanded={_haschildren == true ? true : undefined}
           key={id}
           selected={selected}
           onAddClick={() => {}}
@@ -49,7 +51,7 @@ export function EditorLayerHierarchy() {
         />
       );
     },
-    [state?.selectedNodes]
+    [dispatch, state?.selectedNodes, layers]
   );
 
   const haschildren = useCallback(

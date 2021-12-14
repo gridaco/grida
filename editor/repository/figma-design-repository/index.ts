@@ -20,6 +20,7 @@ export class FigmaDesignRepository {
         case "pages":
           if (!existing) {
             yield next.value;
+            store.upsert(next.value);
           }
           break;
         case "roots":
