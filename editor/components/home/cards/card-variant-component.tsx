@@ -13,6 +13,7 @@ export function ComponentCard({
   thumbnail: string;
   data: {
     file: string;
+    fileName: string;
     id: string;
   };
 }) {
@@ -38,6 +39,7 @@ export function ComponentCard({
         router.push("/files/[key]/[id]", `/files/${data.file}/${data.id}`);
       }}
       label={label}
+      description={data.fileName}
       thumbnail={thumbnail}
     />
   );

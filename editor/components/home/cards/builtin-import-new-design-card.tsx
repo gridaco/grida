@@ -6,7 +6,6 @@ const _id = "--new--";
 const importnewdesingcarddata = {
   id: _id,
   name: "New Design",
-  lastUpdatedAt: new Date(),
   addedAt: new Date(),
   provider: "unknown",
   previewUrl:

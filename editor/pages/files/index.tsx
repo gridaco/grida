@@ -6,8 +6,15 @@ import {
   HomeHeading,
   HomeSidebar,
 } from "components/home";
+import { WorkspaceRepository } from "repository";
 
 export default function FilesPage() {
+  const repository = new WorkspaceRepository();
+  const [files, setFiles] = useState([]);
+  useEffect(() => {
+    repository.getFiles().then(setFiles);
+  }, []);
+
   return (
     <>
       <DefaultEditorWorkspaceLayout
@@ -17,22 +24,8 @@ export default function FilesPage() {
         <div style={{ padding: 80 }}>
           <HomeHeading>Files</HomeHeading>
           <HomeCardGroup
-            cards={[
-              "JRD2EdsbBlWgib8NzTXIGo",
-              "HSozKEVWhh8saZa2vr1Nxd",
-              "Gaznaw1QHppxvs9UkqNOb0",
-              "Y0Gh77AqBoHH7dG1GtK3xF",
-              "iypAHagtcSp3Osfo2a7EDz",
-              "x7RRK6RwWtZuNakmbMLTVH",
-            ].map((d) => (
-              <Cards.File
-                key={d}
-                data={{
-                  file: `${d}`,
-                }}
-                label={"File " + d}
-                thumbnail={null}
-              />
+            cards={files.map((d) => (
+              <Cards.File key={d.id} data={d} label={d.name} thumbnail={null} />
             ))}
           />
         </div>

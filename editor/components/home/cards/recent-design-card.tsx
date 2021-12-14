@@ -36,6 +36,7 @@ function _safe_previewurl(previewUrl: string): string {
 }
 
 function _str_lastUpdatedAt(lastUpdatedAt: Date) {
+  if (!lastUpdatedAt) return;
   return moment(lastUpdatedAt).format("MM/dd/yyyy");
 }
 

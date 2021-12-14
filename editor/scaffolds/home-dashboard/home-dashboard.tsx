@@ -18,14 +18,13 @@ export function HomeDashboard() {
   const [scenes, setScenes] = useState([]);
 
   useEffect(() => {
-    const recents = repository.getRecents({});
-    recents.then(setRecents);
+    repository.getRecents({}).then(setRecents);
 
-    const files = repository.getFiles();
-    files.then(setFiles);
+    repository.getFiles().then(setFiles);
 
-    const scenes = repository.getRecentScenes();
-    scenes.then(setScenes);
+    repository.getRecentScenes().then(setScenes);
+
+    repository.getRecentComponents().then(setComponents);
   }, []);
 
   return (

@@ -108,7 +108,6 @@ const LabelDescContainer = styled.div`
   flex: none;
   gap: 10px;
   width: 221px;
-  height: 48px;
   box-sizing: border-box;
 `;
 
@@ -117,7 +116,6 @@ const LabelArea = styled.div`
   justify-content: flex-start;
   flex-direction: row;
   align-items: center;
-  flex: 1;
   gap: 8px;
   align-self: stretch;
   box-sizing: border-box;
@@ -135,9 +133,8 @@ const ThisLabel = styled.span`
   font-family: "Helvetica Neue", sans-serif;
   font-weight: 400;
   text-align: left;
-  width: 197px;
   overflow: hidden;
-  word-wrap: break-word;
+  white-space: nowrap;
   text-overflow: ellipsis;
   -webkit-line-clamp: 1;
   line-clamp: 1;

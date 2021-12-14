@@ -14,12 +14,20 @@ export class WorkspaceRepository {
 
   async getFiles(): Promise<any[]> {
     return [
-      {
-        id: "xx",
-        name: "dummy file 1",
+      "JRD2EdsbBlWgib8NzTXIGo",
+      "HSozKEVWhh8saZa2vr1Nxd",
+      "Gaznaw1QHppxvs9UkqNOb0",
+      "Y0Gh77AqBoHH7dG1GtK3xF",
+      "iypAHagtcSp3Osfo2a7EDz",
+      "x7RRK6RwWtZuNakmbMLTVH",
+    ].map((id) => {
+      return {
+        id: id,
+        file: id,
+        name: id,
         lastUsed: new Date("2021-01-01"),
-      },
-    ];
+      };
+    });
   }
 
   async getRecentFiles() {
@@ -40,6 +48,7 @@ export class WorkspaceRepository {
     const dummy = (id) => ({
       id: id,
       file: "x7RRK6RwWtZuNakmbMLTVH",
+      fileName: "@app",
       name: "dummy component " + id,
       lastUsed: new Date("2021-01-01"),
     });

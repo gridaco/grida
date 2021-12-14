@@ -1,43 +1,23 @@
 import React from "react";
 import styled from "@emotion/styled";
-
+import { ArrowRightIcon } from "@radix-ui/react-icons";
 export function HomePrimaryInputNextButton({
   disabled = false,
+  onClick,
 }: {
   disabled?: boolean;
+  onClick: () => void;
 }) {
-  if (disabled) {
-    return <DisabledTrueThemeDark />;
-  }
-  return <DisabledFalseThemeDark />;
-}
+  const color = disabled ? "#c4c4c4" : "#00a0ff";
 
-function DisabledFalseThemeDark() {
   return (
-    <RootWrapperDisabledFalseThemeDark
-      src="grida://assets-reservation/images/734:9050"
-      alt="icon"
-    ></RootWrapperDisabledFalseThemeDark>
+    <div
+      onClick={disabled ? undefined : onClick}
+      style={{
+        cursor: disabled ? "not-allowed" : "pointer",
+      }}
+    >
+      <ArrowRightIcon width={24} height={24} fontSize={24} color={color} />
+    </div>
   );
 }
-
-const RootWrapperDisabledFalseThemeDark = styled.img`
-  width: 24px;
-  height: 24px;
-  object-fit: cover;
-`;
-
-function DisabledTrueThemeDark() {
-  return (
-    <RootWrapperDisabledTrueThemeDark
-      src="grida://assets-reservation/images/734:9046"
-      alt="icon"
-    ></RootWrapperDisabledTrueThemeDark>
-  );
-}
-
-const RootWrapperDisabledTrueThemeDark = styled.img`
-  width: 24px;
-  height: 24px;
-  object-fit: cover;
-`;

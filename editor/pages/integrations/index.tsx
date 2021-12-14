@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import styled from "@emotion/styled";
 import { DefaultEditorWorkspaceLayout } from "layouts/default-editor-workspace-layout";
 import { HomeHeading, HomeSidebar } from "components/home";
+import Link from "next/link";
 
 export default function IntegrationsPage() {
   return (
@@ -13,7 +14,7 @@ export default function IntegrationsPage() {
         <div style={{ padding: 80 }}>
           <>
             <HomeHeading>Integrations</HomeHeading>
-            <p>Import From URL</p>
+            <Link href="/import">Import From URL</Link>
             <p>Assistant</p>
             <p>VSCode</p>
           </>
