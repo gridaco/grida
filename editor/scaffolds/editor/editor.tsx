@@ -150,7 +150,15 @@ export function Editor() {
           input: _input,
           build_config: build_config,
           framework: vanilla_presets.vanilla_default,
-          asset_config: { skip_asset_replacement: true },
+          asset_config: {
+            skip_asset_replacement: false,
+            asset_repository: MainImageRepository.instance,
+            custom_asset_replacement: {
+              type: "static",
+              resource:
+                "https://bridged-service-static.s3.us-west-1.amazonaws.com/placeholder-images/image-placeholder-bw-tile-100.png",
+            },
+          },
         }).then(on_preview_result);
 
         designToCode({
