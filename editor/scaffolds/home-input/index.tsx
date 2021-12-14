@@ -8,6 +8,7 @@ import { HomeLogo } from "icons/home-logo";
 import { useAuthState } from "hooks/use-auth-state";
 import { analyze, parseFileAndNodeId } from "@design-sdk/figma-url";
 import { useRouter } from "next/router";
+import { colors } from "theme";
 
 export function HomeInput() {
   const router = useRouter();
@@ -93,7 +94,7 @@ const RootWrapper = styled.div`
   align-items: start;
   gap: 0;
   min-height: 100vh;
-  background-color: rgba(37, 37, 38, 1);
+  background-color: ${colors.color_editor_bg_on_dark};
   box-sizing: border-box;
 `;
 

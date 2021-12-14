@@ -1,5 +1,6 @@
 import React from "react";
 import styled from "@emotion/styled";
+import { colors } from "theme";
 
 export function BaseHomeSceneCard({
   label,
@@ -45,7 +46,7 @@ const RootWrapperBaseHomeSceneCard = styled.div`
   gap: 10px;
   border: solid 1px rgba(72, 72, 72, 1);
   border-radius: 2px;
-  background-color: rgba(37, 37, 38, 1);
+  background-color: ${colors.color_editor_bg_on_dark};
   box-sizing: border-box;
 
   :hover {

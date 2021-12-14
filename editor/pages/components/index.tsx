@@ -8,6 +8,7 @@ import {
   HomeSidebar,
 } from "components/home";
 import { WorkspaceRepository } from "repository";
+import { colors } from "theme";
 
 export default function ComponentsPage() {
   const repository = new WorkspaceRepository();
@@ -21,7 +22,7 @@ export default function ComponentsPage() {
   return (
     <>
       <DefaultEditorWorkspaceLayout
-        backgroundColor={"rgba(37, 37, 38, 1)"}
+        backgroundColor={colors.color_editor_bg_on_dark}
         leftbar={<HomeSidebar />}
       >
         <div style={{ padding: 80 }}>

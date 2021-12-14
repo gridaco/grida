@@ -98,11 +98,21 @@ function unwrapStorableFileResponse(
   stored: StorableFileResponse | undefined | null
 ): FileResponseRecord {
   if (!stored) return;
+  const parsesafe = (s: string) => {
+    try {
+      return JSON.parse(s);
+    } catch (e) {
+      if (process.env.NODE_ENV === "development") {
+        console.error(e);
+        throw e;
+      }
+    }
+  };
   return {
     key: stored[__pk],
-    components: JSON.parse(stored.components),
-    styles: JSON.parse(stored.styles),
-    document: JSON.parse(stored.document),
+    components: parsesafe(stored.components),
+    styles: parsesafe(stored.styles),
+    document: parsesafe(stored.document),
     lastModified: stored.lastModified,
     name: stored.name,
     role: stored.role as any,

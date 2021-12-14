@@ -32,6 +32,7 @@ import {
 import { vanilla_presets } from "@grida/builder-config-preset";
 import { EditorSkeleton } from "./skeleton";
 import { MonacoEmptyMock } from "components/code-editor/monaco-mock-empty";
+import { colors } from "theme";
 
 export function Editor() {
   const router = useRouter();
@@ -186,11 +187,11 @@ export function Editor() {
         <EditorSkeleton percent={_initial_load_progress + 0.2} />
       )}
       <DefaultEditorWorkspaceLayout
-        backgroundColor={"rgba(37, 37, 38, 1)"}
+        backgroundColor={colors.color_editor_bg_on_dark}
         leftbar={<EditorSidebar />}
       >
         <WorkspaceContentPanelGridLayout>
-          <WorkspaceContentPanel>
+          <WorkspaceContentPanel flex={6}>
             <Canvas
               preview={preview}
               fileid={state?.design?.key}
@@ -201,7 +202,7 @@ export function Editor() {
               }}
             />
           </WorkspaceContentPanel>
-          <WorkspaceContentPanel backgroundColor={"rgba(30, 30, 30, 1)"}>
+          <WorkspaceContentPanel flex={4}>
             <CodeEditorContainer>
               {/* <EditorAppbarFragments.CodeEditor /> */}
               <CodeOptionsControl

@@ -45,7 +45,7 @@ export class WorkspaceRepository {
         lastUsed: new Date("2021-01-01"),
       },
     ];
-    return Array.from(Array(20).keys()).map((i) => dummy(i));
+    return Array.from(Array(0).keys()).map((i) => dummy(i));
   }
   async getRecentComponents() {
     const dummy = (id) => ({

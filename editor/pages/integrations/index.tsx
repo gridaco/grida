@@ -3,12 +3,13 @@ import styled from "@emotion/styled";
 import { DefaultEditorWorkspaceLayout } from "layouts/default-editor-workspace-layout";
 import { HomeHeading, HomeSidebar } from "components/home";
 import Link from "next/link";
+import { colors } from "theme";
 
 export default function IntegrationsPage() {
   return (
     <>
       <DefaultEditorWorkspaceLayout
-        backgroundColor={"rgba(37, 37, 38, 1)"}
+        backgroundColor={colors.color_editor_bg_on_dark}
         leftbar={<HomeSidebar />}
       >
         <div style={{ padding: 80 }}>

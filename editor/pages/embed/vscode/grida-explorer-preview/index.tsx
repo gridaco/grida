@@ -3,6 +3,7 @@ import styled from "@emotion/styled";
 import { useRouter } from "next/router";
 import VanillaPreview from "@code-editor/vanilla-preview";
 import { ProgressBar } from "@modulz/design-system";
+import { colors } from "theme";
 
 export default function VSCodeEmbedGridaExplorerPreview() {
   const router = useRouter(); // use router only for loading initial params.
@@ -86,7 +87,7 @@ const EmptyStateContainer = styled.div`
   align-items: center;
   flex: none;
   gap: 10px;
-  background-color: rgba(37, 37, 38, 1);
+  background-color: ${colors.color_editor_bg_on_dark};
   box-sizing: border-box;
 `;
 

@@ -9,6 +9,7 @@ import {
 } from "components/home";
 import { RecentDesignCardList } from "./recent-design-card-list";
 import { WorkspaceRepository } from "repository/workspace-repository";
+import { colors } from "theme";
 
 export function HomeDashboard() {
   const repository = new WorkspaceRepository();
@@ -29,7 +30,7 @@ export function HomeDashboard() {
 
   return (
     <DefaultEditorWorkspaceLayout
-      backgroundColor={"rgba(37, 37, 38, 1)"}
+      backgroundColor={colors.color_editor_bg_on_dark}
       leftbar={<HomeSidebar />}
     >
       <div style={{ height: "100vh", overflow: "scroll" }}>

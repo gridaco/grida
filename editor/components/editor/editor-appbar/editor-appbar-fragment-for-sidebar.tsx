@@ -2,6 +2,7 @@ import React from "react";
 import styled from "@emotion/styled";
 import { ArrowBack } from "@material-ui/icons";
 import { useRouter } from "next/router";
+import { colors } from "theme";
 
 export function AppbarFragmentForSidebar() {
   const router = useRouter();
@@ -35,7 +36,7 @@ const RootWrapperAppbarFragmentForSidebar = styled.div`
   gap: 10px;
   width: 200px;
   align-self: stretch;
-  background-color: rgba(37, 37, 38, 1);
+  background-color: ${colors.color_editor_bg_on_dark};
   box-sizing: border-box;
   padding: 14px 16px;
 `;

@@ -2,13 +2,14 @@ import React from "react";
 import { Global, css } from "@emotion/react";
 import Head from "next/head";
 import { EditorThemeProvider } from "@editor-ui/theme";
+import { colors } from "theme";
 
 function GlobalCss() {
   return (
     <Global
       styles={css`
         html {
-          background-color: #252526;
+          background-color: ${colors.color_editor_bg_on_dark};
           touch-action: none;
         }
 
@@ -58,7 +59,7 @@ function HeadInjection() {
       />
       <meta
         name="theme-color"
-        content="#1e1e1e"
+        content={colors.color_editor_bg_on_dark}
         media="(prefers-color-scheme: dark)"
       />
 
