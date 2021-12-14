@@ -64,10 +64,24 @@ const preset_pages: PresetPage[] = [
     depth: 0,
   },
   {
-    id: "/docs",
-    name: "Docs",
-    path: "/docs",
+    id: "help",
+    name: "Help",
+    path: "",
     depth: 0,
+    children: [
+      {
+        id: "/docs",
+        name: "Bug report",
+        path: "https://github.com/gridaco/designto-code/issues/new",
+        depth: 1,
+      },
+      {
+        id: "/docs",
+        name: "Docs",
+        path: "/docs",
+        depth: 1,
+      },
+    ],
   },
 ];
 
