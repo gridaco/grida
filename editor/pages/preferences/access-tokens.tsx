@@ -44,8 +44,9 @@ const RootWrapperPreferencesAccessTokens = styled.div`
   flex-direction: column;
   align-items: start;
   gap: 200px;
-  background-color: rgba(255, 255, 255, 1);
+  background-color: white;
   box-sizing: border-box;
+  min-height: 100vh;
   padding: 120px 100px 40px;
 `;
 

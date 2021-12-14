@@ -13,4 +13,5 @@ export default function PreferencesHomePage() {
 
 const _Root = styled.div`
   padding: 24px;
+  background-color: white;
 `;
