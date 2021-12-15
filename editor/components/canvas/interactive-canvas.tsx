@@ -32,14 +32,16 @@ function initialTransform(
       : 1;
   const __height_fits_in_canvas =
     frame.height * __initial_scale < __canvas_height - __margin_2x;
-  const __scaled_display_height = frame.height * __initial_scale;
-  const __y_start = __height_fits_in_canvas
-    ? (__canvas_height - __scaled_display_height) / 2
-    : margin;
-  const __initial_xy = [0, __y_start] as [number, number];
   const __initial_transform_origin = __height_fits_in_canvas
     ? "center"
     : "top center";
+  const __scaled_display_height = frame.height * __initial_scale;
+  const __y_start = __height_fits_in_canvas
+    ? __initial_transform_origin === "top center"
+      ? (__canvas_height - __margin_2x - __scaled_display_height) / 2
+      : margin
+    : margin;
+  const __initial_xy = [0, __y_start] as [number, number];
 
   return {
     scale: __initial_scale,
