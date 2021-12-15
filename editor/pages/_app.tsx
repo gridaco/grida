@@ -104,6 +104,8 @@ function SeoMeta() {
   return (
     <>
       <title>Grida: Design to Code</title>
+      <link rel="shortcut icon" href="/favicon.png" />
+      <link rel="icon" href="/favicon.png" />
       <meta property="title" content="Design to Codes" />
       <meta property="description" content="Design to Codes description" />
     </>
