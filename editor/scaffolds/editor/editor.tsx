@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import styled from "@emotion/styled";
 import { useRouter } from "next/router";
 import { DefaultEditorWorkspaceLayout } from "layouts/default-editor-workspace-layout";
@@ -67,6 +67,10 @@ export function Editor() {
   const targetted =
     find_node_by_id_under_entry(targetId, root?.entry) ?? root?.entry;
 
+  const targetStateRef = useRef();
+  //@ts-ignore
+  targetStateRef.current = targetted;
+
   useEffect(() => {
     // ------------------------------------------------------------
     // other platforms are not supported yet
@@ -88,6 +92,20 @@ export function Editor() {
     // ------------------------------------------------------------
   }, [state.design?.key, fat.accessToken]);
 
+  const on_result = (result: Result) => {
+    //@ts-ignore
+    if (result.id == targetStateRef?.current?.id) {
+      setResult(result);
+    }
+  };
+
+  const on_preview_result = (result: Result) => {
+    //@ts-ignore
+    if (result.id == targetStateRef?.current?.id) {
+      setPreview(result);
+    }
+  };
+
   useEffect(() => {
     const __target = targetted;
     if (__target && framework_config) {
@@ -100,12 +118,6 @@ export function Editor() {
       const build_config = {
         ...config.default_build_configuration,
         disable_components: !enable_components,
-      };
-
-      const on_result = (result: Result) => {
-        if (result.id == targetted.id) {
-          setResult(result);
-        }
       };
 
       // build code without assets fetch
@@ -138,12 +150,6 @@ export function Editor() {
         const build_config = {
           ...config.default_build_configuration,
           disable_components: true,
-        };
-
-        const on_preview_result = (result: Result) => {
-          if (result.id == targetId) {
-            setPreview(result);
-          }
         };
 
         // ----- for preview -----
