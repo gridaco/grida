@@ -26,15 +26,23 @@ export function InteractiveCanvas({
   const __canvas_width = 800;
   const __canvas_height = 900;
   const __margin = 20;
-  const __y_start =
-    defaultSize.height < __canvas_height - __margin * 2
-      ? (__canvas_height - defaultSize.height) / 2
-      : __margin;
-  const __initial_xy = [0, __y_start] as [number, number];
+  const __margin_2x = __margin * 2;
   const __initial_scale =
     defaultSize.width > __canvas_width
-      ? (__canvas_width - __margin * 2) / defaultSize.width
+      ? (__canvas_width - __margin_2x) / defaultSize.width
       : 1;
+  const __height_fits_in_canvas =
+    defaultSize.height * __initial_scale < __canvas_height - __margin_2x;
+  const __scaled_display_height = defaultSize.height * __initial_scale;
+  const __y_start = __height_fits_in_canvas
+    ? (__canvas_height - __scaled_display_height) / 2
+    : __margin;
+  const __initial_xy = [0, __y_start] as [number, number];
+  const __initial_transform_origin = __height_fits_in_canvas
+    ? "center"
+    : "top center";
+
+  console.log(__y_start, __scaled_display_height);
 
   const [scale, setScale] = useState(__initial_scale);
   const [xy, setXY] = useState<[number, number]>(__initial_xy);
@@ -85,6 +93,7 @@ export function InteractiveCanvas({
         <TransformContainer
           scale={scale}
           xy={xy}
+          transformOrigin={__initial_transform_origin}
           isTransitioning={isDeltaInteracting}
         >
           <ResizableFrame defaultSize={defaultSize} scale={scale}>
@@ -116,7 +125,9 @@ const TransformContainer = ({
   children,
   xy,
   isTransitioning,
+  transformOrigin = "top center",
 }: {
+  transformOrigin?: string;
   scale: number;
   xy: [number, number];
   isTransitioning: boolean;
@@ -128,7 +139,7 @@ const TransformContainer = ({
         pointerEvents: isTransitioning ? "none" : undefined,
         transform: `scale(${scale}) translateX(${xy[0]}px) translateY(${xy[1]}px)`,
         willChange: "transform",
-        transformOrigin: "top center",
+        transformOrigin: transformOrigin,
       }}
     >
       {children}
