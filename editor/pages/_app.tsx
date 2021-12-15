@@ -1,8 +1,9 @@
-import React from "react";
+import React, { useEffect } from "react";
 import { Global, css } from "@emotion/react";
 import Head from "next/head";
 import { EditorThemeProvider } from "@editor-ui/theme";
 import { colors } from "theme";
+import { useRouter } from "next/router";
 
 function GlobalCss() {
   return (
@@ -17,6 +18,10 @@ function GlobalCss() {
           margin: 0px;
           padding: 0;
           font-family: "Helvetica Nueue", "Roboto", sans-serif;
+
+          /* for editor canvas */
+          overscroll-behavior-x: none;
+          overscroll-behavior-y: none;
         }
 
         iframe {
@@ -106,6 +111,38 @@ function SeoMeta() {
 }
 
 function EditorApp({ Component, pageProps }) {
+  const router = useRouter();
+  const _path = router.asPath.replace("/", "");
+  const analyzed = analyze_dynamic_input(_path);
+  useEffect(() => {
+    if (pageProps.statusCode == 404 && analyzed) {
+      switch (analyzed.ns) {
+        case "figma": {
+          const { file, node } = parseFileAndNodeId(_path) ?? {};
+          switch (analyzed.result) {
+            case "node": {
+              router.replace("/files/[key]/[node]", `/files/${file}/${node}`);
+              break;
+            }
+            case "file": {
+              router.replace("/files/[key]", `/files/${file}`);
+              break;
+            }
+            case "empty":
+            default: {
+              break;
+            }
+          }
+          break;
+        }
+        case "unknown":
+        default: {
+          break;
+        }
+      }
+    }
+  }, [analyzed]);
+
   return (
     <React.Fragment>
       <HeadInjection />
@@ -117,3 +154,32 @@ function EditorApp({ Component, pageProps }) {
 }
 
 export default EditorApp;
+
+import {
+  analyze as figmaurlAnalize,
+  parseFileAndNodeId,
+} from "@design-sdk/figma-url";
+
+function analyze_dynamic_input(input: string) {
+  const _isurl = isurl(input);
+  if (_isurl) {
+    return {
+      ns: "figma",
+      result: figmaurlAnalize(input),
+    };
+  }
+
+  return {
+    ns: "unknown",
+    result: input,
+  };
+}
+
+const isurl = (s: string) => {
+  try {
+    new URL(s);
+    return true;
+  } catch (e) {
+    return false;
+  }
+};

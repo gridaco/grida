@@ -1,8 +1,20 @@
-import React, { useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import styled from "@emotion/styled";
-import { usePinch } from "@use-gesture/react";
+import { useGesture } from "@use-gesture/react";
 import { Resizable } from "re-resizable";
 import { ZoomControl } from "./controller-zoom-control";
+
+/**
+ * A React Hook that returns a delta state.
+ * When user completely stops interacting, after a short delay (600ms), set the value to false.
+ * When user starts interacting, immidiately set the value to true.
+ *
+ * the condition rather if the user is currently interacting or not is set on higher level, which this function accepts the condition as a parameter.
+ * @param interacting
+ */
+function useIsInteractingDelta(interacting: boolean) {
+  throw new Error("Not implemented");
+}
 
 export function InteractiveCanvas({
   children,
@@ -11,22 +23,76 @@ export function InteractiveCanvas({
   defaultSize: { width: number; height: number };
   children?: React.ReactNode;
 }) {
-  const [scale, setScale] = useState(1);
+  const __canvas_width = 800;
+  const __canvas_height = 900;
+  const __margin = 20;
+  const __y_start =
+    defaultSize.height < __canvas_height - __margin * 2
+      ? (__canvas_height - defaultSize.height) / 2
+      : __margin;
+  const __initial_xy = [0, __y_start] as [number, number];
+  const __initial_scale =
+    defaultSize.width > __canvas_width
+      ? (__canvas_width - __margin * 2) / defaultSize.width
+      : 1;
+
+  const [scale, setScale] = useState(__initial_scale);
+  const [xy, setXY] = useState<[number, number]>(__initial_xy);
+
+  const [isPanning, setIsPanning] = useState(false);
+  const [isZooming, setIsZooming] = useState(false);
+  const isDeltaInteracting = isPanning || isZooming;
+
+  const ref = useRef();
+
+  useGesture(
+    {
+      onPinch: (state) => {
+        setIsZooming(state.pinching);
+        setScale(Math.max(scale + state.delta[0], 0.1));
+      },
+      onWheel: ({ delta: [x, y], wheeling }) => {
+        setIsPanning(wheeling);
+        setXY([xy[0] - x / scale, xy[1] - y / scale]);
+      },
+    },
+    { target: ref }
+  );
 
   return (
     <InteractiveCanvasWrapper id="interactive-canvas">
-      <ScalableFrame onRescale={setScale} scale={scale}>
+      <div
+        id="event-listener"
+        ref={ref}
+        style={{
+          flexGrow: 1,
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+        }}
+      >
         <Controls>
-          <ZoomControl scale={scale} onChange={setScale} />
+          <ZoomControl
+            onReset={() => {
+              setScale(__initial_scale);
+              setXY(__initial_xy);
+            }}
+            scale={scale}
+            onChange={setScale}
+          />
         </Controls>
-        <ScalingAreaStaticRoot>
-          <ScalingArea scale={scale}>
-            <ResizableFrame defaultSize={defaultSize} scale={scale}>
-              {children}
-            </ResizableFrame>
-          </ScalingArea>
-        </ScalingAreaStaticRoot>
-      </ScalableFrame>
+        {/* <ScalingAreaStaticRoot> */}
+        <TransformContainer
+          scale={scale}
+          xy={xy}
+          isTransitioning={isDeltaInteracting}
+        >
+          <ResizableFrame defaultSize={defaultSize} scale={scale}>
+            {children}
+          </ResizableFrame>
+        </TransformContainer>
+        {/* </ScalingAreaStaticRoot> */}
+      </div>
     </InteractiveCanvasWrapper>
   );
 }
@@ -34,9 +100,8 @@ export function InteractiveCanvas({
 const InteractiveCanvasWrapper = styled.div`
   display: flex;
   flex-direction: column;
-  /* overflow-y: auto; */
-  overflow-x: hidden;
-  flex: 1;
+  overflow: hidden;
+  flex-grow: 1;
 `;
 
 const Controls = styled.div`
@@ -46,67 +111,23 @@ const Controls = styled.div`
   justify-content: flex-end;
 `;
 
-const ScalingAreaStaticRoot = styled.div`
-  display: flex;
-  align-items: flex-start; // when transform origin is top center.
-  padding-top: 20px;
-  justify-content: center;
-  align-content: flex-start;
-  align-self: stretch;
-  flex: 1;
-  max-height: 100vh; // TODO: make dynamic
-`;
-
-function ScalableFrame({
-  children,
-  scale,
-  onRescale,
-}: {
-  scale: number;
-  onRescale?: (scale: number) => void;
-  children?: React.ReactNode;
-}) {
-  const ref = useRef();
-
-  usePinch(
-    (state) => {
-      const prevscale = scale;
-      const { offset } = state;
-      const thisscale = offset[0];
-      // const newscale = thisscale - prevscale;
-      onRescale(thisscale);
-    },
-    { target: ref }
-  );
-
-  return (
-    <div
-      id="scale-event-listener"
-      ref={ref}
-      style={{
-        display: "flex",
-        flexDirection: "column",
-        flex: 1,
-        alignItems: "center",
-        alignContent: "center",
-      }}
-    >
-      {children}
-    </div>
-  );
-}
-
-const ScalingArea = ({
+const TransformContainer = ({
   scale,
   children,
+  xy,
+  isTransitioning,
 }: {
   scale: number;
+  xy: [number, number];
+  isTransitioning: boolean;
   children: React.ReactNode;
 }) => {
   return (
     <div
       style={{
-        transform: `scale(${scale})`,
+        pointerEvents: isTransitioning ? "none" : undefined,
+        transform: `scale(${scale}) translateX(${xy[0]}px) translateY(${xy[1]}px)`,
+        willChange: "transform",
         transformOrigin: "top center",
       }}
     >
