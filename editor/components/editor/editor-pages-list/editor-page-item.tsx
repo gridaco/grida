@@ -25,6 +25,7 @@ export function EditorPageItem({
       key={id}
       sortable={false}
       selected={selected}
+      selectedColor={"#494949"}
       onPress={onPress}
       onDoubleClick={() => {}}
       icon={<FileIcon color={selected ? iconSelectedColor : iconColor} />}
