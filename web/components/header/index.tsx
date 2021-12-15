@@ -40,7 +40,7 @@ const Header = () => {
 
   const handleSignupClick = () => {
     if (loginstate == "signedin") {
-      window.location.href = URLS.landing.app;
+      window.location.href = URLS.landing.current_app;
     } else {
       window.location.href = URLS.landing.signup_with_return;
     }
@@ -49,7 +49,7 @@ const Header = () => {
   const handleSigninOrMoveAppClick = () => {
     if (loginstate == "signedin") {
       // move to app
-      window.location.href = URLS.landing.app;
+      window.location.href = URLS.landing.current_app;
     } else {
       !isOpenMenu && (window.location.href = URLS.landing.signin_with_return);
     }
