@@ -10,7 +10,7 @@ import { WorkspaceBottomPanelDockLayout } from "layouts/panel/workspace-bottom-p
 import { CodeEditor } from "components/code-editor";
 import { ClearRemoteDesignSessionCache } from "components/clear-remote-design-session-cache";
 import { WidgetTree } from "components/visualization/json-visualization/json-tree";
-import { EditorSidebar } from "components/editor";
+import { EditorAppbarFragments, EditorSidebar } from "components/editor";
 import { useEditorState, useWorkspaceState } from "core/states";
 import { designToCode, Result } from "@designto/code";
 import { RemoteImageRepositories } from "@design-sdk/figma-remote/lib/asset-repository/image-repository";
@@ -210,7 +210,7 @@ export function Editor() {
           </WorkspaceContentPanel>
           <WorkspaceContentPanel flex={4}>
             <CodeEditorContainer>
-              {/* <EditorAppbarFragments.CodeEditor /> */}
+              <EditorAppbarFragments.CodeEditor />
               <CodeOptionsControl
                 initialPreset={router.query.framework as string}
                 fallbackPreset="react_default"
