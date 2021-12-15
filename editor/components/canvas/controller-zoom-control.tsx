@@ -8,12 +8,14 @@ export function ZoomControl({
   stepper,
   onChange,
   onReset,
+  canReset,
 }: {
   onChange: (scale: number) => void;
   resetControl?: boolean;
   select?: boolean;
   stepper?: boolean;
   scale: number;
+  canReset?: boolean;
   onReset?: () => void;
 }) {
   const [isEditing, setIsEditing] = React.useState(false);
@@ -56,7 +58,7 @@ export function ZoomControl({
               </>
             )}
           </Valuedisplay>
-          {scale !== 1 && (
+          {canReset && (
             <RefreshSharpIcon
               onClick={() => {
                 onReset?.();

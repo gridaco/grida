@@ -49,6 +49,7 @@
     "react-json-tree": "^0.15.0",
     "react-resizable": "^3.0.1",
     "react-spring": "^9.3.2",
+    "react-use-measure": "^2.1.1",
     "recoil": "^0.2.0",
     "rxdb": "^10.5.4",
     "rxjs": "^7.4.0",
