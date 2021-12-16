@@ -1,4 +1,4 @@
-export const media = (min: string | null, max: string | null) =>
+export const media = (min: string | null, max?: string | null) =>
   [
     "@media only screen",
     min && `(min-width: ${min})`,

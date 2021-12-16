@@ -21,20 +21,26 @@ export const HeaderMap: HeaderMap[] = [
   //   Products,
   // temporarily disabled
   //   WhyBridged,
-  {
-    label: "Pricing",
-    href: "/pricing",
-  },
+  // temporarily disabled - since the pricing policy is not firm
+  // {
+  //   label: "Pricing",
+  //   href: "/pricing",
+  // },
   {
     label: "Docs",
     href: "/docs",
   },
-  {
-    label: "Blog",
-    href: URLS.social.medium,
-  },
+  // temporarily disabled - since the blog standards is not firm
+  // {
+  //   label: "Blog",
+  //   href: URLS.social.medium,
+  // },
   {
     label: "Github",
     href: URLS.social.github,
+  },
+  {
+    label: "Slack",
+    href: "https://grida.co/join-slack",
   },
 ];

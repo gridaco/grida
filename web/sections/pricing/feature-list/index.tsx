@@ -1,13 +1,15 @@
-import React from "react";
 import styled from "@emotion/styled";
-import FeatureListMobileView from "./mobile-view";
-import FeatureListDesktopView from "./desktop-view";
-import { Flex } from "rebass";
-import { DesktopView } from "utils/styled/styles";
-import { media } from "utils/styled/media";
-import { ThemeInterface } from "utils/styled/theme";
 import SectionLayout from "layout/section";
+import React from "react";
+import { Flex } from "rebass";
+
 import BlankArea from "components/blank-area";
+import { media } from "utils/styled/media";
+import { DesktopView } from "utils/styled/styles";
+import { ThemeInterface } from "utils/styled/theme";
+
+import FeatureListDesktopView from "./desktop-view";
+import FeatureListMobileView from "./mobile-view";
 
 const featureDataList = [
   {

@@ -17,24 +17,28 @@ export const Products: Sitemap = {
       href: "/globalization",
     },
     {
-      label: "Reflect",
-      href: "https://reflect.bridged.xyz",
-    },
-    {
-      label: "Surf",
-      href: "https://surf.codes",
+      label: "Reflect UI",
+      href: "https://reflect-ui.com",
     },
     {
       label: "Assistant",
       href: "/assistant",
     },
     {
-      label: "Console",
-      href: "/console",
+      label: "VSCode",
+      href: "/vscode",
     },
     {
-      label: "Appbox",
-      href: "/appbox",
+      label: "Console",
+      href: "https://console.grida.co",
+    },
+    // {
+    //   label: "Appbox",
+    //   href: "/appbox",
+    // },
+    {
+      label: "Surf",
+      href: "https://surf.codes",
     },
   ],
 };
@@ -51,10 +55,10 @@ export const Solutions: Sitemap = {
       label: "Handoff",
       href: "/handoff",
     },
-    {
-      label: "Get Started",
-      href: "/getstart",
-    },
+    // {
+    //   label: "Get Started",
+    //   href: "/getstart",
+    // },
   ],
 };
 
@@ -132,32 +136,31 @@ export const Together: Sitemap = {
   label: "Together",
   href: "https://together.bridged.xyz",
   child: [
-    {
-      label: "Let's create together",
-      href: "/together/create",
-    },
-    {
-      label: "How to contribute",
-      href: "/together/contribute",
-    },
-    {
-      label: "Github",
-      href: "https://github.com/bridgedxyz",
-    },
+    // {
+    //   label: "Let's create together",
+    //   href: "/together/create",
+    // },
+    // {
+    //   label: "How to contribute",
+    //   href: "/together/contribute",
+    // },
+    // {
+    //   label: "Github",
+    //   href: "https://github.com/gridaco",
+    // },
     {
       label: "Projects",
       href: "/together/projects",
     },
     {
       label: "Join us on Slack",
-      href:
-        "https://together.bridged.xyz/Bridged-OSS-Community-c6983f668e3e4204aed8856da0e73483",
+      href: "https://grida.co/join-slack",
     },
-    {
-      label: "Meetups",
-      href:
-        "https://together.bridged.xyz/Bridged-Meetups-e28469913e35444d80d29921559fe7ff",
-    },
+    // {
+    //   label: "Meetups",
+    //   href:
+    //     "https://together.bridged.xyz/Bridged-Meetups-e28469913e35444d80d29921559fe7ff",
+    // },
     {
       label: "Reddit",
       href: "https://www.reddit.com/r/bridged/",

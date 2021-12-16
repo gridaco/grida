@@ -97,6 +97,7 @@ export function getPostByPath(path: string | string[]): DocsPost {
   const { data, content } = matter(fileContents);
 
   const item: DocsPost = {
+    title: data.title ?? "Docs",
     slug: realSlug,
     route: splits,
     content: content,

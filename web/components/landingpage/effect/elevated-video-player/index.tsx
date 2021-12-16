@@ -66,10 +66,11 @@ function ElevatedVideoPlayer() {
     <Frame style={{ scale }}>
       <div className="youtube-thumbnail">
         <ReactPlayer
-          url={require("public/videos/promotion-video-preview.fast.webm")}
+          url={require("public/videos/promotion-video-preview.fast.mp4")}
           loop
           playing={!actualVideoPlaying}
           muted
+          playsinline
           config={{
             file: {
               attributes: {

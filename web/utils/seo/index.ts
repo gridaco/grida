@@ -6,7 +6,7 @@ const OG_IMAGE_GIF =
   "https://bridged-service-static.s3-us-west-1.amazonaws.com/opengraph/og-image-gif.gif";
 
 export const SEO_OG_DEFAULTS: OpenGraphMeta = {
-  title: "Figma to Flutter | Grida",
+  title: "Figma to Code | Grida",
   type: "website",
   url: "https://grida.co",
   image: OG_IMAGE_GIF,
@@ -16,8 +16,9 @@ export const SEO_DEFAULTS: PageSeoMeta = {
   route: "/",
   title: "Grida",
   description:
-    "Figma to Flutter | automate your frontend development. Instantly convert your design to production ready code.",
+    "Figma to Code | Opensource, Headless design to code automation software. Supercharge your frontend development. Instantly convert your design to production ready code.",
   keywords: [
+    "headless",
     "figma to flutter",
     "design to code",
     "figma to code",

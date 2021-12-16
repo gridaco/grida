@@ -1,7 +1,8 @@
-import React from "react";
-import { Box, Flex } from "rebass";
 import styled from "@emotion/styled";
 import Image from "next/image";
+import React from "react";
+import { Box, Flex } from "rebass";
+
 import { media } from "utils/styled/media";
 import { ThemeInterface } from "utils/styled/theme";
 

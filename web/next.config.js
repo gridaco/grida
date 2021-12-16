@@ -1,21 +1,9 @@
-const withTM = require("next-transpile-modules");
-const withVideos = require("next-videos");
-const withBundleAnalyzer = require("@zeit/next-bundle-analyzer");
-
 const withMDX = require("@next/mdx")({
   extension: /\.mdx?$/,
 });
-
-const FIREBASE_ENV_VARS = {
-  FIREBASE_API_KEY: process.env.FIREBASE_API_KEY,
-  FIREBASE_AUTH_DOMAIN: process.env.FIREBASE_AUTH_DOMAIN,
-  FIREBASE_DATABASE_URL: process.env.FIREBASE_DATABASE_URL,
-  FIREBASE_PROJECT_ID: process.env.FIREBASE_PROJECT_ID,
-  FIREBASE_STORAGE_BUKET: process.env.FIREBASE_STORAGE_BUKET,
-  FIREBASE_MESSAGING_SENDER_ID: process.env.FIREBASE_MESSAGING_SENDER_ID,
-  FIREBASE_APP_ID: process.env.FIREBASE_APP_ID,
-  FIREBASE_MEASUREMENT_ID: process.env.FIREBASE_MEASUREMENT_ID,
-};
+const withBundleAnalyzer = require("@zeit/next-bundle-analyzer");
+const withTM = require("next-transpile-modules");
+const withVideos = require("next-videos");
 
 module.exports = withBundleAnalyzer(
   withVideos(
@@ -49,9 +37,6 @@ module.exports = withBundleAnalyzer(
         images: {
           domains: ["img.youtube.com", "via.placeholder.com"],
         },
-        env: {
-          ...FIREBASE_ENV_VARS,
-        },
         analyzeServer: ["server", "both"].includes(process.env.BUNDLE_ANALYZE),
         analyzeBrowser: ["browser", "both"].includes(
           process.env.BUNDLE_ANALYZE,
@@ -82,8 +67,21 @@ module.exports = withBundleAnalyzer(
             },
             {
               source: "/assistant",
-              destination: "/",
+              destination:
+                "https://www.figma.com/community/plugin/896445082033423994",
               permanent: false,
+            },
+            {
+              source: "/vscode",
+              destination:
+                "https://marketplace.visualstudio.com/items?itemName=grida.grida-vscode",
+              permanent: false,
+            },
+            {
+              source: "/join-slack",
+              destination:
+                "https://join.slack.com/t/gridaco/shared_invite/zt-nmf59381-prFEqq032K~aWe_zOekUmQ",
+              permanent: true,
             },
           ];
         },

@@ -4,7 +4,17 @@ export interface ThemeInterface extends Theme {
   colors: {
     primary: string;
   };
-  breakpoints: string[];
+  breakpoints: [
+    // ~~ xs ~~
+    // sm
+    "768px",
+    // md
+    "1024px",
+    // lg
+    "1280px",
+    // xl
+    "1440px",
+  ];
   buttons: {
     primary: object;
     noShadow: object;
@@ -25,7 +35,17 @@ const defaultButtonProps = {
 };
 
 const defaultTheme: ThemeInterface = {
-  breakpoints: ["768px", "1024px", "1280px", "1440px"],
+  breakpoints: [
+    // ~~ xs ~~
+    // sm
+    "768px",
+    // md
+    "1024px",
+    // lg
+    "1280px",
+    // xl
+    "1440px",
+  ],
   colors: {
     primary: "#2562FF",
   },

@@ -1,18 +1,21 @@
-import React, { useEffect, useState } from "react";
-import SectionLayout from "layout/section";
-import { Box, Flex, Heading, Text } from "rebass";
 import styled from "@emotion/styled";
-import BlankArea from "components/blank-area";
-import { media } from "utils/styled/media";
-import { ThemeInterface } from "utils/styled/theme";
-import ActionItem from "components/action-item";
-import { LandingpageUrls } from "utils/landingpage/constants";
-import OnairButton from "components/landingpage/effect/onair-button";
 import ApplicationPreview from "layout/landingpage/application-preview";
-import { DesktopView, MobileView } from "utils/styled/styles";
-import DesignToCode from "./design-code";
+import SectionLayout from "layout/section";
 import Image from "next/image";
+import React, { useEffect, useState } from "react";
+import { Flex, Text } from "rebass";
+
+import ActionItem from "components/action-item";
+import BlankArea from "components/blank-area";
+import OnairButton from "components/landingpage/effect/onair-button";
 import LandingpageText from "components/landingpage/text";
+import { LandingpageUrls } from "utils/landingpage/constants";
+import { media } from "utils/styled/media";
+import { DesktopView, MobileView } from "utils/styled/styles";
+import { ThemeInterface } from "utils/styled/theme";
+
+import { contents } from "../k";
+import DesignToCode from "./design-code";
 
 interface OnlineAppProps {
   isMobile?: boolean;
@@ -44,12 +47,12 @@ const OnlineApp: React.FC<OnlineAppProps> = ({ isMobile }) => {
         width="100%"
       >
         <Flex flexDirection="column" width="100%" mr="40px">
-          <Text fontSize="24px" mb="15px" letterSpacing="0em">
+          {/* <Text fontSize="24px" mb="15px" letterSpacing="0em">
             What you’ve just sketched?
-          </Text>
+          </Text> */}
           <OnlineTitle variant="h4">
-            <span style={{ letterSpacing: "0em" }}>That just got</span>
-            <OnairButton />
+            <span style={{ letterSpacing: "0em" }}>Less is more.</span>
+            {/* <OnairButton /> */}
           </OnlineTitle>
           <MobileView style={{ marginTop: 40, position: "relative" }}>
             <ApplicationPreview />
@@ -64,10 +67,7 @@ const OnlineApp: React.FC<OnlineAppProps> = ({ isMobile }) => {
             </div>
           </MobileView>
           <Description variant="body1">
-            Design to Code Feature supports Major design tools including Sketch,
-            Figma and Adobe XD. Code is converted to Major
-            Platforms/Languages/Frameworks with various coding styles. These
-            lines of code is ready to use. Design once, Run everywhere.
+            {contents.p_figma_onair_description}
           </Description>
 
           <BlankArea height={[48, 80]} />
@@ -120,7 +120,7 @@ const Description = styled(LandingpageText)`
   }
 `;
 
-const DisableMargin = styled.div`
+export const DisableMargin = styled.div`
   .content-default {
     margin: 0px !important;
   }

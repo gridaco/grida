@@ -1,18 +1,19 @@
-import React, { useState, useEffect, createRef } from "react";
-import SectionLayout from "layout/section";
-import { Flex, Heading, Text } from "rebass";
 import styled from "@emotion/styled";
-import { media } from "utils/styled/media";
-import BlankArea from "components/blank-area";
-import { ThemeInterface } from "utils/styled/theme";
-import Link from "next/link";
 import { motion } from "framer-motion";
-import { PRODUCT_LIST } from "utils/landingpage/constants";
+import SectionLayout from "layout/section";
+import Link from "next/link";
+import React, { useState, useEffect, createRef } from "react";
 import ReactPlayer from "react-player";
+import { Flex, Heading, Text } from "rebass";
+
+import BlankArea from "components/blank-area";
 import LandingpageText from "components/landingpage/text";
+import { PRODUCT_LIST } from "utils/landingpage/constants";
+import { media } from "utils/styled/media";
+import { ThemeInterface } from "utils/styled/theme";
 
 // region video framer motion values
-const videoPlayerMotionAnimationVariants = {
+export const videoPlayerMotionAnimationVariants = {
   loading: { opacity: 0, delay: 0, default: { duration: 1 } },
   loaded: { opacity: 1, delay: 0, default: { duration: 1 } },
 };
@@ -123,6 +124,7 @@ const Products = () => {
             loop
             playing
             muted
+            playsinline
             config={{
               file: {
                 attributes: {
@@ -172,13 +174,13 @@ const Products = () => {
 
 export default Products;
 
-const SubTitle = styled(Heading)`
+export const SubTitle = styled(Heading)`
   ${props => media("0px", (props.theme as ThemeInterface).breakpoints[0])} {
     max-width: calc(100vw - 40px) !important;
   }
 `;
 
-const VideoWrapper = styled(Flex)`
+export const VideoWrapper = styled(Flex)`
   height: 700px;
 
   div {
@@ -208,7 +210,7 @@ const VideoWrapper = styled(Flex)`
   }
 `;
 
-const Description = styled(LandingpageText)`
+export const Description = styled(LandingpageText)`
   max-width: 760px;
   margin-top: 32px;
 
@@ -217,7 +219,7 @@ const Description = styled(LandingpageText)`
   }
 `;
 
-const Container = styled(Flex)`
+export const Container = styled(Flex)`
   position: relative;
   width: 100%;
   margin-top: 0px;
@@ -252,7 +254,7 @@ const Container = styled(Flex)`
   }
 `;
 
-const RowFrame = styled(motion.div)`
+export const RowFrame = styled(motion.div)`
   display: flex;
   width: 80.5%;
   padding-bottom: 10px;
@@ -270,7 +272,7 @@ const RowFrame = styled(motion.div)`
   }
 `;
 
-const List = styled.span<{ gradient: string }>`
+export const List = styled.span<{ gradient: string }>`
   padding-left: 10px;
   margin-left: 26px;
   background: ${p => p.gradient};
@@ -305,7 +307,7 @@ const List = styled.span<{ gradient: string }>`
   }
 `;
 
-const More = styled(Text)`
+export const More = styled(Text)`
   padding-bottom: 8px;
   border-bottom: 2px solid black;
 `;

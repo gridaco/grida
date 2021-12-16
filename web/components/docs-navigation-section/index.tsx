@@ -1,9 +1,10 @@
-import React, { useEffect, useState } from "react";
 import styled from "@emotion/styled";
-import { Flex, Heading } from "rebass";
 import Link from "next/link";
-import { DocsRoute } from "utils/docs/model";
 import { useRouter } from "next/router";
+import React, { useEffect, useState } from "react";
+import { Flex, Heading } from "rebass";
+
+import { DocsRoute } from "utils/docs/model";
 
 function DocsNavigationSection(props: { route: DocsRoute; level?: number }) {
   const routeConfig = props.route;
@@ -15,10 +16,7 @@ function DocsNavigationSection(props: { route: DocsRoute; level?: number }) {
       <SectionWrapper level={level} flexDirection="column">
         {routeConfig.path ? (
           <Link href={routeConfig.path ?? ""}>
-            <Heading
-              className="cursor"
-              fontSize="18px"
-            >
+            <Heading className="cursor" fontSize="16px">
               {routeConfig.title}
             </Heading>
           </Link>
@@ -60,7 +58,7 @@ const SidebarController = styled.div<{ level: number }>`
 `;
 
 const SectionWrapper = styled(Flex)<{ level: number }>`
-  margin-top: 30px;
+  padding-top: 8px;
 
   h4 {
     margin: 0px;

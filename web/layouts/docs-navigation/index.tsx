@@ -14,6 +14,7 @@ import { ThemeInterface } from "utils/styled/theme";
 import { DocsManifest, DocsRoute } from "../../utils/docs/model";
 
 const docsmanifest = import("../../../docs/manifest");
+
 function DocsNavigation() {
   const [manifest, setManifest] = useState<DocsManifest>();
   const [isOpen, setIsOpen] = useState(false);

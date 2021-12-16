@@ -1,9 +1,9 @@
-import React, { useCallback, useState, useEffect } from "react";
-import { NextPage, NextPageContext } from "next";
-import CookieAccept from "components/cookie-accept";
-import { useCookies } from "react-cookie";
 import { motion } from "framer-motion";
+import { NextPage, NextPageContext } from "next";
+import React, { useCallback, useState, useEffect } from "react";
+import { useCookies } from "react-cookie";
 
+import CookieAccept from "components/cookie-accept";
 import Sections from "sections/landingpage";
 
 interface MainPageAppProps {
@@ -41,10 +41,15 @@ const MainPage: NextPage<MainPageAppProps> = ({ isMobileView }) => {
   return (
     <React.Fragment>
       <Sections.Hero />
+      <Sections.DesignOnceRunAnywhere />
+      <div style={{ height: 200 }} />
       <Sections.Section2_design_to_code isMobile={isMobileView} />
-      <Sections.Section3_how_engine_works />
-      <Sections.Section4_features_tab />
-      <Sections.Section5_collaboration />
+      {/* <Sections.Section3_how_engine_works /> */}
+      {/* <Sections.Section__BornToBeHeadLess /> */}
+      {/* <Sections.Section__Opensource /> */}
+      <Sections.Section__CTASeeTheMagic />
+      {/* <Sections.Section4_features_tab /> */}
+      {/* <Sections.Section5_collaboration /> */}
       <Sections.FinalCta />
       {!openCookieAlert && (
         <motion.div

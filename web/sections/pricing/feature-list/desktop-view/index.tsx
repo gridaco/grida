@@ -1,13 +1,12 @@
-import React, { useCallback } from "react";
 import styled from "@emotion/styled";
+import React, { useCallback } from "react";
 import { Flex, Text, Heading } from "rebass";
-import Icon from "components/icon";
-import SectionLayout from "layout/section";
-import { usePopupContext } from "utils/context/PopupContext";
-import { defaultTheme } from "utils/styled";
-import { useWindowWidth } from "utils/hooks/use-window-width";
-import LandingpageText from "components/landingpage/text";
+
 import BlankArea from "components/blank-area";
+import Icon from "components/icon";
+import LandingpageText from "components/landingpage/text";
+import { usePopupContext } from "utils/context/PopupContext";
+
 import ResponsivePricingCell from "../pricing-cell";
 
 interface FeatureProps {
