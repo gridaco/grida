@@ -68,7 +68,7 @@ As shown above, the lastly created item places on the last of the array index, a
 **Sorting strategy**
 
 When sorting strategy not applied and code gen with raw input, below result may come.
-![](./worng-sorting-example-when-not-sanitized.png)
+![](./assets/worng-sorting-example-when-not-sanitized.png)
 
 **Exceptional cases**
 
