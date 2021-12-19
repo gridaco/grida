@@ -62,7 +62,7 @@ module.exports = withBundleAnalyzer(
             // redirecting docs to docs/getting-started since docs main page is not yet implemented.
             {
               source: "/docs",
-              destination: "/docs/getting-started",
+              destination: "/docs/getting-started/01-intro",
               permanent: false,
             },
             {

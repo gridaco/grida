@@ -1362,7 +1362,7 @@
     react-json-view "^1.21.3"
     tslib "^2.3.1"
 
-"@docusaurus/plugin-google-analytics@2.0.0-beta.13":
+"@docusaurus/plugin-google-analytics@2.0.0-beta.13", "@docusaurus/plugin-google-analytics@^2.0.0-beta.13":
   version "2.0.0-beta.13"
   resolved "https://registry.yarnpkg.com/@docusaurus/plugin-google-analytics/-/plugin-google-analytics-2.0.0-beta.13.tgz#4f1eea13c32fa3ccc84b865eaafe988f36d4d95b"
   integrity sha512-I37v2aWq43EXVScSOrYqP6PtHNVWar9OJ4Pbgwx1GNAy2VTyAQMoD8cLOCm6LVsEPxzIj+JsvGHrMlzaXZ3WIQ==

@@ -6,7 +6,7 @@ export default {
       routes: [
         {
           title: "Getting Started",
-          path: "/docs/getting-started",
+          path: "/docs/getting-started/01-intro",
         },
         {
           title: "Assistant",
