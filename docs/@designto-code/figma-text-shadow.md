@@ -48,7 +48,7 @@ Shadow(
 
 It is not currently supported, and it appears to be replaced with drop-shadow.
 
-## Why text shadow isn't support `spread radius`?
+## Why is there no `spread radius` support for text shadow?
 
 W3 describes why there is not current spread property support for text-shadow, thous we can expect this to be supported in the future. Yet other platform such as Flutter also has no spread support
 
