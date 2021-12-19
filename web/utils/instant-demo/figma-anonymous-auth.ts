@@ -66,3 +66,7 @@ export function getFigmaAccessToken__localstorage(): {
     return null;
   }
 }
+
+export function clearFigmaAccessToken__localstorage() {
+  window.localStorage.removeItem(_FIGMA_ACCESS_TOKEN_STORAGE_KEY);
+}

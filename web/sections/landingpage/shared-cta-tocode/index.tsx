@@ -4,11 +4,13 @@ import {
   FigmaUrlType,
   FigmaFileOrNodeIdType,
 } from "@design-sdk/figma-url/dist";
+import { event_cta__to_code } from "analytics";
 import React, { useCallback, useEffect, useState } from "react";
 import { Flex } from "rebass";
 
 import { usePopupContext } from "utils/context/PopupContext";
 import {
+  clearFigmaAccessToken__localstorage,
   getFigmaAccessToken__localstorage,
   startAnonymousFigmaAccessTokenOneshot,
   _FIGMA_ACCESS_TOKEN_STORAGE_KEY,
@@ -28,20 +30,14 @@ import { FigmaAuthDoneModalContents } from "./modal-content-figma-auth-done";
 import { FigmaAuthModalContents } from "./modal-content-figma-auth-prompt";
 import { ModalInvalidInputContentBody } from "./modal-content-invalid-input";
 
-export function CtaArea({ mode }: { mode: "hero-cta" | "footer-cta" }) {
+type CtaOrigin = "hero-cta" | "footer-cta";
+
+export function CtaArea({ mode }: { mode: CtaOrigin }) {
   const inputRef = React.createRef<HTMLInputElement>();
 
   const [hasOngoingAuthProc, setHasOngoingAuthProc] = useState(false);
   const [input, setInput] = useState<string>(null);
   const { addPopup, removePopup } = usePopupContext();
-
-  const isFigmaAccessTokenSet = () => {
-    const tokeninfo = getFigmaAccessToken__localstorage();
-    const accesstoken = tokeninfo && tokeninfo.accessToken;
-    if (accesstoken) {
-      return true;
-    }
-  };
 
   const showInvalidUrlGuide = useCallback(() => {
     addPopup({
@@ -62,6 +58,13 @@ export function CtaArea({ mode }: { mode: "hero-cta" | "footer-cta" }) {
   const showFigmaAuthModal = useCallback(
     async ({ afterurl }: { afterurl: string }) => {
       setHasOngoingAuthProc(true);
+
+      // log event
+      event_cta__to_code({
+        step: "authenticate-with-figma",
+        input: afterurl,
+        origin: mode,
+      });
 
       addPopup({
         title: "",
@@ -116,20 +119,30 @@ export function CtaArea({ mode }: { mode: "hero-cta" | "footer-cta" }) {
     if (hasOngoingAuthProc) {
       return;
     }
+
     try {
       const parsed = parseFileAndNodeId(url);
       if (parsed) {
-        // parsed.file;
-        // parsed.node;
+        // log event
+        event_cta__to_code({
+          step: "input-and-validate",
+          input: url,
+          origin: mode,
+        });
+
         inputRef?.current?.blur();
-        if (isFigmaAccessTokenSet()) {
-          moveToCode({
-            figmaAccessToken: getFigmaAccessToken__localstorage().accessToken,
-            design: url,
-          });
-        } else {
-          showFigmaAuthModal({ afterurl: url });
-        }
+        isAccessTokenValid().then(valid => {
+          if (valid) {
+            moveToCode({
+              figmaAccessToken: getFigmaAccessToken__localstorage().accessToken,
+              design: url,
+            });
+          } else {
+            showFigmaAuthModal({
+              afterurl: url,
+            });
+          }
+        });
       }
     } catch (e) {
       console.error("error while validating figma url", e);
@@ -137,6 +150,12 @@ export function CtaArea({ mode }: { mode: "hero-cta" | "footer-cta" }) {
   };
 
   const moveToCode = (p: { figmaAccessToken: string; design: string }) => {
+    // log event
+    event_cta__to_code({
+      step: "submit-and-move",
+      input: p.design,
+      origin: mode,
+    });
     const q = {
       fat: p.figmaAccessToken,
       design: p.design,
@@ -150,7 +169,7 @@ export function CtaArea({ mode }: { mode: "hero-cta" | "footer-cta" }) {
     window.open(url.toString(), "_blank");
     // after opening a new window, clear the input.
 
-    inputRef.current.value = "";
+    inputRef?.current && (inputRef.current.value = "");
     setInput("");
   };
 
@@ -245,3 +264,33 @@ const FigmaAuthModal = ({ onNextClick }: { onNextClick: () => void }) => {
     </Flex>
   );
 };
+
+async function isAccessTokenValid() {
+  const clearExpired = () => {
+    clearFigmaAccessToken__localstorage();
+  };
+
+  const tokeninfo = getFigmaAccessToken__localstorage();
+  const accesstoken = tokeninfo && tokeninfo.accessToken;
+  if (accesstoken) {
+    try {
+      const res = await fetch(`https://api.figma.com/v1/me`, {
+        method: "GET",
+        headers: new Headers({
+          Authorization: "Bearer " + accesstoken,
+        }),
+      });
+
+      if (res.status >= 400) {
+        clearExpired();
+        return false;
+      }
+      return true;
+    } catch (e) {
+      clearExpired();
+      return false;
+    }
+  }
+  clearExpired();
+  return false;
+}

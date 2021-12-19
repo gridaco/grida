@@ -41,6 +41,7 @@ export const LandingpageUrls = {
    */
   try_the_demo_1: "https://console.grida.co",
   app: "https://app.grida.co",
+  current_app: "https://code.grida.co", // temporary primary app redirection to code.grida.co until app.grida.co is ready.
 
   // misc
   privacy_policy: "/docs/support/privacy-policy",

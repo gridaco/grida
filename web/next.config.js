@@ -5,17 +5,6 @@ const withBundleAnalyzer = require("@zeit/next-bundle-analyzer");
 const withTM = require("next-transpile-modules");
 const withVideos = require("next-videos");
 
-const FIREBASE_ENV_VARS = {
-  FIREBASE_API_KEY: process.env.FIREBASE_API_KEY,
-  FIREBASE_AUTH_DOMAIN: process.env.FIREBASE_AUTH_DOMAIN,
-  FIREBASE_DATABASE_URL: process.env.FIREBASE_DATABASE_URL,
-  FIREBASE_PROJECT_ID: process.env.FIREBASE_PROJECT_ID,
-  FIREBASE_STORAGE_BUKET: process.env.FIREBASE_STORAGE_BUKET,
-  FIREBASE_MESSAGING_SENDER_ID: process.env.FIREBASE_MESSAGING_SENDER_ID,
-  FIREBASE_APP_ID: process.env.FIREBASE_APP_ID,
-  FIREBASE_MEASUREMENT_ID: process.env.FIREBASE_MEASUREMENT_ID,
-};
-
 module.exports = withBundleAnalyzer(
   withVideos(
     withMDX(
@@ -48,9 +37,6 @@ module.exports = withBundleAnalyzer(
         images: {
           domains: ["img.youtube.com", "via.placeholder.com"],
         },
-        env: {
-          ...FIREBASE_ENV_VARS,
-        },
         analyzeServer: ["server", "both"].includes(process.env.BUNDLE_ANALYZE),
         analyzeBrowser: ["browser", "both"].includes(
           process.env.BUNDLE_ANALYZE,
@@ -76,7 +62,7 @@ module.exports = withBundleAnalyzer(
             // redirecting docs to docs/getting-started since docs main page is not yet implemented.
             {
               source: "/docs",
-              destination: "/docs/getting-started",
+              destination: "/docs/getting-started/01-intro",
               permanent: false,
             },
             {
