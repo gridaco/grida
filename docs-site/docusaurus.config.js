@@ -47,7 +47,7 @@ const config = {
             type: "doc",
             docId: "getting-started/intro",
             position: "left",
-            label: "Getting Started",
+            label: "Docs",
           },
           {
             href: "https://github.com/gridaco",
