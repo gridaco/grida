@@ -68,11 +68,11 @@ export const Resources: Sitemap = {
   child: [
     {
       label: "Gettiing Started",
-      href: "/docs/getting-started",
+      href: "/docs/getting-started/intro",
     },
     {
       label: "Docs",
-      href: "/docs",
+      href: "/docs/getting-started/intro",
     },
     {
       label: "API Docs",

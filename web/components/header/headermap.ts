@@ -28,7 +28,7 @@ export const HeaderMap: HeaderMap[] = [
   // },
   {
     label: "Docs",
-    href: "/docs",
+    href: "/docs/getting-started/intro",
   },
   // temporarily disabled - since the blog standards is not firm
   // {
