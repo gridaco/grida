@@ -4,6 +4,11 @@
 const darkCodeTheme = require("prism-react-renderer/themes/dracula");
 const lightCodeTheme = require("prism-react-renderer/themes/github");
 
+const ga_config = {
+  trackingID: "G-C4615L9YZK", // same as grida.co
+  anonymizeIP: true,
+};
+
 /** @type {import('@docusaurus/types').Config} */
 const config = {
   title: "Grida",
@@ -28,6 +33,7 @@ const config = {
         theme: {
           customCss: require.resolve("./src/css/custom.css"),
         },
+        googleAnalytics: ga_config,
       }),
     ],
   ],
