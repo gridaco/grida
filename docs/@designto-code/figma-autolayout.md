@@ -139,7 +139,7 @@ _References_
 
 ### Universal token - Stretched
 
-We use Stretched Token for specifing specific widget to be stretched. Learn more at [@designto/token/tokens](../packages/designto-token/tokens/stretched/README.md)
+We use Stretched Token for specifing specific widget to be stretched. Learn more at [@designto/token/tokens](https://github.com/gridaco/designto-code/blob/main/packages/designto-token/tokens/stretched/README.md)
 
 ## Hug contents item (Not having any intrinsic size)
 

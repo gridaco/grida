@@ -1,3 +1,5 @@
+const { DOCS_URL } = process.env;
+
 const withMDX = require("@next/mdx")({
   extension: /\.mdx?$/,
 });
@@ -60,11 +62,18 @@ module.exports = withBundleAnalyzer(
               permanent: false,
             },
             // redirecting docs to docs/getting-started since docs main page is not yet implemented.
+            // region docs
             {
               source: "/docs",
-              destination: "/docs/getting-started",
-              permanent: false,
+              permanent: true,
+              destination: `${DOCS_URL}/docs/getting-started/intro`,
             },
+            {
+              source: "/docs/:path*",
+              permanent: true,
+              destination: `${DOCS_URL}/docs/:path*`,
+            },
+            // endregion docs
             {
               source: "/assistant",
               destination:

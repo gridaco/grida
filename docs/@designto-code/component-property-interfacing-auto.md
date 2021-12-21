@@ -6,7 +6,7 @@ revision: 1
 
 # Automatic property interfacing strategy for Components
 
-> Learn more at [support-components](../packages/support-components/README.md)
+> Learn more at [support-components](https://github.com/gridaco/designto-code/blob/main/packages/support-components/README.md)
 
 We support automatic property interfacing for Components, which means that we automatically extracts a dynamic property so that you can expect the output component code to be ready to be extended.
 

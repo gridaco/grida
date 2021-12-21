@@ -13,7 +13,7 @@ import { ThemeInterface } from "utils/styled/theme";
 
 import { DocsManifest, DocsRoute } from "../../utils/docs/model";
 
-const docsmanifest = import("../../../docs/manifest");
+const docsmanifest = import("./manifest");
 
 function DocsNavigation() {
   const [manifest, setManifest] = useState<DocsManifest>();
