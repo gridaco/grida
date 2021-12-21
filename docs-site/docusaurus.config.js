@@ -13,7 +13,7 @@ const ga_config = {
 const config = {
   title: "Grida",
   tagline: "Grida documentations",
-  url: "https://docs.grida.co",
+  url: "https://docs.grida.co/",
   baseUrl: "/docs/",
   onBrokenLinks: "throw",
   onBrokenMarkdownLinks: "warn",
@@ -27,7 +27,7 @@ const config = {
       ({
         redirects: [
           {
-            from: ["/", "/getting-started"],
+            from: ["/", "/docs", "/docs/getting-started", "/getting-started"],
             to: "/getting-started/intro",
           },
         ],
