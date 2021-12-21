@@ -61,7 +61,7 @@ const footer = {
 const config = {
   title: "Grida",
   tagline: "Grida documentations",
-  url: "https://supabase.com",
+  url: "https://grida.co",
   baseUrl: "/docs/",
   favicon: "img/favicon.png",
   organizationName: "gridaco", // Usually your GitHub org/user name.
