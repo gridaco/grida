@@ -27,8 +27,8 @@ const config = {
       ({
         redirects: [
           {
-            from: ["/", "/docs", "/docs/getting-started"],
-            to: "/docs/getting-started/intro",
+            from: ["/", "/getting-started"],
+            to: "/getting-started/intro",
           },
         ],
       }),
