@@ -1,6 +1,7 @@
 // @ts-check
 // Note: type annotations allow type checking and IDEs autocompletion
 
+const isDev = process.env.NODE_ENV !== "production";
 const darkCodeTheme = require("prism-react-renderer/themes/dracula");
 const lightCodeTheme = require("prism-react-renderer/themes/github");
 
@@ -13,9 +14,9 @@ const ga_config = {
 const config = {
   title: "Grida",
   tagline: "Grida documentations",
-  url: "https://docs.grida.co/",
+  url: isDev ? "http://localhost:3001/" : "https://grida.co/",
   baseUrl: "/docs/",
-  onBrokenLinks: "throw",
+  onBrokenLinks: "ignore",
   onBrokenMarkdownLinks: "warn",
   favicon: "img/favicon.png",
   organizationName: "gridaco", // Usually your GitHub org/user name.
@@ -25,9 +26,10 @@ const config = {
       "@docusaurus/plugin-client-redirects",
       /** @type {import('@docusaurus/plugin-client-redirects').Options} */
       ({
+        // add custom client redirects here.
         redirects: [
           {
-            from: ["/", "/docs", "/docs/getting-started", "/getting-started"],
+            from: ["/", "/getting-started"],
             to: "/getting-started/intro",
           },
         ],

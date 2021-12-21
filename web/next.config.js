@@ -1,4 +1,8 @@
-const { DOCS_URL } = process.env;
+const isDev = process.env.NODE_ENV === "development";
+const { DOCS_URL: DOCS_URL_FROM_ENV } = process.env;
+const DOCS_URL = isDev ? "http://localhost:3001" : DOCS_URL_FROM_ENV;
+
+console.log("DOCS_URL", DOCS_URL);
 
 const withMDX = require("@next/mdx")({
   extension: /\.mdx?$/,
@@ -58,7 +62,7 @@ module.exports = withBundleAnalyzer(
             // region docs
             {
               source: "/docs",
-              destination: `${DOCS_URL}/docs`,
+              destination: `${DOCS_URL}/docs/getting-started`,
             },
             {
               source: "/docs/:path*",
