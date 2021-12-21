@@ -103,6 +103,54 @@ const config = {
         defaultMode: "light",
         disableSwitch: true,
       },
+      footer: {
+        links: [
+          {
+            title: "Company",
+            items: [
+              {
+                label: "Grida.co",
+                to: "https://grida.co",
+              },
+            ],
+          },
+          {
+            title: "Resources",
+            items: [
+              {
+                label: "Docs",
+                to: "/",
+              },
+              {
+                label: "Together",
+                to: "/together",
+              },
+            ],
+          },
+          {
+            title: "Community",
+            items: [
+              {
+                label: "GitHub",
+                href: "https://github.com/gridaco/grida",
+              },
+              {
+                label: "Twitter",
+                href: "https://twitter.com/grida_co",
+              },
+              {
+                label: "Blog",
+                href: "https://blog.grida.co",
+              },
+              {
+                label: "Slack",
+                href: "https://grida.co/join-slack",
+              },
+            ],
+          },
+        ],
+        copyright: `Copyright © ${new Date().getFullYear()} Grida Inc.`,
+      },
     }),
 };
 
