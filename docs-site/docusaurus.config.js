@@ -13,7 +13,7 @@ const ga_config = {
 const config = {
   title: "Grida",
   tagline: "Grida documentations",
-  url: "https://grida.co",
+  url: "https://docs.grida.co",
   baseUrl: "/docs/",
   onBrokenLinks: "throw",
   onBrokenMarkdownLinks: "warn",
