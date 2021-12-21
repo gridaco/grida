@@ -55,18 +55,11 @@ module.exports = withBundleAnalyzer(
         },
         async redirects() {
           return [
-            // disabling globalization page access since it's not fully implemented. (temporary)
-            {
-              source: "/globalization",
-              destination: "/",
-              permanent: false,
-            },
-            // redirecting docs to docs/getting-started since docs main page is not yet implemented.
             // region docs
             {
               source: "/docs",
               permanent: true,
-              destination: `${DOCS_URL}/docs/getting-started/intro`,
+              destination: `${DOCS_URL}/docs`,
             },
             {
               source: "/docs/:path*",
@@ -74,6 +67,13 @@ module.exports = withBundleAnalyzer(
               destination: `${DOCS_URL}/docs/:path*`,
             },
             // endregion docs
+            // disabling globalization page access since it's not fully implemented. (temporary)
+            {
+              source: "/globalization",
+              destination: "/",
+              permanent: false,
+            },
+            // redirecting docs to docs/getting-started since docs main page is not yet implemented.
             {
               source: "/assistant",
               destination:
