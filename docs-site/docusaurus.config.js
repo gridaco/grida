@@ -36,8 +36,11 @@ const config = {
       /** @type {import('@docusaurus/preset-classic').Options} */
       ({
         docs: {
+          path: "docs",
           sidebarPath: require.resolve("./sidebars.js"),
           editUrl: "https://github.com/gridaco/grida.co/edit/main/docs/",
+          showLastUpdateAuthor: true,
+          showLastUpdateTime: true,
         },
         theme: {
           customCss: require.resolve("./src/css/custom.css"),
@@ -63,6 +66,12 @@ const config = {
             docId: "getting-started/intro",
             position: "left",
             label: "Docs",
+          },
+          {
+            type: "doc",
+            docId: "together/support",
+            position: "left",
+            label: "Together",
           },
           {
             href: "https://github.com/gridaco",
