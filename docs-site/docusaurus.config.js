@@ -20,16 +20,7 @@ const config = {
   favicon: "img/favicon.png",
   organizationName: "gridaco", // Usually your GitHub org/user name.
   projectName: "grida", // Usually your repo name.
-  plugins: [
-    [
-      "@docusaurus/plugin-sitemap",
-      {
-        changefreq: "weekly",
-        priority: 0.5,
-        trailingSlash: false,
-      },
-    ],
-  ],
+  plugins: [],
   presets: [
     [
       "classic",
@@ -67,12 +58,12 @@ const config = {
             position: "left",
             label: "Docs",
           },
-          {
-            type: "doc",
-            docId: "together/support",
-            position: "left",
-            label: "Together",
-          },
+          // {
+          //   type: "doc",
+          //   docId: "together/support",
+          //   position: "left",
+          //   label: "Together",
+          // },
           {
             href: "https://github.com/gridaco",
             label: "GitHub",
