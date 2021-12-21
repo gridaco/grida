@@ -53,20 +53,22 @@ module.exports = withBundleAnalyzer(
             reportFilename: "../bundles/client.html",
           },
         },
-        async redirects() {
+        async rewrites() {
           return [
             // region docs
             {
               source: "/docs",
-              permanent: true,
               destination: `${DOCS_URL}/docs`,
             },
             {
               source: "/docs/:path*",
-              permanent: true,
               destination: `${DOCS_URL}/docs/:path*`,
             },
             // endregion docs
+          ];
+        },
+        async redirects() {
+          return [
             // disabling globalization page access since it's not fully implemented. (temporary)
             {
               source: "/globalization",
