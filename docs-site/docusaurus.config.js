@@ -63,7 +63,7 @@ const footer = {
 const config = {
   title: "Grida",
   tagline: "Grida documentations",
-  url: isDev ? "http://localhost:3001" : "https://grida.co",
+  url: isDev ? "http://localhost:3001" : "https://docs.grida.co",
   baseUrl: "/docs/",
   onBrokenLinks: "ignore",
   onBrokenMarkdownLinks: "warn",
