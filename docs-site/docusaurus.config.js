@@ -20,7 +20,29 @@ const config = {
   favicon: "img/favicon.png",
   organizationName: "gridaco", // Usually your GitHub org/user name.
   projectName: "grida", // Usually your repo name.
-  plugins: [],
+  plugins: [
+    [
+      "@docusaurus/plugin-client-redirects",
+      /** @type {import('@docusaurus/plugin-client-redirects').Options} */
+      ({
+        redirects: [
+          {
+            from: ["/docs", "/docs/getting-started"],
+            to: "/docs/getting-started/intro",
+          },
+        ],
+      }),
+    ],
+    [
+      "@docusaurus/plugin-ideal-image",
+      {
+        quality: 70,
+        max: 1030, // max resized image's size.
+        min: 640, // min resized image's size. if original is lower, use that size.
+        steps: 2, // the max number of images generated between min and max (inclusive)
+      },
+    ],
+  ],
   presets: [
     [
       "classic",

@@ -16,7 +16,9 @@
   },
   "dependencies": {
     "@docusaurus/core": "^2.0.0-beta.14",
+    "@docusaurus/plugin-client-redirects": "^2.0.0-beta.14",
     "@docusaurus/plugin-google-analytics": "^2.0.0-beta.14",
+    "@docusaurus/plugin-ideal-image": "^2.0.0-beta.14",
     "@docusaurus/plugin-sitemap": "^2.0.0-beta.14",
     "@docusaurus/preset-classic": "^2.0.0-beta.14",
     "@mdx-js/react": "^1.6.21",
@@ -38,6 +40,7 @@
     ]
   },
   "devDependencies": {
+    "@docusaurus/types": "^2.0.0-beta.14",
     "fs-extra": "^10.0.0"
   }
 }
