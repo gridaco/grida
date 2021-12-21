@@ -1,10 +1,8 @@
 // @ts-check
 // Note: type annotations allow type checking and IDEs autocompletion
 
-const isDev = process.env.NODE_ENV !== "production";
 const darkCodeTheme = require("prism-react-renderer/themes/dracula");
 const lightCodeTheme = require("prism-react-renderer/themes/github");
-
 const ga_config = {
   trackingID: "G-C4615L9YZK", // same as grida.co
   anonymizeIP: true,
@@ -63,57 +61,13 @@ const footer = {
 const config = {
   title: "Grida",
   tagline: "Grida documentations",
-  url: isDev ? "http://localhost:3001" : "https://docs.grida.co/docs",
-  baseUrl: "/",
-  onBrokenLinks: "ignore",
-  onBrokenMarkdownLinks: "warn",
+  url: "https://supabase.com",
+  baseUrl: "/docs/",
   favicon: "img/favicon.png",
   organizationName: "gridaco", // Usually your GitHub org/user name.
   projectName: "grida", // Usually your repo name.
-  plugins: [
-    // [
-    //   "@docusaurus/plugin-client-redirects",
-    //   /** @type {import('@docusaurus/plugin-client-redirects').Options} */
-    //   ({
-    //     // add custom client redirects here.
-    //     redirects: [
-    //       {
-    //         from: ["/", "/getting-started"],
-    //         to: "/getting-started/intro",
-    //       },
-    //     ],
-    //   }),
-    // ],
-    [
-      "@docusaurus/plugin-ideal-image",
-      {
-        quality: 70,
-        max: 1030, // max resized image's size.
-        min: 640, // min resized image's size. if original is lower, use that size.
-        steps: 2, // the max number of images generated between min and max (inclusive)
-      },
-    ],
-  ],
-  presets: [
-    [
-      "classic",
-      /** @type {import('@docusaurus/preset-classic').Options} */
-      ({
-        docs: {
-          routeBasePath: "/",
-          sidebarPath: require.resolve("./sidebars.js"),
-          editUrl: "https://github.com/gridaco/grida.co/edit/main/docs/",
-          showLastUpdateAuthor: true,
-          showLastUpdateTime: true,
-        },
-        theme: {
-          customCss: require.resolve("./src/css/custom.css"),
-        },
-        googleAnalytics: ga_config,
-      }),
-    ],
-  ],
-
+  onBrokenLinks: "ignore",
+  onBrokenMarkdownLinks: "warn",
   themeConfig:
     /** @type {import('@docusaurus/preset-classic').ThemeConfig} */
     ({
@@ -125,12 +79,12 @@ const config = {
           target: "_self",
         },
         items: [
-          {
-            type: "doc",
-            docId: "getting-started/intro",
-            position: "left",
-            label: "Docs",
-          },
+          // {
+          //   type: "doc",
+          //   docId: "getting-started/intro",
+          //   position: "left",
+          //   label: "Docs",
+          // },
           // {
           //   type: "doc",
           //   docId: "together/support",
@@ -156,6 +110,22 @@ const config = {
       },
       // footer: footer,
     }),
+  presets: [
+    [
+      "@docusaurus/preset-classic",
+      {
+        docs: {
+          routeBasePath: "/",
+          sidebarPath: require.resolve("./sidebars.js"),
+          editUrl: "https://github.com/gridaco/grida.co/edit/main/docs/",
+        },
+        theme: {
+          customCss: require.resolve("./src/css/custom.css"),
+        },
+        googleAnalytics: ga_config,
+      },
+    ],
+  ],
 };
 
 module.exports = config;
