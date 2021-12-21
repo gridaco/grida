@@ -10,11 +10,60 @@ const ga_config = {
   anonymizeIP: true,
 };
 
+const footer = {
+  links: [
+    {
+      title: "Company",
+      items: [
+        {
+          label: "Grida.co",
+          to: "https://grida.co",
+        },
+      ],
+    },
+    {
+      title: "Resources",
+      items: [
+        {
+          label: "Docs",
+          to: "/",
+        },
+        {
+          label: "Together",
+          to: "/together",
+        },
+      ],
+    },
+    {
+      title: "Community",
+      items: [
+        {
+          label: "GitHub",
+          href: "https://github.com/gridaco/grida",
+        },
+        {
+          label: "Twitter",
+          href: "https://twitter.com/grida_co",
+        },
+        {
+          label: "Blog",
+          href: "https://blog.grida.co",
+        },
+        {
+          label: "Slack",
+          href: "https://grida.co/join-slack",
+        },
+      ],
+    },
+  ],
+  copyright: `Copyright © ${new Date().getFullYear()} Grida Inc.`,
+};
+
 /** @type {import('@docusaurus/types').Config} */
 const config = {
   title: "Grida",
   tagline: "Grida documentations",
-  url: isDev ? "http://localhost:3001/" : "https://docs.grida.co/",
+  url: isDev ? "http://localhost:3001" : "https://docs.grida.co",
   baseUrl: "/docs/",
   onBrokenLinks: "ignore",
   onBrokenMarkdownLinks: "warn",
@@ -22,19 +71,19 @@ const config = {
   organizationName: "gridaco", // Usually your GitHub org/user name.
   projectName: "grida", // Usually your repo name.
   plugins: [
-    [
-      "@docusaurus/plugin-client-redirects",
-      /** @type {import('@docusaurus/plugin-client-redirects').Options} */
-      ({
-        // add custom client redirects here.
-        redirects: [
-          {
-            from: ["/", "/getting-started"],
-            to: "/getting-started/intro",
-          },
-        ],
-      }),
-    ],
+    // [
+    //   "@docusaurus/plugin-client-redirects",
+    //   /** @type {import('@docusaurus/plugin-client-redirects').Options} */
+    //   ({
+    //     // add custom client redirects here.
+    //     redirects: [
+    //       {
+    //         from: ["/", "/getting-started"],
+    //         to: "/getting-started/intro",
+    //       },
+    //     ],
+    //   }),
+    // ],
     [
       "@docusaurus/plugin-ideal-image",
       {
@@ -105,54 +154,7 @@ const config = {
         defaultMode: "light",
         disableSwitch: true,
       },
-      footer: {
-        links: [
-          {
-            title: "Company",
-            items: [
-              {
-                label: "Grida.co",
-                to: "https://grida.co",
-              },
-            ],
-          },
-          {
-            title: "Resources",
-            items: [
-              {
-                label: "Docs",
-                to: "/",
-              },
-              {
-                label: "Together",
-                to: "/together",
-              },
-            ],
-          },
-          {
-            title: "Community",
-            items: [
-              {
-                label: "GitHub",
-                href: "https://github.com/gridaco/grida",
-              },
-              {
-                label: "Twitter",
-                href: "https://twitter.com/grida_co",
-              },
-              {
-                label: "Blog",
-                href: "https://blog.grida.co",
-              },
-              {
-                label: "Slack",
-                href: "https://grida.co/join-slack",
-              },
-            ],
-          },
-        ],
-        copyright: `Copyright © ${new Date().getFullYear()} Grida Inc.`,
-      },
+      // footer: footer,
     }),
 };
 
