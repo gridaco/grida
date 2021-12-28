@@ -137,12 +137,14 @@ export function Editor() {
       }).then(on_result);
 
       // build final code with asset fetch
-      designToCode({
-        input: root,
-        framework: framework_config,
-        asset_config: { asset_repository: MainImageRepository.instance },
-        build_config: build_config,
-      }).then(on_result);
+      if (!MainImageRepository.instance.empty) {
+        designToCode({
+          input: root,
+          framework: framework_config,
+          asset_config: { asset_repository: MainImageRepository.instance },
+          build_config: build_config,
+        }).then(on_result);
+      }
     }
   }, [targetted?.id, framework_config?.framework]);
 
@@ -176,12 +178,14 @@ export function Editor() {
           },
         }).then(on_preview_result);
 
-        designToCode({
-          input: root,
-          build_config: build_config,
-          framework: vanilla_presets.vanilla_default,
-          asset_config: { asset_repository: MainImageRepository.instance },
-        }).then(on_preview_result);
+        if (!MainImageRepository.instance.empty) {
+          designToCode({
+            input: root,
+            build_config: build_config,
+            framework: vanilla_presets.vanilla_default,
+            asset_config: { asset_repository: MainImageRepository.instance },
+          }).then(on_preview_result);
+        }
       }
     },
     [targetted?.id]
