@@ -31,6 +31,7 @@ import {
 import { vanilla_presets } from "@grida/builder-config-preset";
 import { EditorSkeleton } from "./skeleton";
 import { colors } from "theme";
+import Link from "next/link";
 
 export function Editor() {
   const router = useRouter();
@@ -302,19 +303,17 @@ const Debugger = ({
         <ClearRemoteDesignSessionCache key={id} file={file} node={id} />
         <br />
         {(type === "INSTANCE" || type === "COMPONENT") && (
-          <button
-            onClick={() => {
-              router.push({
-                pathname: "/figma/inspect-component",
-                query: {
-                  // e.g. https://www.figma.com/file/iypAHagtcSp3Osfo2a7EDz/engine?node-id=3098%3A4097
-                  design: `https://www.figma.com/file/${file}/?node-id=${id}`,
-                },
-              });
+          <Link
+            href={{
+              pathname: "/figma/inspect-component",
+              query: {
+                // e.g. https://www.figma.com/file/iypAHagtcSp3Osfo2a7EDz/engine?node-id=3098%3A4097
+                design: `https://www.figma.com/file/${file}/?node-id=${id}`,
+              },
             }}
           >
             inspect component
-          </button>
+          </Link>
         )}
       </div>
 
