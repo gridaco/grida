@@ -7,6 +7,8 @@ export function editorReducer(state: EditorState, action: Action): EditorState {
   switch (action.type) {
     case "select-node": {
       const { node } = <SelectNodeAction>action;
+      console.clear();
+      console.info("cleard console by editorReducer#select-node");
       return produce(state, (draft) => {
         draft.selectedNodes = [node];
       });
