@@ -1,6 +1,7 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
 import styled from "@emotion/styled";
 import { useGesture } from "@use-gesture/react";
+import useMeasure from "react-use-measure";
 import { Resizable } from "re-resizable";
 import { ZoomControl } from "./controller-zoom-control";
 
@@ -12,9 +13,48 @@ import { ZoomControl } from "./controller-zoom-control";
  * the condition rather if the user is currently interacting or not is set on higher level, which this function accepts the condition as a parameter.
  * @param interacting
  */
-function useIsInteractingDelta(interacting: boolean) {
+function useIsInteractingDelta() {
   throw new Error("Not implemented");
 }
+
+type Size = { width: number; height: number };
+function initialTransform(
+  canvas: Size,
+  frame: Size,
+  margin: number
+): InitialTransform {
+  const __canvas_width = canvas.width;
+  const __canvas_height = canvas.height;
+  const __margin_2x = margin * 2;
+  const __initial_scale =
+    frame.width > __canvas_width
+      ? (__canvas_width - __margin_2x) / frame.width
+      : 1;
+  const __height_fits_in_canvas =
+    frame.height * __initial_scale < __canvas_height - __margin_2x;
+  const __initial_transform_origin = __height_fits_in_canvas
+    ? "center"
+    : "top center";
+  const __scaled_display_height = frame.height * __initial_scale;
+  const __y_start = __height_fits_in_canvas
+    ? __initial_transform_origin === "top center"
+      ? (__canvas_height - __margin_2x - __scaled_display_height) / 2
+      : margin
+    : margin;
+  const __initial_xy = [0, __y_start] as [number, number];
+
+  return {
+    scale: __initial_scale,
+    xy: __initial_xy,
+    transformOrigin: __initial_transform_origin,
+  };
+}
+
+type InitialTransform = {
+  scale: number;
+  xy: [number, number];
+  transformOrigin: string;
+};
 
 export function InteractiveCanvas({
   children,
@@ -23,55 +63,58 @@ export function InteractiveCanvas({
   defaultSize: { width: number; height: number };
   children?: React.ReactNode;
 }) {
-  const __canvas_width = 800;
-  const __canvas_height = 900;
-  const __margin = 20;
-  const __margin_2x = __margin * 2;
-  const __initial_scale =
-    defaultSize.width > __canvas_width
-      ? (__canvas_width - __margin_2x) / defaultSize.width
-      : 1;
-  const __height_fits_in_canvas =
-    defaultSize.height * __initial_scale < __canvas_height - __margin_2x;
-  const __scaled_display_height = defaultSize.height * __initial_scale;
-  const __y_start = __height_fits_in_canvas
-    ? (__canvas_height - __scaled_display_height) / 2
-    : __margin;
-  const __initial_xy = [0, __y_start] as [number, number];
-  const __initial_transform_origin = __height_fits_in_canvas
-    ? "center"
-    : "top center";
+  const _margin = 20;
+  const [canvasSizingRef, canvasBounds] = useMeasure();
+  const [initial, setInitial] = useState(
+    initialTransform(canvasBounds, defaultSize, _margin)
+  );
+  const [hasUserOverride, setHasUserOverride] = useState(false);
 
-  console.log(__y_start, __scaled_display_height);
+  useEffect(() => {
+    if (canvasBounds.width !== 0 && canvasBounds.height !== 0) {
+      const i = initialTransform(canvasBounds, defaultSize, _margin);
+      setInitial(i); // setup new initial
+      if (!hasUserOverride) {
+        setScale(i.scale);
+        setXY(i.xy);
+        setTransformOrigin(i.transformOrigin);
+      }
+    }
+  }, [canvasBounds.width, canvasBounds.height]);
 
-  const [scale, setScale] = useState(__initial_scale);
-  const [xy, setXY] = useState<[number, number]>(__initial_xy);
+  const [scale, setScale] = useState(initial.scale);
+  const [xy, setXY] = useState<[number, number]>(initial.xy);
+  const [transformOrigin, setTransformOrigin] = useState(
+    initial.transformOrigin
+  );
 
   const [isPanning, setIsPanning] = useState(false);
   const [isZooming, setIsZooming] = useState(false);
-  const isDeltaInteracting = isPanning || isZooming;
+  const isDeltaInteracting = isPanning || isZooming; //useIsInteractingDelta();
 
-  const ref = useRef();
+  const interactionEventTargetRef = useRef();
 
   useGesture(
     {
       onPinch: (state) => {
+        setHasUserOverride(true);
         setIsZooming(state.pinching);
         setScale(Math.max(scale + state.delta[0], 0.1));
       },
       onWheel: ({ delta: [x, y], wheeling }) => {
+        setHasUserOverride(true);
         setIsPanning(wheeling);
         setXY([xy[0] - x / scale, xy[1] - y / scale]);
       },
     },
-    { target: ref }
+    { target: interactionEventTargetRef }
   );
 
   return (
-    <InteractiveCanvasWrapper id="interactive-canvas">
+    <InteractiveCanvasWrapper ref={canvasSizingRef} id="interactive-canvas">
       <div
         id="event-listener"
-        ref={ref}
+        ref={interactionEventTargetRef}
         style={{
           flexGrow: 1,
           display: "flex",
@@ -81,9 +124,11 @@ export function InteractiveCanvas({
       >
         <Controls>
           <ZoomControl
+            canReset={hasUserOverride}
             onReset={() => {
-              setScale(__initial_scale);
-              setXY(__initial_xy);
+              setScale(initial.scale);
+              setXY(initial.xy);
+              setHasUserOverride(false);
             }}
             scale={scale}
             onChange={setScale}
@@ -93,7 +138,7 @@ export function InteractiveCanvas({
         <TransformContainer
           scale={scale}
           xy={xy}
-          transformOrigin={__initial_transform_origin}
+          transformOrigin={transformOrigin}
           isTransitioning={isDeltaInteracting}
         >
           <ResizableFrame defaultSize={defaultSize} scale={scale}>
