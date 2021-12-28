@@ -60,10 +60,16 @@ export function Editor() {
 
   const root = thisPageNodes
     ? container_of_target &&
-      DesignInput.fromDesignWithComponents({
-        design: container_of_target,
-        components: state.design.components,
-      })
+      (container_of_target.origin === "COMPONENT"
+        ? DesignInput.forMasterComponent({
+            master: container_of_target,
+            all: state.design.pages,
+            components: state.design.components,
+          })
+        : DesignInput.fromDesignWithComponents({
+            design: container_of_target,
+            components: state.design.components,
+          }))
     : state.design?.input;
 
   const targetted =
