@@ -25,8 +25,8 @@ export function createPendingWorkspaceState(): WorkspaceState {
   return {
     history: createPendingHistoryState(),
     preferences: {
-      debug_mode: false,
-      enable_preview_feature_components_support: true,
+      debug_mode: null,
+      enable_preview_feature_components_support: null,
       preview_runner_framework_config: null,
       framework_config: null,
     },
