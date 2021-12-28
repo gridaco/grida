@@ -12,8 +12,9 @@ export function createInitialWorkspaceState(
   return {
     history: createInitialHistoryState(editor),
     preferences: {
-      debug_mode: false,
-      enable_preview_feature_components_support: false,
+      // TODO: temporarily always true for components dev
+      debug_mode: true,
+      enable_preview_feature_components_support: true,
       preview_runner_framework_config: vanilla_presets.vanilla_default,
       framework_config: react_presets.react_default,
     },
@@ -25,7 +26,7 @@ export function createPendingWorkspaceState(): WorkspaceState {
     history: createPendingHistoryState(),
     preferences: {
       debug_mode: false,
-      enable_preview_feature_components_support: false,
+      enable_preview_feature_components_support: true,
       preview_runner_framework_config: null,
       framework_config: null,
     },

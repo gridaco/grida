@@ -5,8 +5,7 @@ import { Editor } from "scaffolds/editor";
 import { EditorSnapshot, StateProvider } from "core/states";
 import { WorkspaceAction } from "core/actions";
 import { useDesignFile } from "hooks";
-import { convert } from "@design-sdk/figma-node-conversion";
-import { mapper } from "@design-sdk/figma-remote";
+
 import { warmup } from "scaffolds/editor";
 
 export default function FileEntryEditor() {
@@ -31,15 +30,11 @@ export default function FileEntryEditor() {
     if (file) {
       let val: EditorSnapshot;
 
-      const pages = file.document.children.map((page) => ({
-        id: page.id,
-        name: page.name,
-        children: page["children"]?.map((child) => {
-          const _mapped = mapper.mapFigmaRemoteToFigma(child);
-          return convert.intoReflectNode(_mapped);
-        }),
-        type: "design",
-      }));
+      // TODO: seed this as well
+      // ->> file.styles;
+
+      const components = warmup.componentsFrom(file);
+      const pages = warmup.pagesFrom(file);
 
       if (prevstate) {
         val = {
@@ -60,6 +55,8 @@ export default function FileEntryEditor() {
           selectedLayersOnPreview: [],
           design: {
             input: null,
+            components: components,
+            // styles: null,
             key: filekey,
             pages: pages,
           },
@@ -75,7 +72,6 @@ export default function FileEntryEditor() {
   }, [filekey, file?.document?.children]);
 
   const safe_value = warmup.safestate(initialState);
-
   return (
     <SigninToContinueBannerPrmoptProvider>
       <StateProvider state={safe_value} dispatch={handleDispatch}>

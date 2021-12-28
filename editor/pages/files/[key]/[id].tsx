@@ -56,15 +56,8 @@ export default function Page() {
     if (file) {
       let val: EditorSnapshot;
 
-      const pages = file.document.children.map((page) => ({
-        id: page.id,
-        name: page.name,
-        children: page["children"]?.map((child) => {
-          const _mapped = mapper.mapFigmaRemoteToFigma(child);
-          return convert.intoReflectNode(_mapped);
-        }),
-        type: "design",
-      }));
+      const components = warmup.componentsFrom(file);
+      const pages = warmup.pagesFrom(file);
 
       if (prevstate) {
         val = {
@@ -102,6 +95,7 @@ export default function Page() {
               input: null,
               key: filekey,
               pages: pages,
+              components: components,
             },
             selectedPage: warmup.selectedPage(prevstate, pages, null),
           };
