@@ -1,7 +1,15 @@
-import React, { useEffect } from "react";
-import Editor, { useMonaco, Monaco } from "@monaco-editor/react";
+import React, { useRef, useEffect } from "react";
+import Editor, {
+  useMonaco,
+  Monaco,
+  OnChange,
+  OnMount,
+} from "@monaco-editor/react";
 import * as monaco from "monaco-editor/esm/vs/editor/editor.api";
 import { MonacoEmptyMock } from "./monaco-mock-empty";
+import { register } from "./monaco-utils";
+
+type ICodeEditor = monaco.editor.IStandaloneCodeEditor;
 
 export interface MonacoEditorProps {
   defaultValue?: string;
@@ -12,13 +20,28 @@ export interface MonacoEditorProps {
 }
 
 export function MonacoEditor(props: MonacoEditorProps) {
+  const instance = useRef<{ editor: ICodeEditor; format: any } | null>(null);
+  const activeModel = useRef<any>();
+
   const monaco: Monaco = useMonaco();
   useEffect(() => {
     if (monaco) {
       setup_react_support(monaco);
-      // monaco.mo
     }
   }, [monaco]);
+
+  const onMount: OnMount = (editor, monaco) => {
+    const format = editor.getAction("editor.action.formatDocument");
+    instance.current = { editor, format };
+
+    activeModel.current = editor.getModel();
+
+    register.initEditor(editor, monaco);
+
+    editor.onDidChangeModelContent(() => {
+      /* add here */
+    });
+  };
 
   return (
     <Editor
@@ -27,6 +50,7 @@ export function MonacoEditor(props: MonacoEditorProps) {
       defaultLanguage={
         pollyfill_language(props.defaultLanguage) ?? "typescript"
       }
+      onMount={onMount}
       loading={<MonacoEmptyMock />}
       defaultValue={props.defaultValue ?? "// no content"}
       theme="vs-dark"
