@@ -23,7 +23,7 @@ const keymap = (
   ...c: ("ctrl" | "cmd" | "ctrl-cmd" | "shift" | "a" | "p" | "s" | ",")[]
 ) => {
   const magic_replacer = (s: string, os: "win" | "mac") => {
-    return s.replaceAll("ctrl-cmd", os === "win" ? "ctrl" : "cmd");
+    return replaceAll(s, "ctrl-cmd", os === "win" ? "ctrl" : "cmd");
   };
 
   const win = magic_replacer(c.join("+"), "win");
@@ -31,3 +31,10 @@ const keymap = (
   const universal = [win, mac].join(", ");
   return { win, mac, universal };
 };
+
+function _escapeRegExp(string) {
+  return string.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"); // $& means the whole matched string
+}
+function replaceAll(str, match, replacement) {
+  return str.replace(new RegExp(_escapeRegExp(match), "g"), () => replacement);
+}
