@@ -1,7 +1,7 @@
 import React, { useEffect, useCallback, useReducer } from "react";
 import { useRouter } from "next/router";
 import { SigninToContinueBannerPrmoptProvider } from "components/prompt-banner-signin-to-continue";
-import { Editor } from "scaffolds/editor";
+import { Editor, EditorDefaultProviders } from "scaffolds/editor";
 import { EditorSnapshot, StateProvider } from "core/states";
 import { WorkspaceAction } from "core/actions";
 import { useDesignFile } from "hooks";
@@ -79,7 +79,9 @@ export default function FileEntryEditor() {
   return (
     <SigninToContinueBannerPrmoptProvider>
       <StateProvider state={safe_value} dispatch={handleDispatch}>
-        <Editor />
+        <EditorDefaultProviders>
+          <Editor />
+        </EditorDefaultProviders>
       </StateProvider>
     </SigninToContinueBannerPrmoptProvider>
   );
