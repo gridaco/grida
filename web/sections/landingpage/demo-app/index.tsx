@@ -22,7 +22,7 @@ const HeaderPart = () => {
         <TitleAndAvatar>
           <Title>Saturday Morning Mix</Title>
           <AvatarSource
-            src="https://s3-us-west-2.amazonaws.com/figma-alpha-api/img/4f6b/36d5/17d6b783005c459c272ce5fb879a9e9f"
+            src="/demo-app-wnv/avatar-source.png"
             alt="image of AvatarSource"
           ></AvatarSource>
         </TitleAndAvatar>
@@ -46,10 +46,9 @@ const CardMusicItem = ({
     <CardWrapper>
       <ArtworkContainer>
         {artwork}
-        <MusicPlayButton
-          src="https://s3-us-west-2.amazonaws.com/figma-alpha-api/img/5f4a/558c/5524bce036659c4f82d652b44961d944"
-          alt="icon"
-        ></MusicPlayButton>
+        <MusicPlayButtonWrapperPositionerInAlbumCoverCard>
+          <MusicPlayButton />
+        </MusicPlayButtonWrapperPositionerInAlbumCoverCard>
       </ArtworkContainer>
       <MusicName>{musicName}</MusicName>
     </CardWrapper>
@@ -62,14 +61,19 @@ const PrimaryMusicCardsListPart = () => {
       <CardMusicItem
         musicName={"Morning Slowbeats - LoFi"}
         artwork={
-          <DemoAppAlbumCover1>
-            <Rectangle813></Rectangle813>
-            <LoFi>
-              LO
-              <br />
-              FI
-            </LoFi>
-          </DemoAppAlbumCover1>
+          <>
+            <DemoAppAlbumCover1>
+              <Rectangle813></Rectangle813>
+              <LoFi>
+                LO
+                <br />
+                FI
+              </LoFi>
+            </DemoAppAlbumCover1>
+            <MusicPlayButtonWrapperPositionerInAlbumCoverCard>
+              <MusicPlayButton color="white" />
+            </MusicPlayButtonWrapperPositionerInAlbumCoverCard>
+          </>
         }
       />
       <CardMusicItem
@@ -77,13 +81,9 @@ const PrimaryMusicCardsListPart = () => {
         artwork={
           <DemoAppAlbumCover3>
             <Rectangle825
-              src="https://s3-us-west-2.amazonaws.com/figma-alpha-api/img/8a94/bb41/b26e2d09badc33fd87413d2d7cb4f2d6"
+              src="/demo-app-wnv/album-cover-2.png"
               alt="image of Rectangle825"
             ></Rectangle825>
-            <Union
-              src="https://s3-us-west-2.amazonaws.com/figma-alpha-api/img/c86a/b0ec/2cbaa0a2ffcf6665e30c288e0a09bbc4"
-              alt="image of Union"
-            ></Union>
           </DemoAppAlbumCover3>
         }
       />
@@ -92,7 +92,7 @@ const PrimaryMusicCardsListPart = () => {
         artwork={
           <DemoAppAlbumCover2>
             <Rectangle825_0001
-              src="https://s3-us-west-2.amazonaws.com/figma-alpha-api/img/b802/fe12/70b07a6592a33589a9350bb8a5295d9d"
+              src="/demo-app-wnv/album-cover-3.png"
               alt="image of Rectangle825"
             ></Rectangle825_0001>
             <TrpLve>
@@ -126,10 +126,7 @@ const TileMusicItem = ({
                 Morning Slowbeats - LoFi
               </MorningSlowbeatsLoFi_0003>
             </TextInfo>
-            <MusicPlayButton_0003
-              src="https://s3-us-west-2.amazonaws.com/figma-alpha-api/img/56fc/4c35/733e07dee25b0dce8c66a2fb86ef998f"
-              alt="icon"
-            ></MusicPlayButton_0003>
+            <MusicPlayButton />
           </InnerFrame>
         </NonGraphicsArea>
       </Primary>
@@ -146,10 +143,7 @@ const TileMusicItem = ({
                 Morning Slowbeats - LoFi
               </MorningSlowbeatsLoFi_0004>
             </TextInfo_0001>
-            <MusicPlayButton_0004
-              src="https://s3-us-west-2.amazonaws.com/figma-alpha-api/img/e80e/fc39/da9065547bba86fc0f83f31a4310271c"
-              alt="icon"
-            ></MusicPlayButton_0004>
+            <MusicPlayButton />
           </NonGraphicArea>
         </Contents>
       </Card1_0001>
@@ -167,7 +161,7 @@ const FriendsMusicSectionPart = () => {
           cover={
             <>
               <Rectangle825_0002
-                src="https://s3-us-west-2.amazonaws.com/figma-alpha-api/img/0cf0/7836/f073708c3ceb92d2504f0a572048367b"
+                src="/demo-app-wnv/album-cover-2.png"
                 alt="image of Rectangle825"
               ></Rectangle825_0002>
               <TrpLve_0001>
@@ -182,13 +176,9 @@ const FriendsMusicSectionPart = () => {
           cover={
             <>
               <Rectangle825_0003
-                src="https://s3-us-west-2.amazonaws.com/figma-alpha-api/img/26c1/ce4d/c339eeaa7bbbdad0c83e2ab036fbfecb"
+                src="/demo-app-wnv/album-cover-3.png"
                 alt="image of Rectangle825"
               ></Rectangle825_0003>
-              <Union_0001
-                src="https://s3-us-west-2.amazonaws.com/figma-alpha-api/img/6cd5/7710/811330309e1aeaea91da25f5cac2adfd"
-                alt="image of Union"
-              ></Union_0001>
             </>
           }
         />
@@ -389,10 +379,54 @@ const LoFi = styled.span`
   bottom: 8px;
 `;
 
-const MusicPlayButton = styled.img`
+const MusicPlayButton = ({ color = "black" }: { color?: string }) => {
+  return (
+    <svg
+      width="24"
+      height="24"
+      viewBox="0 0 24 24"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+    >
+      <g filter="url(#filter0_b_1_79)">
+        <circle cx="12" cy="12" r="11" stroke="black" stroke-width="2" />
+      </g>
+      <path
+        d="M9.33325 7.33337V16.6667L16.6666 12L9.33325 7.33337Z"
+        fill={color}
+      />
+      <defs>
+        <filter
+          id="filter0_b_1_79"
+          x="-16"
+          y="-16"
+          width="56"
+          height="56"
+          filterUnits="userSpaceOnUse"
+          color-interpolation-filters="sRGB"
+        >
+          <feFlood flood-opacity="0" result="BackgroundImageFix" />
+          <feGaussianBlur in="BackgroundImage" stdDeviation="8" />
+          <feComposite
+            in2="SourceAlpha"
+            operator="in"
+            result="effect1_backgroundBlur_1_79"
+          />
+          <feBlend
+            mode="normal"
+            in="SourceGraphic"
+            in2="effect1_backgroundBlur_1_79"
+            result="shape"
+          />
+        </filter>
+      </defs>
+    </svg>
+  );
+};
+
+const MusicPlayButtonWrapperPositionerInAlbumCoverCard = styled.div`
   width: 28px;
   height: 28px;
-  object-fit: cover;
   position: absolute;
   right: 16px;
   bottom: 14px;
@@ -541,6 +575,7 @@ const Cover = styled.div`
 const Rectangle825_0002 = styled.img`
   object-fit: cover;
   position: absolute;
+  width: 80px;
   left: 0px;
   top: 0px;
   right: 0px;
@@ -659,19 +694,11 @@ const Cover_0001 = styled.div`
 const Rectangle825_0003 = styled.img`
   object-fit: cover;
   position: absolute;
+  width: 64px;
   left: 0px;
   top: 0px;
   right: 0px;
   bottom: 0px;
-`;
-
-const Union_0001 = styled.img`
-  object-fit: cover;
-  position: absolute;
-  left: 9px;
-  top: 9px;
-  right: 10px;
-  bottom: 9px;
 `;
 
 const NonGraphicArea = styled.div`
