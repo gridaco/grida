@@ -30,7 +30,11 @@ export function MonacoEditor(props: MonacoEditorProps) {
       loading={<MonacoEmptyMock />}
       defaultValue={props.defaultValue ?? "// no content"}
       theme="vs-dark"
-      options={{ ...props.options }}
+      options={{
+        ...props.options,
+        // overrided default options
+        unusualLineTerminators: "off",
+      }}
     />
   );
 }
