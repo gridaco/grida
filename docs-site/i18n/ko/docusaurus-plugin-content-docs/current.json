@@ -1,0 +1,82 @@
+{
+  "version.label": {
+    "message": "Next",
+    "description": "The label for version current"
+  },
+  "sidebar.tutorialSidebar.category.Getting Started": {
+    "message": "Getting Started",
+    "description": "The label for category Getting Started in sidebar tutorialSidebar"
+  },
+  "sidebar.tutorialSidebar.category.Concepts": {
+    "message": "Concepts",
+    "description": "The label for category Concepts in sidebar tutorialSidebar"
+  },
+  "sidebar.tutorialSidebar.category.Layouts": {
+    "message": "Layouts",
+    "description": "The label for category Layouts in sidebar tutorialSidebar"
+  },
+  "sidebar.tutorialSidebar.category.Components": {
+    "message": "Components",
+    "description": "The label for category Components in sidebar tutorialSidebar"
+  },
+  "sidebar.tutorialSidebar.category.Widgets": {
+    "message": "Widgets",
+    "description": "The label for category Widgets in sidebar tutorialSidebar"
+  },
+  "sidebar.tutorialSidebar.category.Motions": {
+    "message": "Motions",
+    "description": "The label for category Motions in sidebar tutorialSidebar"
+  },
+  "sidebar.tutorialSidebar.category.Prototyping": {
+    "message": "Prototyping",
+    "description": "The label for category Prototyping in sidebar tutorialSidebar"
+  },
+  "sidebar.tutorialSidebar.category.Events and Actions": {
+    "message": "Events and Actions",
+    "description": "The label for category Events and Actions in sidebar tutorialSidebar"
+  },
+  "sidebar.tutorialSidebar.category.Props": {
+    "message": "Props",
+    "description": "The label for category Props in sidebar tutorialSidebar"
+  },
+  "sidebar.tutorialSidebar.category.Flags": {
+    "message": "Flags",
+    "description": "The label for category Flags in sidebar tutorialSidebar"
+  },
+  "sidebar.tutorialSidebar.category.Contents Management": {
+    "message": "Contents Management",
+    "description": "The label for category Contents Management in sidebar tutorialSidebar"
+  },
+  "sidebar.tutorialSidebar.category.Understanding Behind the scene": {
+    "message": "Understanding Behind the scene",
+    "description": "The label for category Understanding Behind the scene in sidebar tutorialSidebar"
+  },
+  "sidebar.tutorialSidebar.category.Assistant": {
+    "message": "Assistant",
+    "description": "The label for category Assistant in sidebar tutorialSidebar"
+  },
+  "sidebar.tutorialSidebar.category.design-assistant": {
+    "message": "design-assistant",
+    "description": "The label for category design-assistant in sidebar tutorialSidebar"
+  },
+  "sidebar.tutorialSidebar.category.Reference": {
+    "message": "Reference",
+    "description": "The label for category Reference in sidebar tutorialSidebar"
+  },
+  "sidebar.tutorialSidebar.category.Design to code Reference": {
+    "message": "Design to code Reference",
+    "description": "The label for category Design to code Reference in sidebar tutorialSidebar"
+  },
+  "sidebar.tutorialSidebar.category.Flags Reference": {
+    "message": "Flags Reference",
+    "description": "The label for category Flags Reference in sidebar tutorialSidebar"
+  },
+  "sidebar.tutorialSidebar.category.Conventions": {
+    "message": "Conventions",
+    "description": "The label for category Conventions in sidebar tutorialSidebar"
+  },
+  "sidebar.tutorialSidebar.category.Together": {
+    "message": "Together",
+    "description": "The label for category Together in sidebar tutorialSidebar"
+  }
+}
