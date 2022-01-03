@@ -1,0 +1,4 @@
+# This .gitignore file will be included in copy ci execution.
+# Only add targets that shouuld not be included in final docs deployment.
+__**__.md
+README.md
