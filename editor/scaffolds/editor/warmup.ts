@@ -1,6 +1,7 @@
 import {
   createPendingWorkspaceState,
   EditorSnapshot,
+  FigmaReflectRepository,
   WorkspaceState,
 } from "core/states";
 import { createInitialWorkspaceState } from "core/states";
@@ -9,6 +10,10 @@ import { PendingState } from "core/utility-types";
 import { DesignInput } from "@designto/config/input";
 import { TargetNodeConfig } from "query/target-node";
 import { WorkspaceAction } from "core/actions";
+import { FileResponse } from "@design-sdk/figma-remote-types";
+import { convert } from "@design-sdk/figma-node-conversion";
+import { mapper } from "@design-sdk/figma-remote";
+import { find, visit } from "tree-visit";
 
 const pending_workspace_state = createPendingWorkspaceState();
 //
@@ -38,6 +43,61 @@ export function initialReducer(
   }
 }
 
+export function pagesFrom(file: FileResponse): FigmaReflectRepository["pages"] {
+  return file.document.children.map((page) => ({
+    id: page.id,
+    name: page.name,
+    children: page["children"]?.map((child) => {
+      const _mapped = mapper.mapFigmaRemoteToFigma(child);
+      return convert.intoReflectNode(_mapped);
+    }),
+    type: "design",
+  }));
+}
+
+/**
+ * only fetch in-file components. components from shared-library (external file) won't be loaded.
+ * @param file
+ * @returns
+ */
+export function componentsFrom(
+  file: FileResponse
+): FigmaReflectRepository["components"] {
+  const tomap = (a, v) => ({ ...a, [v.id]: v });
+
+  // only fetch in-file components. components from shared-library (external file) won't be loaded.
+  const components_in_file = [];
+  visit<{ id: string; type: string }>(file.document, {
+    getChildren: (node) => {
+      if ("children" in node) return node["children"];
+      return [];
+    },
+    onEnter: (node) => {
+      if (node["type"] == "COMPONENT") {
+        components_in_file.push(node);
+      }
+    },
+  });
+
+  // return components_in_file.reduce(tomap, {});
+
+  return Object.keys(file.components)
+    .map((k) => {
+      const id = k;
+      const meta = file.components[k];
+      const master = components_in_file.find((c) => c.id === id);
+      if (!master) return;
+      return {
+        key: meta.key, // only available with api response. the hash key of current version of component for another api call. (not used)
+        id: master.id,
+        name: master.name,
+        ...master,
+      };
+    })
+    .filter((c) => c)
+    .reduce(tomap, {});
+}
+
 export function initializeDesign(design: TargetNodeConfig): EditorSnapshot {
   return {
     selectedNodes: [design.node],
@@ -45,6 +105,8 @@ export function initializeDesign(design: TargetNodeConfig): EditorSnapshot {
     selectedPage: null,
     design: {
       pages: [],
+      components: null,
+      // styles: null,
       key: design.file,
       input: DesignInput.fromApiResponse({
         ...design,

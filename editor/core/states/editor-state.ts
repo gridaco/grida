@@ -1,4 +1,5 @@
 import type { ReflectSceneNode } from "@design-sdk/figma-node";
+import { ComponentNode } from "@design-sdk/figma-types";
 import { DesignInput } from "@designto/config/input";
 
 export interface EditorState {
@@ -15,7 +16,7 @@ export interface EditorSnapshot {
   design: FigmaReflectRepository;
 }
 
-interface FigmaReflectRepository {
+export interface FigmaReflectRepository {
   /**
    * fileid; filekey
    */
@@ -23,5 +24,7 @@ interface FigmaReflectRepository {
 
   // TODO:
   pages: { id: string; name: string; children: ReflectSceneNode[] }[];
+  components: { [key: string]: ComponentNode };
+  // styles: { [key: string]: {} };
   input: DesignInput;
 }

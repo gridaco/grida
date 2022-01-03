@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import styled from "@emotion/styled";
 import { useRouter } from "next/router";
 import { DefaultEditorWorkspaceLayout } from "layouts/default-editor-workspace-layout";
@@ -10,7 +10,7 @@ import { WorkspaceBottomPanelDockLayout } from "layouts/panel/workspace-bottom-p
 import { CodeEditor } from "components/code-editor";
 import { ClearRemoteDesignSessionCache } from "components/clear-remote-design-session-cache";
 import { WidgetTree } from "components/visualization/json-visualization/json-tree";
-import { EditorSidebar } from "components/editor";
+import { EditorAppbarFragments, EditorSidebar } from "components/editor";
 import { useEditorState, useWorkspaceState } from "core/states";
 import { designToCode, Result } from "@designto/code";
 import { RemoteImageRepositories } from "@design-sdk/figma-remote/lib/asset-repository/image-repository";
@@ -19,7 +19,6 @@ import {
   ImageRepository,
   MainImageRepository,
 } from "@design-sdk/core/assets-repository";
-import { personal } from "@design-sdk/figma-auth-store";
 import { useFigmaAccessToken } from "hooks";
 import { get_framework_config } from "query/to-code-options-from-query";
 import { CodeOptionsControl } from "components/codeui-code-options-control";
@@ -31,8 +30,8 @@ import {
 } from "utils/design-query";
 import { vanilla_presets } from "@grida/builder-config-preset";
 import { EditorSkeleton } from "./skeleton";
-import { MonacoEmptyMock } from "components/code-editor/monaco-mock-empty";
 import { colors } from "theme";
+import Link from "next/link";
 
 export function Editor() {
   const router = useRouter();
@@ -61,7 +60,17 @@ export function Editor() {
     find_node_by_id_under_inpage_nodes(targetId, thisPageNodes) || null;
 
   const root = thisPageNodes
-    ? container_of_target && DesignInput.fromDesign(container_of_target)
+    ? container_of_target &&
+      (container_of_target.origin === "COMPONENT"
+        ? DesignInput.forMasterComponent({
+            master: container_of_target,
+            all: state.design.pages,
+            components: state.design.components,
+          })
+        : DesignInput.fromDesignWithComponents({
+            design: container_of_target,
+            components: state.design.components,
+          }))
     : state.design?.input;
 
   const targetted =
@@ -129,12 +138,14 @@ export function Editor() {
       }).then(on_result);
 
       // build final code with asset fetch
-      designToCode({
-        input: root,
-        framework: framework_config,
-        asset_config: { asset_repository: MainImageRepository.instance },
-        build_config: build_config,
-      }).then(on_result);
+      if (!MainImageRepository.instance.empty) {
+        designToCode({
+          input: root,
+          framework: framework_config,
+          asset_config: { asset_repository: MainImageRepository.instance },
+          build_config: build_config,
+        }).then(on_result);
+      }
     }
   }, [targetted?.id, framework_config?.framework]);
 
@@ -168,12 +179,14 @@ export function Editor() {
           },
         }).then(on_preview_result);
 
-        designToCode({
-          input: root,
-          build_config: build_config,
-          framework: vanilla_presets.vanilla_default,
-          asset_config: { asset_repository: MainImageRepository.instance },
-        }).then(on_preview_result);
+        if (!MainImageRepository.instance.empty) {
+          designToCode({
+            input: root,
+            build_config: build_config,
+            framework: vanilla_presets.vanilla_default,
+            asset_config: { asset_repository: MainImageRepository.instance },
+          }).then(on_preview_result);
+        }
       }
     },
     [targetted?.id]
@@ -210,7 +223,7 @@ export function Editor() {
           </WorkspaceContentPanel>
           <WorkspaceContentPanel flex={4}>
             <CodeEditorContainer>
-              {/* <EditorAppbarFragments.CodeEditor /> */}
+              <EditorAppbarFragments.CodeEditor />
               <CodeOptionsControl
                 initialPreset={router.query.framework as string}
                 fallbackPreset="react_default"
@@ -246,43 +259,14 @@ export function Editor() {
           </WorkspaceContentPanel>
           {wstate.preferences.debug_mode && (
             <WorkspaceBottomPanelDockLayout resizable>
-              <WorkspaceContentPanel>
-                <div
-                  style={{
-                    display: "flex",
-                    flexDirection: "row",
-                    alignItems: "stretch",
-                  }}
-                >
-                  <div style={{ flex: 1 }}>
-                    <ClearRemoteDesignSessionCache
-                      key={root.id}
-                      file={state.design.key}
-                      node={root.id}
-                    />
-                    <br />
-                    {(root.entry.origin === "INSTANCE" ||
-                      root.entry.origin === "COMPONENT") && (
-                      <button
-                        onClick={() => {
-                          router.push({
-                            pathname: "/figma/inspect-component",
-                            query: router.query,
-                          });
-                        }}
-                      >
-                        inspect component
-                      </button>
-                    )}
-                  </div>
-
-                  <div style={{ flex: 2 }}>
-                    <WidgetTree data={root.entry} />
-                  </div>
-                  <div style={{ flex: 2 }}>
-                    <WidgetTree data={result.widget} />
-                  </div>
-                </div>
+              <WorkspaceContentPanel disableBorder>
+                <Debugger
+                  id={root?.id}
+                  file={state?.design?.key}
+                  type={root?.entry?.origin}
+                  entry={root?.entry}
+                  widget={result?.widget}
+                />
               </WorkspaceContentPanel>
             </WorkspaceBottomPanelDockLayout>
           )}
@@ -291,6 +275,57 @@ export function Editor() {
     </>
   );
 }
+
+const Debugger = ({
+  id,
+  file,
+  type,
+  entry,
+  widget,
+}: {
+  type: string;
+  id: string;
+  file: string;
+  entry: any;
+  widget: any;
+}) => {
+  const router = useRouter();
+
+  return (
+    <div
+      style={{
+        display: "flex",
+        flexDirection: "row",
+        alignItems: "stretch",
+      }}
+    >
+      <div style={{ flex: 1 }}>
+        <ClearRemoteDesignSessionCache key={id} file={file} node={id} />
+        <br />
+        {(type === "INSTANCE" || type === "COMPONENT") && (
+          <Link
+            href={{
+              pathname: "/figma/inspect-component",
+              query: {
+                // e.g. https://www.figma.com/file/iypAHagtcSp3Osfo2a7EDz/engine?node-id=3098%3A4097
+                design: `https://www.figma.com/file/${file}/?node-id=${id}`,
+              },
+            }}
+          >
+            inspect component
+          </Link>
+        )}
+      </div>
+
+      <div style={{ flex: 2 }}>
+        <WidgetTree data={entry} />
+      </div>
+      <div style={{ flex: 2 }}>
+        <WidgetTree data={widget} />
+      </div>
+    </div>
+  );
+};
 
 const CodeEditorContainer = styled.div`
   display: flex;

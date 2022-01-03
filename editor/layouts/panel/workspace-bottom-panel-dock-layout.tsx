@@ -40,9 +40,7 @@ export function WorkspaceBottomPanelDockLayout(props: {
 }
 
 const DockRootWrap = styled.div`
-  border: solid #d2d2d2;
   align-self: stretch;
-  border-width: 1px;
   display: flex;
   flex-direction: row;
 `;

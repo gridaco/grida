@@ -87,26 +87,22 @@ export default function InspectComponent() {
                     <WidgetTree data={design.raw as any} />
                   </div>
                 </div>
-                <div style={{ flex: 1 }}>
+                {/* <div style={{ flex: 1 }}>
                   <WidgetTreeLegend title="Figma" />
                   <WidgetTree
                     data={json_only_component_related_fields(design.figma)}
                   />
-                </div>
-                <div style={{ flex: 1 }}>
+                </div> */}
+                {/* <div style={{ flex: 1 }}>
                   <div>
                     <WidgetTreeLegend title="Reflect" />
                     <WidgetTree data={design.reflect} />
                   </div>
-                </div>
+                </div> */}
                 <div style={{ flex: 1 }}>
                   <WidgetTreeLegend title="Component Meta" />
                   <WidgetTree data={componentMetaTree as any} />
                 </div>
-                {/* <div style={{ flex: 1 }}>
-                  <WidgetTreeLegend title="Component tokens" />
-                  <WidgetTree data={componentMetaTree as any} />
-                </div> */}
                 {/* <div style={{ flex: 1 }}>
                   <WidgetTreeLegend title="Reflect" />
                   <WidgetTree data={design.reflect} />
