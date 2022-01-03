@@ -1,4 +1,14 @@
-## Artwork flag
+---
+title: Artwork flag
+id: "--artwork"
+locale: en
+stage:
+  - production
+  - staging
+  - experimental
+---
+
+# Artwork flag
 
 **Accepted keys**
 
@@ -37,4 +47,4 @@ When applied, this will force the node to be exported as an image.
 
 ## See Also
 
-- [`--export-as`](../--export-as)
+- [`--export-as`](./--export-as)

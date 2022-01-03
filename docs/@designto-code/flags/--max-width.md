@@ -1,3 +1,17 @@
+---
+title: Max Width flag
+description: Add max-width property for your responsive design with flags.
+id: "--max-width"
+locale: en
+locales:
+  - en
+  - ko
+stage:
+  - production
+  - staging
+  - experimental
+---
+
 # Max width
 
 **Accepted keys**
@@ -31,6 +45,6 @@ When applied, this will force the node to be rendered with a max-width style.
 
 ## See Also
 
-- [`--max-height`](../--max-height)
-- [`--min-width`](../--max-width)
-- [`--width`](../--max-width)
+- [`--max-height`](./--max-height)
+- [`--min-width`](./--max-width)
+- [`--width`](./--max-width)

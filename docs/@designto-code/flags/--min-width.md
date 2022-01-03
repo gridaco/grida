@@ -1,3 +1,17 @@
+---
+title: Min Width flag
+description: Add min-width property for your responsive design with flags.
+id: "--min-width"
+locale: en
+locales:
+  - en
+  - ko
+stage:
+  - production
+  - staging
+  - experimental
+---
+
 # Min width
 
 **Accepted keys**
@@ -31,6 +45,6 @@ When applied, this will force the node to be rendered with a `min-width` style.
 
 ## See Also
 
-- [`--max-width`](../--max-width)
-- [`--min-height`](../--min-height)
-- [`--width`](../--width)
+- [`--max-width`](./--max-width)
+- [`--min-height`](./--min-height)
+- [`--width`](./--width)

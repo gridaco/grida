@@ -1,3 +1,17 @@
+---
+title: Min Height flag
+description: Add min-height property for your responsive design with flags.
+id: "--min-height"
+locale: en
+locales:
+  - en
+  - ko
+stage:
+  - production
+  - staging
+  - experimental
+---
+
 # Min height
 
 **Accepted keys**
@@ -31,6 +45,6 @@ When applied, this will force the node to be rendered with a `min-height` style.
 
 ## See Also
 
-- [`--max-height`](../--max-height)
-- [`--min-width`](../--max-width)
-- [`--height`](../--height)
+- [`--max-height`](./--max-height)
+- [`--min-width`](./--max-width)
+- [`--height`](./--height)
