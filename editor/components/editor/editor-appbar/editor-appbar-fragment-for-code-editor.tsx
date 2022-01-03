@@ -11,7 +11,9 @@ export function AppbarFragmentForCodeEditor() {
 
   return (
     <RootWrapperAppbarFragmentForCodeEditor>
-      <EditorFrameworkConfigOnAppbar />
+      {/* disable temporarily */}
+      <div style={{ flex: 1 }} />
+      {/* <EditorFrameworkConfigOnAppbar /> */}
       <AppbarActions>
         {hasNotification && (
           <EditorAppbarIconButton onClick={() => {}}>
