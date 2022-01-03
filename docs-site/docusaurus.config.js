@@ -124,6 +124,7 @@ const config = {
       {
         docs: {
           routeBasePath: "/",
+          path: "docs",
           sidebarPath: require.resolve("./sidebars.js"),
           editUrl: "https://github.com/gridaco/grida.co/edit/main/docs/",
         },
