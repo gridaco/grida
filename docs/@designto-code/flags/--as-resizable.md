@@ -1,0 +1,1 @@
+# Resizable widget indication
