@@ -33,4 +33,4 @@
 
 ## See also
 
-- [`--as-char`](../--as-char)
+- [`--as-char`](./--as-char)

@@ -22,4 +22,4 @@ Now vector 1 & 2 will use the same svg data, based on vector 2's svg data (since
 
 ## See also
 
-- [`--id`](../--id/README.md)
+- [`--id`](./--id/README.md)
