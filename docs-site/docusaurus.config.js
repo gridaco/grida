@@ -70,7 +70,11 @@ const config = {
   onBrokenMarkdownLinks: "warn",
   i18n: {
     defaultLocale: "en",
-    locales: ["en", "fr", "ko"],
+    locales: [
+      "en",
+      // "fr",
+      "ko",
+    ],
   },
   themeConfig:
     /** @type {import('@docusaurus/preset-classic').ThemeConfig} */
@@ -95,10 +99,10 @@ const config = {
           //   position: "left",
           //   label: "Together",
           // },
-          {
-            type: "localeDropdown",
-            position: "right",
-          },
+          // {
+          //   type: "localeDropdown",
+          //   position: "right",
+          // },
           {
             href: "https://github.com/gridaco",
             label: "GitHub",
