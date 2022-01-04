@@ -180,6 +180,9 @@ function handle_translation_dir(dir_path, locale) {
             translation_dir_file,
           );
 
+          // TODO: before copying the file, check if asset is being used, we need to support them.
+          // Non supported for now.
+
           // copy origin file to targetted locale directory
           fse.copySync(
             translation_dir_file_path,
