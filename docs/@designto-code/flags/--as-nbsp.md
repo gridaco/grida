@@ -1,3 +1,14 @@
+---
+title: As Space (sbsp) flag
+id: "--as-nbsp"
+locale: en
+stage:
+  - proposal
+  - draft
+  - experimental
+  - not-ready
+---
+
 # `--as-nbsp` As Non-Breaking Space
 
 **Accepted keys**

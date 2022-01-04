@@ -1,3 +1,14 @@
+---
+title: As Character flag
+id: "--as-char"
+locale: en
+stage:
+  - proposal
+  - draft
+  - experimental
+  - not-ready
+---
+
 # As Character
 
 ## See also

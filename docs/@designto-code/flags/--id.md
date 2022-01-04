@@ -1,3 +1,14 @@
+---
+title: ID flag
+id: "--id"
+locale: en
+stage:
+  - proposal
+  - draft
+  - experimental
+  - not-ready
+---
+
 # A Semantic ID Flag
 
 ## When to use and what can it do?

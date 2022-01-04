@@ -1,3 +1,14 @@
+---
+title: Mouse Cursor flag
+id: "--cursor"
+locale: en
+stage:
+  - proposal
+  - draft
+  - experimental
+  - not-ready
+---
+
 # Mouse cursor indication
 
 - `--cursor=pointer`

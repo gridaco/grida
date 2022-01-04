@@ -1,3 +1,14 @@
+---
+title: As Span flag
+id: "--as-span"
+locale: en
+stage:
+  - proposal
+  - draft
+  - experimental
+  - not-ready
+---
+
 # `--as-span` As TextSpan (Text)
 
 > This flag is for web platform. Otherwise, it will be ignored, have no impact on the final output.

@@ -1,3 +1,13 @@
+---
+title: Width flag
+id: "--width"
+locale: en
+stage:
+  - production
+  - staging
+  - experimental
+---
+
 # `--width` for explicit width
 
 **Accepted keys**

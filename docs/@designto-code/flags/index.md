@@ -1,10 +1,11 @@
 ---
-title: "Flags (Proposal)"
+title: "All Flags"
 version: 0.1.0
 revision: 1
+sidebar_position: 1
 ---
 
-# Flags (Proposal)
+# Flags
 
 > Flag feature is not ready to use
 

@@ -1,7 +1,12 @@
 ---
+title: As br flag
+id: "--as-br"
+locale: en
 stage:
   - proposal
   - draft
+  - experimental
+  - not-ready
 ---
 
 <!-- Insider's note. -->

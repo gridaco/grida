@@ -1,3 +1,14 @@
+---
+title: href flag
+id: "--href"
+locale: en
+stage:
+  - proposal
+  - draft
+  - experimental
+  - not-ready
+---
+
 # Link (Href) data provider
 
 _Examples_
