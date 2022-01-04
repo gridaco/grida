@@ -68,6 +68,14 @@ const config = {
   projectName: "grida", // Usually your repo name.
   onBrokenLinks: "ignore",
   onBrokenMarkdownLinks: "warn",
+  i18n: {
+    defaultLocale: "en",
+    locales: [
+      "en",
+      // "fr",
+      "ko",
+    ],
+  },
   themeConfig:
     /** @type {import('@docusaurus/preset-classic').ThemeConfig} */
     ({
@@ -90,6 +98,10 @@ const config = {
           //   docId: "together/support",
           //   position: "left",
           //   label: "Together",
+          // },
+          // {
+          //   type: "localeDropdown",
+          //   position: "right",
           // },
           {
             href: "https://github.com/gridaco",
@@ -116,6 +128,7 @@ const config = {
       {
         docs: {
           routeBasePath: "/",
+          path: "docs",
           sidebarPath: require.resolve("./sidebars.js"),
           editUrl: "https://github.com/gridaco/grida.co/edit/main/docs/",
         },

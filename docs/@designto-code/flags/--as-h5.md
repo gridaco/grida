@@ -1,4 +1,10 @@
 ---
+title: As-H5 flag
+id: "--as-h5"
+locale: en
+locales:
+  - en
+  - ko
 stage:
   - production
   - staging
@@ -36,6 +42,15 @@ stage:
 ----h5
 ```
 
+## When to use
+
+<!-- shared content between h1~h6 -->
+
+**SEO**
+
+Explicitly specifying the heading element tag, ofcourse, is essential for SEO.
+This does not applies to mobile apps, but for web, you might want to specify headings in a semantic sence.
+
 ## Behavior
 
 **Element**
@@ -46,10 +61,10 @@ We don't yet support text style matching with `--h5` flag.
 
 ## See Also
 
-- [`--as-h1`](../--as-h1)
-- [`--as-h2`](../--as-h2)
-- [`--as-h3`](../--as-h3)
-- [`--as-h4`](../--as-h4)
-- [`--as-h6`](../--as-h6)
-- [`--as-p`](../--as-p)
-- [`--as-br`](../--as-br)
+- [`--as-h1`](./--as-h1)
+- [`--as-h2`](./--as-h2)
+- [`--as-h3`](./--as-h3)
+- [`--as-h4`](./--as-h4)
+- [`--as-h6`](./--as-h6)
+- [`--as-p`](./--as-p)
+- [`--as-br`](./--as-br)

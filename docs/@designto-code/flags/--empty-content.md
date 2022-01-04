@@ -4,5 +4,5 @@
 
 ## See also
 
-- [`--dynamic-item`](../--dynamic-item/README.md)
-- [`--dynamic-content`](../--dynamic-container/README.md)
+- [`--dynamic-item`](./--dynamic-item/README.md)
+- [`--dynamic-content`](./--dynamic-container/README.md)

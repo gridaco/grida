@@ -1,3 +1,17 @@
+---
+title: Max Height flag
+description: Add max-height property for your responsive design with flags.
+id: "--max-height"
+locale: en
+locales:
+  - en
+  - ko
+stage:
+  - production
+  - staging
+  - experimental
+---
+
 # Max height
 
 **Accepted keys**
@@ -31,6 +45,6 @@ When applied, this will force the node to be rendered with a `max-height` style.
 
 ## See Also
 
-- [`--max-width`](../--max-width)
-- [`--min-height`](../--max-height)
-- [`--height`](../--height)
+- [`--max-width`](./--max-width)
+- [`--min-height`](./--max-height)
+- [`--height`](./--height)

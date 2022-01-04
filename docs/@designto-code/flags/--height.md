@@ -112,6 +112,6 @@ This will generate style like below.
 
 ## See Also
 
-- [`--max-height`](../--max-height)
-- [`--min-height`](../--min-height)
-- [`--width`](../--width)
+- [`--max-height`](./--max-height)
+- [`--min-height`](./--min-height)
+- [`--width`](./--width)
