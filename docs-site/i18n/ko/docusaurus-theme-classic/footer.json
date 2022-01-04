@@ -1,0 +1,46 @@
+{
+  "link.title.Company": {
+    "message": "Company",
+    "description": "The title of the footer links column with title=Company in the footer"
+  },
+  "link.title.Resources": {
+    "message": "Resources",
+    "description": "The title of the footer links column with title=Resources in the footer"
+  },
+  "link.title.Community": {
+    "message": "Community",
+    "description": "The title of the footer links column with title=Community in the footer"
+  },
+  "link.item.label.Grida.co": {
+    "message": "Grida.co",
+    "description": "The label of footer link with label=Grida.co linking to https://grida.co"
+  },
+  "link.item.label.Docs": {
+    "message": "Docs",
+    "description": "The label of footer link with label=Docs linking to /"
+  },
+  "link.item.label.Together": {
+    "message": "Together",
+    "description": "The label of footer link with label=Together linking to /together"
+  },
+  "link.item.label.GitHub": {
+    "message": "GitHub",
+    "description": "The label of footer link with label=GitHub linking to https://github.com/gridaco/grida"
+  },
+  "link.item.label.Twitter": {
+    "message": "Twitter",
+    "description": "The label of footer link with label=Twitter linking to https://twitter.com/grida_co"
+  },
+  "link.item.label.Blog": {
+    "message": "Blog",
+    "description": "The label of footer link with label=Blog linking to https://blog.grida.co"
+  },
+  "link.item.label.Slack": {
+    "message": "Slack",
+    "description": "The label of footer link with label=Slack linking to https://grida.co/join-slack"
+  },
+  "copyright": {
+    "message": "Copyright © 2022 Grida Inc.",
+    "description": "The footer copyright"
+  }
+}
