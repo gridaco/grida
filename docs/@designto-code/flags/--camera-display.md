@@ -1,3 +1,14 @@
+---
+title: Camera Display flag
+id: "--camera-display"
+locale: en
+stage:
+  - proposal
+  - draft
+  - experimental
+  - not-ready
+---
+
 # Camera display
 
 ## Platforms

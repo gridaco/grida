@@ -1,3 +1,14 @@
+---
+title: Fix Width flag
+description: Fixing the width with fix-width flag for statically sized elements.
+id: "--fix-width"
+locale: en
+stage:
+  - production
+  - staging
+  - experimental
+---
+
 # `--fix-width` Flag (Draft)
 
 When applied, this will force dedicated layer's `width` to be ignore responsive width, use current width as fixed width instead.

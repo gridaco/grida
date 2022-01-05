@@ -1,3 +1,14 @@
+---
+title: Exact Height flag
+id: "--exact-height"
+locale: en
+stage:
+  - proposal
+  - draft
+  - experimental
+  - not-ready
+---
+
 # `--exact-height` Flag (Draft)
 
 When applied, this will force dedicated layer's height to be ignore responsive height, use current height as fixed height instead.

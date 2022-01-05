@@ -1,3 +1,14 @@
+---
+title: Class flag
+id: "--class"
+locale: en
+stage:
+  - proposal
+  - draft
+  - experimental
+  - not-ready
+---
+
 # Custom css class indication (extends)
 
 ```

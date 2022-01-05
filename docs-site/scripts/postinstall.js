@@ -1,5 +1,3 @@
-const copy = require("./docs-site-gen/copy-docs");
-const mv_translations = require("./docs-site-gen/copy-translations");
+const setup_docs = require("./setup-docs");
 
-copy();
-mv_translations();
+setup_docs();

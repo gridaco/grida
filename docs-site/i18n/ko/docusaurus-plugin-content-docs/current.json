@@ -4,55 +4,55 @@
     "description": "The label for version current"
   },
   "sidebar.tutorialSidebar.category.Getting Started": {
-    "message": "Getting Started",
+    "message": "시작하기",
     "description": "The label for category Getting Started in sidebar tutorialSidebar"
   },
   "sidebar.tutorialSidebar.category.Concepts": {
-    "message": "Concepts",
+    "message": "컨셉",
     "description": "The label for category Concepts in sidebar tutorialSidebar"
   },
   "sidebar.tutorialSidebar.category.Layouts": {
-    "message": "Layouts",
+    "message": "레이아웃",
     "description": "The label for category Layouts in sidebar tutorialSidebar"
   },
   "sidebar.tutorialSidebar.category.Components": {
-    "message": "Components",
+    "message": "컴포넌트",
     "description": "The label for category Components in sidebar tutorialSidebar"
   },
   "sidebar.tutorialSidebar.category.Widgets": {
-    "message": "Widgets",
+    "message": "윗젯",
     "description": "The label for category Widgets in sidebar tutorialSidebar"
   },
   "sidebar.tutorialSidebar.category.Motions": {
-    "message": "Motions",
+    "message": "모션",
     "description": "The label for category Motions in sidebar tutorialSidebar"
   },
   "sidebar.tutorialSidebar.category.Prototyping": {
-    "message": "Prototyping",
+    "message": "프로토타이핑",
     "description": "The label for category Prototyping in sidebar tutorialSidebar"
   },
   "sidebar.tutorialSidebar.category.Events and Actions": {
-    "message": "Events and Actions",
+    "message": "이벤트와 액션",
     "description": "The label for category Events and Actions in sidebar tutorialSidebar"
   },
   "sidebar.tutorialSidebar.category.Props": {
-    "message": "Props",
+    "message": "프롭 (Props)",
     "description": "The label for category Props in sidebar tutorialSidebar"
   },
   "sidebar.tutorialSidebar.category.Flags": {
-    "message": "Flags",
+    "message": "플래그",
     "description": "The label for category Flags in sidebar tutorialSidebar"
   },
   "sidebar.tutorialSidebar.category.Contents Management": {
-    "message": "Contents Management",
+    "message": "컨텐츠 관리",
     "description": "The label for category Contents Management in sidebar tutorialSidebar"
   },
   "sidebar.tutorialSidebar.category.Understanding Behind the scene": {
-    "message": "Understanding Behind the scene",
+    "message": "배경 이해하기",
     "description": "The label for category Understanding Behind the scene in sidebar tutorialSidebar"
   },
   "sidebar.tutorialSidebar.category.Assistant": {
-    "message": "Assistant",
+    "message": "어씨스턴트",
     "description": "The label for category Assistant in sidebar tutorialSidebar"
   },
   "sidebar.tutorialSidebar.category.design-assistant": {
@@ -76,7 +76,7 @@
     "description": "The label for category Conventions in sidebar tutorialSidebar"
   },
   "sidebar.tutorialSidebar.category.Together": {
-    "message": "Together",
+    "message": "함께해요",
     "description": "The label for category Together in sidebar tutorialSidebar"
   }
 }

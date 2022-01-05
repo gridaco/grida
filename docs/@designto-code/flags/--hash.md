@@ -1,3 +1,14 @@
+---
+title: Hash flag
+id: "--hash"
+locale: en
+stage:
+  - proposal
+  - draft
+  - experimental
+  - not-ready
+---
+
 # Hash
 
 > Hash is a unique id indicator just like `--id`, but for a asset such as vector & images

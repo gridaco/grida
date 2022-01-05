@@ -1,3 +1,14 @@
+---
+title: Export Gif flag
+id: "--export-gif"
+locale: en
+stage:
+  - proposal
+  - draft
+  - experimental
+  - not-ready
+---
+
 # Export as gif
 
 ## For non-gif-origin-content

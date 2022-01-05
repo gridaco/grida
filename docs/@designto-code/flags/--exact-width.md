@@ -1,3 +1,14 @@
+---
+title: Exact Width flag
+id: "--exact-width"
+locale: en
+stage:
+  - proposal
+  - draft
+  - experimental
+  - not-ready
+---
+
 # `--exact-width` Flag (Draft)
 
 When applied, this will force dedicated layer's `width` to be ignore responsive width, use current width as fixed width instead.

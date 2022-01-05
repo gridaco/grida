@@ -1,3 +1,13 @@
+---
+title: Height flag
+id: "--height"
+locale: en
+stage:
+  - production
+  - staging
+  - experimental
+---
+
 # `--height` for explicit height
 
 **Accepted keys**

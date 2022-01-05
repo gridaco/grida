@@ -1,3 +1,14 @@
+---
+title: As Material Design Icon flag
+id: "--as-mdi"
+locale: en
+stage:
+  - proposal
+  - draft
+  - experimental
+  - not-ready
+---
+
 # `--as=mdi` - [Reflect UI](https://reflect-ui.com) Material Design Icon Widget Indication Flag
 
 ## Syntax
