@@ -1,4 +1,0 @@
----
-id: changelog
-title: "Changelog"
----
