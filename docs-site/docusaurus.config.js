@@ -103,7 +103,7 @@ const config = {
             type: "doc",
             docId: "references/intro",
             position: "left",
-            label: "API",
+            label: "Reference",
           },
           {
             type: "doc",
