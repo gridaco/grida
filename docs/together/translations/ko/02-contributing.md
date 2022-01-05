@@ -15,10 +15,6 @@ Grida 는 오픈소스 프로젝트입니다. 우리는 전세계에서 모인 �
 - Issue 해결을 통해 기여할수 있습니다. 깃허브에서 [Good first issue][github-gridaco-grida-good-first-issue-label] 로 테깅된 이쓔는 여러분이 처음 기여하기에 적합합니다.
 - Grida Docs 의 한국어 번역, 또는 추가 / 개선 작업을 해보세요
 
-[grida-join-slack]: https://grida.co/join-slack
-[grida-slack-lets-docs-channel]: https://gridaco.slack.com/archives/C02SVBT4020
-[github-gridaco-grida-good-first-issue-label]: https://github.com/gridaco/grida/labels/Good%20first%20issue
-
 ### 문서에 기여하기
 
 Grida 의 제품은 많은 파트로 구성되어 있으며, 수많은 사용 시나리오를 포함하고 있습니다. 우리는 최대한 많은 사람이 본인의 상황에 맞는 문제해결법을 찾을수 있도록 완성도 높은 문서 작성에 힘을 내고 있습니다.
@@ -27,7 +23,7 @@ Grida 의 제품은 많은 파트로 구성되어 있으며, 수많은 사용 �
 현존하는 문서의 한국어 번역또한 매우 큰 힘이 됩니다.
 
 - 이 사이트 (grida.co/docs) 에서 문서를 보시다, 애매 하거나 out-dated 된 문서가 있다면 "페이지 편집"(Edit this page) 버튼을 사용해 수정할수 있습니다.
-- 본격적인 번역자로 참여하고 싶으시다면, [Grida 커뮤니티 슬랙에 참여](grida-join-slack)한후, [lets-docs][grida-slack-lets-docs-channel] 채널에 입장한후, 메니저의 안내를 받으세요.
+- 본격적인 번역자로 참여하고 싶으시다면, [Grida 커뮤니티 슬랙에 참여][grida-join-slack]한후, [lets-docs][grida-slack-lets-docs-channel] 채널에 입장한후, 메니저의 안내를 받으세요.
 
 ### Issue 해결하기
 
@@ -58,3 +54,9 @@ Grida Research Program 에 참여하세요.
 
 우리는 항상 뛰어난 사람을 찾고있습니다. 저희 팀과 함께 하시고싶으시다면, 자유롭게 hello@grida.co 로 본인의 소개와 함께 연락주세요.
 어플리케이션은 영어 또는 한국어로 작성가능합니다.
+
+<!-- ----------- -->
+
+[grida-join-slack]: https://grida.co/join-slack
+[grida-slack-lets-docs-channel]: https://gridaco.slack.com/archives/C02SVBT4020
+[github-gridaco-grida-good-first-issue-label]: https://github.com/gridaco/grida/labels/Good%20first%20issue

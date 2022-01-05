@@ -48,6 +48,8 @@ Grida 에 가입하면, 가장 빠른 소식을 받아보실 수 있습니다.
 - [Grida 공식 블로그][grida-blog]
 - [패이스북에서 @grida.co 팔로우][grida-facebook]
 
+<!-- --------------- -->
+
 [grida-youtube]: https://www.youtube.com/channel/UCgJO5apXl_pXRfTxNrkbEBw
 [grida-github]: https://github.com/gridaco
 [grida-join-slack]: https://grida.co/join-slack
