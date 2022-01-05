@@ -87,22 +87,40 @@ const config = {
           target: "_self",
         },
         items: [
-          // {
-          //   type: "doc",
-          //   docId: "getting-started/intro",
-          //   position: "left",
-          //   label: "Docs",
-          // },
-          // {
-          //   type: "doc",
-          //   docId: "together/support",
-          //   position: "left",
-          //   label: "Together",
-          // },
-          // {
-          //   type: "localeDropdown",
-          //   position: "right",
-          // },
+          {
+            type: "doc",
+            docId: "getting-started/intro",
+            position: "left",
+            label: "Docs",
+          },
+          {
+            type: "doc",
+            docId: "flags/intro",
+            position: "left",
+            label: "Flags",
+          },
+          {
+            type: "doc",
+            docId: "references/intro",
+            position: "left",
+            label: "API",
+          },
+          {
+            type: "doc",
+            docId: "together/support",
+            position: "left",
+            label: "Together",
+          },
+          {
+            href:
+              "https://accounts.grida.co/signin?redirect_uri=https://grida.co/docs",
+            position: "left",
+            label: "Sign in",
+          },
+          {
+            type: "localeDropdown",
+            position: "right",
+          },
           {
             href: "https://github.com/gridaco",
             label: "GitHub",
