@@ -1,9 +1,9 @@
 ---
 id: support
-title: "Support"
+title: "기술지원"
 ---
 
-# Support
+# 기술지원
 
 ## Slack Community
 
