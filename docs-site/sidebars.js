@@ -1,7 +1,7 @@
 const _flags_items = [
   {
     type: "category",
-    label: "Heading Flags",
+    label: "Text Element Flags",
     collapsed: false,
     items: [
       {
@@ -27,6 +27,10 @@ const _flags_items = [
       {
         type: "doc",
         id: "@designto-code/flags/--as-h6",
+      },
+      {
+        type: "doc",
+        id: "@designto-code/flags/--as-p",
       },
     ],
   },
