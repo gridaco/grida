@@ -56,11 +56,11 @@
     "description": "The label for category Assistant in sidebar tutorialSidebar"
   },
   "sidebar.tutorialSidebar.category.design-assistant": {
-    "message": "design-assistant",
+    "message": "디자인 어씨스턴트",
     "description": "The label for category design-assistant in sidebar tutorialSidebar"
   },
   "sidebar.tutorialSidebar.category.Reference": {
-    "message": "Reference",
+    "message": "레퍼런스",
     "description": "The label for category Reference in sidebar tutorialSidebar"
   },
   "sidebar.tutorialSidebar.category.Design to code Reference": {
@@ -68,7 +68,7 @@
     "description": "The label for category Design to code Reference in sidebar tutorialSidebar"
   },
   "sidebar.tutorialSidebar.category.Flags Reference": {
-    "message": "Flags Reference",
+    "message": "플래그 레퍼런스",
     "description": "The label for category Flags Reference in sidebar tutorialSidebar"
   },
   "sidebar.tutorialSidebar.category.Conventions": {
@@ -78,5 +78,37 @@
   "sidebar.tutorialSidebar.category.Together": {
     "message": "함께해요",
     "description": "The label for category Together in sidebar tutorialSidebar"
+  },
+  "sidebar.flagsSidebar.category.Text Element Flags": {
+    "message": "텍스트 엘레먼트 플래그",
+    "description": "The label for category Text Element Flags in sidebar flagsSidebar"
+  },
+  "sidebar.flagsSidebar.category.Sizing Flags": {
+    "message": "사이징 플래그",
+    "description": "The label for category Sizing Flags in sidebar flagsSidebar"
+  },
+  "sidebar.togetherSidebar.link.Feature Requests": {
+    "message": "피쳐 리쿼스트",
+    "description": "The label for link Feature Requests in sidebar togetherSidebar, linking to https://github.com/gridaco/grida/issues/new"
+  },
+  "sidebar.togetherSidebar.link.Chat with us on Slack": {
+    "message": "Slack 에서 이야기해요",
+    "description": "The label for link Chat with us on Slack in sidebar togetherSidebar, linking to https://grida.co/join-slack"
+  },
+  "sidebar.apiSidebar.category.Design to Code Blueprints": {
+    "message": "Design to Code Blueprints",
+    "description": "The label for category Design to Code Blueprints in sidebar apiSidebar"
+  },
+  "sidebar.apiSidebar.category.Flags Reference": {
+    "message": "플래그 레퍼런스",
+    "description": "The label for category Flags Reference in sidebar apiSidebar"
+  },
+  "sidebar.apiSidebar.category.Text Element Flags": {
+    "message": "텍스트 엘레먼트 플래그",
+    "description": "The label for category Text Element Flags in sidebar apiSidebar"
+  },
+  "sidebar.apiSidebar.category.Sizing Flags": {
+    "message": "사이징 플래그",
+    "description": "The label for category Sizing Flags in sidebar apiSidebar"
   }
 }
