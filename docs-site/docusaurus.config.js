@@ -123,7 +123,7 @@ const config = {
           },
           {
             href: "https://github.com/gridaco",
-            label: "GitHub",
+            className: "navbar-item-github",
             position: "right",
           },
         ],
