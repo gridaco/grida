@@ -43,8 +43,4 @@ export const HeaderMap: HeaderMap[] = [
     label: "Slack",
     href: "https://grida.co/join-slack",
   },
-  {
-    label: "Monothon",
-    href: "https://grida.co/monothon",
-  },
 ];
