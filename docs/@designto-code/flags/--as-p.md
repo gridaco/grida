@@ -6,12 +6,11 @@ stage:
   - proposal
   - draft
   - experimental
-  - not-ready
 ---
 
 # `--as-p` As Paragraph (Text)
 
-> This flag is for web platform. Otherwise, it will be ignored, have no impact on the final output.
+> This flag is for web platform. On other platforms, this will be ignored, have no impact on the final output.
 
 **Accepted keys**
 
@@ -25,7 +24,7 @@ stage:
 `--as-p${"="typeof boolean}`
 ```
 
-## Example
+**Example**
 
 ```
 --paragraph
