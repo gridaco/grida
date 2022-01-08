@@ -99,6 +99,12 @@ module.exports = withBundleAnalyzer(
                 "https://join.slack.com/t/gridaco/shared_invite/zt-nmf59381-prFEqq032K~aWe_zOekUmQ",
               permanent: true,
             },
+            // events
+            {
+              source: "/monothon",
+              destination: "https://forms.gle/7TfBmiw22rz5SuAS9",
+              permanent: false,
+            },
           ];
         },
       }),
