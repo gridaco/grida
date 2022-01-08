@@ -184,6 +184,10 @@ const flags = [
 
 const docs = [
   {
+    type: "doc",
+    id: "intro",
+  },
+  {
     type: "category",
     label: "Getting Started",
     collapsed: false,
