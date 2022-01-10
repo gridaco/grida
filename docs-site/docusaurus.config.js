@@ -89,7 +89,7 @@ const config = {
         items: [
           {
             type: "doc",
-            docId: "getting-started/intro",
+            docId: "intro",
             position: "left",
             label: "Docs",
           },
@@ -123,7 +123,7 @@ const config = {
           },
           {
             href: "https://github.com/gridaco",
-            label: "GitHub",
+            className: "navbar-item-github",
             position: "right",
           },
         ],
