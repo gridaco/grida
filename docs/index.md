@@ -28,28 +28,33 @@ Grida is a Opensource Design to Code toolkit. To bring your imagination to life 
 - **Various Widgets support**
   - Grida is smart. we understand your design, converts it to desired widgets. Draw a button, we'll make button.
 - **Components and Variant support**
-  -
-  <!-- WIP -->
+  - Supports Features like Components and Variants that are used when structuring your design system.
 - **Responsive code**
+  - Supports Autolayout Perfectly.
+  - Generates Respnsive code based on Flexbox, extending layout features that are not supported by Figma.
+  - On Flutter, we use Column, Row, Flex, Wrap to represent a layout.
+  - Generates hight quality code that you can actually understand and agree on.
 - **Extending your design**
+  - Current version of design tools has foundational limitations for representing dynamic layouts. e.g. We can't represent a layout with max-width nor wrap. Grida enables you to bring your design to the next responsible level without leaving figma, [with our unique feature - Flags][flags-docs].
 - **Lint**
+  - Good designer makes even the very deepest, invisible part organized and explainable. Grida provides Design Lint feature to tidy up your design even to the invisible part. Make your design clean, Make your code clean.
 
 ## Design principles
 
 - **Zero Dependency**
-  <!--  -->
+  <!-- TODO: , but available on prod -->
 - **Strictly follows the standard.**
-  <!--  -->
+  <!-- TODO: , but available on prod -->
 - **Design first.**
-  <!--  -->
+  <!-- TODO: , but available on prod -->
 - **Clean design, Clean code.**
-  <!--  -->
+  <!-- TODO: , but available on prod -->
 - **Transparancy.**
-  <!--  -->
+  <!-- TODO: , but available on prod -->
 - **We're not here to do everything.**
-  <!--  -->
+  <!-- TODO: , but available on prod -->
 - **Accessibility.**
-  <!--  -->
+  <!-- TODO: , but available on prod -->
 
 ## Staying informed
 
@@ -76,3 +81,4 @@ Click the Next button below to get started!
 [grida-instagram]: https://www.instagram.com/grida.co
 [contributor-covenant]: https://www.contributor-covenant.org/
 [grida-codeofconduct]: https://github.com/gridaco/grida.co/blob/main/CODE_OF_CONDUCT.md
+[flags-docs]: https://grida.co/docs/flags/
