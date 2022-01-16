@@ -23,7 +23,10 @@ const Container = styled.div<{ heightscale: number }>`
   min-height: 100%;
 `;
 
-export type ScalingContentProps = ScalingHtmlContentFrameProps;
+export type ScalingContentProps = Omit<
+  ScalingHtmlContentFrameProps,
+  "parentSize"
+>;
 
 export function ScalingContent(props: ScalingContentProps) {
   const { ref: sizingref, height, width } = useComponentSize();

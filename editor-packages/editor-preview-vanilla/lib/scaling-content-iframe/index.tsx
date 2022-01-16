@@ -72,13 +72,14 @@ export interface ScalingHtmlContentFrameProps
    */
   maxScale?: number | "auto";
 
-  onScaleChange: (scale: number) => void;
+  onScaleChange?: (scale: number) => void;
 }
 
 export function ScalingContentIframe({
   onScaleChange,
   disableScroll,
   parentSize,
+  maxScale = 1,
   ...props
 }: ScalingHtmlContentFrameProps) {
   const margin = allow_0(props.margin, _DEFAULT_MARGIN);
@@ -99,7 +100,8 @@ export function ScalingContentIframe({
   useEffect(() => {
     if (props && parentSize.width) {
       const _s = (parentSize.width - margin * 2) / props.origin_size.width;
-      const framescale = Math.min(_s, 1);
+      const framescale =
+        typeof maxScale == "number" ? Math.min(_s, maxScale) : _s;
       onScaleChange(framescale);
       setscalefactor(framescale);
     }
