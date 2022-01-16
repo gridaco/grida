@@ -142,7 +142,7 @@ const config = {
         appId: "1ZAWX8WPMC",
         apiKey: "6fa4836dd0147e0ec0425c65c24a3257",
         indexName: "grida-co",
-        contextualSearch: true,
+        // contextualSearch: true,
       },
       footer: footer,
     }),
