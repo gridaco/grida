@@ -142,6 +142,7 @@ const config = {
         appId: "1ZAWX8WPMC",
         apiKey: "6fa4836dd0147e0ec0425c65c24a3257",
         indexName: "grida-co",
+        // contextual search not working for i18n. - learn more - https://github.com/facebook/docusaurus/issues/3396
         // contextualSearch: true,
         searchParameters: {
           facetFilters: ["language:en"],
