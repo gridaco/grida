@@ -2,11 +2,11 @@ import React from "react";
 import styled from "@emotion/styled";
 import { useComponentSize } from "react-use-size";
 import {
-  ResponsiveContentIframe,
-  ResponsiveContentIframeProps,
-} from "../responsive-content-iframe";
+  ScalingContentIframe,
+  ScalingHtmlContentFrameProps,
+} from "../scaling-content-iframe";
 
-export const Container = styled.div<{ heightscale: number }>`
+const Container = styled.div<{ heightscale: number }>`
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -23,7 +23,9 @@ export const Container = styled.div<{ heightscale: number }>`
   min-height: 100%;
 `;
 
-export function ResponsiveContainer(props: ResponsiveContentIframeProps) {
+export type ScalingContentProps = ScalingHtmlContentFrameProps;
+
+export function ScalingContent(props: ScalingContentProps) {
   const { ref: sizingref, height, width } = useComponentSize();
   // TODO: do not remove comments here. these are required for below height calculation.
   // DON'T REMOVE
@@ -36,8 +38,8 @@ export function ResponsiveContainer(props: ResponsiveContentIframeProps) {
       // DON'T REMOVE
       // heightscale={renderheightScaleFactor}
     >
-      <ResponsiveContentIframe
-        previewInfo={props}
+      <ScalingContentIframe
+        {...props}
         parentSize={{ width, height }}
         onScaleChange={() => {}}
         // DON'T REMOVE
