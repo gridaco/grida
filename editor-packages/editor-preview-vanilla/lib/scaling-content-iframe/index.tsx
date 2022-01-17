@@ -1,5 +1,6 @@
 import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
 import styled from "@emotion/styled";
+import { __dangerously_disable_scroll_in_html_body } from "../utils/remove-scroll";
 
 const _DEFAULT_MARGIN = 0;
 const _DEFAULT_SHADOW = "0px 0px 0px transparent";
@@ -55,7 +56,7 @@ export interface ScalingHtmlContentFrameProps
   /**
    * parent size of this frame for scaling & marginal calculation
    */
-  parentSize: { width: number; height: number };
+  parentWidth: number;
 
   /**
    * margin for the iframe to be placed
@@ -72,18 +73,17 @@ export interface ScalingHtmlContentFrameProps
    */
   maxScale?: number | "auto";
 
-  onScaleChange?: (scale: number) => void;
+  onScaleChange?: (scale: number, margin: number) => void;
 }
 
 export function ScalingContentIframe({
   onScaleChange,
   disableScroll,
-  parentSize,
+  parentWidth,
   maxScale = 1,
+  margin = 12,
   ...props
 }: ScalingHtmlContentFrameProps) {
-  const margin = allow_0(props.margin, _DEFAULT_MARGIN);
-
   const [scalefactor, setscalefactor] = useState(1);
   const iframeRef = useRef<HTMLIFrameElement>(undefined);
 
@@ -98,14 +98,14 @@ export function ScalingContentIframe({
   }, [iframeRef, props.data]);
 
   useEffect(() => {
-    if (props && parentSize.width) {
-      const _s = (parentSize.width - margin * 2) / props.origin_size.width;
+    if (props && parentWidth) {
+      const _s = (parentWidth - margin * 2) / props.origin_size.width;
       const framescale =
         typeof maxScale == "number" ? Math.min(_s, maxScale) : _s;
-      onScaleChange(framescale);
+      onScaleChange(framescale, margin);
       setscalefactor(framescale);
     }
-  }, [parentSize.width, props?.id]);
+  }, [parentWidth, props?.id]);
 
   return (
     <PlainIframe
@@ -123,22 +123,6 @@ export function ScalingContentIframe({
       scale={scalefactor}
     />
   );
-}
-
-/**
- * this is a explicit temporary solution to disable iframe content to be scrolling. we aleardy disable scrolling a root element inside the body, but when the element is big and the scale factor is not persice enough, the scrollbar will be shown.
- * @ask: @softmarshmallow
- * @param iframe
- */
-function __dangerously_disable_scroll_in_html_body(iframe: HTMLIFrameElement) {
-  try {
-    iframe.contentDocument.getElementsByTagName("body")[0].style.overflow =
-      "hidden";
-  } catch (_) {
-    if (process.env.NODE_ENV === "development") {
-      console.error("__dangerously_disable_scroll_in_html_body", _);
-    }
-  }
 }
 
 /**

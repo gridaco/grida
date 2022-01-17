@@ -14,6 +14,7 @@
   "exclude": [
     "node_modules",
     "**/*.spec.ts",
+    "**/*.stories.ts",
     "dist",
     "index.ts" // index.ts is for monorepo use
   ]

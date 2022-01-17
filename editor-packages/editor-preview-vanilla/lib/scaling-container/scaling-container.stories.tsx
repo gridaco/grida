@@ -23,8 +23,8 @@ Default.args = {
   id: "demo",
   maxScale: "auto",
   origin_size: {
-    width: 1080,
-    height: 900,
+    width: 500,
+    height: 1000,
   },
   boxShadow: "0px 0px 10px rgba(0, 0, 0, 0.5)",
 } as ScalingContentProps;
