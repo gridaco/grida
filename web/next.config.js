@@ -69,11 +69,6 @@ module.exports = withBundleAnalyzer(
         },
         async redirects() {
           return [
-            {
-              source: "/docs",
-              destination: "/docs/getting-started/intro",
-              permanent: false,
-            },
             // disabling globalization page access since it's not fully implemented. (temporary)
             {
               source: "/globalization",

@@ -72,7 +72,7 @@ export const Resources: Sitemap = {
     },
     {
       label: "Docs",
-      href: "/docs/getting-started/intro",
+      href: "/docs",
     },
     {
       label: "API Docs",
