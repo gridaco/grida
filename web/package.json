@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "next",
     "build": "next build",
+    "postbuild": "next-sitemap",
     "clean": "rimraf .next",
     "start": "next start",
     "type-check": "tsc --noEmit -p .",
@@ -89,6 +90,7 @@
     "eslint-plugin-react": "^7.14.3",
     "eslint-plugin-react-hooks": "^2.1.2",
     "lint-staged": "^9.2.1",
+    "next-sitemap": "^1.9.12",
     "prettier": "^1.19.1",
     "prettier-eslint": "^9.0.1",
     "rimraf": "^3.0.0",
