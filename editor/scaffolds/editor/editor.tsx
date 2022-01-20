@@ -8,8 +8,6 @@ import {
 } from "layouts/panel";
 import { WorkspaceBottomPanelDockLayout } from "layouts/panel/workspace-bottom-panel-dock-layout";
 import { CodeEditor } from "components/code-editor";
-import { ClearRemoteDesignSessionCache } from "components/clear-remote-design-session-cache";
-import { WidgetTree } from "components/visualization/json-visualization/json-tree";
 import { EditorAppbarFragments, EditorSidebar } from "components/editor";
 import { useEditorState, useWorkspaceState } from "core/states";
 import { designToCode, Result } from "@designto/code";
@@ -31,7 +29,7 @@ import {
 import { vanilla_presets } from "@grida/builder-config-preset";
 import { EditorSkeleton } from "./skeleton";
 import { colors } from "theme";
-import Link from "next/link";
+import { Debugger } from "@code-editor/debugger";
 
 export function Editor() {
   const router = useRouter();
@@ -275,57 +273,6 @@ export function Editor() {
     </>
   );
 }
-
-const Debugger = ({
-  id,
-  file,
-  type,
-  entry,
-  widget,
-}: {
-  type: string;
-  id: string;
-  file: string;
-  entry: any;
-  widget: any;
-}) => {
-  const router = useRouter();
-
-  return (
-    <div
-      style={{
-        display: "flex",
-        flexDirection: "row",
-        alignItems: "stretch",
-      }}
-    >
-      <div style={{ flex: 1 }}>
-        <ClearRemoteDesignSessionCache key={id} file={file} node={id} />
-        <br />
-        {(type === "INSTANCE" || type === "COMPONENT") && (
-          <Link
-            href={{
-              pathname: "/figma/inspect-component",
-              query: {
-                // e.g. https://www.figma.com/file/iypAHagtcSp3Osfo2a7EDz/engine?node-id=3098%3A4097
-                design: `https://www.figma.com/file/${file}/?node-id=${id}`,
-              },
-            }}
-          >
-            inspect component
-          </Link>
-        )}
-      </div>
-
-      <div style={{ flex: 2 }}>
-        <WidgetTree data={entry} />
-      </div>
-      <div style={{ flex: 2 }}>
-        <WidgetTree data={widget} />
-      </div>
-    </div>
-  );
-};
 
 const CodeEditorContainer = styled.div`
   display: flex;
