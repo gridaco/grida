@@ -26,7 +26,6 @@ import {
   find_node_by_id_under_entry,
   find_node_by_id_under_inpage_nodes,
 } from "utils/design-query";
-import { vanilla_presets } from "@grida/builder-config-preset";
 import { EditorSkeleton } from "./skeleton";
 import { colors } from "theme";
 import { Debugger } from "@code-editor/debugger";
@@ -38,7 +37,6 @@ export function Editor() {
 
   const fat = useFigmaAccessToken();
   const [result, setResult] = useState<Result>();
-  const [preview, setPreview] = useState<Result>();
 
   const [framework_config, set_framework_config] = useState(
     wstate.preferences.framework_config
@@ -106,13 +104,6 @@ export function Editor() {
     }
   };
 
-  const on_preview_result = (result: Result) => {
-    //@ts-ignore
-    if (result.id == targetStateRef?.current?.id) {
-      setPreview(result);
-    }
-  };
-
   useEffect(() => {
     const __target = targetted;
     if (__target && framework_config) {
@@ -147,50 +138,6 @@ export function Editor() {
     }
   }, [targetted?.id, framework_config?.framework]);
 
-  useEffect(
-    () => {
-      const __target = targetted; // root.entry;
-      if (__target) {
-        const _input = {
-          id: __target.id,
-          name: __target.name,
-          entry: __target,
-        };
-        const build_config = {
-          ...config.default_build_configuration,
-          disable_components: true,
-        };
-
-        // ----- for preview -----
-        designToCode({
-          input: _input,
-          build_config: build_config,
-          framework: vanilla_presets.vanilla_default,
-          asset_config: {
-            skip_asset_replacement: false,
-            asset_repository: MainImageRepository.instance,
-            custom_asset_replacement: {
-              type: "static",
-              resource:
-                "https://bridged-service-static.s3.us-west-1.amazonaws.com/placeholder-images/image-placeholder-bw-tile-100.png",
-            },
-          },
-        }).then(on_preview_result);
-
-        if (!MainImageRepository.instance.empty) {
-          designToCode({
-            input: root,
-            build_config: build_config,
-            framework: vanilla_presets.vanilla_default,
-            asset_config: { asset_repository: MainImageRepository.instance },
-          }).then(on_preview_result);
-        }
-      }
-    },
-    [targetted?.id]
-    // [root?.id]
-  );
-
   const { code, scaffold, name: componentName } = result ?? {};
   const _initially_loaded = state.design?.pages?.length > 0;
   const _initial_load_progress =
@@ -210,16 +157,20 @@ export function Editor() {
         <WorkspaceContentPanelGridLayout>
           <WorkspaceContentPanel flex={6}>
             <Canvas
-              preview={preview}
+              // preview={preview}
               fileid={state?.design?.key}
-              sceneid={root?.id}
-              originsize={{
-                width: root?.entry?.width,
-                height: root?.entry?.height,
-              }}
+              // sceneid={root?.id}
+              // originsize={{
+              //   width: root?.entry?.width,
+              //   height: root?.entry?.height,
+              // }}
             />
           </WorkspaceContentPanel>
-          <WorkspaceContentPanel flex={4}>
+          <WorkspaceContentPanel
+            flex={4}
+            zIndex={1}
+            backgroundColor={colors.color_editor_bg_on_dark}
+          >
             <CodeEditorContainer>
               <EditorAppbarFragments.CodeEditor />
               <CodeOptionsControl

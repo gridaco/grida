@@ -2,49 +2,48 @@ import React, { useEffect, useState } from "react";
 import styled from "@emotion/styled";
 import { PreviewAndRunPanel } from "components/preview-and-run";
 import { EditorAppbarFragments, EditorSidebar } from "components/editor";
-import { Result } from "@designto/code";
-import { InteractiveCanvas } from "components/canvas";
-import { VanillaRunner } from "components/app-runner/vanilla-app-runner";
+import { Canvas } from "@code-editor/canvas";
+import { LazyFrame } from "@code-editor/canvas/lazy-frame";
+import { useEditorState } from "core/states";
+import { Preview } from "scaffolds/preview";
+/**
+ * Statefull canvas segment that contains canvas as a child, with state-data connected.
+ */
+export function CanvasSegment({ fileid }: { fileid: string }) {
+  const [state] = useEditorState();
 
-export function Canvas({
-  preview,
-  originsize,
-  fileid,
-  sceneid,
-}: {
-  fileid: string;
-  sceneid: string;
-  originsize: { width: number; height: number };
-  preview: Result;
-}) {
+  const { selectedPage, design } = state;
+
+  const thisPageNodes = selectedPage
+    ? state.design.pages
+        .find((p) => p.id == selectedPage)
+        .children.filter(Boolean)
+    : null;
+
+  const isEmptyPage = thisPageNodes?.length === 0;
+
   return (
     <CanvasContainer id="canvas">
-      <EditorAppbarFragments.Canvas />
-      {/* <div
-        style={{
-          display: "flex",
-          justifyContent: "center",
-          flex: 1,
-        }}
-      > */}
-      <InteractiveCanvas key={fileid + sceneid} defaultSize={originsize}>
-        {preview ? (
-          <VanillaRunner
-            key={preview.scaffold.raw}
-            style={{
-              borderRadius: 4,
-              boxShadow: "0px 0px 48px #00000020",
-            }}
-            source={preview.scaffold.raw}
-            width="100%"
-            height="100%"
-            componentName={preview.name}
-          />
-        ) : (
-          <EditorCanvasSkeleton />
-        )}
-      </InteractiveCanvas>
-      {/* </div> */}
+      {/* <EditorAppbarFragments.Canvas /> */}
+      {isEmptyPage ? (
+        <EditorCanvasSkeleton />
+      ) : (
+        <Canvas>
+          <>
+            {thisPageNodes?.map((node) => {
+              return (
+                <LazyFrame
+                  xy={[node.x, node.y]}
+                  size={node}
+                  placeholder={<EmptyFrame />}
+                >
+                  <Preview root={design?.input} target={node} />
+                </LazyFrame>
+              );
+            })}
+          </>
+        </Canvas>
+      )}
     </CanvasContainer>
   );
 }
@@ -74,4 +73,12 @@ const CanvasContainer = styled.div`
   flex-direction: column;
   max-width: calc((100vw - 200px) * 0.6); // TODO: make this dynamic
   height: 100%;
+`;
+
+const EmptyFrame = styled.div`
+  width: 100%;
+  height: 100%;
+  background-color: #f0f0f0;
+  border-radius: 4px;
+  box-shadow: 0px 0px 48px #00000020;
 `;

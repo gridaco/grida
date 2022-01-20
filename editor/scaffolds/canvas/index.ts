@@ -1,1 +1,1 @@
-export { Canvas } from "./canvas";
+export { CanvasSegment as Canvas } from "./canvas";

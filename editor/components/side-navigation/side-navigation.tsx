@@ -1,5 +1,6 @@
 import React from "react";
 import styled from "@emotion/styled";
+import { colors } from "theme";
 
 export function SideNavigation(props: {
   children: JSX.Element | JSX.Element[];
@@ -10,6 +11,7 @@ export function SideNavigation(props: {
 const Wrapper = styled.div`
   flex: 0;
   width: 200px;
+  background: ${colors.color_editor_bg_on_dark};
   /* max-width: 320px; */
   display: flex;
   align-items: stretch;
