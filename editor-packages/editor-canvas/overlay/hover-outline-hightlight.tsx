@@ -12,10 +12,10 @@ type OutlineProps = XYWHRotation;
 export function HoverOutlineHightlight(props: OutlineProps) {
   return (
     <>
-      <OulineSide orientation="r" xywh={props.xywh} zoom={props.zoom} />
       <OulineSide orientation="l" xywh={props.xywh} zoom={props.zoom} />
-      <OulineSide orientation="b" xywh={props.xywh} zoom={props.zoom} />
       <OulineSide orientation="t" xywh={props.xywh} zoom={props.zoom} />
+      <OulineSide orientation="b" xywh={props.xywh} zoom={props.zoom} />
+      <OulineSide orientation="r" xywh={props.xywh} zoom={props.zoom} />
     </>
   );
 }
@@ -44,27 +44,27 @@ function OulineSide({
     case "l": {
       trans = {
         x: bbox[0] - d / 2,
-        y: bbox[1],
+        y: bbox[1] + (d * l_scaley - d) / 2,
       };
       break;
     }
     case "r": {
       trans = {
         x: bbox[2] - d / 2,
-        y: bbox[1],
+        y: bbox[1] + (d * l_scaley - d) / 2,
       };
       break;
     }
     case "t": {
       trans = {
-        x: bbox[0],
+        x: bbox[0] + (d * l_scalex - d) / 2,
         y: bbox[1] - d / 2,
       };
       break;
     }
     case "b": {
       trans = {
-        x: bbox[0],
+        x: bbox[0] + (d * l_scalex - d) / 2,
         y: bbox[3] - d / 2,
       };
       break;
