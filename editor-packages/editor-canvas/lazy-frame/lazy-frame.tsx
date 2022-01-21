@@ -6,16 +6,24 @@ export function LazyFrame({
   placeholder,
   xy,
   size,
+  zoom,
 }: { children: React.ReactNode } & {
   placeholder: React.ReactNode;
   xy: [number, number];
   size: { width: number; height: number };
+  zoom: number;
 }) {
   const visibilityRef = useRef();
   const { inViewport, enterCount } = useInViewport(visibilityRef);
   const [x, y] = xy;
+
+  // const opt_scale = 1; // 1 / zoom;  scale(${opt_scale})
+  const opt_w = size.width; // size.width * zoom;
+  const opt_h = size.height; // size.height * zoom;
+
   return (
     <div
+      id="frame"
       style={{
         pointerEvents: "none",
         transition: "opacity 50ms ease-out 0s",
@@ -24,8 +32,8 @@ export function LazyFrame({
         willChange: "transform",
         display: "block",
         position: "fixed",
-        width: size.width,
-        height: size.height,
+        width: opt_w,
+        height: opt_h,
       }}
       ref={visibilityRef}
     >

@@ -30,15 +30,46 @@ function OulineSide({
   orientation: "l" | "t" | "r" | "b";
 }) {
   const d = 100;
-  const [x, y, w, h] = xywh;
-  const ishoriz = orientation === "l" || orientation === "r";
-  const scalex = ishoriz ? 1 / d : d / w;
-  const scaley = ishoriz ? d / h : 1 / d;
+  const [, , w, h] = xywh;
 
-  const xdelta = ishoriz ? (orientation === "l" ? -w / 2 : w / 2) : 0;
-  const ydelta = ishoriz ? 0 : orientation === "t" ? -h / 2 : h / 2;
-  const transx = x * zoom + xdelta;
-  const transy = y * zoom + ydelta;
+  // is vertical line
+  const isvert = orientation === "l" || orientation === "r";
+  const l_scalex = isvert ? 1 / d : (w / d) * zoom;
+  const l_scaley = isvert ? (h / d) * zoom : 1 / d;
+
+  const bbox = get_boinding_box({ xywh, scale: zoom });
+
+  let trans = { x: 0, y: 0 };
+  switch (orientation) {
+    case "l": {
+      trans = {
+        x: bbox[0] - d / 2,
+        y: bbox[1],
+      };
+      break;
+    }
+    case "r": {
+      trans = {
+        x: bbox[2] - d / 2,
+        y: bbox[1],
+      };
+      break;
+    }
+    case "t": {
+      trans = {
+        x: bbox[0],
+        y: bbox[1] - d / 2,
+      };
+      break;
+    }
+    case "b": {
+      trans = {
+        x: bbox[0],
+        y: bbox[3] - d / 2,
+      };
+      break;
+    }
+  }
 
   return (
     <div
@@ -49,9 +80,26 @@ function OulineSide({
         opacity: 1,
         willChange: "transform",
         transformOrigin: "0px, 0px",
-        transform: `translateX(${transx}px) translateY(${transy}px) translateZ(0px) scaleX(${scalex}) scaleY(${scaley})`,
+        transform: `translateX(${trans.x}px) translateY(${trans.y}px) translateZ(0px) scaleX(${l_scalex}) scaleY(${l_scaley})`,
         backgroundColor: "#0099ff",
       }}
     />
   );
+}
+
+function get_boinding_box({
+  xywh,
+  scale,
+}: {
+  xywh: [number, number, number, number];
+  scale: number;
+}): [number, number, number, number] {
+  const [x, y, w, h] = xywh;
+  const [x1, y1, x2, y2] = [
+    x * scale,
+    y * scale,
+    x * scale + w * scale,
+    y * scale + h * scale,
+  ];
+  return [x1, y1, x2, y2];
 }

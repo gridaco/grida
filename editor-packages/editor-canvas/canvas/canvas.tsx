@@ -1,4 +1,5 @@
 import { ReflectSceneNode } from "@design-sdk/figma-node";
+import styled from "@emotion/styled";
 import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
 import {
   CanvasEventTarget,
@@ -9,6 +10,11 @@ import {
 import { transform_by_zoom_delta, get_hovering_target } from "../math";
 import { HoverOutlineHightlight } from "../overlay";
 import { FrameTitle } from "../frame-title";
+import { LazyFrame } from "@code-editor/canvas/lazy-frame";
+
+const INITIAL_SCALE = 1;
+const INITIAL_XY: XY = [0, 0];
+const LAYER_HOVER_HIT_MARGIN = 3.5;
 
 type XY = [number, number];
 type XYWH = [number, number, number, number];
@@ -24,9 +30,9 @@ export function Canvas({
   nodes: ReflectSceneNode[];
   renderItem: (node: ReflectSceneNode) => React.ReactNode;
 }) {
-  const [zoom, setZoom] = useState(1);
+  const [zoom, setZoom] = useState(INITIAL_SCALE);
   const [isZooming, setIsZooming] = useState(false);
-  const [xy, setXY] = useState<[number, number]>([0, 0]);
+  const [xy, setXY] = useState<[number, number]>(INITIAL_XY);
   const [isPanning, setIsPanning] = useState(false);
 
   const [hovering, sethovering] = useState<ReflectSceneNode | null>(null);
@@ -37,6 +43,7 @@ export function Canvas({
       tree: nodes,
       zoom: zoom,
       offset: xy,
+      margin: LAYER_HOVER_HIT_MARGIN,
     });
     sethovering(hovering);
   };
@@ -84,7 +91,20 @@ export function Canvas({
         onPointerMoveEnd={() => {}}
       />
       <CanvasTransformRoot scale={zoom} xy={xy}>
-        <DisableBackdropFilter>{nodes?.map(renderItem)}</DisableBackdropFilter>
+        {/* <DisableBackdropFilter> */}
+        {nodes?.map((node) => {
+          return (
+            <LazyFrame
+              xy={[node.x, node.y]}
+              size={node}
+              zoom={zoom}
+              placeholder={<EmptyFrame />}
+            >
+              {renderItem(node)}
+            </LazyFrame>
+          );
+        })}
+        {/* </DisableBackdropFilter> */}
       </CanvasTransformRoot>
       <HudSurface
         xy={xy}
@@ -124,7 +144,7 @@ function HudSurface({
   zoom: number;
   hide: boolean;
 }) {
-  const [x, y] = xy;
+  const [ox, oy] = xy;
   return (
     <div
       style={{
@@ -134,7 +154,7 @@ function HudSurface({
         width: 0,
         height: 0,
         willChange: "transform",
-        transform: `translateX(${x}px) translateY(${y}px)`,
+        transform: `translateX(${ox * zoom}px) translateY(${oy * zoom}px)`,
         opacity: hide ? 0 : 1,
         isolation: "isolate",
         transition: "opacity 0.15s ease 0s",
@@ -142,13 +162,17 @@ function HudSurface({
       id="hud-surface"
     >
       {labelDisplayNodes &&
-        labelDisplayNodes.map((node) => (
-          <FrameTitle
-            name={node.name}
-            xywh={[node.absoluteX, node.absoluteY, node.width, node.height]}
-            zoom={zoom}
-          />
-        ))}
+        labelDisplayNodes.map((node) => {
+          const absxy: XY = [node.absoluteX * zoom, node.absoluteY * zoom];
+          return (
+            <FrameTitle
+              name={node.name}
+              xy={absxy}
+              wh={[node.width, node.height]}
+              zoom={zoom}
+            />
+          );
+        })}
       {highlights &&
         highlights.map((h) => {
           return (
@@ -198,3 +222,11 @@ function DisableBackdropFilter({ children }: { children: React.ReactNode }) {
     </div>
   );
 }
+
+const EmptyFrame = styled.div`
+  width: 100%;
+  height: 100%;
+  background-color: #e09292;
+  border-radius: 4px;
+  box-shadow: 0px 0px 48px #00000020;
+`;

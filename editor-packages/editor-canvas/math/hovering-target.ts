@@ -9,6 +9,7 @@ export function get_hovering_target<T extends Tree>({
   tree,
   offset = [0, 0],
   ignore,
+  margin = 0,
 }: {
   /**
    * relative mouse point from canvas 0, 0
@@ -19,8 +20,9 @@ export function get_hovering_target<T extends Tree>({
   /**
    * offset of the canvas (canvas xy transform)
    */
-  offset?: [number, number];
+  offset: [number, number];
   ignore?: (item: T) => boolean;
+  margin?: number;
 }): T | undefined {
   const [ox, oy] = offset;
   for (const item of tree) {
@@ -28,8 +30,8 @@ export function get_hovering_target<T extends Tree>({
       is_point_in_xywh(point, [
         (item.absoluteX + ox) * zoom,
         (item.absoluteY + oy) * zoom,
-        item.width * zoom,
-        item.height * zoom,
+        item.width * zoom + margin,
+        item.height * zoom + margin,
       ])
     ) {
       if (ignore && ignore(item)) {
@@ -42,6 +44,8 @@ export function get_hovering_target<T extends Tree>({
           zoom,
           tree: item.children as T[],
           ignore,
+          margin,
+          offset,
         });
         if (hovering_child) {
           return hovering_child;
