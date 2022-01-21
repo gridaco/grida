@@ -13,14 +13,17 @@ export function LazyFrame({
 }) {
   const visibilityRef = useRef();
   const { inViewport, enterCount } = useInViewport(visibilityRef);
-
+  const [x, y] = xy;
   return (
     <div
       style={{
         pointerEvents: "none",
-        position: "absolute",
-        left: xy[0],
-        top: xy[1],
+        transition: "opacity 50ms ease-out 0s",
+        transformOrigin: "left top",
+        transform: `translateX(${x}px) translateY(${y}px)`,
+        willChange: "transform",
+        display: "block",
+        position: "fixed",
         width: size.width,
         height: size.height,
       }}

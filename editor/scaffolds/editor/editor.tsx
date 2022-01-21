@@ -167,6 +167,7 @@ export function Editor() {
             />
           </WorkspaceContentPanel>
           <WorkspaceContentPanel
+            hidden
             flex={4}
             zIndex={1}
             backgroundColor={colors.color_editor_bg_on_dark}

@@ -28,21 +28,20 @@ export function CanvasSegment({ fileid }: { fileid: string }) {
       {isEmptyPage ? (
         <EditorCanvasSkeleton />
       ) : (
-        <Canvas>
-          <>
-            {thisPageNodes?.map((node) => {
-              return (
-                <LazyFrame
-                  xy={[node.x, node.y]}
-                  size={node}
-                  placeholder={<EmptyFrame />}
-                >
-                  <Preview root={design?.input} target={node} />
-                </LazyFrame>
-              );
-            })}
-          </>
-        </Canvas>
+        <Canvas
+          nodes={thisPageNodes}
+          renderItem={(node) => {
+            return (
+              <LazyFrame
+                xy={[node.x, node.y]}
+                size={node}
+                placeholder={<EmptyFrame />}
+              >
+                <Preview root={design?.input} target={node} />
+              </LazyFrame>
+            );
+          }}
+        />
       )}
     </CanvasContainer>
   );

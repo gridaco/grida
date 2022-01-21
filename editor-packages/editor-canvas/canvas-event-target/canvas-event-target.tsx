@@ -10,19 +10,42 @@ export type OnZoomingHandler = Handler<
   WheelEvent | PointerEvent | TouchEvent | WebKitGestureEvent
 >;
 
+export type OnPointerMoveHandler = Handler<"move">;
+
 export function CanvasEventTarget({
   onPanning,
+  onPanningStart,
+  onPanningEnd,
   onZooming,
+  onZoomingStart,
+  onZoomingEnd,
+  onPointerMove,
+  onPointerMoveStart,
+  onPointerMoveEnd,
 }: {
   onPanning: OnPanningHandler;
+  onPanningStart: OnPanningHandler;
+  onPanningEnd: OnPanningHandler;
   onZooming: OnZoomingHandler;
+  onZoomingStart: OnZoomingHandler;
+  onZoomingEnd: OnZoomingHandler;
+  onPointerMove: OnPointerMoveHandler;
+  onPointerMoveStart: OnPointerMoveHandler;
+  onPointerMoveEnd: OnPointerMoveHandler;
 }) {
   const interactionEventTargetRef = useRef();
 
   useGesture(
     {
       onPinch: onZooming,
+      onPinchStart: onZoomingStart,
+      onPinchEnd: onZoomingEnd,
       onWheel: onPanning,
+      onWheelStart: onPanningStart,
+      onWheelEnd: onPanningEnd,
+      onMove: onPointerMove,
+      onMoveStart: onPointerMoveStart,
+      onMoveEnd: onPointerMoveEnd,
     },
     { target: interactionEventTargetRef }
   );
