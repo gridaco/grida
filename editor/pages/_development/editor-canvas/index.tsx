@@ -9,17 +9,12 @@ export default function EditorCanvasDevPage() {
         height: "100vh",
       }}
     >
-      <Canvas>
-        <div
-          style={{
-            background: "white",
-            width: "100px",
-            height: "100px",
-            pointerEvents: "none",
-          }}
-        />
-      </Canvas>
-      ;
+      <Canvas
+        nodes={[]}
+        renderItem={function (node): React.ReactNode {
+          return <></>;
+        }}
+      />
     </div>
   );
 }
