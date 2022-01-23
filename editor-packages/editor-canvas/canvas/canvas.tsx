@@ -8,16 +8,15 @@ import {
   OnPointerMoveHandler,
 } from "../canvas-event-target";
 import { transform_by_zoom_delta, get_hovering_target } from "../math";
-import { HoverOutlineHightlight } from "../overlay";
-import { FrameTitle } from "../frame-title";
+
 import { LazyFrame } from "@code-editor/canvas/lazy-frame";
+import { HudSurface } from "./hud-surface";
+import type { XY, XYWH } from "../types";
 
 const INITIAL_SCALE = 1;
 const INITIAL_XY: XY = [0, 0];
 const LAYER_HOVER_HIT_MARGIN = 3.5;
 
-type XY = [number, number];
-type XYWH = [number, number, number, number];
 type CanvasTransform = {
   scale: number;
   xy: XY;
@@ -91,20 +90,20 @@ export function Canvas({
         onPointerMoveEnd={() => {}}
       />
       <CanvasTransformRoot scale={zoom} xy={xy}>
-        {/* <DisableBackdropFilter> */}
-        {nodes?.map((node) => {
-          return (
-            <LazyFrame
-              xy={[node.x, node.y]}
-              size={node}
-              zoom={zoom}
-              placeholder={<EmptyFrame />}
-            >
-              {renderItem(node)}
-            </LazyFrame>
-          );
-        })}
-        {/* </DisableBackdropFilter> */}
+        <DisableBackdropFilter>
+          {nodes?.map((node) => {
+            return (
+              <LazyFrame
+                xy={[node.x, node.y]}
+                size={node}
+                zoom={zoom}
+                placeholder={<EmptyFrame />}
+              >
+                {renderItem(node)}
+              </LazyFrame>
+            );
+          })}
+        </DisableBackdropFilter>
       </CanvasTransformRoot>
       <HudSurface
         xy={xy}
@@ -128,63 +127,6 @@ export function Canvas({
         }
       />
     </>
-  );
-}
-
-function HudSurface({
-  xy,
-  highlights,
-  zoom,
-  hide,
-  labelDisplayNodes,
-}: {
-  xy: XY;
-  highlights: { id: string; xywh: XYWH }[];
-  labelDisplayNodes: ReflectSceneNode[];
-  zoom: number;
-  hide: boolean;
-}) {
-  const [ox, oy] = xy;
-  return (
-    <div
-      style={{
-        position: "fixed",
-        top: 0,
-        left: 0,
-        width: 0,
-        height: 0,
-        willChange: "transform",
-        transform: `translateX(${ox * zoom}px) translateY(${oy * zoom}px)`,
-        opacity: hide ? 0 : 1,
-        isolation: "isolate",
-        transition: "opacity 0.15s ease 0s",
-      }}
-      id="hud-surface"
-    >
-      {labelDisplayNodes &&
-        labelDisplayNodes.map((node) => {
-          const absxy: XY = [node.absoluteX * zoom, node.absoluteY * zoom];
-          return (
-            <FrameTitle
-              name={node.name}
-              xy={absxy}
-              wh={[node.width, node.height]}
-              zoom={zoom}
-            />
-          );
-        })}
-      {highlights &&
-        highlights.map((h) => {
-          return (
-            <HoverOutlineHightlight
-              key={h.id}
-              type="xywhr"
-              xywh={h.xywh}
-              zoom={zoom}
-            />
-          );
-        })}
-    </div>
   );
 }
 

@@ -1,5 +1,5 @@
 import React from "react";
-
+import { color_layer_highlight } from "../theme";
 interface XYWHRotation {
   type: "xywhr";
   xywh: [number, number, number, number];
@@ -7,15 +7,37 @@ interface XYWHRotation {
   zoom: number;
 }
 
-type OutlineProps = XYWHRotation;
+type OutlineProps = XYWHRotation & {
+  width?: number;
+};
 
-export function HoverOutlineHightlight(props: OutlineProps) {
+export function HoverOutlineHightlight({ width = 1, ...props }: OutlineProps) {
   return (
     <>
-      <OulineSide orientation="l" xywh={props.xywh} zoom={props.zoom} />
-      <OulineSide orientation="t" xywh={props.xywh} zoom={props.zoom} />
-      <OulineSide orientation="b" xywh={props.xywh} zoom={props.zoom} />
-      <OulineSide orientation="r" xywh={props.xywh} zoom={props.zoom} />
+      <OulineSide
+        orientation="l"
+        xywh={props.xywh}
+        zoom={props.zoom}
+        width={width}
+      />
+      <OulineSide
+        orientation="t"
+        xywh={props.xywh}
+        zoom={props.zoom}
+        width={width}
+      />
+      <OulineSide
+        orientation="b"
+        xywh={props.xywh}
+        zoom={props.zoom}
+        width={width}
+      />
+      <OulineSide
+        orientation="r"
+        xywh={props.xywh}
+        zoom={props.zoom}
+        width={width}
+      />
     </>
   );
 }
@@ -24,18 +46,20 @@ function OulineSide({
   xywh,
   orientation,
   zoom,
+  width,
 }: {
   xywh: [number, number, number, number];
   zoom: number;
   orientation: "l" | "t" | "r" | "b";
+  width: number;
 }) {
   const d = 100;
   const [, , w, h] = xywh;
 
   // is vertical line
   const isvert = orientation === "l" || orientation === "r";
-  const l_scalex = isvert ? 1 / d : (w / d) * zoom;
-  const l_scaley = isvert ? (h / d) * zoom : 1 / d;
+  const l_scalex = isvert ? width / d : (w / d) * zoom;
+  const l_scaley = isvert ? (h / d) * zoom : width / d;
 
   const bbox = get_boinding_box({ xywh, scale: zoom });
 
@@ -81,7 +105,7 @@ function OulineSide({
         willChange: "transform",
         transformOrigin: "0px, 0px",
         transform: `translateX(${trans.x}px) translateY(${trans.y}px) translateZ(0px) scaleX(${l_scalex}) scaleY(${l_scaley})`,
-        backgroundColor: "#0099ff",
+        backgroundColor: color_layer_highlight,
       }}
     />
   );
