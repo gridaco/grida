@@ -1,4 +1,4 @@
-import { HoverOutlineHightlight } from "../overlay";
+import { HoverOutlineHighlight, ReadonlySelectHightlight } from "../overlay";
 import { FrameTitle } from "../frame-title";
 import type { XY, XYWH } from "../types";
 
@@ -61,7 +61,7 @@ export function HudSurface({
       {highlights &&
         highlights.map((h) => {
           return (
-            <HoverOutlineHightlight
+            <ReadonlySelectHightlight
               key={h.id}
               type="xywhr"
               xywh={h.xywh}
