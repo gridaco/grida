@@ -1,6 +1,10 @@
 import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useGesture } from "@use-gesture/react";
-import type { Handler, WebKitGestureEvent } from "@use-gesture/react";
+import type {
+  Handler,
+  WebKitGestureEvent,
+  SharedGestureState,
+} from "@use-gesture/react";
 import styled from "@emotion/styled";
 
 export type OnPanningHandler = Handler<"wheel", WheelEvent>;
@@ -12,6 +16,10 @@ export type OnZoomingHandler = Handler<
 
 export type OnPointerMoveHandler = Handler<"move">;
 
+export type OnPointerDownHandler = (
+  e: { event: React.MouseEvent<EventTarget, MouseEvent> } & SharedGestureState
+) => void;
+
 export function CanvasEventTarget({
   onPanning,
   onPanningStart,
@@ -22,6 +30,7 @@ export function CanvasEventTarget({
   onPointerMove,
   onPointerMoveStart,
   onPointerMoveEnd,
+  onPointerDown,
 }: {
   onPanning: OnPanningHandler;
   onPanningStart: OnPanningHandler;
@@ -32,6 +41,7 @@ export function CanvasEventTarget({
   onPointerMove: OnPointerMoveHandler;
   onPointerMoveStart: OnPointerMoveHandler;
   onPointerMoveEnd: OnPointerMoveHandler;
+  onPointerDown: OnPointerDownHandler;
 }) {
   const interactionEventTargetRef = useRef();
 
@@ -44,6 +54,7 @@ export function CanvasEventTarget({
       onWheelStart: onPanningStart,
       onWheelEnd: onPanningEnd,
       onMove: onPointerMove,
+      onMouseDown: onPointerDown,
       onMoveStart: onPointerMoveStart,
       onMoveEnd: onPointerMoveEnd,
     },

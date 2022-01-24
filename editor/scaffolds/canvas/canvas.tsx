@@ -3,15 +3,18 @@ import styled from "@emotion/styled";
 import { PreviewAndRunPanel } from "components/preview-and-run";
 import { EditorAppbarFragments, EditorSidebar } from "components/editor";
 import { Canvas } from "@code-editor/canvas";
-import { useEditorState } from "core/states";
+import { useEditorState, useWorkspace } from "core/states";
 import { Preview } from "scaffolds/preview";
+import { useDispatch } from "core/dispatch";
 /**
  * Statefull canvas segment that contains canvas as a child, with state-data connected.
  */
 export function CanvasSegment({ fileid }: { fileid: string }) {
   const [state] = useEditorState();
+  const { highlightedLayer, highlightLayer } = useWorkspace();
+  const dispatch = useDispatch();
 
-  const { selectedPage, design } = state;
+  const { selectedPage, design, selectedNodes } = state;
 
   const thisPageNodes = selectedPage
     ? state.design.pages
@@ -28,6 +31,11 @@ export function CanvasSegment({ fileid }: { fileid: string }) {
         <EditorCanvasSkeleton />
       ) : (
         <Canvas
+          selectedNodes={selectedNodes.filter(Boolean)}
+          highlightedLayer={highlightedLayer}
+          onSelectNode={(node) => {
+            dispatch({ type: "select-node", node: node.id });
+          }}
           nodes={thisPageNodes}
           renderItem={(node) => {
             return <Preview root={design?.input} target={node} />;

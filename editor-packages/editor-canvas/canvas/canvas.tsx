@@ -1,11 +1,18 @@
+import React, {
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  useMemo,
+} from "react";
 import { ReflectSceneNode } from "@design-sdk/figma-node";
 import styled from "@emotion/styled";
-import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
 import {
   CanvasEventTarget,
   OnPanningHandler,
   OnZoomingHandler,
   OnPointerMoveHandler,
+  OnPointerDownHandler,
 } from "../canvas-event-target";
 import { transform_by_zoom_delta, get_hovering_target } from "../math";
 
@@ -22,19 +29,41 @@ type CanvasTransform = {
   xy: XY;
 };
 
-export function Canvas({
-  nodes,
-  renderItem,
-}: {
+interface CanvasState {
   nodes: ReflectSceneNode[];
+  highlightedLayer?: string;
+  selectedNodes: string[];
+  readonly?: boolean;
+}
+
+export function Canvas({
+  renderItem,
+  onSelectNode,
+  nodes,
+  highlightedLayer,
+  selectedNodes,
+  readonly = true,
+}: {
   renderItem: (node: ReflectSceneNode) => React.ReactNode;
-}) {
+  onSelectNode?: (node: ReflectSceneNode) => void;
+} & CanvasState) {
   const [zoom, setZoom] = useState(INITIAL_SCALE);
   const [isZooming, setIsZooming] = useState(false);
   const [xy, setXY] = useState<[number, number]>(INITIAL_XY);
   const [isPanning, setIsPanning] = useState(false);
 
-  const [hovering, sethovering] = useState<ReflectSceneNode | null>(null);
+  const wshighlight = useMemo(() => {
+    return highlightedLayer
+      ? nodes.find((n) => n.id === highlightedLayer)
+      : null;
+  }, [highlightedLayer]);
+
+  const [hoveringLayer, setHoveringLayer] =
+    useState<ReflectSceneNode | null>(wshighlight);
+
+  useEffect(() => {
+    setHoveringLayer(wshighlight);
+  }, [highlightedLayer]);
 
   const onPointerMove: OnPointerMoveHandler = (state) => {
     const hovering = get_hovering_target({
@@ -44,7 +73,13 @@ export function Canvas({
       offset: xy,
       margin: LAYER_HOVER_HIT_MARGIN,
     });
-    sethovering(hovering);
+    setHoveringLayer(hovering);
+  };
+
+  const onPointerDown: OnPointerDownHandler = (state) => {
+    if (hoveringLayer) {
+      onSelectNode(hoveringLayer);
+    }
   };
 
   const onPanning: OnPanningHandler = ({ delta: [x, y], wheeling }) => {
@@ -88,6 +123,7 @@ export function Canvas({
         onPointerMove={onPointerMove}
         onPointerMoveStart={() => {}}
         onPointerMoveEnd={() => {}}
+        onPointerDown={onPointerDown}
       />
       <CanvasTransformRoot scale={zoom} xy={xy}>
         <DisableBackdropFilter>
@@ -109,17 +145,21 @@ export function Canvas({
         xy={xy}
         zoom={zoom}
         hide={is_canvas_transforming}
+        readonly={readonly}
         labelDisplayNodes={nodes}
+        selectedNodes={selectedNodes
+          ?.map((id) => nodes.find((n) => n.id === id))
+          .filter(Boolean)}
         highlights={
-          hovering
+          hoveringLayer
             ? [
                 {
-                  id: hovering.id,
+                  id: hoveringLayer.id,
                   xywh: [
-                    hovering.absoluteX,
-                    hovering.absoluteY,
-                    hovering.width,
-                    hovering.height,
+                    hoveringLayer.absoluteX,
+                    hoveringLayer.absoluteY,
+                    hoveringLayer.width,
+                    hoveringLayer.height,
                   ],
                 },
               ]

@@ -1,6 +1,8 @@
 export type WorkspaceAction =
   //
-  HistoryAction;
+  | HistoryAction
+  //
+  | HighlightLayerAction;
 
 export type HistoryAction =
   //
@@ -13,7 +15,9 @@ export type Action =
   //
   | PageAction
   //
-  | SelectNodeAction;
+  | SelectNodeAction
+  //
+  | HighlightLayerAction;
 
 export type ActionType = Action["type"];
 
@@ -28,4 +32,9 @@ export type PageAction = SelectPageAction;
 export interface SelectPageAction {
   type: "select-page";
   page: string;
+}
+
+export interface HighlightLayerAction {
+  type: "highlight-layer";
+  id: string;
 }

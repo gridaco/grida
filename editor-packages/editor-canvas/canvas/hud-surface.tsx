@@ -20,12 +20,16 @@ export function HudSurface({
   zoom,
   hide,
   labelDisplayNodes,
+  selectedNodes,
+  readonly,
 }: {
   xy: XY;
   highlights: { id: string; xywh: XYWH }[];
   labelDisplayNodes: DisplayNodeMeta[];
+  selectedNodes: DisplayNodeMeta[];
   zoom: number;
   hide: boolean;
+  readonly: boolean;
 }) {
   const [ox, oy] = xy;
   return (
@@ -61,7 +65,7 @@ export function HudSurface({
       {highlights &&
         highlights.map((h) => {
           return (
-            <ReadonlySelectHightlight
+            <HoverOutlineHighlight
               key={h.id}
               type="xywhr"
               xywh={h.xywh}
@@ -69,6 +73,28 @@ export function HudSurface({
               width={2}
             />
           );
+        })}
+      {selectedNodes &&
+        selectedNodes.map((s) => {
+          const xywh: [number, number, number, number] = [
+            s.absoluteX,
+            s.absoluteY,
+            s.width,
+            s.height,
+          ];
+          if (readonly) {
+            return (
+              <ReadonlySelectHightlight
+                key={s.id}
+                type="xywhr"
+                xywh={xywh}
+                zoom={zoom}
+                width={2}
+              />
+            );
+          } else {
+            // TODO: support non readonly canvas
+          }
         })}
     </div>
   );

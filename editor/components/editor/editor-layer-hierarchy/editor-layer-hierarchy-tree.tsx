@@ -6,7 +6,7 @@ import {
   IconContainer,
   LayerIcon,
 } from "./editor-layer-hierarchy-item";
-import { useEditorState } from "core/states";
+import { useEditorState, useWorkspace } from "core/states";
 import { useDispatch } from "core/dispatch";
 import {
   flattenNodeTree,
@@ -15,19 +15,22 @@ import {
 
 export function EditorLayerHierarchy() {
   const [state] = useEditorState();
+  const { highlightLayer, highlightedLayer } = useWorkspace();
   const dispatch = useDispatch();
+
+  const { selectedNodes, selectedPage, design } = state;
 
   const [expands, setExpands] = useState<string[]>(state?.selectedNodes ?? []);
 
-  const root = state.selectedPage
-    ? state.design.pages.find((p) => p.id == state.selectedPage).children
-    : [state.design?.input?.entry];
+  const root = selectedPage
+    ? design.pages.find((p) => p.id == selectedPage).children
+    : [design?.input?.entry];
 
   const layers: FlattenedDisplayItemNode[][] = useMemo(() => {
     return root
       ? root
           .filter((l) => !!l)
-          .map((layer) => flattenNodeTree(layer, state.selectedNodes, expands))
+          .map((layer) => flattenNodeTree(layer, selectedNodes, expands))
       : [];
   }, [root, state?.selectedNodes, expands]);
 
@@ -62,6 +65,9 @@ export function EditorLayerHierarchy() {
             } else {
               setExpands([...expands, id]);
             }
+          }}
+          onHoverChange={(hovered) => {
+            highlightLayer(hovered ? id : undefined);
           }}
           onMenuClick={() => {}}
           onDoubleClick={() => {}}

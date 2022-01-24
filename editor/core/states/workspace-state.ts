@@ -3,6 +3,10 @@ import { HistoryState } from "core/states/history-state";
 
 export interface WorkspaceState {
   history: HistoryState;
+  /**
+   * hovered layer; single or none.
+   */
+  highlightedLayer?: string;
   preferences: WorkspacePreferences;
 }
 
