@@ -33,6 +33,13 @@ import { EditorSkeleton } from "./skeleton";
 import { colors } from "theme";
 import Link from "next/link";
 
+const _ignore_d2c_errors_on_prod = (e) => {
+  if (process.env.NODE_ENV === "production") {
+    return;
+  }
+  throw e;
+};
+
 export function Editor() {
   const router = useRouter();
   const wstate = useWorkspaceState();
@@ -135,7 +142,9 @@ export function Editor() {
         framework: framework_config,
         asset_config: { skip_asset_replacement: true },
         build_config: build_config,
-      }).then(on_result);
+      })
+        .then(on_result)
+        .catch(_ignore_d2c_errors_on_prod);
 
       // build final code with asset fetch
       if (!MainImageRepository.instance.empty) {
@@ -144,7 +153,9 @@ export function Editor() {
           framework: framework_config,
           asset_config: { asset_repository: MainImageRepository.instance },
           build_config: build_config,
-        }).then(on_result);
+        })
+          .then(on_result)
+          .catch(_ignore_d2c_errors_on_prod);
       }
     }
   }, [targetted?.id, framework_config?.framework]);
@@ -177,7 +188,9 @@ export function Editor() {
                 "https://bridged-service-static.s3.us-west-1.amazonaws.com/placeholder-images/image-placeholder-bw-tile-100.png",
             },
           },
-        }).then(on_preview_result);
+        })
+          .then(on_preview_result)
+          .catch(_ignore_d2c_errors_on_prod);
 
         if (!MainImageRepository.instance.empty) {
           designToCode({
@@ -185,7 +198,9 @@ export function Editor() {
             build_config: build_config,
             framework: vanilla_presets.vanilla_default,
             asset_config: { asset_repository: MainImageRepository.instance },
-          }).then(on_preview_result);
+          })
+            .then(on_preview_result)
+            .catch(_ignore_d2c_errors_on_prod);
         }
       }
     },
