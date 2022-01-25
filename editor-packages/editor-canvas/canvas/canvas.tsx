@@ -188,7 +188,34 @@ export function Canvas({
         onPointerMoveStart={() => {}}
         onPointerMoveEnd={() => {}}
         onPointerDown={onPointerDown}
-      />
+      >
+        <HudSurface
+          offset={xy}
+          zoom={zoom}
+          hide={is_canvas_transforming}
+          readonly={readonly}
+          labelDisplayNodes={nodes}
+          selectedNodes={selected_nodes}
+          highlights={
+            hoveringLayer?.node
+              ? (config.can_highlight_selected_layer
+                  ? [hoveringLayer.node]
+                  : noduplicates([hoveringLayer.node], selected_nodes)
+                ).map((h) => ({
+                  id: h.id,
+                  xywh: [h.absoluteX, h.absoluteY, h.width, h.height],
+                }))
+              : []
+          }
+          onHoverNode={(id) => {
+            setHoveringLayer({ node: node(id), reason: "frame-title" });
+          }}
+          onSelectNode={(id) => {
+            onSelectNode(node(id));
+          }}
+          renderFrameTitle={props.renderFrameTitle}
+        />
+      </CanvasEventTarget>
       <CanvasTransformRoot scale={zoom} xy={xy}>
         <DisableBackdropFilter>
           {nodes?.map((node) => {
@@ -206,32 +233,6 @@ export function Canvas({
           })}
         </DisableBackdropFilter>
       </CanvasTransformRoot>
-      <HudSurface
-        offset={xy}
-        zoom={zoom}
-        hide={is_canvas_transforming}
-        readonly={readonly}
-        labelDisplayNodes={nodes}
-        selectedNodes={selected_nodes}
-        highlights={
-          hoveringLayer?.node
-            ? (config.can_highlight_selected_layer
-                ? [hoveringLayer.node]
-                : noduplicates([hoveringLayer.node], selected_nodes)
-              ).map((h) => ({
-                id: h.id,
-                xywh: [h.absoluteX, h.absoluteY, h.width, h.height],
-              }))
-            : []
-        }
-        onHoverNode={(id) => {
-          setHoveringLayer({ node: node(id), reason: "frame-title" });
-        }}
-        onSelectNode={(id) => {
-          onSelectNode(node(id));
-        }}
-        renderFrameTitle={props.renderFrameTitle}
-      />
     </>
   );
 }

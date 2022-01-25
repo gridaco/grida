@@ -33,6 +33,7 @@ export function CanvasEventTarget({
   onPointerMoveStart,
   onPointerMoveEnd,
   onPointerDown,
+  children,
 }: {
   onPanning: OnPanningHandler;
   onPanningStart: OnPanningHandler;
@@ -44,6 +45,7 @@ export function CanvasEventTarget({
   onPointerMoveStart: OnPointerMoveHandler;
   onPointerMoveEnd: OnPointerMoveHandler;
   onPointerDown: OnPointerDownHandler;
+  children?: React.ReactNode;
 }) {
   const interactionEventTargetRef = useRef();
 
@@ -139,7 +141,9 @@ export function CanvasEventTarget({
       }}
       id="gesture-event-listener"
       ref={interactionEventTargetRef}
-    />
+    >
+      {children}
+    </EventTargetContainer>
   );
 }
 
