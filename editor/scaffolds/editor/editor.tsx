@@ -35,15 +35,7 @@ export function Editor() {
       >
         <WorkspaceContentPanelGridLayout>
           <WorkspaceContentPanel flex={6}>
-            <Canvas
-              // preview={preview}
-              fileid={state?.design?.key}
-              // sceneid={root?.id}
-              // originsize={{
-              //   width: root?.entry?.width,
-              //   height: root?.entry?.height,
-              // }}
-            />
+            <Canvas fileid={state?.design?.key} />
           </WorkspaceContentPanel>
           <WorkspaceContentPanel
             hidden={state.selectedNodes.length === 0}

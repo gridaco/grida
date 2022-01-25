@@ -3,16 +3,8 @@ import { useHover } from "@editor-ui/hooks";
 import styled from "@emotion/styled";
 import { color_frame_title } from "../theme";
 
-export function FrameTitle({
-  name,
-  xy,
-  wh,
-  zoom,
-  highlight = false,
-  selected,
-  onHoverChange,
-  onSelect,
-}: {
+export interface FrameTitleProps {
+  id?: string;
   name: string;
   /**
    * absolute x, y
@@ -27,7 +19,18 @@ export function FrameTitle({
   selected?: boolean;
   onHoverChange?: (hover: boolean) => void;
   onSelect?: () => void;
-}) {
+}
+
+export function FrameTitle({
+  name,
+  xy,
+  wh,
+  zoom,
+  highlight = false,
+  selected,
+  onHoverChange,
+  onSelect,
+}: FrameTitleProps) {
   const [x, y] = xy;
   const [w, h] = wh;
   const view_height = 24;
@@ -46,25 +49,15 @@ export function FrameTitle({
   });
 
   return (
-    <div
+    <FrameTitleContainer
       id="frame-title"
       onClick={onSelect}
-      style={{
-        position: "fixed",
-        width: w * zoom,
-        height: view_height,
-        fontSize: 12,
-        willChange: "transform",
-        cursor: "default",
-        overflow: "hidden",
-        transform: `translateX(${x}px) translateY(${height_considered_y_transform}px)`,
-        display: "flex",
-        flexDirection: "row",
-        alignItems: "center",
-      }}
+      width={w * zoom}
+      height={view_height}
+      xy={[x, height_considered_y_transform]}
       {...hoverProps}
     >
-      <TitleLabel
+      <FrameTitleLabel
         color={
           selected || highlight || hoverred
             ? color_frame_title.highlight
@@ -72,12 +65,30 @@ export function FrameTitle({
         }
       >
         {name}
-      </TitleLabel>
-    </div>
+      </FrameTitleLabel>
+    </FrameTitleContainer>
   );
 }
 
-const TitleLabel = styled.span<{
+export const FrameTitleContainer = styled.div<{
+  width: number;
+  height: number;
+  xy: [number, number];
+}>`
+  position: fixed;
+  width: ${(p) => p.width}px;
+  height: ${(p) => p.height}px;
+  will-change: transform;
+  cursor: default;
+  overflow: hidden;
+  transform: translateX(${(p) => p.xy[0]}px) translateY(${(p) => p.xy[1]}px);
+  display: flex;
+  font-size: 12px;
+  flex-direction: row;
+  align-items: center;
+`;
+
+export const FrameTitleLabel = styled.span<{
   color: string;
 }>`
   color: ${(p) => p.color};

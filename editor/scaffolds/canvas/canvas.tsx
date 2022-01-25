@@ -1,11 +1,13 @@
 import React, { useEffect, useState } from "react";
 import styled from "@emotion/styled";
-import { PreviewAndRunPanel } from "components/preview-and-run";
-import { EditorAppbarFragments, EditorSidebar } from "components/editor";
+import { EditorAppbarFragments } from "components/editor";
 import { Canvas } from "@code-editor/canvas";
 import { useEditorState, useWorkspace } from "core/states";
 import { Preview } from "scaffolds/preview";
 import { useDispatch } from "core/dispatch";
+import { FrameTitleRenderer } from "./render/frame-title";
+import { IsolateModeCanvas } from "./isolate-mode";
+
 /**
  * Statefull canvas segment that contains canvas as a child, with state-data connected.
  */
@@ -24,50 +26,59 @@ export function VisualContentArea({ fileid }: { fileid: string }) {
 
   const isEmptyPage = thisPageNodes?.length === 0;
 
+  const [mode, setMode] = useState<"full" | "isolate">("full");
+
   return (
     <CanvasContainer id="canvas">
       {/* <EditorAppbarFragments.Canvas /> */}
+
       {isEmptyPage ? (
-        <EditorCanvasSkeleton />
+        <></>
       ) : (
-        <Canvas
-          selectedNodes={selectedNodes.filter(Boolean)}
-          highlightedLayer={highlightedLayer}
-          onSelectNode={(node) => {
-            dispatch({ type: "select-node", node: node.id });
-          }}
-          onClearSelection={() => {
-            dispatch({ type: "select-node", node: null });
-          }}
-          nodes={thisPageNodes}
-          renderItem={(node) => {
-            return <Preview root={design?.input} target={node} />;
-          }}
-        />
+        <>
+          {mode == "isolate" && (
+            <IsolateModeCanvas
+              onClose={() => {
+                setMode("full");
+              }}
+            />
+          )}
+          <div
+            style={{
+              display: mode == "full" ? undefined : "none",
+            }}
+          >
+            <Canvas
+              selectedNodes={selectedNodes.filter(Boolean)}
+              highlightedLayer={highlightedLayer}
+              onSelectNode={(node) => {
+                dispatch({ type: "select-node", node: node.id });
+              }}
+              onClearSelection={() => {
+                dispatch({ type: "select-node", node: null });
+              }}
+              nodes={thisPageNodes}
+              renderItem={(node) => {
+                return (
+                  <Preview key={node.id} root={design?.input} target={node} />
+                );
+              }}
+              renderFrameTitle={(p) => (
+                <FrameTitleRenderer
+                  key={p.id}
+                  {...p}
+                  onRunClick={() => {
+                    setMode("isolate");
+                  }}
+                />
+              )}
+            />
+          </div>
+        </>
       )}
     </CanvasContainer>
   );
 }
-
-const EditorCanvasSkeleton = () => {
-  return (
-    <PreviewAndRunPanel
-      config={{
-        src: "",
-        platform: "vanilla",
-        componentName: "loading",
-        sceneSize: {
-          w: 375,
-          h: 812,
-        },
-        initialMode: "run",
-        fileid: "loading",
-        sceneid: "loading",
-        hideModeChangeControls: true,
-      }}
-    />
-  );
-};
 
 const CanvasContainer = styled.div`
   display: flex;

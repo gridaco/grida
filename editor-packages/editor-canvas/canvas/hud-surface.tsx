@@ -1,10 +1,14 @@
 import { HoverOutlineHighlight, ReadonlySelectHightlight } from "../overlay";
-import { FrameTitle } from "../frame-title";
+import { FrameTitle, FrameTitleProps } from "../frame-title";
 import type { XY, XYWH } from "../types";
 
 interface HudControls {
   onSelectNode: (node: string) => void;
   onHoverNode: (node: string) => void;
+}
+
+export interface HudCustomRenderers {
+  renderFrameTitle?: (props: FrameTitleProps) => React.ReactNode;
 }
 
 /**
@@ -29,6 +33,8 @@ export function HudSurface({
   readonly,
   onSelectNode,
   onHoverNode,
+  //
+  renderFrameTitle = frame_title_default_renderer,
 }: {
   offset: XY;
   zoom: number;
@@ -37,7 +43,8 @@ export function HudSurface({
   selectedNodes: DisplayNodeMeta[];
   hide: boolean;
   readonly: boolean;
-} & HudControls) {
+} & HudControls &
+  HudCustomRenderers) {
   const [ox, oy] = offset;
   return (
     <div
@@ -58,31 +65,27 @@ export function HudSurface({
       {labelDisplayNodes &&
         labelDisplayNodes.map((node) => {
           const absxy: XY = [node.absoluteX * zoom, node.absoluteY * zoom];
-          return (
-            <FrameTitle
-              key={node.id}
-              name={node.name}
-              xy={absxy}
-              wh={[node.width, node.height]}
-              zoom={zoom}
-              selected={selectedNodes.some(
-                (selectedNode) => selectedNode.id === node.id
-              )}
-              onSelect={() => onSelectNode(node.id)}
-              onHoverChange={(hv) => {
-                if (hv) {
-                  onHoverNode(node.id);
-                } else {
-                  onHoverNode(null);
-                }
-              }}
-              highlight={
-                !![...highlights, ...selectedNodes].find(
-                  (n) => n.id === node.id
-                )
+          return renderFrameTitle({
+            id: node.id,
+            name: node.name,
+            xy: absxy,
+            wh: [node.width, node.height],
+            zoom: zoom,
+            selected: selectedNodes.some(
+              (selectedNode) => selectedNode.id === node.id
+            ),
+            onSelect: () => onSelectNode(node.id),
+            onHoverChange: (hv) => {
+              if (hv) {
+                onHoverNode(node.id);
+              } else {
+                onHoverNode(null);
               }
-            />
-          );
+            },
+            highlight: !![...highlights, ...selectedNodes].find(
+              (n) => n.id === node.id
+            ),
+          });
         })}
       {highlights &&
         highlights.map((h) => {
@@ -121,3 +124,7 @@ export function HudSurface({
     </div>
   );
 }
+
+const frame_title_default_renderer = (p: FrameTitleProps) => (
+  <FrameTitle key={p.id} {...p} />
+);

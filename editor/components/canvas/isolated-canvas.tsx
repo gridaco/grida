@@ -56,12 +56,14 @@ type InitialTransform = {
   transformOrigin: string;
 };
 
-export function InteractiveCanvas({
+export function IsolatedCanvas({
   children,
   defaultSize,
+  onExit,
 }: {
   defaultSize: { width: number; height: number };
   children?: React.ReactNode;
+  onExit?: () => void;
 }) {
   const _margin = 20;
   const [canvasSizingRef, canvasBounds] = useMeasure();
@@ -133,6 +135,7 @@ export function InteractiveCanvas({
             scale={scale}
             onChange={setScale}
           />
+          {onExit && <ExitButton onClick={onExit}>End Isolation</ExitButton>}
         </Controls>
         {/* <ScalingAreaStaticRoot> */}
         <TransformContainer
@@ -150,6 +153,17 @@ export function InteractiveCanvas({
     </InteractiveCanvasWrapper>
   );
 }
+
+const ExitButton = styled.button`
+  align-self: center;
+  outline: none;
+  border: none;
+  cursor: pointer;
+  background: none;
+  color: white;
+  border-radius: 2px;
+  height: 24px;
+`;
 
 const InteractiveCanvasWrapper = styled.div`
   display: flex;

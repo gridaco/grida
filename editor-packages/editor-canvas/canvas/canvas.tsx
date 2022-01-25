@@ -17,7 +17,7 @@ import {
 import { transform_by_zoom_delta, get_hovering_target } from "../math";
 import { utils } from "@design-sdk/core";
 import { LazyFrame } from "@code-editor/canvas/lazy-frame";
-import { HudSurface } from "./hud-surface";
+import { HudCustomRenderers, HudSurface } from "./hud-surface";
 import type { XY, XYWH } from "../types";
 
 const designq = utils.query;
@@ -38,6 +38,10 @@ interface CanvasState {
   selectedNodes: string[];
   readonly?: boolean;
 }
+
+type CanvasCustomRenderers = HudCustomRenderers & {
+  renderItem: (node: ReflectSceneNode) => React.ReactNode;
+};
 
 interface CanvsPreferences {
   can_highlight_selected_layer?: boolean;
@@ -61,11 +65,12 @@ export function Canvas({
   selectedNodes,
   readonly = true,
   config = default_canvas_preferences,
+  ...props
 }: {
-  renderItem: (node: ReflectSceneNode) => React.ReactNode;
   onSelectNode?: (node: ReflectSceneNode) => void;
   onClearSelection?: () => void;
-} & CanvasState & {
+} & CanvasCustomRenderers &
+  CanvasState & {
     config?: CanvsPreferences;
   }) {
   const [zoom, setZoom] = useState(INITIAL_SCALE);
@@ -189,6 +194,7 @@ export function Canvas({
           {nodes?.map((node) => {
             return (
               <LazyFrame
+                key={node.id}
                 xy={[node.x, node.y]}
                 size={node}
                 zoom={zoom}
@@ -224,6 +230,7 @@ export function Canvas({
         onSelectNode={(id) => {
           onSelectNode(node(id));
         }}
+        renderFrameTitle={props.renderFrameTitle}
       />
     </>
   );
