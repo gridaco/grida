@@ -47,9 +47,32 @@ export function CanvasEventTarget({
 }) {
   const interactionEventTargetRef = useRef();
 
+  const [isSpacebarPressed, setIsSpacebarPressed] = useState(false);
   let platform: PlatformName = "other";
   useEffect(() => {
     platform = getCurrentPlatform(window.navigator);
+  });
+
+  useEffect(() => {
+    const kd = (e) => {
+      // if spacebar is pressed, enable panning wirt dragging.
+      if (e.code === "Space") {
+        setIsSpacebarPressed(true);
+      }
+    };
+    const ku = (e) => {
+      if (e.code === "Space") {
+        setIsSpacebarPressed(false);
+      }
+    };
+
+    document.addEventListener("keydown", kd);
+    document.addEventListener("keyup", ku);
+
+    return () => {
+      document.removeEventListener("keydown", kd);
+      document.removeEventListener("keyup", ku);
+    };
   });
 
   const transform_wheel_to_zoom = (s) => {
@@ -65,6 +88,10 @@ export function CanvasEventTarget({
       onPinchStart: onZoomingStart,
       onPinchEnd: onZoomingEnd,
       onWheel: (s) => {
+        if (s.altKey) {
+          // altkey prevents panning the canvas.
+          return;
+        }
         if (s.ctrlKey) {
           // crtl key is also enabled on onPinch - we don't have to explicitly add linux & windows support for ctrl + scroll.
           return;
@@ -80,6 +107,24 @@ export function CanvasEventTarget({
       onWheelStart: onPanningStart,
       onWheelEnd: onPanningEnd,
       onMove: onPointerMove,
+      onDragStart: (s) => {
+        if (isSpacebarPressed) {
+          onPanningStart(s as any);
+        }
+      },
+      onDrag: (s) => {
+        if (isSpacebarPressed) {
+          onPanning({
+            ...s,
+            delta: [-s.delta[0], -s.delta[1]],
+          } as any);
+        }
+      },
+      onDragEnd: (s) => {
+        if (isSpacebarPressed) {
+          onPanningEnd(s as any);
+        }
+      },
       onMouseDown: onPointerDown,
       onMoveStart: onPointerMoveStart,
       onMoveEnd: onPointerMoveEnd,
@@ -89,6 +134,9 @@ export function CanvasEventTarget({
 
   return (
     <EventTargetContainer
+      style={{
+        cursor: isSpacebarPressed ? "grab" : "default",
+      }}
       id="gesture-event-listener"
       ref={interactionEventTargetRef}
     />

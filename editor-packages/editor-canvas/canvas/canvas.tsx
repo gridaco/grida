@@ -96,6 +96,9 @@ export function Canvas({
   };
 
   const onPointerDown: OnPointerDownHandler = (state) => {
+    if (isPanning || isZooming) {
+      return;
+    }
     if (hoveringLayer) {
       onSelectNode(hoveringLayer);
     } else {
@@ -103,7 +106,12 @@ export function Canvas({
     }
   };
 
-  const onPanning: OnPanningHandler = ({ delta: [x, y], wheeling }) => {
+  const onPanning: OnPanningHandler = (s) => {
+    const {
+      delta: [x, y],
+      wheeling,
+    } = s;
+
     setXY([xy[0] - x / zoom, xy[1] - y / zoom]);
   };
   const onZooming: OnZoomingHandler = (state) => {
