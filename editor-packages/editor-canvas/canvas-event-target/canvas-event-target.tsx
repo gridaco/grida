@@ -20,6 +20,8 @@ export type OnPointerDownHandler = (
   e: { event: React.MouseEvent<EventTarget, MouseEvent> } & SharedGestureState
 ) => void;
 
+const ZOOM_WITH_SCROLL_SENSITIVITY = 0.001;
+
 export function CanvasEventTarget({
   onPanning,
   onPanningStart,
@@ -45,12 +47,36 @@ export function CanvasEventTarget({
 }) {
   const interactionEventTargetRef = useRef();
 
+  let platform: PlatformName = "other";
+  useEffect(() => {
+    platform = getCurrentPlatform(window.navigator);
+  });
+
+  const transform_wheel_to_zoom = (s) => {
+    return {
+      ...s,
+      delta: [s.delta[1] * ZOOM_WITH_SCROLL_SENSITIVITY, 0],
+    };
+  };
+
   useGesture(
     {
       onPinch: onZooming,
       onPinchStart: onZoomingStart,
       onPinchEnd: onZoomingEnd,
-      onWheel: onPanning,
+      onWheel: (s) => {
+        if (s.ctrlKey) {
+          // crtl key is also enabled on onPinch - we don't have to explicitly add linux & windows support for ctrl + scroll.
+          return;
+        } else {
+          // only for mac
+          if (s.metaKey) {
+            onZooming(transform_wheel_to_zoom(s));
+            return;
+          }
+        }
+        onPanning(s);
+      },
       onWheelStart: onPanningStart,
       onWheelEnd: onPanningEnd,
       onMove: onPointerMove,
@@ -76,3 +102,16 @@ const EventTargetContainer = styled.div`
   overflow: hidden;
   touch-action: none;
 `;
+
+type PlatformName = "mac" | "win" | "linux" | "other";
+
+const getCurrentPlatform = (navigator?: { platform: string }): PlatformName =>
+  typeof navigator === "undefined"
+    ? "other"
+    : /Mac/.test(navigator.platform)
+    ? "mac"
+    : /Win/.test(navigator.platform)
+    ? "win"
+    : /Linux|X11/.test(navigator.platform)
+    ? "linux"
+    : "other";

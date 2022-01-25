@@ -25,6 +25,7 @@ const designq = utils.query;
 const INITIAL_SCALE = 1;
 const INITIAL_XY: XY = [0, 0];
 const LAYER_HOVER_HIT_MARGIN = 3.5;
+const MIN_ZOOM = 0.05;
 
 type CanvasTransform = {
   scale: number;
@@ -80,6 +81,10 @@ export function Canvas({
   }, [highlightedLayer]);
 
   const onPointerMove: OnPointerMoveHandler = (state) => {
+    if (isPanning || isZooming) {
+      // don't perform hover calculation while transforming.
+      return;
+    }
     const hovering = get_hovering_target({
       point: state.xy,
       tree: nodes,
@@ -110,7 +115,7 @@ export function Canvas({
       state.event.clientY ?? 0,
     ];
 
-    const newzoom = Math.max(zoom + zoomdelta, 0.1);
+    const newzoom = Math.max(zoom + zoomdelta, MIN_ZOOM);
     setZoom(newzoom);
 
     const delta = transform_by_zoom_delta(zoomdelta, zoompoint);
