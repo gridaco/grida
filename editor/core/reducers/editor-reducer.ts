@@ -10,7 +10,7 @@ export function editorReducer(state: EditorState, action: Action): EditorState {
       console.clear();
       console.info("cleard console by editorReducer#select-node");
       return produce(state, (draft) => {
-        draft.selectedNodes = [node];
+        draft.selectedNodes = [node].filter(Boolean);
       });
     }
     case "select-page": {

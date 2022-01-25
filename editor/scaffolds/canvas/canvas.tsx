@@ -9,7 +9,7 @@ import { useDispatch } from "core/dispatch";
 /**
  * Statefull canvas segment that contains canvas as a child, with state-data connected.
  */
-export function CanvasSegment({ fileid }: { fileid: string }) {
+export function VisualContentArea({ fileid }: { fileid: string }) {
   const [state] = useEditorState();
   const { highlightedLayer, highlightLayer } = useWorkspace();
   const dispatch = useDispatch();

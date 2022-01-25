@@ -1,1 +1,1 @@
-export { CanvasSegment as Canvas } from "./canvas";
+export { VisualContentArea as Canvas } from "./canvas";
