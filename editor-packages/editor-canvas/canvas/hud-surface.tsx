@@ -65,6 +65,9 @@ export function HudSurface({
               xy={absxy}
               wh={[node.width, node.height]}
               zoom={zoom}
+              selected={selectedNodes.some(
+                (selectedNode) => selectedNode.id === node.id
+              )}
               onSelect={() => onSelectNode(node.id)}
               onHoverChange={(hv) => {
                 if (hv) {

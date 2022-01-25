@@ -9,6 +9,7 @@ export function FrameTitle({
   wh,
   zoom,
   highlight = false,
+  selected,
   onHoverChange,
   onSelect,
 }: {
@@ -23,12 +24,13 @@ export function FrameTitle({
   wh: [number, number];
   zoom: number;
   highlight?: boolean;
+  selected?: boolean;
   onHoverChange?: (hover: boolean) => void;
   onSelect?: () => void;
 }) {
   const [x, y] = xy;
   const [w, h] = wh;
-  const view_height = 20;
+  const view_height = 24;
 
   const height_considered_y_transform = y - view_height;
 
@@ -58,12 +60,13 @@ export function FrameTitle({
         transform: `translateX(${x}px) translateY(${height_considered_y_transform}px)`,
         display: "flex",
         flexDirection: "row",
+        alignItems: "center",
       }}
       {...hoverProps}
     >
       <TitleLabel
         color={
-          highlight || hoverred
+          selected || highlight || hoverred
             ? color_frame_title.highlight
             : color_frame_title.default
         }
