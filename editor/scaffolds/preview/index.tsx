@@ -56,19 +56,24 @@ export function Preview({
         },
       })
         .then(on_preview_result)
-        .catch(console.error);
+        .catch((e) => {
+          console.error("error while making first paint preview.", e);
+        });
 
       if (!MainImageRepository.instance.empty) {
         designToCode({
-          input: root,
+          input: _input,
           build_config: build_config,
           framework: vanilla_presets.vanilla_default,
           asset_config: { asset_repository: MainImageRepository.instance },
         })
           .then(on_preview_result)
-          .catch(console.error);
-      } else {
-        console.error("MainImageRepository is empty");
+          .catch((e) => {
+            console.error(
+              "error while making preview with image repo provided.",
+              e
+            );
+          });
       }
     }
   }, [target?.id]);

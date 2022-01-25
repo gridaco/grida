@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { DefaultEditorWorkspaceLayout } from "layouts/default-editor-workspace-layout";
 import {
   WorkspaceContentPanel,
@@ -15,9 +15,39 @@ import { colors } from "theme";
 import { Debugger } from "@code-editor/debugger";
 import { CodeSegment } from "scaffolds/code";
 
+import { RemoteImageRepositories } from "@design-sdk/figma-remote/lib/asset-repository/image-repository";
+import {
+  ImageRepository,
+  MainImageRepository,
+} from "@design-sdk/core/assets-repository";
+import { useFigmaAccessToken } from "hooks";
+
 export function Editor() {
   const wstate = useWorkspaceState();
   const [state] = useEditorState();
+
+  const fat = useFigmaAccessToken();
+
+  useEffect(() => {
+    // ------------------------------------------------------------
+    // other platforms are not supported yet
+    // set image repo for figma platform
+    if (state.design) {
+      MainImageRepository.instance = new RemoteImageRepositories(
+        state.design.key,
+        {
+          authentication: fat,
+        }
+      );
+      MainImageRepository.instance.register(
+        new ImageRepository(
+          "fill-later-assets",
+          "grida://assets-reservation/images/"
+        )
+      );
+    }
+    // ------------------------------------------------------------
+  }, [state.design?.key, fat.accessToken]);
 
   const _initially_loaded = state.design?.pages?.length > 0;
   const _initial_load_progress =

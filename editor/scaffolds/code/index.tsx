@@ -6,13 +6,10 @@ import { EditorAppbarFragments } from "components/editor";
 import { get_framework_config } from "query/to-code-options-from-query";
 import { CodeOptionsControl } from "components/codeui-code-options-control";
 import { designToCode, Result } from "@designto/code";
-import { RemoteImageRepositories } from "@design-sdk/figma-remote/lib/asset-repository/image-repository";
+
 import { config } from "@designto/config";
-import {
-  ImageRepository,
-  MainImageRepository,
-} from "@design-sdk/core/assets-repository";
-import { useFigmaAccessToken } from "hooks";
+import { MainImageRepository } from "@design-sdk/core/assets-repository";
+
 import { DesignInput } from "@designto/config/input";
 import { useEditorState, useWorkspaceState } from "core/states";
 
@@ -24,7 +21,6 @@ export function CodeSegment() {
   const [result, setResult] = useState<Result>();
   const wstate = useWorkspaceState();
   const [state] = useEditorState();
-  const fat = useFigmaAccessToken();
   const [framework_config, set_framework_config] = useState(
     wstate.preferences.framework_config
   );
@@ -62,27 +58,6 @@ export function CodeSegment() {
   const targetStateRef = useRef();
   //@ts-ignore
   targetStateRef.current = targetted;
-
-  useEffect(() => {
-    // ------------------------------------------------------------
-    // other platforms are not supported yet
-    // set image repo for figma platform
-    if (state.design) {
-      MainImageRepository.instance = new RemoteImageRepositories(
-        state.design.key,
-        {
-          authentication: fat,
-        }
-      );
-      MainImageRepository.instance.register(
-        new ImageRepository(
-          "fill-later-assets",
-          "grida://assets-reservation/images/"
-        )
-      );
-    }
-    // ------------------------------------------------------------
-  }, [state.design?.key, fat.accessToken]);
 
   const on_result = (result: Result) => {
     //@ts-ignore
