@@ -207,10 +207,7 @@ function ReadonlyHandle({
   }
 
   // translate x, y
-  const [tx, ty] = [
-    dx - size / 2 - outlineWidth / 2,
-    dy - size / 2 - outlineWidth / 2,
-  ];
+  const [tx, ty] = [dx - size / 2 - outlineWidth, dy - size / 2 - outlineWidth];
 
   return (
     <div

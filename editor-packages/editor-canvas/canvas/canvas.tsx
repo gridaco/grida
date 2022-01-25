@@ -15,10 +15,12 @@ import {
   OnPointerDownHandler,
 } from "../canvas-event-target";
 import { transform_by_zoom_delta, get_hovering_target } from "../math";
-
+import { utils } from "@design-sdk/core";
 import { LazyFrame } from "@code-editor/canvas/lazy-frame";
 import { HudSurface } from "./hud-surface";
 import type { XY, XYWH } from "../types";
+
+const designq = utils.query;
 
 const INITIAL_SCALE = 1;
 const INITIAL_XY: XY = [0, 0];
@@ -36,33 +38,45 @@ interface CanvasState {
   readonly?: boolean;
 }
 
+interface CanvsPreferences {
+  can_highlight_selected_layer?: boolean;
+}
+
+const default_canvas_preferences: CanvsPreferences = {
+  can_highlight_selected_layer: false,
+};
+
 export function Canvas({
   renderItem,
   onSelectNode,
+  onClearSelection,
   nodes,
   highlightedLayer,
   selectedNodes,
   readonly = true,
+  config = default_canvas_preferences,
 }: {
   renderItem: (node: ReflectSceneNode) => React.ReactNode;
   onSelectNode?: (node: ReflectSceneNode) => void;
-} & CanvasState) {
+  onClearSelection?: () => void;
+} & CanvasState & {
+    config?: CanvsPreferences;
+  }) {
   const [zoom, setZoom] = useState(INITIAL_SCALE);
   const [isZooming, setIsZooming] = useState(false);
   const [xy, setXY] = useState<[number, number]>(INITIAL_XY);
   const [isPanning, setIsPanning] = useState(false);
 
-  const wshighlight = useMemo(() => {
-    return highlightedLayer
-      ? nodes.find((n) => n.id === highlightedLayer)
-      : null;
-  }, [highlightedLayer]);
+  const wshighlight = highlightedLayer
+    ? designq.find_node_by_id_under_inpage_nodes(highlightedLayer, nodes)
+    : null;
 
   const [hoveringLayer, setHoveringLayer] =
     useState<ReflectSceneNode | null>(wshighlight);
 
   useEffect(() => {
     setHoveringLayer(wshighlight);
+    // console.log("wshighlight", wshighlight, highlightedLayer);
   }, [highlightedLayer]);
 
   const onPointerMove: OnPointerMoveHandler = (state) => {
@@ -79,6 +93,8 @@ export function Canvas({
   const onPointerDown: OnPointerDownHandler = (state) => {
     if (hoveringLayer) {
       onSelectNode(hoveringLayer);
+    } else {
+      onClearSelection();
     }
   };
 
@@ -102,6 +118,11 @@ export function Canvas({
   };
 
   const is_canvas_transforming = isPanning || isZooming;
+  const selected_nodes = selectedNodes
+    ?.map((id) => designq.find_node_by_id_under_inpage_nodes(id, nodes))
+    .filter(Boolean);
+
+  // console.log("selected_nodes", selected_nodes);
 
   return (
     <>
@@ -147,27 +168,29 @@ export function Canvas({
         hide={is_canvas_transforming}
         readonly={readonly}
         labelDisplayNodes={nodes}
-        selectedNodes={selectedNodes
-          ?.map((id) => nodes.find((n) => n.id === id))
-          .filter(Boolean)}
+        selectedNodes={selected_nodes}
         highlights={
           hoveringLayer
-            ? [
-                {
-                  id: hoveringLayer.id,
-                  xywh: [
-                    hoveringLayer.absoluteX,
-                    hoveringLayer.absoluteY,
-                    hoveringLayer.width,
-                    hoveringLayer.height,
-                  ],
-                },
-              ]
+            ? (config.can_highlight_selected_layer
+                ? [hoveringLayer]
+                : noduplicates([hoveringLayer], selected_nodes)
+              ).map((h) => ({
+                id: h.id,
+                xywh: [h.absoluteX, h.absoluteY, h.width, h.height],
+              }))
             : []
         }
       />
     </>
   );
+}
+
+function noduplicates(
+  a: ReflectSceneNode[],
+  b: ReflectSceneNode[]
+): ReflectSceneNode[] {
+  // compare contents and return array of unique items
+  return a.filter((item) => b.indexOf(item) === -1);
 }
 
 function CanvasTransformRoot({

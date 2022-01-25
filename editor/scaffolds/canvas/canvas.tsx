@@ -36,6 +36,9 @@ export function CanvasSegment({ fileid }: { fileid: string }) {
           onSelectNode={(node) => {
             dispatch({ type: "select-node", node: node.id });
           }}
+          onClearSelection={() => {
+            dispatch({ type: "select-node", node: null });
+          }}
           nodes={thisPageNodes}
           renderItem={(node) => {
             return <Preview root={design?.input} target={node} />;

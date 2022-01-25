@@ -53,6 +53,7 @@ export function HudSurface({
           const absxy: XY = [node.absoluteX * zoom, node.absoluteY * zoom];
           return (
             <FrameTitle
+              key={node.id}
               name={node.name}
               xy={absxy}
               wh={[node.width, node.height]}
@@ -89,7 +90,7 @@ export function HudSurface({
                 type="xywhr"
                 xywh={xywh}
                 zoom={zoom}
-                width={2}
+                width={1}
               />
             );
           } else {

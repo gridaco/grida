@@ -13,6 +13,11 @@ import {
   FlattenedDisplayItemNode,
 } from "./editor-layer-heriarchy-controller";
 
+// TODO:
+// - add navigate context menu
+// - add go to main component
+// - add reveal on select
+
 export function EditorLayerHierarchy() {
   const [state] = useEditorState();
   const { highlightLayer, highlightedLayer } = useWorkspace();
@@ -43,8 +48,7 @@ export function EditorLayerHierarchy() {
       depth,
       data,
     }: FlattenedDisplayItemNode) => {
-      // const _haschildren = useMemo(() => haschildren(id), [id, depth]);
-      // const _haschildren = haschildren(id);
+      const hovered = highlightedLayer === id;
 
       return (
         <LayerRow
@@ -69,6 +73,7 @@ export function EditorLayerHierarchy() {
           onHoverChange={(hovered) => {
             highlightLayer(hovered ? id : undefined);
           }}
+          hovered={hovered}
           onMenuClick={() => {}}
           onDoubleClick={() => {}}
           onPress={() => {
@@ -79,15 +84,8 @@ export function EditorLayerHierarchy() {
         />
       );
     },
-    [dispatch, state?.selectedNodes, layers, expands]
+    [dispatch, selectedNodes, layers, expands, highlightedLayer]
   );
-
-  // const haschildren = useCallback(
-  //   (id: string) => {
-  //     return layers.some((l) => l.some((layer) => layer.parent === id));
-  //   },
-  //   [layers]
-  // );
 
   return (
     <TreeView.Root

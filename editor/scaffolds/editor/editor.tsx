@@ -22,13 +22,12 @@ import { get_framework_config } from "query/to-code-options-from-query";
 import { CodeOptionsControl } from "components/codeui-code-options-control";
 import { DesignInput } from "@designto/config/input";
 import { Canvas } from "scaffolds/canvas";
-import {
-  find_node_by_id_under_entry,
-  find_node_by_id_under_inpage_nodes,
-} from "utils/design-query";
+import { utils } from "@design-sdk/core";
 import { EditorSkeleton } from "./skeleton";
 import { colors } from "theme";
 import { Debugger } from "@code-editor/debugger";
+
+const designq = utils.query;
 
 export function Editor() {
   const router = useRouter();
@@ -53,7 +52,7 @@ export function Editor() {
     state?.selectedNodes?.length === 1 ? state.selectedNodes[0] : null;
 
   const container_of_target =
-    find_node_by_id_under_inpage_nodes(targetId, thisPageNodes) || null;
+    designq.find_node_by_id_under_inpage_nodes(targetId, thisPageNodes) || null;
 
   const root = thisPageNodes
     ? container_of_target &&
@@ -70,7 +69,7 @@ export function Editor() {
     : state.design?.input;
 
   const targetted =
-    find_node_by_id_under_entry(targetId, root?.entry) ?? root?.entry;
+    designq.find_node_by_id_under_entry(targetId, root?.entry) ?? root?.entry;
 
   const targetStateRef = useRef();
   //@ts-ignore
