@@ -55,7 +55,7 @@ export function CanvasEventTarget({
   const transform_wheel_to_zoom = (s) => {
     return {
       ...s,
-      delta: [s.delta[1] * ZOOM_WITH_SCROLL_SENSITIVITY, 0],
+      delta: [-s.delta[1] * ZOOM_WITH_SCROLL_SENSITIVITY, 0],
     };
   };
 
