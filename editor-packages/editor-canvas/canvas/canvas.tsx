@@ -71,7 +71,7 @@ export function Canvas({
   config = default_canvas_preferences,
   ...props
 }: {
-  onSelectNode?: (node: ReflectSceneNode) => void;
+  onSelectNode?: (node?: ReflectSceneNode) => void;
   onClearSelection?: () => void;
 } & CanvasCustomRenderers &
   CanvasState & {
@@ -261,6 +261,7 @@ function CanvasTransformRoot({
   return (
     <div
       style={{
+        zIndex: -1,
         position: "fixed",
         top: 0,
         left: 0,

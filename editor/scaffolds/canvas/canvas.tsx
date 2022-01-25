@@ -52,7 +52,7 @@ export function VisualContentArea({ fileid }: { fileid: string }) {
               selectedNodes={selectedNodes.filter(Boolean)}
               highlightedLayer={highlightedLayer}
               onSelectNode={(node) => {
-                dispatch({ type: "select-node", node: node.id });
+                dispatch({ type: "select-node", node: node?.id });
               }}
               onClearSelection={() => {
                 dispatch({ type: "select-node", node: null });
