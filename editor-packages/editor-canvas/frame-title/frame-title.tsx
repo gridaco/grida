@@ -93,5 +93,7 @@ export const FrameTitleLabel = styled.span<{
 }>`
   color: ${(p) => p.color};
   user-select: none;
+  overflow: hidden;
   text-overflow: ellipsis;
+  white-space: nowrap;
 `;

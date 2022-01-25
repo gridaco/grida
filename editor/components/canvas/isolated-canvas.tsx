@@ -4,6 +4,7 @@ import { useGesture } from "@use-gesture/react";
 import useMeasure from "react-use-measure";
 import { Resizable } from "re-resizable";
 import { ZoomControl } from "./controller-zoom-control";
+import { colors } from "theme";
 
 /**
  * A React Hook that returns a delta state.
@@ -156,12 +157,13 @@ export function IsolatedCanvas({
 
 const ExitButton = styled.button`
   align-self: center;
+  background-color: ${colors.color_editor_bg_on_dark};
+  box-shadow: ${colors.color_editor_bg_on_dark} 0px 0px 0px 16px inset;
   outline: none;
   border: none;
   cursor: pointer;
-  background: none;
   color: white;
-  border-radius: 2px;
+  border-radius: 4px;
   height: 24px;
 `;
 
