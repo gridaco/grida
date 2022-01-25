@@ -1,3 +1,8 @@
+// TODO:
+/**
+ * if the array's order represents the reversed index (depth) set this to true.
+ */
+
 /**
  * get the hovering target node from nested children tree.
  * - ignore invisible nodes.

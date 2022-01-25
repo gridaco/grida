@@ -62,6 +62,7 @@ export function OulineSide({
         width: d,
         height: d,
         opacity: 1,
+        pointerEvents: "none",
         willChange: "transform",
         transformOrigin: "0px, 0px",
         transform: `translateX(${trans.x}px) translateY(${trans.y}px) translateZ(0px) scaleX(${l_scalex}) scaleY(${l_scaley})`,

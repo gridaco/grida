@@ -1,3 +1,5 @@
+import React, { useState } from "react";
+import { useHover } from "@editor-ui/hooks";
 import styled from "@emotion/styled";
 import { color_frame_title } from "../theme";
 
@@ -7,8 +9,8 @@ export function FrameTitle({
   wh,
   zoom,
   highlight = false,
-  onHoverStart,
-  onHoverEnd,
+  onHoverChange,
+  onSelect,
 }: {
   name: string;
   /**
@@ -21,8 +23,8 @@ export function FrameTitle({
   wh: [number, number];
   zoom: number;
   highlight?: boolean;
-  onHoverStart?: () => void;
-  onHoverEnd?: () => void;
+  onHoverChange?: (hover: boolean) => void;
+  onSelect?: () => void;
 }) {
   const [x, y] = xy;
   const [w, h] = wh;
@@ -30,9 +32,21 @@ export function FrameTitle({
 
   const height_considered_y_transform = y - view_height;
 
+  const [hoverred, setHoverred] = useState(false);
+
+  const _onHoverChange = (hover) => {
+    setHoverred(hover);
+    onHoverChange?.(hover);
+  };
+
+  const { hoverProps } = useHover({
+    onHoverChange: _onHoverChange,
+  });
+
   return (
     <div
       id="frame-title"
+      onClick={onSelect}
       style={{
         position: "fixed",
         width: w * zoom,
@@ -42,13 +56,16 @@ export function FrameTitle({
         cursor: "default",
         overflow: "hidden",
         transform: `translateX(${x}px) translateY(${height_considered_y_transform}px)`,
+        display: "flex",
+        flexDirection: "row",
       }}
-      onMouseEnter={onHoverStart}
-      onMouseLeave={onHoverEnd}
+      {...hoverProps}
     >
       <TitleLabel
         color={
-          highlight ? color_frame_title.highlight : color_frame_title.default
+          highlight || hoverred
+            ? color_frame_title.highlight
+            : color_frame_title.default
         }
       >
         {name}

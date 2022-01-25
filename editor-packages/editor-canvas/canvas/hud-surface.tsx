@@ -2,6 +2,11 @@ import { HoverOutlineHighlight, ReadonlySelectHightlight } from "../overlay";
 import { FrameTitle } from "../frame-title";
 import type { XY, XYWH } from "../types";
 
+interface HudControls {
+  onSelectNode: (node: string) => void;
+  onHoverNode: (node: string) => void;
+}
+
 /**
  * minimum meta of displaying nodes for hud surface
  */
@@ -15,23 +20,25 @@ export interface DisplayNodeMeta {
 }
 
 export function HudSurface({
-  xy,
+  offset,
   highlights,
   zoom,
   hide,
   labelDisplayNodes,
   selectedNodes,
   readonly,
+  onSelectNode,
+  onHoverNode,
 }: {
-  xy: XY;
+  offset: XY;
+  zoom: number;
   highlights: { id: string; xywh: XYWH }[];
   labelDisplayNodes: DisplayNodeMeta[];
   selectedNodes: DisplayNodeMeta[];
-  zoom: number;
   hide: boolean;
   readonly: boolean;
-}) {
-  const [ox, oy] = xy;
+} & HudControls) {
+  const [ox, oy] = offset;
   return (
     <div
       style={{
@@ -58,8 +65,19 @@ export function HudSurface({
               xy={absxy}
               wh={[node.width, node.height]}
               zoom={zoom}
-              onHoverStart={() => {}}
-              onHoverEnd={() => {}}
+              onSelect={() => onSelectNode(node.id)}
+              onHoverChange={(hv) => {
+                if (hv) {
+                  onHoverNode(node.id);
+                } else {
+                  onHoverNode(null);
+                }
+              }}
+              highlight={
+                !![...highlights, ...selectedNodes].find(
+                  (n) => n.id === node.id
+                )
+              }
             />
           );
         })}

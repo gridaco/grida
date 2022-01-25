@@ -17,7 +17,11 @@ export function ReadonlySelectHightlight({
   const dot_size = 4;
 
   return (
-    <>
+    <div
+      style={{
+        pointerEvents: "none",
+      }}
+    >
       <>
         <ReadonlyHandle
           box={bbox}
@@ -112,7 +116,7 @@ export function ReadonlySelectHightlight({
           color={color_layer_readonly_highlight}
         />
       </>
-    </>
+    </div>
   );
 }
 

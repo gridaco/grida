@@ -47,6 +47,11 @@ const default_canvas_preferences: CanvsPreferences = {
   can_highlight_selected_layer: false,
 };
 
+interface HovringNode {
+  node: ReflectSceneNode;
+  reason: "frame-title" | "raycast" | "external";
+}
+
 export function Canvas({
   renderItem,
   onSelectNode,
@@ -68,12 +73,14 @@ export function Canvas({
   const [xy, setXY] = useState<[number, number]>(INITIAL_XY);
   const [isPanning, setIsPanning] = useState(false);
 
+  const node = (id) => designq.find_node_by_id_under_inpage_nodes(id, nodes);
+
   const wshighlight = highlightedLayer
-    ? designq.find_node_by_id_under_inpage_nodes(highlightedLayer, nodes)
+    ? ({ node: node(highlightedLayer), reason: "external" } as HovringNode)
     : null;
 
   const [hoveringLayer, setHoveringLayer] =
-    useState<ReflectSceneNode | null>(wshighlight);
+    useState<HovringNode | null>(wshighlight);
 
   useEffect(() => {
     setHoveringLayer(wshighlight);
@@ -92,7 +99,20 @@ export function Canvas({
       offset: xy,
       margin: LAYER_HOVER_HIT_MARGIN,
     });
-    setHoveringLayer(hovering);
+
+    if (!hovering) {
+      if (
+        hoveringLayer &&
+        hoveringLayer.node &&
+        hoveringLayer.reason === "frame-title"
+      ) {
+        // skip
+      } else {
+        setHoveringLayer(null);
+      }
+    } else {
+      setHoveringLayer({ node: hovering, reason: "raycast" });
+    }
   };
 
   const onPointerDown: OnPointerDownHandler = (state) => {
@@ -100,7 +120,12 @@ export function Canvas({
       return;
     }
     if (hoveringLayer) {
-      onSelectNode(hoveringLayer);
+      switch (hoveringLayer.reason) {
+        case "frame-title":
+        case "raycast":
+          onSelectNode(hoveringLayer.node);
+          break;
+      }
     } else {
       onClearSelection();
     }
@@ -176,23 +201,29 @@ export function Canvas({
         </DisableBackdropFilter>
       </CanvasTransformRoot>
       <HudSurface
-        xy={xy}
+        offset={xy}
         zoom={zoom}
         hide={is_canvas_transforming}
         readonly={readonly}
         labelDisplayNodes={nodes}
         selectedNodes={selected_nodes}
         highlights={
-          hoveringLayer
+          hoveringLayer?.node
             ? (config.can_highlight_selected_layer
-                ? [hoveringLayer]
-                : noduplicates([hoveringLayer], selected_nodes)
+                ? [hoveringLayer.node]
+                : noduplicates([hoveringLayer.node], selected_nodes)
               ).map((h) => ({
                 id: h.id,
                 xywh: [h.absoluteX, h.absoluteY, h.width, h.height],
               }))
             : []
         }
+        onHoverNode={(id) => {
+          setHoveringLayer({ node: node(id), reason: "frame-title" });
+        }}
+        onSelectNode={(id) => {
+          onSelectNode(node(id));
+        }}
       />
     </>
   );
