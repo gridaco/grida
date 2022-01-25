@@ -14,7 +14,11 @@ import {
   OnPointerMoveHandler,
   OnPointerDownHandler,
 } from "../canvas-event-target";
-import { transform_by_zoom_delta, get_hovering_target } from "../math";
+import {
+  transform_by_zoom_delta,
+  get_hovering_target,
+  centerOf,
+} from "../math";
 import { utils } from "@design-sdk/core";
 import { LazyFrame } from "@code-editor/canvas/lazy-frame";
 import { HudCustomRenderers, HudSurface } from "./hud-surface";
@@ -73,9 +77,14 @@ export function Canvas({
   CanvasState & {
     config?: CanvsPreferences;
   }) {
-  const [zoom, setZoom] = useState(INITIAL_SCALE);
+  const { center: _inicial_xy, scale: _initial_scale } = useMemo(
+    () => centerOf(null, ...nodes),
+    [nodes]
+  );
+
+  const [zoom, setZoom] = useState(_initial_scale);
   const [isZooming, setIsZooming] = useState(false);
-  const [xy, setXY] = useState<[number, number]>(INITIAL_XY);
+  const [xy, setXY] = useState<[number, number]>(_inicial_xy);
   const [isPanning, setIsPanning] = useState(false);
 
   const node = (id) => designq.find_node_by_id_under_inpage_nodes(id, nodes);
@@ -89,7 +98,6 @@ export function Canvas({
 
   useEffect(() => {
     setHoveringLayer(wshighlight);
-    // console.log("wshighlight", wshighlight, highlightedLayer);
   }, [highlightedLayer]);
 
   const onPointerMove: OnPointerMoveHandler = (state) => {

@@ -22,7 +22,7 @@ export function VisualContentArea({ fileid }: { fileid: string }) {
     ? state.design.pages
         .find((p) => p.id == selectedPage)
         .children.filter(Boolean)
-    : null;
+    : [];
 
   const isEmptyPage = thisPageNodes?.length === 0;
 
