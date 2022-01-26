@@ -14,11 +14,7 @@ import {
   OnPointerMoveHandler,
   OnPointerDownHandler,
 } from "../canvas-event-target";
-import {
-  transform_by_zoom_delta,
-  get_hovering_target,
-  centerOf,
-} from "../math";
+import { get_hovering_target, centerOf } from "../math";
 import { utils } from "@design-sdk/core";
 import { LazyFrame } from "@code-editor/canvas/lazy-frame";
 import { HudCustomRenderers, HudSurface } from "./hud-surface";
@@ -29,7 +25,7 @@ const designq = utils.query;
 const INITIAL_SCALE = 1;
 const INITIAL_XY: XY = [0, 0];
 const LAYER_HOVER_HIT_MARGIN = 3.5;
-const MIN_ZOOM = 0.05;
+const MIN_ZOOM = 0.02;
 
 type CanvasTransform = {
   scale: number;
@@ -84,7 +80,8 @@ export function Canvas({
 
   const [zoom, setZoom] = useState(_initial_scale);
   const [isZooming, setIsZooming] = useState(false);
-  const [xy, setXY] = useState<[number, number]>(_inicial_xy);
+  const [offset, setOffset] = useState<[number, number]>(_inicial_xy);
+  const nonscaled_offset: XY = [offset[0] / zoom, offset[1] / zoom]; // offset;
   const [isPanning, setIsPanning] = useState(false);
 
   const node = (id) => designq.find_node_by_id_under_inpage_nodes(id, nodes);
@@ -109,7 +106,7 @@ export function Canvas({
       point: state.xy,
       tree: nodes,
       zoom: zoom,
-      offset: xy,
+      offset: nonscaled_offset,
       margin: LAYER_HOVER_HIT_MARGIN,
     });
 
@@ -150,8 +147,9 @@ export function Canvas({
       wheeling,
     } = s;
 
-    setXY([xy[0] - x / zoom, xy[1] - y / zoom]);
+    setOffset([offset[0] - x, offset[1] - y]);
   };
+
   const onZooming: OnZoomingHandler = (state) => {
     const zoomdelta = state.delta[0];
     const zoompoint: XY = [
@@ -163,17 +161,14 @@ export function Canvas({
 
     const newzoom = Math.max(zoom + zoomdelta, MIN_ZOOM);
     setZoom(newzoom);
-
-    const delta = transform_by_zoom_delta(zoomdelta, zoompoint);
-    setXY([xy[0] + delta[0], xy[1] + delta[1]]);
+    // TODO: transform offset
+    // setOffset([offset[0], offset[1]]);
   };
 
   const is_canvas_transforming = isPanning || isZooming;
   const selected_nodes = selectedNodes
     ?.map((id) => designq.find_node_by_id_under_inpage_nodes(id, nodes))
     .filter(Boolean);
-
-  // console.log("selected_nodes", selected_nodes);
 
   return (
     <>
@@ -198,7 +193,7 @@ export function Canvas({
         onPointerDown={onPointerDown}
       >
         <HudSurface
-          offset={xy}
+          offset={nonscaled_offset}
           zoom={zoom}
           hide={is_canvas_transforming}
           readonly={readonly}
@@ -224,7 +219,7 @@ export function Canvas({
           renderFrameTitle={props.renderFrameTitle}
         />
       </CanvasEventTarget>
-      <CanvasTransformRoot scale={zoom} xy={xy}>
+      <CanvasTransformRoot scale={zoom} xy={nonscaled_offset}>
         <DisableBackdropFilter>
           {nodes?.map((node) => {
             return (
