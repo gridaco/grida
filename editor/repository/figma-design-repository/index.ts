@@ -1,6 +1,19 @@
 import { fetch } from "@design-sdk/figma-remote";
 import { FileResponse } from "@design-sdk/figma-remote-types";
-import { FigmaFileStore } from "store/fimga-file-store/figma-file-store";
+import {
+  FigmaFileStore,
+  FileResponseRecord,
+} from "store/fimga-file-store/figma-file-store";
+
+export type TFetchFileForApp = (
+  | fetch.FetchFileGeneratorReturnType
+  | FileResponseRecord
+) & {
+  /**
+   * rather this fetch is a initail fetch. this is used when blocking the user interaction until first initial whole file fetching on first entry.
+   */
+  __initial: boolean;
+};
 
 export class FigmaDesignRepository {
   constructor(
@@ -10,7 +23,7 @@ export class FigmaDesignRepository {
     const store = new FigmaFileStore(fileId);
     const existing = await store.get();
     if (existing) {
-      yield existing;
+      yield { ...existing, __initial: false } as TFetchFileForApp;
     }
 
     const _iter = fetch.fetchFile({ file: fileId, auth: this.auth });
@@ -19,18 +32,18 @@ export class FigmaDesignRepository {
       switch (next.value.__response_type) {
         case "pages":
           if (!existing) {
-            yield next.value;
+            yield { ...next.value, __initial: true } as TFetchFileForApp;
             store.upsert(next.value);
           }
           break;
         case "roots":
           if (!existing) {
-            yield next.value;
+            yield { ...next.value, __initial: true } as TFetchFileForApp;
             store.upsert(next.value);
           }
           break;
         case "whole":
-          yield next.value;
+          yield { ...next.value, __initial: false } as TFetchFileForApp;
           store.upsert(next.value);
           break;
       }

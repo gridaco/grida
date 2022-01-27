@@ -22,7 +22,14 @@ import {
 } from "@design-sdk/core/assets-repository";
 import { useFigmaAccessToken } from "hooks";
 
-export function Editor() {
+export function Editor({
+  loading = false,
+}: {
+  /**
+   * explicitly set loading to block uesr interaction.
+   */
+  loading?: boolean;
+}) {
   const wstate = useWorkspaceState();
   const [state] = useEditorState();
 
@@ -51,13 +58,16 @@ export function Editor() {
 
   const _initially_loaded = state.design?.pages?.length > 0;
   const _initial_load_progress =
-    [!!state.design?.input, state.design?.pages?.length > 0].filter(Boolean)
-      .length / 2;
+    [!!state.design?.input, state.design?.pages?.length > 0, !loading].filter(
+      Boolean
+    ).length /
+      3 +
+    0.2;
 
   return (
     <>
-      {!_initially_loaded && (
-        <EditorSkeleton percent={_initial_load_progress + 0.2} />
+      {(loading || !_initially_loaded) && (
+        <EditorSkeleton percent={_initial_load_progress * 100} />
       )}
       <DefaultEditorWorkspaceLayout
         backgroundColor={colors.color_editor_bg_on_dark}

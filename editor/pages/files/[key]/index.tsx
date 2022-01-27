@@ -1,4 +1,4 @@
-import React, { useEffect, useCallback, useReducer } from "react";
+import React, { useEffect, useCallback, useReducer, useState } from "react";
 import { useRouter } from "next/router";
 import { SigninToContinueBannerPrmoptProvider } from "components/prompt-banner-signin-to-continue";
 import { Editor, EditorDefaultProviders } from "scaffolds/editor";
@@ -12,6 +12,8 @@ export default function FileEntryEditor() {
   const router = useRouter();
   const { key } = router.query;
   const filekey = key as string;
+
+  const [loading, setLoading] = useState<boolean>(true);
 
   const [initialState, initialDispatcher] = useReducer(warmup.initialReducer, {
     type: "pending",
@@ -28,6 +30,11 @@ export default function FileEntryEditor() {
 
   useEffect(() => {
     if (file) {
+      if (!file.__initial) {
+        // when full file is loaded, allow editor with user interaction.
+        setLoading(false);
+      }
+
       let val: EditorSnapshot;
 
       // TODO: seed this as well
@@ -76,7 +83,7 @@ export default function FileEntryEditor() {
     <SigninToContinueBannerPrmoptProvider>
       <StateProvider state={safe_value} dispatch={handleDispatch}>
         <EditorDefaultProviders>
-          <Editor />
+          <Editor loading={loading} />
         </EditorDefaultProviders>
       </StateProvider>
     </SigninToContinueBannerPrmoptProvider>
