@@ -35,9 +35,11 @@ export function Preview({
         name: __target.name,
         entry: __target,
       };
-      const build_config = {
+      const build_config: config.BuildConfiguration = {
         ...config.default_build_configuration,
         disable_components: true,
+        disable_detection: true,
+        disable_flags_support: true,
       };
 
       // ----- for preview -----
@@ -95,8 +97,7 @@ export function Preview({
     <VanillaRunner
       key={preview.scaffold.raw}
       style={{
-        borderRadius: 4,
-        boxShadow: "0px 0px 48px #00000020",
+        borderRadius: 1,
       }}
       source={preview.scaffold.raw}
       width="100%"

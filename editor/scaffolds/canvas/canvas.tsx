@@ -49,6 +49,7 @@ export function VisualContentArea({ fileid }: { fileid: string }) {
             }}
           >
             <Canvas
+              key={selectedPage}
               selectedNodes={selectedNodes.filter(Boolean)}
               highlightedLayer={highlightedLayer}
               onSelectNode={(node) => {
