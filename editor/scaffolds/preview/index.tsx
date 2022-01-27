@@ -1,5 +1,4 @@
 import React, { useEffect, useState } from "react";
-import styled from "@emotion/styled";
 import { vanilla_presets } from "@grida/builder-config-preset";
 import { designToCode, Result } from "@designto/code";
 import { config } from "@designto/config";
@@ -8,23 +7,14 @@ import {
   MainImageRepository,
 } from "@design-sdk/core/assets-repository";
 import type { ReflectSceneNode } from "@design-sdk/figma-node";
-import { DesignInput } from "@designto/config/input";
 import { VanillaRunner } from "components/app-runner/vanilla-app-runner";
+import { colorFromFills } from "@design-sdk/core/utils/colors";
 
-export function Preview({
-  target,
-  root,
-}: {
-  root: DesignInput;
-  target: ReflectSceneNode;
-}) {
+export function Preview({ target }: { target: ReflectSceneNode }) {
   const [preview, setPreview] = useState<Result>();
 
   const on_preview_result = (result: Result) => {
-    //@ts-ignore
-    // if (result.id == targetStateRef?.current?.id) {
     setPreview(result);
-    // }
   };
 
   useEffect(() => {
@@ -80,16 +70,18 @@ export function Preview({
     }
   }, [target?.id]);
 
+  const bg = colorFromFills(target.fills);
+
   if (!preview) {
     return (
       <div
         style={{
-          width: "100%",
-          height: "100%",
-          borderRadius: 4,
-          boxShadow: "0px 0px 48px #00000020",
+          width: target.width,
+          height: target.height,
+          backgroundColor: bg ? "#" + bg.hex : "transparent",
+          borderRadius: 1,
         }}
-      ></div>
+      />
     );
   }
 

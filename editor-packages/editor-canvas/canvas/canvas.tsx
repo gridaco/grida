@@ -1,10 +1,4 @@
-import React, {
-  useEffect,
-  useLayoutEffect,
-  useRef,
-  useState,
-  useMemo,
-} from "react";
+import React, { useEffect, useRef, useState, useMemo } from "react";
 import { ReflectSceneNode } from "@design-sdk/figma-node";
 import styled from "@emotion/styled";
 import {
@@ -14,7 +8,7 @@ import {
   OnPointerMoveHandler,
   OnPointerDownHandler,
 } from "../canvas-event-target";
-import { get_hovering_target, centerOf } from "../math";
+import { get_hovering_target } from "../math";
 import { utils } from "@design-sdk/core";
 import { LazyFrame } from "@code-editor/canvas/lazy-frame";
 import { HudCustomRenderers, HudSurface } from "./hud-surface";
@@ -37,6 +31,7 @@ interface CanvasState {
   highlightedLayer?: string;
   selectedNodes: string[];
   readonly?: boolean;
+  initialTransform?: CanvasTransform;
 }
 
 type CanvasCustomRenderers = HudCustomRenderers & {
@@ -61,6 +56,10 @@ export function Canvas({
   onSelectNode,
   onClearSelection,
   nodes,
+  initialTransform = {
+    xy: INITIAL_XY,
+    scale: INITIAL_SCALE,
+  },
   highlightedLayer,
   selectedNodes,
   readonly = true,
@@ -73,14 +72,9 @@ export function Canvas({
   CanvasState & {
     config?: CanvsPreferences;
   }) {
-  const { center: _inicial_xy, scale: _initial_scale } = useMemo(
-    () => centerOf(null, ...nodes),
-    [nodes]
-  );
-
-  const [zoom, setZoom] = useState(_initial_scale);
+  const [zoom, setZoom] = useState(initialTransform.scale);
   const [isZooming, setIsZooming] = useState(false);
-  const [offset, setOffset] = useState<[number, number]>(_inicial_xy);
+  const [offset, setOffset] = useState<[number, number]>(initialTransform.xy);
   const nonscaled_offset: XY = [offset[0] / zoom, offset[1] / zoom]; // offset;
   const [isPanning, setIsPanning] = useState(false);
 

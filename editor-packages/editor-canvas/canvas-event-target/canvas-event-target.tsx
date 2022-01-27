@@ -5,7 +5,6 @@ import type {
   WebKitGestureEvent,
   SharedGestureState,
 } from "@use-gesture/react";
-import styled from "@emotion/styled";
 
 export type OnPanningHandler = Handler<"wheel", WheelEvent>;
 
@@ -135,25 +134,22 @@ export function CanvasEventTarget({
   );
 
   return (
-    <EventTargetContainer
+    <div
       style={{
+        position: "absolute",
+        inset: 0,
+        background: "transparent",
+        overflow: "hidden",
+        touchAction: "none",
         cursor: isSpacebarPressed ? "grab" : "default",
       }}
       id="gesture-event-listener"
       ref={interactionEventTargetRef}
     >
       {children}
-    </EventTargetContainer>
+    </div>
   );
 }
-
-const EventTargetContainer = styled.div`
-  position: absolute;
-  inset: 0px;
-  background: transparent;
-  overflow: hidden;
-  touch-action: none;
-`;
 
 type PlatformName = "mac" | "win" | "linux" | "other";
 

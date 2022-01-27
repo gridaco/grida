@@ -60,9 +60,7 @@ export function VisualContentArea({ fileid }: { fileid: string }) {
               }}
               nodes={thisPageNodes}
               renderItem={(node) => {
-                return (
-                  <Preview key={node.id} root={design?.input} target={node} />
-                );
+                return <Preview key={node.id} target={node} />;
               }}
               renderFrameTitle={(p) => (
                 <FrameTitleRenderer
