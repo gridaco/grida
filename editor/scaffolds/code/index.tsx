@@ -86,7 +86,9 @@ export function CodeSegment() {
         framework: framework_config,
         asset_config: { skip_asset_replacement: true },
         build_config: build_config,
-      }).then(on_result);
+      })
+        .then(on_result)
+        .catch(console.error);
 
       // build final code with asset fetch
       if (!MainImageRepository.instance.empty) {
@@ -95,7 +97,9 @@ export function CodeSegment() {
           framework: framework_config,
           asset_config: { asset_repository: MainImageRepository.instance },
           build_config: build_config,
-        }).then(on_result);
+        })
+          .then(on_result)
+          .catch(console.error);
       }
     }
   }, [targetted?.id, framework_config?.framework]);
