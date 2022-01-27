@@ -16,7 +16,7 @@ import type { XY, XYWH } from "../types";
 
 const designq = utils.query;
 
-const INITIAL_SCALE = 1;
+const INITIAL_SCALE = 0.5;
 const INITIAL_XY: XY = [0, 0];
 const LAYER_HOVER_HIT_MARGIN = 3.5;
 const MIN_ZOOM = 0.02;
