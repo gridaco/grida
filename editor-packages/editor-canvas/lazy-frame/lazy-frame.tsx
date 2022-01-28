@@ -3,15 +3,11 @@ import { useInViewport } from "react-in-viewport";
 
 export function LazyFrame({
   children,
-  placeholder,
   xy,
   size,
-  zoom,
 }: { children: React.ReactNode } & {
-  placeholder: React.ReactNode;
   xy: [number, number];
   size: { width: number; height: number };
-  zoom: number;
 }) {
   const visibilityRef = useRef();
   const { inViewport, enterCount } = useInViewport(visibilityRef);
@@ -34,25 +30,17 @@ export function LazyFrame({
         position: "fixed",
         width: opt_w,
         height: opt_h,
+        backgroundColor: inViewport ? undefined : "grey",
+        backdropFilter: "none!important",
       }}
       ref={visibilityRef}
     >
-      <div
-        style={{
-          top: 0,
-          left: 0,
-          position: "absolute",
-          zIndex: -1,
-        }}
-      >
-        {placeholder}
-      </div>
       {enterCount > 0 && (
         <div
           style={{
             width: "100%",
             height: "100%",
-            display: inViewport ? undefined : "none",
+            display: inViewport ? "block" : "none",
           }}
         >
           {children}

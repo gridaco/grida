@@ -13,7 +13,7 @@ import { utils } from "@design-sdk/core";
 import { LazyFrame } from "@code-editor/canvas/lazy-frame";
 import { HudCustomRenderers, HudSurface } from "./hud-surface";
 import type { XY, XYWH } from "../types";
-
+import type { FrameOptimizationFactors } from "../frame";
 const designq = utils.query;
 
 const INITIAL_SCALE = 0.5;
@@ -27,6 +27,7 @@ type CanvasTransform = {
 };
 
 interface CanvasState {
+  filekey: string;
   nodes: ReflectSceneNode[];
   highlightedLayer?: string;
   selectedNodes: string[];
@@ -35,7 +36,11 @@ interface CanvasState {
 }
 
 type CanvasCustomRenderers = HudCustomRenderers & {
-  renderItem: (node: ReflectSceneNode) => React.ReactNode;
+  renderItem: (
+    p: {
+      node: ReflectSceneNode & { filekey: string };
+    } & FrameOptimizationFactors
+  ) => React.ReactNode;
 };
 
 interface CanvsPreferences {
@@ -55,6 +60,7 @@ export function Canvas({
   renderItem,
   onSelectNode,
   onClearSelection,
+  filekey,
   nodes,
   initialTransform = {
     xy: INITIAL_XY,
@@ -216,15 +222,15 @@ export function Canvas({
       <CanvasTransformRoot scale={zoom} xy={nonscaled_offset}>
         <DisableBackdropFilter>
           {nodes?.map((node) => {
+            node["filekey"] = filekey;
             return (
-              <LazyFrame
-                key={node.id}
-                xy={[node.x, node.y]}
-                size={node}
-                zoom={zoom}
-                placeholder={<EmptyFrame />}
-              >
-                {renderItem(node)}
+              <LazyFrame key={node.id} xy={[node.x, node.y]} size={node}>
+                {renderItem({
+                  node: node as ReflectSceneNode & { filekey: string },
+                  zoom, // ? use scaled_zoom ?
+                  inViewport: true, // TODO:
+                  focused: selectedNodes.includes(node.id),
+                })}
               </LazyFrame>
             );
           })}
@@ -277,11 +283,3 @@ function DisableBackdropFilter({ children }: { children: React.ReactNode }) {
     </div>
   );
 }
-
-const EmptyFrame = styled.div`
-  width: 100%;
-  height: 100%;
-  background-color: #e09292;
-  border-radius: 4px;
-  box-shadow: 0px 0px 48px #00000020;
-`;

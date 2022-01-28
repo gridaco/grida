@@ -9,34 +9,74 @@ import {
 import type { ReflectSceneNode } from "@design-sdk/figma-node";
 import { VanillaRunner } from "components/app-runner/vanilla-app-runner";
 import { colorFromFills } from "@design-sdk/core/utils/colors";
+import type { FrameOptimizationFactors } from "@code-editor/canvas/frame";
+import { remote } from "@design-sdk/figma";
 
-export function Preview({ target }: { target: ReflectSceneNode }) {
+const DEV_ONLY_FIGMA_PAT =
+  process.env.NEXT_PUBLIC_DEVELOPER_FIGMA_PERSONAL_ACCESS_TOKEN;
+
+const build_config: config.BuildConfiguration = {
+  ...config.default_build_configuration,
+  disable_components: true,
+  disable_detection: true,
+  disable_flags_support: true,
+};
+
+const framework_config: config.VanillaFrameworkConfig = {
+  ...vanilla_presets.vanilla_default,
+  additional_css_declaration: {
+    declarations: [
+      {
+        key: {
+          name: "body",
+          selector: "tag",
+        },
+        style: {
+          contain: "layout style paint",
+        },
+      },
+    ],
+  },
+};
+
+type TResultCache = Result & { __image: boolean };
+const cache = {
+  set: (key: string, value: TResultCache) => {
+    sessionStorage.setItem(key, JSON.stringify(value));
+  },
+  get: (key: string): TResultCache => {
+    const value = sessionStorage.getItem(key);
+    return value ? JSON.parse(value) : null;
+  },
+};
+
+export function Preview({
+  target,
+}: {
+  target: ReflectSceneNode & {
+    filekey: string;
+  };
+} & FrameOptimizationFactors) {
   const [preview, setPreview] = useState<Result>();
+  const key = target
+    ? `${target.filekey}-${target.id}-${new Date().getMinutes()}`
+    : null;
 
-  const on_preview_result = (result: Result) => {
+  const on_preview_result = (result: Result, __image: boolean) => {
     setPreview(result);
+    cache.set(target.filekey, { ...result, __image });
   };
 
   useEffect(() => {
-    const __target = target; // root.entry;
-    if (__target) {
-      const _input = {
-        id: __target.id,
-        name: __target.name,
-        entry: __target,
-      };
-      const build_config: config.BuildConfiguration = {
-        ...config.default_build_configuration,
-        disable_components: true,
-        disable_detection: true,
-        disable_flags_support: true,
-      };
+    if (preview) {
+      return;
+    }
 
-      // ----- for preview -----
+    const d2c_firstload = () => {
       designToCode({
         input: _input,
         build_config: build_config,
-        framework: vanilla_presets.vanilla_default,
+        framework: framework_config,
         asset_config: {
           skip_asset_replacement: false,
           asset_repository: MainImageRepository.instance,
@@ -47,19 +87,25 @@ export function Preview({ target }: { target: ReflectSceneNode }) {
           },
         },
       })
-        .then(on_preview_result)
+        .then((r) => {
+          on_preview_result(r, false);
+        })
         .catch((e) => {
           console.error("error while making first paint preview.", e);
         });
+    };
 
+    const d2c_imageload = () => {
       if (!MainImageRepository.instance.empty) {
         designToCode({
           input: _input,
           build_config: build_config,
-          framework: vanilla_presets.vanilla_default,
+          framework: framework_config,
           asset_config: { asset_repository: MainImageRepository.instance },
         })
-          .then(on_preview_result)
+          .then((r) => {
+            on_preview_result(r, true);
+          })
           .catch((e) => {
             console.error(
               "error while making preview with image repo provided.",
@@ -67,34 +113,124 @@ export function Preview({ target }: { target: ReflectSceneNode }) {
             );
           });
       }
+    };
+
+    const _input = target
+      ? {
+          id: target.id,
+          name: target.name,
+          entry: target,
+        }
+      : null;
+
+    const cached = cache.get(key);
+    if (cached) {
+      setPreview(cached);
+      if (cached.__image) {
+        return;
+      }
+      if (_input) {
+        d2c_imageload();
+      }
+    } else {
+      if (_input) {
+        d2c_firstload();
+        d2c_imageload();
+      }
     }
   }, [target?.id]);
 
-  const bg = colorFromFills(target.fills);
+  const __bg = colorFromFills(target.fills);
+  const bg_color_str = __bg ? "#" + __bg.hex : "transparent";
 
-  if (!preview) {
-    return (
-      <div
-        style={{
-          width: target.width,
-          height: target.height,
-          backgroundColor: bg ? "#" + bg.hex : "transparent",
-          borderRadius: 1,
-        }}
-      />
-    );
+  return (
+    <div
+      style={{
+        width: target.width,
+        height: target.height,
+        borderRadius: 1,
+        backgroundColor: bg_color_str,
+        contain: "layout style paint",
+      }}
+    >
+      {preview && (
+        <VanillaRunner
+          key={preview.scaffold.raw}
+          style={{
+            borderRadius: 1,
+            contain: "layout style paint",
+          }}
+          source={preview.scaffold.raw}
+          width="100%"
+          height="100%"
+          componentName={preview.name}
+        />
+      )}
+    </div>
+  );
+}
+
+function FigmaFrameImageView({
+  filekey,
+  nodeid,
+  zoom,
+}: {
+  filekey: string;
+  nodeid: string;
+  zoom: number;
+}) {
+  // fetch image
+  const [image_1, setImage_1] = useState<string>();
+  const [image_s, setImage_s] = useState<string>();
+
+  useEffect(() => {
+    // fetch image from figma
+    // fetch smaller one first, then fatch the full scaled.
+    remote
+      .fetchNodeAsImage(
+        filekey,
+        { personalAccessToken: DEV_ONLY_FIGMA_PAT },
+        nodeid
+        // scale = 1
+      )
+      .then((r) => {
+        console.log("fetched image from figma", r);
+        setImage_1(r.__default);
+        setImage_s(r.__default);
+      });
+  }, [filekey, nodeid]);
+
+  let imgscale: 1 | 0.2 = 1;
+  if (zoom > 1) {
+    return null;
+  } else if (zoom <= 1 && zoom > 0.3) {
+    imgscale = 1;
+    // display 1 scaled image
+  } else {
+    // display 0.2 scaled image
+    imgscale = 0.2;
   }
 
   return (
-    <VanillaRunner
-      key={preview.scaffold.raw}
+    <div
       style={{
-        borderRadius: 1,
+        top: 0,
+        left: 0,
+        position: "fixed",
+        width: "100%",
+        height: "100%",
       }}
-      source={preview.scaffold.raw}
-      width="100%"
-      height="100%"
-      componentName={preview.name}
-    />
+    >
+      <img
+        style={{
+          width: "100%",
+          height: "100%",
+          objectFit: "fill",
+          border: 0,
+        }}
+        src={imgscale === 1 ? image_1 : image_s}
+        alt=""
+      />
+    </div>
   );
 }

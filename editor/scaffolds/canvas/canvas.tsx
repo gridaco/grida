@@ -50,6 +50,7 @@ export function VisualContentArea({ fileid }: { fileid: string }) {
           >
             <Canvas
               key={selectedPage}
+              filekey={state.design.key}
               selectedNodes={selectedNodes.filter(Boolean)}
               highlightedLayer={highlightedLayer}
               onSelectNode={(node) => {
@@ -59,8 +60,8 @@ export function VisualContentArea({ fileid }: { fileid: string }) {
                 dispatch({ type: "select-node", node: null });
               }}
               nodes={thisPageNodes}
-              renderItem={(node) => {
-                return <Preview key={node.id} target={node} />;
+              renderItem={(p) => {
+                return <Preview key={p.node.id} target={p.node} {...p} />;
               }}
               renderFrameTitle={(p) => (
                 <FrameTitleRenderer

@@ -10,6 +10,7 @@ export default function EditorCanvasDevPage() {
       }}
     >
       <Canvas
+        filekey="unknown"
         selectedNodes={[]}
         nodes={[]}
         renderItem={function (node): React.ReactNode {
