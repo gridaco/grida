@@ -12,7 +12,7 @@ import { get_hovering_target } from "../math";
 import { utils } from "@design-sdk/core";
 import { LazyFrame } from "@code-editor/canvas/lazy-frame";
 import { HudCustomRenderers, HudSurface } from "./hud-surface";
-import type { XY, XYWH } from "../types";
+import type { XY, XYWH, CanvasTransform } from "../types";
 import type { FrameOptimizationFactors } from "../frame";
 const designq = utils.query;
 
@@ -20,11 +20,6 @@ const INITIAL_SCALE = 0.5;
 const INITIAL_XY: XY = [0, 0];
 const LAYER_HOVER_HIT_MARGIN = 3.5;
 const MIN_ZOOM = 0.02;
-
-type CanvasTransform = {
-  scale: number;
-  xy: XY;
-};
 
 interface CanvasState {
   filekey: string;
