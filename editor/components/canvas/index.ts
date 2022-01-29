@@ -1,1 +1,1 @@
-export * from "./interactive-canvas";
+export * from "./isolated-canvas";

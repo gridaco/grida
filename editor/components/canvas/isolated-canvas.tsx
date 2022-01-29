@@ -4,6 +4,7 @@ import { useGesture } from "@use-gesture/react";
 import useMeasure from "react-use-measure";
 import { Resizable } from "re-resizable";
 import { ZoomControl } from "./controller-zoom-control";
+import { colors } from "theme";
 
 /**
  * A React Hook that returns a delta state.
@@ -56,12 +57,14 @@ type InitialTransform = {
   transformOrigin: string;
 };
 
-export function InteractiveCanvas({
+export function IsolatedCanvas({
   children,
   defaultSize,
+  onExit,
 }: {
   defaultSize: { width: number; height: number };
   children?: React.ReactNode;
+  onExit?: () => void;
 }) {
   const _margin = 20;
   const [canvasSizingRef, canvasBounds] = useMeasure();
@@ -133,6 +136,7 @@ export function InteractiveCanvas({
             scale={scale}
             onChange={setScale}
           />
+          {onExit && <ExitButton onClick={onExit}>End Isolation</ExitButton>}
         </Controls>
         {/* <ScalingAreaStaticRoot> */}
         <TransformContainer
@@ -150,6 +154,18 @@ export function InteractiveCanvas({
     </InteractiveCanvasWrapper>
   );
 }
+
+const ExitButton = styled.button`
+  align-self: center;
+  background-color: ${colors.color_editor_bg_on_dark};
+  box-shadow: ${colors.color_editor_bg_on_dark} 0px 0px 0px 16px inset;
+  outline: none;
+  border: none;
+  cursor: pointer;
+  color: white;
+  border-radius: 4px;
+  height: 24px;
+`;
 
 const InteractiveCanvasWrapper = styled.div`
   display: flex;

@@ -6,7 +6,9 @@
   "repository": "https://github.com/gridaco/designto-code",
   "scripts": {
     "clean": "rimraf dist",
-    "prepack": "yarn clean && tsc"
+    "prepack": "yarn clean && tsc",
+    "storybook": "start-storybook -p 6006",
+    "build-storybook": "build-storybook"
   },
   "files": [
     "dist",
@@ -18,10 +20,17 @@
     "react": "^17.0.2"
   },
   "devDependencies": {
+    "@babel/core": "^7.16.7",
+    "@storybook/addon-actions": "^6.4.13",
+    "@storybook/addon-essentials": "^6.4.13",
+    "@storybook/addon-links": "^6.4.13",
+    "@storybook/react": "^6.4.13",
     "@types/node": "^16.11.7",
+    "babel-loader": "^8.2.3",
     "typescript": "^4.4.4"
   },
   "dependencies": {
+    "re-resizable": "^6.9.1",
     "react-use-size": "^2.0.4"
   },
   "publishConfig": {

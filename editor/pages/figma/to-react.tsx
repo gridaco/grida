@@ -8,7 +8,7 @@ import {
   WorkspaceContentPanelGridLayout,
 } from "layouts/panel";
 import { WorkspaceBottomPanelDockLayout } from "layouts/panel/workspace-bottom-panel-dock-layout";
-import { WidgetTree } from "components/visualization/json-visualization/json-tree";
+import { WidgetTree } from "@code-editor/debugger/components/visualization/json-visualization/json-tree";
 import { CodeEditor } from "components/code-editor";
 import { tokenize } from "@designto/token";
 import * as react from "@designto/react";

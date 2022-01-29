@@ -1,12 +1,12 @@
 import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
 import styled from "@emotion/styled";
+import { __dangerously_disable_scroll_in_html_body } from "../utils/remove-scroll";
 
 const _DEFAULT_MARGIN = 0;
 const _DEFAULT_SHADOW = "0px 0px 0px transparent";
 const _DEFAULT_BORDER_RADIUS = 0;
 
-export interface ResponsiveContentIframeProps {
-  type: "responsive";
+interface HtmlViewFrameProps {
   /**
    * the vanilla html code or remote embeddable web url;
    */
@@ -25,14 +25,9 @@ export interface ResponsiveContentIframeProps {
     width: number;
     height: number;
   };
+}
 
-  /**
-   * margin for the iframe to be placed
-   *
-   * @default 12
-   */
-  margin?: number;
-
+interface FrameStylingProps {
   /**
    * border radius of iframe container
    *
@@ -46,19 +41,49 @@ export interface ResponsiveContentIframeProps {
    * @default "0px 4px 64px rgba(160, 160, 160, 0.18)"
    */
   boxShadow?: string;
+
+  /**
+   * when true, disables inner iframe scroll by modifying root elements style (dangerously)
+   */
+  disableScroll?: boolean;
 }
 
-export function ResponsiveContentIframe({
-  previewInfo,
-  parentSize,
-  onScaleChange,
-}: {
-  onScaleChange: (scale: number) => void;
-  previewInfo: ResponsiveContentIframeProps;
-  parentSize: { width: number; height: number };
-}) {
-  const margin = allow_0(previewInfo.margin, _DEFAULT_MARGIN);
+export interface ScalingHtmlContentFrameProps
+  extends HtmlViewFrameProps,
+    FrameStylingProps {
+  type: "scaling";
 
+  /**
+   * parent size of this frame for scaling & marginal calculation
+   */
+  parentWidth: number;
+
+  /**
+   * margin for the iframe to be placed
+   *
+   * @default 12
+   */
+  margin?: number;
+
+  /**
+   * the max scale of the autoscaling value. (defaults to 1).
+   * set `"auto"` to enable autoscaling.
+   *
+   * @default 1
+   */
+  maxScale?: number | "auto";
+
+  onScaleChange?: (scale: number, margin: number) => void;
+}
+
+export function ScalingContentIframe({
+  onScaleChange,
+  disableScroll,
+  parentWidth,
+  maxScale = 1,
+  margin = 12,
+  ...props
+}: ScalingHtmlContentFrameProps) {
   const [scalefactor, setscalefactor] = useState(1);
   const iframeRef = useRef<HTMLIFrameElement>(undefined);
 
@@ -66,52 +91,38 @@ export function ResponsiveContentIframe({
   // ask: @softmarshmallow
   useLayoutEffect(() => {
     if (iframeRef.current) {
-      __dangerously_disable_scroll_in_html_body(iframeRef.current);
+      if (disableScroll) {
+        __dangerously_disable_scroll_in_html_body(iframeRef.current);
+      }
     }
-  }, [iframeRef, previewInfo.data]);
+  }, [iframeRef, props.data]);
 
   useEffect(() => {
-    if (previewInfo && parentSize.width) {
-      const _s =
-        (parentSize.width - margin * 2) / previewInfo.origin_size.width;
-      const framescale = Math.min(_s, 1);
-      onScaleChange(framescale);
+    if (props && parentWidth) {
+      const _s = (parentWidth - margin * 2) / props.origin_size.width;
+      const framescale =
+        typeof maxScale == "number" ? Math.min(_s, maxScale) : _s;
+      onScaleChange(framescale, margin);
       setscalefactor(framescale);
     }
-  }, [parentSize.width, parentSize.height, previewInfo?.id]);
+  }, [parentWidth, props?.id]);
 
   return (
     <PlainIframe
-      key={previewInfo.id}
+      key={props.id}
       id="preview-iframe"
       ref={iframeRef}
-      width={previewInfo?.origin_size?.width ?? 0}
-      height={previewInfo?.origin_size?.height ?? 0}
+      width={props?.origin_size?.width ?? 0}
+      height={props?.origin_size?.height ?? 0}
       sandbox="allow-same-origin"
       margin={margin}
-      borderRadius={allow_0(previewInfo?.borderRadius, _DEFAULT_BORDER_RADIUS)}
-      boxShadow={previewInfo?.boxShadow ?? _DEFAULT_SHADOW}
-      inner_view_ready={previewInfo.data !== undefined}
-      srcDoc={previewInfo.data}
+      borderRadius={allow_0(props?.borderRadius, _DEFAULT_BORDER_RADIUS)}
+      boxShadow={props?.boxShadow ?? _DEFAULT_SHADOW}
+      inner_view_ready={props.data !== undefined}
+      srcDoc={props.data}
       scale={scalefactor}
     />
   );
-}
-
-/**
- * this is a explicit temporary solution to disable iframe content to be scrolling. we aleardy disable scrolling a root element inside the body, but when the element is big and the scale factor is not persice enough, the scrollbar will be shown.
- * @ask: @softmarshmallow
- * @param iframe
- */
-function __dangerously_disable_scroll_in_html_body(iframe: HTMLIFrameElement) {
-  try {
-    iframe.contentDocument.getElementsByTagName("body")[0].style.overflow =
-      "hidden";
-  } catch (_) {
-    if (process.env.NODE_ENV === "development") {
-      console.error("__dangerously_disable_scroll_in_html_body", _);
-    }
-  }
 }
 
 /**

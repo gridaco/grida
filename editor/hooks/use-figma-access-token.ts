@@ -13,14 +13,46 @@ import { personal } from "@design-sdk/figma-auth-store";
  * ```
  * @returns
  */
-export function useFigmaAccessToken() {
+export function useFigmaAccessToken(): {
+  accessToken: { token?: string; loading: boolean; verified: boolean };
+  personalAccessToken: string;
+} {
   const personalAccessToken = personal.get_safe();
   const [fat, setFat] = useState<string>(null);
+  const [loading, setLoading] = useState<boolean>(true);
   const router = useRouter();
 
   useEffect(() => {
     setFat(router.query.fat as string); // undefined is a valid input.
+    if (router.query.fat) {
+      setLoading(false);
+    }
+  }, [router.query]);
+
+  useEffect(() => {
+    setTimeout(() => {
+      // assume router query loading is complete after this timeout
+      setLoading(false);
+    }, 50);
   }, [router]);
 
-  return { accessToken: fat, personalAccessToken: personalAccessToken };
+  if (personalAccessToken) {
+    return {
+      accessToken: {
+        token: fat,
+        loading: loading,
+        verified: false,
+      },
+      personalAccessToken,
+    };
+  }
+
+  return {
+    accessToken: {
+      token: fat,
+      loading: loading,
+      verified: false,
+    },
+    personalAccessToken: personalAccessToken,
+  };
 }
