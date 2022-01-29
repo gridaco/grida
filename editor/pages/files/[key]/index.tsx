@@ -4,9 +4,10 @@ import { SigninToContinueBannerPrmoptProvider } from "components/prompt-banner-s
 import { Editor, EditorDefaultProviders } from "scaffolds/editor";
 import { EditorSnapshot, StateProvider } from "core/states";
 import { WorkspaceAction } from "core/actions";
-import { useDesign, useDesignFile } from "hooks";
+import { useDesignFile } from "hooks";
 
 import { warmup } from "scaffolds/editor";
+import { FileResponse } from "@design-sdk/figma-remote-types";
 
 export default function FileEntryEditor() {
   const router = useRouter();
@@ -30,32 +31,7 @@ export default function FileEntryEditor() {
   const prevstate =
     initialState.type == "success" && initialState.value.history.present;
 
-  useEffect(() => {
-    if (file.__type === "loading") {
-      return;
-    }
-
-    if (file.__type === "error") {
-      // handle error by reason
-      switch (file.reason) {
-        case "unauthorized":
-        case "no-auth": {
-          router.push("/preferences/access-tokens");
-          break;
-        }
-        case "no-file": {
-          // ignore. might still be fetching file from query param.
-          break;
-        }
-      }
-      return;
-    }
-
-    if (!file.__initial) {
-      // when full file is loaded, allow editor with user interaction.
-      setLoading(false);
-    }
-
+  const initWith = (file: FileResponse) => {
     let val: EditorSnapshot;
 
     // TODO: seed this as well
@@ -96,6 +72,49 @@ export default function FileEntryEditor() {
       type: "set",
       value: val,
     });
+  };
+
+  useEffect(() => {
+    if (!loading) {
+      return;
+    }
+
+    if (file.__type === "loading") {
+      return;
+    }
+
+    if (file.__type === "error") {
+      // handle error by reason
+      switch (file.reason) {
+        case "unauthorized":
+        case "no-auth": {
+          if (file.cached) {
+            initWith(file.cached);
+            setLoading(false);
+            alert(
+              "You will now see the cached version of this file. To view the latest version, setup your personall access token."
+            );
+            // TODO: show signin prompt
+            window.open("/preferences/access-tokens", "_blank");
+          } else {
+            router.push("/preferences/access-tokens");
+          }
+          break;
+        }
+        case "no-file": {
+          // ignore. might still be fetching file from query param.
+          break;
+        }
+      }
+      return;
+    }
+
+    if (!file.__initial) {
+      // when full file is loaded, allow editor with user interaction.
+      setLoading(false);
+    }
+
+    initWith(file);
   }, [
     filekey,
     file,

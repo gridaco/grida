@@ -174,7 +174,12 @@ export function useDesign({
 
 type TUseDesignFile =
   | TFetchFileForApp
-  | { __type: "error"; reason: "no-file" | "no-auth" | "unauthorized" }
+  | {
+      __type: "error";
+      reason: "no-auth" | "unauthorized";
+      cached?: TFetchFileForApp;
+    }
+  | { __type: "error"; reason: "no-file" }
   | { __type: "loading" };
 
 export function useDesignFile({ file }: { file: string }) {
@@ -203,10 +208,21 @@ export function useDesignFile({ file }: { file: string }) {
             __type: "loading",
           });
         } else {
-          setDesignFile({
-            __type: "error",
-            reason: "no-auth",
-          });
+          // if no auth provided, try to used cached file if possible.
+          FigmaDesignRepository.fetchCachedFile(file)
+            .then((r) => {
+              setDesignFile({
+                __type: "error",
+                reason: "no-auth",
+                cached: r,
+              });
+            })
+            .catch((e) => {
+              setDesignFile({
+                __type: "error",
+                reason: "no-auth",
+              });
+            });
         }
       }
     } else {

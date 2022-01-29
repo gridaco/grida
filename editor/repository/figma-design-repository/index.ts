@@ -21,6 +21,17 @@ export class FigmaDesignRepository {
   constructor(
     readonly auth: { accessToken: string; personalAccessToken: string }
   ) {}
+
+  static async fetchCachedFile(fileId: string) {
+    const store = new FigmaFileStore(fileId);
+    const existing = await store.get();
+    if (existing) {
+      return { ...existing, __initial: false } as TFetchFileForApp;
+    } else {
+      throw new Error("file not found");
+    }
+  }
+
   async *fetchFile(fileId: string) {
     const store = new FigmaFileStore(fileId);
     const existing = await store.get();
