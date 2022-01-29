@@ -15,6 +15,9 @@ import { remote } from "@design-sdk/figma";
 const DEV_ONLY_FIGMA_PAT =
   process.env.NEXT_PUBLIC_DEVELOPER_FIGMA_PERSONAL_ACCESS_TOKEN;
 
+const placeholderimg =
+  "https://bridged-service-static.s3.us-west-1.amazonaws.com/placeholder-images/image-placeholder-bw-tile-100.png";
+
 const build_config: config.BuildConfiguration = {
   ...config.default_build_configuration,
   disable_components: true,
@@ -78,7 +81,7 @@ export function Preview({
     }
 
     const d2c_firstload = () => {
-      designToCode({
+      return designToCode({
         input: _input,
         build_config: build_config,
         framework: framework_config,
@@ -87,17 +90,10 @@ export function Preview({
           asset_repository: MainImageRepository.instance,
           custom_asset_replacement: {
             type: "static",
-            resource:
-              "https://bridged-service-static.s3.us-west-1.amazonaws.com/placeholder-images/image-placeholder-bw-tile-100.png",
+            resource: placeholderimg,
           },
         },
-      })
-        .then((r) => {
-          on_preview_result(r, false);
-        })
-        .catch((e) => {
-          console.error("error while making first paint preview.", e);
-        });
+      });
     };
 
     const d2c_imageload = () => {
@@ -139,8 +135,14 @@ export function Preview({
       }
     } else {
       if (_input) {
-        d2c_firstload();
-        d2c_imageload();
+        d2c_firstload().then((r) => {
+          on_preview_result(r, false);
+          // if the result contains a image and needs to be fetched,
+          if (r.code.raw.includes(placeholderimg)) {
+            // TODO: we don't yet have other way to know if image is used, other than checking if placeholder image is used. - this needs to be updated in d2c module to include used images meta in the result.
+            d2c_imageload();
+          }
+        });
       }
     }
   }, [target?.id]);

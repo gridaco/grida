@@ -32,7 +32,11 @@ export function VisualContentArea() {
   const [mode, setMode] = useState<"full" | "isolate">("full");
 
   return (
-    <CanvasContainer ref={canvasSizingRef} id="canvas">
+    <CanvasContainer
+      ref={canvasSizingRef}
+      id="canvas"
+      maxWidth={mode == "isolate" ? "calc((100vw - 200px) * 0.6)" : "100%"} // TODO: make this dynamic
+    >
       {/* <EditorAppbarFragments.Canvas /> */}
 
       {isEmptyPage ? (
@@ -90,8 +94,11 @@ export function VisualContentArea() {
   );
 }
 
-const CanvasContainer = styled.div`
+const CanvasContainer = styled.div<{
+  maxWidth?: string;
+}>`
   display: flex;
   flex-direction: column;
+  max-width: ${(p) => p.maxWidth};
   height: 100%;
 `;
