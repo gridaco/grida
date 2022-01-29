@@ -1,8 +1,11 @@
 import React from "react";
-export function MonacoEmptyMock() {
+export function MonacoEmptyMock({ l = 100 }: { l?: number }) {
   return (
     <div
       style={{
+        position: "relative",
+        top: 0,
+        height: 0,
         display: "flex",
         flexDirection: "column",
         width: "100%",
@@ -11,7 +14,7 @@ export function MonacoEmptyMock() {
         background: "#1e1e1e",
       }}
     >
-      {Array.from(Array(100).keys()).map((i) => (
+      {Array.from(Array(l).keys()).map((i) => (
         <span
           style={{
             left: 0,

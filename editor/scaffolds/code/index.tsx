@@ -13,6 +13,8 @@ import { MainImageRepository } from "@design-sdk/core/assets-repository";
 import { DesignInput } from "@designto/config/input";
 import { useEditorState, useWorkspaceState } from "core/states";
 
+import { utils_dart } from "utils";
+
 import { utils as _design_utils } from "@design-sdk/core";
 const designq = _design_utils.query;
 
@@ -55,15 +57,13 @@ export function CodeSegment() {
   const targetted =
     designq.find_node_by_id_under_entry(targetId, root?.entry) ?? root?.entry;
 
-  const targetStateRef = useRef();
-  //@ts-ignore
-  targetStateRef.current = targetted;
-
   const on_result = (result: Result) => {
-    //@ts-ignore
-    if (result.id == targetStateRef?.current?.id) {
-      setResult(result);
+    if (framework_config.language == "dart") {
+      // special formatter support for dartlang
+      result.code.raw = utils_dart.format(result.code.raw);
+      result.scaffold.raw = utils_dart.format(result.scaffold.raw);
     }
+    setResult(result);
   };
 
   useEffect(() => {
@@ -102,7 +102,7 @@ export function CodeSegment() {
           .catch(console.error);
       }
     }
-  }, [targetted?.id, framework_config?.framework]);
+  }, [targetted?.id, framework_config]);
 
   const { code, scaffold, name: componentName } = result ?? {};
 
