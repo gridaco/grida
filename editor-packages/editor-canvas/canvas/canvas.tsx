@@ -59,67 +59,6 @@ interface HovringNode {
   reason: "frame-title" | "raycast" | "external";
 }
 
-function auto_initial_transform(
-  viewbound: Box,
-  nodes: ReflectSceneNode[]
-): CanvasTransform {
-  const _default = {
-    scale: INITIAL_SCALE,
-    xy: INITIAL_XY,
-  };
-
-  if (!nodes || viewbound_not_measured(viewbound)) {
-    return _default;
-  }
-
-  const fit_single_node = (n: ReflectSceneNode) => {
-    return centerOf(viewbound, n);
-  };
-
-  if (nodes.length === 0) {
-    return _default;
-  } else if (nodes.length === 1) {
-    // return center the node
-    const c = fit_single_node(nodes[0]);
-    return {
-      xy: c.translate,
-      scale: c.scale,
-    };
-  } else if (nodes.length < 20) {
-    // fit bounds
-    const c = centerOf(viewbound, ...nodes);
-    return {
-      xy: c.translate,
-      scale: c.scale,
-    };
-  } else {
-    // if more than 20 nodes, just center the first one. why? -> loading all frames at once will slow down the canvas, and in most cases, we don't have to show the whole content of the canvas.
-    // fit first item
-    const c = fit_single_node(nodes[0]);
-    return {
-      xy: c.translate,
-      scale: c.scale,
-    };
-  }
-
-  return _default;
-}
-
-/**
- * when viewbound is not measured, it means the canvas is not ready to render. and the value will be `[0,0,0,0]` (from react-use-measure)
- * @param viewbound visible canvas area bound
- * @returns
- */
-const viewbound_not_measured = (viewbound: Box) => {
-  return (
-    !viewbound ||
-    (viewbound[0] === 0 &&
-      viewbound[1] === 0 &&
-      viewbound[2] === 0 &&
-      viewbound[3] === 0)
-  );
-};
-
 export function Canvas({
   viewbound,
   renderItem,
@@ -251,7 +190,8 @@ export function Canvas({
 
   const onZooming: OnZoomingHandler = (state) => {
     const zoomdelta = state.delta[0];
-    const zoompoint: XY = [
+    // the origin point of the zooming point in x, y
+    const [ox, oy]: XY = [
       // @ts-ignore
       state.event.clientX ?? 0,
       // @ts-ignore
@@ -259,9 +199,15 @@ export function Canvas({
     ];
 
     const newzoom = Math.max(zoom + zoomdelta, MIN_ZOOM);
+
+    // calculate the offset that should be applied with scale with css transform.
+    const [newx, newy] = [
+      ox - (ox - offset[0]) * (newzoom / zoom),
+      oy - (oy - offset[1]) * (newzoom / zoom),
+    ];
+
     setZoom(newzoom);
-    // TODO: transform offset
-    // setOffset([offset[0], offset[1]]);
+    setOffset([newx, newy]);
   };
 
   const is_canvas_transforming = isPanning || isZooming;
@@ -388,3 +334,64 @@ function DisableBackdropFilter({ children }: { children: React.ReactNode }) {
     </div>
   );
 }
+
+function auto_initial_transform(
+  viewbound: Box,
+  nodes: ReflectSceneNode[]
+): CanvasTransform {
+  const _default = {
+    scale: INITIAL_SCALE,
+    xy: INITIAL_XY,
+  };
+
+  if (!nodes || viewbound_not_measured(viewbound)) {
+    return _default;
+  }
+
+  const fit_single_node = (n: ReflectSceneNode) => {
+    return centerOf(viewbound, n);
+  };
+
+  if (nodes.length === 0) {
+    return _default;
+  } else if (nodes.length === 1) {
+    // return center the node
+    const c = fit_single_node(nodes[0]);
+    return {
+      xy: c.translate,
+      scale: c.scale,
+    };
+  } else if (nodes.length < 20) {
+    // fit bounds
+    const c = centerOf(viewbound, ...nodes);
+    return {
+      xy: c.translate,
+      scale: c.scale,
+    };
+  } else {
+    // if more than 20 nodes, just center the first one. why? -> loading all frames at once will slow down the canvas, and in most cases, we don't have to show the whole content of the canvas.
+    // fit first item
+    const c = fit_single_node(nodes[0]);
+    return {
+      xy: c.translate,
+      scale: c.scale,
+    };
+  }
+
+  return _default;
+}
+
+/**
+ * when viewbound is not measured, it means the canvas is not ready to render. and the value will be `[0,0,0,0]` (from react-use-measure)
+ * @param viewbound visible canvas area bound
+ * @returns
+ */
+const viewbound_not_measured = (viewbound: Box) => {
+  return (
+    !viewbound ||
+    (viewbound[0] === 0 &&
+      viewbound[1] === 0 &&
+      viewbound[2] === 0 &&
+      viewbound[3] === 0)
+  );
+};
