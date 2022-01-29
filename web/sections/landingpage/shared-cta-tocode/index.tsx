@@ -3,6 +3,7 @@ import {
   parseFileAndNodeId,
   FigmaUrlType,
   FigmaFileOrNodeIdType,
+  FigmaTargetNodeConfig,
 } from "@design-sdk/figma-url/dist";
 import { event_cta__to_code } from "analytics";
 import React, { useCallback, useEffect, useState } from "react";
@@ -135,7 +136,7 @@ export function CtaArea({ mode }: { mode: CtaOrigin }) {
           if (valid) {
             moveToCode({
               figmaAccessToken: getFigmaAccessToken__localstorage().accessToken,
-              design: url,
+              target: parsed,
             });
           } else {
             showFigmaAuthModal({
@@ -149,20 +150,29 @@ export function CtaArea({ mode }: { mode: CtaOrigin }) {
     }
   };
 
-  const moveToCode = (p: { figmaAccessToken: string; design: string }) => {
+  const moveToCode = ({
+    figmaAccessToken,
+    target,
+  }: {
+    figmaAccessToken: string;
+    target: FigmaTargetNodeConfig;
+  }) => {
     // log event
     event_cta__to_code({
       step: "submit-and-move",
-      input: p.design,
+      input: target.url,
       origin: mode,
     });
     const q = {
-      fat: p.figmaAccessToken,
-      design: p.design,
+      fat: figmaAccessToken,
+      figma: "1",
+      node: target.node,
     };
-    const url = new URL("https://code.grida.co/to-code");
-    // pass the design param
-    url.searchParams.append("design", q.design);
+    const url = new URL(`https://code.grida.co/files/${target.file}`);
+    // set the design platform
+    url.searchParams.append("figma", "1");
+    // set the target node if available
+    q.node && url.searchParams.append("node", q.node);
     // set figma access token (will be replaced with cookie)
     url.searchParams.append("fat", q.fat);
 

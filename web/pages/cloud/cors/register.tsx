@@ -1,4 +1,5 @@
 import styled from "@emotion/styled";
+import Head from "next/head";
 import { useRouter } from "next/router";
 import React from "react";
 
@@ -35,6 +36,13 @@ export default function TemporaryCorsServiceApiSignupProxyPage() {
 function CorsLoadingStateTemporarySignupForApiKey() {
   return (
     <RootWrapperCorsLoadingStateTemporarySignupForApiKey>
+      <Head>
+        <title>Grida CORS Proxy service - Register</title>
+        <meta
+          name="description"
+          content="Register your application for Free CORS Proxy service"
+        />
+      </Head>
       <Frame1>
         <Loading>Loading...</Loading>
         <CheckingYourAuthenticationState>
