@@ -1,4 +1,17 @@
-## `--root` Flag (Draft)
+---
+title: Root flag
+id: "--root"
+locale: en
+locales:
+  - en
+stage:
+  - draft
+  - staging
+  - proposal
+  - experimental
+---
+
+# `--root` Flag (Draft)
 
 This speficies that the node should be interpreted as root of the layout.
 
@@ -16,3 +29,7 @@ This speficies that the node should be interpreted as root of the layout.
 --root=false
 --root=use-static-strategy
 ```
+
+## See also
+
+- [`--unwrap`](--unwrap)

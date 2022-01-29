@@ -28,7 +28,7 @@ stage:
 `--h6${"="typeof boolean}`
 ```
 
-## Example
+**Example**
 
 ```
 --h6
