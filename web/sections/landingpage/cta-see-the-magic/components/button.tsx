@@ -1,4 +1,5 @@
 import styled from "@emotion/styled";
+import Image from "next/image";
 import React from "react";
 
 import { breakpoints } from "sections/landingpage/_breakpoints";
@@ -7,10 +8,12 @@ export function MagicButton({ onClick }: { onClick?: () => void }) {
   return (
     <Button onClick={onClick}>
       <Texts>
-        <EmojiWond
-          src="https://s3-us-west-2.amazonaws.com/figma-alpha-api/img/4341/1554/128f94840d219df83cb481ca2ddd4a50"
+        <Image
+          width="46px"
+          height="46px"
+          src="/assets/magic-wond-emoji.png"
           alt="image of EmojiWond"
-        ></EmojiWond>
+        />
       </Texts>
     </Button>
   );
@@ -62,21 +65,4 @@ const Texts = styled.div`
   width: 191px;
   height: 46px;
   box-sizing: border-box;
-`;
-
-const EmojiWond = styled.img`
-  width: 46px;
-  height: 46px;
-  object-fit: cover;
-`;
-
-const Label = styled.span`
-  color: rgba(255, 255, 255, 1);
-  text-overflow: ellipsis;
-  font-size: 24px;
-  font-family: "Helvetica Neue", sans-serif;
-  font-weight: 500;
-  letter-spacing: -1px;
-  line-height: 98%;
-  text-align: left;
 `;
