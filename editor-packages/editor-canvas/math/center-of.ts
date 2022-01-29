@@ -43,7 +43,7 @@ export function centerOf(
   // center of the box, viewbound not considered.
   const boxcenter: XY = [(x1 + x2) / 2, (y1 + y2) / 2];
   // scale factor to fix the box to the viewbound.
-  const scale = scaleToFit(box, viewbound);
+  const scale = Math.min(scaleToFit(box, viewbound), 1); // no need to zoom-in
   // center of the viewbound.
   const vbcenter: XY = [
     viewbound[0] + (viewbound[0] + viewbound[2]) / 2,
