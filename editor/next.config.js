@@ -1,3 +1,4 @@
+const TerserPlugin = require("terser-webpack-plugin");
 const withTM = require("next-transpile-modules")([
   // region @editor-app
   "@editor-app/live-session",
@@ -99,6 +100,13 @@ module.exports = withTM({
       test: /\.mjs$/,
       include: /node_modules/,
     });
+
+    const terser = config.optimization.minimizer.find(
+      (m) => m.constructor.name === "TerserPlugin"
+    );
+    // for @flutter-builder classname issue
+    terser.options.terserOptions.keep_classnames = true;
+
     return config;
   },
   async redirects() {
