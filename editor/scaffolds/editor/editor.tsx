@@ -9,11 +9,12 @@ import { EditorSidebar } from "components/editor";
 import { useEditorState, useWorkspaceState } from "core/states";
 
 import { Canvas } from "scaffolds/canvas";
+import { CodeSegment } from "scaffolds/code";
+import { Inspector } from "scaffolds/inspector";
 
 import { EditorSkeleton } from "./skeleton";
 import { colors } from "theme";
 import { Debugger } from "@code-editor/debugger";
-import { CodeSegment } from "scaffolds/code";
 
 import { RemoteImageRepositories } from "@design-sdk/figma-remote/lib/asset-repository/image-repository";
 import {
@@ -78,6 +79,7 @@ export function Editor({
       <DefaultEditorWorkspaceLayout
         backgroundColor={colors.color_editor_bg_on_dark}
         leftbar={<EditorSidebar />}
+        // rightbar={<Inspector />}
       >
         <WorkspaceContentPanelGridLayout>
           <WorkspaceContentPanel flex={6}>

@@ -4,6 +4,7 @@ import type {
   Handler,
   WebKitGestureEvent,
   SharedGestureState,
+  FullGestureState,
 } from "@use-gesture/react";
 
 export type OnPanningHandler = Handler<"wheel", WheelEvent>;
@@ -84,6 +85,9 @@ export function CanvasEventTarget({
     };
   };
 
+  const [first_wheel_event, set_first_wheel_event] =
+    useState<FullGestureState<"wheel">>();
+
   useGesture(
     {
       onPinch: onZooming,
@@ -99,10 +103,22 @@ export function CanvasEventTarget({
           return;
         } else {
           // only for mac
-          if (s.metaKey) {
+          // TODO: on firefox, cmd + scroll resizes the window zoom level. this should be prevented.
+          if (s.metaKey && first_wheel_event?.metaKey) {
             onZooming(transform_wheel_to_zoom(s));
-            // TODO: on firefox, cmd + scroll resizes the window zoom level. this should be prevented.
             return;
+          }
+          if (first_wheel_event && first_wheel_event.metaKey) {
+            if (
+              Math.sign(first_wheel_event.direction[0]) ==
+              Math.sign(s.direction[0])
+            ) {
+              onZooming(transform_wheel_to_zoom(s));
+              return;
+            } else {
+              // direction inverted, setting new state.
+              set_first_wheel_event(s);
+            }
           }
         }
         onPanning(s);
@@ -110,11 +126,15 @@ export function CanvasEventTarget({
         s.event.preventDefault();
       },
       onWheelStart: (s) => {
+        set_first_wheel_event(s);
         onPanningStart(s);
         s.event.stopPropagation();
         s.event.preventDefault();
       },
-      onWheelEnd: onPanningEnd,
+      onWheelEnd: (s) => {
+        set_first_wheel_event(undefined);
+        onPanningEnd(s);
+      },
       onMove: onPointerMove,
       onDragStart: (s) => {
         if (isSpacebarPressed) {
