@@ -7,20 +7,22 @@ import type { CanvasTransform } from "../types";
  *
  * (uses session storage)
  */
-export class PageStateStore {
+export class CanvasStateStore {
   constructor(readonly filekey: string, readonly pageid: string) {}
 
-  saveLastSelection(nodeid: string) {
+  saveLastSelection(...nodes: string[]) {
     sessionStorage.setItem(
       `canvas-page-state-store/${this.filekey}/${this.pageid}/last-selection`,
-      nodeid
+      nodes ? JSON.stringify(nodes) : null
     );
   }
 
-  getLastSelection(): string | null {
-    return sessionStorage.getItem(
+  getLastSelection(): string[] | null {
+    const pl = sessionStorage.getItem(
       `canvas-page-state-store/${this.filekey}/${this.pageid}/last-selection`
     );
+    if (!pl) return null;
+    return JSON.parse(pl);
   }
 
   saveLastTransform(transform: CanvasTransform) {

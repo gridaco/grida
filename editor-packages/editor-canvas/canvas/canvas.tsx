@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState, useMemo } from "react";
 import { ReflectSceneNode } from "@design-sdk/figma-node";
-import styled from "@emotion/styled";
+import { CanvasStateStore } from "../stores";
 import {
   CanvasEventTarget,
   OnPanningHandler,
@@ -22,6 +22,7 @@ const LAYER_HOVER_HIT_MARGIN = 3.5;
 const MIN_ZOOM = 0.02;
 
 interface CanvasState {
+  pageid: string;
   filekey: string;
   nodes: ReflectSceneNode[];
   highlightedLayer?: string;
@@ -56,11 +57,9 @@ export function Canvas({
   onSelectNode,
   onClearSelection,
   filekey,
+  pageid,
   nodes,
-  initialTransform = {
-    xy: INITIAL_XY,
-    scale: INITIAL_SCALE,
-  },
+  initialTransform,
   highlightedLayer,
   selectedNodes,
   readonly = true,
@@ -73,11 +72,23 @@ export function Canvas({
   CanvasState & {
     config?: CanvsPreferences;
   }) {
+  const _canvas_state_store = new CanvasStateStore(filekey, pageid);
+
+  initialTransform = initialTransform ??
+    _canvas_state_store.getLastTransform() ?? {
+      scale: INITIAL_SCALE,
+      xy: INITIAL_XY,
+    };
+
   const [zoom, setZoom] = useState(initialTransform.scale);
   const [isZooming, setIsZooming] = useState(false);
   const [offset, setOffset] = useState<[number, number]>(initialTransform.xy);
   const nonscaled_offset: XY = [offset[0] / zoom, offset[1] / zoom]; // offset;
   const [isPanning, setIsPanning] = useState(false);
+  const cvtransform: CanvasTransform = {
+    scale: zoom,
+    xy: offset,
+  };
 
   const node = (id) => designq.find_node_by_id_under_inpage_nodes(id, nodes);
 
@@ -173,6 +184,7 @@ export function Canvas({
           setIsPanning(true);
         }}
         onPanningEnd={() => {
+          _canvas_state_store.saveLastTransform(cvtransform);
           setIsPanning(false);
         }}
         onZooming={onZooming}
@@ -180,6 +192,7 @@ export function Canvas({
           setIsZooming(true);
         }}
         onZoomingEnd={() => {
+          _canvas_state_store.saveLastTransform(cvtransform);
           setIsZooming(false);
         }}
         onPointerMove={onPointerMove}

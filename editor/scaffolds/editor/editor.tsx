@@ -64,6 +64,9 @@ export function Editor({
       3 +
     0.2;
 
+  // this key is used for force re-rendering canvas after the whole file is fetched.
+  const _refreshkey = loading || !_initially_loaded ? "1" : "0";
+
   return (
     <>
       {(loading || !_initially_loaded) && (
@@ -75,7 +78,7 @@ export function Editor({
       >
         <WorkspaceContentPanelGridLayout>
           <WorkspaceContentPanel flex={6}>
-            <Canvas fileid={state?.design?.key} />
+            <Canvas key={_refreshkey} fileid={state?.design?.key} />
           </WorkspaceContentPanel>
           <WorkspaceContentPanel
             hidden={state.selectedNodes.length === 0}

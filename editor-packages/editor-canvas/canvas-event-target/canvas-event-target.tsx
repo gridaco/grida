@@ -137,7 +137,12 @@ export function CanvasEventTarget({
       onMoveStart: onPointerMoveStart,
       onMoveEnd: onPointerMoveEnd,
     },
-    { target: interactionEventTargetRef }
+    {
+      target: interactionEventTargetRef,
+      eventOptions: {
+        passive: false,
+      },
+    }
   );
 
   return (
