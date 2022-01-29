@@ -169,20 +169,39 @@ export function useDesign({
   return design;
 }
 
+type TUseDesignFile =
+  | TFetchFileForApp
+  | { __type: "error"; reason: "no-file" | "no-auth" | "unauthorized" }
+  | { __type: "loading" };
+
 export function useDesignFile({ file }: { file: string }) {
-  const [designfile, setDesignFile] = useState<TFetchFileForApp>(null);
+  const [designfile, setDesignFile] = useState<TUseDesignFile>({
+    __type: "loading",
+  });
   const fat = useFigmaAccessToken();
   useEffect(() => {
-    if (file && (fat.accessToken || fat.personalAccessToken)) {
-      async function handle() {
-        const repo = new FigmaDesignRepository(fat);
-        const iterator = repo.fetchFile(file);
-        let next: IteratorResult<TFetchFileForApp>;
-        while ((next = await iterator.next()).done === false) {
-          setDesignFile(next.value);
+    if (file) {
+      if (fat.accessToken || fat.personalAccessToken) {
+        async function handle() {
+          const repo = new FigmaDesignRepository(fat);
+          const iterator = repo.fetchFile(file);
+          let next: IteratorResult<TFetchFileForApp>;
+          while ((next = await iterator.next()).done === false) {
+            setDesignFile(next.value);
+          }
         }
+        handle();
+      } else {
+        setDesignFile({
+          __type: "error",
+          reason: "no-auth",
+        });
       }
-      handle();
+    } else {
+      setDesignFile({
+        __type: "error",
+        reason: "no-file",
+      });
     }
   }, [file, fat.accessToken]);
 

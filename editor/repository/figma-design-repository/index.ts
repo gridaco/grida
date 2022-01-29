@@ -13,6 +13,8 @@ export type TFetchFileForApp = (
    * rather this fetch is a initail fetch. this is used when blocking the user interaction until first initial whole file fetching on first entry.
    */
   __initial: boolean;
+
+  __type: "file-fetched-for-app";
 };
 
 export class FigmaDesignRepository {
@@ -32,18 +34,30 @@ export class FigmaDesignRepository {
       switch (next.value.__response_type) {
         case "pages":
           if (!existing) {
-            yield { ...next.value, __initial: true } as TFetchFileForApp;
+            yield {
+              ...next.value,
+              __initial: true,
+              __type: "file-fetched-for-app",
+            } as TFetchFileForApp;
             store.upsert(next.value);
           }
           break;
         case "roots":
           if (!existing) {
-            yield { ...next.value, __initial: true } as TFetchFileForApp;
+            yield {
+              ...next.value,
+              __initial: true,
+              __type: "file-fetched-for-app",
+            } as TFetchFileForApp;
             store.upsert(next.value);
           }
           break;
         case "whole":
-          yield { ...next.value, __initial: false } as TFetchFileForApp;
+          yield {
+            ...next.value,
+            __initial: false,
+            __type: "file-fetched-for-app",
+          } as TFetchFileForApp;
           store.upsert(next.value);
           break;
       }

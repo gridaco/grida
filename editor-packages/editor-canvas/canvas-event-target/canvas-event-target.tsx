@@ -100,12 +100,19 @@ export function CanvasEventTarget({
           // only for mac
           if (s.metaKey) {
             onZooming(transform_wheel_to_zoom(s));
+            // TODO: on firefox, cmd + scroll resizes the window zoom level. this should be prevented.
             return;
           }
         }
         onPanning(s);
+        s.event.stopPropagation();
+        s.event.preventDefault();
       },
-      onWheelStart: onPanningStart,
+      onWheelStart: (s) => {
+        onPanningStart(s);
+        s.event.stopPropagation();
+        s.event.preventDefault();
+      },
       onWheelEnd: onPanningEnd,
       onMove: onPointerMove,
       onDragStart: (s) => {

@@ -79,6 +79,13 @@ function HeadInjection() {
         }}
       />
 
+      {/* disable swipe back navigation on safari mac (incomplete implementation.)*/}
+      <script
+        dangerouslySetInnerHTML={{
+          __html: `function init_disable_mac_safari_swipe_back_gesture () { document.body.addEventListener('mousewheel', function(event) { var maxX = this.scrollWidth - this.offsetWidth; var maxY = this.scrollHeight - this.offsetHeight; if (this.scrollLeft + event.deltaX < 0 || this.scrollLeft + event.deltaX > maxX || this.scrollTop + event.deltaY < 0 || this.scrollTop + event.deltaY > maxY) { event.preventDefault(); this.scrollLeft = Math.max(0, Math.min(maxX, this.scrollLeft + event.deltaX)); this.scrollTop = Math.max(0, Math.min(maxY, this.scrollTop + event.deltaY)); } }, false); } window.addEventListener("DOMContentLoaded", init_disable_mac_safari_swipe_back_gesture, false);`,
+        }}
+      />
+
       {/* region Google analytics */}
       {/* https://stackoverflow.com/a/62552263 */}
       <script

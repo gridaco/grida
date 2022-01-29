@@ -40,6 +40,7 @@ const SkeletonWrap = styled.div`
 const LoadingIndicatorContainer = styled.div`
   z-index: 100;
   user-select: none;
+  cursor: default;
   display: flex;
   justify-content: flex-start;
   flex-direction: column;

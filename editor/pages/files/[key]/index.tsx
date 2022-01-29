@@ -29,54 +29,76 @@ export default function FileEntryEditor() {
     initialState.type == "success" && initialState.value.history.present;
 
   useEffect(() => {
-    if (file) {
-      if (!file.__initial) {
-        // when full file is loaded, allow editor with user interaction.
-        setLoading(false);
-      }
-
-      let val: EditorSnapshot;
-
-      // TODO: seed this as well
-      // ->> file.styles;
-
-      const components = warmup.componentsFrom(file);
-      const pages = warmup.pagesFrom(file);
-
-      if (prevstate) {
-        val = {
-          ...prevstate,
-          design: {
-            ...prevstate.design,
-            pages: pages,
-          },
-          selectedPage: warmup.selectedPage(
-            prevstate,
-            pages,
-            prevstate.selectedNodes
-          ),
-        };
-      } else {
-        val = {
-          selectedNodes: [],
-          selectedLayersOnPreview: [],
-          design: {
-            input: null,
-            components: components,
-            // styles: null,
-            key: filekey,
-            pages: pages,
-          },
-          selectedPage: warmup.selectedPage(prevstate, pages, null),
-        };
-      }
-
-      initialDispatcher({
-        type: "set",
-        value: val,
-      });
+    if (file.__type === "loading") {
+      return;
     }
-  }, [filekey, file?.document?.children]);
+
+    if (file.__type === "error") {
+      // handle error by reason
+      switch (file.reason) {
+        case "unauthorized":
+        case "no-auth": {
+          router.push("/preferences/access-tokens");
+          break;
+        }
+        case "no-file": {
+          // ignore. might still be fetching file from query param.
+          break;
+        }
+      }
+      return;
+    }
+
+    if (!file.__initial) {
+      // when full file is loaded, allow editor with user interaction.
+      setLoading(false);
+    }
+
+    let val: EditorSnapshot;
+
+    // TODO: seed this as well
+    // ->> file.styles;
+
+    const components = warmup.componentsFrom(file);
+    const pages = warmup.pagesFrom(file);
+
+    if (prevstate) {
+      val = {
+        ...prevstate,
+        design: {
+          ...prevstate.design,
+          pages: pages,
+        },
+        selectedPage: warmup.selectedPage(
+          prevstate,
+          pages,
+          prevstate.selectedNodes
+        ),
+      };
+    } else {
+      val = {
+        selectedNodes: [],
+        selectedLayersOnPreview: [],
+        design: {
+          input: null,
+          components: components,
+          // styles: null,
+          key: filekey,
+          pages: pages,
+        },
+        selectedPage: warmup.selectedPage(prevstate, pages, null),
+      };
+    }
+
+    initialDispatcher({
+      type: "set",
+      value: val,
+    });
+  }, [
+    filekey,
+    file,
+    file.__type == "file-fetched-for-app" ? file.document?.children : null,
+  ]);
 
   const safe_value = warmup.safestate(initialState);
   return (
