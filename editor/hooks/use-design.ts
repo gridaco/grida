@@ -131,7 +131,10 @@ export function useDesign({
             .fetchTargetAsReflect({
               file: targetnodeconfig.file,
               node: targetnodeconfig.node,
-              auth: fat,
+              auth: {
+                personalAccessToken: fat.personalAccessToken,
+                accessToken: fat.accessToken.token,
+              },
             })
             .then((res) => {
               cacheStore.set(res.raw); // setting cache does not need to be determined by `use_session_cache` option.
@@ -181,9 +184,12 @@ export function useDesignFile({ file }: { file: string }) {
   const fat = useFigmaAccessToken();
   useEffect(() => {
     if (file) {
-      if (fat.accessToken || fat.personalAccessToken) {
+      if (fat.personalAccessToken || fat.accessToken.token) {
         async function handle() {
-          const repo = new FigmaDesignRepository(fat);
+          const repo = new FigmaDesignRepository({
+            personalAccessToken: fat.personalAccessToken,
+            accessToken: fat.accessToken.token,
+          });
           const iterator = repo.fetchFile(file);
           let next: IteratorResult<TFetchFileForApp>;
           while ((next = await iterator.next()).done === false) {
@@ -192,10 +198,16 @@ export function useDesignFile({ file }: { file: string }) {
         }
         handle();
       } else {
-        setDesignFile({
-          __type: "error",
-          reason: "no-auth",
-        });
+        if (fat.accessToken.loading) {
+          setDesignFile({
+            __type: "loading",
+          });
+        } else {
+          setDesignFile({
+            __type: "error",
+            reason: "no-auth",
+          });
+        }
       }
     } else {
       setDesignFile({
@@ -203,7 +215,7 @@ export function useDesignFile({ file }: { file: string }) {
         reason: "no-file",
       });
     }
-  }, [file, fat.accessToken]);
+  }, [file, fat.accessToken.loading]);
 
   return designfile;
 }

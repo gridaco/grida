@@ -26,6 +26,7 @@ export default function FileEntryEditor() {
 
   // background whole file fetching
   const file = useDesignFile({ file: filekey });
+
   const prevstate =
     initialState.type == "success" && initialState.value.history.present;
 

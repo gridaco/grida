@@ -24,7 +24,6 @@ export function centerOf(
   translate: XY;
   scale: number;
 } {
-  console.log("get center of", rects, "in", viewbound);
   if (!rects || rects.length === 0) {
     return {
       box: viewbound,

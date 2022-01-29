@@ -43,7 +43,10 @@ export function Editor({
       MainImageRepository.instance = new RemoteImageRepositories(
         state.design.key,
         {
-          authentication: fat,
+          authentication: {
+            personalAccessToken: fat.personalAccessToken,
+            accessToken: fat.accessToken.token,
+          },
         }
       );
       MainImageRepository.instance.register(
