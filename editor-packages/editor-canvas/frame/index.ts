@@ -17,4 +17,14 @@ export interface FrameOptimizationFactors {
    * whether the frame is selected / focused by user
    */
   focused: boolean;
+
+  /**
+   * whether the canvas is being zoomed by user
+   */
+  isZooming: boolean;
+
+  /**
+   * whether the canvas is being panned by user
+   */
+  isPanning: boolean;
 }

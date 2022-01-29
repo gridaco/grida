@@ -189,14 +189,11 @@ export function Canvas({
   };
 
   const onZooming: OnZoomingHandler = (state) => {
+    // TODO: pinch delta is not consistent. - https://github.com/pmndrs/use-gesture/issues/435
+
     const zoomdelta = state.delta[0];
     // the origin point of the zooming point in x, y
-    const [ox, oy]: XY = [
-      // @ts-ignore
-      state.event.clientX ?? 0,
-      // @ts-ignore
-      state.event.clientY ?? 0,
-    ];
+    const [ox, oy]: XY = state.origin;
 
     const newzoom = Math.max(zoom + zoomdelta, MIN_ZOOM);
 
@@ -215,6 +212,24 @@ export function Canvas({
     ?.map((id) => designq.find_node_by_id_under_inpage_nodes(id, nodes))
     .filter(Boolean);
 
+  const items = useMemo(() => {
+    return nodes?.map((node) => {
+      node["filekey"] = filekey;
+      return (
+        <LazyFrame key={node.id} xy={[node.x, node.y]} size={node}>
+          {renderItem({
+            node: node as ReflectSceneNode & { filekey: string },
+            zoom, // ? use scaled_zoom ?
+            inViewport: true, // TODO:
+            isZooming: isZooming,
+            isPanning: isPanning,
+            focused: selectedNodes.includes(node.id),
+          })}
+        </LazyFrame>
+      );
+    });
+  }, [nodes, selectedNodes, isZooming, isPanning]);
+
   if (!transformIntitialized) {
     return <></>;
   }
@@ -227,8 +242,8 @@ export function Canvas({
           setIsPanning(true);
         }}
         onPanningEnd={() => {
-          _canvas_state_store.saveLastTransform(cvtransform);
           setIsPanning(false);
+          _canvas_state_store.saveLastTransform(cvtransform);
         }}
         onZooming={onZooming}
         onZoomingStart={() => {
@@ -271,21 +286,7 @@ export function Canvas({
         />
       </CanvasEventTarget>
       <CanvasTransformRoot scale={zoom} xy={nonscaled_offset}>
-        <DisableBackdropFilter>
-          {nodes?.map((node) => {
-            node["filekey"] = filekey;
-            return (
-              <LazyFrame key={node.id} xy={[node.x, node.y]} size={node}>
-                {renderItem({
-                  node: node as ReflectSceneNode & { filekey: string },
-                  zoom, // ? use scaled_zoom ?
-                  inViewport: true, // TODO:
-                  focused: selectedNodes.includes(node.id),
-                })}
-              </LazyFrame>
-            );
-          })}
-        </DisableBackdropFilter>
+        <DisableBackdropFilter>{items}</DisableBackdropFilter>
       </CanvasTransformRoot>
     </>
   );

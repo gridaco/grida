@@ -74,11 +74,12 @@ export function CanvasEventTarget({
       document.removeEventListener("keydown", kd);
       document.removeEventListener("keyup", ku);
     };
-  });
+  }, []);
 
   const transform_wheel_to_zoom = (s) => {
     return {
       ...s,
+      origin: [s.event.clientX, s.event.clientY],
       delta: [-s.delta[1] * ZOOM_WITH_SCROLL_SENSITIVITY, 0],
     };
   };
@@ -143,6 +144,7 @@ export function CanvasEventTarget({
         // passive to false to raise `e.preventDefault()` and `e.stopPropagation()`. - this will prevent the browser from scrolling the page, navigating with swipe gesture (safari, firefox).
         passive: false,
       },
+      pinch: {},
     }
   );
 

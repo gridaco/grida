@@ -55,6 +55,8 @@ const cache = {
 
 export function Preview({
   target,
+  isZooming,
+  isPanning,
 }: {
   target: ReflectSceneNode & {
     filekey: string;
@@ -75,7 +77,14 @@ export function Preview({
     cache.set(target.filekey, { ...result, __image });
   };
 
+  const hide_preview = isZooming || isPanning;
+
   useEffect(() => {
+    if (hide_preview) {
+      // don't make preview if zooming.
+      return;
+    }
+
     if (preview) {
       return;
     }
@@ -135,17 +144,19 @@ export function Preview({
       }
     } else {
       if (_input) {
-        d2c_firstload().then((r) => {
-          on_preview_result(r, false);
-          // if the result contains a image and needs to be fetched,
-          if (r.code.raw.includes(placeholderimg)) {
-            // TODO: we don't yet have other way to know if image is used, other than checking if placeholder image is used. - this needs to be updated in d2c module to include used images meta in the result.
-            d2c_imageload();
-          }
-        });
+        d2c_firstload()
+          .then((r) => {
+            on_preview_result(r, false);
+            // if the result contains a image and needs to be fetched,
+            if (r.code.raw.includes(placeholderimg)) {
+              // TODO: we don't yet have other way to know if image is used, other than checking if placeholder image is used. - this needs to be updated in d2c module to include used images meta in the result.
+              d2c_imageload();
+            }
+          })
+          .catch(console.error);
       }
     }
-  }, [target?.id]);
+  }, [target?.id, isZooming, isPanning]);
 
   const __bg = colorFromFills(target.fills);
   const bg_color_str = __bg ? "#" + __bg.hex : "transparent";
