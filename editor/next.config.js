@@ -111,7 +111,7 @@ module.exports = withTM({
       },
       {
         source: "/files/:key/:id",
-        destination: "/files/:key",
+        destination: "/files/:key?node=:id",
         permanent: false,
       },
     ];

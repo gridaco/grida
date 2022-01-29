@@ -4,6 +4,7 @@ import { EditorAppbarFragments } from "components/editor";
 import { Canvas } from "@code-editor/canvas";
 import { useEditorState, useWorkspace } from "core/states";
 import { Preview } from "scaffolds/preview";
+import useMeasure from "react-use-measure";
 import { useDispatch } from "core/dispatch";
 import { FrameTitleRenderer } from "./render/frame-title";
 import { IsolateModeCanvas } from "./isolate-mode";
@@ -11,8 +12,10 @@ import { IsolateModeCanvas } from "./isolate-mode";
 /**
  * Statefull canvas segment that contains canvas as a child, with state-data connected.
  */
-export function VisualContentArea({ fileid }: { fileid: string }) {
+export function VisualContentArea() {
   const [state] = useEditorState();
+  const [canvasSizingRef, canvasBounds] = useMeasure();
+
   const { highlightedLayer, highlightLayer } = useWorkspace();
   const dispatch = useDispatch();
 
@@ -29,7 +32,7 @@ export function VisualContentArea({ fileid }: { fileid: string }) {
   const [mode, setMode] = useState<"full" | "isolate">("full");
 
   return (
-    <CanvasContainer id="canvas">
+    <CanvasContainer ref={canvasSizingRef} id="canvas">
       {/* <EditorAppbarFragments.Canvas /> */}
 
       {isEmptyPage ? (
@@ -50,6 +53,12 @@ export function VisualContentArea({ fileid }: { fileid: string }) {
           >
             <Canvas
               key={selectedPage}
+              viewbound={[
+                canvasBounds.left,
+                canvasBounds.top,
+                canvasBounds.bottom,
+                canvasBounds.right,
+              ]}
               filekey={state.design.key}
               pageid={selectedPage}
               selectedNodes={selectedNodes.filter(Boolean)}
@@ -84,6 +93,5 @@ export function VisualContentArea({ fileid }: { fileid: string }) {
 const CanvasContainer = styled.div`
   display: flex;
   flex-direction: column;
-  max-width: calc((100vw - 200px) * 0.6); // TODO: make this dynamic
   height: 100%;
 `;

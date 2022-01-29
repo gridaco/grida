@@ -8,11 +8,11 @@ import {
   OnPointerMoveHandler,
   OnPointerDownHandler,
 } from "../canvas-event-target";
-import { get_hovering_target } from "../math";
+import { get_hovering_target, centerOf } from "../math";
 import { utils } from "@design-sdk/core";
 import { LazyFrame } from "@code-editor/canvas/lazy-frame";
 import { HudCustomRenderers, HudSurface } from "./hud-surface";
-import type { XY, XYWH, CanvasTransform } from "../types";
+import type { Box, XY, CanvasTransform } from "../types";
 import type { FrameOptimizationFactors } from "../frame";
 const designq = utils.query;
 
@@ -28,6 +28,13 @@ interface CanvasState {
   highlightedLayer?: string;
   selectedNodes: string[];
   readonly?: boolean;
+  /**
+   * when provided, it will override the saved value or centering logic and use this transform as initial instead.
+   *
+   * Canvas automatically saves the last transform and also automatically calculates the initial transform based on the input's complexity.
+   *
+   * @default undefined
+   */
   initialTransform?: CanvasTransform;
 }
 
@@ -52,7 +59,69 @@ interface HovringNode {
   reason: "frame-title" | "raycast" | "external";
 }
 
+function auto_initial_transform(
+  viewbound: Box,
+  nodes: ReflectSceneNode[]
+): CanvasTransform {
+  const _default = {
+    scale: INITIAL_SCALE,
+    xy: INITIAL_XY,
+  };
+
+  if (!nodes || viewbound_not_measured(viewbound)) {
+    return _default;
+  }
+
+  const fit_single_node = (n: ReflectSceneNode) => {
+    return centerOf(viewbound, n);
+  };
+
+  if (nodes.length === 0) {
+    return _default;
+  } else if (nodes.length === 1) {
+    // return center the node
+    const c = fit_single_node(nodes[0]);
+    return {
+      xy: c.translate,
+      scale: c.scale,
+    };
+  } else if (nodes.length < 20) {
+    // fit bounds
+    const c = centerOf(viewbound, ...nodes);
+    return {
+      xy: c.translate,
+      scale: c.scale,
+    };
+  } else {
+    // if more than 20 nodes, just center the first one. why? -> loading all frames at once will slow down the canvas, and in most cases, we don't have to show the whole content of the canvas.
+    // fit first item
+    const c = fit_single_node(nodes[0]);
+    return {
+      xy: c.translate,
+      scale: c.scale,
+    };
+  }
+
+  return _default;
+}
+
+/**
+ * when viewbound is not measured, it means the canvas is not ready to render. and the value will be `[0,0,0,0]` (from react-use-measure)
+ * @param viewbound visible canvas area bound
+ * @returns
+ */
+const viewbound_not_measured = (viewbound: Box) => {
+  return (
+    !viewbound ||
+    (viewbound[0] === 0 &&
+      viewbound[1] === 0 &&
+      viewbound[2] === 0 &&
+      viewbound[3] === 0)
+  );
+};
+
 export function Canvas({
+  viewbound,
   renderItem,
   onSelectNode,
   onClearSelection,
@@ -66,24 +135,48 @@ export function Canvas({
   config = default_canvas_preferences,
   ...props
 }: {
+  viewbound: Box;
   onSelectNode?: (node?: ReflectSceneNode) => void;
   onClearSelection?: () => void;
 } & CanvasCustomRenderers &
   CanvasState & {
     config?: CanvsPreferences;
   }) {
-  const _canvas_state_store = new CanvasStateStore(filekey, pageid);
+  const _canvas_state_store = useMemo(
+    () => new CanvasStateStore(filekey, pageid),
+    [filekey, pageid]
+  );
 
-  initialTransform = initialTransform ??
-    _canvas_state_store.getLastTransform() ?? {
-      scale: INITIAL_SCALE,
-      xy: INITIAL_XY,
-    };
+  useEffect(() => {
+    if (transformIntitialized) {
+      return;
+    }
 
-  const [zoom, setZoom] = useState(initialTransform.scale);
+    const _last_knwon = _canvas_state_store.getLastTransform();
+    if (_last_knwon) {
+      setZoom(_last_knwon.scale);
+      setOffset(_last_knwon.xy);
+      setTransformInitialized(true);
+      return;
+    }
+
+    if (viewbound_not_measured(viewbound)) {
+      return;
+    }
+
+    const t = auto_initial_transform(viewbound, nodes);
+    setZoom(t.scale);
+    setOffset(t.xy);
+    setTransformInitialized(true);
+  }, [viewbound]);
+
+  const [transformIntitialized, setTransformInitialized] = useState(false);
+  const [zoom, setZoom] = useState(initialTransform?.scale);
   const [isZooming, setIsZooming] = useState(false);
-  const [offset, setOffset] = useState<[number, number]>(initialTransform.xy);
-  const nonscaled_offset: XY = [offset[0] / zoom, offset[1] / zoom]; // offset;
+  const [offset, setOffset] = useState<[number, number]>(initialTransform?.xy);
+  const nonscaled_offset: XY = offset
+    ? [offset[0] / zoom, offset[1] / zoom]
+    : [0, 0];
   const [isPanning, setIsPanning] = useState(false);
   const cvtransform: CanvasTransform = {
     scale: zoom,
@@ -175,6 +268,10 @@ export function Canvas({
   const selected_nodes = selectedNodes
     ?.map((id) => designq.find_node_by_id_under_inpage_nodes(id, nodes))
     .filter(Boolean);
+
+  if (!transformIntitialized) {
+    return <></>;
+  }
 
   return (
     <>

@@ -78,7 +78,7 @@ export function Editor({
       >
         <WorkspaceContentPanelGridLayout>
           <WorkspaceContentPanel flex={6}>
-            <Canvas key={_refreshkey} fileid={state?.design?.key} />
+            <Canvas key={_refreshkey} />
           </WorkspaceContentPanel>
           <WorkspaceContentPanel
             hidden={state.selectedNodes.length === 0}

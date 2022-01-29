@@ -4,3 +4,4 @@ export type CanvasTransform = {
   scale: number;
   xy: XY;
 };
+export type Box = [number, number, number, number];

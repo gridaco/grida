@@ -1,3 +1,5 @@
+import type { Box, XY } from "../types";
+
 type Rect = {
   x: number;
   y: number;
@@ -5,8 +7,6 @@ type Rect = {
   height: number;
   rotation: number;
 };
-
-type Box = [number, number, number, number];
 
 /**
  * get center of a list of rectangles and the scale factor to fit them all.
@@ -16,43 +16,70 @@ type Box = [number, number, number, number];
  * the output is a bounding box x1, y1, x2, y2 and scale.
  */
 export function centerOf(
-  bound: Box,
+  viewbound: Box,
   ...rects: Rect[]
 ): {
   box: Box;
-  center: [number, number];
+  center: XY;
+  translate: XY;
   scale: number;
 } {
+  console.log("get center of", rects, "in", viewbound);
   if (!rects || rects.length === 0) {
     return {
-      box: [0, 0, 0, 0],
+      box: viewbound,
       center: [0, 0],
+      translate: [
+        viewbound[0] + (viewbound[0] + viewbound[2]) / 2,
+        viewbound[1] + (viewbound[1] + viewbound[3]) / 2,
+      ],
       scale: 1,
     };
   }
 
+  const [x1, y1, x2, y2] = bound(...rects);
+  // box containing the rects.
+  const box: Box = [x1, y1, x2, y2];
+  // center of the box, viewbound not considered.
+  const boxcenter: XY = [(x1 + x2) / 2, (y1 + y2) / 2];
+  // scale factor to fix the box to the viewbound.
+  const scale = scaleToFit(box, viewbound);
+  // center of the viewbound.
+  const vbcenter: XY = [
+    viewbound[0] + (viewbound[0] + viewbound[2]) / 2,
+    viewbound[1] + (viewbound[1] + viewbound[3]) / 2,
+  ];
+
+  // translate x, y to center the box's center into the viewbound's center considering the scale.
+  const translate: XY = [
+    vbcenter[0] - boxcenter[0] * scale,
+    vbcenter[1] - boxcenter[1] * scale,
+  ];
+
+  console.log(translate, scale);
+
+  return {
+    box: box,
+    center: boxcenter,
+    translate: translate,
+    scale: scale,
+  };
+}
+
+function bound(...rects: Rect[]): Box {
   let x1 = Infinity;
   let y1 = Infinity;
   let x2 = -Infinity;
   let y2 = -Infinity;
-
   for (const rect of rects) {
-    const { x, y, width: w, height: h, rotation: r } = rect;
-    const [cx, cy] = rotate(x + w / 2, y + h / 2, r);
-    x1 = Math.min(x1, cx - w / 2);
-    y1 = Math.min(y1, cy - h / 2);
-    x2 = Math.max(x2, cx + w / 2);
-    y2 = Math.max(y2, cy + h / 2);
+    const { x, y, width: w, height: h } = rect;
+    // TODO: handle rotation. (no rotation for now)
+    x1 = Math.min(x1, x);
+    y1 = Math.min(y1, y);
+    x2 = Math.max(x2, x + w);
+    y2 = Math.max(y2, y + h);
   }
-  const ww = x2 - x1;
-  const hh = y2 - y1;
-  const box: Box = [x1, y1, x2, y2];
-
-  return {
-    box: box,
-    center: [(x1 + x2) / 2, (y1 + y2) / 2],
-    scale: scaleToFit(bound, box),
-  };
+  return [x1, y1, x2, y2];
 }
 
 function rotate(x: number, y: number, r: number): [number, number] {

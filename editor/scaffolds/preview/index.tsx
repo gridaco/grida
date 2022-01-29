@@ -63,6 +63,11 @@ export function Preview({
     : null;
 
   const on_preview_result = (result: Result, __image: boolean) => {
+    if (preview) {
+      if (preview.code === result.code) {
+        return;
+      }
+    }
     setPreview(result);
     cache.set(target.filekey, { ...result, __image });
   };

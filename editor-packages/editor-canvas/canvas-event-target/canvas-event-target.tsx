@@ -140,6 +140,7 @@ export function CanvasEventTarget({
     {
       target: interactionEventTargetRef,
       eventOptions: {
+        // passive to false to raise `e.preventDefault()` and `e.stopPropagation()`. - this will prevent the browser from scrolling the page, navigating with swipe gesture (safari, firefox).
         passive: false,
       },
     }
