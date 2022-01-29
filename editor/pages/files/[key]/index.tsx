@@ -4,14 +4,15 @@ import { SigninToContinueBannerPrmoptProvider } from "components/prompt-banner-s
 import { Editor, EditorDefaultProviders } from "scaffolds/editor";
 import { EditorSnapshot, StateProvider } from "core/states";
 import { WorkspaceAction } from "core/actions";
-import { useDesignFile } from "hooks";
+import { useDesign, useDesignFile } from "hooks";
 
 import { warmup } from "scaffolds/editor";
 
 export default function FileEntryEditor() {
   const router = useRouter();
-  const { key } = router.query;
+  const { key, node } = router.query;
   const filekey = key as string;
+  const nodeid = node as string;
 
   const [loading, setLoading] = useState<boolean>(true);
 
@@ -111,3 +112,47 @@ export default function FileEntryEditor() {
     </SigninToContinueBannerPrmoptProvider>
   );
 }
+
+/**
+ * TODO: support single design fetching
+  // if target node is provided from query, use it.
+  const design = useDesign({
+    type: "use-file-node-id",
+    file: filekey,
+    node: nodeid,
+  });
+
+
+  useEffect(() => {
+    if (!loading) {
+      // if already loaded, ignore target node change.
+      return;
+    }
+    if (design) {
+      if (initialState.type === "success") return;
+      initialDispatcher({
+        type: "set",
+        value: warmup.initializeDesign(design),
+      });
+    }
+  }, [design, router.query, loading]);
+
+  // under main hook
+  if (design) {
+    const initialState = warmup.initializeDesign(design);
+    val = {
+      ...initialState,
+      design: {
+        ...initialState.design,
+        pages: pages,
+      },
+      selectedPage: warmup.selectedPage(
+        prevstate,
+        pages,
+        initialState.selectedNodes
+      ),
+    };
+  } else {
+    
+  }
+ */
