@@ -37,16 +37,13 @@ export function FrameTitleRenderer({
     onHoverChange: _onHoverChange,
   });
 
-  x;
-  height_considered_y_transform;
-  view_height;
-  w * zoom;
   return (
     <FrameTitleContainer
       id="frame-title"
       onClick={onSelect}
-      width={w * zoom}
+      width={selected ? Math.max(w * zoom, 40) : w * zoom}
       height={view_height}
+      zIndex={selected ? 1 : 0}
       xy={[x, height_considered_y_transform]}
       {...hoverProps}
     >

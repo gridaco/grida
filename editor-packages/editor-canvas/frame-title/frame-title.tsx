@@ -73,6 +73,7 @@ export function FrameTitle({
 export const FrameTitleContainer = styled.div<{
   width: number;
   height: number;
+  zIndex?: number;
   xy: [number, number];
 }>`
   position: fixed;
@@ -86,6 +87,7 @@ export const FrameTitleContainer = styled.div<{
   font-size: 12px;
   flex-direction: row;
   align-items: center;
+  z-index: ${(p) => p.zIndex ?? 0};
 `;
 
 export const FrameTitleLabel = styled.span<{
