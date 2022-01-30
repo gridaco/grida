@@ -20,5 +20,5 @@ const InspectorContainer = styled.div`
   width: 200px;
   height: 100%;
   background-color: ${colors.color_editor_bg_on_dark};
-  /* background-color: ${(props) => props.theme.colors.background}; */
 `;
+/* background-color: ${(props) => props.theme.colors.background}; */
