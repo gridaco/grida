@@ -16,6 +16,8 @@ export type OnZoomingHandler = Handler<
 
 export type OnPointerMoveHandler = Handler<"move">;
 
+export type OnDragHandler = Handler<"drag">;
+
 export type OnPointerDownHandler = (
   e: { event: React.MouseEvent<EventTarget, MouseEvent> } & SharedGestureState
 ) => void;
@@ -33,6 +35,9 @@ export function CanvasEventTarget({
   onPointerMoveStart,
   onPointerMoveEnd,
   onPointerDown,
+  onDrag,
+  onDragStart,
+  onDragEnd,
   children,
 }: {
   onPanning: OnPanningHandler;
@@ -45,6 +50,9 @@ export function CanvasEventTarget({
   onPointerMoveStart: OnPointerMoveHandler;
   onPointerMoveEnd: OnPointerMoveHandler;
   onPointerDown: OnPointerDownHandler;
+  onDrag: OnDragHandler;
+  onDragStart: OnDragHandler;
+  onDragEnd: OnDragHandler;
   children?: React.ReactNode;
 }) {
   const interactionEventTargetRef = useRef();
@@ -139,7 +147,10 @@ export function CanvasEventTarget({
       onDragStart: (s) => {
         if (isSpacebarPressed) {
           onPanningStart(s as any);
+          return;
         }
+
+        onDragStart(s);
       },
       onDrag: (s) => {
         if (isSpacebarPressed) {
@@ -147,12 +158,18 @@ export function CanvasEventTarget({
             ...s,
             delta: [-s.delta[0], -s.delta[1]],
           } as any);
+          return;
         }
+
+        onDrag(s);
       },
       onDragEnd: (s) => {
         if (isSpacebarPressed) {
           onPanningEnd(s as any);
+          return;
         }
+
+        onDragEnd(s);
       },
       onMouseDown: onPointerDown,
       onMoveStart: onPointerMoveStart,

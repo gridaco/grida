@@ -2,7 +2,7 @@ import React from "react";
 import { HoverOutlineHighlight, ReadonlySelectHightlight } from "../overlay";
 import { FrameTitle, FrameTitleProps } from "../frame-title";
 import type { XY, XYWH } from "../types";
-
+import { Marquee } from "../marquee";
 interface HudControls {
   onSelectNode: (node: string) => void;
   onHoverNode: (node: string) => void;
@@ -34,6 +34,7 @@ export function HudSurface({
   readonly,
   onSelectNode,
   onHoverNode,
+  marquee,
   //
   renderFrameTitle = frame_title_default_renderer,
 }: {
@@ -43,6 +44,7 @@ export function HudSurface({
   labelDisplayNodes: DisplayNodeMeta[];
   selectedNodes: DisplayNodeMeta[];
   hide: boolean;
+  marquee?: XYWH;
   readonly: boolean;
 } & HudControls &
   HudCustomRenderers) {
@@ -63,6 +65,7 @@ export function HudSurface({
       }}
       id="hud-surface"
     >
+      {marquee && <Marquee rect={marquee} />}
       {!hide && (
         <>
           {labelDisplayNodes &&
