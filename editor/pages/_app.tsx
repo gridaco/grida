@@ -75,14 +75,9 @@ function HeadInjection() {
       />
       <script
         dangerouslySetInnerHTML={{
-          __html: `function init() { document.body.addEventListener("wheel", (event) => {const { ctrlKey } = event; if (ctrlKey) { event.preventDefault(); return; }}, { passive: false });} window.addEventListener("DOMContentLoaded", init, false);`,
-        }}
-      />
-
-      {/* disable swipe back navigation on safari mac (incomplete implementation.)*/}
-      <script
-        dangerouslySetInnerHTML={{
-          __html: `function init_disable_mac_safari_swipe_back_gesture () { document.body.addEventListener('mousewheel', function(event) { var maxX = this.scrollWidth - this.offsetWidth; var maxY = this.scrollHeight - this.offsetHeight; if (this.scrollLeft + event.deltaX < 0 || this.scrollLeft + event.deltaX > maxX || this.scrollTop + event.deltaY < 0 || this.scrollTop + event.deltaY > maxY) { event.preventDefault(); this.scrollLeft = Math.max(0, Math.min(maxX, this.scrollLeft + event.deltaX)); this.scrollTop = Math.max(0, Math.min(maxY, this.scrollTop + event.deltaY)); } }, false); } window.addEventListener("DOMContentLoaded", init_disable_mac_safari_swipe_back_gesture, false);`,
+          // wheel + ctrl        - disable zoom on chrome / safari
+          // wheel + meta (cmd)  - disable zoom on firefox-mac
+          __html: `function init() { document.body.addEventListener("wheel", (event) => {const { ctrlKey, metaKey } = event; if (ctrlKey || metaKey) { event.preventDefault(); return; }}, { passive: false });} window.addEventListener("DOMContentLoaded", init, false);`,
         }}
       />
 
