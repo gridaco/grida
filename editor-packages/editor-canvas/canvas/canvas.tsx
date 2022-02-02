@@ -243,6 +243,9 @@ export function Canvas({
       node["filekey"] = filekey;
       return (
         <LazyFrame key={node.id} xy={[node.x, node.y]} size={node}>
+          {/* 👇 dev only (for performance tracking) 👇 */}
+          {/* <div style={{ width: "100%", height: "100%", background: "grey" }} /> */}
+          {/* 👆 ----------------------------------- 👆 */}
           {renderItem({
             node: node as ReflectSceneNode & { filekey: string },
             zoom, // ? use scaled_zoom ?
