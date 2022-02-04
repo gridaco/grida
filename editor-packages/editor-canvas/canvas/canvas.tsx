@@ -49,10 +49,23 @@ type CanvasCustomRenderers = HudCustomRenderers & {
 
 interface CanvsPreferences {
   can_highlight_selected_layer?: boolean;
+  marquee: MarqueeOprions;
+}
+
+interface MarqueeOprions {
+  /**
+   * disable marquee - events and selection with dragging.
+   *
+   * @default false
+   */
+  disabled?: boolean;
 }
 
 const default_canvas_preferences: CanvsPreferences = {
   can_highlight_selected_layer: false,
+  marquee: {
+    disabled: false,
+  },
 };
 
 interface HovringNode {
@@ -295,6 +308,7 @@ export function Canvas({
           zoom={zoom}
           hide={is_canvas_transforming}
           readonly={readonly}
+          disableMarquee={config.marquee.disabled}
           marquee={marquee}
           labelDisplayNodes={nodes}
           selectedNodes={selected_nodes}

@@ -35,6 +35,7 @@ export function HudSurface({
   onSelectNode,
   onHoverNode,
   marquee,
+  disableMarquee = false,
   //
   renderFrameTitle = frame_title_default_renderer,
 }: {
@@ -45,6 +46,7 @@ export function HudSurface({
   selectedNodes: DisplayNodeMeta[];
   hide: boolean;
   marquee?: XYWH;
+  disableMarquee?: boolean;
   readonly: boolean;
 } & HudControls &
   HudCustomRenderers) {
@@ -65,7 +67,7 @@ export function HudSurface({
       }}
       id="hud-surface"
     >
-      {marquee && <Marquee rect={marquee} />}
+      {!disableMarquee && marquee && <Marquee rect={marquee} />}
       {!hide && (
         <>
           {labelDisplayNodes &&
