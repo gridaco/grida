@@ -109,7 +109,6 @@ export function CodeSegment() {
   }, [targetted?.id, framework_config]);
 
   const { code, scaffold, name: componentName } = result ?? {};
-
   return (
     <CodeEditorContainer>
       <EditorAppbarFragments.CodeEditor />
@@ -117,7 +116,30 @@ export function CodeSegment() {
         initialPreset={router.query.framework as string}
         fallbackPreset="react_default"
         onUseroptionChange={(o) => {
-          set_framework_config(get_framework_config(o.framework));
+          let c;
+          switch (o.framework) {
+            case "react": {
+              switch (o.styling) {
+                case "inline-css":
+                  c = get_framework_config("react-with-inline-css");
+                  break;
+                case "styled-components":
+                  c = get_framework_config("react-with-styled-components");
+                  break;
+                case "css":
+                  // TODO:
+                  break;
+              }
+              break;
+            }
+            case "flutter":
+              c = get_framework_config(o.framework);
+              break;
+            case "vanilla":
+              c = get_framework_config(o.framework);
+              break;
+          }
+          set_framework_config(c);
         }}
       />
       <CodeEditor
