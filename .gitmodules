@@ -1,9 +1,3 @@
-[submodule "externals/design-server"]
-	path = externals/design-server
-	url = https://github.com/gridaco/design-server
-[submodule "externals/design-git"]
-	path = externals/design-git
-	url = https://github.com/gridaco/design-git
 [submodule "packages/core-format"]
 	path = packages/core-format
 	url = https://github.com/gridaco/.grida
