@@ -4,8 +4,8 @@
     "dependencies": {
         "@app/scene-view": "0.0.0",
         "@app/blocks": "0.0.0",
-        "@base-sdk-fp/accounts": "^0.0.1",
-        "@base-sdk-fp/auth-components-react": "^0.0.1",
+        "@base-sdk-fp/accounts": "^0.0.3",
+        "@base-sdk-fp/auth-components-react": "^0.0.2",
         "@base-sdk/scene-store": "^0.0.8",
         "@grida.co/app": "0.0.0",
         "@radix-ui/utils": "^0.0.3",
