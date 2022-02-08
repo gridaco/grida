@@ -1,17 +1,14 @@
-import { QuicklookQueryParams } from "@base-sdk/base/features/quicklook";
-import { AppFramework } from "../../../../../externals/base-sdk/base/types/app-frameworks";
-import { AppLanguage } from "../../../../../externals/base-sdk/base/types/app-languages";
-import {
-  buildFlutterFrameUrl,
-  checkFrameSourceMode,
-} from "@base-sdk/base/frame-embed";
+import type { AppFramework } from "@base-sdk/base/types/app-frameworks";
+import type { AppLanguage } from "@base-sdk/base/types/app-languages";
+import type { ScenePreviewParams } from "@base-sdk/base/features/scene-preview";
+import { buildFlutterFrameUrl } from "@base-sdk/base/frame-embed";
 import React from "react";
 import styled from "@emotion/styled";
 import { ResizableIframeAppRunnerFrame } from "@app/scene-view/components";
 import CircularProgress from "@material-ui/core/CircularProgress";
 
 interface Props {
-  data: QuicklookQueryParams;
+  data: ScenePreviewParams;
 }
 
 export function ScaffoldSceneappRunnerView(props: Props) {

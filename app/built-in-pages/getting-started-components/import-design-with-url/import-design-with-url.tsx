@@ -17,6 +17,7 @@ import {
   flutter_presets,
   vanilla_presets,
 } from "@grida/builder-config-preset";
+import { BrowserClient } from "@base-sdk-fp/core";
 
 export function ImportDesignWithUrl() {
   const addPage = useAddPage();
@@ -75,7 +76,9 @@ export function ImportDesignWithUrl() {
 
     switch (analyzeDesignUrl(url)) {
       case "figma":
-        const cancontinue = await linkedaccounts.hasLinkedFigmaAccount();
+        const cancontinue = await new linkedaccounts.FigmaLinkedAccountsClient(
+          new BrowserClient()
+        ).hasLinkedFigmaAccount();
         if (!cancontinue) {
           await show_dialog_import_figma_design_after_authentication();
         }

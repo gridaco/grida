@@ -12,7 +12,7 @@ import { TopBar } from "../../../../app/components";
 import { ShareModalContents } from "@app/scene-view";
 import { makeService } from "services/scenes-store";
 import { SceneRecord } from "@base-sdk/scene-store";
-import { __PutSharingPolicy } from "@base-sdk/scene-store/dist/__api/server-types";
+import { __PutSharingPolicy } from "@base-sdk/scene-store/__api/server-types";
 import { ResizableIframeAppRunnerFrame } from "@app/scene-view/components";
 import { useAuthState } from "@base-sdk-fp/auth-components-react";
 import { redirectionSignin } from "util/auth";
@@ -22,8 +22,8 @@ import { UserProfile } from "../../../../app/3rd-party-api/type";
 
 import { ScaffoldSceneView } from "@app/scene-view/components/scaffold";
 import { ElevatedSceneWrap } from "@app/scene-view/components/elevated-scene-wrapper";
-import { QuicklookQueryParams } from "@base-sdk/base/features/quicklook";
 import { IPlayer } from "../../../../app/components/top-bar/player-type";
+import { ScenePreviewParams } from "@base-sdk/base/features/scene-preview";
 /**
  * frame or url is required
  * @param frame the frame id of selected node, which uploaded to default bridged quicklook s3 buket.
@@ -38,7 +38,7 @@ export default function ScenesId() {
   const [isPublic, setIsPublic] = useState<boolean>(false);
   const [players, setPlayers] = useState<IPlayer[]>([]);
   const [_appRunnerConfig, _setAppRunnerConfig] =
-    useState<QuicklookQueryParams>();
+    useState<ScenePreviewParams>();
 
   const service = makeService();
 
@@ -51,7 +51,7 @@ export default function ScenesId() {
       await service
         .get(sid)
         .then((_scene) => {
-          const _appConfig: QuicklookQueryParams = {
+          const _appConfig: ScenePreviewParams = {
             framework: _framework(_scene.customdata_1p),
             url: extractSource____temporary(_scene).flutter.executable.url,
             language: _language(_scene.customdata_1p),

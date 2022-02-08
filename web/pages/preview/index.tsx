@@ -4,7 +4,6 @@ import Axios from "axios";
 
 import { useRouter } from "next/router";
 
-import { QuicklookQueryParams } from "@base-sdk/base/features/quicklook";
 import Editor, { useMonaco } from "@monaco-editor/react";
 import CircularProgress from "@material-ui/core/CircularProgress";
 
@@ -12,6 +11,7 @@ import CircularProgress from "@material-ui/core/CircularProgress";
 
 import Toolbar from "@app/scene-view/components/toolbar";
 import { checkFrameSourceMode } from "@base-sdk/base/frame-embed";
+import { ScenePreviewParams } from "@base-sdk/base/features/scene-preview";
 import { AppFramework, AppLanguage } from "@base-sdk/base/types";
 import Background from "@app/scene-view/components/canves/background";
 import { EditorThemeProvider } from "../../../ui/editor-ui/packages/editor-ui-theme";
@@ -31,7 +31,7 @@ export default function Frame() {
 
   let editingSource: string;
 
-  const query: QuicklookQueryParams = {
+  const query: ScenePreviewParams = {
     id: (router.query.id as string) ?? "",
     framework: (router.query.framework as AppFramework) ?? AppFramework.flutter,
     language: (router.query.language as AppLanguage) ?? AppLanguage.dart,
