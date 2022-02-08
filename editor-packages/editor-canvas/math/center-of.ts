@@ -55,8 +55,6 @@ export function centerOf(
     vbcenter[1] - boxcenter[1] * scale,
   ];
 
-  console.log(translate, scale);
-
   return {
     box: box,
     center: boxcenter,

@@ -50,6 +50,11 @@ export function CodeOptionsControl(props: CodeOptionsControlProps) {
         description: "with styled-component",
       },
       {
+        name: "React",
+        value: "react_with_inline_css",
+        description: "with inline-css",
+      },
+      {
         name: "Flutter",
         value: "flutter_default",
         description: "flutter",

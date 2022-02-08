@@ -7,7 +7,7 @@ export enum Language {
   html = "html",
 }
 
-export type ReactStylingStrategy = "css" | "styled-components" | "css-in-jsx";
+export type ReactStylingStrategy = "css" | "styled-components" | "inline-css";
 
 export interface FlutterOption {
   framework: Framework.flutter;
@@ -38,10 +38,10 @@ export const react_presets = {
     language: Language.tsx,
     styling: "styled-components",
   },
-  react_with_css_in_jsx: <ReactOption>{
+  react_with_inline_css: <ReactOption>{
     framework: Framework.react,
     language: Language.tsx,
-    styling: "css-in-jsx",
+    styling: "inline-css",
   },
   react_with_css: <ReactOption>{
     framework: Framework.react,
@@ -74,8 +74,8 @@ export const all_preset_options__prod = [
   flutter_presets.flutter_default,
   react_presets.react_default,
   react_presets.react_with_styled_components,
+  react_presets.react_with_inline_css,
   vanilla_presets.vanilla_default,
-  // react_with_css_in_jsx // NOT ON PRODUCTION
   // react_with_css // NOT ON PRODUCTION
 ];
 
@@ -84,8 +84,8 @@ export const all_preset_options_map__prod = {
   flutter_default: flutter_presets.flutter_default,
   react_default: react_presets.react_default,
   react_with_styled_components: react_presets.react_with_styled_components,
+  react_with_inline_css: react_presets.react_with_inline_css,
   vanilla_default: vanilla_presets.vanilla_default,
-  // react_with_css_in_jsx // NOT ON PRODUCTION
   // react_with_css // NOT ON PRODUCTION
 };
 
@@ -97,7 +97,7 @@ export const lang_by_framework = {
 
 export const react_styles: ReactStylingStrategy[] = [
   "styled-components",
-  "css-in-jsx",
+  "inline-css",
   "css",
 ];
 

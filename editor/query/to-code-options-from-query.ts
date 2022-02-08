@@ -30,9 +30,13 @@ export function get_framework_config(framework: string) {
     case "react.default":
       return react_presets.react_default;
     case "react-with-styled-components":
+    case "react_with_styled_components":
       return react_presets.react_with_styled_components;
     case "react-with-emotion-styled":
       return react_presets.react_with_emotion_styled;
+    case "react_with_inline_css":
+    case "react-with-inline-css":
+      return react_presets.react_with_inline_css;
     case "flutter":
     case "flutter_default":
     case "flutter-default":
