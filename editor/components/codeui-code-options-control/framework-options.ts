@@ -8,6 +8,10 @@ export enum Language {
 }
 
 export type ReactStylingStrategy = "css" | "styled-components" | "inline-css";
+export type ReactNativeStylingStrategy =
+  | "style-sheet"
+  | "styled-components"
+  | "inline-style";
 
 export interface FlutterOption {
   framework: Framework.flutter;
@@ -20,12 +24,22 @@ export interface ReactOption {
   styling: ReactStylingStrategy;
 }
 
+export interface ReactNativeOption {
+  framework: Framework.reactnative;
+  language: Language.jsx | Language.tsx;
+  styling: ReactNativeStylingStrategy;
+}
+
 export interface VanillaOption {
   framework: Framework.vanilla;
   language: Language.html;
 }
 
-export type FrameworkOption = ReactOption | FlutterOption | VanillaOption;
+export type FrameworkOption =
+  | ReactOption
+  | ReactNativeOption
+  | FlutterOption
+  | VanillaOption;
 
 export const react_presets = {
   react_default: <ReactOption>{
@@ -50,6 +64,19 @@ export const react_presets = {
   },
 };
 
+export const reactnative_presets = {
+  reactnative_default: <ReactNativeOption>{
+    framework: Framework.reactnative,
+    language: Language.tsx,
+    styling: "style-sheet",
+  },
+  reactnative_with_styled_components: <ReactNativeOption>{
+    framework: Framework.reactnative,
+    language: Language.tsx,
+    styling: "styled-components",
+  },
+};
+
 export const flutter_presets = {
   flutter_default: <FlutterOption>{
     framework: Framework.flutter,
@@ -66,6 +93,7 @@ export const vanilla_presets = {
 
 export const presets = {
   react: react_presets,
+  reactnative: reactnative_presets,
   flutter: flutter_presets,
   vanilla: vanilla_presets,
 };
@@ -75,6 +103,7 @@ export const all_preset_options__prod = [
   react_presets.react_default,
   react_presets.react_with_styled_components,
   react_presets.react_with_inline_css,
+  reactnative_presets.reactnative_default,
   vanilla_presets.vanilla_default,
   // react_with_css // NOT ON PRODUCTION
 ];
@@ -85,6 +114,7 @@ export const all_preset_options_map__prod = {
   react_default: react_presets.react_default,
   react_with_styled_components: react_presets.react_with_styled_components,
   react_with_inline_css: react_presets.react_with_inline_css,
+  reactnative_default: reactnative_presets.reactnative_default,
   vanilla_default: vanilla_presets.vanilla_default,
   // react_with_css // NOT ON PRODUCTION
 };
@@ -92,6 +122,7 @@ export const all_preset_options_map__prod = {
 export const lang_by_framework = {
   flutter: [Language.dart],
   react: [Language.jsx, Language.tsx],
+  "react-native": [Language.jsx, Language.tsx],
   vanilla: [Language.html],
 };
 
@@ -115,6 +146,8 @@ export const getDefaultPresetNameByFramework = (frameowrk: Framework) => {
       return "flutter_default";
     case Framework.react:
       return "react_default";
+    case Framework.reactnative:
+      return "reactnative_default";
     case Framework.vanilla:
       return "vanilla_default";
   }

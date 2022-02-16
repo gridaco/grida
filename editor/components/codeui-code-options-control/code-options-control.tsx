@@ -13,6 +13,7 @@ import {
   react_styles,
 } from "./framework-options";
 import styled from "@emotion/styled";
+import assert from "assert";
 
 type DesigntoCodeUserOptions = FrameworkOption;
 
@@ -30,6 +31,8 @@ export function CodeOptionsControl(props: CodeOptionsControlProps) {
   const [useroption, setUseroption] = React.useState<DesigntoCodeUserOptions>(
     all_preset_options_map__prod[__presetname]
   );
+
+  assert(useroption, "option must be specified");
 
   useEffect(() => {
     // trigger initial value
@@ -53,6 +56,11 @@ export function CodeOptionsControl(props: CodeOptionsControlProps) {
         name: "React",
         value: "react_with_inline_css",
         description: "with inline-css",
+      },
+      {
+        name: "React Native",
+        value: "reactnative_default",
+        description: "react-native",
       },
       {
         name: "Flutter",
@@ -138,6 +146,7 @@ export function CodeOptionsControl(props: CodeOptionsControlProps) {
 
   const fields_config = {
     react: [platform_field_config, lang_field_config, react_style_field_config],
+    "react-native": [platform_field_config, lang_field_config],
     flutter: [platform_field_config, lang_field_config],
     vanilla: [platform_field_config, lang_field_config],
   };

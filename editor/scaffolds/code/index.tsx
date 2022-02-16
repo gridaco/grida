@@ -132,6 +132,10 @@ export function CodeSegment() {
               }
               break;
             }
+            case "react-native": {
+              c = get_framework_config("react-native");
+              break;
+            }
             case "flutter":
               c = get_framework_config(o.framework);
               break;
