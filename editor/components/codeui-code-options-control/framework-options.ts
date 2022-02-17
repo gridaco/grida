@@ -7,7 +7,12 @@ export enum Language {
   html = "html",
 }
 
-export type ReactStylingStrategy = "css" | "styled-components" | "inline-css";
+export type ReactStylingStrategy =
+  | "css"
+  | "styled-components"
+  | "inline-css"
+  | "css-module";
+
 export type ReactNativeStylingStrategy =
   | "style-sheet"
   | "styled-components"
@@ -57,6 +62,11 @@ export const react_presets = {
     language: Language.tsx,
     styling: "inline-css",
   },
+  react_with_css_module: <ReactOption>{
+    framework: Framework.react,
+    language: Language.tsx,
+    styling: "css-module",
+  },
   react_with_css: <ReactOption>{
     framework: Framework.react,
     language: Language.tsx,
@@ -103,6 +113,7 @@ export const all_preset_options__prod = [
   react_presets.react_default,
   react_presets.react_with_styled_components,
   react_presets.react_with_inline_css,
+  react_presets.react_with_css_module,
   reactnative_presets.reactnative_default,
   vanilla_presets.vanilla_default,
   // react_with_css // NOT ON PRODUCTION
@@ -114,6 +125,7 @@ export const all_preset_options_map__prod = {
   react_default: react_presets.react_default,
   react_with_styled_components: react_presets.react_with_styled_components,
   react_with_inline_css: react_presets.react_with_inline_css,
+  react_with_css_module: react_presets.react_with_css_module,
   reactnative_default: reactnative_presets.reactnative_default,
   vanilla_default: vanilla_presets.vanilla_default,
   // react_with_css // NOT ON PRODUCTION

@@ -38,6 +38,9 @@ export function get_framework_config(framework: string) {
     case "react_with_inline_css":
     case "react-with-inline-css":
       return react_presets.react_with_inline_css;
+    case "react_with_css_module":
+    case "react-with-css-module":
+      return react_presets.react_with_css_module;
     case "react-native":
       return reactnative_presets.reactnative_default;
     case "flutter":

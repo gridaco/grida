@@ -58,6 +58,11 @@ export function CodeOptionsControl(props: CodeOptionsControlProps) {
         description: "with inline-css",
       },
       {
+        name: "React",
+        value: "react_with_css_module",
+        description: "with css-module",
+      },
+      {
         name: "React Native",
         value: "reactnative_default",
         description: "react-native",
