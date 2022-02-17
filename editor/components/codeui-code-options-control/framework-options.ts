@@ -141,6 +141,7 @@ export const lang_by_framework = {
 export const react_styles: ReactStylingStrategy[] = [
   "styled-components",
   "inline-css",
+  "css-module",
   "css",
 ];
 

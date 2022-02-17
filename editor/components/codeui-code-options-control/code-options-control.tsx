@@ -102,12 +102,12 @@ export function CodeOptionsControl(props: CodeOptionsControlProps) {
   const getreactstyle = (frameworkPreset: string) => {
     const preset = getpreset(frameworkPreset) as ReactOption;
     const selected_styling = preset.styling;
-    const sorted_langs = [
+    const sorted_styles = [
       selected_styling,
       /* remove target item // - https://developer.mozilla.org/ko/docs/Web/JavaScript/Reference/Global_Objects/Array/splice */
       ...react_styles.splice(1, 0, selected_styling),
     ];
-    return sorted_langs;
+    return sorted_styles;
   };
 
   const react_style_field_config: IField = {
