@@ -85,6 +85,11 @@ export const reactnative_presets = {
     language: Language.tsx,
     styling: "styled-components",
   },
+  reactnative_with_inline_style: <ReactNativeOption>{
+    framework: Framework.reactnative,
+    language: Language.tsx,
+    styling: "inline-style",
+  },
 };
 
 export const flutter_presets = {
@@ -129,6 +134,8 @@ export const all_preset_options_map__prod = {
   reactnative_default: reactnative_presets.reactnative_default,
   reactnative_with_styled_components:
     reactnative_presets.reactnative_with_styled_components,
+  reactnative_with_inline_style:
+    reactnative_presets.reactnative_with_inline_style,
   vanilla_default: vanilla_presets.vanilla_default,
   // react_with_css // NOT ON PRODUCTION
 };

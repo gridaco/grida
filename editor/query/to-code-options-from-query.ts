@@ -47,6 +47,8 @@ export function get_framework_config(framework: string) {
       return reactnative_presets.reactnative_with_style_sheet;
     case "react-native-with-styled-components":
       return reactnative_presets.reactnative_with_styled_components;
+    case "react-native-with-inline-style":
+      return reactnative_presets.reactnative_with_inline_style;
     case "flutter":
     case "flutter_default":
     case "flutter-default":

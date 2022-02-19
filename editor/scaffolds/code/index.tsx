@@ -146,6 +146,9 @@ export function CodeSegment() {
                     "react-native-with-styled-components"
                   );
                   break;
+                case "inline-style":
+                  c = get_framework_config("react-native-with-inline-style");
+                  break;
               }
               break;
             }
