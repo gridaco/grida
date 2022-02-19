@@ -137,7 +137,16 @@ export function CodeSegment() {
               break;
             }
             case "react-native": {
-              c = get_framework_config("react-native");
+              switch (o.styling) {
+                case "style-sheet":
+                  c = get_framework_config("react-native-with-style-sheet");
+                  break;
+                case "styled-components":
+                  c = get_framework_config(
+                    "react-native-with-styled-components"
+                  );
+                  break;
+              }
               break;
             }
             case "flutter":

@@ -127,6 +127,8 @@ export const all_preset_options_map__prod = {
   react_with_inline_css: react_presets.react_with_inline_css,
   react_with_css_module: react_presets.react_with_css_module,
   reactnative_default: reactnative_presets.reactnative_default,
+  reactnative_with_styled_components:
+    reactnative_presets.reactnative_with_styled_components,
   vanilla_default: vanilla_presets.vanilla_default,
   // react_with_css // NOT ON PRODUCTION
 };

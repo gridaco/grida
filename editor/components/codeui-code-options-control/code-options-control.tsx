@@ -68,6 +68,11 @@ export function CodeOptionsControl(props: CodeOptionsControlProps) {
         description: "react-native",
       },
       {
+        name: "React Native",
+        value: "reactnative_with_styled_components",
+        description: "with styled-components",
+      },
+      {
         name: "Flutter",
         value: "flutter_default",
         description: "flutter",

@@ -43,6 +43,10 @@ export function get_framework_config(framework: string) {
       return react_presets.react_with_css_module;
     case "react-native":
       return reactnative_presets.reactnative_default;
+    case "react-native-with-style-sheet":
+      return reactnative_presets.reactnative_with_style_sheet;
+    case "react-native-with-styled-components":
+      return reactnative_presets.reactnative_with_styled_components;
     case "flutter":
     case "flutter_default":
     case "flutter-default":
