@@ -14,6 +14,7 @@ import { utils_dart } from "utils";
 import type { ReflectSceneNode } from "@design-sdk/core";
 
 import { utils as _design_utils } from "@design-sdk/core";
+import assert from "assert";
 const designq = _design_utils.query;
 
 export function CodeSegment() {
@@ -120,14 +121,33 @@ export function CodeSegment() {
           switch (o.framework) {
             case "react": {
               switch (o.styling) {
-                case "inline-css":
-                  c = get_framework_config("react-with-inline-css");
-                  break;
                 case "styled-components":
                   c = get_framework_config("react-with-styled-components");
                   break;
+                case "inline-css":
+                  c = get_framework_config("react-with-inline-css");
+                  break;
+                case "css-module":
+                  c = get_framework_config("react-with-css-module");
+                  break;
                 case "css":
                   // TODO:
+                  break;
+              }
+              break;
+            }
+            case "react-native": {
+              switch (o.styling) {
+                case "style-sheet":
+                  c = get_framework_config("react-native-with-style-sheet");
+                  break;
+                case "styled-components":
+                  c = get_framework_config(
+                    "react-native-with-styled-components"
+                  );
+                  break;
+                case "inline-style":
+                  c = get_framework_config("react-native-with-inline-style");
                   break;
               }
               break;
@@ -139,6 +159,8 @@ export function CodeSegment() {
               c = get_framework_config(o.framework);
               break;
           }
+
+          assert(c);
           set_framework_config(c);
         }}
       />

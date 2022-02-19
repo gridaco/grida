@@ -1,5 +1,6 @@
 import {
   react_presets,
+  reactnative_presets,
   flutter_presets,
   vanilla_presets,
 } from "@grida/builder-config-preset";
@@ -37,6 +38,17 @@ export function get_framework_config(framework: string) {
     case "react_with_inline_css":
     case "react-with-inline-css":
       return react_presets.react_with_inline_css;
+    case "react_with_css_module":
+    case "react-with-css-module":
+      return react_presets.react_with_css_module;
+    case "react-native":
+      return reactnative_presets.reactnative_default;
+    case "react-native-with-style-sheet":
+      return reactnative_presets.reactnative_with_style_sheet;
+    case "react-native-with-styled-components":
+      return reactnative_presets.reactnative_with_styled_components;
+    case "react-native-with-inline-style":
+      return reactnative_presets.reactnative_with_inline_style;
     case "flutter":
     case "flutter_default":
     case "flutter-default":

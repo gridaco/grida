@@ -13,6 +13,7 @@ import {
   react_styles,
 } from "./framework-options";
 import styled from "@emotion/styled";
+import assert from "assert";
 
 type DesigntoCodeUserOptions = FrameworkOption;
 
@@ -30,6 +31,8 @@ export function CodeOptionsControl(props: CodeOptionsControlProps) {
   const [useroption, setUseroption] = React.useState<DesigntoCodeUserOptions>(
     all_preset_options_map__prod[__presetname]
   );
+
+  assert(useroption, "option must be specified");
 
   useEffect(() => {
     // trigger initial value
@@ -53,6 +56,26 @@ export function CodeOptionsControl(props: CodeOptionsControlProps) {
         name: "React",
         value: "react_with_inline_css",
         description: "with inline-css",
+      },
+      {
+        name: "React",
+        value: "react_with_css_module",
+        description: "with css-module",
+      },
+      {
+        name: "React Native",
+        value: "reactnative_default",
+        description: "react-native",
+      },
+      {
+        name: "React Native",
+        value: "reactnative_with_styled_components",
+        description: "with styled-components",
+      },
+      {
+        name: "React Native",
+        value: "reactnative_with_inline_style",
+        description: "with inline-style",
       },
       {
         name: "Flutter",
@@ -89,12 +112,12 @@ export function CodeOptionsControl(props: CodeOptionsControlProps) {
   const getreactstyle = (frameworkPreset: string) => {
     const preset = getpreset(frameworkPreset) as ReactOption;
     const selected_styling = preset.styling;
-    const sorted_langs = [
+    const sorted_styles = [
       selected_styling,
       /* remove target item // - https://developer.mozilla.org/ko/docs/Web/JavaScript/Reference/Global_Objects/Array/splice */
       ...react_styles.splice(1, 0, selected_styling),
     ];
-    return sorted_langs;
+    return sorted_styles;
   };
 
   const react_style_field_config: IField = {
@@ -138,6 +161,7 @@ export function CodeOptionsControl(props: CodeOptionsControlProps) {
 
   const fields_config = {
     react: [platform_field_config, lang_field_config, react_style_field_config],
+    "react-native": [platform_field_config, lang_field_config],
     flutter: [platform_field_config, lang_field_config],
     vanilla: [platform_field_config, lang_field_config],
   };
