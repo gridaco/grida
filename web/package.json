@@ -71,6 +71,7 @@
     "@storybook/addon-links": "^6.3.8",
     "@storybook/react": "^6.3.8",
     "@types/fontfaceobserver": "^0.0.6",
+    "@types/gtag.js": "^0.0.8",
     "@types/lodash-es": "^4.17.3",
     "@types/node": "^12.6.8",
     "@types/react": "^16.8.23",

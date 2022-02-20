@@ -81,11 +81,9 @@ export function event_cta__to_code({
 
   // conversion tracking
   try {
-    // <script>
-    //   gtag('event', 'conversion', {'send_to': 'AW-922132529/w4qwCNbTlogDELHA2rcD'});
-    // </script>
-    a.logEvent("conversion", { send_to: "AW-922132529/w4qwCNbTlogDELHA2rcD" });
-  } catch (e) {
-    console.warn("analytics not available - this can happen in dev mode");
-  }
+    // event_cta__to_code
+    window.gtag("event", "conversion", {
+      send_to: "AW-922132529/w4qwCNbTlogDELHA2rcD",
+    });
+  } catch (e) {}
 }
