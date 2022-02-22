@@ -56,24 +56,35 @@ export function CodeSegment() {
   const targetted =
     designq.find_node_by_id_under_entry(targetId, root?.entry) ?? root?.entry;
 
-  const targetStateRef = useRef<ReflectSceneNode>();
-  targetStateRef.current = targetted;
+  const targetStateRef =
+    useRef<{
+      node: ReflectSceneNode;
+      config: config.FrameworkConfig;
+    }>();
+  targetStateRef.current = { node: targetted, config: framework_config };
 
   const on_result = (result: Result) => {
+    if (
+      result.framework.framework !==
+        targetStateRef?.current?.config.framework ||
+      result.id !== targetStateRef?.current?.node.id
+    ) {
+      return;
+    }
+
     if (framework_config.language == "dart") {
       // special formatter support for dartlang
       result.code.raw = utils_dart.format(result.code.raw);
       result.scaffold.raw = utils_dart.format(result.scaffold.raw);
     }
 
-    if (result.id == targetStateRef?.current?.id) {
-      setResult(result);
-    }
+    setResult(result);
   };
 
   useEffect(() => {
     const __target = targetted;
-    if (__target && framework_config) {
+    const __framework_config = framework_config;
+    if (__target && __framework_config) {
       const _input = {
         id: __target.id,
         name: __target.name,
@@ -88,7 +99,7 @@ export function CodeSegment() {
       // build code without assets fetch
       designToCode({
         input: _input,
-        framework: framework_config,
+        framework: __framework_config,
         asset_config: { skip_asset_replacement: true },
         build_config: build_config,
       })
@@ -99,7 +110,7 @@ export function CodeSegment() {
       if (!MainImageRepository.instance.empty) {
         designToCode({
           input: root,
-          framework: framework_config,
+          framework: __framework_config,
           asset_config: { asset_repository: MainImageRepository.instance },
           build_config: build_config,
         })
