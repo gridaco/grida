@@ -4,6 +4,7 @@ import type {
   Handler,
   WebKitGestureEvent,
   SharedGestureState,
+  FullGestureState,
 } from "@use-gesture/react";
 
 export type OnPanningHandler = Handler<"wheel", WheelEvent>;
@@ -14,6 +15,8 @@ export type OnZoomingHandler = Handler<
 >;
 
 export type OnPointerMoveHandler = Handler<"move">;
+
+export type OnDragHandler = Handler<"drag">;
 
 export type OnPointerDownHandler = (
   e: { event: React.MouseEvent<EventTarget, MouseEvent> } & SharedGestureState
@@ -32,6 +35,9 @@ export function CanvasEventTarget({
   onPointerMoveStart,
   onPointerMoveEnd,
   onPointerDown,
+  onDrag,
+  onDragStart,
+  onDragEnd,
   children,
 }: {
   onPanning: OnPanningHandler;
@@ -44,6 +50,9 @@ export function CanvasEventTarget({
   onPointerMoveStart: OnPointerMoveHandler;
   onPointerMoveEnd: OnPointerMoveHandler;
   onPointerDown: OnPointerDownHandler;
+  onDrag: OnDragHandler;
+  onDragStart: OnDragHandler;
+  onDragEnd: OnDragHandler;
   children?: React.ReactNode;
 }) {
   const interactionEventTargetRef = useRef();
@@ -84,6 +93,9 @@ export function CanvasEventTarget({
     };
   };
 
+  const [first_wheel_event, set_first_wheel_event] =
+    useState<FullGestureState<"wheel">>();
+
   useGesture(
     {
       onPinch: onZooming,
@@ -99,10 +111,22 @@ export function CanvasEventTarget({
           return;
         } else {
           // only for mac
-          if (s.metaKey) {
+          // TODO: on firefox, cmd + scroll resizes the window zoom level. this should be prevented.
+          if (s.metaKey && first_wheel_event?.metaKey) {
             onZooming(transform_wheel_to_zoom(s));
-            // TODO: on firefox, cmd + scroll resizes the window zoom level. this should be prevented.
             return;
+          }
+          if (first_wheel_event && first_wheel_event.metaKey) {
+            if (
+              Math.sign(first_wheel_event.direction[0]) ==
+              Math.sign(s.direction[0])
+            ) {
+              onZooming(transform_wheel_to_zoom(s));
+              return;
+            } else {
+              // direction inverted, setting new state.
+              set_first_wheel_event(s);
+            }
           }
         }
         onPanning(s);
@@ -110,16 +134,23 @@ export function CanvasEventTarget({
         s.event.preventDefault();
       },
       onWheelStart: (s) => {
+        set_first_wheel_event(s);
         onPanningStart(s);
         s.event.stopPropagation();
         s.event.preventDefault();
       },
-      onWheelEnd: onPanningEnd,
+      onWheelEnd: (s) => {
+        set_first_wheel_event(undefined);
+        onPanningEnd(s);
+      },
       onMove: onPointerMove,
       onDragStart: (s) => {
         if (isSpacebarPressed) {
           onPanningStart(s as any);
+          return;
         }
+
+        onDragStart(s);
       },
       onDrag: (s) => {
         if (isSpacebarPressed) {
@@ -127,12 +158,18 @@ export function CanvasEventTarget({
             ...s,
             delta: [-s.delta[0], -s.delta[1]],
           } as any);
+          return;
         }
+
+        onDrag(s);
       },
       onDragEnd: (s) => {
         if (isSpacebarPressed) {
           onPanningEnd(s as any);
+          return;
         }
+
+        onDragEnd(s);
       },
       onMouseDown: onPointerDown,
       onMoveStart: onPointerMoveStart,

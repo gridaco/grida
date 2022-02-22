@@ -14,6 +14,7 @@ import { utils_dart } from "utils";
 import type { ReflectSceneNode } from "@design-sdk/core";
 
 import { utils as _design_utils } from "@design-sdk/core";
+import assert from "assert";
 const designq = _design_utils.query;
 
 export function CodeSegment() {
@@ -55,24 +56,35 @@ export function CodeSegment() {
   const targetted =
     designq.find_node_by_id_under_entry(targetId, root?.entry) ?? root?.entry;
 
-  const targetStateRef = useRef<ReflectSceneNode>();
-  targetStateRef.current = targetted;
+  const targetStateRef =
+    useRef<{
+      node: ReflectSceneNode;
+      config: config.FrameworkConfig;
+    }>();
+  targetStateRef.current = { node: targetted, config: framework_config };
 
   const on_result = (result: Result) => {
+    if (
+      result.framework.framework !==
+        targetStateRef?.current?.config.framework ||
+      result.id !== targetStateRef?.current?.node.id
+    ) {
+      return;
+    }
+
     if (framework_config.language == "dart") {
       // special formatter support for dartlang
       result.code.raw = utils_dart.format(result.code.raw);
       result.scaffold.raw = utils_dart.format(result.scaffold.raw);
     }
 
-    if (result.id == targetStateRef?.current?.id) {
-      setResult(result);
-    }
+    setResult(result);
   };
 
   useEffect(() => {
     const __target = targetted;
-    if (__target && framework_config) {
+    const __framework_config = framework_config;
+    if (__target && __framework_config) {
       const _input = {
         id: __target.id,
         name: __target.name,
@@ -87,7 +99,7 @@ export function CodeSegment() {
       // build code without assets fetch
       designToCode({
         input: _input,
-        framework: framework_config,
+        framework: __framework_config,
         asset_config: { skip_asset_replacement: true },
         build_config: build_config,
       })
@@ -98,7 +110,7 @@ export function CodeSegment() {
       if (!MainImageRepository.instance.empty) {
         designToCode({
           input: root,
-          framework: framework_config,
+          framework: __framework_config,
           asset_config: { asset_repository: MainImageRepository.instance },
           build_config: build_config,
         })
@@ -109,7 +121,6 @@ export function CodeSegment() {
   }, [targetted?.id, framework_config]);
 
   const { code, scaffold, name: componentName } = result ?? {};
-
   return (
     <CodeEditorContainer>
       <EditorAppbarFragments.CodeEditor />
@@ -117,7 +128,51 @@ export function CodeSegment() {
         initialPreset={router.query.framework as string}
         fallbackPreset="react_default"
         onUseroptionChange={(o) => {
-          set_framework_config(get_framework_config(o.framework));
+          let c;
+          switch (o.framework) {
+            case "react": {
+              switch (o.styling) {
+                case "styled-components":
+                  c = get_framework_config("react-with-styled-components");
+                  break;
+                case "inline-css":
+                  c = get_framework_config("react-with-inline-css");
+                  break;
+                case "css-module":
+                  c = get_framework_config("react-with-css-module");
+                  break;
+                case "css":
+                  // TODO:
+                  break;
+              }
+              break;
+            }
+            case "react-native": {
+              switch (o.styling) {
+                case "style-sheet":
+                  c = get_framework_config("react-native-with-style-sheet");
+                  break;
+                case "styled-components":
+                  c = get_framework_config(
+                    "react-native-with-styled-components"
+                  );
+                  break;
+                case "inline-style":
+                  c = get_framework_config("react-native-with-inline-style");
+                  break;
+              }
+              break;
+            }
+            case "flutter":
+              c = get_framework_config(o.framework);
+              break;
+            case "vanilla":
+              c = get_framework_config(o.framework);
+              break;
+          }
+
+          assert(c);
+          set_framework_config(c);
         }}
       />
       <CodeEditor

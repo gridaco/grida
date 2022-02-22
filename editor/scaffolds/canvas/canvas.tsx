@@ -77,6 +77,12 @@ export function VisualContentArea() {
               renderItem={(p) => {
                 return <Preview key={p.node.id} target={p.node} {...p} />;
               }}
+              config={{
+                can_highlight_selected_layer: true,
+                marquee: {
+                  disabled: true,
+                },
+              }}
               renderFrameTitle={(p) => (
                 <FrameTitleRenderer
                   key={p.id}

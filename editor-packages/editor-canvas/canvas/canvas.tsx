@@ -7,12 +7,13 @@ import {
   OnZoomingHandler,
   OnPointerMoveHandler,
   OnPointerDownHandler,
+  OnDragHandler,
 } from "../canvas-event-target";
 import { get_hovering_target, centerOf } from "../math";
 import { utils } from "@design-sdk/core";
 import { LazyFrame } from "@code-editor/canvas/lazy-frame";
 import { HudCustomRenderers, HudSurface } from "./hud-surface";
-import type { Box, XY, CanvasTransform } from "../types";
+import type { Box, XY, CanvasTransform, XYWH } from "../types";
 import type { FrameOptimizationFactors } from "../frame";
 const designq = utils.query;
 
@@ -48,10 +49,23 @@ type CanvasCustomRenderers = HudCustomRenderers & {
 
 interface CanvsPreferences {
   can_highlight_selected_layer?: boolean;
+  marquee: MarqueeOprions;
+}
+
+interface MarqueeOprions {
+  /**
+   * disable marquee - events and selection with dragging.
+   *
+   * @default false
+   */
+  disabled?: boolean;
 }
 
 const default_canvas_preferences: CanvsPreferences = {
   can_highlight_selected_layer: false,
+  marquee: {
+    disabled: false,
+  },
 };
 
 interface HovringNode {
@@ -117,6 +131,8 @@ export function Canvas({
     ? [offset[0] / zoom, offset[1] / zoom]
     : [0, 0];
   const [isPanning, setIsPanning] = useState(false);
+  const [marquee, setMarquee] = useState<XYWH>(null);
+
   const cvtransform: CanvasTransform = {
     scale: zoom,
     xy: offset,
@@ -207,6 +223,29 @@ export function Canvas({
     setOffset([newx, newy]);
   };
 
+  const onDrag: OnDragHandler = (s) => {
+    const [x1, y1] = s.initial;
+    const [x2, y2] = [
+      // @ts-ignore
+      s.event.clientX,
+      // @ts-ignore
+      s.event.clientY,
+    ];
+
+    const [ox, oy] = offset;
+    const [x, y, w, h] = [
+      x1 - ox,
+      y1 - oy,
+      x2 - x1, // w
+      y2 - y1, // h
+    ];
+    setMarquee([x, y, w, h]);
+  };
+
+  const onDragEnd: OnDragHandler = (s) => {
+    setMarquee(null);
+  };
+
   const is_canvas_transforming = isPanning || isZooming;
   const selected_nodes = selectedNodes
     ?.map((id) => designq.find_node_by_id_under_inpage_nodes(id, nodes))
@@ -217,6 +256,9 @@ export function Canvas({
       node["filekey"] = filekey;
       return (
         <LazyFrame key={node.id} xy={[node.x, node.y]} size={node}>
+          {/* 👇 dev only (for performance tracking) 👇 */}
+          {/* <div style={{ width: "100%", height: "100%", background: "grey" }} /> */}
+          {/* 👆 ----------------------------------- 👆 */}
           {renderItem({
             node: node as ReflectSceneNode & { filekey: string },
             zoom, // ? use scaled_zoom ?
@@ -257,12 +299,17 @@ export function Canvas({
         onPointerMoveStart={() => {}}
         onPointerMoveEnd={() => {}}
         onPointerDown={onPointerDown}
+        onDrag={onDrag}
+        onDragStart={() => {}} // TODO:
+        onDragEnd={onDragEnd}
       >
         <HudSurface
           offset={nonscaled_offset}
           zoom={zoom}
           hide={is_canvas_transforming}
           readonly={readonly}
+          disableMarquee={config.marquee.disabled}
+          marquee={marquee}
           labelDisplayNodes={nodes}
           selectedNodes={selected_nodes}
           highlights={

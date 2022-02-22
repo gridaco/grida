@@ -87,7 +87,10 @@ const SceneCardPreviewThumbnail = styled.div`
 const ThumbnailImage = styled.img`
   object-fit: cover;
   width: 100%;
+  width: -webkit-fill-available; /* Safari */
   height: 100%;
+  flex-shrink: 0;
+  -webkit-flex-shrink: 0;
 `;
 
 const ContentArea = styled.div`
