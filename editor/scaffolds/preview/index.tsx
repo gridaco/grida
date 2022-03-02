@@ -167,7 +167,7 @@ export function Preview({
         width: target.width,
         height: target.height,
         borderRadius: 1,
-        backgroundColor: bg_color_str,
+        backgroundColor: !preview && bg_color_str, // clear bg after preview is rendered.
         contain: "layout style paint",
       }}
     >
