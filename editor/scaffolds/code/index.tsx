@@ -7,7 +7,10 @@ import { get_framework_config } from "query/to-code-options-from-query";
 import { CodeOptionsControl } from "components/codeui-code-options-control";
 import { designToCode, Result } from "@designto/code";
 import { config } from "@designto/config";
-import { MainImageRepository } from "@design-sdk/core/assets-repository";
+import {
+  ImageRepository,
+  MainImageRepository,
+} from "@design-sdk/core/assets-repository";
 import { DesignInput } from "@designto/config/input";
 import { useEditorState, useWorkspaceState } from "core/states";
 import { utils_dart } from "utils";
@@ -15,6 +18,7 @@ import type { ReflectSceneNode } from "@design-sdk/core";
 
 import { utils as _design_utils } from "@design-sdk/core";
 import assert from "assert";
+import { RemoteImageRepositories } from "@design-sdk/figma-remote/lib/asset-repository/image-repository";
 const designq = _design_utils.query;
 
 export function CodeSegment() {
@@ -85,6 +89,24 @@ export function CodeSegment() {
     const __target = targetted;
     const __framework_config = framework_config;
     if (__target && __framework_config) {
+      if (!MainImageRepository.isReady) {
+        // this is not the smartest way, but the image repo has a design flaw.
+        // this happens when the target node is setted on the query param on first load, when the image repo is not set by the higher editor container.
+        MainImageRepository.instance = new RemoteImageRepositories(
+          state.design.key,
+          {
+            // setting this won't load any image btw. (just to prevent errors)
+            authentication: { accessToken: "" },
+          }
+        );
+        MainImageRepository.instance.register(
+          new ImageRepository(
+            "fill-later-assets",
+            "grida://assets-reservation/images/"
+          )
+        );
+      }
+
       const _input = {
         id: __target.id,
         name: __target.name,

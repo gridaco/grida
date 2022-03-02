@@ -55,7 +55,10 @@ export default function FileEntryEditor() {
       };
     } else {
       val = {
-        selectedNodes: [],
+        selectedNodes:
+          // set selected nodes initially only if the nodeid is the id of non-page node
+          pages.some((p) => p.id === nodeid) ? [] : nodeid ? [nodeid] : [],
+        selectedPage: warmup.selectedPage(prevstate, pages, nodeid && [nodeid]),
         selectedLayersOnPreview: [],
         design: {
           input: null,
@@ -64,7 +67,6 @@ export default function FileEntryEditor() {
           key: filekey,
           pages: pages,
         },
-        selectedPage: warmup.selectedPage(prevstate, pages, null),
       };
     }
 
