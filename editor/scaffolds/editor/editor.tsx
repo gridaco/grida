@@ -1,10 +1,9 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect } from "react";
 import { DefaultEditorWorkspaceLayout } from "layouts/default-editor-workspace-layout";
 import {
   WorkspaceContentPanel,
   WorkspaceContentPanelGridLayout,
 } from "layouts/panel";
-import { FullScreenPreview } from "scaffolds/preview-full-screen";
 import { EditorSidebar } from "components/editor";
 import { useEditorState, useWorkspaceState } from "core/states";
 import { Canvas } from "scaffolds/canvas";
@@ -66,23 +65,15 @@ export function Editor({
   // this key is used for force re-rendering canvas after the whole file is fetched.
   const _refreshkey = loading || !_initially_loaded ? "1" : "0";
 
-  // TODO: migrate this to wsstate or editor state, - only for development.
-  const [mode, setMode] = useState<"edit" | "fullscreen-preview">("edit");
-
-  const FullscreenPreviewMode = () => {
-    return <FullScreenPreview />;
-  };
-
   return (
     <>
       {(loading || !_initially_loaded) && (
         <EditorSkeleton percent={_initial_load_progress * 100} />
       )}
-      {mode == "fullscreen-preview" && <FullscreenPreviewMode />}
+
       <DefaultEditorWorkspaceLayout
         backgroundColor={colors.color_editor_bg_on_dark}
         leftbar={<EditorSidebar />}
-        display={mode == "fullscreen-preview" ? "none" : undefined}
         // rightbar={<Inspector />}
       >
         <WorkspaceContentPanelGridLayout>

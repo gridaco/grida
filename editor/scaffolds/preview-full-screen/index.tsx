@@ -14,7 +14,7 @@ import { useTargetContainer, useWindowSize } from "hooks";
 import Close from "@material-ui/icons/Close";
 import ClientOnly from "components/client-only";
 
-export function FullScreenPreview() {
+export function FullScreenPreview({ onClose }: { onClose: () => void }) {
   const [state] = useEditorState();
   const [preview, setPreview] = useState<Result>();
   const windowsize = useWindowSize();
@@ -97,11 +97,7 @@ export function FullScreenPreview() {
           <StaticSizeInput value={windowsize.height ?? 0} suffix={"H"} />
         </AppbarControlSizeInputs>
         <AppbarActionsSegment>
-          <CloseButton
-            onClick={() => {
-              // TODO: end preview mode
-            }}
-          />
+          <CloseButton onClick={onClose} />
         </AppbarActionsSegment>
       </FullscreenPreviewAppbar>
       <Body>
