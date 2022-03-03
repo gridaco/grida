@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from "react";
 import styled from "@emotion/styled";
-import { EditorAppbarFragments } from "components/editor";
 import { Canvas } from "@code-editor/canvas";
 import { useEditorState, useWorkspace } from "core/states";
 import { Preview } from "scaffolds/preview";
@@ -8,17 +7,22 @@ import useMeasure from "react-use-measure";
 import { useDispatch } from "core/dispatch";
 import { FrameTitleRenderer } from "./render/frame-title";
 import { IsolateModeCanvas } from "./isolate-mode";
+import { useRouter } from "next/router";
+
+type ViewMode = "full" | "isolate";
 
 /**
  * Statefull canvas segment that contains canvas as a child, with state-data connected.
  */
 export function VisualContentArea() {
   const [state] = useEditorState();
+  const router = useRouter();
+  const { mode: q_mode } = router.query;
 
   // this hook is used for focusing the node on the first load with the initial selection is provided externally.
   useEffect(() => {
-    // if the initial selection is available, and not empty
-    if (state.selectedNodesInitial?.length) {
+    // if the initial selection is available, and not empty &&
+    if (state.selectedNodesInitial?.length && q_mode == "isolate") {
       // trigger isolation mode once.
       setMode("isolate");
 
@@ -42,7 +46,14 @@ export function VisualContentArea() {
 
   const isEmptyPage = thisPageNodes?.length === 0;
 
-  const [mode, setMode] = useState<"full" | "isolate">("full");
+  const [mode, _setMode] = useState<ViewMode>("full");
+
+  const setMode = (m: ViewMode) => {
+    _setMode(m);
+
+    // update the router
+    (router.query.mode = m) && router.push(router);
+  };
 
   return (
     <CanvasContainer
