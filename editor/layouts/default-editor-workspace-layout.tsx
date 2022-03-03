@@ -7,10 +7,14 @@ export function DefaultEditorWorkspaceLayout(props: {
   rightbar?: JSX.Element;
   appbar?: JSX.Element;
   children: JSX.Element | Array<JSX.Element>;
+  display?: "none" | "initial"; // set to none when to hide.
   backgroundColor?: string;
 }) {
   return (
-    <WorkspaceRoot backgroundColor={props.backgroundColor}>
+    <WorkspaceRoot
+      display={props.display}
+      backgroundColor={props.backgroundColor}
+    >
       <AppBarMenuAndBelowContentWrap>
         {props.appbar && <AppBarWrap>{props.appbar}</AppBarWrap>}
         <NonMenuContentZoneWrap>
@@ -27,7 +31,11 @@ export function DefaultEditorWorkspaceLayout(props: {
   );
 }
 
-const WorkspaceRoot = styled.div<{ backgroundColor: string }>`
+const WorkspaceRoot = styled.div<{
+  display?: "none" | "initial";
+  backgroundColor: string;
+}>`
+  ${(props) => props.display && `display: ${props.display};`}
   width: 100vw;
   height: 100vh;
   background-color: ${(p) => p.backgroundColor ?? "transparent"};
