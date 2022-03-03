@@ -1,38 +1,22 @@
+import { HomeInput } from "scaffolds/home-input";
+import { HomeDashboard } from "scaffolds/home-dashboard";
 import React from "react";
-import Link from "next/link";
-import styled from "@emotion/styled";
-import { RecentDesignCardList } from "../components/recent-design-card";
-import {
-  WorkspaceContentPanel,
-  WorkspaceContentPanelGridLayout,
-} from "../layout/panel";
-import { DefaultEditorWorkspaceLayout } from "../layout/default-editor-workspace-layout";
-import { SideNavigation } from "../components/side-navigation";
+import { useAuthState } from "hooks/use-auth-state";
 
 export default function Home() {
-  return (
-    <DefaultEditorWorkspaceLayout leftbar={<SideNavigation>{}</SideNavigation>}>
-      <BodyContainer />
-      {/* <Link href="/figma">from figma</Link>
-      <br />
-      <br />
-      <Link href="/preferences">Preferences (set access token)</Link> */}
-    </DefaultEditorWorkspaceLayout>
-  );
-}
+  const authstate = useAuthState();
 
-function BodyContainer() {
-  return (
-    <div style={{ padding: 24 }}>
-      <RecentDesignSection />
-    </div>
-  );
-}
+  // region - dev injected
+  return <HomeDashboard />;
+  // endregion
 
-function RecentDesignSection() {
-  return (
-    <>
-      <RecentDesignCardList />
-    </>
-  );
+  switch (authstate) {
+    case "loading":
+    case "expired":
+    case "unauthorized":
+    default:
+      return <HomeInput />;
+    case "signedin":
+      return <HomeDashboard />;
+  }
 }

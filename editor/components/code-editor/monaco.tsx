@@ -1,9 +1,9 @@
 import React, { useEffect } from "react";
-import Editor, { useMonaco } from "@monaco-editor/react";
+import Editor, { useMonaco, Monaco } from "@monaco-editor/react";
 import * as monaco from "monaco-editor/esm/vs/editor/editor.api";
-import _react_type_def_txt from "./react.d.ts.txt";
+import { MonacoEmptyMock } from "./monaco-mock-empty";
 
-interface EditorProps {
+export interface MonacoEditorProps {
   defaultValue?: string;
   defaultLanguage?: string;
   width?: number | string;
@@ -11,32 +11,12 @@ interface EditorProps {
   options?: monaco.editor.IStandaloneEditorConstructionOptions;
 }
 
-export function MonacoEditor(props: EditorProps) {
-  const monaco = useMonaco();
+export function MonacoEditor(props: MonacoEditorProps) {
+  const monaco: Monaco = useMonaco();
   useEffect(() => {
-    // adding jsx support - https://github.com/microsoft/monaco-editor/issues/264
     if (monaco) {
-      monaco.languages.typescript.typescriptDefaults.setCompilerOptions({
-        target: monaco.languages.typescript.ScriptTarget.Latest,
-        allowNonTsExtensions: true,
-        moduleResolution:
-          monaco.languages.typescript.ModuleResolutionKind.NodeJs,
-        module: monaco.languages.typescript.ModuleKind.CommonJS,
-        noEmit: true,
-        esModuleInterop: true,
-        jsx: monaco.languages.typescript.JsxEmit.React,
-        reactNamespace: "React",
-        allowJs: true,
-      });
-
-      monaco.languages.typescript.typescriptDefaults.setDiagnosticsOptions({
-        noSemanticValidation: false,
-        noSyntaxValidation: false,
-      });
-
-      monaco.languages.typescript.typescriptDefaults.addExtraLib(
-        _react_type_def_txt
-      );
+      setup_react_support(monaco);
+      // monaco.mo
     }
   }, [monaco]);
 
@@ -47,9 +27,14 @@ export function MonacoEditor(props: EditorProps) {
       defaultLanguage={
         pollyfill_language(props.defaultLanguage) ?? "typescript"
       }
+      loading={<MonacoEmptyMock l={5} />}
       defaultValue={props.defaultValue ?? "// no content"}
       theme="vs-dark"
-      options={props.options}
+      options={{
+        ...props.options,
+        // overrided default options
+        unusualLineTerminators: "off",
+      }}
     />
   );
 }
@@ -64,5 +49,25 @@ const pollyfill_language = (lang: string) => {
       return lang;
   }
 };
+
+function setup_react_support(monaco: Monaco) {
+  // adding jsx support - https://github.com/microsoft/monaco-editor/issues/264
+  monaco.languages.typescript.typescriptDefaults.setCompilerOptions({
+    target: monaco.languages.typescript.ScriptTarget.Latest,
+    allowNonTsExtensions: true,
+    moduleResolution: monaco.languages.typescript.ModuleResolutionKind.NodeJs,
+    module: monaco.languages.typescript.ModuleKind.CommonJS,
+    noEmit: true,
+    esModuleInterop: true,
+    jsx: monaco.languages.typescript.JsxEmit.React,
+    reactNamespace: "React",
+    allowJs: true,
+  });
+
+  monaco.languages.typescript.typescriptDefaults.setDiagnosticsOptions({
+    noSemanticValidation: false,
+    noSyntaxValidation: false,
+  });
+}
 
 export { useMonaco } from "@monaco-editor/react";

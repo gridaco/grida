@@ -4,7 +4,7 @@ import TreeView from "@material-ui/lab/TreeView";
 import ExpandMoreIcon from "@material-ui/icons/ExpandMore";
 import ChevronRightIcon from "@material-ui/icons/ChevronRight";
 import TreeItem from "@material-ui/lab/TreeItem";
-import { SideNavigation } from "../../side-navigation";
+import { SideNavigation } from "components/side-navigation";
 
 interface LayerTree {
   id: string;

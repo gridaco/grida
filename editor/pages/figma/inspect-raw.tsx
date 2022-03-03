@@ -1,22 +1,27 @@
 import React from "react";
-import styled from "@emotion/styled";
-import { useReflectTargetNode } from "../../query/from-figma";
-import { MonacoEditor } from "../../components/code-editor";
+import { MonacoEditor } from "components/code-editor";
+import { useDesign } from "hooks";
+import LoadingLayout from "layouts/loading-overlay";
 
+/**
+ * shows full node data as json in a monaco editor
+ * @returns
+ */
 export default function InspectRaw() {
   //
-  const targetNodeConfig = useReflectTargetNode();
-  const figmaNode = targetNodeConfig?.figma;
-  const reflect = targetNodeConfig?.reflect;
+  const design = useDesign({ type: "use-router" });
+  if (!design) {
+    return <LoadingLayout />;
+  }
+  const { node, reflect, raw, remote, figma } = design;
   //
-
   return (
     <>
       <MonacoEditor
-        key={figmaNode?.id}
+        key={figma.id}
         height="100vh"
         defaultLanguage="json"
-        defaultValue={JSON.stringify(figmaNode, null, 2)}
+        defaultValue={JSON.stringify(figma, null, 2)}
       />
     </>
   );

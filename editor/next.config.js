@@ -1,4 +1,15 @@
+const TerserPlugin = require("terser-webpack-plugin");
 const withTM = require("next-transpile-modules")([
+  // region @editor-app
+  "@editor-app/live-session",
+  "@code-editor/preview-pip", // TODO: remove me. this is for development. for production, use npm ver instead.
+  "@code-editor/debugger",
+  "@code-editor/canvas",
+
+  // region editor-submodule deps
+  "@base-sdk-fp/auth",
+  "@base-sdk-fp/auth-components-react",
+
   // -----------------------------
   // region @designto-code
   "@designto/config",
@@ -11,16 +22,20 @@ const withTM = require("next-transpile-modules")([
   "@designto/web",
   "@designto/vanilla",
   "@designto/react",
+  "@designto/react-native",
 
   "@code-features/assets",
+  "@code-features/component",
+  "@code-features/flags",
   // -----------------------------
 
   // -----------------------------
   // region @design-sdk
-  "@design-sdk/key-annotations",
+  "@design-sdk/flags",
   "@design-sdk/core",
   "@design-sdk/core-types",
   "@design-sdk/universal",
+  "@design-sdk/diff",
   "@design-sdk/figma",
   "@design-sdk/figma-node",
   "@design-sdk/figma-types",
@@ -49,7 +64,12 @@ const withTM = require("next-transpile-modules")([
   // -----------------------------
 
   // reflect-ui ui framework
-  "@reflect-ui/editor-ui",
+  // @editor-ui ui components
+  "@editor-ui/editor",
+  "@editor-ui/hierarchy",
+  "@editor-ui/spacer",
+  "@editor-ui/utils",
+  "@editor-ui/button",
 
   // -----------------------------
   // region coli
@@ -61,15 +81,14 @@ const withTM = require("next-transpile-modules")([
 
   // -----------------------------
   // region builders - part of designto-code / coli
-  // region flutter builder
-  "@bridged.xyz/flutter-builder",
-  // endregion flutter builder
 
   // region web builders
-  "@coli.codes/nodejs-builder",
+  "@web-builder/nodejs",
   "@web-builder/core",
   "@web-builder/vanilla",
+  "@web-builder/react-core",
   "@web-builder/react",
+  "@web-builder/react-native",
   "@web-builder/reflect-ui",
   "@web-builder/styled",
   "@web-builder/styles",
@@ -77,18 +96,35 @@ const withTM = require("next-transpile-modules")([
   // -----------------------------
 ]);
 
-const withCSS = require("@zeit/next-css");
-module.exports = withTM(
-  withCSS({
-    webpack: (config) => {
-      config.node = {
-        fs: "empty",
-      };
-      config.module.rules.push({
-        test: /\.txt$/,
-        use: "raw-loader",
-      });
-      return config;
-    },
-  })
-);
+module.exports = withTM({
+  webpack: (config) => {
+    config.module.rules.push({
+      type: "javascript/auto",
+      test: /\.mjs$/,
+      include: /node_modules/,
+    });
+
+    const terser = config.optimization.minimizer.find(
+      (m) => m.constructor.name === "TerserPlugin"
+    );
+    // for @flutter-builder classname issue
+    terser.options.terserOptions.keep_classnames = true;
+
+    return config;
+  },
+  async redirects() {
+    return [
+      {
+        // typo gaurd
+        source: "/preference",
+        destination: "/preferences",
+        permanent: true,
+      },
+      {
+        source: "/files/:key/:id",
+        destination: "/files/:key?node=:id",
+        permanent: false,
+      },
+    ];
+  },
+});

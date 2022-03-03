@@ -1,16 +1,17 @@
 import React, { useState } from "react";
 import { nodes } from "@design-sdk/figma";
-import { types, fetch } from "@design-sdk/figma-remote";
-import {
-  parseFileAndNodeId,
-  FigmaTargetNodeConfig,
-} from "@design-sdk/figma-url";
-import { UserInputCache } from "../../utils/user-input-value-cache";
+import { fetch } from "@design-sdk/figma-remote";
+import { FigmaTargetNodeConfig } from "@design-sdk/figma-url";
 import { personal } from "@design-sdk/figma-auth-store";
 
 export type OnImportedCallback = (reflect: nodes.ReflectSceneNode) => void;
 type _OnPartiallyLoadedCallback = (pack: fetch.FigmaRemoteImportPack) => void;
 
+/**
+ * @deprecated - use `useDesign` instead
+ * @param props
+ * @returns
+ */
 export function FigmaScreenImporter(props: {
   onImported: OnImportedCallback;
   onTargetEnter?: (target: FigmaTargetNodeConfig) => void;
@@ -39,13 +40,13 @@ export function FigmaScreenImporter(props: {
       ) : (
         <>
           <_DefaultImporterSegment onLoaded={handleLocalDataLoad} />
-          <_UrlImporterSegment
+          {/* <_UrlImporterSegment
             onLoaded={handleLocalDataLoad}
             onUrlEnter={(url: string) => {
               const nodeconfig = parseFileAndNodeId(url);
               props.onTargetEnter(nodeconfig);
             }}
-          />
+          /> */}
         </>
       )}
     </>
@@ -77,67 +78,67 @@ function _DefaultImporterSegment(props: {
   );
 }
 
-const _FIGMA_FILE_URL_IMPORT_INPUT_CACHE_KEY =
-  "_FIGMA_FILE_URL_IMPORT_INPUT_CACHE_KEY";
-function _UrlImporterSegment(props: {
-  onLoaded: _OnPartiallyLoadedCallback;
-  onUrlEnter?: (url: string) => void;
-}) {
-  const [loadState, setLoadState] = useState<
-    "none" | "loading" | "failed" | "complete"
-  >("none");
+// const _FIGMA_FILE_URL_IMPORT_INPUT_CACHE_KEY =
+//   "_FIGMA_FILE_URL_IMPORT_INPUT_CACHE_KEY";
+// function _UrlImporterSegment(props: {
+//   onLoaded: _OnPartiallyLoadedCallback;
+//   onUrlEnter?: (url: string) => void;
+// }) {
+//   const [loadState, setLoadState] = useState<
+//     "none" | "loading" | "failed" | "complete"
+//   >("none");
 
-  let urlInput: string = UserInputCache.load(
-    _FIGMA_FILE_URL_IMPORT_INPUT_CACHE_KEY
-  );
+//   let urlInput: string = UserInputCache.load(
+//     _FIGMA_FILE_URL_IMPORT_INPUT_CACHE_KEY
+//   );
 
-  const figmaTargetConfig = parseFileAndNodeId(urlInput);
+//   const figmaTargetConfig = parseFileAndNodeId(urlInput);
 
-  const handleEnter = () => {
-    props.onUrlEnter?.(urlInput);
-    UserInputCache.set(_FIGMA_FILE_URL_IMPORT_INPUT_CACHE_KEY, urlInput);
-    setLoadState("loading");
-    fetch
-      .fetchTarget(figmaTargetConfig.file, figmaTargetConfig.node, {
-        personalAccessToken: personal.get_safe(),
-      })
-      .then((d) => {
-        setLoadState("complete");
-        props.onLoaded(d);
-      })
-      .catch((_) => {
-        setLoadState("failed");
-        console.error(_);
-      });
-  };
+//   const handleEnter = () => {
+//     props.onUrlEnter?.(urlInput);
+//     UserInputCache.set(_FIGMA_FILE_URL_IMPORT_INPUT_CACHE_KEY, urlInput);
+//     setLoadState("loading");
+//     fetch
+//       .fetchTarget(figmaTargetConfig.file, figmaTargetConfig.node, {
+//         personalAccessToken: personal.get_safe(),
+//       })
+//       .then((d) => {
+//         setLoadState("complete");
+//         props.onLoaded({ ...d, node: d.ids[0] });
+//       })
+//       .catch((_) => {
+//         setLoadState("failed");
+//         console.error(_);
+//       });
+//   };
 
-  const makeMessage = () => {
-    switch (loadState) {
-      case "failed":
-        return "failed to fetch the design. check if you have set the personal access token.";
-      case "loading":
-        return "fetching design...";
-      case "none":
-        return "Tip: you must have access to the target file";
-      case "complete":
-        return "fetched";
-    }
-  };
+//   const makeMessage = () => {
+//     switch (loadState) {
+//       case "failed":
+//         return "failed to fetch the design. check if you have set the personal access token.";
+//       case "loading":
+//         return "fetching design...";
+//       case "none":
+//         return "Tip: you must have access to the target file";
+//       case "complete":
+//         return "fetched";
+//     }
+//   };
 
-  return (
-    <div>
-      <p>{makeMessage()}</p>
-      <input
-        defaultValue={urlInput}
-        onChange={(e) => {
-          urlInput = e.target.value;
-        }}
-        onKeyDown={(e) => {
-          if (e.key === "Enter") {
-            handleEnter();
-          }
-        }}
-      />
-    </div>
-  );
-}
+//   return (
+//     <div>
+//       <p>{makeMessage()}</p>
+//       <input
+//         defaultValue={urlInput}
+//         onChange={(e) => {
+//           urlInput = e.target.value;
+//         }}
+//         onKeyDown={(e) => {
+//           if (e.key === "Enter") {
+//             handleEnter();
+//           }
+//         }}
+//       />
+//     </div>
+//   );
+// }

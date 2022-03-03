@@ -1,7 +1,7 @@
 import styled from "@emotion/styled";
 import React, { useState } from "react";
-import { AppRunner } from "../app-runner";
-import { ScenePreview } from "../scene-preview";
+import { AppRunner } from "components/app-runner";
+import { DesignPreview } from "components/design-preview";
 
 type Mode = "preview" | "run";
 
@@ -16,6 +16,7 @@ interface SceneRunnerConfig {
   platform: "react" | "flutter" | "vanilla" | "vue" | "svelte";
   componentName: string;
   initialMode?: Mode;
+  hideModeChangeControls?: boolean;
 }
 
 export function PreviewAndRunPanel(props: { config: SceneRunnerConfig }) {
@@ -40,7 +41,7 @@ export function PreviewAndRunPanel(props: { config: SceneRunnerConfig }) {
     switch (mode) {
       case "preview":
         return (
-          <ScenePreview
+          <DesignPreview
             config={{
               fileid: sceneConfig?.fileid,
               sceneid: sceneConfig?.sceneid,
@@ -80,15 +81,28 @@ export function PreviewAndRunPanel(props: { config: SceneRunnerConfig }) {
   };
 
   return (
-    <div style={{ height: "100%" }}>
-      <StickyTab>
-        <ModeSelectionTab />
-      </StickyTab>
-      <TargetModePanel />
+    <div>
+      {props.config.hideModeChangeControls ? null : (
+        <>
+          <StickyTab>
+            <ModeSelectionTab />
+          </StickyTab>
+        </>
+      )}
+      <TargetModePanelWrap>
+        <TargetModePanel />
+      </TargetModePanelWrap>
     </div>
   );
 }
 
 const StickyTab = styled.div`
   position: relative;
+`;
+
+const TargetModePanelWrap = styled.div`
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
 `;

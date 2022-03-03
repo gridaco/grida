@@ -1,40 +1,53 @@
-//// dynamic code editor. supports codemirror & monaco
-import React from "react";
-import CodeMirror from "./code-mirror";
-import { MonacoEditor } from "./monaco";
+import React, { useState } from "react";
+import { MonacoEditor, MonacoEditorProps as MonacoEditorProps } from "./monaco";
+import { Tabs, Tab } from "@material-ui/core";
 
-interface DynamicEdotorProps {
-  host?: _Host;
+export interface CodeEditorProps
+  extends Omit<MonacoEditorProps, "defaultValue" | "defaultLanguage"> {}
+export interface IFile {
+  name: string;
+  language: string;
+  raw: string;
 }
 
-type _Host = "codemirror" | "monaco" | "auto";
-// uses monaco by default. when set auto or host not provided.
-const fallbackAutoHost = "monaco";
+export type Files = { [name: string]: IFile };
 
-export function CodeEditor(props: DynamicEdotorProps) {
-  const _editorname = getTargetEditorName(props.host);
+export function CodeEditor({
+  files,
+  ...editor_props
+}: {
+  files: Files;
+} & CodeEditorProps) {
+  const keys = Object.keys(files);
+  const [filekey, setFilekey] = useState<string>(keys[0]);
+  const getfile = (key: string) => files[key];
+  const handleChange = (event, newValue) => {
+    setFilekey(newValue);
+  };
 
-  switch (_editorname) {
-    case "codemirror":
-      return <CodeMirror />;
-    case "monaco":
-      return <MonacoEditor />;
-  }
-}
+  const file = getfile(filekey);
 
-function getTargetEditorName(host?: _Host): "codemirror" | "monaco" {
-  if (!host) {
-    return fallbackAutoHost;
-  }
-
-  switch (host) {
-    case "auto":
-      return fallbackAutoHost;
-    case "codemirror":
-      return "codemirror";
-    case "monaco":
-      return "monaco";
-  }
-
-  throw `invalid host option provided - "${host}"`;
+  return (
+    <>
+      {keys.length >= 2 && (
+        <Tabs
+          value={filekey}
+          onChange={handleChange}
+          variant="scrollable"
+          scrollButtons="off"
+          aria-label="scrollable prevent tabs example"
+        >
+          {Object.keys(files).map((name) => {
+            return <Tab key={name} label={name} value={name} />;
+          })}
+        </Tabs>
+      )}
+      <MonacoEditor
+        key={filekey}
+        {...editor_props}
+        defaultLanguage={file.language}
+        defaultValue={file.raw}
+      />
+    </>
+  );
 }

@@ -1,23 +1,28 @@
 import React from "react";
-import styled from "@emotion/styled";
-import { useReflectTargetNode } from "../../query/from-figma";
-import { MonacoEditor } from "../../components/code-editor";
+import { MonacoEditor } from "components/code-editor";
 import { SceneNode } from "@design-sdk/figma-types";
+import { useDesign } from "hooks";
+import LoadingLayout from "layouts/loading-overlay";
 
+/**
+ * shows layout related data as json in a monaco editor
+ * @returns
+ */
 export default function InspectAutolayout() {
   //
-  const targetNodeConfig = useReflectTargetNode();
-  const figmaNode = targetNodeConfig?.figma;
-  const reflect = targetNodeConfig?.reflect;
+  const design = useDesign({ type: "use-router" });
+  if (!design) {
+    return <LoadingLayout />;
+  }
+  const { node, reflect, raw, remote, figma } = design;
   //
 
-  const inspectionTarget =
-    figmaNode && extractOnlyAutolayoutProoperties(figmaNode);
+  const inspectionTarget = figma && extractOnlyAutolayoutProoperties(figma);
 
   return (
     <>
       <MonacoEditor
-        key={figmaNode?.id}
+        key={figma?.id}
         height="100vh"
         defaultLanguage="json"
         defaultValue={JSON.stringify(inspectionTarget, null, 2)}
