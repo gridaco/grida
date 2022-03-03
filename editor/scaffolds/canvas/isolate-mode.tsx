@@ -85,8 +85,8 @@ export function IsolateModeCanvas({ onClose }: { onClose: () => void }) {
             setFullscreen(false);
           }}
         />
-        ;
       </Dialog>
+
       <IsolatedCanvas
         key={target?.id}
         onExit={onClose}

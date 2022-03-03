@@ -157,7 +157,8 @@ const RootWrapperFullScreenRunnerViewLayout = styled.div`
   flex-direction: column;
   align-items: center;
   flex: none;
-  min-height: 100vh;
+  height: 100vh;
+  overflow: hidden;
   box-sizing: border-box;
 `;
 
