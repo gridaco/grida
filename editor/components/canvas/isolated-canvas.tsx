@@ -1,4 +1,4 @@
-import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import styled from "@emotion/styled";
 import { useGesture } from "@use-gesture/react";
 import useMeasure from "react-use-measure";
@@ -61,10 +61,12 @@ export function IsolatedCanvas({
   children,
   defaultSize,
   onExit,
+  onFullscreen,
 }: {
   defaultSize: { width: number; height: number };
   children?: React.ReactNode;
   onExit?: () => void;
+  onFullscreen?: () => void;
 }) {
   const _margin = 20;
   const [canvasSizingRef, canvasBounds] = useMeasure();
@@ -136,7 +138,12 @@ export function IsolatedCanvas({
             scale={scale}
             onChange={setScale}
           />
-          {onExit && <ExitButton onClick={onExit}>End Isolation</ExitButton>}
+          {onFullscreen && (
+            <ActionButton onClick={onFullscreen}>Full Screen</ActionButton>
+          )}
+          {onExit && (
+            <ActionButton onClick={onExit}>End Isolation</ActionButton>
+          )}
         </Controls>
         {/* <ScalingAreaStaticRoot> */}
         <TransformContainer
@@ -155,7 +162,7 @@ export function IsolatedCanvas({
   );
 }
 
-const ExitButton = styled.button`
+const ActionButton = styled.button`
   align-self: center;
   background-color: ${colors.color_editor_bg_on_dark};
   box-shadow: ${colors.color_editor_bg_on_dark} 0px 0px 0px 16px inset;

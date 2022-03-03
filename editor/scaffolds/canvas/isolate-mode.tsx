@@ -8,10 +8,13 @@ import { IsolatedCanvas } from "components/canvas";
 import { PreviewAndRunPanel } from "components/preview-and-run";
 import { useEditorState } from "core/states";
 import { useTargetContainer } from "hooks";
+import { Dialog } from "@material-ui/core";
+import { FullScreenPreview } from "scaffolds/preview-full-screen";
 
 export function IsolateModeCanvas({ onClose }: { onClose: () => void }) {
   const [state] = useEditorState();
   const [preview, setPreview] = useState<Result>();
+  const [fullscreen, setFullscreen] = useState(false);
 
   const { target, root } = useTargetContainer();
 
@@ -69,30 +72,49 @@ export function IsolateModeCanvas({ onClose }: { onClose: () => void }) {
   }, [target?.id]);
 
   return (
-    <IsolatedCanvas
-      key={target?.id}
-      onExit={onClose}
-      defaultSize={{
-        width: target?.width ?? 375,
-        height: target?.height ?? 812,
-      }}
-    >
-      {preview ? (
-        <VanillaRunner
-          key={preview.scaffold.raw}
-          style={{
-            borderRadius: 4,
-            boxShadow: "0px 0px 48px #00000020",
+    <>
+      <Dialog
+        fullScreen
+        onClose={() => {
+          setFullscreen(false);
+        }}
+        open={fullscreen}
+      >
+        <FullScreenPreview
+          onClose={() => {
+            setFullscreen(false);
           }}
-          source={preview.scaffold.raw}
-          width="100%"
-          height="100%"
-          componentName={preview.name}
         />
-      ) : (
-        <EditorCanvasSkeleton />
-      )}
-    </IsolatedCanvas>
+      </Dialog>
+
+      <IsolatedCanvas
+        key={target?.id}
+        onExit={onClose}
+        onFullscreen={() => {
+          setFullscreen(true);
+        }}
+        defaultSize={{
+          width: target?.width ?? 375,
+          height: target?.height ?? 812,
+        }}
+      >
+        {preview ? (
+          <VanillaRunner
+            key={preview.scaffold.raw}
+            style={{
+              borderRadius: 4,
+              boxShadow: "0px 0px 48px #00000020",
+            }}
+            source={preview.scaffold.raw}
+            width="100%"
+            height="100%"
+            componentName={preview.name}
+          />
+        ) : (
+          <EditorCanvasSkeleton />
+        )}
+      </IsolatedCanvas>
+    </>
   );
 }
 
