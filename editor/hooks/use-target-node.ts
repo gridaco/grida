@@ -7,7 +7,10 @@ import { utils as _design_utils } from "@design-sdk/core";
 const designq = _design_utils.query;
 
 export function useTargetContainer() {
-  const [t, setT] = useState<{ target: ReflectSceneNode; root: DesignInput }>();
+  const [t, setT] = useState<{ target: ReflectSceneNode; root: DesignInput }>({
+    target: undefined,
+    root: undefined,
+  });
   const [state] = useEditorState();
 
   //
