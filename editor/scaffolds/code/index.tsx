@@ -11,15 +11,12 @@ import {
   ImageRepository,
   MainImageRepository,
 } from "@design-sdk/core/assets-repository";
-import { DesignInput } from "@designto/config/input";
 import { useEditorState, useWorkspaceState } from "core/states";
 import { utils_dart } from "utils";
 import type { ReflectSceneNode } from "@design-sdk/core";
-
-import { utils as _design_utils } from "@design-sdk/core";
-import assert from "assert";
 import { RemoteImageRepositories } from "@design-sdk/figma-remote/lib/asset-repository/image-repository";
-const designq = _design_utils.query;
+import { useTargetContainer } from "hooks/use-target-node";
+import assert from "assert";
 
 export function CodeSegment() {
   const router = useRouter();
@@ -30,35 +27,10 @@ export function CodeSegment() {
     wstate.preferences.framework_config
   );
 
+  const { target: targetted, root } = useTargetContainer();
+
   const enable_components =
     wstate.preferences.enable_preview_feature_components_support;
-
-  const thisPageNodes = state.selectedPage
-    ? state.design.pages.find((p) => p.id == state.selectedPage).children
-    : null;
-
-  const targetId =
-    state?.selectedNodes?.length === 1 ? state.selectedNodes[0] : null;
-
-  const container_of_target =
-    designq.find_node_by_id_under_inpage_nodes(targetId, thisPageNodes) || null;
-
-  const root = thisPageNodes
-    ? container_of_target &&
-      (container_of_target.origin === "COMPONENT"
-        ? DesignInput.forMasterComponent({
-            master: container_of_target,
-            all: state.design.pages,
-            components: state.design.components,
-          })
-        : DesignInput.fromDesignWithComponents({
-            design: container_of_target,
-            components: state.design.components,
-          }))
-    : state.design?.input;
-
-  const targetted =
-    designq.find_node_by_id_under_entry(targetId, root?.entry) ?? root?.entry;
 
   const targetStateRef =
     useRef<{
