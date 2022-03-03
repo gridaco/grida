@@ -54,10 +54,13 @@ export default function FileEntryEditor() {
         ),
       };
     } else {
+      const initialSelections =
+        // set selected nodes initially only if the nodeid is the id of non-page node
+        pages.some((p) => p.id === nodeid) ? [] : nodeid ? [nodeid] : [];
+
       val = {
-        selectedNodes:
-          // set selected nodes initially only if the nodeid is the id of non-page node
-          pages.some((p) => p.id === nodeid) ? [] : nodeid ? [nodeid] : [],
+        selectedNodes: initialSelections,
+        selectedNodesInitial: initialSelections,
         selectedPage: warmup.selectedPage(prevstate, pages, nodeid && [nodeid]),
         selectedLayersOnPreview: [],
         design: {
