@@ -1,3 +1,4 @@
+/* eslint-disable import-helpers/order-imports */
 import { Global, css } from "@emotion/core";
 import { ThemeProvider } from "emotion-theming";
 import { AppProps } from "next/app";
@@ -26,6 +27,7 @@ import { SEO_DEFAULTS } from "utils/seo";
 import makeKeywords from "utils/seo/make-keywords";
 
 import { Box } from "rebass";
+import { env } from "process";
 
 const App = ({ Component, pageProps }: AppProps) => {
   const router = useRouter();
@@ -122,6 +124,12 @@ const App = ({ Component, pageProps }: AppProps) => {
         <meta property="og:type" content={SEO_DEFAULTS.og.type} />
         <meta property="og:url" content={SEO_DEFAULTS.og.url} />
         <meta property="og:image" content={SEO_DEFAULTS.og.image} />
+
+        {/* pinterest domain verify */}
+        <meta
+          name="p:domain_verify"
+          content={env.NEXT_PUBLIC_P_DOMAIN_VERIFY}
+        />
 
         {/* region Nanum Pen Script Font */}
         <link rel="preconnect" href="https://fonts.googleapis.com" />
