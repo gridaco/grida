@@ -7,15 +7,16 @@ import { get_framework_config } from "query/to-code-options-from-query";
 import { CodeOptionsControl } from "components/codeui-code-options-control";
 import { designToCode, Result } from "@designto/code";
 import { config } from "@designto/config";
-import { MainImageRepository } from "@design-sdk/core/assets-repository";
-import { DesignInput } from "@designto/config/input";
+import {
+  ImageRepository,
+  MainImageRepository,
+} from "@design-sdk/core/assets-repository";
 import { useEditorState, useWorkspaceState } from "core/states";
 import { utils_dart } from "utils";
 import type { ReflectSceneNode } from "@design-sdk/core";
-
-import { utils as _design_utils } from "@design-sdk/core";
+import { RemoteImageRepositories } from "@design-sdk/figma-remote/lib/asset-repository/image-repository";
+import { useTargetContainer } from "hooks/use-target-node";
 import assert from "assert";
-const designq = _design_utils.query;
 
 export function CodeSegment() {
   const router = useRouter();
@@ -26,35 +27,10 @@ export function CodeSegment() {
     wstate.preferences.framework_config
   );
 
+  const { target: targetted, root } = useTargetContainer();
+
   const enable_components =
     wstate.preferences.enable_preview_feature_components_support;
-
-  const thisPageNodes = state.selectedPage
-    ? state.design.pages.find((p) => p.id == state.selectedPage).children
-    : null;
-
-  const targetId =
-    state?.selectedNodes?.length === 1 ? state.selectedNodes[0] : null;
-
-  const container_of_target =
-    designq.find_node_by_id_under_inpage_nodes(targetId, thisPageNodes) || null;
-
-  const root = thisPageNodes
-    ? container_of_target &&
-      (container_of_target.origin === "COMPONENT"
-        ? DesignInput.forMasterComponent({
-            master: container_of_target,
-            all: state.design.pages,
-            components: state.design.components,
-          })
-        : DesignInput.fromDesignWithComponents({
-            design: container_of_target,
-            components: state.design.components,
-          }))
-    : state.design?.input;
-
-  const targetted =
-    designq.find_node_by_id_under_entry(targetId, root?.entry) ?? root?.entry;
 
   const targetStateRef =
     useRef<{
@@ -85,6 +61,24 @@ export function CodeSegment() {
     const __target = targetted;
     const __framework_config = framework_config;
     if (__target && __framework_config) {
+      if (!MainImageRepository.isReady) {
+        // this is not the smartest way, but the image repo has a design flaw.
+        // this happens when the target node is setted on the query param on first load, when the image repo is not set by the higher editor container.
+        MainImageRepository.instance = new RemoteImageRepositories(
+          state.design.key,
+          {
+            // setting this won't load any image btw. (just to prevent errors)
+            authentication: { accessToken: "" },
+          }
+        );
+        MainImageRepository.instance.register(
+          new ImageRepository(
+            "fill-later-assets",
+            "grida://assets-reservation/images/"
+          )
+        );
+      }
+
       const _input = {
         id: __target.id,
         name: __target.name,

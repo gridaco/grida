@@ -27,7 +27,12 @@ export function editorReducer(state: EditorState, action: Action): EditorState {
 
         const new_selections = [node].filter(Boolean);
         _canvas_state_store.saveLastSelection(...new_selections);
+
+        // assign new nodes set to the state.
         draft.selectedNodes = new_selections;
+
+        // remove the initial selection after the first interaction.
+        draft.selectedNodesInitial = null;
       });
     }
     case "select-page": {

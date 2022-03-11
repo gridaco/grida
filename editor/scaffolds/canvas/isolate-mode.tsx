@@ -7,41 +7,16 @@ import { VanillaRunner } from "components/app-runner/vanilla-app-runner";
 import { IsolatedCanvas } from "components/canvas";
 import { PreviewAndRunPanel } from "components/preview-and-run";
 import { useEditorState } from "core/states";
-import { DesignInput } from "@designto/config/input";
-
-import { utils as _design_utils } from "@design-sdk/core";
-const designq = _design_utils.query;
+import { useTargetContainer } from "hooks";
+import { Dialog } from "@material-ui/core";
+import { FullScreenPreview } from "scaffolds/preview-full-screen";
 
 export function IsolateModeCanvas({ onClose }: { onClose: () => void }) {
   const [state] = useEditorState();
   const [preview, setPreview] = useState<Result>();
+  const [fullscreen, setFullscreen] = useState(false);
 
-  const thisPageNodes = state.selectedPage
-    ? state.design.pages.find((p) => p.id == state.selectedPage).children
-    : null;
-
-  const targetId =
-    state?.selectedNodes?.length === 1 ? state.selectedNodes[0] : null;
-
-  const container_of_target =
-    designq.find_node_by_id_under_inpage_nodes(targetId, thisPageNodes) || null;
-
-  const root = thisPageNodes
-    ? container_of_target &&
-      (container_of_target.origin === "COMPONENT"
-        ? DesignInput.forMasterComponent({
-            master: container_of_target,
-            all: state.design.pages,
-            components: state.design.components,
-          })
-        : DesignInput.fromDesignWithComponents({
-            design: container_of_target,
-            components: state.design.components,
-          }))
-    : state.design?.input;
-
-  const target =
-    designq.find_node_by_id_under_entry(targetId, root?.entry) ?? root?.entry;
+  const { target, root } = useTargetContainer();
 
   const on_preview_result = (result: Result) => {
     //@ts-ignore
@@ -97,30 +72,49 @@ export function IsolateModeCanvas({ onClose }: { onClose: () => void }) {
   }, [target?.id]);
 
   return (
-    <IsolatedCanvas
-      key={targetId}
-      onExit={onClose}
-      defaultSize={{
-        width: target?.width ?? 375,
-        height: target?.height ?? 812,
-      }}
-    >
-      {preview ? (
-        <VanillaRunner
-          key={preview.scaffold.raw}
-          style={{
-            borderRadius: 4,
-            boxShadow: "0px 0px 48px #00000020",
+    <>
+      <Dialog
+        fullScreen
+        onClose={() => {
+          setFullscreen(false);
+        }}
+        open={fullscreen}
+      >
+        <FullScreenPreview
+          onClose={() => {
+            setFullscreen(false);
           }}
-          source={preview.scaffold.raw}
-          width="100%"
-          height="100%"
-          componentName={preview.name}
         />
-      ) : (
-        <EditorCanvasSkeleton />
-      )}
-    </IsolatedCanvas>
+      </Dialog>
+
+      <IsolatedCanvas
+        key={target?.id}
+        onExit={onClose}
+        onFullscreen={() => {
+          setFullscreen(true);
+        }}
+        defaultSize={{
+          width: target?.width ?? 375,
+          height: target?.height ?? 812,
+        }}
+      >
+        {preview ? (
+          <VanillaRunner
+            key={preview.scaffold.raw}
+            style={{
+              borderRadius: 4,
+              boxShadow: "0px 0px 48px #00000020",
+            }}
+            source={preview.scaffold.raw}
+            width="100%"
+            height="100%"
+            componentName={preview.name}
+          />
+        ) : (
+          <EditorCanvasSkeleton />
+        )}
+      </IsolatedCanvas>
+    </>
   );
 }
 
