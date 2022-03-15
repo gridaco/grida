@@ -22,6 +22,7 @@ export interface DisplayNodeMeta {
   absoluteY: number;
   width: number;
   height: number;
+  rotation: number;
 }
 
 export function HudSurface({
@@ -41,7 +42,7 @@ export function HudSurface({
 }: {
   offset: XY;
   zoom: number;
-  highlights: { id: string; xywh: XYWH }[];
+  highlights: { id: string; xywh: XYWH; rotation: number }[];
   labelDisplayNodes: DisplayNodeMeta[];
   selectedNodes: DisplayNodeMeta[];
   hide: boolean;
@@ -102,6 +103,7 @@ export function HudSurface({
                   key={h.id}
                   type="xywhr"
                   xywh={h.xywh}
+                  rotation={h.rotation}
                   zoom={zoom}
                   width={2}
                 />
@@ -121,6 +123,7 @@ export function HudSurface({
                     key={s.id}
                     type="xywhr"
                     xywh={xywh}
+                    rotation={s.rotation}
                     zoom={zoom}
                     width={1}
                   />
