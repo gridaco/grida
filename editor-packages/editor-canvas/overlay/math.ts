@@ -6,6 +6,8 @@ export function get_boinding_box({
   scale: number;
 }): [number, number, number, number] {
   const [x, y, w, h] = xywh;
+
+  // return the bounding box in [number, number, number, number] form with givven x, y, w, h, rotation and scale.
   const [x1, y1, x2, y2] = [
     x * scale,
     y * scale,

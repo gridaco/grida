@@ -320,6 +320,7 @@ export function Canvas({
                 ).map((h) => ({
                   id: h.id,
                   xywh: [h.absoluteX, h.absoluteY, h.width, h.height],
+                  rotation: h.rotation,
                 }))
               : []
           }

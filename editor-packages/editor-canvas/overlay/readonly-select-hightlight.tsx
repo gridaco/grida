@@ -3,12 +3,13 @@ import type { OutlineProps } from "./types";
 import { color_layer_readonly_highlight } from "../theme";
 import { get_boinding_box } from "./math";
 import { OulineSide } from "./outline-side";
+import { OverlayContainer } from "./overlay-container";
 
 export function ReadonlySelectHightlight({
   width = 1,
   ...props
 }: OutlineProps) {
-  const { xywh, zoom } = props;
+  const { xywh, zoom, rotation } = props;
   const bbox = get_boinding_box({ xywh, scale: zoom });
   const wh: [number, number] = [xywh[2], xywh[3]];
 
@@ -16,12 +17,16 @@ export function ReadonlySelectHightlight({
   const handle_size = 3;
   const dot_size = 4;
 
+  const sideprops = {
+    wh: wh,
+    zoom: props.zoom,
+    width: width,
+    box: bbox,
+    color: color_layer_readonly_highlight,
+  };
+
   return (
-    <div
-      style={{
-        pointerEvents: "none",
-      }}
-    >
+    <OverlayContainer xywh={bbox} rotation={rotation}>
       <>
         <ReadonlyHandle
           box={bbox}
@@ -83,40 +88,12 @@ export function ReadonlySelectHightlight({
         />
       </>
       <>
-        <OulineSide
-          orientation="l"
-          wh={wh}
-          zoom={props.zoom}
-          width={width}
-          box={bbox}
-          color={color_layer_readonly_highlight}
-        />
-        <OulineSide
-          orientation="t"
-          wh={wh}
-          zoom={props.zoom}
-          width={width}
-          box={bbox}
-          color={color_layer_readonly_highlight}
-        />
-        <OulineSide
-          orientation="b"
-          wh={wh}
-          zoom={props.zoom}
-          width={width}
-          box={bbox}
-          color={color_layer_readonly_highlight}
-        />
-        <OulineSide
-          orientation="r"
-          wh={wh}
-          zoom={props.zoom}
-          width={width}
-          box={bbox}
-          color={color_layer_readonly_highlight}
-        />
+        <OulineSide orientation="l" {...sideprops} />
+        <OulineSide orientation="t" {...sideprops} />
+        <OulineSide orientation="b" {...sideprops} />
+        <OulineSide orientation="r" {...sideprops} />
       </>
-    </div>
+    </OverlayContainer>
   );
 }
 
