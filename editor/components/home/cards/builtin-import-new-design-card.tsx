@@ -14,8 +14,8 @@ const importnewdesingcarddata = {
 export function ImportNewDesignCard() {
   const router = useRouter();
   const onclick = () => {
-    // router.push("/import");
-    router.push("https://grida.co");
+    router.push("/import");
+    // router.push("https://grida.co");
   };
 
   return (
