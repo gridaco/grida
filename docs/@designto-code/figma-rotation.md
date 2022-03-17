@@ -12,6 +12,37 @@ revision: 1
 
 > Figma rotation from [figma plugin docs](https://www.figma.com/plugin-docs/api/properties/nodes-rotation/#docsNav)
 
+## [Note] The rotation value needs to be inverted on the client side.
+
+to rotate something to the clockwise direction,
+
+- figma: -n
+- client: +n (css)
+
+the transform origin
+
+- figma: not specified (always top left)
+- client: top left
+
+**so the conversion from figma to css will be like below**
+
+```
+# figma
+{
+  x: 100,
+  y: 100,
+  rotation: 10,
+}
+
+# css
+.rotate-n {
+  top: 100;
+  left: 100;
+  transform: rotate(-10deg);
+  transform-origin: top left;
+}
+```
+
 ## Transform?
 
 While figma and other major design tools has both transform value, and explicit rotation value (which can be calculated from transform value), The intuitive way to represent a rotation value is by using a `Rotation` token. Overall all figma node properties, the only two property that has impact to final transform (based on css) is `scale` and `rotation`.
