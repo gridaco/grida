@@ -1,12 +1,12 @@
 export type Sitemap = {
   label: string;
-  href: string;
+  href?: string;
+  badge?: "alpha" | "beta";
   child?: Sitemap[];
 };
 
 export const Products: Sitemap = {
   label: "Products",
-  href: "/products",
   child: [
     {
       label: "Cloud",
@@ -45,7 +45,6 @@ export const Products: Sitemap = {
 
 export const Solutions: Sitemap = {
   label: "Solutions",
-  href: "/solutions",
   child: [
     {
       label: "Showcase",
@@ -64,7 +63,6 @@ export const Solutions: Sitemap = {
 
 export const Resources: Sitemap = {
   label: "Resources",
-  href: "/resources",
   child: [
     {
       label: "Gettiing Started",
@@ -91,66 +89,69 @@ export const Resources: Sitemap = {
 
 export const Platforms: Sitemap = {
   label: "Platforms",
-  href: "/platforms",
   child: [
     {
       label: "Figma",
-      href: "/docs/platforms/figma",
+      href: "/docs/getting-started/intro",
     },
-    {
-      label: "Sketch",
-      href: "/docs/platforms/sketch",
-    },
-    {
-      label: "XD",
-      href: "/docs/platforms/xd",
-    },
+    // {
+    //   label: "Sketch",
+    //   href: "/sketch",
+    // },
+    // {
+    //   label: "XD",
+    //   href: "/adobe-xd",
+    // },
     {
       label: "React",
-      href: "/docs/platforms/react",
+      href: "/react-js",
+    },
+    {
+      label: "React Native",
+      badge: "beta",
+      href: "/react-native",
     },
     {
       label: "Flutter",
-      href: "/docs/platforms/flutter",
+      href: "/flutter",
     },
-    {
-      label: "Vue",
-      href: "/docs/platforms/vue",
-    },
-    {
-      label: "Svelte",
-      href: "/docs/platforms/svelte",
-    },
+    // {
+    //   label: "Vue",
+    //   badge: "alpha",
+    //   href: "/vue",
+    // },
+    // {
+    //   label: "Svelte",
+    //   badge: "alpha",
+    //   href: "/svelte",
+    // },
     {
       label: "HTML/CSS",
-      href: "/docs/platforms/vanilla-web",
+      href: "/vanilla",
     },
     {
-      label: "Reflect",
-      href: "https://reflect.bridged.xyz",
+      label: "Reflect UI",
+      badge: "alpha",
+      href: "https://reflect-ui.com/",
     },
   ],
 };
 
 export const Together: Sitemap = {
   label: "Together",
-  href: "https://together.bridged.xyz",
+  href: "/docs/together/contributing",
   child: [
-    // {
-    //   label: "Let's create together",
-    //   href: "/together/create",
-    // },
-    // {
-    //   label: "How to contribute",
-    //   href: "/together/contribute",
-    // },
-    // {
-    //   label: "Github",
-    //   href: "https://github.com/gridaco",
-    // },
+    {
+      label: "Github",
+      href: "https://github.com/gridaco",
+    },
     {
       label: "Projects",
-      href: "/together/projects",
+      href: "/docs/together/projects",
+    },
+    {
+      label: "Support",
+      href: "/docs/together/support",
     },
     {
       label: "Join us on Slack",
@@ -163,14 +164,14 @@ export const Together: Sitemap = {
     // },
     {
       label: "Reddit",
-      href: "https://www.reddit.com/r/bridged/",
+      href: "https://www.reddit.com/r/gridaco/",
     },
   ],
 };
 
 export const Sitemap: Sitemap[] = [
   Products,
-  Solutions,
+  // Solutions,
   Resources,
   Platforms,
   Together,

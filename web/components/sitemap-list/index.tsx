@@ -12,22 +12,27 @@ interface SitemapListProps {
 const SitemapList: React.FC<SitemapListProps> = ({ sitemap }) => {
   const { label, href, child } = sitemap;
 
+  const Header = () => {
+    const HeaderText = (
+      <Text
+        className={href && "cursor"}
+        fontWeight="500"
+        fontSize="18px"
+        mb="40px"
+        style={{
+          letterSpacing: "0em",
+          fontWeight: 700,
+        }}
+      >
+        {label}
+      </Text>
+    );
+    return href ? <Link href={href}>{HeaderText}</Link> : HeaderText;
+  };
+
   return (
     <Flex flexDirection="column">
-      <Link href={href}>
-        <Text
-          className="cursor"
-          fontWeight="500"
-          fontSize="18px"
-          mb="40px"
-          style={{
-            letterSpacing: "0em",
-            fontWeight: 700,
-          }}
-        >
-          {label}
-        </Text>
-      </Link>
+      <Header />
       {child.map(i => (
         <Link href={i.href} key={i.label}>
           <Text
