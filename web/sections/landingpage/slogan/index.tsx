@@ -1,8 +1,9 @@
-import Icon from "components/icon";
+import styled from "@emotion/styled";
 import SectionLayout from "layout/section";
 import React from "react";
-import { Button, Flex, Heading } from "rebass";
-import styled from "@emotion/styled";
+import { Flex } from "rebass";
+
+import Icon from "components/icon";
 import LandingMainCtaButton from "components/landingpage/main-cta-button";
 import LandingpageText from "components/landingpage/text";
 
