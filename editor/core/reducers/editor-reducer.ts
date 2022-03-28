@@ -16,8 +16,14 @@ export function editorReducer(state: EditorState, action: Action): EditorState {
       console.info("cleard console by editorReducer#select-node");
 
       // update router
-      router.query.node = node ?? state.selectedPage;
-      router.push(router);
+      router.push(
+        {
+          pathname: router.pathname,
+          query: { ...router.query, node: node ?? state.selectedPage },
+        },
+        undefined,
+        {}
+      );
 
       return produce(state, (draft) => {
         const _canvas_state_store = new CanvasStateStore(
@@ -42,8 +48,14 @@ export function editorReducer(state: EditorState, action: Action): EditorState {
       console.info("cleard console by editorReducer#select-page");
 
       // update router
-      router.query.node = page;
-      router.push(router);
+      router.push(
+        {
+          pathname: router.pathname,
+          query: { ...router.query, node: page },
+        },
+        undefined,
+        {}
+      );
 
       return produce(state, (draft) => {
         const _canvas_state_store = new CanvasStateStore(filekey, page);

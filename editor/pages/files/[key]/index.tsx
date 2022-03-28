@@ -8,6 +8,7 @@ import { useDesignFile } from "hooks";
 
 import { warmup } from "scaffolds/editor";
 import { FileResponse } from "@design-sdk/figma-remote-types";
+import { EditorBrowserMetaHead } from "components/editor";
 
 export default function FileEntryEditor() {
   const router = useRouter();
@@ -64,6 +65,7 @@ export default function FileEntryEditor() {
         selectedPage: warmup.selectedPage(prevstate, pages, nodeid && [nodeid]),
         selectedLayersOnPreview: [],
         design: {
+          name: file.name,
           input: null,
           components: components,
           // styles: null,
@@ -131,7 +133,9 @@ export default function FileEntryEditor() {
     <SigninToContinueBannerPrmoptProvider>
       <StateProvider state={safe_value} dispatch={handleDispatch}>
         <EditorDefaultProviders>
-          <Editor loading={loading} />
+          <EditorBrowserMetaHead>
+            <Editor loading={loading} />
+          </EditorBrowserMetaHead>
         </EditorDefaultProviders>
       </StateProvider>
     </SigninToContinueBannerPrmoptProvider>

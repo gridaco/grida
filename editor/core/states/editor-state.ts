@@ -25,6 +25,11 @@ export interface EditorSnapshot {
 
 export interface FigmaReflectRepository {
   /**
+   * name of the file
+   */
+  name: string;
+
+  /**
    * fileid; filekey
    */
   key: string;
