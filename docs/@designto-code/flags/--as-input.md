@@ -16,3 +16,7 @@ stage:
 - `--as-input`
 - `--as-input=true`
 - `--as=input`
+
+## See also
+
+- [`--placeholder`](--placeholder)
