@@ -82,7 +82,7 @@ export function VanillaRunner({
     <iframe
       ref={ref}
       style={style}
-      sandbox="allow-same-origin"
+      sandbox="allow-same-origin allow-scripts"
       srcDoc={inlinesource}
       width={width}
       height={height}
