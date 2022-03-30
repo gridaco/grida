@@ -30,11 +30,10 @@ export const HeaderMap: HeaderMap[] = [
     label: "Docs",
     href: "/docs",
   },
-  // temporarily disabled - since the blog standards is not firm
-  // {
-  //   label: "Blog",
-  //   href: URLS.social.medium,
-  // },
+  {
+    label: "Blog",
+    href: URLS.social.medium,
+  },
   {
     label: "Github",
     href: URLS.social.github,
