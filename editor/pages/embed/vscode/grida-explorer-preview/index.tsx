@@ -119,12 +119,13 @@ function PreviewState({
     <>
       {loading && <LoadingOverlay />}
       <VanillaPreview
-        type="responsive"
         id={id ?? "no-id"}
         data={srcDoc}
         margin={0}
         borderRadius={0}
         origin_size={size}
+        type="scaling"
+        parentWidth={undefined} // TODO: fix this
       />
     </>
   );

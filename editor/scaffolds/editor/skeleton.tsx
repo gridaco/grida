@@ -4,14 +4,24 @@ import { HomeLogo } from "icons/home-logo";
 import { withStyles } from "@material-ui/core/styles";
 import Box from "@material-ui/core/Box";
 import LinearProgress from "@material-ui/core/LinearProgress";
+import ClientOnly from "components/client-only";
 
-export function EditorSkeleton({ percent = 0 }: { percent?: number }) {
+export function EditorSkeleton({
+  percent = 0,
+}: {
+  /**
+   * loading progress to display on progress bar
+   */
+  percent?: number;
+}) {
   return (
     <SkeletonWrap>
       <LoadingIndicatorContainer>
         <LogoAndLoading>
           <HomeLogo />
-          <ColoredLinearProgress />
+          <ClientOnly>
+            <ColoredLinearProgress value={percent} />
+          </ClientOnly>
         </LogoAndLoading>
         <TipsContainer />
       </LoadingIndicatorContainer>
@@ -30,6 +40,7 @@ const SkeletonWrap = styled.div`
 const LoadingIndicatorContainer = styled.div`
   z-index: 100;
   user-select: none;
+  cursor: default;
   display: flex;
   justify-content: flex-start;
   flex-direction: column;
@@ -68,7 +79,9 @@ const styles = (props) => ({
   },
 });
 
-const ColoredLinearProgress = withStyles(styles)(function (props) {
+const ColoredLinearProgress = withStyles(styles)(function (props: {
+  value?: number;
+}) {
   //@ts-ignore
   const { classes } = props;
   return (

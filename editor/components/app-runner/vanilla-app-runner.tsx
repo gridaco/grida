@@ -43,7 +43,7 @@ export function VanillaRunner({
     if (ref.current && enableInspector) {
       ref.current.onload = () => {
         const matches = ref.current.contentDocument.querySelectorAll(
-          "div, span, button, img, image, svg"
+          "div, span, img, image, svg" // button, input - disabled due to interaction testing (for users)
         );
         matches.forEach((el) => {
           const tint = "rgba(20, 0, 255, 0.2)";
@@ -82,7 +82,7 @@ export function VanillaRunner({
     <iframe
       ref={ref}
       style={style}
-      sandbox="allow-same-origin"
+      sandbox="allow-same-origin allow-scripts"
       srcDoc={inlinesource}
       width={width}
       height={height}

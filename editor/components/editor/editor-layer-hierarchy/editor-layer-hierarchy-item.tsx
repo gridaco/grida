@@ -100,6 +100,7 @@ export const LayerRow = memo(
       onDoubleClick,
       onClick,
       children,
+      hovered,
       ...props
     }: TreeView.TreeRowProps<""> & {
       name: string;
@@ -109,12 +110,9 @@ export const LayerRow = memo(
     },
     forwardedRef: any
   ) {
-    const [hovered, setHovered] = useState(false);
-
     const handleHoverChange = useCallback(
       (hovered: boolean) => {
         onHoverChange?.(hovered);
-        setHovered(hovered);
       },
       [onHoverChange]
     );
@@ -124,6 +122,7 @@ export const LayerRow = memo(
       <TreeView.Row<PageMenuItemType>
         ref={forwardedRef}
         onHoverChange={handleHoverChange}
+        hovered={hovered}
         selected={selected}
         disabled={false}
         onPress={onPress}

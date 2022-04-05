@@ -1,1 +1,1 @@
-export const dummy = "canvas";
+export { Canvas } from "./canvas";

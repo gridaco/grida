@@ -7,7 +7,16 @@ export enum Language {
   html = "html",
 }
 
-export type ReactStylingStrategy = "css" | "styled-components" | "css-in-jsx";
+export type ReactStylingStrategy =
+  | "css"
+  | "styled-components"
+  | "inline-css"
+  | "css-module";
+
+export type ReactNativeStylingStrategy =
+  | "style-sheet"
+  | "styled-components"
+  | "inline-style";
 
 export interface FlutterOption {
   framework: Framework.flutter;
@@ -20,12 +29,22 @@ export interface ReactOption {
   styling: ReactStylingStrategy;
 }
 
+export interface ReactNativeOption {
+  framework: Framework.reactnative;
+  language: Language.jsx | Language.tsx;
+  styling: ReactNativeStylingStrategy;
+}
+
 export interface VanillaOption {
   framework: Framework.vanilla;
   language: Language.html;
 }
 
-export type FrameworkOption = ReactOption | FlutterOption | VanillaOption;
+export type FrameworkOption =
+  | ReactOption
+  | ReactNativeOption
+  | FlutterOption
+  | VanillaOption;
 
 export const react_presets = {
   react_default: <ReactOption>{
@@ -38,15 +57,38 @@ export const react_presets = {
     language: Language.tsx,
     styling: "styled-components",
   },
-  react_with_css_in_jsx: <ReactOption>{
+  react_with_inline_css: <ReactOption>{
     framework: Framework.react,
     language: Language.tsx,
-    styling: "css-in-jsx",
+    styling: "inline-css",
+  },
+  react_with_css_module: <ReactOption>{
+    framework: Framework.react,
+    language: Language.tsx,
+    styling: "css-module",
   },
   react_with_css: <ReactOption>{
     framework: Framework.react,
     language: Language.tsx,
     styling: "css",
+  },
+};
+
+export const reactnative_presets = {
+  reactnative_default: <ReactNativeOption>{
+    framework: Framework.reactnative,
+    language: Language.tsx,
+    styling: "style-sheet",
+  },
+  reactnative_with_styled_components: <ReactNativeOption>{
+    framework: Framework.reactnative,
+    language: Language.tsx,
+    styling: "styled-components",
+  },
+  reactnative_with_inline_style: <ReactNativeOption>{
+    framework: Framework.reactnative,
+    language: Language.tsx,
+    styling: "inline-style",
   },
 };
 
@@ -66,6 +108,7 @@ export const vanilla_presets = {
 
 export const presets = {
   react: react_presets,
+  reactnative: reactnative_presets,
   flutter: flutter_presets,
   vanilla: vanilla_presets,
 };
@@ -74,8 +117,10 @@ export const all_preset_options__prod = [
   flutter_presets.flutter_default,
   react_presets.react_default,
   react_presets.react_with_styled_components,
+  react_presets.react_with_inline_css,
+  react_presets.react_with_css_module,
+  reactnative_presets.reactnative_default,
   vanilla_presets.vanilla_default,
-  // react_with_css_in_jsx // NOT ON PRODUCTION
   // react_with_css // NOT ON PRODUCTION
 ];
 
@@ -84,20 +129,28 @@ export const all_preset_options_map__prod = {
   flutter_default: flutter_presets.flutter_default,
   react_default: react_presets.react_default,
   react_with_styled_components: react_presets.react_with_styled_components,
+  react_with_inline_css: react_presets.react_with_inline_css,
+  react_with_css_module: react_presets.react_with_css_module,
+  reactnative_default: reactnative_presets.reactnative_default,
+  reactnative_with_styled_components:
+    reactnative_presets.reactnative_with_styled_components,
+  reactnative_with_inline_style:
+    reactnative_presets.reactnative_with_inline_style,
   vanilla_default: vanilla_presets.vanilla_default,
-  // react_with_css_in_jsx // NOT ON PRODUCTION
   // react_with_css // NOT ON PRODUCTION
 };
 
 export const lang_by_framework = {
   flutter: [Language.dart],
   react: [Language.jsx, Language.tsx],
+  "react-native": [Language.jsx, Language.tsx],
   vanilla: [Language.html],
 };
 
 export const react_styles: ReactStylingStrategy[] = [
   "styled-components",
-  "css-in-jsx",
+  "inline-css",
+  "css-module",
   "css",
 ];
 
@@ -115,6 +168,8 @@ export const getDefaultPresetNameByFramework = (frameowrk: Framework) => {
       return "flutter_default";
     case Framework.react:
       return "react_default";
+    case Framework.reactnative:
+      return "reactnative_default";
     case Framework.vanilla:
       return "vanilla_default";
   }

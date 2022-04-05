@@ -75,7 +75,9 @@ function HeadInjection() {
       />
       <script
         dangerouslySetInnerHTML={{
-          __html: `function init() { document.body.addEventListener("wheel", (event) => {const { ctrlKey } = event; if (ctrlKey) { event.preventDefault(); return; }}, { passive: false });} window.addEventListener("DOMContentLoaded", init, false);`,
+          // wheel + ctrl        - disable zoom on chrome / safari
+          // wheel + meta (cmd)  - disable zoom on firefox-mac
+          __html: `function init() { document.body.addEventListener("wheel", (event) => {const { ctrlKey, metaKey } = event; if (ctrlKey || metaKey) { event.preventDefault(); return; }}, { passive: false });} window.addEventListener("DOMContentLoaded", init, false);`,
         }}
       />
 

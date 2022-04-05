@@ -1,5 +1,8 @@
 {
   "name": "@code-editor/canvas",
   "version": "0.0.0",
-  "main": "index.ts"
+  "main": "index.ts",
+  "dependencies": {
+    "react-in-viewport": "^1.0.0-alpha.20"
+  }
 }

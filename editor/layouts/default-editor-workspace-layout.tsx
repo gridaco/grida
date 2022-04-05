@@ -7,10 +7,14 @@ export function DefaultEditorWorkspaceLayout(props: {
   rightbar?: JSX.Element;
   appbar?: JSX.Element;
   children: JSX.Element | Array<JSX.Element>;
+  display?: "none" | "initial"; // set to none when to hide.
   backgroundColor?: string;
 }) {
   return (
-    <WorkspaceRoot backgroundColor={props.backgroundColor}>
+    <WorkspaceRoot
+      display={props.display}
+      backgroundColor={props.backgroundColor}
+    >
       <AppBarMenuAndBelowContentWrap>
         {props.appbar && <AppBarWrap>{props.appbar}</AppBarWrap>}
         <NonMenuContentZoneWrap>
@@ -27,7 +31,11 @@ export function DefaultEditorWorkspaceLayout(props: {
   );
 }
 
-const WorkspaceRoot = styled.div<{ backgroundColor: string }>`
+const WorkspaceRoot = styled.div<{
+  display?: "none" | "initial";
+  backgroundColor: string;
+}>`
+  ${(props) => props.display && `display: ${props.display};`}
   width: 100vw;
   height: 100vh;
   background-color: ${(p) => p.backgroundColor ?? "transparent"};
@@ -53,6 +61,7 @@ const NonMenuContentZoneWrap = styled.div`
 `;
 
 const PanelLeftSideWrap = styled.div`
+  z-index: 1;
   flex-grow: 0;
   min-height: 100%;
   max-height: 100%;
@@ -60,8 +69,11 @@ const PanelLeftSideWrap = styled.div`
 `;
 
 const PanelRightSideWrap = styled.div`
+  z-index: 1;
   flex-grow: 0;
   min-height: 100%;
+  max-height: 100%;
+  max-width: 400px;
 `;
 
 const ChildrenContainerRoot = styled.div`

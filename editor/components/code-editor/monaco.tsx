@@ -51,10 +51,14 @@ export function MonacoEditor(props: MonacoEditorProps) {
         pollyfill_language(props.defaultLanguage) ?? "typescript"
       }
       onMount={onMount}
-      loading={<MonacoEmptyMock />}
+      loading={<MonacoEmptyMock l={5} />}
       defaultValue={props.defaultValue ?? "// no content"}
       theme="vs-dark"
-      options={{ ...props.options }}
+      options={{
+        ...props.options,
+        // overrided default options
+        unusualLineTerminators: "off",
+      }}
     />
   );
 }

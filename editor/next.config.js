@@ -1,7 +1,10 @@
+const TerserPlugin = require("terser-webpack-plugin");
 const withTM = require("next-transpile-modules")([
   // region @editor-app
   "@editor-app/live-session",
   "@code-editor/preview-pip", // TODO: remove me. this is for development. for production, use npm ver instead.
+  "@code-editor/debugger",
+  "@code-editor/canvas",
 
   // region editor-submodule deps
   "@base-sdk-fp/auth",
@@ -19,6 +22,7 @@ const withTM = require("next-transpile-modules")([
   "@designto/web",
   "@designto/vanilla",
   "@designto/react",
+  "@designto/react-native",
 
   "@code-features/assets",
   "@code-features/component",
@@ -79,10 +83,12 @@ const withTM = require("next-transpile-modules")([
   // region builders - part of designto-code / coli
 
   // region web builders
-  "@coli.codes/nodejs-builder",
+  "@web-builder/nodejs",
   "@web-builder/core",
   "@web-builder/vanilla",
+  "@web-builder/react-core",
   "@web-builder/react",
+  "@web-builder/react-native",
   "@web-builder/reflect-ui",
   "@web-builder/styled",
   "@web-builder/styles",
@@ -97,6 +103,13 @@ module.exports = withTM({
       test: /\.mjs$/,
       include: /node_modules/,
     });
+
+    const terser = config.optimization.minimizer.find(
+      (m) => m.constructor.name === "TerserPlugin"
+    );
+    // for @flutter-builder classname issue
+    terser.options.terserOptions.keep_classnames = true;
+
     return config;
   },
   async redirects() {
@@ -107,12 +120,11 @@ module.exports = withTM({
         destination: "/preferences",
         permanent: true,
       },
-      // {
-      //   // typo gaurd
-      //   source: "/",
-      //   destination: "https://grida.co",
-      //   permanent: false,
-      // },
+      {
+        source: "/files/:key/:id",
+        destination: "/files/:key?node=:id",
+        permanent: false,
+      },
     ];
   },
 });

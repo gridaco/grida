@@ -8,6 +8,16 @@ export function workspaceReducer(
   action: WorkspaceAction
 ): WorkspaceState {
   switch (action.type) {
+    case "highlight-layer": {
+      return produce(state, (draft) => {
+        draft.highlightedLayer = action.id;
+      });
+    }
+    // default fallback - use history reducer
+    case "redo":
+    case "undo":
+    case "select-node":
+    case "select-page":
     default: {
       return produce(state, (draft) => {
         // @ts-ignore

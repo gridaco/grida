@@ -22,9 +22,18 @@ export function SceneCard({
   useEffect(() => {
     if (fat) {
       if (!thumbnail) {
-        fetch.fetchNodeAsImage(data.file, fat, data.id).then((url) => {
-          setThumbnail(url.__default);
-        });
+        fetch
+          .fetchNodeAsImage(
+            data.file,
+            {
+              personalAccessToken: fat.personalAccessToken,
+              accessToken: fat.accessToken.token,
+            },
+            data.id
+          )
+          .then((url) => {
+            setThumbnail(url.__default);
+          });
       }
     }
   }, [fat]);

@@ -4,12 +4,12 @@ import { tokenize } from "@designto/token";
 import React from "react";
 import { canvas } from "components";
 import { LayerHierarchy } from "components/editor-hierarchy";
-import { visualize_node } from "components/visualization";
+import { visualize_node } from "@code-editor/debugger/components/visualization";
 import {
   JsonTree,
   WidgetTree,
   WidgetTreeLegend,
-} from "components/visualization/json-visualization/json-tree";
+} from "@code-editor/debugger/components/visualization/json-visualization/json-tree";
 import { DefaultEditorWorkspaceLayout } from "layouts/default-editor-workspace-layout";
 import LoadingLayout from "layouts/loading-overlay";
 import {
@@ -87,26 +87,22 @@ export default function InspectComponent() {
                     <WidgetTree data={design.raw as any} />
                   </div>
                 </div>
-                <div style={{ flex: 1 }}>
+                {/* <div style={{ flex: 1 }}>
                   <WidgetTreeLegend title="Figma" />
                   <WidgetTree
                     data={json_only_component_related_fields(design.figma)}
                   />
-                </div>
-                <div style={{ flex: 1 }}>
+                </div> */}
+                {/* <div style={{ flex: 1 }}>
                   <div>
                     <WidgetTreeLegend title="Reflect" />
                     <WidgetTree data={design.reflect} />
                   </div>
-                </div>
+                </div> */}
                 <div style={{ flex: 1 }}>
                   <WidgetTreeLegend title="Component Meta" />
                   <WidgetTree data={componentMetaTree as any} />
                 </div>
-                {/* <div style={{ flex: 1 }}>
-                  <WidgetTreeLegend title="Component tokens" />
-                  <WidgetTree data={componentMetaTree as any} />
-                </div> */}
                 {/* <div style={{ flex: 1 }}>
                   <WidgetTreeLegend title="Reflect" />
                   <WidgetTree data={design.reflect} />

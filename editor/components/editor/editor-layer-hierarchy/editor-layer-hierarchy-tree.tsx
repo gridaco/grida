@@ -6,28 +6,36 @@ import {
   IconContainer,
   LayerIcon,
 } from "./editor-layer-hierarchy-item";
-import { useEditorState } from "core/states";
+import { useEditorState, useWorkspace } from "core/states";
 import { useDispatch } from "core/dispatch";
 import {
   flattenNodeTree,
   FlattenedDisplayItemNode,
 } from "./editor-layer-heriarchy-controller";
 
+// TODO:
+// - add navigate context menu
+// - add go to main component
+// - add reveal on select
+
 export function EditorLayerHierarchy() {
   const [state] = useEditorState();
+  const { highlightLayer, highlightedLayer } = useWorkspace();
   const dispatch = useDispatch();
+
+  const { selectedNodes, selectedPage, design } = state;
 
   const [expands, setExpands] = useState<string[]>(state?.selectedNodes ?? []);
 
-  const root = state.selectedPage
-    ? state.design.pages.find((p) => p.id == state.selectedPage).children
-    : [state.design?.input?.entry];
+  const root = selectedPage
+    ? design.pages.find((p) => p.id == selectedPage).children
+    : [design?.input?.entry];
 
   const layers: FlattenedDisplayItemNode[][] = useMemo(() => {
     return root
       ? root
           .filter((l) => !!l)
-          .map((layer) => flattenNodeTree(layer, state.selectedNodes, expands))
+          .map((layer) => flattenNodeTree(layer, selectedNodes, expands))
       : [];
   }, [root, state?.selectedNodes, expands]);
 
@@ -40,8 +48,7 @@ export function EditorLayerHierarchy() {
       depth,
       data,
     }: FlattenedDisplayItemNode) => {
-      // const _haschildren = useMemo(() => haschildren(id), [id, depth]);
-      // const _haschildren = haschildren(id);
+      const hovered = highlightedLayer === id;
 
       return (
         <LayerRow
@@ -63,6 +70,10 @@ export function EditorLayerHierarchy() {
               setExpands([...expands, id]);
             }
           }}
+          onHoverChange={(hovered) => {
+            highlightLayer(hovered ? id : undefined);
+          }}
+          hovered={hovered}
           onMenuClick={() => {}}
           onDoubleClick={() => {}}
           onPress={() => {
@@ -73,15 +84,8 @@ export function EditorLayerHierarchy() {
         />
       );
     },
-    [dispatch, state?.selectedNodes, layers, expands]
+    [dispatch, selectedNodes, layers, expands, highlightedLayer]
   );
-
-  // const haschildren = useCallback(
-  //   (id: string) => {
-  //     return layers.some((l) => l.some((layer) => layer.parent === id));
-  //   },
-  //   [layers]
-  // );
 
   return (
     <TreeView.Root
