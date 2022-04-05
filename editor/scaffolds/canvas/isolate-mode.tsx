@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { vanilla_presets } from "@grida/builder-config-preset";
+import { preview_presets } from "@grida/builder-config-preset";
 import { designToCode, Result } from "@designto/code";
 import { config } from "@designto/config";
 import { MainImageRepository } from "@design-sdk/core/assets-repository";
@@ -42,7 +42,7 @@ export function IsolateModeCanvas({ onClose }: { onClose: () => void }) {
       designToCode({
         input: _input,
         build_config: build_config,
-        framework: vanilla_presets.vanilla_default,
+        framework: preview_presets.default,
         asset_config: {
           skip_asset_replacement: false,
           asset_repository: MainImageRepository.instance,
@@ -60,7 +60,7 @@ export function IsolateModeCanvas({ onClose }: { onClose: () => void }) {
         designToCode({
           input: root,
           build_config: build_config,
-          framework: vanilla_presets.vanilla_default,
+          framework: preview_presets.default,
           asset_config: { asset_repository: MainImageRepository.instance },
         })
           .then(on_preview_result)

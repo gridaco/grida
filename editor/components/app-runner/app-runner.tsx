@@ -94,14 +94,15 @@ function DedicatedFrameworkRunner({
                   name: `${_name}.dart`,
                 })
                 .then((r) => {
-                  const qlurl = features.quicklook.buildConsoleQuicklookUrl({
-                    id: nanoid(),
-                    framework: types.AppFramework.flutter,
-                    language: types.AppLanguage.dart,
-                    url: r.url,
-                    name: _name,
-                  });
-                  open(qlurl);
+                  throw "flutter preview disabled";
+                  // const qlurl = features.quicklook.buildConsoleQuicklookUrl({
+                  //   id: nanoid(),
+                  //   framework: types.AppFramework.flutter,
+                  //   language: types.AppLanguage.dart,
+                  //   url: r.url,
+                  //   name: _name,
+                  // });
+                  // open(qlurl);
                 });
             }}
           >

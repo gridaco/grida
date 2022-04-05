@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useEditorState } from "core/states";
 import styled from "@emotion/styled";
-import { vanilla_presets } from "@grida/builder-config-preset";
+import { preview_presets } from "@grida/builder-config-preset";
 import { designToCode, Result } from "@designto/code";
 import { config } from "@designto/config";
 import {
@@ -59,7 +59,7 @@ export function FullScreenPreview({ onClose }: { onClose: () => void }) {
       designToCode({
         input: _input,
         build_config: build_config,
-        framework: vanilla_presets.vanilla_default,
+        framework: preview_presets.default,
         asset_config: {
           skip_asset_replacement: false,
           asset_repository: MainImageRepository.instance,
@@ -77,7 +77,7 @@ export function FullScreenPreview({ onClose }: { onClose: () => void }) {
         designToCode({
           input: target.root,
           build_config: build_config,
-          framework: vanilla_presets.vanilla_default,
+          framework: preview_presets.default,
           asset_config: { asset_repository: MainImageRepository.instance },
         })
           .then(on_preview_result)
