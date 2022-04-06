@@ -46,43 +46,50 @@ export const VanillaRunner = React.forwardRef(function (
   }, [cref.current]);
 
   useEffect(() => {
-    if (cref.current) {
-      cref.current.onload = (e) => {
-        if (enableInspector) {
-          const matches = cref.current.contentDocument.querySelectorAll(
+    const cb = (e) => {
+      if (enableInspector) {
+        const matches =
+          cref.current?.contentDocument?.querySelectorAll(
             "div, span, img, image, svg" // button, input - disabled due to interaction testing (for users)
-          );
-          matches.forEach((el) => {
-            const tint = "rgba(20, 0, 255, 0.2)";
-            const tintl = "rgba(20, 0, 255, 0.5)";
-            const originstyle = {
+          ) ?? [];
+        matches.forEach((el) => {
+          const tint = "rgba(20, 0, 255, 0.2)";
+          const tintl = "rgba(20, 0, 255, 0.5)";
+          const originstyle = {
+            //@ts-ignore
+            ...el.style,
+          };
+
+          if (el.id.includes("RootWrapper")) {
+          } else {
+            el.addEventListener("mouseenter", (e) => {
               //@ts-ignore
-              ...el.style,
-            };
+              e.target.style.background = tint;
+              //@ts-ignore
+              e.target.style.outline = `${tintl} solid 1px`;
+            });
+            el.addEventListener("mouseleave", (e) => {
+              //@ts-ignore
+              e.target.style.background = originstyle.background;
+              //@ts-ignore
+              e.target.style.outline = originstyle.outline;
+            });
+          }
+        });
 
-            if (el.id.includes("RootWrapper")) {
-            } else {
-              el.addEventListener("mouseenter", (e) => {
-                //@ts-ignore
-                e.target.style.background = tint;
-                //@ts-ignore
-                e.target.style.outline = `${tintl} solid 1px`;
-              });
-              el.addEventListener("mouseleave", (e) => {
-                //@ts-ignore
-                e.target.style.background = originstyle.background;
-                //@ts-ignore
-                e.target.style.outline = originstyle.outline;
-              });
-            }
-          });
+        // cref.current.contentWindow.addEventListener("click", (e) => {
+        //   console.log("click", e);
+        // });
+      }
+    };
 
-          // cref.current.contentWindow.addEventListener("click", (e) => {
-          //   console.log("click", e);
-          // });
-        }
-      };
+    if (cref.current) {
+      cref.current.onload = cb;
     }
+
+    return () => {
+      cref?.current?.onload && (cref.current.onload = () => {});
+    };
   }, [cref.current, enableInspector]);
 
   const inlinesource = source || `<div></div>`;
