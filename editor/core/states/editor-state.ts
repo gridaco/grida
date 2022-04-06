@@ -13,6 +13,13 @@ export interface EditorState {
    */
   selectedNodesInitial?: string[] | null;
   design: FigmaReflectRepository;
+  editingCode?: {
+    type: "single-file-component";
+    componentName: string;
+    framework: string;
+    lang: string;
+    raw: string;
+  };
 }
 
 export interface EditorSnapshot {

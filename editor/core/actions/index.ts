@@ -17,7 +17,9 @@ export type Action =
   //
   | SelectNodeAction
   //
-  | HighlightLayerAction;
+  | HighlightLayerAction
+  //
+  | CodeEditorAction;
 
 export type ActionType = Action["type"];
 
@@ -37,4 +39,14 @@ export interface SelectPageAction {
 export interface HighlightLayerAction {
   type: "highlight-layer";
   id: string;
+}
+
+export type CodeEditorAction = CodeEditorEditComponentCodeAction;
+
+export interface CodeEditorEditComponentCodeAction {
+  type: "code-editor-edit-component-code";
+  id: string;
+  framework: string;
+  componentName: string;
+  raw: string;
 }
