@@ -1,27 +1,31 @@
 import React, { ReactEventHandler, useEffect, useRef } from "react";
 
-export function VanillaRunner({
-  width,
-  height,
-  source,
-  onLoad,
-  enableInspector = true,
-  style,
-}: {
-  width: string;
-  height: string;
-  source: string;
-  onLoad?: ReactEventHandler<HTMLIFrameElement>;
-  componentName: string;
-  enableInspector?: boolean;
-  style?: React.CSSProperties;
-}) {
-  const ref = useRef<HTMLIFrameElement>();
+export const VanillaRunner = React.forwardRef(function (
+  {
+    width,
+    height,
+    source,
+    onLoad,
+    enableInspector = true,
+    style,
+  }: {
+    width: string;
+    height: string;
+    source: string;
+    onLoad?: ReactEventHandler<HTMLIFrameElement>;
+    componentName: string;
+    enableInspector?: boolean;
+    style?: React.CSSProperties;
+  },
+  ref: React.MutableRefObject<HTMLIFrameElement>
+) {
+  const lref = useRef(null);
+  const cref = ref || lref;
 
   useEffect(() => {
-    if (ref.current) {
+    if (cref.current) {
       function disablezoom() {
-        ref.current.contentWindow.addEventListener(
+        cref.current.contentWindow.addEventListener(
           "wheel",
           (event) => {
             const { ctrlKey } = event;
@@ -33,19 +37,19 @@ export function VanillaRunner({
           { passive: false }
         );
       }
-      ref.current.contentWindow.addEventListener(
+      cref.current.contentWindow.addEventListener(
         "DOMContentLoaded",
         disablezoom,
         false
       );
     }
-  }, [ref.current]);
+  }, [cref.current]);
 
   useEffect(() => {
-    if (ref.current) {
-      ref.current.onload = (e) => {
+    if (cref.current) {
+      cref.current.onload = (e) => {
         if (enableInspector) {
-          const matches = ref.current.contentDocument.querySelectorAll(
+          const matches = cref.current.contentDocument.querySelectorAll(
             "div, span, img, image, svg" // button, input - disabled due to interaction testing (for users)
           );
           matches.forEach((el) => {
@@ -73,18 +77,18 @@ export function VanillaRunner({
             }
           });
 
-          ref.current.contentWindow.addEventListener("click", (e) => {
-            console.log("click", e);
-          });
+          // cref.current.contentWindow.addEventListener("click", (e) => {
+          //   console.log("click", e);
+          // });
         }
       };
     }
-  }, [ref.current, enableInspector]);
+  }, [cref.current, enableInspector]);
 
   const inlinesource = source || `<div></div>`;
   return (
     <iframe
-      ref={ref}
+      ref={cref}
       onLoad={onLoad}
       style={style}
       sandbox="allow-same-origin allow-scripts"
@@ -93,4 +97,4 @@ export function VanillaRunner({
       height={height}
     />
   );
-}
+});

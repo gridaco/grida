@@ -7,9 +7,10 @@ import {
   WorkspaceContentPanel,
   WorkspaceContentPanelGridLayout,
 } from "layout/panel";
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { colors } from "theme";
 import bundler from "@code-editor/esbuild-services";
+import { debounce } from "utils/debounce";
 
 const component_code = `
 import React from 'react';
@@ -30,17 +31,21 @@ export default function SandboxPage() {
     setIsbuilding(true);
     bundler(script, "tsx")
       .then((d) => {
-        if (d.code) {
-          setJsOut(d.code);
-        }
-        if (d.err) {
-          console.error(d.err);
+        console.log(d);
+        if (d.err == null) {
+          if (d.code && d.code !== jsout) {
+            setJsOut(d.code);
+          }
         }
       })
       .finally(() => {
         setIsbuilding(false);
       });
   }, [script]);
+
+  const onChangeHandler = debounce((k, code) => {
+    setScript(code);
+  }, 500);
 
   return (
     <>
@@ -63,9 +68,7 @@ export default function SandboxPage() {
                       name: "component.tsx",
                     },
                   }}
-                  onChange={(k, v) => {
-                    setScript(v);
-                  }}
+                  onChange={onChangeHandler}
                 />
               </CodeEditorContainer>
             </>
@@ -101,6 +104,8 @@ function PreviewSegment({
     javascript: string;
   };
 }) {
+  const ref = useRef<HTMLIFrameElement>();
+
   const loadCode = useCallback(
     (e: HTMLIFrameElement) => {
       e?.contentWindow?.postMessage({ html: doc?.html }, "*");
@@ -109,6 +114,12 @@ function PreviewSegment({
     },
     [doc?.html, doc?.css, doc?.javascript]
   );
+
+  useEffect(() => {
+    if (ref.current) {
+      loadCode(ref.current);
+    }
+  }, [doc?.html, doc?.css, doc?.javascript]);
 
   return (
     <div
@@ -126,7 +137,7 @@ function PreviewSegment({
         }}
       >
         <VanillaRunner
-          key={doc?.javascript}
+          ref={ref}
           onLoad={(e) => loadCode(e.currentTarget)}
           style={{
             borderRadius: 4,
