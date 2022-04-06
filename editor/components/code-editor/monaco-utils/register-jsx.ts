@@ -1,5 +1,5 @@
 import { Monaco } from "@monaco-editor/react";
-// import { createWorkerQueue } from "../../../workers";
+import { createWorkerQueue } from "../../../workers";
 // import Worker from '../../../workers/monaco-syntax-highlight/syntax-highlight.worker';
 
 import type { editor } from "monaco-editor";
