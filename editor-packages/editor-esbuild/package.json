@@ -1,0 +1,14 @@
+{
+  "name": "@code-editor/esbuild",
+  "version": "0.0.0",
+  "private": false,
+  "dependencies": {
+    "esbuild-wasm": "^0.14.31",
+    "localforage": "^1.10.0"
+  },
+  "peerDependencies": {
+    "@monaco-editor/react": "^4.4.1",
+    "axios": "^0.26.1",
+    "nanoid": "^3.3.2"
+  }
+}
