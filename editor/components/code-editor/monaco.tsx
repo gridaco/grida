@@ -33,6 +33,20 @@ export function MonacoEditor(props: MonacoEditorProps) {
 
     register.initEditor(editor, monaco);
 
+    editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, function () {
+      format.run();
+    });
+
+    // disabled. todo: find a way to format on new line, but also with adding new line.
+    // editor.addCommand(monaco.KeyCode.Enter, function () {
+    //   format.run();
+    // });
+
+    editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyR, function () {
+      // don't reload the entire page
+      // do nothing.
+    });
+
     editor.onDidChangeModelContent(() => {
       /* add here */
     });
