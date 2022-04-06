@@ -1,6 +1,6 @@
 import * as monaco from "monaco-editor";
 import { Monaco, OnMount } from "@monaco-editor/react";
-// import { registerDocumentPrettier } from "./register-prettier";
+import { registerDocumentPrettier } from "./register-prettier";
 import { registerJsxHighlighter } from "./register-jsx";
 import { registerTypesWorker } from "./register-typings";
 
@@ -9,7 +9,7 @@ type CompilerOptions = monaco.languages.typescript.CompilerOptions;
 export const initEditor: OnMount = (editor, monaco) => {
   console.log("Init editor");
   registerJsxHighlighter(editor, monaco);
-  // registerDocumentPrettier(editor, monaco);
+  registerDocumentPrettier(editor, monaco);
 };
 
 export const initMonaco = (monaco: Monaco) => {

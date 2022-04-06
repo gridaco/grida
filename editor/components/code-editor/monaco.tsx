@@ -40,18 +40,20 @@ export function MonacoEditor(props: MonacoEditorProps) {
 
   return (
     <Editor
+      beforeMount={register.initMonaco}
+      onMount={onMount}
       width={props.width}
       height={props.height}
       defaultLanguage={
         pollyfill_language(props.defaultLanguage) ?? "typescript"
       }
-      onMount={onMount}
       loading={<MonacoEmptyMock l={5} />}
       defaultValue={props.defaultValue ?? "// no content"}
       theme="vs-dark"
       options={{
         ...props.options,
         // overrided default options
+        wordWrap: "off",
         unusualLineTerminators: "off",
       }}
     />
