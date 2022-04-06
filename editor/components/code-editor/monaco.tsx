@@ -1,5 +1,10 @@
 import React, { useRef, useEffect } from "react";
-import Editor, { useMonaco, Monaco, OnMount } from "@monaco-editor/react";
+import Editor, {
+  useMonaco,
+  Monaco,
+  OnMount,
+  OnChange,
+} from "@monaco-editor/react";
 import * as monaco from "monaco-editor/esm/vs/editor/editor.api";
 import { MonacoEmptyMock } from "./monaco-mock-empty";
 import { register } from "./monaco-utils";
@@ -9,6 +14,7 @@ type ICodeEditor = monaco.editor.IStandaloneCodeEditor;
 export interface MonacoEditorProps {
   defaultValue?: string;
   defaultLanguage?: string;
+  onChange?: OnChange;
   width?: number | string;
   height?: number | string;
   options?: monaco.editor.IStandaloneEditorConstructionOptions;
@@ -47,7 +53,7 @@ export function MonacoEditor(props: MonacoEditorProps) {
       // do nothing.
     });
 
-    editor.onDidChangeModelContent(() => {
+    editor.onDidChangeModelContent((e) => {
       /* add here */
     });
   };
@@ -64,6 +70,7 @@ export function MonacoEditor(props: MonacoEditorProps) {
       loading={<MonacoEmptyMock l={5} />}
       defaultValue={props.defaultValue ?? "// no content"}
       theme="vs-dark"
+      onChange={props.onChange}
       options={{
         ...props.options,
         // overrided default options

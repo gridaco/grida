@@ -10,36 +10,36 @@ import {
 import React, { useCallback, useEffect, useState } from "react";
 import { colors } from "theme";
 import bundler from "@code-editor/esbuild-services";
-import { RunnerLoadingIndicator } from "components/app-runner/loading-indicator";
 
-export default function SandboxPage() {
-  const component_name = "Comopnent";
-  const component_code = `
-export function ${component_name}() { return <>Hi</> }`;
-  const html_code = `<div id="root"></div>`;
-
-  const [jsout, setJsOut] = useState<string>();
-  const [script, setScript] = useState<string>(component_code);
-
-  const app_code = `import React from 'react';
+const component_code = `
+import React from 'react';
 import ReactDOM from 'react-dom';
 
-${script}
-
-const App = () => <><${component_name}/></>
+const App = () => <>Hi</>
 
 ReactDOM.render(<App />, document.querySelector('#root'));`;
 
+export default function SandboxPage() {
+  const html_code = `<div id="root"></div>`;
+
+  const [isbuilding, setIsbuilding] = useState(false);
+  const [jsout, setJsOut] = useState<string>();
+  const [script, setScript] = useState<string>(component_code);
+
   useEffect(() => {
-    bundler(app_code, "tsx").then((d) => {
-      if (d.code) {
-        console.log("bundled", d.code);
-        setJsOut(d.code);
-      }
-      if (d.err) {
-        console.error(d.err);
-      }
-    });
+    setIsbuilding(true);
+    bundler(script, "tsx")
+      .then((d) => {
+        if (d.code) {
+          setJsOut(d.code);
+        }
+        if (d.err) {
+          console.error(d.err);
+        }
+      })
+      .finally(() => {
+        setIsbuilding(false);
+      });
   }, [script]);
 
   return (
@@ -62,16 +62,9 @@ ReactDOM.render(<App />, document.querySelector('#root'));`;
                       language: "tsx",
                       name: "component.tsx",
                     },
-                    "app.tsx": {
-                      raw: app_code,
-                      language: "tsx",
-                      name: "app.tsx",
-                    },
-                    "index.html": {
-                      raw: html_code,
-                      language: "html",
-                      name: "index.html",
-                    },
+                  }}
+                  onChange={(k, v) => {
+                    setScript(v);
                   }}
                 />
               </CodeEditorContainer>
@@ -82,17 +75,14 @@ ReactDOM.render(<App />, document.querySelector('#root'));`;
             zIndex={1}
             backgroundColor={colors.color_editor_bg_on_dark}
           >
-            <>
-              <RunnerLoadingIndicator size={32} />
-              <PreviewSegment
-                key={jsout}
-                doc={{
-                  html: html_code,
-                  css: "",
-                  javascript: jsout,
-                }}
-              />
-            </>
+            <PreviewSegment
+              building={isbuilding}
+              doc={{
+                html: html_code,
+                css: "",
+                javascript: jsout,
+              }}
+            />
           </WorkspaceContentPanel>
         </WorkspaceContentPanelGridLayout>
       </DefaultEditorWorkspaceLayout>
@@ -102,7 +92,9 @@ ReactDOM.render(<App />, document.querySelector('#root'));`;
 
 function PreviewSegment({
   doc,
+  building,
 }: {
+  building: boolean;
   doc?: {
     html: string;
     css: string;
@@ -119,17 +111,26 @@ function PreviewSegment({
   );
 
   return (
-    <>
+    <div
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        height: "100%",
+      }}
+    >
       <IsolatedCanvas
+        building={building}
         defaultSize={{
           width: 375,
           height: 812,
         }}
       >
         <VanillaRunner
+          key={doc?.javascript}
           onLoad={(e) => loadCode(e.currentTarget)}
           style={{
             borderRadius: 4,
+            backgroundColor: "white",
             boxShadow: "0px 0px 48px #00000020",
           }}
           source={_html}
@@ -138,7 +139,7 @@ function PreviewSegment({
           componentName={"preview"}
         />
       </IsolatedCanvas>
-    </>
+    </div>
   );
 }
 
