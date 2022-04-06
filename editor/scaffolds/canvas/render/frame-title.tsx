@@ -65,6 +65,11 @@ function SelectedStatePrimaryAction({ onClick }: { onClick: () => void }) {
   return (
     <span
       onClick={onClick}
+      onPointerDown={(e) => {
+        // this is required to prevent the canvas' event listener being called first.
+        e.stopPropagation();
+        e.preventDefault();
+      }}
       style={{
         marginRight: 4,
         cursor: "pointer",
