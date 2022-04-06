@@ -16,7 +16,7 @@ let serviceLoaded: boolean | null = null;
 const bundler = async (rawCode: string, lang: Loader) => {
   if (!serviceLoaded) {
     await initialize({
-      wasmURL: "https://unpkg.com/esbuild-wasm@0.13.14/esbuild.wasm",
+      wasmURL: "https://unpkg.com/esbuild-wasm@0.14.31/esbuild.wasm",
       worker: true,
     });
     serviceLoaded = true;

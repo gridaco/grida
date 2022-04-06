@@ -35,6 +35,7 @@ export function CodeEditor({
           onChange={handleChange}
           variant="scrollable"
           scrollButtons="off"
+          style={{ color: "white" }}
           aria-label="scrollable prevent tabs example"
         >
           {Object.keys(files).map((name) => {

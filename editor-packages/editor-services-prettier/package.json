@@ -1,0 +1,9 @@
+{
+  "name": "@code-editor/prettier-services",
+  "version": "0.0.0",
+  "private": false,
+  "dependencies": {},
+  "peerDependencies": {
+    "@monaco-editor/react": "^4.4.1"
+  }
+}
