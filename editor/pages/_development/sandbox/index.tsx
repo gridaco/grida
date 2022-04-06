@@ -10,6 +10,7 @@ import {
 import React, { useCallback, useEffect, useState } from "react";
 import { colors } from "theme";
 import bundler from "@code-editor/esbuild-services";
+import { RunnerLoadingIndicator } from "components/app-runner/loading-indicator";
 
 export default function SandboxPage() {
   const component_name = "Comopnent";
@@ -45,11 +46,6 @@ ReactDOM.render(<App />, document.querySelector('#root'));`;
     <>
       <DefaultEditorWorkspaceLayout
         backgroundColor={colors.color_editor_bg_on_dark}
-        leftbar={
-          <>sidebar</>
-          // <EditorSidebar />
-        }
-        // rightbar={<Inspector />}
       >
         <WorkspaceContentPanelGridLayout>
           <WorkspaceContentPanel flex={6}>
@@ -86,14 +82,17 @@ ReactDOM.render(<App />, document.querySelector('#root'));`;
             zIndex={1}
             backgroundColor={colors.color_editor_bg_on_dark}
           >
-            <PreviewSegment
-              key={jsout}
-              doc={{
-                html: html_code,
-                css: "",
-                javascript: jsout,
-              }}
-            />
+            <>
+              <RunnerLoadingIndicator size={32} />
+              <PreviewSegment
+                key={jsout}
+                doc={{
+                  html: html_code,
+                  css: "",
+                  javascript: jsout,
+                }}
+              />
+            </>
           </WorkspaceContentPanel>
         </WorkspaceContentPanelGridLayout>
       </DefaultEditorWorkspaceLayout>
