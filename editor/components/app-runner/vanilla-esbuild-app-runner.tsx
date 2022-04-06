@@ -53,6 +53,12 @@ const _html = `
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Preview</title>
     <style id="_style"></style>
+    <style>
+    * {
+      margin: 0px;
+      font-family: Helvetica, "Helvetica Neue", Roboto, Noto, Arial, sans-serif;
+    }
+    </style>
 </head>
 
 <body>
