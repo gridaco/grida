@@ -49,7 +49,7 @@ export function CodeEditor({
         key={filekey}
         {...editor_props}
         onChange={(v: string, e) => {
-          onChange(filekey, v, e);
+          onChange?.(filekey, v, e);
         }}
         defaultLanguage={file.language}
         defaultValue={file.raw}
