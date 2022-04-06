@@ -63,10 +63,11 @@ export function FrameTitleRenderer({
 
 function SelectedStatePrimaryAction({ onClick }: { onClick: () => void }) {
   return (
-    <div
+    <span
       onClick={onClick}
       style={{
         marginRight: 4,
+        cursor: "pointer",
       }}
     >
       <svg
@@ -81,6 +82,6 @@ function SelectedStatePrimaryAction({ onClick }: { onClick: () => void }) {
           fill="#52A1FF"
         />
       </svg>
-    </div>
+    </span>
   );
 }

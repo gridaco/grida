@@ -43,7 +43,7 @@ export function CodeSegment() {
     if (
       result.framework.framework !==
         targetStateRef?.current?.config.framework ||
-      result.id !== targetStateRef?.current?.node.id
+      result.id !== targetStateRef?.current?.node?.id
     ) {
       return;
     }
