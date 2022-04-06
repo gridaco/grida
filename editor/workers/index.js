@@ -1,4 +1,4 @@
-import PQueue from "p-queue/dist";
+import PQueue from "p-queue";
 
 export function createWorkerQueue(worker) {
   const queue = new PQueue({ concurrency: 1 });
