@@ -1,6 +1,5 @@
 import { Monaco } from "@monaco-editor/react";
 import { createWorkerQueue } from "../../../workers";
-// import Worker from '../../../workers/monaco-syntax-highlight/syntax-highlight.worker';
 
 import type { editor } from "monaco-editor";
 export function registerJsxHighlighter(
@@ -19,9 +18,8 @@ export function registerJsxHighlighter(
   const highlightHandler = () => {
     const title = "app.js";
     const model = editor.getModel();
-    const version = model!.getVersionId();
-    // @ts-ignore
-    const lang = model._languageIdentifier.language;
+    const version = model?.getVersionId();
+    const lang = model?.getLanguageId();
 
     if (lang === "javascript" || "typescript") {
       const code = model?.getValue();
@@ -51,9 +49,7 @@ export function registerJsxHighlighter(
           classification.end
         ),
         options: {
-          inlineClassName: classification.type
-            ? `ayu-dark ${classification.kind} ${classification.type}-of-${classification.parentKind}`
-            : classification.kind,
+          //
         },
       }));
 
