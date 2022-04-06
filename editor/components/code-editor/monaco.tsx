@@ -1,7 +1,10 @@
-import React, { useEffect } from "react";
-import Editor, { useMonaco, Monaco } from "@monaco-editor/react";
+import React, { useRef, useEffect } from "react";
+import Editor, { useMonaco, Monaco, OnMount } from "@monaco-editor/react";
 import * as monaco from "monaco-editor/esm/vs/editor/editor.api";
 import { MonacoEmptyMock } from "./monaco-mock-empty";
+import { register } from "./monaco-utils";
+
+type ICodeEditor = monaco.editor.IStandaloneCodeEditor;
 
 export interface MonacoEditorProps {
   defaultValue?: string;
@@ -12,16 +15,47 @@ export interface MonacoEditorProps {
 }
 
 export function MonacoEditor(props: MonacoEditorProps) {
+  const instance = useRef<{ editor: ICodeEditor; format: any } | null>(null);
+  const activeModel = useRef<any>();
+
   const monaco: Monaco = useMonaco();
   useEffect(() => {
     if (monaco) {
       setup_react_support(monaco);
-      // monaco.mo
     }
   }, [monaco]);
 
+  const onMount: OnMount = (editor, monaco) => {
+    const format = editor.getAction("editor.action.formatDocument");
+    instance.current = { editor, format };
+
+    activeModel.current = editor.getModel();
+
+    register.initEditor(editor, monaco);
+
+    editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, function () {
+      format.run();
+    });
+
+    // disabled. todo: find a way to format on new line, but also with adding new line.
+    // editor.addCommand(monaco.KeyCode.Enter, function () {
+    //   format.run();
+    // });
+
+    editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyR, function () {
+      // don't reload the entire page
+      // do nothing.
+    });
+
+    editor.onDidChangeModelContent(() => {
+      /* add here */
+    });
+  };
+
   return (
     <Editor
+      beforeMount={register.initMonaco}
+      onMount={onMount}
       width={props.width}
       height={props.height}
       defaultLanguage={
@@ -33,6 +67,7 @@ export function MonacoEditor(props: MonacoEditorProps) {
       options={{
         ...props.options,
         // overrided default options
+        wordWrap: "off",
         unusualLineTerminators: "off",
       }}
     />
