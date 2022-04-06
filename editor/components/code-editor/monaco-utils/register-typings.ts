@@ -13,8 +13,8 @@ export function registerTypesWorker(monaco: Monaco) {
   if (!typesWorker) {
     typesWorker = new Worker(
       new URL(
-        "../../../workers/fetch-types/fetch-types.worker.js"
-        // import.meta.url
+        "../../../workers/fetch-types/fetch-types.worker.js",
+        import.meta.url
       )
     );
   }

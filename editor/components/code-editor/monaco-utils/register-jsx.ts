@@ -10,8 +10,8 @@ export function registerJsxHighlighter(
   const { worker: syntaxWorker } = createWorkerQueue(
     new Worker(
       new URL(
-        "../../../workers/monaco-syntax-highlight/syntax-highlight.worker.js"
-        // import.meta.url
+        "../../../workers/monaco-syntax-highlight/syntax-highlight.worker.js",
+        import.meta.url
       )
     )
   );

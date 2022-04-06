@@ -1,10 +1,5 @@
 import React, { useRef, useEffect } from "react";
-import Editor, {
-  useMonaco,
-  Monaco,
-  OnChange,
-  OnMount,
-} from "@monaco-editor/react";
+import Editor, { useMonaco, Monaco, OnMount } from "@monaco-editor/react";
 import * as monaco from "monaco-editor/esm/vs/editor/editor.api";
 import { MonacoEmptyMock } from "./monaco-mock-empty";
 import { register } from "./monaco-utils";
