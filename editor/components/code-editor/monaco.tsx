@@ -1,6 +1,7 @@
 import React, { useEffect } from "react";
 import Editor, { useMonaco, Monaco } from "@monaco-editor/react";
 import * as monaco from "monaco-editor/esm/vs/editor/editor.api";
+import { MonacoEmptyMock } from "./monaco-mock-empty";
 
 export interface MonacoEditorProps {
   defaultValue?: string;
@@ -26,9 +27,14 @@ export function MonacoEditor(props: MonacoEditorProps) {
       defaultLanguage={
         pollyfill_language(props.defaultLanguage) ?? "typescript"
       }
+      loading={<MonacoEmptyMock l={5} />}
       defaultValue={props.defaultValue ?? "// no content"}
       theme="vs-dark"
-      options={{ ...props.options }}
+      options={{
+        ...props.options,
+        // overrided default options
+        unusualLineTerminators: "off",
+      }}
     />
   );
 }

@@ -13,6 +13,12 @@ import { FigmaRemoteErrors } from "@design-sdk/figma-remote/lib/fetch";
 import { RemoteDesignSessionCacheStore } from "../store";
 import { convert } from "@design-sdk/figma-node-conversion";
 import { mapFigmaRemoteToFigma } from "@design-sdk/figma-remote/lib/mapper";
+import { useFigmaAccessToken } from ".";
+import { FileResponse } from "@design-sdk/figma-remote-types";
+import {
+  FigmaDesignRepository,
+  TFetchFileForApp,
+} from "repository/figma-design-repository";
 
 // globally configure auth credentials for interacting with `@design-sdk/figma-remote`
 configure_auth_credentials({
@@ -22,7 +28,7 @@ configure_auth_credentials({
 /**
  * query param for design input
  */
-const P_DESIGN = "design";
+export const P_DESIGN = "design";
 
 type UseDesignProp =
   | (UseDesignFromRouter & UseDesingOptions)
@@ -50,15 +56,16 @@ interface UseDesignFromFileAndNode {
 }
 
 export function useDesign({
-  use_session_cache = true,
+  use_session_cache = false,
   type,
   ...props
 }: UseDesignProp) {
   const [design, setDesign] = useState<TargetNodeConfig>(null);
+  const fat = useFigmaAccessToken();
   const router = (type === "use-router" && props["router"]) ?? useRouter();
+
   useEffect(() => {
     let targetnodeconfig: FigmaTargetNodeConfig;
-    console.log("type", type);
     switch (type) {
       case "use-file-node-id": {
         if (props["file"] && props["node"]) {
@@ -110,44 +117,123 @@ export function useDesign({
         const _2_converted_to_reflect = convert.intoReflectNode(
           _1_converted_to_figma
         );
-        setDesign(<TargetNodeConfig>{
+
+        const res = <TargetNodeConfig>{
           ...targetnodeconfig,
           raw: last_response,
           figma: _1_converted_to_figma,
           reflect: _2_converted_to_reflect,
-        });
+        };
+        setDesign(res);
       } else {
-        fetch
-          .fetchTargetAsReflect({
-            file: targetnodeconfig.file,
-            node: targetnodeconfig.node,
-            auth: {
-              personalAccessToken: personal.get_safe(),
-            },
-          })
-          .then((res) => {
-            cacheStore.set(res.raw); // setting cache does not need to be determined by `use_session_cache` option.
-            setDesign(<TargetNodeConfig>{
-              ...res,
-              ...targetnodeconfig,
-            });
-          })
-          .catch((err: FigmaRemoteErrors) => {
-            switch (err.type) {
-              case "UnauthorizedError": {
-                // unauthorized
-                router.push("/preferences/access-tokens");
-                console.info(`(ignored) error while fetching design`, err);
-                break;
+        if (fat.accessToken || fat.personalAccessToken) {
+          fetch
+            .fetchTargetAsReflect({
+              file: targetnodeconfig.file,
+              node: targetnodeconfig.node,
+              auth: {
+                personalAccessToken: fat.personalAccessToken,
+                accessToken: fat.accessToken.token,
+              },
+            })
+            .then((res) => {
+              cacheStore.set(res.raw); // setting cache does not need to be determined by `use_session_cache` option.
+              setDesign(<TargetNodeConfig>{
+                ...res,
+                ...targetnodeconfig,
+              });
+            })
+            .catch((err: FigmaRemoteErrors) => {
+              switch (err.type) {
+                case "UnauthorizedError": {
+                  // unauthorized
+                  router.push("/preferences/access-tokens");
+                  console.info(`(ignored) error while fetching design`, err);
+                  break;
+                }
+                default:
+                  if (fat.accessToken) {
+                    // wait..
+                  } else {
+                    console.error(`error while fetching design`, err);
+                    throw err;
+                  }
               }
-              default:
-                throw err;
-            }
-          });
+            });
+        } else {
+          // wait..
+          // throw new Error(
+          //   "No valid figma access token provided. cannot read design."
+          // );
+        }
       }
     }
-  }, [router]);
+  }, [router, fat.accessToken, props["url"]]);
   return design;
+}
+
+type TUseDesignFile =
+  | TFetchFileForApp
+  | {
+      __type: "error";
+      reason: "no-auth" | "unauthorized";
+      cached?: TFetchFileForApp;
+    }
+  | { __type: "error"; reason: "no-file" }
+  | { __type: "loading" };
+
+export function useDesignFile({ file }: { file: string }) {
+  const [designfile, setDesignFile] = useState<TUseDesignFile>({
+    __type: "loading",
+  });
+  const fat = useFigmaAccessToken();
+  useEffect(() => {
+    if (file) {
+      if (fat.personalAccessToken || fat.accessToken.token) {
+        async function handle() {
+          const repo = new FigmaDesignRepository({
+            personalAccessToken: fat.personalAccessToken,
+            accessToken: fat.accessToken.token,
+          });
+          const iterator = repo.fetchFile(file);
+          let next: IteratorResult<TFetchFileForApp>;
+          while ((next = await iterator.next()).done === false) {
+            setDesignFile(next.value);
+          }
+        }
+        handle();
+      } else {
+        if (fat.accessToken.loading) {
+          setDesignFile({
+            __type: "loading",
+          });
+        } else {
+          // if no auth provided, try to used cached file if possible.
+          FigmaDesignRepository.fetchCachedFile(file)
+            .then((r) => {
+              setDesignFile({
+                __type: "error",
+                reason: "no-auth",
+                cached: r,
+              });
+            })
+            .catch((e) => {
+              setDesignFile({
+                __type: "error",
+                reason: "no-auth",
+              });
+            });
+        }
+      }
+    } else {
+      setDesignFile({
+        __type: "error",
+        reason: "no-file",
+      });
+    }
+  }, [file, fat.accessToken.loading]);
+
+  return designfile;
 }
 
 const analyze = (query: string): "id" | DesignProvider => {

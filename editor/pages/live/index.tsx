@@ -1,16 +1,15 @@
 import React, { useState, useEffect } from "react";
 import Pusher from "pusher-js";
-import LoadingLayout from "../../layout/loading-overlay";
-import { useDesign } from "../../hooks";
+import LoadingLayout from "layouts/loading-overlay";
+import { useDesign } from "hooks";
 import { designToCode, Result } from "@designto/code";
 import { TargetNodeConfig } from "../../query/target-node";
-import { DefaultEditorWorkspaceLayout } from "../../layout/default-editor-workspace-layout";
 import {
   WorkspaceContentPanel,
   WorkspaceContentPanelGridLayout,
-} from "../../layout/panel";
-import { PreviewAndRunPanel } from "../../components/preview-and-run";
-import { CodeEditor } from "../../components/code-editor";
+} from "layouts/panel";
+import { PreviewAndRunPanel } from "components/preview-and-run";
+import { CodeEditor } from "components/code-editor";
 import {
   ImageRepository,
   MainImageRepository,
@@ -23,6 +22,7 @@ import {
   flutter_presets,
   vanilla_presets,
 } from "@grida/builder-config-preset";
+import {} from "hooks";
 
 const _base_url =
   "https://ahzdf5x4q3.execute-api.us-west-1.amazonaws.com/production"; // "https://assistant-live-session.grida.cc";
@@ -142,7 +142,6 @@ function ResultProxyPage({ design }: { design: TargetNodeConfig }) {
   }
 
   const { code, scaffold, name: componentName } = result;
-  console.log("preview", preview);
   return (
     <WorkspaceContentPanelGridLayout>
       <WorkspaceContentPanel disableBorder>

@@ -1,10 +1,17 @@
 import React from "react";
 import { RemoteDesignSessionCacheStore } from "../../store";
 
-export function ClearRemoteDesignSessionCache(props: { url: string }) {
+export function ClearRemoteDesignSessionCache(
+  props:
+    | { url: string }
+    | {
+        file: string;
+        node: string;
+      }
+) {
   const clearCache = () => {
-    new RemoteDesignSessionCacheStore({ url: props.url }).clear();
-    alert("cleared - " + props.url);
+    new RemoteDesignSessionCacheStore(props).clear();
+    alert("cleared - " + JSON.stringify(props));
   };
 
   return (

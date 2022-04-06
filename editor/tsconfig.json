@@ -1,11 +1,7 @@
 {
   "compilerOptions": {
     "target": "es2015",
-    "lib": [
-      "dom",
-      "dom.iterable",
-      "esnext"
-    ],
+    "lib": ["dom", "dom.iterable", "esnext"],
     "allowJs": true,
     "skipLibCheck": true,
     "strict": false,
@@ -17,14 +13,21 @@
     "resolveJsonModule": true,
     "isolatedModules": true,
     "jsx": "preserve",
-    "incremental": true
+    "incremental": true,
+    "baseUrl": ".",
+    "paths": {
+      "components/*": ["./components/*"],
+      "icons/*": ["./icons/*"],
+      "layout/*": ["./layouts/*"],
+      "scaffolds/*": ["./scaffolds/*"],
+      "core/*": ["./core/*"],
+      "store/*": ["./store/*"],
+      "repository/*": ["./repository/*"],
+      "utils/*": ["./utils/*"],
+      "public/*": ["./public/*"],
+      "hooks/*": ["./hooks/*"]
+    }
   },
-  "include": [
-    "next-env.d.ts",
-    "**/*.ts",
-    "**/*.tsx"
-  ],
-  "exclude": [
-    "node_modules"
-  ]
+  "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx"],
+  "exclude": ["node_modules"]
 }
