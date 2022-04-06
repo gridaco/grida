@@ -104,11 +104,25 @@ module.exports = withTM({
       include: /node_modules/,
     });
 
-    const terser = config.optimization.minimizer.find(
-      (m) => m.constructor.name === "TerserPlugin"
-    );
+    config.resolve.fallback = {
+      fs: false, // used by handlebars
+      path: false, // used by handlebars
+      crypto: false, // or crypto-browserify (used for totp auth)
+      stream: false, // or stream-browserify (used for totp auth)
+    };
+
+    // -----------------------------
     // for @flutter-builder classname issue
-    terser.options.terserOptions.keep_classnames = true;
+    config.optimization.minimizer.push(
+      new TerserPlugin({
+        parallel: true,
+        terserOptions: {
+          // https://github.com/webpack-contrib/terser-webpack-plugin#terseroptions
+          keep_classnames: true,
+        },
+      })
+    );
+    // -----------------------------
 
     return config;
   },
