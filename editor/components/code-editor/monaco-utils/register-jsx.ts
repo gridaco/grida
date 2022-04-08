@@ -1,5 +1,5 @@
 import { Monaco } from "@monaco-editor/react";
-import { createWorkerQueue } from "../../../workers";
+import { createWorkerQueue } from "@code-editor/webworker-services-core";
 
 import type { editor } from "monaco-editor";
 export function registerJsxHighlighter(
@@ -49,7 +49,9 @@ export function registerJsxHighlighter(
           classification.end
         ),
         options: {
-          //
+          inlineClassName: classification.type
+            ? `${classification.kind} ${classification.type}-of-${classification.parentKind}`
+            : classification.kind,
         },
       }));
 

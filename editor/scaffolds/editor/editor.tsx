@@ -73,7 +73,12 @@ export function Editor({
 
       <DefaultEditorWorkspaceLayout
         backgroundColor={colors.color_editor_bg_on_dark}
-        leftbar={<EditorSidebar />}
+        leftbar={{
+          _type: "resizable",
+          minWidth: 240,
+          maxWidth: 600,
+          children: <EditorSidebar />,
+        }}
         // rightbar={<Inspector />}
       >
         <WorkspaceContentPanelGridLayout>
@@ -82,7 +87,12 @@ export function Editor({
           </WorkspaceContentPanel>
           <WorkspaceContentPanel
             hidden={state.selectedNodes.length === 0}
+            overflow="hidden"
             flex={4}
+            resize={{
+              left: true,
+            }}
+            minWidth={300}
             zIndex={1}
             backgroundColor={colors.color_editor_bg_on_dark}
           >

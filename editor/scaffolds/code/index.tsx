@@ -12,15 +12,17 @@ import {
   MainImageRepository,
 } from "@design-sdk/core/assets-repository";
 import { useEditorState, useWorkspaceState } from "core/states";
-import { utils_dart } from "utils";
+import { useDispatch } from "core/dispatch";
 import type { ReflectSceneNode } from "@design-sdk/core";
 import { RemoteImageRepositories } from "@design-sdk/figma-remote/lib/asset-repository/image-repository";
 import { useTargetContainer } from "hooks/use-target-node";
 import assert from "assert";
+import { debounce } from "utils/debounce";
 
 export function CodeSegment() {
   const router = useRouter();
   const [result, setResult] = useState<Result>();
+  const dispatch = useDispatch();
   const wstate = useWorkspaceState();
   const [state] = useEditorState();
   const [framework_config, set_framework_config] = useState(
@@ -46,12 +48,6 @@ export function CodeSegment() {
       result.id !== targetStateRef?.current?.node?.id
     ) {
       return;
-    }
-
-    if (framework_config.language == "dart") {
-      // special formatter support for dartlang
-      result.code.raw = utils_dart.format(result.code.raw);
-      result.scaffold.raw = utils_dart.format(result.scaffold.raw);
     }
 
     setResult(result);
@@ -114,6 +110,24 @@ export function CodeSegment() {
     }
   }, [targetted?.id, framework_config]);
 
+  const onChangeHandler = debounce((k, code) => {
+    if (!result) {
+      return;
+    }
+    if (!targetted) {
+      return;
+    }
+    if (framework_config.framework === "react") {
+      dispatch({
+        type: "code-editor-edit-component-code",
+        framework: framework_config.framework,
+        componentName: result.name,
+        id: targetted.id,
+        raw: code,
+      });
+    }
+  }, 500);
+
   const { code, scaffold, name: componentName } = result ?? {};
   return (
     <CodeEditorContainer>
@@ -175,6 +189,7 @@ export function CodeSegment() {
         options={{
           automaticLayout: true,
         }}
+        onChange={onChangeHandler}
         files={
           code
             ? {

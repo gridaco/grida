@@ -1,5 +1,10 @@
 import produce from "immer";
-import { Action, SelectNodeAction, SelectPageAction } from "core/actions";
+import type {
+  Action,
+  SelectNodeAction,
+  SelectPageAction,
+  CodeEditorEditComponentCodeAction,
+} from "core/actions";
 import { EditorState } from "core/states";
 import { useRouter } from "next/router";
 import { CanvasStateStore } from "@code-editor/canvas/stores";
@@ -69,6 +74,17 @@ export function editorReducer(state: EditorState, action: Action): EditorState {
         draft.selectedPage = page;
         draft.selectedNodes = last_known_selections_of_this_page;
       });
+    }
+    case "code-editor-edit-component-code": {
+      const { ...rest } = <CodeEditorEditComponentCodeAction>action;
+      return produce(state, (draft) => {
+        draft.editingCode = {
+          ...rest,
+          type: "single-file-component",
+          lang: "unknown",
+        };
+      });
+      //
     }
     default:
       throw new Error(`Unhandled action type: ${action["type"]}`);

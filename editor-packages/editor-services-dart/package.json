@@ -1,0 +1,6 @@
+{
+  "name": "@code-editor/dart-services",
+  "description": "dart build services for flutter framework",
+  "version": "0.0.0",
+  "private": false
+}
