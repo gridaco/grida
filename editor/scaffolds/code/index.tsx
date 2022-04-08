@@ -13,7 +13,6 @@ import {
 } from "@design-sdk/core/assets-repository";
 import { useEditorState, useWorkspaceState } from "core/states";
 import { useDispatch } from "core/dispatch";
-import { utils_dart } from "utils";
 import type { ReflectSceneNode } from "@design-sdk/core";
 import { RemoteImageRepositories } from "@design-sdk/figma-remote/lib/asset-repository/image-repository";
 import { useTargetContainer } from "hooks/use-target-node";
@@ -49,12 +48,6 @@ export function CodeSegment() {
       result.id !== targetStateRef?.current?.node?.id
     ) {
       return;
-    }
-
-    if (framework_config.language == "dart") {
-      // special formatter support for dartlang
-      result.code.raw = utils_dart.format(result.code.raw);
-      result.scaffold.raw = utils_dart.format(result.scaffold.raw);
     }
 
     setResult(result);
