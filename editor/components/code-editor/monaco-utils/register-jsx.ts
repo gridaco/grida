@@ -49,7 +49,9 @@ export function registerJsxHighlighter(
           classification.end
         ),
         options: {
-          //
+          inlineClassName: classification.type
+            ? `${classification.kind} ${classification.type}-of-${classification.parentKind}`
+            : classification.kind,
         },
       }));
 
