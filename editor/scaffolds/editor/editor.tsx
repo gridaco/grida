@@ -92,6 +92,7 @@ export function Editor({
             resize={{
               left: true,
             }}
+            minWidth={300}
             zIndex={1}
             backgroundColor={colors.color_editor_bg_on_dark}
           >

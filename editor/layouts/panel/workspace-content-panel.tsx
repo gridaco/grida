@@ -20,11 +20,13 @@ export function WorkspaceContentPanel({
     bottom: false,
     left: false,
   },
+  minWidth = 0,
 }: {
   children: JSX.Element;
   hidden?: boolean;
 } & Omit<WorkspaceCPanelStyleProps, "display"> & {
     resize?: ResizableProps["enable"];
+    minWidth?: number;
   }) {
   const [oflex, setOFlex] = React.useState(flex);
 
@@ -32,7 +34,9 @@ export function WorkspaceContentPanel({
     <Resizable
       enable={resize}
       onResizeStart={() => setOFlex(undefined)}
+      minWidth={minWidth}
       style={{
+        minWidth: minWidth,
         border: disableBorder ? "none" : "solid #d2d2d2",
         backgroundColor: backgroundColor,
         borderWidth: 1,
