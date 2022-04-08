@@ -7,12 +7,7 @@ export function registerJsxHighlighter(
   monaco: Monaco
 ) {
   const { worker: syntaxWorker } = createWorkerQueue(
-    new Worker(
-      new URL(
-        "../../../workers/monaco-syntax-highlight/syntax-highlight.worker.js",
-        import.meta.url
-      )
-    )
+    new Worker(new URL("./workers/syntax-highlight.worker.js", import.meta.url))
   );
 
   const highlightHandler = () => {

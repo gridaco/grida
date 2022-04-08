@@ -1,7 +1,7 @@
 import * as monaco from "monaco-editor";
 import { Monaco, OnMount } from "@monaco-editor/react";
 import { registerDocumentPrettier } from "@code-editor/prettier-services";
-import { registerJsxHighlighter } from "./register-jsx";
+import { registerJsxHighlighter } from "@code-editor/jsx-syntax-highlight-services";
 
 type CompilerOptions = monaco.languages.typescript.CompilerOptions;
 
