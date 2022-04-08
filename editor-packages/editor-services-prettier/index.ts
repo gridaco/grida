@@ -1,6 +1,6 @@
 import * as monaco from "monaco-editor";
 import { formatCode as formatDartCode } from "dart-style";
-import { createWorkerQueue } from "../../../workers";
+import { createWorkerQueue } from "@code-editor/webworker-services-core";
 
 export function registerDocumentPrettier(editor, monaco) {
   const disposables: monaco.IDisposable[] = [];
@@ -24,12 +24,7 @@ export function registerDocumentPrettier(editor, monaco) {
     async provideDocumentFormattingEdits(model, _options, _token) {
       if (!prettierWorker) {
         prettierWorker = createWorkerQueue(
-          new Worker(
-            new URL(
-              "../../../workers/prettier/prettier.worker.js",
-              import.meta.url
-            )
-          )
+          new Worker(new URL("./workers/prettier.worker.js", import.meta.url))
         );
       }
 

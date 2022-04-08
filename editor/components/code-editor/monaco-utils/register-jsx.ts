@@ -1,5 +1,5 @@
 import { Monaco } from "@monaco-editor/react";
-import { createWorkerQueue } from "../../../workers";
+import { createWorkerQueue } from "@code-editor/webworker-services-core";
 
 import type { editor } from "monaco-editor";
 export function registerJsxHighlighter(
