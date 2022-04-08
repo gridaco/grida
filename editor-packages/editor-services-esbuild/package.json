@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": false,
   "dependencies": {
-    "esbuild-wasm": "^0.14.31",
+    "esbuild-wasm": "0.14.34",
     "localforage": "^1.10.0"
   },
   "peerDependencies": {
