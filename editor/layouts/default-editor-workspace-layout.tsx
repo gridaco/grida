@@ -51,6 +51,10 @@ function Sidebar(
       case "resizable": {
         return (
           <Resizable
+            defaultSize={{
+              width: p.signature.minWidth,
+              height: "100%",
+            }}
             style={{
               zIndex: 1,
               flexGrow: 0,
@@ -96,6 +100,7 @@ const WorkspaceRoot = styled.div<{
   backgroundColor: string;
 }>`
   ${(props) => props.display && `display: ${props.display};`}
+  overflow: hidden;
   width: 100vw;
   height: 100vh;
   background-color: ${(p) => p.backgroundColor ?? "transparent"};
