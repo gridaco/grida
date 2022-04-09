@@ -18,6 +18,9 @@ export default function FileEntryEditor() {
 
   const [loading, setLoading] = useState<boolean>(true);
 
+  // background whole file fetching
+  const file = useDesignFile({ file: filekey });
+
   const [initialState, initialDispatcher] = useReducer(warmup.initialReducer, {
     type: "pending",
   });
@@ -25,9 +28,6 @@ export default function FileEntryEditor() {
   const handleDispatch = useCallback((action: WorkspaceAction) => {
     initialDispatcher({ type: "update", value: action });
   }, []);
-
-  // background whole file fetching
-  const file = useDesignFile({ file: filekey });
 
   const prevstate =
     initialState.type == "success" && initialState.value.history.present;

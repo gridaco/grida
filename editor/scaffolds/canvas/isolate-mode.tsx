@@ -80,8 +80,6 @@ export function IsolateModeCanvas({ onClose }: { onClose: () => void }) {
         .finally(() => {
           setIsbuilding(false); // o
         });
-    } else {
-      console.error("MainImageRepository is empty");
     }
   }, [target?.id]);
 

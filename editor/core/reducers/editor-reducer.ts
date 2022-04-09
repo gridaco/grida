@@ -9,6 +9,8 @@ import { EditorState } from "core/states";
 import { useRouter } from "next/router";
 import { CanvasStateStore } from "@code-editor/canvas/stores";
 
+const _editor_path_name = "/files/[key]/";
+
 export function editorReducer(state: EditorState, action: Action): EditorState {
   const router = useRouter();
   const filekey = state.design.key;
@@ -23,11 +25,11 @@ export function editorReducer(state: EditorState, action: Action): EditorState {
       // update router
       router.push(
         {
-          pathname: router.pathname,
+          pathname: _editor_path_name,
           query: { ...router.query, node: node ?? state.selectedPage },
         },
         undefined,
-        {}
+        { shallow: true }
       );
 
       return produce(state, (draft) => {
@@ -55,11 +57,11 @@ export function editorReducer(state: EditorState, action: Action): EditorState {
       // update router
       router.push(
         {
-          pathname: router.pathname,
+          pathname: _editor_path_name,
           query: { ...router.query, node: page },
         },
         undefined,
-        {}
+        { shallow: true }
       );
 
       return produce(state, (draft) => {

@@ -10,6 +10,7 @@ import { IsolateModeCanvas } from "./isolate-mode";
 import { useRouter } from "next/router";
 
 type ViewMode = "full" | "isolate";
+const _editor_path_name = "/files/[key]/";
 
 /**
  * Statefull canvas segment that contains canvas as a child, with state-data connected.
@@ -52,7 +53,10 @@ export function VisualContentArea() {
     _setMode(m);
 
     // update the router
-    (router.query.mode = m) && router.push(router);
+    router.push({
+      pathname: _editor_path_name,
+      query: { ...router.query, mode: m },
+    });
   };
 
   return (

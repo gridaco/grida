@@ -5,7 +5,7 @@ import {
   WorkspaceContentPanelGridLayout,
 } from "layouts/panel";
 import { EditorSidebar } from "components/editor";
-import { useEditorState, useWorkspaceState } from "core/states";
+import { useEditorState } from "core/states";
 import { Canvas } from "scaffolds/canvas";
 import { CodeSegment } from "scaffolds/code";
 import { EditorSkeleton } from "./skeleton";
@@ -25,7 +25,6 @@ export function Editor({
    */
   loading?: boolean;
 }) {
-  const wstate = useWorkspaceState();
   const [state] = useEditorState();
 
   const fat = useFigmaAccessToken();
