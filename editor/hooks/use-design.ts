@@ -172,7 +172,7 @@ export function useDesign({
   return design;
 }
 
-type TUseDesignFile =
+export type TUseDesignFile =
   | TFetchFileForApp
   | {
       __type: "error";

@@ -1,25 +1,60 @@
 import React, { useEffect, useCallback, useReducer, useState } from "react";
-import { useRouter } from "next/router";
+import { useRouter, NextRouter } from "next/router";
 import { SigninToContinueBannerPrmoptProvider } from "components/prompt-banner-signin-to-continue";
 import { Editor, EditorDefaultProviders } from "scaffolds/editor";
 import { EditorSnapshot, StateProvider } from "core/states";
 import { WorkspaceAction } from "core/actions";
-import { useDesignFile } from "hooks";
-
+import { useDesignFile, TUseDesignFile } from "hooks";
 import { warmup } from "scaffolds/editor";
 import { FileResponse } from "@design-sdk/figma-remote-types";
 import { EditorBrowserMetaHead } from "components/editor";
 
 export default function FileEntryEditor() {
   const router = useRouter();
-  const { key, node } = router.query;
-  const filekey = key as string;
-  const nodeid = node as string;
+  const { key } = router.query;
 
-  const [loading, setLoading] = useState<boolean>(true);
+  const [nodeid, setNodeid] = useState<string>();
+  const filekey = key as string;
+  // const nodeid = node as string;
 
   // background whole file fetching
   const file = useDesignFile({ file: filekey });
+
+  useEffect(() => {
+    if (!router.isReady) return;
+
+    if (!nodeid) {
+      // set nodeid only first time
+      setNodeid(router.query.node as string);
+      console.log("nodeid set", router.query.node);
+    }
+  }, [router.isReady]);
+
+  return (
+    <SigninToContinueBannerPrmoptProvider>
+      <SetupEditor
+        key={filekey}
+        file={file}
+        filekey={filekey}
+        nodeid={nodeid}
+        router={router}
+      />
+    </SigninToContinueBannerPrmoptProvider>
+  );
+}
+
+function SetupEditor({
+  filekey,
+  nodeid,
+  router,
+  file,
+}: {
+  nodeid: string;
+  filekey: string;
+  router: NextRouter;
+  file: TUseDesignFile;
+}) {
+  const [loading, setLoading] = useState<boolean>(true);
 
   const [initialState, initialDispatcher] = useReducer(warmup.initialReducer, {
     type: "pending",
@@ -29,10 +64,10 @@ export default function FileEntryEditor() {
     initialDispatcher({ type: "update", value: action });
   }, []);
 
-  const prevstate =
-    initialState.type == "success" && initialState.value.history.present;
-
   const initWith = (file: FileResponse) => {
+    const prevstate =
+      initialState.type == "success" && initialState.value.history.present;
+
     let val: EditorSnapshot;
 
     // TODO: seed this as well
@@ -129,16 +164,15 @@ export default function FileEntryEditor() {
   ]);
 
   const safe_value = warmup.safestate(initialState);
+
   return (
-    <SigninToContinueBannerPrmoptProvider>
-      <StateProvider state={safe_value} dispatch={handleDispatch}>
-        <EditorDefaultProviders>
-          <EditorBrowserMetaHead>
-            <Editor loading={loading} />
-          </EditorBrowserMetaHead>
-        </EditorDefaultProviders>
-      </StateProvider>
-    </SigninToContinueBannerPrmoptProvider>
+    <StateProvider state={safe_value} dispatch={handleDispatch}>
+      <EditorDefaultProviders>
+        <EditorBrowserMetaHead>
+          <Editor loading={loading} />
+        </EditorBrowserMetaHead>
+      </EditorDefaultProviders>
+    </StateProvider>
   );
 }
 
