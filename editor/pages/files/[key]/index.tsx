@@ -64,6 +64,10 @@ function SetupEditor({
     initialDispatcher({ type: "update", value: action });
   }, []);
 
+  const initialCanvasMode = q_map_canvas_mode_from_query(
+    router.query.mode as string
+  ); // TODO: change this to reflect the nodeid input
+
   const initWith = (file: FileResponse) => {
     const prevstate =
       initialState.type == "success" && initialState.value.history.present;
@@ -107,6 +111,7 @@ function SetupEditor({
           key: filekey,
           pages: pages,
         },
+        canvasMode: initialCanvasMode,
       };
     }
 
@@ -219,3 +224,25 @@ function SetupEditor({
     
   }
  */
+
+const q_map_canvas_mode_from_query = (
+  mode: string
+): EditorSnapshot["canvasMode"] => {
+  switch (mode) {
+    case "free":
+    case "isolated-view":
+    case "fullscreen-preview":
+      return mode;
+
+    // -------------------------
+    // legacy query param key
+    case "full":
+      return "free";
+    case "isolate":
+      return "isolated-view";
+    // -------------------------
+
+    default:
+      return "free";
+  }
+};

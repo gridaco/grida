@@ -8,20 +8,26 @@ import { IsolatedCanvas } from "components/canvas";
 import { PreviewAndRunPanel } from "components/preview-and-run";
 import { useEditorState } from "core/states";
 import { useTargetContainer } from "hooks";
-import { Dialog } from "@material-ui/core";
-import { FullScreenPreview } from "scaffolds/preview-full-screen";
+
 import { VanillaESBuildAppRunner } from "components/app-runner";
 import bundler from "@code-editor/esbuild-services";
 import assert from "assert";
 
 const esbuild_base_html_code = `<div id="root"></div>`;
 
-export function IsolateModeCanvas({ onClose }: { onClose: () => void }) {
+export function IsolateModeCanvas({
+  onClose,
+  onEnterFullscreen,
+}: {
+  onClose: () => void;
+  onEnterFullscreen: () => void;
+}) {
   const [state] = useEditorState();
   const [initialPreview, setInitialPreview] = useState<Result>();
   const [buildPreview, setBuildPreview] = useState<string>();
   const [isbuilding, setIsbuilding] = useState(false);
-  const [fullscreen, setFullscreen] = useState(false);
+
+  // const [fullscreen, setFullscreen] = useState(false);
 
   const { target, root } = useTargetContainer();
 
@@ -89,19 +95,19 @@ export function IsolateModeCanvas({ onClose }: { onClose: () => void }) {
   useEffect(() => {
     if (
       !isInitialPreviewFullyLoaded ||
-      !state.editingCode ||
+      !state.editingModule ||
       // now only react is supported.
-      state.editingCode.framework !== "react"
+      state.editingModule.framework !== "react"
     ) {
       return;
     }
 
-    assert(state.editingCode.componentName, "component name is required");
-    assert(state.editingCode.raw, "raw input code is required");
+    assert(state.editingModule.componentName, "component name is required");
+    assert(state.editingModule.raw, "raw input code is required");
 
     setIsbuilding(true);
     bundler(
-      transform(state.editingCode.raw, state.editingCode.componentName),
+      transform(state.editingModule.raw, state.editingModule.componentName),
       "tsx"
     )
       .then((d) => {
@@ -114,32 +120,17 @@ export function IsolateModeCanvas({ onClose }: { onClose: () => void }) {
       .finally(() => {
         setIsbuilding(false);
       });
-  }, [state.editingCode?.framework, state.editingCode?.raw]);
+  }, [state.editingModule?.framework, state.editingModule?.raw]);
 
   // ------------------------
 
   return (
     <>
-      <Dialog
-        fullScreen
-        onClose={() => {
-          setFullscreen(false);
-        }}
-        open={fullscreen}
-      >
-        <FullScreenPreview
-          onClose={() => {
-            setFullscreen(false);
-          }}
-        />
-      </Dialog>
       <IsolatedCanvas
         key={target?.id}
         building={isbuilding}
         onExit={onClose}
-        onFullscreen={() => {
-          setFullscreen(true);
-        }}
+        onFullscreen={onEnterFullscreen}
         defaultSize={{
           width: target?.width ?? 375,
           height: target?.height ?? 812,

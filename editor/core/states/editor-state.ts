@@ -1,6 +1,14 @@
 import type { ReflectSceneNode } from "@design-sdk/figma-node";
+import type { FrameworkConfig } from "@designto/config";
 import { ComponentNode } from "@design-sdk/figma-types";
 import { DesignInput } from "@designto/config/input";
+
+/**
+ * View mode of the canvas.
+ * - full - default
+ * - isolated - focus to one scene
+ */
+type TCanvasMode = "free" | "isolated-view" | "fullscreen-preview";
 
 export interface EditorState {
   selectedPage: string;
@@ -13,13 +21,10 @@ export interface EditorState {
    */
   selectedNodesInitial?: string[] | null;
   design: FigmaReflectRepository;
-  editingCode?: {
-    type: "single-file-component";
-    componentName: string;
-    framework: string;
-    lang: string;
-    raw: string;
-  };
+  canvasMode: TCanvasMode;
+  canvasMode_previous?: TCanvasMode;
+  code?: CodeRepository;
+  editingModule?: EditingModule;
 }
 
 export interface EditorSnapshot {
@@ -28,6 +33,7 @@ export interface EditorSnapshot {
   selectedLayersOnPreview: string[];
   selectedNodesInitial?: string[] | null;
   design: FigmaReflectRepository;
+  canvasMode: TCanvasMode;
 }
 
 export interface FigmaReflectRepository {
@@ -46,4 +52,19 @@ export interface FigmaReflectRepository {
   components: { [key: string]: ComponentNode };
   // styles: { [key: string]: {} };
   input: DesignInput;
+}
+
+export interface CodeRepository {
+  // TODO:
+  // files: { [key: string]: string };
+}
+
+type TEditingModuleType = "single-file-component";
+
+export interface EditingModule {
+  type: TEditingModuleType;
+  componentName: string;
+  framework: FrameworkConfig["framework"];
+  lang: string;
+  raw: string;
 }

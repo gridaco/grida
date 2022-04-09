@@ -1,3 +1,6 @@
+import type { FrameworkConfig } from "@designto/config";
+import type { EditorState } from "core/states";
+
 export type WorkspaceAction =
   //
   | HistoryAction
@@ -12,13 +15,10 @@ export type HistoryAction =
   | Action;
 
 export type Action =
-  //
   | PageAction
-  //
   | SelectNodeAction
-  //
   | HighlightLayerAction
-  //
+  | CanvasModeAction
   | CodeEditorAction;
 
 export type ActionType = Action["type"];
@@ -41,12 +41,23 @@ export interface HighlightLayerAction {
   id: string;
 }
 
+type CanvasModeAction = CanvasModeSwitchAction | CanvasModeGobackAction;
+export interface CanvasModeSwitchAction {
+  type: "canvas-mode-switch";
+  mode: EditorState["canvasMode"];
+}
+
+export interface CanvasModeGobackAction {
+  type: "canvas-mode-goback";
+  fallback?: EditorState["canvasMode"];
+}
+
 export type CodeEditorAction = CodeEditorEditComponentCodeAction;
 
 export interface CodeEditorEditComponentCodeAction {
   type: "code-editor-edit-component-code";
   id: string;
-  framework: string;
+  framework: FrameworkConfig["framework"];
   componentName: string;
   raw: string;
 }
