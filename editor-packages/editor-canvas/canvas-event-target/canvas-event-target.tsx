@@ -194,6 +194,8 @@ export function CanvasEventTarget({
         overflow: "hidden",
         touchAction: "none",
         cursor: isSpacebarPressed ? "grab" : "default",
+        userSelect: "none",
+        WebkitUserSelect: "none",
       }}
       id="gesture-event-listener"
       ref={interactionEventTargetRef}

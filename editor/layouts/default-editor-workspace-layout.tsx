@@ -63,6 +63,8 @@ function Sidebar(
               width: "100%",
               maxWidth: p.signature.maxWidth,
               minWidth: p.signature.minWidth,
+              userSelect: "none",
+              WebkitUserSelect: "none",
             }}
             minWidth={p.signature.minWidth}
             maxWidth={p.signature.maxWidth}
@@ -88,6 +90,8 @@ function Sidebar(
         minHeight: "100%",
         maxHeight: "100%",
         maxWidth: 400,
+        userSelect: "none",
+        WebkitUserSelect: "none",
       }}
     >
       {p.signature as JSX.Element}

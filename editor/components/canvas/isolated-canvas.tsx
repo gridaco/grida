@@ -128,6 +128,8 @@ export function IsolatedCanvas({
           display: "flex",
           flexDirection: "column",
           alignItems: "center",
+          userSelect: "none",
+          WebkitUserSelect: "none",
         }}
       >
         <Controls>
