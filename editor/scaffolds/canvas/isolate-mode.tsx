@@ -12,6 +12,7 @@ import { Dialog } from "@material-ui/core";
 import { FullScreenPreview } from "scaffolds/preview-full-screen";
 import { VanillaESBuildAppRunner } from "components/app-runner";
 import bundler from "@code-editor/esbuild-services";
+import assert from "assert";
 
 const esbuild_base_html_code = `<div id="root"></div>`;
 
@@ -95,12 +96,8 @@ export function IsolateModeCanvas({ onClose }: { onClose: () => void }) {
       return;
     }
 
-    const transform = (s, n) => {
-      return `import React from 'react'; import ReactDOM from 'react-dom';
-${s}
-const App = () => <><${n}/></>
-ReactDOM.render(<App />, document.querySelector('#root'));`;
-    };
+    assert(state.editingCode.componentName, "component name is required");
+    assert(state.editingCode.raw, "raw input code is required");
 
     setIsbuilding(true);
     bundler(
@@ -197,4 +194,11 @@ const EditorCanvasSkeleton = () => {
       }}
     />
   );
+};
+
+const transform = (s, n) => {
+  return `import React from 'react'; import ReactDOM from 'react-dom';
+${s}
+const App = () => <><${n}/></>
+ReactDOM.render(<App />, document.querySelector('#root'));`;
 };
