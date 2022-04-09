@@ -3,9 +3,6 @@ import { nanoid } from "nanoid";
 import { build, initialize, Loader } from "esbuild-wasm";
 import { fetchPlugin } from "./fetch.plugin";
 import { unpkgPathPlugin } from "./unpkg-path.plugin";
-// import store from "../../redux";
-// import { INIT_BUNDLER } from "../../redux/actions/bundler.actions";
-// import { PRINT_CONSOLE } from "../../redux/actions/editor.actions";
 
 declare const window: {
   monaco: Monaco;
@@ -19,14 +16,8 @@ const bundler = async (rawCode: string, lang: Loader) => {
       wasmURL: "https://unpkg.com/esbuild-wasm@0.14.34/esbuild.wasm",
       worker: true,
     });
+    console.log("esbuild-wasm initialized");
     serviceLoaded = true;
-    // store.dispatch(INIT_BUNDLER());
-    // store.dispatch(
-    //   PRINT_CONSOLE({
-    //     method: "info",
-    //     data: ["Bundler initialized...Happy coding ❤️"],
-    //   })
-    // );
   }
 
   try {
@@ -49,11 +40,13 @@ const bundler = async (rawCode: string, lang: Loader) => {
 
     loadTypes(imports);
 
+    // console.log("esbuild result: ", result);
+
     return { code: result.outputFiles[0].text, err: null };
   } catch (error: any) {
-    console.error("error: ", error);
+    console.error("esbuild error: ", error);
     return {
-      code: "",
+      code: null,
       err: { method: "error", data: [error.message], id: nanoid() },
     };
   }
