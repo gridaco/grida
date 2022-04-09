@@ -80,8 +80,7 @@ const loadTypes = (types) => {
   const disposables: any = [];
   const monaco = window && window.monaco;
 
-  const dependencies =
-    types.map((e) => ({ name: e, version: "@latest" })) || [];
+  const dependencies = types.map((e) => ({ name: e, version: "latest" })) || [];
 
   if (!typesWorker) {
     typesWorker = new Worker(
