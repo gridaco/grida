@@ -3,7 +3,9 @@ import { VanillaRunner } from "components/app-runner/vanilla-app-runner";
 
 export function VanillaESBuildAppRunner({
   doc,
+  componentName,
 }: {
+  componentName: string;
   doc?: {
     html: string;
     css?: string;
@@ -39,7 +41,7 @@ export function VanillaESBuildAppRunner({
       source={_html}
       width="100%"
       height="100%"
-      componentName={"preview"}
+      componentName={componentName}
     />
   );
 }

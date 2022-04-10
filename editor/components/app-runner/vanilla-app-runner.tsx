@@ -2,15 +2,15 @@ import React, { ReactEventHandler, useEffect, useRef } from "react";
 
 export const VanillaRunner = React.forwardRef(function (
   {
-    width,
-    height,
+    width = "100%",
+    height = "100%",
     source,
     onLoad,
     enableInspector = true,
     style,
   }: {
-    width: string;
-    height: string;
+    width?: React.CSSProperties["width"];
+    height?: React.CSSProperties["height"];
     source: string;
     onLoad?: ReactEventHandler<HTMLIFrameElement>;
     componentName: string;

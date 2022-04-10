@@ -4,3 +4,4 @@ export * from "./flutter-app-runner";
 export * from "./react-app-runner";
 export * from "./loading-indicator";
 export * from "./vanilla-esbuild-app-runner";
+export * from "./vanilla-dedicated-preview-renderer";
