@@ -8,6 +8,7 @@ import bundler from "@code-editor/esbuild-services";
 import assert from "assert";
 import { useDispatch } from "core/dispatch";
 import { useTargetContainer } from "hooks";
+import { WidgetKey } from "@reflect-ui/core";
 
 const esbuild_base_html_code = `<div id="root"></div>`;
 
@@ -26,6 +27,8 @@ export function EditorPreviewDataProvider({
 
   const [state] = useEditorState();
   const dispatch = useDispatch();
+
+  const { target, root } = useTargetContainer();
 
   const updateBuildingState = useCallback(
     (isBuilding: boolean) => {
@@ -67,9 +70,13 @@ export function EditorPreviewDataProvider({
 
   const onEsbuildReactPreviewResult = useCallback(
     ({
+      key,
+      initialSize,
       bundledjs,
       componentName,
     }: {
+      key: WidgetKey;
+      initialSize: { width: number; height: number };
       bundledjs: string;
       componentName: string;
     }) => {
@@ -78,17 +85,14 @@ export function EditorPreviewDataProvider({
         data: {
           loader: "vanilla-esbuild-template",
           viewtype: "unknown",
-          widgetKey: state.currentPreview?.widgetKey, // TODO: fixme
+          widgetKey: key,
           componentName: componentName,
           fallbackSource: state.currentPreview?.fallbackSource,
           source: {
             html: esbuild_base_html_code,
             javascript: bundledjs,
           },
-          initialSize: {
-            width: undefined,
-            height: undefined,
-          },
+          initialSize: initialSize,
           isBuilding: false,
           meta: {
             bundler: "esbuild-wasm",
@@ -101,8 +105,6 @@ export function EditorPreviewDataProvider({
     },
     [dispatch]
   );
-
-  const { target, root } = useTargetContainer();
 
   const _is_mode_requires_preview_build =
     state.canvasMode === "fullscreen-preview" ||
@@ -187,6 +189,14 @@ export function EditorPreviewDataProvider({
         if (d.err == null) {
           if (d.code) {
             onEsbuildReactPreviewResult({
+              key: new WidgetKey({
+                originName: target.name,
+                id: target.id,
+              }),
+              initialSize: {
+                width: target.width,
+                height: target.height,
+              },
               bundledjs: d.code,
               componentName: componentName,
             });
