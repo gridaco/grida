@@ -1,5 +1,5 @@
 import type { FrameworkConfig } from "@designto/config";
-import type { EditorState } from "core/states";
+import type { EditorState, ScenePreviewData } from "core/states";
 
 export type WorkspaceAction =
   //
@@ -19,6 +19,7 @@ export type Action =
   | SelectNodeAction
   | HighlightLayerAction
   | CanvasModeAction
+  | PreviewAction
   | CodeEditorAction;
 
 export type ActionType = Action["type"];
@@ -50,6 +51,18 @@ export interface CanvasModeSwitchAction {
 export interface CanvasModeGobackAction {
   type: "canvas-mode-goback";
   fallback?: EditorState["canvasMode"];
+}
+
+export type PreviewAction = PreviewSetAction | PreviewBuildingStateUpdateAction;
+
+export interface PreviewSetAction {
+  type: "preview-set";
+  data: ScenePreviewData;
+}
+
+export interface PreviewBuildingStateUpdateAction {
+  type: "preview-update-building-state";
+  isBuilding: boolean;
 }
 
 export type CodeEditorAction = CodeEditorEditComponentCodeAction;
