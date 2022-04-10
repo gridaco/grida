@@ -1,4 +1,4 @@
-import React, { useEffect } from "react";
+import React from "react";
 import { DefaultEditorWorkspaceLayout } from "layouts/default-editor-workspace-layout";
 import {
   WorkspaceContentPanel,
@@ -10,12 +10,6 @@ import { Canvas } from "scaffolds/canvas";
 import { CodeSegment } from "scaffolds/code";
 import { EditorSkeleton } from "./skeleton";
 import { colors } from "theme";
-import { RemoteImageRepositories } from "@design-sdk/figma-remote/lib/asset-repository/image-repository";
-import {
-  ImageRepository,
-  MainImageRepository,
-} from "@design-sdk/core/assets-repository";
-import { useFigmaAccessToken } from "hooks";
 
 export function Editor({
   loading = false,
@@ -26,32 +20,6 @@ export function Editor({
   loading?: boolean;
 }) {
   const [state] = useEditorState();
-
-  const fat = useFigmaAccessToken();
-
-  useEffect(() => {
-    // ------------------------------------------------------------
-    // other platforms are not supported yet
-    // set image repo for figma platform
-    if (state.design) {
-      MainImageRepository.instance = new RemoteImageRepositories(
-        state.design.key,
-        {
-          authentication: {
-            personalAccessToken: fat.personalAccessToken,
-            accessToken: fat.accessToken.token,
-          },
-        }
-      );
-      MainImageRepository.instance.register(
-        new ImageRepository(
-          "fill-later-assets",
-          "grida://assets-reservation/images/"
-        )
-      );
-    }
-    // ------------------------------------------------------------
-  }, [state.design?.key, fat.accessToken]);
 
   const _initially_loaded = state.design?.pages?.length > 0;
   const _initial_load_progress =
