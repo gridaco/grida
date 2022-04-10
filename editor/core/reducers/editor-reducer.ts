@@ -108,8 +108,16 @@ export function editorReducer(state: EditorState, action: Action): EditorState {
     }
     case "canvas-mode-goback": {
       const { fallback } = <CanvasModeGobackAction>action;
+
+      const dest = state.canvasMode_previous ?? fallback;
+
+      router.push({
+        pathname: _editor_path_name,
+        query: { ...router.query, mode: dest },
+        // no need to set shallow here.
+      });
+
       return produce(state, (draft) => {
-        const dest = draft.canvasMode_previous ?? fallback;
         assert(
           dest,
           "canvas-mode-goback: cannot resolve destination. (no fallback provided)"
