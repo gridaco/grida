@@ -1,92 +1,34 @@
 import React, { useEffect, useState } from "react";
 import { useEditorState } from "core/states";
 import styled from "@emotion/styled";
-import { preview_presets } from "@grida/builder-config-preset";
-import { designToCode, Result } from "@designto/code";
-import { config } from "@designto/config";
-import {
-  ImageRepository,
-  MainImageRepository,
-} from "@design-sdk/core/assets-repository";
-import { RemoteImageRepositories } from "@design-sdk/figma-remote/lib/asset-repository/image-repository";
-import { VanillaRunner } from "components/app-runner/vanilla-app-runner";
-import { useTargetContainer, useWindowSize } from "hooks";
+import { useWindowSize } from "hooks";
 import Close from "@material-ui/icons/Close";
 import ClientOnly from "components/client-only";
+import { VanillaDedicatedPreviewRenderer } from "components/app-runner";
 
 export function FullScreenPreview({ onClose }: { onClose: () => void }) {
   const [state] = useEditorState();
-  const [preview, setPreview] = useState<Result>();
   const windowsize = useWindowSize();
-  const target = useTargetContainer();
 
-  const on_preview_result = (result: Result) => {
-    setPreview(result);
+  const {
+    fallbackSource,
+    loader,
+    source,
+    initialSize,
+    isBuilding,
+    widgetKey: key,
+    componentName,
+  } = state.currentPreview || {
+    isBuilding: true,
   };
 
   useEffect(() => {
-    const __target = target?.target; // root.entry;
-    if (__target) {
-      if (!MainImageRepository.isReady) {
-        // this is not the smartest way, but the image repo has a design flaw.
-        // this happens when the target node is setted on the query param on first load, when the image repo is not set by the higher editor container.
-        MainImageRepository.instance = new RemoteImageRepositories(
-          state.design.key,
-          {
-            // setting this won't load any image btw. (just to prevent errors)
-            authentication: { accessToken: "" },
-          }
-        );
-        MainImageRepository.instance.register(
-          new ImageRepository(
-            "fill-later-assets",
-            "grida://assets-reservation/images/"
-          )
-        );
-      }
-
-      const _input = {
-        id: __target.id,
-        name: __target.name,
-        entry: __target,
-      };
-      const build_config = {
-        ...config.default_build_configuration,
-        disable_components: true,
-      };
-
-      // ----- for preview -----
-      designToCode({
-        input: _input,
-        build_config: build_config,
-        framework: preview_presets.default,
-        asset_config: {
-          skip_asset_replacement: false,
-          asset_repository: MainImageRepository.instance,
-          custom_asset_replacement: {
-            type: "static",
-            resource:
-              "https://bridged-service-static.s3.us-west-1.amazonaws.com/placeholder-images/image-placeholder-bw-tile-100.png",
-          },
-        },
-      })
-        .then(on_preview_result)
-        .catch(console.error);
-
-      if (!MainImageRepository.instance.empty) {
-        designToCode({
-          input: target.root,
-          build_config: build_config,
-          framework: preview_presets.default,
-          asset_config: { asset_repository: MainImageRepository.instance },
-        })
-          .then(on_preview_result)
-          .catch(console.error);
-      } else {
-        console.error("MainImageRepository is empty");
-      }
-    }
-  }, [target?.target?.id]);
+    // logger
+    console.log(
+      "rendering fullscreen preview with existing preview data..",
+      state.currentPreview
+    );
+  }, []);
 
   //
   return (
@@ -101,25 +43,10 @@ export function FullScreenPreview({ onClose }: { onClose: () => void }) {
         </AppbarActionsSegment>
       </FullscreenPreviewAppbar>
       <Body>
-        {preview && (
-          <VanillaRunner
-            key={preview.scaffold.raw}
-            style={{
-              alignSelf: "stretch",
-              borderRadius: 0,
-              // TODO: do not specify static bg color
-              background: "white",
-              flexGrow: 1,
-              border: "none",
-              margin: 0,
-              padding: 0,
-            }}
-            enableInspector={false}
-            source={preview.scaffold.raw}
-            width="100%"
-            height="100%"
-            componentName={preview.name}
-          />
+        {isBuilding ? (
+          <>loading</>
+        ) : (
+          <VanillaDedicatedPreviewRenderer {...state.currentPreview} />
         )}
       </Body>
     </RootWrapperFullScreenRunnerViewLayout>
