@@ -38,7 +38,7 @@ export function EditorPreviewDataProvider({
   );
 
   const onVanillaPreviewResult = useCallback(
-    (result: Result) => {
+    (result: Result, isAssetUpdate?: boolean) => {
       dispatch({
         type: "preview-set",
         data: {
@@ -56,6 +56,7 @@ export function EditorPreviewDataProvider({
           meta: {
             bundler: "vanilla",
             framework: result.framework.framework,
+            reason: isAssetUpdate ? "fill-assets" : "initial",
           },
           updatedAt: Date.now(),
         },
@@ -92,6 +93,7 @@ export function EditorPreviewDataProvider({
           meta: {
             bundler: "esbuild-wasm",
             framework: "react",
+            reason: "update",
           },
           updatedAt: Date.now(),
         },
@@ -100,11 +102,11 @@ export function EditorPreviewDataProvider({
     [dispatch]
   );
 
+  const { target, root } = useTargetContainer();
+
   const _is_mode_requires_preview_build =
     state.canvasMode === "fullscreen-preview" ||
     state.canvasMode === "isolated-view";
-
-  const { target, root } = useTargetContainer();
 
   useEffect(() => {
     if (!_is_mode_requires_preview_build) {
@@ -155,7 +157,9 @@ export function EditorPreviewDataProvider({
         framework: preview_presets.default,
         asset_config: { asset_repository: MainImageRepository.instance },
       })
-        .then(onVanillaPreviewResult)
+        .then((r) => {
+          onVanillaPreviewResult(r, true);
+        })
         .catch(console.error)
         .finally(() => {
           updateBuildingState(false);

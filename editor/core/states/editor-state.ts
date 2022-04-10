@@ -72,6 +72,7 @@ export interface IScenePreviewData<T> {
   meta: {
     bundler: "vanilla" | "esbuild-wasm" | "dart-services";
     framework: FrameworkConfig["framework"];
+    reason: "fill-assets" | "initial" | "update";
   };
   updatedAt: number;
 }
