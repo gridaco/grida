@@ -8,6 +8,7 @@ import Editor, {
 import * as monaco from "monaco-editor/esm/vs/editor/editor.api";
 import { MonacoEmptyMock } from "./monaco-mock-empty";
 import { register } from "./monaco-utils";
+import { __dangerous__lastFormattedValue__global } from "@code-editor/prettier-services";
 
 type ICodeEditor = monaco.editor.IStandaloneCodeEditor;
 
@@ -66,7 +67,13 @@ export function MonacoEditor(props: MonacoEditorProps) {
       loading={<MonacoEmptyMock l={5} />}
       defaultValue={props.defaultValue ?? "// no content"}
       theme="vs-dark"
-      onChange={props.onChange}
+      onChange={(...v) => {
+        if (v[0] === __dangerous__lastFormattedValue__global) {
+          // if change is caused by formatter, ignore.
+          return;
+        }
+        props.onChange(...v);
+      }}
       options={{
         ...props.options,
         // overrided default options

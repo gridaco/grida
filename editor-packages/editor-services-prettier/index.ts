@@ -2,6 +2,8 @@ import * as monaco from "monaco-editor";
 import { formatCode as formatDartCode } from "dart-style";
 import { createWorkerQueue } from "@code-editor/webworker-services-core";
 
+export let __dangerous__lastFormattedValue__global: string;
+
 export function registerDocumentPrettier(editor, monaco) {
   const disposables: monaco.IDisposable[] = [];
   let prettierWorker;
@@ -11,6 +13,7 @@ export function registerDocumentPrettier(editor, monaco) {
       const raw = model.getValue();
       const { code, error } = formatDartCode(raw);
       if (error) return [];
+      __dangerous__lastFormattedValue__global = code;
       return [
         {
           range: model.getFullModelRange(),
@@ -34,7 +37,7 @@ export function registerDocumentPrettier(editor, monaco) {
       });
 
       if (canceled || error) return [];
-
+      __dangerous__lastFormattedValue__global = pretty;
       return [
         {
           range: model.getFullModelRange(),
