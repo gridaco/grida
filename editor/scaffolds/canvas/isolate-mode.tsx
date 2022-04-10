@@ -5,9 +5,11 @@ import { useEditorState } from "core/states";
 import { VanillaDedicatedPreviewRenderer } from "components/app-runner";
 
 export function IsolateModeCanvas({
+  hidden = false,
   onClose,
   onEnterFullscreen,
 }: {
+  hidden?: boolean;
   onClose: () => void;
   onEnterFullscreen: () => void;
 }) {
@@ -26,24 +28,26 @@ export function IsolateModeCanvas({
   };
 
   return (
-    <IsolatedCanvas
-      key={widgetKey?.id}
-      building={isBuilding}
-      onExit={onClose}
-      onFullscreen={onEnterFullscreen}
-      defaultSize={{
-        width: initialSize?.width ?? 375,
-        height: initialSize?.height ?? 812,
-      }}
-    >
-      <>
-        {source ? (
-          <VanillaDedicatedPreviewRenderer {...state.currentPreview} />
-        ) : (
-          <EditorCanvasSkeleton />
-        )}
-      </>
-    </IsolatedCanvas>
+    <div style={{ display: hidden && "hidden" }}>
+      <IsolatedCanvas
+        key={widgetKey?.id}
+        building={isBuilding}
+        onExit={onClose}
+        onFullscreen={onEnterFullscreen}
+        defaultSize={{
+          width: initialSize?.width ?? 375,
+          height: initialSize?.height ?? 812,
+        }}
+      >
+        <>
+          {source ? (
+            <VanillaDedicatedPreviewRenderer {...state.currentPreview} />
+          ) : (
+            <EditorCanvasSkeleton />
+          )}
+        </>
+      </IsolatedCanvas>
+    </div>
   );
 }
 

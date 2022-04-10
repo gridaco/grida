@@ -20,7 +20,13 @@ export function VisualContentArea() {
   const { highlightedLayer, highlightLayer } = useWorkspace();
   const dispatch = useDispatch();
 
-  const { selectedPage, design, selectedNodes, canvasMode } = state;
+  const {
+    selectedPage,
+    design,
+    selectedNodes,
+    canvasMode,
+    canvasMode_previous,
+  } = state;
 
   const thisPageNodes = selectedPage
     ? design.pages.find((p) => p.id == selectedPage).children.filter(Boolean)
@@ -76,8 +82,15 @@ export function VisualContentArea() {
             show={canvasMode == "fullscreen-preview"}
             onExit={exitFullscreenPreview}
           />
-          {canvasMode == "isolated-view" && (
+          {(canvasMode == "isolated-view" ||
+            (canvasMode == "fullscreen-preview" &&
+              canvasMode_previous === "isolated-view")) && (
             <IsolateModeCanvas
+              hidden={
+                // if prev mode is this, hide, not remove.
+                canvasMode == "fullscreen-preview" &&
+                canvasMode_previous === "isolated-view"
+              }
               onClose={endIsolatedViewMode}
               onEnterFullscreen={startFullscreenPreviewMode}
             />
