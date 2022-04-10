@@ -7,17 +7,8 @@ import { ZoomControl } from "./controller-zoom-control";
 import { colors } from "theme";
 import { RunnerLoadingIndicator } from "components/app-runner/loading-indicator";
 
-/**
- * A React Hook that returns a delta state.
- * When user completely stops interacting, after a short delay (600ms), set the value to false.
- * When user starts interacting, immidiately set the value to true.
- *
- * the condition rather if the user is currently interacting or not is set on higher level, which this function accepts the condition as a parameter.
- * @param interacting
- */
-function useIsInteractingDelta() {
-  throw new Error("Not implemented");
-}
+// TODO:
+// - add gesture debounce
 
 type Size = { width: number; height: number };
 function initialTransform(

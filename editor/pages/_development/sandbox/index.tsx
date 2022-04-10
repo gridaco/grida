@@ -93,6 +93,7 @@ export default function SandboxPage() {
                 }}
               >
                 <VanillaESBuildAppRunner
+                  componentName="preview"
                   doc={{
                     html: html_code,
                     css: "",
