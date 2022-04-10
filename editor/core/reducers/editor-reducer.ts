@@ -6,6 +6,8 @@ import type {
   CodeEditorEditComponentCodeAction,
   CanvasModeSwitchAction,
   CanvasModeGobackAction,
+  PreviewBuildingStateUpdateAction,
+  PreviewSetAction,
 } from "core/actions";
 import { EditorState } from "core/states";
 import { useRouter } from "next/router";
@@ -116,9 +118,35 @@ export function editorReducer(state: EditorState, action: Action): EditorState {
         draft.canvasMode = dest; // previous or fallback
       });
     }
+    case "preview-update-building-state": {
+      const { isBuilding } = <PreviewBuildingStateUpdateAction>action;
+      return produce(state, (draft) => {
+        if (draft.currentPreview) {
+          draft.currentPreview.isBuilding = isBuilding;
+        } else {
+          draft.currentPreview = {
+            loader: null,
+            viewtype: "unknown",
+            isBuilding: true,
+            widgetKey: null,
+            componentName: null,
+            fallbackSource: "loading",
+            initialSize: null,
+            meta: null,
+            source: null,
+            updatedAt: Date.now(),
+          };
+        }
+      });
+    }
+    case "preview-set": {
+      const { data } = <PreviewSetAction>action;
+      return produce(state, (draft) => {
+        draft.currentPreview = data; // set
+      });
+    }
     default:
       throw new Error(`Unhandled action type: ${action["type"]}`);
   }
-
   return state;
 }
