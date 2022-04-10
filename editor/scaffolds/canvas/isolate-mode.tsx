@@ -41,7 +41,10 @@ export function IsolateModeCanvas({
       >
         <>
           {source ? (
-            <VanillaDedicatedPreviewRenderer {...state.currentPreview} />
+            <VanillaDedicatedPreviewRenderer
+              {...state.currentPreview}
+              enableIspector
+            />
           ) : (
             <EditorCanvasSkeleton />
           )}

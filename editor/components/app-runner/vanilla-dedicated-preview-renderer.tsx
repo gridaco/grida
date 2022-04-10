@@ -7,7 +7,10 @@ export function VanillaDedicatedPreviewRenderer({
   loader,
   componentName,
   source,
-}: ScenePreviewData) {
+  enableIspector = false,
+}: ScenePreviewData & {
+  enableIspector?: boolean;
+}) {
   return (
     <>
       {loader === "vanilla-esbuild-template" ? (
@@ -25,6 +28,7 @@ export function VanillaDedicatedPreviewRenderer({
             borderRadius: 4,
             boxShadow: "0px 0px 48px #00000020",
           }}
+          enableInspector={enableIspector}
           source={source}
           componentName={componentName}
         />
