@@ -14,8 +14,10 @@ export type Files = { [name: string]: IFile };
 
 export function CodeEditor({
   files,
+  onChange,
   ...editor_props
 }: {
+  onChange?: (key: string, value: string, e?) => void;
   files: Files;
 } & CodeEditorProps) {
   const keys = Object.keys(files);
@@ -35,6 +37,7 @@ export function CodeEditor({
           onChange={handleChange}
           variant="scrollable"
           scrollButtons="off"
+          style={{ color: "white" }}
           aria-label="scrollable prevent tabs example"
         >
           {Object.keys(files).map((name) => {
@@ -45,6 +48,9 @@ export function CodeEditor({
       <MonacoEditor
         key={filekey}
         {...editor_props}
+        onChange={(v: string, e) => {
+          onChange?.(filekey, v, e);
+        }}
         defaultLanguage={file.language}
         defaultValue={file.raw}
       />

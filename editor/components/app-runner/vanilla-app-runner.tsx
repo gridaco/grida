@@ -1,25 +1,31 @@
-import React, { useEffect, useRef } from "react";
+import React, { ReactEventHandler, useEffect, useRef } from "react";
 
-export function VanillaRunner({
-  width,
-  height,
-  source,
-  enableInspector = true,
-  style,
-}: {
-  width: string;
-  height: string;
-  source: string;
-  componentName: string;
-  enableInspector?: boolean;
-  style?: React.CSSProperties;
-}) {
-  const ref = useRef<HTMLIFrameElement>();
+export const VanillaRunner = React.forwardRef(function (
+  {
+    width = "100%",
+    height = "100%",
+    source,
+    onLoad,
+    enableInspector = true,
+    style,
+  }: {
+    width?: React.CSSProperties["width"];
+    height?: React.CSSProperties["height"];
+    source: string;
+    onLoad?: ReactEventHandler<HTMLIFrameElement>;
+    componentName: string;
+    enableInspector?: boolean;
+    style?: React.CSSProperties;
+  },
+  ref: React.MutableRefObject<HTMLIFrameElement>
+) {
+  const lref = useRef(null);
+  const cref = ref || lref;
 
   useEffect(() => {
-    if (ref.current) {
+    if (cref.current) {
       function disablezoom() {
-        ref.current.contentWindow.addEventListener(
+        cref.current.contentWindow.addEventListener(
           "wheel",
           (event) => {
             const { ctrlKey } = event;
@@ -31,20 +37,21 @@ export function VanillaRunner({
           { passive: false }
         );
       }
-      ref.current.contentWindow.addEventListener(
+      cref.current.contentWindow.addEventListener(
         "DOMContentLoaded",
         disablezoom,
         false
       );
     }
-  }, [ref.current]);
+  }, [cref.current]);
 
   useEffect(() => {
-    if (ref.current && enableInspector) {
-      ref.current.onload = () => {
-        const matches = ref.current.contentDocument.querySelectorAll(
-          "div, span, img, image, svg" // button, input - disabled due to interaction testing (for users)
-        );
+    const cb = (e) => {
+      if (enableInspector) {
+        const matches =
+          cref.current?.contentDocument?.querySelectorAll(
+            "div, span, img, image, svg" // button, input - disabled due to interaction testing (for users)
+          ) ?? [];
         matches.forEach((el) => {
           const tint = "rgba(20, 0, 255, 0.2)";
           const tintl = "rgba(20, 0, 255, 0.5)";
@@ -70,17 +77,26 @@ export function VanillaRunner({
           }
         });
 
-        ref.current.contentWindow.addEventListener("click", (e) => {
-          console.log("click", e);
-        });
-      };
+        // cref.current.contentWindow.addEventListener("click", (e) => {
+        //   console.log("click", e);
+        // });
+      }
+    };
+
+    if (cref.current) {
+      cref.current.onload = cb;
     }
-  }, [ref.current, enableInspector]);
+
+    return () => {
+      cref?.current?.onload && (cref.current.onload = () => {});
+    };
+  }, [cref.current, enableInspector]);
 
   const inlinesource = source || `<div></div>`;
   return (
     <iframe
-      ref={ref}
+      ref={cref}
+      onLoad={onLoad}
       style={style}
       sandbox="allow-same-origin allow-scripts"
       srcDoc={inlinesource}
@@ -88,4 +104,4 @@ export function VanillaRunner({
       height={height}
     />
   );
-}
+});

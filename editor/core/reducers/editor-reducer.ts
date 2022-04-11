@@ -1,14 +1,25 @@
 import produce from "immer";
-import { Action, SelectNodeAction, SelectPageAction } from "core/actions";
+import type {
+  Action,
+  SelectNodeAction,
+  SelectPageAction,
+  CodeEditorEditComponentCodeAction,
+  CanvasModeSwitchAction,
+  CanvasModeGobackAction,
+  PreviewBuildingStateUpdateAction,
+  PreviewSetAction,
+} from "core/actions";
 import { EditorState } from "core/states";
 import { useRouter } from "next/router";
 import { CanvasStateStore } from "@code-editor/canvas/stores";
+import assert from "assert";
+
+const _editor_path_name = "/files/[key]/";
 
 export function editorReducer(state: EditorState, action: Action): EditorState {
   const router = useRouter();
   const filekey = state.design.key;
 
-  // TODO: handle actions here.
   switch (action.type) {
     case "select-node": {
       const { node } = <SelectNodeAction>action;
@@ -18,11 +29,11 @@ export function editorReducer(state: EditorState, action: Action): EditorState {
       // update router
       router.push(
         {
-          pathname: router.pathname,
+          pathname: _editor_path_name,
           query: { ...router.query, node: node ?? state.selectedPage },
         },
         undefined,
-        {}
+        { shallow: true }
       );
 
       return produce(state, (draft) => {
@@ -50,11 +61,11 @@ export function editorReducer(state: EditorState, action: Action): EditorState {
       // update router
       router.push(
         {
-          pathname: router.pathname,
+          pathname: _editor_path_name,
           query: { ...router.query, node: page },
         },
         undefined,
-        {}
+        { shallow: true }
       );
 
       return produce(state, (draft) => {
@@ -70,9 +81,80 @@ export function editorReducer(state: EditorState, action: Action): EditorState {
         draft.selectedNodes = last_known_selections_of_this_page;
       });
     }
+    case "code-editor-edit-component-code": {
+      const { ...rest } = <CodeEditorEditComponentCodeAction>action;
+      return produce(state, (draft) => {
+        draft.editingModule = {
+          ...rest,
+          type: "single-file-component",
+          lang: "unknown",
+        };
+      });
+      //
+    }
+    case "canvas-mode-switch": {
+      const { mode } = <CanvasModeSwitchAction>action;
+
+      router.push({
+        pathname: _editor_path_name,
+        query: { ...router.query, mode: mode },
+        // no need to set shallow here.
+      });
+
+      return produce(state, (draft) => {
+        draft.canvasMode_previous = draft.canvasMode;
+        draft.canvasMode = mode;
+      });
+    }
+    case "canvas-mode-goback": {
+      const { fallback } = <CanvasModeGobackAction>action;
+
+      const dest = state.canvasMode_previous ?? fallback;
+
+      router.push({
+        pathname: _editor_path_name,
+        query: { ...router.query, mode: dest },
+        // no need to set shallow here.
+      });
+
+      return produce(state, (draft) => {
+        assert(
+          dest,
+          "canvas-mode-goback: cannot resolve destination. (no fallback provided)"
+        );
+        draft.canvasMode_previous = draft.canvasMode; // swap
+        draft.canvasMode = dest; // previous or fallback
+      });
+    }
+    case "preview-update-building-state": {
+      const { isBuilding } = <PreviewBuildingStateUpdateAction>action;
+      return produce(state, (draft) => {
+        if (draft.currentPreview) {
+          draft.currentPreview.isBuilding = isBuilding;
+        } else {
+          draft.currentPreview = {
+            loader: null,
+            viewtype: "unknown",
+            isBuilding: true,
+            widgetKey: null,
+            componentName: null,
+            fallbackSource: "loading",
+            initialSize: null,
+            meta: null,
+            source: null,
+            updatedAt: Date.now(),
+          };
+        }
+      });
+    }
+    case "preview-set": {
+      const { data } = <PreviewSetAction>action;
+      return produce(state, (draft) => {
+        draft.currentPreview = data; // set
+      });
+    }
     default:
       throw new Error(`Unhandled action type: ${action["type"]}`);
   }
-
   return state;
 }

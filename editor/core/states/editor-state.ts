@@ -1,6 +1,15 @@
 import type { ReflectSceneNode } from "@design-sdk/figma-node";
-import { ComponentNode } from "@design-sdk/figma-types";
-import { DesignInput } from "@designto/config/input";
+import type { FrameworkConfig } from "@designto/config";
+import type { WidgetKey } from "@reflect-ui/core";
+import type { ComponentNode } from "@design-sdk/figma-types";
+import type { DesignInput } from "@designto/config/input";
+
+/**
+ * View mode of the canvas.
+ * - full - default
+ * - isolated - focus to one scene
+ */
+type TCanvasMode = "free" | "isolated-view" | "fullscreen-preview";
 
 export interface EditorState {
   selectedPage: string;
@@ -13,6 +22,11 @@ export interface EditorState {
    */
   selectedNodesInitial?: string[] | null;
   design: FigmaReflectRepository;
+  canvasMode: TCanvasMode;
+  canvasMode_previous?: TCanvasMode;
+  currentPreview?: ScenePreviewData;
+  code?: CodeRepository;
+  editingModule?: EditingModule;
 }
 
 export interface EditorSnapshot {
@@ -21,6 +35,7 @@ export interface EditorSnapshot {
   selectedLayersOnPreview: string[];
   selectedNodesInitial?: string[] | null;
   design: FigmaReflectRepository;
+  canvasMode: TCanvasMode;
 }
 
 export interface FigmaReflectRepository {
@@ -39,4 +54,58 @@ export interface FigmaReflectRepository {
   components: { [key: string]: ComponentNode };
   // styles: { [key: string]: {} };
   input: DesignInput;
+}
+
+export type ScenePreviewData =
+  | IScenePreviewDataVanillaPreview
+  | IScenePreviewDataFlutterPreview
+  | IScenePreviewDataEsbuildPreview;
+
+export interface IScenePreviewData<T> {
+  viewtype: "page" | "component" | "layer" | "unknown";
+  widgetKey: WidgetKey;
+  componentName: string;
+  fallbackSource: string;
+  source: T;
+  initialSize: { width: number; height: number };
+  isBuilding: boolean;
+  meta: {
+    bundler: "vanilla" | "esbuild-wasm" | "dart-services";
+    framework: FrameworkConfig["framework"];
+    reason: "fill-assets" | "initial" | "update";
+  };
+  updatedAt: number;
+}
+
+interface IScenePreviewDataVanillaPreview extends IScenePreviewData<string> {
+  loader: "vanilla-html";
+  source: string;
+}
+
+interface IScenePreviewDataFlutterPreview extends IScenePreviewData<string> {
+  loader: "vanilla-flutter-template";
+  source: string;
+}
+
+interface IScenePreviewDataEsbuildPreview
+  extends IScenePreviewData<{
+    html: string;
+    javascript: string;
+  }> {
+  loader: "vanilla-esbuild-template";
+}
+
+export interface CodeRepository {
+  // TODO:
+  // files: { [key: string]: string };
+}
+
+type TEditingModuleType = "single-file-component";
+
+export interface EditingModule {
+  type: TEditingModuleType;
+  componentName: string;
+  framework: FrameworkConfig["framework"];
+  lang: string;
+  raw: string;
 }

@@ -1,0 +1,8 @@
+{
+  "name": "@code-editor/webworker-services-core",
+  "version": "0.0.0",
+  "private": false,
+  "dependencies": {
+    "p-queue": "^7.2.0"
+  }
+}

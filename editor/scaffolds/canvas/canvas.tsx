@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useCallback } from "react";
 import styled from "@emotion/styled";
 import { Canvas } from "@code-editor/canvas";
 import { useEditorState, useWorkspace } from "core/states";
@@ -7,76 +7,97 @@ import useMeasure from "react-use-measure";
 import { useDispatch } from "core/dispatch";
 import { FrameTitleRenderer } from "./render/frame-title";
 import { IsolateModeCanvas } from "./isolate-mode";
-import { useRouter } from "next/router";
-
-type ViewMode = "full" | "isolate";
+import { Dialog } from "@material-ui/core";
+import { FullScreenPreview } from "scaffolds/preview-full-screen";
 
 /**
  * Statefull canvas segment that contains canvas as a child, with state-data connected.
  */
 export function VisualContentArea() {
   const [state] = useEditorState();
-  const router = useRouter();
-  const { mode: q_mode } = router.query;
-
-  // this hook is used for focusing the node on the first load with the initial selection is provided externally.
-  useEffect(() => {
-    // if the initial selection is available, and not empty &&
-    if (state.selectedNodesInitial?.length && q_mode == "isolate") {
-      // trigger isolation mode once.
-      setMode("isolate");
-
-      // TODO: set explicit canvas initial transform.
-      // make the canvas fit to the initial target even when the isolation mode is complete by the user.
-    }
-  }, [state.selectedNodesInitial]);
-
   const [canvasSizingRef, canvasBounds] = useMeasure();
 
   const { highlightedLayer, highlightLayer } = useWorkspace();
   const dispatch = useDispatch();
 
-  const { selectedPage, design, selectedNodes } = state;
+  const {
+    selectedPage,
+    design,
+    selectedNodes,
+    canvasMode,
+    canvasMode_previous,
+  } = state;
 
   const thisPageNodes = selectedPage
-    ? state.design.pages
-        .find((p) => p.id == selectedPage)
-        .children.filter(Boolean)
+    ? design.pages.find((p) => p.id == selectedPage).children.filter(Boolean)
     : [];
 
   const isEmptyPage = thisPageNodes?.length === 0;
 
-  const [mode, _setMode] = useState<ViewMode>("full");
+  const startIsolatedViewMode = useCallback(
+    () =>
+      dispatch({
+        type: "canvas-mode-switch",
+        mode: "isolated-view",
+      }),
+    [dispatch]
+  );
 
-  const setMode = (m: ViewMode) => {
-    _setMode(m);
+  const startFullscreenPreviewMode = useCallback(
+    () =>
+      dispatch({
+        type: "canvas-mode-switch",
+        mode: "fullscreen-preview",
+      }),
+    [dispatch]
+  );
 
-    // update the router
-    (router.query.mode = m) && router.push(router);
-  };
+  const endIsolatedViewMode = useCallback(
+    () =>
+      dispatch({
+        type: "canvas-mode-switch",
+        mode: "free",
+      }),
+    [dispatch]
+  );
+
+  const exitFullscreenPreview = useCallback(
+    () =>
+      dispatch({
+        type: "canvas-mode-goback",
+        fallback: "isolated-view",
+      }),
+    [dispatch]
+  );
 
   return (
-    <CanvasContainer
-      ref={canvasSizingRef}
-      id="canvas"
-      maxWidth={mode == "isolate" ? "calc((100vw - 200px) * 0.6)" : "100%"} // TODO: make this dynamic
-    >
+    <CanvasContainer ref={canvasSizingRef} id="canvas">
       {/* <EditorAppbarFragments.Canvas /> */}
 
       {isEmptyPage ? (
         <></>
       ) : (
         <>
-          {mode == "isolate" && (
+          <FullScreenPreviewContainer
+            show={canvasMode == "fullscreen-preview"}
+            onExit={exitFullscreenPreview}
+          />
+          {(canvasMode == "isolated-view" ||
+            (canvasMode == "fullscreen-preview" &&
+              canvasMode_previous === "isolated-view")) && (
             <IsolateModeCanvas
-              onClose={() => {
-                setMode("full");
-              }}
+              hidden={
+                // if prev mode is this, hide, not remove.
+                canvasMode == "fullscreen-preview" &&
+                canvasMode_previous === "isolated-view"
+              }
+              onClose={endIsolatedViewMode}
+              onEnterFullscreen={startFullscreenPreviewMode}
             />
           )}
           <div
             style={{
-              display: mode == "full" ? undefined : "none",
+              display: canvasMode !== "free" && "none",
             }}
           >
             <Canvas
@@ -112,9 +133,7 @@ export function VisualContentArea() {
                 <FrameTitleRenderer
                   key={p.id}
                   {...p}
-                  onRunClick={() => {
-                    setMode("isolate");
-                  }}
+                  onRunClick={startIsolatedViewMode}
                 />
               )}
             />
@@ -125,11 +144,22 @@ export function VisualContentArea() {
   );
 }
 
-const CanvasContainer = styled.div<{
-  maxWidth?: string;
-}>`
+function FullScreenPreviewContainer({
+  onExit,
+  show,
+}: {
+  onExit: () => void;
+  show: boolean;
+}) {
+  return (
+    <Dialog fullScreen onClose={onExit} open={show}>
+      <FullScreenPreview onClose={onExit} />
+    </Dialog>
+  );
+}
+
+const CanvasContainer = styled.div`
   display: flex;
   flex-direction: column;
-  max-width: ${(p) => p.maxWidth};
   height: 100%;
 `;

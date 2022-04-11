@@ -1,11 +1,8 @@
 import React, { useEffect, useState } from "react";
-import { vanilla_presets } from "@grida/builder-config-preset";
+import { preview_presets } from "@grida/builder-config-preset";
 import { designToCode, Result } from "@designto/code";
 import { config } from "@designto/config";
-import {
-  ImageRepository,
-  MainImageRepository,
-} from "@design-sdk/core/assets-repository";
+import { MainImageRepository } from "@design-sdk/core/assets-repository";
 import type { ReflectSceneNode } from "@design-sdk/figma-node";
 import { VanillaRunner } from "components/app-runner/vanilla-app-runner";
 import { colorFromFills } from "@design-sdk/core/utils/colors";
@@ -25,8 +22,8 @@ const build_config: config.BuildConfiguration = {
   disable_flags_support: true,
 };
 
-const framework_config: config.VanillaFrameworkConfig = {
-  ...vanilla_presets.vanilla_default,
+const framework_config: config.VanillaPreviewFrameworkConfig = {
+  ...preview_presets.default,
   additional_css_declaration: {
     declarations: [
       {

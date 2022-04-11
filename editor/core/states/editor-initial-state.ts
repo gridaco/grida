@@ -7,6 +7,7 @@ export function createInitialEditorState(editor: EditorSnapshot): EditorState {
     selectedNodesInitial: editor.selectedNodes,
     selectedLayersOnPreview: editor.selectedLayersOnPreview,
     design: editor.design,
+    canvasMode: editor.canvasMode,
   };
 }
 
@@ -17,5 +18,6 @@ export function createPendingEditorState(): EditorState {
     selectedNodesInitial: null,
     selectedLayersOnPreview: [],
     design: null,
+    canvasMode: "free",
   };
 }

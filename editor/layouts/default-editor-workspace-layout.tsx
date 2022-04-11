@@ -1,10 +1,20 @@
 import styled from "@emotion/styled";
 import React from "react";
 import { AppMenu } from "./app-menu";
+import { Resizable } from "re-resizable";
+
+type SidebarElementSignature =
+  | JSX.Element
+  | {
+      _type: "resizable";
+      children: JSX.Element;
+      minWidth: number;
+      maxWidth: number;
+    };
 
 export function DefaultEditorWorkspaceLayout(props: {
-  leftbar?: JSX.Element;
-  rightbar?: JSX.Element;
+  leftbar?: SidebarElementSignature;
+  rightbar?: SidebarElementSignature;
   appbar?: JSX.Element;
   children: JSX.Element | Array<JSX.Element>;
   display?: "none" | "initial"; // set to none when to hide.
@@ -19,15 +29,73 @@ export function DefaultEditorWorkspaceLayout(props: {
         {props.appbar && <AppBarWrap>{props.appbar}</AppBarWrap>}
         <NonMenuContentZoneWrap>
           {props.leftbar && (
-            <PanelLeftSideWrap>{props.leftbar}</PanelLeftSideWrap>
+            <Sidebar position="left" signature={props.leftbar}></Sidebar>
           )}
           <ChildrenContainerRoot>{props.children}</ChildrenContainerRoot>
           {props.rightbar && (
-            <PanelRightSideWrap>{props.rightbar}</PanelRightSideWrap>
+            <Sidebar position="right" signature={props.rightbar}></Sidebar>
           )}
         </NonMenuContentZoneWrap>
       </AppBarMenuAndBelowContentWrap>
     </WorkspaceRoot>
+  );
+}
+
+function Sidebar(
+  p: { signature: SidebarElementSignature } & {
+    position: "left" | "right";
+  }
+) {
+  if ("_type" in p.signature) {
+    switch (p.signature._type) {
+      case "resizable": {
+        return (
+          <Resizable
+            defaultSize={{
+              width: p.signature.minWidth,
+              height: "100%",
+            }}
+            style={{
+              zIndex: 1,
+              flexGrow: 0,
+              minHeight: "100%",
+              maxHeight: "100%",
+              width: "100%",
+              maxWidth: p.signature.maxWidth,
+              minWidth: p.signature.minWidth,
+              userSelect: "none",
+              WebkitUserSelect: "none",
+            }}
+            minWidth={p.signature.minWidth}
+            maxWidth={p.signature.maxWidth}
+            enable={{
+              left: p.position === "right", // if position is right, then enable left
+              right: p.position === "left", // if position is left, then enable right
+              top: false,
+              bottom: false,
+            }}
+          >
+            {p.signature.children}
+          </Resizable>
+        );
+      }
+    }
+  }
+
+  return (
+    <div
+      style={{
+        zIndex: 1,
+        flexGrow: 0,
+        minHeight: "100%",
+        maxHeight: "100%",
+        maxWidth: 400,
+        userSelect: "none",
+        WebkitUserSelect: "none",
+      }}
+    >
+      {p.signature as JSX.Element}
+    </div>
   );
 }
 
@@ -36,6 +104,7 @@ const WorkspaceRoot = styled.div<{
   backgroundColor: string;
 }>`
   ${(props) => props.display && `display: ${props.display};`}
+  overflow: hidden;
   width: 100vw;
   height: 100vh;
   background-color: ${(p) => p.backgroundColor ?? "transparent"};
@@ -58,22 +127,6 @@ const NonMenuContentZoneWrap = styled.div`
   display: flex;
   flex-direction: row;
   align-items: stretch;
-`;
-
-const PanelLeftSideWrap = styled.div`
-  z-index: 1;
-  flex-grow: 0;
-  min-height: 100%;
-  max-height: 100%;
-  max-width: 400px;
-`;
-
-const PanelRightSideWrap = styled.div`
-  z-index: 1;
-  flex-grow: 0;
-  min-height: 100%;
-  max-height: 100%;
-  max-width: 400px;
 `;
 
 const ChildrenContainerRoot = styled.div`
