@@ -126,7 +126,9 @@ export const all_preset_options__prod = [
 
 export const all_preset_options_map__prod = {
   none: null,
+  flutter: flutter_presets.flutter_default,
   flutter_default: flutter_presets.flutter_default,
+  react: react_presets.react_default,
   react_default: react_presets.react_default,
   react_with_styled_components: react_presets.react_with_styled_components,
   react_with_inline_css: react_presets.react_with_inline_css,

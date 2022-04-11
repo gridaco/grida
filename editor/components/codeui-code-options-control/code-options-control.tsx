@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect } from "react";
 import { IField, LanguageType, Option } from "@code-ui/docstring/dist/lib/type";
 import { Docstring as DocstringView } from "@code-ui/docstring";
 import {
@@ -32,12 +32,12 @@ export function CodeOptionsControl(props: CodeOptionsControlProps) {
     all_preset_options_map__prod[__presetname]
   );
 
-  assert(useroption, "option must be specified");
-
   useEffect(() => {
     // trigger initial value
     props.onUseroptionChange(useroption);
   }, []);
+
+  assert(useroption, "option must be specified");
 
   // FIXME: this should be fixed on https://github.com/gridaco/code-like-ui (view CURSOR)
   const __dirty_sort_framework = (): Option<string>[] => {
