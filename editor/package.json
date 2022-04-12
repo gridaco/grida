@@ -64,5 +64,8 @@
     "next-transpile-modules": "^9.0.0",
     "raw-loader": "^4.0.2",
     "typescript": "^4.2.3"
+  },
+  "engines": {
+    "node": ">=16.14.0"
   }
 }
