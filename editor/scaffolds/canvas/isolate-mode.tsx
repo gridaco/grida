@@ -3,6 +3,7 @@ import { IsolatedCanvas } from "components/canvas";
 import { PreviewAndRunPanel } from "components/preview-and-run";
 import { useEditorState } from "core/states";
 import { VanillaDedicatedPreviewRenderer } from "components/app-runner";
+import { ConsoleFeed } from "./console-feed";
 
 export function IsolateModeCanvas({
   hidden = false,
@@ -50,6 +51,7 @@ export function IsolateModeCanvas({
           )}
         </>
       </IsolatedCanvas>
+      <ConsoleFeed />
     </div>
   );
 }
