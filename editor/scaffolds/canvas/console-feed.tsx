@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Console, Hook, Unhook } from "console-feed";
+import { Console, Hook, Unhook } from "@code-editor/console-feed";
 
 export function ConsoleFeed() {
   const [logs, setLogs] = useState([]);
