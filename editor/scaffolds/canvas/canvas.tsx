@@ -7,7 +7,7 @@ import useMeasure from "react-use-measure";
 import { useDispatch } from "core/dispatch";
 import { FrameTitleRenderer } from "./render/frame-title";
 import { IsolateModeCanvas } from "./isolate-mode";
-import { Dialog } from "@material-ui/core";
+import { Dialog } from "@mui/material";
 import { FullScreenPreview } from "scaffolds/preview-full-screen";
 
 /**
