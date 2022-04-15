@@ -50,19 +50,28 @@ const cache = {
   },
 };
 
+const cachekey = (target: { filekey; id }) =>
+  target ? `${target.filekey}-${target.id}-${new Date().getMinutes()}` : null;
+
+const blurred_bg_fill = (target: ReflectSceneNode) => {
+  const __bg = colorFromFills(target.fills);
+  const bg_color_str = __bg ? "#" + __bg.hex : "transparent";
+  return bg_color_str;
+};
+
+type VanillaPreviewProps = {
+  target: ReflectSceneNode & {
+    filekey: string;
+  };
+} & FrameOptimizationFactors;
+
 export function D2CVanillaPreview({
   target,
   isZooming,
   isPanning,
-}: {
-  target: ReflectSceneNode & {
-    filekey: string;
-  };
-} & FrameOptimizationFactors) {
+}: VanillaPreviewProps) {
   const [preview, setPreview] = useState<Result>();
-  const key = target
-    ? `${target.filekey}-${target.id}-${new Date().getMinutes()}`
-    : null;
+  const key = cachekey(target);
 
   const on_preview_result = (result: Result, __image: boolean) => {
     if (preview) {
@@ -155,14 +164,72 @@ export function D2CVanillaPreview({
     }
   }, [target?.id, isZooming, isPanning]);
 
-  const __bg = colorFromFills(target.fills);
-  const bg_color_str = __bg ? "#" + __bg.hex : "transparent";
+  const bg_color_str = blurred_bg_fill(target);
 
   return (
     <PreviewContent
       id={target.id}
       name={target.name}
-      source={preview.scaffold.raw}
+      source={preview?.scaffold?.raw}
+      width={target.width}
+      height={target.height}
+      backgroundColor={
+        !preview && bg_color_str // clear bg after preview is rendered.
+      }
+    />
+  );
+}
+
+import { createWorkerQueue } from "@code-editor/webworker-services-core";
+import { useFigmaAccessToken } from "hooks/use-figma-access-token";
+
+export function WebWorkerD2CVanillaPreview({ target }: VanillaPreviewProps) {
+  const [preview, setPreview] = useState<Result>();
+  const bg_color_str = blurred_bg_fill(target);
+
+  const fat = useFigmaAccessToken();
+
+  useEffect(() => {
+    if (preview) {
+      return;
+    }
+
+    const { worker, terminate } = createWorkerQueue(
+      new Worker(new URL("./workers/vanilla.worker.js", import.meta.url))
+    );
+
+    const input = target
+      ? {
+          id: target.id,
+          name: target.name,
+          entry: target,
+        }
+      : null;
+
+    // TODO: this is not production ready
+    worker.postMessage({
+      input,
+      authentication: fat,
+      filekey: target.filekey,
+    });
+
+    worker.onmessage = (e) => {
+      // console.log(target.id, e.data.id);
+      // if (((e.data as Result).id = target.id)) {
+      setPreview(e.data as Result);
+      // }
+    };
+
+    () => {
+      terminate();
+    };
+  }, [target?.id]);
+
+  return (
+    <PreviewContent
+      id={target.id}
+      name={target.name}
+      source={preview?.scaffold?.raw}
       width={target.width}
       height={target.height}
       backgroundColor={
