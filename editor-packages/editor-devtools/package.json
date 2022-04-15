@@ -1,5 +1,8 @@
 {
   "name": "@code-editor/devtools",
   "version": "0.0.0",
-  "private": false
+  "private": false,
+  "dependencies": {
+    "@code-editor/console-feed": "^3.3.1"
+  }
 }

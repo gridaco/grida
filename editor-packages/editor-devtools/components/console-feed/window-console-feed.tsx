@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { Console, Hook, Unhook } from "@code-editor/console-feed";
 
-export function ConsoleFeed() {
+export function WindowConsoleFeed() {
   const [logs, setLogs] = useState([]);
 
   useEffect(() => {
