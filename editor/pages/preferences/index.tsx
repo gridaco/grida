@@ -2,9 +2,9 @@ import React from "react";
 import Link from "next/link";
 import styled from "@emotion/styled";
 
-// import FormGroup from "@mui/material/FormGroup";
-// import FormControlLabel from "@mui/material/FormControlLabel";
-// import Checkbox from "@mui/material/Checkbox";
+import FormGroup from "@mui/material/FormGroup";
+import FormControlLabel from "@mui/material/FormControlLabel";
+import Checkbox from "@mui/material/Checkbox";
 import { WorkspacePreferenceStore } from "store/workspace-preference-store";
 
 export default function PreferencesHomePage() {
@@ -20,7 +20,7 @@ export default function PreferencesHomePage() {
       <br />
       <br />
       <h5>Workspace preferences</h5>
-      {/* <FormGroup>
+      <FormGroup>
         <FormControlLabel
           control={
             <Checkbox
@@ -47,7 +47,7 @@ export default function PreferencesHomePage() {
           }
           label="enable_preview_feature_components_support"
         />
-      </FormGroup> */}
+      </FormGroup>
     </_Root>
   );
 }

@@ -35,6 +35,8 @@ export function CodeEditor({
         <Tabs
           value={filekey}
           onChange={handleChange}
+          indicatorColor="primary"
+          textColor="inherit"
           variant="scrollable"
           scrollButtons={false}
           style={{ color: "white" }}

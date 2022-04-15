@@ -1,6 +1,5 @@
 import styled from "@emotion/styled";
 import React from "react";
-import { AppMenu } from "./app-menu";
 import { Resizable } from "re-resizable";
 
 type SidebarElementSignature =

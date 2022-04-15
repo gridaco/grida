@@ -20,8 +20,7 @@ export function EditorSkeleton({
           <HomeLogo />
           <ClientOnly>
             <Box sx={{ width: "100%" }}>
-              {/* TODO: use styled progress bar */}
-              {/* <LinearProgress value={percent} /> */}
+              <ColoredLinearProgress value={percent} />
             </Box>
           </ClientOnly>
         </LogoAndLoading>
@@ -81,9 +80,9 @@ const LogoAndLoading = styled.div`
 //   },
 // });
 
-// const ColoredLinearProgress = styled(LinearProgress)`
-//   color: white;
-// `;
+const ColoredLinearProgress = styled(LinearProgress)`
+  color: white;
+`;
 
 export function TipsContainer() {
   return (
