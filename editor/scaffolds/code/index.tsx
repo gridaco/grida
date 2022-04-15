@@ -117,7 +117,12 @@ export function CodeSegment() {
     if (!targetted) {
       return;
     }
-    if (framework_config.framework === "react") {
+
+    // currently react and vanilla are supported
+    if (
+      framework_config.framework === "react" ||
+      framework_config.framework === "vanilla"
+    ) {
       dispatch({
         type: "code-editor-edit-component-code",
         framework: framework_config.framework,

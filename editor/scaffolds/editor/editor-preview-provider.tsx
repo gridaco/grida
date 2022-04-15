@@ -174,8 +174,9 @@ export function EditorPreviewDataProvider({
   useEffect(() => {
     if (
       !state.editingModule ||
-      // now only react is supported.
-      state.editingModule.framework !== "react"
+      // now only react and vanilla are supported.
+      state.editingModule.framework !== "react" ||
+      state.editingModule.framework !== "vanilla"
     ) {
       return;
     }
@@ -184,28 +185,37 @@ export function EditorPreviewDataProvider({
     assert(componentName, "component name is required");
     assert(raw, "raw input code is required");
     updateBuildingState(true);
-    bundler(transform(raw, componentName), "tsx")
-      .then((d) => {
-        if (d.err == null) {
-          if (d.code) {
-            onEsbuildReactPreviewResult({
-              key: new WidgetKey({
-                originName: target.name,
-                id: target.id,
-              }),
-              initialSize: {
-                width: target.width,
-                height: target.height,
-              },
-              bundledjs: d.code,
-              componentName: componentName,
-            });
-          }
-        }
-      })
-      .finally(() => {
-        updateBuildingState(false);
-      });
+
+    switch (state.editingModule.framework) {
+      case "react": {
+        bundler(transform(raw, componentName), "tsx")
+          .then((d) => {
+            if (d.err == null) {
+              if (d.code) {
+                onEsbuildReactPreviewResult({
+                  key: new WidgetKey({
+                    originName: target.name,
+                    id: target.id,
+                  }),
+                  initialSize: {
+                    width: target.width,
+                    height: target.height,
+                  },
+                  bundledjs: d.code,
+                  componentName: componentName,
+                });
+              }
+            }
+          })
+          .finally(() => {
+            updateBuildingState(false);
+          });
+        break;
+      }
+      case "vanilla": {
+        // TODO:
+      }
+    }
   }, [state.editingModule?.framework, state.editingModule?.raw]);
 
   return <>{children}</>;
