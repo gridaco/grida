@@ -18,6 +18,7 @@ import { RemoteImageRepositories } from "@design-sdk/figma-remote/lib/asset-repo
 import { useTargetContainer } from "hooks/use-target-node";
 import assert from "assert";
 import { debounce } from "utils/debounce";
+import { supportsScripting } from "config";
 
 export function CodeSegment() {
   const router = useRouter();
@@ -119,10 +120,7 @@ export function CodeSegment() {
     }
 
     // currently react and vanilla are supported
-    if (
-      framework_config.framework === "react" ||
-      framework_config.framework === "vanilla"
-    ) {
+    if (supportsScripting(framework_config.framework)) {
       dispatch({
         type: "code-editor-edit-component-code",
         framework: framework_config.framework,

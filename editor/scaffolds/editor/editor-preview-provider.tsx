@@ -9,6 +9,7 @@ import assert from "assert";
 import { useDispatch } from "core/dispatch";
 import { useTargetContainer } from "hooks";
 import { WidgetKey } from "@reflect-ui/core";
+import { supportsPreview } from "config";
 
 const esbuild_base_html_code = `<div id="root"></div>`;
 
@@ -172,48 +173,46 @@ export function EditorPreviewDataProvider({
   //   // ------------------------
   //   // ------ for esbuild -----
   useEffect(() => {
-    if (
-      !state.editingModule ||
-      // now only react and vanilla are supported.
-      state.editingModule.framework !== "react" ||
-      state.editingModule.framework !== "vanilla"
-    ) {
+    if (!state.editingModule) {
       return;
     }
 
-    const { raw, componentName } = state.editingModule;
-    assert(componentName, "component name is required");
-    assert(raw, "raw input code is required");
-    updateBuildingState(true);
+    if (supportsPreview(state.editingModule.framework)) {
+      const { raw, componentName } = state.editingModule;
+      assert(componentName, "component name is required");
+      assert(raw, "raw input code is required");
+      updateBuildingState(true);
 
-    switch (state.editingModule.framework) {
-      case "react": {
-        bundler(transform(raw, componentName), "tsx")
-          .then((d) => {
-            if (d.err == null) {
-              if (d.code) {
-                onEsbuildReactPreviewResult({
-                  key: new WidgetKey({
-                    originName: target.name,
-                    id: target.id,
-                  }),
-                  initialSize: {
-                    width: target.width,
-                    height: target.height,
-                  },
-                  bundledjs: d.code,
-                  componentName: componentName,
-                });
+      switch (state.editingModule.framework) {
+        case "react": {
+          bundler(transform(raw, componentName), "tsx")
+            .then((d) => {
+              if (d.err == null) {
+                if (d.code) {
+                  onEsbuildReactPreviewResult({
+                    key: new WidgetKey({
+                      originName: target.name,
+                      id: target.id,
+                    }),
+                    initialSize: {
+                      width: target.width,
+                      height: target.height,
+                    },
+                    bundledjs: d.code,
+                    componentName: componentName,
+                  });
+                }
               }
-            }
-          })
-          .finally(() => {
-            updateBuildingState(false);
-          });
-        break;
-      }
-      case "vanilla": {
-        // TODO:
+            })
+            .finally(() => {
+              updateBuildingState(false);
+            });
+          break;
+        }
+        case "vanilla": {
+          //
+          // TODO:
+        }
       }
     }
   }, [state.editingModule?.framework, state.editingModule?.raw]);
