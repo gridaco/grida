@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { Console, Hook, Unhook } from "@code-editor/console-feed";
 
-export function WindowConsoleFeed() {
+export function WindowConsoleFeed({ style }: { style?: React.CSSProperties }) {
   const [logs, setLogs] = useState([]);
 
   useEffect(() => {
@@ -16,5 +16,9 @@ export function WindowConsoleFeed() {
     };
   }, []);
 
-  return <Console logs={logs} variant="dark" />;
+  return (
+    <div style={style}>
+      <Console logs={logs} variant="dark" />
+    </div>
+  );
 }
