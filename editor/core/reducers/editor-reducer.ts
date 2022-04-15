@@ -8,6 +8,8 @@ import type {
   CanvasModeGobackAction,
   PreviewBuildingStateUpdateAction,
   PreviewSetAction,
+  DevtoolsConsoleAction,
+  DevtoolsConsoleClearAction,
 } from "core/actions";
 import { EditorState } from "core/states";
 import { useRouter } from "next/router";
@@ -152,6 +154,27 @@ export function editorReducer(state: EditorState, action: Action): EditorState {
       return produce(state, (draft) => {
         draft.currentPreview = data; // set
       });
+    }
+    case "devtools-console": {
+      const { log } = <DevtoolsConsoleAction>action;
+      return produce(state, (draft) => {
+        if (!draft.devtoolsConsole?.logs?.length) {
+          draft.devtoolsConsole = { logs: [] };
+        }
+
+        const logs = Array.from(state.devtoolsConsole?.logs ?? []);
+        logs.push(log);
+
+        draft.devtoolsConsole.logs = logs;
+      });
+      break;
+    }
+    case "devtools-console-clear": {
+      const {} = <DevtoolsConsoleClearAction>action;
+      return produce(state, (draft) => {
+        draft.devtoolsConsole = null;
+      });
+      break;
     }
     default:
       throw new Error(`Unhandled action type: ${action["type"]}`);
