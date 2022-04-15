@@ -172,7 +172,15 @@ export function editorReducer(state: EditorState, action: Action): EditorState {
     case "devtools-console-clear": {
       const {} = <DevtoolsConsoleClearAction>action;
       return produce(state, (draft) => {
-        draft.devtoolsConsole = null;
+        if (draft.devtoolsConsole?.logs?.length) {
+          draft.devtoolsConsole.logs = [
+            {
+              id: "clear",
+              method: "info",
+              data: ["Console was cleared"],
+            },
+          ];
+        }
       });
       break;
     }
