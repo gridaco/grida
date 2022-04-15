@@ -5,6 +5,7 @@ import { MonacoEmptyMock } from "./monaco-mock-empty";
 import { register } from "./monaco-utils";
 import { __dangerous__lastFormattedValue__global } from "@code-editor/prettier-services";
 import { debounce } from "utils/debounce";
+import { downloadFile } from "utils/download";
 
 type ICodeEditor = monaco.editor.IStandaloneCodeEditor;
 
@@ -57,13 +58,7 @@ export function MonacoEditor(props: MonacoEditorProps) {
       contextMenuGroupId: "navigation",
       contextMenuOrder: 1.5,
       run: function (ed) {
-        var data = new Blob([ed.getModel().getValue()], { type: "text/txt" });
-        var csvURL = window.URL.createObjectURL(data);
-        const tempLink = document.createElement("a");
-        tempLink.href = csvURL;
-        tempLink.setAttribute("download", path);
-        tempLink.click();
-        tempLink.remove();
+        downloadFile({ data: ed.getModel().getValue(), filename: path });
       },
     });
 
