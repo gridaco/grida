@@ -20,8 +20,8 @@ export default function InspectRaw() {
       <MonacoEditor
         key={figma.id}
         height="100vh"
-        defaultLanguage="json"
-        defaultValue={JSON.stringify(figma, null, 2)}
+        language="json"
+        value={JSON.stringify(figma, null, 2)}
       />
     </>
   );
