@@ -1,11 +1,14 @@
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import styled from "@emotion/styled";
-import { DevtoolsTab, WindowConsoleFeed } from "@code-editor/devtools";
+import { DevtoolsTab } from "@code-editor/devtools";
 import { colors } from "theme";
 import { Resizable } from "re-resizable";
 import { AngleDownIcon } from "icons/icon-angle-down";
 import { AngleUpIcon } from "icons/icon-angle-up";
 import { TrashIcon } from "icons/icon-trash";
+import { useDispatch } from "core/dispatch";
+import { EditorConsoleFeed } from "./console-feed";
+import { useEditorState } from "core/states";
 
 const min_body_height = 120;
 const max_body_height = 500;
@@ -27,7 +30,17 @@ const height_store = {
 
 export function Devtools() {
   const [expanded, setExpended] = useState(false);
-  const [height, setHeight] = useState(height_store.get());
+  const [height, setHeight] = useState(
+    expanded ? height_store.get() : precalculated_bar_height
+  );
+
+  const dispatch = useDispatch();
+
+  const clearConsole = useCallback(() => {
+    dispatch({
+      type: "devtools-console-clear",
+    });
+  }, [dispatch]);
 
   // save height
   useEffect(() => {
@@ -64,7 +77,8 @@ export function Devtools() {
       }}
       minHeight={precalculated_bar_height}
       style={{
-        // opacity: 0.95,
+        opacity: expanded ? 1 : 0.8,
+        transition: "opacity 0.2s",
         overflow: "hidden",
         marginLeft: 21,
         marginRight: 21,
@@ -92,6 +106,7 @@ export function Devtools() {
           }
           setExpended(!expanded);
         }}
+        onClearConsole={clearConsole}
       />
       <ContentBody hidden={!expanded} />
     </Resizable>
@@ -100,7 +115,7 @@ export function Devtools() {
 
 function ContentBody({ hidden = false }: { hidden?: boolean }) {
   return (
-    <WindowConsoleFeed
+    <EditorConsoleFeed
       style={{
         display: hidden ? "none" : "flex",
         minHeight: 120,
@@ -114,9 +129,11 @@ function ContentBody({ hidden = false }: { hidden?: boolean }) {
 function ControllerBar({
   onToggleExpand,
   expanded,
+  onClearConsole,
 }: {
   onToggleExpand: () => void;
   expanded: boolean;
+  onClearConsole: () => void;
 }) {
   return (
     <div
@@ -130,12 +147,7 @@ function ControllerBar({
       <Tabs onClick={onToggleExpand} />
       <ControllerBarActionArea>
         {expanded ? (
-          <TrashIcon
-            onClick={() => {
-              console.clear();
-            }}
-            style={{ cursor: "pointer" }}
-          />
+          <TrashIcon onClick={onClearConsole} style={{ cursor: "pointer" }} />
         ) : null}
         {expanded ? (
           <AngleDownIcon
@@ -156,6 +168,9 @@ const ControllerBarActionArea = styled.div`
 `;
 
 function Tabs({ onClick }: { onClick?: () => void }) {
+  const [state] = useEditorState();
+  const { devtoolsConsole } = state;
+
   return (
     <div
       onClick={onClick}
@@ -165,7 +180,11 @@ function Tabs({ onClick }: { onClick?: () => void }) {
         gap: 12,
       }}
     >
-      <DevtoolsTab label="Console" selected badge={0} />
+      <DevtoolsTab
+        label="Console"
+        selected
+        badge={devtoolsConsole?.logs?.length ?? 0}
+      />
       {/* <DevtoolsTab label="Problems" badge={0} />
       <DevtoolsTab label="React DevTools" badge={0} />
       <DevtoolsTab label="Properties"  /> */}

@@ -44,7 +44,6 @@ const bundler = async (rawCode: string, lang: Loader) => {
 
     return { code: result.outputFiles[0].text, err: null };
   } catch (error: any) {
-    console.error("esbuild error: ", error);
     return {
       code: null,
       err: { method: "error", data: [error.message], id: nanoid() },
