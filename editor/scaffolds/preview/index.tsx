@@ -50,7 +50,7 @@ const cache = {
   },
 };
 
-export function Preview({
+export function D2CVanillaPreview({
   target,
   isZooming,
   isPanning,
@@ -159,26 +159,55 @@ export function Preview({
   const bg_color_str = __bg ? "#" + __bg.hex : "transparent";
 
   return (
+    <PreviewContent
+      id={target.id}
+      name={target.name}
+      source={preview.scaffold.raw}
+      width={target.width}
+      height={target.height}
+      backgroundColor={
+        !preview && bg_color_str // clear bg after preview is rendered.
+      }
+    />
+  );
+}
+
+function PreviewContent({
+  width,
+  height,
+  backgroundColor,
+  id,
+  source,
+  name,
+}: {
+  width: number;
+  height: number;
+  backgroundColor: string;
+  id: string;
+  source: string;
+  name: string;
+}) {
+  return (
     <div
       style={{
-        width: target.width,
-        height: target.height,
+        width: width,
+        height: height,
         borderRadius: 1,
-        backgroundColor: !preview && bg_color_str, // clear bg after preview is rendered.
+        backgroundColor: backgroundColor,
         contain: "layout style paint",
       }}
     >
-      {preview && (
+      {source && (
         <VanillaRunner
-          key={preview.scaffold.raw}
+          key={id}
           style={{
             borderRadius: 1,
             contain: "layout style paint",
           }}
-          source={preview.scaffold.raw}
+          source={source}
           width="100%"
           height="100%"
-          componentName={preview.name}
+          componentName={name}
         />
       )}
     </div>

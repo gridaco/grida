@@ -2,7 +2,7 @@ import React, { useCallback } from "react";
 import styled from "@emotion/styled";
 import { Canvas } from "@code-editor/canvas";
 import { useEditorState, useWorkspace } from "core/states";
-import { Preview } from "scaffolds/preview";
+import { D2CVanillaPreview } from "scaffolds/preview";
 import useMeasure from "react-use-measure";
 import { useDispatch } from "core/dispatch";
 import { FrameTitleRenderer } from "./render/frame-title";
@@ -121,7 +121,9 @@ export function VisualContentArea() {
               nodes={thisPageNodes}
               // initialTransform={ } // TODO: if the initial selection is provided from first load, from the query param, we have to focus to fit that node.
               renderItem={(p) => {
-                return <Preview key={p.node.id} target={p.node} {...p} />;
+                return (
+                  <D2CVanillaPreview key={p.node.id} target={p.node} {...p} />
+                );
               }}
               config={{
                 can_highlight_selected_layer: true,
