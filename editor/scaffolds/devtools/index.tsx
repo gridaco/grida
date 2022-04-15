@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import styled from "@emotion/styled";
 import { DevtoolsTab, WindowConsoleFeed } from "@code-editor/devtools";
 import { colors } from "theme";
@@ -12,9 +12,30 @@ const max_body_height = 500;
 const precalculated_bar_height = 44;
 const expand_default_height = min_body_height + precalculated_bar_height;
 
+const height_store = {
+  get: () => {
+    const stored = localStorage.getItem("devtools-height");
+    if (stored) {
+      return parseInt(stored);
+    }
+    return expand_default_height;
+  },
+  set: (height) => {
+    localStorage.setItem("devtools-height", height.toString());
+  },
+};
+
 export function Devtools() {
   const [expanded, setExpended] = useState(false);
-  const [height, setHeight] = useState(precalculated_bar_height);
+  const [height, setHeight] = useState(height_store.get());
+
+  // save height
+  useEffect(() => {
+    if (expanded) {
+      height_store.set(height);
+    }
+  }, [height, expanded]);
+
   return (
     <Resizable
       maxHeight={max_body_height}
@@ -43,7 +64,7 @@ export function Devtools() {
       }}
       minHeight={precalculated_bar_height}
       style={{
-        opacity: 0.95,
+        // opacity: 0.95,
         overflow: "hidden",
         marginLeft: 21,
         marginRight: 21,
@@ -67,7 +88,7 @@ export function Devtools() {
           if (expanded) {
             setHeight(precalculated_bar_height);
           } else {
-            setHeight(expand_default_height);
+            setHeight(height_store.get());
           }
           setExpended(!expanded);
         }}
@@ -106,7 +127,7 @@ function ControllerBar({
         padding: 12,
       }}
     >
-      <Tabs />
+      <Tabs onClick={onToggleExpand} />
       <ControllerBarActionArea>
         {expanded ? (
           <TrashIcon
@@ -134,9 +155,10 @@ const ControllerBarActionArea = styled.div`
   gap: 10px;
 `;
 
-function Tabs() {
+function Tabs({ onClick }: { onClick?: () => void }) {
   return (
     <div
+      onClick={onClick}
       style={{
         display: "flex",
         flex: 1,
