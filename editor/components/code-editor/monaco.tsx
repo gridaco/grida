@@ -50,6 +50,26 @@ export function MonacoEditor(props: MonacoEditorProps) {
       rename.run();
     });
 
+    editor.addAction({
+      // An unique identifier of the contributed action.
+      id: "export-module-as-file",
+
+      // A label of the action that will be presented to the user.
+      label: "Export as file",
+      precondition: null,
+      keybindingContext: null,
+      contextMenuGroupId: "navigation",
+      contextMenuOrder: 1.5,
+      run: function (ed) {
+        var data = new Blob([ed.getModel().getValue()], { type: "text/txt" });
+        var csvURL = window.URL.createObjectURL(data);
+        const tempLink = document.createElement("a");
+        tempLink.href = csvURL;
+        tempLink.setAttribute("download", "filename.csv");
+        tempLink.click();
+      },
+    });
+
     editor.onDidChangeModelContent((e) => {
       /* add here */
     });
