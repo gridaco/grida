@@ -51,8 +51,8 @@ export function CodeEditor({
         onChange={(v: string, e) => {
           onChange?.(filekey, v, e);
         }}
-        defaultLanguage={file.language}
-        defaultValue={file.raw}
+        language={file.language}
+        value={file.raw}
       />
     </>
   );
