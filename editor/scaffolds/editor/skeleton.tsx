@@ -1,9 +1,8 @@
 import React from "react";
 import styled from "@emotion/styled";
 import { HomeLogo } from "icons/home-logo";
-import { withStyles } from "@material-ui/core/styles";
-import Box from "@material-ui/core/Box";
-import LinearProgress from "@material-ui/core/LinearProgress";
+import Box from "@mui/material/Box";
+import LinearProgress from "@mui/material/LinearProgress";
 import ClientOnly from "components/client-only";
 
 export function EditorSkeleton({
@@ -20,7 +19,9 @@ export function EditorSkeleton({
         <LogoAndLoading>
           <HomeLogo />
           <ClientOnly>
-            <ColoredLinearProgress value={percent} />
+            <Box sx={{ width: "100%" }}>
+              <ColoredLinearProgress value={percent} />
+            </Box>
           </ClientOnly>
         </LogoAndLoading>
         <TipsContainer />
@@ -70,32 +71,18 @@ const LogoAndLoading = styled.div`
   box-sizing: border-box;
 `;
 
-const styles = (props) => ({
-  colorPrimary: {
-    backgroundColor: "rgba(255, 255, 255, 0.3)",
-  },
-  barColorPrimary: {
-    backgroundColor: "#fff",
-  },
-});
+// const styles = (props) => ({
+//   colorPrimary: {
+//     backgroundColor: "rgba(255, 255, 255, 0.3)",
+//   },
+//   barColorPrimary: {
+//     backgroundColor: "#fff",
+//   },
+// });
 
-const ColoredLinearProgress = withStyles(styles)(function (props: {
-  value?: number;
-}) {
-  //@ts-ignore
-  const { classes } = props;
-  return (
-    <Box sx={{ width: "100%" }}>
-      <LinearProgress
-        {...props}
-        classes={{
-          colorPrimary: classes.colorPrimary,
-          barColorPrimary: classes.barColorPrimary,
-        }}
-      />
-    </Box>
-  );
-});
+const ColoredLinearProgress = styled(LinearProgress)`
+  color: white;
+`;
 
 export function TipsContainer() {
   return (

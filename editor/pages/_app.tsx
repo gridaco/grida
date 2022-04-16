@@ -3,6 +3,7 @@ import { Global, css } from "@emotion/react";
 import Head from "next/head";
 import Script from "next/script";
 import { EditorThemeProvider } from "@editor-ui/theme";
+import { MuiThemeProvider } from "theme/mui";
 import { colors } from "theme";
 import { useRouter } from "next/router";
 
@@ -146,9 +147,11 @@ function EditorApp({ Component, pageProps }) {
   return (
     <React.Fragment>
       <HeadInjection />
-      <EditorThemeProvider dark>
-        <Component {...pageProps} />
-      </EditorThemeProvider>
+      <MuiThemeProvider>
+        <EditorThemeProvider dark>
+          <Component {...pageProps} />
+        </EditorThemeProvider>
+      </MuiThemeProvider>
     </React.Fragment>
   );
 }
