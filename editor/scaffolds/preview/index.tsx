@@ -213,12 +213,12 @@ export function WebWorkerD2CVanillaPreview({ target }: VanillaPreviewProps) {
       filekey: target.filekey,
     });
 
-    worker.onmessage = (e) => {
+    worker.addEventListener("message", (e) => {
       // console.log(target.id, e.data.id);
       // if (((e.data as Result).id = target.id)) {
       setPreview(e.data as Result);
       // }
-    };
+    });
 
     () => {
       terminate();
