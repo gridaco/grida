@@ -12,7 +12,7 @@ import {
 import { get_hovering_target, centerOf } from "../math";
 import { utils } from "@design-sdk/core";
 import { LazyFrame } from "@code-editor/canvas/lazy-frame";
-import { HudCustomRenderers, HudSurface } from "./hud-surface";
+import { HudCustomRenderers, HudSurface } from "../hud";
 import type { Box, XY, CanvasTransform, XYWH } from "../types";
 import type { FrameOptimizationFactors } from "../frame";
 const designq = utils.query;
