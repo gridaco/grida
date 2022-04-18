@@ -163,6 +163,7 @@ export function Canvas({
       zoom: zoom,
       offset: nonscaled_offset,
       margin: LAYER_HOVER_HIT_MARGIN,
+      reverse: true,
     });
 
     if (!hovering) {
