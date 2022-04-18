@@ -1,17 +1,22 @@
 import React from "react";
 import styled from "@emotion/styled";
-import { useRouter } from "next/router";
 import { EditorAppbarIconButton } from "./editor-appbar-icon-button";
 import { GithubIcon, NotificationBellIcon } from "icons";
 import { EditorFrameworkConfigOnAppbar } from "../editor-framework-config-on-appbar";
 import { EditorProgressIndicator } from "scaffolds/editor-progress-indicator";
+import { colors } from "theme";
 
-export function AppbarFragmentForCodeEditor() {
-  const router = useRouter();
+export function AppbarFragmentForCodeEditor({
+  background = false,
+}: {
+  background?: boolean;
+}) {
   const hasNotification = false;
 
   return (
-    <RootWrapperAppbarFragmentForCodeEditor>
+    <RootWrapperAppbarFragmentForCodeEditor
+      background={background ? colors.color_editor_bg_on_dark : "transparent"}
+    >
       {/* disable temporarily */}
       <div style={{ flex: 1 }} />
       {/* <EditorFrameworkConfigOnAppbar /> */}
@@ -34,7 +39,9 @@ export function AppbarFragmentForCodeEditor() {
   );
 }
 
-const RootWrapperAppbarFragmentForCodeEditor = styled.div`
+const RootWrapperAppbarFragmentForCodeEditor = styled.div<{
+  background: React.CSSProperties["background"];
+}>`
   z-index: 10;
   display: flex;
   justify-content: center;
@@ -48,6 +55,7 @@ const RootWrapperAppbarFragmentForCodeEditor = styled.div`
   padding-top: 14px;
   padding-left: 12px;
   padding-right: 20px;
+  background: ${(props) => props.background};
 `;
 
 const AppbarActions = styled.div`

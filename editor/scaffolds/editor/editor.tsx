@@ -47,7 +47,8 @@ export function Editor({
           maxWidth: 600,
           children: <EditorSidebar />,
         }}
-        appbar={<Appbar />}
+        contentAreaAppbar={<Appbar />}
+        // appbar={}
         // rightbar={<Inspector />}
       >
         <WorkspaceContentPanelGridLayout>

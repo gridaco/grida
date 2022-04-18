@@ -1,9 +1,16 @@
 import React from "react";
 import { EditorAppbarFragments } from "components/editor";
+import { useEditorState } from "core/states";
 /**
  * a scaffold App bar linked with editor state
  */
 export function Appbar() {
+  const [state] = useEditorState();
+
+  const isCodeEditorShown = state.selectedNodes.length > 0;
+
+  console.log("Appbar", isCodeEditorShown);
+
   return (
     <div
       style={{
@@ -11,9 +18,7 @@ export function Appbar() {
         flexDirection: "row",
       }}
     >
-      <EditorAppbarFragments.Sidebar />
-      <EditorAppbarFragments.Canvas />
-      <EditorAppbarFragments.CodeEditor />
+      <EditorAppbarFragments.CodeEditor background={isCodeEditorShown} />
     </div>
   );
 }
