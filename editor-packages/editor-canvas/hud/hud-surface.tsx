@@ -117,8 +117,8 @@ export function HudSurface({
                 />
               );
             })}
-          {selectedNodes?.length &&
-            (disableGrouping ? (
+          {selectedNodes?.length ? (
+            disableGrouping ? (
               selectedNodes.map((s) => {
                 const xywh: [number, number, number, number] = [
                   s.absoluteX,
@@ -151,7 +151,10 @@ export function HudSurface({
               })
             ) : (
               <SelectionGroupHighlight selections={selectedNodes} zoom={zoom} />
-            ))}
+            )
+          ) : (
+            <></>
+          )}
         </>
       )}
     </div>

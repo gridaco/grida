@@ -211,6 +211,7 @@ export function Canvas({
       offset: nonscaled_offset,
       margin: LAYER_HOVER_HIT_MARGIN,
       reverse: true,
+      ignore: (n) => selectedNodes.includes(n.id),
     });
 
     if (!hovering) {
