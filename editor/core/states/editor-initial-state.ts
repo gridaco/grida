@@ -8,6 +8,7 @@ export function createInitialEditorState(editor: EditorSnapshot): EditorState {
     selectedLayersOnPreview: editor.selectedLayersOnPreview,
     design: editor.design,
     canvasMode: editor.canvasMode,
+    editorTaskQueue: editor.editorTaskQueue,
   };
 }
 
@@ -19,5 +20,15 @@ export function createPendingEditorState(): EditorState {
     selectedLayersOnPreview: [],
     design: null,
     canvasMode: "free",
+    editorTaskQueue: {
+      isBusy: true,
+      tasks: [
+        {
+          id: "pending",
+          name: "loading",
+          progress: null,
+        },
+      ],
+    },
   };
 }

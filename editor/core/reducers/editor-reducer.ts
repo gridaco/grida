@@ -10,6 +10,9 @@ import type {
   PreviewSetAction,
   DevtoolsConsoleAction,
   DevtoolsConsoleClearAction,
+  EditorTaskPushAction,
+  EditorTaskPopAction,
+  EditorTaskUpdateProgressAction,
 } from "core/actions";
 import { EditorState } from "core/states";
 import { useRouter } from "next/router";
@@ -181,6 +184,36 @@ export function editorReducer(state: EditorState, action: Action): EditorState {
             },
           ];
         }
+      });
+      break;
+    }
+    case "editor-task-push": {
+      const { task } = <EditorTaskPushAction>action;
+      const { id } = task;
+      // TODO: check id duplication
+
+      return produce(state, (draft) => {
+        draft.editorTaskQueue.tasks.push(task);
+      });
+      break;
+    }
+    case "editor-task-pop": {
+      const { task } = <EditorTaskPopAction>action;
+      const { id } = task;
+
+      return produce(state, (draft) => {
+        draft.editorTaskQueue.tasks = draft.editorTaskQueue.tasks.filter(
+          (i) => i.id !== id
+        );
+        // TODO: handle isBusy property by the task
+      });
+      break;
+    }
+    case "editor-task-update-progress": {
+      const { id, progress } = <EditorTaskUpdateProgressAction>action;
+      return produce(state, (draft) => {
+        draft.editorTaskQueue.tasks.find((i) => i.id !== id).progress =
+          progress;
       });
       break;
     }
