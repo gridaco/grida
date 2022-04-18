@@ -115,8 +115,8 @@ export function VisualContentArea() {
               pageid={selectedPage}
               selectedNodes={selectedNodes.filter(Boolean)}
               highlightedLayer={highlightedLayer}
-              onSelectNode={(node) => {
-                dispatch({ type: "select-node", node: node?.id });
+              onSelectNode={(...nodes) => {
+                dispatch({ type: "select-node", node: nodes.map((n) => n.id) });
               }}
               onClearSelection={() => {
                 dispatch({ type: "select-node", node: null });

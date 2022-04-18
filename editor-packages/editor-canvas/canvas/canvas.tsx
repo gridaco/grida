@@ -9,7 +9,12 @@ import {
   OnPointerDownHandler,
   OnDragHandler,
 } from "../canvas-event-target";
-import { target_of_point, centerOf, edge_scrolling } from "../math";
+import {
+  target_of_point,
+  centerOf,
+  edge_scrolling,
+  target_of_area,
+} from "../math";
 import { utils } from "@design-sdk/core";
 import { LazyFrame } from "@code-editor/canvas/lazy-frame";
 import { HudCustomRenderers, HudSurface } from "../hud";
@@ -89,7 +94,7 @@ export function Canvas({
   ...props
 }: {
   viewbound: Box;
-  onSelectNode?: (node?: ReflectSceneNode) => void;
+  onSelectNode?: (...node: ReflectSceneNode[]) => void;
   onClearSelection?: () => void;
 } & CanvasCustomRenderers &
   CanvasState & {
@@ -151,6 +156,34 @@ export function Canvas({
   useEffect(() => {
     setHoveringLayer(wshighlight);
   }, [highlightedLayer]);
+
+  // area selection hook
+  useEffect(() => {
+    if (marquee) {
+      const area: XYWH = [
+        marquee[0] / zoom,
+        marquee[1] / zoom,
+        marquee[2] / zoom,
+        marquee[3] / zoom,
+      ];
+
+      const selections = target_of_area({
+        area,
+        tree: nodes,
+        contain: false,
+      });
+
+      // https://stackoverflow.com/a/19746771
+      const same =
+        selectedNodes.length === selections?.length &&
+        selectedNodes.every((value, index) => value === selections[index].id);
+
+      if (!same) {
+        onSelectNode(...selections);
+      }
+    }
+    //
+  }, [marquee]);
 
   const onPointerMove: OnPointerMoveHandler = (state) => {
     if (isPanning || isZooming || isDraggomg) {
