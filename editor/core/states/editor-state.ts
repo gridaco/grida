@@ -28,6 +28,7 @@ export interface EditorState {
   code?: CodeRepository;
   editingModule?: EditingModule;
   devtoolsConsole?: DevtoolsConsole;
+  editorTaskQueue?: EditorTaskQueue;
 }
 
 export interface EditorSnapshot {
@@ -130,4 +131,21 @@ export interface ConsoleLog {
     | "timeEnd"
     | "count"
     | "assert";
+}
+
+export interface EditorTaskQueue {
+  isBusy: boolean;
+  tasks: EditorTask[];
+}
+
+export interface EditorTask {
+  id: string;
+  name: string;
+  description: string;
+  cancelable: boolean;
+  onCancel: () => void;
+  /**
+   * 0-1, if null, it is indeterminate
+   */
+  progress: number | null;
 }
