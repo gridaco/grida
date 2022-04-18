@@ -4,6 +4,7 @@ import { color_layer_readonly_highlight } from "../theme";
 import { get_boinding_box } from "./math";
 import { OulineSide } from "./outline-side";
 import { OverlayContainer } from "./overlay-container";
+import { Handle } from "./handle";
 
 export function ReadonlySelectHightlight({
   width = 1,
@@ -64,34 +65,34 @@ export function ReadonlySelectHightlight({
       <>
         <SideCenterEmp
           box={bbox}
-          side="l"
+          side="w"
           size={dot_size}
           color={color_layer_readonly_highlight}
         />
         <SideCenterEmp
           box={bbox}
-          side="r"
+          side="e"
           size={dot_size}
           color={color_layer_readonly_highlight}
         />
         <SideCenterEmp
           box={bbox}
-          side="t"
+          side="n"
           size={dot_size}
           color={color_layer_readonly_highlight}
         />
         <SideCenterEmp
           box={bbox}
-          side="b"
+          side="s"
           size={dot_size}
           color={color_layer_readonly_highlight}
         />
       </>
       <>
-        <OulineSide orientation="l" {...sideprops} />
-        <OulineSide orientation="t" {...sideprops} />
-        <OulineSide orientation="b" {...sideprops} />
-        <OulineSide orientation="r" {...sideprops} />
+        <OulineSide orientation="w" {...sideprops} />
+        <OulineSide orientation="n" {...sideprops} />
+        <OulineSide orientation="s" {...sideprops} />
+        <OulineSide orientation="e" {...sideprops} />
       </>
     </OverlayContainer>
   );
@@ -103,7 +104,7 @@ function SideCenterEmp({
   box,
   size = 3,
 }: {
-  side: "l" | "r" | "t" | "b";
+  side: "w" | "e" | "n" | "s";
   color: string;
   box: [number, number, number, number];
   size?: number;
@@ -111,19 +112,19 @@ function SideCenterEmp({
   let dx = 0;
   let dy = 0;
   switch (side) {
-    case "l":
+    case "w":
       dx = box[0];
       dy = box[1] + (box[3] - box[1]) / 2;
       break;
-    case "r":
+    case "e":
       dx = box[2];
       dy = box[1] + (box[3] - box[1]) / 2;
       break;
-    case "t":
+    case "n":
       dx = box[0] + (box[2] - box[0]) / 2;
       dy = box[1];
       break;
-    case "b":
+    case "s":
       dx = box[0] + (box[2] - box[0]) / 2;
       dy = box[3];
       break;
@@ -166,43 +167,16 @@ function ReadonlyHandle({
   anchor: "nw" | "ne" | "sw" | "se";
   box: [number, number, number, number];
 }) {
-  let dx = 0;
-  let dy = 0;
-  switch (anchor) {
-    case "nw":
-      dx = box[0];
-      dy = box[1];
-      break;
-    case "ne":
-      dx = box[2];
-      dy = box[1];
-      break;
-    case "sw":
-      dx = box[0];
-      dy = box[3];
-      break;
-    case "se":
-      dx = box[2];
-      dy = box[3];
-      break;
-  }
-
-  // translate x, y
-  const [tx, ty] = [dx - size / 2 - outlineWidth, dy - size / 2 - outlineWidth];
-
   return (
-    <div
-      style={{
-        position: "absolute",
-        borderRadius: "50%",
-        width: size,
-        height: size,
-        border: `${outlineColor} solid ${outlineWidth}px`,
-        willChange: "transform",
-        transform: `translateX(${tx}px) translateY(${ty}px)`,
-        backgroundColor: color,
-        zIndex: 1,
-      }}
+    <Handle
+      borderRadius={"50%"}
+      readonly
+      color={color}
+      anchor={anchor}
+      box={box}
+      outlineWidth={outlineWidth}
+      outlineColor={outlineColor}
+      size={size}
     />
   );
 }

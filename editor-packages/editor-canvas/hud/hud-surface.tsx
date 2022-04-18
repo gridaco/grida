@@ -1,5 +1,9 @@
 import React from "react";
-import { HoverOutlineHighlight, ReadonlySelectHightlight } from "../overlay";
+import {
+  HoverOutlineHighlight,
+  ReadonlySelectHightlight,
+  SelectHightlight,
+} from "../overlay";
 import { FrameTitle, FrameTitleProps } from "../frame-title";
 import type { XY, XYWH } from "../types";
 import { Marquee } from "../marquee";
@@ -129,7 +133,19 @@ export function HudSurface({
                   />
                 );
               } else {
-                // TODO: support non readonly canvas
+                return (
+                  <SelectHightlight
+                    onResize={(anchor, e) => {
+                      // console.log("resize", anchor, e);
+                    }}
+                    key={s.id}
+                    type="xywhr"
+                    xywh={xywh}
+                    rotation={s.rotation}
+                    zoom={zoom}
+                    width={1}
+                  />
+                );
               }
             })}
         </>

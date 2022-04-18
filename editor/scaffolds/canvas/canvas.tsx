@@ -139,6 +139,7 @@ export function VisualContentArea() {
                   <D2CVanillaPreview key={p.node.id} target={p.node} {...p} />
                 );
               }}
+              readonly={false}
               config={{
                 can_highlight_selected_layer: true,
                 marquee: {

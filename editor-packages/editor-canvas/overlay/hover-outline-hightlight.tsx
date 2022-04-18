@@ -19,10 +19,10 @@ export function HoverOutlineHighlight({ width = 1, ...props }: OutlineProps) {
 
   return (
     <OverlayContainer xywh={bbox} rotation={rotation}>
-      <OulineSide orientation="l" {...vprops} />
-      <OulineSide orientation="t" {...vprops} />
-      <OulineSide orientation="b" {...vprops} />
-      <OulineSide orientation="r" {...vprops} />
+      <OulineSide orientation="w" {...vprops} />
+      <OulineSide orientation="n" {...vprops} />
+      <OulineSide orientation="s" {...vprops} />
+      <OulineSide orientation="e" {...vprops} />
     </OverlayContainer>
   );
 }
