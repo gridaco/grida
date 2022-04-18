@@ -113,7 +113,7 @@ export function VisualContentArea() {
               ]}
               filekey={state.design.key}
               pageid={selectedPage}
-              selectedNodes={selectedNodes.filter(Boolean)}
+              selectedNodes={selectedNodes}
               highlightedLayer={highlightedLayer}
               onSelectNode={(...nodes) => {
                 dispatch({ type: "select-node", node: nodes.map((n) => n.id) });
@@ -143,6 +143,7 @@ export function VisualContentArea() {
                 <FrameTitleRenderer
                   key={p.id}
                   {...p}
+                  runnable={selectedNodes.length === 1}
                   onRunClick={startIsolatedViewMode}
                 />
               )}
