@@ -9,7 +9,7 @@ import {
   OnPointerDownHandler,
   OnDragHandler,
 } from "../canvas-event-target";
-import { get_hovering_target, centerOf, edge_scrolling } from "../math";
+import { target_of_point, centerOf, edge_scrolling } from "../math";
 import { utils } from "@design-sdk/core";
 import { LazyFrame } from "@code-editor/canvas/lazy-frame";
 import { HudCustomRenderers, HudSurface } from "../hud";
@@ -157,7 +157,7 @@ export function Canvas({
       // don't perform hover calculation while transforming.
       return;
     }
-    const hovering = get_hovering_target({
+    const hovering = target_of_point({
       point: state.xy,
       tree: nodes,
       zoom: zoom,
@@ -247,6 +247,7 @@ export function Canvas({
       y2 - y1, // h
     ];
 
+    // FIXME: marquee logic incomplete
     setMarquee([x, y, w, h]);
 
     // edge scrolling

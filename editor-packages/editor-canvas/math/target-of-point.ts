@@ -3,12 +3,14 @@
  * if the array's order represents the reversed index (depth) set this to true.
  */
 
+import type { Tree, XY, XYWH } from "../types";
+
 /**
  * get the hovering target node from nested children tree.
  * - ignore invisible nodes.
  * - target is layer in higher level. (e.g. child of a parent is hovering target if both matches the point)
  */
-export function get_hovering_target<T extends Tree>({
+export function target_of_point<T extends Tree>({
   point,
   zoom,
   tree,
@@ -19,13 +21,13 @@ export function get_hovering_target<T extends Tree>({
   /**
    * relative mouse point from canvas 0, 0
    */
-  point: [number, number];
+  point: XY;
   zoom: number;
   tree: T[];
   /**
    * offset of the canvas (canvas xy transform)
    */
-  offset: [number, number];
+  offset: XY;
   ignore?: (item: T) => boolean;
   margin?: number;
 }): T | undefined {
@@ -44,7 +46,7 @@ export function get_hovering_target<T extends Tree>({
         continue;
       }
       if (item.children) {
-        const hovering_child = get_hovering_target({
+        const hovering_child = target_of_point({
           point,
           zoom,
           tree: item.children as T[],
@@ -61,27 +63,9 @@ export function get_hovering_target<T extends Tree>({
   }
 }
 
-function is_point_in_xywh(
-  point: [number, number],
-  xywh: [number, number, number, number]
-): boolean {
+function is_point_in_xywh(point: XY, xywh: XYWH): boolean {
   const [x, y] = point;
   const [x0, y0, w, h] = xywh;
   const inbound = x >= x0 && x <= x0 + w && y >= y0 && y <= y0 + h;
   return inbound;
-}
-
-interface Tree {
-  id: string;
-  /**
-   * absolute x point.
-   */
-  absoluteX: number;
-  /**
-   * absolute y point.
-   */
-  absoluteY: number;
-  width: number;
-  height: number;
-  children?: Tree[] | undefined;
 }

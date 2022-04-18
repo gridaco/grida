@@ -125,18 +125,18 @@ export function VisualContentArea() {
               // initialTransform={ } // TODO: if the initial selection is provided from first load, from the query param, we have to focus to fit that node.
               renderItem={(p) => {
                 return (
-                  <WebWorkerD2CVanillaPreview
-                    key={p.node.id}
-                    target={p.node}
-                    {...p}
-                  />
-                  // <D2CVanillaPreview key={p.node.id} target={p.node} {...p} />
+                  // <WebWorkerD2CVanillaPreview
+                  //   key={p.node.id}
+                  //   target={p.node}
+                  //   {...p}
+                  // />
+                  <D2CVanillaPreview key={p.node.id} target={p.node} {...p} />
                 );
               }}
               config={{
                 can_highlight_selected_layer: true,
                 marquee: {
-                  disabled: true,
+                  disabled: false,
                 },
               }}
               renderFrameTitle={(p) => (
