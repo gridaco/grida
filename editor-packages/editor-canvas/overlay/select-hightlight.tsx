@@ -5,16 +5,12 @@ import { get_boinding_box } from "./math";
 import { OulineSide } from "./outline-side";
 import { OverlayContainer } from "./overlay-container";
 import { Handle } from "./handle";
-import { useDrag } from "@use-gesture/react";
+import { useGesture } from "@use-gesture/react";
 import type { OnDragHandler } from "../canvas-event-target";
 
 export function SelectHightlight({
-  width = 1,
-  onResize,
   ...props
-}: OutlineProps & {
-  onResize?: (anchor: "nw" | "ne" | "sw" | "se", e) => void;
-}) {
+}: Omit<OutlineProps, "width"> & {}) {
   const { xywh, zoom, rotation } = props;
   const bbox = get_boinding_box({ xywh, scale: zoom });
   const wh: [number, number] = [xywh[2], xywh[3]];
@@ -22,37 +18,70 @@ export function SelectHightlight({
   const sideprops = {
     wh: wh,
     zoom: props.zoom,
-    width: width,
+    width: 1,
     readonly: false,
     box: bbox,
     color: color_layer_highlight,
   };
 
-  const onresizecb = (anchor: "nw" | "ne" | "sw" | "se") => (e) => {
-    if (onResize) {
-      onResize(anchor, e);
-    }
-  };
-
   return (
     <OverlayContainer xywh={bbox} rotation={rotation}>
+      {/* TODO: add rotation knob */}
+      {/* <>
+        <RotateHandle box={bbox} anchor="ne" onDrag={onrotatecb("ne")} />
+        <RotateHandle box={bbox} anchor="nw" onDrag={onrotatecb("nw")} />
+        <RotateHandle box={bbox} anchor="se" onDrag={onrotatecb("se")} />
+        <RotateHandle box={bbox} anchor="sw" onDrag={onrotatecb("sw")} />
+      </> */}
       <>
-        <ResizeHandle box={bbox} anchor="ne" onDrag={onresizecb("ne")} />
-        <ResizeHandle box={bbox} anchor="nw" onDrag={onresizecb("nw")} />
-        <ResizeHandle box={bbox} anchor="se" onDrag={onresizecb("se")} />
-        <ResizeHandle box={bbox} anchor="sw" onDrag={onresizecb("sw")} />
+        <ResizeHandle box={bbox} anchor="ne" />
+        <ResizeHandle box={bbox} anchor="nw" />
+        <ResizeHandle box={bbox} anchor="se" />
+        <ResizeHandle box={bbox} anchor="sw" />
       </>
       <>
-        <OulineSide orientation="w" {...sideprops} cursor="w-resize" />
-        <OulineSide orientation="n" {...sideprops} cursor="n-resize" />
-        <OulineSide orientation="s" {...sideprops} cursor="s-resize" />
-        <OulineSide orientation="e" {...sideprops} cursor="e-resize" />
+        <OulineSide orientation="w" {...sideprops} cursor="ew-resize" />
+        <OulineSide orientation="n" {...sideprops} cursor="ns-resize" />
+        <OulineSide orientation="s" {...sideprops} cursor="ns-resize" />
+        <OulineSide orientation="e" {...sideprops} cursor="ew-resize" />
       </>
     </OverlayContainer>
   );
 }
 
+const resize_cursor_map = {
+  nw: "nwse-resize",
+  ne: "nesw-resize",
+  sw: "nesw-resize",
+  se: "nwse-resize",
+  w: "ew-resize",
+  n: "ns-resize",
+  s: "ns-resize",
+  e: "ew-resize",
+};
+
 function ResizeHandle({
+  anchor,
+  box,
+}: {
+  anchor: "nw" | "ne" | "sw" | "se";
+  box: [number, number, number, number];
+}) {
+  return (
+    <Handle
+      cursor={resize_cursor_map[anchor]}
+      readonly={false}
+      color={"white"}
+      anchor={anchor}
+      box={box}
+      outlineWidth={1}
+      outlineColor={color_layer_highlight}
+      size={8}
+    />
+  );
+}
+
+function RotateHandle({
   anchor,
   box,
   onDrag,
@@ -62,23 +91,38 @@ function ResizeHandle({
   onDrag: OnDragHandler;
 }) {
   const ref = useRef();
-  useDrag(onDrag, {
-    target: ref,
-  });
+  useGesture(
+    {
+      onDragStart: (e) => {
+        e.event.stopPropagation();
+      },
+      onDragEnd: (e) => {
+        e.event.stopPropagation();
+      },
+      onDrag: (e) => {
+        onDrag(e);
+        e.event.stopPropagation();
+      },
+    },
+    {
+      target: ref,
+      eventOptions: {
+        capture: false,
+      },
+    }
+  );
 
   return (
-    <div ref={ref}>
-      <Handle
-        cursor={`${anchor}-resize`}
-        readonly={false}
-        color={"white"}
-        anchor={anchor}
-        box={box}
-        borderRadius={1}
-        outlineWidth={1}
-        outlineColor={color_layer_highlight}
-        size={6}
-      />
-    </div>
+    <Handle
+      ref={ref}
+      cursor={"crosshair"} // FIXME:
+      readonly={false}
+      // center={false}
+      color={"transparent"}
+      anchor={anchor}
+      box={box}
+      outlineWidth={1}
+      size={18}
+    />
   );
 }

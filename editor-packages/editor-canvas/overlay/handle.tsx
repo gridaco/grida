@@ -1,10 +1,10 @@
-import React from "react";
-export function Handle({
+import React, { forwardRef } from "react";
+export const Handle = forwardRef(function ({
   color,
   anchor,
   box,
   outlineWidth = 1,
-  outlineColor,
+  outlineColor = "transparent",
   size = 4,
   borderRadius = 0,
   cursor,
@@ -14,8 +14,8 @@ export function Handle({
   /**
    * the width of the outline
    */
-  outlineWidth: number;
-  outlineColor: string;
+  outlineWidth?: number;
+  outlineColor?: string;
   size: number;
   anchor: "nw" | "ne" | "sw" | "se";
   box: [number, number, number, number];
@@ -54,14 +54,14 @@ export function Handle({
         borderRadius: borderRadius,
         width: size,
         height: size,
-        border: `${outlineColor} solid ${outlineWidth}px`,
+        border: outlineWidth && `${outlineColor} solid ${outlineWidth}px`,
         willChange: "transform",
         transform: `translate3d(${tx}px, ${ty}px, 0)`,
         backgroundColor: color,
         cursor: cursor,
-        zIndex: 1,
-        pointerEvents: readonly ? "none" : "all",
+        zIndex: 2,
+        pointerEvents: readonly ? "none" : "auto",
       }}
     />
   );
-}
+});

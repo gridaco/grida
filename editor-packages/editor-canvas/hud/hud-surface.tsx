@@ -135,15 +135,11 @@ export function HudSurface({
               } else {
                 return (
                   <SelectHightlight
-                    onResize={(anchor, e) => {
-                      // console.log("resize", anchor, e);
-                    }}
                     key={s.id}
                     type="xywhr"
                     xywh={xywh}
                     rotation={s.rotation}
                     zoom={zoom}
-                    width={1}
                   />
                 );
               }
