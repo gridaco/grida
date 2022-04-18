@@ -4,6 +4,7 @@ import { useRouter } from "next/router";
 import { EditorAppbarIconButton } from "./editor-appbar-icon-button";
 import { GithubIcon, NotificationBellIcon } from "icons";
 import { EditorFrameworkConfigOnAppbar } from "../editor-framework-config-on-appbar";
+import { EditorProgressIndicator } from "scaffolds/editor-progress-indicator";
 
 export function AppbarFragmentForCodeEditor() {
   const router = useRouter();
@@ -20,6 +21,7 @@ export function AppbarFragmentForCodeEditor() {
             <NotificationBellIcon size={24} color="#787878" />
           </EditorAppbarIconButton>
         )}
+        <EditorProgressIndicator />
         <EditorAppbarIconButton
           onClick={() => {
             window.open("https://github.com/gridaco/designto-code/", "_blank");

@@ -1,20 +1,21 @@
 import React from "react";
 import styled from "@emotion/styled";
+import LinearProgress from "@mui/material/LinearProgress";
 
 export function EditorTaskItem({
   label,
   description,
+  progress,
 }: {
   label: string;
   description?: string;
+  progress: number | null;
 }) {
   return (
     <RootWrapperProgressingItemReadonly>
       <TitleAndValueContainer>
         <ThisLabel>{label}</ThisLabel>
-        <ProgressBar>
-          <Value />
-        </ProgressBar>
+        <ColoredLinearProgress value={progress} />
       </TitleAndValueContainer>
       <ThisDescription>{description}</ThisDescription>
     </RootWrapperProgressingItemReadonly>
@@ -28,7 +29,6 @@ const RootWrapperProgressingItemReadonly = styled.div`
   align-items: flex-start;
   flex: none;
   gap: 4px;
-  min-height: 100vh;
   box-sizing: border-box;
 `;
 
@@ -53,27 +53,11 @@ const ThisLabel = styled.span`
   width: 80px;
 `;
 
-const ProgressBar = styled.div`
-  display: flex;
-  justify-content: center;
-  flex-direction: column;
-  align-items: flex-start;
-  flex: 1;
-  gap: 10px;
-  border-radius: 7px;
+const ColoredLinearProgress = styled(LinearProgress)`
+  height: 4px;
   width: 203px;
-  height: 4px;
-  background-color: rgba(255, 255, 255, 0.5);
-  box-sizing: border-box;
-`;
-
-const Value = styled.div`
-  height: 4px;
+  border-radius: 7px;
   background-color: rgb(37, 98, 255);
-  border-radius: 4px;
-  align-self: stretch;
-  flex-shrink: 0;
-  flex: 1;
 `;
 
 const ThisDescription = styled.span`

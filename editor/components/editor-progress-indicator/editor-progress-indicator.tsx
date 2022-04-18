@@ -17,11 +17,18 @@ export function EditorProgressIndicator({
       <Popover.Trigger>
         <EditorProgressIndicatorButton isBusy={isBusy} />
       </Popover.Trigger>
-      <EditorProgressIndicatorPopoverContent>
-        {tasks.map((task, index) => (
-          <EditorTaskItem key={index.toString()} {...task} />
-        ))}
-      </EditorProgressIndicatorPopoverContent>
+      <Popover.Content>
+        <EditorProgressIndicatorPopoverContent>
+          {tasks.map((task, index) => (
+            <EditorTaskItem
+              key={index.toString()}
+              label={task.name}
+              description={task.description}
+              progress={task.progress}
+            />
+          ))}
+        </EditorProgressIndicatorPopoverContent>
+      </Popover.Content>
     </Popover.Root>
   );
 }

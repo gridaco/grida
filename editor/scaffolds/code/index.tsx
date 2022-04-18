@@ -2,7 +2,6 @@ import React, { useEffect, useRef, useState } from "react";
 import styled from "@emotion/styled";
 import { useRouter } from "next/router";
 import { CodeEditor } from "components/code-editor";
-import { EditorAppbarFragments } from "components/editor";
 import { get_framework_config } from "query/to-code-options-from-query";
 import { CodeOptionsControl } from "components/codeui-code-options-control";
 import { designToCode, Result } from "@designto/code";
@@ -131,7 +130,6 @@ export function CodeSegment() {
   const { code, scaffold, name: componentName } = result ?? {};
   return (
     <CodeEditorContainer>
-      <EditorAppbarFragments.CodeEditor />
       <CodeOptionsControl
         initialPreset={router.query.framework as string}
         fallbackPreset="react_default"

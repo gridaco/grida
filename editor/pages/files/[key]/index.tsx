@@ -103,6 +103,16 @@ function SetupEditor({
         selectedNodesInitial: initialSelections,
         selectedPage: warmup.selectedPage(prevstate, pages, nodeid && [nodeid]),
         selectedLayersOnPreview: [],
+        editorTaskQueue: {
+          isBusy: true,
+          tasks: [
+            {
+              id: "refetch-file",
+              name: "refreshing..",
+              progress: null,
+            },
+          ],
+        },
         design: {
           name: file.name,
           input: null,

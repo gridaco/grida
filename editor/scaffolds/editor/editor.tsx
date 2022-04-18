@@ -10,6 +10,7 @@ import { Canvas } from "scaffolds/canvas";
 import { CodeSegment } from "scaffolds/code";
 import { EditorSkeleton } from "./skeleton";
 import { colors } from "theme";
+import { Appbar } from "scaffolds/appbar";
 
 export function Editor({
   loading = false,
@@ -46,6 +47,7 @@ export function Editor({
           maxWidth: 600,
           children: <EditorSidebar />,
         }}
+        appbar={<Appbar />}
         // rightbar={<Inspector />}
       >
         <WorkspaceContentPanelGridLayout>
