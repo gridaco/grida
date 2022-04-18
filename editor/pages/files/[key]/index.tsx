@@ -43,6 +43,8 @@ export default function FileEntryEditor() {
   );
 }
 
+const action_fetchfile_id = "fetchfile";
+
 function SetupEditor({
   filekey,
   nodeid,
@@ -103,16 +105,6 @@ function SetupEditor({
         selectedNodesInitial: initialSelections,
         selectedPage: warmup.selectedPage(prevstate, pages, nodeid && [nodeid]),
         selectedLayersOnPreview: [],
-        editorTaskQueue: {
-          isBusy: true,
-          tasks: [
-            {
-              id: "refetch-file",
-              name: "refreshing..",
-              progress: null,
-            },
-          ],
-        },
         design: {
           name: file.name,
           input: null,
@@ -122,6 +114,17 @@ function SetupEditor({
           pages: pages,
         },
         canvasMode: initialCanvasMode,
+        editorTaskQueue: {
+          isBusy: true,
+          tasks: [
+            {
+              id: action_fetchfile_id,
+              name: "Figma File",
+              description: "Refreshing remote file",
+              progress: null,
+            },
+          ],
+        },
       };
     }
 

@@ -9,8 +9,6 @@ export function Appbar() {
 
   const isCodeEditorShown = state.selectedNodes.length > 0;
 
-  console.log("Appbar", isCodeEditorShown);
-
   return (
     <div
       style={{
