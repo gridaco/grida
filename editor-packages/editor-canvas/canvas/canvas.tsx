@@ -363,7 +363,7 @@ function CanvasTransformRoot({
         width: 0,
         height: 0,
         willChange: "transform",
-        transform: `scale(${scale}) translateX(${xy[0]}px) translateY(${xy[1]}px)`,
+        transform: `scale(${scale}) translate3d(${xy[0]}px, ${xy[1]}px, 0)`,
         isolation: "isolate",
       }}
     >
