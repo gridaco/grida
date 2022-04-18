@@ -201,7 +201,6 @@ export function CanvasEventTarget({
       style={{
         position: "absolute",
         inset: 0,
-        background: "transparent",
         overflow: "hidden",
         touchAction: "none",
         cursor: isSpacebarPressed ? "grab" : "default",

@@ -30,6 +30,7 @@ const MIN_ZOOM = 0.02;
 interface CanvasState {
   pageid: string;
   filekey: string;
+  backgroundColor?: React.CSSProperties["backgroundColor"];
   nodes: ReflectSceneNode[];
   highlightedLayer?: string;
   selectedNodes: string[];
@@ -91,6 +92,7 @@ export function Canvas({
   selectedNodes,
   readonly = true,
   config = default_canvas_preferences,
+  backgroundColor,
   ...props
 }: {
   viewbound: Box;
@@ -389,6 +391,7 @@ export function Canvas({
           renderFrameTitle={props.renderFrameTitle}
         />
       </CanvasEventTarget>
+      <CanvasBackground backgroundColor={backgroundColor} />
       <CanvasTransformRoot scale={zoom} xy={nonscaled_offset}>
         <DisableBackdropFilter>{items}</DisableBackdropFilter>
       </CanvasTransformRoot>
@@ -437,6 +440,22 @@ function DisableBackdropFilter({ children }: { children: React.ReactNode }) {
     >
       {children}
     </div>
+  );
+}
+
+function CanvasBackground({ backgroundColor }: { backgroundColor?: string }) {
+  return (
+    <div
+      style={{
+        zIndex: -2,
+        position: "fixed",
+        top: 0,
+        left: 0,
+        width: "100%",
+        height: "100%",
+        backgroundColor,
+      }}
+    />
   );
 }
 

@@ -1,6 +1,6 @@
 import type { ReflectSceneNode } from "@design-sdk/figma-node";
 import type { FrameworkConfig } from "@designto/config";
-import type { WidgetKey } from "@reflect-ui/core";
+import type { RGBA, WidgetKey } from "@reflect-ui/core";
 import type { ComponentNode } from "@design-sdk/figma-types";
 import type { DesignInput } from "@designto/config/input";
 
@@ -50,7 +50,13 @@ export interface FigmaReflectRepository {
   key: string;
 
   // TODO:
-  pages: { id: string; name: string; children: ReflectSceneNode[] }[];
+  pages: {
+    id: string;
+    name: string;
+    children: ReflectSceneNode[];
+    backgroundColor: RGBA;
+    flowStartingPoints: any[];
+  }[];
   components: { [key: string]: ComponentNode };
   // styles: { [key: string]: {} };
   input: DesignInput;

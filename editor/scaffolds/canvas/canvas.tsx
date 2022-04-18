@@ -31,9 +31,8 @@ export function VisualContentArea() {
     canvasMode_previous,
   } = state;
 
-  const thisPageNodes = selectedPage
-    ? design.pages.find((p) => p.id == selectedPage).children.filter(Boolean)
-    : [];
+  const thisPage = design?.pages?.find((p) => p.id == selectedPage);
+  const thisPageNodes = selectedPage ? thisPage.children.filter(Boolean) : [];
 
   const isEmptyPage = thisPageNodes?.length === 0;
 
@@ -72,6 +71,12 @@ export function VisualContentArea() {
       }),
     [dispatch]
   );
+
+  const _bg =
+    thisPage?.backgroundColor &&
+    `rgba(${thisPage.backgroundColor.r * 255}, ${
+      thisPage.backgroundColor.g * 255
+    }, ${thisPage.backgroundColor.b * 255}, ${thisPage.backgroundColor.a})`;
 
   return (
     <CanvasContainer ref={canvasSizingRef} id="canvas">
@@ -113,6 +118,7 @@ export function VisualContentArea() {
               ]}
               filekey={state.design.key}
               pageid={selectedPage}
+              backgroundColor={_bg}
               selectedNodes={selectedNodes}
               highlightedLayer={highlightedLayer}
               onSelectNode={(...nodes) => {
