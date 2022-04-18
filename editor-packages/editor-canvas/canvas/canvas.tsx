@@ -9,7 +9,7 @@ import {
   OnPointerDownHandler,
   OnDragHandler,
 } from "../canvas-event-target";
-import { get_hovering_target, centerOf } from "../math";
+import { get_hovering_target, centerOf, edge_scrolling } from "../math";
 import { utils } from "@design-sdk/core";
 import { LazyFrame } from "@code-editor/canvas/lazy-frame";
 import { HudCustomRenderers, HudSurface } from "../hud";
@@ -131,6 +131,7 @@ export function Canvas({
     ? [offset[0] / zoom, offset[1] / zoom]
     : [0, 0];
   const [isPanning, setIsPanning] = useState(false);
+  const [isDraggomg, setIsDragging] = useState(false);
   const [marquee, setMarquee] = useState<XYWH>(null);
 
   const cvtransform: CanvasTransform = {
@@ -152,7 +153,7 @@ export function Canvas({
   }, [highlightedLayer]);
 
   const onPointerMove: OnPointerMoveHandler = (state) => {
-    if (isPanning || isZooming) {
+    if (isPanning || isZooming || isDraggomg) {
       // don't perform hover calculation while transforming.
       return;
     }
@@ -223,6 +224,12 @@ export function Canvas({
     setOffset([newx, newy]);
   };
 
+  const onDragStart: OnDragHandler = (s) => {
+    onClearSelection();
+    setIsDragging(true);
+    setHoveringLayer(null);
+  };
+
   const onDrag: OnDragHandler = (s) => {
     const [x1, y1] = s.initial;
     const [x2, y2] = [
@@ -239,11 +246,20 @@ export function Canvas({
       x2 - x1, // w
       y2 - y1, // h
     ];
+
     setMarquee([x, y, w, h]);
+
+    // edge scrolling
+    const [cx, cy] = [x2, y2];
+    const [dx, dy] = edge_scrolling(cx, cy, viewbound);
+    if (dx || dy) {
+      setOffset([ox + dx, oy + dy]);
+    }
   };
 
   const onDragEnd: OnDragHandler = (s) => {
     setMarquee(null);
+    setIsDragging(false);
   };
 
   const is_canvas_transforming = isPanning || isZooming;
@@ -299,8 +315,8 @@ export function Canvas({
         onPointerMoveStart={() => {}}
         onPointerMoveEnd={() => {}}
         onPointerDown={onPointerDown}
+        onDragStart={onDragStart}
         onDrag={onDrag}
-        onDragStart={() => {}} // TODO:
         onDragEnd={onDragEnd}
       >
         <HudSurface
