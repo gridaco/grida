@@ -40,7 +40,7 @@ export function LazyFrame({
           style={{
             width: "100%",
             height: "100%",
-            display: inViewport ? "block" : "none",
+            contentVisibility: inViewport ? "visible" : "hidden",
           }}
         >
           {children}
