@@ -229,30 +229,35 @@ export function Canvas({
     onClearSelection();
     setIsDragging(true);
     setHoveringLayer(null);
+
+    // set the marquee start point
+    const [x, y] = s.initial;
+    const [ox, oy] = offset;
+    const [x1, y1] = [x - ox, y - oy];
+    setMarquee([x1, y1, 0, 0]);
   };
 
   const onDrag: OnDragHandler = (s) => {
-    const [x1, y1] = s.initial;
-    const [x2, y2] = [
+    const [ox, oy] = offset;
+    const [x, y] = [
       // @ts-ignore
       s.event.clientX,
       // @ts-ignore
       s.event.clientY,
     ];
 
-    const [ox, oy] = offset;
-    const [x, y, w, h] = [
-      x1 - ox,
-      y1 - oy,
-      x2 - x1, // w
-      y2 - y1, // h
-    ];
+    const [x1, y1] = [x - ox, y - oy];
 
-    // FIXME: marquee logic incomplete
-    setMarquee([x, y, w, h]);
+    if (marquee) {
+      const [w, h] = [
+        x1 - marquee[0], // w
+        y1 - marquee[1], // h
+      ];
+      setMarquee([marquee[0], marquee[1], w, h]);
+    }
 
     // edge scrolling
-    const [cx, cy] = [x2, y2];
+    const [cx, cy] = [x, y];
     const [dx, dy] = edge_scrolling(cx, cy, viewbound);
     if (dx || dy) {
       setOffset([ox + dx, oy + dy]);
