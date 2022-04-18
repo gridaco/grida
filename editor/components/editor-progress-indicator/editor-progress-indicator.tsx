@@ -14,10 +14,14 @@ export function EditorProgressIndicator({
 }) {
   return (
     <Popover.Root>
-      <Popover.Trigger>
+      <StyledTrigger>
         <EditorProgressIndicatorButton isBusy={isBusy} />
-      </Popover.Trigger>
-      <Popover.Content>
+      </StyledTrigger>
+      <Popover.Content
+        style={{
+          marginTop: 8,
+        }}
+      >
         <EditorProgressIndicatorPopoverContent>
           {tasks.map((task, index) => (
             <EditorTaskItem
@@ -32,3 +36,9 @@ export function EditorProgressIndicator({
     </Popover.Root>
   );
 }
+
+const StyledTrigger = styled(Popover.Trigger)`
+  outline: none;
+  border: none;
+  background: none;
+`;
