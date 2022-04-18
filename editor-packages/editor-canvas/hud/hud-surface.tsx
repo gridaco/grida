@@ -2,11 +2,13 @@ import React from "react";
 import {
   HoverOutlineHighlight,
   ReadonlySelectHightlight,
+  InSelectionGroupSelectHighlight,
   SelectHightlight,
 } from "../overlay";
 import { FrameTitle, FrameTitleProps } from "../frame-title";
 import type { XY, XYWH } from "../types";
 import { Marquee } from "../marquee";
+import { boundingbox, box_to_xywh } from "../math";
 interface HudControls {
   onSelectNode: (node: string) => void;
   onHoverNode: (node: string) => void;
@@ -37,6 +39,7 @@ export function HudSurface({
   labelDisplayNodes,
   selectedNodes,
   readonly,
+  disableGrouping = false,
   onSelectNode,
   onHoverNode,
   marquee,
@@ -52,6 +55,7 @@ export function HudSurface({
   hide: boolean;
   marquee?: XYWH;
   disableMarquee?: boolean;
+  disableGrouping?: boolean;
   readonly: boolean;
 } & HudControls &
   HudCustomRenderers) {
@@ -113,40 +117,85 @@ export function HudSurface({
                 />
               );
             })}
-          {selectedNodes &&
-            selectedNodes.map((s) => {
-              const xywh: [number, number, number, number] = [
-                s.absoluteX,
-                s.absoluteY,
-                s.width,
-                s.height,
-              ];
-              if (readonly) {
-                return (
-                  <ReadonlySelectHightlight
-                    key={s.id}
-                    type="xywhr"
-                    xywh={xywh}
-                    rotation={s.rotation}
-                    zoom={zoom}
-                    width={1}
-                  />
-                );
-              } else {
-                return (
-                  <SelectHightlight
-                    key={s.id}
-                    type="xywhr"
-                    xywh={xywh}
-                    rotation={s.rotation}
-                    zoom={zoom}
-                  />
-                );
-              }
-            })}
+          {selectedNodes?.length &&
+            (disableGrouping ? (
+              selectedNodes.map((s) => {
+                const xywh: [number, number, number, number] = [
+                  s.absoluteX,
+                  s.absoluteY,
+                  s.width,
+                  s.height,
+                ];
+                if (readonly) {
+                  return (
+                    <ReadonlySelectHightlight
+                      key={s.id}
+                      type="xywhr"
+                      xywh={xywh}
+                      rotation={s.rotation}
+                      zoom={zoom}
+                      width={1}
+                    />
+                  );
+                } else {
+                  return (
+                    <SelectHightlight
+                      key={s.id}
+                      type="xywhr"
+                      xywh={xywh}
+                      rotation={s.rotation}
+                      zoom={zoom}
+                    />
+                  );
+                }
+              })
+            ) : (
+              <SelectionGroupHighlight selections={selectedNodes} zoom={zoom} />
+            ))}
         </>
       )}
     </div>
+  );
+}
+
+function SelectionGroupHighlight({
+  selections,
+  zoom,
+}: {
+  selections: DisplayNodeMeta[];
+  zoom: number;
+}) {
+  const box = boundingbox(
+    selections.map((d) => {
+      return [d.absoluteX, d.absoluteY, d.width, d.height, d.rotation];
+    }),
+    2
+  );
+
+  const xywh = box_to_xywh(box);
+
+  return (
+    <>
+      <>
+        {selections.map((s) => {
+          return (
+            <InSelectionGroupSelectHighlight
+              key={s.id}
+              type={"xywhr"}
+              xywh={[s.absoluteX, s.absoluteY, s.width, s.height]}
+              zoom={zoom}
+            />
+          );
+        })}
+      </>
+      <SelectHightlight
+        key={"selections-highlight"}
+        type="xywhr"
+        xywh={xywh}
+        rotation={0}
+        zoom={zoom}
+      />
+    </>
   );
 }
 

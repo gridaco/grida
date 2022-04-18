@@ -145,6 +145,9 @@ export function VisualContentArea() {
                 marquee: {
                   disabled: false,
                 },
+                grouping: {
+                  disabled: false,
+                },
               }}
               renderFrameTitle={(p) => (
                 <FrameTitleRenderer

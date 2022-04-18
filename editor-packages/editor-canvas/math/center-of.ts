@@ -1,4 +1,5 @@
-import type { Box, XY } from "../types";
+import type { Box, XY, XYWHR } from "../types";
+import { boundingbox } from "./bounding-box";
 
 type Rect = {
   x: number;
@@ -24,6 +25,9 @@ export function centerOf(
   translate: XY;
   scale: number;
 } {
+  const xywhrs = rects.map((r) => {
+    return [r.x, r.y, r.width, r.height, r.rotation] as XYWHR;
+  });
   if (!rects || rects.length === 0) {
     return {
       box: viewbound,
@@ -36,7 +40,7 @@ export function centerOf(
     };
   }
 
-  const [x1, y1, x2, y2] = bound(...rects);
+  const [x1, y1, x2, y2] = boundingbox(xywhrs, 2);
   // box containing the rects.
   const box: Box = [x1, y1, x2, y2];
   // center of the box, viewbound not considered.
@@ -61,22 +65,6 @@ export function centerOf(
     translate: translate,
     scale: scale,
   };
-}
-
-function bound(...rects: Rect[]): Box {
-  let x1 = Infinity;
-  let y1 = Infinity;
-  let x2 = -Infinity;
-  let y2 = -Infinity;
-  for (const rect of rects) {
-    const { x, y, width: w, height: h } = rect;
-    // TODO: handle rotation. (no rotation for now)
-    x1 = Math.min(x1, x);
-    y1 = Math.min(y1, y);
-    x2 = Math.max(x2, x + w);
-    y2 = Math.max(y2, y + h);
-  }
-  return [x1, y1, x2, y2];
 }
 
 function rotate(x: number, y: number, r: number): [number, number] {

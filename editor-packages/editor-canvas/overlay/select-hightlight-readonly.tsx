@@ -1,7 +1,7 @@
 import React from "react";
 import type { OutlineProps } from "./types";
 import { color_layer_readonly_highlight } from "../theme";
-import { get_boinding_box } from "./math";
+import { xywh_to_bounding_box } from "../math";
 import { OulineSide } from "./outline-side";
 import { OverlayContainer } from "./overlay-container";
 import { Handle } from "./handle";
@@ -11,7 +11,7 @@ export function ReadonlySelectHightlight({
   ...props
 }: OutlineProps) {
   const { xywh, zoom, rotation } = props;
-  const bbox = get_boinding_box({ xywh, scale: zoom });
+  const bbox = xywh_to_bounding_box({ xywh, scale: zoom });
   const wh: [number, number] = [xywh[2], xywh[3]];
 
   const handle_outline_width = width;

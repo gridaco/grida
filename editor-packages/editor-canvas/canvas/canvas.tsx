@@ -56,6 +56,7 @@ type CanvasCustomRenderers = HudCustomRenderers & {
 interface CanvsPreferences {
   can_highlight_selected_layer?: boolean;
   marquee: MarqueeOprions;
+  grouping: GroupingOptions;
 }
 
 interface MarqueeOprions {
@@ -67,9 +68,20 @@ interface MarqueeOprions {
   disabled?: boolean;
 }
 
+interface GroupingOptions {
+  /**
+   * disable grouping - multiple selections will not be grouped.
+   * @default false
+   **/
+  disabled?: boolean;
+}
+
 const default_canvas_preferences: CanvsPreferences = {
   can_highlight_selected_layer: false,
   marquee: {
+    disabled: false,
+  },
+  grouping: {
     disabled: false,
   },
 };
@@ -367,6 +379,7 @@ export function Canvas({
           hide={is_canvas_transforming}
           readonly={readonly}
           disableMarquee={config.marquee.disabled}
+          disableGrouping={config.grouping.disabled}
           marquee={marquee}
           labelDisplayNodes={nodes}
           selectedNodes={selected_nodes}

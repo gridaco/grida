@@ -69,7 +69,10 @@ export default function CanvasServerPage() {
         config={{
           can_highlight_selected_layer: true,
           marquee: {
-            disabled: true,
+            disabled: false,
+          },
+          grouping: {
+            disabled: false,
           },
         }}
         renderFrameTitle={(p) => (
