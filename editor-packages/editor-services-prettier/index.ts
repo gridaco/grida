@@ -10,16 +10,20 @@ export function registerDocumentPrettier(editor, monaco) {
 
   const dartFormattingEditProvider = {
     provideDocumentFormattingEdits: (model, options, token) => {
-      const raw = model.getValue();
-      const { code, error } = formatDartCode(raw);
-      if (error) return [];
-      __dangerous__lastFormattedValue__global = code;
-      return [
-        {
-          range: model.getFullModelRange(),
-          text: code,
-        },
-      ];
+      try {
+        const raw = model.getValue();
+        const { code, error } = formatDartCode(raw);
+        if (error) return [];
+        __dangerous__lastFormattedValue__global = code;
+        return [
+          {
+            range: model.getFullModelRange(),
+            text: code,
+          },
+        ];
+      } catch (_) {
+        // ignore. this is caused by disposed model
+      }
     },
   };
 
@@ -31,19 +35,23 @@ export function registerDocumentPrettier(editor, monaco) {
         );
       }
 
-      const { canceled, error, pretty } = await prettierWorker?.emit({
-        text: model.getValue(),
-        language: model._languageId,
-      });
+      try {
+        const { canceled, error, pretty } = await prettierWorker?.emit({
+          text: model.getValue(),
+          language: model._languageId,
+        });
 
-      if (canceled || error) return [];
-      __dangerous__lastFormattedValue__global = pretty;
-      return [
-        {
-          range: model.getFullModelRange(),
-          text: pretty,
-        },
-      ];
+        if (canceled || error) return [];
+        __dangerous__lastFormattedValue__global = pretty;
+        return [
+          {
+            range: model.getFullModelRange(),
+            text: pretty,
+          },
+        ];
+      } catch (_) {
+        // ignore. this is caused by disposed model
+      }
     },
   };
 

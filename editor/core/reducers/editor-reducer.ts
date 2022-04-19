@@ -31,7 +31,7 @@ export function editorReducer(state: EditorState, action: Action): EditorState {
 
       if (ids.length > 1 && ids.length === current_node.length) {
         // the selection event is always triggered by user, which means selecting same amount of nodes (greater thatn 1, and having a different node array is impossible.)
-        return;
+        return produce(state, (draft) => {});
       }
 
       console.clear();
