@@ -1,4 +1,4 @@
-import type { XYWH, X1Y1X2Y2, Box, XYWHR } from "../types";
+import type { XYWH, Box, XYWHR, XY } from "../types";
 
 export function xywh_to_bounding_box({
   xywh,
@@ -40,6 +40,12 @@ export function boundingbox(
     y2 = Math.max(y2, _y2);
   }
   return [x1, y1, x2, y2];
+}
+
+export function is_point_inside_box(point: XY, box: Box) {
+  const [x, y] = point;
+  const [x1, y1, x2, y2] = box;
+  return x >= x1 && x <= x2 && y >= y1 && y <= y2;
 }
 
 /**

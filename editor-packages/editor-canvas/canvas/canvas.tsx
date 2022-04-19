@@ -14,6 +14,8 @@ import {
   centerOf,
   edge_scrolling,
   target_of_area,
+  boundingbox,
+  is_point_inside_box,
 } from "../math";
 import { utils } from "@design-sdk/core";
 import { LazyFrame } from "@code-editor/canvas/lazy-frame";
@@ -95,6 +97,9 @@ export function Canvas({
   viewbound,
   renderItem,
   onSelectNode,
+  onMoveNodeStart,
+  onMoveNode,
+  onMoveNodeEnd,
   onClearSelection,
   filekey,
   pageid,
@@ -109,6 +114,9 @@ export function Canvas({
 }: {
   viewbound: Box;
   onSelectNode?: (...node: ReflectSceneNode[]) => void;
+  onMoveNodeStart?: (...node: string[]) => void;
+  onMoveNode?: (delta: XY, ...node: string[]) => void;
+  onMoveNodeEnd?: (delta: XY, ...node: string[]) => void;
   onClearSelection?: () => void;
 } & CanvasCustomRenderers &
   CanvasState & {
@@ -150,7 +158,8 @@ export function Canvas({
     ? [offset[0] / zoom, offset[1] / zoom]
     : [0, 0];
   const [isPanning, setIsPanning] = useState(false);
-  const [isDraggomg, setIsDragging] = useState(false);
+  const [isDraggimg, setIsDragging] = useState(false);
+  const [isMovingSelections, setIsMovingSelections] = useState(false);
   const [marquee, setMarquee] = useState<XYWH>(null);
 
   const cvtransform: CanvasTransform = {
@@ -200,7 +209,7 @@ export function Canvas({
   }, [marquee]);
 
   const onPointerMove: OnPointerMoveHandler = (state) => {
-    if (isPanning || isZooming || isDraggomg) {
+    if (isPanning || isZooming || isDraggimg) {
       // don't perform hover calculation while transforming.
       return;
     }
@@ -230,9 +239,16 @@ export function Canvas({
   };
 
   const onPointerDown: OnPointerDownHandler = (state) => {
+    const [x, y] = [state.event.clientX, state.event.clientY];
+
     if (isPanning || isZooming) {
       return;
     }
+
+    if (shouldStartMoveSelections([x, y])) {
+      return; // don't do anything. onDrag will handle this. only block the event.
+    }
+
     if (hoveringLayer) {
       switch (hoveringLayer.reason) {
         case "frame-title":
@@ -274,7 +290,6 @@ export function Canvas({
   };
 
   const onDragStart: OnDragHandler = (s) => {
-    onClearSelection();
     setIsDragging(true);
     setHoveringLayer(null);
 
@@ -282,7 +297,33 @@ export function Canvas({
     const [x, y] = s.initial;
     const [ox, oy] = offset;
     const [x1, y1] = [x - ox, y - oy];
+
+    // if dragging a selection group bounding box, move the selected items.
+    if (shouldStartMoveSelections([x, y])) {
+      setIsMovingSelections(true);
+      onMoveNodeStart?.(...selectedNodes);
+      return;
+    }
+
+    // else, clear and start a marquee
+    onClearSelection();
     setMarquee([x1, y1, 0, 0]);
+  };
+
+  const shouldStartMoveSelections = ([cx, cy]) => {
+    // x, y is a client x, y.
+    const [ox, oy] = offset;
+    [cx, cy] = [cx - ox, cy - oy];
+    const [x, y] = [cx / zoom, cy / zoom];
+
+    const box = boundingbox(
+      selected_nodes.map((d) => {
+        return [d.absoluteX, d.absoluteY, d.width, d.height, d.rotation];
+      }),
+      2
+    );
+
+    return is_point_inside_box([x, y], box);
   };
 
   const onDrag: OnDragHandler = (s) => {
@@ -295,6 +336,11 @@ export function Canvas({
     ];
 
     const [x1, y1] = [x - ox, y - oy];
+
+    if (isMovingSelections) {
+      const [dx, dy] = s.delta;
+      onMoveNode?.([dx / zoom, dy / zoom], ...selectedNodes);
+    }
 
     if (marquee) {
       const [w, h] = [
@@ -315,6 +361,18 @@ export function Canvas({
   const onDragEnd: OnDragHandler = (s) => {
     setMarquee(null);
     setIsDragging(false);
+    if (isMovingSelections) {
+      const [ix, iy] = s.initial;
+      const [fx, fy] = [
+        //@ts-ignore
+        s.event.clientX,
+        //@ts-ignore
+        s.event.clientY,
+      ];
+
+      onMoveNodeEnd?.([(fx - ix) / zoom, (fy - iy) / zoom], ...selectedNodes);
+      setIsMovingSelections(false);
+    }
   };
 
   const is_canvas_transforming = isPanning || isZooming;

@@ -124,6 +124,14 @@ export function VisualContentArea() {
               onSelectNode={(...nodes) => {
                 dispatch({ type: "select-node", node: nodes.map((n) => n.id) });
               }}
+              onMoveNodeEnd={([x, y], ...nodes) => {
+                dispatch({
+                  type: "node-transform-translate",
+                  node: nodes,
+                  translate: [x, y],
+                });
+              }}
+              onMoveNode={() => {}}
               onClearSelection={() => {
                 dispatch({ type: "select-node", node: null });
               }}
