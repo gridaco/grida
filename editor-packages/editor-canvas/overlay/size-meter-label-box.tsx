@@ -3,6 +3,8 @@ import styled from "@emotion/styled";
 import type { XYWH } from "../types";
 import { xywh_to_bounding_box } from "../math";
 
+const font_size = 10;
+
 export function SizeMeterLabelBox({
   size,
   anchor = "s",
@@ -29,42 +31,33 @@ export function SizeMeterLabelBox({
   const boxWidth = x2 - x1; // use this to center position the label
 
   const text = `${+size.width.toFixed(2)} x ${+size.height.toFixed()}`;
+  const labelwidth = (text.length * font_size) / 1.8; // a view width assumption (we will not use flex box for faster painting)
+  const viewwidth = labelwidth + 4; // 4 is for horizontal padding
+
+  const [tx, ty] = [x1 + boxWidth / 2 - viewwidth / 2, y2 + margin];
 
   return (
     <div
       id="size-meter"
       style={{
-        display: "flex",
-        minWidth: size.width * zoom,
-        justifyContent: "center",
+        minWidth: viewwidth,
         position: "absolute",
         pointerEvents: "none",
-        transform: `translate3d(${x1}px, ${y2 + margin}px, 0)`,
+        transform: `translate3d(${tx}px, ${ty}px, 0)`,
         willChange: "transform, opacity",
+        boxSizing: "border-box",
+        whiteSpace: "nowrap",
+        borderRadius: 4,
+        background: "rgb(0, 87, 255)",
+        padding: "2px 4px",
+        color: "white",
+        fontSize: font_size,
+        fontFamily: "Inter, sans-serif",
+        fontWeight: 500,
+        textAlign: "center",
       }}
     >
-      <Container>
-        <Label>{text}</Label>
-      </Container>
+      {text}
     </div>
   );
 }
-
-const Container = styled.div`
-  display: flex;
-  border-radius: 4px;
-  background-color: rgb(0, 87, 255);
-  box-sizing: border-box;
-  overflow: auto;
-  padding: 2px 4px;
-`;
-
-const Label = styled.span`
-  width: max-content;
-  color: white;
-  text-overflow: ellipsis;
-  font-size: 10px;
-  font-family: Inter, sans-serif;
-  font-weight: 500;
-  text-align: center;
-`;
