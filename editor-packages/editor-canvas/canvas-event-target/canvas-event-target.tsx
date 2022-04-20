@@ -25,6 +25,7 @@ export type OnPointerDownHandler = (
 const ZOOM_WITH_SCROLL_SENSITIVITY = 0.001;
 
 export function CanvasEventTarget({
+  onZoomToFit,
   onPanning,
   onPanningStart,
   onPanningEnd,
@@ -40,6 +41,7 @@ export function CanvasEventTarget({
   onDragEnd,
   children,
 }: {
+  onZoomToFit?: () => void;
   onPanning: OnPanningHandler;
   onPanningStart: OnPanningHandler;
   onPanningEnd: OnPanningHandler;
@@ -68,6 +70,10 @@ export function CanvasEventTarget({
       // if spacebar is pressed, enable panning wirt dragging.
       if (e.code === "Space") {
         setIsSpacebarPressed(true);
+      }
+      // if shift + 0
+      else if (e.code === "Digit0" && e.shiftKey) {
+        onZoomToFit?.();
       }
     };
     const ku = (e) => {

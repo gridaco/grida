@@ -416,6 +416,10 @@ export function Canvas({
           setIsPanning(false);
           _canvas_state_store.saveLastTransform(cvtransform);
         }}
+        onZoomToFit={() => {
+          setZoom(1);
+          _canvas_state_store.saveLastTransform(cvtransform);
+        }}
         onZooming={onZooming}
         onZoomingStart={() => {
           setIsZooming(true);
