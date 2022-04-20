@@ -19,6 +19,19 @@ export function xywh_to_bounding_box({
   return [x1, y1, x2, y2];
 }
 
+/**
+ * @deprecated - not tested
+ * @param box
+ * @param zoom
+ * @returns
+ */
+export function zoom_box(box: Box, zoom: number): Box {
+  const [x1, y1, x2, y2] = box;
+  const [w, h] = [x2 - x1, y2 - y1];
+  const [dw, dh] = [w * zoom, h * zoom];
+  return [x1 * zoom, y1 * zoom, x1 + dw, y1 + dh];
+}
+
 type BoundingBoxInput =
   | (Box & { type?: 0 })
   | (XYWH & { type?: 1 })

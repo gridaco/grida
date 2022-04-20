@@ -4,6 +4,7 @@ import {
   ReadonlySelectHightlight,
   InSelectionGroupSelectHighlight,
   SelectHightlight,
+  SizeMeterLabelBox,
 } from "../overlay";
 import { FrameTitle, FrameTitleProps } from "../frame-title";
 import type { XY, XYWH } from "../types";
@@ -164,9 +165,11 @@ export function HudSurface({
 function SelectionGroupHighlight({
   selections,
   zoom,
+  disableSizeDisplay = false,
 }: {
   selections: DisplayNodeMeta[];
   zoom: number;
+  disableSizeDisplay?: boolean;
 }) {
   const box = boundingbox(
     selections.map((d) => {
@@ -176,6 +179,7 @@ function SelectionGroupHighlight({
   );
 
   const xywh = box_to_xywh(box);
+  const [x, y, w, h] = xywh;
 
   return (
     <>
@@ -190,6 +194,22 @@ function SelectionGroupHighlight({
             />
           );
         })}
+      </>
+      <>
+        {!disableSizeDisplay ? (
+          <SizeMeterLabelBox
+            xywh={xywh}
+            zoom={zoom}
+            anchor="s"
+            margin={8}
+            size={{
+              width: w,
+              height: h,
+            }}
+          />
+        ) : (
+          <></>
+        )}
       </>
       <SelectHightlight
         key={"selections-highlight"}
