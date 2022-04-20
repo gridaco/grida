@@ -28,7 +28,7 @@ export type ActionType = Action["type"];
 export type HierarchyAction = SelectNodeAction;
 export interface SelectNodeAction {
   type: "select-node";
-  node: string;
+  node: string | string[];
 }
 
 export type PageAction = SelectPageAction;
