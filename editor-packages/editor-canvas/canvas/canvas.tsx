@@ -418,6 +418,7 @@ export function Canvas({
         }}
         onZoomToFit={() => {
           setZoom(1);
+          // setOffset([newx, newy]); // TODO: set offset to center of the viewport
           _canvas_state_store.saveLastTransform(cvtransform);
         }}
         onZooming={onZooming}
