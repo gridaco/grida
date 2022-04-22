@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import {
   D2CVanillaPreview,
   WebWorkerD2CVanillaPreview,
-} from "scaffolds/preview";
+} from "scaffolds/preview-canvas";
 import { Canvas } from "@code-editor/canvas";
 import useMeasure from "react-use-measure";
 import { FrameTitleRenderer } from "scaffolds/canvas/render/frame-title";
@@ -16,17 +16,6 @@ export default function CanvasServerPage() {
 
   const [canvasSizingRef, canvasBounds] = useMeasure();
   const [selectedPage, setSelectedPage] = useState<string | null>(null);
-
-  // useEffect(() => {
-  //   const handler = (e) => {
-  //     //
-  //   };
-
-  //   window.addEventListener("message", handler);
-  //   return () => {
-  //     window.removeEventListener("message", handler);
-  //   };
-  // }, []);
 
   // const thisPageNodes = selectedPage
   //   ? design.pages.find((p) => p.id == selectedPage).children.filter(Boolean)
