@@ -17,5 +17,5 @@ const react_preset_dependencies = [
  */
 export function registerPresetTypes() {
   // load the react presets
-  loadTypes(react_preset_dependencies);
+  return loadTypes(react_preset_dependencies);
 }
