@@ -1,12 +1,24 @@
 import * as monaco from "monaco-editor";
-import { Monaco, OnMount } from "@monaco-editor/react";
+import { Monaco } from "@monaco-editor/react";
 import { registerDocumentPrettier } from "@code-editor/prettier-services";
 import { registerJsxHighlighter } from "@code-editor/jsx-syntax-highlight-services";
 type CompilerOptions = monaco.languages.typescript.CompilerOptions;
 
-export const initEditor: OnMount = (editor, monaco) => {
-  registerJsxHighlighter(editor, monaco);
-  registerDocumentPrettier(editor, monaco);
+export const initEditor = (
+  editor: monaco.editor.IStandaloneCodeEditor,
+  monaco: Monaco
+) => {
+  const { dispose: disposeJsxHighlighter } = registerJsxHighlighter(
+    editor,
+    monaco
+  );
+
+  const { dispose: disposePrettier } = registerDocumentPrettier(editor, monaco);
+
+  return () => {
+    disposeJsxHighlighter();
+    disposePrettier();
+  };
 };
 
 export const initMonaco = (monaco: Monaco) => {
