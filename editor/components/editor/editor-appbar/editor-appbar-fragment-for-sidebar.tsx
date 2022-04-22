@@ -1,6 +1,6 @@
 import React from "react";
 import styled from "@emotion/styled";
-import { ArrowBack } from "@material-ui/icons";
+import { ArrowBack } from "@mui/icons-material";
 import { useRouter } from "next/router";
 import { colors } from "theme";
 import ClientOnly from "components/client-only";

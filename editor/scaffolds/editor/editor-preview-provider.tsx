@@ -106,6 +106,16 @@ export function EditorPreviewDataProvider({
     [dispatch]
   );
 
+  const consoleLog = useCallback(
+    (p: { method; data }) => {
+      dispatch({
+        type: "devtools-console",
+        log: p,
+      });
+    },
+    [dispatch]
+  );
+
   const _is_mode_requires_preview_build =
     state.canvasMode === "fullscreen-preview" ||
     state.canvasMode === "isolated-view";
@@ -202,7 +212,12 @@ export function EditorPreviewDataProvider({
               componentName: componentName,
             });
           }
+        } else {
+          consoleLog({ ...d.err });
         }
+      })
+      .catch((e) => {
+        consoleLog({ method: "error", data: [e.message] });
       })
       .finally(() => {
         updateBuildingState(false);

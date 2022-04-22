@@ -2,7 +2,10 @@ import React from "react";
 import PIP from "./pip";
 import { ResizableBox } from "react-resizable";
 import "react-resizable/css/styles.css";
-import type { ResizableBoxProps as RawResizableBoxProps } from "react-resizable";
+import type {
+  ResizableBoxProps as RawResizableBoxProps,
+  ResizableProps,
+} from "react-resizable";
 import styled from "@emotion/styled";
 
 interface ResizableBoxProps
@@ -17,7 +20,7 @@ interface ResizableBoxProps
    * resize handle to display - a react component
    * @default none
    */
-  resizeHandle?: React.ReactNode;
+  resizeHandle?: ResizableProps["handle"];
   /**
    * @default 500
    */

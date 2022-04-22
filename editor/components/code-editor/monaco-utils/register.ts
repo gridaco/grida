@@ -2,6 +2,8 @@ import * as monaco from "monaco-editor";
 import { Monaco } from "@monaco-editor/react";
 import { registerDocumentPrettier } from "@code-editor/prettier-services";
 import { registerJsxHighlighter } from "@code-editor/jsx-syntax-highlight-services";
+import { registerPresetTypes } from "./register-preset-types";
+
 type CompilerOptions = monaco.languages.typescript.CompilerOptions;
 
 export const initEditor = (
@@ -15,9 +17,12 @@ export const initEditor = (
 
   const { dispose: disposePrettier } = registerDocumentPrettier(editor, monaco);
 
+  const { dispose: dispostPresetTypesLoader } = registerPresetTypes();
+
   return () => {
     disposeJsxHighlighter();
     disposePrettier();
+    dispostPresetTypesLoader();
   };
 };
 
