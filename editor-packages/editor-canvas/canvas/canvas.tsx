@@ -22,12 +22,15 @@ import { LazyFrame } from "@code-editor/canvas/lazy-frame";
 import { HudCustomRenderers, HudSurface } from "../hud";
 import type { Box, XY, CanvasTransform, XYWH } from "../types";
 import type { FrameOptimizationFactors } from "../frame";
-const designq = utils.query;
+import { TransformDraftingStore } from "../drafting";
+import {
+  CANVAS_LAYER_HOVER_HIT_MARGIN,
+  CANVAS_INITIAL_XY,
+  CANVAS_INITIAL_SCALE,
+  CANVAS_MIN_ZOOM,
+} from "../k";
 
-const INITIAL_SCALE = 0.5;
-const INITIAL_XY: XY = [0, 0];
-const LAYER_HOVER_HIT_MARGIN = 3.5;
-const MIN_ZOOM = 0.02;
+const designq = utils.query;
 
 interface CanvasState {
   pageid: string;
@@ -122,11 +125,6 @@ export function Canvas({
   CanvasState & {
     config?: CanvsPreferences;
   }) {
-  const _canvas_state_store = useMemo(
-    () => new CanvasStateStore(filekey, pageid),
-    [filekey, pageid]
-  );
-
   useEffect(() => {
     if (transformIntitialized) {
       return;
@@ -161,6 +159,16 @@ export function Canvas({
   const [isDraggimg, setIsDragging] = useState(false);
   const [isMovingSelections, setIsMovingSelections] = useState(false);
   const [marquee, setMarquee] = useState<XYWH>(null);
+
+  const is_canvas_transforming = isPanning || isZooming;
+  const selected_nodes = selectedNodes
+    ?.map((id) => designq.find_node_by_id_under_inpage_nodes(id, nodes))
+    .filter(Boolean);
+
+  const _canvas_state_store = useMemo(
+    () => new CanvasStateStore(filekey, pageid),
+    [filekey, pageid]
+  );
 
   const cvtransform: CanvasTransform = {
     scale: zoom,
@@ -218,7 +226,7 @@ export function Canvas({
       tree: nodes,
       zoom: zoom,
       offset: nonscaled_offset,
-      margin: LAYER_HOVER_HIT_MARGIN,
+      margin: CANVAS_LAYER_HOVER_HIT_MARGIN,
       reverse: true,
       ignore: (n) => selectedNodes.includes(n.id),
     });
@@ -277,7 +285,7 @@ export function Canvas({
     // the origin point of the zooming point in x, y
     const [ox, oy]: XY = state.origin;
 
-    const newzoom = Math.max(zoom + zoomdelta, MIN_ZOOM);
+    const newzoom = Math.max(zoom + zoomdelta, CANVAS_MIN_ZOOM);
 
     // calculate the offset that should be applied with scale with css transform.
     const [newx, newy] = [
@@ -374,11 +382,6 @@ export function Canvas({
       setIsMovingSelections(false);
     }
   };
-
-  const is_canvas_transforming = isPanning || isZooming;
-  const selected_nodes = selectedNodes
-    ?.map((id) => designq.find_node_by_id_under_inpage_nodes(id, nodes))
-    .filter(Boolean);
 
   const items = useMemo(() => {
     return nodes?.map((node) => {
@@ -541,8 +544,8 @@ function auto_initial_transform(
   nodes: ReflectSceneNode[]
 ): CanvasTransform {
   const _default = {
-    scale: INITIAL_SCALE,
-    xy: INITIAL_XY,
+    scale: CANVAS_INITIAL_SCALE,
+    xy: CANVAS_INITIAL_XY,
   };
 
   if (!nodes || viewbound_not_measured(viewbound)) {
