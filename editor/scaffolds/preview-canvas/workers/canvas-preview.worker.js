@@ -37,6 +37,7 @@ const framework_config = {
 };
 
 function initialize({ filekey, authentication }) {
+  console.info("initializing.. wwpreview");
   // ------- setup image repo with auth + filekey -------
   MainImageRepository.instance = new RemoteImageRepositories(filekey, {
     authentication: authentication,
@@ -57,6 +58,9 @@ function initialize({ filekey, authentication }) {
   // 2. format the data to reflect
   // 3. set the data status as 'ready'
   // (the below requests can be operated after when this processes are complete)
+  // indexedDB.open("").onsuccess = (event) => {
+  //   //
+  // };
 }
 
 addEventListener("message", async (event) => {
@@ -78,6 +82,7 @@ addEventListener("message", async (event) => {
       try {
         const { node } = event.data;
 
+        throw "not ready";
         const result = await designToCode({
           input: input,
           build_config: build_config,

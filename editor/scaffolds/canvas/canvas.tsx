@@ -12,6 +12,7 @@ import { FrameTitleRenderer } from "./render/frame-title";
 import { IsolateModeCanvas } from "./isolate-mode";
 import { Dialog } from "@material-ui/core";
 import { FullScreenPreview } from "scaffolds/preview-full-screen";
+import { EditorCanvasPreviewProvider } from "scaffolds/preview-canvas/editor-canvas-preview-provider";
 
 /**
  * Statefull canvas segment that contains canvas as a child, with state-data connected.
@@ -103,70 +104,75 @@ export function VisualContentArea() {
               onEnterFullscreen={startFullscreenPreviewMode}
             />
           )}
-          <div
-            style={{
-              display: canvasMode !== "free" && "none",
-            }}
-          >
-            <Canvas
-              key={selectedPage}
-              viewbound={[
-                canvasBounds.left,
-                canvasBounds.top,
-                canvasBounds.bottom,
-                canvasBounds.right,
-              ]}
-              filekey={state.design.key}
-              pageid={selectedPage}
-              backgroundColor={_bg}
-              selectedNodes={selectedNodes}
-              highlightedLayer={highlightedLayer}
-              onSelectNode={(...nodes) => {
-                dispatch({ type: "select-node", node: nodes.map((n) => n.id) });
+          <EditorCanvasPreviewProvider>
+            <div
+              style={{
+                display: canvasMode !== "free" && "none",
               }}
-              // onMoveNodeEnd={([x, y], ...nodes) => {
-              //   dispatch({
-              //     type: "node-transform-translate",
-              //     node: nodes,
-              //     translate: [x, y],
-              //   });
-              // }}
-              // onMoveNode={() => {}}
-              onClearSelection={() => {
-                dispatch({ type: "select-node", node: null });
-              }}
-              nodes={thisPageNodes}
-              // initialTransform={ } // TODO: if the initial selection is provided from first load, from the query param, we have to focus to fit that node.
-              renderItem={(p) => {
-                return (
-                  <WebWorkerD2CVanillaPreview
-                    key={p.node.id}
-                    target={p.node}
+            >
+              <Canvas
+                key={selectedPage}
+                viewbound={[
+                  canvasBounds.left,
+                  canvasBounds.top,
+                  canvasBounds.bottom,
+                  canvasBounds.right,
+                ]}
+                filekey={state.design.key}
+                pageid={selectedPage}
+                backgroundColor={_bg}
+                selectedNodes={selectedNodes}
+                highlightedLayer={highlightedLayer}
+                onSelectNode={(...nodes) => {
+                  dispatch({
+                    type: "select-node",
+                    node: nodes.map((n) => n.id),
+                  });
+                }}
+                // onMoveNodeEnd={([x, y], ...nodes) => {
+                //   dispatch({
+                //     type: "node-transform-translate",
+                //     node: nodes,
+                //     translate: [x, y],
+                //   });
+                // }}
+                // onMoveNode={() => {}}
+                onClearSelection={() => {
+                  dispatch({ type: "select-node", node: null });
+                }}
+                nodes={thisPageNodes}
+                // initialTransform={ } // TODO: if the initial selection is provided from first load, from the query param, we have to focus to fit that node.
+                renderItem={(p) => {
+                  return (
+                    <WebWorkerD2CVanillaPreview
+                      key={p.node.id}
+                      target={p.node}
+                      {...p}
+                    />
+                    // <D2CVanillaPreview key={p.node.id} target={p.node} {...p} />
+                  );
+                }}
+                readonly={false}
+                config={{
+                  can_highlight_selected_layer: true,
+                  marquee: {
+                    disabled: false,
+                  },
+                  grouping: {
+                    disabled: false,
+                  },
+                }}
+                renderFrameTitle={(p) => (
+                  <FrameTitleRenderer
+                    key={p.id}
                     {...p}
+                    runnable={selectedNodes.length === 1}
+                    onRunClick={startIsolatedViewMode}
                   />
-                  // <D2CVanillaPreview key={p.node.id} target={p.node} {...p} />
-                );
-              }}
-              readonly={false}
-              config={{
-                can_highlight_selected_layer: true,
-                marquee: {
-                  disabled: false,
-                },
-                grouping: {
-                  disabled: false,
-                },
-              }}
-              renderFrameTitle={(p) => (
-                <FrameTitleRenderer
-                  key={p.id}
-                  {...p}
-                  runnable={selectedNodes.length === 1}
-                  onRunClick={startIsolatedViewMode}
-                />
-              )}
-            />
-          </div>
+                )}
+              />
+            </div>
+          </EditorCanvasPreviewProvider>
         </>
       )}
     </CanvasContainer>

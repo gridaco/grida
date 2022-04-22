@@ -6,7 +6,7 @@ export function initialize(filekey: string, authentication) {
   // initialize the worker and set the preferences.
   if (!previewworker) {
     const { worker } = createWorkerQueue(
-      new Worker(new URL("./workers/vanilla.worker.js", import.meta.url))
+      new Worker(new URL("./workers/canvas-preview.worker.js", import.meta.url))
     );
 
     previewworker = worker;
