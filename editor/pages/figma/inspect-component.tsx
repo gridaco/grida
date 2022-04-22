@@ -4,12 +4,12 @@ import { tokenize } from "@designto/token";
 import React from "react";
 import { canvas } from "components";
 import { LayerHierarchy } from "components/editor-hierarchy";
-import { visualize_node } from "@code-editor/debugger/components/visualization";
+import { visualize_node } from "@code-editor/devtools/components/visualization";
 import {
   JsonTree,
   WidgetTree,
   WidgetTreeLegend,
-} from "@code-editor/debugger/components/visualization/json-visualization/json-tree";
+} from "@code-editor/devtools/components/visualization/json-visualization/json-tree";
 import { DefaultEditorWorkspaceLayout } from "layouts/default-editor-workspace-layout";
 import LoadingLayout from "layouts/loading-overlay";
 import {

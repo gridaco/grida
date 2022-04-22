@@ -1,8 +1,8 @@
 import React, { useState } from "react";
 import { canvas } from "components";
 import { ReflectSceneNode } from "@design-sdk/core";
-import { visualize_node } from "@code-editor/debugger/components/visualization";
-import { JsonTree } from "@code-editor/debugger/components/visualization/json-visualization/json-tree";
+import { visualize_node } from "@code-editor/devtools/components/visualization";
+import { JsonTree } from "@code-editor/devtools/components/visualization/json-visualization/json-tree";
 import { useReflectTargetNode } from "../../query/from-figma";
 
 export default function FigmaToReflectNodePage() {

@@ -1,5 +1,4 @@
-import React, { useEffect, useState } from "react";
-import styled from "@emotion/styled";
+import React from "react";
 import { DefaultEditorWorkspaceLayout } from "layouts/default-editor-workspace-layout";
 import { HomeHeading, HomeSidebar } from "components/home";
 import Link from "next/link";

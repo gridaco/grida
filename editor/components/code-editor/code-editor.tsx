@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { MonacoEditor, MonacoEditorProps as MonacoEditorProps } from "./monaco";
-import { Tabs, Tab } from "@material-ui/core";
+import { Tabs, Tab } from "@mui/material";
 
 export interface CodeEditorProps
   extends Omit<MonacoEditorProps, "defaultValue" | "defaultLanguage"> {}
@@ -35,8 +35,10 @@ export function CodeEditor({
         <Tabs
           value={filekey}
           onChange={handleChange}
+          indicatorColor="primary"
+          textColor="inherit"
           variant="scrollable"
-          scrollButtons="off"
+          scrollButtons={false}
           style={{ color: "white" }}
           aria-label="scrollable prevent tabs example"
         >

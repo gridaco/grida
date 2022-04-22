@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import styled from "@emotion/styled";
 import { useRouter } from "next/router";
 import { ClearRemoteDesignSessionCache } from "components/clear-remote-design-session-cache";
-import { WidgetTree } from "@code-editor/debugger/components/visualization/json-visualization/json-tree";
+import { WidgetTree } from "@code-editor/devtools/components/visualization/json-visualization/json-tree";
 import Link from "next/link";
 
 export const Debugger = ({

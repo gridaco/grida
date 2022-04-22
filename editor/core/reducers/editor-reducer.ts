@@ -9,6 +9,8 @@ import type {
   TranslateNodeAction,
   PreviewBuildingStateUpdateAction,
   PreviewSetAction,
+  DevtoolsConsoleAction,
+  DevtoolsConsoleClearAction,
 } from "core/actions";
 import { EditorState } from "core/states";
 import { useRouter } from "next/router";
@@ -28,6 +30,15 @@ export function editorReducer(state: EditorState, action: Action): EditorState {
       const ids = Array.isArray(node) ? node : [node];
 
       const current_node = state.selectedNodes;
+
+      if (
+        ids.length <= 1 &&
+        current_node.length <= 1 &&
+        ids[0] === current_node[0]
+      ) {
+        // same selection (no selection or same 1 selection)
+        return produce(state, (draft) => {});
+      }
 
       if (ids.length > 1 && ids.length === current_node.length) {
         // the selection event is always triggered by user, which means selecting same amount of nodes (greater thatn 1, and having a different node array is impossible.)
@@ -181,6 +192,35 @@ export function editorReducer(state: EditorState, action: Action): EditorState {
       return produce(state, (draft) => {
         draft.currentPreview = data; // set
       });
+    }
+    case "devtools-console": {
+      const { log } = <DevtoolsConsoleAction>action;
+      return produce(state, (draft) => {
+        if (!draft.devtoolsConsole?.logs?.length) {
+          draft.devtoolsConsole = { logs: [] };
+        }
+
+        const logs = Array.from(state.devtoolsConsole?.logs ?? []);
+        logs.push(log);
+
+        draft.devtoolsConsole.logs = logs;
+      });
+      break;
+    }
+    case "devtools-console-clear": {
+      const {} = <DevtoolsConsoleClearAction>action;
+      return produce(state, (draft) => {
+        if (draft.devtoolsConsole?.logs?.length) {
+          draft.devtoolsConsole.logs = [
+            {
+              id: "clear",
+              method: "info",
+              data: ["Console was cleared"],
+            },
+          ];
+        }
+      });
+      break;
     }
     default:
       throw new Error(`Unhandled action type: ${action["type"]}`);
