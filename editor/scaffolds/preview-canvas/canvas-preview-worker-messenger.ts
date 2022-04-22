@@ -2,7 +2,10 @@ import { createWorkerQueue } from "@code-editor/webworker-services-core";
 import type { Result } from "@designto/code";
 
 let previewworker: Worker;
-export function initialize(filekey: string, authentication) {
+export function initialize(
+  { filekey, authentication }: { filekey: string; authentication },
+  onReady: () => void
+) {
   // initialize the worker and set the preferences.
   if (!previewworker) {
     const { worker } = createWorkerQueue(
@@ -13,9 +16,15 @@ export function initialize(filekey: string, authentication) {
   }
 
   previewworker.postMessage({
-    $type: "init",
+    $type: "initialize",
     filekey,
     authentication,
+  });
+
+  previewworker.addEventListener("message", (e) => {
+    if (e.data.$type === "data-readt") {
+      onReady();
+    }
   });
 
   return () => {
@@ -26,24 +35,33 @@ export function initialize(filekey: string, authentication) {
 }
 
 export function preview(
-  node: string,
+  { target, page }: { target: string; page: string },
   onResult: (result: Result) => void,
   onError?: (error: Error) => void
 ) {
   previewworker.postMessage({
     $type: "preview",
-    node,
+    page,
+    target,
   });
 
-  previewworker.addEventListener("message", (e) => {
-    // TODO: add id matcher (?)
-    switch (e.data.$type) {
-      case "result":
-        onResult(e.data);
-        break;
-      case "error":
-        onError(new Error(e.data.message));
-        break;
+  const handler = (e) => {
+    const id = e.data.id;
+    if (target === id) {
+      switch (e.data.$type) {
+        case "result":
+          onResult(e.data);
+          break;
+        case "error":
+          onError(new Error(e.data.message));
+          break;
+      }
     }
-  });
+  };
+
+  previewworker.addEventListener("message", handler);
+
+  return () => {
+    previewworker.removeEventListener("message", handler);
+  };
 }

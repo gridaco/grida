@@ -1,7 +1,7 @@
 import React, { useEffect } from "react";
 import { useFigmaAccessToken } from "hooks/use-figma-access-token";
-import { initialize } from "scaffolds/preview-canvas/canvas-preview-worker-messenger";
 import { useEditorState } from "core/states";
+import { initialize } from "./canvas-preview-worker-messenger";
 
 export function EditorCanvasPreviewProvider({
   children,
@@ -13,12 +13,18 @@ export function EditorCanvasPreviewProvider({
 
   useEffect(() => {
     if (
-      state.design.key &&
+      state.design?.key &&
       (fat.personalAccessToken || !fat.accessToken.loading)
     ) {
-      initialize(state.design.key, fat);
+      const authentication = {
+        personalAccessToken: fat.personalAccessToken,
+        accessToken: fat.accessToken.token,
+      };
+      initialize({ filekey: state.design.key, authentication }, () => {
+        //
+      });
     }
-  }, [fat, state.design.key]);
+  }, [fat.personalAccessToken, fat.accessToken.token, state.design?.key]);
 
   return <>{children}</>;
 }

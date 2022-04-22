@@ -15,7 +15,21 @@ export function WebWorkerD2CVanillaPreview({ target }: VanillaPreviewProps) {
       return;
     }
 
-    wwpreview(target.id, setPreview);
+    let dispose;
+
+    setTimeout(() => {
+      dispose = wwpreview(
+        {
+          page: target.page,
+          target: target.id,
+        },
+        setPreview
+      );
+    }, 50);
+
+    return () => {
+      dispose?.();
+    };
   }, [target?.id]);
 
   return (

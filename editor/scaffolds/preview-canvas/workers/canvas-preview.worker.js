@@ -6,6 +6,9 @@ import {
 import { RemoteImageRepositories } from "@design-sdk/figma-remote/lib/asset-repository/image-repository";
 import { config } from "@designto/config";
 import { preview_presets } from "@grida/builder-config-preset";
+import { FigmaFileStore } from "@editor/figma-file-store";
+import { convert } from "@design-sdk/figma-node-conversion";
+import { mapper } from "@design-sdk/figma-remote";
 
 const placeholderimg =
   "https://bridged-service-static.s3.us-west-1.amazonaws.com/placeholder-images/image-placeholder-bw-tile-100.png";
@@ -36,6 +39,9 @@ const framework_config = {
   },
 };
 
+let initialized = false;
+let pages = [];
+
 function initialize({ filekey, authentication }) {
   console.info("initializing.. wwpreview");
   // ------- setup image repo with auth + filekey -------
@@ -54,13 +60,31 @@ function initialize({ filekey, authentication }) {
   // setup indexed db connection for reading the file.
   // ⛔️ the assumbtion is that file does not change during the app is running.
 
+  const store = new FigmaFileStore(filekey);
   // 1. read the raw data from indexed db
-  // 2. format the data to reflect
-  // 3. set the data status as 'ready'
+  store.get().then((raw) => {
+    // 2. format the data to reflect
+    pages = pagesFrom(raw);
+
+    // 3. set the data status as 'ready'
+    initialized = true;
+    postMessage({ $type: "data-ready" });
+  });
   // (the below requests can be operated after when this processes are complete)
-  // indexedDB.open("").onsuccess = (event) => {
-  //   //
-  // };
+}
+
+function pagesFrom(file) {
+  return file.document.children.map((page) => ({
+    id: page.id,
+    name: page.name,
+    children: page["children"]?.map((child) => {
+      const _mapped = mapper.mapFigmaRemoteToFigma(child);
+      return convert.intoReflectNode(_mapped);
+    }),
+    flowStartingPoints: page.flowStartingPoints,
+    backgroundColor: page.backgroundColor,
+    type: "design",
+  }));
 }
 
 addEventListener("message", async (event) => {
@@ -70,21 +94,39 @@ addEventListener("message", async (event) => {
     }, 0);
   }
 
+  if (event.data.$type === "initialize") {
+    initialize({
+      filekey: event.data.filekey,
+      authentication: event.data.authentication,
+    });
+    return;
+  }
+
+  if (!initialized) {
+    return;
+  }
+
   switch (event.data.$type) {
     case "initialize": {
-      initialize({
-        filekey: event.data.filekey,
-        authentication: event.data.authentication,
-      });
-      return;
+      // unreachable
+      break;
     }
     case "preview": {
       try {
-        const { node } = event.data;
+        // requires all 2 data for faster query
+        const { page, target } = event.data;
+        const node = pages
+          .find((p) => p.id === page)
+          .children.find((c) => c.id === target);
 
-        throw "not ready";
+        const _input = {
+          id: node.id,
+          name: node.name,
+          entry: node,
+        };
+
         const result = await designToCode({
-          input: input,
+          input: _input,
           build_config: build_config,
           framework: framework_config,
           asset_config: {
@@ -98,8 +140,19 @@ addEventListener("message", async (event) => {
         });
 
         respond(result);
+
+        const result_w_img = await designToCode({
+          input: _input,
+          build_config: build_config,
+          framework: framework_config,
+          asset_config: {
+            asset_repository: MainImageRepository.instance,
+          },
+        });
+
+        respond(result_w_img);
       } catch (error) {
-        respond({ error });
+        // respond({ error });
       }
 
       break;
