@@ -173,6 +173,7 @@ export function EditorPreviewDataProvider({
   //   // ------ for esbuild -----
   useEffect(() => {
     if (
+      !target ||
       !state.editingModule ||
       // now only react is supported.
       state.editingModule.framework !== "react"
