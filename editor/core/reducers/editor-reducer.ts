@@ -31,6 +31,15 @@ export function editorReducer(state: EditorState, action: Action): EditorState {
 
       const current_node = state.selectedNodes;
 
+      if (
+        ids.length <= 1 &&
+        current_node.length <= 1 &&
+        ids[0] === current_node[0]
+      ) {
+        // same selection (no selection or same 1 selection)
+        return produce(state, (draft) => {});
+      }
+
       if (ids.length > 1 && ids.length === current_node.length) {
         // the selection event is always triggered by user, which means selecting same amount of nodes (greater thatn 1, and having a different node array is impossible.)
         return produce(state, (draft) => {});
