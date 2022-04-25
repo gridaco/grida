@@ -42,3 +42,13 @@ export interface Tree {
   height: number;
   children?: Tree[] | undefined;
 }
+
+export const directions_cardinal = ["n", "e", "s", "w"] as const;
+export type CardinalDirection = typeof directions_cardinal[number];
+export const directions_ordinal = ["ne", "se", "sw", "nw"] as const;
+export type OrdinalDirection = typeof directions_ordinal[number];
+export const directions_compass: CompassDirection[] = [
+  ...directions_cardinal,
+  ...directions_cardinal,
+];
+export type CompassDirection = CardinalDirection | OrdinalDirection;
