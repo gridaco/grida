@@ -22,7 +22,7 @@ import { LazyFrame } from "@code-editor/canvas/lazy-frame";
 import { HudCustomRenderers, HudSurface } from "../hud";
 import type { Box, XY, CanvasTransform, XYWH } from "../types";
 import type { FrameOptimizationFactors } from "../frame";
-import { TransformDraftingStore } from "../drafting";
+// import { TransformDraftingStore } from "../drafting";
 import {
   CANVAS_LAYER_HOVER_HIT_MARGIN,
   CANVAS_INITIAL_XY,
