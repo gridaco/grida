@@ -133,11 +133,14 @@ export const all_preset_options_map__prod = {
   react_with_styled_components: react_presets.react_with_styled_components,
   react_with_inline_css: react_presets.react_with_inline_css,
   react_with_css_module: react_presets.react_with_css_module,
+  "react-native": reactnative_presets.reactnative_default,
+  reactnative: reactnative_presets.reactnative_default,
   reactnative_default: reactnative_presets.reactnative_default,
   reactnative_with_styled_components:
     reactnative_presets.reactnative_with_styled_components,
   reactnative_with_inline_style:
     reactnative_presets.reactnative_with_inline_style,
+  vanilla: vanilla_presets.vanilla_default,
   vanilla_default: vanilla_presets.vanilla_default,
   // react_with_css // NOT ON PRODUCTION
 };
