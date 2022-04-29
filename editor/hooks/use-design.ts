@@ -14,7 +14,6 @@ import { RemoteDesignSessionCacheStore } from "../store";
 import { convert } from "@design-sdk/figma-node-conversion";
 import { mapFigmaRemoteToFigma } from "@design-sdk/figma-remote/lib/mapper";
 import { useFigmaAccessToken } from ".";
-import { FileResponse } from "@design-sdk/figma-remote-types";
 import {
   FigmaDesignRepository,
   TFetchFileForApp,
@@ -115,7 +114,9 @@ export function useDesign({
           last_response.nodes[targetnodeconfig.node]
         );
         const _2_converted_to_reflect = convert.intoReflectNode(
-          _1_converted_to_figma
+          _1_converted_to_figma,
+          null,
+          "rest"
         );
 
         const res = <TargetNodeConfig>{

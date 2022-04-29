@@ -47,7 +47,7 @@ export function pagesFrom(file: FileResponse): FigmaReflectRepository["pages"] {
     name: page.name,
     children: page["children"]?.map((child) => {
       const _mapped = mapper.mapFigmaRemoteToFigma(child);
-      return convert.intoReflectNode(_mapped);
+      return convert.intoReflectNode(_mapped, null, "rest");
     }),
     type: "design",
   }));
