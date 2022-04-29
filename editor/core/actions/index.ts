@@ -1,5 +1,5 @@
 import type { FrameworkConfig } from "@designto/config";
-import type { EditorState, ScenePreviewData } from "core/states";
+import type { ConsoleLog, EditorState, ScenePreviewData } from "core/states";
 
 export type WorkspaceAction =
   //
@@ -20,14 +20,15 @@ export type Action =
   | HighlightLayerAction
   | CanvasModeAction
   | PreviewAction
-  | CodeEditorAction;
+  | CodeEditorAction
+  | DevtoolsAction;
 
 export type ActionType = Action["type"];
 
 export type HierarchyAction = SelectNodeAction;
 export interface SelectNodeAction {
   type: "select-node";
-  node: string;
+  node: string | string[];
 }
 
 export type PageAction = SelectPageAction;
@@ -73,4 +74,14 @@ export interface CodeEditorEditComponentCodeAction {
   framework: FrameworkConfig["framework"];
   componentName: string;
   raw: string;
+}
+
+export type DevtoolsAction = DevtoolsConsoleAction | DevtoolsConsoleClearAction;
+export interface DevtoolsConsoleAction {
+  type: "devtools-console";
+  log: ConsoleLog;
+}
+
+export interface DevtoolsConsoleClearAction {
+  type: "devtools-console-clear";
 }

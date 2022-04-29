@@ -44,6 +44,7 @@ const Positioner = styled.div`
   align-items: center;
   flex-direction: column;
   justify-content: center;
+  align-items: flex-end;
 
   position: fixed;
   bottom: 0;

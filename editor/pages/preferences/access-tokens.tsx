@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import styled from "@emotion/styled";
-import { TextField } from "@material-ui/core";
+import { TextField } from "@mui/material";
 import { personal } from "@design-sdk/figma-auth-store";
 
 export default function AccessTokenConfigurationPage_Dev() {

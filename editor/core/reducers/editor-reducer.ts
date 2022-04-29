@@ -8,6 +8,8 @@ import type {
   CanvasModeGobackAction,
   PreviewBuildingStateUpdateAction,
   PreviewSetAction,
+  DevtoolsConsoleAction,
+  DevtoolsConsoleClearAction,
 } from "core/actions";
 import { EditorState } from "core/states";
 import { useRouter } from "next/router";
@@ -26,11 +28,14 @@ export function editorReducer(state: EditorState, action: Action): EditorState {
       console.clear();
       console.info("cleard console by editorReducer#select-node");
 
+      const ids = Array.isArray(node) ? node : [node];
+      const primary = ids?.[0];
+
       // update router
       router.push(
         {
           pathname: _editor_path_name,
-          query: { ...router.query, node: node ?? state.selectedPage },
+          query: { ...router.query, node: primary ?? state.selectedPage },
         },
         undefined,
         { shallow: true }
@@ -42,7 +47,7 @@ export function editorReducer(state: EditorState, action: Action): EditorState {
           state.selectedPage
         );
 
-        const new_selections = [node].filter(Boolean);
+        const new_selections = ids.filter(Boolean);
         _canvas_state_store.saveLastSelection(...new_selections);
 
         // assign new nodes set to the state.
@@ -152,6 +157,35 @@ export function editorReducer(state: EditorState, action: Action): EditorState {
       return produce(state, (draft) => {
         draft.currentPreview = data; // set
       });
+    }
+    case "devtools-console": {
+      const { log } = <DevtoolsConsoleAction>action;
+      return produce(state, (draft) => {
+        if (!draft.devtoolsConsole?.logs?.length) {
+          draft.devtoolsConsole = { logs: [] };
+        }
+
+        const logs = Array.from(state.devtoolsConsole?.logs ?? []);
+        logs.push(log);
+
+        draft.devtoolsConsole.logs = logs;
+      });
+      break;
+    }
+    case "devtools-console-clear": {
+      const {} = <DevtoolsConsoleClearAction>action;
+      return produce(state, (draft) => {
+        if (draft.devtoolsConsole?.logs?.length) {
+          draft.devtoolsConsole.logs = [
+            {
+              id: "clear",
+              method: "info",
+              data: ["Console was cleared"],
+            },
+          ];
+        }
+      });
+      break;
     }
     default:
       throw new Error(`Unhandled action type: ${action["type"]}`);

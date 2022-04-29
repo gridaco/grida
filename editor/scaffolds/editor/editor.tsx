@@ -53,7 +53,7 @@ export function Editor({
             <Canvas key={_refreshkey} />
           </WorkspaceContentPanel>
           <WorkspaceContentPanel
-            hidden={state.selectedNodes.length === 0}
+            hidden={state.selectedNodes.length !== 1}
             overflow="hidden"
             flex={4}
             resize={{

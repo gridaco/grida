@@ -1,6 +1,6 @@
 import React from "react";
 import styled from "@emotion/styled";
-import RefreshSharpIcon from "@material-ui/icons/RefreshSharp";
+import RefreshSharpIcon from "@mui/icons-material/RefreshSharp";
 import { colors } from "theme";
 
 export function ZoomControl({

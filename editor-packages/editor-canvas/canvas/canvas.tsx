@@ -9,10 +9,15 @@ import {
   OnPointerDownHandler,
   OnDragHandler,
 } from "../canvas-event-target";
-import { get_hovering_target, centerOf } from "../math";
+import {
+  target_of_point,
+  centerOf,
+  edge_scrolling,
+  target_of_area,
+} from "../math";
 import { utils } from "@design-sdk/core";
 import { LazyFrame } from "@code-editor/canvas/lazy-frame";
-import { HudCustomRenderers, HudSurface } from "./hud-surface";
+import { HudCustomRenderers, HudSurface } from "../hud";
 import type { Box, XY, CanvasTransform, XYWH } from "../types";
 import type { FrameOptimizationFactors } from "../frame";
 const designq = utils.query;
@@ -89,7 +94,7 @@ export function Canvas({
   ...props
 }: {
   viewbound: Box;
-  onSelectNode?: (node?: ReflectSceneNode) => void;
+  onSelectNode?: (...node: ReflectSceneNode[]) => void;
   onClearSelection?: () => void;
 } & CanvasCustomRenderers &
   CanvasState & {
@@ -131,6 +136,7 @@ export function Canvas({
     ? [offset[0] / zoom, offset[1] / zoom]
     : [0, 0];
   const [isPanning, setIsPanning] = useState(false);
+  const [isDraggomg, setIsDragging] = useState(false);
   const [marquee, setMarquee] = useState<XYWH>(null);
 
   const cvtransform: CanvasTransform = {
@@ -151,17 +157,46 @@ export function Canvas({
     setHoveringLayer(wshighlight);
   }, [highlightedLayer]);
 
+  // area selection hook
+  useEffect(() => {
+    if (marquee) {
+      const area: XYWH = [
+        marquee[0] / zoom,
+        marquee[1] / zoom,
+        marquee[2] / zoom,
+        marquee[3] / zoom,
+      ];
+
+      const selections = target_of_area({
+        area,
+        tree: nodes,
+        contain: false,
+      });
+
+      // https://stackoverflow.com/a/19746771
+      const same =
+        selectedNodes.length === selections?.length &&
+        selectedNodes.every((value, index) => value === selections[index].id);
+
+      if (!same) {
+        onSelectNode(...selections);
+      }
+    }
+    //
+  }, [marquee]);
+
   const onPointerMove: OnPointerMoveHandler = (state) => {
-    if (isPanning || isZooming) {
+    if (isPanning || isZooming || isDraggomg) {
       // don't perform hover calculation while transforming.
       return;
     }
-    const hovering = get_hovering_target({
+    const hovering = target_of_point({
       point: state.xy,
       tree: nodes,
       zoom: zoom,
       offset: nonscaled_offset,
       margin: LAYER_HOVER_HIT_MARGIN,
+      reverse: true,
     });
 
     if (!hovering) {
@@ -223,27 +258,48 @@ export function Canvas({
     setOffset([newx, newy]);
   };
 
+  const onDragStart: OnDragHandler = (s) => {
+    onClearSelection();
+    setIsDragging(true);
+    setHoveringLayer(null);
+
+    // set the marquee start point
+    const [x, y] = s.initial;
+    const [ox, oy] = offset;
+    const [x1, y1] = [x - ox, y - oy];
+    setMarquee([x1, y1, 0, 0]);
+  };
+
   const onDrag: OnDragHandler = (s) => {
-    const [x1, y1] = s.initial;
-    const [x2, y2] = [
+    const [ox, oy] = offset;
+    const [x, y] = [
       // @ts-ignore
       s.event.clientX,
       // @ts-ignore
       s.event.clientY,
     ];
 
-    const [ox, oy] = offset;
-    const [x, y, w, h] = [
-      x1 - ox,
-      y1 - oy,
-      x2 - x1, // w
-      y2 - y1, // h
-    ];
-    setMarquee([x, y, w, h]);
+    const [x1, y1] = [x - ox, y - oy];
+
+    if (marquee) {
+      const [w, h] = [
+        x1 - marquee[0], // w
+        y1 - marquee[1], // h
+      ];
+      setMarquee([marquee[0], marquee[1], w, h]);
+    }
+
+    // edge scrolling
+    const [cx, cy] = [x, y];
+    const [dx, dy] = edge_scrolling(cx, cy, viewbound);
+    if (dx || dy) {
+      setOffset([ox + dx, oy + dy]);
+    }
   };
 
   const onDragEnd: OnDragHandler = (s) => {
     setMarquee(null);
+    setIsDragging(false);
   };
 
   const is_canvas_transforming = isPanning || isZooming;
@@ -299,8 +355,8 @@ export function Canvas({
         onPointerMoveStart={() => {}}
         onPointerMoveEnd={() => {}}
         onPointerDown={onPointerDown}
+        onDragStart={onDragStart}
         onDrag={onDrag}
-        onDragStart={() => {}} // TODO:
         onDragEnd={onDragEnd}
       >
         <HudSurface
@@ -363,7 +419,7 @@ function CanvasTransformRoot({
         width: 0,
         height: 0,
         willChange: "transform",
-        transform: `scale(${scale}) translateX(${xy[0]}px) translateY(${xy[1]}px)`,
+        transform: `scale(${scale}) translate3d(${xy[0]}px, ${xy[1]}px, 0)`,
         isolation: "isolate",
       }}
     >

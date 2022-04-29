@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { useEditorState } from "core/states";
 import styled from "@emotion/styled";
 import { useWindowSize } from "hooks";
-import Close from "@material-ui/icons/Close";
+import Close from "@mui/icons-material/Close";
 import ClientOnly from "components/client-only";
 import { VanillaDedicatedPreviewRenderer } from "components/app-runner";
 

@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { VanillaRunner } from "components/app-runner/vanilla-app-runner";
+import { useDispatch } from "core/dispatch";
 
 export function VanillaESBuildAppRunner({
   doc,
@@ -13,6 +14,17 @@ export function VanillaESBuildAppRunner({
   };
 }) {
   const ref = useRef<HTMLIFrameElement>();
+  const dispatch = useDispatch();
+
+  const consoleLog = useCallback(
+    (p: { method; data }) => {
+      dispatch({
+        type: "devtools-console",
+        log: p,
+      });
+    },
+    [dispatch]
+  );
 
   const loadCode = useCallback(
     (e: HTMLIFrameElement) => {
@@ -28,6 +40,22 @@ export function VanillaESBuildAppRunner({
       loadCode(ref.current);
     }
   }, [doc?.html, doc?.css, doc?.javascript]);
+
+  useEffect(() => {
+    const handler = (event: any) => {
+      if (event.data.type === "console") {
+        console[event.data.method](JSON.parse(event.data.data).join(" "));
+        consoleLog({
+          method: event.data.method,
+          data: JSON.parse(event.data.data),
+        });
+      }
+    };
+
+    window.addEventListener("message", handler);
+
+    return () => window.removeEventListener("message", handler);
+  }, []);
 
   return (
     <VanillaRunner

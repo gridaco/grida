@@ -2,12 +2,15 @@ import React, { useCallback } from "react";
 import styled from "@emotion/styled";
 import { Canvas } from "@code-editor/canvas";
 import { useEditorState, useWorkspace } from "core/states";
-import { Preview } from "scaffolds/preview";
+import {
+  D2CVanillaPreview,
+  WebWorkerD2CVanillaPreview,
+} from "scaffolds/preview";
 import useMeasure from "react-use-measure";
 import { useDispatch } from "core/dispatch";
 import { FrameTitleRenderer } from "./render/frame-title";
 import { IsolateModeCanvas } from "./isolate-mode";
-import { Dialog } from "@material-ui/core";
+import { Dialog } from "@mui/material";
 import { FullScreenPreview } from "scaffolds/preview-full-screen";
 
 /**
@@ -110,10 +113,10 @@ export function VisualContentArea() {
               ]}
               filekey={state.design.key}
               pageid={selectedPage}
-              selectedNodes={selectedNodes.filter(Boolean)}
+              selectedNodes={selectedNodes}
               highlightedLayer={highlightedLayer}
-              onSelectNode={(node) => {
-                dispatch({ type: "select-node", node: node?.id });
+              onSelectNode={(...nodes) => {
+                dispatch({ type: "select-node", node: nodes.map((n) => n.id) });
               }}
               onClearSelection={() => {
                 dispatch({ type: "select-node", node: null });
@@ -121,18 +124,26 @@ export function VisualContentArea() {
               nodes={thisPageNodes}
               // initialTransform={ } // TODO: if the initial selection is provided from first load, from the query param, we have to focus to fit that node.
               renderItem={(p) => {
-                return <Preview key={p.node.id} target={p.node} {...p} />;
+                return (
+                  // <WebWorkerD2CVanillaPreview
+                  //   key={p.node.id}
+                  //   target={p.node}
+                  //   {...p}
+                  // />
+                  <D2CVanillaPreview key={p.node.id} target={p.node} {...p} />
+                );
               }}
               config={{
                 can_highlight_selected_layer: true,
                 marquee: {
-                  disabled: true,
+                  disabled: false,
                 },
               }}
               renderFrameTitle={(p) => (
                 <FrameTitleRenderer
                   key={p.id}
                   {...p}
+                  runnable={selectedNodes.length === 1}
                   onRunClick={startIsolatedViewMode}
                 />
               )}

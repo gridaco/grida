@@ -196,10 +196,11 @@ export function CodeSegment() {
         files={
           code
             ? {
-                "index.tsx": {
+                // TODO: make this to match framework
+                "App.tsx": {
                   raw: code.raw,
                   language: framework_config.language,
-                  name: "index.tsx",
+                  name: "App.tsx",
                 },
               }
             : {
