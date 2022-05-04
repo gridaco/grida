@@ -31,7 +31,7 @@ export function Marquee({ rect }: { rect: XYWH }) {
         height: Math.abs(h),
         willChange: "transform, opacity",
         transformOrigin: "0px 0px",
-        transform: `translateX(${x}px) translateY(${y}px) rotate(${r}deg)`,
+        transform: `translate3d(${x}px, ${y}px, 0) rotate(${r}deg)`,
         border: `${canvasSelectionRectBorderColor} 1px solid`,
       }}
     ></div>

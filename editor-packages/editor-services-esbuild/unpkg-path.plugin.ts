@@ -27,10 +27,21 @@ export const unpkgPathPlugin = () => ({
      * Resolve main module files
      */
     build.onResolve({ filter: /.*/ }, async (args: any) => {
+      const name = get_package_name(args.path);
       return {
         namespace: "a",
-        path: new URL(args.path, unpkg_path + "/").href,
+        path: new URL(name, unpkg_path + "/").href,
       };
     });
   },
 });
+
+const get_package_name = (path: string) => {
+  // get the name of the package
+  // @org/package-name -> "@org/package-name"
+  // package/module -> "package"
+  if (path.startsWith("@")) {
+    return path;
+  }
+  return path.split("/")[0];
+};

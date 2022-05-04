@@ -27,6 +27,7 @@ export interface EditorState {
   currentPreview?: ScenePreviewData;
   code?: CodeRepository;
   editingModule?: EditingModule;
+  devtoolsConsole?: DevtoolsConsole;
 }
 
 export interface EditorSnapshot {
@@ -108,4 +109,25 @@ export interface EditingModule {
   framework: FrameworkConfig["framework"];
   lang: string;
   raw: string;
+}
+
+interface DevtoolsConsole {
+  logs: ConsoleLog[];
+}
+
+export interface ConsoleLog {
+  id?: string;
+  data: any[];
+  method:
+    | "log"
+    | "debug"
+    | "info"
+    | "warn"
+    | "error"
+    | "table"
+    | "clear"
+    | "time"
+    | "timeEnd"
+    | "count"
+    | "assert";
 }

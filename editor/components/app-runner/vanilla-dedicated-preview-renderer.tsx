@@ -4,6 +4,7 @@ import { ScenePreviewData } from "core/states";
 import { VanillaESBuildAppRunner } from "components/app-runner";
 
 export function VanillaDedicatedPreviewRenderer({
+  widgetKey,
   loader,
   componentName,
   source,
@@ -15,6 +16,7 @@ export function VanillaDedicatedPreviewRenderer({
     <>
       {loader === "vanilla-esbuild-template" ? (
         <VanillaESBuildAppRunner
+          key={widgetKey.id}
           componentName={componentName}
           doc={{
             html: source.html,
@@ -23,7 +25,7 @@ export function VanillaDedicatedPreviewRenderer({
         />
       ) : (
         <VanillaRunner
-          key={source}
+          key={widgetKey.id}
           style={{
             borderRadius: 4,
             boxShadow: "0px 0px 48px #00000020",

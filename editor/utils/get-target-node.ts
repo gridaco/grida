@@ -11,6 +11,10 @@ export function getTargetContainer(state: EditorState) {
   const targetId =
     state?.selectedNodes?.length === 1 ? state.selectedNodes[0] : null;
 
+  if (!targetId) {
+    return { target: null, root: null };
+  }
+
   const container_of_target =
     designq.find_node_by_id_under_inpage_nodes(targetId, thisPageNodes) || null;
 

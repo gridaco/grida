@@ -219,7 +219,7 @@ const TransformContainer = ({
     <div
       style={{
         pointerEvents: isTransitioning ? "none" : undefined,
-        transform: `scale(${scale}) translateX(${xy[0]}px) translateY(${xy[1]}px)`,
+        transform: `scale(${scale}) translate3d(${xy[0]}px, ${xy[1]}px, 0)`,
         willChange: "transform",
         transformOrigin: transformOrigin,
       }}

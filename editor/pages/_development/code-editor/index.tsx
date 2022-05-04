@@ -8,11 +8,11 @@ export default function CodeEditorDevPage() {
       language: "typescript",
       raw: `export * from "./components"`,
     },
-    "components/index.ts": {
-      name: "index.ts",
-      language: "typescript",
-      raw: `export * from "./app-bar"`,
-    },
+    // "components/index.ts": {
+    //   name: "index.ts",
+    //   language: "typescript",
+    //   raw: `export * from "./app-bar"`,
+    // },
   };
 
   return <CodeEditor height="100vh" files={files} />;
