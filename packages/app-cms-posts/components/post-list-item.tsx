@@ -15,7 +15,7 @@ export function PostListItem({
   autor?: string;
   publishedAt?: Date | string;
   thumbnail?: string;
-  readingTime?: string | { minutes?: number; seconds?: number };
+  readingTime?: string;
   onClick?: () => void;
 }) {
   return (
