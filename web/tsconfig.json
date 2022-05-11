@@ -1,26 +1,50 @@
 {
   "extends": "../tsconfig.base.json",
   "compilerOptions": {
-    "target": "es5",
-    "lib": ["dom", "dom.iterable", "esnext"],
+    "target": "es2015",
+    "lib": [
+      "dom",
+      "dom.iterable",
+      "esnext"
+    ],
     "allowJs": true,
     "skipLibCheck": true,
+    "strict": false,
     "forceConsistentCasingInFileNames": true,
+    "noEmit": true,
     "esModuleInterop": true,
     "module": "esnext",
     "moduleResolution": "node",
     "resolveJsonModule": true,
+    "isolatedModules": true,
     "jsx": "preserve",
     "baseUrl": ".",
     "paths": {
-      "components/*": ["./components/*"],
-      "layouts/*": ["./layouts/*"],
-      "pages/*": ["./pages/*"],
-      "utils/*": ["utils/*"],
-      "public/*": ["public/*"]
+      "components/*": [
+        "./components/*"
+      ],
+      "layouts/*": [
+        "./layouts/*"
+      ],
+      "pages/*": [
+        "./pages/*"
+      ],
+      "utils/*": [
+        "utils/*"
+      ],
+      "public/*": [
+        "public/*"
+      ]
     },
-    "isolatedModules": true
+    "incremental": true
   },
-  "exclude": ["node_modules"],
-  "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", "next.config.js"]
+  "exclude": [
+    "node_modules"
+  ],
+  "include": [
+    "next-env.d.ts",
+    "**/*.ts",
+    "**/*.tsx",
+    "next.config.js"
+  ]
 }

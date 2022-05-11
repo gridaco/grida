@@ -12,7 +12,7 @@ export const _DEMO_NWV_MAIN_PAGE_DESIGN_FIGMA_SNAPSHOT: DemoDesignSnapshot = {
     const _mapped = mapper.mapFigmaRemoteToFigma(
       ___DEMO_NWV_MAIN_PAGE_DESIGN_FIGMA_REMOTE_DATA as any
     );
-    const _converted = convert.intoReflectNode(_mapped);
+    const _converted = convert.intoReflectNode(_mapped, null, "rest");
     return _converted;
   })(), //
   name: `Newest World Vibes`,

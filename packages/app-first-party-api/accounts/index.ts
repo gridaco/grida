@@ -1,1 +1,0 @@
-export * as linkedaccounts from "./linked-accounts"

@@ -2,8 +2,14 @@
     "name": "@grida.co/app",
     "version": "0.0.0",
     "dependencies": {
+        "@app/scene-view": "0.0.0",
         "@app/blocks": "0.0.0",
-        "@app/fapi": "0.0.0",
+        "@base-sdk-fp/accounts": "^0.0.3",
+        "@base-sdk-fp/auth-components-react": "^0.0.2",
+        "@base-sdk/scene-store": "^0.0.8",
+        "@grida.co/app": "0.0.0",
+        "@radix-ui/utils": "^0.0.3",
+        "@material-ui/core": "^4.11.2",
         "@boring-ui/embed": "3.3.4",
         "@boringso/react-core": "0.0.0",
         "@core/app-state": "0.0.0",
@@ -25,6 +31,9 @@
         "nanoid": "^3.1.23",
         "react": "^17.0.2",
         "react-router-dom": "^5.2.0",
+        "re-resizable": "^6.9.0",
+        "react-contextmenu": "^2.14.0",
+        "react-modal": "^3.14.3",
         "recoil": "^0.3.1"
     },
     "devDependencies": {

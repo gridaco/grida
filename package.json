@@ -15,8 +15,8 @@
         "externals/reflect-core/packages/*",
         "externals/design-sdk/*",
         "externals/design-to-code/packages/*",
-        "externals/design-to-code/packages/coli/packages/*",
-        "externals/design-to-code/packages/coli-web-builder/*",
+        "externals/design-to-code/externals/coli/packages/*",
+        "externals/design-to-code/packages/*",
         "boring/packages/*",
         "ui/editor-ui/packages/*"
     ],

@@ -8,11 +8,16 @@ import { DesignImporterLoaderResult } from "./o";
 import { analyzeDesignUrl, DesignProvider } from "@design-sdk/url-analysis";
 import { designToCode } from "@designto/code";
 import { input } from "@designto/config";
-import { Language } from "@grida/builder-platform-types";
-import { hasLinkedFigmaAccount } from "@app/fapi/accounts/linked-accounts";
+import { linkedaccounts } from "@base-sdk-fp/accounts";
 import { show_dialog_import_figma_design_after_authentication } from "../../../modals/import-figma-design-after-authentication";
 import { isOneOfDemoDesignUrl, loadDemoDesign } from "../../../built-in-demos";
 import { add_on_current } from "@core/state";
+import {
+  react_presets,
+  flutter_presets,
+  vanilla_presets,
+} from "@grida/builder-config-preset";
+import { BrowserClient } from "@base-sdk-fp/core";
 
 export function ImportDesignWithUrl() {
   const addPage = useAddPage();
@@ -22,29 +27,30 @@ export function ImportDesignWithUrl() {
 
   const onsubmitcomplete = async (_, v: DesignImporterLoaderResult) => {
     const _design = v;
-    const _res_flutter = designToCode(
-      input.DesignInput.fromDesign(_design.node),
-      {
-        framework: "flutter",
-        language: Language.dart,
-      }
-    );
+    const _res_flutter = designToCode({
+      input: input.DesignInput.fromDesign(_design.node),
+      framework: flutter_presets.flutter_default,
+      build_config: {
+        disable_components: true,
+      },
+      asset_config: {},
+    });
 
-    const _res_react = designToCode(
-      input.DesignInput.fromDesign(_design.node),
-      {
-        framework: "react",
-        language: Language.tsx,
-        styling: "styled-components",
-      }
-    );
+    const _res_react = designToCode({
+      input: input.DesignInput.fromDesign(_design.node),
+      framework: react_presets.react_default,
+      build_config: {
+        disable_components: true,
+      },
+      asset_config: {},
+    });
 
     const _code = {
       flutter: {
-        raw: _res_flutter.code.raw,
+        raw: (await _res_flutter).code.raw,
       },
       react: {
-        raw: _res_react.code.raw,
+        raw: (await _res_react).code.raw,
       },
     };
     const template = new ImportedScreenTemplate({
@@ -70,7 +76,9 @@ export function ImportDesignWithUrl() {
 
     switch (analyzeDesignUrl(url)) {
       case "figma":
-        const cancontinue = await hasLinkedFigmaAccount();
+        const cancontinue = await new linkedaccounts.FigmaLinkedAccountsClient(
+          new BrowserClient()
+        ).hasLinkedFigmaAccount();
         if (!cancontinue) {
           await show_dialog_import_figma_design_after_authentication();
         }

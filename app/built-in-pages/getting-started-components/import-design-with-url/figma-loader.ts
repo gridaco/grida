@@ -12,9 +12,13 @@ export async function figmaloader(
 
   const access_token = getAccessToken();
 
-  const pack = await fetch.fetchTargetAsReflect(f, n, {
-    accessToken: access_token,
-    personalAccessToken: access_token,
+  const pack = await fetch.fetchTargetAsReflect({
+    file: f,
+    node: n,
+    auth: {
+      accessToken: access_token,
+      personalAccessToken: access_token,
+    },
   });
   const { name: n_name, id: n_id } = pack.reflect;
 
