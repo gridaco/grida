@@ -8,6 +8,7 @@ const withTM = require("next-transpile-modules")(
     "@grida.co/app",
     "@app/scene-view",
     "@app/blocks",
+    "@app/cms-posts",
     "@core/state",
     "@core/app-state",
     "@core/store",
