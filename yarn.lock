@@ -1243,7 +1243,7 @@
     exec-sh "^0.3.2"
     minimist "^1.2.0"
 
-"@design-sdk/figma-remote-api@0.0.0", "@design-sdk/figma-remote-api@^0.0.0":
+"@design-sdk/figma-remote-api@^0.0.0":
   version "0.0.0"
   resolved "https://registry.yarnpkg.com/@design-sdk/figma-remote-api/-/figma-remote-api-0.0.0.tgz#c1937575bbf824ca8fc45141db5327dd98d789ff"
   integrity sha512-AA+LelJSudE2fEIvrecgcc7nmXTeRZy8WEdqhqZV4SuvgqZUH8i+t2m3dw/L/NmbxxdduRmltzTuX78MxwGntA==
@@ -3121,6 +3121,13 @@
   resolved "https://registry.yarnpkg.com/@reflect-ui/core/-/core-0.0.2-rc.7.tgz#9d531f5a0b9caab31e7563020044b753700e2bbc"
   integrity sha512-EqF4SRU57bfa5DOPET1rv5lROFyMVHLv1xTEIlN6N2gDpXt71QceImWfQp3z3Khqnb4R/p9OhNK6DXGUpozWKw==
 
+"@reflect-ui/core@0.0.2-rc.8":
+  version "0.0.2-rc.8"
+  resolved "https://registry.yarnpkg.com/@reflect-ui/core/-/core-0.0.2-rc.8.tgz#4ab47a860e7dc655ed95e37b69e6a9bbaef894bc"
+  integrity sha512-yyzhDej9jo0l3582fUkPEOpgm0icnP9Yimqc3YIFThQRYW9r/SkAR4ed+lpuXL/ztyiNI12PuXB8GyRNWaHGag==
+  dependencies:
+    "@reflect-ui/uiutils" "^0.1.2-1"
+
 "@reflect-ui/namings@0.0.3":
   version "0.0.3"
   resolved "https://registry.yarnpkg.com/@reflect-ui/namings/-/namings-0.0.3.tgz#6e9fd4809dd5c9d2a996516236c71b99ea93fbcb"
@@ -3527,6 +3534,11 @@
     "@types/node" "*"
     "@types/responselike" "*"
 
+"@types/camelcase-css@^2.0.0":
+  version "2.0.0"
+  resolved "https://registry.yarnpkg.com/@types/camelcase-css/-/camelcase-css-2.0.0.tgz#9604ffb754861b348e1f361c40fbf4d94d43b890"
+  integrity sha512-HSD3U+7+1BneOuIcvn3SUJHmEhPZGM6h5wUBQ3L7LL8VAIx2THIlN8HMH2ylxF4yuxu93UAFTcmeb+MT2Dozkg==
+
 "@types/cheerio@*", "@types/cheerio@^0.22.22":
   version "0.22.31"
   resolved "https://registry.yarnpkg.com/@types/cheerio/-/cheerio-0.22.31.tgz#b8538100653d6bb1b08a1e46dec75b4f2a5d5eb6"
@@ -3851,6 +3863,13 @@
   version "17.0.11"
   resolved "https://registry.yarnpkg.com/@types/react-dom/-/react-dom-17.0.11.tgz#e1eadc3c5e86bdb5f7684e00274ae228e7bcc466"
   integrity sha512-f96K3k+24RaLGVu/Y2Ng3e1EbZ8/cVJvypZWd7cy0ofCBaf2lcM46xNhycMZ2xGwbBjRql7hOlZ+e2WlJ5MH3Q==
+  dependencies:
+    "@types/react" "*"
+
+"@types/react-native@^0.66.16":
+  version "0.66.18"
+  resolved "https://registry.yarnpkg.com/@types/react-native/-/react-native-0.66.18.tgz#924fdbf413047e7ac2c18aead60142345814dede"
+  integrity sha512-a+xIlll1Wo4rhBPdoecH6VfvMgm8dcMScJgO5GSt+BB+7rMX/UOTWmfAV7BXx/x4okf2Tu6nSbEygnNYgNtp2A==
   dependencies:
     "@types/react" "*"
 
@@ -5508,6 +5527,11 @@ callsites@^3.0.0:
   version "3.1.0"
   resolved "https://registry.yarnpkg.com/callsites/-/callsites-3.1.0.tgz#b3630abd8943432f54b3f0519238e33cd7df2f73"
   integrity sha512-P8BjAsXvZS+VIDUI11hHCQEv74YT67YUi5JJFNWIqL235sBmjX4+qx9Muvls5ivyNENctx46xQLQ3aTuE7ssaQ==
+
+camelcase-css@^2.0.1:
+  version "2.0.1"
+  resolved "https://registry.yarnpkg.com/camelcase-css/-/camelcase-css-2.0.1.tgz#ee978f6947914cc30c6b44741b6ed1df7f043fd5"
+  integrity sha512-QOSvevhslijgYwRx6Rv7zKdMF8lbRmx+uQGx2+vDc+KI/eBnsy9kit5aj23AgGu3pa4t9AgwbnXWqS+iOY+2aA==
 
 camelcase-keys@^6.2.2:
   version "6.2.2"
