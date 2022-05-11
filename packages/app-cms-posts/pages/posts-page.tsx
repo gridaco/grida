@@ -138,8 +138,8 @@ export default function PostsPage({
 }
 
 const Container = styled.div`
-  width: 960px;
-  height: 920px;
+  margin: 100px 160px 40px 160px;
+  box-sizing: border-box;
   background-color: white;
   position: relative;
   align-self: stretch;
@@ -248,7 +248,7 @@ const List = styled.div`
   display: flex;
   justify-content: flex-start;
   flex-direction: column;
-  align-items: flex-start;
+  align-items: stretch;
   flex: none;
   gap: 24px;
   height: 598px;

@@ -46,6 +46,7 @@ const Container = styled.div`
   flex-direction: row;
   align-items: flex-start;
   flex: none;
+  gap: 16px;
   box-sizing: border-box;
 `;
 
@@ -56,7 +57,6 @@ const TextContents = styled.div`
   align-items: flex-start;
   flex: 1;
   gap: 8px;
-  width: 849px;
   box-sizing: border-box;
 `;
 
