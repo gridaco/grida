@@ -5,6 +5,7 @@ export function TableTabItem({
   icon,
   children = <>Tab Item</>,
   selected = false,
+  onClick,
 }: {
   icon?: React.ReactNode;
   /**
@@ -12,9 +13,10 @@ export function TableTabItem({
    */
   children: React.ReactNode;
   selected?: boolean;
+  onClick?: () => void;
 }) {
   return (
-    <Container>
+    <Container onClick={onClick}>
       <TopSpacer />
       <HoverEffectContainer>
         {icon ? <IconContainer>{icon}</IconContainer> : <></>}

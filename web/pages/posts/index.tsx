@@ -1,6 +1,21 @@
 import React from "react";
-import PostsPage from "@app/cms-posts/pages";
+import { TablePage } from "@app/cms-posts/pages";
+import { useRouter } from "next/router";
+import Head from "next/head";
 
 export default function WebPostsPage() {
-  return <PostsPage />;
+  const router = useRouter();
+
+  const onPostClick = (id) => {
+    router.push("/posts/" + id);
+  };
+
+  return (
+    <>
+      <Head>
+        <title>Posts</title>
+      </Head>
+      <TablePage onPostClick={onPostClick} />
+    </>
+  );
 }

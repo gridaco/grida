@@ -48,20 +48,56 @@ const posts = [
   },
 ];
 
-export default function PostsPage({ title = "Posts" }: { title?: string }) {
+export default function PostsPage({
+  title = "Posts",
+  onPostClick,
+  onNewPostClick,
+}: {
+  title?: string;
+  onPostClick?: (id: string) => void;
+  onNewPostClick?: () => void;
+}) {
+  const tabs = [
+    {
+      id: "drafts",
+      label: "Drafts and submissions",
+    },
+    {
+      id: "scheduled",
+      label: "Scheduled",
+    },
+    {
+      id: "published",
+      label: "Published",
+    },
+    {
+      id: "unlisted",
+      label: "Unlisted",
+    },
+  ];
+
+  const [tab, setTab] = React.useState("drafts");
+
   return (
     <Container>
       <Toolbar>
         <Underline />
         <Tools>
           <Tabs>
-            <TableTabItem selected>Drafts and submissions</TableTabItem>
-            <TableTabItem>Scheduled</TableTabItem>
-            <TableTabItem>Published</TableTabItem>
-            <TableTabItem>Unlisted</TableTabItem>
+            {tabs.map((t) => (
+              <TableTabItem
+                key={t.id}
+                selected={tab === t.id}
+                onClick={() => {
+                  setTab(t.id);
+                }}
+              >
+                {t.label}
+              </TableTabItem>
+            ))}
           </Tabs>
           <Actions>
-            <Button>
+            <Button onClick={onNewPostClick}>
               <Icons
                 src="grida://assets-reservation/images/1009:87638"
                 alt="icon"
@@ -82,7 +118,7 @@ export default function PostsPage({ title = "Posts" }: { title?: string }) {
             readingTime={post.readingTime}
             thumbnail={post.thumbnail}
             onClick={() => {
-              open("https://grida.co/blog/" + post.id);
+              onPostClick?.(post.id);
             }}
           />
         ))}

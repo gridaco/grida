@@ -1,3 +1,2 @@
-import PostsPage from "./posts-page";
-
-export default PostsPage;
+export { default as TablePage } from "./posts-page";
+export { default as EditPage } from "./post-edit-page";
