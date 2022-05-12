@@ -71,7 +71,7 @@ export function PublishPostReviewDialogBody({
               />
               <SummaryAsInput
                 type="text"
-                value={initialSummary}
+                value={summary}
                 placeholder="Summary"
                 onChange={(e) => {
                   const v = e.target.value;

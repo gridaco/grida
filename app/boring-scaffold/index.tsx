@@ -1,5 +1,9 @@
 import React from "react";
-import { Scaffold as Boring, InitialDocumentProp } from "@boringso/react-core";
+import {
+  Scaffold as Boring,
+  InitialDocumentProp,
+  OnContentChange,
+} from "@boringso/react-core";
 import { boring_extended_import_design_with_url } from "../built-in-pages/getting-started-components";
 import { extensions as default_extensions } from "../app-blocks";
 const extensions = [
@@ -7,7 +11,21 @@ const extensions = [
   boring_extended_import_design_with_url,
 ];
 
-export function BoringScaffold(props: { initial?: InitialDocumentProp }) {
-  //@ts-ignore (todo: inspect warning)
-  return <Boring {...props} extensions={extensions} />;
+export function BoringScaffold({
+  initial,
+  onTitleChange,
+  onContentChange,
+}: {
+  initial?: InitialDocumentProp;
+  onTitleChange?: (title: string) => void;
+  onContentChange?: OnContentChange;
+}) {
+  return (
+    <Boring
+      initial={initial}
+      extensions={extensions}
+      onTitleChange={onTitleChange}
+      onContentChange={onContentChange}
+    />
+  );
 }

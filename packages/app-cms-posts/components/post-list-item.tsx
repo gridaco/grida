@@ -29,7 +29,7 @@ export function PostListItem({
             Published on{" "}
             {typeof publishedAt === "string"
               ? publishedAt
-              : publishedAt.toDateString()}
+              : publishedAt?.toDateString()}
           </PublishedAt>
           <ReadingTime>{readingTime}</ReadingTime>
         </MetaContainer>

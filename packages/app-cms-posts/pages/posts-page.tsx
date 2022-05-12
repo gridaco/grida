@@ -4,7 +4,7 @@ import { PostListItem } from "../components";
 import { TableTabItem } from "@app/blocks/table-tab-item";
 import { InBlockButton } from "@app/blocks";
 
-const posts = [
+const dummy_posts = [
   {
     id: "1",
     title: "Introducing Grida Posts",
@@ -48,34 +48,35 @@ const posts = [
   },
 ];
 
+const tabs = [
+  {
+    id: "drafts",
+    label: "Drafts and submissions",
+  },
+  {
+    id: "scheduled",
+    label: "Scheduled",
+  },
+  {
+    id: "published",
+    label: "Published",
+  },
+  {
+    id: "unlisted",
+    label: "Unlisted",
+  },
+];
 export default function PostsPage({
   title = "Posts",
+  posts,
   onPostClick,
   onNewPostClick,
 }: {
   title?: string;
+  posts: any[];
   onPostClick?: (id: string) => void;
   onNewPostClick?: () => void;
 }) {
-  const tabs = [
-    {
-      id: "drafts",
-      label: "Drafts and submissions",
-    },
-    {
-      id: "scheduled",
-      label: "Scheduled",
-    },
-    {
-      id: "published",
-      label: "Published",
-    },
-    {
-      id: "unlisted",
-      label: "Unlisted",
-    },
-  ];
-
   const [tab, setTab] = React.useState("drafts");
 
   return (
@@ -111,10 +112,11 @@ export default function PostsPage({
       <List>
         {posts.map((post) => (
           <PostListItem
+            key={post.id}
             title={post.title}
             summary={post.summary}
             autor={post.autor}
-            publishedAt={post.publishedAt}
+            publishedAt={post.postedAt}
             readingTime={post.readingTime}
             thumbnail={post.thumbnail}
             onClick={() => {
