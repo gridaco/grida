@@ -1,26 +1,48 @@
 import React from "react";
 import styled from "@emotion/styled";
 
-export function SavingIndicator({ status }: { status: "saving" | "saved" }) {
-  const label = status === "saving" ? "Saving..." : "Saved";
-  return (
-    <Container>
-      {status === "saving" ? (
-        // {/* TODO: add progress */}
-        <ProgressContainer
-          src="grida://assets-reservation/images/1010:88789"
-          alt="icon"
-        />
-      ) : (
-        // {/* TODO: check icon */}
-        <IconContainer
-          src="grida://assets-reservation/images/1010:88717"
-          alt="icon"
-        />
-      )}
-      <Label>{label}</Label>
-    </Container>
-  );
+export function SavingIndicator({
+  status,
+}: {
+  status: "saving" | "saved" | "error";
+  onRetryClick?: () => void;
+  onClick?: () => void;
+}) {
+  switch (status) {
+    case "error": {
+      return (
+        <Container>
+          {/* // <ProgressContainer */}
+          {/* //   src="grida://assets-reservation/images/1010:88789" */}
+          {/* //   alt="icon" */}
+          {/* // /> */}
+          <Label>Document has unsaved changes</Label>
+        </Container>
+      );
+    }
+    case "saved": {
+      return (
+        <Container>
+          {/* // <ProgressContainer */}
+          {/* //   src="grida://assets-reservation/images/1010:88789" */}
+          {/* //   alt="icon" */}
+          {/* // /> */}
+          <Label>Saved</Label>
+        </Container>
+      );
+    }
+    case "saving": {
+      return (
+        <Container>
+          {/* // <ProgressContainer */}
+          {/* //   src="grida://assets-reservation/images/1010:88789" */}
+          {/* //   alt="icon" */}
+          {/* // /> */}
+          <Label>Saving...</Label>
+        </Container>
+      );
+    }
+  }
 }
 
 const Container = styled.div`

@@ -6,6 +6,8 @@ import { PublishPostReviewDialogBody } from "../dialogs";
 import { PostsClient } from "../api";
 import { BoringDocumentsStore } from "@boring.so/store";
 import { BoringContent, BoringTitle } from "@boring.so/document-model";
+import type { OnContentChange } from "@boringso/react-core";
+import { RightActionBar } from "../components/app-bar";
 
 interface Post {
   id: string;
@@ -13,11 +15,14 @@ interface Post {
   summary?: string;
   body: any;
 }
+const store = new BoringDocumentsStore();
+
+type PostEditPageProps = { id: string } | { draft: true };
 
 export default function PostEditPage({ id }: { id: string }) {
-  const [review, setReview] = React.useState(false);
+  const [publishDialog, setPublishDialog] = React.useState(false); // controls review dialog
+
   const client = new PostsClient("627c481391a5de075f80a177");
-  const store = new BoringDocumentsStore();
   const [data, setData] = useState<Post>();
   const [loaded, setLoaded] = useState(false);
 
@@ -29,8 +34,23 @@ export default function PostEditPage({ id }: { id: string }) {
   }, [id]);
 
   useEffect(() => {
+    if (!id) return;
+    // load from store
+    store.get(id).then((doc) => {
+      if (doc) {
+        setData({
+          id,
+          title: doc.title.raw,
+          body: doc.content.raw,
+        });
+        setLoaded(true);
+      }
+    });
+  }, [id]);
+
+  useEffect(() => {
     if (!data) return;
-    console.log(data);
+
     store
       .put({
         id: id,
@@ -58,21 +78,22 @@ export default function PostEditPage({ id }: { id: string }) {
   }, 1000);
 
   return (
-    <div>
+    <>
       <Dialog
         maxWidth="xl"
-        open={review}
+        open={publishDialog}
         onClose={() => {
-          setReview(false);
+          setPublishDialog(false);
         }}
       >
         <PublishPostReviewDialogBody
           title="Hi"
           onPublish={(p) => {
             // 1. update with value (TODO:)
-            client.publish(id).then(() => {
+            client.publish(id).then(({ id }) => {
               // 2. then => publish
-              setReview(false);
+              setPublishDialog(false);
+              open("https://grida.co/blogs/" + id);
             });
           }}
           onTitleChange={onTitleChange}
@@ -81,10 +102,10 @@ export default function PostEditPage({ id }: { id: string }) {
             // TODO:
             // 1. update with value
             // 2. them => schedule
-            setReview(false);
+            setPublishDialog(false);
           }}
           onCancel={() => {
-            setReview(false);
+            setPublishDialog(false);
           }}
           onTagsEdit={(tags: string[]) => {
             // TODO:
@@ -94,21 +115,39 @@ export default function PostEditPage({ id }: { id: string }) {
           }}
         />
       </Dialog>
-      <button
-        onClick={() => {
-          setReview(true);
+      <RightActionBar
+        onCancelClick={() => {}}
+        onPublishClick={() => {
+          setPublishDialog(true);
         }}
-      >
-        publish
-      </button>
-      {loaded && (
-        <BoringScaffold
-          initial={id}
-          onContentChange={onContentChange}
-          onTitleChange={onTitleChange}
-        />
-      )}
-    </div>
+      />
+      <Editor
+        id={id}
+        store={store}
+        onTitleChange={onTitleChange}
+        onContentChange={onContentChange}
+      />
+    </>
+  );
+}
+
+function Editor({
+  id,
+  store,
+  onTitleChange,
+  onContentChange,
+}: {
+  id: string;
+  store;
+  onContentChange: OnContentChange;
+  onTitleChange: (t: string) => void;
+}) {
+  return (
+    <BoringScaffold
+      initial={id}
+      onContentChange={onContentChange}
+      onTitleChange={onTitleChange}
+    />
   );
 }
 

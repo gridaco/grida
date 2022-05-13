@@ -44,7 +44,7 @@ export class PostsClient {
   }
 
   async publish(id: string) {
-    await (
+    return await (
       await this._client.post(`/${id}/publish`)
     ).data;
   }

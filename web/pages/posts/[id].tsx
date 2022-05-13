@@ -11,7 +11,7 @@ export default function PostEditPage() {
   return (
     <>
       <Head>
-        <title>New Post</title>
+        <title>Editing </title>
       </Head>
       {id && <EditPage id={id as string} />}
     </>

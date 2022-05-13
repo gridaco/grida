@@ -21,8 +21,8 @@ export function PostListItem({
   return (
     <Container onClick={onClick}>
       <TextContents>
-        <Title>{title}</Title>
-        <Summary>{summary}</Summary>
+        <Title>{title ?? "Untitled story"}</Title>
+        {summary && <Summary>{summary}</Summary>}
         <MetaContainer>
           <Author>@{autor}</Author>
           <PublishedAt>
