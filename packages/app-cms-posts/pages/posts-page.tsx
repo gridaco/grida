@@ -4,50 +4,6 @@ import { PostListItem } from "../components";
 import { TableTabItem } from "@app/blocks/table-tab-item";
 import { InBlockButton } from "@app/blocks";
 
-const dummy_posts = [
-  {
-    id: "1",
-    title: "Introducing Grida Posts",
-    summary:
-      "Grida posts is a new way of managing your posts, blogs and newspresses. Write, publish customize your posts without leaving Grida. Comes with headless CMS and SDK for your custom needs",
-    autor: "universe",
-    publishedAt: "May 6",
-    readingTime: "1 minute read",
-    thumbnail: "grida://assets-reservation/images/I999:86124;999:86110",
-  },
-  {
-    id: "2",
-    title: "Our First Step Towards Interactive Coding on Figma",
-    summary: "Figma + React + ESBuild = 🪄",
-    autor: "universe",
-    publishedAt: "May 6",
-    readingTime: "1 minute read",
-    thumbnail: "grida://assets-reservation/images/I999:86124;999:86110",
-  },
-  {
-    id: "3",
-    title:
-      "Introducing Grida Embeddings - Figma designs made alive. (with production-ready code)",
-    summary:
-      "Introducing Grida Embeddings. Youtube, Google Maps and Live Camera in your Figma designs & prototypes (with-production ready code).",
-    autor: "universe",
-    publishedAt: "May 6",
-    readingTime: "1 minute read",
-    thumbnail: "grida://assets-reservation/images/I999:86124;999:86110",
-  },
-  {
-    id: "4",
-    title:
-      "Figma Assistant by Grida — Supercharge your design & development workflow",
-    summary:
-      "A Opensource Design to code figma plugin. figma to flutter, figma to react. with linted design & clean code",
-    autor: "universe",
-    publishedAt: "May 6",
-    readingTime: "1 minute read",
-    thumbnail: "grida://assets-reservation/images/I999:86124;999:86110",
-  },
-];
-
 const tabs = [
   {
     id: "drafts",
@@ -66,6 +22,7 @@ const tabs = [
     label: "Unlisted",
   },
 ];
+
 export default function PostsPage({
   title = "Posts",
   posts,
@@ -99,11 +56,8 @@ export default function PostsPage({
           </Tabs>
           <Actions>
             <Button onClick={onNewPostClick}>
-              <Icons
-                src="grida://assets-reservation/images/1009:87638"
-                alt="icon"
-              />
-              <ButtonLabel>New Post</ButtonLabel>
+              <Icons />
+              New Post
             </Button>
           </Actions>
         </Tools>
@@ -125,7 +79,6 @@ export default function PostsPage({
           />
         ))}
       </List>
-
       <BoringBlocksInBlockButton>
         <InBlockButton
           onClick={() => {
@@ -203,7 +156,9 @@ const Actions = styled.div`
   flex-shrink: 0;
 `;
 
-const Button = styled.div`
+const Button = styled.button`
+  outline: none;
+  border: none;
   display: flex;
   justify-content: center;
   flex-direction: row;
@@ -214,21 +169,25 @@ const Button = styled.div`
   background-color: rgba(35, 77, 255, 0.9);
   box-sizing: border-box;
   padding: 8px 10px;
-`;
-
-const Icons = styled.img`
-  width: 18px;
-  height: 18px;
-  object-fit: cover;
-`;
-
-const ButtonLabel = styled.span`
   color: white;
   text-overflow: ellipsis;
   font-size: 14px;
   font-family: Inter, sans-serif;
   font-weight: 500;
   text-align: center;
+
+  :hover {
+    opacity: 0.8;
+  }
+
+  :active {
+    opacity: 0.9;
+  }
+`;
+
+const Icons = styled.svg`
+  width: 18px;
+  height: 18px;
 `;
 
 const Title = styled.span`
