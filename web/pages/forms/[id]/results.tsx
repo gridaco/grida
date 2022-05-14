@@ -9,6 +9,7 @@ import {
 import Axios from "axios";
 import { useRouter } from "next/router";
 import dayjs from "dayjs";
+import { FormsDetailNavigationTabs } from "@app/cms-forms/nav";
 
 const client = Axios.create({ baseURL: "https://forms.grida.cc" });
 
@@ -32,11 +33,24 @@ export default function FormResultsPage() {
   }, [id]);
 
   return (
-    <>
+    <Root>
+      <FormsDetailNavigationTabs
+        initial="results"
+        badges={{
+          results: data.length.toString(),
+        }}
+      />
       <Table key={data.length} data={data as any} />
-    </>
+    </Root>
   );
 }
+
+const Root = styled.div`
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow-y: scroll;
+`;
 
 type Response = {
   id: string;
@@ -148,7 +162,7 @@ function Table({ data }: { data: Response[] }) {
   }));
 
   return (
-    <Style className="p-2">
+    <TableStyler className="p-2">
       <table>
         <thead>
           {instance.getHeaderGroups().map((headerGroup) => (
@@ -171,8 +185,7 @@ function Table({ data }: { data: Response[] }) {
           ))}
         </tbody>
       </table>
-      <div className="h-2" />
-      <div className="flex items-center gap-2">
+      <div className="pagination items-center gap-2">
         <button
           className="border rounded p-1"
           onClick={() => instance.setPageIndex(0)}
@@ -233,14 +246,20 @@ function Table({ data }: { data: Response[] }) {
           ))}
         </select>
       </div>
-      <div className="h-4" />
-    </Style>
+    </TableStyler>
   );
 }
 
-const Style = styled.div`
+const TableStyler = styled.div`
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding: 24px;
+  justify-content: space-between;
+
   table {
-    border: 1px solid lightgray;
+    flex: 1;
+    width: 100%;
   }
 
   tbody {
@@ -248,16 +267,15 @@ const Style = styled.div`
   }
 
   th {
-    border-bottom: 1px solid lightgray;
-    border-right: 1px solid lightgray;
     padding: 2px 4px;
   }
 
-  tfoot {
-    color: gray;
+  tr {
+    height: 40px;
   }
 
-  tfoot th {
-    font-weight: normal;
+  .pagination {
+    display: flex;
+    width: 100%;
   }
 `;

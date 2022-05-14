@@ -5,6 +5,7 @@ export function TableTabItem({
   icon,
   children = <>Tab Item</>,
   selected = false,
+  badge = null,
   onClick,
 }: {
   icon?: React.ReactNode;
@@ -13,6 +14,7 @@ export function TableTabItem({
    */
   children: React.ReactNode;
   selected?: boolean;
+  badge?: string;
   onClick?: () => void;
 }) {
   return (
@@ -21,6 +23,7 @@ export function TableTabItem({
       <HoverEffectContainer>
         {icon ? <IconContainer>{icon}</IconContainer> : <></>}
         <Label>{children}</Label>
+        {badge && <Badge>{badge}</Badge>}
       </HoverEffectContainer>
       <Indicator color={selected ? "black" : "transparent"} />
     </Container>
@@ -79,4 +82,16 @@ const Indicator = styled.div<{ color: "black" | "transparent" }>`
   background-color: ${({ color }) => color};
   align-self: stretch;
   flex-shrink: 0;
+`;
+
+const Badge = styled.div`
+  background-color: rgba(0, 0, 0, 0.2);
+  border-radius: 100px;
+  padding: 4px 6px;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1;
+  text-align: center;
+  color: rgb(0, 0, 0);
+  box-sizing: border-box;
 `;
