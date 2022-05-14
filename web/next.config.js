@@ -9,6 +9,7 @@ const withTM = require("next-transpile-modules")(
     "@app/scene-view",
     "@app/blocks",
     "@app/cms-posts",
+    "@app/cms-forms",
     "@core/state",
     "@core/app-state",
     "@core/store",
