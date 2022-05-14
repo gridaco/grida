@@ -1,4 +1,4 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useMemo } from "react";
 import styled from "@emotion/styled";
 import {
   createTable,
@@ -8,6 +8,7 @@ import {
 } from "@tanstack/react-table";
 import Axios from "axios";
 import { useRouter } from "next/router";
+import dayjs from "dayjs";
 
 const client = Axios.create({ baseURL: "https://forms.grida.cc" });
 
@@ -32,7 +33,7 @@ export default function FormResultsPage() {
 
   return (
     <>
-      <Table data={data as any} />
+      <Table key={data.length} data={data as any} />
     </>
   );
 }
@@ -42,53 +43,88 @@ type Response = {
   landedAt: Date | string;
   submittedAt: Date | string;
   formId: string;
-  answers: {
-    field: string;
-    data: {
-      value: any;
-    };
-  }[];
-  metadata: {
-    ip: string;
-    browser: null;
-    platform: "api" | "web";
-    referer: string;
-    ua: string;
+  answers: ResponseAnswer[];
+  metadata: ResponseMetadata;
+};
+
+type ResponseAnswer = {
+  field: string;
+  data: {
+    value: any;
   };
 };
 
-type Row = {
-  firstName: string;
-  lastName: string;
-  age: number;
-  visits: number;
-  status: string;
-  progress: number;
+type ResponseMetadata = {
+  ip: string;
+  browser: null;
+  platform: "api" | "web";
+  referer: string;
+  ua: string;
 };
 
-const table = createTable().setRowType<Response>();
+type ResponseDisplayRow = {
+  id: string;
+  landedAt: Date | string;
+  submittedAt: Date | string;
+  formId: string;
+  answers: { [key: string]: any };
+  metadata: ResponseMetadata;
+};
+
+function dataToTable(data: Response[]): ResponseDisplayRow[] {
+  return data.map((d) => {
+    return {
+      ...d,
+      answers: d.answers.reduce((acc, a) => {
+        acc[a.field] = a.data.value;
+        return acc;
+      }, {}),
+    };
+  });
+}
+
+const table = createTable().setRowType<ResponseDisplayRow>();
 
 const defaultColumns = [
-  table.createDataColumn("id", {
-    cell: (info) => info.getValue(),
-    footer: (props) => props.column.id,
-  }),
   table.createDataColumn("submittedAt", {
-    cell: (info) => new Date(info.getValue()).toLocaleDateString("en-US"),
+    id: "Date",
+    cell: (info) => dayjs(info.getValue()).format("DD MMM YYYY\nHH:mm"),
     footer: (props) => props.column.id,
   }),
 ];
 
-function Table({ data }: { data: Response[] }) {
-  const [columns] = React.useState<typeof defaultColumns>(() => [
-    ...defaultColumns,
-  ]);
+function makeAnswersColumn(data: ResponseDisplayRow[]) {
+  // read all anser fields, make the necessary columns
+  const fields = new Set<string>();
+  data.forEach((response) => {
+    Object.keys(response.answers).forEach((k) => {
+      fields.add(k);
+    });
+  });
 
-  const rerender = React.useReducer(() => ({}), {})[1];
+  return Array.from(fields).map((f) => {
+    return table.createDataColumn(
+      (r: ResponseDisplayRow) => {
+        return r.answers[f];
+      },
+      {
+        id: f,
+        cell: (info) => {
+          return info.getValue();
+        },
+      }
+    );
+  });
+}
+
+function Table({ data }: { data: Response[] }) {
+  const displayData = useMemo(() => dataToTable(data), [data.length]);
+
+  const columns = [...defaultColumns, ...makeAnswersColumn(displayData)];
 
   // Create the instance and pass your options
   const instance = useTableInstance(table, {
-    data,
+    data: displayData,
     columns,
     getCoreRowModel: getCoreRowModel(),
     getPaginationRowModel: getPaginationRowModel(),
@@ -134,17 +170,6 @@ function Table({ data }: { data: Response[] }) {
             </tr>
           ))}
         </tbody>
-        <tfoot>
-          {instance.getFooterGroups().map((footerGroup) => (
-            <tr key={footerGroup.id}>
-              {footerGroup.headers.map((header) => (
-                <th key={header.id} colSpan={header.colSpan}>
-                  {header.isPlaceholder ? null : header.renderFooter()}
-                </th>
-              ))}
-            </tr>
-          ))}
-        </tfoot>
       </table>
       <div className="h-2" />
       <div className="flex items-center gap-2">
@@ -201,7 +226,7 @@ function Table({ data }: { data: Response[] }) {
             instance.setPageSize(Number(e.target.value));
           }}
         >
-          {[10, 20, 30, 40, 50].map((pageSize) => (
+          {[10, 50, 100, 500, 1000].map((pageSize) => (
             <option key={pageSize} value={pageSize}>
               Show {pageSize}
             </option>
@@ -209,9 +234,6 @@ function Table({ data }: { data: Response[] }) {
         </select>
       </div>
       <div className="h-4" />
-      <button onClick={() => rerender()} className="border p-2">
-        Rerender
-      </button>
     </Style>
   );
 }
