@@ -179,7 +179,7 @@ module.exports = withTM({
   },
 
   // enable SPA mode, disable SSR
-  target: "serverless",
+  // target: "serverless",
   async rewrites() {
     return [
       // Rewrite everything to `pages/index`
