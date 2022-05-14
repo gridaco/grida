@@ -10,6 +10,7 @@
   "dependencies": {
     "@emotion/babel-preset-css-prop": "^11.2.0",
     "babel-plugin-module-resolver": "^4.1.0",
+    "dayjs": "^1.11.2",
     "next": "12",
     "react": "^18.1.0",
     "react-dom": "^18.1.0"
