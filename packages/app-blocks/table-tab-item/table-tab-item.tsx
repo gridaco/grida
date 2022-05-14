@@ -31,6 +31,7 @@ export function TableTabItem({
 }
 
 const Container = styled.div`
+  user-select: none;
   display: flex;
   justify-content: space-between;
   flex-direction: column;

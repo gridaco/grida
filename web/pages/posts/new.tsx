@@ -1,3 +1,4 @@
+import React from "react";
 import Head from "next/head";
 import { useRouter } from "next/router";
 import { EditPage } from "@app/cms-posts/pages";
@@ -22,6 +23,7 @@ export default function NewPostPage() {
       <Head>
         <title>New Post</title>
       </Head>
+      <div>dummy</div>
       {/* <EditPage /> */}
     </>
   );
