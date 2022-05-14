@@ -1,0 +1,8 @@
+{
+  "name": "@app/cms-forms",
+  "version": "0.0.0",
+  "private": false,
+  "dependencies": {
+    "@tanstack/react-table": "^8.0.0-alpha.76"
+  }
+}

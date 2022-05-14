@@ -22,7 +22,7 @@ export function TableTabItem({
         {icon ? <IconContainer>{icon}</IconContainer> : <></>}
         <Label>{children}</Label>
       </HoverEffectContainer>
-      {selected ? <Indicator /> : <></>}
+      <Indicator color={selected ? "black" : "transparent"} />
     </Container>
   );
 }
@@ -34,6 +34,7 @@ const Container = styled.div`
   align-items: flex-start;
   flex: none;
   box-sizing: border-box;
+  align-self: stretch;
 `;
 
 const TopSpacer = styled.div`
@@ -73,9 +74,9 @@ const Label = styled.span`
   text-align: left;
 `;
 
-const Indicator = styled.div`
+const Indicator = styled.div<{ color: "black" | "transparent" }>`
   height: 1px;
-  background-color: black;
+  background-color: ${({ color }) => color};
   align-self: stretch;
   flex-shrink: 0;
 `;
