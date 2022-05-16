@@ -3,7 +3,7 @@ import styled from "@emotion/styled";
 import { PostListItem } from "../components";
 import { TableTabItem } from "@app/blocks/table-tab-item";
 import { InBlockButton } from "@app/blocks";
-import type { Post } from "../types";
+import type { Post, Publication } from "../types";
 
 /**
  * keep this name readable
@@ -32,11 +32,13 @@ const tabs: { id: TabType; label: string }[] = [
 
 export default function PostsPage({
   title = "Posts",
+  publication,
   posts,
   onPostClick,
   onNewPostClick,
 }: {
   title?: string;
+  publication: Publication;
   posts: Post[];
   onPostClick?: (id: string) => void;
   onNewPostClick?: () => void;
@@ -44,11 +46,7 @@ export default function PostsPage({
   const [tab, setTab] = React.useState<TabType>("draft");
 
   const items = filterPostsBy(posts, tab);
-
-  const host = new URL("https://grida.co/blog");
-
-  /* remove scheme - e.g. blog.grida.co/path */
-  const display_host_name = `${host.host}/${host.pathname}`;
+  const { hosts, name: publicationName } = publication;
 
   return (
     <Container>
@@ -95,15 +93,24 @@ export default function PostsPage({
           <Empty>There are currently no {tab} posts in this publication.</Empty>
         )}
       </List>
-      <BoringBlocksInBlockButton>
-        <InBlockButton
-          onClick={() => {
-            open(host);
-          }}
-        >
-          {display_host_name}
-        </InBlockButton>
-      </BoringBlocksInBlockButton>
+      {hosts?.map((h) => {
+        const host = new URL(h.homepage);
+
+        /* remove scheme - e.g. blog.grida.co/path */
+        const display_host_name = `${host.host}${host.pathname}`;
+
+        return (
+          <BoringBlocksInBlockButton>
+            <InBlockButton
+              onClick={() => {
+                open(host);
+              }}
+            >
+              {display_host_name}
+            </InBlockButton>
+          </BoringBlocksInBlockButton>
+        );
+      })}
     </Container>
   );
 }

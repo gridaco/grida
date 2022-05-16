@@ -6,11 +6,13 @@ import Head from "next/head";
 
 export default function WebPostsPage() {
   const router = useRouter();
+  const [publication, setPublication] = useState<any>({});
   const [posts, setPosts] = useState([]);
   const client = new PostsClient("627c481391a5de075f80a177");
 
   useEffect(() => {
     client.posts().then(setPosts);
+    client.publication().then(setPublication);
   }, []);
 
   const onPostClick = (id) => {
@@ -22,12 +24,16 @@ export default function WebPostsPage() {
     router.push("/posts/" + id);
   };
 
+  const title = publication?.name || "Posts";
+
   return (
     <>
       <Head>
-        <title>Posts</title>
+        <title>{title}</title>
       </Head>
       <TablePage
+        title={title}
+        publication={publication}
         posts={posts}
         onPostClick={onPostClick}
         onNewPostClick={onNewPostClick}

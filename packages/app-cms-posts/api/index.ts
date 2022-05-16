@@ -3,10 +3,17 @@ import Axios, { AxiosInstance } from "axios";
 export class PostsClient {
   private _client: AxiosInstance;
 
-  constructor(readonly publication: string) {
+  constructor(readonly publicationId: string) {
     this._client = Axios.create({
       baseURL: "https://posts.grida.cc",
     });
+  }
+
+  async publication(id?: string) {
+    id = id ?? this.publicationId;
+    return await (
+      await this._client.get(`/publications/${id}`)
+    ).data;
   }
 
   async get(id: string) {
@@ -30,7 +37,7 @@ export class PostsClient {
   }) {
     return await (
       await this._client.post("/drafts", {
-        publication: this.publication,
+        publication: this.publicationId,
         title: title ?? "",
         visibility,
       })

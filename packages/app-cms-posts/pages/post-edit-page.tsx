@@ -8,13 +8,19 @@ import { BoringDocumentsStore } from "@boring.so/store";
 import { BoringContent, BoringTitle } from "@boring.so/document-model";
 import type { OnContentChange } from "@boringso/react-core";
 import { RightActionBar } from "../components/app-bar";
-import type { Post } from "../types";
+import type { Post, Publication } from "../types";
 
 const store = new BoringDocumentsStore();
 
 type PostEditPageProps = { id: string } | { draft: true };
 
-export default function PostEditPage({ id }: { id: string }) {
+export default function PostEditPage({
+  id,
+  publication,
+}: {
+  id: string;
+  publication: Publication;
+}) {
   const [publishDialog, setPublishDialog] = React.useState(false); // controls review dialog
 
   const client = new PostsClient("627c481391a5de075f80a177");
