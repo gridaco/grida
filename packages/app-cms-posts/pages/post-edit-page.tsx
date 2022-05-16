@@ -25,6 +25,9 @@ export default function PostEditPage({ id }: { id: string }) {
   const client = new PostsClient("627c481391a5de075f80a177");
   const [data, setData] = useState<Post>();
   const [loaded, setLoaded] = useState(false);
+  const [saving, setSaving] = useState<"saving" | "saved" | "error">(undefined);
+
+  console.log("saving", saving);
 
   useEffect(() => {
     client.get(id).then((post) => {
@@ -65,16 +68,39 @@ export default function PostEditPage({ id }: { id: string }) {
   }, [data]);
 
   const onTitleChange = debounce((t) => {
-    client.updateTitle(id, t);
+    setSaving("saving");
+    client
+      .updateTitle(id, t)
+      .then(() => {
+        setSaving("saved");
+      })
+      .catch((e) => {
+        setSaving("error");
+      });
   }, 1000);
 
   const onContentChange = debounce((t) => {
-    console.log(t);
-    client.updateBody(id, t);
+    setSaving("saving");
+    client
+      .updateBody(id, t)
+      .then(() => {
+        setSaving("saved");
+      })
+      .catch((e) => {
+        setSaving("error");
+      });
   }, 3000);
 
   const onSummaryChange = debounce((t) => {
-    client.updateSummary(id, { summary: t });
+    setSaving("saving");
+    client
+      .updateSummary(id, { summary: t })
+      .then(() => {
+        setSaving("saved");
+      })
+      .catch((e) => {
+        setSaving("error");
+      });
   }, 1000);
 
   return (
@@ -116,6 +142,7 @@ export default function PostEditPage({ id }: { id: string }) {
         />
       </Dialog>
       <RightActionBar
+        saving={saving}
         onCancelClick={() => {}}
         onPublishClick={() => {
           setPublishDialog(true);

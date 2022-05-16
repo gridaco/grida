@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import styled from "@emotion/styled";
 
 export function SavingIndicator({
@@ -21,15 +21,7 @@ export function SavingIndicator({
       );
     }
     case "saved": {
-      return (
-        <Container>
-          {/* // <ProgressContainer */}
-          {/* //   src="grida://assets-reservation/images/1010:88789" */}
-          {/* //   alt="icon" */}
-          {/* // /> */}
-          <Label>Saved</Label>
-        </Container>
-      );
+      return <SavedIndicationWithTimer />;
     }
     case "saving": {
       return (
@@ -45,7 +37,28 @@ export function SavingIndicator({
   }
 }
 
-const Container = styled.div`
+function SavedIndicationWithTimer({
+  delay = 2.5, // show for 2.5s
+}: {
+  delay?: number;
+}) {
+  const [show, setShow] = useState(true);
+
+  useEffect(() => {
+    let timer1 = setTimeout(() => setShow(false), delay * 1000);
+    return () => {
+      clearTimeout(timer1);
+    };
+  }, []);
+
+  return (
+    <Container opacity={show ? 1 : 0}>
+      <Label>Saved</Label>
+    </Container>
+  );
+}
+
+const Container = styled.div<{ opacity?: number }>`
   display: flex;
   justify-content: center;
   flex-direction: row;
@@ -55,6 +68,8 @@ const Container = styled.div`
   border-radius: 4px;
   box-sizing: border-box;
   padding: 8px;
+  opacity: ${(props) => props.opacity ?? 1};
+  transition: opacity 0.2s ease-in-out;
 `;
 
 const ProgressContainer = styled.img`

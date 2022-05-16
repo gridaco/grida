@@ -7,7 +7,7 @@ export function RightActionBar({
   onCancelClick,
   onPublishClick,
 }: {
-  saving?: "saving" | "saved" | undefined;
+  saving?: "saving" | "saved" | "error" | undefined;
   onCancelClick: () => void;
   onPublishClick: () => void;
 }) {
