@@ -71,9 +71,6 @@ export function PublishPostReviewDialogBody({
           </PreviewContainer>
         </Left>
         <Right>
-          <PublishingToGridaBlog>
-            Publishing to :<strong>{publication.name}</strong>
-          </PublishingToGridaBlog>
           <TagsAndPublishContainer>
             <EditTagsSegment
               tags={initialTags}
@@ -149,13 +146,14 @@ const Container = styled.div`
   flex-direction: column;
   align-items: flex-start;
   flex: none;
-  gap: 74px;
   border-radius: 4px;
   background-color: white;
   box-sizing: border-box;
   padding: 80px 120px;
   margin: auto;
   max-width: 1080px;
+  min-width: 70vw;
+  min-height: 70vh;
   width: 100%;
 `;
 
@@ -169,19 +167,12 @@ const Top = styled.div`
   flex-shrink: 0;
 `;
 
-const Heading = styled.span`
+const Heading = styled.h2`
   color: rgb(26, 26, 26);
   text-overflow: ellipsis;
-  font-size: 48px;
-  font-family: "Helvetica Neue", sans-serif;
+  font-size: 30px;
   font-weight: 700;
   text-align: left;
-`;
-
-const Icons = styled.img`
-  width: 24px;
-  height: 24px;
-  object-fit: cover;
 `;
 
 const Body = styled.div`
@@ -201,8 +192,7 @@ const Left = styled.div`
   flex-direction: column;
   align-items: flex-start;
   flex: 1;
-  gap: 35px;
-  width: 380px;
+  gap: 12px;
   box-sizing: border-box;
 `;
 
@@ -233,18 +223,7 @@ const Right = styled.div`
   align-items: flex-start;
   flex: 1;
   gap: 36px;
-  width: 380px;
   box-sizing: border-box;
-`;
-
-const PublishingToGridaBlog = styled.span`
-  color: rgb(26, 26, 26);
-  text-overflow: ellipsis;
-  font-size: 14px;
-  font-weight: normal;
-  text-align: left;
-  align-self: stretch;
-  flex-shrink: 0;
 `;
 
 const TagsAndPublishContainer = styled.div`

@@ -28,8 +28,6 @@ export default function PostEditPage({ id }: { id: string }) {
   const [loaded, setLoaded] = useState(false);
   const [saving, setSaving] = useState<"saving" | "saved" | "error">(undefined);
 
-  console.log("saving", saving);
-
   useEffect(() => {
     client.get(id).then((post) => {
       console.log(post);
@@ -70,6 +68,7 @@ export default function PostEditPage({ id }: { id: string }) {
 
   const onTitleChange = debounce((t) => {
     setSaving("saving");
+    setData((d) => ({ ...d, title: t }));
     client
       .updateTitle(id, t)
       .then(() => {
@@ -82,6 +81,7 @@ export default function PostEditPage({ id }: { id: string }) {
 
   const onContentChange = debounce((t) => {
     setSaving("saving");
+    setData((d) => ({ ...d, body: { html: t } }));
     client
       .updateBody(id, t)
       .then(() => {
@@ -94,6 +94,7 @@ export default function PostEditPage({ id }: { id: string }) {
 
   const onSummaryChange = debounce((t) => {
     setSaving("saving");
+    setData((d) => ({ ...d, summary: t }));
     client
       .updateSummary(id, { summary: t })
       .then(() => {
@@ -113,36 +114,38 @@ export default function PostEditPage({ id }: { id: string }) {
           setPublishDialog(false);
         }}
       >
-        <PublishPostReviewDialogBody
-          title={data.title}
-          summary={data.summary}
-          tags={data.tags}
-          onPublish={(p) => {
-            // 1. update with value (TODO:)
-            client.publish(id).then(({ id }) => {
-              // 2. then => publish
+        {data && (
+          <PublishPostReviewDialogBody
+            title={data.title}
+            summary={data.summary}
+            tags={data.tags}
+            onPublish={(p) => {
+              // 1. update with value (TODO:)
+              client.publish(id).then(({ id }) => {
+                // 2. then => publish
+                setPublishDialog(false);
+                open("https://grida.co/blogs/" + id);
+              });
+            }}
+            onTitleChange={onTitleChange}
+            onSummaryChange={onSummaryChange}
+            onSchedule={(p) => {
+              // TODO:
+              // 1. update with value
+              // 2. them => schedule
               setPublishDialog(false);
-              open("https://grida.co/blogs/" + id);
-            });
-          }}
-          onTitleChange={onTitleChange}
-          onSummaryChange={onSummaryChange}
-          onSchedule={(p) => {
-            // TODO:
-            // 1. update with value
-            // 2. them => schedule
-            setPublishDialog(false);
-          }}
-          onCancel={() => {
-            setPublishDialog(false);
-          }}
-          onTagsEdit={(tags: string[]) => {
-            // TODO:
-          }}
-          publication={{
-            name: "Grida",
-          }}
-        />
+            }}
+            onCancel={() => {
+              setPublishDialog(false);
+            }}
+            onTagsEdit={(tags: string[]) => {
+              // TODO:
+            }}
+            publication={{
+              name: "Grida",
+            }}
+          />
+        )}
       </Dialog>
       <RightActionBar
         saving={saving}

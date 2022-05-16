@@ -1,5 +1,6 @@
 import React from "react";
 import styled from "@emotion/styled";
+import TextareaAutosize from "react-textarea-autosize";
 
 export function EditSummarySegment({
   title,
@@ -15,7 +16,6 @@ export function EditSummarySegment({
   return (
     <SummaryArea>
       <TitleAsInput
-        type="text"
         value={title}
         placeholder="Title"
         onChange={(e) => {
@@ -24,7 +24,6 @@ export function EditSummarySegment({
         }}
       />
       <SummaryAsInput
-        type="text"
         value={summary}
         placeholder="Summary"
         onChange={(e) => {
@@ -47,7 +46,7 @@ const SummaryArea = styled.div`
   flex-shrink: 0;
 `;
 
-const TitleAsInput = styled.textarea`
+const TitleAsInput = styled(TextareaAutosize)`
   border: none;
   outline: none;
   color: rgb(26, 26, 26);
@@ -62,7 +61,7 @@ const TitleAsInput = styled.textarea`
   text-overflow: ellipsis;
 `;
 
-const SummaryAsInput = styled.textarea`
+const SummaryAsInput = styled(TextareaAutosize)`
   border: none;
   outline: none;
   color: rgb(26, 26, 26);
