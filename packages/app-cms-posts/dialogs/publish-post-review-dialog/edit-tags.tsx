@@ -1,25 +1,34 @@
-import React, { useState } from "react";
+import React from "react";
 import styled from "@emotion/styled";
 import { TagsInput } from "@ui/tags-input";
 
-export function EditTagsSegment() {
+export function EditTagsSegment({
+  tags,
+  onChange,
+}: {
+  tags: Array<string>;
+  onChange: (tags: Array<string>) => void;
+}) {
   return (
     <TagsEditContainer>
-      <AddTagsForReadersUpTo5>
-        Add tags for readers (up to 5)
-      </AddTagsForReadersUpTo5>
-      {/* <Tags></Tags> */}
-      <TagsInput />
+      <AddTagsForReadersUpTo5>Add tags for search</AddTagsForReadersUpTo5>
+      <TagsInput
+        initialTags={tags.map((tag) => ({ id: tag, text: tag }))}
+        onChange={(t) => {
+          onChange(t.map((t) => t.text));
+        }}
+        style={{
+          alignSelf: "stretch",
+          flexShrink: 0,
+          fontSize: 14,
+          padding: 8,
+          borderRadius: 4,
+          backgroundColor: "rgba(0, 0, 0, 0.02)",
+        }}
+      />
     </TagsEditContainer>
   );
 }
-
-const Tags = styled.div`
-  height: 71px;
-  background-color: rgba(0, 0, 0, 0.02);
-  align-self: stretch;
-  flex-shrink: 0;
-`;
 
 const TagsEditContainer = styled.div`
   display: flex;

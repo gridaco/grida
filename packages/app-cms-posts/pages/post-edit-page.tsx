@@ -14,6 +14,7 @@ interface Post {
   title: string;
   summary?: string;
   body: any;
+  tags?: string[];
 }
 const store = new BoringDocumentsStore();
 
@@ -113,7 +114,9 @@ export default function PostEditPage({ id }: { id: string }) {
         }}
       >
         <PublishPostReviewDialogBody
-          title="Hi"
+          title={data.title}
+          summary={data.summary}
+          tags={data.tags}
           onPublish={(p) => {
             // 1. update with value (TODO:)
             client.publish(id).then(({ id }) => {

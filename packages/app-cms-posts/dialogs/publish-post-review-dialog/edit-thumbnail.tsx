@@ -13,9 +13,10 @@ export function EditThumbnailSegment() {
 }
 
 const ThumbnailEdit = styled.div`
-  height: 173px;
+  min-height: 180px;
+  min-width: 400px;
   overflow: hidden;
-  background-color: rgb(193, 193, 193);
+  background-color: rgba(0, 0, 0, 0.02);
   position: relative;
   align-self: stretch;
   flex-shrink: 0;

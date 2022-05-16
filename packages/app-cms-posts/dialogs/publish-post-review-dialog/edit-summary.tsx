@@ -47,8 +47,9 @@ const SummaryArea = styled.div`
   flex-shrink: 0;
 `;
 
-const TitleAsInput = styled.input`
+const TitleAsInput = styled.textarea`
   border: none;
+  outline: none;
   color: rgb(26, 26, 26);
   font-size: 18px;
   font-family: "Helvetica Neue", sans-serif;
@@ -56,10 +57,14 @@ const TitleAsInput = styled.input`
   text-align: start;
   align-self: stretch;
   flex-shrink: 0;
+  resize: none;
+  max-height: 40px;
+  text-overflow: ellipsis;
 `;
 
-const SummaryAsInput = styled.input`
+const SummaryAsInput = styled.textarea`
   border: none;
+  outline: none;
   color: rgb(26, 26, 26);
   font-size: 13px;
   font-family: "Helvetica Neue", sans-serif;
@@ -67,4 +72,5 @@ const SummaryAsInput = styled.input`
   text-align: start;
   align-self: stretch;
   flex-shrink: 0;
+  resize: none;
 `;

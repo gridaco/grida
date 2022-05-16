@@ -75,7 +75,12 @@ export function PublishPostReviewDialogBody({
             Publishing to :<strong>{publication.name}</strong>
           </PublishingToGridaBlog>
           <TagsAndPublishContainer>
-            <EditTagsSegment />
+            <EditTagsSegment
+              tags={initialTags}
+              onChange={(tags) => {
+                setTags(tags);
+              }}
+            />
             {isScheduling && (
               <div>
                 <input
