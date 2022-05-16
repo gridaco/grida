@@ -14,7 +14,7 @@ export function TableTabItem({
    */
   children: React.ReactNode;
   selected?: boolean;
-  badge?: string;
+  badge?: string | number;
   onClick?: () => void;
 }) {
   return (

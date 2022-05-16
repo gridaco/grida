@@ -23,10 +23,12 @@ export function TagsInput({
   onAdd,
   onDelete,
   style,
+  autofocus = false,
 }: {
   suggestions?: Array<Tag>;
   initialTags?: Array<Tag>;
   placeholder?: string;
+  autofocus?: boolean;
   onChange?: (tags: Array<Tag>) => void;
   onClick?: (tag: Tag) => void;
   onAdd?: (tag: Tag) => void;
@@ -76,6 +78,7 @@ export function TagsInput({
         placeholder={placeholder}
         // removeComponent={(props) => <RemoveComponent {...props} />}
         autocomplete
+        autofocus={autofocus}
       />
     </StyleRoot>
   );

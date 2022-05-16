@@ -2,25 +2,40 @@ import React from "react";
 import styled from "@emotion/styled";
 import { SavingIndicator } from "@grida.co/app/components/saving-indicator";
 
+const publish_mode_labels = {
+  update: "Publish changes",
+  post: "Publish",
+};
+
 export function RightActionBar({
   saving,
-  onCancelClick,
+  mode,
+  onPreviewClick,
   onPublishClick,
+  disabled = false,
 }: {
   saving?: "saving" | "saved" | "error" | undefined;
-  onCancelClick: () => void;
+  mode: "update" | "post";
+  disabled?: boolean;
+  onPreviewClick: () => void;
   onPublishClick: () => void;
 }) {
   return (
     <Root>
       {saving && <SavingIndicator status={saving} />}
-      <CancelButton onClick={onCancelClick}>Cancel</CancelButton>
-      <PublishButton onClick={onPublishClick}>Publish</PublishButton>
+      <CancelButton onClick={onPreviewClick}>Preview</CancelButton>
+      <PublishButton onClick={onPublishClick} disabled={disabled}>
+        {publish_mode_labels[mode] ?? publish_mode_labels.post}
+      </PublishButton>
     </Root>
   );
 }
 
 const Root = styled.div`
+  position: fixed;
+  inset: 0;
+  z-index: 9;
+  user-select: none;
   display: flex;
   justify-content: flex-end;
   flex-direction: row;
@@ -30,7 +45,7 @@ const Root = styled.div`
   height: 56px;
   box-sizing: border-box;
   padding-left: 16px;
-  padding-right: 12px;
+  padding-right: 20px;
   flex-shrink: 0;
 `;
 

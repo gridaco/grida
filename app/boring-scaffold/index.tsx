@@ -15,13 +15,16 @@ export function BoringScaffold({
   initial,
   onTitleChange,
   onContentChange,
+  readonly = false,
 }: {
   initial?: InitialDocumentProp;
   onTitleChange?: (title: string) => void;
   onContentChange?: OnContentChange;
+  readonly?: boolean;
 }) {
   return (
     <Boring
+      readonly={readonly}
       initial={initial}
       extensions={extensions}
       onTitleChange={onTitleChange}

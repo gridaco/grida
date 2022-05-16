@@ -3,8 +3,10 @@ import styled from "@emotion/styled";
 import { PostListItem } from "../components";
 import { TableTabItem } from "@app/blocks/table-tab-item";
 import { InBlockButton } from "@app/blocks";
+import type { Post } from "../types";
 
-const tabs = [
+type TabType = "drafts" | "scheduled" | "published" | "unlisted";
+const tabs: { id: TabType; label: string }[] = [
   {
     id: "drafts",
     label: "Drafts and submissions",
@@ -30,11 +32,13 @@ export default function PostsPage({
   onNewPostClick,
 }: {
   title?: string;
-  posts: any[];
+  posts: Post[];
   onPostClick?: (id: string) => void;
   onNewPostClick?: () => void;
 }) {
-  const [tab, setTab] = React.useState("drafts");
+  const [tab, setTab] = React.useState<TabType>("drafts");
+
+  const items = filterPostsBy(posts, tab);
 
   return (
     <Container>
@@ -46,6 +50,7 @@ export default function PostsPage({
               <TableTabItem
                 key={t.id}
                 selected={tab === t.id}
+                badge={filterPostsBy(posts, t.id).length.toString()}
                 onClick={() => {
                   setTab(t.id);
                 }}
@@ -64,14 +69,14 @@ export default function PostsPage({
       </Toolbar>
       <Title>{title}</Title>
       <List>
-        {posts.map((post) => (
+        {items.map((post) => (
           <PostListItem
             key={post.id}
             title={post.title}
             summary={post.summary}
-            autor={post.autor}
+            author={post.author}
             publishedAt={post.postedAt}
-            readingTime={post.readingTime}
+            readingTime={post.readingTime ? post.readingTime + "s" : null}
             thumbnail={post.thumbnail}
             onClick={() => {
               onPostClick?.(post.id);
@@ -91,6 +96,24 @@ export default function PostsPage({
     </Container>
   );
 }
+
+const filterPostsBy = (posts: Post[], type: TabType) => {
+  return posts.filter((p) => {
+    switch (type) {
+      case "drafts": {
+        return p.isDraft;
+      }
+      case "published": {
+        return !p.isDraft;
+      }
+      case "scheduled": {
+        return !!p.scheduledAt;
+      }
+      case "unlisted":
+        return !p.isDraft && !!!p.postedAt;
+    }
+  });
+};
 
 const Container = styled.div`
   margin: 100px 160px 40px 160px;
@@ -112,7 +135,7 @@ const Toolbar = styled.div`
 
 const Underline = styled.div`
   height: 1px;
-  background-color: rgb(196, 196, 196);
+  background-color: rgba(0, 0, 0, 0.1);
   position: absolute;
   left: 0px;
   right: 0px;

@@ -1,10 +1,11 @@
 import React from "react";
 import styled from "@emotion/styled";
+import dayjs from "dayjs";
 
 export function PostListItem({
   title,
   summary,
-  autor,
+  author,
   publishedAt,
   thumbnail,
   readingTime,
@@ -12,7 +13,7 @@ export function PostListItem({
 }: {
   title: string;
   summary: string;
-  autor?: string;
+  author?: string;
   publishedAt?: Date | string;
   thumbnail?: string;
   readingTime?: string;
@@ -24,17 +25,14 @@ export function PostListItem({
         <Title>{title ?? "Untitled story"}</Title>
         {summary && <Summary>{summary}</Summary>}
         <MetaContainer>
-          <Author>@{autor}</Author>
+          {author && <Author>@{author}</Author>}
           <PublishedAt>
-            Published on{" "}
-            {typeof publishedAt === "string"
-              ? publishedAt
-              : publishedAt?.toDateString()}
+            Published on {dayjs(publishedAt).format("MM/DD/YYYY")}
           </PublishedAt>
           <ReadingTime>{readingTime}</ReadingTime>
         </MetaContainer>
       </TextContents>
-      <Thumbnail src={thumbnail} />
+      {thumbnail && <Thumbnail src={thumbnail} />}
     </Container>
   );
 }
@@ -47,6 +45,7 @@ const Container = styled.div`
   align-items: flex-start;
   flex: none;
   gap: 16px;
+  min-height: 80px;
   box-sizing: border-box;
 `;
 
