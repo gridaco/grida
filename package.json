@@ -18,7 +18,8 @@
         "externals/design-to-code/externals/coli/packages/*",
         "externals/design-to-code/packages/*",
         "boring/packages/*",
-        "ui/editor-ui/packages/*"
+        "ui/editor-ui/packages/*",
+        "ui/*"
     ],
     "scripts": {
         "web": "yarn workspace web run dev",

@@ -15,6 +15,19 @@ const withTM = require("next-transpile-modules")(
     "@core/store",
     "@core/model",
 
+    // ui
+    "@ui/tags-input",
+
+    // https://github.com/vercel/next.js/discussions/13553#discussioncomment-20092  ----------------------------
+    // cause of this, we also set `experimental: { esmExternals: "loose" }`
+    "react-tag-input",
+    "react-dnd",
+    "dnd-core",
+    "@react-dnd/invariant",
+    "@react-dnd/asap",
+    "@react-dnd/shallowequal",
+    //  --------------------------------------------------------------------------------------------------------
+
     // utils
     "treearray",
 
@@ -177,6 +190,8 @@ module.exports = withTM({
 
     return config;
   },
+
+  experimental: { esmExternals: "loose" },
 
   // enable SPA mode, disable SSR
   // target: "serverless",
