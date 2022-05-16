@@ -32,6 +32,7 @@ export function TableTabItem({
 
 const Container = styled.div`
   user-select: none;
+  cursor: pointer;
   display: flex;
   justify-content: space-between;
   flex-direction: column;
@@ -62,6 +63,12 @@ const HoverEffectContainer = styled.div`
   :hover {
     background-color: rgba(0, 0, 0, 0.05);
   }
+
+  :active {
+    background-color: rgba(0, 0, 0, 0.1);
+  }
+
+  transition: background-color 0.1s ease-in-out;
 `;
 
 const IconContainer = styled.div`
@@ -83,6 +90,7 @@ const Indicator = styled.div<{ color: "black" | "transparent" }>`
   background-color: ${({ color }) => color};
   align-self: stretch;
   flex-shrink: 0;
+  transition: background-color 0.2s ease-in-out;
 `;
 
 const Badge = styled.div`

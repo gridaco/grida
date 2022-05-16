@@ -5,10 +5,15 @@ import { TableTabItem } from "@app/blocks/table-tab-item";
 import { InBlockButton } from "@app/blocks";
 import type { Post } from "../types";
 
-type TabType = "drafts" | "scheduled" | "published" | "unlisted";
+/**
+ * keep this name readable
+ * this is used to build user message
+ * > "There are currently no {t} posts in this publication.""
+ */
+type TabType = "draft" | "scheduled" | "published" | "unlisted";
 const tabs: { id: TabType; label: string }[] = [
   {
-    id: "drafts",
+    id: "draft",
     label: "Drafts and submissions",
   },
   {
@@ -36,9 +41,14 @@ export default function PostsPage({
   onPostClick?: (id: string) => void;
   onNewPostClick?: () => void;
 }) {
-  const [tab, setTab] = React.useState<TabType>("drafts");
+  const [tab, setTab] = React.useState<TabType>("draft");
 
   const items = filterPostsBy(posts, tab);
+
+  const host = new URL("https://grida.co/blog");
+
+  /* remove scheme - e.g. blog.grida.co/path */
+  const display_host_name = `${host.host}/${host.pathname}`;
 
   return (
     <Container>
@@ -60,47 +70,54 @@ export default function PostsPage({
             ))}
           </Tabs>
           <Actions>
-            <Button onClick={onNewPostClick}>
-              <Icons />
-              New Post
-            </Button>
+            <Button onClick={onNewPostClick}>New Post</Button>
           </Actions>
         </Tools>
       </Toolbar>
       <Title>{title}</Title>
       <List>
-        {items.map((post) => (
-          <PostListItem
-            key={post.id}
-            title={post.title}
-            summary={post.summary}
-            author={post.author}
-            publishedAt={post.postedAt}
-            readingTime={post.readingTime ? post.readingTime + "s" : null}
-            thumbnail={post.thumbnail}
-            onClick={() => {
-              onPostClick?.(post.id);
-            }}
-          />
-        ))}
+        {items.length ? (
+          items.map((post) => (
+            <PostListItem
+              key={post.id}
+              title={post.title}
+              summary={post.summary}
+              author={post.author}
+              publishedAt={post.postedAt}
+              readingTime={post.readingTime ? post.readingTime + "s" : null}
+              thumbnail={post.thumbnail}
+              onClick={() => {
+                onPostClick?.(post.id);
+              }}
+            />
+          ))
+        ) : (
+          <Empty>There are currently no {tab} posts in this publication.</Empty>
+        )}
       </List>
       <BoringBlocksInBlockButton>
         <InBlockButton
           onClick={() => {
-            open("https://grida.co/blog");
+            open(host);
           }}
         >
-          grida.co/blog
+          {display_host_name}
         </InBlockButton>
       </BoringBlocksInBlockButton>
     </Container>
   );
 }
 
+const Empty = styled.div`
+  padding: 80px 40px;
+  text-align: center;
+  opacity: 0.5;
+`;
+
 const filterPostsBy = (posts: Post[], type: TabType) => {
   return posts.filter((p) => {
     switch (type) {
-      case "drafts": {
+      case "draft": {
         return p.isDraft;
       }
       case "published": {
@@ -208,7 +225,7 @@ const Button = styled.button`
   }
 `;
 
-const Icons = styled.svg`
+const Icon = styled.svg`
   width: 18px;
   height: 18px;
 `;
