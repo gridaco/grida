@@ -1,5 +1,8 @@
 import React, { useState } from "react";
 import styled from "@emotion/styled";
+import { EditSummarySegment } from "./edit-summary";
+import { EditThumbnailSegment } from "./edit-thumbnail";
+import { EditTagsSegment } from "./edit-tags";
 
 type PostVisibility = "public" | "private" | "password_protected";
 
@@ -52,34 +55,19 @@ export function PublishPostReviewDialogBody({
         <Left>
           <PreviewText>Post Preview</PreviewText>
           <PreviewContainer>
-            <ThumbnailEdit>
-              <Src
-                src="grida://assets-reservation/images/1010:91716"
-                alt="image of Src"
-              />
-            </ThumbnailEdit>
-            <SummaryArea>
-              <TitleAsInput
-                type="text"
-                value={title}
-                placeholder="Title"
-                onChange={(e) => {
-                  const v = e.target.value;
-                  setTitle(v);
-                  onTitleChange(v);
-                }}
-              />
-              <SummaryAsInput
-                type="text"
-                value={summary}
-                placeholder="Summary"
-                onChange={(e) => {
-                  const v = e.target.value;
-                  setSummary(v);
-                  onSummaryChange(v);
-                }}
-              />
-            </SummaryArea>
+            <EditThumbnailSegment />
+            <EditSummarySegment
+              title={title}
+              summary={summary}
+              onTitleChange={(title) => {
+                setTitle(title);
+                onTitleChange(title);
+              }}
+              onSummaryChange={(summary) => {
+                setSummary(summary);
+                onSummaryChange(summary);
+              }}
+            />
           </PreviewContainer>
         </Left>
         <Right>
@@ -87,12 +75,7 @@ export function PublishPostReviewDialogBody({
             Publishing to :<strong>{publication.name}</strong>
           </PublishingToGridaBlog>
           <TagsAndPublishContainer>
-            <TagsEditContainer>
-              <AddTagsForReadersUpTo5>
-                Add tags for readers (up to 5)
-              </AddTagsForReadersUpTo5>
-              <TagsEdit />
-            </TagsEditContainer>
+            <EditTagsSegment />
             {isScheduling && (
               <div>
                 <input
@@ -238,57 +221,6 @@ const PreviewContainer = styled.div`
   flex-shrink: 0;
 `;
 
-const ThumbnailEdit = styled.div`
-  height: 173px;
-  overflow: hidden;
-  background-color: rgb(193, 193, 193);
-  position: relative;
-  align-self: stretch;
-  flex-shrink: 0;
-`;
-
-const Src = styled.img`
-  object-fit: cover;
-  position: absolute;
-  left: 0px;
-  top: 0px;
-  right: 0px;
-  bottom: 0px;
-`;
-
-const SummaryArea = styled.div`
-  display: flex;
-  justify-content: flex-start;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 13px;
-  align-self: stretch;
-  box-sizing: border-box;
-  flex-shrink: 0;
-`;
-
-const TitleAsInput = styled.input`
-  border: none;
-  color: rgb(26, 26, 26);
-  font-size: 18px;
-  font-family: "Helvetica Neue", sans-serif;
-  font-weight: 700;
-  text-align: start;
-  align-self: stretch;
-  flex-shrink: 0;
-`;
-
-const SummaryAsInput = styled.input`
-  border: none;
-  color: rgb(26, 26, 26);
-  font-size: 13px;
-  font-family: "Helvetica Neue", sans-serif;
-  font-weight: 400;
-  text-align: start;
-  align-self: stretch;
-  flex-shrink: 0;
-`;
-
 const Right = styled.div`
   display: flex;
   justify-content: flex-start;
@@ -318,35 +250,6 @@ const TagsAndPublishContainer = styled.div`
   gap: 26px;
   align-self: stretch;
   box-sizing: border-box;
-  flex-shrink: 0;
-`;
-
-const TagsEditContainer = styled.div`
-  display: flex;
-  justify-content: flex-start;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 6px;
-  align-self: stretch;
-  box-sizing: border-box;
-  flex-shrink: 0;
-`;
-
-const AddTagsForReadersUpTo5 = styled.span`
-  color: rgb(26, 26, 26);
-  text-overflow: ellipsis;
-  font-size: 14px;
-  font-family: "Helvetica Neue", sans-serif;
-  font-weight: 400;
-  text-align: left;
-  align-self: stretch;
-  flex-shrink: 0;
-`;
-
-const TagsEdit = styled.div`
-  height: 71px;
-  background-color: rgba(0, 0, 0, 0.02);
-  align-self: stretch;
   flex-shrink: 0;
 `;
 
