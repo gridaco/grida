@@ -182,11 +182,6 @@ export default function PostEditPage({
         onPublishClick={() => {
           setPublishDialog(true);
         }}
-        theme={{
-          primaryButton: {
-            backgroundColor: theme.app_posts_cms.colors.button_primary,
-          },
-        }}
       />
       <EditorContainer>
         <Editor

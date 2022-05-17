@@ -1,13 +1,26 @@
-import React, { useRef } from "react";
+import React, { useRef, useState } from "react";
 import styled from "@emotion/styled";
 import { ThumbnailView } from "./edit-thumbnail-view";
-export function EditThumbnailSegment() {
+export function EditThumbnailSegment({
+  onFileUpload,
+}: {
+  /**
+   * handle file
+   * ```ts
+   * let data = new FormData();
+   * data.append("file", file);
+   * ```
+   */
+  onFileUpload: (file: File) => void;
+}) {
   const inputFile = useRef(null);
+  const [uploaded, setUploaded] = useState<string>();
 
   return (
     <>
       <ThumbnailView
-        label="Upload an image"
+        label={uploaded ? "Change thumbnail" : "Upload an image"}
+        src={uploaded}
         onClick={() => {
           inputFile.current.click();
         }}
@@ -21,9 +34,8 @@ export function EditThumbnailSegment() {
           // @ts-ignore
           let file = event.target.files[0];
           if (file) {
-            let data = new FormData();
-            data.append("file", file);
-            // axios.post('/files', data)...
+            setUploaded(URL.createObjectURL(file));
+            onFileUpload?.(file);
           }
         }}
         style={{ contentVisibility: "hidden" }}

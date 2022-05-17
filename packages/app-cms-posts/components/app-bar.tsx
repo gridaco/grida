@@ -1,6 +1,7 @@
 import React from "react";
 import styled from "@emotion/styled";
 import { SavingIndicator } from "@grida.co/app/components/saving-indicator";
+import { RoundPrimaryButton } from "../components";
 
 const publish_mode_labels = {
   update: "Publish changes",
@@ -43,12 +44,6 @@ interface RightActionBarProps {
   disabledPublish?: boolean;
   onPreviewClick: () => void;
   onPublishClick: () => void;
-  theme?: {
-    primaryButton?: {
-      backgroundColor?: React.CSSProperties["color"];
-      borderRadius?: React.CSSProperties["borderRadius"];
-    };
-  };
 }
 
 export function RightActionBar({
@@ -57,20 +52,14 @@ export function RightActionBar({
   onPreviewClick,
   onPublishClick,
   disabledPublish: disabled = false,
-  theme,
 }: RightActionBarProps) {
   return (
     <RightActionBarContainer>
       {saving && <SavingIndicator status={saving} />}
       <PreviewButton onClick={onPreviewClick}>Preview</PreviewButton>
-      <PublishButton
-        backgroundColor={theme?.primaryButton?.backgroundColor}
-        borderRadius={theme?.primaryButton?.borderRadius}
-        onClick={onPublishClick}
-        disabled={disabled}
-      >
+      <RoundPrimaryButton onClick={onPublishClick} disabled={disabled}>
         {publish_mode_labels[mode] ?? publish_mode_labels.post}
-      </PublishButton>
+      </RoundPrimaryButton>
     </RightActionBarContainer>
   );
 }
@@ -89,38 +78,6 @@ const PreviewButton = styled.button`
   border-radius: 20px;
   padding: 0px 12px;
   color: black;
-  font-size: 13px;
-  font-family: Inter, sans-serif;
-  font-weight: 400;
-  border: none;
-  outline: none;
-  cursor: pointer;
-
-  :hover {
-    opacity: 0.8;
-  }
-
-  :disabled {
-    opacity: 0.5;
-  }
-
-  :active {
-    opacity: 1;
-  }
-
-  :focus {
-  }
-`;
-
-const PublishButton = styled.button<{
-  backgroundColor?: React.CSSProperties["color"];
-  borderRadius?: React.CSSProperties["borderRadius"];
-}>`
-  height: 32px;
-  background-color: ${(props) => props.backgroundColor ?? "rgb(35, 77, 255)"};
-  border-radius: ${(props) => props.borderRadius ?? "20px"};
-  padding: 0px 12px;
-  color: white;
   font-size: 13px;
   font-family: Inter, sans-serif;
   font-weight: 400;

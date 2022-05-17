@@ -3,6 +3,8 @@ import styled from "@emotion/styled";
 import { EditSummarySegment } from "./edit-summary";
 import { EditThumbnailSegment } from "./edit-thumbnail";
 import { EditTagsSegment } from "./edit-tags";
+import { RoundPrimaryButton } from "../../components";
+import { StyledDatePicker } from "@ui/date-picker";
 
 type PostVisibility = "public" | "private" | "password_protected";
 
@@ -53,9 +55,13 @@ export function PublishPostReviewDialogBody({
       </Top>
       <Body>
         <Left>
-          <PreviewText>Post Preview</PreviewText>
+          <PreviewText>Preview</PreviewText>
           <PreviewContainer>
-            <EditThumbnailSegment />
+            <EditThumbnailSegment
+              onFileUpload={() => {
+                // TODO:
+              }}
+            />
             <EditSummarySegment
               title={title}
               summary={summary}
@@ -80,22 +86,21 @@ export function PublishPostReviewDialogBody({
             />
             {isScheduling && (
               <div>
-                <input
-                  type="date"
-                  value={
-                    scheduledAt
-                      ? scheduledAt.toISOString().split("T")[0]
-                      : undefined
-                  }
-                  onChange={(e) => {
-                    setScheduledAt(new Date(e.target.value));
+                <StyledDatePicker
+                  showTimeSelect
+                  minDate={new Date()}
+                  selected={scheduledAt}
+                  onChange={(date) => {
+                    setScheduledAt(date);
                   }}
+                  value={scheduledAt}
                 />
               </div>
             )}
             <Actions>
               {isScheduling ? (
-                <PublishButton
+                <RoundPrimaryButton
+                  disabled={!!!scheduledAt}
                   onClick={() => {
                     onSchedule({
                       scheduledAt: scheduledAt,
@@ -106,9 +111,9 @@ export function PublishPostReviewDialogBody({
                   }}
                 >
                   Schedule to publish
-                </PublishButton>
+                </RoundPrimaryButton>
               ) : (
-                <PublishButton
+                <RoundPrimaryButton
                   onClick={() => {
                     onPublish({
                       visibility: "public",
@@ -118,7 +123,7 @@ export function PublishPostReviewDialogBody({
                   }}
                 >
                   Publish now
-                </PublishButton>
+                </RoundPrimaryButton>
               )}
               <ScheduleForLater
                 onClick={() => {
@@ -142,6 +147,7 @@ export function PublishPostReviewDialogBody({
 const Container = styled.div`
   z-index: 1;
   display: flex;
+  cursor: default;
   justify-content: flex-start;
   flex-direction: column;
   align-items: flex-start;
@@ -155,6 +161,11 @@ const Container = styled.div`
   min-width: 70vw;
   min-height: 70vh;
   width: 100%;
+
+  @media (max-width: 1080px) {
+    padding: 40px 80px;
+    align-items: stretch;
+  }
 `;
 
 const Top = styled.div`
@@ -184,6 +195,10 @@ const Body = styled.div`
   align-self: stretch;
   box-sizing: border-box;
   flex-shrink: 0;
+
+  @media (max-width: 1080px) {
+    flex-direction: column;
+  }
 `;
 
 const Left = styled.div`
@@ -248,36 +263,6 @@ const Actions = styled.div`
   flex-shrink: 0;
 `;
 
-const PublishButton = styled.button`
-  cursor: pointer;
-  border: none;
-  outline: none;
-  display: flex;
-  justify-content: center;
-  flex-direction: row;
-  align-items: center;
-  flex: none;
-  border-radius: 20px;
-  height: 32px;
-  background-color: rgb(35, 77, 255);
-  box-sizing: border-box;
-  padding: 0px 12px;
-  color: white;
-  text-overflow: ellipsis;
-  font-size: 13px;
-  font-family: Inter, sans-serif;
-  font-weight: 400;
-  text-align: left;
-
-  :hover {
-    opacity: 0.8;
-  }
-
-  :active {
-    opacity: 0.9;
-  }
-`;
-
 const ScheduleForLater = styled.span`
   cursor: pointer;
   color: rgba(0, 0, 0, 0.6);
@@ -286,4 +271,10 @@ const ScheduleForLater = styled.span`
   font-family: Inter, sans-serif;
   font-weight: 400;
   text-align: left;
+
+  :hover {
+    color: rgba(0, 0, 0, 0.8);
+  }
+
+  transition: color 0.1s ease-in-out;
 `;

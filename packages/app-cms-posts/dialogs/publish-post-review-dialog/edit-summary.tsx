@@ -1,5 +1,6 @@
 import React from "react";
 import styled from "@emotion/styled";
+import css from "@emotion/css";
 import TextareaAutosize from "react-textarea-autosize";
 
 export function EditSummarySegment({
@@ -18,6 +19,7 @@ export function EditSummarySegment({
       <TitleAsInput
         value={title}
         placeholder="Title"
+        maxRows={3}
         onChange={(e) => {
           const v = e.target.value;
           onTitleChange(v);
@@ -25,7 +27,8 @@ export function EditSummarySegment({
       />
       <SummaryAsInput
         value={summary}
-        placeholder="Summary"
+        maxRows={3}
+        placeholder="Please enter a summary. this will be displayed in the post preview."
         onChange={(e) => {
           const v = e.target.value;
           onSummaryChange(v);
@@ -46,30 +49,30 @@ const SummaryArea = styled.div`
   flex-shrink: 0;
 `;
 
-const TitleAsInput = styled(TextareaAutosize)`
+const BaseInputStyle = css`
   border: none;
   outline: none;
   color: rgb(26, 26, 26);
-  font-size: 18px;
   font-family: "Helvetica Neue", sans-serif;
-  font-weight: 700;
   text-align: start;
   align-self: stretch;
   flex-shrink: 0;
   resize: none;
-  max-height: 40px;
   text-overflow: ellipsis;
+
+  ::placeholder {
+    opacity: 0.5;
+  }
+`;
+
+const TitleAsInput = styled(TextareaAutosize)`
+  ${BaseInputStyle}
+  font-size: 18px;
+  font-weight: 700;
 `;
 
 const SummaryAsInput = styled(TextareaAutosize)`
-  border: none;
-  outline: none;
-  color: rgb(26, 26, 26);
+  ${BaseInputStyle}
   font-size: 13px;
-  font-family: "Helvetica Neue", sans-serif;
   font-weight: 400;
-  text-align: start;
-  align-self: stretch;
-  flex-shrink: 0;
-  resize: none;
 `;

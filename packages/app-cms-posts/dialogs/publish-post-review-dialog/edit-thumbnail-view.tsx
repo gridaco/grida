@@ -5,14 +5,16 @@ export function ThumbnailView({
   src,
   label,
   onClick,
+  loading,
 }: {
   src?: string;
   label?: string;
   onClick?: () => void;
+  loading?: boolean;
   //
 }) {
   return (
-    <Container>
+    <Container loading={loading}>
       {src && <Src src={src} />}
       {label && (
         <ChangePreviewButton onClick={onClick}>{label}</ChangePreviewButton>
@@ -21,20 +23,31 @@ export function ThumbnailView({
   );
 }
 
-const Container = styled.div`
+const Container = styled.div<{ loading: boolean }>`
   min-height: 180px;
-  min-width: 400px;
+  max-width: 400px;
+  min-width: 200px;
   overflow: hidden;
   background-color: rgba(0, 0, 0, 0.02);
   position: relative;
   align-self: stretch;
   flex-shrink: 0;
+  border: 1px solid rgba(0, 0, 0, 0.02);
+  border-radius: 2px;
+  opacity: ${(props) => (props.loading ? 0.5 : 1)};
+  pointer-events: ${(props) => (props.loading ? "none" : "auto")};
+
+  transition: opacity 0.3s ease-in-out;
 `;
 
 const Src = styled.img`
+  width: 100%;
+  height: 100%;
   object-fit: cover;
   position: absolute;
   inset: 0;
+  user-select: none;
+  pointer-events: none;
 `;
 
 const ChangePreviewButton = styled.button`

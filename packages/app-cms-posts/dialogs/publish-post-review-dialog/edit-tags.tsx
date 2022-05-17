@@ -23,6 +23,7 @@ export function EditTagsSegment({
           fontSize: 14,
           padding: 8,
           borderRadius: 4,
+          flex: 1,
           backgroundColor: "rgba(0, 0, 0, 0.02)",
         }}
       />
@@ -42,6 +43,7 @@ const TagsEditContainer = styled.div`
 `;
 
 const AddTagsForReadersUpTo5 = styled.span`
+  cursor: default;
   color: rgb(26, 26, 26);
   text-overflow: ellipsis;
   font-size: 14px;
