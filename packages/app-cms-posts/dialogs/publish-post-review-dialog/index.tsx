@@ -4,7 +4,8 @@ import { EditSummarySegment } from "./edit-summary";
 import { EditThumbnailSegment } from "./edit-thumbnail";
 import { EditTagsSegment } from "./edit-tags";
 import { RoundPrimaryButton } from "../../components";
-import { StyledDatePicker } from "@ui/date-picker";
+import { DatePicker } from "@ui/date-picker";
+import css from "@emotion/css";
 
 type PostVisibility = "public" | "private" | "password_protected";
 
@@ -86,14 +87,22 @@ export function PublishPostReviewDialogBody({
             />
             {isScheduling && (
               <div>
-                <StyledDatePicker
+                <DatePicker
+                  autoFocus
                   showTimeSelect
+                  placeholderText="Schedule for..."
                   minDate={new Date()}
+                  maxDate={
+                    new Date(
+                      new Date().setFullYear(new Date().getFullYear() + 1)
+                    )
+                  }
                   selected={scheduledAt}
                   onChange={(date) => {
                     setScheduledAt(date);
                   }}
                   value={scheduledAt}
+                  dateFormat="MMMM d, yyyy h:mm aa"
                 />
               </div>
             )}
