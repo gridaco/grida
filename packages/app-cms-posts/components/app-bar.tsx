@@ -13,18 +13,31 @@ export function RightActionBar({
   onPreviewClick,
   onPublishClick,
   disabled = false,
+  theme,
 }: {
   saving?: "saving" | "saved" | "error" | undefined;
   mode: "update" | "post";
   disabled?: boolean;
   onPreviewClick: () => void;
   onPublishClick: () => void;
+  theme?: {
+    primaryButton?: {
+      backgroundColor?: React.CSSProperties["color"];
+      borderRadius?: React.CSSProperties["borderRadius"];
+    };
+  };
+  // primaryColor?: string;
 }) {
   return (
     <Root>
       {saving && <SavingIndicator status={saving} />}
-      <CancelButton onClick={onPreviewClick}>Preview</CancelButton>
-      <PublishButton onClick={onPublishClick} disabled={disabled}>
+      <PreviewButton onClick={onPreviewClick}>Preview</PreviewButton>
+      <PublishButton
+        backgroundColor={theme?.primaryButton?.backgroundColor}
+        borderRadius={theme?.primaryButton?.borderRadius}
+        onClick={onPublishClick}
+        disabled={disabled}
+      >
         {publish_mode_labels[mode] ?? publish_mode_labels.post}
       </PublishButton>
     </Root>
@@ -49,9 +62,9 @@ const Root = styled.div`
   flex-shrink: 0;
 `;
 
-const CancelButton = styled.button`
+const PreviewButton = styled.button`
   height: 32px;
-  background-color: rgb(241, 241, 241);
+  background-color: rgba(0, 0, 0, 0.06);
   border-radius: 20px;
   padding: 0px 12px;
   color: black;
@@ -78,10 +91,13 @@ const CancelButton = styled.button`
   }
 `;
 
-const PublishButton = styled.button`
+const PublishButton = styled.button<{
+  backgroundColor?: React.CSSProperties["color"];
+  borderRadius?: React.CSSProperties["borderRadius"];
+}>`
   height: 32px;
-  background-color: rgb(35, 77, 255);
-  border-radius: 20px;
+  background-color: ${(props) => props.backgroundColor ?? "rgb(35, 77, 255)"};
+  border-radius: ${(props) => props.borderRadius ?? "20px"};
   padding: 0px 12px;
   color: white;
   font-size: 13px;
