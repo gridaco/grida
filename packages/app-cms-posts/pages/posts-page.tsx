@@ -102,7 +102,7 @@ export default function PostsPage({
                   summary={post.summary}
                   author={post.author}
                   publishedAt={post.postedAt}
-                  readingTime={post.readingTime ? post.readingTime + "s" : null}
+                  readingTime={post.readingTime}
                   thumbnail={post.thumbnail}
                   onClick={() => {
                     onPostClick?.(post.id);

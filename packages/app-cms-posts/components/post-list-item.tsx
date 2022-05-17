@@ -16,7 +16,7 @@ export function PostListItem({
   author?: string;
   publishedAt?: Date | string;
   thumbnail?: string;
-  readingTime?: string;
+  readingTime?: number;
   onClick?: () => void;
 }) {
   return (
@@ -29,12 +29,21 @@ export function PostListItem({
           <PublishedAt>
             Published on {dayjs(publishedAt).format("MM/DD/YYYY")}
           </PublishedAt>
-          <ReadingTime>{readingTime}</ReadingTime>
+          {readingTime && (
+            <ReadingTime>
+              {readingtimeToMinutes(readingTime) + " minutes read"}
+            </ReadingTime>
+          )}
         </MetaContainer>
       </TextContents>
       {thumbnail && <Thumbnail src={thumbnail} />}
     </Container>
   );
+}
+
+function readingtimeToMinutes(readingTime: number) {
+  // 0 min -> 1 min
+  return Math.max(1, Math.floor(readingTime / 60));
 }
 
 const Container = styled.div`
@@ -129,4 +138,7 @@ const Thumbnail = styled.img`
   width: 130px;
   height: 130px;
   object-fit: cover;
+  border-radius: 2px;
+  overflow: hidden;
+  border: 1px solid rgba(0, 0, 0, 0.05);
 `;

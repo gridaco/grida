@@ -1,6 +1,7 @@
 export interface Post {
   id: string;
   title: string;
+  displayTitle?: string;
   summary?: string;
   thumbnail?: string;
   author?: any; // TODO:

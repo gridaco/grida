@@ -14,8 +14,9 @@ export function PublishPostReviewDialogBody({
   onCancel,
   onTagsEdit,
   onSchedule,
-  onTitleChange,
+  onDisplayTitleChange,
   onSummaryChange,
+  onThumbnailChange,
   title: initialTitle,
   summary: initialSummary = "",
   tags: initialTags = [],
@@ -26,8 +27,9 @@ export function PublishPostReviewDialogBody({
     summary: string;
     visibility: PostVisibility;
   }) => void;
-  onTitleChange: (t: string) => void;
+  onDisplayTitleChange: (t: string) => void;
   onSummaryChange: (t: string) => void;
+  onThumbnailChange: (f: File) => void;
   onSchedule: (p: {
     scheduledAt: Date;
     title: string;
@@ -44,7 +46,7 @@ export function PublishPostReviewDialogBody({
   };
 }) {
   const [isScheduling, setIsScheduling] = useState(false);
-  const [title, setTitle] = useState(initialTitle);
+  const [displayTitle, setDisplayTitle] = useState(initialTitle);
   const [summary, setSummary] = useState(initialSummary);
   const [tags, setTags] = useState(initialTags);
   const [scheduledAt, setScheduledAt] = useState(null);
@@ -58,17 +60,13 @@ export function PublishPostReviewDialogBody({
         <Left>
           <PreviewText>Preview</PreviewText>
           <PreviewContainer>
-            <EditThumbnailSegment
-              onFileUpload={() => {
-                // TODO:
-              }}
-            />
+            <EditThumbnailSegment onFileUpload={onThumbnailChange} />
             <EditSummarySegment
-              title={title}
+              title={displayTitle}
               summary={summary}
               onTitleChange={(title) => {
-                setTitle(title);
-                onTitleChange(title);
+                setDisplayTitle(title);
+                onDisplayTitleChange(title);
               }}
               onSummaryChange={(summary) => {
                 setSummary(summary);
@@ -114,7 +112,7 @@ export function PublishPostReviewDialogBody({
                     onSchedule({
                       scheduledAt: scheduledAt,
                       visibility: "public",
-                      title: title,
+                      title: displayTitle,
                       summary: summary,
                     });
                   }}
@@ -126,7 +124,7 @@ export function PublishPostReviewDialogBody({
                   onClick={() => {
                     onPublish({
                       visibility: "public",
-                      title: title,
+                      title: displayTitle,
                       summary: summary,
                     });
                   }}

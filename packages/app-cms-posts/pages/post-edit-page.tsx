@@ -85,6 +85,19 @@ export default function PostEditPage({
       });
   }, 1000);
 
+  const onDisplayTitleChange = debounce((t) => {
+    setSaving("saving");
+    setData((d) => ({ ...d, title: t }));
+    client
+      .updateSummary(id, { title: t })
+      .then(() => {
+        setSaving("saved");
+      })
+      .catch((e) => {
+        setSaving("error");
+      });
+  }, 1000);
+
   const onContentChange = debounce((t) => {
     setSaving("saving");
     setData((d) => ({ ...d, body: { html: t } }));
@@ -146,13 +159,27 @@ export default function PostEditPage({
                 }
               });
             }}
-            onTitleChange={onTitleChange}
+            onDisplayTitleChange={onDisplayTitleChange}
             onSummaryChange={onSummaryChange}
             onSchedule={(p) => {
               // TODO:
               // 1. update with value
               // 2. them => schedule
               setPublishDialog(false);
+            }}
+            onThumbnailChange={(f) => {
+              setSaving("saving");
+              //
+              client
+                .putThumbnail(id, f)
+                .then(() => {
+                  setSaving("saved");
+                  //
+                })
+                .catch((e) => {
+                  setSaving("error");
+                  //
+                });
             }}
             onCancel={() => {
               setPublishDialog(false);

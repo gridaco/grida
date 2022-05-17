@@ -30,10 +30,14 @@ export function EditThumbnailSegment({
         id="file"
         accept="image/*"
         ref={inputFile}
-        onInput={(event) => {
+        onChange={(event) => {
           // @ts-ignore
           let file = event.target.files[0];
           if (file) {
+            if (file.size > 1048576 * 5) {
+              alert("Oops. Thumbnail cannot be bigger than 5mb");
+              return;
+            }
             setUploaded(URL.createObjectURL(file));
             onFileUpload?.(file);
           }

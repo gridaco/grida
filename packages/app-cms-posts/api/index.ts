@@ -24,7 +24,11 @@ export class PostsClient {
 
   async posts() {
     return await (
-      await this._client.get("/")
+      await this._client.get("/", {
+        params: {
+          publication: this.publicationId,
+        },
+      })
     ).data;
   }
 
@@ -98,7 +102,7 @@ export class PostsClient {
 
   async updateSummary(
     id: string,
-    { summary, title }: { summary: string; title?: string }
+    { summary, title }: { summary?: string; title?: string }
   ) {
     await (
       await this._client.post(`/${id}/summary`, {
@@ -120,6 +124,28 @@ export class PostsClient {
         visibility,
       })
     ).data;
+  }
+
+  async putThumbnail(
+    id: string,
+    thumbnail: string | File
+  ): Promise<{
+    thumbnail: string;
+  }> {
+    const route = `/${id}/thumbnail`;
+    if (typeof thumbnail === "string") {
+      return (
+        await this._client.put(route, {
+          thumbnail,
+        })
+      ).data;
+    }
+
+    if (thumbnail instanceof File) {
+      const form = new FormData();
+      form.append("thumbnail", thumbnail);
+      return (await this._client.put(route, form)).data;
+    }
   }
 
   // assets
