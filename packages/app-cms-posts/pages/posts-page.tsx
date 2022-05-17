@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import styled from "@emotion/styled";
 import { PostListItem, PostsTableToolBar } from "../components";
 import { InBlockButton } from "@app/blocks";
@@ -12,6 +12,19 @@ import {
   IconLayout,
   ContentsLayout,
 } from "../layouts";
+
+const selected_tab_store = {
+  get: (): PostStatusType => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem(
+        "@app/posts-cms/pages/posts#tab-selected"
+      ) as PostStatusType;
+    }
+  },
+  set: (tab: PostStatusType) => {
+    localStorage.setItem("@app/posts-cms/pages/posts#tab-selected", tab);
+  },
+};
 
 export default function PostsPage({
   title = "Posts",
@@ -29,9 +42,19 @@ export default function PostsPage({
   theme?: PostCmsAppTheme;
 }) {
   const { hosts } = publication;
-  const [tab, setTab] = React.useState<PostStatusType>("draft");
+
+  const [tab, setTab] = useState<PostStatusType>();
+
+  useEffect(() => {
+    setTab(selected_tab_store.get() || "draft");
+  }, []);
 
   const items = filterPostsBy(posts, tab);
+
+  const onTabSelect = (tab: PostStatusType) => {
+    setTab(tab);
+    selected_tab_store.set(tab);
+  };
 
   return (
     <PostsAppThemeProvider theme={theme}>
@@ -60,11 +83,13 @@ export default function PostsPage({
         <ContentsLayout>
           <PostsTableToolBar
             tab={tab}
-            onSelect={(id) => {
-              setTab(id);
-            }}
+            onNewPostClick={onNewPostClick}
+            onSelect={onTabSelect}
             getBadge={(id) => {
-              return filterPostsBy(posts, id).length.toString();
+              const l = filterPostsBy(posts, id).length;
+              if (l) {
+                return l.toString();
+              }
             }}
           />
           <div style={{ marginTop: 40 }} />

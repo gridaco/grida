@@ -1,13 +1,13 @@
 import React, { useState, useEffect } from "react";
 import Dialog from "@material-ui/core/Dialog";
-
+import { useRouter } from "next/router";
 import { BoringScaffold } from "@grida.co/app/boring-scaffold";
 import { PublishPostReviewDialogBody } from "../dialogs";
 import { PostsClient } from "../api";
 import { BoringDocumentsStore } from "@boring.so/store";
 import { BoringContent, BoringTitle } from "@boring.so/document-model";
 import type { OnContentChange } from "@boringso/react-core";
-import { RightActionBar } from "../components/app-bar";
+import { Appbar, RightActionBar } from "../components/app-bar";
 import type { Post, Publication, PublicationHost } from "../types";
 import { PostsAppThemeProvider } from "../theme";
 import type { Theme as PostCmsAppTheme } from "../theme";
@@ -27,6 +27,7 @@ export default function PostEditPage({
   publication: Publication;
   theme?: PostCmsAppTheme;
 }) {
+  const router = useRouter();
   const [publishDialog, setPublishDialog] = React.useState(false); // controls review dialog
 
   const client = new PostsClient("627c481391a5de075f80a177");
@@ -165,23 +166,29 @@ export default function PostEditPage({
           />
         )}
       </Dialog>
-      <Container>
-        <RightActionBar
-          mode={data?.postedAt ? "update" : "post"}
-          saving={saving}
-          disabled={!canPublish}
-          onPreviewClick={() => {
-            open(buildTargetUrl(primaryHost, { ...data }, true));
-          }}
-          onPublishClick={() => {
-            setPublishDialog(true);
-          }}
-          theme={{
-            primaryButton: {
-              backgroundColor: theme.app_posts_cms.colors.button_primary,
-            },
-          }}
-        />
+      <Appbar
+        logo={
+          publication.logo ? <LogoContainer src={publication.logo} /> : null
+        }
+        onLogoClick={() => {
+          router.push("/posts");
+        }}
+        mode={data?.postedAt ? "update" : "post"}
+        saving={saving}
+        disabledPublish={!canPublish}
+        onPreviewClick={() => {
+          open(buildTargetUrl(primaryHost, { ...data }, true));
+        }}
+        onPublishClick={() => {
+          setPublishDialog(true);
+        }}
+        theme={{
+          primaryButton: {
+            backgroundColor: theme.app_posts_cms.colors.button_primary,
+          },
+        }}
+      />
+      <EditorContainer>
         <Editor
           id={id}
           fileUploader={onUploadImage}
@@ -191,15 +198,31 @@ export default function PostEditPage({
           readonly={!loaded}
           theme={theme?.app_posts_cms?.editor}
         />
-      </Container>
+      </EditorContainer>
     </PostsAppThemeProvider>
   );
 }
 
-const Container = styled.div`
+const LogoContainer = styled.img`
+  height: 100%;
+  width: 100%;
+  object-fit: contain;
+`;
+
+const EditorContainer = styled.div`
+  margin: 80px 120px 100px;
+  border-radius: 8px;
+  box-shadow: 0px 4px 24px 4px rgba(0, 0, 0, 0.04);
   background-color: ${(props) =>
     /* @ts-ignore */
     props.theme.app_posts_cms.colors.root_background};
+
+  @media (max-width: 1080px) {
+    margin: 80px 40px 100px;
+  }
+  @media (max-width: 768px) {
+    margin: 80px 20px 80px;
+  }
 `;
 
 function buildTargetUrl(

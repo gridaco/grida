@@ -7,17 +7,40 @@ const publish_mode_labels = {
   post: "Publish",
 };
 
-export function RightActionBar({
-  saving,
-  mode,
-  onPreviewClick,
-  onPublishClick,
-  disabled = false,
-  theme,
-}: {
+export function Appbar({ ...props }: RightActionBarProps & BreadcrumbProps) {
+  return (
+    <Root>
+      <Breadcrumb {...props} />
+      <Spacer />
+      <RightActionBar {...props} />
+    </Root>
+  );
+}
+
+const Root = styled.div`
+  display: flex;
+  position: fixed;
+  user-select: none;
+  z-index: 9;
+  inset: 0;
+  padding-left: 16px;
+  padding-right: 20px;
+  flex-shrink: 0;
+  align-self: stretch;
+  height: 56px;
+  box-sizing: border-box;
+  background: white;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+`;
+
+const Spacer = styled.div`
+  flex: 1;
+`;
+
+interface RightActionBarProps {
   saving?: "saving" | "saved" | "error" | undefined;
   mode: "update" | "post";
-  disabled?: boolean;
+  disabledPublish?: boolean;
   onPreviewClick: () => void;
   onPublishClick: () => void;
   theme?: {
@@ -26,10 +49,18 @@ export function RightActionBar({
       borderRadius?: React.CSSProperties["borderRadius"];
     };
   };
-  // primaryColor?: string;
-}) {
+}
+
+export function RightActionBar({
+  saving,
+  mode,
+  onPreviewClick,
+  onPublishClick,
+  disabledPublish: disabled = false,
+  theme,
+}: RightActionBarProps) {
   return (
-    <Root>
+    <RightActionBarContainer>
       {saving && <SavingIndicator status={saving} />}
       <PreviewButton onClick={onPreviewClick}>Preview</PreviewButton>
       <PublishButton
@@ -40,26 +71,16 @@ export function RightActionBar({
       >
         {publish_mode_labels[mode] ?? publish_mode_labels.post}
       </PublishButton>
-    </Root>
+    </RightActionBarContainer>
   );
 }
 
-const Root = styled.div`
-  position: fixed;
-  inset: 0;
-  z-index: 9;
-  user-select: none;
+const RightActionBarContainer = styled.div`
   display: flex;
   justify-content: flex-end;
   flex-direction: row;
   align-items: center;
   gap: 8px;
-  align-self: stretch;
-  height: 56px;
-  box-sizing: border-box;
-  padding-left: 16px;
-  padding-right: 20px;
-  flex-shrink: 0;
 `;
 
 const PreviewButton = styled.button`
@@ -121,4 +142,32 @@ const PublishButton = styled.button<{
 
   :focus {
   }
+`;
+
+interface BreadcrumbProps {
+  logo?: React.ReactElement;
+  onLogoClick?: () => void;
+}
+
+export function Breadcrumb({ logo, onLogoClick }: BreadcrumbProps) {
+  return (
+    <BreadcrumbContainer>
+      {logo ? <LogoButton onClick={onLogoClick}>{logo}</LogoButton> : <></>}
+    </BreadcrumbContainer>
+  );
+}
+
+const BreadcrumbContainer = styled.div`
+  display: flex;
+`;
+
+const LogoButton = styled.button`
+  cursor: pointer;
+  outline: none;
+  border: none;
+  background-color: transparent;
+  height: 24px;
+  max-width: 160px;
+  margin-top: auto;
+  margin-bottom: auto;
 `;
