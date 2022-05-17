@@ -12,7 +12,7 @@ import { IPlayer } from "./player-type";
  * determines right menu visiable according to context
  */
 export function TopBar(props: {
-  controlDoubleClick: () => void;
+  controlDoubleClick?: () => void;
   contorlModal?: () => void;
   title?: string;
   isMain?: boolean;

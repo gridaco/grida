@@ -35,9 +35,6 @@ export default function PostEditPage({
   const [saving, setSaving] = useState<"saving" | "saved" | "error">(undefined);
   const { hosts } = publication;
   const primaryHost = hosts?.[0];
-  const pattern = primaryHost
-    ? new UrlPattern(primaryHost.pattern, {})
-    : { stringify: (...args: any) => "" };
 
   useEffect(() => {
     client.get(id).then((post) => {
@@ -144,7 +141,7 @@ export default function PostEditPage({
                 // 2. then => publish
                 setPublishDialog(false);
                 if (primaryHost) {
-                  open(primaryHost.homepage + pattern.stringify(data));
+                  open(buildTargetUrl(primaryHost, { ...data }, false));
                 }
               });
             }}
@@ -174,7 +171,7 @@ export default function PostEditPage({
           saving={saving}
           disabled={!canPublish}
           onPreviewClick={() => {
-            open(primaryHost.homepage + pattern.stringify(data));
+            open(buildTargetUrl(primaryHost, { ...data }, true));
           }}
           onPublishClick={() => {
             setPublishDialog(true);
@@ -207,11 +204,18 @@ const Container = styled.div`
 
 function buildTargetUrl(
   host: PublicationHost,
-  params: { [key: string]: string }
+  params: { [key: string]: any },
+  preview?: boolean
 ) {
   const { homepage, pattern } = host;
-  // host.homepage +
-  //
+  const url = new URL(homepage + new UrlPattern(pattern, {}).stringify(params));
+
+  // add preview?=true if needed
+  if (preview) {
+    url.searchParams.set("preview", "true");
+  }
+
+  return url.toString();
 }
 
 function Editor({
