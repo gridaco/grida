@@ -37,6 +37,8 @@ const Container = styled.div`
   :active {
     background-color: rgba(0, 0, 0, 0.1);
   }
+
+  transition: background-color 0.1s ease-in-out;
 `;
 
 const IconContainer = styled.div`

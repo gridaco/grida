@@ -34,3 +34,12 @@ export type PublicationHost = {
    */
   pattern: string;
 };
+
+/**
+ * keep this name readable
+ * this is used to build user message
+ * > "There are currently no {t} posts in this publication.""
+ *
+ * > NOTE: this is a client-only type
+ */
+export type PostStatusType = "draft" | "scheduled" | "published" | "unlisted";

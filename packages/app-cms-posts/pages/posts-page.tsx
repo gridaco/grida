@@ -1,35 +1,17 @@
 import React from "react";
 import styled from "@emotion/styled";
-import { PostListItem } from "../components";
-import { TableTabItem } from "@app/blocks/table-tab-item";
+import { PostListItem, PostsTableToolBar } from "../components";
 import { InBlockButton } from "@app/blocks";
 import { PostsAppThemeProvider } from "../theme";
 import type { Post, Publication } from "../types";
 import type { Theme as PostCmsAppTheme } from "../theme";
-/**
- * keep this name readable
- * this is used to build user message
- * > "There are currently no {t} posts in this publication.""
- */
-type TabType = "draft" | "scheduled" | "published" | "unlisted";
-const tabs: { id: TabType; label: string }[] = [
-  {
-    id: "draft",
-    label: "Drafts and submissions",
-  },
-  {
-    id: "scheduled",
-    label: "Scheduled",
-  },
-  {
-    id: "published",
-    label: "Published",
-  },
-  {
-    id: "unlisted",
-    label: "Unlisted",
-  },
-];
+import type { PostStatusType } from "../types";
+import {
+  CoverLayout,
+  TitleLayout,
+  IconLayout,
+  ContentsLayout,
+} from "../layouts";
 
 export default function PostsPage({
   title = "Posts",
@@ -46,89 +28,101 @@ export default function PostsPage({
   onNewPostClick?: () => void;
   theme?: PostCmsAppTheme;
 }) {
-  const [tab, setTab] = React.useState<TabType>("draft");
+  const { hosts } = publication;
+  const [tab, setTab] = React.useState<PostStatusType>("draft");
 
   const items = filterPostsBy(posts, tab);
-  const { hosts } = publication;
 
   return (
     <PostsAppThemeProvider theme={theme}>
       <Container>
-        <Toolbar>
-          <Underline />
-          <Tools>
-            <Tabs>
-              {tabs.map((t) => (
-                <TableTabItem
-                  key={t.id}
-                  selected={tab === t.id}
-                  badge={filterPostsBy(posts, t.id).length.toString()}
+        <CoverLayout src={publication.cover} />
+        <TitleAndIconContainer>
+          <IconLayout src={publication.logo} />
+          <TitleLayout>{title}</TitleLayout>
+          {hosts?.map((h) => {
+            const host = new URL(h.homepage);
+            /* remove scheme - e.g. blog.grida.co/path */
+            const display_host_name = `${host.host}${host.pathname}`;
+            return (
+              <BoringBlocksInBlockButton key={h.homepage + h.pattern}>
+                <InBlockButton
                   onClick={() => {
-                    setTab(t.id);
+                    open(host);
                   }}
                 >
-                  {t.label}
-                </TableTabItem>
-              ))}
-            </Tabs>
-            <Actions>
-              <Button onClick={onNewPostClick}>New Post</Button>
-            </Actions>
-          </Tools>
-        </Toolbar>
-        <Title>{title}</Title>
-        <List>
-          {items.length ? (
-            items.map((post) => (
-              <PostListItem
-                key={post.id}
-                title={post.title}
-                summary={post.summary}
-                author={post.author}
-                publishedAt={post.postedAt}
-                readingTime={post.readingTime ? post.readingTime + "s" : null}
-                thumbnail={post.thumbnail}
-                onClick={() => {
-                  onPostClick?.(post.id);
-                }}
-              />
-            ))
-          ) : (
-            <Empty>
-              There are currently no {tab} posts in this publication.
-            </Empty>
-          )}
-        </List>
-        {hosts?.map((h) => {
-          const host = new URL(h.homepage);
-
-          /* remove scheme - e.g. blog.grida.co/path */
-          const display_host_name = `${host.host}${host.pathname}`;
-
-          return (
-            <BoringBlocksInBlockButton>
-              <InBlockButton
-                onClick={() => {
-                  open(host);
-                }}
-              >
-                {display_host_name}
-              </InBlockButton>
-            </BoringBlocksInBlockButton>
-          );
-        })}
+                  {display_host_name}
+                </InBlockButton>
+              </BoringBlocksInBlockButton>
+            );
+          })}
+        </TitleAndIconContainer>
+        <ContentsLayout>
+          <PostsTableToolBar
+            tab={tab}
+            onSelect={(id) => {
+              setTab(id);
+            }}
+            getBadge={(id) => {
+              return filterPostsBy(posts, id).length.toString();
+            }}
+          />
+          <div style={{ marginTop: 40 }} />
+          <List>
+            {items.length ? (
+              items.map((post) => (
+                <PostListItem
+                  key={post.id}
+                  title={post.title}
+                  summary={post.summary}
+                  author={post.author}
+                  publishedAt={post.postedAt}
+                  readingTime={post.readingTime ? post.readingTime + "s" : null}
+                  thumbnail={post.thumbnail}
+                  onClick={() => {
+                    onPostClick?.(post.id);
+                  }}
+                />
+              ))
+            ) : (
+              <EmptyStateContainer>
+                There are currently no {tab} posts in this publication.
+              </EmptyStateContainer>
+            )}
+          </List>
+        </ContentsLayout>
       </Container>
     </PostsAppThemeProvider>
   );
 }
 
-const Empty = styled.div`
+const Container = styled.div`
+  margin: 0px 160px 40px 160px;
+  box-sizing: border-box;
+  position: relative;
+  align-self: stretch;
+  flex-shrink: 0;
+  flex: 1;
+
+  @media (max-width: 1080px) {
+    margin: 0px 40px 40px 40px;
+  }
+`;
+
+const TitleAndIconContainer = styled.div`
+  position: relative;
+  z-index: 3;
+  transform: translateY(-150px);
+  height: 0px;
+`;
+
+const EmptyStateContainer = styled.div`
   padding: 80px 40px;
   text-align: center;
   opacity: 0.5;
 `;
 
-const filterPostsBy = (posts: Post[], type: TabType) => {
+const filterPostsBy = (posts: Post[], type: PostStatusType) => {
   return posts.filter((p) => {
     switch (type) {
       case "draft": {
@@ -146,123 +140,6 @@ const filterPostsBy = (posts: Post[], type: TabType) => {
   });
 };
 
-const Container = styled.div`
-  margin: 100px 160px 40px 160px;
-  box-sizing: border-box;
-  position: relative;
-  background-color: ${(props) =>
-    // @ts-ignore
-    props.theme.app_posts_cms.colors.root_background};
-  align-self: stretch;
-  flex-shrink: 0;
-  flex: 1;
-`;
-
-const Toolbar = styled.div`
-  height: 50px;
-  position: absolute;
-  left: 0px;
-  top: 147px;
-  right: 0px;
-`;
-
-const Underline = styled.div`
-  height: 1px;
-  background-color: rgba(0, 0, 0, 0.1);
-  position: absolute;
-  left: 0px;
-  right: 0px;
-  bottom: 0px;
-`;
-
-const Tools = styled.div`
-  display: flex;
-  justify-content: space-between;
-  flex-direction: row;
-  align-items: center;
-  flex: none;
-  box-sizing: border-box;
-  position: absolute;
-  left: 0px;
-  top: 0px;
-  right: 0px;
-  bottom: 0px;
-`;
-
-const Tabs = styled.div`
-  display: flex;
-  justify-content: flex-start;
-  flex-direction: row;
-  align-items: flex-start;
-  gap: 21px;
-  align-self: stretch;
-  box-sizing: border-box;
-  flex-shrink: 0;
-`;
-
-const Actions = styled.div`
-  display: flex;
-  justify-content: center;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 10px;
-  align-self: stretch;
-  box-sizing: border-box;
-  padding-left: 10px;
-  flex-shrink: 0;
-`;
-
-const Button = styled.button`
-  outline: none;
-  border: none;
-  display: flex;
-  justify-content: center;
-  flex-direction: row;
-  align-items: center;
-  flex: none;
-  gap: 4px;
-  border-radius: 4px;
-  background-color: ${(props) =>
-    // @ts-ignore
-    props.theme.app_posts_cms.colors.button_primary};
-  box-sizing: border-box;
-  padding: 8px 10px;
-  color: white;
-  text-overflow: ellipsis;
-  font-size: 14px;
-  font-family: Inter, sans-serif;
-  font-weight: 500;
-  text-align: center;
-
-  :hover {
-    opacity: 0.8;
-  }
-
-  :active {
-    opacity: 0.9;
-  }
-`;
-
-const Icon = styled.svg`
-  width: 18px;
-  height: 18px;
-`;
-
-const Title = styled.span`
-  color: rgb(26, 26, 26);
-  text-overflow: ellipsis;
-  font-size: 48px;
-  font-family: "Helvetica Neue", sans-serif;
-  font-weight: 700;
-  text-align: left;
-  width: 800px;
-  position: absolute;
-  left: 0px;
-  top: 0px;
-  align-self: stretch;
-  flex-shrink: 0;
-`;
-
 const List = styled.div`
   display: flex;
   justify-content: flex-start;
@@ -270,12 +147,7 @@ const List = styled.div`
   align-items: stretch;
   flex: none;
   gap: 24px;
-  height: 598px;
   box-sizing: border-box;
-  position: absolute;
-  left: 0px;
-  top: 235px;
-  right: 0px;
 `;
 
 const BoringBlocksInBlockButton = styled.div`
@@ -287,7 +159,4 @@ const BoringBlocksInBlockButton = styled.div`
   width: 124px;
   height: 33px;
   box-sizing: border-box;
-  position: absolute;
-  left: 0px;
-  top: 78px;
 `;

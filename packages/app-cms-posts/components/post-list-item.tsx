@@ -47,6 +47,15 @@ const Container = styled.div`
   gap: 16px;
   min-height: 80px;
   box-sizing: border-box;
+  color: rgb(55, 53, 48);
+  border-bottom: 1px solid transparent;
+
+  :hover {
+    border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+    color: black;
+  }
+
+  transition: border-bottom 0.3s ease-in-out, color 0.3s ease-in-out;
 `;
 
 const TextContents = styled.div`
@@ -60,7 +69,6 @@ const TextContents = styled.div`
 `;
 
 const Title = styled.span`
-  color: rgb(55, 53, 48);
   text-overflow: ellipsis;
   font-size: 24px;
   font-family: "Helvetica Neue", sans-serif;
@@ -71,7 +79,7 @@ const Title = styled.span`
 `;
 
 const Summary = styled.span`
-  color: rgba(55, 53, 48, 0.9);
+  opacity: 0.9;
   text-overflow: ellipsis;
   font-size: 18px;
   font-family: "Helvetica Neue", sans-serif;
