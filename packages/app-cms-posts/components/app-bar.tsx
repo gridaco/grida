@@ -60,6 +60,7 @@ export function RightActionBar({
       <RoundPrimaryButton onClick={onPublishClick} disabled={disabled}>
         {publish_mode_labels[mode] ?? publish_mode_labels.post}
       </RoundPrimaryButton>
+      {/* <PreviewButton onClick={onPreviewClick}>...</PreviewButton> */}
     </RightActionBarContainer>
   );
 }
@@ -109,7 +110,13 @@ interface BreadcrumbProps {
 export function Breadcrumb({ logo, onLogoClick }: BreadcrumbProps) {
   return (
     <BreadcrumbContainer>
-      {logo ? <LogoButton onClick={onLogoClick}>{logo}</LogoButton> : <></>}
+      {logo ? (
+        <LogoButton title="Home" onClick={onLogoClick}>
+          {logo}
+        </LogoButton>
+      ) : (
+        <></>
+      )}
     </BreadcrumbContainer>
   );
 }
@@ -119,12 +126,30 @@ const BreadcrumbContainer = styled.div`
 `;
 
 const LogoButton = styled.button`
+  user-select: none;
   cursor: pointer;
   outline: none;
   border: none;
   background-color: transparent;
-  height: 24px;
+  height: 100%;
+  max-height: 32px;
+  padding: 4px 8px;
   max-width: 160px;
   margin-top: auto;
   margin-bottom: auto;
+  border-radius: 4px;
+
+  img {
+    pointer-events: none;
+  }
+
+  :hover {
+    background-color: rgba(0, 0, 0, 0.1);
+  }
+
+  :active {
+    background-color: rgba(0, 0, 0, 0.2);
+  }
+
+  transition: background-color 0.2s ease-in-out;
 `;
