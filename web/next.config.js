@@ -17,6 +17,7 @@ const withTM = require("next-transpile-modules")(
 
     // ui
     "@ui/tags-input",
+    "@ui/date-picker",
 
     // https://github.com/vercel/next.js/discussions/13553#discussioncomment-20092  ----------------------------
     // cause of this, we also set `experimental: { esmExternals: "loose" }`
