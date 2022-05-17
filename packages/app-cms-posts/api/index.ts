@@ -115,9 +115,27 @@ export class PostsClient {
   }
 
   async updateVisibility(id: string, visibility: string) {
-    await (
+    return await (
       await this._client.put(`/${id}/tags`, {
         visibility,
+      })
+    ).data;
+  }
+
+  // assets
+
+  async uploadAsset(id, asset) {
+    return await (
+      await this._client.post(`/assets/${id}/upload`, {
+        // visibility,
+      })
+    ).data;
+  }
+
+  async makeAssetClient(id) {
+    return await (
+      await this._client.post(`/assets/${id}/client`, {
+        // visibility,
       })
     ).data;
   }

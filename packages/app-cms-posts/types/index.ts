@@ -23,7 +23,7 @@ export interface Publication {
   createdAt: Date;
 }
 
-type PublicationHost = {
+export type PublicationHost = {
   /**
    * e.g https://blog.grida.co/posts
    */

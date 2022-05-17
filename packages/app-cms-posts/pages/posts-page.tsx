@@ -3,8 +3,9 @@ import styled from "@emotion/styled";
 import { PostListItem } from "../components";
 import { TableTabItem } from "@app/blocks/table-tab-item";
 import { InBlockButton } from "@app/blocks";
+import { PostsAppThemeProvider } from "../theme";
 import type { Post, Publication } from "../types";
-
+import type { Theme as PostCmsAppTheme } from "../theme";
 /**
  * keep this name readable
  * this is used to build user message
@@ -36,82 +37,88 @@ export default function PostsPage({
   posts,
   onPostClick,
   onNewPostClick,
+  theme,
 }: {
   title?: string;
   publication: Publication;
   posts: Post[];
   onPostClick?: (id: string) => void;
   onNewPostClick?: () => void;
+  theme?: PostCmsAppTheme;
 }) {
   const [tab, setTab] = React.useState<TabType>("draft");
 
   const items = filterPostsBy(posts, tab);
-  const { hosts, name: publicationName } = publication;
+  const { hosts } = publication;
 
   return (
-    <Container>
-      <Toolbar>
-        <Underline />
-        <Tools>
-          <Tabs>
-            {tabs.map((t) => (
-              <TableTabItem
-                key={t.id}
-                selected={tab === t.id}
-                badge={filterPostsBy(posts, t.id).length.toString()}
+    <PostsAppThemeProvider theme={theme}>
+      <Container>
+        <Toolbar>
+          <Underline />
+          <Tools>
+            <Tabs>
+              {tabs.map((t) => (
+                <TableTabItem
+                  key={t.id}
+                  selected={tab === t.id}
+                  badge={filterPostsBy(posts, t.id).length.toString()}
+                  onClick={() => {
+                    setTab(t.id);
+                  }}
+                >
+                  {t.label}
+                </TableTabItem>
+              ))}
+            </Tabs>
+            <Actions>
+              <Button onClick={onNewPostClick}>New Post</Button>
+            </Actions>
+          </Tools>
+        </Toolbar>
+        <Title>{title}</Title>
+        <List>
+          {items.length ? (
+            items.map((post) => (
+              <PostListItem
+                key={post.id}
+                title={post.title}
+                summary={post.summary}
+                author={post.author}
+                publishedAt={post.postedAt}
+                readingTime={post.readingTime ? post.readingTime + "s" : null}
+                thumbnail={post.thumbnail}
                 onClick={() => {
-                  setTab(t.id);
+                  onPostClick?.(post.id);
+                }}
+              />
+            ))
+          ) : (
+            <Empty>
+              There are currently no {tab} posts in this publication.
+            </Empty>
+          )}
+        </List>
+        {hosts?.map((h) => {
+          const host = new URL(h.homepage);
+
+          /* remove scheme - e.g. blog.grida.co/path */
+          const display_host_name = `${host.host}${host.pathname}`;
+
+          return (
+            <BoringBlocksInBlockButton>
+              <InBlockButton
+                onClick={() => {
+                  open(host);
                 }}
               >
-                {t.label}
-              </TableTabItem>
-            ))}
-          </Tabs>
-          <Actions>
-            <Button onClick={onNewPostClick}>New Post</Button>
-          </Actions>
-        </Tools>
-      </Toolbar>
-      <Title>{title}</Title>
-      <List>
-        {items.length ? (
-          items.map((post) => (
-            <PostListItem
-              key={post.id}
-              title={post.title}
-              summary={post.summary}
-              author={post.author}
-              publishedAt={post.postedAt}
-              readingTime={post.readingTime ? post.readingTime + "s" : null}
-              thumbnail={post.thumbnail}
-              onClick={() => {
-                onPostClick?.(post.id);
-              }}
-            />
-          ))
-        ) : (
-          <Empty>There are currently no {tab} posts in this publication.</Empty>
-        )}
-      </List>
-      {hosts?.map((h) => {
-        const host = new URL(h.homepage);
-
-        /* remove scheme - e.g. blog.grida.co/path */
-        const display_host_name = `${host.host}${host.pathname}`;
-
-        return (
-          <BoringBlocksInBlockButton>
-            <InBlockButton
-              onClick={() => {
-                open(host);
-              }}
-            >
-              {display_host_name}
-            </InBlockButton>
-          </BoringBlocksInBlockButton>
-        );
-      })}
-    </Container>
+                {display_host_name}
+              </InBlockButton>
+            </BoringBlocksInBlockButton>
+          );
+        })}
+      </Container>
+    </PostsAppThemeProvider>
   );
 }
 
@@ -142,8 +149,10 @@ const filterPostsBy = (posts: Post[], type: TabType) => {
 const Container = styled.div`
   margin: 100px 160px 40px 160px;
   box-sizing: border-box;
-  background-color: white;
   position: relative;
+  background-color: ${(props) =>
+    // @ts-ignore
+    props.theme.app_posts_cms.colors.root_background};
   align-self: stretch;
   flex-shrink: 0;
   flex: 1;
@@ -213,7 +222,9 @@ const Button = styled.button`
   flex: none;
   gap: 4px;
   border-radius: 4px;
-  background-color: rgba(35, 77, 255, 0.9);
+  background-color: ${(props) =>
+    // @ts-ignore
+    props.theme.app_posts_cms.colors.button_primary};
   box-sizing: border-box;
   padding: 8px 10px;
   color: white;
