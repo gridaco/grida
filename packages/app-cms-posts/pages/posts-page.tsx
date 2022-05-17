@@ -111,7 +111,8 @@ export default function PostsPage({
               ))
             ) : (
               <EmptyStateContainer>
-                There are currently no {tab} posts in this publication.
+                There are currently no {tab ? `${tab} ` : ""}posts in this
+                publication.
               </EmptyStateContainer>
             )}
           </List>

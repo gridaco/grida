@@ -23,6 +23,7 @@ const Container = styled.div`
   z-index: 2;
   flex-grow: 0;
   align-items: center;
+  transition: height 0.3s ease-in-out;
 `;
 
 const CoverImage = styled.img`
