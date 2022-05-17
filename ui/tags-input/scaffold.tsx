@@ -18,6 +18,7 @@ export function TagsInput({
   suggestions = [],
   initialTags = [],
   placeholder = "Add a tag...",
+  placeholderOnEmpty = "Add a tag... (with , or enter)",
   onChange,
   onClick,
   onAdd,
@@ -28,6 +29,7 @@ export function TagsInput({
   suggestions?: Array<Tag>;
   initialTags?: Array<Tag>;
   placeholder?: string;
+  placeholderOnEmpty?: string;
   autofocus?: boolean;
   onChange?: (tags: Array<Tag>) => void;
   onClick?: (tag: Tag) => void;
@@ -65,7 +67,7 @@ export function TagsInput({
   };
 
   return (
-    <StyleRoot style={style}>
+    <StyleRoot style={style} width={tags.length ? undefined : "100%"}>
       <ReactTags
         tags={tags}
         suggestions={suggestions}
@@ -75,7 +77,9 @@ export function TagsInput({
         handleDrag={handleDrag}
         handleTagClick={handleTagClick}
         inputFieldPosition="inline"
-        placeholder={placeholder}
+        placeholder={
+          tags.length ? placeholder : placeholderOnEmpty || placeholder
+        }
         // removeComponent={(props) => <RemoveComponent {...props} />}
         autocomplete
         autofocus={autofocus}
@@ -84,7 +88,7 @@ export function TagsInput({
   );
 }
 
-const StyleRoot = styled.div`
+const StyleRoot = styled.div<{ width: React.CSSProperties["width"] }>`
   .tag-wrapper {
     cursor: pointer !important;
   }
@@ -95,7 +99,7 @@ const StyleRoot = styled.div`
 
   /* Styles for the input */
   .ReactTags__tagInput {
-    /* width: 200px; */
+    ${(props) => props.width && `width: ${props.width}`};
     outline: none;
     border: none;
     display: inline-block;

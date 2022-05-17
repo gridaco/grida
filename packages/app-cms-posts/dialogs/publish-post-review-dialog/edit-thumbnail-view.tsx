@@ -86,4 +86,6 @@ const ChangePreviewButton = styled.button`
 
   :focus {
   }
+
+  transition: opacity 0.1s ease-in-out;
 `;
