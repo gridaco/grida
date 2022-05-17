@@ -1,6 +1,7 @@
 import React from "react";
 import {
   Scaffold as Boring,
+  ScaffoldProps as BoringProps,
   InitialDocumentProp,
   OnContentChange,
 } from "@boringso/react-core";
@@ -16,12 +17,8 @@ export function BoringScaffold({
   onTitleChange,
   onContentChange,
   readonly = false,
-}: {
-  initial?: InitialDocumentProp;
-  onTitleChange?: (title: string) => void;
-  onContentChange?: OnContentChange;
-  readonly?: boolean;
-}) {
+  ...props
+}: Omit<BoringProps, "extensions">) {
   return (
     <Boring
       readonly={readonly}
@@ -29,6 +26,7 @@ export function BoringScaffold({
       extensions={extensions}
       onTitleChange={onTitleChange}
       onContentChange={onContentChange}
+      {...props}
     />
   );
 }
