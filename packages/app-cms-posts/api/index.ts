@@ -150,11 +150,21 @@ export class PostsClient {
 
   // assets
 
-  async uploadAsset(id, asset) {
+  async uploadAsset(
+    id,
+    ...assets: File[]
+  ): Promise<{
+    post_id: string;
+    assets: { [originalname: string]: string };
+  }> {
+    const form = new FormData();
+
+    assets.forEach((a) => {
+      form.append("files", a);
+    });
+
     return await (
-      await this._client.post(`/assets/${id}/upload`, {
-        // visibility,
-      })
+      await this._client.post(`/assets/${id}/upload`, form)
     ).data;
   }
 

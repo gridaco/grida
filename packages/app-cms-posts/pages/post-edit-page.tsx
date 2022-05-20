@@ -124,12 +124,14 @@ export default function PostEditPage({
       });
   }, 1000);
 
-  const onUploadImage = async (d): Promise<string | false> => {
-    console.log("have to upload this resouce", d);
-
-    // return "https://wallpaperaccess.com/full/366398.jpg";
-    return "https://mir-s3-cdn-cf.behance.net/project_modules/max_1200/5eeea355389655.59822ff824b72.gif";
-    // return "https://grida.co/";
+  const uploadAsset = async (d: File): Promise<string | false> => {
+    try {
+      const uploaded = await client.uploadAsset(id, d);
+      const asseturl = uploaded.assets[d.name];
+      return asseturl;
+    } catch (e) {
+      return false;
+    }
   };
 
   const canPublish: boolean =
@@ -213,7 +215,7 @@ export default function PostEditPage({
       <EditorContainer>
         <Editor
           id={id}
-          fileUploader={onUploadImage}
+          fileUploader={uploadAsset}
           store={store}
           onTitleChange={onTitleChange}
           onContentChange={onContentChange}
