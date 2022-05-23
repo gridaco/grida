@@ -34,17 +34,19 @@ export class PostsClient {
 
   async draft({
     title,
-    visibility,
+    visibility = "public",
   }: {
     title?: string | undefined;
     visibility?: "public" | "private";
   }) {
+    const body = {
+      publication: this.publicationId,
+      title: title ?? "",
+      visibility,
+    };
+
     return await (
-      await this._client.post("/drafts", {
-        publication: this.publicationId,
-        title: title ?? "",
-        visibility,
-      })
+      await this._client.post("/drafts", body)
     ).data;
   }
 

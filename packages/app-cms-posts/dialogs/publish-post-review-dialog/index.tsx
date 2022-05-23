@@ -21,12 +21,13 @@ export function PublishPostReviewDialogBody({
   summary: initialSummary = "",
   tags: initialTags = [],
   publication,
+  disableSchedule = false,
 }: {
   onPublish: (p: {
     title: string;
     summary: string;
     visibility: PostVisibility;
-  }) => void;
+  }) => Promise<boolean>;
   onDisplayTitleChange: (t: string) => void;
   onSummaryChange: (t: string) => void;
   onThumbnailChange: (f: File) => void;
@@ -44,8 +45,10 @@ export function PublishPostReviewDialogBody({
   publication: {
     name: string;
   };
+  disableSchedule?: boolean;
 }) {
   const [isScheduling, setIsScheduling] = useState(false);
+  const [isPublishing, setIsPublishing] = useState(false);
   const [displayTitle, setDisplayTitle] = useState(initialTitle);
   const [summary, setSummary] = useState(initialSummary);
   const [tags, setTags] = useState(initialTags);
@@ -121,11 +124,15 @@ export function PublishPostReviewDialogBody({
                 </RoundPrimaryButton>
               ) : (
                 <RoundPrimaryButton
+                  disabled={isPublishing}
                   onClick={() => {
+                    setIsPublishing(true);
                     onPublish({
                       visibility: "public",
                       title: displayTitle,
                       summary: summary,
+                    }).finally(() => {
+                      setIsPublishing(false);
                     });
                   }}
                 >
@@ -133,6 +140,7 @@ export function PublishPostReviewDialogBody({
                 </RoundPrimaryButton>
               )}
               <ScheduleForLater
+                hidden={disableSchedule}
                 onClick={() => {
                   setIsScheduling(!isScheduling);
                 }}

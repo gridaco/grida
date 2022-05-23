@@ -10,6 +10,8 @@ export interface Post {
   tags?: string[];
   scheduledAt?: string | Date;
   postedAt?: string | Date;
+  createdAt?: string | Date;
+  lastEditAt?: string | Date;
   readingTime?: number;
 }
 

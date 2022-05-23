@@ -102,6 +102,8 @@ export default function PostsPage({
                   summary={post.summary}
                   author={post.author}
                   publishedAt={post.postedAt}
+                  isDraft={post.isDraft}
+                  createdAt={post.createdAt}
                   readingTime={post.readingTime}
                   thumbnail={post.thumbnail}
                   onClick={() => {

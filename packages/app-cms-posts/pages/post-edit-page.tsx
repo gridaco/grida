@@ -66,7 +66,7 @@ export default function PostEditPage({
     store.put({
       id: id,
       title: new BoringTitle(data.title),
-      content: data.body.html
+      content: data.body?.html
         ? new BoringContent(data.body.html)
         : new BoringContent(""),
     });
@@ -135,7 +135,7 @@ export default function PostEditPage({
   };
 
   const canPublish: boolean =
-    data && !!data.title.length && !!data.body.html?.length;
+    data && !!data.title?.length && !!data.body?.html?.length;
 
   return (
     <PostsAppThemeProvider theme={theme}>
@@ -149,17 +149,24 @@ export default function PostEditPage({
         {data && (
           <PublishPostReviewDialogBody
             title={data.title}
-            summary={data.summary}
+            summary={data.summary ?? makeSummaryFromBody(data.body)}
             tags={data.tags}
-            onPublish={(p) => {
+            onPublish={async (p) => {
+              setData((d) => ({ ...d, ...p }));
+
+              // updte
+              await client.updateSummary(id, { ...p });
+
               // 1. update with value (TODO:)
               client.publish(id).then(({ id }) => {
                 // 2. then => publish
                 setPublishDialog(false);
                 if (primaryHost) {
-                  open(buildTargetUrl(primaryHost, { ...data }, false));
+                  open(buildTargetUrl(primaryHost, { id }, false));
                 }
               });
+
+              return true;
             }}
             onDisplayTitleChange={onDisplayTitleChange}
             onSummaryChange={onSummaryChange}
@@ -192,6 +199,7 @@ export default function PostEditPage({
             publication={{
               name: "Grida",
             }}
+            disableSchedule
           />
         )}
       </Dialog>
@@ -225,6 +233,52 @@ export default function PostEditPage({
       </EditorContainer>
     </PostsAppThemeProvider>
   );
+}
+
+/**
+ * get the summary from the body html.
+ *
+ *
+ * e.g. from
+ * ```html
+ * <p><b>SERVES: 1</b></p>
+ * <p>Legend has it that the Ice Cream Float was invented on a particularly hot Philadelphia day by a soda vendor who had run out of ice. To cool his drinks</p>
+ * ```
+ *
+ * => returns the second paragraph
+ *
+ *
+ * @param body
+ * @returns
+ */
+function makeSummaryFromBody(body: { html: string }): string {
+  const { html } = body;
+
+  if (!html) return undefined;
+
+  // parse html, extract first paragraph
+  const doc = new DOMParser().parseFromString(html, "text/html");
+  const paragraphs = doc.querySelectorAll("p");
+  if (paragraphs.length) {
+    // list first 3 paragraphs, get the longest one.
+    const longest = Array.from(paragraphs)
+      .slice(0, 3)
+      .reduce(
+        (acc, p) => {
+          const text = p.textContent;
+          if (text.length > acc.length) {
+            return text;
+          }
+          return acc;
+        },
+        //
+        ""
+      );
+    return longest.substring(0, 200);
+  } else {
+    // extract any text from html doc
+    return doc.textContent.substring(0, 200);
+  }
 }
 
 const LogoContainer = styled.img`

@@ -8,10 +8,10 @@ const tabs: { id: PostStatusType; label: string }[] = [
     id: "draft",
     label: "Drafts and submissions",
   },
-  {
-    id: "scheduled",
-    label: "Scheduled",
-  },
+  // {
+  //   id: "scheduled",
+  //   label: "Scheduled",
+  // },
   {
     id: "published",
     label: "Published",
