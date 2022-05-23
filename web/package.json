@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "next dev -p 3301",
     "build": "next build",
-    "start": "next start"
+    "start": "next start -p 3301"
   },
   "dependencies": {
     "@emotion/babel-preset-css-prop": "^11.2.0",
