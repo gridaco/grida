@@ -7,14 +7,18 @@ export function PostListItem({
   summary,
   author,
   publishedAt,
+  createdAt,
   thumbnail,
   readingTime,
   onClick,
+  isDraft,
 }: {
   title: string;
   summary: string;
   author?: string;
   publishedAt?: Date | string;
+  createdAt?: Date | string;
+  isDraft?: boolean;
   thumbnail?: string;
   readingTime?: number;
   onClick?: () => void;
@@ -22,12 +26,16 @@ export function PostListItem({
   return (
     <Container onClick={onClick}>
       <TextContents>
-        <Title>{title ?? "Untitled story"}</Title>
+        <Title>{title?.length ? title : "Untitled post"}</Title>
         {summary && <Summary>{summary}</Summary>}
         <MetaContainer>
           {author && <Author>@{author}</Author>}
           <PublishedAt>
-            Published on {dayjs(publishedAt).format("MM/DD/YYYY")}
+            {isDraft ? (
+              <>Created on {dayjs(createdAt).format("MMM DD, YYYY")}</>
+            ) : (
+              <>Published on {dayjs(publishedAt).format("MM/DD/YYYY")}</>
+            )}
           </PublishedAt>
           {readingTime && (
             <ReadingTime>
@@ -138,6 +146,7 @@ const Thumbnail = styled.img`
   width: 130px;
   height: 130px;
   object-fit: cover;
+  margin-bottom: 4px;
   border-radius: 2px;
   overflow: hidden;
   border: 1px solid rgba(0, 0, 0, 0.05);
