@@ -277,7 +277,7 @@ function makeSummaryFromBody(body: { html: string }): string {
     return longest.substring(0, 200);
   } else {
     // extract any text from html doc
-    return doc.textContent.substring(0, 200);
+    return doc.textContent?.substring(0, 200) ?? "";
   }
 }
 
