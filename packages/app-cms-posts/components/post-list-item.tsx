@@ -51,7 +51,7 @@ export function PostListItem({
 
 function readingtimeToMinutes(readingTime: number) {
   // 0 min -> 1 min
-  return Math.max(1, Math.floor(readingTime / 60));
+  return Math.max(1, Math.floor(readingTime / 1000 / 60));
 }
 
 const Container = styled.div`
