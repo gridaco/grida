@@ -43,6 +43,7 @@ export const SceneItem = ({
   return (
     <Wrapper>
       <Inner>
+        {/* @ts-ignore */}
         <ContextMenuTrigger id={id}>
           <ItemContainer
             onClick={handleClick}
@@ -56,6 +57,7 @@ export const SceneItem = ({
             <Name>{name}</Name>
           </ItemContainer>
         </ContextMenuTrigger>
+        {/* @ts-ignore */}
         <ContextMenu id={id}>
           <SceneItemContextMenu />
         </ContextMenu>

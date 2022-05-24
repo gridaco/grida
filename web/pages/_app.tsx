@@ -61,19 +61,19 @@ function SeoMeta() {
   );
 }
 
-function BridgedRootWebApp({ Component, pageProps }) {
+function GridaRootWebApp({ Component, pageProps }) {
   return (
     <>
       <HeadInjection />
-      <SafeHydrate>
-        <StrictMode>
-          <Suspense fallback="Loading...">
-            <Component {...pageProps} />
-          </Suspense>
-        </StrictMode>
-      </SafeHydrate>
+      {/* <SafeHydrate> */}
+      {/* <StrictMode> */}
+      {/* <Suspense fallback="Loading..."> */}
+      <Component {...pageProps} />
+      {/* </Suspense> */}
+      {/* </StrictMode> */}
+      {/* </SafeHydrate> */}
     </>
   );
 }
 
-export default BridgedRootWebApp;
+export default GridaRootWebApp;

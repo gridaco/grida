@@ -8,10 +8,26 @@ const withTM = require("next-transpile-modules")(
     "@grida.co/app",
     "@app/scene-view",
     "@app/blocks",
+    "@app/cms-posts",
+    "@app/cms-forms",
     "@core/state",
     "@core/app-state",
     "@core/store",
     "@core/model",
+
+    // ui
+    "@ui/tags-input",
+    "@ui/date-picker",
+
+    // https://github.com/vercel/next.js/discussions/13553#discussioncomment-20092  ----------------------------
+    // cause of this, we also set `experimental: { esmExternals: "loose" }`
+    "react-tag-input",
+    "react-dnd",
+    "dnd-core",
+    "@react-dnd/invariant",
+    "@react-dnd/asap",
+    "@react-dnd/shallowequal",
+    //  --------------------------------------------------------------------------------------------------------
 
     // utils
     "treearray",
@@ -176,8 +192,10 @@ module.exports = withTM({
     return config;
   },
 
+  experimental: { esmExternals: "loose" },
+
   // enable SPA mode, disable SSR
-  target: "serverless",
+  // target: "serverless",
   async rewrites() {
     return [
       // Rewrite everything to `pages/index`

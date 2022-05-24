@@ -18,7 +18,8 @@
         "externals/design-to-code/externals/coli/packages/*",
         "externals/design-to-code/packages/*",
         "boring/packages/*",
-        "ui/editor-ui/packages/*"
+        "ui/editor-ui/packages/*",
+        "ui/*"
     ],
     "scripts": {
         "web": "yarn workspace web run dev",
@@ -28,8 +29,8 @@
         "clean:install": "yarn clean && yarn"
     },
     "resolutions": {
-        "react": "^17.0.1",
-        "react-dom": "^17.0.1"
+        "react": "^18.1.0",
+        "react-dom": "^18.1.0"
     },
     "devDependencies": {
         "typescript": "4.2.4"

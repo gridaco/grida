@@ -5,20 +5,22 @@
   "scripts": {
     "dev": "next dev -p 3301",
     "build": "next build",
-    "start": "next start"
+    "start": "next start -p 3301"
   },
   "dependencies": {
     "@emotion/babel-preset-css-prop": "^11.2.0",
     "babel-plugin-module-resolver": "^4.1.0",
-    "next": "12",
+    "dayjs": "^1.11.2",
+    "next": "^12.1.4",
     "react": "^18.1.0",
     "react-dom": "^18.1.0"
   },
   "devDependencies": {
     "@emotion/babel-plugin": "^11.3.0",
+    "@types/react": "^18.0.9",
     "@types/resize-observer-browser": "^0.1.5",
     "next-transpile-modules": "^9.0.0",
     "terser-webpack-plugin": "^5.3.1",
-    "typescript": "^4.3.2"
+    "typescript": "^4.3.5"
   }
 }

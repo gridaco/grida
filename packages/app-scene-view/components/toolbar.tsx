@@ -6,6 +6,7 @@ import styled from "@emotion/styled";
 interface IToolbar {
   toQuicklook?: string;
   toGlobalization?: string;
+  children?: React.ReactNode;
 }
 
 const Toolbar: React.FC<IToolbar> = ({

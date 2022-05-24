@@ -1,0 +1,11 @@
+{
+  "name": "@ui/date-picker",
+  "version": "0.0.0",
+  "private": false,
+  "dependencies": {
+    "react-datepicker": "^4.8.0"
+  },
+  "devDependencies": {
+    "@types/react-datepicker": "^4.4.1"
+  }
+}
