@@ -14,7 +14,15 @@ import type { Theme as PostCmsAppTheme } from "../theme";
 import styled from "@emotion/styled";
 import UrlPattern from "url-pattern";
 
-const store = new BoringDocumentsStore();
+function useBoringDocumentStore() {
+  const [store, setStore] = useState<BoringDocumentsStore>();
+  useEffect(() => {
+    const store = new BoringDocumentsStore();
+    setStore(store);
+  }, []);
+
+  return store;
+}
 
 type PostEditPageProps = { id: string } | { draft: true };
 
@@ -31,6 +39,7 @@ export default function PostEditPage({
   const [publishDialog, setPublishDialog] = React.useState(false); // controls review dialog
 
   const client = new PostsClient("627c481391a5de075f80a177");
+  const store = useBoringDocumentStore();
   const [data, setData] = useState<Post>();
   const [loaded, setLoaded] = useState(false);
   const [saving, setSaving] = useState<"saving" | "saved" | "error">(undefined);
@@ -45,7 +54,7 @@ export default function PostEditPage({
   }, [id]);
 
   useEffect(() => {
-    if (!id) return;
+    if (!id || !store) return;
     // load from store
     store.get(id).then((doc) => {
       if (doc) {
@@ -58,7 +67,7 @@ export default function PostEditPage({
         });
       }
     });
-  }, [id]);
+  }, [id, store]);
 
   useEffect(() => {
     if (!data) return;
