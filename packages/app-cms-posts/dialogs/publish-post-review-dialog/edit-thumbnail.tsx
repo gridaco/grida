@@ -3,6 +3,7 @@ import styled from "@emotion/styled";
 import { ThumbnailView } from "./edit-thumbnail-view";
 export function EditThumbnailSegment({
   onFileUpload,
+  initialThumbnail,
 }: {
   /**
    * handle file
@@ -12,9 +13,11 @@ export function EditThumbnailSegment({
    * ```
    */
   onFileUpload: (file: File) => void;
+
+  initialThumbnail?: string;
 }) {
   const inputFile = useRef(null);
-  const [uploaded, setUploaded] = useState<string>();
+  const [uploaded, setUploaded] = useState<string>(initialThumbnail);
 
   return (
     <>

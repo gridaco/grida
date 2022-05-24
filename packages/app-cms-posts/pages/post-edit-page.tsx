@@ -160,6 +160,7 @@ export default function PostEditPage({
             title={data.title}
             summary={data.summary ?? makeSummaryFromBody(data.body)}
             tags={data.tags}
+            thumbnail={data.thumbnail}
             onPublish={async (p) => {
               setData((d) => ({ ...d, ...p }));
 
@@ -203,7 +204,15 @@ export default function PostEditPage({
               setPublishDialog(false);
             }}
             onTagsEdit={(tags: string[]) => {
-              // TODO:
+              setSaving("saving");
+              client
+                .updateTags(id, tags)
+                .then(() => {
+                  setSaving("saved");
+                })
+                .catch((e) => {
+                  setSaving("error");
+                });
             }}
             publication={{
               name: "Grida",

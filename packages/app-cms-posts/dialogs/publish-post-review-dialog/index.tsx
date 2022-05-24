@@ -20,6 +20,7 @@ export function PublishPostReviewDialogBody({
   title: initialTitle,
   summary: initialSummary = "",
   tags: initialTags = [],
+  thumbnail: initialThumbnail,
   publication,
   disableSchedule = false,
 }: {
@@ -41,6 +42,7 @@ export function PublishPostReviewDialogBody({
   onTagsEdit: (tags: string[]) => void;
   title: string;
   summary?: string;
+  thumbnail?: string;
   tags?: string[];
   publication: {
     name: string;
@@ -63,7 +65,10 @@ export function PublishPostReviewDialogBody({
         <Left>
           <PreviewText>Preview</PreviewText>
           <PreviewContainer>
-            <EditThumbnailSegment onFileUpload={onThumbnailChange} />
+            <EditThumbnailSegment
+              initialThumbnail={initialThumbnail}
+              onFileUpload={onThumbnailChange}
+            />
             <EditSummarySegment
               title={displayTitle}
               summary={summary}
@@ -84,6 +89,7 @@ export function PublishPostReviewDialogBody({
               tags={initialTags}
               onChange={(tags) => {
                 setTags(tags);
+                onTagsEdit?.(tags);
               }}
             />
             {isScheduling && (

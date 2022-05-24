@@ -114,9 +114,11 @@ export class PostsClient {
     ).data;
   }
 
-  async updateTags(id: string) {
-    await (
-      await this._client.put(`/${id}/tags`)
+  async updateTags(id: string, tags: string[]): Promise<{ tags: string[] }> {
+    return await (
+      await this._client.put(`/${id}/tags`, {
+        tags,
+      })
     ).data;
   }
 
