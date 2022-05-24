@@ -8,6 +8,23 @@ export function SavingIndicator({
   onRetryClick?: () => void;
   onClick?: () => void;
 }) {
+  useEffect(() => {
+    // if saving or with error, ask user if sure to close the window.
+    if (status === "saved") {
+      return;
+    }
+
+    // Enable navigation prompt
+    window.onbeforeunload = function () {
+      return true;
+    };
+
+    return () => {
+      // Remove navigation prompt
+      window.onbeforeunload = null;
+    };
+  }, [status]);
+
   switch (status) {
     case "error": {
       return (
