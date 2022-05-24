@@ -56,7 +56,7 @@ export default function PostEditPage({
   useEffect(() => {
     if (!id || !store) return;
     // load from store
-    store.get(id).then((doc) => {
+    store?.get(id).then((doc) => {
       if (doc) {
         setData({
           id,
@@ -72,7 +72,7 @@ export default function PostEditPage({
   useEffect(() => {
     if (!data) return;
 
-    store.put({
+    store?.put({
       id: id,
       title: new BoringTitle(data.title),
       content: data.body?.html
