@@ -12,7 +12,7 @@ import type { Post, Publication, PublicationHost } from "../types";
 import { PostsAppThemeProvider } from "../theme";
 import type { Theme as PostCmsAppTheme } from "../theme";
 import styled from "@emotion/styled";
-import UrlPattern from "url-pattern";
+import { buildViewPostOnPublicationUrl } from "../urls";
 
 function useBoringDocumentStore() {
   const [store, setStore] = useState<BoringDocumentsStore>();
@@ -173,7 +173,9 @@ export default function PostEditPage({
                 // 2. then => publish
                 setPublishDialog(false);
                 if (primaryHost) {
-                  open(buildTargetUrl(primaryHost, { id }, false));
+                  open(
+                    buildViewPostOnPublicationUrl(primaryHost, { id }, false)
+                  );
                 }
               });
 
@@ -233,7 +235,7 @@ export default function PostEditPage({
         saving={saving}
         disabledPublish={!canPublish}
         onPreviewClick={() => {
-          open(buildTargetUrl(primaryHost, { ...data }, true));
+          open(buildViewPostOnPublicationUrl(primaryHost, { ...data }, true));
         }}
         onPublishClick={() => {
           setPublishDialog(true);
@@ -321,22 +323,6 @@ const EditorContainer = styled.div`
     margin: 80px 20px 80px;
   }
 `;
-
-function buildTargetUrl(
-  host: PublicationHost,
-  params: { [key: string]: any },
-  preview?: boolean
-) {
-  const { homepage, pattern } = host;
-  const url = new URL(homepage + new UrlPattern(pattern, {}).stringify(params));
-
-  // add preview?=true if needed
-  if (preview) {
-    url.searchParams.set("preview", "true");
-  }
-
-  return url.toString();
-}
 
 function Editor({
   id,

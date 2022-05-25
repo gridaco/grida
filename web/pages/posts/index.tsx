@@ -1,11 +1,13 @@
 import React, { useEffect, useState } from "react";
+import { useRouter } from "next/router";
+import { GetServerSideProps } from "next";
+import Head from "next/head";
+
 import { TablePage } from "@app/cms-posts/pages";
 import { themeFrom } from "@app/cms-posts/theme";
 import { PostsClient } from "@app/cms-posts/api";
-import { useRouter } from "next/router";
-import { GetServerSideProps } from "next";
+import { buildViewPostOnPublicationUrl } from "@app/cms-posts/urls";
 import type { Post } from "@app/cms-posts/types";
-import Head from "next/head";
 
 export default function WebPostsPage({ publication, theme }) {
   const router = useRouter();
@@ -50,6 +52,12 @@ export default function WebPostsPage({ publication, theme }) {
     );
   };
 
+  const onViewPostOnPublicationClick = (id) => {
+    const primaryhost = publication.hosts?.[0];
+    const url = buildViewPostOnPublicationUrl(primaryhost, { id }, true);
+    open(url);
+  };
+
   const onNewPostClick = async () => {
     const { id } = await client.draft({});
     router.push("/posts/" + id);
@@ -72,6 +80,7 @@ export default function WebPostsPage({ publication, theme }) {
         onPostDeleteClick={onPostDeleteClick}
         onPostUnlistClick={onPostUnlistClick}
         onPostPublishClick={onPostPublishClick}
+        onPostViewOnPublicationClick={onViewPostOnPublicationClick}
       />
     </>
   );
