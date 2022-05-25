@@ -142,6 +142,7 @@ export default function PostsPage({
 
                 return (
                   <PostListItem
+                    href={`/posts/${post.id}`}
                     key={post.id}
                     title={post.title}
                     summary={post.summary}

@@ -111,7 +111,7 @@ export function Breadcrumb({ logo, onLogoClick }: BreadcrumbProps) {
   return (
     <BreadcrumbContainer>
       {logo ? (
-        <LogoButton title="Home" onClick={onLogoClick}>
+        <LogoButton title="Home" onClick={onLogoClick} href="/posts">
           {logo}
         </LogoButton>
       ) : (
@@ -125,7 +125,7 @@ const BreadcrumbContainer = styled.div`
   display: flex;
 `;
 
-const LogoButton = styled.button`
+const LogoButton = styled.a`
   user-select: none;
   cursor: pointer;
   outline: none;

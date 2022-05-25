@@ -5,20 +5,23 @@ export function InBlockButton({
   icon,
   children,
   onClick,
+  href,
 }: {
   icon?: React.ReactNode;
   children: React.ReactNode;
   onClick?: () => void;
+  href?: string;
 }) {
   return (
-    <Container onClick={onClick}>
+    <Container onClick={onClick} href={href}>
       {icon ? <IconContainer>{icon}</IconContainer> : <></>}
       <Label>{children}</Label>
     </Container>
   );
 }
 
-const Container = styled.div`
+const Container = styled.a`
+  text-decoration: none;
   display: flex;
   cursor: pointer;
   justify-content: center;

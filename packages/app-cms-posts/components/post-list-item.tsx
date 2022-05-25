@@ -28,6 +28,7 @@ export function PostListItem({
   onClick,
   isDraft,
   isListed,
+  href,
   ...menuProps
 }: {
   title: string;
@@ -40,9 +41,10 @@ export function PostListItem({
   readingTime?: number;
   isListed?: boolean;
   onClick?: () => void;
+  href?: string;
 } & ItemMenuProps) {
   return (
-    <Container onClick={onClick}>
+    <Container onClick={onClick} href={href}>
       <TextContents>
         <Title>{title?.length ? title : "Untitled post"}</Title>
         {summary && <Summary>{summary}</Summary>}
@@ -180,7 +182,8 @@ function readingtimeToMinutes(readingTime: number) {
   }
 }
 
-const Container = styled.div`
+const Container = styled.a`
+  text-decoration: none;
   cursor: pointer;
   display: flex;
   justify-content: flex-start;
