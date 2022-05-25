@@ -30,27 +30,31 @@ export default function PostEditPage({
   id,
   publication,
   theme,
+  post: initialPost,
 }: {
   id: string;
   publication: Publication;
   theme?: PostCmsAppTheme;
+  post?: Post;
 }) {
   const router = useRouter();
   const [publishDialog, setPublishDialog] = React.useState(false); // controls review dialog
 
   const client = new PostsClient("627c481391a5de075f80a177");
   const store = useBoringDocumentStore();
-  const [data, setData] = useState<Post>();
+  const [data, setData] = useState<Post>(initialPost);
   const [loaded, setLoaded] = useState(false);
   const [saving, setSaving] = useState<"saving" | "saved" | "error">(undefined);
   const { hosts } = publication;
   const primaryHost = hosts?.[0];
 
   useEffect(() => {
-    client.get(id).then((post) => {
-      setData(post);
-      setLoaded(true);
-    });
+    if (!initialPost) {
+      client.get(id).then((post) => {
+        setData(post);
+        setLoaded(true);
+      });
+    }
   }, [id]);
 
   useEffect(() => {

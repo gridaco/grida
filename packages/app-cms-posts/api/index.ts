@@ -1,4 +1,5 @@
 import Axios, { AxiosInstance } from "axios";
+import type { Post, Publication } from "../types";
 
 export class PostsClient {
   private _client: AxiosInstance;
@@ -9,12 +10,12 @@ export class PostsClient {
     });
   }
 
-  async publication(id?: string) {
+  async publication(id?: string): Promise<Publication> {
     id = id ?? this.publicationId;
     return (await this._client.get(`/publications/${id}`)).data;
   }
 
-  async get(id: string) {
+  async get(id: string): Promise<Post> {
     return (await this._client.get(`${id}`)).data;
   }
 
