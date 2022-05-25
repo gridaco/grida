@@ -12,6 +12,7 @@ import {
   IconLayout,
   ContentsLayout,
 } from "../layouts";
+import { DeletePostConfirmAlertDialog } from "../dialogs";
 
 const selected_tab_store = {
   get: (): PostStatusType => {
@@ -49,6 +50,8 @@ export default function PostsPage({
 }) {
   const { hosts } = publication;
 
+  // set the id of the target post
+  const [confirmDeleteFor, setConfirmDeleteFor] = useState<string>(undefined);
   const [tab, setTab] = useState<PostStatusType>();
 
   useEffect(() => {
@@ -64,6 +67,14 @@ export default function PostsPage({
 
   return (
     <PostsAppThemeProvider theme={theme}>
+      <DeletePostConfirmAlertDialog
+        open={confirmDeleteFor !== undefined}
+        onCancel={() => setConfirmDeleteFor(undefined)}
+        onDeleteConfirm={() => {
+          onPostDeleteClick?.(confirmDeleteFor);
+          setConfirmDeleteFor(undefined);
+        }}
+      />
       <Container>
         <CoverLayout src={publication.cover} />
         <TitleAndIconContainer>
@@ -106,7 +117,7 @@ export default function PostsPage({
                   tab !== "published" &&
                   onPostDeleteClick &&
                   (() => {
-                    onPostDeleteClick?.(post.id);
+                    setConfirmDeleteFor(post.id);
                   });
 
                 const _onunlist =

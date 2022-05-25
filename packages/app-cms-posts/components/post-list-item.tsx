@@ -1,5 +1,6 @@
 import React from "react";
 import styled from "@emotion/styled";
+import dayjs from "dayjs";
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -7,7 +8,6 @@ import {
   DropdownMenuItem,
   DropdownMenuArrow,
 } from "@editor-ui/dropdown-menu";
-import dayjs from "dayjs";
 
 interface ItemMenuProps {
   onDeleteClick?: () => void;
