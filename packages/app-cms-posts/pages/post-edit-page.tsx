@@ -355,6 +355,9 @@ function Editor({
         textAlign: theme.title_text_align,
       }}
       fileUploader={fileUploader}
+      collaboration={{
+        enabled: true,
+      }}
     />
   );
 }

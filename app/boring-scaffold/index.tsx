@@ -20,13 +20,29 @@ export function BoringScaffold({
   ...props
 }: Omit<BoringProps, "extensions">) {
   return (
-    <Boring
-      readonly={readonly}
-      initial={initial}
-      extensions={extensions}
-      onTitleChange={onTitleChange}
-      onContentChange={onContentChange}
-      {...props}
-    />
+    <ClientOnly>
+      <Boring
+        readonly={readonly}
+        initial={initial}
+        extensions={extensions}
+        onTitleChange={onTitleChange}
+        onContentChange={onContentChange}
+        {...props}
+      />
+    </ClientOnly>
   );
 }
+
+const ClientOnly = ({ children, ...delegated }) => {
+  const [hasMounted, setHasMounted] = React.useState(false);
+
+  React.useEffect(() => {
+    setHasMounted(true);
+  }, []);
+
+  if (!hasMounted) return null;
+
+  return <React.Fragment {...delegated}>{children}</React.Fragment>;
+};
+
+export default ClientOnly;
