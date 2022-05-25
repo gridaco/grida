@@ -109,12 +109,14 @@ export default function PostsPage({
                   });
 
                 const _onunlist =
+                  tab === "published" &&
                   onPostUnlistClick &&
                   (() => {
                     onPostUnlistClick?.(post.id);
                   });
 
                 const _onpublish =
+                  tab !== "published" &&
                   onPostPublishClick &&
                   (() => {
                     onPostPublishClick?.(post.id);
