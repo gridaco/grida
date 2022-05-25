@@ -103,6 +103,7 @@ export default function PostsPage({
             {items.length ? (
               items.map((post) => {
                 const _ondelete =
+                  tab !== "published" &&
                   onPostDeleteClick &&
                   (() => {
                     onPostDeleteClick?.(post.id);
@@ -117,6 +118,7 @@ export default function PostsPage({
 
                 const _onpublish =
                   tab !== "published" &&
+                  tab !== "scheduled" &&
                   onPostPublishClick &&
                   (() => {
                     onPostPublishClick?.(post.id);

@@ -54,7 +54,7 @@ export function PostListItem({
           {readingTime && (
             <ReadingTime>{readingtimeToMinutes(readingTime)}</ReadingTime>
           )}
-          <ItemDropdownMenu {...menuProps} />
+          <ItemDropdownMenu {...menuProps} onEditClick={onClick} />
         </MetaContainer>
       </TextContents>
       {thumbnail && <Thumbnail src={thumbnail} />}
@@ -66,7 +66,10 @@ function ItemDropdownMenu({
   onDeleteClick,
   onPublishClick,
   onUnlistClick,
-}: ItemMenuProps) {
+  onEditClick,
+}: ItemMenuProps & {
+  onEditClick: () => void;
+}) {
   return (
     <DropdownMenu>
       <MoreMenu onClick={(e) => e.stopPropagation()}>
@@ -116,6 +119,7 @@ function ItemDropdownMenu({
             Publish
           </DropdownMenuItem>
         )}
+        <DropdownMenuItem onClick={onEditClick}>Edit</DropdownMenuItem>
         <DropdownMenuArrow />
       </DropdownMenuContent>
     </DropdownMenu>
