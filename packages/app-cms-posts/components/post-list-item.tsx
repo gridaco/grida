@@ -69,12 +69,7 @@ function ItemDropdownMenu({
 }: ItemMenuProps) {
   return (
     <DropdownMenu>
-      <MoreMenu
-        onClick={(e) => {
-          // show menu
-          e.stopPropagation();
-        }}
-      >
+      <MoreMenu onClick={(e) => e.stopPropagation()}>
         <svg
           width="18"
           height="18"
@@ -83,8 +78,8 @@ function ItemDropdownMenu({
           xmlns="http://www.w3.org/2000/svg"
         >
           <path
-            fill-rule="evenodd"
-            clip-rule="evenodd"
+            fillRule="evenodd"
+            clipRule="evenodd"
             d="M8.68374 11.8844C8.88017 12.0542 9.17735 12.0458 9.36385 11.8593L13.6065 7.61666C13.8018 7.4214 13.8018 7.10482 13.6065 6.90955C13.4112 6.71429 13.0946 6.71429 12.8994 6.90955L9.00973 10.7992L5.11381 6.90328C4.91855 6.70802 4.60196 6.70802 4.4067 6.90328C4.21144 7.09854 4.21144 7.41513 4.4067 7.61039L8.64934 11.853C8.66043 11.8641 8.67191 11.8746 8.68374 11.8844Z"
             fill="#535455"
           />
@@ -92,13 +87,34 @@ function ItemDropdownMenu({
       </MoreMenu>
       <DropdownMenuContent>
         {onDeleteClick && (
-          <DropdownMenuItem onClick={onDeleteClick}>Delete</DropdownMenuItem>
+          <DropdownMenuItem
+            onClick={(e) => {
+              e.stopPropagation();
+              onDeleteClick();
+            }}
+          >
+            Delete
+          </DropdownMenuItem>
         )}
         {onUnlistClick && (
-          <DropdownMenuItem onClick={onUnlistClick}>Unlist</DropdownMenuItem>
+          <DropdownMenuItem
+            onClick={(e) => {
+              e.stopPropagation();
+              onUnlistClick();
+            }}
+          >
+            Unlist
+          </DropdownMenuItem>
         )}
         {onPublishClick && (
-          <DropdownMenuItem onClick={onPublishClick}>Publish</DropdownMenuItem>
+          <DropdownMenuItem
+            onClick={(e) => {
+              e.stopPropagation();
+              onPublishClick();
+            }}
+          >
+            Publish
+          </DropdownMenuItem>
         )}
         <DropdownMenuArrow />
       </DropdownMenuContent>

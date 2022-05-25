@@ -186,13 +186,13 @@ const filterPostsBy = (posts: Post[], type: PostStatusType) => {
         return p.isDraft;
       }
       case "published": {
-        return !p.isDraft;
+        return p.isListed;
       }
       case "scheduled": {
         return !!p.scheduledAt;
       }
       case "unlisted":
-        return !p.isDraft && !!!p.postedAt;
+        return !p.isDraft && !p.isListed;
     }
   });
 };
