@@ -46,7 +46,10 @@ export default function PostsPage({
   onPostDeleteClick?: (id: string) => void;
   onPostPublishClick?: (id: string) => void;
   onPostUnlistClick?: (id: string) => void;
-  onPostViewOnPublicationClick?: (id: string) => void;
+  onPostViewOnPublicationClick?: (
+    id: string,
+    options?: { preview: boolean }
+  ) => void;
   onNewPostClick?: () => void;
   theme?: PostCmsAppTheme;
 }) {
@@ -148,15 +151,15 @@ export default function PostsPage({
                     createdAt={post.createdAt}
                     readingTime={post.readingTime}
                     thumbnail={post.thumbnail}
-                    unlisted={tab === "unlisted"}
+                    isListed={post.isListed}
                     onClick={() => {
                       onPostClick?.(post.id);
                     }}
                     onDeleteClick={_ondelete}
                     onUnlistClick={_onunlist}
                     onPublishClick={_onpublish}
-                    onPreviewClick={() => {
-                      onPostViewOnPublicationClick?.(post.id);
+                    onViewOnPublicationClick={({ preview }) => {
+                      onPostViewOnPublicationClick?.(post.id, { preview });
                     }}
                   />
                 );

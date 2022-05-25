@@ -52,9 +52,9 @@ export default function WebPostsPage({ publication, theme }) {
     );
   };
 
-  const onViewPostOnPublicationClick = (id) => {
+  const onViewPostOnPublicationClick = (id, { preview }) => {
     const primaryhost = publication.hosts?.[0];
-    const url = buildViewPostOnPublicationUrl(primaryhost, { id }, true);
+    const url = buildViewPostOnPublicationUrl(primaryhost, { id }, preview);
     open(url);
   };
 

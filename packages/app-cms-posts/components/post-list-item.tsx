@@ -14,7 +14,7 @@ interface ItemMenuProps {
   onDeleteClick?: () => void;
   onUnlistClick?: () => void;
   onPublishClick?: () => void;
-  onPreviewClick: () => void;
+  onViewOnPublicationClick: (props: { preview: boolean }) => void;
 }
 
 export function PostListItem({
@@ -27,7 +27,7 @@ export function PostListItem({
   readingTime,
   onClick,
   isDraft,
-  unlisted,
+  isListed,
   ...menuProps
 }: {
   title: string;
@@ -38,7 +38,7 @@ export function PostListItem({
   isDraft?: boolean;
   thumbnail?: string;
   readingTime?: number;
-  unlisted?: boolean;
+  isListed?: boolean;
   onClick?: () => void;
 } & ItemMenuProps) {
   return (
@@ -47,7 +47,7 @@ export function PostListItem({
         <Title>{title?.length ? title : "Untitled post"}</Title>
         {summary && <Summary>{summary}</Summary>}
         <MetaContainer>
-          {unlisted && <UnlistedIndicator />}
+          {isListed === false && !isDraft && <UnlistedIndicator />}
           {author && <Author>@{author}</Author>}
           <PublishedAt>
             {isDraft ? (
@@ -62,7 +62,7 @@ export function PostListItem({
           <ItemDropdownMenu
             {...menuProps}
             onEditClick={onClick}
-            view={unlisted ? "preview" : "view"}
+            view={isDraft ? "preview" : "view"}
           />
         </MetaContainer>
       </TextContents>
@@ -98,7 +98,7 @@ function ItemDropdownMenu({
   onPublishClick,
   onUnlistClick,
   onEditClick,
-  onPreviewClick,
+  onViewOnPublicationClick: onPreviewClick,
   view,
 }: ItemMenuProps & {
   onEditClick: () => void;
@@ -157,7 +157,9 @@ function ItemDropdownMenu({
         <DropdownMenuItem
           onClick={(e) => {
             e.stopPropagation();
-            onPreviewClick();
+            onPreviewClick({
+              preview: view === "preview",
+            });
           }}
         >
           {view === "view" ? "View on publication" : "Preview on publication"}
