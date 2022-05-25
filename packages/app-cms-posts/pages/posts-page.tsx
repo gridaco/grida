@@ -32,12 +32,18 @@ export default function PostsPage({
   posts,
   onPostClick,
   onNewPostClick,
+  onPostDeleteClick,
+  onPostPublishClick,
+  onPostUnlistClick,
   theme,
 }: {
   title?: string;
   publication: Publication;
   posts: Post[];
   onPostClick?: (id: string) => void;
+  onPostDeleteClick?: (id: string) => void;
+  onPostPublishClick?: (id: string) => void;
+  onPostUnlistClick?: (id: string) => void;
   onNewPostClick?: () => void;
   theme?: PostCmsAppTheme;
 }) {
@@ -95,22 +101,45 @@ export default function PostsPage({
           <div style={{ marginTop: 40 }} />
           <List>
             {items.length ? (
-              items.map((post) => (
-                <PostListItem
-                  key={post.id}
-                  title={post.title}
-                  summary={post.summary}
-                  author={post.author}
-                  publishedAt={post.postedAt}
-                  isDraft={post.isDraft}
-                  createdAt={post.createdAt}
-                  readingTime={post.readingTime}
-                  thumbnail={post.thumbnail}
-                  onClick={() => {
-                    onPostClick?.(post.id);
-                  }}
-                />
-              ))
+              items.map((post) => {
+                const _ondelete =
+                  onPostDeleteClick &&
+                  (() => {
+                    onPostDeleteClick?.(post.id);
+                  });
+
+                const _onunlist =
+                  onPostUnlistClick &&
+                  (() => {
+                    onPostUnlistClick?.(post.id);
+                  });
+
+                const _onpublish =
+                  onPostPublishClick &&
+                  (() => {
+                    onPostPublishClick?.(post.id);
+                  });
+
+                return (
+                  <PostListItem
+                    key={post.id}
+                    title={post.title}
+                    summary={post.summary}
+                    author={post.author}
+                    publishedAt={post.postedAt}
+                    isDraft={post.isDraft}
+                    createdAt={post.createdAt}
+                    readingTime={post.readingTime}
+                    thumbnail={post.thumbnail}
+                    onClick={() => {
+                      onPostClick?.(post.id);
+                    }}
+                    onDeleteClick={_ondelete}
+                    onUnlistClick={_onunlist}
+                    onPublishClick={_onpublish}
+                  />
+                );
+              })
             ) : (
               <EmptyStateContainer>
                 There are currently no {tab ? `${tab} ` : ""}posts in this

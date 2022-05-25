@@ -64,6 +64,7 @@ export default function PostEditPage({
           title: doc.title.raw,
           body: doc.content.raw,
           isDraft: true,
+          isListed: undefined,
         });
       }
     });

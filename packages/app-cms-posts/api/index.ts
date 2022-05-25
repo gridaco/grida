@@ -11,19 +11,15 @@ export class PostsClient {
 
   async publication(id?: string) {
     id = id ?? this.publicationId;
-    return await (
-      await this._client.get(`/publications/${id}`)
-    ).data;
+    return (await this._client.get(`/publications/${id}`)).data;
   }
 
   async get(id: string) {
-    return await (
-      await this._client.get(`${id}`)
-    ).data;
+    return (await this._client.get(`${id}`)).data;
   }
 
   async posts() {
-    return await (
+    return (
       await this._client.get("/", {
         params: {
           publication: this.publicationId,
@@ -45,43 +41,31 @@ export class PostsClient {
       visibility,
     };
 
-    return await (
-      await this._client.post("/drafts", body)
-    ).data;
+    return (await this._client.post("/drafts", body)).data;
   }
 
   async drafts() {
-    await (
-      await this._client.get("/drafts")
-    ).data;
+    return (await this._client.get("/drafts")).data;
   }
 
   async publish(id: string) {
-    return await (
-      await this._client.post(`/${id}/publish`)
-    ).data;
+    return (await this._client.post(`/${id}/publish`)).data;
   }
 
   async unlist(id: string) {
-    await (
-      await this._client.post(`/${id}/unlist`)
-    ).data;
+    return (await this._client.post(`/${id}/unlist`)).data;
   }
 
   async schedule(id: string) {
-    await (
-      await this._client.post(`/${id}/schedule`)
-    ).data;
+    return (await this._client.post(`/${id}/schedule`)).data;
   }
 
   async scheduled() {
-    await (
-      await this._client.get("/scheduled")
-    ).data;
+    return (await this._client.get("/scheduled")).data;
   }
 
   async updateBody(id: string, html: string) {
-    await (
+    return (
       await this._client.put(`/${id}/body`, {
         html,
       })
@@ -89,13 +73,11 @@ export class PostsClient {
   }
 
   async updateBodyCustom(id: string) {
-    await (
-      await this._client.put("/")
-    ).data;
+    return (await this._client.put("/")).data;
   }
 
   async updateTitle(id: string, title: string) {
-    await (
+    return (
       await this._client.post(`/${id}/title`, {
         title,
       })
@@ -106,7 +88,7 @@ export class PostsClient {
     id: string,
     { summary, title }: { summary?: string; title?: string }
   ) {
-    await (
+    return (
       await this._client.post(`/${id}/summary`, {
         summary,
         title,
@@ -115,7 +97,7 @@ export class PostsClient {
   }
 
   async updateTags(id: string, tags: string[]): Promise<{ tags: string[] }> {
-    return await (
+    return (
       await this._client.put(`/${id}/tags`, {
         tags,
       })
@@ -123,7 +105,7 @@ export class PostsClient {
   }
 
   async updateVisibility(id: string, visibility: string) {
-    return await (
+    return (
       await this._client.put(`/${id}/tags`, {
         visibility,
       })
@@ -167,16 +149,18 @@ export class PostsClient {
       form.append("files", a);
     });
 
-    return await (
-      await this._client.post(`/assets/${id}/upload`, form)
-    ).data;
+    return (await this._client.post(`/assets/${id}/upload`, form)).data;
   }
 
   async makeAssetClient(id) {
-    return await (
+    return (
       await this._client.post(`/assets/${id}/client`, {
         // visibility,
       })
     ).data;
+  }
+
+  async deletePost(id) {
+    return (await this._client.delete(`/${id}`)).data;
   }
 }

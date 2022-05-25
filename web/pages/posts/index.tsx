@@ -3,12 +3,14 @@ import { TablePage } from "@app/cms-posts/pages";
 import { themeFrom } from "@app/cms-posts/theme";
 import { PostsClient } from "@app/cms-posts/api";
 import { useRouter } from "next/router";
+import { GetServerSideProps } from "next";
+import type { Post } from "@app/cms-posts/types";
 import Head from "next/head";
 
 export default function WebPostsPage({ publication, theme }) {
   const router = useRouter();
 
-  const [posts, setPosts] = useState([]);
+  const [posts, setPosts] = useState<Post[]>([]);
   const client = new PostsClient("627c481391a5de075f80a177");
 
   useEffect(() => {
@@ -17,6 +19,35 @@ export default function WebPostsPage({ publication, theme }) {
 
   const onPostClick = (id) => {
     router.push("/posts/" + id);
+  };
+
+  const onPostDeleteClick = (id) => {
+    client.deletePost(id);
+    setPosts(posts.filter((post) => post.id !== id));
+  };
+
+  const onPostPublishClick = (id) => {
+    client.publish(id);
+    setPosts(
+      posts.map((post) => {
+        if (post.id === id) {
+          post.isListed = true;
+        }
+        return post;
+      })
+    );
+  };
+
+  const onPostUnlistClick = (id) => {
+    client.unlist(id);
+    setPosts(
+      posts.map((post) => {
+        if (post.id === id) {
+          post.isListed = false;
+        }
+        return post;
+      })
+    );
   };
 
   const onNewPostClick = async () => {
@@ -38,12 +69,14 @@ export default function WebPostsPage({ publication, theme }) {
         posts={posts}
         onPostClick={onPostClick}
         onNewPostClick={onNewPostClick}
+        onPostDeleteClick={onPostDeleteClick}
+        onPostUnlistClick={onPostUnlistClick}
+        onPostPublishClick={onPostPublishClick}
       />
     </>
   );
 }
 
-import { GetServerSideProps } from "next";
 export const getServerSideProps: GetServerSideProps = async ({
   req,
   res,

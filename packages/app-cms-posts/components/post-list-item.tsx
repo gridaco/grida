@@ -1,7 +1,19 @@
 import React from "react";
 import styled from "@emotion/styled";
-// import {MenuItem} from "@editor-ui/drop"
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuArrow,
+} from "@editor-ui/dropdown-menu";
 import dayjs from "dayjs";
+
+interface ItemMenuProps {
+  onDeleteClick?: () => void;
+  onUnlistClick?: () => void;
+  onPublishClick?: () => void;
+}
 
 export function PostListItem({
   title,
@@ -13,6 +25,7 @@ export function PostListItem({
   readingTime,
   onClick,
   isDraft,
+  ...menuProps
 }: {
   title: string;
   summary: string;
@@ -23,7 +36,7 @@ export function PostListItem({
   thumbnail?: string;
   readingTime?: number;
   onClick?: () => void;
-}) {
+} & ItemMenuProps) {
   return (
     <Container onClick={onClick}>
       <TextContents>
@@ -39,10 +52,9 @@ export function PostListItem({
             )}
           </PublishedAt>
           {readingTime && (
-            <ReadingTime>
-              {readingtimeToMinutes(readingTime) + " minutes read"}
-            </ReadingTime>
+            <ReadingTime>{readingtimeToMinutes(readingTime)}</ReadingTime>
           )}
+          <ItemDropdownMenu {...menuProps} />
         </MetaContainer>
       </TextContents>
       {thumbnail && <Thumbnail src={thumbnail} />}
@@ -50,9 +62,58 @@ export function PostListItem({
   );
 }
 
+function ItemDropdownMenu({
+  onDeleteClick,
+  onPublishClick,
+  onUnlistClick,
+}: ItemMenuProps) {
+  return (
+    <DropdownMenu>
+      <MoreMenu
+        onClick={(e) => {
+          // show menu
+          e.stopPropagation();
+        }}
+      >
+        <svg
+          width="18"
+          height="18"
+          viewBox="0 0 18 18"
+          fill="none"
+          xmlns="http://www.w3.org/2000/svg"
+        >
+          <path
+            fill-rule="evenodd"
+            clip-rule="evenodd"
+            d="M8.68374 11.8844C8.88017 12.0542 9.17735 12.0458 9.36385 11.8593L13.6065 7.61666C13.8018 7.4214 13.8018 7.10482 13.6065 6.90955C13.4112 6.71429 13.0946 6.71429 12.8994 6.90955L9.00973 10.7992L5.11381 6.90328C4.91855 6.70802 4.60196 6.70802 4.4067 6.90328C4.21144 7.09854 4.21144 7.41513 4.4067 7.61039L8.64934 11.853C8.66043 11.8641 8.67191 11.8746 8.68374 11.8844Z"
+            fill="#535455"
+          />
+        </svg>
+      </MoreMenu>
+      <DropdownMenuContent>
+        {onDeleteClick && (
+          <DropdownMenuItem onClick={onDeleteClick}>Delete</DropdownMenuItem>
+        )}
+        {onUnlistClick && (
+          <DropdownMenuItem onClick={onUnlistClick}>Unlist</DropdownMenuItem>
+        )}
+        {onPublishClick && (
+          <DropdownMenuItem onClick={onPublishClick}>Publish</DropdownMenuItem>
+        )}
+        <DropdownMenuArrow />
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
 function readingtimeToMinutes(readingTime: number) {
   // 0 min -> 1 min
-  return Math.max(1, Math.floor(readingTime / 1000 / 60));
+  const min = Math.max(1, Math.floor(readingTime / 1000 / 60));
+  if (min === 1) {
+    return "1 minute read";
+  } else {
+    return `${min} minutes read`;
+  }
 }
 
 const Container = styled.div`
@@ -111,7 +172,7 @@ const MetaContainer = styled.div`
   display: flex;
   justify-content: flex-start;
   flex-direction: row;
-  align-items: flex-start;
+  align-items: center;
   flex: none;
   gap: 20px;
   box-sizing: border-box;
@@ -151,4 +212,18 @@ const Thumbnail = styled.img`
   border-radius: 2px;
   overflow: hidden;
   border: 1px solid rgba(0, 0, 0, 0.05);
+`;
+
+const MoreMenu = styled(DropdownMenuTrigger)`
+  padding: 0px;
+  outline: none;
+  border: none;
+  width: 21px;
+  height: 21px;
+  border-radius: 100px;
+  background-color: transparent;
+
+  :hover {
+    background-color: rgba(0, 0, 0, 0.05);
+  }
 `;

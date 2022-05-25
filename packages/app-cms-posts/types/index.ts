@@ -7,6 +7,7 @@ export interface Post {
   author?: any; // TODO:
   body: any;
   isDraft: boolean;
+  isListed: boolean;
   tags?: string[];
   scheduledAt?: string | Date;
   postedAt?: string | Date;
