@@ -22,14 +22,17 @@ export function DeletePostConfirmAlertDialog({
   onDeleteConfirm: () => void;
 }) {
   return (
+    // TODO: this dialog contains non english content - this is for testing i18n, will be updated soon.
     <Dialog open={open}>
       <Body>
         {/* <AlertDialogContent> */}
-        <Title>Delete Post</Title>
+        <Title>
+          포스트 삭제
+          {/* Delete Post */}
+        </Title>
         <Description>
-          This will permanently delete the post. This action cannot be undone.
-          {/* 이 포스트를 정말 삭제하시겠습니까? 삭제된 포스트는 복구가
-          불가능합니다. */}
+          {/* This will permanently delete the post. This action cannot be undone. */}
+          정말 삭제하시겠습니까? 삭제된 포스트는 복구할 수 없습니다.
         </Description>
 
         {/* <AlertDialogTitle>Delete Post</AlertDialogTitle> */}
@@ -38,10 +41,16 @@ export function DeletePostConfirmAlertDialog({
       </AlertDialogDescription> */}
         <ActionsContainer>
           {/* <AlertDialogCancel asChild> */}
-          <CancelButton onClick={onCancel}>Cancel</CancelButton>
+          <CancelButton onClick={onCancel}>
+            취소
+            {/* Cancel */}
+          </CancelButton>
           {/* </AlertDialogCancel> */}
           {/* <AlertDialogAction asChild> */}
-          <DeleteButton onClick={onDeleteConfirm}>Delete</DeleteButton>
+          <DeleteButton onClick={onDeleteConfirm}>
+            삭제
+            {/* Delete */}
+          </DeleteButton>
           {/* </AlertDialogAction> */}
         </ActionsContainer>
         {/* </AlertDialogContent> */}
