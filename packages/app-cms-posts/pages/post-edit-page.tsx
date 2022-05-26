@@ -43,48 +43,51 @@ export default function PostEditPage({
   const client = new PostsClient("627c481391a5de075f80a177");
   const store = useBoringDocumentStore();
   const [data, setData] = useState<Post>(initialPost);
-  const [loaded, setLoaded] = useState(false);
+  const [loaded, setLoaded] = useState<boolean>(false); // loaded from local db
   const [saving, setSaving] = useState<"saving" | "saved" | "error">(undefined);
   const { hosts } = publication;
   const primaryHost = hosts?.[0];
 
   useEffect(() => {
-    if (!initialPost) {
+    if (!data) {
       client.get(id).then((post) => {
         setData(post);
-        setLoaded(true);
       });
     }
   }, [id]);
 
-  useEffect(() => {
-    if (!id || !store) return;
-    // load from store
-    store?.get(id).then((doc) => {
-      if (doc) {
-        setData({
-          id,
-          ...doc,
-          title: doc.title.raw,
-          body: doc.content.raw,
-          isDraft: true,
-          isListed: undefined,
-        });
-      }
-    });
-  }, [id, store]);
+  // useEffect(() => {
+  //   if (loaded || !id || !store) return;
+  //   // load from store
+  //   store?.get(id).then((doc) => {
+  //     if (doc) {
+  //       setData({
+  //         id,
+  //         ...doc,
+  //         title: doc.title.raw,
+  //         body: doc.content.raw,
+  //         isDraft: true,
+  //         isListed: undefined,
+  //       });
+  //     }
+  //   });
+  // }, [id, store, loaded]);
 
   useEffect(() => {
     if (!data) return;
 
-    store?.put({
-      id: id,
-      title: new BoringTitle(data.title),
-      content: data.body?.html
-        ? new BoringContent(data.body.html)
-        : new BoringContent(""),
-    });
-  }, [data]);
+    store
+      ?.put({
+        id: id,
+        title: new BoringTitle(data.title),
+        content: data.body?.html
+          ? new BoringContent(data.body.html)
+          : new BoringContent(""),
+      })
+      .then(() => {
+        setLoaded(true);
+      });
+  }, [store, data.title, data.body?.html]);
 
   const onTitleChange = debounce((t) => {
     setSaving("saving");
@@ -246,15 +249,17 @@ export default function PostEditPage({
         }}
       />
       <EditorContainer>
-        <Editor
-          id={id}
-          fileUploader={uploadAsset}
-          store={store}
-          onTitleChange={onTitleChange}
-          onContentChange={onContentChange}
-          readonly={!loaded}
-          theme={theme?.app_posts_cms?.editor}
-        />
+        {loaded && (
+          <Editor
+            id={id}
+            fileUploader={uploadAsset}
+            store={store}
+            onTitleChange={onTitleChange}
+            onContentChange={onContentChange}
+            readonly={!loaded}
+            theme={theme?.app_posts_cms?.editor}
+          />
+        )}
       </EditorContainer>
     </PostsAppThemeProvider>
   );

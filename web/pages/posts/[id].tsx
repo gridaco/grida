@@ -27,6 +27,7 @@ export default function PostEditPage({
         theme={themeFrom(theme)}
         publication={publication}
         id={id as string}
+        post={post}
       />
     </>
   );
