@@ -8,6 +8,7 @@ interface _Theme {
     colors: {
       root_background: React.CSSProperties["color"];
       button_primary: React.CSSProperties["color"];
+      button_danger: React.CSSProperties["color"];
     };
     editor: {
       title_text_align: React.CSSProperties["textAlign"];
@@ -20,6 +21,7 @@ export const theme: _Theme = {
     colors: {
       root_background: "black",
       button_primary: "rgba(35, 77, 255, 0.9)",
+      button_danger: "rgba(249, 34, 34, 0.9)",
     },
     editor: {
       title_text_align: "left",
@@ -58,6 +60,8 @@ export function themeFrom(theme): Theme {
       colors: {
         root_background: theme.background,
         button_primary: theme.primary,
+        // TODO: add button_danger
+        button_danger: theme.primary,
       },
       editor: {
         title_text_align: theme.title_text_align,

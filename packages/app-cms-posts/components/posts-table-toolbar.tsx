@@ -114,6 +114,9 @@ const Actions = styled.div`
   flex-shrink: 0;
 `;
 
+// 이 포스트를 정말 삭제하시겠습니까? 삭제된 포스트는 복구가
+// 불가능합니다.
+
 const Button = styled.button`
   cursor: pointer;
   outline: none;
