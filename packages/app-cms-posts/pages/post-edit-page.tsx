@@ -356,7 +356,7 @@ function Editor({
       }}
       fileUploader={fileUploader}
       collaboration={{
-        enabled: true,
+        enabled: false,
       }}
     />
   );
