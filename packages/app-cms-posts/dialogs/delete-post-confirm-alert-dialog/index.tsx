@@ -23,7 +23,7 @@ export function DeletePostConfirmAlertDialog({
 }) {
   return (
     // TODO: this dialog contains non english content - this is for testing i18n, will be updated soon.
-    <Dialog open={open}>
+    <Dialog open={open} onClose={onCancel}>
       <Body>
         {/* <AlertDialogContent> */}
         <Title>
