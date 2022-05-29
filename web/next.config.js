@@ -17,6 +17,11 @@ module.exports = withTM({
       //   source: "/:any*",
       //   destination: "/",
       // },
+
+      {
+        source: "/posts/:path*",
+        destination: `https://posts.grida.co/:path*`,
+      },
     ];
   },
 });
