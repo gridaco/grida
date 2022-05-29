@@ -3,7 +3,7 @@ import { useRouter } from "next/router";
 import { GetServerSideProps } from "next";
 import Head from "next/head";
 
-import { TablePage } from "@app/cms-posts/pages";
+import { TablePage } from "@app/cms-posts/scaffolds";
 import { themeFrom } from "@app/cms-posts/theme";
 import { PostsClient } from "@app/cms-posts/api";
 import { buildViewPostOnPublicationUrl } from "@app/cms-posts/urls";

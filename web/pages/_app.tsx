@@ -2,6 +2,7 @@ import React from "react";
 import { Suspense, StrictMode } from "react";
 import Head from "next/head";
 import { Global, css } from "@emotion/react";
+import { GlobalHelpButton } from "@app/fp-customer-support";
 
 // enable SPA mode, supports react.Suspense; if you don't want to use Suspense, you can use NextJS' dynamic import instead. - on SSR mode
 // though, this app does not benefit from SSR.
@@ -66,6 +67,7 @@ function GridaRootWebApp({ Component, pageProps }) {
     <>
       <HeadInjection />
       {/* <SafeHydrate> */}
+      <GlobalHelpButton />
       {/* <StrictMode> */}
       {/* <Suspense fallback="Loading..."> */}
       <Component {...pageProps} />

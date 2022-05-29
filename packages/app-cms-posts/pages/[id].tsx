@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { EditPage } from "@app/cms-posts/pages";
+import { EditPage } from "@app/cms-posts/scaffolds";
 import Head from "next/head";
 import { themeFrom } from "@app/cms-posts/theme";
 import { PostsClient } from "@app/cms-posts/api";

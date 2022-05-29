@@ -13,6 +13,7 @@ import { PostsAppThemeProvider } from "../theme";
 import type { Theme as PostCmsAppTheme } from "../theme";
 import styled from "@emotion/styled";
 import { buildViewPostOnPublicationUrl } from "../urls";
+import { summarize } from "../utils";
 
 function useBoringDocumentStore() {
   const [store, setStore] = useState<BoringDocumentsStore>();
@@ -166,7 +167,7 @@ export default function PostEditPage({
         {data && (
           <PublishPostReviewDialogBody
             title={data.title}
-            summary={data.summary ?? makeSummaryFromBody(data.body)}
+            summary={data.summary ?? summarize(data.body)}
             tags={data.tags}
             thumbnail={data.thumbnail}
             onPublish={async (p) => {
@@ -263,52 +264,6 @@ export default function PostEditPage({
       </EditorContainer>
     </PostsAppThemeProvider>
   );
-}
-
-/**
- * get the summary from the body html.
- *
- *
- * e.g. from
- * ```html
- * <p><b>SERVES: 1</b></p>
- * <p>Legend has it that the Ice Cream Float was invented on a particularly hot Philadelphia day by a soda vendor who had run out of ice. To cool his drinks</p>
- * ```
- *
- * => returns the second paragraph
- *
- *
- * @param body
- * @returns
- */
-function makeSummaryFromBody(body: { html: string }): string {
-  const { html } = body;
-
-  if (!html) return undefined;
-
-  // parse html, extract first paragraph
-  const doc = new DOMParser().parseFromString(html, "text/html");
-  const paragraphs = doc.querySelectorAll("p");
-  if (paragraphs.length) {
-    // list first 3 paragraphs, get the longest one.
-    const longest = Array.from(paragraphs)
-      .slice(0, 3)
-      .reduce(
-        (acc, p) => {
-          const text = p.textContent;
-          if (text.length > acc.length) {
-            return text;
-          }
-          return acc;
-        },
-        //
-        ""
-      );
-    return longest.substring(0, 200);
-  } else {
-    // extract any text from html doc
-    return doc.textContent?.substring(0, 200) ?? "";
-  }
 }
 
 const LogoContainer = styled.img`

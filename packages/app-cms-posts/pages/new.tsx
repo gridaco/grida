@@ -1,7 +1,7 @@
 import React from "react";
 import Head from "next/head";
 import { useRouter } from "next/router";
-import { EditPage } from "@app/cms-posts/pages";
+import { EditPage } from "@app/cms-posts/scaffolds";
 
 export default function NewPostPage() {
   const router = useRouter();
