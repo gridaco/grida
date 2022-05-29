@@ -2,7 +2,19 @@
   "name": "@app/cms-posts",
   "version": "0.0.0",
   "private": false,
+  "scripts": {
+    "dev": "next dev -p 3315",
+    "build": "next build",
+    "start": "next start -p 3315"
+  },
   "dependencies": {
+    "next": "12.1.6",
+    "react": "18.1.0",
+    "react-dom": "18.1.0",
     "url-pattern": "^1.0.3"
+  },
+  "devDependencies": {
+    "@types/react": "18.0.9",
+    "typescript": "4.7.2"
   }
 }
