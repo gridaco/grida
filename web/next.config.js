@@ -10,6 +10,7 @@ const withTM = require("next-transpile-modules")(
     "@app/blocks",
     "@app/cms-posts",
     "@app/cms-forms",
+    "@app/fp-customer-support",
     "@core/state",
     "@core/app-state",
     "@core/store",
@@ -173,6 +174,9 @@ module.exports = withTM({
     // -----------------------------
 
     config.resolve.fallback = {
+      net: false,
+      tls: false,
+      child_process: false,
       fs: false, // used by handlebars
       path: false, // used by handlebars
       crypto: false, // or crypto-browserify (used for totp auth)

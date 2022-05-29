@@ -44,6 +44,7 @@ export function summarize(body: { html: string }): string {
       return doc.textContent?.substring(0, 200) ?? "";
     }
   } catch (e) {
+    console.error("error while summarizing the body", e, body);
     return "";
   }
 }
