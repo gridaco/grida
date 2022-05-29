@@ -1,5 +1,3 @@
-import jsdom from "jsdom";
-
 /**
  * get the summary from the body html.
  *
@@ -22,9 +20,8 @@ export function summarize(body: { html: string }): string {
 
     if (!html) return undefined;
 
-    const doc = new jsdom.JSDOM(html, {
-      contentType: "text/html",
-    }).window.document; // new DOMParser().parseFromString(html, "text/html");
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(html, "text/html");
     const paragraphs = doc.querySelectorAll("p");
     if (paragraphs.length) {
       // list first 3 paragraphs, get the longest one.

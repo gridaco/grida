@@ -173,11 +173,6 @@ module.exports = withTM({
     // -----------------------------
 
     config.resolve.fallback = {
-      net: false,
-      tls: false,
-      child_process: false,
-      bufferutil: false,
-      "utf-8-validate": false,
       fs: false, // used by handlebars
       path: false, // used by handlebars
       crypto: false, // or crypto-browserify (used for totp auth)
