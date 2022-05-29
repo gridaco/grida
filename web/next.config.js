@@ -20,7 +20,7 @@ module.exports = withTM({
 
       {
         source: "/posts/:path*",
-        destination: `https://posts.grida.co/:path*`,
+        destination: `https://posts.grida.co/posts/:path*`,
       },
     ];
   },
