@@ -114,9 +114,10 @@ const HelpIcon = () => {
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
       style={{
+        marginLeft: "auto",
+        marginRight: "auto",
         marginTop: "30%",
         display: "block",
-        margin: "auto",
       }}
     >
       <path
