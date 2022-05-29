@@ -3,11 +3,6 @@
   "version": "0.0.0",
   "private": false,
   "dependencies": {
-    "canvas": "^2.9.1",
-    "jsdom": "^19.0.0",
     "url-pattern": "^1.0.3"
-  },
-  "devDependencies": {
-    "@types/jsdom": "^16.2.14"
   }
 }
