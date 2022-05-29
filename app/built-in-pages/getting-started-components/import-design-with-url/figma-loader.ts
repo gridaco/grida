@@ -2,11 +2,13 @@ import { DesignImporterLoaderResult } from "./o";
 import { fetch } from "@design-sdk/figma-remote";
 import { parseFileAndNodeId } from "@design-sdk/figma-url";
 import { getAccessToken } from "@design-sdk/figma-auth-store";
-
+import assert from "assert";
 export async function figmaloader(
   url: string
 ): Promise<DesignImporterLoaderResult> {
   const f_n_n = parseFileAndNodeId(url);
+  assert(f_n_n, "url is not a valid figma url");
+
   const f = f_n_n.file;
   const n = f_n_n.node;
 
@@ -20,13 +22,14 @@ export async function figmaloader(
       personalAccessToken: access_token,
     },
   });
-  const { name: n_name, id: n_id } = pack.reflect;
+
+  const { name: n_name, id: n_id } = pack.reflect!;
 
   return {
     name: n_name,
     id: n_id,
     source: "figma",
     url: url,
-    node: pack.reflect, // todo
+    node: pack.reflect!, // todo
   };
 }

@@ -33,7 +33,13 @@ export function BoringScaffold({
   );
 }
 
-const ClientOnly = ({ children, ...delegated }) => {
+const ClientOnly = ({
+  children,
+  ...delegated
+}: {
+  children: React.ReactNode;
+  [key: string]: any;
+}) => {
   const [hasMounted, setHasMounted] = React.useState(false);
 
   React.useEffect(() => {

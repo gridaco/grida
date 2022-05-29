@@ -29,5 +29,5 @@ export function loadDemoDesign(url: string) {
 }
 
 export function __loadDemoDesign__figma(url: string): DemoDesignSnapshot {
-  return __figma_demo_designs.find((d) => d.url === url);
+  return __figma_demo_designs.find((d) => d.url === url)!;
 }

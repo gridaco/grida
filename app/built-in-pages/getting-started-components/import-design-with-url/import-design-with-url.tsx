@@ -23,9 +23,10 @@ export function ImportDesignWithUrl() {
   const addPage = useAddPage();
 
   /** pass if design url is defined and parsable (recognized as one of the supported platforms) */
-  const validation = (url: string) => analyzeDesignUrl(url) !== "unknown";
+  const validation = (url?: string) =>
+    !!url && analyzeDesignUrl(url) !== "unknown";
 
-  const onsubmitcomplete = async (_, v: DesignImporterLoaderResult) => {
+  const onsubmitcomplete = async (_: string, v: DesignImporterLoaderResult) => {
     const _design = v;
     const _res_flutter = designToCode({
       input: input.DesignInput.fromDesign(_design.node),
