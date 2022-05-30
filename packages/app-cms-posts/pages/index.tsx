@@ -60,7 +60,7 @@ export default function WebPostsPage({ publication, theme }) {
 
   const onNewPostClick = async () => {
     const { id } = await client.draft({});
-    router.push("/posts/" + id);
+    router.push("/" + id);
   };
 
   const title = publication.name;
