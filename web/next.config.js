@@ -2,7 +2,7 @@ const TerserPlugin = require("terser-webpack-plugin");
 const path = require("path");
 const config = require("../next.config.base");
 const { withTM, webpack } = config;
-const { APP_CMS_POSTS_URL } = process.env;
+const { NEXT_PUBLIC_APP_CMS_POSTS_URL } = process.env;
 module.exports = withTM({
   webpack: webpack(__dirname),
 
@@ -23,11 +23,11 @@ module.exports = withTM({
       },
       {
         source: "/posts/",
-        destination: `${APP_CMS_POSTS_URL}/posts/`,
+        destination: `${NEXT_PUBLIC_APP_CMS_POSTS_URL}/posts/`,
       },
       {
         source: "/posts/:path*",
-        destination: `${APP_CMS_POSTS_URL}/posts/:path*`,
+        destination: `${NEXT_PUBLIC_APP_CMS_POSTS_URL}/posts/:path*`,
       },
     ];
   },
