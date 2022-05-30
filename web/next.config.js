@@ -22,8 +22,8 @@ module.exports = withTM({
         destination: `/:path*`,
       },
       {
-        source: "/posts/",
-        destination: `${NEXT_PUBLIC_APP_CMS_POSTS_URL}/posts/`,
+        source: "/posts",
+        destination: `${NEXT_PUBLIC_APP_CMS_POSTS_URL}/posts`,
       },
       {
         source: "/posts/:path*",
