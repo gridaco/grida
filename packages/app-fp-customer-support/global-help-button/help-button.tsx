@@ -63,9 +63,9 @@ function HelpMenu({
         <DropdownMenuItem onClick={onChatWithUs}>
           Send us a message
         </DropdownMenuItem>
-        <DropdownMenuItem onClick={onShowKeyboardShortcuts}>
+        {/* <DropdownMenuItem onClick={onShowKeyboardShortcuts}>
           Keyboard shortcuts
-        </DropdownMenuItem>
+        </DropdownMenuItem> */}
         <DropdownMenuItem
           onClick={(e) => {
             open("https://grida.co/join-slack");
