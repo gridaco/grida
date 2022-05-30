@@ -6,7 +6,7 @@ function MyApp({ Component, pageProps }: AppProps) {
   return (
     <>
       <GlobalHelpButton />
-      <Component {...pageProps} />;
+      <Component {...pageProps} />
     </>
   );
 }
