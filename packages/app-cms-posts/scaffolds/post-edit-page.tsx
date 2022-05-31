@@ -152,9 +152,11 @@ export default function PostEditPage({
       await Axios.put(target, d, {
         headers: {
           "Content-Type": d.type,
-          "x-amz-acl": "public-read",
         },
       });
+      // .catch((e) => {
+      //   alert("failed to upload asset");
+      // });
       return assetreq.url;
     } else {
       try {

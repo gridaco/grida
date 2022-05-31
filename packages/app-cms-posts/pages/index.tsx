@@ -20,7 +20,7 @@ export default function WebPostsPage({ publication, theme }) {
   }, []);
 
   const onPostClick = (id) => {
-    router.push("/posts/" + id);
+    router.push("/" + id);
   };
 
   const onPostDeleteClick = (id) => {

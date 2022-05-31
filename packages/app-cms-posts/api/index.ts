@@ -164,10 +164,8 @@ export class PostsClient {
     assert(postid, "postid is required");
     return (
       await this._client.post(`/assets/${postid}/client/one-time`, {
-        data: {
-          originalname: file.name,
-          mimetype: file.type,
-        },
+        originalname: file.name,
+        mimetype: file.type,
       })
     ).data;
   }
