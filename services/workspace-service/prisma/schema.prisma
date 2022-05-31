@@ -10,16 +10,36 @@ generator client {
   provider = "prisma-client-js"
 }
 
-
 model Workspace {
-  // the db recird id of this project
   id String @id @default(uuid())
 
+  displayName String
+
   // the name of this project set by editor
-  name String
+  name String @unique
+
+  //* accessor name
+  //* name used for accessing configuration of this project by template syntax.
+  //* e.g. - BRIDGED -> so it can be reference on other projects like so,
+  //* "Hello ! {BRIDGED.SOME_SHARED_KEY}, great to use shared variables.")
+  accessorName String @unique
+
+  logo String
+
+  avatar String
+
+  private Boolean @default(true)
+
+  website String?
+
+  twitter String?
+
+  plan String @default("free")
 
   // the preview (cover) image set by eidtor, if non set, showing the default screen's perview, or bridged's default asset
-  previewImage String
+  // previewImage String
+
+  billingEmail String
 
   // last update of this project's asset / scene
   updatedAt DateTime @updatedAt
@@ -28,33 +48,90 @@ model Workspace {
   createdAt DateTime @default(now())
 
   // the default locale of this project, set as en_US by default
-  defaultLocale String
-
+  defaultLocale String @default("en_US")
 
   // the available, supported locales of this project's assets.
   locales String[]
 
-  //* accessor name
-  //* name used for accessing configuration of this project by template syntax.
-  //* e.g. - BRIDGED -> so it can be reference on other projects like so,
-  //* "Hello ! {BRIDGED.SOME_SHARED_KEY}, great to use shared variables.")
-  accessorName String
-
-
   // region = relations
-  accessLogs UserWorkspaceAccessLog[]
+  activities ActivityLog[]
 
+  members MembersOnWorkspace[]
+  guests  GuestsOnWorkspace[]
+  invitations Invitation[]
+  domains Domain[]
 }
 
+model MembersOnWorkspace {
+  id          String            @id @default(uuid())
+  workspace   Workspace         @relation(fields: [workspaceID], references: [id])
+  workspaceID String            @unique
+  userID      String            @unique
+  level       MemberAccessLevel @default(member)
+}
 
-model UserWorkspaceAccessLog{
+model GuestsOnWorkspace {
+  id          String    @id @default(uuid())
+  workspace   Workspace @relation(fields: [workspaceID], references: [id])
+  workspaceID String    @unique
+  userID      String    @unique
+  access      String[]
+}
+
+enum MemberAccessLevel {
+  admin
+  member
+}
+
+model ActivityLog {
+  id           String    @id @default(uuid())
+  userID       String
+  workspace    Workspace @relation(fields: [workspaceID], references: [id])
+  workspaceID  String
+  signinAt     DateTime  @default(now())
+  lastActiveAt DateTime  @updatedAt
+  active       Boolean   @default(true) // defaults to true since the creation happens on signin.
+  ip           String?
+  ua           String?
+}
+
+model Invitation{
   id String @id @default(uuid())
-  userId String
-  workspace Workspace @relation(fields: [workspaceId], references: [id])
-  workspaceId String
-  signinAt DateTime @default(now())
-  lastActiveAt DateTime @updatedAt
-  active Boolean @default(true) // defaults to true since the creation happens on signin.
-  ip String?
-  ua String?
+
+  workspace Workspace @relation(fields: [workspaceID], references: [id])
+  workspaceID String
+
+  email String @unique
+
+  // the invitation code
+  code String @unique
+
+  // the invitation status
+  status String @default("pending")
+
+  // the invitation type
+  type String @default("invitation")
+
+  // the invitation created at
+  createdAt DateTime @default(now())
+
+  // the invitation updated at
+  updatedAt DateTime @updatedAt
+}
+
+model Domain{
+  id String @id @default(uuid())
+
+  workspace Workspace @relation(fields: [workspaceID], references: [id])
+  workspaceID String
+
+  name String @unique
+
+  // the domain created at
+  createdAt DateTime @default(now())
+  createdBy String
+
+  // the domain updated at
+  updatedAt DateTime @updatedAt
+  registrar String
 }

@@ -12,8 +12,8 @@ export class WorkspaceManagementController {
     });
   }
 
-  @Get("/primary")
-  getPrimaryWorkspace() {
+  @Get("/last")
+  getLastUsedWorkspace() {
     this.service.getWorkspace({
       id: workspaceid,
     });
