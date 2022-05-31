@@ -1,5 +1,6 @@
 import Axios, { AxiosInstance } from "axios";
 import type { Post, Publication } from "../types";
+import assert from "assert";
 
 export class PostsClient {
   private _client: AxiosInstance;
@@ -138,7 +139,7 @@ export class PostsClient {
   // assets
 
   async uploadAsset(
-    id,
+    postid: string,
     ...assets: File[]
   ): Promise<{
     post_id: string;
@@ -150,13 +151,21 @@ export class PostsClient {
       form.append("files", a);
     });
 
-    return (await this._client.post(`/assets/${id}/upload`, form)).data;
+    return (await this._client.post(`/assets/${postid}/upload`, form)).data;
   }
 
-  async makeAssetClient(id) {
+  /**
+   * returns a presigned s3 upload url for payload size bigger than 6mb.
+   */
+  async makeOneTimeAssetClient(
+    postid: string,
+    file: File
+  ): Promise<AssetOneTimeUploadClientMakeResult> {
+    assert(postid, "postid is required");
     return (
-      await this._client.post(`/assets/${id}/client`, {
-        // visibility,
+      await this._client.post(`/assets/${postid}/client/one-time`, {
+        originalname: file.name,
+        mimetype: file.type,
       })
     ).data;
   }
@@ -165,3 +174,21 @@ export class PostsClient {
     return (await this._client.delete(`/${id}`)).data;
   }
 }
+
+type AssetOneTimeUploadClientMakeResult = {
+  client: {
+    /**
+     * the client url make a put request here
+     */
+    url: string;
+    expires_in: number;
+    expires_at: string | Date;
+    mimetype: string;
+    originalname: string;
+    path: string;
+  };
+  /**
+   * a asset url
+   */
+  url: string;
+};

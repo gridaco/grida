@@ -14,6 +14,7 @@ import type { Theme as PostCmsAppTheme } from "../theme";
 import styled from "@emotion/styled";
 import { buildViewPostOnPublicationUrl } from "../urls";
 import { summarize } from "../utils";
+import Axios from "axios";
 
 function useBoringDocumentStore() {
   const [store, setStore] = useState<BoringDocumentsStore>();
@@ -143,12 +144,28 @@ export default function PostEditPage({
   }, 1000);
 
   const uploadAsset = async (d: File): Promise<string | false> => {
-    try {
-      const uploaded = await client.uploadAsset(id, d);
-      const asseturl = uploaded.assets[d.name];
-      return asseturl;
-    } catch (e) {
-      return false;
+    // > 3mib
+    const bytesToMegaBytes = (bytes) => bytes / 1024 ** 2;
+    if (bytesToMegaBytes(d.size) > 3) {
+      const assetreq = await client.makeOneTimeAssetClient(id, d);
+      const target = assetreq.client.url;
+      await Axios.put(target, d, {
+        headers: {
+          "Content-Type": d.type,
+        },
+      });
+      // .catch((e) => {
+      //   alert("failed to upload asset");
+      // });
+      return assetreq.url;
+    } else {
+      try {
+        const uploaded = await client.uploadAsset(id, d);
+        const asseturl = uploaded.assets[d.name];
+        return asseturl;
+      } catch (e) {
+        return false;
+      }
     }
   };
 

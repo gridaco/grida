@@ -12,10 +12,10 @@ plugins:
 
 custom:
   customDomain:
-    domainName: g11n.bridged.cc
+    domainName: workspace-services.grida.co
     hostedZoneId: us-west-1
     basePath: ""
-    stage: ${self:provider.stage}
+    stage: production
     createRoute53Record: true
   serverless-offline:
     httpPort: 4007
