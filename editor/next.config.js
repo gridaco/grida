@@ -19,6 +19,7 @@ const withTM = require("next-transpile-modules")([
   "@designto/sanitized",
   "@designto/token",
   "@designto/flutter",
+  "@designto/solid-js",
   "@designto/web",
   "@designto/vanilla",
   "@designto/react",
@@ -85,6 +86,8 @@ const withTM = require("next-transpile-modules")([
   // region web builders
   "@web-builder/nodejs",
   "@web-builder/core",
+  "@web-builder/module-es",
+  "@web-builder/solid-js",
   "@web-builder/vanilla",
   "@web-builder/react-core",
   "@web-builder/react",
