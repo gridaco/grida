@@ -34,6 +34,11 @@ export const scripting_and_preview_framework_config: {
     nativeScripting: false,
     enabled: false,
   },
+  "solid-js": {
+    nativePreview: false,
+    nativeScripting: false,
+    enabled: false,
+  },
   preview: null,
 } as const;
 
