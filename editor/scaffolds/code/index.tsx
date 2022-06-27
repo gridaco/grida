@@ -57,7 +57,6 @@ export function CodeSegment() {
   useEffect(() => {
     const __target = targetted;
     const __framework_config = framework_config;
-    console.log("__framework_config", __framework_config);
     if (__target && __framework_config) {
       if (!MainImageRepository.isReady) {
         // this is not the smartest way, but the image repo has a design flaw.
