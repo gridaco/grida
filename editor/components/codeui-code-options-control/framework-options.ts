@@ -18,6 +18,12 @@ export type ReactNativeStylingStrategy =
   | "styled-components"
   | "inline-style";
 
+export type SolidStylingStrategy =
+  | "css"
+  //
+  | "styled-components"
+  | "inline-css";
+
 export interface FlutterOption {
   framework: Framework.flutter;
   language: Language.dart;
@@ -35,6 +41,12 @@ export interface ReactNativeOption {
   styling: ReactNativeStylingStrategy;
 }
 
+export interface SolidOption {
+  framework: Framework.solid;
+  language: Language.jsx | Language.tsx;
+  styling: SolidStylingStrategy;
+}
+
 export interface VanillaOption {
   framework: Framework.vanilla;
   language: Language.html;
@@ -44,6 +56,7 @@ export type FrameworkOption =
   | ReactOption
   | ReactNativeOption
   | FlutterOption
+  | SolidOption
   | VanillaOption;
 
 export const react_presets = {
@@ -99,6 +112,24 @@ export const flutter_presets = {
   },
 };
 
+export const solid_presets = {
+  solid_default: <SolidOption>{
+    framework: Framework.solid,
+    language: Language.tsx,
+    styling: "styled-components",
+  },
+  solid_with_styled_components: <SolidOption>{
+    framework: Framework.solid,
+    language: Language.tsx,
+    styling: "styled-components",
+  },
+  solid_with_inline_css: <SolidOption>{
+    framework: Framework.solid,
+    language: Language.tsx,
+    styling: "inline-css",
+  },
+};
+
 export const vanilla_presets = {
   vanilla_default: <VanillaOption>{
     framework: Framework.vanilla,
@@ -111,6 +142,7 @@ export const presets = {
   reactnative: reactnative_presets,
   flutter: flutter_presets,
   vanilla: vanilla_presets,
+  solid: solid_presets,
 };
 
 export const all_preset_options__prod = [
@@ -121,6 +153,7 @@ export const all_preset_options__prod = [
   react_presets.react_with_css_module,
   reactnative_presets.reactnative_default,
   vanilla_presets.vanilla_default,
+  solid_presets.solid_default,
   // react_with_css // NOT ON PRODUCTION
 ];
 
@@ -142,6 +175,10 @@ export const all_preset_options_map__prod = {
     reactnative_presets.reactnative_with_inline_style,
   vanilla: vanilla_presets.vanilla_default,
   vanilla_default: vanilla_presets.vanilla_default,
+  solid: solid_presets.solid_default,
+  solid_default: solid_presets.solid_default,
+  solid_with_inline_css: solid_presets.solid_with_inline_css,
+  solid_with_styled_components: solid_presets.solid_with_styled_components,
   // react_with_css // NOT ON PRODUCTION
 };
 
@@ -149,6 +186,7 @@ export const lang_by_framework = {
   flutter: [Language.dart],
   react: [Language.jsx, Language.tsx],
   "react-native": [Language.jsx, Language.tsx],
+  "solid-js": [Language.jsx, Language.tsx],
   vanilla: [Language.html],
 };
 

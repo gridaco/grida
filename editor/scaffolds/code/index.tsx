@@ -57,6 +57,7 @@ export function CodeSegment() {
   useEffect(() => {
     const __target = targetted;
     const __framework_config = framework_config;
+    console.log("__framework_config", __framework_config);
     if (__target && __framework_config) {
       if (!MainImageRepository.isReady) {
         // this is not the smartest way, but the image repo has a design flaw.
@@ -170,6 +171,14 @@ export function CodeSegment() {
                   break;
                 case "inline-style":
                   c = get_framework_config("react-native-with-inline-style");
+                  break;
+              }
+              break;
+            }
+            case "solid-js": {
+              switch (o.styling) {
+                case "styled-components":
+                  c = get_framework_config("solid-with-styled-components");
                   break;
               }
               break;
