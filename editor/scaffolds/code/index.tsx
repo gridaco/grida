@@ -174,6 +174,14 @@ export function CodeSegment() {
               }
               break;
             }
+            case "solid-js": {
+              switch (o.styling) {
+                case "styled-components":
+                  c = get_framework_config("solid-with-styled-components");
+                  break;
+              }
+              break;
+            }
             case "flutter":
               c = get_framework_config(o.framework);
               break;
