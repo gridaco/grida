@@ -53,6 +53,9 @@ export function get_framework_config(framework: string) {
     case "solid_with_styled_components":
     case "solid-with-styled-components":
       return solid_presets.solid_with_styled_components;
+    case "solid_with_inline_css":
+    case "solid-with-inline-css":
+      return solid_presets.solid_with_inline_css;
     case "flutter_default":
     case "flutter-default":
     case "flutter.default":

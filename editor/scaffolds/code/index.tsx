@@ -179,6 +179,10 @@ export function CodeSegment() {
                 case "styled-components":
                   c = get_framework_config("solid-with-styled-components");
                   break;
+                case "inline-css": {
+                  c = get_framework_config("solid-with-inline-css");
+                  break;
+                }
               }
               break;
             }
