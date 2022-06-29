@@ -87,6 +87,7 @@ const withTM = require("next-transpile-modules")([
   "@web-builder/nodejs",
   "@web-builder/core",
   "@web-builder/module-es",
+  "@web-builder/module-jsx",
   "@web-builder/solid-js",
   "@web-builder/vanilla",
   "@web-builder/react-core",
