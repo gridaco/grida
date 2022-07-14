@@ -94,6 +94,12 @@ module.exports = withBundleAnalyzer(
                 "https://join.slack.com/t/gridaco/shared_invite/zt-nmf59381-prFEqq032K~aWe_zOekUmQ",
               permanent: true,
             },
+            {
+              source: "/github",
+              destination:
+                "https://github.com/gridaco",
+              permanent: true,
+            },
             // events
             {
               source: "/monothon",
