@@ -26,6 +26,7 @@ const withTM = require("next-transpile-modules")([
   "@designto/react-native",
 
   "@code-features/assets",
+  "@code-features/module",
   "@code-features/component",
   "@code-features/flags",
   // -----------------------------
