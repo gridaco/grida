@@ -27,6 +27,7 @@ const withTM = require("next-transpile-modules")([
 
   "@code-features/assets",
   "@code-features/module",
+  "@code-features/documentation",
   "@code-features/component",
   "@code-features/flags",
   // -----------------------------
