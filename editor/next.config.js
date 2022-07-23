@@ -14,6 +14,7 @@ const withTM = require("next-transpile-modules")([
 
   // -----------------------------
   // region @designto-code
+  "@designto/debugger",
   "@designto/config",
   "@grida/builder-config-preset",
   "@grida/builder-platform-types",
