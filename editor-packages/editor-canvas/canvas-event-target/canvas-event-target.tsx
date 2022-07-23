@@ -182,6 +182,7 @@ export function CanvasEventTarget({
         set_drag_start_emitted(false);
         onDragEnd(s);
       },
+      // @ts-ignore
       onMouseDown: onPointerDown,
       onMoveStart: onPointerMoveStart,
       onMoveEnd: onPointerMoveEnd,
@@ -209,6 +210,7 @@ export function CanvasEventTarget({
         WebkitUserSelect: "none",
       }}
       id="gesture-event-listener"
+      // @ts-ignore
       ref={interactionEventTargetRef}
     >
       {children}
