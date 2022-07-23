@@ -1,5 +1,7 @@
 const TerserPlugin = require("terser-webpack-plugin");
 const withTM = require("next-transpile-modules")([
+  "dirty",
+
   // region @editor-app
   "@editor-app/live-session",
   "@code-editor/preview-pip", // TODO: remove me. this is for development. for production, use npm ver instead.
