@@ -60,9 +60,7 @@ const blurred_bg_fill = (target: ReflectSceneNode) => {
 };
 
 type VanillaPreviewProps = {
-  target: ReflectSceneNode & {
-    filekey: string;
-  };
+  target: ReflectSceneNode;
 } & FrameOptimizationFactors;
 
 export function D2CVanillaPreview({
@@ -80,7 +78,10 @@ export function D2CVanillaPreview({
       }
     }
     setPreview(result);
-    cache.set(target.filekey, { ...result, __image });
+
+    if (typeof target.filekey == "string") {
+      cache.set(target.filekey, { ...result, __image });
+    }
   };
 
   const hide_preview = isZooming || isPanning;

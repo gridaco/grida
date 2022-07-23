@@ -47,7 +47,7 @@ interface CanvasState {
 type CanvasCustomRenderers = HudCustomRenderers & {
   renderItem: (
     p: {
-      node: ReflectSceneNode & { filekey: string };
+      node: ReflectSceneNode;
     } & FrameOptimizationFactors
   ) => React.ReactNode;
 };
@@ -309,14 +309,13 @@ export function Canvas({
 
   const items = useMemo(() => {
     return nodes?.map((node) => {
-      node["filekey"] = filekey;
       return (
         <LazyFrame key={node.id} xy={[node.x, node.y]} size={node}>
           {/* 👇 dev only (for performance tracking) 👇 */}
           {/* <div style={{ width: "100%", height: "100%", background: "grey" }} /> */}
           {/* 👆 ----------------------------------- 👆 */}
           {renderItem({
-            node: node as ReflectSceneNode & { filekey: string },
+            node: node as ReflectSceneNode,
             zoom, // ? use scaled_zoom ?
             inViewport: true, // TODO:
             isZooming: isZooming,
