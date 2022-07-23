@@ -101,8 +101,8 @@ export function useDesign({
     }
 
     if (targetnodeconfig) {
+      const filekey = targetnodeconfig.file;
       // load design from local storage or remote figma
-
       const cacheStore = new RemoteDesignSessionCacheStore({
         file: targetnodeconfig.file,
         node: targetnodeconfig.node,
@@ -116,7 +116,8 @@ export function useDesign({
         const _2_converted_to_reflect = convert.intoReflectNode(
           _1_converted_to_figma,
           null,
-          "rest"
+          "rest",
+          filekey
         );
 
         const res = <TargetNodeConfig>{

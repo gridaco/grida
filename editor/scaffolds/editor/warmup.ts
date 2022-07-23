@@ -41,13 +41,16 @@ export function initialReducer(
   }
 }
 
-export function pagesFrom(file: FileResponse): FigmaReflectRepository["pages"] {
+export function pagesFrom(
+  filekey: string,
+  file: FileResponse
+): FigmaReflectRepository["pages"] {
   return file.document.children.map((page) => ({
     id: page.id,
     name: page.name,
     children: page["children"]?.map((child) => {
       const _mapped = mapper.mapFigmaRemoteToFigma(child);
-      return convert.intoReflectNode(_mapped, null, "rest");
+      return convert.intoReflectNode(_mapped, null, "rest", filekey);
     }),
     type: "design",
   }));
