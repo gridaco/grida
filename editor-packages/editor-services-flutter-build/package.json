@@ -1,0 +1,8 @@
+{
+  "name": "@code-editor/flutter-build",
+  "version": "0.0.0",
+  "private": false,
+  "description": "run flutter build command with webworker api",
+  "dependencies": {},
+  "peerDependencies": {}
+}
