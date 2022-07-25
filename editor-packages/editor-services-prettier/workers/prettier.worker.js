@@ -19,7 +19,7 @@ const options = {
     printWidth: 100,
     semi: true,
     useTabs: false,
-    singleQuote: true,
+    singleQuote: false,
   }),
   typescript: async () => ({
     parser: "babel",
@@ -27,7 +27,7 @@ const options = {
     printWidth: 100,
     semi: true,
     useTabs: false,
-    singleQuote: true,
+    singleQuote: false,
   }),
 };
 
