@@ -1,22 +1,14 @@
-import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import styled from "@emotion/styled";
 import { useGesture } from "@use-gesture/react";
 import useMeasure from "react-use-measure";
 import { Resizable } from "re-resizable";
 import { ZoomControl } from "./controller-zoom-control";
 import { colors } from "theme";
+import { RunnerLoadingIndicator } from "components/app-runner/loading-indicator";
 
-/**
- * A React Hook that returns a delta state.
- * When user completely stops interacting, after a short delay (600ms), set the value to false.
- * When user starts interacting, immidiately set the value to true.
- *
- * the condition rather if the user is currently interacting or not is set on higher level, which this function accepts the condition as a parameter.
- * @param interacting
- */
-function useIsInteractingDelta() {
-  throw new Error("Not implemented");
-}
+// TODO:
+// - add gesture debounce
 
 type Size = { width: number; height: number };
 function initialTransform(
@@ -60,11 +52,15 @@ type InitialTransform = {
 export function IsolatedCanvas({
   children,
   defaultSize,
+  building = false,
   onExit,
+  onFullscreen,
 }: {
   defaultSize: { width: number; height: number };
   children?: React.ReactNode;
+  building?: boolean;
   onExit?: () => void;
+  onFullscreen?: () => void;
 }) {
   const _margin = 20;
   const [canvasSizingRef, canvasBounds] = useMeasure();
@@ -123,6 +119,8 @@ export function IsolatedCanvas({
           display: "flex",
           flexDirection: "column",
           alignItems: "center",
+          userSelect: "none",
+          WebkitUserSelect: "none",
         }}
       >
         <Controls>
@@ -136,7 +134,12 @@ export function IsolatedCanvas({
             scale={scale}
             onChange={setScale}
           />
-          {onExit && <ExitButton onClick={onExit}>End Isolation</ExitButton>}
+          {onFullscreen && (
+            <ActionButton onClick={onFullscreen}>Full Screen</ActionButton>
+          )}
+          {onExit && (
+            <ActionButton onClick={onExit}>End Isolation</ActionButton>
+          )}
         </Controls>
         {/* <ScalingAreaStaticRoot> */}
         <TransformContainer
@@ -151,11 +154,25 @@ export function IsolatedCanvas({
         </TransformContainer>
         {/* </ScalingAreaStaticRoot> */}
       </div>
+      {building && (
+        <div
+          style={{
+            position: "absolute",
+            width: 32,
+            height: 32,
+            right: 32,
+            bottom: 32,
+            zIndex: 9,
+          }}
+        >
+          <RunnerLoadingIndicator size={32} />
+        </div>
+      )}
     </InteractiveCanvasWrapper>
   );
 }
 
-const ExitButton = styled.button`
+const ActionButton = styled.button`
   align-self: center;
   background-color: ${colors.color_editor_bg_on_dark};
   box-shadow: ${colors.color_editor_bg_on_dark} 0px 0px 0px 16px inset;
@@ -168,9 +185,13 @@ const ExitButton = styled.button`
 `;
 
 const InteractiveCanvasWrapper = styled.div`
+  position: absolute;
+  width: 100%;
+  height: 100%;
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  align-items: stretch;
   flex-grow: 1;
 `;
 
@@ -198,7 +219,7 @@ const TransformContainer = ({
     <div
       style={{
         pointerEvents: isTransitioning ? "none" : undefined,
-        transform: `scale(${scale}) translateX(${xy[0]}px) translateY(${xy[1]}px)`,
+        transform: `scale(${scale}) translate3d(${xy[0]}px, ${xy[1]}px, 0)`,
         willChange: "transform",
         transformOrigin: transformOrigin,
       }}

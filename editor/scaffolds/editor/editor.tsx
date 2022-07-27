@@ -1,27 +1,15 @@
-import React, { useEffect, useRef, useState } from "react";
+import React from "react";
 import { DefaultEditorWorkspaceLayout } from "layouts/default-editor-workspace-layout";
 import {
   WorkspaceContentPanel,
   WorkspaceContentPanelGridLayout,
 } from "layouts/panel";
-import { WorkspaceBottomPanelDockLayout } from "layouts/panel/workspace-bottom-panel-dock-layout";
 import { EditorSidebar } from "components/editor";
-import { useEditorState, useWorkspaceState } from "core/states";
-
+import { useEditorState } from "core/states";
 import { Canvas } from "scaffolds/canvas";
 import { CodeSegment } from "scaffolds/code";
-import { Inspector } from "scaffolds/inspector";
-
 import { EditorSkeleton } from "./skeleton";
 import { colors } from "theme";
-import { Debugger } from "@code-editor/debugger";
-
-import { RemoteImageRepositories } from "@design-sdk/figma-remote/lib/asset-repository/image-repository";
-import {
-  ImageRepository,
-  MainImageRepository,
-} from "@design-sdk/core/assets-repository";
-import { useFigmaAccessToken } from "hooks";
 
 export function Editor({
   loading = false,
@@ -31,34 +19,7 @@ export function Editor({
    */
   loading?: boolean;
 }) {
-  const wstate = useWorkspaceState();
   const [state] = useEditorState();
-
-  const fat = useFigmaAccessToken();
-
-  useEffect(() => {
-    // ------------------------------------------------------------
-    // other platforms are not supported yet
-    // set image repo for figma platform
-    if (state.design) {
-      MainImageRepository.instance = new RemoteImageRepositories(
-        state.design.key,
-        {
-          authentication: {
-            personalAccessToken: fat.personalAccessToken,
-            accessToken: fat.accessToken.token,
-          },
-        }
-      );
-      MainImageRepository.instance.register(
-        new ImageRepository(
-          "fill-later-assets",
-          "grida://assets-reservation/images/"
-        )
-      );
-    }
-    // ------------------------------------------------------------
-  }, [state.design?.key, fat.accessToken]);
 
   const _initially_loaded = state.design?.pages?.length > 0;
   const _initial_load_progress =
@@ -76,9 +37,15 @@ export function Editor({
       {(loading || !_initially_loaded) && (
         <EditorSkeleton percent={_initial_load_progress * 100} />
       )}
+
       <DefaultEditorWorkspaceLayout
         backgroundColor={colors.color_editor_bg_on_dark}
-        leftbar={<EditorSidebar />}
+        leftbar={{
+          _type: "resizable",
+          minWidth: 240,
+          maxWidth: 600,
+          children: <EditorSidebar />,
+        }}
         // rightbar={<Inspector />}
       >
         <WorkspaceContentPanelGridLayout>
@@ -86,8 +53,13 @@ export function Editor({
             <Canvas key={_refreshkey} />
           </WorkspaceContentPanel>
           <WorkspaceContentPanel
-            hidden={state.selectedNodes.length === 0}
+            hidden={state.selectedNodes.length !== 1}
+            overflow="hidden"
             flex={4}
+            resize={{
+              left: true,
+            }}
+            minWidth={300}
             zIndex={1}
             backgroundColor={colors.color_editor_bg_on_dark}
           >

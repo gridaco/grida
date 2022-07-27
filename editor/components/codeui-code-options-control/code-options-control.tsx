@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect } from "react";
 import { IField, LanguageType, Option } from "@code-ui/docstring/dist/lib/type";
 import { Docstring as DocstringView } from "@code-ui/docstring";
 import {
@@ -32,12 +32,12 @@ export function CodeOptionsControl(props: CodeOptionsControlProps) {
     all_preset_options_map__prod[__presetname]
   );
 
-  assert(useroption, "option must be specified");
-
   useEffect(() => {
     // trigger initial value
     props.onUseroptionChange(useroption);
   }, []);
+
+  assert(useroption, "option must be specified");
 
   // FIXME: this should be fixed on https://github.com/gridaco/code-like-ui (view CURSOR)
   const __dirty_sort_framework = (): Option<string>[] => {
@@ -76,6 +76,16 @@ export function CodeOptionsControl(props: CodeOptionsControlProps) {
         name: "React Native",
         value: "reactnative_with_inline_style",
         description: "with inline-style",
+      },
+      {
+        name: "Solid",
+        value: "solid_default",
+        description: "solid-js",
+      },
+      {
+        name: "Solid",
+        value: "solid_with_inline_css",
+        description: "with inline-css",
       },
       {
         name: "Flutter",
@@ -162,6 +172,7 @@ export function CodeOptionsControl(props: CodeOptionsControlProps) {
   const fields_config = {
     react: [platform_field_config, lang_field_config, react_style_field_config],
     "react-native": [platform_field_config, lang_field_config],
+    "solid-js": [platform_field_config, lang_field_config],
     flutter: [platform_field_config, lang_field_config],
     vanilla: [platform_field_config, lang_field_config],
   };

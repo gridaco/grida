@@ -3,6 +3,7 @@ import {
   reactnative_presets,
   flutter_presets,
   vanilla_presets,
+  solid_presets,
 } from "@grida/builder-config-preset";
 import { ParsedUrlQuery } from "querystring";
 import { FrameworkConfig } from "@designto/config";
@@ -49,7 +50,12 @@ export function get_framework_config(framework: string) {
       return reactnative_presets.reactnative_with_styled_components;
     case "react-native-with-inline-style":
       return reactnative_presets.reactnative_with_inline_style;
-    case "flutter":
+    case "solid_with_styled_components":
+    case "solid-with-styled-components":
+      return solid_presets.solid_with_styled_components;
+    case "solid_with_inline_css":
+    case "solid-with-inline-css":
+      return solid_presets.solid_with_inline_css;
     case "flutter_default":
     case "flutter-default":
     case "flutter.default":
@@ -59,6 +65,10 @@ export function get_framework_config(framework: string) {
     case "vanilla.default":
       return vanilla_presets.vanilla_default;
     default:
+      console.warn(
+        'no matching framework preset found for "' + framework + '"',
+        "fallback to react preset"
+      );
       return react_presets.react_default;
   }
 }

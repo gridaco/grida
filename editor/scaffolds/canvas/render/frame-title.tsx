@@ -17,7 +17,9 @@ export function FrameTitleRenderer({
   onHoverChange,
   onSelect,
   onRunClick,
+  runnable = false,
 }: FrameTitleProps & {
+  runnable?: boolean;
   onRunClick: () => void;
 }) {
   const [x, y] = xy;
@@ -47,7 +49,9 @@ export function FrameTitleRenderer({
       xy={[x, height_considered_y_transform]}
       {...hoverProps}
     >
-      {selected && <SelectedStatePrimaryAction onClick={onRunClick} />}
+      {selected && runnable && (
+        <SelectedStatePrimaryAction onClick={onRunClick} />
+      )}
       <FrameTitleLabel
         color={
           selected || highlight || hoverred
@@ -63,10 +67,16 @@ export function FrameTitleRenderer({
 
 function SelectedStatePrimaryAction({ onClick }: { onClick: () => void }) {
   return (
-    <div
+    <span
       onClick={onClick}
+      onPointerDown={(e) => {
+        // this is required to prevent the canvas' event listener being called first.
+        e.stopPropagation();
+        e.preventDefault();
+      }}
       style={{
         marginRight: 4,
+        cursor: "pointer",
       }}
     >
       <svg
@@ -81,6 +91,6 @@ function SelectedStatePrimaryAction({ onClick }: { onClick: () => void }) {
           fill="#52A1FF"
         />
       </svg>
-    </div>
+    </span>
   );
 }

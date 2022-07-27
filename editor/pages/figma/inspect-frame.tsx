@@ -24,8 +24,8 @@ export default function InspectAutolayout() {
       <MonacoEditor
         key={figma?.id}
         height="100vh"
-        defaultLanguage="json"
-        defaultValue={JSON.stringify(inspectionTarget, null, 2)}
+        language="json"
+        value={JSON.stringify(inspectionTarget, null, 2)}
       />
     </>
   );

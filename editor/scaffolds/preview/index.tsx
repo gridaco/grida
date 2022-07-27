@@ -1,11 +1,8 @@
 import React, { useEffect, useState } from "react";
-import { vanilla_presets } from "@grida/builder-config-preset";
+import { preview_presets } from "@grida/builder-config-preset";
 import { designToCode, Result } from "@designto/code";
 import { config } from "@designto/config";
-import {
-  ImageRepository,
-  MainImageRepository,
-} from "@design-sdk/core/assets-repository";
+import { MainImageRepository } from "@design-sdk/core/assets-repository";
 import type { ReflectSceneNode } from "@design-sdk/figma-node";
 import { VanillaRunner } from "components/app-runner/vanilla-app-runner";
 import { colorFromFills } from "@design-sdk/core/utils/colors";
@@ -25,8 +22,8 @@ const build_config: config.BuildConfiguration = {
   disable_flags_support: true,
 };
 
-const framework_config: config.VanillaFrameworkConfig = {
-  ...vanilla_presets.vanilla_default,
+const framework_config: config.VanillaPreviewFrameworkConfig = {
+  ...preview_presets.default,
   additional_css_declaration: {
     declarations: [
       {
@@ -53,19 +50,26 @@ const cache = {
   },
 };
 
-export function Preview({
+const cachekey = (target: { filekey; id }) =>
+  target ? `${target.filekey}-${target.id}-${new Date().getMinutes()}` : null;
+
+const blurred_bg_fill = (target: ReflectSceneNode) => {
+  const __bg = colorFromFills(target.fills);
+  const bg_color_str = __bg ? "#" + __bg.hex : "transparent";
+  return bg_color_str;
+};
+
+type VanillaPreviewProps = {
+  target: ReflectSceneNode;
+} & FrameOptimizationFactors;
+
+export function D2CVanillaPreview({
   target,
   isZooming,
   isPanning,
-}: {
-  target: ReflectSceneNode & {
-    filekey: string;
-  };
-} & FrameOptimizationFactors) {
+}: VanillaPreviewProps) {
   const [preview, setPreview] = useState<Result>();
-  const key = target
-    ? `${target.filekey}-${target.id}-${new Date().getMinutes()}`
-    : null;
+  const key = cachekey(target);
 
   const on_preview_result = (result: Result, __image: boolean) => {
     if (preview) {
@@ -74,7 +78,10 @@ export function Preview({
       }
     }
     setPreview(result);
-    cache.set(target.filekey, { ...result, __image });
+
+    if (typeof target.filekey == "string") {
+      cache.set(target.filekey, { ...result, __image });
+    }
   };
 
   const hide_preview = isZooming || isPanning;
@@ -158,30 +165,117 @@ export function Preview({
     }
   }, [target?.id, isZooming, isPanning]);
 
-  const __bg = colorFromFills(target.fills);
-  const bg_color_str = __bg ? "#" + __bg.hex : "transparent";
+  const bg_color_str = blurred_bg_fill(target);
 
+  return (
+    <PreviewContent
+      id={target.id}
+      name={target.name}
+      source={preview?.scaffold?.raw}
+      width={target.width}
+      height={target.height}
+      backgroundColor={
+        !preview && bg_color_str // clear bg after preview is rendered.
+      }
+    />
+  );
+}
+
+import { createWorkerQueue } from "@code-editor/webworker-services-core";
+import { useFigmaAccessToken } from "hooks/use-figma-access-token";
+
+export function WebWorkerD2CVanillaPreview({ target }: VanillaPreviewProps) {
+  const [preview, setPreview] = useState<Result>();
+  const bg_color_str = blurred_bg_fill(target);
+
+  const fat = useFigmaAccessToken();
+
+  useEffect(() => {
+    if (preview) {
+      return;
+    }
+
+    const { worker, terminate } = createWorkerQueue(
+      new Worker(new URL("./workers/vanilla.worker.js", import.meta.url))
+    );
+
+    const input = target
+      ? {
+          id: target.id,
+          name: target.name,
+          entry: target,
+        }
+      : null;
+
+    // TODO: this is not production ready
+    worker.postMessage({
+      input,
+      authentication: fat,
+      filekey: target.filekey,
+    });
+
+    worker.addEventListener("message", (e) => {
+      // console.log(target.id, e.data.id);
+      // if (((e.data as Result).id = target.id)) {
+      setPreview(e.data as Result);
+      // }
+    });
+
+    () => {
+      terminate();
+    };
+  }, [target?.id]);
+
+  return (
+    <PreviewContent
+      id={target.id}
+      name={target.name}
+      source={preview?.scaffold?.raw}
+      width={target.width}
+      height={target.height}
+      backgroundColor={
+        !preview && bg_color_str // clear bg after preview is rendered.
+      }
+    />
+  );
+}
+
+function PreviewContent({
+  width,
+  height,
+  backgroundColor,
+  id,
+  source,
+  name,
+}: {
+  width: number;
+  height: number;
+  backgroundColor: string;
+  id: string;
+  source: string;
+  name: string;
+}) {
   return (
     <div
       style={{
-        width: target.width,
-        height: target.height,
+        width: width,
+        height: height,
         borderRadius: 1,
-        backgroundColor: !preview && bg_color_str, // clear bg after preview is rendered.
+        backgroundColor: backgroundColor,
         contain: "layout style paint",
       }}
     >
-      {preview && (
+      {source && (
         <VanillaRunner
-          key={preview.scaffold.raw}
+          key={id}
           style={{
             borderRadius: 1,
             contain: "layout style paint",
           }}
-          source={preview.scaffold.raw}
+          source={source}
           width="100%"
           height="100%"
-          componentName={preview.name}
+          componentName={name}
         />
       )}
     </div>

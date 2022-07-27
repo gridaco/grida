@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import Head from "next/head";
 import { DefaultEditorWorkspaceLayout } from "layouts/default-editor-workspace-layout";
 import {
   Cards,
@@ -19,6 +20,9 @@ export default function FilesPage() {
 
   return (
     <>
+      <Head>
+        <title>Grida | files</title>
+      </Head>
       <DefaultEditorWorkspaceLayout
         backgroundColor={colors.color_editor_bg_on_dark}
         leftbar={<HomeSidebar />}

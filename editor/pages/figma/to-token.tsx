@@ -4,7 +4,7 @@ import { tokenize } from "@designto/token";
 import {
   JsonTree,
   WidgetTree,
-} from "@code-editor/debugger/components/visualization/json-visualization/json-tree";
+} from "@code-editor/devtools/components/visualization/json-visualization/json-tree";
 import { DefaultEditorWorkspaceLayout } from "layouts/default-editor-workspace-layout";
 import { LayerHierarchy } from "components/editor-hierarchy";
 import { WorkspaceContentPanelGridLayout } from "layouts/panel/workspace-content-panel-grid-layout";

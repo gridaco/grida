@@ -7,13 +7,11 @@ import {
 import { createInitialWorkspaceState } from "core/states";
 import { workspaceReducer } from "core/reducers";
 import { PendingState } from "core/utility-types";
-import { DesignInput } from "@designto/config/input";
-import { TargetNodeConfig } from "query/target-node";
 import { WorkspaceAction } from "core/actions";
 import { FileResponse } from "@design-sdk/figma-remote-types";
 import { convert } from "@design-sdk/figma-node-conversion";
 import { mapper } from "@design-sdk/figma-remote";
-import { find, visit } from "tree-visit";
+import { visit } from "tree-visit";
 
 const pending_workspace_state = createPendingWorkspaceState();
 //
@@ -43,13 +41,16 @@ export function initialReducer(
   }
 }
 
-export function pagesFrom(file: FileResponse): FigmaReflectRepository["pages"] {
+export function pagesFrom(
+  filekey: string,
+  file: FileResponse
+): FigmaReflectRepository["pages"] {
   return file.document.children.map((page) => ({
     id: page.id,
     name: page.name,
     children: page["children"]?.map((child) => {
       const _mapped = mapper.mapFigmaRemoteToFigma(child);
-      return convert.intoReflectNode(_mapped);
+      return convert.intoReflectNode(_mapped, null, "rest", filekey);
     }),
     type: "design",
   }));
@@ -96,24 +97,6 @@ export function componentsFrom(
     })
     .filter((c) => c)
     .reduce(tomap, {});
-}
-
-export function initializeDesign(design: TargetNodeConfig): EditorSnapshot {
-  return {
-    selectedNodes: [design.node],
-    selectedLayersOnPreview: [],
-    selectedPage: null,
-    design: {
-      pages: [],
-      components: null,
-      // styles: null,
-      key: design.file,
-      input: DesignInput.fromApiResponse({
-        ...design,
-        entry: design.reflect,
-      }),
-    },
-  };
 }
 
 export function safestate(initialState) {

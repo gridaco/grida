@@ -1,7 +1,9 @@
 import React, { useEffect } from "react";
 import { Global, css } from "@emotion/react";
 import Head from "next/head";
+import Script from "next/script";
 import { EditorThemeProvider } from "@editor-ui/theme";
+import { MuiThemeProvider } from "theme/mui";
 import { colors } from "theme";
 import { useRouter } from "next/router";
 
@@ -51,11 +53,6 @@ function HeadInjection() {
     <Head>
       <GlobalCss />
       <SeoMeta />
-      <link
-        href="https://fonts.googleapis.com/css2?family=Roboto:ital,wght@0,100;0,300;0,400;0,500;0,700;0,900;1,100;1,300;1,400;1,500;1,700;1,900&"
-        rel="stylesheet"
-        type="text/css"
-      />
       {/* safari 15 color */}
       <meta
         name="theme-color"
@@ -73,7 +70,7 @@ function HeadInjection() {
         name="viewport"
         content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
       />
-      <script
+      <Script
         dangerouslySetInnerHTML={{
           // wheel + ctrl        - disable zoom on chrome / safari
           // wheel + meta (cmd)  - disable zoom on firefox-mac
@@ -83,11 +80,11 @@ function HeadInjection() {
 
       {/* region Google analytics */}
       {/* https://stackoverflow.com/a/62552263 */}
-      <script
+      <Script
         async
         src="https://www.googletagmanager.com/gtag/js?id=G-7Y9DGWF5RT"
       />
-      <script
+      <Script
         dangerouslySetInnerHTML={{
           __html: `
             window.dataLayer = window.dataLayer || [];
@@ -150,9 +147,11 @@ function EditorApp({ Component, pageProps }) {
   return (
     <React.Fragment>
       <HeadInjection />
-      <EditorThemeProvider dark>
-        <Component {...pageProps} />
-      </EditorThemeProvider>
+      <MuiThemeProvider>
+        <EditorThemeProvider dark>
+          <Component {...pageProps} />
+        </EditorThemeProvider>
+      </MuiThemeProvider>
     </React.Fragment>
   );
 }

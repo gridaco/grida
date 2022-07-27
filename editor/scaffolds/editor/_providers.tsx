@@ -1,7 +1,16 @@
 import React from "react";
 import { useHotkeys } from "react-hotkeys-hook";
+import { EditorImageRepositoryProvider } from "./editor-image-repository-provider";
+import { EditorPreviewDataProvider } from "./editor-preview-provider";
+
 export function EditorDefaultProviders(props: { children: React.ReactNode }) {
-  return <ShortcutsProvider>{props.children}</ShortcutsProvider>;
+  return (
+    <ShortcutsProvider>
+      <EditorImageRepositoryProvider>
+        <EditorPreviewDataProvider>{props.children}</EditorPreviewDataProvider>
+      </EditorImageRepositoryProvider>
+    </ShortcutsProvider>
+  );
 }
 
 function ShortcutsProvider(props: { children: React.ReactNode }) {

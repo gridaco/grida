@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { MonacoEditor, MonacoEditorProps as MonacoEditorProps } from "./monaco";
-import { Tabs, Tab } from "@material-ui/core";
+import { Tabs, Tab } from "@mui/material";
 
 export interface CodeEditorProps
   extends Omit<MonacoEditorProps, "defaultValue" | "defaultLanguage"> {}
@@ -14,8 +14,10 @@ export type Files = { [name: string]: IFile };
 
 export function CodeEditor({
   files,
+  onChange,
   ...editor_props
 }: {
+  onChange?: (key: string, value: string, e?) => void;
   files: Files;
 } & CodeEditorProps) {
   const keys = Object.keys(files);
@@ -33,8 +35,11 @@ export function CodeEditor({
         <Tabs
           value={filekey}
           onChange={handleChange}
+          indicatorColor="primary"
+          textColor="inherit"
           variant="scrollable"
-          scrollButtons="off"
+          scrollButtons={false}
+          style={{ color: "white" }}
           aria-label="scrollable prevent tabs example"
         >
           {Object.keys(files).map((name) => {
@@ -45,8 +50,11 @@ export function CodeEditor({
       <MonacoEditor
         key={filekey}
         {...editor_props}
-        defaultLanguage={file.language}
-        defaultValue={file.raw}
+        onChange={(v: string, e) => {
+          onChange?.(filekey, v, e);
+        }}
+        language={file.language}
+        value={file.raw}
       />
     </>
   );
