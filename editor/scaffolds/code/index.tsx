@@ -131,7 +131,7 @@ export function CodeSegment() {
     }
   }, 500);
 
-  const { code, scaffold, name: componentName } = result ?? {};
+  const { code, scaffold, name: componentName, framework } = result ?? {};
   return (
     <CodeEditorContainer>
       <EditorAppbarFragments.CodeEditor />
@@ -209,10 +209,10 @@ export function CodeSegment() {
           code
             ? {
                 // TODO: make this to match framework
-                "App.tsx": {
-                  raw: code.raw,
+                [filename[framework.framework]]: {
+                  raw: scaffold.raw,
                   language: framework_config.language,
-                  name: "App.tsx",
+                  name: filename[framework.framework],
                 },
               }
             : {
@@ -227,6 +227,14 @@ export function CodeSegment() {
     </CodeEditorContainer>
   );
 }
+
+const filename = {
+  vanilla: "index.html",
+  react: "app.tsx",
+  "solid-js": "app.tsx",
+  vue: "app.vue",
+  flutter: "main.dart",
+} as const;
 
 const CodeEditorContainer = styled.div`
   display: flex;

@@ -78,17 +78,19 @@ export interface IScenePreviewData<T> {
   updatedAt: number;
 }
 
-interface IScenePreviewDataVanillaPreview extends IScenePreviewData<string> {
+export interface IScenePreviewDataVanillaPreview
+  extends IScenePreviewData<string> {
   loader: "vanilla-html";
   source: string;
 }
 
-interface IScenePreviewDataFlutterPreview extends IScenePreviewData<string> {
+export interface IScenePreviewDataFlutterPreview
+  extends IScenePreviewData<string> {
   loader: "vanilla-flutter-template";
   source: string;
 }
 
-interface IScenePreviewDataEsbuildPreview
+export interface IScenePreviewDataEsbuildPreview
   extends IScenePreviewData<{
     html: string;
     javascript: string;

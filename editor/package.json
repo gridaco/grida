@@ -32,6 +32,7 @@
     "@visx/shape": "^1.8.0",
     "codesandbox": "^2.2.3",
     "cuid": "^2.1.8",
+    "dart-services": "^0.2.5",
     "firebase": "^9.6.0",
     "framer-motion": "^5.3.1",
     "idb": "^6.1.2",
