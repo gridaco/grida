@@ -139,6 +139,10 @@ export function EditorPreviewDataProvider({
           updatedAt: Date.now(),
         },
       });
+      consoleLog({
+        method: "info",
+        data: ["compiled esbuild-react", key, componentName],
+      });
     },
     [dispatch]
   );
@@ -173,6 +177,10 @@ export function EditorPreviewDataProvider({
           },
           updatedAt: Date.now(),
         },
+      });
+      consoleLog({
+        method: "info",
+        data: ["compiled flutter app", key, componentName],
       });
     },
     [dispatch]

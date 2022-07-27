@@ -58,6 +58,11 @@ function DartpadServedHtmlIframe({ js }: { js: string }) {
       sandbox="allow-scripts allow-popups"
       ref={ref}
       src={dartservices_html_src}
+      style={{
+        borderRadius: 4,
+        backgroundColor: "white",
+        boxShadow: "0px 0px 48px #00000020",
+      }}
     />
   );
 }
