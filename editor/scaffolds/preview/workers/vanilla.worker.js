@@ -2,8 +2,8 @@ import { designToCode } from "@designto/code";
 import {
   ImageRepository,
   MainImageRepository,
-} from "@design-sdk/core/assets-repository";
-import { RemoteImageRepositories } from "@design-sdk/figma-remote/lib/asset-repository/image-repository";
+} from "@design-sdk/asset-repository";
+import { RemoteImageRepositories } from "@design-sdk/figma-remote/asset-repository";
 import { config } from "@designto/config";
 import { preview_presets } from "@grida/builder-config-preset";
 

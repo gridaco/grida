@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import type { ReflectSceneNode } from "@design-sdk/core";
+import type { ReflectSceneNode } from "@design-sdk/figma-node";
 import type { DesignInput } from "@designto/config/input";
 import { useEditorState } from "core/states";
 import { getTargetContainer } from "utils/get-target-node";

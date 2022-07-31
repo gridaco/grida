@@ -3,7 +3,7 @@ import { useEditorState } from "core/states";
 import { preview_presets } from "@grida/builder-config-preset";
 import { designToCode, Result } from "@designto/code";
 import { config } from "@designto/config";
-import { MainImageRepository } from "@design-sdk/core/assets-repository";
+import { MainImageRepository } from "@design-sdk/asset-repository";
 import bundler from "@code-editor/esbuild-services";
 import assert from "assert";
 import { useDispatch } from "core/dispatch";

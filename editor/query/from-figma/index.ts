@@ -2,7 +2,9 @@ import {
   FigmaTargetNodeConfig,
   parseFileAndNodeId,
 } from "@design-sdk/figma-url";
-import { Figma, nodes, api } from "@design-sdk/figma";
+import { Figma } from "@design-sdk/figma";
+import type { Node } from "@design-sdk/figma-remote-types";
+import type { ReflectSceneNode } from "@design-sdk/figma-node";
 import { NextRouter, useRouter } from "next/router";
 import { useEffect, useState } from "react";
 import { fetch } from "@design-sdk/figma-remote";
@@ -23,7 +25,7 @@ export function extractFromFigmaQueryParams(router: NextRouter) {
 }
 
 export function setFigmaTargetUrl(router: NextRouter, url: string) {
-  ((router.query as any) as FigmaToReactRouterQueryParams).figma_target_url = url;
+  (router.query as any as FigmaToReactRouterQueryParams).figma_target_url = url;
   router.push(router);
 }
 
@@ -56,10 +58,10 @@ export function useFigmaTargetNode() {
 }
 
 export interface TargetNodeConfig
-  extends _TargetNodeConfig<api.Node, Figma.SceneNode> {
-  remote: api.Node;
+  extends _TargetNodeConfig<Node, Figma.SceneNode> {
+  remote: Node;
   figma: Figma.SceneNode;
-  reflect: nodes.ReflectSceneNode;
+  reflect: ReflectSceneNode;
   url: string;
   file: string;
   node: string;

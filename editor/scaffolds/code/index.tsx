@@ -10,11 +10,11 @@ import { config } from "@designto/config";
 import {
   ImageRepository,
   MainImageRepository,
-} from "@design-sdk/core/assets-repository";
+} from "@design-sdk/asset-repository";
 import { useEditorState, useWorkspaceState } from "core/states";
 import { useDispatch } from "core/dispatch";
-import type { ReflectSceneNode } from "@design-sdk/core";
-import { RemoteImageRepositories } from "@design-sdk/figma-remote/lib/asset-repository/image-repository";
+import type { ReflectSceneNode } from "@design-sdk/figma-node";
+import { RemoteImageRepositories } from "@design-sdk/figma-remote/asset-repository";
 import { useTargetContainer } from "hooks/use-target-node";
 import assert from "assert";
 import { debounce } from "utils/debounce";

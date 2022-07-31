@@ -2,12 +2,12 @@ import React, { useEffect, useState } from "react";
 import { preview_presets } from "@grida/builder-config-preset";
 import { designToCode, Result } from "@designto/code";
 import { config } from "@designto/config";
-import { MainImageRepository } from "@design-sdk/core/assets-repository";
+import { MainImageRepository } from "@design-sdk/asset-repository";
 import type { ReflectSceneNode } from "@design-sdk/figma-node";
 import { VanillaRunner } from "components/app-runner/vanilla-app-runner";
-import { colorFromFills } from "@design-sdk/core/utils/colors";
+import { colorFromFills } from "@design-sdk/core/utils";
 import type { FrameOptimizationFactors } from "@code-editor/canvas/frame";
-import { remote } from "@design-sdk/figma";
+import { fetchNodeAsImage } from "@design-sdk/figma-remote";
 
 const DEV_ONLY_FIGMA_PAT =
   process.env.NEXT_PUBLIC_DEVELOPER_FIGMA_PERSONAL_ACCESS_TOKEN;
@@ -298,18 +298,16 @@ function FigmaFrameImageView({
   useEffect(() => {
     // fetch image from figma
     // fetch smaller one first, then fatch the full scaled.
-    remote
-      .fetchNodeAsImage(
-        filekey,
-        { personalAccessToken: DEV_ONLY_FIGMA_PAT },
-        nodeid
-        // scale = 1
-      )
-      .then((r) => {
-        console.log("fetched image from figma", r);
-        setImage_1(r.__default);
-        setImage_s(r.__default);
-      });
+    fetchNodeAsImage(
+      filekey,
+      { personalAccessToken: DEV_ONLY_FIGMA_PAT },
+      nodeid
+      // scale = 1
+    ).then((r) => {
+      console.log("fetched image from figma", r);
+      setImage_1(r.__default);
+      setImage_s(r.__default);
+    });
   }, [filekey, nodeid]);
 
   let imgscale: 1 | 0.2 = 1;
