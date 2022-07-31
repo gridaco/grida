@@ -4,7 +4,7 @@ import {
   MainImageRepository,
 } from "@design-sdk/asset-repository";
 import { RemoteImageRepositories } from "@design-sdk/figma-remote/asset-repository";
-import { config } from "@designto/config";
+import { config } from "@grida/builder-config";
 import { preview_presets } from "@grida/builder-config-preset";
 
 const placeholderimg =

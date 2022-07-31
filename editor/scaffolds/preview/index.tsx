@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { preview_presets } from "@grida/builder-config-preset";
 import { designToCode, Result } from "@designto/code";
-import { config } from "@designto/config";
+import { config } from "@grida/builder-config";
 import { MainImageRepository } from "@design-sdk/asset-repository";
 import type { ReflectSceneNode } from "@design-sdk/figma-node";
 import { VanillaRunner } from "components/app-runner/vanilla-app-runner";

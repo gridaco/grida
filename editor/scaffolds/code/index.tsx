@@ -6,7 +6,7 @@ import { EditorAppbarFragments } from "components/editor";
 import { get_framework_config } from "query/to-code-options-from-query";
 import { CodeOptionsControl } from "components/codeui-code-options-control";
 import { designToCode, Result } from "@designto/code";
-import { config } from "@designto/config";
+import { config } from "@grida/builder-config";
 import {
   ImageRepository,
   MainImageRepository,

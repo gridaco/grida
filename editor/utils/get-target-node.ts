@@ -1,5 +1,5 @@
 import type { EditorState } from "core/states";
-import { DesignInput } from "@designto/config/input";
+import { DesignInput } from "@grida/builder-config/input";
 import {
   find_node_by_id_under_inpage_nodes,
   find_node_by_id_under_entry,
