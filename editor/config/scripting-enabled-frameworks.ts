@@ -1,4 +1,4 @@
-import type { FrameworkConfig } from "@designto/config";
+import type { FrameworkConfig } from "@grida/builder-config";
 
 type Framework = FrameworkConfig["framework"];
 

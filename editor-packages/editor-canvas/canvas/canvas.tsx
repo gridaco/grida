@@ -15,12 +15,11 @@ import {
   edge_scrolling,
   target_of_area,
 } from "../math";
-import { utils } from "@design-sdk/core";
+import { find_node_by_id_under_inpage_nodes } from "@design-sdk/core/utils";
 import { LazyFrame } from "@code-editor/canvas/lazy-frame";
 import { HudCustomRenderers, HudSurface } from "../hud";
 import type { Box, XY, CanvasTransform, XYWH } from "../types";
 import type { FrameOptimizationFactors } from "../frame";
-const designq = utils.query;
 
 const INITIAL_SCALE = 0.5;
 const INITIAL_XY: XY = [0, 0];
@@ -144,7 +143,7 @@ export function Canvas({
     xy: offset,
   };
 
-  const node = (id) => designq.find_node_by_id_under_inpage_nodes(id, nodes);
+  const node = (id) => find_node_by_id_under_inpage_nodes(id, nodes);
 
   const wshighlight = highlightedLayer
     ? ({ node: node(highlightedLayer), reason: "external" } as HovringNode)
@@ -304,7 +303,7 @@ export function Canvas({
 
   const is_canvas_transforming = isPanning || isZooming;
   const selected_nodes = selectedNodes
-    ?.map((id) => designq.find_node_by_id_under_inpage_nodes(id, nodes))
+    ?.map((id) => find_node_by_id_under_inpage_nodes(id, nodes))
     .filter(Boolean);
 
   const items = useMemo(() => {
