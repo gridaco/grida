@@ -6,7 +6,7 @@ import {
   solid_presets,
 } from "@grida/builder-config-preset";
 import { ParsedUrlQuery } from "querystring";
-import { FrameworkConfig } from "@designto/config";
+import { FrameworkConfig } from "@grida/builder-config";
 
 export function get_enable_components_config_from_query(
   query: ParsedUrlQuery

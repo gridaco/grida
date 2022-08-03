@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { canvas } from "components";
-import { ReflectSceneNode } from "@design-sdk/core";
+import { ReflectSceneNode } from "@design-sdk/figma-node";
 import { visualize_node } from "@code-editor/devtools/components/visualization";
 import { JsonTree } from "@code-editor/devtools/components/visualization/json-visualization/json-tree";
 import { useReflectTargetNode } from "../../query/from-figma";

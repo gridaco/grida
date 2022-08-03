@@ -1,8 +1,8 @@
 import type { ReflectSceneNode } from "@design-sdk/figma-node";
-import type { FrameworkConfig } from "@designto/config";
+import type { FrameworkConfig } from "@grida/builder-config";
 import type { WidgetKey } from "@reflect-ui/core";
 import type { ComponentNode } from "@design-sdk/figma-types";
-import type { DesignInput } from "@designto/config/input";
+import type { DesignInput } from "@grida/builder-config/input";
 
 /**
  * View mode of the canvas.
