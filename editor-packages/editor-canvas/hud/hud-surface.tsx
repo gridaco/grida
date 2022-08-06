@@ -5,7 +5,7 @@ import type { XY, XYWH } from "../types";
 import { Marquee } from "../marquee";
 interface HudControls {
   onSelectNode: (node: string) => void;
-  onHoverNode: (node: string) => void;
+  onHoverNode: (node: string | null) => void;
 }
 
 export interface HudCustomRenderers {
@@ -46,7 +46,7 @@ export function HudSurface({
   labelDisplayNodes: DisplayNodeMeta[];
   selectedNodes: DisplayNodeMeta[];
   hide: boolean;
-  marquee?: XYWH;
+  marquee?: XYWH | null;
   disableMarquee?: boolean;
   readonly: boolean;
 } & HudControls &
