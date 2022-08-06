@@ -184,6 +184,11 @@ function Tabs({ onClick }: { onClick?: () => void }) {
         label="Console"
         selected
         badge={devtoolsConsole?.logs?.length ?? 0}
+        badgeType={
+          devtoolsConsole?.logs?.find((l) => l.method === "error")
+            ? "error"
+            : "default"
+        }
       />
       {/* <DevtoolsTab label="Problems" badge={0} />
       <DevtoolsTab label="React DevTools" badge={0} />

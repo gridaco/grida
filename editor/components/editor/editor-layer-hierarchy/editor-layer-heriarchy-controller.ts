@@ -1,4 +1,4 @@
-import { ReflectSceneNode } from "@design-sdk/figma";
+import type { ReflectSceneNode } from "@design-sdk/figma-node";
 import { visit } from "tree-visit";
 
 export interface ITreeNode<T = any> {

@@ -1,9 +1,9 @@
 import React, { useEffect } from "react";
-import { RemoteImageRepositories } from "@design-sdk/figma-remote/lib/asset-repository/image-repository";
+import { RemoteImageRepositories } from "@design-sdk/figma-remote/asset-repository";
 import {
   ImageRepository,
   MainImageRepository,
-} from "@design-sdk/core/assets-repository";
+} from "@design-sdk/asset-repository";
 import { useEditorState } from "core/states";
 import { useFigmaAccessToken } from "hooks";
 

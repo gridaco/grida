@@ -2,13 +2,15 @@ import React, { useCallback, useEffect, useMemo } from "react";
 import { useEditorState } from "core/states";
 import { preview_presets } from "@grida/builder-config-preset";
 import { designToCode, Result } from "@designto/code";
-import { config } from "@designto/config";
-import { MainImageRepository } from "@design-sdk/core/assets-repository";
+import { config } from "@grida/builder-config";
+import { MainImageRepository } from "@design-sdk/asset-repository";
 import bundler from "@code-editor/esbuild-services";
 import assert from "assert";
 import { useDispatch } from "core/dispatch";
 import { useTargetContainer } from "hooks";
 import { WidgetKey } from "@reflect-ui/core";
+import { supportsPreview } from "config";
+import { stable as dartservices } from "dart-services";
 
 const esbuild_base_html_code = `<div id="root"></div>`;
 
@@ -40,7 +42,7 @@ export function EditorPreviewDataProvider({
     [dispatch]
   );
 
-  const onVanillaPreviewResult = useCallback(
+  const onInitialVanillaPreviewResult = useCallback(
     (result: Result, isAssetUpdate?: boolean) => {
       dispatch({
         type: "preview-set",
@@ -60,6 +62,41 @@ export function EditorPreviewDataProvider({
             bundler: "vanilla",
             framework: result.framework.framework,
             reason: isAssetUpdate ? "fill-assets" : "initial",
+          },
+          updatedAt: Date.now(),
+        },
+      });
+    },
+    [dispatch]
+  );
+
+  const onVanillaPreviewResult = useCallback(
+    ({
+      key,
+      initialSize,
+      raw,
+      componentName,
+    }: {
+      key: WidgetKey;
+      initialSize: { width: number; height: number };
+      raw: string;
+      componentName: string;
+    }) => {
+      dispatch({
+        type: "preview-set",
+        data: {
+          loader: "vanilla-html",
+          viewtype: "unknown",
+          widgetKey: key,
+          componentName: componentName,
+          fallbackSource: raw,
+          source: raw,
+          initialSize: initialSize,
+          isBuilding: false,
+          meta: {
+            bundler: "vanilla",
+            framework: "vanilla",
+            reason: "update",
           },
           updatedAt: Date.now(),
         },
@@ -101,6 +138,49 @@ export function EditorPreviewDataProvider({
           },
           updatedAt: Date.now(),
         },
+      });
+      consoleLog({
+        method: "info",
+        data: ["compiled esbuild-react", key, componentName],
+      });
+    },
+    [dispatch]
+  );
+
+  const onDartServicesFlutterBuildComplete = useCallback(
+    ({
+      key,
+      js,
+      initialSize,
+      componentName,
+    }: {
+      key: WidgetKey;
+      js: string;
+      initialSize: { width: number; height: number };
+      componentName: string;
+    }) => {
+      dispatch({
+        type: "preview-set",
+        data: {
+          loader: "vanilla-flutter-template",
+          viewtype: "unknown",
+          widgetKey: key,
+          componentName: componentName,
+          fallbackSource: state.currentPreview?.fallbackSource,
+          source: js,
+          initialSize: initialSize,
+          isBuilding: false,
+          meta: {
+            bundler: "esbuild-wasm",
+            framework: "react",
+            reason: "update",
+          },
+          updatedAt: Date.now(),
+        },
+      });
+      consoleLog({
+        method: "info",
+        data: ["compiled flutter app", key, componentName],
       });
     },
     [dispatch]
@@ -158,7 +238,7 @@ export function EditorPreviewDataProvider({
         },
       },
     })
-      .then(onVanillaPreviewResult)
+      .then(onInitialVanillaPreviewResult)
       .catch(console.error);
 
     if (!MainImageRepository.instance.empty) {
@@ -170,7 +250,7 @@ export function EditorPreviewDataProvider({
         asset_config: { asset_repository: MainImageRepository.instance },
       })
         .then((r) => {
-          onVanillaPreviewResult(r, true);
+          onInitialVanillaPreviewResult(r, true);
         })
         .catch(console.error)
         .finally(() => {
@@ -182,45 +262,89 @@ export function EditorPreviewDataProvider({
   //   // ------------------------
   //   // ------ for esbuild -----
   useEffect(() => {
-    if (
-      !state.editingModule ||
-      // now only react is supported.
-      state.editingModule.framework !== "react"
-    ) {
+    if (!state.editingModule) {
       return;
     }
 
-    const { raw, componentName } = state.editingModule;
-    assert(componentName, "component name is required");
-    assert(raw, "raw input code is required");
-    updateBuildingState(true);
-    bundler(transform(raw, componentName), "tsx")
-      .then((d) => {
-        if (d.err == null) {
-          if (d.code) {
-            onEsbuildReactPreviewResult({
-              key: new WidgetKey({
-                originName: target.name,
-                id: target.id,
-              }),
-              initialSize: {
-                width: target.width,
-                height: target.height,
-              },
-              bundledjs: d.code,
-              componentName: componentName,
-            });
-          }
-        } else {
-          consoleLog({ ...d.err });
-        }
-      })
-      .catch((e) => {
-        consoleLog({ method: "error", data: [e.message] });
-      })
-      .finally(() => {
-        updateBuildingState(false);
+    if (supportsPreview(state.editingModule.framework)) {
+      const { raw, componentName } = state.editingModule;
+      assert(componentName, "component name is required");
+      assert(raw, "raw input code is required");
+      updateBuildingState(true);
+
+      const wkey = new WidgetKey({
+        originName: target.name,
+        id: target.id,
       });
+
+      const initialSize = {
+        width: target.width,
+        height: target.height,
+      };
+
+      switch (state.editingModule.framework) {
+        case "react": {
+          bundler(transform(raw, componentName), "tsx")
+            .then((d) => {
+              if (d.err == null) {
+                if (d.code) {
+                  onEsbuildReactPreviewResult({
+                    key: wkey,
+                    initialSize: initialSize,
+                    bundledjs: d.code,
+                    componentName: componentName,
+                  });
+                }
+              } else {
+                consoleLog({ ...d.err });
+              }
+            })
+            .catch((e) => {
+              consoleLog({ method: "error", data: [e.message] });
+            })
+            .finally(() => {
+              updateBuildingState(false);
+            });
+          break;
+        }
+        case "vanilla": {
+          onVanillaPreviewResult({
+            key: wkey,
+            initialSize,
+            componentName,
+            raw: state.editingModule.raw,
+          });
+          break;
+        }
+        case "flutter": {
+          dartservices
+            .compileComplete(state.editingModule.raw)
+            .then((r) => {
+              if (!r.error) {
+                onDartServicesFlutterBuildComplete({
+                  key: wkey,
+                  initialSize: initialSize,
+                  componentName: componentName,
+                  js: r.result,
+                });
+              } else {
+                consoleLog({ method: "error", data: [r.error] });
+              }
+            })
+            .catch((e) => {
+              consoleLog({ method: "error", data: [e.message] });
+            })
+            .finally(() => {
+              updateBuildingState(false);
+            });
+          break;
+        }
+        default:
+          throw new Error(
+            `Unsupported framework: ${state.editingModule.framework}`
+          );
+      }
+    }
   }, [state.editingModule?.framework, state.editingModule?.raw]);
 
   return <>{children}</>;

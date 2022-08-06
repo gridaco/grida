@@ -34,7 +34,7 @@ export function EditorLayerHierarchy() {
   const layers: FlattenedDisplayItemNode[][] = useMemo(() => {
     return root
       ? root
-          .filter((l) => !!l)
+          .filter(Boolean)
           .map((layer) => flattenNodeTree(layer, selectedNodes, expands))
       : [];
   }, [root, state?.selectedNodes, expands]);
