@@ -82,7 +82,7 @@ interface HovringNode {
 export function Canvas({
   viewbound,
   renderItem,
-  onSelectNode,
+  onSelectNode: _cb_onSelectNode,
   onClearSelection,
   filekey,
   pageid,
@@ -148,6 +148,10 @@ export function Canvas({
   };
 
   const node = (id) => find_node_by_id_under_inpage_nodes(id, nodes);
+
+  const onSelectNode = (...nodes: ReflectSceneNode[]) => {
+    _cb_onSelectNode?.(...nodes.filter(Boolean));
+  };
 
   const wshighlight = highlightedLayer
     ? ({ node: node(highlightedLayer), reason: "external" } as HovringNode)
@@ -340,7 +344,7 @@ export function Canvas({
         items={[
           { title: "Show all layers", value: "canvas-focus-all-to-fit" },
           "separator",
-          { title: "Run", value: "deploy-to-vercel" },
+          { title: "Run", value: "run" },
           { title: "Deploy", value: "deploy-to-vercel" },
           { title: "Open in Figma", value: "open-in-figma" },
           { title: "Get sharable link", value: "make-sharable-link" },
