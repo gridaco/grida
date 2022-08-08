@@ -42,7 +42,7 @@ $ grida init
 
 - origin : 디자인 소스를 어디서 가져올지 선택합니다.
 - file : 파일을 선택합니다.
-- token : 파일에 접근할수 있는 [personal-access-token]() 을 발급받아 입력합니다.
+- token : 파일에 접근할수 있는 [personal-access-token](../with-figma/guides/how-to-get-personal-access-token) 을 발급받아 입력합니다.
 
 ## `grida add`
 
