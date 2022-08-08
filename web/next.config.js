@@ -96,8 +96,7 @@ module.exports = withBundleAnalyzer(
             },
             {
               source: "/github",
-              destination:
-                "https://github.com/gridaco",
+              destination: "https://github.com/gridaco",
               permanent: true,
             },
             // events

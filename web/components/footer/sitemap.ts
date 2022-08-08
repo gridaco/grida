@@ -9,6 +9,18 @@ export const Products: Sitemap = {
   label: "Products",
   child: [
     {
+      label: "Code",
+      href: "https://code.grida.co",
+    },
+    {
+      label: "Assistant",
+      href: "/assistant",
+    },
+    {
+      label: "CLI",
+      href: "/cli",
+    },
+    {
       label: "Cloud",
       href: "/cloud",
     },
@@ -21,24 +33,8 @@ export const Products: Sitemap = {
       href: "https://reflect-ui.com",
     },
     {
-      label: "Assistant",
-      href: "/assistant",
-    },
-    {
       label: "VSCode",
       href: "/vscode",
-    },
-    {
-      label: "Console",
-      href: "https://console.grida.co",
-    },
-    // {
-    //   label: "Appbox",
-    //   href: "/appbox",
-    // },
-    {
-      label: "Surf",
-      href: "https://surf.codes",
     },
   ],
 };

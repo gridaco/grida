@@ -85,7 +85,7 @@ const MadeWithGridaFooterText = styled.a`
   color: rgba(0, 0, 0, 0.6);
   text-overflow: ellipsis;
   font-size: 16px;
-  font-family: "Roboto Mono", sans-serif;
+  font-family: "Roboto Mono", monospace !important;
   font-weight: 400;
   line-height: 167%;
   text-align: center;

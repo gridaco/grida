@@ -242,7 +242,7 @@ const StartAsButton = styled.button`
   padding: 10px 16px;
   color: white;
   font-size: 18px;
-  font-family: "Roboto Mono", sans-serif;
+  font-family: "Roboto Mono", monospace !important;
   font-weight: 500;
   border: none;
   outline: none;
