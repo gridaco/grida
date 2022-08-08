@@ -14,6 +14,8 @@ Before we start, we recommand you to read [Figma Constraint docs](https://www.fi
 
 ![](./assets/constraint-calculation-center.png)
 
+It's similar how Android's `ConstraintLayout` works. Yet, web (css) or flutter does not have such layout.
+
 ## Web - css
 
 [Example sandbox file](https://codesandbox.io/s/wizardly-robinson-c034i)
