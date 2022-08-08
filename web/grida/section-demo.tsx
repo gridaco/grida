@@ -196,6 +196,15 @@ const ProjectsMyReactAppZsh = styled.span`
 `;
 
 const Ignore = styled.div`
+  overflow: scroll;
+
+  /* no scrollbar */
+  -ms-overflow-style: none; /* IE and Edge */
+  scrollbar-width: none; /* Firefox */
+  ::-webkit-scrollbar {
+    display: none;
+  }
+
   display: flex;
   justify-content: flex-start;
   flex-direction: column;

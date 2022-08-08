@@ -55,7 +55,7 @@ export default function Home() {
             alignItems: "stretch",
           }}
         >
-          <SectionConfiguration />
+          <SectionConfiguration onSeeTheDocsClick={onstartclick} />
           <div
             style={{
               position: "relative",
