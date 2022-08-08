@@ -8,7 +8,7 @@
   },
   "peerDependencies": {
     "@monaco-editor/react": "^4.4.1",
-    "axios": "^0.26.1",
+    "axios": "^0.26.1 || ^0.21.0",
     "nanoid": "^3.3.2"
   }
 }

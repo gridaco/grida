@@ -13,10 +13,10 @@ import { CodeEditor } from "components/code-editor";
 import {
   ImageRepository,
   MainImageRepository,
-} from "@design-sdk/core/assets-repository";
-import { RemoteImageRepositories } from "@design-sdk/figma-remote/lib/asset-repository/image-repository";
-import { DesignInput } from "@designto/config/input";
-import { config, FrameworkConfig, output } from "@designto/config";
+} from "@design-sdk/asset-repository";
+import { RemoteImageRepositories } from "@design-sdk/figma-remote/asset-repository";
+import { DesignInput } from "@grida/builder-config/input";
+import { config, FrameworkConfig, output } from "@grida/builder-config";
 import {
   react_presets,
   flutter_presets,

@@ -61,6 +61,7 @@ function PIP({
   backgroundColor?: string;
 }) {
   return (
+    // @ts-ignore
     <Draggable handle=".handle" bounds="parent">
       <PipWindow
         className="handle"

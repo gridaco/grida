@@ -70,7 +70,7 @@ function HeadInjection() {
         name="viewport"
         content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
       />
-      <Script
+      <script
         dangerouslySetInnerHTML={{
           // wheel + ctrl        - disable zoom on chrome / safari
           // wheel + meta (cmd)  - disable zoom on firefox-mac
@@ -78,13 +78,24 @@ function HeadInjection() {
         }}
       />
 
+      <script
+        dangerouslySetInnerHTML={{
+          // Disable native context menu on non-input element
+
+          // This lets us open another context menu when one is currently open.
+          // This may only be needed if the pointer is a pen.
+          // >> document.body.style.pointerEvents = "";
+          __html: `function disablecontextmenu() { document.oncontextmenu = (event) => { if (event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement) { return; } event.preventDefault(); document.body.style.pointerEvents = ""; }; } window.addEventListener("DOMContentLoaded", disablecontextmenu, false);`,
+        }}
+      />
+
       {/* region Google analytics */}
       {/* https://stackoverflow.com/a/62552263 */}
-      <Script
+      <script
         async
         src="https://www.googletagmanager.com/gtag/js?id=G-7Y9DGWF5RT"
       />
-      <Script
+      <script
         dangerouslySetInnerHTML={{
           __html: `
             window.dataLayer = window.dataLayer || [];

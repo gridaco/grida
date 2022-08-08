@@ -6,15 +6,15 @@ import { EditorAppbarFragments } from "components/editor";
 import { get_framework_config } from "query/to-code-options-from-query";
 import { CodeOptionsControl } from "components/codeui-code-options-control";
 import { designToCode, Result } from "@designto/code";
-import { config } from "@designto/config";
+import { config } from "@grida/builder-config";
 import {
   ImageRepository,
   MainImageRepository,
-} from "@design-sdk/core/assets-repository";
+} from "@design-sdk/asset-repository";
 import { useEditorState, useWorkspaceState } from "core/states";
 import { useDispatch } from "core/dispatch";
-import type { ReflectSceneNode } from "@design-sdk/core";
-import { RemoteImageRepositories } from "@design-sdk/figma-remote/lib/asset-repository/image-repository";
+import type { ReflectSceneNode } from "@design-sdk/figma-node";
+import { RemoteImageRepositories } from "@design-sdk/figma-remote/asset-repository";
 import { useTargetContainer } from "hooks/use-target-node";
 import assert from "assert";
 import { debounce } from "utils/debounce";
@@ -131,7 +131,7 @@ export function CodeSegment() {
     }
   }, 500);
 
-  const { code, scaffold, name: componentName } = result ?? {};
+  const { code, scaffold, name: componentName, framework } = result ?? {};
   return (
     <CodeEditorContainer>
       <EditorAppbarFragments.CodeEditor />
@@ -174,6 +174,18 @@ export function CodeSegment() {
               }
               break;
             }
+            case "solid-js": {
+              switch (o.styling) {
+                case "styled-components":
+                  c = get_framework_config("solid-with-styled-components");
+                  break;
+                case "inline-css": {
+                  c = get_framework_config("solid-with-inline-css");
+                  break;
+                }
+              }
+              break;
+            }
             case "flutter":
               c = get_framework_config(o.framework);
               break;
@@ -197,10 +209,10 @@ export function CodeSegment() {
           code
             ? {
                 // TODO: make this to match framework
-                "App.tsx": {
-                  raw: code.raw,
+                [filename[framework.framework]]: {
+                  raw: scaffold.raw,
                   language: framework_config.language,
-                  name: "App.tsx",
+                  name: filename[framework.framework],
                 },
               }
             : {
@@ -215,6 +227,14 @@ export function CodeSegment() {
     </CodeEditorContainer>
   );
 }
+
+const filename = {
+  vanilla: "index.html",
+  react: "app.tsx",
+  "solid-js": "app.tsx",
+  vue: "app.vue",
+  flutter: "main.dart",
+} as const;
 
 const CodeEditorContainer = styled.div`
   display: flex;

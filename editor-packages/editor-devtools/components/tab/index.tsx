@@ -6,17 +6,19 @@ export function DevtoolsTab({
   label,
   badge,
   selected,
+  badgeType = "default",
   onTap,
 }: {
   selected?: boolean;
   label: string;
   badge?: string | number;
+  badgeType?: "default" | "warning" | "error";
   onTap?: () => void;
 }) {
   return (
     <TabBase onClick={onTap}>
       <Label data-selected={selected}>{label}</Label>
-      <TabBadge value={badge} />
+      <TabBadge value={badge} type={badgeType} />
     </TabBase>
   );
 }

@@ -9,10 +9,10 @@ import { fetch } from "@design-sdk/figma-remote";
 import { personal } from "@design-sdk/figma-auth-store";
 import { configure_auth_credentials } from "@design-sdk/figma-remote";
 import { TargetNodeConfig } from "../query/target-node";
-import { FigmaRemoteErrors } from "@design-sdk/figma-remote/lib/fetch";
+import { FigmaRemoteErrors } from "@design-sdk/figma-remote";
 import { RemoteDesignSessionCacheStore } from "../store";
 import { convert } from "@design-sdk/figma-node-conversion";
-import { mapFigmaRemoteToFigma } from "@design-sdk/figma-remote/lib/mapper";
+import { mapper } from "@design-sdk/figma-remote";
 import { useFigmaAccessToken } from ".";
 import {
   FigmaDesignRepository,
@@ -101,8 +101,8 @@ export function useDesign({
     }
 
     if (targetnodeconfig) {
+      const filekey = targetnodeconfig.file;
       // load design from local storage or remote figma
-
       const cacheStore = new RemoteDesignSessionCacheStore({
         file: targetnodeconfig.file,
         node: targetnodeconfig.node,
@@ -110,13 +110,14 @@ export function useDesign({
       // cache control
       if (use_session_cache && cacheStore.exists) {
         const last_response = cacheStore.get();
-        const _1_converted_to_figma = mapFigmaRemoteToFigma(
+        const _1_converted_to_figma = mapper.mapFigmaRemoteToFigma(
           last_response.nodes[targetnodeconfig.node]
         );
         const _2_converted_to_reflect = convert.intoReflectNode(
           _1_converted_to_figma,
           null,
-          "rest"
+          "rest",
+          filekey
         );
 
         const res = <TargetNodeConfig>{

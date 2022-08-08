@@ -1,4 +1,4 @@
-import type { FrameworkConfig } from "@designto/config";
+import type { FrameworkConfig } from "@grida/builder-config";
 
 type Framework = FrameworkConfig["framework"];
 
@@ -30,6 +30,11 @@ export const scripting_and_preview_framework_config: {
     enabled: false,
   },
   flutter: {
+    nativePreview: true,
+    nativeScripting: true,
+    enabled: true,
+  },
+  "solid-js": {
     nativePreview: false,
     nativeScripting: false,
     enabled: false,

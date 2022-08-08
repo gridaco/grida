@@ -78,6 +78,16 @@ export function CodeOptionsControl(props: CodeOptionsControlProps) {
         description: "with inline-style",
       },
       {
+        name: "Solid",
+        value: "solid_default",
+        description: "solid-js",
+      },
+      {
+        name: "Solid",
+        value: "solid_with_inline_css",
+        description: "with inline-css",
+      },
+      {
         name: "Flutter",
         value: "flutter_default",
         description: "flutter",
@@ -162,6 +172,7 @@ export function CodeOptionsControl(props: CodeOptionsControlProps) {
   const fields_config = {
     react: [platform_field_config, lang_field_config, react_style_field_config],
     "react-native": [platform_field_config, lang_field_config],
+    "solid-js": [platform_field_config, lang_field_config],
     flutter: [platform_field_config, lang_field_config],
     vanilla: [platform_field_config, lang_field_config],
   };
