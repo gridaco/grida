@@ -101,7 +101,7 @@ const config = {
           },
           {
             type: "doc",
-            docId: "references/intro",
+            docId: "reference/intro",
             position: "left",
             label: "Reference",
           },
