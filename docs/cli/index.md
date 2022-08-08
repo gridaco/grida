@@ -136,16 +136,58 @@ Once project setup is complete, you'll see you project tree organized like below
 
 ## `grida add`
 
-grida add 는 패키지 매니저와 비슷하게 작동합니다. `grida add [modules...]` 의 형식으로 사용합니다.
+grida works like a package manager that you might already be familiar with. The syntax is,
 
 ```
+grida add [modules...]
+# use project configuration
+grida add
+# add specific design module
+grida add <modules...>
+```
 
+**Running `grida add` without arguments**
+
+Running `grida add` without any arguments will prompt you to select a design module to add. This is automatically managed by grida cli. but this is not recommended since idendifying your design with its name may cause human errors.
+
+**Adding package**
+
+> `grida add <module>`
+
+**Adding package with figma url**
+
+You can import target design with, `grida add <figma-url>`.
+
+> If the givven figma url points to entire file or a page, You might be importing tons of modules at one time. It is recommended to use frame-level url instead.
+
+```bash
+$ grida add https://www.figma.com/file/x7RRK6RwWtZuNakmbMLTVH/examples?node-id=2422%3A10181
+
+# or you can add with id only (the target should be a node that is inside the file you have in grida.config.js)
+
+$ grida add 2422:10181
+```
+
+The added package will be added to `/grida` or `/lib/grida` (for flutter) by default, unless you have additional configuration.
+
+You are now good to go with your main working file, and import the added module.
+
+So for example (react), In your `pages/index.tsx`, you may import like..
+
+```tsx
+import { NewModuleFromFigma } from "../grida/new-module-from-figma";
+
+export default function() {
+  return (
+    <>
+      {/* ... */}
+      <NewModuleFromFigma />
+      {/* ... */}
+    </>
+  );
+}
 ```
 
 ## See also
 
 - [(ko) Grida CLI @ disquiet.io](https://disquiet.io/product/figma-cli-by-grida)
-
-```
-
-```

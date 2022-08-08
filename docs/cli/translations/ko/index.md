@@ -134,7 +134,53 @@ grida init 을 통해 정상적으로 프로젝트가 셋업 되었다면 아래
 grida add 는 패키지 매니저와 비슷하게 작동합니다. `grida add [modules...]` 의 형식으로 사용합니다.
 
 ```
+grida add [modules...]
+# use project configuration
+grida add
+# add specific design module
+grida add <modules...>
+```
 
+**아무 arguments 없이 `grida add` 사용하기**
+
+아무 arguments 없이 `grida add` 를 실행할경우, 어떤 모듈을 더할지 cli 에서 자동으로 관리해 줍니다. 하지만 이는 디자인의 이름으로 선택해야 하기때문에 예상과 다른 디자인을 임포트하는 실수를 유발하기 쉽습니다. `grida add` 에 타겟 모듈을 명시하여 사용하는것을 추천드립니다.
+
+**Adding package**
+
+> `grida add <module>`
+
+**Adding package with figma url**
+
+`grida add <figma-url>` 의 형태로 아래와 같이 사용할수 있습니다.
+
+> 만약 figma url 이 파일 전채나, 페이지를 가르킬 경우, 많은 모듈이 한번에 임포트 되수 있기에 프레임 단위의 url 을 사용하는것을 추천드립니다.
+
+```bash
+$ grida add https://www.figma.com/file/x7RRK6RwWtZuNakmbMLTVH/examples?node-id=2422%3A10181
+
+# or you can add with id only (the target should be a node that is inside the file you have in grida.config.js)
+
+$ grida add 2422:10181
+```
+
+추가된 페키지는 기본설정에 따라 `/grida` 또는 `/lib/grida` (flutter) 에 추가 됩니다. (grida.config.js 에 추가 설정이 없을경우)
+
+이제, 작업중인 메인 파일에 돌아가, 모듈을 임포트 할수 있습니다.
+
+예시로 (react), `pages/index.tsx` 에서, 아래와 같이 사용될수 있습니다.
+
+```tsx
+import { NewModuleFromFigma } from "../grida/new-module-from-figma";
+
+export default function() {
+  return (
+    <>
+      {/* ... */}
+      <NewModuleFromFigma />
+      {/* ... */}
+    </>
+  );
+}
 ```
 
 ## See also
