@@ -1,11 +1,12 @@
 ---
 id: cli
 title: "CLI"
+locale: ko
 ---
 
 # CLI
 
-![introducing grida cli - a cli for your figma design](../../assets/supercharged-with-cli.png)
+<!-- ![introducing grida cli - a cli for your figma design](../../assets/supercharged-with-cli.png) -->
 
 Grida CLI 는 디자인을 마치 모듈처럼 관리할수 있도록 도와주는 일종의 패키지 매니저 입니다. 간단히는 디자인 모듈을 임포트하여 프로젝트에 사용하거나, 응용으로는 디자인을 바탕으로 CI/CD 파이프라인을 구축할수도 있습니다.
 
