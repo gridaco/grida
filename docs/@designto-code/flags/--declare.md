@@ -39,7 +39,7 @@ stage:
 
 ## When to use
 
-Baes on this tsx react example - assuming the input design has a deep-depthed children structure, you can specify the `--declare` flag to split one of the child as a in-module component and transformt the module tree.
+Based on this tsx react example - assuming the input design has a deep-depthed children structure, you can specify the `--declare` flag to split one of the child as a in-module component and transformt the module tree.
 
 In result,
 
