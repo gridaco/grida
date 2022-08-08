@@ -1,6 +1,7 @@
 ---
 id: cli
 title: "CLI"
+locale: ko
 ---
 
 # CLI
