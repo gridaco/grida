@@ -1,5 +1,6 @@
 import React from "react";
 import styled from "@emotion/styled";
+
 /**
  * `<SectionOneCommand>` ('section-one-command')
  * - [Open in Figma](https://figma.com/file/Gaznaw1QHppxvs9UkqNOb0?node-id=8266:64060)
@@ -55,33 +56,8 @@ export function SectionOneCommand() {
         <E1 />
       </Bg>
       <ArtworkGroup>
-        <TopDesign>
-          <Rectangle787 />
-          <Rectangle789 />
-          <Rectangle788 />
-          <PlatformIconsFigmaDefault>
-            <Image71
-              src="https://figma-alpha-api.s3.us-west-2.amazonaws.com/images/c5ea3975-7eaf-43ad-86ee-ca985649370a"
-              alt="image of Image71"
-            />
-          </PlatformIconsFigmaDefault>
-        </TopDesign>
-        <BottomCode>
-          <ScreenShot20220806At4471
-            src="https://figma-alpha-api.s3.us-west-2.amazonaws.com/images/6c030df7-4192-4b4f-b643-e26d0befc1b4"
-            alt="image of ScreenShot20220806At4471"
-          />
-          <Frame216>
-            <Image65
-              src="https://figma-alpha-api.s3.us-west-2.amazonaws.com/images/1a8d9b36-3a06-4e12-9c7f-92265bd1a536"
-              alt="image of Image65"
-            />
-            <Image65
-              src="https://figma-alpha-api.s3.us-west-2.amazonaws.com/images/99e4594d-3641-4371-9553-00e2c2e8ec9a"
-              alt="image of Image66"
-            />
-          </Frame216>
-        </BottomCode>
+        <TopDesign src="/cli/top-design.png" />
+        <BottomCode src="/cli/bottom-code.png" />
       </ArtworkGroup>
       <Section2HeadingAsH2>
         One command to add designs as a module to your existing projects.
@@ -101,10 +77,9 @@ export function SectionOneCommand() {
           d="M18 9.74017L16.4137 8.02346L10.125 14.8172L10.125 0L7.875 0L7.875 14.8172L1.5975 8.01129L0 9.74017L9 19.4803L18 9.74017Z"
         />
       </Vector>
-      <CliLineArtwork
-        src="https://figma-alpha-api.s3.us-west-2.amazonaws.com/images/fc417ae8-65d0-45cd-972b-04fac8cb3a4e"
-        alt="image of CliLineArtwork"
-      />
+      <CliLineContainer>
+        <CliLine />
+      </CliLineContainer>
     </RootWrapperSectionOneCommand>
   );
 }
@@ -176,7 +151,7 @@ const ArtworkGroup = styled.div`
   height: 312px;
 `;
 
-const TopDesign = styled.div`
+const TopDesign = styled.img`
   width: 228px;
   height: 156px;
   overflow: hidden;
@@ -187,59 +162,7 @@ const TopDesign = styled.div`
   box-shadow: 0px 4px 24px rgba(0, 0, 0, 0.04);
 `;
 
-const Rectangle787 = styled.div`
-  width: 61px;
-  height: 107px;
-  background-color: white;
-  border-radius: 2px;
-  position: absolute;
-  left: 84px;
-  top: 42px;
-`;
-
-const Rectangle789 = styled.div`
-  width: 61px;
-  height: 107px;
-  background-color: white;
-  border-radius: 2px;
-  position: absolute;
-  left: -22px;
-  top: 42px;
-`;
-
-const Rectangle788 = styled.div`
-  width: 61px;
-  height: 107px;
-  background-color: white;
-  border-radius: 2px;
-  position: absolute;
-  left: 183px;
-  top: 42px;
-`;
-
-const PlatformIconsFigmaDefault = styled.div`
-  width: 32px;
-  height: 32px;
-  overflow: hidden;
-  border-top-left-radius: 0px;
-  border-top-right-radius: 0px;
-  border-bottom-right-radius: 0px;
-  border-bottom-left-radius: 0px;
-  position: absolute;
-  left: 98px;
-  top: 62px;
-`;
-
-const Image71 = styled.img`
-  object-fit: cover;
-  position: absolute;
-  left: 6px;
-  top: 0px;
-  right: 5px;
-  bottom: 0px;
-`;
-
-const BottomCode = styled.div`
+const BottomCode = styled.img`
   width: 228px;
   height: 156px;
   overflow: hidden;
@@ -248,39 +171,6 @@ const BottomCode = styled.div`
   border-radius: 4px;
   position: relative;
   box-shadow: 0px 4px 24px rgba(0, 0, 0, 0.12);
-`;
-
-const ScreenShot20220806At4471 = styled.img`
-  width: 228px;
-  height: 174px;
-  object-fit: cover;
-  position: absolute;
-  left: 0px;
-  top: -18px;
-`;
-
-const Frame216 = styled.div`
-  display: flex;
-  justify-content: center;
-  flex-direction: row;
-  align-items: flex-end;
-  gap: 29px;
-  border: solid 1px rgba(255, 255, 255, 0.1);
-  border-radius: 9px;
-  background-color: rgb(30, 30, 30);
-  box-sizing: border-box;
-  padding: 12px;
-  position: absolute;
-  top: 54px;
-  right: 64px;
-  width: 101px;
-  height: 48px;
-`;
-
-const Image65 = styled.img`
-  width: 24px;
-  height: 24px;
-  object-fit: cover;
 `;
 
 const Section2HeadingAsH2 = styled.h2`
@@ -312,7 +202,8 @@ const DescriptionLayout = styled.div`
   position: absolute;
   left: calc((calc((50% + 3px)) - 274px));
   top: 650px;
-  width: 548px;
+  width: 100%;
+  max-width: 548px;
   height: 81px;
 `;
 
@@ -336,6 +227,7 @@ const Section2DescriptionAsP_0001 = styled.p`
   line-height: 167%;
   text-align: center;
   opacity: 0.8;
+  max-width: fit-content;
 `;
 
 const Vector = styled.svg`
@@ -346,11 +238,73 @@ const Vector = styled.svg`
   bottom: 39px;
 `;
 
-const CliLineArtwork = styled.img`
-  width: 282px;
-  height: 49px;
-  object-fit: cover;
+const CliLineContainer = styled.div`
   position: absolute;
   left: calc((calc((50% + 3px)) - 141px));
   top: 415px;
+`;
+
+function CliLine() {
+  return (
+    <RootWrapperCliLine>
+      <Icon>➜</Icon>
+      <Command>grida add</Command>
+      <Arg>
+        https://www.figma.com/file/x7RRK6RwWtZuNakmbMLTVH/?node-id=906%3A779
+      </Arg>
+    </RootWrapperCliLine>
+  );
+}
+
+const RootWrapperCliLine = styled.div`
+  word-break: keep-all;
+  display: flex;
+  justify-content: flex-start;
+  flex-direction: row;
+  align-items: center;
+  flex: none;
+  gap: 12px;
+  box-shadow: 0px 4px 32px 0px rgba(0, 0, 0, 0.04);
+  border: solid 1px rgba(0, 0, 0, 0.1);
+  border-radius: 8px;
+  height: 50px;
+  width: 282px;
+  overflow: scroll;
+  background-color: white;
+  box-sizing: border-box;
+  padding: 0px 21px;
+  ::-webkit-scrollbar {
+    display: none;
+  }
+  -ms-overflow-style: none; /* IE and Edge */
+  scrollbar-width: none; /* Firefox */
+`;
+
+const Icon = styled.span`
+  color: rgba(0, 0, 0, 0.5);
+  text-overflow: ellipsis;
+  font-size: 12px;
+  font-family: "Roboto Mono", sans-serif;
+  font-weight: 400;
+  text-align: left;
+`;
+
+const Command = styled.span`
+  flex-shrink: 0;
+  color: black;
+  text-overflow: ellipsis;
+  font-size: 12px;
+  font-family: "Roboto Mono", sans-serif;
+  font-weight: 500;
+  text-align: left;
+`;
+
+const Arg = styled.span`
+  flex-shrink: 0;
+  color: rgba(0, 0, 0, 0.5);
+  text-overflow: ellipsis;
+  font-size: 12px;
+  font-family: "Roboto Mono", sans-serif;
+  font-weight: 400;
+  text-align: left;
 `;

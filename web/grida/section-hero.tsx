@@ -53,14 +53,14 @@ export function SectionHero({
             <BadgeLabel>_ Grida CLI // Beta</BadgeLabel>
           </BadgeContainer>
           <Frame508>
-            <HeadingAsH1>CI</HeadingAsH1>
-            <HeadingAsH1_0001>your design.</HeadingAsH1_0001>
+            <Heading>
+              <Mono>CI</Mono> your design.
+            </Heading>
           </Frame508>
         </HeaderWithBadge>
         <DescriptionAsP>
-          Grida CLI generate code from Design input and saves directly into
-          <br />
-          your workspace. Use your design like a package.
+          Grida CLI generate code from Design input and saves directly into your
+          workspace. Use your design like a package.
         </DescriptionAsP>
       </HeaderContainer>
       <CtaArea>
@@ -86,6 +86,8 @@ const RootWrapperSectionHero = styled.div`
   min-height: 100vh;
   background-color: white;
   box-sizing: border-box;
+  padding-left: 16px;
+  padding-right: 16px;
 `;
 
 const HeaderContainer = styled.div`
@@ -155,25 +157,22 @@ const Frame508 = styled.div`
   box-sizing: border-box;
 `;
 
-const HeadingAsH1 = styled.h1`
-  color: black;
-  text-overflow: ellipsis;
+const Mono = styled.span`
   font-size: 74px;
   font-family: "Roboto Mono", monospace !important;
   font-weight: 700;
   letter-spacing: -1px;
   line-height: 95%;
-  text-align: left;
 `;
 
-const HeadingAsH1_0001 = styled.h1`
+const Heading = styled.h1`
   color: black;
   text-overflow: ellipsis;
   font-size: 74px;
   font-family: "Helvetica Neue", sans-serif;
   font-weight: 700;
   letter-spacing: -1px;
-  text-align: left;
+  text-align: center;
 `;
 
 const DescriptionAsP = styled.p`
@@ -186,6 +185,7 @@ const DescriptionAsP = styled.p`
   text-align: center;
   align-self: stretch;
   flex-shrink: 0;
+  max-width: fit-content;
 `;
 
 const CtaArea = styled.div`

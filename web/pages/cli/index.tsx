@@ -3,11 +3,11 @@ import Head from "next/head";
 import { useRouter } from "next/router";
 import React, { useState } from "react";
 
-import { FooterCtaSection as SectionFooterCta } from "../../grida/FooterCtaSection";
-import { SectionConfiguration } from "../../grida/SectionConfiguration";
-import { SectionDemo } from "../../grida/SectionDemo";
-import { SectionHero } from "../../grida/SectionHero";
-import { SectionOneCommand } from "../../grida/SectionOneCommand";
+import { FooterCtaSection as SectionFooterCta } from "../../grida/section-footer-cta";
+import { SectionConfiguration } from "../../grida/section-configuration";
+import { SectionDemo } from "../../grida/section-demo";
+import { SectionHero } from "../../grida/section-hero";
+import { SectionOneCommand } from "../../grida/section-command";
 
 export default function Home() {
   const router = useRouter();
@@ -90,4 +90,7 @@ const MadeWithGridaFooterText = styled.a`
   line-height: 167%;
   text-align: center;
   width: 100%;
+  box-sizing: border-box;
+  padding-left: 32px;
+  padding-right: 32px;
 `;

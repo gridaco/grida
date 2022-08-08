@@ -49,11 +49,11 @@ export function SectionConfiguration({
             <FitsIntoYourConfiguration>
               Fits into your configuration.
             </FitsIntoYourConfiguration>
-            <ConfigureGridaWithGridaConfgJsYouCanDefinePluginsOutputCodeStylesAndCustomizeTheBehaviourDeepDownToAstLevel>
+            <Description>
               Configure grida with grida.confg.js. You can define plugins,
               output code styles and customize the behaviour deep down to AST
               level.
-            </ConfigureGridaWithGridaConfgJsYouCanDefinePluginsOutputCodeStylesAndCustomizeTheBehaviourDeepDownToAstLevel>
+            </Description>
           </ContentsHeader>
           <ContentsList>
             <FeatureListItem>
@@ -90,7 +90,7 @@ export function SectionConfiguration({
           </StartAsButton>
         </Contents>
       </LeftContainer>
-      <RightContainer>
+      {/* <RightContainer>
         <Src
           src="https://figma-alpha-api.s3.us-west-2.amazonaws.com/images/f6bc8df7-dc04-435d-86d8-8e2b70214973"
           alt="image of Src"
@@ -104,7 +104,7 @@ export function SectionConfiguration({
           src="https://figma-alpha-api.s3.us-west-2.amazonaws.com/images/839ad44e-858a-47fb-93ef-cd3bf85a4e1d"
           alt="image of VideoPlayDefaultArtwork"
         />
-      </RightContainer>
+      </RightContainer> */}
     </RootWrapperSectionConfiguration>
   );
 }
@@ -180,13 +180,14 @@ const FitsIntoYourConfiguration = styled.span`
   width: 417px;
 `;
 
-const ConfigureGridaWithGridaConfgJsYouCanDefinePluginsOutputCodeStylesAndCustomizeTheBehaviourDeepDownToAstLevel = styled.span`
+const Description = styled.span`
   color: rgba(255, 255, 255, 0.6);
   text-overflow: ellipsis;
   font-size: 16px;
   font-family: "Helvetica Neue", sans-serif;
   font-weight: 400;
   line-height: 167%;
+  max-width: 500px;
   text-align: left;
   align-self: stretch;
   flex-shrink: 0;
@@ -275,6 +276,10 @@ const RightContainer = styled.div`
   align-self: stretch;
   flex-shrink: 0;
   flex: 1;
+
+  @media (max-width: 768px) {
+    display: none;
+  }
 `;
 
 const Src = styled.img`

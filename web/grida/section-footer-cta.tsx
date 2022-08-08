@@ -82,6 +82,8 @@ const HeadingAsH3 = styled.h3`
   text-align: center;
   align-self: stretch;
   flex-shrink: 0;
+  padding-left: 16px;
+  padding-right: 16px;
 `;
 
 const CtaContainer = styled.div`

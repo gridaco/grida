@@ -1,5 +1,6 @@
-import React from "react";
+import React, { useState } from "react";
 import styled from "@emotion/styled";
+import { CliDemoTypeContent } from "./section-demo-type-content";
 /**
  * `<SectionDemo>` ('section-demo')
  * - [Open in Figma](https://figma.com/file/Gaznaw1QHppxvs9UkqNOb0?node-id=8266:64061)
@@ -37,11 +38,29 @@ import styled from "@emotion/styled";
  * <!-- grida.meta.widget_declaration | engine : 0.0.1 | source : figma://Gaznaw1QHppxvs9UkqNOb0/8266:64061 -->
  */
 export function SectionDemo() {
+  const [demoplaykey, setdemoplaykey] = useState("initial");
+
+  const onreplayclick = () => {
+    setdemoplaykey("replay" + Math.random());
+  };
+
   return (
     <RootWrapperSectionDemo>
-      <ReplayButton>
+      <ReplayButton onClick={onreplayclick}>
         <Replay>replay</Replay>
-        <IconsMdiReplay src="https://figma-alpha-api.s3.us-west-2.amazonaws.com/images/8ae07f02-e52b-4682-876b-bb5d539908d6" />
+        <svg
+          width="14"
+          height="18"
+          viewBox="0 0 14 18"
+          fill="none"
+          xmlns="http://www.w3.org/2000/svg"
+        >
+          <path
+            d="M6.99967 4.16658V0.833252L2.83301 4.99992L6.99967 9.16658V5.83325C9.758 5.83325 11.9997 8.07492 11.9997 10.8333C11.9997 13.5916 9.758 15.8332 6.99967 15.8332C4.24134 15.8332 1.99967 13.5916 1.99967 10.8333H0.333008C0.333008 14.5166 3.31634 17.4999 6.99967 17.4999C10.683 17.4999 13.6663 14.5166 13.6663 10.8333C13.6663 7.14992 10.683 4.16658 6.99967 4.16658Z"
+            fill="black"
+            fill-opacity="0.9"
+          />
+        </svg>
       </ReplayButton>
       <Demo>
         <Frame286>
@@ -49,10 +68,30 @@ export function SectionDemo() {
             ~/projects/my-react-app -- zsh
           </ProjectsMyReactAppZsh>
         </Frame286>
+        <Ignore>
+          <CliDemoTypeContent key={demoplaykey} language="bash">
+            {src}
+          </CliDemoTypeContent>
+        </Ignore>
       </Demo>
     </RootWrapperSectionDemo>
   );
 }
+
+const src = `➜ ~/ grida add https://www.figma.com/file/x7RRK6RwWtZuNakmbMLTVH/?node-id=906%3A779
+➜ ~/ Fetching desing...
+➜ ~/ Generating code
+➜ ~/ Fetching assets..
+➜ ~/ Module added to ./src/grida/home.tsx
+➜ ~/ To use this module, import..
+
+     \`\`\`
+     import React from “react”;
+     import { Home } from “./grida/home”;
+     \`\`\`
+
+➜ ~/
+`;
 
 const RootWrapperSectionDemo = styled.div`
   min-height: 100vh;
@@ -64,7 +103,11 @@ const RootWrapperSectionDemo = styled.div`
   position: relative;
 `;
 
-const ReplayButton = styled.div`
+const ReplayButton = styled.button`
+  cursor: pointer;
+  outline: none;
+  border: none;
+  background: none;
   display: flex;
   justify-content: center;
   flex-direction: row;
@@ -79,6 +122,13 @@ const ReplayButton = styled.div`
   opacity: 0.8;
   width: 124px;
   height: 44px;
+
+  opacity: 0.8;
+
+  :hover {
+    opacity: 1;
+  }
+  transition: all 0.2s ease-in-out;
 `;
 
 const Replay = styled.span`
@@ -108,10 +158,14 @@ const Demo = styled.div`
   background-color: white;
   box-sizing: border-box;
   position: absolute;
-  left: 200px;
   top: 147px;
-  right: 200px;
   height: 593px;
+  @media (max-width: 768px) {
+    left: 24px;
+    right: 24px;
+  }
+  left: 200px;
+  right: 200px;
 `;
 
 const Frame286 = styled.div`
@@ -154,67 +208,4 @@ const Ignore = styled.div`
   box-sizing: border-box;
   padding: 0px 40px;
   flex-shrink: 0;
-`;
-
-const GridaAddHttpsWwwFigmaComFileX7Rrk6RwWtZuNakmbMltvhNodeId9063A779 = styled.span`
-  color: black;
-  text-overflow: ellipsis;
-  font-size: 16px;
-  font-family: Monaco, sans-serif;
-  font-weight: 400;
-  text-align: left;
-`;
-
-const FetchingDesing = styled.span`
-  color: black;
-  text-overflow: ellipsis;
-  font-size: 16px;
-  font-family: Monaco, sans-serif;
-  font-weight: 400;
-  text-align: left;
-`;
-
-const GeneratingCode = styled.span`
-  color: black;
-  text-overflow: ellipsis;
-  font-size: 16px;
-  font-family: Monaco, sans-serif;
-  font-weight: 400;
-  text-align: left;
-`;
-
-const FetchingAssets = styled.span`
-  color: black;
-  text-overflow: ellipsis;
-  font-size: 16px;
-  font-family: Monaco, sans-serif;
-  font-weight: 400;
-  text-align: left;
-`;
-
-const ModuleAddedToSrcGridaHomeTsx = styled.span`
-  color: black;
-  text-overflow: ellipsis;
-  font-size: 16px;
-  font-family: Monaco, sans-serif;
-  font-weight: 400;
-  text-align: left;
-`;
-
-const ToUseThisModuleImportImportReactFromReactImportHomeFromGridaHome = styled.span`
-  color: black;
-  text-overflow: ellipsis;
-  font-size: 16px;
-  font-family: Monaco, sans-serif;
-  font-weight: 400;
-  text-align: left;
-`;
-
-const NaN = styled.span`
-  color: black;
-  text-overflow: ellipsis;
-  font-size: 16px;
-  font-family: Monaco, sans-serif;
-  font-weight: 400;
-  text-align: left;
 `;
