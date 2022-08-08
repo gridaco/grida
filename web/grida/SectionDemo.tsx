@@ -85,7 +85,7 @@ const Replay = styled.span`
   color: rgba(0, 0, 0, 0.8);
   text-overflow: ellipsis;
   font-size: 18px;
-  font-family: "Roboto Mono", sans-serif;
+  font-family: "Roboto Mono", monospace !important;
   font-weight: 400;
   text-align: left;
 `;

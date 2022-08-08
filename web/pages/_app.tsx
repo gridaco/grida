@@ -142,6 +142,10 @@ const App = ({ Component, pageProps }: AppProps) => {
           href="https://fonts.googleapis.com/css2?family=Nanum+Pen+Script&display=swap"
           rel="stylesheet"
         ></link>
+        <link
+          href="https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@400;500;600;700&display=swap"
+          rel="stylesheet"
+        />
         {/* endregion */}
 
         {/* region Google analytics */}

@@ -135,7 +135,7 @@ const BadgeLabel = styled.span`
   color: white;
   text-overflow: ellipsis;
   font-size: 12px;
-  font-family: "Roboto Mono", sans-serif;
+  font-family: "Roboto Mono", monospace !important;
   font-weight: 400;
   line-height: 167%;
   text-align: left;
@@ -159,7 +159,7 @@ const HeadingAsH1 = styled.h1`
   color: black;
   text-overflow: ellipsis;
   font-size: 74px;
-  font-family: "Roboto Mono", sans-serif;
+  font-family: "Roboto Mono", monospace !important;
   font-weight: 700;
   letter-spacing: -1px;
   line-height: 95%;
@@ -209,7 +209,7 @@ const CopyAsButton = styled.button`
   padding: 10px 16px;
   color: rgba(0, 0, 0, 0.8);
   font-size: 18px;
-  font-family: "Roboto Mono", sans-serif;
+  font-family: "Roboto Mono", monospace !important;
   font-weight: 400;
   outline: none;
   cursor: pointer;
@@ -236,7 +236,7 @@ const StartAsButton = styled.button`
   padding: 10px 16px;
   color: white;
   font-size: 18px;
-  font-family: "Roboto Mono", sans-serif;
+  font-family: "Roboto Mono", monospace !important;
   font-weight: 500;
   border: none;
   outline: none;
