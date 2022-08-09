@@ -65,7 +65,7 @@ export function SectionOneCommand() {
       <DescriptionLayout>
         <Section2DescriptionAsP>Be the Maestro.</Section2DescriptionAsP>
         <Section2DescriptionAsP_0001>
-          You can import your design like a well-cded library, with full
+          You can import your design like a well-coded library, with full
           documentations.
           <br />
           We play the details // you play the orchestra.

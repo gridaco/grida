@@ -59,8 +59,8 @@ export function SectionHero({
           </Frame508>
         </HeaderWithBadge>
         <DescriptionAsP>
-          Grida CLI generate code from Design input and saves directly into your
-          workspace. Use your design like a package.
+          Grida CLI generates code from Design input and saves it directly into
+          your workspace. Use your design like a package.
         </DescriptionAsP>
       </HeaderContainer>
       <CtaArea>
