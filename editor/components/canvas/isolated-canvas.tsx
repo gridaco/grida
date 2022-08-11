@@ -140,9 +140,7 @@ export function IsolatedCanvas({
             <ActionButton onClick={onFullscreen}>Full Screen</ActionButton>
           )}
           {onReload && <ActionButton onClick={onReload}>Reload</ActionButton>}
-          {onExit && (
-            <ActionButton onClick={onExit}>End Isolation</ActionButton>
-          )}
+          {onExit && <ActionButton onClick={onExit}>Exit</ActionButton>}
         </Controls>
         {/* <ScalingAreaStaticRoot> */}
         <TransformContainer
