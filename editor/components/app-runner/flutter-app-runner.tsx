@@ -1,16 +1,32 @@
 import React, { useEffect, useRef, useState } from "react";
 import type { IScenePreviewDataFlutterPreview } from "core/states";
+import FlutterDaemonView from "@code-editor/flutter-daemon-view";
 
 const dartservices_html_src = "https://dartpad.dev/scripts/frame_dark.html";
 
 export function VanillaFlutterRunner({
+  updatedAt,
   widgetKey,
   loader,
   source,
 }: IScenePreviewDataFlutterPreview) {
   switch (loader) {
     case "vanilla-flutter-template": {
-      return <DartpadServedHtmlIframe js={source} />;
+      return <DartpadServedHtmlIframe key={widgetKey.id} js={source} />;
+    }
+    case "flutter-daemon-view": {
+      // return <FlutterDaemonView key={widgetKey.id} src={source} />;
+      return (
+        <iframe
+          key={updatedAt.toString()}
+          style={{
+            width: "100%",
+            height: "100%",
+            border: "none",
+          }}
+          src={source}
+        />
+      );
     }
     default: {
       throw new Error(`Unsupported loader: ${loader}`);
