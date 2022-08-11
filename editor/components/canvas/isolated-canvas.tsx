@@ -55,12 +55,14 @@ export function IsolatedCanvas({
   building = false,
   onExit,
   onFullscreen,
+  onReload,
 }: {
   defaultSize: { width: number; height: number };
   children?: React.ReactNode;
   building?: boolean;
   onExit?: () => void;
   onFullscreen?: () => void;
+  onReload?: () => void;
 }) {
   const _margin = 20;
   const [canvasSizingRef, canvasBounds] = useMeasure();
@@ -140,6 +142,7 @@ export function IsolatedCanvas({
           {onExit && (
             <ActionButton onClick={onExit}>End Isolation</ActionButton>
           )}
+          {onReload && <ActionButton onClick={onReload}>Reload</ActionButton>}
         </Controls>
         {/* <ScalingAreaStaticRoot> */}
         <TransformContainer

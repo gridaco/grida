@@ -71,7 +71,7 @@ export interface IScenePreviewData<T> {
   initialSize: { width: number; height: number };
   isBuilding: boolean;
   meta: {
-    bundler: "vanilla" | "esbuild-wasm" | "dart-services";
+    bundler: "vanilla" | "esbuild-wasm" | "dart-services" | "flutter-daemon";
     framework: FrameworkConfig["framework"];
     reason: "fill-assets" | "initial" | "update";
   };
@@ -86,7 +86,7 @@ export interface IScenePreviewDataVanillaPreview
 
 export interface IScenePreviewDataFlutterPreview
   extends IScenePreviewData<string> {
-  loader: "vanilla-flutter-template";
+  loader: "vanilla-flutter-template" | "flutter-daemon-view";
   source: string;
 }
 

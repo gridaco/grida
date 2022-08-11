@@ -27,6 +27,7 @@ export function VanillaDedicatedPreviewRenderer({
         />
       );
     }
+    case "flutter-daemon-view":
     case "vanilla-flutter-template": {
       return (
         <VanillaFlutterRunner

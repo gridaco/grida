@@ -1,0 +1,8 @@
+{
+  "name": "@code-editor/flutter-daemon-view",
+  "version": "0.0.0",
+  "description": "Flutter render view uses @flutter-daemon/clinet to communicate with the Flutter engine.",
+  "dependencies": {
+    "@flutter-daemon/client": "^0.0.1"
+  }
+}
