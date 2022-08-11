@@ -334,8 +334,8 @@ export function EditorPreviewDataProvider({
                       FlutterDaemon.instance
                         .save(state.editingModule.raw)
                         .then(() => {
-                          updateBuildingState(false);
                           FlutterDaemon.instance.webLaunchUrl().then((url) => {
+                            updateBuildingState(false);
                             dispatch({
                               type: "preview-set",
                               data: {
