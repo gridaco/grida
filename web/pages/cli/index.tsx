@@ -3,11 +3,11 @@ import Head from "next/head";
 import { useRouter } from "next/router";
 import React, { useState } from "react";
 
-import { FooterCtaSection as SectionFooterCta } from "../../grida/section-footer-cta";
+import { SectionOneCommand } from "../../grida/section-command";
 import { SectionConfiguration } from "../../grida/section-configuration";
 import { SectionDemo } from "../../grida/section-demo";
+import { FooterCtaSection as SectionFooterCta } from "../../grida/section-footer-cta";
 import { SectionHero } from "../../grida/section-hero";
-import { SectionOneCommand } from "../../grida/section-command";
 
 export default function Home() {
   const router = useRouter();
