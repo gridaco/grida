@@ -80,6 +80,7 @@ export function D2CVanillaPreview({
     setPreview(result);
 
     if (typeof target.filekey == "string") {
+      delete result["widget"];
       cache.set(target.filekey, { ...result, __image });
     }
   };
