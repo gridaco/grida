@@ -140,6 +140,13 @@ const CodeView = styled(Box)`
     border-bottom-right-radius: 8px;
 
     pre {
+      /* hide scrollbar */
+      ::-webkit-scrollbar {
+        display: none;
+      }
+      -ms-overflow-style: none; /* IE and Edge */
+      scrollbar-width: none; /* Firefox */
+      /* -- */
       width: 95%;
       height: 95%;
       padding: 0px !important;
