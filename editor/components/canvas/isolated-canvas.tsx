@@ -139,10 +139,8 @@ export function IsolatedCanvas({
           {onFullscreen && (
             <ActionButton onClick={onFullscreen}>Full Screen</ActionButton>
           )}
-          {onExit && (
-            <ActionButton onClick={onExit}>End Isolation</ActionButton>
-          )}
           {onReload && <ActionButton onClick={onReload}>Reload</ActionButton>}
+          {onExit && <ActionButton onClick={onExit}>Exit</ActionButton>}
         </Controls>
         {/* <ScalingAreaStaticRoot> */}
         <TransformContainer
@@ -183,7 +181,7 @@ const ActionButton = styled.button`
   border: none;
   cursor: pointer;
   color: white;
-  border-radius: 4px;
+  /* border-radius: 4px; */
   height: 24px;
 `;
 
@@ -199,10 +197,15 @@ const InteractiveCanvasWrapper = styled.div`
 `;
 
 const Controls = styled.div`
+  position: relative;
+  top: 16px;
   z-index: 2;
+  background-color: ${colors.color_editor_bg_on_dark};
   display: flex;
   flex-direction: row;
   justify-content: flex-end;
+  border-radius: 32px;
+  padding-right: 16px;
 `;
 
 const TransformContainer = ({
