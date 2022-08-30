@@ -31,8 +31,13 @@ export default function Home() {
         <title>Grida CLI</title>
         <meta
           name="description"
-          content="Grida CLI is a command line interface for Grida."
+          content="Grida CLI for integrating your figma design direcly in your codebase"
         />
+        <meta
+          name="keywords"
+          content="figma, grida ,cli ,command line interface, figma cli, figma to code, figma handoff cli, zeplin cli"
+        />
+        <meta name="og:title" property="og:title" content="Grida CLI"></meta>
       </Head>
       <div
         style={{
