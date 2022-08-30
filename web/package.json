@@ -20,7 +20,7 @@
     "build-storybook": "build-storybook"
   },
   "dependencies": {
-    "@base-sdk-fp/auth-components-react": "^0.0.1",
+    "@base-sdk-fp/auth-components-react": "^0.1.4",
     "@code-editor/vanilla-preview": "^0.0.2",
     "@design-sdk/figma-url": "^0.0.6",
     "@emotion/babel-preset-css-prop": "^10",
@@ -34,7 +34,6 @@
     "@mdx-js/loader": "^1.6.22",
     "@mdx-js/react": "^1.6.22",
     "@next/mdx": "^10.0.9",
-    "@reflect-ui/react-core": "0.0.1",
     "@zeit/next-bundle-analyzer": "^0.1.2",
     "@zeit/next-css": "^1.0.1",
     "axios": "^0.21.1",

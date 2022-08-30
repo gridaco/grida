@@ -1,7 +1,7 @@
 import {
   LoginState,
   useAuthState as _useAuthState,
-} from "@base-sdk-fp/auth-components-react/dist/lib/use-auth-state";
+} from "@base-sdk-fp/auth-components-react";
 import { useEffect, useState } from "react";
 
 /**
