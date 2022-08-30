@@ -99,6 +99,11 @@ module.exports = withBundleAnalyzer(
               destination: "https://github.com/gridaco",
               permanent: true,
             },
+            {
+              source: "/cloud/cors",
+              destination: "https://cors.sh",
+              permanent: true,
+            },
             // events
             {
               source: "/monothon",
