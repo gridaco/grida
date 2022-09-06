@@ -1,5 +1,6 @@
 import styled from "@emotion/styled";
 import { motion } from "framer-motion";
+import { useRouter } from "next/router";
 import React from "react";
 import { Button, Box } from "rebass";
 
@@ -8,15 +9,17 @@ import { URLS } from "utils/landingpage/constants";
 
 export default function LandingMainCtaButton() {
   const loginstate = useAuthState();
+  const router = useRouter();
 
   const handleCta = () => {
     switch (loginstate) {
       case "expired":
       case "unauthorized":
       case "loading": // loading also fallbacks as singup since there is no better way to handle this is ux perspective. - althoug, we will have enough time for the authstate from remote to bn loaded.
-        window.location.href = URLS.landing.signup_with_return;
+        router.push(URLS.landing.signup_with_return);
+        break;
       case "signedin":
-        window.location.href = "/docs/getting-started";
+        router.push("/docs");
         break;
     }
   };
