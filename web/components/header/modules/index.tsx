@@ -9,7 +9,12 @@ export function ModuleGroup({ label, href, children }: GroupEntity) {
     <Group>
       <GroupLabel>{label}</GroupLabel>
       {children.map(c => (
-        <ModuleItem key={c.label} label={c.label} icon={c["icon"]} />
+        <ModuleItem
+          key={c.label}
+          label={c.label}
+          href={c.href}
+          icon={c["icon"]}
+        />
       ))}
     </Group>
   );
@@ -32,11 +37,20 @@ const Group = styled.div`
   margin-bottom: 16px;
 `;
 
-export function ModuleItem({ label, icon }: { label: string; icon: string }) {
+export function ModuleItem({
+  label,
+  icon,
+  href,
+}: {
+  label: string;
+  icon: string;
+  href: string;
+}) {
   const [hovering, setHovering] = React.useState(false);
 
   return (
     <Wrapper
+      href={href}
       onMouseEnter={() => setHovering(true)}
       onMouseLeave={() => setHovering(false)}
     >
@@ -64,7 +78,7 @@ export function ModuleItem({ label, icon }: { label: string; icon: string }) {
   );
 }
 
-const Wrapper = styled.div`
+const Wrapper = styled.a`
   min-width: 200px;
   width: fit-content;
   padding: 8px;
