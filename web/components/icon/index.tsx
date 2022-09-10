@@ -5,8 +5,10 @@ import { width, height } from "styled-system";
 
 import icons, { IconList } from "./icons";
 
+export type IconKey = keyof IconList;
+
 interface IconProps extends BoxProps {
-  name: keyof IconList;
+  name: IconKey;
   width?: number | number[];
   height?: any;
   isClickable?: boolean;

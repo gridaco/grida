@@ -83,6 +83,16 @@ module.exports = withBundleAnalyzer(
               permanent: false,
             },
             {
+              source: "/code",
+              destination: "https://code.grida.co",
+              permanent: false,
+            },
+            {
+              source: "/console",
+              destination: "https://console.grida.co",
+              permanent: false,
+            },
+            {
               source: "/vscode",
               destination:
                 "https://marketplace.visualstudio.com/items?itemName=grida.grida-vscode",

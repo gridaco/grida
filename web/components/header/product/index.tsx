@@ -1,29 +1,37 @@
 import styled from "@emotion/styled";
 import React from "react";
-import { Box, Flex, Text } from "rebass";
+import { Flex, Text } from "rebass";
 
-import Icon from "components/icon";
-import { media } from "utils/styled/media";
-import { ThemeInterface } from "utils/styled/theme";
+import Icon, { IconKey } from "components/icon";
 
-const Product = ({ title, iconName, desc, href }) => {
+const Product = ({
+  title,
+  iconName,
+  desc,
+  href,
+}: {
+  title: string;
+  iconName?: IconKey;
+  desc: string;
+  href: string;
+}) => {
   return (
     <a href={href}>
       <ProductWrapper
         width="100%"
         height="100%"
-        justifyContent="center"
+        justifyContent="start"
         flexDirection="column"
         mt="12px"
       >
-        <Flex alignItems="center" mb="11px">
-          <Icon name={iconName} />
-          <Text fontWeight="500" fontSize="16px" ml="9px">
+        <LabelContainer>
+          {iconName && <Icon name={iconName} />}
+          <Text fontWeight="500" fontSize="16px">
             {title}
           </Text>
-        </Flex>
+        </LabelContainer>
         {desc && (
-          <Text color="#8B8B8B" fontSize="14px">
+          <Text opacity={0.6} fontSize="14px">
             {desc}
           </Text>
         )}
@@ -37,10 +45,18 @@ export default Product;
 const ProductWrapper = styled(Flex)`
   cursor: pointer;
   padding: 12px 16px;
+  border-radius: 2px;
 
   :hover {
-    background-color: rgba(0, 0, 0, 0.05);
+    background-color: rgba(0, 0, 0, 0.03);
+    opacity: 0.9;
   }
 
   transition: all 0.2s ease-in-out;
+`;
+
+const LabelContainer = styled(Flex)`
+  gap: 9px;
+  margin-bottom: 11px;
+  align-items: center;
 `;

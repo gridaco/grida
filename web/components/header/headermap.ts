@@ -34,15 +34,9 @@ export const HeaderMap: Sitemap = [
     children: [
       {
         type: "link",
-        label: "Grida Desktop",
-        href: "/desktop",
+        label: "Grida",
+        href: "https://app.grida.co",
         tagline: "Design, Code, Manage in one place.",
-      },
-      {
-        type: "link",
-        label: "Figma Assistant",
-        href: "/assistant",
-        tagline: "Figma plugin for organizing your design and fly on the go",
       },
       {
         type: "link",
@@ -52,22 +46,34 @@ export const HeaderMap: Sitemap = [
       },
       {
         type: "link",
-        label: "Handoff",
-        href: "/handoff",
-        tagline: "Automated sync & integration ready",
+        label: "Figma Assistant",
+        href: "/assistant",
+        tagline: "Figma plugin for organizing your design and fly on the go",
       },
       {
         type: "link",
-        label: "CMS",
-        href: "/cms",
-        tagline: "Design-first Content management",
+        label: "Console",
+        href: "/console",
+        tagline: "Manage your design system and components",
       },
-      {
-        type: "link",
-        label: "Design Lint",
-        href: "/lint",
-        tagline: "Keep you design consistece and production ready",
-      },
+      // {
+      //   type: "link",
+      //   label: "Handoff",
+      //   href: "/handoff",
+      //   tagline: "Automated sync & integration ready",
+      // },
+      // {
+      //   type: "link",
+      //   label: "CMS",
+      //   href: "/cms",
+      //   tagline: "Design-first Content management",
+      // },
+      // {
+      //   type: "link",
+      //   label: "Design Lint",
+      //   href: "/lint",
+      //   tagline: "Keep you design consistece and production ready",
+      // },
       {
         type: "link",
         label: "CLI / API",
@@ -100,7 +106,7 @@ export const HeaderMap: Sitemap = [
       },
       {
         type: "link",
-        label: "Slack",
+        label: "Join Slack Community",
         href: "https://grida.co/join-slack",
       },
       {
@@ -108,6 +114,21 @@ export const HeaderMap: Sitemap = [
         label: "Blog",
         href: URLS.social.medium,
       },
+      {
+        type: "link",
+        label: "Contact Sales",
+        href: "/contact/sales",
+      },
+      {
+        type: "link",
+        label: "News Room",
+        href: "/newsroom",
+      },
     ],
+  },
+  {
+    type: "link",
+    label: "Pricing",
+    href: "/pricing",
   },
 ];

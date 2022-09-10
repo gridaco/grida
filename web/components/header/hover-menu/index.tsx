@@ -32,7 +32,6 @@ function HoverMenu({
           <ModalBackground onClick={close}>
             <HoverView
               onMouseLeave={close}
-              p={["10px", "10px", "15px 30px"]}
               bg="white"
               onClick={onModalInnerClick}
             >
@@ -43,7 +42,6 @@ function HoverMenu({
                 {item.children.map((i, index) => (
                   <Product
                     key={index}
-                    iconName="mockIcon"
                     title={i.label}
                     href={i.href}
                     desc={i.tagline}
@@ -102,24 +100,20 @@ const ModalBackground = styled.div`
 `;
 
 const HoverView = styled(Flex)`
-  position: absolute;
-  top: 210px;
-  left: 50%;
+  position: relative;
   width: 100%;
-  height: 500px;
   overflow-y: scroll;
   box-shadow: 4px 6px 20px 0 rgba(0, 0, 0, 0.09);
-  transform: translate(-50%, -50%);
   align-items: center;
   justify-content: center;
 `;
 
 const ExpandHeaderContent = styled(Flex)`
   display: grid;
-  grid-template-columns: 250px 250px 250px;
-  /* grid-template-rows: 70px 70px 70px; */
-  grid-column-gap: 48px;
+  grid-template-columns: 1fr 1fr 1fr;
+  grid-template-rows: repeat(auto-fill, 1fr);
   grid-row-gap: 21px;
-
   max-height: 350px;
+  padding-top: 21px;
+  padding-bottom: 64px;
 `;
