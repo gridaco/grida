@@ -2,9 +2,9 @@ import styled from "@emotion/styled";
 import React, { useCallback } from "react";
 import { Flex } from "rebass";
 
-import Product from "components/header/product";
-
 import { GroupEntity } from "../headermap";
+import { ModuleItem } from "../modules";
+import { ProductItem } from "../product";
 
 function HoverMenu({
   item,
@@ -39,14 +39,24 @@ function HoverMenu({
                 width={["320px", "730px", "985px", "1040px"]}
                 height="100%"
               >
-                {item.children.map((i, index) => (
-                  <Product
-                    key={index}
-                    title={i.label}
-                    href={i.href}
-                    desc={i.tagline}
-                  />
-                ))}
+                {item.children.map((i, index) => {
+                  switch (i.layout) {
+                    case "module-item":
+                      return (
+                        <ModuleItem key={index} label={i.label} icon={i.icon} />
+                      );
+                    case "product-item":
+                    default:
+                      return (
+                        <ProductItem
+                          key={index}
+                          label={i.label}
+                          href={i.href}
+                          tagline={i.tagline}
+                        />
+                      );
+                  }
+                })}
               </ExpandHeaderContent>
             </HoverView>
           </ModalBackground>
@@ -60,12 +70,12 @@ function HoverMenu({
           mb="24px"
         >
           {item.children.map((i, index) => (
-            <Product
+            <ProductItem
               key={index}
-              iconName="mockIcon"
-              title={i.label}
+              icon="mockIcon"
+              label={i.label}
               href={i.href}
-              desc="Tell customer about this product. Keep it simple"
+              tagline="Tell customer about this product. Keep it simple"
             />
           ))}
         </Container>

@@ -4,17 +4,17 @@ import { Flex, Text } from "rebass";
 
 import Icon, { IconKey } from "components/icon";
 
-const Product = ({
-  title,
-  iconName,
-  desc,
+export function ProductItem({
+  label,
+  icon: iconName,
+  tagline,
   href,
 }: {
-  title: string;
-  iconName?: IconKey;
-  desc: string;
+  label: string;
+  icon?: IconKey;
+  tagline: string;
   href: string;
-}) => {
+}) {
   return (
     <a href={href}>
       <ProductWrapper
@@ -27,20 +27,18 @@ const Product = ({
         <LabelContainer>
           {iconName && <Icon name={iconName} />}
           <Text fontWeight="500" fontSize="16px">
-            {title}
+            {label}
           </Text>
         </LabelContainer>
-        {desc && (
+        {tagline && (
           <Text opacity={0.6} fontSize="14px">
-            {desc}
+            {tagline}
           </Text>
         )}
       </ProductWrapper>
     </a>
   );
-};
-
-export default Product;
+}
 
 const ProductWrapper = styled(Flex)`
   cursor: pointer;
