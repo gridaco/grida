@@ -110,6 +110,11 @@ module.exports = withBundleAnalyzer(
               permanent: true,
             },
             {
+              source: "/jobs/:path*",
+              destination: "/careers/:path*",
+              permanent: true,
+            },
+            {
               source: "/cloud/cors",
               destination: "https://cors.sh",
               permanent: true,
