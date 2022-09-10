@@ -2,8 +2,9 @@ import { URLS } from "utils/landingpage/constants";
 export type GroupEntity = {
   type: "group";
   label: string;
-  children: LinkEntity[];
+  children: Entity[];
   href?: string;
+  layout?: "module-group";
 };
 
 type Icon = string;
@@ -14,153 +15,237 @@ export type LinkEntity = {
   href: string;
   tagline?: string;
   icon?: Icon;
-  layout?: "module-item" | "product-item";
+  layout?: "module-item" | "product-item" | "line-item";
 };
 
 export type Entity = LinkEntity | GroupEntity;
 
 type Sitemap = Entity[];
 
-const Frameworks: LinkEntity[] = [
+const Frameworks: Sitemap = [
+  // react
   {
-    type: "link",
-    label: "CSS",
-    href: "/vanilla#css",
-    icon: "/module-icons/css",
-    layout: "module-item",
-  },
-  {
-    type: "link",
-    label: "Expo",
-    href: "/expo",
-    icon: "/module-icons/expo",
-    layout: "module-item",
-  },
-  {
-    type: "link",
-    label: "Flutter",
-    href: "/flutter",
-    icon: "/module-icons/flutter",
-    layout: "module-item",
-  },
-  {
-    type: "link",
-    label: "Framer motion",
-    href: "/framer-motion",
-    icon: "/module-icons/framer-motion",
-    layout: "module-item",
-  },
-  {
-    type: "link",
-    label: "Headless UI",
-    href: "/headless-ui",
-    icon: "/module-icons/headless-ui",
-    layout: "module-item",
-  },
-  {
-    type: "link",
-    label: "HTML",
-    href: "/vanilla",
-    icon: "/module-icons/html",
-    layout: "module-item",
-  },
-  {
-    type: "link",
-    label: "Jetpack Compose",
-    href: "/jetpack-compose",
-    icon: "/module-icons/jetpack-compose",
-    layout: "module-item",
-  },
-  {
-    type: "link",
-    label: "Material UI",
-    href: "/react-mui",
-    icon: "/module-icons/mui",
-    layout: "module-item",
-  },
-  {
-    type: "link",
-    label: "NextJS",
-    href: "/nextjs",
-    icon: "/module-icons/nextjs",
-    layout: "module-item",
-  },
-  {
-    type: "link",
-    label: "NuxtJS",
-    href: "/nuxtjs",
-    icon: "/module-icons/nuxtjs",
-    layout: "module-item",
-  },
-  {
-    type: "link",
-    label: "Preact",
-    href: "/preact",
-    icon: "/module-icons/preact",
-    layout: "module-item",
-  },
-  {
-    type: "link",
+    type: "group",
     label: "React",
-    href: "/react",
-    icon: "/module-icons/react",
-    layout: "module-item",
+    layout: "module-group",
+    children: [
+      {
+        type: "link",
+        label: "React",
+        href: "/react",
+        icon: "/module-icons/react",
+        layout: "module-item",
+      },
+      {
+        type: "link",
+        label: "NextJS",
+        href: "/nextjs",
+        icon: "/module-icons/nextjs",
+        layout: "module-item",
+      },
+      {
+        type: "link",
+        label: "Preact",
+        href: "/preact",
+        icon: "/module-icons/preact",
+        layout: "module-item",
+      },
+    ],
   },
+
+  // vue
   {
-    type: "link",
-    label: "Scss",
-    href: "/sass",
-    icon: "/module-icons/sass",
-    layout: "module-item",
-  },
-  {
-    type: "link",
-    label: "SolidJS",
-    href: "/solid-js",
-    icon: "/module-icons/solid-js",
-    layout: "module-item",
-  },
-  {
-    type: "link",
-    label: "Storybook",
-    href: "/storybook",
-    icon: "/module-icons/storybook",
-    layout: "module-item",
-  },
-  {
-    type: "link",
-    label: "Svelte",
-    href: "/svelte",
-    icon: "/module-icons/svelte",
-    layout: "module-item",
-  },
-  {
-    type: "link",
-    label: "Swift UI",
-    href: "/swiftui",
-    icon: "/module-icons/swiftui",
-    layout: "module-item",
-  },
-  {
-    type: "link",
-    label: "Tailwind CSS",
-    href: "/sass",
-    icon: "/module-icons/tailwindcss",
-    layout: "module-item",
-  },
-  {
-    type: "link",
+    type: "group",
     label: "Vue",
-    href: "/vue",
-    icon: "/module-icons/vue",
-    layout: "module-item",
+    layout: "module-group",
+    children: [
+      {
+        type: "link",
+        label: "Vue",
+        href: "/vue",
+        icon: "/module-icons/vue",
+        layout: "module-item",
+      },
+      {
+        type: "link",
+        label: "NuxtJS",
+        href: "/nuxtjs",
+        icon: "/module-icons/nuxtjs",
+        layout: "module-item",
+      },
+    ],
   },
+
+  // core web
+
   {
-    type: "link",
-    label: "Web Components",
-    href: "/webcomponents",
-    icon: "/module-icons/webcomponents",
-    layout: "module-item",
+    type: "group",
+    label: "Core web",
+    layout: "module-group",
+    children: [
+      {
+        type: "link",
+        label: "Web Components",
+        href: "/webcomponents",
+        icon: "/module-icons/webcomponents",
+        layout: "module-item",
+      },
+      {
+        type: "link",
+        label: "HTML",
+        href: "/vanilla",
+        icon: "/module-icons/html",
+        layout: "module-item",
+      },
+      {
+        type: "link",
+        label: "Svelte",
+        href: "/svelte",
+        icon: "/module-icons/svelte",
+        layout: "module-item",
+      },
+      {
+        type: "link",
+        label: "SolidJS",
+        href: "/solid-js",
+        icon: "/module-icons/solid-js",
+        layout: "module-item",
+      },
+    ],
+  },
+
+  // Flutter
+  {
+    type: "group",
+    label: "Flutter",
+    layout: "module-group",
+    children: [
+      {
+        type: "link",
+        label: "Flutter",
+        href: "/flutter",
+        icon: "/module-icons/flutter",
+        layout: "module-item",
+      },
+    ],
+  },
+
+  // React Native
+  {
+    type: "group",
+    label: "React Native",
+    layout: "module-group",
+    children: [
+      {
+        type: "link",
+        label: "React Native",
+        href: "/react-native",
+        icon: "/module-icons/react",
+        layout: "module-item",
+      },
+      {
+        type: "link",
+        label: "Expo",
+        href: "/expo",
+        icon: "/module-icons/expo",
+        layout: "module-item",
+      },
+    ],
+  },
+
+  // iOS / AOS
+  {
+    type: "group",
+    label: "iOS / Android",
+    layout: "module-group",
+    children: [
+      {
+        type: "link",
+        label: "Jetpack Compose",
+        href: "/jetpack-compose",
+        icon: "/module-icons/jetpack-compose",
+        layout: "module-item",
+      },
+      {
+        type: "link",
+        label: "Swift UI",
+        href: "/swiftui",
+        icon: "/module-icons/swiftui",
+        layout: "module-item",
+      },
+    ],
+  },
+
+  // Modules
+  {
+    type: "group",
+    label: "Modules",
+    layout: "module-group",
+    children: [
+      {
+        type: "link",
+        label: "Storybook",
+        href: "/storybook",
+        icon: "/module-icons/storybook",
+        layout: "module-item",
+      },
+      {
+        type: "link",
+        label: "Material UI",
+        href: "/react-mui",
+        icon: "/module-icons/mui",
+        layout: "module-item",
+      },
+      {
+        type: "link",
+        label: "Emotion JS",
+        href: "/emotion-js",
+        icon: "/module-icons/emotion-js",
+        layout: "module-item",
+      },
+      {
+        type: "link",
+        label: "CSS",
+        href: "/vanilla#css",
+        icon: "/module-icons/css",
+        layout: "module-item",
+      },
+      {
+        type: "link",
+        label: "Framer motion",
+        href: "/framer-motion",
+        icon: "/module-icons/framer-motion",
+        layout: "module-item",
+      },
+      {
+        type: "link",
+        label: "Headless UI",
+        href: "/headless-ui",
+        icon: "/module-icons/headless-ui",
+        layout: "module-item",
+      },
+      {
+        type: "link",
+        label: "Scss",
+        href: "/sass",
+        icon: "/module-icons/sass",
+        layout: "module-item",
+      },
+      {
+        type: "link",
+        label: "Styled Components",
+        href: "/styled-components",
+        icon: "/module-icons/styled-components",
+        layout: "module-item",
+      },
+      {
+        type: "link",
+        label: "Tailwind CSS",
+        href: "/sass",
+        icon: "/module-icons/tailwindcss",
+        layout: "module-item",
+      },
+    ],
   },
 ];
 
@@ -260,26 +345,67 @@ export const HeaderMap: Sitemap = [
         type: "link",
         label: "Github",
         href: URLS.social.github,
+        layout: "line-item",
       },
       {
         type: "link",
         label: "Join Slack Community",
         href: "https://grida.co/join-slack",
+        layout: "line-item",
       },
       {
         type: "link",
         label: "Blog",
         href: URLS.social.medium,
+        layout: "line-item",
       },
       {
         type: "link",
         label: "Contact Sales",
         href: "/contact/sales",
+        layout: "line-item",
+      },
+      {
+        type: "link",
+        label: "Projects",
+        href: "/projects",
+        layout: "line-item",
       },
       {
         type: "link",
         label: "News Room",
         href: "/newsroom",
+        layout: "line-item",
+      },
+      {
+        type: "link",
+        label: "Starter Kit",
+        href: "/first-aid",
+        layout: "line-item",
+      },
+      {
+        type: "link",
+        label: "Landingpage Kit",
+        href: "/first-aid/landingpage",
+        layout: "line-item",
+      },
+      {
+        type: "link",
+        label: "Widget Catalog",
+        href: "/widgets",
+        layout: "line-item",
+      },
+      {
+        type: "link",
+        label: "Customer Stories",
+        href: "/stories/customer",
+        layout: "line-item",
+      },
+      {
+        type: "link",
+        label: "Jobs",
+        href: "/jobs",
+        layout: "line-item",
       },
     ],
   },

@@ -2,6 +2,36 @@ import styled from "@emotion/styled";
 import Image from "next/image";
 import React from "react";
 
+import { GroupEntity } from "../headermap";
+
+export function ModuleGroup({ label, href, children }: GroupEntity) {
+  return (
+    <Group>
+      <GroupLabel>{label}</GroupLabel>
+      {children.map(c => (
+        <ModuleItem key={c.label} label={c.label} icon={c["icon"]} />
+      ))}
+    </Group>
+  );
+}
+
+const GroupLabel = styled.label`
+  color: rgba(0, 0, 0, 0.5);
+  text-overflow: ellipsis;
+  font-size: 14px;
+  font-family: Inter, sans-serif;
+  font-weight: 400;
+  text-align: left;
+  margin-bottom: 16px;
+`;
+
+const Group = styled.div`
+  display: flex;
+  flex-direction: column;
+  padding: 0 16px;
+  margin-bottom: 16px;
+`;
+
 export function ModuleItem({ label, icon }: { label: string; icon: string }) {
   const [hovering, setHovering] = React.useState(false);
 

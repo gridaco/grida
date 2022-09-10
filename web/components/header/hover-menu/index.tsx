@@ -3,7 +3,8 @@ import React, { useCallback } from "react";
 import { Flex } from "rebass";
 
 import { GroupEntity } from "../headermap";
-import { ModuleItem } from "../modules";
+import { LineItem } from "../line-item";
+import { ModuleGroup, ModuleItem } from "../modules";
 import { ProductItem } from "../product";
 
 function HoverMenu({
@@ -41,12 +42,14 @@ function HoverMenu({
               >
                 {item.children.map((i, index) => {
                   switch (i.layout) {
+                    case "module-group": {
+                      return <ModuleGroup key={index} {...i} />;
+                    }
                     case "module-item":
                       return (
                         <ModuleItem key={index} label={i.label} icon={i.icon} />
                       );
                     case "product-item":
-                    default:
                       return (
                         <ProductItem
                           key={index}
@@ -55,6 +58,9 @@ function HoverMenu({
                           tagline={i.tagline}
                         />
                       );
+                    case "line-item":
+                    default:
+                      return <LineItem key={index} {...i} />;
                   }
                 })}
               </ExpandHeaderContent>
@@ -120,10 +126,10 @@ const HoverView = styled(Flex)`
 
 const ExpandHeaderContent = styled(Flex)`
   display: grid;
+  grid-auto-flow: row;
   grid-template-columns: 1fr 1fr 1fr;
   grid-template-rows: repeat(auto-fill, 1fr);
   grid-row-gap: 21px;
-  max-height: 350px;
   padding-top: 21px;
   padding-bottom: 64px;
 `;
