@@ -93,7 +93,7 @@ const Frameworks: Sitemap = [
       {
         type: "link",
         label: "HTML",
-        href: "/docs/with-vanilla",
+        href: "/docs/with-html",
         icon: "/module-icons/html",
         layout: "module-item",
       },
@@ -199,7 +199,7 @@ const Frameworks: Sitemap = [
       {
         type: "link",
         label: "Emotion JS",
-        href: "/emotion-js",
+        href: "/docs/with-emotion-js",
         icon: "/module-icons/emotion-js",
         layout: "module-item",
       },
@@ -213,7 +213,7 @@ const Frameworks: Sitemap = [
       {
         type: "link",
         label: "Framer motion",
-        href: "/framer-motion",
+        href: "/docs/with-framer-motion",
         icon: "/module-icons/framer-motion",
         layout: "module-item",
       },
