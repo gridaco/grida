@@ -1,7 +1,10 @@
 /* eslint-disable import-helpers/order-imports */
+import { ReactElement, ReactNode } from "react";
+import { NextPage } from "next";
+import { AppProps } from "next/app";
+
 import { Global, css } from "@emotion/core";
 import { ThemeProvider } from "emotion-theming";
-import { AppProps } from "next/app";
 import Head from "next/head";
 import { useRouter } from "next/router";
 import React, { useEffect } from "react";
@@ -29,8 +32,33 @@ import makeKeywords from "utils/seo/make-keywords";
 import { Box } from "rebass";
 import { env } from "process";
 
-const App = ({ Component, pageProps }: AppProps) => {
+export type NextPageWithLayout<P = {}, IP = P> = NextPage<P, IP> & {
+  getLayout?: (page: ReactElement) => ReactNode;
+};
+
+type AppPropsWithLayout = AppProps & {
+  Component: NextPageWithLayout;
+};
+
+function defaultLayout(page: ReactElement) {
+  return (
+    <>
+      <Header />
+      <BodyCustomStyleInAbosulteSectionLayout
+        mt="60px"
+        style={{ position: "relative" }}
+      >
+        {page}
+      </BodyCustomStyleInAbosulteSectionLayout>
+      <Footer />
+    </>
+  );
+}
+
+const App = ({ Component, pageProps }: AppPropsWithLayout) => {
   const router = useRouter();
+
+  const getLayout = Component.getLayout ?? defaultLayout;
 
   useEffect(() => {
     // region set firebase analytics
@@ -191,14 +219,7 @@ const App = ({ Component, pageProps }: AppProps) => {
       <Box
         style={{ display: "flex", flexDirection: "column", minHeight: "100vh" }}
       >
-        <Header />
-        <BodyCustomStyleInAbosulteSectionLayout
-          mt="60px"
-          style={{ position: "relative" }}
-        >
-          <Component {...pageProps} />
-        </BodyCustomStyleInAbosulteSectionLayout>
-        <Footer />
+        {getLayout(<Component {...pageProps} />)}
       </Box>
       {renderPopups()}
     </Providers>
