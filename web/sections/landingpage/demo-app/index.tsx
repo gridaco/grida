@@ -405,7 +405,7 @@ const MusicPlayButton = ({ color = "black" }: { color?: string }) => {
           filterUnits="userSpaceOnUse"
           color-interpolation-filters="sRGB"
         >
-          <feFlood flood-opacity="0" result="BackgroundImageFix" />
+          <feFlood floodOpacity="0" result="BackgroundImageFix" />
           <feGaussianBlur in="BackgroundImage" stdDeviation="8" />
           <feComposite
             in2="SourceAlpha"

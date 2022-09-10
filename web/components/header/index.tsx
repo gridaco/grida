@@ -12,34 +12,35 @@ import { media } from "utils/styled/media";
 import { center } from "utils/styled/styles";
 import { ThemeInterface } from "utils/styled/theme";
 
-import ExpandHeaderItem from "./expand-header-item";
-import { HeaderMap } from "./headermap";
+import { GroupEntity, HeaderMap } from "./headermap";
+import HoverMenu from "./hover-menu";
 
 const Header = () => {
-  const [currentExpandHeader, setCurrentExpandHeader] = useState("");
-  const [isOpenMenu, setIsOpenMenu] = useState(false);
-  const [currentRouter, setCurrentRouter] = useState("");
-  const loginstate = useAuthState();
   const router = useRouter();
+  const auth = useAuthState();
+
+  const [hoveringItem, setHoveringItem] = useState<string>();
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [path, setPath] = useState<string>();
+
   useEffect(() => {
-    if (isOpenMenu) {
+    // disable overflow scrolling
+    if (isMenuOpen) {
       document.getElementsByTagName("html")[0].style.overflowY = "hidden";
     } else {
       document.getElementsByTagName("html")[0].style.overflowY = "auto";
     }
-  }, [isOpenMenu]);
+  }, [isMenuOpen]);
 
-  const handleClickMenu = useCallback(() => setIsOpenMenu(!isOpenMenu), [
-    isOpenMenu,
+  const handleClickMenu = useCallback(() => setIsMenuOpen(!isMenuOpen), [
+    isMenuOpen,
   ]);
 
-  const onClickExpandHeader = useCallback(
-    (title: string) => setCurrentExpandHeader(title),
-    [],
-  );
+  const showHoverMenu = useCallback((key: string) => setHoveringItem(key), []);
+  const hideHoverMenu = useCallback(() => setHoveringItem(undefined), []);
 
   const handleSignupClick = () => {
-    if (loginstate == "signedin") {
+    if (auth == "signedin") {
       window.location.href = URLS.landing.current_app;
     } else {
       window.location.href = URLS.landing.signup_with_return;
@@ -47,19 +48,19 @@ const Header = () => {
   };
 
   const handleSigninOrMoveAppClick = () => {
-    if (loginstate == "signedin") {
+    if (auth == "signedin") {
       // move to app
       window.location.href = URLS.landing.current_app;
     } else {
-      !isOpenMenu && (window.location.href = URLS.landing.signin_with_return);
+      !isMenuOpen && (window.location.href = URLS.landing.signin_with_return);
     }
   };
 
   useEffect(() => {
-    setCurrentRouter(router.asPath);
+    setPath(router.asPath);
 
-    if (currentRouter != router.asPath && currentRouter != "") {
-      setIsOpenMenu(false);
+    if (path != router.asPath && path != "") {
+      setIsMenuOpen(false);
     }
   }, [router]);
 
@@ -73,12 +74,12 @@ const Header = () => {
         height="100%"
       >
         <ResponsiveMenu className="cursor" onClick={handleClickMenu}>
-          <Icon name={isOpenMenu ? "headerClose" : "headerMenu"} />
+          <Icon name={isMenuOpen ? "headerClose" : "headerMenu"} />
         </ResponsiveMenu>
 
         <Flex alignItems="center">
           <Link href="/">
-            <Bridged
+            <Logo
               className="cursor"
               name="bridged"
               width={32}
@@ -97,50 +98,32 @@ const Header = () => {
             </ResponsiveTitle>
           </Link>
           <NavigationWrapper ml="60px" alignItems="center">
-            {HeaderMap.map(i =>
-              !i.href ? (
-                <ExpandHeaderItem
-                  type="desktop"
-                  key={i.label}
-                  item={i}
-                  isExpand={currentExpandHeader === i.label}
-                  onExpandHeader={() => onClickExpandHeader(i.label)}
-                  onContractHeader={() => onClickExpandHeader("")}
-                />
-              ) : (
-                <Link href={i.href} key={i.label}>
-                  <Item
-                    onClick={() => {
-                      // log header menu click event
-                      event_click_header_menu({ menu: i.label });
-                    }}
-                    onMouseOver={() => onClickExpandHeader("")}
-                    className="cursor"
-                    mx="12px"
-                    color={currentRouter === i.href ? "#000" : "#888"}
-                    fontWeight="bold"
-                    fontSize="16px"
-                  >
-                    {i.label}
-                  </Item>
-                </Link>
-              ),
-            )}
+            {HeaderMap.map(i => (
+              <Item
+                key={i.label}
+                variant="desktop"
+                {...i}
+                onHover={() => {
+                  showHoverMenu(i.label);
+                }}
+                selected={path === i.href}
+              />
+            ))}
           </NavigationWrapper>
         </Flex>
 
         <SignupButton
           onClick={handleSignupClick}
-          style={{ opacity: isOpenMenu && 0 }}
+          style={{ opacity: isMenuOpen && 0 }}
           fontSize={["13px", "13px", "15px"]}
           p={["6px 10px", "6px 10px", "9px 20px", "9px 20px"]}
           variant="noShadow"
         >
-          {loginstate == "signedin" ? "Go to App" : "Sign up"}
+          {auth == "signedin" ? "Go to App" : "Sign up"}
         </SignupButton>
       </Flex>
 
-      {isOpenMenu && (
+      {isMenuOpen && (
         <ResponsiveMenu
           justifyContent="space-between"
           style={{
@@ -155,30 +138,9 @@ const Header = () => {
           flexDirection="column"
         >
           <Flex mt="24px" flexDirection="column">
-            {HeaderMap.map(i =>
-              !i.href ? (
-                <ExpandHeaderItem
-                  key={i.label}
-                  type="mobile"
-                  item={i}
-                  isExpand={currentExpandHeader === i.label}
-                  onExpandHeader={() => onClickExpandHeader(i.label)}
-                  onContractHeader={() => onClickExpandHeader("")}
-                />
-              ) : (
-                <Link href={i.href} key={i.label}>
-                  <Item
-                    className="cursor"
-                    my="12px"
-                    color={currentRouter === i.href ? "#000" : "#888"}
-                    fontWeight="bold"
-                    fontSize="16px"
-                  >
-                    {i.label}
-                  </Item>
-                </Link>
-              ),
-            )}
+            {HeaderMap.map(i => (
+              <Item variant="mobile" key={i.label} {...i} />
+            ))}
           </Flex>
 
           <Box>
@@ -189,9 +151,9 @@ const Header = () => {
               height="35px"
               fontSize="13px"
               mb="12px"
-              disabled={loginstate == "signedin"}
+              disabled={auth == "signedin"}
               style={{
-                opacity: (loginstate == "signedin") != null ? 0 : 1,
+                opacity: (auth == "signedin") != null ? 0 : 1,
               }}
               onClick={handleSignupClick}
             >
@@ -207,7 +169,7 @@ const Header = () => {
               style={center}
               onClick={handleSigninOrMoveAppClick}
             >
-              {loginstate == "signedin" ? (
+              {auth == "signedin" ? (
                 "Go to App"
               ) : (
                 <React.Fragment>
@@ -219,11 +181,63 @@ const Header = () => {
           </Box>
         </ResponsiveMenu>
       )}
+
+      {HeaderMap.filter(i => i.type === "group").map(
+        (i: GroupEntity, index) => (
+          <HoverMenu
+            key={index}
+            item={i}
+            isExpand={i.label == hoveringItem}
+            onExit={function(): void {
+              hideHoverMenu();
+            }}
+            // TODO:
+            type={"desktop"}
+          />
+        ),
+      )}
     </HeaderWrapper>
   );
 };
 
 export default Header;
+
+function Item({
+  label,
+  href,
+  selected,
+  onHover,
+  variant,
+}: {
+  href?: string;
+  label: string;
+  selected?: boolean;
+  onHover?: () => void;
+  variant: "desktop" | "mobile";
+}) {
+  const content = (
+    <Label
+      onClick={() => {
+        // log header menu click event
+        event_click_header_menu({ menu: label });
+      }}
+      onMouseOver={onHover}
+      className="cursor"
+      mx={variant === "desktop" ? "12px" : undefined}
+      my={variant === "mobile" ? "12px" : undefined}
+      data-selected={selected}
+      fontWeight="bold"
+      fontSize="16px"
+    >
+      {label}
+    </Label>
+  );
+  if (href) {
+    return <Link href={href}>{content}</Link>;
+  } else {
+    return content;
+  }
+}
 
 const HeaderWrapper = styled(Flex)`
   position: absolute;
@@ -236,19 +250,26 @@ const HeaderWrapper = styled(Flex)`
   align-items: center;
 `;
 
-const Bridged = styled(Icon)`
+const Logo = styled(Icon)`
   ${props => media(null, (props.theme as ThemeInterface).breakpoints[0])} {
     position: absolute;
   }
 `;
 
-const Item = styled(Text)`
+const Label = styled(Text)`
   font-weight: 500;
   letter-spacing: 0em;
+  color: rgba(0, 0, 0, 0.55);
 
   &:hover {
-    color: #000;
+    color: black;
   }
+
+  [data-selected="true"] {
+    color: black;
+  }
+
+  transition: all 0.1s ease-in-out;
 `;
 
 const SignupButton = styled(Button)`
