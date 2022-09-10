@@ -13,7 +13,7 @@ export function ModuleItem({ label, icon }: { label: string; icon: string }) {
       <IconSet>
         <Icon opacity={0.8} data-hidden={hovering}>
           <Image
-            id="icon-black"
+            priority
             width={21}
             height={21}
             src={icon + "/black.svg"}
@@ -22,7 +22,6 @@ export function ModuleItem({ label, icon }: { label: string; icon: string }) {
         </Icon>
         <Icon opacity={1} data-hidden={!hovering}>
           <Image
-            id="icon-color"
             width={21}
             height={21}
             src={icon + "/default.svg"}
