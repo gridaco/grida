@@ -1,5 +1,5 @@
-import React from "react";
 import styled from "@emotion/styled";
+import React from "react";
 /**
  * `<SectionConfiguration>` ('section-configuration')
  * - [Open in Figma](https://figma.com/file/Gaznaw1QHppxvs9UkqNOb0?node-id=8266:64062)
@@ -57,31 +57,31 @@ export function SectionConfiguration({
           </ContentsHeader>
           <ContentsList>
             <FeatureListItem>
-              <IconsMdiCheck src="https://figma-alpha-api.s3.us-west-2.amazonaws.com/images/d7dcadd4-2a14-464f-9c39-18b67f949095" />
+              <Check />
               <Label>secure, runs locally</Label>
             </FeatureListItem>
             <FeatureListItem>
-              <IconsMdiCheck src="https://figma-alpha-api.s3.us-west-2.amazonaws.com/images/68262741-d91b-4711-ae1a-0c3987013b6f" />
+              <Check />
               <Label>zero dependency by default</Label>
             </FeatureListItem>
             <FeatureListItem>
-              <IconsMdiCheck src="https://figma-alpha-api.s3.us-west-2.amazonaws.com/images/9c092098-9188-4717-86b3-6be999c4f03f" />
+              <Check />
               <Label>works with svelte</Label>
             </FeatureListItem>
             <FeatureListItem>
-              <IconsMdiCheck src="https://figma-alpha-api.s3.us-west-2.amazonaws.com/images/cbbfbaf5-4b37-4ae8-96b7-4baadff3f790" />
+              <Check />
               <Label>works with solid-js</Label>
             </FeatureListItem>
             <FeatureListItem>
-              <IconsMdiCheck src="https://figma-alpha-api.s3.us-west-2.amazonaws.com/images/92ae010c-9d9d-4161-b6c2-ebddce840814" />
+              <Check />
               <Label>works with vanilla html/css</Label>
             </FeatureListItem>
             <FeatureListItem>
-              <IconsMdiCheck src="https://figma-alpha-api.s3.us-west-2.amazonaws.com/images/b3849037-50ce-4047-a8c4-c223c007f8c6" />
+              <Check />
               <Label>works with react & react-native</Label>
             </FeatureListItem>
             <FeatureListItem>
-              <IconsMdiCheck src="https://figma-alpha-api.s3.us-west-2.amazonaws.com/images/96a15013-fb16-46cd-aa1b-21a4abfe23ea" />
+              <Check />
               <Label>works with flutter</Label>
             </FeatureListItem>
           </ContentsList>
@@ -108,6 +108,35 @@ export function SectionConfiguration({
     </RootWrapperSectionConfiguration>
   );
 }
+
+const Check = () => {
+  return (
+    <svg
+      width="17"
+      height="17"
+      viewBox="0 0 17 17"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+    >
+      <g clip-path="url(#clip0_8393_56954)">
+        <path
+          d="M6.5001 11.2799L3.7201 8.4999L2.77344 9.43989L6.5001 13.1666L14.5001 5.16656L13.5601 4.22656L6.5001 11.2799Z"
+          fill="white"
+        />
+      </g>
+      <defs>
+        <clipPath id="clip0_8393_56954">
+          <rect
+            width="16"
+            height="16"
+            fill="white"
+            transform="translate(0.5 0.5)"
+          />
+        </clipPath>
+      </defs>
+    </svg>
+  );
+};
 
 const RootWrapperSectionConfiguration = styled.div`
   display: flex;
