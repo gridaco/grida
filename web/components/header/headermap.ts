@@ -386,7 +386,7 @@ export const HeaderMap: Sitemap = [
       {
         type: "link",
         label: "Landingpage Kit",
-        href: "/first-aid/landingpage",
+        href: "/first-aid/landingpage-kit",
         layout: "line-item",
       },
       {
@@ -398,7 +398,7 @@ export const HeaderMap: Sitemap = [
       {
         type: "link",
         label: "Customer Stories",
-        href: "/stories/customer",
+        href: "/customers/stories",
         layout: "line-item",
       },
       {

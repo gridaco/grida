@@ -93,12 +93,6 @@ module.exports = withBundleAnalyzer(
               permanent: false,
             },
             {
-              source: "/vscode",
-              destination:
-                "https://marketplace.visualstudio.com/items?itemName=grida.grida-vscode",
-              permanent: false,
-            },
-            {
               source: "/join-slack",
               destination:
                 "https://join.slack.com/t/gridaco/shared_invite/zt-nmf59381-prFEqq032K~aWe_zOekUmQ",
