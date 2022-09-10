@@ -92,6 +92,13 @@ const Frameworks: Sitemap = [
       },
       {
         type: "link",
+        label: "Lit",
+        href: "/docs/with-lit",
+        icon: "/module-icons/lit",
+        layout: "module-item",
+      },
+      {
+        type: "link",
         label: "HTML",
         href: "/docs/with-html",
         icon: "/module-icons/html",
