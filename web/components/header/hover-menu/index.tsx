@@ -47,7 +47,12 @@ function HoverMenu({
                     }
                     case "module-item":
                       return (
-                        <ModuleItem key={index} label={i.label} icon={i.icon} />
+                        <ModuleItem
+                          key={index}
+                          label={i.label}
+                          icon={i.icon}
+                          href={i.href}
+                        />
                       );
                     case "product-item":
                       return (
