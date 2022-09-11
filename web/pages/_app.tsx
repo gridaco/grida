@@ -3,6 +3,7 @@ import { Suspense, StrictMode } from "react";
 import Head from "next/head";
 import { Global, css } from "@emotion/react";
 import { GlobalHelpButton } from "@app/fp-customer-support";
+import Script from "next/script";
 
 // enable SPA mode, supports react.Suspense; if you don't want to use Suspense, you can use NextJS' dynamic import instead. - on SSR mode
 // though, this app does not benefit from SSR.
@@ -48,6 +49,26 @@ function HeadInjection() {
   );
 }
 
+function ScriptsInjection() {
+  return (
+    <>
+      {/* <!-- Google tag (gtag.js) --> */}
+      <Script
+        strategy="afterInteractive"
+        src="https://www.googletagmanager.com/gtag/js?id=G-TCE3NJ6FWN"
+      />
+      <Script id="google-analytics" strategy="afterInteractive">
+        {`
+          window.dataLayer = window.dataLayer || [];
+          function gtag(){dataLayer.push(arguments);}
+          gtag('js', new Date());
+          gtag('config', 'G-TCE3NJ6FWN');
+        `}
+      </Script>
+    </>
+  );
+}
+
 function SeoMeta() {
   const meta = {
     title: "Grida",
@@ -65,6 +86,7 @@ function SeoMeta() {
 function GridaRootWebApp({ Component, pageProps }) {
   return (
     <>
+      <ScriptsInjection />
       <HeadInjection />
       {/* <SafeHydrate> */}
       <GlobalHelpButton />
