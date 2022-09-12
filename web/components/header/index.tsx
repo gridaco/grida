@@ -296,15 +296,16 @@ const SignupButton = styled(Button)`
   align-items: center;
   justify-content: center;
   opacity: 0 !important;
+  color: black;
+  /* background-color: #fff; */
+  /* color: ${props => props.theme.colors.primary}; */
 
   ${props => media(props.theme.breakpoints[0], null)} {
     height: 25px;
     opacity: 1 !important;
   }
 
-  ${props => media(props.theme.breakpoints[0], null)} {
-    background-color: #fff;
-    color: #2562ff;
+${props => media(props.theme.breakpoints[0], null)} {
   }
 `;
 

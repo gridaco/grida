@@ -39,4 +39,5 @@ const MainButton = styled(Button)`
   font-size: 17.5px;
   line-height: 22px;
   letter-spacing: 0.02em;
+  background-color: ${p => p.theme.colors.primary};
 `;

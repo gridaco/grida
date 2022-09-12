@@ -1,17 +1,17 @@
 @font-face {
-  font-family: "HelveticaNeue";
+  font-family: "Helvetica Neue";
   font-weight: 400;
   src: url("/fonts/HelveticaNeue-Regular.ttf") format("truetype");
 }
 
 @font-face {
-  font-family: "HelveticaNeue";
+  font-family: "Helvetica Neue";
   font-weight: 500;
   src: url("/fonts/HelveticaNeue-Medium.ttf") format("truetype");
 }
 
 @font-face {
-  font-family: "HelveticaNeue";
+  font-family: "Helvetica Neue";
   font-weight: 600;
   src: url("/fonts/HelveticaNeue-Bold.ttf") format("truetype");
 }
@@ -67,7 +67,7 @@ h3,
 h4,
 h5,
 h6 {
-  font-family: HelveticaNeue, sans-serif !important;
+  font-family: "Helvetica Neue", sans-serif !important;
 }
 
 button {

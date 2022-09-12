@@ -23,7 +23,7 @@ export const selectTheme = selector<"system" | "light" | "dark">({
 });
 
 export const selectSystemTheme = selector<"pending" | "light" | "dark">({
-  key: "theme-selector",
+  key: "system-theme-selector",
   get: ({ get }) => {
     const { system } = get(themeState);
     return system;
