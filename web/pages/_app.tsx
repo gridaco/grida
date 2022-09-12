@@ -29,7 +29,7 @@ import makeKeywords from "utils/seo/make-keywords";
 import { Box } from "rebass";
 import { env } from "process";
 
-import "../styles/styles.css";
+import "../styles/global.css";
 
 export type NextPageWithLayout<P = {}, IP = P> = NextPage<P, IP> & {
   getLayout?: (page: ReactElement) => ReactNode;
