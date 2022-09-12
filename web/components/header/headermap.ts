@@ -375,7 +375,7 @@ export const HeaderMap: Sitemap = [
       {
         type: "link",
         label: "Projects",
-        href: "/projects",
+        href: "/docs/together/projects",
         layout: "line-item",
       },
       {
