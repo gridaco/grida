@@ -10,10 +10,7 @@ export default function FeatureCardItem(props: {
   return (
     <Card>
       <LandingpageText variant="h4">{props.data.title}</LandingpageText>
-      <Description variant="body1">
-        {props.data.description}
-      </Description>
-
+      <Description variant="body1">{props.data.description}</Description>
     </Card>
   );
 }
@@ -27,4 +24,4 @@ const Card = styled(Flex)`
 
 const Description = styled(LandingpageText)`
   margin-top: 32px;
-`
+`;

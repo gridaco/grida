@@ -1,5 +1,5 @@
 import styled from "@emotion/styled";
-import SectionLayout from "layout/section";
+import SectionLayout from "layouts/section";
 import Image from "next/image";
 import React, { useState } from "react";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";

@@ -1,5 +1,5 @@
 import styled from "@emotion/styled";
-import SectionLayout from "layout/section";
+import SectionLayout from "layouts/section";
 import React from "react";
 
 import BlankArea from "components/blank-area";

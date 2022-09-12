@@ -1,7 +1,7 @@
 module.exports = {
   presets: ["next/babel", "@emotion/babel-preset-css-prop"],
   plugins: [
-    ["emotion"],
+    ["@emotion"],
     [
       "module-resolver",
       {

@@ -1,6 +1,6 @@
 import styled from "@emotion/styled";
-import ApplicationPreview from "layout/landingpage/application-preview";
-import SectionLayout from "layout/section";
+import ApplicationPreview from "layouts/landingpage/application-preview";
+import SectionLayout from "layouts/section";
 import Image from "next/image";
 import React, { useEffect, useState } from "react";
 import { Flex, Text } from "rebass";

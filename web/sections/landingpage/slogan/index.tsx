@@ -1,5 +1,5 @@
 import styled from "@emotion/styled";
-import SectionLayout from "layout/section";
+import SectionLayout from "layouts/section";
 import React from "react";
 import { Flex } from "rebass";
 
@@ -45,6 +45,5 @@ const SloganText = styled(LandingpageText)`
   path {
     fill: #fff;
   }
-
   letter-spacing: -0.03em;
 `;

@@ -20,6 +20,7 @@ export default function PostBody({ content }) {
   // const docs = hydrate(content, {})
   const [docs, setDocs] = useState(undefined);
   useAsyncEffect(async () => {
+    // @ts-ignore
     const mdxSource = await renderToString(content, { components });
     setDocs(mdxSource.renderedOutput);
   });

@@ -2,7 +2,7 @@ import styled from "@emotion/styled";
 import ActionItem from "components/action-item";
 import BlankArea from "components/blank-area";
 import LandingpageText from "components/landingpage/text";
-import SectionLayout from "layout/section";
+import SectionLayout from "layouts/section";
 import Image from "next/image";
 import React from "react";
 import { Flex } from "rebass";

@@ -1,7 +1,7 @@
 import styled from "@emotion/styled";
-import CodePreview from "layout/landingpage/code-preview";
-import DesignPlatforms from "layout/landingpage/design-platforms";
-import SectionLayout from "layout/section";
+import CodePreview from "layouts/landingpage/code-preview";
+import DesignPlatforms from "layouts/landingpage/design-platforms";
+import SectionLayout from "layouts/section";
 import React from "react";
 import { Box, Flex, Heading, Text } from "rebass";
 

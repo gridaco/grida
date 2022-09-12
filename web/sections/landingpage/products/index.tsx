@@ -1,6 +1,6 @@
 import styled from "@emotion/styled";
 import { motion } from "framer-motion";
-import SectionLayout from "layout/section";
+import SectionLayout from "layouts/section";
 import Link from "next/link";
 import React, { useState, useEffect, createRef } from "react";
 import ReactPlayer from "react-player";

@@ -29,10 +29,7 @@ export default function QuestionItem(props: { question: FaqQnaItem }) {
           alignItems="center"
           justifyContent="center"
         >
-          <Icon
-            name={isOpen ? "faqClose" : "plus"}
-            className="cursor"
-          />
+          <Icon name={isOpen ? "faqClose" : "plus"} className="cursor" />
         </Flex>
       </Flex>
       {isOpen && (
@@ -53,9 +50,7 @@ const Query = styled(Text)`
 const Answer = styled(Flex)`
   font-size: 20px;
   line-height: 133%;
-
   color: #3d3d3d;
-
   letter-spacing: 0em;
   text-align: left;
 `;

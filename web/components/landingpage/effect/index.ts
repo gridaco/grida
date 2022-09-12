@@ -1,5 +1,3 @@
-import ElevatedVideoPlayer from './elevated-video-player';
+import ElevatedVideoPlayer from "./elevated-video-player";
 
-export { 
-  ElevatedVideoPlayer
-}
+export { ElevatedVideoPlayer };

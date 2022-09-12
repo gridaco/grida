@@ -1,5 +1,5 @@
 import styled from "@emotion/styled";
-import DocsNavigation from "layout/docs-navigation";
+import DocsNavigation from "layouts/docs-navigation";
 import ErrorPage from "next/error";
 import Head from "next/head";
 import { useRouter } from "next/router";
@@ -81,10 +81,125 @@ export async function getStaticPaths() {
 const Article = styled.article`
   width: calc(100% - 40px);
   margin: 0px 20px;
+  @media screen and (min-width: 768px) {
+    width: calc(100% - 320px - 40px);
+    width: calc(100% - 40px);
+    margin: 0px 20px;
+    @media screen and (min-width: 768px) {
+      width: calc(
+        100% - 320px - 40px
+      );
+  width: calc(100% - 40px);
+  margin: 0px 20px;
+  @media screen and (min-width: 768px) {
+    width: calc(
+      100% - 320px - 40px
+    );
+  width: calc(100% - 40px);
+  margin: 0px 20px;
 
   @media screen and (min-width: 768px) {
     width: calc(100% - 320px - 40px);
     /* TEMPORARY! */
     /* 320px is sidebar 250px + sidebar margin 70px */
+  }
+
+  width: calc(100% - 40px);
+  margin: 0px 20px;
+
+  @media screen and (min-width: 768px) {
+    width: calc(100% - 320px - 40px);
+    /* TEMPORARY! */
+    /* 320px is sidebar 250px + sidebar margin 70px */
+  }
+
+  }
+
+  width: calc(100% - 40px);
+  margin: 0px 20px;
+  @media screen and (min-width: 768px) {
+    width: calc(
+      100% - 320px - 40px
+    );
+  width: calc(100% - 40px);
+  margin: 0px 20px;
+
+  @media screen and (min-width: 768px) {
+    width: calc(100% - 320px - 40px);
+    /* TEMPORARY! */
+    /* 320px is sidebar 250px + sidebar margin 70px */
+  }
+
+  width: calc(100% - 40px);
+  margin: 0px 20px;
+
+  @media screen and (min-width: 768px) {
+    width: calc(100% - 320px - 40px);
+    /* TEMPORARY! */
+    /* 320px is sidebar 250px + sidebar margin 70px */
+  }
+
+  }
+
+    }
+    width: calc(100% - 40px);
+    margin: 0px 20px;
+    @media screen and (min-width: 768px) {
+      width: calc(
+        100% - 320px - 40px
+      );
+  width: calc(100% - 40px);
+  margin: 0px 20px;
+  @media screen and (min-width: 768px) {
+    width: calc(
+      100% - 320px - 40px
+    );
+  width: calc(100% - 40px);
+  margin: 0px 20px;
+
+  @media screen and (min-width: 768px) {
+    width: calc(100% - 320px - 40px);
+    /* TEMPORARY! */
+    /* 320px is sidebar 250px + sidebar margin 70px */
+  }
+
+  width: calc(100% - 40px);
+  margin: 0px 20px;
+
+  @media screen and (min-width: 768px) {
+    width: calc(100% - 320px - 40px);
+    /* TEMPORARY! */
+    /* 320px is sidebar 250px + sidebar margin 70px */
+  }
+
+  }
+
+  width: calc(100% - 40px);
+  margin: 0px 20px;
+  @media screen and (min-width: 768px) {
+    width: calc(
+      100% - 320px - 40px
+    );
+  width: calc(100% - 40px);
+  margin: 0px 20px;
+
+  @media screen and (min-width: 768px) {
+    width: calc(100% - 320px - 40px);
+    /* TEMPORARY! */
+    /* 320px is sidebar 250px + sidebar margin 70px */
+  }
+
+  width: calc(100% - 40px);
+  margin: 0px 20px;
+
+  @media screen and (min-width: 768px) {
+    width: calc(100% - 320px - 40px);
+    /* TEMPORARY! */
+    /* 320px is sidebar 250px + sidebar margin 70px */
+  }
+
+  }
+
+    }
   }
 `;

@@ -9,7 +9,7 @@ const variants = [
   "content-inset-1",
 ];
 
-interface SectionLayoutProps {
+type SectionLayoutProps = React.PropsWithChildren<{
   variant?:
     | "full-width"
     | "content-overflow-1"
@@ -24,7 +24,7 @@ interface SectionLayoutProps {
   backgroundColor?: string;
   className?: string;
   notAutoAllocateHeight?: boolean;
-}
+}>;
 
 const SectionLayout: React.FC<SectionLayoutProps> = ({
   variant = "content-default",

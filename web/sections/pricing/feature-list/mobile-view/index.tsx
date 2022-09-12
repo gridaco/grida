@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import styled from "@emotion/styled";
 import { Flex, Text, Heading } from "rebass";
 import Icon from "components/icon";
-import SectionLayout from "layout/section";
+import SectionLayout from "layouts/section";
 import FeatureChoice from "components/feature-choice";
 
 // TODO

@@ -3,7 +3,7 @@ import BlankArea from "components/blank-area";
 import FeatureCardItem from "components/globalization/feature-card-item";
 import { FeatureListupCardItemDisplayData } from "components/globalization/feature-card-item/interface";
 import LandingpageText from "components/landingpage/text";
-import SectionLayout from "layout/section";
+import SectionLayout from "layouts/section";
 import React from "react";
 import { Box } from "rebass";
 

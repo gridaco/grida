@@ -1,7 +1,7 @@
 import React from "react";
 import styled from "@emotion/styled";
 import { Flex, Heading, Text } from "rebass";
-import SectionLayout from "layout/section";
+import SectionLayout from "layouts/section";
 import StartNow from "components/start-now";
 import BlankArea from "components/blank-area";
 
@@ -26,7 +26,6 @@ export default FreePlan;
 const FreeText = styled(Heading)`
   font-size: 72px;
   color: #000000;
-
   text-align: center;
   letter-spacing: -0.025em;
 `;
@@ -36,6 +35,5 @@ const Desc = styled(Text)`
   line-height: 34px;
   letter-spacing: 0em;
   text-align: center;
-
   color: #707070;
 `;

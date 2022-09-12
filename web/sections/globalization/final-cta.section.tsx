@@ -1,6 +1,6 @@
 import styled from "@emotion/styled";
 import LandingpageText from "components/landingpage/text";
-import SectionLayout from "layout/section";
+import SectionLayout from "layouts/section";
 import React from "react";
 import { Button, Flex } from "rebass";
 export default function SectionFinalCta() {

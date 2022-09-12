@@ -1,7 +1,7 @@
 import React, { useCallback } from "react";
 import styled from "@emotion/styled";
 import { Flex, Heading, Text, Button } from "rebass";
-import SectionLayout from "layout/section";
+import SectionLayout from "layouts/section";
 import BlankArea from "components/blank-area";
 import Icon from "components/icon";
 import { media } from "utils/styled/media";
