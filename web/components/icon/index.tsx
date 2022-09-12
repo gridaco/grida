@@ -43,7 +43,7 @@ const Icon = (props: IconProps) => {
   );
 };
 
-export default Icon;
+export default React.forwardRef(Icon);
 
 const ResponsiveBox = styled(Box)`
   display: inline-flex;

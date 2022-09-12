@@ -1,8 +1,8 @@
 import { Html, Head, Main, NextScript } from "next/document";
 
-export default function Document() {
+export default function Document(props) {
   return (
-    <Html>
+    <Html lang={"en"}>
       <Head>
         {/* region Font */}
         <link rel="preconnect" href="https://fonts.googleapis.com" />

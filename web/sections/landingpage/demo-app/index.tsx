@@ -204,6 +204,7 @@ const TabBar = () => {
     <Footer>
       <TabBarBackground></TabBarBackground>
       <Tabs>
+        {/* TODO: replace image srcs */}
         <TabIcon
           src="https://s3-us-west-2.amazonaws.com/figma-alpha-api/img/e350/9fb4/422697fd40f9d0f19a35ebbc5df11b57"
           alt="image of IconsMdiHome"
@@ -389,7 +390,7 @@ const MusicPlayButton = ({ color = "black" }: { color?: string }) => {
       xmlns="http://www.w3.org/2000/svg"
     >
       <g filter="url(#filter0_b_1_79)">
-        <circle cx="12" cy="12" r="11" stroke="black" stroke-width="2" />
+        <circle cx="12" cy="12" r="11" stroke="black" strokeWidth="2" />
       </g>
       <path
         d="M9.33325 7.33337V16.6667L16.6666 12L9.33325 7.33337Z"
@@ -403,7 +404,7 @@ const MusicPlayButton = ({ color = "black" }: { color?: string }) => {
           width="56"
           height="56"
           filterUnits="userSpaceOnUse"
-          color-interpolation-filters="sRGB"
+          colorInterpolationFilters="sRGB"
         >
           <feFlood floodOpacity="0" result="BackgroundImageFix" />
           <feGaussianBlur in="BackgroundImage" stdDeviation="8" />

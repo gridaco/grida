@@ -7,7 +7,6 @@ import Head from "next/head";
 import { useRouter } from "next/router";
 import React, { useEffect } from "react";
 import { CookiesProvider } from "react-cookie";
-
 import Footer from "components/footer";
 import Header from "components/header";
 import Popup from "components/popup";
@@ -30,6 +29,7 @@ import { Box } from "rebass";
 import { env } from "process";
 
 import "../styles/global.css";
+import Script from "next/script";
 
 export type NextPageWithLayout<P = {}, IP = P> = NextPage<P, IP> & {
   getLayout?: (page: ReactElement) => ReactNode;
@@ -62,14 +62,11 @@ const App = ({ Component, pageProps }: AppPropsWithLayout) => {
   const getTheme = Component.getTheme ?? (() => "system");
 
   useEffect(() => {
-    // region set firebase analytics
-    try {
-      analytics();
-    } catch (_) {
-      console.error(
-        "seems like you are a contributor! ignore this message since this is a warning that we could not find firebase credentials to initialize.",
-      );
+    if (process.env.NODE_ENV === "development") {
+      return;
     }
+    // region set firebase analytics
+    analytics();
     // endregion set firebase analytics
   }, [router.events, router.pathname]);
 
@@ -95,46 +92,29 @@ const App = ({ Component, pageProps }: AppPropsWithLayout) => {
           content={env.NEXT_PUBLIC_P_DOMAIN_VERIFY}
         />
 
-        {/* region Font */}
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link
-          rel="preconnect"
-          href="https://fonts.gstatic.com"
-          crossOrigin=""
-        />
-        {/* Nanum Pen Script, Roboto Mono, Inter */}
-        <link
-          href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Nanum+Pen+Script&family=Roboto+Mono:wght@400;500;600;700&display=swap"
-          rel="stylesheet"
-        />
-        {/* endregion */}
-
         {/* region Google analytics */}
         {/* https://stackoverflow.com/a/62552263 */}
-        <script
+        <Script
           async
           src="https://www.googletagmanager.com/gtag/js?id=UA-196372205-1"
         />
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `
+        <Script>
+          {`
             window.dataLayer = window.dataLayer || [];
             function gtag(){dataLayer.push(arguments);}
             gtag('js', new Date());
             gtag('config', 'UA-196372205-1');
-        `,
-          }}
-        />
+        `}
+        </Script>
         {/* end region */}
 
         {/* region Global site tag (gtag.js) - Google Ads: 922132529 */}
-        <script
+        <Script
           async
           src="https://www.googletagmanager.com/gtag/js?id=AW-922132529"
-        ></script>
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `
+        />
+        <Script>
+          {`
             window.dataLayer = window.dataLayer || [];
             function gtag(){dataLayer.push(arguments);}
             gtag('set', 'linker', {
@@ -142,9 +122,9 @@ const App = ({ Component, pageProps }: AppPropsWithLayout) => {
 		        });
             gtag('js', new Date());
             gtag('config', 'AW-922132529');
-        `,
-          }}
-        />
+        `}
+        </Script>
+
         {/* end region */}
       </Head>
       <Box
