@@ -96,10 +96,12 @@ const CodeView = styled(Box)`
 
 const Platforms = styled.div`
   margin-top: 20px;
-  div {
+  display: flex;
+  gap: 28px;
+
+  span {
     width: 24px;
     height: 24px;
-    margin-right: 28px !important;
   }
 `;
 

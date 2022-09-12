@@ -112,7 +112,7 @@ const OnlineTitle = styled(LandingpageText)`
 
 const Description = styled(LandingpageText)`
   max-width: 525px;
-  margin-top: 30px;
+  margin-top: 30px !important;
 
   ${props => media("0px", props.theme.breakpoints[0])} {
     max-width: 100%;

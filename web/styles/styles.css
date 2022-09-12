@@ -23,8 +23,7 @@
 }
 
 html,
-body,
-#__next {
+body {
   padding: 0;
   margin: 0;
   word-break: keep-all;

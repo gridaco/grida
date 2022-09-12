@@ -48,8 +48,8 @@ const DesignPlatforms = () => {
                   loading="eager"
                   alt="Grida supported design patforms"
                   src={`/assets/design-platforms/${currentPlatform}.png`}
-                  width="auto"
-                  height="565px"
+                  width={904}
+                  height={564}
                 />
               </div>
             </Postioner>
@@ -104,7 +104,7 @@ const PlatformView = styled.div`
   margin-left: auto;
   height: 580px;
 
-  .platforms > div {
+  .platforms > span {
     width: 24px;
     height: 24px;
     margin-right: 28px !important;

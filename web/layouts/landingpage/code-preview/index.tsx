@@ -67,8 +67,8 @@ const CodePreview = () => {
                     src={`/assets/platform-icons/${i.name}/${
                       currentPlatform.name === i.name ? "default" : "grey"
                     }.png`}
-                    width="24"
-                    height="24"
+                    width={24}
+                    height={24}
                   />
                 ))}
               </Platforms>
@@ -97,9 +97,9 @@ const ViewWrapper = styled(Flex)`
 
 const Platforms = styled.div`
   margin-top: 20px;
-  div {
-    width: 24px;
-    height: 24px;
+  span {
+    width: 24px !important;
+    height: 24px !important;
     margin-right: 28px !important;
   }
 `;

@@ -1,5 +1,5 @@
-import Button from "components/mdx/button";
 import React from "react";
+import { Button } from "rebass";
 import { LandingpageUrls } from "utils/landingpage/constants";
 
 function PricingCTAButton(props) {

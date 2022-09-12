@@ -54,7 +54,7 @@ export const Title = styled(LandingpageText)`
 
 const Description = styled(LandingpageText)`
   max-width: 520px;
-  margin-top: 20px;
+  margin-top: 20px !important;
   z-index: 99;
 
   ${props => media("0px", props.theme.breakpoints[0])} {

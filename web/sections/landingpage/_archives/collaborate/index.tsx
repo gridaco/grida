@@ -173,7 +173,7 @@ const BackgroundImage = styled(Flex)`
       transform: translate(50vw, 5vh);
     }
 
-    .notifications > .notification > div {
+    .notifications > .notification > span {
       width: 50% !important;
       height: 45% !important;
     }
@@ -183,7 +183,7 @@ const BackgroundImage = styled(Flex)`
       bottom: -30%;
     }
 
-    .application-ui > div {
+    .application-ui > span {
       max-width: 280px !important;
       max-height: 600px;
     }
