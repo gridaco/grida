@@ -1,12 +1,10 @@
 import styled from "@emotion/styled";
 import React, { useEffect, useRef, useState } from "react";
-import ReactPlayer from "react-player";
 import { Flex } from "rebass";
 
 import animationData from "public/animations/live-demo-app-design-motion/comp.json";
 import useOnScreen from "utils/hooks/use-on-screen";
 import { media } from "utils/styled/media";
-import { ThemeInterface } from "utils/styled/theme";
 
 export default function LiveDesignDemoFrame() {
   const [isStopped, setIsStopped] = useState(true);
@@ -89,7 +87,7 @@ const DesignFramePreview = styled(Flex)`
     border-radius: 12px;
   }
 
-  ${props => media("0px", (props.theme as ThemeInterface).breakpoints[0])} {
+  ${props => media("0px", props.theme.breakpoints[0])} {
     width: 280px !important;
     height: 465px !important;
     div {

@@ -1,4 +1,3 @@
-import { css } from "@emotion/core";
 import styled from "@emotion/styled";
 import renderToString from "next-mdx-remote/render-to-string";
 import Link from "next/link";
@@ -9,7 +8,6 @@ import CodeBlock from "components/code";
 import Icon from "components/icon";
 import useAsyncEffect from "utils/hooks/use-async-effect";
 import { media } from "utils/styled/media";
-import { ThemeInterface } from "utils/styled/theme";
 
 import { WasThisPostHelpful } from "./was-this-post-helpful";
 
@@ -176,13 +174,13 @@ const Documentation = styled.div`
   }
 
   // figma design : ~ breakpoints[3] screen
-  ${props => media((props.theme as ThemeInterface).breakpoints[2], null)} {
+  ${props => media(props.theme.breakpoints[2], null)} {
   }
-  ${props => media(null, (props.theme as ThemeInterface).breakpoints[2])} {
+  ${props => media(null, props.theme.breakpoints[2])} {
   }
-  ${props => media(null, (props.theme as ThemeInterface).breakpoints[1])} {
+  ${props => media(null, props.theme.breakpoints[1])} {
   }
-  ${props => media(null, (props.theme as ThemeInterface).breakpoints[0])} {
+  ${props => media(null, props.theme.breakpoints[0])} {
     li {
       list-style-position: inside;
     }

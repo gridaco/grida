@@ -3,13 +3,10 @@ import { useRouter } from "next/router";
 import React, { useEffect, useState } from "react";
 import { Box, Flex, Text } from "rebass";
 
-import DocsNavigationMobile from "components/docs-navigation-mobile";
 import DocsNavigationSection from "components/docs-navigation-section";
-import DocsSearchBar from "components/docs-search-bar";
 import Icon from "components/icon";
 import { media } from "utils/styled/media";
 import { center } from "utils/styled/styles";
-import { ThemeInterface } from "utils/styled/theme";
 
 import { DocsManifest, DocsRoute } from "../../utils/docs/model";
 
@@ -98,14 +95,14 @@ const NavigationWrapper = styled(Flex)`
 
 const Mobile = styled.div`
   display: none;
-  ${props => media("0px", (props.theme as ThemeInterface).breakpoints[0])} {
+  ${props => media("0px", props.theme.breakpoints[0])} {
     display: block;
   }
 `;
 
 const Desktop = styled.div`
   display: block;
-  ${props => media("0px", (props.theme as ThemeInterface).breakpoints[0])} {
+  ${props => media("0px", props.theme.breakpoints[0])} {
     display: none;
   }
 `;

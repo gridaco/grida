@@ -7,7 +7,7 @@ import BlankArea from "components/blank-area";
 import SectionLayout from "layouts/section";
 import { useWindowWidth } from "utils/hooks/use-window-width";
 import { LandingpageUrls } from "utils/landingpage/constants";
-import { defaultTheme } from "utils/styled";
+import theme from "theme";
 
 function replaceStylePxToNumber(stylePx: string) {
   return parseInt(stylePx.replace("px", ""));
@@ -25,7 +25,7 @@ const CookieAccept: React.FC<CookieAcceptProps> = ({ accpetCookie }) => {
       <SectionLayout variant="content-default" alignContent="center">
         <Flex width="100%" justifyContent="space-between" alignItems="center">
           <Flex flexDirection="column">
-            {width < replaceStylePxToNumber(defaultTheme.breakpoints[0]) ? (
+            {width < replaceStylePxToNumber(theme.breakpoints[0]) ? (
               <Title>
                 We use{" "}
                 <Link href={LandingpageUrls.cookies_policy}>cookies</Link> for
@@ -34,7 +34,7 @@ const CookieAccept: React.FC<CookieAcceptProps> = ({ accpetCookie }) => {
             ) : (
               <Title>We use cookies</Title>
             )}
-            {width > replaceStylePxToNumber(defaultTheme.breakpoints[0]) && (
+            {width > replaceStylePxToNumber(theme.breakpoints[0]) && (
               <Desc>
                 Grida collects cookies for handling signin, analysing our
                 traffic and making website usage faster.
@@ -44,7 +44,7 @@ const CookieAccept: React.FC<CookieAcceptProps> = ({ accpetCookie }) => {
           </Flex>
 
           <Button className="cursor" onClick={() => accpetCookie()}>
-            {width < replaceStylePxToNumber(defaultTheme.breakpoints[0])
+            {width < replaceStylePxToNumber(theme.breakpoints[0])
               ? "OK"
               : "Accept"}
           </Button>

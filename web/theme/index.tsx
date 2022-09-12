@@ -50,3 +50,6 @@ export function ThemeProvider({
 
   return <TP theme={_theme}>{children}</TP>;
 }
+
+export * from "./theme";
+export { default } from "./theme";

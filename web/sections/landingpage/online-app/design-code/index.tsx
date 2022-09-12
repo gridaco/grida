@@ -1,4 +1,3 @@
-import { css } from "@emotion/core";
 import styled from "@emotion/styled";
 import CodePreview from "layout/landingpage/code-preview";
 import DesignPlatforms from "layout/landingpage/design-platforms";
@@ -10,7 +9,6 @@ import BlankArea from "components/blank-area";
 import LandingpageText from "components/landingpage/text";
 import { k } from "sections";
 import { media } from "utils/styled/media";
-import { ThemeInterface } from "utils/styled/theme";
 
 const DesignToCode = () => {
   return (
@@ -59,7 +57,7 @@ const Description = styled(LandingpageText)`
   margin-top: 20px;
   z-index: 99;
 
-  ${props => media("0px", (props.theme as ThemeInterface).breakpoints[0])} {
+  ${props => media("0px", props.theme.breakpoints[0])} {
     max-width: calc(100vw - 40px);
   }
 `;

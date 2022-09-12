@@ -5,7 +5,7 @@ import SectionLayout from "layout/section";
 import BlankArea from "components/blank-area";
 import Icon from "components/icon";
 import { media } from "utils/styled/media";
-import defaultTheme, { ThemeInterface } from "utils/styled/theme";
+import theme, { Theme } from "theme";
 import { usePopupContext } from "utils/context/PopupContext";
 import { useWindowWidth } from "utils/hooks/use-window-width";
 import Link from "next/link";
@@ -35,7 +35,6 @@ const TeamPlanList = [
 ];
 
 export default function PlanList() {
-
   return (
     <SectionLayout alignContent="center">
       <Title mb="43px">Pay as you grow</Title>
@@ -92,7 +91,7 @@ const Wrapper = styled(Flex)`
   max-height: 800px;
   height: 200vh;
 
-  ${props => media("0px", (props.theme as ThemeInterface).breakpoints[0])} {
+  ${props => media("0px", props.theme.breakpoints[0])} {
     max-height: 1300px;
   }
 `;

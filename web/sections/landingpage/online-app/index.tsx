@@ -12,7 +12,6 @@ import LandingpageText from "components/landingpage/text";
 import { LandingpageUrls } from "utils/landingpage/constants";
 import { media } from "utils/styled/media";
 import { DesktopView, MobileView } from "utils/styled/styles";
-import { ThemeInterface } from "utils/styled/theme";
 
 import { contents } from "../k";
 import DesignToCode from "./design-code";
@@ -105,7 +104,7 @@ const OnlineTitle = styled(LandingpageText)`
   display: flex;
   align-items: center;
 
-  ${props => media("0px", (props.theme as ThemeInterface).breakpoints[0])} {
+  ${props => media("0px", props.theme.breakpoints[0])} {
     align-items: flex-start;
     flex-direction: column;
   }
@@ -115,7 +114,7 @@ const Description = styled(LandingpageText)`
   max-width: 525px;
   margin-top: 30px;
 
-  ${props => media("0px", (props.theme as ThemeInterface).breakpoints[0])} {
+  ${props => media("0px", props.theme.breakpoints[0])} {
     max-width: 100%;
   }
 `;

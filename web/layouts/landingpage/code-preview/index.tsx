@@ -7,7 +7,6 @@ import { vscDarkPlus as colorscheme } from "react-syntax-highlighter/dist/cjs/st
 import { Flex, Box } from "rebass";
 
 import { media } from "utils/styled/media";
-import { ThemeInterface } from "utils/styled/theme";
 
 import {
   DevFrameworkDemoConfig,
@@ -91,11 +90,7 @@ export default CodePreview;
 const ViewWrapper = styled(Flex)`
   position: relative;
   top: 156px;
-  ${props =>
-    media(
-      (props.theme as ThemeInterface).breakpoints[0],
-      (props.theme as ThemeInterface).breakpoints[3],
-    )} {
+  ${props => media(props.theme.breakpoints[0], props.theme.breakpoints[3])} {
     transform: translateX(45%);
   }
 `;
@@ -158,14 +153,14 @@ const CodeView = styled(Box)`
 
 const Mobile = styled.div`
   display: none;
-  ${props => media("0px", (props.theme as ThemeInterface).breakpoints[0])} {
+  ${props => media("0px", props.theme.breakpoints[0])} {
     display: block;
   }
 `;
 
 const Desktop = styled.div`
   display: block;
-  ${props => media("0px", (props.theme as ThemeInterface).breakpoints[0])} {
+  ${props => media("0px", props.theme.breakpoints[0])} {
     display: none;
   }
 `;

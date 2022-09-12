@@ -10,7 +10,7 @@ import { useAuthState } from "utils/hooks/use-auth-state";
 import { URLS } from "utils/landingpage/constants";
 import { media } from "utils/styled/media";
 import { center } from "utils/styled/styles";
-import { ThemeInterface } from "utils/styled/theme";
+import { Theme } from "theme";
 
 import { GroupEntity, HeaderMap } from "./headermap";
 import HoverMenu from "./hover-menu";
@@ -268,7 +268,7 @@ const HeaderWrapper = styled.header`
 `;
 
 const Logo = styled(Icon)`
-  ${props => media(null, (props.theme as ThemeInterface).breakpoints[0])} {
+  ${props => media(null, props.theme.breakpoints[0])} {
     position: absolute;
   }
 `;
@@ -297,12 +297,12 @@ const SignupButton = styled(Button)`
   justify-content: center;
   opacity: 0 !important;
 
-  ${props => media((props.theme as ThemeInterface).breakpoints[0], null)} {
+  ${props => media(props.theme.breakpoints[0], null)} {
     height: 25px;
     opacity: 1 !important;
   }
 
-  ${props => media((props.theme as ThemeInterface).breakpoints[0], null)} {
+  ${props => media(props.theme.breakpoints[0], null)} {
     background-color: #fff;
     color: #2562ff;
   }
@@ -314,7 +314,7 @@ const MenuList = styled.ul`
   align-items: center;
   height: 24px;
 
-  ${props => media(null, (props.theme as ThemeInterface).breakpoints[0])} {
+  ${props => media(null, props.theme.breakpoints[0])} {
     display: none;
   }
 `;
@@ -322,7 +322,7 @@ const MenuList = styled.ul`
 const ResponsiveMenu = styled(Flex)`
   display: none;
 
-  ${props => media(null, (props.theme as ThemeInterface).breakpoints[0])} {
+  ${props => media(null, props.theme.breakpoints[0])} {
     display: flex;
   }
 `;
@@ -330,7 +330,7 @@ const ResponsiveMenu = styled(Flex)`
 const ResponsiveTitle = styled(Text)`
   letter-spacing: -0.035em;
   font-weight: 600;
-  ${props => media(null, (props.theme as ThemeInterface).breakpoints[1])} {
+  ${props => media(null, props.theme.breakpoints[1])} {
     display: none;
   }
 `;

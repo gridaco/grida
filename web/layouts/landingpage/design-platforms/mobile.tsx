@@ -5,7 +5,6 @@ import { Flex } from "rebass";
 
 import LiveDesignDemoFrame from "components/landingpage/motion/live-design-demo";
 import { media } from "utils/styled/media";
-import { ThemeInterface } from "utils/styled/theme";
 
 const renderPlatforms = ["figma", "sketch", "adobexd"];
 

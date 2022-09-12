@@ -8,7 +8,6 @@ import { IconList } from "components/icon/icons";
 import SitemapList from "components/sitemap-list";
 import { URLS } from "utils/landingpage/constants";
 import { media } from "utils/styled/media";
-import { ThemeInterface } from "utils/styled/theme";
 
 import { Sitemap } from "./sitemap";
 
@@ -90,7 +89,7 @@ export default Footer;
 const FooterContent = styled(Flex)`
   justify-content: center;
 
-  ${props => media(null, (props.theme as ThemeInterface).breakpoints[0])} {
+  ${props => media(null, props.theme.breakpoints[0])} {
     flex-direction: column;
   }
 `;
@@ -100,7 +99,7 @@ const FooterBottom = styled(Flex)`
   font-size: 14px;
   letter-spacing: 0em;
   font-weight: 400;
-  ${props => media(null, (props.theme as ThemeInterface).breakpoints[0])} {
+  ${props => media(null, props.theme.breakpoints[0])} {
     flex-direction: column;
 
     .policys {
@@ -135,7 +134,7 @@ const SitemapWrapper = styled(Box)`
   grid-column-gap: 80px;
   grid-row-gap: 64px;
 
-  ${props => media(null, (props.theme as ThemeInterface).breakpoints[0])} {
+  ${props => media(null, props.theme.breakpoints[0])} {
     grid-column-gap: 80px;
   }
 `;

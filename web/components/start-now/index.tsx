@@ -3,7 +3,6 @@ import styled from "@emotion/styled";
 import { Flex, Text, Heading, Button } from "rebass";
 import Icon from "components/icon";
 import { media } from "utils/styled/media";
-import { ThemeInterface } from "utils/styled/theme";
 import PricingCTAButton from "components/pricing-cta-button";
 
 const descList = [
@@ -104,19 +103,19 @@ const Card = styled(Flex)`
   box-shadow: 0px 4px 64px 12px rgba(0, 0, 0, 0.08);
   border-radius: 8px;
 
-  ${props => media("0px", (props.theme as ThemeInterface).breakpoints[0])} {
+  ${props => media("0px", props.theme.breakpoints[0])} {
     height: 686px;
   }
 `;
 
 const LeftWrapper = styled(Flex)`
-  ${props => media("0px", (props.theme as ThemeInterface).breakpoints[0])} {
+  ${props => media("0px", props.theme.breakpoints[0])} {
     height: 50%;
   }
 `;
 
 const RightWrapper = styled(Flex)`
-  ${props => media("0px", (props.theme as ThemeInterface).breakpoints[0])} {
+  ${props => media("0px", props.theme.breakpoints[0])} {
     height: 50%;
   }
 `;

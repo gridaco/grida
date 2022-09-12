@@ -1,6 +1,7 @@
-import { Theme } from "styled-system";
+import { Theme as System } from "styled-system";
 
-export interface ThemeInterface extends Theme {
+type Color = React.CSSProperties["color"];
+interface _Theme extends System {
   colors: {
     primary: string;
   };
@@ -20,6 +21,9 @@ export interface ThemeInterface extends Theme {
     noShadow: object;
   };
 }
+declare module "@emotion/react" {
+  export interface Theme extends _Theme {}
+}
 
 const defaultButtonProps = {
   bg: "primary",
@@ -34,7 +38,17 @@ const defaultButtonProps = {
   boxShadow: "0px 4px 16px rgba(0, 0, 0, 0.12)",
 };
 
-const defaultTheme: ThemeInterface = {
+export type HeaderTheme = {
+  bg: Color;
+  color: Color;
+  menu: {
+    resting: Color;
+    hover: Color;
+  };
+  accent: Color;
+};
+
+const defaultTheme: _Theme = {
   breakpoints: [
     // ~~ xs ~~
     // sm
@@ -60,4 +74,8 @@ const defaultTheme: ThemeInterface = {
   },
 };
 
+export type {_Theme as Theme};
+
 export default defaultTheme;
+
+export const theme = {};

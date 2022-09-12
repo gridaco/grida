@@ -2,7 +2,6 @@ import styled from "@emotion/styled";
 import { Flex } from "rebass";
 
 import { media } from "utils/styled/media";
-import { ThemeInterface } from "utils/styled/theme";
 
 import Meta from "./meta";
 
@@ -20,7 +19,7 @@ export default function Layout({ children }) {
 }
 
 const DocsWrapper = styled(Flex)`
-  ${props => media("0px", (props.theme as ThemeInterface).breakpoints[0])} {
+  ${props => media("0px", props.theme.breakpoints[0])} {
     display: flex;
     flex-direction: column;
     margin-top: 0px;

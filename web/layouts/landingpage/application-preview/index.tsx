@@ -4,7 +4,6 @@ import React from "react";
 import { Box, Flex } from "rebass";
 
 import { media } from "utils/styled/media";
-import { ThemeInterface } from "utils/styled/theme";
 
 const ApplicationPreview = () => {
   return (
@@ -49,11 +48,7 @@ const Preview = styled(Flex)`
   position: absolute;
   border-radius: 30px;
 
-  ${props =>
-    media(
-      (props.theme as ThemeInterface).breakpoints[0],
-      (props.theme as ThemeInterface).breakpoints[1],
-    )} {
+  ${props => media(props.theme.breakpoints[0], props.theme.breakpoints[1])} {
     height: 90%;
   }
 `;

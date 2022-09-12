@@ -8,7 +8,6 @@ import { Button, Flex, Text } from "rebass";
 import { usePopupContext } from "utils/context/PopupContext";
 import { LandingpageUrls } from "utils/landingpage/constants";
 import { media } from "utils/styled/media";
-import { ThemeInterface } from "utils/styled/theme";
 import PricingCTAButton from "components/pricing-cta-button";
 
 function PricingCard(props: {
@@ -166,7 +165,7 @@ const Wrapper = styled(Flex)`
     }
   }}
 
-  ${props => media("0px", (props.theme as ThemeInterface).breakpoints[0])} {
+  ${props => media("0px", props.theme.breakpoints[0])} {
     width: 100%;
   }
 `;
@@ -215,7 +214,7 @@ const PlanDescription = styled(Flex)`
       color: #535353;
     }
 
-    ${props => media("0px", (props.theme as ThemeInterface).breakpoints[0])} {
+    ${props => media("0px", props.theme.breakpoints[0])} {
       flex: none;
       margin-top: 16px;
     }

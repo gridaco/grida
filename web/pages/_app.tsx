@@ -2,9 +2,7 @@
 import { ReactElement, ReactNode } from "react";
 import { NextPage } from "next";
 import { AppProps } from "next/app";
-
-import { Global, css } from "@emotion/core";
-import { ThemeProvider } from "emotion-theming";
+import { ThemeProvider } from "@emotion/react";
 import Head from "next/head";
 import { useRouter } from "next/router";
 import React, { useEffect } from "react";
@@ -19,10 +17,9 @@ import {
   PopupProvider,
 } from "utils/context/PopupContext";
 import { analytics } from "utils/firebase";
-import { defaultTheme } from "utils/styled";
+import theme from "theme";
 import { BodyCustomStyleInAbosulteSectionLayout } from "utils/styled/styles";
 
-import "../utils/styled/fonts.css";
 import { MDXProvider } from "@mdx-js/react";
 
 import { _MDX_COMPONENTS } from "components/mdx";
@@ -31,6 +28,8 @@ import makeKeywords from "utils/seo/make-keywords";
 
 import { Box } from "rebass";
 import { env } from "process";
+
+import "../styles/styles.css";
 
 export type NextPageWithLayout<P = {}, IP = P> = NextPage<P, IP> & {
   getLayout?: (page: ReactElement) => ReactNode;
@@ -88,62 +87,6 @@ const App = ({ Component, pageProps }: AppPropsWithLayout) => {
 
   return (
     <Providers>
-      <Global
-        styles={css`
-          html,
-          body,
-          #__next {
-            padding: 0;
-            margin: 0;
-            word-break: keep-all;
-            min-height: 100vh;
-            overflow-x: hidden;
-            scroll-behavior: smooth;
-            @media (prefers-reduced-motion: reduce) {
-              scroll-behavior: auto;
-            }
-          }
-
-          .cursor {
-            cursor: pointer;
-          }
-
-          .no-drag {
-            user-select: none;
-          }
-
-          input {
-            box-sizing: border-box;
-          }
-
-          a {
-            text-decoration: none;
-            color: inherit;
-          }
-
-          p {
-            margin-block-start: 0.3em;
-            margin-block-end: 0.3em;
-          }
-
-          body,
-          button,
-          input,
-          textarea,
-          h1,
-          h2,
-          h3,
-          h4,
-          h5,
-          h6 {
-            font-family: HelveticaNeue, sans-serif !important;
-          }
-
-          button {
-            outline: none;
-          }
-        `}
-      />
       <Head>
         <SeoMeta />
         {/* pinterest domain verify */}
@@ -237,7 +180,7 @@ const Providers = ({ children }: { children: React.ReactNode }) => {
     <PopupProvider>
       <CookiesProvider>
         <MDXProvider components={_MDX_COMPONENTS}>
-          <ThemeProvider theme={defaultTheme}>{children}</ThemeProvider>
+          <ThemeProvider theme={theme}>{children}</ThemeProvider>
         </MDXProvider>
       </CookiesProvider>
     </PopupProvider>

@@ -1,8 +1,6 @@
 import React, { useRef, useEffect, useState } from "react";
 import { Flex } from "rebass";
 import styled, { CSSObject } from "@emotion/styled";
-import { InterpolationWithTheme } from "@emotion/core";
-import { ThemeInterface } from "utils/styled/theme";
 
 const variants = [
   "full-width",

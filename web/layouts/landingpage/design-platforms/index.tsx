@@ -6,7 +6,6 @@ import { Box, Flex } from "rebass";
 
 import LiveDesignDemoFrame from "components/landingpage/motion/live-design-demo";
 import { media } from "utils/styled/media";
-import { ThemeInterface } from "utils/styled/theme";
 
 import DesignPlatformsMobile from "./mobile";
 
@@ -135,35 +134,23 @@ const Postioner = styled(Flex)`
       width: 100% !important;
     }
 
-    ${props =>
-      media(
-        (props.theme as ThemeInterface).breakpoints[0],
-        (props.theme as ThemeInterface).breakpoints[3],
-      )} {
+    ${props => media(props.theme.breakpoints[0], props.theme.breakpoints[3])} {
       direction: rtl;
     }
   }
 
-  ${props =>
-    media(
-      (props.theme as ThemeInterface).breakpoints[0],
-      (props.theme as ThemeInterface).breakpoints[1],
-    )} {
+  ${props => media(props.theme.breakpoints[0], props.theme.breakpoints[1])} {
     width: 80% !important;
   }
 
-  ${props =>
-    media(
-      (props.theme as ThemeInterface).breakpoints[1],
-      (props.theme as ThemeInterface).breakpoints[2],
-    )} {
+  ${props => media(props.theme.breakpoints[1], props.theme.breakpoints[2])} {
     width: 60% !important;
   }
 `;
 
 const Mobile = styled.div`
   display: none;
-  ${props => media("0px", (props.theme as ThemeInterface).breakpoints[0])} {
+  ${props => media("0px", props.theme.breakpoints[0])} {
     display: block;
     margin-bottom: 300px;
   }
@@ -172,7 +159,7 @@ const Mobile = styled.div`
 const Desktop = styled.div`
   display: block;
   height: 700px;
-  ${props => media("0px", (props.theme as ThemeInterface).breakpoints[0])} {
+  ${props => media("0px", props.theme.breakpoints[0])} {
     display: none;
   }
 `;
