@@ -111,6 +111,12 @@ module.exports = withBundleAnalyzer(
             {
               source: "/cloud/cors",
               destination: "https://cors.sh",
+              permanent: false,
+            },
+            {
+              // Legacy. keep this for a while.
+              source: "/cloud/cors/register",
+              destination: "https://cors.sh",
               permanent: true,
             },
             // events
