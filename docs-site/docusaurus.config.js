@@ -3,10 +3,6 @@
 
 const darkCodeTheme = require("prism-react-renderer/themes/dracula");
 const lightCodeTheme = require("prism-react-renderer/themes/github");
-const ga_config = {
-  trackingID: "G-C4615L9YZK", // same as grida.co
-  anonymizeIP: true,
-};
 
 const footer = {
   links: [
@@ -163,7 +159,10 @@ const config = {
         theme: {
           customCss: require.resolve("./src/css/custom.css"),
         },
-        googleAnalytics: ga_config,
+        gtag: {
+          trackingID: "G-C4615L9YZK", // same as grida.co
+          anonymizeIP: true,
+        },
       },
     ],
   ],
