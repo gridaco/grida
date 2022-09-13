@@ -113,7 +113,7 @@ const Header = () => {
                   onHover={() => {
                     showHoverMenu(i.label);
                   }}
-                  selected={path === i.href}
+                  selected={path === i.href || hoveringItem === i.label}
                 />
               ))}
             </MenuList>
@@ -283,7 +283,7 @@ const Label = styled(Text)`
     color: ${p => p.theme.header.menu.hover};
   }
 
-  [data-selected="true"] {
+  &[data-selected="true"] {
     color: ${p => p.theme.header.menu.hover};
   }
 
