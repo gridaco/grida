@@ -10,6 +10,7 @@ import { URLS } from "utils/landingpage/constants";
 import { media } from "utils/styled/media";
 
 import { Sitemap } from "./sitemap";
+import { useTheme } from "@emotion/react";
 
 const iconList: Array<{
   icon: keyof IconList;
@@ -42,6 +43,8 @@ const iconList: Array<{
 ];
 
 const Footer = () => {
+  const theme = useTheme();
+
   return (
     <Flex alignItems="center" justifyContent="center" width="100%">
       <Flex
@@ -51,7 +54,11 @@ const Footer = () => {
         flexDirection="column"
       >
         <FooterContent width="100%">
-          <Icon name="bridged" mr="100px" mb="64px" />
+          <Icon
+            name={theme.type === "light" ? "grida_black" : "grida_white"}
+            mr="100px"
+            mb="64px"
+          />
           <SitemapWrapper>
             {Sitemap.map(i => (
               <SitemapList key={i.label} sitemap={i} />
@@ -95,7 +102,7 @@ const FooterContent = styled(Flex)`
 `;
 
 const FooterBottom = styled(Flex)`
-  color: #4e4e4e;
+  color: ${p => p.theme.footer.bottom.color};
   font-size: 14px;
   letter-spacing: 0em;
   font-weight: 400;

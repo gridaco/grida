@@ -3,22 +3,27 @@ import React, { useEffect } from "react";
 import { useCookies } from "react-cookie";
 import { useSetRecoilState, useRecoilValue } from "recoil";
 import { selectSystemTheme, selectTheme, themeState } from "./state";
-import { theme } from "./theme";
+import theme from "./theme";
 
 export function ThemeProvider({
-  theme: explicit = "light",
+  override,
+  fallback,
   children,
 }: React.PropsWithChildren<{
-  theme?: "light" | "dark";
+  override?: "light" | "dark";
+  fallback: "light" | "dark";
 }>) {
   const [cookies, setCookie, removeCookie] = useCookies(["theme"]);
 
   const currentTheme = useRecoilValue(themeState);
 
-  const _theme =
-    currentTheme.system === "pending"
-      ? theme[explicit]
-      : theme[currentTheme.mode];
+  const _theme = override
+    ? theme[override]
+    : currentTheme.mode === "system"
+    ? currentTheme.system === "pending"
+      ? theme[fallback]
+      : theme[currentTheme.system]
+    : theme[currentTheme.mode];
 
   const setMode = useSetRecoilState(selectTheme);
   const setSystem = useSetRecoilState(selectSystemTheme);
@@ -40,7 +45,9 @@ export function ThemeProvider({
   }, [setSystem]);
 
   useEffect(() => {
-    return setMode(currentTheme.system as "light" | "dark");
+    if (currentTheme.system !== "pending" && currentTheme.mode !== undefined) {
+      return setMode(currentTheme.system);
+    }
   }, [currentTheme.system, setMode]);
 
   useEffect(() => {

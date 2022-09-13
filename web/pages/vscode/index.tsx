@@ -52,6 +52,7 @@ export default function VSCodePage() {
       <Contents>
         <Spacer />
         <Spacer />
+        <Spacer />
         <Heading1>VSCode X Grida</Heading1>
         <InstallButton onClick={onInstall}>
           Install Grida VSCode Extension
@@ -77,6 +78,8 @@ VSCodePage.getLayout = (page: ReactElement) => {
     </Page>
   );
 };
+
+VSCodePage.getTheme = () => "dark";
 
 const Page = styled.div`
   ${BackgroundGradient}

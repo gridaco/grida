@@ -4,6 +4,7 @@ import React from "react";
 import { Flex, Text } from "rebass";
 
 import { Sitemap } from "components/footer/sitemap";
+import { useTheme } from "@emotion/react";
 
 interface SitemapListProps {
   sitemap: Sitemap;
@@ -12,12 +13,15 @@ interface SitemapListProps {
 const SitemapList: React.FC<SitemapListProps> = ({ sitemap }) => {
   const { label, href, child } = sitemap;
 
+  const theme = useTheme();
+
   const Header = () => {
     const HeaderText = (
       <Text
         className={href && "cursor"}
         fontWeight="500"
         fontSize="18px"
+        color={theme.footer.group.color}
         mb="40px"
         style={{
           letterSpacing: "0em",
@@ -43,7 +47,7 @@ const SitemapList: React.FC<SitemapListProps> = ({ sitemap }) => {
             className="cursor"
             fontSize="14px"
             mb="15px"
-            color="#292929"
+            color={theme.footer.menu.color}
             style={{
               letterSpacing: "0em",
               fontWeight: 400,

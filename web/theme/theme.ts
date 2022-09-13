@@ -1,42 +1,10 @@
 import { Theme as System } from "styled-system";
+import light from "./light"
+import dark from "./dark"
+import * as defaults from "./shared";
 
 type Color = React.CSSProperties["color"];
-interface _Theme extends System {
-  colors: {
-    primary: string;
-  };
-  breakpoints: [
-    // ~~ xs ~~
-    // sm
-    "768px",
-    // md
-    "1024px",
-    // lg
-    "1280px",
-    // xl
-    "1440px",
-  ];
-  buttons: {
-    primary: object;
-    noShadow: object;
-  };
-}
-declare module "@emotion/react" {
-  export interface Theme extends _Theme {}
-}
-
-const defaultButtonProps = {
-  bg: "primary",
-  borderRadius: "100px",
-  p: "12px 28px",
-  fontSize: "16px",
-  fontWeight: 500,
-  cursor: "pointer",
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "center",
-  boxShadow: "0px 4px 16px rgba(0, 0, 0, 0.12)",
-};
+type BoxShadow = React.CSSProperties["boxShadow"];
 
 export type HeaderTheme = {
   bg: Color;
@@ -46,36 +14,49 @@ export type HeaderTheme = {
     hover: Color;
   };
   accent: Color;
+  // expansion: {
+  //   bg: Color;
+  //   shadow: BoxShadow;
+  //   overlay: {
+  //     color: Color;
+  //   }
+  //   color: Color;
+  //   label: {color: Color};
+  //   tagline: {color: Color};
+  // }
 };
 
-const defaultTheme: _Theme = {
-  breakpoints: [
-    // ~~ xs ~~
-    // sm
-    "768px",
-    // md
-    "1024px",
-    // lg
-    "1280px",
-    // xl
-    "1440px",
-  ],
+export type FooterTheme = {
+  group: {
+    color: Color;
+  },
+  menu: {
+    color: Color;
+  },
+  bottom: {
+    color: Color;
+  }
+}
+
+
+interface _Theme extends System {
+  type: "light" | "dark";
+  header: HeaderTheme;
+  footer: FooterTheme;
   colors: {
-    primary: "#2562FF",
-  },
+    primary: string;
+  };
+  breakpoints: typeof defaults.breakpoints;
   buttons: {
-    primary: {
-      ...defaultButtonProps,
-    },
-    noShadow: {
-      ...defaultButtonProps,
-      boxShadow: "",
-    },
-  },
-};
+    primary: object;
+    noShadow: object;
+  };
+}
+declare module "@emotion/react" {
+  export interface Theme extends _Theme {}
+}
 
+// eslint-disable-next-line prettier/prettier
 export type {_Theme as Theme};
 
-export default defaultTheme;
-
-export const theme = {};
+export default {light, dark};

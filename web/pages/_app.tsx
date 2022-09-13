@@ -2,7 +2,7 @@
 import { ReactElement, ReactNode } from "react";
 import { NextPage } from "next";
 import { AppProps } from "next/app";
-import { ThemeProvider } from "@emotion/react";
+import { ThemeProvider } from "theme";
 import Head from "next/head";
 import { useRouter } from "next/router";
 import React, { useEffect } from "react";
@@ -16,7 +16,6 @@ import {
   PopupProvider,
 } from "utils/context/PopupContext";
 import { analytics } from "utils/firebase";
-import theme from "theme";
 import { BodyCustomStyleInAbosulteSectionLayout } from "utils/styled/styles";
 
 import { MDXProvider } from "@mdx-js/react";
@@ -30,10 +29,11 @@ import { env } from "process";
 
 import "../styles/global.css";
 import Script from "next/script";
+import { RecoilRoot } from "recoil";
 
 export type NextPageWithLayout<P = {}, IP = P> = NextPage<P, IP> & {
   getLayout?: (page: ReactElement) => ReactNode;
-  getTheme?: () => "system" | "light" | "dark";
+  getTheme?: () => "light" | "dark" | undefined;
 };
 
 type AppPropsWithLayout = AppProps & {
@@ -59,7 +59,7 @@ const App = ({ Component, pageProps }: AppPropsWithLayout) => {
   const router = useRouter();
 
   const getLayout = Component.getLayout ?? defaultLayout;
-  const getTheme = Component.getTheme ?? (() => "system");
+  const getTheme = Component.getTheme ?? (() => undefined);
 
   useEffect(() => {
     if (process.env.NODE_ENV === "development") {
@@ -130,7 +130,10 @@ const App = ({ Component, pageProps }: AppPropsWithLayout) => {
       <Box
         style={{ display: "flex", flexDirection: "column", minHeight: "100vh" }}
       >
-        {getLayout(<Component {...pageProps} />)}
+        <ThemeProvider fallback="light" override={getTheme() ?? "light"}>
+          {/*  */}
+          {getLayout(<Component {...pageProps} />)}
+        </ThemeProvider>
       </Box>
       {renderPopups()}
     </Providers>
@@ -160,7 +163,7 @@ const Providers = ({ children }: { children: React.ReactNode }) => {
     <PopupProvider>
       <CookiesProvider>
         <MDXProvider components={_MDX_COMPONENTS}>
-          <ThemeProvider theme={theme}>{children}</ThemeProvider>
+          <RecoilRoot>{children}</RecoilRoot>
         </MDXProvider>
       </CookiesProvider>
     </PopupProvider>

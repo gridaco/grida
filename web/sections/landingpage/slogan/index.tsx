@@ -23,7 +23,7 @@ const Slogan = () => {
         <SloganText variant="h2">Focus on the core</SloganText>
         <SloganText variant="h2">
           <Icon
-            name="bridged"
+            name="grida_black"
             width={[32, 64]}
             height={[32, 64]}
             isVerticalMiddle

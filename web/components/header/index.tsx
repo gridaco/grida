@@ -10,14 +10,15 @@ import { useAuthState } from "utils/hooks/use-auth-state";
 import { URLS } from "utils/landingpage/constants";
 import { media } from "utils/styled/media";
 import { center } from "utils/styled/styles";
-import { Theme } from "theme";
 
 import { GroupEntity, HeaderMap } from "./headermap";
 import HoverMenu from "./hover-menu";
+import { useTheme } from "@emotion/react";
 
 const Header = () => {
   const router = useRouter();
   const auth = useAuthState();
+  const theme = useTheme();
 
   const [hoveringItem, setHoveringItem] = useState<string>();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -87,7 +88,7 @@ const Header = () => {
             <Link href="/">
               <Logo
                 className="cursor"
-                name="bridged"
+                name={theme.type === "light" ? "grida_black" : "grida_white"}
                 width={32}
                 height={32}
                 ml={["8px", "8px", "8px", "8px"]}
@@ -120,7 +121,7 @@ const Header = () => {
 
           <SignupButton
             onClick={handleSignupClick}
-            style={{ opacity: isMenuOpen && 0 }}
+            style={{ opacity: isMenuOpen ? 0 : 1 }}
             fontSize={["13px", "13px", "15px"]}
             p={["6px 10px", "6px 10px", "9px 20px", "9px 20px"]}
             variant="noShadow"
@@ -153,7 +154,7 @@ const Header = () => {
               <Button
                 variant="noShadow"
                 width="100%"
-                bg="#2562FF"
+                bg={theme.header.accent}
                 height="35px"
                 fontSize="13px"
                 mb="12px"
@@ -168,8 +169,7 @@ const Header = () => {
               <Button
                 variant="noShadow"
                 width="100%"
-                bg="#fff"
-                color="#000"
+                color={theme.header.color}
                 height="35px"
                 fontSize="13px"
                 style={center}
@@ -277,14 +277,14 @@ const Label = styled(Text)`
   font-weight: 500;
   letter-spacing: 0em;
   font-size: 15px;
-  color: rgba(0, 0, 0, 0.55);
+  color: ${p => p.theme.header.menu.resting};
 
   &:hover {
-    color: black;
+    color: ${p => p.theme.header.menu.hover};
   }
 
   [data-selected="true"] {
-    color: black;
+    color: ${p => p.theme.header.menu.hover};
   }
 
   transition: all 0.1s ease-in-out;
@@ -296,16 +296,16 @@ const SignupButton = styled(Button)`
   align-items: center;
   justify-content: center;
   opacity: 0 !important;
-  color: black;
-  /* background-color: #fff; */
-  /* color: ${props => props.theme.colors.primary}; */
+  color: ${p => p.theme.header.accent} !important;
+  background: none;
+  padding: 0 !important;
 
   ${props => media(props.theme.breakpoints[0], null)} {
     height: 25px;
     opacity: 1 !important;
   }
 
-${props => media(props.theme.breakpoints[0], null)} {
+  ${props => media(props.theme.breakpoints[0], null)} {
   }
 `;
 
@@ -331,6 +331,7 @@ const ResponsiveMenu = styled(Flex)`
 const ResponsiveTitle = styled(Text)`
   letter-spacing: -0.035em;
   font-weight: 600;
+  color: ${p => p.theme.header.color};
   ${props => media(null, props.theme.breakpoints[1])} {
     display: none;
   }
