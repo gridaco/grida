@@ -82,5 +82,5 @@ export default MainPage;
  * https://github.com/vercel/community/discussions/103?sort=top#discussioncomment-2584250
  */
 export const config = {
-  unstable_excludeFiles: ["public/**/*"],
+  unstable_excludeFiles: ["public/**/*", "static/**/*"],
 };
