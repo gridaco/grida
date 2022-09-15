@@ -66,7 +66,9 @@ function ElevatedVideoPlayer() {
     <Frame style={{ scale }}>
       <div className="youtube-thumbnail">
         <ReactPlayer
-          url={require("public/videos/promotion-video-preview.fast.mp4")}
+          url={
+            "https://player.vimeo.com/progressive_redirect/playback/749854972/rendition/720p/file.mp4?loc=external&signature=2e08689472fda44beb5f7b7ad6454054029e93f539ac6ca2ae9c2faeef5a448d"
+          }
           loop
           playing={!actualVideoPlaying}
           muted
