@@ -1,7 +1,10 @@
 {
   "framework": "nextjs",
+  "buildCommand": "next build",
   "public": true,
-  "src/pages/**/*": {
-    "excludeFiles": "public/**/*"
+  "functions": {
+    "src/pages/**/*": {
+      "excludeFiles": "public/**/*"
+    }
   }
 }
