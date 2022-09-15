@@ -3,7 +3,7 @@
   "buildCommand": "next build",
   "public": true,
   "functions": {
-    "src/pages/**/*": {
+    "pages/**/*": {
       "excludeFiles": "public/**/*"
     }
   }
