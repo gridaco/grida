@@ -1,0 +1,7 @@
+{
+  "framework": "nextjs",
+  "public": true,
+  "src/pages/**/*": {
+    "excludeFiles": "public/**/*"
+  }
+}
