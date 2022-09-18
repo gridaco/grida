@@ -36,8 +36,13 @@ export default function LandingMainCtaButton() {
 }
 
 const MainButton = styled(Button)`
+  cursor: pointer;
+  border-radius: 100px !important;
+  padding: 12px 28px !important;
+  font-weight: 500;
   font-size: 17.5px;
   line-height: 22px;
   letter-spacing: 0.02em;
   background-color: ${p => p.theme.colors.primary};
+  box-shadow: 0px 4px 16px rgba(0, 0, 0, 0.12);
 `;
