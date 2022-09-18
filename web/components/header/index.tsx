@@ -9,7 +9,7 @@ import Icon from "components/icon";
 import { useAuthState } from "utils/hooks/use-auth-state";
 import { URLS } from "utils/landingpage/constants";
 import { media } from "utils/styled/media";
-import { center } from "utils/styled/styles";
+import { center, pointer } from "utils/styled/styles";
 
 import { GroupEntity, HeaderMap } from "./headermap";
 import HoverMenu from "./hover-menu";
@@ -58,7 +58,7 @@ const Header = () => {
       // move to app
       window.location.href = URLS.landing.current_app;
     } else {
-      !isMenuOpen && (window.location.href = URLS.landing.signin_with_return);
+      window.location.href = URLS.landing.signin_with_return;
     }
   };
 
@@ -135,10 +135,12 @@ const Header = () => {
             justifyContent="space-between"
             style={{
               position: "absolute",
-              top: 60,
-              height: "calc(100vh - 60px)",
+              top: 0,
+              paddingTop: 60,
+              zIndex: -1,
+              height: "100vh",
             }}
-            bg="#fff"
+            bg={theme.header.bg}
             width="100%"
             px="20px"
             pb="24px"
@@ -170,9 +172,11 @@ const Header = () => {
                 variant="noShadow"
                 width="100%"
                 color={theme.header.color}
+                backgroundColor="transparent"
+                fontWeight={500}
                 height="35px"
                 fontSize="13px"
-                style={center}
+                style={{ ...center, ...pointer }}
                 onClick={handleSigninOrMoveAppClick}
               >
                 {auth == "signedin" ? (
@@ -274,7 +278,7 @@ const Logo = styled(Icon)`
 `;
 
 const Label = styled(Text)`
-  font-weight: 500;
+  font-weight: 500 !important;
   letter-spacing: 0em;
   font-size: 15px;
   color: ${p => p.theme.header.menu.resting};
@@ -291,6 +295,7 @@ const Label = styled(Text)`
 `;
 
 const SignupButton = styled(Button)`
+  font-weight: 500 !important;
   height: 35px;
   display: flex;
   align-items: center;

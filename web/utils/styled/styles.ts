@@ -15,6 +15,10 @@ export const center = {
   justifyContent: "center",
 };
 
+export const pointer = {
+  cursor: "pointer",
+};
+
 export const DesktopView = styled.div`
   display: flex;
 
