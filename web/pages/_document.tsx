@@ -1,11 +1,15 @@
 import React from "react";
 import { Html, Head, Main, NextScript } from "next/document";
 import { SEO_DEFAULTS } from "utils/seo";
+import i18nextConfig from "../next-i18next.config";
 import makeKeywords from "utils/seo/make-keywords";
 
 export default function Document(props) {
+  const currentLocale =
+    props.__NEXT_DATA__.query.locale || i18nextConfig.i18n.defaultLocale;
+
   return (
-    <Html lang={"en"}>
+    <Html lang={currentLocale}>
       <Head>
         <SeoMeta />
         {/* region Font */}
