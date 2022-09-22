@@ -1,6 +1,6 @@
 import styled from "@emotion/styled";
 import React, { useCallback } from "react";
-import { Flex, Text, Heading } from "rebass";
+import { Flex, Text, Heading } from "theme-ui";
 
 import BlankArea from "components/blank-area";
 import Icon from "components/icon";
@@ -28,9 +28,11 @@ const FeatureListDesktopView: React.FC<FeatureProps> = ({ data }) => {
       title: "",
       element: (
         <Flex
-          width="calc(100vw - 40px)"
-          alignItems="center"
-          flexDirection="column"
+          style={{
+            width: "calc(100vw - 40px)",
+            alignItems: "center",
+            flexDirection: "column",
+          }}
           p="48px"
         >
           <Icon
@@ -39,7 +41,13 @@ const FeatureListDesktopView: React.FC<FeatureProps> = ({ data }) => {
             ml="auto"
             onClick={() => removePopup()}
           />
-          <Flex width="80%" flexDirection="column" alignItems="center">
+          <Flex
+            style={{
+              width: "80%",
+              flexDirection: "column",
+              alignItems: "center",
+            }}
+          >
             <LandingpageText variant="h4" textAlign="center">
               What is extra usage fee?
             </LandingpageText>
@@ -56,21 +64,56 @@ const FeatureListDesktopView: React.FC<FeatureProps> = ({ data }) => {
   }, []);
 
   return (
-    <Flex flexDirection="column" width="100%">
+    <Flex
+      style={{
+        flexDirection: "column",
+        width: "100%",
+      }}
+    >
       <Header
-        justifyContent="space-between"
-        width="100%"
-        alignItems="baseline"
+        style={{
+          width: "100%",
+          justifyContent: "space-between",
+          alignItems: "baseline",
+        }}
         pb="26px"
         mb="30px"
       >
-        <Heading flex="1" fontSize="56px" color="#000000" fontWeight="bold">
+        <Heading
+          style={{
+            flex: 1,
+            fontSize: "56px",
+            color: "black",
+            fontWeight: "bold",
+          }}
+        >
           Features
         </Heading>
-        <Flex flex="1">
-          <HeaderContent flex="1">Free</HeaderContent>
-          <HeaderContent flex="1">Team</HeaderContent>
-          <HeaderContent flex="1" alignItems="center">
+        <Flex
+          style={{
+            flex: 1,
+          }}
+        >
+          <HeaderContent
+            style={{
+              flex: 1,
+            }}
+          >
+            Free
+          </HeaderContent>
+          <HeaderContent
+            style={{
+              flex: 1,
+            }}
+          >
+            Team
+          </HeaderContent>
+          <HeaderContent
+            style={{
+              flex: 1,
+              alignItems: "center",
+            }}
+          >
             Extra usage
             <Icon
               className="cursor"
@@ -85,21 +128,59 @@ const FeatureListDesktopView: React.FC<FeatureProps> = ({ data }) => {
         </Flex>
       </Header>
 
-      <Flex width="100%" flexDirection="column" justifyContent="space-between">
+      <Flex
+        style={{
+          width: "100%",
+          flexDirection: "column",
+          justifyContent: "space-between",
+        }}
+      >
         {data.map((item, ix) => (
-          <Flex key={ix} mb="60px" flexDirection="column">
-            <Text mb="24px" color="#000000" fontSize="16px" fontWeight="bold">
+          <Flex
+            key={ix}
+            mb="60px"
+            style={{
+              flexDirection: "column",
+            }}
+          >
+            <Text
+              mb="24px"
+              color="black"
+              style={{
+                fontSize: "16px",
+                fontWeight: "bold",
+              }}
+            >
               {item.title}
             </Text>
-            <Flex flexDirection="column">
+            <Flex
+              style={{
+                flexDirection: "column",
+              }}
+            >
               {item.feature.map((item, ix) => (
                 <ContentsWrapper mb="12px" key={ix}>
-                  <Flex fontSize="18px" color="#2b2b2b" flex="3">
+                  <Flex
+                    style={{
+                      fontSize: "18px",
+                      color: "#2b2b2b",
+                      flex: 3,
+                    }}
+                  >
                     {item.name}
                   </Flex>
-                  <ResponsivePricingCell flex="1" price={item.price[0]} />
-                  <ResponsivePricingCell flex="1" price={item.price[1]} />
-                  <ResponsivePricingCell flex="1" price={item.price[2]} />
+                  <ResponsivePricingCell
+                    style={{ flex: 1 }}
+                    price={item.price[0]}
+                  />
+                  <ResponsivePricingCell
+                    style={{ flex: 1 }}
+                    price={item.price[1]}
+                  />
+                  <ResponsivePricingCell
+                    style={{ flex: 1 }}
+                    price={item.price[2]}
+                  />
                 </ContentsWrapper>
               ))}
             </Flex>

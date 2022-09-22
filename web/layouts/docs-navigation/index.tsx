@@ -1,15 +1,12 @@
 import styled from "@emotion/styled";
 import { useRouter } from "next/router";
 import React, { useEffect, useState } from "react";
-import { Box, Flex, Text } from "rebass";
+import { Box, Flex, Text } from "theme-ui";
 
-import DocsNavigationMobile from "components/docs-navigation-mobile";
 import DocsNavigationSection from "components/docs-navigation-section";
-import DocsSearchBar from "components/docs-search-bar";
 import Icon from "components/icon";
 import { media } from "utils/styled/media";
 import { center } from "utils/styled/styles";
-import { ThemeInterface } from "utils/styled/theme";
 
 import { DocsManifest, DocsRoute } from "../../utils/docs/model";
 
@@ -39,7 +36,9 @@ function DocsNavigation() {
   const docs = manifest ? manifest[0] : undefined;
   return (
     <NavigationWrapper
-      flexDirection="column"
+      style={{
+        flexDirection: "column",
+      }}
       mr={["0px", "70px", "70px", "70px"]}
     >
       {/* <DocsSearchBar /> */}
@@ -52,10 +51,12 @@ function DocsNavigation() {
       <Mobile>
         <Wrapper>
           <Text
-            style={center}
+            style={{
+              ...center,
+              fontSize: "18px",
+              fontWeight: "bold",
+            }}
             className="cursor"
-            fontSize="18px"
-            fontWeight="bold"
             onClick={() => setIsOpen(!isOpen)}
           >
             <Icon
@@ -98,14 +99,14 @@ const NavigationWrapper = styled(Flex)`
 
 const Mobile = styled.div`
   display: none;
-  ${props => media("0px", (props.theme as ThemeInterface).breakpoints[0])} {
+  ${props => media("0px", props.theme.breakpoints[0])} {
     display: block;
   }
 `;
 
 const Desktop = styled.div`
   display: block;
-  ${props => media("0px", (props.theme as ThemeInterface).breakpoints[0])} {
+  ${props => media("0px", props.theme.breakpoints[0])} {
     display: none;
   }
 `;

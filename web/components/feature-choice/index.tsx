@@ -1,5 +1,5 @@
 import React, { useCallback, useState } from "react";
-import { Flex, Text } from "rebass";
+import { Flex, Text } from "theme-ui";
 import styled from "@emotion/styled";
 import Icon from "components/icon";
 import LandingpageText from "components/landingpage/text";
@@ -32,9 +32,11 @@ const FeatureChoice: React.FC<FeatureChoiceProps> = props => {
       title: "",
       element: (
         <Flex
-          width="calc(100vw - 40px)"
-          alignItems="center"
-          flexDirection="column"
+          style={{
+            width: "calc(100vw - 40px)",
+            alignItems: "center",
+            flexDirection: "column",
+          }}
           p="48px"
         >
           <Icon
@@ -43,7 +45,13 @@ const FeatureChoice: React.FC<FeatureChoiceProps> = props => {
             ml="auto"
             onClick={() => removePopup()}
           />
-          <Flex width="80%" flexDirection="column" alignItems="center">
+          <Flex
+            style={{
+              width: "80%",
+              flexDirection: "column",
+              alignItems: "center",
+            }}
+          >
             <LandingpageText variant="h4" textAlign="center">
               What is extra usage fee?
             </LandingpageText>
@@ -60,9 +68,26 @@ const FeatureChoice: React.FC<FeatureChoiceProps> = props => {
   }, []);
 
   return (
-    <Flex width="100%" alignItems="center" mb="58px">
-      <Flex flexDirection="column">
-        <Text mt="17px" mb="33px" fontSize="18px" color="#7e7e7e">
+    <Flex
+      style={{
+        width: "100%",
+        alignItems: "center",
+      }}
+      mb="58px"
+    >
+      <Flex
+        style={{
+          flexDirection: "column",
+        }}
+      >
+        <Text
+          mt="17px"
+          mb="33px"
+          style={{
+            fontSize: "18px",
+          }}
+          color="#7e7e7e"
+        >
           {titleList}{" "}
           {titleList === "Extra Usage" && (
             <Icon
@@ -75,18 +100,36 @@ const FeatureChoice: React.FC<FeatureChoiceProps> = props => {
         </Text>
         {featureData.map((item, ix) => (
           <Item
-            flexDirection="column"
+            style={{
+              flexDirection: "column",
+            }}
             onClick={() => handleFeatureClick(ix)}
             className="cursor"
             mb="36px"
             key={item.id}
           >
-            <Text fontWeight="bold" fontSize="16px" color="#000000">
+            <Text
+              style={{
+                fontWeight: "bold",
+                fontSize: "16px",
+              }}
+              color="#000000"
+            >
               {item.title}
             </Text>
-            <Text color="#2b2b2b" fontWeight="normal">
+            <Text
+              color="#2b2b2b"
+              style={{
+                fontWeight: "normal",
+              }}
+            >
               {item.feature.map((i, idx) => (
-                <Feature width="100%" key={i.id}>
+                <Feature
+                  key={i.id}
+                  style={{
+                    width: "100%",
+                  }}
+                >
                   {isOpen.includes(ix) && <Flex mb="12px">{i.name}</Flex>}
                 </Feature>
               ))}

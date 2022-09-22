@@ -1,13 +1,12 @@
 import styled from "@emotion/styled";
-import SectionLayout from "layout/section";
+import SectionLayout from "layouts/section";
 import Image from "next/image";
 import React, { useState } from "react";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { vscDarkPlus as colorscheme } from "react-syntax-highlighter/dist/cjs/styles/prism";
-import { Flex, Box } from "rebass";
+import { Flex, Box } from "theme-ui";
 
 import { media } from "utils/styled/media";
-import { ThemeInterface } from "utils/styled/theme";
 
 import {
   DevFrameworkDemoConfig,
@@ -28,21 +27,33 @@ const CodePreview = () => {
       </Mobile>
       <Desktop>
         <SectionLayout variant="full-width" inherit={false}>
-          <Flex width="100%">
-            <Box width="25%" height="1px" />
-            <Box width="25%" height="1px" />
+          <Flex
+            sx={{
+              width: "100%",
+            }}
+          >
+            <Box sx={{ width: "25%", height: 1 }} />
+            <Box sx={{ width: "25%", height: 1 }} />
             <ViewWrapper
-              width="37%"
-              flexDirection="column"
-              alignItems={[
-                "flex-start",
-                "flex-start",
-                "flex-start",
-                "flex-start",
-                "flex-end",
-              ]}
+              sx={{
+                width: "37%",
+                flexDirection: "column",
+                alignItems: [
+                  "flex-start",
+                  "flex-start",
+                  "flex-start",
+                  "flex-start",
+                  "flex-end",
+                ],
+              }}
             >
-              <CodeView width="460px" height="770px" bg="rgb(30, 30, 30)">
+              <CodeView
+                sx={{
+                  width: "460px",
+                  height: "770px",
+                }}
+                bg="rgb(30, 30, 30)"
+              >
                 <header>
                   <span />
                   <span />
@@ -68,13 +79,15 @@ const CodePreview = () => {
                     src={`/assets/platform-icons/${i.name}/${
                       currentPlatform.name === i.name ? "default" : "grey"
                     }.png`}
-                    width="24"
-                    height="24"
+                    width={24}
+                    height={24}
                   />
                 ))}
               </Platforms>
             </ViewWrapper>
-            <Box width={["0px", "0px", "0px", "0px", "13%"]} height="1px" />
+            <Box
+              sx={{ width: ["0px", "0px", "0px", "0px", "13%"], height: 1 }}
+            />
           </Flex>
         </SectionLayout>
       </Desktop>
@@ -91,20 +104,16 @@ export default CodePreview;
 const ViewWrapper = styled(Flex)`
   position: relative;
   top: 156px;
-  ${props =>
-    media(
-      (props.theme as ThemeInterface).breakpoints[0],
-      (props.theme as ThemeInterface).breakpoints[3],
-    )} {
+  ${props => media(props.theme.breakpoints[0], props.theme.breakpoints[3])} {
     transform: translateX(45%);
   }
 `;
 
 const Platforms = styled.div`
   margin-top: 20px;
-  div {
-    width: 24px;
-    height: 24px;
+  span {
+    width: 24px !important;
+    height: 24px !important;
     margin-right: 28px !important;
   }
 `;
@@ -158,14 +167,14 @@ const CodeView = styled(Box)`
 
 const Mobile = styled.div`
   display: none;
-  ${props => media("0px", (props.theme as ThemeInterface).breakpoints[0])} {
+  ${props => media("0px", props.theme.breakpoints[0])} {
     display: block;
   }
 `;
 
 const Desktop = styled.div`
   display: block;
-  ${props => media("0px", (props.theme as ThemeInterface).breakpoints[0])} {
+  ${props => media("0px", props.theme.breakpoints[0])} {
     display: none;
   }
 `;

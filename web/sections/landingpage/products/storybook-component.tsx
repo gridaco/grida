@@ -1,6 +1,6 @@
 import styled from "@emotion/styled";
 import { motion } from "framer-motion";
-import SectionLayout from "layout/section";
+import SectionLayout from "layouts/section";
 import React, { useState } from "react";
 
 import LandingpageText from "components/landingpage/text";

@@ -31,8 +31,9 @@ export default function HeroResponsive() {
       <DesignToolExampleContainer>
         <Image
           src="/assets/design-platforms/figma.png"
-          width="907px"
-          height="571px"
+          width={907}
+          height={571}
+          layout="fill"
         />
       </DesignToolExampleContainer>
       <IPhoneXFrame>
@@ -46,7 +47,6 @@ const Wrapper = styled.div`
   background-color: rgba(255, 255, 255, 1);
   position: relative;
   overflow: hidden;
-
   @media ${breakpoints.xl} {
     height: 1033px;
   }
@@ -100,7 +100,6 @@ const HeroTextAreaWithCta = styled.div`
   align-items: start;
   box-sizing: border-box;
   position: absolute;
-
   @media ${breakpoints.xl} {
     gap: 62px;
     left: calc((calc((50% + -195px)) - 325px));
@@ -138,7 +137,6 @@ const HeroTextAndBody = styled.div`
   align-items: start;
   align-self: stretch;
   box-sizing: border-box;
-
   @media ${breakpoints.xl} {
     flex: 1;
     gap: 24px;
@@ -170,7 +168,6 @@ const Heading1 = styled.h1`
   letter-spacing: -2px;
   line-height: 98%;
   text-align: left;
-
   @media ${breakpoints.xl} {
     align-self: stretch;
   }
@@ -210,7 +207,6 @@ const DescriptionHolder = styled.div`
   flex: none;
   gap: 24px;
   box-sizing: border-box;
-
   @media ${breakpoints.xl} {
     width: 520px;
   }
@@ -313,7 +309,6 @@ const IPhoneXFrame = styled.div`
   left: calc((calc((50% + 353px)) - 141px));
   top: 240px;
   opacity: 0.9;
-
   @media ${breakpoints.xs} {
     display: none;
   }

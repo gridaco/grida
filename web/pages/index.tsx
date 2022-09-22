@@ -5,6 +5,7 @@ import { useCookies } from "react-cookie";
 
 import CookieAccept from "components/cookie-accept";
 import Sections from "sections/landingpage";
+import Head from "next/head";
 
 interface MainPageAppProps {
   isMobileView: boolean;
@@ -40,6 +41,9 @@ const MainPage: NextPage<MainPageAppProps> = ({ isMobileView }) => {
 
   return (
     <React.Fragment>
+      <Head>
+        <title>Grida</title>
+      </Head>
       <Sections.Hero />
       <Sections.DesignOnceRunAnywhere />
       <div style={{ height: 200 }} />

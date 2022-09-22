@@ -1,9 +1,9 @@
 import React from "react";
-import { defaultTheme } from "utils/styled";
+import theme from "theme";
 import { ThemeProvider } from "emotion-theming";
 
 export const decorators = [
-  Story => <ThemeProvider theme={defaultTheme}>{Story()}</ThemeProvider>,
+  Story => <ThemeProvider theme={theme}>{Story()}</ThemeProvider>,
 ];
 
 export const parameters = {

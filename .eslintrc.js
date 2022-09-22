@@ -1,49 +1,27 @@
 module.exports = {
-    parser: "@typescript-eslint/parser",
-    extends: ["plugin:prettier/recommended"],
-    parserOptions: {
-        ecmaVersion: 2018,
-        sourceType: "module",
-        ecmaFeatures: {
-            jsx: true,
-        },
+  parser: "@typescript-eslint/parser",
+  extends: ["plugin:prettier/recommended"],
+  parserOptions: {
+    ecmaVersion: 2018,
+    sourceType: "module",
+    ecmaFeatures: {
+      jsx: true,
     },
-    plugins: [
-        "prettier",
-        "react",
-        "@typescript-eslint",
-        "react-hooks",
-        "import-helpers",
-    ],
-    rules: {
-        "react-hooks/rules-of-hooks": "error",
-        "import-helpers/order-imports": [
-            "error", {
-                // example configuration
-                newlinesBetween: "always",
-                groups: [
-                    ["module", "/^lodash-es/"],
-                    [
-                        "/^components/",
-                        "/^pages/",
-                        "/^public/",
-                        "/^utils/",
-                        "/^layouts/",
-                        "/^common/",
-                        "/^sections/",
-                    ],
-                    ["parent", "sibling", "index"],
-                ],
-                alphabetize: {
-                    order: "asc",
-                    ignoreCase: true
-                },
-            },
-        ],
+  },
+  plugins: [
+    "prettier",
+    "react",
+    "@typescript-eslint",
+    "react-hooks",
+    "import-helpers",
+  ],
+  rules: {
+    "react-hooks/rules-of-hooks": "error",
+    "import-helpers/order-imports": "off",
+  },
+  settings: {
+    react: {
+      version: "detect",
     },
-    settings: {
-        react: {
-            version: "detect",
-        },
-    },
+  },
 };

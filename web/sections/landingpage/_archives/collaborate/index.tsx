@@ -1,14 +1,13 @@
 import styled from "@emotion/styled";
-import SectionLayout from "layout/section";
+import SectionLayout from "layouts/section";
 import Image from "next/image";
 import React from "react";
-import { Flex, Heading, Text } from "rebass";
+import { Flex } from "theme-ui";
 
 import BlankArea from "components/blank-area";
 import Icon from "components/icon";
 import LandingpageText from "components/landingpage/text";
 import { media } from "utils/styled/media";
-import { ThemeInterface } from "utils/styled/theme";
 
 const Collaborate = () => {
   return (
@@ -20,7 +19,9 @@ const Collaborate = () => {
       <Flex
         mt="20px"
         mx="20px"
-        flexDirection={["column", "column", "row", "row"]}
+        sx={{
+          flexDirection: ["column", "column", "row", "row"],
+        }}
       >
         <SyncIcon name="loading" mr="20px" />
         <LandingpageText variant="h2">
@@ -88,16 +89,12 @@ const Collaborate = () => {
 export default Collaborate;
 
 export const SyncIcon = styled(Icon)`
-  ${props => media("0px", (props.theme as ThemeInterface).breakpoints[0])} {
+  ${props => media("0px", props.theme.breakpoints[0])} {
     width: 32px;
     height: 32px;
   }
 
-  ${props =>
-    media(
-      (props.theme as ThemeInterface).breakpoints[1],
-      (props.theme as ThemeInterface).breakpoints[2],
-    )} {
+  ${props => media(props.theme.breakpoints[1], props.theme.breakpoints[2])} {
     width: 64px;
     height: 64px;
   }
@@ -108,32 +105,20 @@ export const Description = styled(LandingpageText)`
   margin-left: 120px;
   max-width: 655px;
 
-  ${props => media("0px", (props.theme as ThemeInterface).breakpoints[0])} {
+  ${props => media("0px", props.theme.breakpoints[0])} {
     max-width: 100%;
     margin-left: 20px;
   }
 
-  ${props =>
-    media(
-      (props.theme as ThemeInterface).breakpoints[0],
-      (props.theme as ThemeInterface).breakpoints[1],
-    )} {
+  ${props => media(props.theme.breakpoints[0], props.theme.breakpoints[1])} {
     margin-left: 20px;
   }
 
-  ${props =>
-    media(
-      (props.theme as ThemeInterface).breakpoints[1],
-      (props.theme as ThemeInterface).breakpoints[2],
-    )} {
+  ${props => media(props.theme.breakpoints[1], props.theme.breakpoints[2])} {
     margin-left: 100px;
   }
 
-  ${props =>
-    media(
-      (props.theme as ThemeInterface).breakpoints[2],
-      (props.theme as ThemeInterface).breakpoints[3],
-    )} {
+  ${props => media(props.theme.breakpoints[2], props.theme.breakpoints[3])} {
     margin-left: 120px;
   }
 `;
@@ -185,12 +170,12 @@ const BackgroundImage = styled(Flex)`
     }
   }
 
-  ${props => media("0px", (props.theme as ThemeInterface).breakpoints[0])} {
+  ${props => media("0px", props.theme.breakpoints[0])} {
     .notifications {
       transform: translate(50vw, 5vh);
     }
 
-    .notifications > .notification > div {
+    .notifications > .notification > span {
       width: 50% !important;
       height: 45% !important;
     }
@@ -200,17 +185,13 @@ const BackgroundImage = styled(Flex)`
       bottom: -30%;
     }
 
-    .application-ui > div {
+    .application-ui > span {
       max-width: 280px !important;
       max-height: 600px;
     }
   }
 
-  ${props =>
-    media(
-      (props.theme as ThemeInterface).breakpoints[0],
-      (props.theme as ThemeInterface).breakpoints[1],
-    )} {
+  ${props => media(props.theme.breakpoints[0], props.theme.breakpoints[1])} {
     .application-ui {
       left: 5%;
       bottom: -10%;

@@ -7,7 +7,7 @@ import {
   GithubReleaseNote,
   getGithubReleaseNote,
 } from "utils/methods/getGithubReleaseNote";
-import { Flex } from "rebass";
+import { Flex } from "theme-ui";
 import WhatsNewHeaderLabel from "sections/whats-new/header-label";
 import WhatsNewReleaseNote from "sections/whats-new/release-note";
 import { center } from "utils/styled/styles";
@@ -49,8 +49,12 @@ const UpdateNoteDetail = () => {
       </Head>
       <Flex style={center}>
         <Flex
-          width={["320px", "730px", "985px", "1040px"]}
-          flexDirection="column"
+          style={{
+            flexDirection: "column",
+          }}
+          sx={{
+            width: ["320px", "730px", "985px", "1040px"],
+          }}
           mx="20px"
           mb="20px"
         >

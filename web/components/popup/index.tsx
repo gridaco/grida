@@ -6,7 +6,7 @@ import React, {
   Children,
   useState,
 } from "react";
-import { Flex, Text, Button } from "rebass";
+import { Flex, Text } from "theme-ui";
 import { borderColor, height } from "styled-system";
 
 import Icon from "components/icon";
@@ -60,18 +60,22 @@ const Popup = (props: PopupProps) => {
       }}
     >
       <Modal
-        width={info.width || ""}
-        height={(info.height as string) || ""}
+        sx={{
+          width: info.width,
+          height: info.height,
+        }}
         onClick={onModalInnerClick}
       >
         {info.message && (
           <Text
             pt="25px"
             pb="35px"
-            textAlign="center"
             color="gray100"
-            fontSize="14px"
-            style={{ whiteSpace: "pre-line" }}
+            style={{
+              whiteSpace: "pre-line",
+              textAlign: "center",
+              fontSize: "14px",
+            }}
           >
             {info.message}
           </Text>
@@ -111,7 +115,7 @@ const Modal = styled(Flex)`
   max-width: 1240px;
   min-width: 280px;
   max-height: 80vh;
-  /* max-height: ${props => (props.height ? "initial" : "70%")}; */
+  /* max-height: {props => (props.height ? "initial" : "70%")}; */
   overflow-y: scroll;
   /* border: 1px solid; */
   border-radius: 7px;

@@ -1,19 +1,24 @@
 import styled from "@emotion/styled";
 import LandingpageText from "components/landingpage/text";
-import SectionLayout from "layout/section";
+import SectionLayout from "layouts/section";
 import React from "react";
-import { Button, Flex } from "rebass";
+import { Button, Flex } from "theme-ui";
+
 export default function SectionFinalCta() {
   return (
     <SectionLayout alignContent="center">
-      <Flex width="100%">
-        <Flex width="50%" flexDirection="column">
+      <Flex style={{ width: "100%" }}>
+        <Flex style={{ width: "50%", flexDirection: "column" }}>
           <LandingpageText variant="h1">
             Ready to go world wide?
           </LandingpageText>
           <CTAButton mt="50px">Request a private demo</CTAButton>
         </Flex>
-        <Flex width="50%"></Flex>
+        <Flex
+          style={{
+            width: "50%",
+          }}
+        ></Flex>
       </Flex>
     </SectionLayout>
   );

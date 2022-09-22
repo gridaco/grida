@@ -1,17 +1,25 @@
 import React from "react";
-import { Flex, Text } from "rebass";
+import { Flex, Text } from "theme-ui";
 
 import Icon from "components/icon";
 
 export function WasThisPostHelpful() {
   return (
     <Flex
-      alignItems="center"
-      justifyContent="center"
+      style={{
+        alignItems: "center",
+        justifyContent: "center",
+        flexDirection: "column",
+      }}
       mt="60px"
-      flexDirection="column"
     >
-      <Text fontSize="18px" fontWeight="500" color="#686868">
+      <Text
+        style={{
+          fontSize: "18px",
+          fontWeight: "500",
+        }}
+        color="#686868"
+      >
         Was this page helpful?
       </Text>
       <Flex mt="16px">

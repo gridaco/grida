@@ -1,13 +1,11 @@
 import styled from "@emotion/styled";
+import React from "react";
 import Link from "next/link";
-import React, { useEffect } from "react";
-import { Flex, Heading } from "rebass";
-
-import BlankArea from "components/blank-area";
+import { Flex, Heading } from "theme-ui";
 import SectionLayout from "layouts/section";
 import { useWindowWidth } from "utils/hooks/use-window-width";
 import { LandingpageUrls } from "utils/landingpage/constants";
-import { defaultTheme } from "utils/styled";
+import { breakpoints } from "theme/shared";
 
 function replaceStylePxToNumber(stylePx: string) {
   return parseInt(stylePx.replace("px", ""));
@@ -23,9 +21,15 @@ const CookieAccept: React.FC<CookieAcceptProps> = ({ accpetCookie }) => {
   return (
     <Positioner>
       <SectionLayout variant="content-default" alignContent="center">
-        <Flex width="100%" justifyContent="space-between" alignItems="center">
-          <Flex flexDirection="column">
-            {width < replaceStylePxToNumber(defaultTheme.breakpoints[0]) ? (
+        <Flex
+          style={{
+            width: "100%",
+            justifyContent: "space-between",
+            alignItems: "center",
+          }}
+        >
+          <Flex style={{ flexDirection: "column" }}>
+            {width < replaceStylePxToNumber(breakpoints[0]) ? (
               <Title>
                 We use{" "}
                 <Link href={LandingpageUrls.cookies_policy}>cookies</Link> for
@@ -34,7 +38,7 @@ const CookieAccept: React.FC<CookieAcceptProps> = ({ accpetCookie }) => {
             ) : (
               <Title>We use cookies</Title>
             )}
-            {width > replaceStylePxToNumber(defaultTheme.breakpoints[0]) && (
+            {width > replaceStylePxToNumber(breakpoints[0]) && (
               <Desc>
                 Grida collects cookies for handling signin, analysing our
                 traffic and making website usage faster.
@@ -44,9 +48,7 @@ const CookieAccept: React.FC<CookieAcceptProps> = ({ accpetCookie }) => {
           </Flex>
 
           <Button className="cursor" onClick={() => accpetCookie()}>
-            {width < replaceStylePxToNumber(defaultTheme.breakpoints[0])
-              ? "OK"
-              : "Accept"}
+            {width < replaceStylePxToNumber(breakpoints[0]) ? "OK" : "Accept"}
           </Button>
         </Flex>
       </SectionLayout>

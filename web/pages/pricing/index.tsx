@@ -10,7 +10,7 @@ export default function PricingPage() {
       <Sections.Hero_TryFreePlan />
       <Sections.ComparePlans />
       <Sections.FeaturesAndPricingTable />
-      <Sections.FAQs />
+      {/* <Sections.FAQs /> */}
     </>
   );
 }

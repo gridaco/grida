@@ -30,6 +30,7 @@ export function CodeIcon({
           width={size}
           height={size}
           src="/assets/platform-icons/dummy/default.png"
+          alt="dummy"
         />
       );
     }
@@ -39,6 +40,7 @@ export function CodeIcon({
           width={size}
           height={size}
           src={`/assets/platform-icons/react/${color}.png`}
+          alt="react"
         />
       );
     }
@@ -48,6 +50,7 @@ export function CodeIcon({
           width={size}
           height={size}
           src={`/assets/platform-icons/flutter/${color}.png`}
+          alt="flutter"
         />
       );
     }
@@ -57,6 +60,7 @@ export function CodeIcon({
           width={size}
           height={size}
           src={`/assets/platform-icons/html/${color}.png`}
+          alt="html"
         />
       );
     }
@@ -66,6 +70,7 @@ export function CodeIcon({
           width={size}
           height={size}
           src={`/assets/platform-icons/css/${color}.png`}
+          alt="css"
         />
       );
     }
@@ -75,6 +80,7 @@ export function CodeIcon({
           width={size}
           height={size}
           src={`/assets/platform-icons/webcomponents/${color}.png`}
+          alt="webcomponents"
         />
       );
     }
@@ -84,6 +90,7 @@ export function CodeIcon({
           width={size}
           height={size}
           src={`/assets/platform-icons/vscode/${color}.png`}
+          alt="vscode"
         />
       );
     }
@@ -93,6 +100,7 @@ export function CodeIcon({
           width={size}
           height={size}
           src={`/assets/platform-icons/figma/${color}.png`}
+          alt="figma"
         />
       );
     }
@@ -102,6 +110,7 @@ export function CodeIcon({
           width={size}
           height={size}
           src={`/assets/platform-icons/grida/${color}.png`}
+          alt="grida"
         />
       );
     }
@@ -117,6 +126,7 @@ export function CodeIcon({
       width={size}
       height={size}
       src="/assets/platform-icons/dummy/default.png"
+      alt="dummy"
     />
   );
 }

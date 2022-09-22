@@ -1,6 +1,6 @@
 import React from "react";
 import { Grid } from "layouts/grid";
-import SectionLayout from "layout/section";
+import SectionLayout from "layouts/section";
 
 export default function GridLayoutExample() {
   return (

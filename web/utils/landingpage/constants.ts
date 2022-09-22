@@ -63,7 +63,8 @@ export const PRODUCT_LIST = [
       "With powerful Design2Code Engine, Grida generates production ready code that can also easily be used for existing projects. Supprt for components, various code styles, naming conventions and fille/directory structures are supported.",
     gradient: "linear-gradient(99.57deg, #6268FF 0%, #9039FF 100%)",
     type: "video",
-    path: require("public/videos/your-design-is-your-code.mp4"),
+    path:
+      "https://player.vimeo.com/progressive_redirect/playback/749855084/rendition/720p/file.mp4?loc=external&signature=92a761c4a90e4b28614eea76e9a386d8d13872e8b3777f8128925688e0b204cf",
   },
   // {
   // title: "server",
@@ -78,7 +79,8 @@ export const PRODUCT_LIST = [
       "Intuitive content management for your app. Translations support is included. No more excel based text managin tools - we all know that just doesn’t work. With Bridged Globalization, translate where your deisgns are at and update your contents with no update time. Go live with a click.",
     gradient: "linear-gradient(99.57deg, #FBA33C 0%, #FFC700 100%)",
     type: "video",
-    path: require("public/videos/your-design-is-your-transation.mp4"),
+    path:
+      "https://player.vimeo.com/progressive_redirect/playback/749855294/rendition/720p/file.mp4?loc=external&signature=f7ff8058f27797c8461363439e58031789fcc1d54257d36f75d88892e983a167",
   },
   // {
   //     title: "insight",
@@ -94,7 +96,8 @@ export const PRODUCT_LIST = [
       "Built-in git support enables you to integrate your design as a pure component into your existing project. Experience all-in-sync workflow. Keep your code synced as a design. Finally, the code generation tool that supports git.",
     gradient: "linear-gradient(99.57deg, #0E1279 0%, #632655 100%)",
     type: "video",
-    path: require("public/videos/your-design-is-your-git.mp4"),
+    path:
+      "https://player.vimeo.com/progressive_redirect/playback/749855176/rendition/720p/file.mp4?loc=external&signature=8307e5beafb0bf9591cf708a3d240fa857812ddb38fcd772cfda7ab279c747db",
   },
   //  {
   //     title: "everything",

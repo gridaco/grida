@@ -1,5 +1,5 @@
 import styled from "@emotion/styled";
-import SectionLayout from "layout/section";
+import SectionLayout from "layouts/section";
 import React, { useState } from "react";
 
 import ActionItem from "components/action-item";
@@ -10,7 +10,6 @@ import MotionRadio from "components/landingpage/motion/radio";
 import LandingpageText from "components/landingpage/text";
 import { LandingpageUrls } from "utils/landingpage/constants";
 import { media } from "utils/styled/media";
-import { ThemeInterface } from "utils/styled/theme";
 
 const renderMoitonComponents = [MotionButton];
 
@@ -61,7 +60,7 @@ export default LayoutDetect;
 const DetectTitle = styled(LandingpageText)`
   display: flex;
   align-items: center;
-  ${props => media("0px", (props.theme as ThemeInterface).breakpoints[0])} {
+  ${props => media("0px", props.theme.breakpoints[0])} {
     align-items: flex-start;
     flex-direction: column;
   }
@@ -70,7 +69,7 @@ const DetectTitle = styled(LandingpageText)`
 const Description = styled(LandingpageText)`
   max-width: 520px;
   margin-top: 40px;
-  ${props => media("0px", (props.theme as ThemeInterface).breakpoints[0])} {
+  ${props => media("0px", props.theme.breakpoints[0])} {
     max-width: 100%;
   }
 `;

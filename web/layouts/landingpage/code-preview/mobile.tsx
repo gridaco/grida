@@ -3,7 +3,7 @@ import Image from "next/image";
 import React, { useState } from "react";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { vscDarkPlus as colorscheme } from "react-syntax-highlighter/dist/cjs/styles/prism";
-import { Box } from "rebass";
+import { Box } from "theme-ui";
 
 import {
   DevFrameworkDemoConfig,
@@ -18,7 +18,12 @@ const CodePreviewMobile = () => {
 
   return (
     <div>
-      <CodeView height="420px" bg="rgb(30, 30, 30)">
+      <CodeView
+        style={{
+          height: "420px",
+        }}
+        bg="rgb(30, 30, 30)"
+      >
         <header>
           <span />
           <span />
@@ -96,10 +101,12 @@ const CodeView = styled(Box)`
 
 const Platforms = styled.div`
   margin-top: 20px;
-  div {
+  display: flex;
+  gap: 28px;
+
+  span {
     width: 24px;
     height: 24px;
-    margin-right: 28px !important;
   }
 `;
 

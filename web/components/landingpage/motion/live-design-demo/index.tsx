@@ -1,12 +1,10 @@
 import styled from "@emotion/styled";
 import React, { useEffect, useRef, useState } from "react";
-import ReactPlayer from "react-player";
-import { Flex } from "rebass";
+import { Flex } from "theme-ui";
 
 import animationData from "public/animations/live-demo-app-design-motion/comp.json";
 import useOnScreen from "utils/hooks/use-on-screen";
 import { media } from "utils/styled/media";
-import { ThemeInterface } from "utils/styled/theme";
 
 export default function LiveDesignDemoFrame() {
   const [isStopped, setIsStopped] = useState(true);
@@ -47,27 +45,15 @@ export default function LiveDesignDemoFrame() {
       {/* READ ./ios-15-safari-video-issue.md */}
       {/* https://github.com/cookpete/react-player/issues/1344 */}
       <video
-        src={require("public/videos/landingpage-section2-live-design-demo.min.mp4")}
+        src={
+          "https://player.vimeo.com/progressive_redirect/playback/749854935/rendition/360p/file.mp4?loc=external&signature=a265cb5c5d96e6f2c46cce9c57c1abcef90d1437e7cde0ab1ffa7cccc838f35e"
+        }
         autoPlay
         muted
         loop
         playsInline
         preload="auto"
       />
-      {/* <ReactPlayer
-        url={require("public/videos/landingpage-section2-live-design-demo.min.mp4")}
-        loop
-        playing
-        muted
-        playsinline
-        config={{
-          file: {
-            attributes: {
-              preload: "auto",
-            },
-          },
-        }}
-      /> */}
     </DesignFramePreview>
   );
 }
@@ -89,7 +75,7 @@ const DesignFramePreview = styled(Flex)`
     border-radius: 12px;
   }
 
-  ${props => media("0px", (props.theme as ThemeInterface).breakpoints[0])} {
+  ${props => media("0px", props.theme.breakpoints[0])} {
     width: 280px !important;
     height: 465px !important;
     div {
