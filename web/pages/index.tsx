@@ -68,16 +68,36 @@ const MainPage: NextPage<MainPageAppProps> = ({ isMobileView }) => {
   );
 };
 
-MainPage.getInitialProps = async ({ req }: NextPageContext) => {
-  let isMobileView = (req
-    ? req.headers["user-agent"]
-    : navigator.userAgent
-  ).match(/Android|BlackBerry|iPhone|iPad|iPod|Opera Mini|IEMobile|WPDesktop/i);
+import { serverSideTranslations } from "next-i18next/serverSideTranslations";
+
+// MainPage.getInitialProps = async ({ req, locale }: NextPageContext) => {
+// let isMobileView = (req
+//   ? req.headers["user-agent"]
+//   : navigator.userAgent
+// ).match(/Android|BlackBerry|iPhone|iPad|iPod|Opera Mini|IEMobile|WPDesktop/i);
+
+// //Returning the isMobileView as a prop to the component for further use.
+// return {
+//   isMobileView: Boolean(isMobileView),
+//   props: {
+//     ...(await serverSideTranslations(locale, ["common", "footer"])),
+//   },
+// };
+// };
+
+export async function getStaticProps({ req, locale }: NextPageContext) {
+  // let isMobileView = (req
+  //   ? req.headers["user-agent"]
+  //   : navigator.userAgent
+  // ).match(/Android|BlackBerry|iPhone|iPad|iPod|Opera Mini|IEMobile|WPDesktop/i);
 
   //Returning the isMobileView as a prop to the component for further use.
   return {
-    isMobileView: Boolean(isMobileView),
+    props: {
+      // isMobileView: Boolean(isMobileView),
+      ...(await serverSideTranslations(locale, ["footer"])),
+    },
   };
-};
+}
 
 export default MainPage;

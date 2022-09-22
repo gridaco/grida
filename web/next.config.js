@@ -1,7 +1,10 @@
+const { i18n } = require("./next-i18next.config");
+
 /**
  * @type {import('next').NextConfig}
  */
 const nextconfig = {
+  i18n,
   images: {
     domains: ["img.youtube.com", "via.placeholder.com"],
   },

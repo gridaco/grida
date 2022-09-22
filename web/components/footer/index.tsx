@@ -11,6 +11,7 @@ import { media } from "utils/styled/media";
 
 import { Sitemap } from "./sitemap";
 import { useTheme } from "@emotion/react";
+import { useTranslation } from "next-i18next";
 
 const iconList: Array<{
   icon: keyof IconList;
@@ -44,6 +45,7 @@ const iconList: Array<{
 
 const Footer = () => {
   const theme = useTheme();
+  const { t } = useTranslation("footer");
 
   return (
     <Flex
@@ -95,7 +97,7 @@ const Footer = () => {
               <span className="cursor">Privacy policy</span>
             </Link>
             <Link href={URLS.landing.terms_and_conditions}>
-              <span className="cursor">Terms and conditions</span>
+              <span className="cursor">{t("terms-and-conditions")}</span>
             </Link>
           </Flex>
         </FooterBottom>
