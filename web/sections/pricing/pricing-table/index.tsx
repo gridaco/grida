@@ -38,7 +38,6 @@ export default function PlanList() {
       <Wrapper
         style={{
           width: "100%",
-          height: "100%",
           alignItems: "center",
         }}
         sx={{
