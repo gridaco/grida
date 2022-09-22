@@ -410,7 +410,7 @@ export const HeaderMap: Sitemap = [
       {
         type: "link",
         label: "Jobs",
-        href: "/jobs",
+        href: "/careers",
         layout: "line-item",
       },
     ],
