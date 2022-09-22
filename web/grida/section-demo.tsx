@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import styled from "@emotion/styled";
 import { CliDemoTypeContent } from "./section-demo-type-content";
+import { useTranslation } from "next-i18next";
 /**
  * `<SectionDemo>` ('section-demo')
  * - [Open in Figma](https://figma.com/file/Gaznaw1QHppxvs9UkqNOb0?node-id=8266:64061)
@@ -39,6 +40,7 @@ import { CliDemoTypeContent } from "./section-demo-type-content";
  */
 export function SectionDemo() {
   const [demoplaykey, setdemoplaykey] = useState("initial");
+  const { t } = useTranslation();
 
   const onreplayclick = () => {
     setdemoplaykey("replay" + Math.random());
@@ -47,7 +49,7 @@ export function SectionDemo() {
   return (
     <RootWrapperSectionDemo>
       <ReplayButton onClick={onreplayclick}>
-        <Replay>replay</Replay>
+        <Replay>{t("replay")}</Replay>
         <svg
           width="14"
           height="18"
@@ -120,7 +122,6 @@ const ReplayButton = styled.button`
   left: calc((calc((50% + -4px)) - 62px));
   top: 840px;
   opacity: 0.8;
-  width: 124px;
   height: 44px;
 
   opacity: 0.8;

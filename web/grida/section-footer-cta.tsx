@@ -1,4 +1,5 @@
 import styled from "@emotion/styled";
+import { useTranslation } from "next-i18next";
 import React from "react";
 /**
  * `<FooterCtaSection>` ('footer-cta-section --width=50vh')
@@ -45,11 +46,16 @@ export function FooterCtaSection({
   onCopyClick?: (text: string) => void;
   onStartClick?: () => void;
 }) {
+  const { t } = useTranslation("page-cli");
   return (
     <RootWrapperFooterCtaSectionWidth50Vh>
-      <HeadingAsH3>CI your design.</HeadingAsH3>
+      <HeadingAsH3
+        dangerouslySetInnerHTML={{
+          __html: t("section/hero.heading"),
+        }}
+      />
       <CtaContainer>
-        <StartAsButton onClick={onStartClick}>Start Coding</StartAsButton>
+        <StartAsButton onClick={onStartClick}>{t("cta-start")}</StartAsButton>
         <CopyAsButton onClick={() => onCopyClick?.("npx grida init")}>
           {copyText}
         </CopyAsButton>
