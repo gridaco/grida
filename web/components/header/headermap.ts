@@ -269,7 +269,7 @@ export const HeaderMap: Sitemap = [
   {
     type: "group",
     label: "Products",
-    href: "/products",
+    // href: "/products",
     children: [
       // {
       //   type: "link",
