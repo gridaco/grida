@@ -14,7 +14,7 @@ export default function CareersPage() {
       <div style={{ textAlign: "center" }}>
         <Headings>
           <JoinUs>Join Us.</JoinUs>
-          <Tagline>Help us the way how we build applications.</Tagline>
+          <Tagline>Help us change the way how we build applications.</Tagline>
         </Headings>
         <Button onClick={onContact}>Contact CEO</Button>
         <div
