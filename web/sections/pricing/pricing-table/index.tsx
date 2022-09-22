@@ -1,15 +1,9 @@
-import React, { useCallback } from "react";
+import React from "react";
 import styled from "@emotion/styled";
-import { Flex, Heading, Text, Button } from "rebass";
+import { Flex, Heading, Text } from "theme-ui";
 import SectionLayout from "layouts/section";
 import BlankArea from "components/blank-area";
-import Icon from "components/icon";
 import { media } from "utils/styled/media";
-import theme, { Theme } from "theme";
-import { usePopupContext } from "utils/context/PopupContext";
-import { useWindowWidth } from "utils/hooks/use-window-width";
-import Link from "next/link";
-import { LandingpageUrls } from "utils/landingpage/constants";
 import LandingpageText from "components/landingpage/text";
 import PricingCard from "components/pricing-card";
 
@@ -42,11 +36,15 @@ export default function PlanList() {
         Start small, pay when you’re ready.
       </Desc>
       <Wrapper
-        width="100%"
-        height="100%"
-        alignItems="center"
-        justifyContent={["space-between", "center", "center", "center"]}
-        flexDirection={["column", "row", "row", "row"]}
+        style={{
+          width: "100%",
+          height: "100%",
+          alignItems: "center",
+        }}
+        sx={{
+          justifyContent: ["space-between", "center", "center", "center"],
+          flexDirection: ["column", "row", "row", "row"],
+        }}
       >
         <PricingCard type="none-paid" planList={PersonalPlanList} />
         <PricingCard type="paid" planList={TeamPlanList} />

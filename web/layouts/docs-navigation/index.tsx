@@ -1,7 +1,7 @@
 import styled from "@emotion/styled";
 import { useRouter } from "next/router";
 import React, { useEffect, useState } from "react";
-import { Box, Flex, Text } from "rebass";
+import { Box, Flex, Text } from "theme-ui";
 
 import DocsNavigationSection from "components/docs-navigation-section";
 import Icon from "components/icon";
@@ -36,7 +36,9 @@ function DocsNavigation() {
   const docs = manifest ? manifest[0] : undefined;
   return (
     <NavigationWrapper
-      flexDirection="column"
+      style={{
+        flexDirection: "column",
+      }}
       mr={["0px", "70px", "70px", "70px"]}
     >
       {/* <DocsSearchBar /> */}
@@ -49,10 +51,12 @@ function DocsNavigation() {
       <Mobile>
         <Wrapper>
           <Text
-            style={center}
+            style={{
+              ...center,
+              fontSize: "18px",
+              fontWeight: "bold",
+            }}
             className="cursor"
-            fontSize="18px"
-            fontWeight="bold"
             onClick={() => setIsOpen(!isOpen)}
           >
             <Icon

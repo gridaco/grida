@@ -3,7 +3,7 @@ import BlankArea from "components/blank-area";
 import LandingpageText from "components/landingpage/text";
 import SectionLayout from "layouts/section";
 import React from "react";
-import { Button } from "rebass";
+import { Button } from "theme-ui";
 
 export default function GlobalizationHeroSection() {
   return (

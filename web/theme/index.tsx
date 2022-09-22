@@ -1,4 +1,5 @@
 import { ThemeProvider as TP } from "@emotion/react";
+import { ThemeProvider as TUTP } from "theme-ui";
 import React, { useEffect } from "react";
 import { useCookies } from "react-cookie";
 import { useSetRecoilState, useRecoilValue } from "recoil";
@@ -55,7 +56,12 @@ export function ThemeProvider({
     setCookie("theme", currentTheme.mode);
   }, [currentTheme.mode]);
 
-  return <TP theme={_theme}>{children}</TP>;
+  return (
+    <TP theme={_theme}>
+      {/* @ts-ignore */}
+      <TUTP theme={_theme}>{children}</TUTP>
+    </TP>
+  );
 }
 
 export * from "./theme";

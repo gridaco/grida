@@ -24,7 +24,7 @@ import { _MDX_COMPONENTS } from "components/mdx";
 import { SEO_DEFAULTS } from "utils/seo";
 import makeKeywords from "utils/seo/make-keywords";
 
-import { Box } from "rebass";
+import { Box } from "theme-ui";
 import { env } from "process";
 
 import "../styles/global.css";

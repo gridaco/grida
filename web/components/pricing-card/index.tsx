@@ -4,7 +4,7 @@ import Icon from "components/icon";
 import LandingpageText from "components/landingpage/text";
 import Link from "next/link";
 import React, { useCallback } from "react";
-import { Button, Flex, Text } from "rebass";
+import { Button, Flex, Text } from "theme-ui";
 import { usePopupContext } from "utils/context/PopupContext";
 import { LandingpageUrls } from "utils/landingpage/constants";
 import { media } from "utils/styled/media";
@@ -21,9 +21,11 @@ function PricingCard(props: {
       title: "",
       element: (
         <Flex
-          width="calc(100vw - 40px)"
-          alignItems="center"
-          flexDirection="column"
+          style={{
+            width: "calc(100vw - 40px)",
+            alignItems: "center",
+            flexDirection: "column",
+          }}
           p="48px"
         >
           <Icon
@@ -32,7 +34,13 @@ function PricingCard(props: {
             ml="auto"
             onClick={() => removePopup()}
           />
-          <Flex width="80%" flexDirection="column" alignItems="center">
+          <Flex
+            style={{
+              width: "80%",
+              flexDirection: "column",
+              alignItems: "center",
+            }}
+          >
             <LandingpageText variant="h4" textAlign="center">
               What are the limitations of free plan?
             </LandingpageText>
@@ -55,9 +63,11 @@ function PricingCard(props: {
       title: "",
       element: (
         <Flex
-          width="calc(100vw - 40px)"
-          alignItems="center"
-          flexDirection="column"
+          style={{
+            width: "calc(100vw - 40px)",
+            alignItems: "center",
+            flexDirection: "column",
+          }}
           p="48px"
         >
           <Icon
@@ -66,7 +76,13 @@ function PricingCard(props: {
             ml="auto"
             onClick={() => removePopup()}
           />
-          <Flex width="80%" flexDirection="column" alignItems="center">
+          <Flex
+            style={{
+              width: "80%",
+              flexDirection: "column",
+              alignItems: "center",
+            }}
+          >
             <LandingpageText variant="h4" textAlign="center">
               Woopsy.
             </LandingpageText>
@@ -88,6 +104,7 @@ function PricingCard(props: {
   }, []);
 
   return (
+    // @ts-ignore
     <Wrapper type={props.type}>
       <Heading>
         <LandingpageText variant="h4">
@@ -107,7 +124,13 @@ function PricingCard(props: {
         </LandingpageText>
         {props.type != "none-paid" && <Seat variant="body1">per seat/mo</Seat>}
       </PlanPricing>
-      <Flex alignItems="center" height="100%" my="30px">
+      <Flex
+        style={{
+          alignItems: "center",
+          height: "100%",
+        }}
+        my="30px"
+      >
         <PlanDescription>
           {props.planList.map(i => (
             <div className="planlist" key={i}>
@@ -127,6 +150,7 @@ function PricingCard(props: {
           Start now
         </PricingCTAButton>
       ) : (
+        // @ts-ignore
         <CardCTAButton
           className="cursor"
           type={props.type}
@@ -141,13 +165,17 @@ function PricingCard(props: {
 
 export default PricingCard;
 
-const Wrapper = styled(Flex)`
+type _Type = { type: "paid" | "none-paid" };
+
+// @ts-ignore
+const Wrapper = styled<_Type>(Flex)`
   border-radius: 8px;
   margin: 27px;
   padding: 40px;
   flex-direction: column;
 
   ${p => {
+    // @ts-ignore
     if (p.type === "paid") {
       return {
         width: "100%",
@@ -155,6 +183,7 @@ const Wrapper = styled(Flex)`
         boxShadow: "0px 4px 128px 32px rgba(0, 0, 0, 0.08)",
         backgroundColor: "#fff",
       };
+      // @ts-ignore
     } else if (p.type === "none-paid") {
       return {
         width: "90%",
@@ -179,10 +208,12 @@ const Seat = styled(LandingpageText)`
   margin-left: 10px;
 `;
 
-const CardCTAButton = styled(Button)`
+// @ts-ignore
+const CardCTAButton = styled<_Type>(Button)`
   margin-top: auto;
   border-radius: 4px;
   ${p => {
+    // @ts-ignore
     if (p.type === "paid") {
       return {
         backgroundColor: "#D2D2D2",

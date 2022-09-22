@@ -1,10 +1,9 @@
 import styled from "@emotion/styled";
 import { motion } from "framer-motion";
 import SectionLayout from "layouts/section";
-import Link from "next/link";
 import React, { useState, useEffect, createRef } from "react";
 import ReactPlayer from "react-player";
-import { Flex, Heading, Text } from "rebass";
+import { Flex, Heading, Text } from "theme-ui";
 
 import BlankArea from "components/blank-area";
 import LandingpageText from "components/landingpage/text";
@@ -108,7 +107,9 @@ const Products = () => {
         </Container>
       </SectionLayout>
       <VideoWrapper
-        width={["95%", "95%", "100%", "100%"]}
+        sx={{
+          width: ["95%", "95%", "100%", "100%"],
+        }}
         mt="50px"
         mx={["20px", "20px", 0, 0]}
       >
@@ -135,11 +136,15 @@ const Products = () => {
         </motion.div>
       </VideoWrapper>
       <SubTitle
-        fontSize={["18px", "32px", "32px", "32px"]}
+        sx={{
+          fontSize: ["18px", "32px", "32px", "32px"],
+        }}
         mt="40px"
-        fontWeight="600"
-        letterSpacing="0em"
-        style={{ maxWidth: "60%" }}
+        style={{
+          maxWidth: "60%",
+          fontWeight: "600",
+          letterSpacing: "0em",
+        }}
       >
         {PRODUCT_LIST[beforeClick].subTitle}
       </SubTitle>

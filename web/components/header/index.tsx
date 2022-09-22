@@ -3,7 +3,7 @@ import { event_click_header_menu } from "analytics";
 import Link from "next/link";
 import { useRouter } from "next/router";
 import React, { useState, useEffect, useCallback } from "react";
-import { Box, Flex, Text, Button } from "rebass";
+import { Box, Flex, Text, Button } from "theme-ui";
 
 import Icon from "components/icon";
 import { useAuthState } from "utils/hooks/use-auth-state";
@@ -74,17 +74,24 @@ const Header = () => {
     <>
       <HeaderWrapper>
         <Flex
-          width={["100%", "728px", "984px", "1040px"]}
+          sx={{
+            width: ["100%", "728px", "984px", "1040px"],
+            justifyContent: "space-between",
+            alignItems: "center",
+            height: "100%",
+          }}
           mx={["20px"]}
-          justifyContent="space-between"
-          alignItems="center"
-          height="100%"
         >
           <ResponsiveMenu className="cursor" onClick={handleClickMenu}>
             <Icon name={isMenuOpen ? "headerClose" : "headerMenu"} />
           </ResponsiveMenu>
 
-          <Flex as={"nav"} alignItems="center">
+          <Flex
+            as={"nav"}
+            style={{
+              alignItems: "center",
+            }}
+          >
             <Link href="/">
               <Logo
                 className="cursor"
@@ -97,9 +104,11 @@ const Header = () => {
             <Link href="/">
               <ResponsiveTitle
                 className="cursor"
-                fontSize="18px"
+                style={{
+                  fontSize: "18px",
+                  fontWeight: "600",
+                }}
                 ml="8px"
-                fontWeight="600"
               >
                 Grida
               </ResponsiveTitle>
@@ -122,7 +131,9 @@ const Header = () => {
           <SignupButton
             onClick={handleSignupClick}
             style={{ opacity: isMenuOpen ? 0 : 1 }}
-            fontSize={["13px", "13px", "15px"]}
+            sx={{
+              fontSize: ["13px", "13px", "15px"],
+            }}
             p={["6px 10px", "6px 10px", "9px 20px", "9px 20px"]}
             variant="noShadow"
           >
@@ -132,8 +143,10 @@ const Header = () => {
 
         {isMenuOpen && (
           <ResponsiveMenu
-            justifyContent="space-between"
             style={{
+              width: "100%",
+              flexDirection: "column",
+              justifyContent: "space-between",
               position: "absolute",
               top: 0,
               paddingTop: 60,
@@ -141,12 +154,15 @@ const Header = () => {
               height: "100vh",
             }}
             bg={theme.header.bg}
-            width="100%"
             px="20px"
             pb="24px"
-            flexDirection="column"
           >
-            <Flex mt="24px" flexDirection="column">
+            <Flex
+              mt="24px"
+              style={{
+                flexDirection: "column",
+              }}
+            >
               {HeaderMap.map(i => (
                 <Item variant="mobile" key={i.label} {...i} />
               ))}
@@ -155,13 +171,13 @@ const Header = () => {
             <Box>
               <Button
                 variant="noShadow"
-                width="100%"
                 bg={theme.header.accent}
-                height="35px"
-                fontSize="13px"
                 mb="12px"
                 disabled={auth == "signedin"}
                 style={{
+                  width: "100%",
+                  height: "35px",
+                  fontSize: "13px",
                   opacity: (auth == "signedin") != null ? 0 : 1,
                 }}
                 onClick={handleSignupClick}
@@ -170,13 +186,16 @@ const Header = () => {
               </Button>
               <Button
                 variant="noShadow"
-                width="100%"
                 color={theme.header.color}
                 backgroundColor="transparent"
-                fontWeight={500}
-                height="35px"
-                fontSize="13px"
-                style={{ ...center, ...pointer }}
+                style={{
+                  ...center,
+                  ...pointer,
+                  width: "100%",
+                  height: "35px",
+                  fontSize: "13px",
+                  fontWeight: 500,
+                }}
                 onClick={handleSigninOrMoveAppClick}
               >
                 {auth == "signedin" ? (
@@ -243,8 +262,10 @@ function Item({
       mx={variant === "desktop" ? "18px" : undefined}
       my={variant === "mobile" ? "12px" : undefined}
       data-selected={selected}
-      fontWeight="bold"
-      fontSize="16px"
+      style={{
+        fontWeight: "bold",
+        fontSize: "16px",
+      }}
     >
       {label}
     </Label>

@@ -2,7 +2,7 @@ import styled from "@emotion/styled";
 import SectionLayout from "layouts/section";
 import Image from "next/image";
 import React from "react";
-import { Flex, Heading, Text } from "rebass";
+import { Flex } from "theme-ui";
 
 import BlankArea from "components/blank-area";
 import Icon from "components/icon";
@@ -19,7 +19,9 @@ const Collaborate = () => {
       <Flex
         mt="20px"
         mx="20px"
-        flexDirection={["column", "column", "row", "row"]}
+        sx={{
+          flexDirection: ["column", "column", "row", "row"],
+        }}
       >
         <SyncIcon name="loading" mr="20px" />
         <LandingpageText variant="h2">

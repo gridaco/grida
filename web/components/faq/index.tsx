@@ -1,6 +1,6 @@
 import React from "react";
 import styled from "@emotion/styled";
-import { Flex, Heading } from "rebass";
+import { Flex, Heading } from "theme-ui";
 import SectionLayout from "layouts/section";
 import Question from "./question-item";
 import BlankArea from "components/blank-area";
@@ -9,9 +9,19 @@ import { FaqDisplayData } from "./interface";
 export default function FAQs(props: { questions: FaqDisplayData }) {
   return (
     <SectionLayout>
-      <Flex flexDirection="column" width="100%">
+      <Flex
+        style={{
+          flexDirection: "column",
+          width: "100%",
+        }}
+      >
         <TitleText>FAQs</TitleText>
-        <Wrapper flexDirection="column" width="100%">
+        <Wrapper
+          style={{
+            flexDirection: "column",
+            width: "100%",
+          }}
+        >
           {props.questions.map((item, ix) => (
             <Question question={item} key={ix} />
           ))}

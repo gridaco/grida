@@ -2,7 +2,7 @@ import styled from "@emotion/styled";
 import { motion } from "framer-motion";
 import { useRouter } from "next/router";
 import React from "react";
-import { Button, Box } from "rebass";
+import { Button, Box } from "theme-ui";
 
 import { useAuthState } from "utils/hooks/use-auth-state";
 import { URLS } from "utils/landingpage/constants";

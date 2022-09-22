@@ -3,7 +3,7 @@ import Image from "next/image";
 import React, { useState } from "react";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { vscDarkPlus as colorscheme } from "react-syntax-highlighter/dist/cjs/styles/prism";
-import { Box } from "rebass";
+import { Box } from "theme-ui";
 
 import {
   DevFrameworkDemoConfig,
@@ -18,7 +18,12 @@ const CodePreviewMobile = () => {
 
   return (
     <div>
-      <CodeView height="420px" bg="rgb(30, 30, 30)">
+      <CodeView
+        style={{
+          height: "420px",
+        }}
+        bg="rgb(30, 30, 30)"
+      >
         <header>
           <span />
           <span />

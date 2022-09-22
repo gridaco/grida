@@ -1,6 +1,6 @@
 import styled from "@emotion/styled";
 import React from "react";
-import { Flex, Text } from "rebass";
+import { Flex, Text } from "theme-ui";
 
 import Icon, { IconKey } from "components/icon";
 
@@ -18,20 +18,32 @@ export function ProductItem({
   return (
     <a href={href}>
       <ProductWrapper
-        width="100%"
-        height="100%"
-        justifyContent="start"
-        flexDirection="column"
+        style={{
+          width: "100%",
+          height: "100%",
+          justifyContent: "start",
+          flexDirection: "column",
+        }}
         mt="12px"
       >
         <LabelContainer>
           {iconName && <Icon name={iconName} />}
-          <Text fontWeight="500" fontSize="16px">
+          <Text
+            style={{
+              fontWeight: "500",
+              fontSize: "16px",
+            }}
+          >
             {label}
           </Text>
         </LabelContainer>
         {tagline && (
-          <Text opacity={0.6} fontSize="14px">
+          <Text
+            opacity={0.6}
+            style={{
+              fontSize: "14px",
+            }}
+          >
             {tagline}
           </Text>
         )}

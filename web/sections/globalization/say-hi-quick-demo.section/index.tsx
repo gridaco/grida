@@ -3,9 +3,9 @@ import LandingpageText from "components/landingpage/text";
 import React from "react";
 import Image from "next/image";
 import SectionLayout from "layouts/section";
-import { Flex } from "rebass";
 import styled from "@emotion/styled";
 import BlankArea from "components/blank-area";
+
 export default function GlobalizationQuickDemoSayHiSection() {
   return (
     <SectionLayout variant="content-default" alignContent="start">

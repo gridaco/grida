@@ -1,8 +1,6 @@
 import React, { useState } from "react";
 import styled from "@emotion/styled";
-import { Flex, Text, Heading } from "rebass";
-import Icon from "components/icon";
-import SectionLayout from "layouts/section";
+import { Flex, Text, Heading } from "theme-ui";
 import FeatureChoice from "components/feature-choice";
 
 // TODO
@@ -14,14 +12,25 @@ const choice = ["Free", "Team", "Extra Usage"];
 
 const FeatureListMobileView: React.FC<FeatureProps> = ({ data }) => {
   return (
-    <Flex flexDirection="column">
-      <Heading fontSize="32px" mb="25px">
+    <Flex
+      style={{
+        flexDirection: "column",
+      }}
+    >
+      <Heading
+        style={{
+          fontSize: "32px",
+        }}
+        mb="25px"
+      >
         Features
       </Heading>
       <Wrapper
-        width="100%"
-        flexDirection="column"
-        justifyContent="space-between"
+        style={{
+          width: "100%",
+          flexDirection: "column",
+          justifyContent: "space-between",
+        }}
       >
         {choice.map(i => (
           <FeatureChoice titleList={i} featureData={data} key={i} />

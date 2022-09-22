@@ -1,6 +1,6 @@
 import React from "react";
 import styled from "@emotion/styled";
-import { Flex, Heading, Text } from "rebass";
+import { Heading, Text } from "theme-ui";
 import SectionLayout from "layouts/section";
 import StartNow from "components/start-now";
 import BlankArea from "components/blank-area";
@@ -10,7 +10,12 @@ const FreePlan = () => {
     <SectionLayout alignContent="center">
       <BlankArea height={[221, 221]} />
       <FreeText mb="43px">Free for dreamers</FreeText>
-      <Desc width="80%" mb="132px">
+      <Desc
+        style={{
+          width: "80%",
+        }}
+        mb="132px"
+      >
         Unlock your possibility, express your ideas faster then ever. Grida is
         free forever.
       </Desc>

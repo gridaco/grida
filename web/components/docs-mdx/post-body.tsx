@@ -2,7 +2,7 @@ import styled from "@emotion/styled";
 import renderToString from "next-mdx-remote/render-to-string";
 import Link from "next/link";
 import React, { useState } from "react";
-import { Flex, Text } from "rebass";
+import { Flex, Text } from "theme-ui";
 
 import CodeBlock from "components/code";
 import Icon from "components/icon";
@@ -32,20 +32,40 @@ export default function PostBody({ content }) {
           __html: docs,
         }}
       ></Documentation>
-      <Flex justifyContent="space-between" mt="90px">
-        <Flex className="cursor" alignItems="center">
+      <Flex
+        style={{
+          justifyContent: "space-between",
+        }}
+        mt="90px"
+      >
+        <Flex
+          className="cursor"
+          style={{
+            alignItems: "center",
+          }}
+        >
           <CustomIcon
             name="arrowDown"
             isVerticalMiddle
             style={{ transform: "rotate(90deg)", marginRight: "12px" }}
           />
-          <Text fontSize="16px" color="#2562FF">
+          <Text
+            style={{
+              fontSize: "16px",
+            }}
+            color="#2562FF"
+          >
             Prev
           </Text>
         </Flex>
 
-        <Flex className="cursor" alignItems="center">
-          <Text fontSize="16px" color="#2562FF">
+        <Flex
+          className="cursor"
+          style={{
+            alignItems: "center",
+          }}
+        >
+          <Text style={{ fontSize: "16px" }} color="#2562FF">
             Next
           </Text>
           <CustomIcon
@@ -59,11 +79,20 @@ export default function PostBody({ content }) {
       {/* <WasThisPostHelpful /> */}
       <Flex
         mt="40px"
-        justifyContent="flex-end"
-        style={{ borderTop: "1px solid #F8F8F8" }}
+        style={{
+          justifyContent: "flex-end",
+          borderTop: "1px solid #F8F8F8",
+        }}
       >
         <Link href="https://github.com/gridaco/grida.co">
-          <Text className="cursor" pt="24px" fontSize="16px" color="#2562FF">
+          <Text
+            className="cursor"
+            pt="24px"
+            style={{
+              fontSize: "16px",
+            }}
+            color="#2562FF"
+          >
             Edit this page on Github
           </Text>
         </Link>

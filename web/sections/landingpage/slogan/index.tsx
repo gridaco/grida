@@ -1,7 +1,7 @@
 import styled from "@emotion/styled";
 import SectionLayout from "layouts/section";
 import React from "react";
-import { Flex } from "rebass";
+import { Flex } from "theme-ui";
 
 import Icon from "components/icon";
 import LandingMainCtaButton from "components/landingpage/main-cta-button";
@@ -15,10 +15,12 @@ const Slogan = () => {
       backgroundColor="#000"
     >
       <Flex
-        flexDirection="column"
-        alignItems="center"
         my={["120px", "300px"]}
-        style={{ zIndex: 5 }}
+        style={{
+          zIndex: 5,
+          flexDirection: "column",
+          alignItems: "center",
+        }}
       >
         <SloganText variant="h2">Focus on the core</SloganText>
         <SloganText variant="h2">

@@ -1,7 +1,6 @@
 import styled from "@emotion/styled";
 import LandingpageText from "components/landingpage/text";
 import React from "react";
-import { Flex } from "rebass";
 import { FeatureListupCardItemDisplayData } from "./interface";
 
 export default function FeatureCardItem(props: {
@@ -15,7 +14,8 @@ export default function FeatureCardItem(props: {
   );
 }
 
-const Card = styled(Flex)`
+const Card = styled.div`
+  display: flex;
   flex-direction: column;
   box-shadow: 0px 4px 128px 32px rgba(0, 0, 0, 0.08);
   border-radius: 8px;

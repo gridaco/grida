@@ -1,8 +1,8 @@
 import styled from "@emotion/styled";
 import Link from "next/link";
 import { useRouter } from "next/router";
-import React, { useEffect, useState } from "react";
-import { Flex, Heading } from "rebass";
+import React from "react";
+import { Flex, Heading } from "theme-ui";
 
 import { DocsRoute } from "utils/docs/model";
 
@@ -13,10 +13,20 @@ function DocsNavigationSection(props: { route: DocsRoute; level?: number }) {
 
   return (
     <SidebarController level={level}>
-      <SectionWrapper level={level} flexDirection="column">
+      <SectionWrapper
+        level={level}
+        style={{
+          flexDirection: "column",
+        }}
+      >
         {routeConfig.path ? (
           <Link href={routeConfig.path ?? ""}>
-            <Heading className="cursor" fontSize="16px">
+            <Heading
+              className="cursor"
+              style={{
+                fontSize: "16px",
+              }}
+            >
               {routeConfig.title}
             </Heading>
           </Link>
@@ -32,9 +42,11 @@ function DocsNavigationSection(props: { route: DocsRoute; level?: number }) {
               <Link href={i.path} key={ix}>
                 <Heading
                   className="cursor"
-                  fontSize="16px"
+                  style={{
+                    fontSize: "16px",
+                    fontWeight: 400,
+                  }}
                   my="6px"
-                  fontWeight={400}
                   color={"#686868"}
                 >
                   {i.title}

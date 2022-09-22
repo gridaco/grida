@@ -3,11 +3,10 @@ import ApplicationPreview from "layouts/landingpage/application-preview";
 import SectionLayout from "layouts/section";
 import Image from "next/image";
 import React, { useEffect, useState } from "react";
-import { Flex, Text } from "rebass";
+import { Flex } from "theme-ui";
 
 import ActionItem from "components/action-item";
 import BlankArea from "components/blank-area";
-import OnairButton from "components/landingpage/effect/onair-button";
 import LandingpageText from "components/landingpage/text";
 import { LandingpageUrls } from "utils/landingpage/constants";
 import { media } from "utils/styled/media";
@@ -37,15 +36,25 @@ const OnlineApp: React.FC<OnlineAppProps> = ({ isMobile }) => {
         <DesignToCode />
       </DisableMargin>
       <Flex
-        justifyContent={[
-          "center",
-          "space-between",
-          "space-between",
-          "space-between",
-        ]}
-        width="100%"
+        sx={{
+          justifyContent: [
+            "center",
+            "space-between",
+            "space-between",
+            "space-between",
+          ],
+        }}
+        style={{
+          width: "100%",
+        }}
       >
-        <Flex flexDirection="column" width="100%" mr="40px">
+        <Flex
+          style={{
+            width: "100%",
+            flexDirection: "column",
+          }}
+          mr="40px"
+        >
           {/* <Text fontSize="24px" mb="15px" letterSpacing="0em">
             What you’ve just sketched?
           </Text> */}

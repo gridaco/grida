@@ -1,6 +1,5 @@
 import React from "react";
 import styled from "@emotion/styled";
-import { Flex } from "rebass";
 import Icon from "components/icon";
 
 const DocsSearchBar = () => {
@@ -20,7 +19,8 @@ const DocsSearchBar = () => {
 
 export default DocsSearchBar;
 
-const SearcBarWrapper = styled(Flex)`
+const SearcBarWrapper = styled.div`
+  display: flex;
   height: 40px;
   border: 1px solid #c1c1c1;
   width: 100%;

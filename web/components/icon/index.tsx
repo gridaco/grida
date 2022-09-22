@@ -1,6 +1,6 @@
 import styled from "@emotion/styled";
 import React from "react";
-import { Box, BoxProps } from "rebass";
+import { Box, BoxProps } from "theme-ui";
 import { width, height } from "styled-system";
 
 import icons, { IconList } from "./icons";

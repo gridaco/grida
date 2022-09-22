@@ -1,8 +1,8 @@
 import styled from "@emotion/styled";
 import SectionLayout from "layouts/section";
 import Image from "next/image";
-import React, { useState, useRef, useEffect } from "react";
-import { Box, Flex } from "rebass";
+import React, { useState } from "react";
+import { Box, Flex } from "theme-ui";
 
 import LiveDesignDemoFrame from "components/landingpage/motion/live-design-demo";
 import { media } from "utils/styled/media";
@@ -37,23 +37,36 @@ const DesignPlatforms = () => {
           inherit={false}
           alignContent="center"
         >
-          <Flex width="100%" height="100%">
+          <Flex
+            style={{
+              width: "100%",
+              height: "100%",
+            }}
+          >
             <Postioner
-              width="50%"
-              justifyContent="flex-end"
-              flexDirection="column"
+              style={{
+                width: "50%",
+                justifyContent: "flex-end",
+                flexDirection: "column",
+              }}
             >
               <div className="platforms-preview">
                 <Image
                   loading="eager"
                   alt="Grida supported design patforms"
                   src={`/assets/design-platforms/${currentPlatform}.png`}
+                  objectFit="cover"
                   width={904}
                   height={564}
                 />
               </div>
             </Postioner>
-            <Box width="50%" height="100%" />
+            <Box
+              style={{
+                width: "50%",
+                height: "100%",
+              }}
+            />
           </Flex>
         </SectionLayout>
         <PlatformView className="previews">
@@ -124,9 +137,10 @@ const Postioner = styled(Flex)`
     margin-top: 60px;
     max-width: 920px;
     width: 100%;
+    overflow: visible;
     opacity: 0.6;
-    box-shadow: 0px 4px 128px 32px rgba(0, 0, 0, 0.08);
-    div {
+    span {
+      box-shadow: 0px 4px 128px 32px rgba(0, 0, 0, 0.08);
       min-width: 818px;
       left: 20%;
       transform: translateX(-20%);

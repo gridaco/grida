@@ -1,7 +1,7 @@
 import styled from "@emotion/styled";
 import Image from "next/image";
 import React from "react";
-import { Box, Flex } from "rebass";
+import { Flex } from "theme-ui";
 
 import { media } from "utils/styled/media";
 

@@ -1,6 +1,6 @@
 import { css } from "@emotion/react";
 import styled from "@emotion/styled";
-import { Box } from "rebass";
+import { Box } from "theme-ui";
 import { media } from "./media";
 
 export const resetUl = css`
@@ -29,7 +29,7 @@ export const DesktopView = styled.div`
     right: -20%;
     z-index: -1;
 
-    div {
+    span {
       width: 1040px !important;
       height: 1027px !important;
     }
@@ -54,7 +54,7 @@ export const MobileView = styled.div`
       top: -20%;
       z-index: -1;
 
-      div {
+      span {
         width: 768px !important;
         height: 520px !important;
       }

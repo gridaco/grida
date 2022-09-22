@@ -3,7 +3,7 @@ import CodePreview from "layouts/landingpage/code-preview";
 import DesignPlatforms from "layouts/landingpage/design-platforms";
 import SectionLayout from "layouts/section";
 import React from "react";
-import { Box, Flex, Heading, Text } from "rebass";
+import { Flex } from "theme-ui";
 
 import BlankArea from "components/blank-area";
 import LandingpageText from "components/landingpage/text";
@@ -13,8 +13,20 @@ import { media } from "utils/styled/media";
 const DesignToCode = () => {
   return (
     <SectionLayout alignContent="start" backgroundColor="rgba(0,0,0,0)">
-      <Flex width="100%" flexDirection={["column", "row", "row", "row"]}>
-        <Flex className="text-platform" flexDirection="column">
+      <Flex
+        style={{
+          width: "100%",
+        }}
+        sx={{
+          flexDirection: ["column", "row", "row", "row"],
+        }}
+      >
+        <Flex
+          className="text-platform"
+          style={{
+            flexDirection: "column",
+          }}
+        >
           <Title variant="h2">{k.contents.heading2_everything_instant}</Title>
           <Description variant="body1">
             {k.contents.p_everything_instant_description}
@@ -23,8 +35,10 @@ const DesignToCode = () => {
         </Flex>
         <Flex
           className="code-view"
-          width={["100%", "50%", "50%", "50%"]}
-          justifyContent={["flex-start", "flex-end", "flex-end", "flex-end"]}
+          sx={{
+            width: ["100%", "50%", "50%", "50%"],
+            justifyContent: ["flex-start", "flex-end", "flex-end", "flex-end"],
+          }}
         >
           <CodePreview />
         </Flex>

@@ -1,7 +1,7 @@
 import styled from "@emotion/styled";
 import React from "react";
 import Link from "next/link";
-import { Flex, Heading } from "rebass";
+import { Flex, Heading } from "theme-ui";
 import SectionLayout from "layouts/section";
 import { useWindowWidth } from "utils/hooks/use-window-width";
 import { LandingpageUrls } from "utils/landingpage/constants";
@@ -21,8 +21,14 @@ const CookieAccept: React.FC<CookieAcceptProps> = ({ accpetCookie }) => {
   return (
     <Positioner>
       <SectionLayout variant="content-default" alignContent="center">
-        <Flex width="100%" justifyContent="space-between" alignItems="center">
-          <Flex flexDirection="column">
+        <Flex
+          style={{
+            width: "100%",
+            justifyContent: "space-between",
+            alignItems: "center",
+          }}
+        >
+          <Flex style={{ flexDirection: "column" }}>
             {width < replaceStylePxToNumber(breakpoints[0]) ? (
               <Title>
                 We use{" "}

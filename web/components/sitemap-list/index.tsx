@@ -1,7 +1,7 @@
 import { event_click_footer_menu } from "analytics";
 import Link from "next/link";
 import React from "react";
-import { Flex, Text } from "rebass";
+import { Flex, Text } from "theme-ui";
 
 import { Sitemap } from "components/footer/sitemap";
 import { useTheme } from "@emotion/react";
@@ -19,13 +19,12 @@ const SitemapList: React.FC<SitemapListProps> = ({ sitemap }) => {
     const HeaderText = (
       <Text
         className={href && "cursor"}
-        fontWeight="500"
-        fontSize="18px"
         color={theme.footer.group.color}
         mb="40px"
         style={{
+          fontWeight: 700, // 500?
+          fontSize: "18px",
           letterSpacing: "0em",
-          fontWeight: 700,
         }}
       >
         {label}
@@ -35,7 +34,11 @@ const SitemapList: React.FC<SitemapListProps> = ({ sitemap }) => {
   };
 
   return (
-    <Flex flexDirection="column">
+    <Flex
+      style={{
+        flexDirection: "column",
+      }}
+    >
       <Header />
       {child.map(i => (
         <Link href={i.href} key={i.label}>
@@ -45,10 +48,10 @@ const SitemapList: React.FC<SitemapListProps> = ({ sitemap }) => {
               event_click_footer_menu({ menu: i.label });
             }}
             className="cursor"
-            fontSize="14px"
             mb="15px"
             color={theme.footer.menu.color}
             style={{
+              fontSize: "14px",
               letterSpacing: "0em",
               fontWeight: 400,
             }}

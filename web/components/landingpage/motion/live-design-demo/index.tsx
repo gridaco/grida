@@ -1,6 +1,6 @@
 import styled from "@emotion/styled";
 import React, { useEffect, useRef, useState } from "react";
-import { Flex } from "rebass";
+import { Flex } from "theme-ui";
 
 import animationData from "public/animations/live-demo-app-design-motion/comp.json";
 import useOnScreen from "utils/hooks/use-on-screen";

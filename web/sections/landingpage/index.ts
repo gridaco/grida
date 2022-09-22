@@ -3,7 +3,7 @@ import Section__CTASeeTheMagic from "./cta-see-the-magic";
 import DesignOnceRunAnywhere from "./design-once-run-anywhere";
 import Hero from "./hero";
 import LayoutDetect from "./layout-detect";
-import OnlineApp from "./online-app";
+import OnlineApp from "./everything-instant";
 import Products from "./products";
 import SectionOpensource from "./section-opensource";
 import Slogan from "./slogan";

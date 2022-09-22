@@ -55,11 +55,11 @@
     "react-responsive": "^9.0.0-beta.10",
     "react-syntax-highlighter": "^15.5.0",
     "react-typist": "^2.0.5",
-    "rebass": "^4.0.7",
     "recoil": "^0.7.5",
     "refractor": "^4.2.1",
     "remark-html": "^13.0.1",
-    "styled-system": "^5.1.0"
+    "styled-system": "^5.1.0",
+    "theme-ui": "^0.14.7"
   },
   "devDependencies": {
     "@babel/core": "^7.15.5",
@@ -72,11 +72,10 @@
     "@types/fontfaceobserver": "^0.0.6",
     "@types/gtag.js": "^0.0.8",
     "@types/lodash-es": "^4.17.3",
-    "@types/node": "^12.6.8",
+    "@types/node": "^18.7.18",
     "@types/react": "^18.0.19",
     "@types/react-dom": "^18.0.6",
     "@types/react-typist": "^2.0.3",
-    "@types/rebass": "^3.0.4",
     "@typescript-eslint/eslint-plugin": "^5.36.2",
     "@typescript-eslint/parser": "^5.36.2",
     "babel-loader": "^8.2.2",
@@ -97,7 +96,7 @@
     "stylelint": "^10.1.0",
     "stylelint-prettier": "^1.1.1",
     "tsconfig-paths-webpack-plugin": "^3.5.1",
-    "typescript": "^3.6.3",
+    "typescript": "^4.8.3",
     "url-loader": "^2.1.0",
     "webpack": "^4.44.0"
   }

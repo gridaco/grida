@@ -1,6 +1,6 @@
 import styled from "@emotion/styled";
 import React, { useCallback } from "react";
-import { Flex } from "rebass";
+import { Flex } from "theme-ui";
 
 import { GroupEntity } from "../headermap";
 import { LineItem } from "../line-item";
@@ -37,8 +37,10 @@ function HoverMenu({
               onClick={onModalInnerClick}
             >
               <ExpandHeaderContent
-                width={["320px", "730px", "985px", "1040px"]}
-                height="100%"
+                sx={{
+                  height: "100%",
+                  width: ["320px", "730px", "985px", "1040px"],
+                }}
               >
                 {item.children.map((i, index) => {
                   switch (i.layout) {
@@ -76,7 +78,9 @@ function HoverMenu({
       {type === "mobile" && (
         <Container
           data-expanded={isExpand}
-          flexDirection="column"
+          style={{
+            flexDirection: "column",
+          }}
           mt="12px"
           mb="24px"
         >

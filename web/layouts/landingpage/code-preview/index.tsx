@@ -4,7 +4,7 @@ import Image from "next/image";
 import React, { useState } from "react";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { vscDarkPlus as colorscheme } from "react-syntax-highlighter/dist/cjs/styles/prism";
-import { Flex, Box } from "rebass";
+import { Flex, Box } from "theme-ui";
 
 import { media } from "utils/styled/media";
 
@@ -27,21 +27,33 @@ const CodePreview = () => {
       </Mobile>
       <Desktop>
         <SectionLayout variant="full-width" inherit={false}>
-          <Flex width="100%">
-            <Box width="25%" height="1px" />
-            <Box width="25%" height="1px" />
+          <Flex
+            sx={{
+              width: "100%",
+            }}
+          >
+            <Box sx={{ width: "25%", height: 1 }} />
+            <Box sx={{ width: "25%", height: 1 }} />
             <ViewWrapper
-              width="37%"
-              flexDirection="column"
-              alignItems={[
-                "flex-start",
-                "flex-start",
-                "flex-start",
-                "flex-start",
-                "flex-end",
-              ]}
+              sx={{
+                width: "37%",
+                flexDirection: "column",
+                alignItems: [
+                  "flex-start",
+                  "flex-start",
+                  "flex-start",
+                  "flex-start",
+                  "flex-end",
+                ],
+              }}
             >
-              <CodeView width="460px" height="770px" bg="rgb(30, 30, 30)">
+              <CodeView
+                sx={{
+                  width: "460px",
+                  height: "770px",
+                }}
+                bg="rgb(30, 30, 30)"
+              >
                 <header>
                   <span />
                   <span />
@@ -73,7 +85,9 @@ const CodePreview = () => {
                 ))}
               </Platforms>
             </ViewWrapper>
-            <Box width={["0px", "0px", "0px", "0px", "13%"]} height="1px" />
+            <Box
+              sx={{ width: ["0px", "0px", "0px", "0px", "13%"], height: 1 }}
+            />
           </Flex>
         </SectionLayout>
       </Desktop>

@@ -1,7 +1,7 @@
 import styled from "@emotion/styled";
 import SectionLayout from "layouts/section";
 import React from "react";
-import { Flex } from "rebass";
+import { Flex } from "theme-ui";
 
 import BlankArea from "components/blank-area";
 import { media } from "utils/styled/media";

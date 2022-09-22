@@ -3,7 +3,7 @@ import Icon from "components/icon";
 import React, { useCallback, useState } from "react";
 import { motion, useTransform, useViewportScroll } from "framer-motion";
 import { usePopupContext } from "utils/context/PopupContext";
-import { Flex } from "rebass";
+import { Flex } from "theme-ui";
 import ReactPlayer from "react-player";
 
 const VideoContainer = styled(Flex)`
@@ -38,9 +38,16 @@ function ElevatedVideoPlayer() {
     addPopup({
       title: "",
       element: (
-        <VideoContainer width="calc(100vw - 40px)" height="100%">
+        <VideoContainer
+          style={{
+            width: "calc(100vw - 40px)",
+            height: "100%",
+          }}
+        >
           <ReactPlayer
-            url="https://www.youtube.com/watch?v=RIZjZFoDhRc&ab_channel=Bridged"
+            url={
+              "https://www.youtube.com/watch?v=RIZjZFoDhRc&ab_channel=Bridged"
+            }
             width="100%"
             height="100%"
             playing

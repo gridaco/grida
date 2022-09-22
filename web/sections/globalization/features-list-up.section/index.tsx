@@ -5,7 +5,7 @@ import { FeatureListupCardItemDisplayData } from "components/globalization/featu
 import LandingpageText from "components/landingpage/text";
 import SectionLayout from "layouts/section";
 import React from "react";
-import { Box } from "rebass";
+import { Box } from "theme-ui";
 
 const FEATURES: FeatureListupCardItemDisplayData[] = [
   {

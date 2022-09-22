@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import styled from "@emotion/styled";
-import { Box, Flex, Text } from "rebass";
+import { Flex, Text } from "theme-ui";
 import Icon from "components/icon";
 import { FaqQnaItem } from "./interface";
 
@@ -13,27 +13,40 @@ export default function QuestionItem(props: { question: FaqQnaItem }) {
   };
 
   return (
-    <Flex flexDirection="column">
+    <Flex
+      style={{
+        flexDirection: "column",
+      }}
+    >
       <Flex
         className="cursor"
-        width="100%"
-        alignItems="center"
-        justifyContent="space-between"
+        style={{
+          width: "100%",
+          alignItems: "center",
+          justifyContent: "space-between",
+        }}
         mb={["40px", "36px", "36px", "28px"]}
         onClick={handleQueryHeaderClick}
       >
         <Query mr={["51px", 0, 0, 0]}>{question.query}</Query>
         <Flex
-          width="24px"
-          height="24px"
-          alignItems="center"
-          justifyContent="center"
+          style={{
+            width: "24px",
+            height: "24px",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
         >
           <Icon name={isOpen ? "faqClose" : "plus"} className="cursor" />
         </Flex>
       </Flex>
       {isOpen && (
-        <Answer width="95%" mb={["89px", "39px", "43px", "48px"]}>
+        <Answer
+          style={{
+            width: "95%",
+          }}
+          mb={["89px", "39px", "43px", "48px"]}
+        >
           {question.answer}
         </Answer>
       )}

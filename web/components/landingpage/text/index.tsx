@@ -1,5 +1,4 @@
-import styled from "@emotion/styled";
-import { Heading, Text } from "rebass";
+import { Heading, Text } from "theme-ui";
 const h1FontSizes = ["32px", "64px", "64px", "80px"];
 const h2FontSizes = ["32px", "64px", "64px", "64px"];
 const h4FontSizes = ["32px", "36px", "36px", "36px"];
@@ -25,11 +24,13 @@ export default function LandingpageText(props: {
         <Heading
           as="h1"
           className={className}
-          color={color}
-          textAlign={textAlign}
-          fontSize={h1FontSizes}
-          letterSpacing={"-0.03em"}
-          lineHeight={"97.1%"}
+          sx={{
+            textAlign: textAlign,
+            fontSize: h1FontSizes,
+            letterSpacing: "-0.03em",
+            lineHeight: "97.1%",
+            color: color,
+          }}
         >
           {props.children}
         </Heading>
@@ -39,11 +40,13 @@ export default function LandingpageText(props: {
         <Heading
           as="h2"
           className={className}
-          letterSpacing={"0em"}
-          lineHeight={"98.1%"}
-          color={color}
-          textAlign={textAlign}
-          fontSize={h2FontSizes}
+          sx={{
+            textAlign: textAlign,
+            fontSize: h2FontSizes,
+            letterSpacing: "0em",
+            lineHeight: "98.1%",
+            color: color,
+          }}
         >
           {props.children}
         </Heading>
@@ -53,10 +56,12 @@ export default function LandingpageText(props: {
         <Heading
           as="h4"
           className={className}
-          letterSpacing={"0em"}
-          color={color}
-          textAlign={textAlign}
-          fontSize={h4FontSizes}
+          sx={{
+            letterSpacing: "0em",
+            color: color,
+            textAlign: textAlign,
+            fontSize: h4FontSizes,
+          }}
         >
           {props.children}
         </Heading>
@@ -65,13 +70,15 @@ export default function LandingpageText(props: {
       return (
         <Text
           as="p"
-          fontWeight={400}
-          lineHeight={"38px"}
-          letterSpacing={"0em"}
           className={className}
-          color={color ?? "#444545"}
-          textAlign={textAlign}
-          fontSize={body1FontSizes}
+          sx={{
+            fontWeight: 400,
+            lineHeight: "38px",
+            letterSpacing: "0em",
+            color: color ?? "#444545",
+            textAlign: textAlign,
+            fontSize: body1FontSizes,
+          }}
         >
           {props.children}
         </Text>

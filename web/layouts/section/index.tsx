@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useState } from "react";
-import { Flex } from "rebass";
+import { Flex } from "theme-ui";
 import styled, { CSSObject } from "@emotion/styled";
 
 const variants = [
@@ -128,11 +128,13 @@ const SectionLayout: React.FC<SectionLayoutProps> = ({
   return (
     <Flex
       className={className}
-      width="100%"
       ref={parentFlexBox}
-      alignItems="center"
-      justifyContent="center"
-      height="100%"
+      style={{
+        width: "100%",
+        alignItems: "center",
+        justifyContent: "center",
+        height: "100%",
+      }}
     >
       {debug && (
         <Debug>
@@ -156,10 +158,14 @@ const SectionLayout: React.FC<SectionLayoutProps> = ({
         ref={childFlexBox}
         className={variant}
         bg={!debug ? backgroundColor : "rgba(83, 245, 255, 0.4)"}
-        width={getWidthUseVaraint()}
-        flexDirection="column"
-        alignItems={getAlignContent()}
-        style={getAbsoluteStyle()}
+        style={{
+          ...getAbsoluteStyle(),
+          flexDirection: "column",
+          alignItems: getAlignContent(),
+        }}
+        sx={{
+          width: getWidthUseVaraint(),
+        }}
       >
         {children}
       </Flex>
