@@ -101,8 +101,8 @@ module.exports = withBundleAnalyzer(
             permanent: true,
           },
           {
-            source: "/jobs/:path*",
-            destination: "/careers/:path*",
+            source: "/jobs",
+            destination: "/careers",
             permanent: true,
           },
           {
