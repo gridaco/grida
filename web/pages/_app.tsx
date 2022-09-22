@@ -21,8 +21,6 @@ import { BodyCustomStyleInAbosulteSectionLayout } from "utils/styled/styles";
 import { MDXProvider } from "@mdx-js/react";
 
 import { _MDX_COMPONENTS } from "components/mdx";
-import { SEO_DEFAULTS } from "utils/seo";
-import makeKeywords from "utils/seo/make-keywords";
 
 import { Box } from "theme-ui";
 import { env } from "process";
@@ -85,7 +83,6 @@ const App = ({ Component, pageProps }: AppPropsWithLayout) => {
   return (
     <Providers>
       <Head>
-        <SeoMeta />
         {/* pinterest domain verify */}
         <meta
           name="p:domain_verify"
@@ -139,24 +136,6 @@ const App = ({ Component, pageProps }: AppPropsWithLayout) => {
     </Providers>
   );
 };
-
-function SeoMeta() {
-  return (
-    <>
-      <title>{SEO_DEFAULTS.title}</title>
-      <link rel="icon" href="/favicon.png" />
-
-      <meta name="description" content={SEO_DEFAULTS.description} />
-      <meta name="keywords" content={makeKeywords(SEO_DEFAULTS.keywords)} />
-      <meta name="author" content={SEO_DEFAULTS.author} />
-
-      <meta property="og:title" content={SEO_DEFAULTS.og.title} />
-      <meta property="og:type" content={SEO_DEFAULTS.og.type} />
-      <meta property="og:url" content={SEO_DEFAULTS.og.url} />
-      <meta property="og:image" content={SEO_DEFAULTS.og.image} />
-    </>
-  );
-}
 
 const Providers = ({ children }: { children: React.ReactNode }) => {
   return (
