@@ -161,6 +161,7 @@ const Header = () => {
               mt="24px"
               style={{
                 flexDirection: "column",
+                gap: 24,
               }}
             >
               {HeaderMap.map(i => (
@@ -337,7 +338,7 @@ const SignupButton = styled(Button)`
 
 const MenuList = styled.ul`
   display: flex;
-  margin-left: 40px;
+  margin-left: 20px;
   align-items: center;
   height: 24px;
 
