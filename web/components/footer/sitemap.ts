@@ -100,16 +100,16 @@ export const Platforms: Sitemap = {
     // },
     {
       label: "React",
-      href: "/react-js",
+      href: "/docs/with-react",
     },
     {
       label: "React Native",
       badge: "beta",
-      href: "/react-native",
+      href: "/docs/with-react-native",
     },
     {
       label: "Flutter",
-      href: "/flutter",
+      href: "/docs/with-flutter",
     },
     // {
     //   label: "Vue",
@@ -123,7 +123,7 @@ export const Platforms: Sitemap = {
     // },
     {
       label: "HTML/CSS",
-      href: "/vanilla",
+      href: "/docs/with-vanilla",
     },
     {
       label: "Reflect UI",

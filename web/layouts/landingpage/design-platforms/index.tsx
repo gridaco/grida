@@ -1,12 +1,11 @@
 import styled from "@emotion/styled";
-import SectionLayout from "layout/section";
+import SectionLayout from "layouts/section";
 import Image from "next/image";
-import React, { useState, useRef, useEffect } from "react";
-import { Box, Flex } from "rebass";
+import React, { useState } from "react";
+import { Box, Flex } from "theme-ui";
 
 import LiveDesignDemoFrame from "components/landingpage/motion/live-design-demo";
 import { media } from "utils/styled/media";
-import { ThemeInterface } from "utils/styled/theme";
 
 import DesignPlatformsMobile from "./mobile";
 
@@ -38,23 +37,36 @@ const DesignPlatforms = () => {
           inherit={false}
           alignContent="center"
         >
-          <Flex width="100%" height="100%">
+          <Flex
+            style={{
+              width: "100%",
+              height: "100%",
+            }}
+          >
             <Postioner
-              width="50%"
-              justifyContent="flex-end"
-              flexDirection="column"
+              style={{
+                width: "50%",
+                justifyContent: "flex-end",
+                flexDirection: "column",
+              }}
             >
               <div className="platforms-preview">
                 <Image
                   loading="eager"
                   alt="Grida supported design patforms"
                   src={`/assets/design-platforms/${currentPlatform}.png`}
-                  width="auto"
-                  height="565px"
+                  objectFit="cover"
+                  width={904}
+                  height={564}
                 />
               </div>
             </Postioner>
-            <Box width="50%" height="100%" />
+            <Box
+              style={{
+                width: "50%",
+                height: "100%",
+              }}
+            />
           </Flex>
         </SectionLayout>
         <PlatformView className="previews">
@@ -105,7 +117,7 @@ const PlatformView = styled.div`
   margin-left: auto;
   height: 580px;
 
-  .platforms > div {
+  .platforms > span {
     width: 24px;
     height: 24px;
     margin-right: 28px !important;
@@ -125,9 +137,10 @@ const Postioner = styled(Flex)`
     margin-top: 60px;
     max-width: 920px;
     width: 100%;
+    overflow: visible;
     opacity: 0.6;
-    box-shadow: 0px 4px 128px 32px rgba(0, 0, 0, 0.08);
-    div {
+    span {
+      box-shadow: 0px 4px 128px 32px rgba(0, 0, 0, 0.08);
       min-width: 818px;
       left: 20%;
       transform: translateX(-20%);
@@ -135,35 +148,23 @@ const Postioner = styled(Flex)`
       width: 100% !important;
     }
 
-    ${props =>
-      media(
-        (props.theme as ThemeInterface).breakpoints[0],
-        (props.theme as ThemeInterface).breakpoints[3],
-      )} {
+    ${props => media(props.theme.breakpoints[0], props.theme.breakpoints[3])} {
       direction: rtl;
     }
   }
 
-  ${props =>
-    media(
-      (props.theme as ThemeInterface).breakpoints[0],
-      (props.theme as ThemeInterface).breakpoints[1],
-    )} {
+  ${props => media(props.theme.breakpoints[0], props.theme.breakpoints[1])} {
     width: 80% !important;
   }
 
-  ${props =>
-    media(
-      (props.theme as ThemeInterface).breakpoints[1],
-      (props.theme as ThemeInterface).breakpoints[2],
-    )} {
+  ${props => media(props.theme.breakpoints[1], props.theme.breakpoints[2])} {
     width: 60% !important;
   }
 `;
 
 const Mobile = styled.div`
   display: none;
-  ${props => media("0px", (props.theme as ThemeInterface).breakpoints[0])} {
+  ${props => media("0px", props.theme.breakpoints[0])} {
     display: block;
     margin-bottom: 300px;
   }
@@ -172,7 +173,7 @@ const Mobile = styled.div`
 const Desktop = styled.div`
   display: block;
   height: 700px;
-  ${props => media("0px", (props.theme as ThemeInterface).breakpoints[0])} {
+  ${props => media("0px", props.theme.breakpoints[0])} {
     display: none;
   }
 `;

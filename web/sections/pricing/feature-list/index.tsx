@@ -1,12 +1,11 @@
 import styled from "@emotion/styled";
-import SectionLayout from "layout/section";
+import SectionLayout from "layouts/section";
 import React from "react";
-import { Flex } from "rebass";
+import { Flex } from "theme-ui";
 
 import BlankArea from "components/blank-area";
 import { media } from "utils/styled/media";
 import { DesktopView } from "utils/styled/styles";
-import { ThemeInterface } from "utils/styled/theme";
 
 import FeatureListDesktopView from "./desktop-view";
 import FeatureListMobileView from "./mobile-view";
@@ -124,7 +123,7 @@ const FeatureList: React.FC = () => {
 const Mobile = styled(Flex)`
   display: none;
 
-  ${props => media("0px", (props.theme as ThemeInterface).breakpoints[0])} {
+  ${props => media("0px", props.theme.breakpoints[0])} {
     display: flex;
     width: 100%;
     position: relative;

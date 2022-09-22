@@ -3,7 +3,7 @@ import Icon from "components/icon";
 import React, { useCallback, useState } from "react";
 import { motion, useTransform, useViewportScroll } from "framer-motion";
 import { usePopupContext } from "utils/context/PopupContext";
-import { Flex } from "rebass";
+import { Flex } from "theme-ui";
 import ReactPlayer from "react-player";
 
 const VideoContainer = styled(Flex)`
@@ -38,9 +38,16 @@ function ElevatedVideoPlayer() {
     addPopup({
       title: "",
       element: (
-        <VideoContainer width="calc(100vw - 40px)" height="100%">
+        <VideoContainer
+          style={{
+            width: "calc(100vw - 40px)",
+            height: "100%",
+          }}
+        >
           <ReactPlayer
-            url="https://www.youtube.com/watch?v=RIZjZFoDhRc&ab_channel=Bridged"
+            url={
+              "https://www.youtube.com/watch?v=RIZjZFoDhRc&ab_channel=Bridged"
+            }
             width="100%"
             height="100%"
             playing
@@ -66,7 +73,9 @@ function ElevatedVideoPlayer() {
     <Frame style={{ scale }}>
       <div className="youtube-thumbnail">
         <ReactPlayer
-          url={require("public/videos/promotion-video-preview.fast.mp4")}
+          url={
+            "https://player.vimeo.com/progressive_redirect/playback/749854972/rendition/720p/file.mp4?loc=external&signature=2e08689472fda44beb5f7b7ad6454054029e93f539ac6ca2ae9c2faeef5a448d"
+          }
           loop
           playing={!actualVideoPlaying}
           muted

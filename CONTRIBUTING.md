@@ -32,18 +32,20 @@ Join slack via link on README, contact maintaners for rapid contribution. otherw
   - 320 (iPhone SE)
 
 ### Interactive checkist
+
 - css `cursor: pointer` for clickable elements
 - hover state (color or scale or underline) for dynamic link elements
 
 ### Component checklist
+
 - component on storyboard
 - primative component as state indepandent (primative component shall not contain state for itself)
 - mdx component compatibility (general components should have in-mdx-usage capabilities)
 
 ### Code quality checklist
+
 - no style related constant in jsx (constant such like color and px shall not be inlined in jsx)
 - comment design links to visual component files or provide README
-
 
 ## Techniques
 
@@ -58,28 +60,30 @@ Join slack via link on README, contact maintaners for rapid contribution. otherw
 
 **Reponsive Layout Development**
 
-- [Rebass](https://rebassjs.org/)
+- [theme-ui](https://theme-ui.com/)
 
 **General UI Development**
 
 - [Reflect React](https://reflect-ui.com)
 - [Emotion/styled](https://emotion.sh/docs/styled)
 
-
 ## React coding conventions
+
 **for root components**
+
 - use function as component
 - don't use const as component
 - don't use React.FC as component
 - don't export function as default on end of file explicitly.
-``` tsx
+
+```tsx
 export default function GeneralComponent(props: {
-  title: string
-  desc: string
-}){
+  title: string;
+  desc: string;
+}) {
   <div>
     <h1>{props.title}</h1>
     <p>{props.desc}</p>
-  </div>
+  </div>;
 }
 ```

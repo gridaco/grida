@@ -1,6 +1,6 @@
 import FAQs from "components/faq";
 import { FaqDisplayData } from "components/faq/interface";
-import SectionLayout from "layout/section";
+import SectionLayout from "layouts/section";
 import React from "react";
 
 const GLOBALIZATION_QUESTIONS: FaqDisplayData = [

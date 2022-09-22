@@ -1,16 +1,16 @@
 import styled from "@emotion/styled";
 import Link from "next/link";
 import React from "react";
-import { Box, Flex, Text } from "rebass";
+import { Box, Flex, Text } from "theme-ui";
 
 import Icon from "components/icon";
 import { IconList } from "components/icon/icons";
 import SitemapList from "components/sitemap-list";
 import { URLS } from "utils/landingpage/constants";
 import { media } from "utils/styled/media";
-import { ThemeInterface } from "utils/styled/theme";
 
 import { Sitemap } from "./sitemap";
+import { useTheme } from "@emotion/react";
 
 const iconList: Array<{
   icon: keyof IconList;
@@ -43,16 +43,30 @@ const iconList: Array<{
 ];
 
 const Footer = () => {
+  const theme = useTheme();
+
   return (
-    <Flex alignItems="center" justifyContent="center" width="100%">
+    <Flex
+      style={{
+        width: "100%",
+        alignItems: "center",
+        justifyContent: "center",
+      }}
+    >
       <Flex
-        width={["100%", "730px", "985px", "1040px"]}
+        sx={{
+          width: ["100%", "730px", "985px", "1040px"],
+          flexDirection: "column",
+        }}
         my={["40px", "50px", "100px", "150px"]}
         mx="20px"
-        flexDirection="column"
       >
-        <FooterContent width="100%">
-          <Icon name="bridged" mr="100px" mb="64px" />
+        <FooterContent style={{ width: "100%" }}>
+          <Icon
+            name={theme.type === "light" ? "grida_black" : "grida_white"}
+            mr="100px"
+            mb="64px"
+          />
           <SitemapWrapper>
             {Sitemap.map(i => (
               <SitemapList key={i.label} sitemap={i} />
@@ -66,7 +80,12 @@ const Footer = () => {
             </Link>
           ))}
         </Box>
-        <FooterBottom justifyContent="space-between" my="24px">
+        <FooterBottom
+          style={{
+            justifyContent: "space-between",
+          }}
+          my="24px"
+        >
           <Text>Copyright © {new Date().getFullYear()} Grida.co</Text>
           <Flex className="policys">
             <Link href={URLS.landing.cookies_policy}>
@@ -90,17 +109,17 @@ export default Footer;
 const FooterContent = styled(Flex)`
   justify-content: center;
 
-  ${props => media(null, (props.theme as ThemeInterface).breakpoints[0])} {
+  ${props => media(null, props.theme.breakpoints[0])} {
     flex-direction: column;
   }
 `;
 
 const FooterBottom = styled(Flex)`
-  color: #4e4e4e;
+  color: ${p => p.theme.footer.bottom.color};
   font-size: 14px;
   letter-spacing: 0em;
   font-weight: 400;
-  ${props => media(null, (props.theme as ThemeInterface).breakpoints[0])} {
+  ${props => media(null, props.theme.breakpoints[0])} {
     flex-direction: column;
 
     .policys {
@@ -135,7 +154,7 @@ const SitemapWrapper = styled(Box)`
   grid-column-gap: 80px;
   grid-row-gap: 64px;
 
-  ${props => media(null, (props.theme as ThemeInterface).breakpoints[0])} {
+  ${props => media(null, props.theme.breakpoints[0])} {
     grid-column-gap: 80px;
   }
 `;

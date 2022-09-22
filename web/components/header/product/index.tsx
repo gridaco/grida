@@ -1,30 +1,72 @@
-import React from 'react'
-import { Box, Flex, Text } from 'rebass';
-import styled from '@emotion/styled';
-import Icon from 'components/icon';
-import { ThemeInterface } from 'utils/styled/theme';
-import { media } from 'utils/styled/media';
+import styled from "@emotion/styled";
+import React from "react";
+import { Flex, Text } from "theme-ui";
 
+import Icon, { IconKey } from "components/icon";
 
-const Product = ({ title, iconName, desc }) => {
+export function ProductItem({
+  label,
+  icon: iconName,
+  tagline,
+  href,
+}: {
+  label: string;
+  icon?: IconKey;
+  tagline: string;
+  href: string;
+}) {
   return (
-    <ProductWrapper width="100%" height="100%" justifyContent="center" flexDirection="column" mt="12px">
-      <Flex alignItems="center" mb="11px">
-        <Icon name={iconName} />
-        <Text fontWeight="500" fontSize="16px" ml="9px">{title}</Text>
-      </Flex>
-      <Text color="#8B8B8B" fontSize="14px" >{desc}</Text>
-    </ProductWrapper>
-  )
+    <a href={href}>
+      <ProductWrapper
+        style={{
+          width: "100%",
+          height: "100%",
+          justifyContent: "start",
+          flexDirection: "column",
+        }}
+        mt="12px"
+      >
+        <LabelContainer>
+          {iconName && <Icon name={iconName} />}
+          <Text
+            style={{
+              fontWeight: "500",
+              fontSize: "16px",
+            }}
+          >
+            {label}
+          </Text>
+        </LabelContainer>
+        {tagline && (
+          <Text
+            opacity={0.6}
+            style={{
+              fontSize: "14px",
+            }}
+          >
+            {tagline}
+          </Text>
+        )}
+      </ProductWrapper>
+    </a>
+  );
 }
 
-export default Product
-
 const ProductWrapper = styled(Flex)`
-  max-width: 255px;
-  max-height: 70px;
+  cursor: pointer;
+  padding: 12px 16px;
+  border-radius: 2px;
 
-  ${props => media(null, (props.theme as ThemeInterface).breakpoints[1])} {
-    max-width: 320px;
+  :hover {
+    background-color: rgba(0, 0, 0, 0.03);
+    opacity: 0.9;
   }
-`
+
+  transition: all 0.2s ease-in-out;
+`;
+
+const LabelContainer = styled(Flex)`
+  gap: 9px;
+  margin-bottom: 11px;
+  align-items: center;
+`;

@@ -1,28 +1,55 @@
 {
-    "compilerOptions": {
-        "target": "es5",
-        "lib": ["dom", "dom.iterable", "esnext"],
-        "allowJs": true,
-        "skipLibCheck": true,
-        "strict": false,
-        "forceConsistentCasingInFileNames": true,
-        "noEmit": true,
-        "esModuleInterop": true,
-        "module": "esnext",
-        "moduleResolution": "node",
-        "resolveJsonModule": true,
-        "jsx": "preserve",
-        "baseUrl": ".",
-        "paths": {
-            "components/*": ["./components/*"],
-            "common/*": ["./common/*"],
-            "layout/*": ["./layouts/*"],
-            "pages/*": ["./pages/*"],
-            "utils/*": ["utils/*"],
-            "public/*": ["public/*"]
-        },
-        "isolatedModules": true
+  "compilerOptions": {
+    "target": "es5",
+    "lib": [
+      "dom",
+      "dom.iterable",
+      "esnext"
+    ],
+    "allowJs": true,
+    "skipLibCheck": true,
+    "strict": false,
+    "forceConsistentCasingInFileNames": true,
+    "noEmit": true,
+    "esModuleInterop": true,
+    "module": "esnext",
+    "moduleResolution": "node",
+    "resolveJsonModule": true,
+    "jsx": "preserve",
+    "baseUrl": ".",
+    "paths": {
+      "components/*": [
+        "./components/*"
+      ],
+      "common/*": [
+        "./common/*"
+      ],
+      "layouts/*": [
+        "./layouts/*"
+      ],
+      "pages/*": [
+        "./pages/*"
+      ],
+      "theme/*": [
+        "./theme/*"
+      ],
+      "utils/*": [
+        "utils/*"
+      ],
+      "public/*": [
+        "public/*"
+      ]
     },
-    "exclude": ["node_modules"],
-    "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", "next.config.js"]
+    "isolatedModules": true,
+    "incremental": true
+  },
+  "exclude": [
+    "node_modules"
+  ],
+  "include": [
+    "next-env.d.ts",
+    "**/*.ts",
+    "**/*.tsx",
+    "next.config.js"
+  ]
 }

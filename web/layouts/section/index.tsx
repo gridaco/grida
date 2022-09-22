@@ -1,8 +1,6 @@
 import React, { useRef, useEffect, useState } from "react";
-import { Flex } from "rebass";
+import { Flex } from "theme-ui";
 import styled, { CSSObject } from "@emotion/styled";
-import { InterpolationWithTheme } from "@emotion/core";
-import { ThemeInterface } from "utils/styled/theme";
 
 const variants = [
   "full-width",
@@ -11,7 +9,7 @@ const variants = [
   "content-inset-1",
 ];
 
-interface SectionLayoutProps {
+type SectionLayoutProps = React.PropsWithChildren<{
   variant?:
     | "full-width"
     | "content-overflow-1"
@@ -26,7 +24,7 @@ interface SectionLayoutProps {
   backgroundColor?: string;
   className?: string;
   notAutoAllocateHeight?: boolean;
-}
+}>;
 
 const SectionLayout: React.FC<SectionLayoutProps> = ({
   variant = "content-default",
@@ -130,11 +128,13 @@ const SectionLayout: React.FC<SectionLayoutProps> = ({
   return (
     <Flex
       className={className}
-      width="100%"
       ref={parentFlexBox}
-      alignItems="center"
-      justifyContent="center"
-      height="100%"
+      style={{
+        width: "100%",
+        alignItems: "center",
+        justifyContent: "center",
+        height: "100%",
+      }}
     >
       {debug && (
         <Debug>
@@ -158,10 +158,14 @@ const SectionLayout: React.FC<SectionLayoutProps> = ({
         ref={childFlexBox}
         className={variant}
         bg={!debug ? backgroundColor : "rgba(83, 245, 255, 0.4)"}
-        width={getWidthUseVaraint()}
-        flexDirection="column"
-        alignItems={getAlignContent()}
-        style={getAbsoluteStyle()}
+        style={{
+          ...getAbsoluteStyle(),
+          flexDirection: "column",
+          alignItems: getAlignContent(),
+        }}
+        sx={{
+          width: getWidthUseVaraint(),
+        }}
       >
         {children}
       </Flex>

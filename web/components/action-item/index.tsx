@@ -5,7 +5,6 @@ import React from "react";
 
 import Icon from "components/icon";
 import { media } from "utils/styled/media";
-import { ThemeInterface } from "utils/styled/theme";
 
 const Colors = {
   light: {
@@ -67,7 +66,7 @@ const Text = styled(motion.span)<{ color: string }>`
   display: flex;
   align-items: center;
 
-  ${props => media("0px", (props.theme as ThemeInterface).breakpoints[0])} {
+  ${props => media("0px", props.theme.breakpoints[0])} {
     font-size: 17px;
   }
 `;

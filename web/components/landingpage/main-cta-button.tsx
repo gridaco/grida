@@ -2,7 +2,7 @@ import styled from "@emotion/styled";
 import { motion } from "framer-motion";
 import { useRouter } from "next/router";
 import React from "react";
-import { Button, Box } from "rebass";
+import { Button, Box } from "theme-ui";
 
 import { useAuthState } from "utils/hooks/use-auth-state";
 import { URLS } from "utils/landingpage/constants";
@@ -36,7 +36,13 @@ export default function LandingMainCtaButton() {
 }
 
 const MainButton = styled(Button)`
+  cursor: pointer;
+  border-radius: 100px !important;
+  padding: 12px 28px !important;
+  font-weight: 500;
   font-size: 17.5px;
   line-height: 22px;
   letter-spacing: 0.02em;
+  background-color: ${p => p.theme.colors.primary};
+  box-shadow: 0px 4px 16px rgba(0, 0, 0, 0.12);
 `;

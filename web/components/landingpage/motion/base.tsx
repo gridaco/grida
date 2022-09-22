@@ -1,5 +1,5 @@
 import React from "react";
-import styled from '@emotion/styled';
+import styled from "@emotion/styled";
 
 // tripple click or above
 const TRIGGER_NEXT_MUTIPLE_CLICKS = 3;
@@ -32,4 +32,4 @@ export function MotionItemContainer(props: MotionItemContainerProps) {
 
 const Postioner = styled.div`
   margin-right: auto;
-`
+`;

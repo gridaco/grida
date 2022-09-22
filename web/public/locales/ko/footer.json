@@ -1,0 +1,38 @@
+{
+  "products": {
+    "label": "제품",
+    "code": "코드",
+    "cli": "커맨드 라인 인터페이스",
+    "cloud": "클라우드",
+    "globalization": "현지화",
+    "reflect-ui": "Reflect UI",
+    "vscode": "VSCode"
+  },
+  "solutions": {
+    "label": "솔루션",
+    "showcase": "쇼케이스",
+    "handoff": "핸드오프"
+  },
+  "resources": {
+    "label": "리소스",
+    "docs": "문서",
+    "api-docs": "API 문서",
+    "blogs": "블로그"
+  },
+  "platforms": {
+    "label": "플랫폼",
+    "react": "React",
+    "react-native": "React Native",
+    "flutter": "Flutter",
+    "vanilla": "HTML/CSS",
+    "reflect-ui": "Reflect UI"
+  },
+  "together": {
+    "label": "함께해요",
+    "github": "깃허브",
+    "projects": "프로젝트",
+    "support": "지원",
+    "slack": "슬랙에서 이야기 해요",
+    "reddit": "레딧"
+  }
+}

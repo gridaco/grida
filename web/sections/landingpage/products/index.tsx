@@ -1,16 +1,14 @@
 import styled from "@emotion/styled";
 import { motion } from "framer-motion";
-import SectionLayout from "layout/section";
-import Link from "next/link";
+import SectionLayout from "layouts/section";
 import React, { useState, useEffect, createRef } from "react";
 import ReactPlayer from "react-player";
-import { Flex, Heading, Text } from "rebass";
+import { Flex, Heading, Text } from "theme-ui";
 
 import BlankArea from "components/blank-area";
 import LandingpageText from "components/landingpage/text";
 import { PRODUCT_LIST } from "utils/landingpage/constants";
 import { media } from "utils/styled/media";
-import { ThemeInterface } from "utils/styled/theme";
 
 // region video framer motion values
 export const videoPlayerMotionAnimationVariants = {
@@ -109,7 +107,9 @@ const Products = () => {
         </Container>
       </SectionLayout>
       <VideoWrapper
-        width={["95%", "95%", "100%", "100%"]}
+        sx={{
+          width: ["95%", "95%", "100%", "100%"],
+        }}
         mt="50px"
         mx={["20px", "20px", 0, 0]}
       >
@@ -136,11 +136,15 @@ const Products = () => {
         </motion.div>
       </VideoWrapper>
       <SubTitle
-        fontSize={["18px", "32px", "32px", "32px"]}
+        sx={{
+          fontSize: ["18px", "32px", "32px", "32px"],
+        }}
         mt="40px"
-        fontWeight="600"
-        letterSpacing="0em"
-        style={{ maxWidth: "60%" }}
+        style={{
+          maxWidth: "60%",
+          fontWeight: "600",
+          letterSpacing: "0em",
+        }}
       >
         {PRODUCT_LIST[beforeClick].subTitle}
       </SubTitle>
@@ -175,7 +179,7 @@ const Products = () => {
 export default Products;
 
 export const SubTitle = styled(Heading)`
-  ${props => media("0px", (props.theme as ThemeInterface).breakpoints[0])} {
+  ${props => media("0px", props.theme.breakpoints[0])} {
     max-width: calc(100vw - 40px) !important;
   }
 `;
@@ -188,24 +192,16 @@ export const VideoWrapper = styled(Flex)`
     height: 100% !important;
   }
 
-  ${props => media("0px", (props.theme as ThemeInterface).breakpoints[0])} {
+  ${props => media("0px", props.theme.breakpoints[0])} {
     height: 100%;
     margin-left: 0px !important;
   }
 
-  ${props =>
-    media(
-      (props.theme as ThemeInterface).breakpoints[0],
-      (props.theme as ThemeInterface).breakpoints[1],
-    )} {
+  ${props => media(props.theme.breakpoints[0], props.theme.breakpoints[1])} {
     height: 500px;
   }
 
-  ${props =>
-    media(
-      (props.theme as ThemeInterface).breakpoints[1],
-      (props.theme as ThemeInterface).breakpoints[2],
-    )} {
+  ${props => media(props.theme.breakpoints[1], props.theme.breakpoints[2])} {
     height: 700px;
   }
 `;
@@ -214,7 +210,7 @@ export const Description = styled(LandingpageText)`
   max-width: 760px;
   margin-top: 32px;
 
-  ${props => media("0px", (props.theme as ThemeInterface).breakpoints[0])} {
+  ${props => media("0px", props.theme.breakpoints[0])} {
     max-width: 100%;
   }
 `;
@@ -259,7 +255,7 @@ export const RowFrame = styled(motion.div)`
   width: 80.5%;
   padding-bottom: 10px;
 
-  ${props => media("0px", (props.theme as ThemeInterface).breakpoints[2])} {
+  ${props => media("0px", props.theme.breakpoints[2])} {
     width: 95%;
   }
 
@@ -285,7 +281,7 @@ export const List = styled.span<{ gradient: string }>`
     padding-left: 0;
   }
 
-  ${props => media("0px", (props.theme as ThemeInterface).breakpoints[0])} {
+  ${props => media("0px", props.theme.breakpoints[0])} {
     margin-left: 35px;
     &:first-of-type {
       padding-left: 10px;
@@ -296,11 +292,7 @@ export const List = styled.span<{ gradient: string }>`
     }
   }
 
-  ${props =>
-    media(
-      (props.theme as ThemeInterface).breakpoints[0],
-      (props.theme as ThemeInterface).breakpoints[1],
-    )} {
+  ${props => media(props.theme.breakpoints[0], props.theme.breakpoints[1])} {
     &:first-of-type {
       padding-left: 1%;
     }

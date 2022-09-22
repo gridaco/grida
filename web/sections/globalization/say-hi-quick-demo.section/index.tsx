@@ -2,10 +2,10 @@ import ActionItem from "components/action-item";
 import LandingpageText from "components/landingpage/text";
 import React from "react";
 import Image from "next/image";
-import SectionLayout from "layout/section";
-import { Flex } from "rebass";
+import SectionLayout from "layouts/section";
 import styled from "@emotion/styled";
 import BlankArea from "components/blank-area";
+
 export default function GlobalizationQuickDemoSayHiSection() {
   return (
     <SectionLayout variant="content-default" alignContent="start">

@@ -7,7 +7,7 @@ import {
 } from "@design-sdk/figma-url/dist";
 import { event_cta__to_code } from "analytics";
 import React, { useCallback, useEffect, useState } from "react";
-import { Flex } from "rebass";
+import { Flex } from "theme-ui";
 
 import { usePopupContext } from "utils/context/PopupContext";
 import {
@@ -45,9 +45,11 @@ export function CtaArea({ mode }: { mode: CtaOrigin }) {
       title: "",
       element: (
         <Flex
-          width="calc(100vw - 40px)"
-          alignItems="center"
-          flexDirection="column"
+          style={{
+            width: "calc(100vw - 40px)",
+            alignItems: "center",
+            flexDirection: "column",
+          }}
           p="48px"
         >
           <ModalInvalidInputContentBody />
@@ -261,9 +263,11 @@ const FigmaAuthModal = ({ onNextClick }: { onNextClick: () => void }) => {
 
   return (
     <Flex
-      width="calc(100vw - 40px)"
-      alignItems="center"
-      flexDirection="column"
+      style={{
+        width: "calc(100vw - 40px)",
+        alignItems: "center",
+        flexDirection: "column",
+      }}
       p="48px"
     >
       {isFigmaAccessProvided ? (

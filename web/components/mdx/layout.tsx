@@ -1,3 +1,3 @@
-import SectionLayout from "layout/section";
+import SectionLayout from "layouts/section";
 
 export { SectionLayout };

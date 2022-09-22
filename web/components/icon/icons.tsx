@@ -6,7 +6,8 @@ interface IconListProps {
 
 export interface IconList {
   search: IconListProps;
-  bridged: IconListProps;
+  grida_black: IconListProps;
+  grida_white: IconListProps;
   youtube: IconListProps;
   instagram: IconListProps;
   twitter: IconListProps;
@@ -56,7 +57,7 @@ const icons: IconList = {
       </svg>
     ),
   },
-  bridged: {
+  grida_black: {
     width: 64,
     height: 64,
     svg: (
@@ -78,6 +79,32 @@ const icons: IconList = {
           clipRule="evenodd"
           d="M38.3364 15.3609C30.0295 16.2906 23.5716 23.3374 23.5716 31.8926L23.5716 39.8323L23.8552 57.1296L7.125 40.7775V23.3857V23.2912L7.12526 23.2914C7.17599 14.1472 14.6045 6.75 23.7607 6.75C30.0384 6.75 35.504 10.2273 38.3364 15.3609Z"
           fill="black"
+        />
+      </svg>
+    ),
+  },
+  grida_white: {
+    width: 64,
+    height: 64,
+    svg: (
+      <svg
+        width="64"
+        height="64"
+        viewBox="0 0 64 64"
+        fill="none"
+        xmlns="http://www.w3.org/2000/svg"
+      >
+        <path
+          fillRule="evenodd"
+          clipRule="evenodd"
+          d="M40.3016 23.3848L40.207 40.6821L56.9372 57.0342V40.0204V39.7369L56.9348 39.7345C56.7822 30.6788 49.3937 23.3848 40.3016 23.3848Z"
+          fill="white"
+        />
+        <path
+          fillRule="evenodd"
+          clipRule="evenodd"
+          d="M38.3364 15.3609C30.0295 16.2906 23.5716 23.3374 23.5716 31.8926L23.5716 39.8323L23.8552 57.1296L7.125 40.7775V23.3857V23.2912L7.12526 23.2914C7.17599 14.1472 14.6045 6.75 23.7607 6.75C30.0384 6.75 35.504 10.2273 38.3364 15.3609Z"
+          fill="white"
         />
       </svg>
     ),
@@ -528,7 +555,7 @@ const icons: IconList = {
             width="2640"
             height="2240"
             filterUnits="userSpaceOnUse"
-            color-interpolation-filters="sRGB"
+            colorInterpolationFilters="sRGB"
           >
             <feFlood floodOpacity="0" result="BackgroundImageFix" />
             <feBlend

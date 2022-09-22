@@ -2,7 +2,6 @@ import styled from "@emotion/styled";
 import React from "react";
 
 import { media } from "utils/styled/media";
-import { ThemeInterface } from "utils/styled/theme";
 
 const OnairButton = () => {
   return <Button style={{ letterSpacing: "0em" }}>ON AIR</Button>;
@@ -40,7 +39,7 @@ const Button = styled.button`
   font-size: 32px;
   font-weight: bold;
 
-  ${props => media((props.theme as ThemeInterface).breakpoints[0], null)} {
+  ${props => media(props.theme.breakpoints[0], null)} {
     margin-left: 20px;
     margin-top: 0px;
   }

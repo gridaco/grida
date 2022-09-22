@@ -1,3 +1,5 @@
+const with_react = require("./sidebar.with-react");
+
 const _flags_items = [
   {
     type: "category",
@@ -239,6 +241,7 @@ const sidebars = {
   flagsSidebar: flags,
   togetherSidebar: together,
   apiSidebar: api,
+  withReactSidebar: with_react,
 };
 
 module.exports = sidebars;

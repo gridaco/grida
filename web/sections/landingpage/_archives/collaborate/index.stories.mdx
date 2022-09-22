@@ -1,7 +1,7 @@
 import { Meta, Story, Preview, Props } from "@storybook/addon-docs/blocks";
 import { Description } from "./storybook-style";
 import LandingpageText from "components/landingpage/text";
-import { Flex, Heading, Text } from "rebass";
+import { Flex } from "theme-ui";
 
 <Meta title="section/collaborate" />
 
@@ -15,7 +15,9 @@ section-layout
       <Flex
         mt="20px"
         mx="20px"
-        flexDirection={["column", "column", "row", "row"]}
+        sx={{
+          flexDirection: ["column", "column", "row", "row"]
+        }}
       >
         <SyncIcon name="loading" mr="20px" />
         <LandingpageText variant="h2">
@@ -30,7 +32,7 @@ section-layout
         the time you’ve spent repeating    yourself.
         </Description>
        </Flex>
-      
+
     </div>
   </Story>
 </Preview>

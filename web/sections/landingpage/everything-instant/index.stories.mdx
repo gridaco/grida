@@ -1,0 +1,42 @@
+import { Meta, Story, Preview, Props } from "@storybook/addon-docs/blocks";
+import { Description } from "./storybook-style";
+import { Title } from "./design-code";
+import DesignPlatforms from "layouts/landingpage/design-platforms";
+import { DesktopView, MobileView } from "utils/styled/styles";
+import Image from "next/image";
+import ApplicationPreview from "layouts/landingpage/application-preview";
+import OnairButton from "components/landingpage/effect/onair-button";
+
+
+<Meta title="section/online-app" />
+
+# Preview
+
+<Preview>
+  <Story name="design-code">
+    <div>
+      <Title variant="h2">
+        Designs, <br />
+        come to live.
+      </Title>
+      <Description variant="body1">
+        Keep your design live. Not as a prototype, but as a ready product.
+        Instantly convert your design to code, prototype and product within a
+        click. No coding required.
+      </Description>
+    </div>
+  </Story>
+  <Story name="desktop">
+    <div>
+      <Flex flexDirection="column" width="100%" mr="40px">
+        <Text fontSize="24px" mb="15px" letterSpacing="0em">
+          What you’ve just sketched?
+        </Text>
+        <OnlineTitle variant="h4">
+          <span style={{ letterSpacing: "0em" }}>That just got</span>
+        <OnairButton />
+        </OnlineTitle>
+      </Flex>
+    </div>
+  </Story>
+</Preview>

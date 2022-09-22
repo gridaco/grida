@@ -1,0 +1,75 @@
+@font-face {
+  font-family: "Helvetica Neue";
+  font-weight: 400;
+  src: url("/fonts/HelveticaNeue-Regular.ttf") format("truetype");
+}
+
+@font-face {
+  font-family: "Helvetica Neue";
+  font-weight: 500;
+  src: url("/fonts/HelveticaNeue-Medium.ttf") format("truetype");
+}
+
+@font-face {
+  font-family: "Helvetica Neue";
+  font-weight: 600;
+  src: url("/fonts/HelveticaNeue-Bold.ttf") format("truetype");
+}
+
+@font-face {
+  font-family: "codicon";
+  font-weight: 600;
+  src: url("/fonts/codicon.ttf") format("truetype");
+}
+
+html,
+body {
+  padding: 0;
+  margin: 0;
+  word-break: keep-all;
+  min-height: 100vh;
+  overflow-x: hidden;
+  scroll-behavior: smooth;
+  @media (prefers-reduced-motion: reduce) {
+    scroll-behavior: auto;
+  }
+}
+
+.cursor {
+  cursor: pointer;
+}
+
+.no-drag {
+  user-select: none;
+}
+
+input {
+  box-sizing: border-box;
+}
+
+a {
+  text-decoration: none;
+  color: inherit;
+}
+
+p {
+  margin-block-start: 0.3em;
+  margin-block-end: 0.3em;
+}
+
+body,
+button,
+input,
+textarea,
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-family: "Helvetica Neue", sans-serif !important;
+}
+
+button {
+  outline: none;
+}
