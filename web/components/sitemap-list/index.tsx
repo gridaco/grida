@@ -5,6 +5,7 @@ import { Flex, Text } from "theme-ui";
 
 import { Sitemap } from "components/footer/sitemap";
 import { useTheme } from "@emotion/react";
+import { useTranslation } from "next-i18next";
 
 interface SitemapListProps {
   sitemap: Sitemap;
@@ -14,6 +15,7 @@ const SitemapList: React.FC<SitemapListProps> = ({ sitemap }) => {
   const { label, href, child } = sitemap;
 
   const theme = useTheme();
+  const { t } = useTranslation("footer");
 
   const Header = () => {
     const HeaderText = (
@@ -27,7 +29,7 @@ const SitemapList: React.FC<SitemapListProps> = ({ sitemap }) => {
           letterSpacing: "0em",
         }}
       >
-        {label}
+        {t(label)}
       </Text>
     );
     return href ? <Link href={href}>{HeaderText}</Link> : HeaderText;
@@ -56,7 +58,7 @@ const SitemapList: React.FC<SitemapListProps> = ({ sitemap }) => {
               fontWeight: 400,
             }}
           >
-            {i.label}
+            {t(i.label)}
           </Text>
         </Link>
       ))}

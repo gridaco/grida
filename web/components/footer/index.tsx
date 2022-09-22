@@ -91,10 +91,10 @@ const Footer = () => {
           <Text>Copyright © {new Date().getFullYear()} Grida.co</Text>
           <Flex className="policys">
             <Link href={URLS.landing.cookies_policy}>
-              <span className="cursor">Cookies</span>
+              <span className="cursor">{t("cookie-policy")}</span>
             </Link>
             <Link href={URLS.landing.privacy_policy}>
-              <span className="cursor">Privacy policy</span>
+              <span className="cursor">{t("privacy-policy")}</span>
             </Link>
             <Link href={URLS.landing.terms_and_conditions}>
               <span className="cursor">{t("terms-and-conditions")}</span>

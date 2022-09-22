@@ -6,48 +6,48 @@ export type Sitemap = {
 };
 
 export const Products: Sitemap = {
-  label: "Products",
+  label: "products.label",
   child: [
     {
-      label: "Code",
+      label: "products.code",
       href: "https://code.grida.co",
     },
     {
-      label: "Assistant",
+      label: "products.assistant",
       href: "/assistant",
     },
     {
-      label: "CLI",
+      label: "products.cli",
       href: "/cli",
     },
     {
-      label: "Cloud",
+      label: "products.cloud",
       href: "/cloud",
     },
     {
-      label: "Globalization",
+      label: "products.globalization",
       href: "/globalization",
     },
     {
-      label: "Reflect UI",
+      label: "products.reflect-ui",
       href: "https://reflect-ui.com",
     },
     {
-      label: "VSCode",
+      label: "products.vscode",
       href: "/vscode",
     },
   ],
 };
 
 export const Solutions: Sitemap = {
-  label: "Solutions",
+  label: "solutions.label",
   child: [
     {
-      label: "Showcase",
+      label: "solutions.showcase",
       href: "/showcase",
     },
     {
-      label: "Handoff",
+      label: "solutions.handoff",
       href: "/handoff",
     },
     // {
@@ -58,36 +58,32 @@ export const Solutions: Sitemap = {
 };
 
 export const Resources: Sitemap = {
-  label: "Resources",
+  label: "resources.label",
   child: [
     {
-      label: "Gettiing Started",
+      label: "Getting Started",
       href: "/docs/getting-started/intro",
     },
     {
-      label: "Docs",
+      label: "resources.docs",
       href: "/docs",
     },
     {
-      label: "API Docs",
+      label: "resources.api-docs",
       href: "/docs/api",
     },
     {
-      label: "Papers",
-      href: "/resources/papers",
-    },
-    {
-      label: "Blogs",
+      label: "resources.blogs",
       href: "https://medium.com/bridgedxyz",
     },
   ],
 };
 
 export const Platforms: Sitemap = {
-  label: "Platforms",
+  label: "platforms.label",
   child: [
     {
-      label: "Figma",
+      label: "platforms.figma",
       href: "/docs/getting-started/intro",
     },
     // {
@@ -99,16 +95,16 @@ export const Platforms: Sitemap = {
     //   href: "/adobe-xd",
     // },
     {
-      label: "React",
+      label: "platforms.react",
       href: "/docs/with-react",
     },
     {
-      label: "React Native",
+      label: "platforms.react-native",
       badge: "beta",
       href: "/docs/with-react-native",
     },
     {
-      label: "Flutter",
+      label: "platforms.flutter",
       href: "/docs/with-flutter",
     },
     // {
@@ -122,11 +118,11 @@ export const Platforms: Sitemap = {
     //   href: "/svelte",
     // },
     {
-      label: "HTML/CSS",
+      label: "platforms.vanilla",
       href: "/docs/with-vanilla",
     },
     {
-      label: "Reflect UI",
+      label: "platforms.reflect-ui",
       badge: "alpha",
       href: "https://reflect-ui.com/",
     },
@@ -134,23 +130,23 @@ export const Platforms: Sitemap = {
 };
 
 export const Together: Sitemap = {
-  label: "Together",
+  label: "together.label",
   href: "/docs/together/contributing",
   child: [
     {
-      label: "Github",
+      label: "together.github",
       href: "https://github.com/gridaco",
     },
     {
-      label: "Projects",
+      label: "together.projects",
       href: "/docs/together/projects",
     },
     {
-      label: "Support",
+      label: "together.support",
       href: "/docs/together/support",
     },
     {
-      label: "Join us on Slack",
+      label: "together.slack",
       href: "https://grida.co/join-slack",
     },
     // {
@@ -159,7 +155,7 @@ export const Together: Sitemap = {
     //     "https://together.bridged.xyz/Bridged-Meetups-e28469913e35444d80d29921559fe7ff",
     // },
     {
-      label: "Reddit",
+      label: "together.reddit",
       href: "https://www.reddit.com/r/gridaco/",
     },
   ],
