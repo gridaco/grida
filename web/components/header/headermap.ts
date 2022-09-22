@@ -268,7 +268,7 @@ export const HeaderMap: Sitemap = [
   // },
   {
     type: "group",
-    label: "Products",
+    label: "products",
     // href: "/products",
     children: [
       // {
@@ -280,16 +280,16 @@ export const HeaderMap: Sitemap = [
       // },
       {
         type: "link",
-        label: "Code",
+        label: "header:products.code.label",
         href: "/code",
-        tagline: "Figma to Code",
+        tagline: "header:products.code.tagline",
         layout: "product-item",
       },
       {
         type: "link",
-        label: "Figma Assistant",
+        label: "header:products.assistant.label",
         href: "/assistant",
-        tagline: "All-in-one Figma plugin",
+        tagline: "header:products.assistant.tagline",
         layout: "product-item",
       },
       // {
@@ -319,61 +319,61 @@ export const HeaderMap: Sitemap = [
       // },
       {
         type: "link",
-        label: "VSCode Extension",
+        label: "header:products.vscode.label",
         href: "/vscode",
-        tagline: "Copilot + Design knowledge",
+        tagline: "header:products.vscode.tagline",
         layout: "product-item",
       },
       {
         type: "link",
-        label: "CLI / API",
+        label: "header:products.cli.label",
         href: "/cli",
-        tagline: "Import your design as a module",
+        tagline: "header:products.cli.tagline",
         layout: "product-item",
       },
     ],
   },
   {
     type: "link",
-    label: "Docs",
+    label: "docs",
     href: "/docs",
   },
   {
     type: "group",
-    label: "Frameworks",
+    label: "frameworks",
     children: Frameworks,
   },
   {
     type: "group",
-    label: "Resources",
+    label: "resources",
     children: [
       {
         type: "link",
-        label: "Github",
+        label: "github",
         href: URLS.social.github,
         layout: "line-item",
       },
       {
         type: "link",
-        label: "Join Slack Community",
+        label: "header:resources.join-slack",
         href: "https://grida.co/join-slack",
         layout: "line-item",
       },
       {
         type: "link",
-        label: "Blog",
+        label: "blog",
         href: URLS.social.medium,
         layout: "line-item",
       },
       {
         type: "link",
-        label: "Contact Sales",
+        label: "contact-sales",
         href: "/contact/sales",
         layout: "line-item",
       },
       {
         type: "link",
-        label: "Projects",
+        label: "projects",
         href: "/docs/together/projects",
         layout: "line-item",
       },
@@ -409,7 +409,7 @@ export const HeaderMap: Sitemap = [
       // },
       {
         type: "link",
-        label: "Jobs",
+        label: "careers",
         href: "/careers",
         layout: "line-item",
       },
@@ -417,7 +417,7 @@ export const HeaderMap: Sitemap = [
   },
   {
     type: "link",
-    label: "Pricing",
+    label: "pricing",
     href: "/pricing",
   },
 ];

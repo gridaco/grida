@@ -1,4 +1,5 @@
 import styled from "@emotion/styled";
+import { useTranslation } from "next-i18next";
 import React, { useCallback } from "react";
 import { Flex } from "theme-ui";
 
@@ -18,6 +19,8 @@ function HoverMenu({
   onExit: () => void;
   type: "mobile" | "desktop";
 }) {
+  const { t } = useTranslation(["common", "header"]);
+
   const close = useCallback(() => {
     onExit();
   }, []);
@@ -43,6 +46,7 @@ function HoverMenu({
                 }}
               >
                 {item.children.map((i, index) => {
+                  const label = t(i.label);
                   switch (i.layout) {
                     case "module-group": {
                       return <ModuleGroup key={index} {...i} />;
@@ -51,7 +55,7 @@ function HoverMenu({
                       return (
                         <ModuleItem
                           key={index}
-                          label={i.label}
+                          label={label}
                           icon={i.icon}
                           href={i.href}
                         />
@@ -60,14 +64,14 @@ function HoverMenu({
                       return (
                         <ProductItem
                           key={index}
-                          label={i.label}
+                          label={label}
                           href={i.href}
-                          tagline={i.tagline}
+                          tagline={t(i.tagline)}
                         />
                       );
                     case "line-item":
                     default:
-                      return <LineItem key={index} {...i} />;
+                      return <LineItem key={index} {...i} label={label} />;
                   }
                 })}
               </ExpandHeaderContent>

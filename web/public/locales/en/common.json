@@ -1,5 +1,8 @@
 {
+  "blog": "Blog",
   "copied-to-clipboard": "Copied to clipboard",
+  "contact-sales": "Contact Sales",
+  "careers": "Careers",
   "replay": "replay",
   "sign-up": "Sign up",
   "sign-in": "Sign in",
@@ -7,5 +10,7 @@
   "products": "Products",
   "frameworks": "Frameworks",
   "resources": "Resources",
-  "pricing": "Pricing"
+  "pricing": "Pricing",
+  "projects": "Projects",
+  "github": "GitHub"
 }
