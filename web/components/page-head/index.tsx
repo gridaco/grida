@@ -49,6 +49,8 @@ export default function PageHead({
 function PageHeadByName({ page }: { page: string }) {
   const { t, i18n } = useTranslation(`page-${page}`);
 
+  const _path = page === "index" ? "" : page; // '/*' - '/', '/route'
+
   return (
     <Head>
       <title>{t("title")}</title>
@@ -66,8 +68,8 @@ function PageHeadByName({ page }: { page: string }) {
             hrefLang={locale}
             href={
               locale === config.defaultLocale
-                ? `https://grida.co/${page}`
-                : `https://grida.co/${locale}/${page}`
+                ? `https://grida.co/${_path}`
+                : `https://grida.co/${locale}/${_path}`
             }
           />
         ))}
