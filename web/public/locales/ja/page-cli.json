@@ -1,0 +1,32 @@
+{
+  "title": "Grida CLI",
+  "description": "Grida CLI は、皆さんのピグマデザインを既存のコードベースに直接接続できるようにサポートします。",
+  "keywords": "figma, grida ,cli ,command line interface, figma cli, figma to code, figma handoff cli, zeplin cli",
+  "cta-start": "始める",
+  "cta-command": "npx grida init",
+  "cta-docs": "文書を見る",
+  "section/hero": {
+    "tagline": "_ Grida CLI // ベータ",
+    "heading": "デザインのための<span class='mono'>CI</span>",
+    "description": "Grida CLI を通じてデザインから直接コードを生成し、作業スペースにすぐに追加してみてください。 もう、デザインをパッケージのようにお使いください。"
+  },
+  "section/command": {
+    "heading": "デザインをモジュールにインポートするまで、コマンド1つで可能です。",
+    "tagline": "指揮者になってください。",
+    "description": "まるでよく組まれたライブラリーのように、皆さんのデザインをインポートして使用してください。<br/>ディテールはこちらで取ります。 // 皆さんはオーケストラを演奏してください。"
+  },
+  "section/config": {
+    "heading": "どんなモジュールを使っても。",
+    "description": "grida.confg.jsでカスタムに設定できます。 プラグインを使用したり、結果物のコードスタイルをASTレベルでまでユーザー定義することができます。",
+    "features": [
+      "ローカルで実行され、安全です。",
+      "ゼロ-ディペンダントッシュとして使用可能です",
+      "svelte と互換",
+      "solid-js と互換",
+      "vanilla html/css と互換",
+      "react & react-native と互換",
+      "flutter と互換"
+    ]
+  },
+  "this-page-was-made-with-grida-cli": "このページは grida CLI を通じて7分以内に作られました。<br/>NextJS と @emotion/styled を使用"
+}

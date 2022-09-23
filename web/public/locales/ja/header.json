@@ -1,0 +1,24 @@
+{
+  "cta-go-to-app": "アプリへ",
+  "products": {
+    "code": {
+      "label": "コード",
+      "tagline": "Figma to Code"
+    },
+    "assistant": {
+      "label": "アシスタント",
+      "tagline": "すべてのFigmaプラグインを一つに"
+    },
+    "vscode": {
+      "label": "VSCode Extension",
+      "tagline": "あなたのデザインを理解するコパイルロッ"
+    },
+    "cli": {
+      "label": "CLI / API",
+      "tagline": "デザインをモジュールのようにインポート"
+    }
+  },
+  "resources": {
+    "join-slack": "Slackコミュニティに参加"
+  }
+}
