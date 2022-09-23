@@ -19,9 +19,14 @@ export default function Document(props) {
           href="https://fonts.gstatic.com"
           crossOrigin=""
         />
-        {/* Nanum Pen Script, Roboto Mono, Inter */}
+        {/* (en) Nanum Pen Script (+ ko), Roboto Mono, Inter */}
         <link
           href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Nanum+Pen+Script&family=Roboto+Mono:wght@400;500;600;700&display=swap"
+          rel="stylesheet"
+        />
+        {/* (ja) Hachi Maru Pop */}
+        <link
+          href="https://fonts.googleapis.com/css2?family=Hachi+Maru+Pop&display=swap"
           rel="stylesheet"
         />
         {/* endregion */}

@@ -9,9 +9,10 @@ import { CtaArea } from "../shared-cta-tocode";
 import { useTranslation } from "next-i18next";
 
 export default function SectionCtaLastSeeTheMagicScaffold() {
-  const { t } = useTranslation("page-index", {
+  const { t, i18n } = useTranslation("page-index", {
     keyPrefix: "section/see-the-magic",
   });
+
   return (
     <Wrapper>
       <TextArea>
@@ -21,7 +22,15 @@ export default function SectionCtaLastSeeTheMagicScaffold() {
       <ActionArea>
         <ScribbleGuideContainer>
           <ScribbleGuide>
-            <ScribbleText>{t("cta-paste-link")}</ScribbleText>
+            <ScribbleText
+              fontFamily={
+                i18n.language === "ja"
+                  ? `"Hachi Maru Pop"`
+                  : `"Nanum Pen Script", cursive`
+              }
+            >
+              {t("cta-paste-link")}
+            </ScribbleText>
             <Pointer />
           </ScribbleGuide>
           <Spacer></Spacer>
@@ -263,11 +272,12 @@ const ScribbleGuide = styled.div`
   box-sizing: border-box;
 `;
 
-const ScribbleText = styled.span`
+const ScribbleText = styled.span<{ fontFamily: string }>`
   color: rgba(164, 164, 164, 1);
   text-overflow: ellipsis;
+  word-break: keep-all;
   font-size: 24px;
-  font-family: "Nanum Pen Script", cursive;
+  font-family: ${props => props.fontFamily};
   font-weight: 400;
   line-height: 98%;
   text-align: left;

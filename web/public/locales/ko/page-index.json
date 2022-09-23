@@ -4,7 +4,7 @@
     "p": "Grida 는 앱개발을 위한 오픈소스 플렛폼으로, 여러분의 피그마 디자인을 개발자 친화적인 코드로 변환합니다."
   },
   "section/run-anywhere": {
-    "heading": "디자은 한번만, 실행은 어디에서나"
+    "heading": "디자인은 한번만, 실행은 어디에서나"
   },
   "section/instant": {
     "heading": "눈 깜짝할 사이에",
@@ -24,7 +24,7 @@
   "section/final-cta": {
     "heading": {
       "focus": "본질에만 집중하세요",
-      "do-the-rest": "가 나머지를 할께요"
+      "do-the-rest": "가 나머지를 할게요"
     }
   },
   "demo-cta-input": {
