@@ -140,7 +140,7 @@ const Header = () => {
             p={["6px 10px", "6px 10px", "9px 20px", "9px 20px"]}
             variant="noShadow"
           >
-            {auth == "signedin" ? t("cta-go-to-app") : "Sign up"}
+            {auth == "signedin" ? t("cta-go-to-app") : t("common:sign-up")}
           </SignupButton>
         </Flex>
 
