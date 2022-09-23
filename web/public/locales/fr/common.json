@@ -1,4 +1,5 @@
 {
+  "ok": "OK",
   "blog": "Blog",
   "copied-to-clipboard": "Copié dans le clipboard.",
   "contact-sales": "Contact Ventes",
@@ -12,5 +13,9 @@
   "resources": "Ressources",
   "pricing": "Tarification",
   "projects": "Projets",
-  "github": "GitHub"
+  "github": "GitHub",
+  "start-now": "Commencer maintenant",
+  "learn-more": "En savoir plus",
+  "accept": "Accepter",
+  "cookies": "Cookies"
 }

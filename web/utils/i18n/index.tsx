@@ -6,6 +6,7 @@ export async function getPageTranslations(locale: string, page?: string) {
     [
       //
       "common",
+      "app",
       "header",
       "footer",
       page ? `page-${page}` : undefined,

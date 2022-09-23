@@ -1,4 +1,5 @@
 {
+  "ok": "확인",
   "blog": "블로그",
   "copied-to-clipboard": "복사됨",
   "contact-sales": "컨택세일즈",
@@ -13,5 +14,8 @@
   "pricing": "요금제",
   "projects": "프로젝트",
   "github": "깃허브",
-  "start-now": "지금 시작하기"
+  "start-now": "지금 시작하기",
+  "learn-more": "더 알아보기",
+  "accept": "수락",
+  "cookies": "쿠키"
 }

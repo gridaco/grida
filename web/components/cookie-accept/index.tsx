@@ -6,6 +6,7 @@ import SectionLayout from "layouts/section";
 import { useWindowWidth } from "utils/hooks/use-window-width";
 import { LandingpageUrls } from "utils/landingpage/constants";
 import { breakpoints } from "theme/shared";
+import { useTranslation } from "next-i18next";
 
 function replaceStylePxToNumber(stylePx: string) {
   return parseInt(stylePx.replace("px", ""));
@@ -16,6 +17,11 @@ interface CookieAcceptProps {
 }
 
 const CookieAccept: React.FC<CookieAcceptProps> = ({ accpetCookie }) => {
+  const { t: tc } = useTranslation("common");
+  const { t } = useTranslation(["app", "common"], {
+    keyPrefix: "cookie-consent",
+  });
+
   const width = useWindowWidth();
 
   return (
@@ -24,6 +30,7 @@ const CookieAccept: React.FC<CookieAcceptProps> = ({ accpetCookie }) => {
         <Flex
           style={{
             width: "100%",
+            gap: 12,
             justifyContent: "space-between",
             alignItems: "center",
           }}
@@ -31,24 +38,29 @@ const CookieAccept: React.FC<CookieAcceptProps> = ({ accpetCookie }) => {
           <Flex style={{ flexDirection: "column" }}>
             {width < replaceStylePxToNumber(breakpoints[0]) ? (
               <Title>
-                We use{" "}
-                <Link href={LandingpageUrls.cookies_policy}>cookies</Link> for
-                better website experience
+                {t("mobile.we-use")}{" "}
+                <Link href={LandingpageUrls.cookies_policy}>
+                  <a className="lowercase">{tc("cookies")}</a>
+                </Link>{" "}
+                {t("mobile.for")}
               </Title>
             ) : (
-              <Title>We use cookies</Title>
+              <Title>{t("heading")}</Title>
             )}
             {width > replaceStylePxToNumber(breakpoints[0]) && (
               <Desc>
-                Grida collects cookies for handling signin, analysing our
-                traffic and making website usage faster.
-                <Link href={LandingpageUrls.cookies_policy}>Learn more</Link>
+                {t("p")}
+                <Link href={LandingpageUrls.cookies_policy}>
+                  {tc("learn-more")}
+                </Link>
               </Desc>
             )}
           </Flex>
 
           <Button className="cursor" onClick={() => accpetCookie()}>
-            {width < replaceStylePxToNumber(breakpoints[0]) ? "OK" : "Accept"}
+            {width < replaceStylePxToNumber(breakpoints[0])
+              ? tc("ok")
+              : tc("accept")}
           </Button>
         </Flex>
       </SectionLayout>

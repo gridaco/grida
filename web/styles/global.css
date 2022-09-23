@@ -42,6 +42,10 @@ body {
   user-select: none;
 }
 
+.lowercase {
+  text-transform: lowercase;
+}
+
 input {
   box-sizing: border-box;
 }

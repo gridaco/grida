@@ -1,4 +1,5 @@
 {
+  "ok": "OK",
   "blog": "Blog",
   "copied-to-clipboard": "Copied to clipboard",
   "contact-sales": "Contact Sales",
@@ -13,5 +14,8 @@
   "pricing": "Pricing",
   "projects": "Projects",
   "github": "GitHub",
-  "start-now": "Start now"
+  "start-now": "Start now",
+  "learn-more": "Learn more",
+  "accept": "Accept",
+  "cookies": "Cookies"
 }

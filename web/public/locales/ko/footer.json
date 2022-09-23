@@ -2,7 +2,7 @@
   "products": {
     "label": "제품",
     "code": "코드",
-    "cli": "커맨드 라인 인터페이스",
+    "cli": "CLI",
     "cloud": "클라우드",
     "globalization": "현지화",
     "reflect-ui": "Reflect UI",
