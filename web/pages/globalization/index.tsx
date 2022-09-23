@@ -1,6 +1,7 @@
 import PageHead from "components/page-head";
 import React from "react";
 import Sections from "sections/globalization";
+import { getPageTranslations } from "utils/i18n";
 import PAGES from "utils/seo/pages";
 
 export default function GlobalizationPage() {
@@ -15,4 +16,12 @@ export default function GlobalizationPage() {
       <Sections.CTA />
     </div>
   );
+}
+
+export async function getStaticProps({ locale }) {
+  return {
+    props: {
+      ...(await getPageTranslations(locale)),
+    },
+  };
 }
