@@ -1,5 +1,6 @@
 import styled from "@emotion/styled";
 import Image from "next/image";
+import Link from "next/link";
 import React from "react";
 
 import { GroupEntity } from "../headermap";
@@ -49,36 +50,37 @@ export function ModuleItem({
   const [hovering, setHovering] = React.useState(false);
 
   return (
-    <Wrapper
-      href={href}
-      onMouseEnter={() => setHovering(true)}
-      onMouseLeave={() => setHovering(false)}
-    >
-      <IconSet>
-        <Icon opacity={0.8} data-hidden={hovering}>
-          <Image
-            priority
-            width={21}
-            height={21}
-            src={icon + "/black.svg"}
-            alt={label}
-          />
-        </Icon>
-        <Icon opacity={1} data-hidden={!hovering}>
-          <Image
-            width={21}
-            height={21}
-            src={icon + "/default.svg"}
-            alt={label}
-          />
-        </Icon>
-      </IconSet>
-      <Name>{label}</Name>
-    </Wrapper>
+    <Link href={href}>
+      <Wrapper
+        onMouseEnter={() => setHovering(true)}
+        onMouseLeave={() => setHovering(false)}
+      >
+        <IconSet>
+          <Icon opacity={0.8} data-hidden={hovering}>
+            <Image
+              priority
+              width={21}
+              height={21}
+              src={icon + "/black.svg"}
+              alt={label}
+            />
+          </Icon>
+          <Icon opacity={1} data-hidden={!hovering}>
+            <Image
+              width={21}
+              height={21}
+              src={icon + "/default.svg"}
+              alt={label}
+            />
+          </Icon>
+        </IconSet>
+        <Name>{label}</Name>
+      </Wrapper>
+    </Link>
   );
 }
 
-const Wrapper = styled.a`
+const Wrapper = styled.div`
   min-width: 200px;
   width: fit-content;
   padding: 8px;

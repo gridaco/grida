@@ -2,6 +2,7 @@ import Head from "next/head";
 import Script from "next/script";
 import React from "react";
 import { Widget } from "@typeform/embed-react";
+import { getPageTranslations } from "utils/i18n";
 
 export default function ContactSalesPage() {
   return (
@@ -20,4 +21,12 @@ export default function ContactSalesPage() {
       />
     </>
   );
+}
+
+export async function getStaticProps({ locale }) {
+  return {
+    props: {
+      ...(await getPageTranslations(locale)),
+    },
+  };
 }

@@ -34,7 +34,9 @@ export default function useOnScreen(
     }
     // Remove the observer as soon as the component is unmounted
     return () => {
-      observer.current.unobserve(ref.current);
+      try {
+        observer.current.unobserve(ref.current);
+      } catch (e) {}
     };
   }, [ref]);
 
