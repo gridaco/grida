@@ -7,6 +7,7 @@ import LandingpageText from "components/landingpage/text";
 import { breakpoints, BreakPoints } from "../_breakpoints";
 import { CtaArea } from "../shared-cta-tocode";
 import { useTranslation } from "next-i18next";
+import ClientOnly from "components/clientonly";
 
 export default function SectionCtaLastSeeTheMagicScaffold() {
   const { t, i18n } = useTranslation("page-index", {
@@ -60,13 +61,13 @@ const Pointer = () => {
       />
     );
     return (
-      <>
+      <ClientOnly>
         <BreakPoints.xl>{xl2sm}</BreakPoints.xl>
         <BreakPoints.lg>{xl2sm}</BreakPoints.lg>
         <BreakPoints.md>{xl2sm}</BreakPoints.md>
         <BreakPoints.sm>{xl2sm}</BreakPoints.sm>
         <BreakPoints.xs>{xs}</BreakPoints.xs>
-      </>
+      </ClientOnly>
     );
   };
 
