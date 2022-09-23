@@ -5,20 +5,23 @@ import React from "react";
 import LandingpageText from "components/landingpage/text";
 
 import { breakpoints, BreakPoints } from "../_breakpoints";
-import { contents } from "../k";
 import { CtaArea } from "../shared-cta-tocode";
+import { useTranslation } from "next-i18next";
 
 export default function SectionCtaLastSeeTheMagicScaffold() {
+  const { t } = useTranslation("page-index", {
+    keyPrefix: "section/see-the-magic",
+  });
   return (
     <Wrapper>
       <TextArea>
-        <Heading variant="h2">{contents.heading2_see_the_magic}</Heading>
-        <Desc variant="body1">{contents.p_see_the_magic_description}</Desc>
+        <Heading variant="h2">{t("heading")}</Heading>
+        <Desc variant="body1">{t("tagline")}</Desc>
       </TextArea>
       <ActionArea>
         <ScribbleGuideContainer>
           <ScribbleGuide>
-            <ScribbleText>Paste your figma design url.</ScribbleText>
+            <ScribbleText>{t("cta-paste-link")}</ScribbleText>
             <Pointer />
           </ScribbleGuide>
           <Spacer></Spacer>

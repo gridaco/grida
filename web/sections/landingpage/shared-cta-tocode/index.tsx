@@ -6,6 +6,7 @@ import {
   FigmaTargetNodeConfig,
 } from "@design-sdk/figma-url/dist";
 import { event_cta__to_code } from "analytics";
+import { useTranslation } from "next-i18next";
 import React, { useCallback, useEffect, useState } from "react";
 import { Flex } from "theme-ui";
 
@@ -34,6 +35,9 @@ import { ModalInvalidInputContentBody } from "./modal-content-invalid-input";
 type CtaOrigin = "hero-cta" | "footer-cta";
 
 export function CtaArea({ mode }: { mode: CtaOrigin }) {
+  const { t } = useTranslation("page-index", {
+    keyPrefix: "demo-cta-input",
+  });
   const inputRef = React.createRef<HTMLInputElement>();
 
   const [hasOngoingAuthProc, setHasOngoingAuthProc] = useState(false);
@@ -205,8 +209,11 @@ export function CtaArea({ mode }: { mode: CtaOrigin }) {
               ref={inputRef}
               onChange={onchange}
               onSubmit={onSubmit}
+              placeholder={t("placeholder")}
             />
-            <HeroPrimaryButton onClick={onSubmit} />
+            <HeroPrimaryButton onClick={onSubmit}>
+              {t("action")}
+            </HeroPrimaryButton>
           </HeroCtaContainer>
         </>
       );

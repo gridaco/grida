@@ -7,10 +7,13 @@ import { Flex } from "theme-ui";
 
 import BlankArea from "components/blank-area";
 import LandingpageText from "components/landingpage/text";
-import { k } from "sections";
 import { media } from "utils/styled/media";
+import { useTranslation } from "next-i18next";
 
 const DesignToCode = () => {
+  const { t } = useTranslation("page-index", {
+    keyPrefix: "section/instant",
+  });
   return (
     <SectionLayout alignContent="start" backgroundColor="rgba(0,0,0,0)">
       <Flex
@@ -27,10 +30,8 @@ const DesignToCode = () => {
             flexDirection: "column",
           }}
         >
-          <Title variant="h2">{k.contents.heading2_everything_instant}</Title>
-          <Description variant="body1">
-            {k.contents.p_everything_instant_description}
-          </Description>
+          <Title variant="h2">{t("heading")}</Title>
+          <Description variant="body1">{t("p")}</Description>
           <DesignPlatforms />
         </Flex>
         <Flex

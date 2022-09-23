@@ -11,15 +11,17 @@ import LandingpageText from "components/landingpage/text";
 import { LandingpageUrls } from "utils/landingpage/constants";
 import { media } from "utils/styled/media";
 import { DesktopView, MobileView } from "utils/styled/styles";
-
-import { contents } from "../k";
 import DesignToCode from "./design-code";
+import { useTranslation } from "next-i18next";
 
 interface OnlineAppProps {
   isMobile?: boolean;
 }
 
 const OnlineApp: React.FC<OnlineAppProps> = ({ isMobile }) => {
+  const { t } = useTranslation("page-index", {
+    keyPrefix: "section/figma-dedicated",
+  });
   const [assetUrl, setAssetUrl] = useState("/assets/gradient-bg.png");
 
   useEffect(() => {
@@ -59,7 +61,7 @@ const OnlineApp: React.FC<OnlineAppProps> = ({ isMobile }) => {
             What you’ve just sketched?
           </Text> */}
           <OnlineTitle variant="h4">
-            <span style={{ letterSpacing: "0em" }}>Less is more.</span>
+            <span style={{ letterSpacing: "0em" }}>{t("heading")}</span>
             {/* <OnairButton /> */}
           </OnlineTitle>
           <MobileView style={{ marginTop: 40, position: "relative" }}>
@@ -74,18 +76,14 @@ const OnlineApp: React.FC<OnlineAppProps> = ({ isMobile }) => {
               />
             </div>
           </MobileView>
-          <Description variant="body1">
-            {contents.p_figma_onair_description}
-          </Description>
-
+          <Description variant="body1">{t("p")}</Description>
           <BlankArea height={[48, 80]} />
-
           <ActionItem
-            label="How does Design to code work?"
+            label={t("cta-how-it-works")}
             href={LandingpageUrls.article_how_do_design_to_code_work}
           />
           <ActionItem
-            label="Try the demo"
+            label={t("cta-try-demo")}
             href={LandingpageUrls.try_the_demo_1}
           />
         </Flex>
