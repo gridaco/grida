@@ -135,40 +135,32 @@ const FooterContent = styled(Flex)`
 const FooterBottom = styled(Flex)`
   color: ${p => p.theme.footer.bottom.color};
   font-size: 14px;
+  flex-wrap: wrap;
   letter-spacing: 0em;
   font-weight: 400;
   ${props => media(null, props.theme.breakpoints[0])} {
     flex-direction: column;
 
-    .policys {
-      margin-top: 20px;
-      display: grid;
-      grid-template-rows: repeat(3, 20px);
-      grid-template-columns: repeat(2, 80px);
-      grid-template-areas:
-        "span span ."
-        "span . .";
+    gap: 20px;
 
+    .policys {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 16px;
       span {
-        margin-top: 10px;
         white-space: nowrap;
         margin-left: 0px !important;
-        margin-right: 16px;
       }
     }
   }
 
   .policys {
-    span {
-      margin-left: 16px;
-    }
+    gap: 16px;
   }
 
   .locales {
     gap: 8px;
     align-items: center;
-    justify-items: center;
-    justify-content: center;
     span {
       cursor: pointer;
       :hover {
