@@ -126,6 +126,8 @@ function WorldMap() {
   return (
     <img
       style={{
+        userSelect: "none",
+        pointerEvents: "none",
         display: "block",
         margin: "auto",
         transform: "translateY(80px) scale(150%)",

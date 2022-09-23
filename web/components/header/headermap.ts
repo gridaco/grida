@@ -13,6 +13,7 @@ export type LinkEntity = {
   type: "link";
   label: string;
   href: string;
+  locale?: string;
   tagline?: string;
   icon?: Icon;
   layout?: "module-item" | "product-item" | "line-item";

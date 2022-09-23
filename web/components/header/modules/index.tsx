@@ -1,4 +1,5 @@
 import styled from "@emotion/styled";
+import { LinkWithDocsFallback } from "components/fixme";
 import Image from "next/image";
 import Link from "next/link";
 import React from "react";
@@ -50,7 +51,7 @@ export function ModuleItem({
   const [hovering, setHovering] = React.useState(false);
 
   return (
-    <Link href={href}>
+    <LinkWithDocsFallback href={href}>
       <Wrapper
         onMouseEnter={() => setHovering(true)}
         onMouseLeave={() => setHovering(false)}
@@ -76,7 +77,7 @@ export function ModuleItem({
         </IconSet>
         <Name>{label}</Name>
       </Wrapper>
-    </Link>
+    </LinkWithDocsFallback>
   );
 }
 

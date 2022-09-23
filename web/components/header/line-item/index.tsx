@@ -1,14 +1,14 @@
 import styled from "@emotion/styled";
-import Link from "next/link";
+import { LinkWithDocsFallback } from "components/fixme";
 import React from "react";
 
 export function LineItem({ label, href }: { label: string; href: string }) {
   return (
-    <Link href={href}>
+    <LinkWithDocsFallback href={href}>
       <a>
         <Label>{label}</Label>
       </a>
-    </Link>
+    </LinkWithDocsFallback>
   );
 }
 

@@ -1,8 +1,8 @@
+import React from "react";
 import { event_click_footer_menu } from "analytics";
 import Link from "next/link";
-import React from "react";
+import { LinkWithDocsFallback } from "components/fixme";
 import { Flex, Text } from "theme-ui";
-
 import { Sitemap } from "components/footer/sitemap";
 import { useTheme } from "@emotion/react";
 import { useTranslation } from "next-i18next";
@@ -43,7 +43,7 @@ const SitemapList: React.FC<SitemapListProps> = ({ sitemap }) => {
     >
       <Header />
       {child.map(i => (
-        <Link href={i.href} key={i.label}>
+        <LinkWithDocsFallback href={i.href} key={i.label}>
           <Text
             onClick={() => {
               // log footer menu item click
@@ -60,7 +60,7 @@ const SitemapList: React.FC<SitemapListProps> = ({ sitemap }) => {
           >
             {t(i.label)}
           </Text>
-        </Link>
+        </LinkWithDocsFallback>
       ))}
     </Flex>
   );

@@ -15,6 +15,7 @@ import { GroupEntity, HeaderMap } from "./headermap";
 import HoverMenu from "./hover-menu";
 import { useTheme } from "@emotion/react";
 import { useTranslation } from "next-i18next";
+import { LinkWithDocsFallback } from "components/fixme";
 
 const Header = () => {
   const router = useRouter();
@@ -277,9 +278,9 @@ function Item({
   if (href) {
     return (
       <li style={{ listStyle: "none" }}>
-        <Link href={href}>
+        <LinkWithDocsFallback href={href}>
           <a>{content}</a>
-        </Link>
+        </LinkWithDocsFallback>
       </li>
     );
   } else {

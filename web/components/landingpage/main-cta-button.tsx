@@ -21,7 +21,10 @@ export default function LandingMainCtaButton() {
         router.push(URLS.landing.signup_with_return);
         break;
       case "signedin":
-        router.push("/docs");
+        router.push("/docs", "/docs", {
+          // TODO: disable explicit locale once docs locale resolution is fixed.
+          locale: "en",
+        });
         break;
     }
   };

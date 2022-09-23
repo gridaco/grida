@@ -106,13 +106,13 @@ const Footer = () => {
             </Link>
           </Flex>
           <Flex className="policys">
-            <Link href={URLS.landing.cookies_policy}>
+            <Link href={URLS.landing.cookies_policy} locale="en">
               <span className="cursor">{t("cookie-policy")}</span>
             </Link>
-            <Link href={URLS.landing.privacy_policy}>
+            <Link href={URLS.landing.privacy_policy} locale="en">
               <span className="cursor">{t("privacy-policy")}</span>
             </Link>
-            <Link href={URLS.landing.terms_and_conditions}>
+            <Link href={URLS.landing.terms_and_conditions} locale="en">
               <span className="cursor">{t("terms-and-conditions")}</span>
             </Link>
           </Flex>

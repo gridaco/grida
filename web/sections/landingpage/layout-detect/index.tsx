@@ -39,6 +39,9 @@ const LayoutDetect = () => {
       <BlankArea height={[33, 50]} />
       <ActionItem
         href={LandingpageUrls.article_how_engine_works}
+        as={LandingpageUrls.article_how_engine_works}
+        // TODO: disable explicit locale once docs locale resolution is fixed.
+        locale="en"
         label="Learn how the engine works"
       />
       <SectionLayout

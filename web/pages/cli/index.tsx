@@ -17,7 +17,10 @@ export default function Home() {
   const [copied, setCopied] = useState(false);
 
   const onstartclick = () => {
-    router.push("/docs/cli");
+    router.push("/docs/cli", "/docs/cli", {
+      // TODO: disable explicit locale once docs locale resolution is fixed.
+      locale: "en",
+    });
   };
 
   const oncopycommandclick = (t: string) => {
