@@ -8,9 +8,8 @@ import { SectionConfiguration } from "../../grida/section-configuration";
 import { SectionDemo } from "../../grida/section-demo";
 import { FooterCtaSection as SectionFooterCta } from "../../grida/section-footer-cta";
 import { SectionHero } from "../../grida/section-hero";
-
-import { serverSideTranslations } from "next-i18next/serverSideTranslations";
 import { useTranslation } from "next-i18next";
+import { getPageTranslations } from "utils/i18n";
 
 export default function Home() {
   const router = useRouter();
@@ -101,13 +100,7 @@ const MadeWithGridaFooterText = styled.a`
 export async function getStaticProps({ locale }) {
   return {
     props: {
-      ...(await serverSideTranslations(locale, [
-        "common",
-        "header",
-        "footer",
-        "page-cli",
-      ])),
-      // Will be passed to the page component as props
+      ...(await getPageTranslations(locale, "cli")),
     },
   };
 }

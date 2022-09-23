@@ -2,6 +2,7 @@ import { motion } from "framer-motion";
 import { NextPage, NextPageContext } from "next";
 import React, { useCallback, useState, useEffect } from "react";
 import { useCookies } from "react-cookie";
+import { getPageTranslations } from "utils/i18n";
 
 import CookieAccept from "components/cookie-accept";
 import Sections from "sections/landingpage";
@@ -68,8 +69,6 @@ const MainPage: NextPage<MainPageAppProps> = ({ isMobileView }) => {
   );
 };
 
-import { serverSideTranslations } from "next-i18next/serverSideTranslations";
-
 // MainPage.getInitialProps = async ({ req, locale }: NextPageContext) => {
 // let isMobileView = (req
 //   ? req.headers["user-agent"]
@@ -95,7 +94,7 @@ export async function getStaticProps({ req, locale }: NextPageContext) {
   return {
     props: {
       // isMobileView: Boolean(isMobileView),
-      ...(await serverSideTranslations(locale, ["footer"])),
+      ...(await getPageTranslations(locale, "index")),
     },
   };
 }
