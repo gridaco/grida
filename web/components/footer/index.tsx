@@ -12,6 +12,7 @@ import { media } from "utils/styled/media";
 import { Sitemap } from "./sitemap";
 import { useTheme } from "@emotion/react";
 import { useTranslation } from "next-i18next";
+import { useRouter } from "next/router";
 
 const iconList: Array<{
   icon: keyof IconList;
@@ -45,6 +46,7 @@ const iconList: Array<{
 
 const Footer = () => {
   const theme = useTheme();
+  const router = useRouter();
   const { t } = useTranslation("footer");
 
   return (
@@ -88,7 +90,21 @@ const Footer = () => {
           }}
           my="24px"
         >
-          <Text>Copyright © {new Date().getFullYear()} Grida.co</Text>
+          <Text>Copyright © {new Date().getFullYear()} Grida Inc.</Text>
+          <Flex className="locales">
+            <Link href={router.route} locale="en">
+              English
+            </Link>
+            <Link href={router.route} locale="ja">
+              日本語
+            </Link>
+            <Link href={router.route} locale="ko">
+              한국어
+            </Link>
+            <Link href={router.route} locale="fr">
+              Français
+            </Link>
+          </Flex>
           <Flex className="policys">
             <Link href={URLS.landing.cookies_policy}>
               <span className="cursor">{t("cookie-policy")}</span>
@@ -146,6 +162,20 @@ const FooterBottom = styled(Flex)`
     span {
       margin-left: 16px;
     }
+  }
+
+  .locales {
+    gap: 8px;
+    align-items: center;
+    justify-items: center;
+    justify-content: center;
+    span {
+      cursor: pointer;
+      :hover {
+        opacity: 0.9;
+      }
+    }
+    transition: all 0.2s ease-in-out;
   }
 `;
 
