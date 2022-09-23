@@ -80,7 +80,7 @@ const OnlineApp: React.FC<OnlineAppProps> = ({ isMobile }) => {
           <BlankArea height={[48, 80]} />
           <ActionItem
             label={t("cta-how-it-works")}
-            href={LandingpageUrls.article_how_do_design_to_code_work}
+            href={LandingpageUrls.try_with_cli}
           />
           <ActionItem
             label={t("cta-try-demo")}
