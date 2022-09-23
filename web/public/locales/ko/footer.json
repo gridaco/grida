@@ -2,7 +2,7 @@
   "products": {
     "label": "제품",
     "code": "코드",
-    "cli": "커맨드 라인 인터페이스",
+    "cli": "CLI",
     "cloud": "클라우드",
     "globalization": "현지화",
     "reflect-ui": "Reflect UI",
@@ -34,5 +34,8 @@
     "support": "지원",
     "slack": "슬랙에서 이야기 해요",
     "reddit": "레딧"
-  }
+  },
+  "cookie-policy": "쿠키 정책",
+  "privacy-policy": "개인정보 정책",
+  "terms-and-conditions": "이용약관"
 }

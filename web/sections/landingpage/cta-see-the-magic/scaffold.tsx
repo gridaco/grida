@@ -5,20 +5,33 @@ import React from "react";
 import LandingpageText from "components/landingpage/text";
 
 import { breakpoints, BreakPoints } from "../_breakpoints";
-import { contents } from "../k";
 import { CtaArea } from "../shared-cta-tocode";
+import { useTranslation } from "next-i18next";
+import ClientOnly from "components/clientonly";
 
 export default function SectionCtaLastSeeTheMagicScaffold() {
+  const { t, i18n } = useTranslation("page-index", {
+    keyPrefix: "section/see-the-magic",
+  });
+
   return (
     <Wrapper>
       <TextArea>
-        <Heading variant="h2">{contents.heading2_see_the_magic}</Heading>
-        <Desc variant="body1">{contents.p_see_the_magic_description}</Desc>
+        <Heading variant="h2">{t("heading")}</Heading>
+        <Desc variant="body1">{t("tagline")}</Desc>
       </TextArea>
       <ActionArea>
         <ScribbleGuideContainer>
           <ScribbleGuide>
-            <ScribbleText>Paste your figma design url.</ScribbleText>
+            <ScribbleText
+              fontFamily={
+                i18n.language === "ja"
+                  ? `"Hachi Maru Pop"`
+                  : `"Nanum Pen Script", cursive`
+              }
+            >
+              {t("cta-paste-link")}
+            </ScribbleText>
             <Pointer />
           </ScribbleGuide>
           <Spacer></Spacer>
@@ -48,13 +61,13 @@ const Pointer = () => {
       />
     );
     return (
-      <>
+      <ClientOnly>
         <BreakPoints.xl>{xl2sm}</BreakPoints.xl>
         <BreakPoints.lg>{xl2sm}</BreakPoints.lg>
         <BreakPoints.md>{xl2sm}</BreakPoints.md>
         <BreakPoints.sm>{xl2sm}</BreakPoints.sm>
         <BreakPoints.xs>{xs}</BreakPoints.xs>
-      </>
+      </ClientOnly>
     );
   };
 
@@ -260,11 +273,12 @@ const ScribbleGuide = styled.div`
   box-sizing: border-box;
 `;
 
-const ScribbleText = styled.span`
+const ScribbleText = styled.span<{ fontFamily: string }>`
   color: rgba(164, 164, 164, 1);
   text-overflow: ellipsis;
+  word-break: keep-all;
   font-size: 24px;
-  font-family: "Nanum Pen Script", cursive;
+  font-family: ${props => props.fontFamily};
   font-weight: 400;
   line-height: 98%;
   text-align: left;

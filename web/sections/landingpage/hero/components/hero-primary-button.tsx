@@ -1,10 +1,13 @@
 import styled from "@emotion/styled";
 import React from "react";
 
-export function HeroPrimaryButton({ onClick }: { onClick?: () => void }) {
+export function HeroPrimaryButton({
+  onClick,
+  children,
+}: React.PropsWithChildren<{ onClick?: () => void }>) {
   return (
     <Base onClick={onClick}>
-      <ToCode>To Code</ToCode>
+      <Label>{children}</Label>
     </Base>
   );
 }
@@ -28,7 +31,7 @@ const Base = styled.button`
   }
 `;
 
-const ToCode = styled.span`
+const Label = styled.span`
   color: rgba(255, 255, 255, 1);
   text-overflow: ellipsis;
   font-size: 18px;

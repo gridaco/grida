@@ -1,5 +1,6 @@
 import styled from "@emotion/styled";
 import { motion } from "framer-motion";
+import { useTranslation } from "next-i18next";
 import { useRouter } from "next/router";
 import React from "react";
 import { Button, Box } from "theme-ui";
@@ -8,6 +9,7 @@ import { useAuthState } from "utils/hooks/use-auth-state";
 import { URLS } from "utils/landingpage/constants";
 
 export default function LandingMainCtaButton() {
+  const { t } = useTranslation();
   const loginstate = useAuthState();
   const router = useRouter();
 
@@ -19,7 +21,10 @@ export default function LandingMainCtaButton() {
         router.push(URLS.landing.signup_with_return);
         break;
       case "signedin":
-        router.push("/docs");
+        router.push("/docs", "/docs", {
+          // TODO: disable explicit locale once docs locale resolution is fixed.
+          locale: "en",
+        });
         break;
     }
   };
@@ -29,7 +34,7 @@ export default function LandingMainCtaButton() {
       mb={["134px", "84px", "100px", "145px"]}
     >
       <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-        <MainButton onClick={handleCta}>Start now</MainButton>
+        <MainButton onClick={handleCta}>{t("start-now")}</MainButton>
       </motion.div>
     </Box>
   );

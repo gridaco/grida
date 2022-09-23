@@ -1,13 +1,18 @@
 import React from "react";
-import { Html, Head, Main, NextScript } from "next/document";
+import { Html, Head, Main, NextScript, DocumentProps } from "next/document";
 import { SEO_DEFAULTS } from "utils/seo";
-import makeKeywords from "utils/seo/make-keywords";
+import i18nextConfig from "../next-i18next.config";
+import { keywords } from "utils/seo";
 
-export default function Document(props) {
+export default function Document(props: DocumentProps) {
+  const currentLocale =
+    (props.__NEXT_DATA__.query.locale as string) ||
+    i18nextConfig.i18n.defaultLocale;
+
   return (
-    <Html lang={"en"}>
+    <Html lang={currentLocale}>
       <Head>
-        <SeoMeta />
+        <DefaultSeoMeta />
         {/* region Font */}
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link
@@ -15,9 +20,14 @@ export default function Document(props) {
           href="https://fonts.gstatic.com"
           crossOrigin=""
         />
-        {/* Nanum Pen Script, Roboto Mono, Inter */}
+        {/* (en) Nanum Pen Script (+ ko), Roboto Mono, Inter */}
         <link
           href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Nanum+Pen+Script&family=Roboto+Mono:wght@400;500;600;700&display=swap"
+          rel="stylesheet"
+        />
+        {/* (ja) Hachi Maru Pop */}
+        <link
+          href="https://fonts.googleapis.com/css2?family=Hachi+Maru+Pop&display=swap"
           rel="stylesheet"
         />
         {/* endregion */}
@@ -30,17 +40,15 @@ export default function Document(props) {
   );
 }
 
-function SeoMeta() {
+function DefaultSeoMeta() {
   return (
     <>
-      <title>{SEO_DEFAULTS.title}</title>
       <link rel="icon" href="/favicon.png" />
 
       <meta name="description" content={SEO_DEFAULTS.description} />
-      <meta name="keywords" content={makeKeywords(SEO_DEFAULTS.keywords)} />
+      <meta name="keywords" content={keywords(SEO_DEFAULTS.keywords)} />
       <meta name="author" content={SEO_DEFAULTS.author} />
 
-      <meta property="og:title" content={SEO_DEFAULTS.og.title} />
       <meta property="og:type" content={SEO_DEFAULTS.og.type} />
       <meta property="og:url" content={SEO_DEFAULTS.og.url} />
       <meta property="og:image" content={SEO_DEFAULTS.og.image} />

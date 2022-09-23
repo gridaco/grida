@@ -26,7 +26,6 @@ html,
 body {
   padding: 0;
   margin: 0;
-  word-break: keep-all;
   min-height: 100vh;
   overflow-x: hidden;
   scroll-behavior: smooth;
@@ -41,6 +40,10 @@ body {
 
 .no-drag {
   user-select: none;
+}
+
+.lowercase {
+  text-transform: lowercase;
 }
 
 input {

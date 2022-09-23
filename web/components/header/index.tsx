@@ -14,11 +14,14 @@ import { center, pointer } from "utils/styled/styles";
 import { GroupEntity, HeaderMap } from "./headermap";
 import HoverMenu from "./hover-menu";
 import { useTheme } from "@emotion/react";
+import { useTranslation } from "next-i18next";
+import { LinkWithDocsFallback } from "components/fixme";
 
 const Header = () => {
   const router = useRouter();
   const auth = useAuthState();
   const theme = useTheme();
+  const { t } = useTranslation("header");
 
   const [hoveringItem, setHoveringItem] = useState<string>();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -137,7 +140,7 @@ const Header = () => {
             p={["6px 10px", "6px 10px", "9px 20px", "9px 20px"]}
             variant="noShadow"
           >
-            {auth == "signedin" ? "Go to App" : "Sign up"}
+            {auth == "signedin" ? t("cta-go-to-app") : t("common:sign-up")}
           </SignupButton>
         </Flex>
 
@@ -183,7 +186,7 @@ const Header = () => {
                 }}
                 onClick={handleSignupClick}
               >
-                Sign up
+                {t("sign-up")}
               </Button>
               <Button
                 variant="noShadow"
@@ -200,11 +203,11 @@ const Header = () => {
                 onClick={handleSigninOrMoveAppClick}
               >
                 {auth == "signedin" ? (
-                  "Go to App"
+                  t("cta-go-to-app")
                 ) : (
                   <React.Fragment>
                     <Icon name="lock" isVerticalMiddle mr="6px" />
-                    Sign in
+                    {t("sign-in")}
                   </React.Fragment>
                 )}
               </Button>
@@ -252,6 +255,7 @@ function Item({
   onHover?: () => void;
   variant: "desktop" | "mobile";
 }) {
+  const { t } = useTranslation();
   const content = (
     <Label
       onClick={() => {
@@ -268,13 +272,15 @@ function Item({
         fontSize: "16px",
       }}
     >
-      {label}
+      {t(label)}
     </Label>
   );
   if (href) {
     return (
       <li style={{ listStyle: "none" }}>
-        <a href={href}>{content}</a>
+        <LinkWithDocsFallback href={href}>
+          <a>{content}</a>
+        </LinkWithDocsFallback>
       </li>
     );
   } else {

@@ -20,11 +20,15 @@ const Colors = {
 const ActionItem = ({
   label,
   href,
+  as,
+  locale,
   theme = "light",
   openInNewTab = false,
 }: {
   label: string;
   href: string;
+  as?: string;
+  locale?: string;
   theme?: "light" | "dark";
   openInNewTab?: boolean;
 }) => {
@@ -43,15 +47,11 @@ const ActionItem = ({
     </Text>
   );
 
-  if (openInNewTab) {
-    return (
-      <a href={href} target="_blank">
-        {Content}
-      </a>
-    );
-  } else {
-    return <Link href={href}>{Content}</Link>;
-  }
+  return (
+    <Link href={href} as={as} locale={locale} passHref>
+      <a target={openInNewTab ? "_blank" : undefined}>{Content}</a>
+    </Link>
+  );
 };
 
 const Text = styled(motion.span)<{ color: string }>`

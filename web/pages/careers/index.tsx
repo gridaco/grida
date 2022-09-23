@@ -3,20 +3,33 @@ import styled from "@emotion/styled";
 import Footer from "components/footer";
 import Header from "components/header";
 import { useRouter } from "next/router";
+import { getPageTranslations } from "utils/i18n";
+import { useTranslation } from "next-i18next";
+import LandingpageText from "components/landingpage/text";
+import PageHead from "components/page-head";
 
 export default function CareersPage() {
+  const { t } = useTranslation("page-careers");
   const router = useRouter();
   const onContact = () => {
     router.push("mailto:universe@grida.co");
   };
   return (
     <>
+      <PageHead type="id" page="careers" />
       <div style={{ textAlign: "center" }}>
         <Headings>
-          <JoinUs>Join Us.</JoinUs>
-          <Tagline>Help us change the way how we build applications.</Tagline>
+          <LandingpageText
+            fontFamily="Inter, sans-serif !important"
+            fontWeight="900"
+            variant="h1"
+            color="rgba(255, 255, 255, 0.95)"
+          >
+            {t("heading")}
+          </LandingpageText>
+          <Tagline>{t("tagline")}</Tagline>
         </Headings>
-        <Button onClick={onContact}>Contact CEO</Button>
+        <Button onClick={onContact}>{t("cta-contact")}</Button>
         <div
           style={{
             userSelect: "none",
@@ -47,16 +60,6 @@ const Headings = styled.div`
   left: 50%;
   transform: translateX(-50%);
   box-sizing: border-box;
-`;
-
-const JoinUs = styled.span`
-  color: rgba(255, 255, 255, 0.95);
-  text-overflow: ellipsis;
-  font-size: 96px;
-  word-break: keep-all;
-  font-family: Inter, sans-serif;
-  font-weight: 900;
-  text-align: left;
 `;
 
 const Tagline = styled.span`
@@ -123,6 +126,8 @@ function WorldMap() {
   return (
     <img
       style={{
+        userSelect: "none",
+        pointerEvents: "none",
         display: "block",
         margin: "auto",
         transform: "translateY(80px) scale(150%)",
@@ -134,4 +139,12 @@ function WorldMap() {
       src={"/assets/world-map.svg"}
     />
   );
+}
+
+export async function getStaticProps({ locale }) {
+  return {
+    props: {
+      ...(await getPageTranslations(locale, "careers")),
+    },
+  };
 }

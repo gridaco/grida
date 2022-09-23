@@ -15,7 +15,7 @@ interface IconProps extends BoxProps {
   isVerticalMiddle?: boolean;
 }
 
-const Icon = (props: IconProps) => {
+const Icon = (props: IconProps, ref) => {
   const {
     name,
     width,

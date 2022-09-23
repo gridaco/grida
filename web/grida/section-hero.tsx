@@ -1,5 +1,6 @@
 import React from "react";
 import styled from "@emotion/styled";
+import { useTranslation } from "next-i18next";
 /**
  * `<SectionHero>` ('section-hero')
  * - [Open in Figma](https://figma.com/file/Gaznaw1QHppxvs9UkqNOb0?node-id=8266:64059)
@@ -45,29 +46,30 @@ export function SectionHero({
   onStartClick?: () => void;
   copyText?: string;
 }) {
+  const { t } = useTranslation("page-cli");
+
   return (
     <RootWrapperSectionHero>
       <HeaderContainer>
         <HeaderWithBadge>
           <BadgeContainer>
-            <BadgeLabel>_ Grida CLI // Beta</BadgeLabel>
+            <BadgeLabel>{t("section/hero.tagline")}</BadgeLabel>
           </BadgeContainer>
           <Frame508>
-            <Heading>
-              <Mono>CI</Mono> your design.
-            </Heading>
+            <Heading
+              dangerouslySetInnerHTML={{
+                __html: t("section/hero.heading"),
+              }}
+            />
           </Frame508>
         </HeaderWithBadge>
-        <DescriptionAsP>
-          Grida CLI generates code from Design input and saves it directly into
-          your workspace. Use your design like a package.
-        </DescriptionAsP>
+        <DescriptionAsP>{t("section/hero.description")}</DescriptionAsP>
       </HeaderContainer>
       <CtaArea>
         <CopyAsButton onClick={() => onCopyClick?.("npx grida init")}>
           {copyText}
         </CopyAsButton>
-        <StartAsButton onClick={onStartClick}>Start Coding</StartAsButton>
+        <StartAsButton onClick={onStartClick}>{t("cta-start")}</StartAsButton>
       </CtaArea>
     </RootWrapperSectionHero>
   );
@@ -157,14 +159,6 @@ const Frame508 = styled.div`
   box-sizing: border-box;
 `;
 
-const Mono = styled.span`
-  font-size: 74px;
-  font-family: "Roboto Mono", monospace !important;
-  font-weight: 700;
-  letter-spacing: -1px;
-  line-height: 95%;
-`;
-
 const Heading = styled.h1`
   color: black;
   text-overflow: ellipsis;
@@ -173,6 +167,11 @@ const Heading = styled.h1`
   font-weight: 700;
   letter-spacing: -1px;
   text-align: center;
+
+  .mono {
+    font-family: "Roboto Mono", monospace !important;
+    line-height: 95%;
+  }
 `;
 
 const DescriptionAsP = styled.p`

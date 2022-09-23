@@ -149,4 +149,6 @@ const Providers = ({ children }: { children: React.ReactNode }) => {
   );
 };
 
-export default App;
+import { appWithTranslation } from "next-i18next";
+
+export default appWithTranslation(App);

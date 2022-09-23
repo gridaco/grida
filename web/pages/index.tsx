@@ -2,10 +2,11 @@ import { motion } from "framer-motion";
 import { NextPage, NextPageContext } from "next";
 import React, { useCallback, useState, useEffect } from "react";
 import { useCookies } from "react-cookie";
+import { getPageTranslations } from "utils/i18n";
 
 import CookieAccept from "components/cookie-accept";
 import Sections from "sections/landingpage";
-import Head from "next/head";
+import PageHead from "components/page-head";
 
 interface MainPageAppProps {
   isMobileView: boolean;
@@ -41,13 +42,11 @@ const MainPage: NextPage<MainPageAppProps> = ({ isMobileView }) => {
 
   return (
     <React.Fragment>
-      <Head>
-        <title>Grida</title>
-      </Head>
+      <PageHead type="id" page="index" />
       <Sections.Hero />
       <Sections.DesignOnceRunAnywhere />
       <div style={{ height: 200 }} />
-      <Sections.Section2_design_to_code isMobile={isMobileView} />
+      <Sections.Section2_design_to_code />
       {/* <Sections.Section3_how_engine_works /> */}
       {/* <Sections.Section__BornToBeHeadLess /> */}
       {/* <Sections.Section__Opensource /> */}
@@ -68,16 +67,20 @@ const MainPage: NextPage<MainPageAppProps> = ({ isMobileView }) => {
   );
 };
 
-MainPage.getInitialProps = async ({ req }: NextPageContext) => {
-  let isMobileView = (req
-    ? req.headers["user-agent"]
-    : navigator.userAgent
-  ).match(/Android|BlackBerry|iPhone|iPad|iPod|Opera Mini|IEMobile|WPDesktop/i);
+export async function getStaticProps({ req, locale }: NextPageContext) {
+  // LEGACY FEATURE - this was required to render different image on mobile device @ Section2_design_to_code
+  // let isMobileView = (req
+  //   ? req.headers["user-agent"]
+  //   : navigator.userAgent
+  // ).match(/Android|BlackBerry|iPhone|iPad|iPod|Opera Mini|IEMobile|WPDesktop/i);
 
   //Returning the isMobileView as a prop to the component for further use.
   return {
-    isMobileView: Boolean(isMobileView),
+    props: {
+      // isMobileView: Boolean(isMobileView),
+      ...(await getPageTranslations(locale, "index")),
+    },
   };
-};
+}
 
 export default MainPage;

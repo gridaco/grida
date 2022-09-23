@@ -13,6 +13,9 @@ import {
 } from "components/mock-vscode";
 import { breakpoints } from "sections/landingpage/_breakpoints";
 import MusicHome from "sections/landingpage/demo-app";
+import { getPageTranslations } from "utils/i18n";
+import { useTranslation } from "next-i18next";
+import PageHead from "components/page-head";
 
 export const BackgroundGradient = css`
   background: linear-gradient(
@@ -32,40 +35,42 @@ export const HeadingGradient = css`
 
 export default function VSCodePage() {
   const router = useRouter();
+  const { t } = useTranslation("page-vscode");
   const onInstall = () => {
     router.push(
       "https://marketplace.visualstudio.com/items?itemName=grida.grida-vscode",
     );
   };
   return (
-    <RootWrapper>
-      <img
-        style={{
-          position: "absolute",
-          zIndex: 0,
-          objectFit: "cover",
-        }}
-        width="100%"
-        height={924}
-        src="/vscode/bg-pattern.svg"
-      />
-      <Contents>
+    <>
+      <PageHead type="id" page="vscode" />
+      <RootWrapper>
+        <img
+          style={{
+            position: "absolute",
+            zIndex: 0,
+            objectFit: "cover",
+          }}
+          width="100%"
+          height={924}
+          src="/vscode/bg-pattern.svg"
+        />
+        <Contents>
+          <Spacer />
+          <Spacer />
+          <Spacer />
+          <Heading1>{t("heading")}</Heading1>
+          <InstallButton onClick={onInstall}>{t("cta-install")}</InstallButton>
+          {/* <p>Convert your figma design to React, Flutter, TS & HTML/CSS code.</p> */}
+          <VscodeDemo>
+            <WindowHandle />
+            <DemoContents />
+            <StatusBar></StatusBar>
+          </VscodeDemo>
+        </Contents>
         <Spacer />
-        <Spacer />
-        <Spacer />
-        <Heading1>VSCode X Grida</Heading1>
-        <InstallButton onClick={onInstall}>
-          Install Grida VSCode Extension
-        </InstallButton>
-        {/* <p>Convert your figma design to React, Flutter, TS & HTML/CSS code.</p> */}
-        <VscodeDemo>
-          <WindowHandle />
-          <DemoContents />
-          <StatusBar></StatusBar>
-        </VscodeDemo>
-      </Contents>
-      <Spacer />
-    </RootWrapper>
+      </RootWrapper>
+    </>
   );
 }
 
@@ -347,3 +352,11 @@ const ResponsiveActivityBar = styled.div`
     display: none;
   }
 `;
+
+export async function getStaticProps({ locale }) {
+  return {
+    props: {
+      ...(await getPageTranslations(locale, "vscode")),
+    },
+  };
+}

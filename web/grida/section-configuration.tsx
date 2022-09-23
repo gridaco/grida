@@ -1,4 +1,5 @@
 import styled from "@emotion/styled";
+import { useTranslation } from "next-i18next";
 import React from "react";
 /**
  * `<SectionConfiguration>` ('section-configuration')
@@ -41,52 +42,29 @@ export function SectionConfiguration({
 }: {
   onSeeTheDocsClick?: () => void;
 }) {
+  const { t } = useTranslation("page-cli");
   return (
     <RootWrapperSectionConfiguration>
       <LeftContainer>
         <Contents>
           <ContentsHeader>
             <FitsIntoYourConfiguration>
-              Fits into your configuration.
+              {t("section/config.heading")}
             </FitsIntoYourConfiguration>
-            <Description>
-              Configure grida with grida.confg.js. You can define plugins,
-              output code styles and customize the behaviour deep down to AST
-              level.
-            </Description>
+            <Description>{t("section/config.description")}</Description>
           </ContentsHeader>
           <ContentsList>
-            <FeatureListItem>
-              <Check />
-              <Label>secure, runs locally</Label>
-            </FeatureListItem>
-            <FeatureListItem>
-              <Check />
-              <Label>zero dependency by default</Label>
-            </FeatureListItem>
-            <FeatureListItem>
-              <Check />
-              <Label>works with svelte</Label>
-            </FeatureListItem>
-            <FeatureListItem>
-              <Check />
-              <Label>works with solid-js</Label>
-            </FeatureListItem>
-            <FeatureListItem>
-              <Check />
-              <Label>works with vanilla html/css</Label>
-            </FeatureListItem>
-            <FeatureListItem>
-              <Check />
-              <Label>works with react & react-native</Label>
-            </FeatureListItem>
-            <FeatureListItem>
-              <Check />
-              <Label>works with flutter</Label>
-            </FeatureListItem>
+            {(t("section/config.features", { returnObjects: true }) as Array<
+              string
+            >).map((item, index) => (
+              <FeatureListItem key={index}>
+                <Check />
+                <Label>{item}</Label>
+              </FeatureListItem>
+            ))}
           </ContentsList>
           <StartAsButton onClick={onSeeTheDocsClick}>
-            See the docs
+            {t("cta-docs")}
           </StartAsButton>
         </Contents>
       </LeftContainer>
@@ -118,7 +96,7 @@ const Check = () => {
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
     >
-      <g clip-path="url(#clip0_8393_56954)">
+      <g clipPath="url(#clip0_8393_56954)">
         <path
           d="M6.5001 11.2799L3.7201 8.4999L2.77344 9.43989L6.5001 13.1666L14.5001 5.16656L13.5601 4.22656L6.5001 11.2799Z"
           fill="white"

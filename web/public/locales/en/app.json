@@ -1,0 +1,10 @@
+{
+  "cookie-consent": {
+    "mobile": {
+      "we-use": "We use",
+      "for": "for better website experience"
+    },
+    "heading": "We use cookies",
+    "p": "Grida collects cookies for handling signin, analysing our traffic and making website usage faster."
+  }
+}

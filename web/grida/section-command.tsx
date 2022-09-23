@@ -1,5 +1,6 @@
 import React from "react";
 import styled from "@emotion/styled";
+import { useTranslation } from "next-i18next";
 
 /**
  * `<SectionOneCommand>` ('section-one-command')
@@ -38,6 +39,8 @@ import styled from "@emotion/styled";
  * <!-- grida.meta.widget_declaration | engine : 0.0.1 | source : figma://Gaznaw1QHppxvs9UkqNOb0/8266:64060 -->
  */
 export function SectionOneCommand() {
+  const { t } = useTranslation("page-cli");
+
   return (
     <RootWrapperSectionOneCommand>
       <Bg>
@@ -59,17 +62,14 @@ export function SectionOneCommand() {
         <TopDesign src="/cli/top-design.png" />
         <BottomCode src="/cli/bottom-code.png" />
       </ArtworkGroup>
-      <Section2HeadingAsH2>
-        One command to add designs as a module to your existing projects.
-      </Section2HeadingAsH2>
+      <Section2HeadingAsH2>{t("section/command.heading")}</Section2HeadingAsH2>
       <DescriptionLayout>
-        <Section2DescriptionAsP>Be the Maestro.</Section2DescriptionAsP>
-        <Section2DescriptionAsP_0001>
-          You can import your design like a well-coded library, with full
-          documentations.
-          <br />
-          We play the details // you play the orchestra.
-        </Section2DescriptionAsP_0001>
+        <Tagline>{t("section/command.tagline")}</Tagline>
+        <Description
+          dangerouslySetInnerHTML={{
+            __html: t("section/command.description"),
+          }}
+        />
       </DescriptionLayout>
       <Vector xmlns="http://www.w3.org/2000/svg">
         <path
@@ -207,7 +207,7 @@ const DescriptionLayout = styled.div`
   height: 81px;
 `;
 
-const Section2DescriptionAsP = styled.p`
+const Tagline = styled.p`
   color: white;
   text-overflow: ellipsis;
   font-size: 16px;
@@ -218,7 +218,7 @@ const Section2DescriptionAsP = styled.p`
   opacity: 0.8;
 `;
 
-const Section2DescriptionAsP_0001 = styled.p`
+const Description = styled.p`
   color: white;
   text-overflow: ellipsis;
   font-size: 16px;

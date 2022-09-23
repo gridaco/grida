@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import styled from "@emotion/styled";
 import { CliDemoTypeContent } from "./section-demo-type-content";
+import { useTranslation } from "next-i18next";
 /**
  * `<SectionDemo>` ('section-demo')
  * - [Open in Figma](https://figma.com/file/Gaznaw1QHppxvs9UkqNOb0?node-id=8266:64061)
@@ -39,6 +40,7 @@ import { CliDemoTypeContent } from "./section-demo-type-content";
  */
 export function SectionDemo() {
   const [demoplaykey, setdemoplaykey] = useState("initial");
+  const { t } = useTranslation();
 
   const onreplayclick = () => {
     setdemoplaykey("replay" + Math.random());
@@ -47,7 +49,7 @@ export function SectionDemo() {
   return (
     <RootWrapperSectionDemo>
       <ReplayButton onClick={onreplayclick}>
-        <Replay>replay</Replay>
+        <Replay>{t("replay")}</Replay>
         <svg
           width="14"
           height="18"
@@ -58,7 +60,7 @@ export function SectionDemo() {
           <path
             d="M6.99967 4.16658V0.833252L2.83301 4.99992L6.99967 9.16658V5.83325C9.758 5.83325 11.9997 8.07492 11.9997 10.8333C11.9997 13.5916 9.758 15.8332 6.99967 15.8332C4.24134 15.8332 1.99967 13.5916 1.99967 10.8333H0.333008C0.333008 14.5166 3.31634 17.4999 6.99967 17.4999C10.683 17.4999 13.6663 14.5166 13.6663 10.8333C13.6663 7.14992 10.683 4.16658 6.99967 4.16658Z"
             fill="black"
-            fill-opacity="0.9"
+            fillOpacity="0.9"
           />
         </svg>
       </ReplayButton>
@@ -120,7 +122,6 @@ const ReplayButton = styled.button`
   left: calc((calc((50% + -4px)) - 62px));
   top: 840px;
   opacity: 0.8;
-  width: 124px;
   height: 44px;
 
   opacity: 0.8;

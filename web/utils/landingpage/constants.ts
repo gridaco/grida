@@ -33,7 +33,7 @@ export const LandingpageUrls = {
   latest_promotion_video_youtube: promotion_video_primary_demo_url,
 
   // linked articles
-  article_how_do_design_to_code_work: "/docs/concepts/design-to-code",
+  try_with_cli: "/cli",
   article_how_engine_works: "/docs/concepts/detection",
 
   /**

@@ -6,8 +6,12 @@ import { Flex } from "theme-ui";
 import Icon from "components/icon";
 import LandingMainCtaButton from "components/landingpage/main-cta-button";
 import LandingpageText from "components/landingpage/text";
+import { useTranslation } from "next-i18next";
 
 const Slogan = () => {
+  const { t } = useTranslation("page-index", {
+    keyPrefix: "section/final-cta",
+  });
   return (
     <SectionLayout
       variant="full-width"
@@ -22,7 +26,7 @@ const Slogan = () => {
           alignItems: "center",
         }}
       >
-        <SloganText variant="h2">Focus on the core</SloganText>
+        <SloganText variant="h2">{t("heading.focus")}</SloganText>
         <SloganText variant="h2">
           <Icon
             name="grida_black"
@@ -31,7 +35,7 @@ const Slogan = () => {
             isVerticalMiddle
             mr={[12, 28]}
           />
-          will do the rest
+          {t("heading.do-the-rest")}
         </SloganText>
         <LandingMainCtaButton />
       </Flex>

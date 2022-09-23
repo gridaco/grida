@@ -1,14 +1,16 @@
 import styled from "@emotion/styled";
 import Image from "next/image";
 import React from "react";
-
-import { k } from "sections";
-
 import { breakpoints } from "../_breakpoints";
 import MusicHome from "../demo-app";
 import { CtaArea } from "../shared-cta-tocode";
+import { useTranslation } from "next-i18next";
 
 export default function HeroResponsive() {
+  const { t } = useTranslation("page-index", {
+    keyPrefix: "section/hero",
+  });
+
   return (
     <Wrapper key="section-hero">
       <HeroGradientBgArtwork>
@@ -21,9 +23,9 @@ export default function HeroResponsive() {
       </HeroGradientBgArtwork>
       <HeroTextAreaWithCta>
         <HeroTextAndBody>
-          <Heading1>{k.contents.heading1_figma_to_code}</Heading1>
+          <Heading1>{t("heading")}</Heading1>
           <DescriptionHolder>
-            <HeroBodyText>{k.contents.p_hero_description}</HeroBodyText>
+            <HeroBodyText>{t("p")}</HeroBodyText>
           </DescriptionHolder>
         </HeroTextAndBody>
         <CtaArea mode="hero-cta" />

@@ -1,5 +1,4 @@
 import styled from "@emotion/styled";
-import Head from "next/head";
 import { useRouter } from "next/router";
 import React, { useState } from "react";
 
@@ -8,13 +7,20 @@ import { SectionConfiguration } from "../../grida/section-configuration";
 import { SectionDemo } from "../../grida/section-demo";
 import { FooterCtaSection as SectionFooterCta } from "../../grida/section-footer-cta";
 import { SectionHero } from "../../grida/section-hero";
+import { useTranslation } from "next-i18next";
+import { getPageTranslations } from "utils/i18n";
+import PageHead from "components/page-head";
 
 export default function Home() {
   const router = useRouter();
+  const { t } = useTranslation("page-cli");
   const [copied, setCopied] = useState(false);
 
   const onstartclick = () => {
-    router.push("/docs/cli");
+    router.push("/docs/cli", "/docs/cli", {
+      // TODO: disable explicit locale once docs locale resolution is fixed.
+      locale: "en",
+    });
   };
 
   const oncopycommandclick = (t: string) => {
@@ -27,18 +33,9 @@ export default function Home() {
 
   return (
     <>
-      <Head>
-        <title>Grida CLI</title>
-        <meta
-          name="description"
-          content="Grida CLI for integrating your figma design direcly in your codebase"
-        />
-        <meta
-          name="keywords"
-          content="figma, grida ,cli ,command line interface, figma cli, figma to code, figma handoff cli, zeplin cli"
-        />
-        <meta name="og:title" property="og:title" content="Grida CLI"></meta>
-      </Head>
+      <PageHead type="id" page="cli">
+        <link rel="alternate" hrefLang="en" href={`https://grida.co/cli`} />
+      </PageHead>
       <div
         style={{
           display: "flex",
@@ -47,7 +44,7 @@ export default function Home() {
         }}
       >
         <SectionHero
-          copyText={copied ? "Copied to clipboard" : "npx grida init"}
+          copyText={copied ? t("copied-to-clipboard") : t("cta-command")}
           onCopyClick={oncopycommandclick}
           onStartClick={onstartclick}
         />
@@ -69,17 +66,17 @@ export default function Home() {
             }}
           >
             <SectionFooterCta
-              copyText={copied ? "Copied to clipboard" : "npx grida init"}
+              copyText={copied ? t("copied-to-clipboard") : t("cta-command")}
               onCopyClick={oncopycommandclick}
               onStartClick={onstartclick}
             />
           </div>
         </div>
-        <MadeWithGridaFooterText>
-          This page was made with grida CLI under 7 minutes
-          <br />
-          with NextJS & @emotion/styled
-        </MadeWithGridaFooterText>
+        <MadeWithGridaFooterText
+          dangerouslySetInnerHTML={{
+            __html: t("this-page-was-made-with-grida-cli"),
+          }}
+        />
       </div>
       <div style={{ height: 80 }} />
     </>
@@ -99,3 +96,11 @@ const MadeWithGridaFooterText = styled.a`
   padding-left: 32px;
   padding-right: 32px;
 `;
+
+export async function getStaticProps({ locale }) {
+  return {
+    props: {
+      ...(await getPageTranslations(locale, "cli")),
+    },
+  };
+}
