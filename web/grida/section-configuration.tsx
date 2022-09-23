@@ -96,7 +96,7 @@ const Check = () => {
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
     >
-      <g clip-path="url(#clip0_8393_56954)">
+      <g clipPath="url(#clip0_8393_56954)">
         <path
           d="M6.5001 11.2799L3.7201 8.4999L2.77344 9.43989L6.5001 13.1666L14.5001 5.16656L13.5601 4.22656L6.5001 11.2799Z"
           fill="white"
