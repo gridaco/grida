@@ -46,7 +46,7 @@ const MainPage: NextPage<MainPageAppProps> = ({ isMobileView }) => {
       <Sections.Hero />
       <Sections.DesignOnceRunAnywhere />
       <div style={{ height: 200 }} />
-      <Sections.Section2_design_to_code isMobile={isMobileView} />
+      <Sections.Section2_design_to_code />
       {/* <Sections.Section3_how_engine_works /> */}
       {/* <Sections.Section__BornToBeHeadLess /> */}
       {/* <Sections.Section__Opensource /> */}
@@ -67,22 +67,8 @@ const MainPage: NextPage<MainPageAppProps> = ({ isMobileView }) => {
   );
 };
 
-// MainPage.getInitialProps = async ({ req, locale }: NextPageContext) => {
-// let isMobileView = (req
-//   ? req.headers["user-agent"]
-//   : navigator.userAgent
-// ).match(/Android|BlackBerry|iPhone|iPad|iPod|Opera Mini|IEMobile|WPDesktop/i);
-
-// //Returning the isMobileView as a prop to the component for further use.
-// return {
-//   isMobileView: Boolean(isMobileView),
-//   props: {
-//     ...(await serverSideTranslations(locale, ["common", "footer"])),
-//   },
-// };
-// };
-
 export async function getStaticProps({ req, locale }: NextPageContext) {
+  // LEGACY FEATURE - this was required to render different image on mobile device @ Section2_design_to_code
   // let isMobileView = (req
   //   ? req.headers["user-agent"]
   //   : navigator.userAgent

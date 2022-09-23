@@ -14,23 +14,25 @@ import { DesktopView, MobileView } from "utils/styled/styles";
 import DesignToCode from "./design-code";
 import { useTranslation } from "next-i18next";
 
-interface OnlineAppProps {
-  isMobile?: boolean;
-}
+// interface OnlineAppProps {
+//   isMobile?: boolean;
+// }
 
-const OnlineApp: React.FC<OnlineAppProps> = ({ isMobile }) => {
+const OnlineApp: React.FC = () => {
   const { t } = useTranslation("page-index", {
     keyPrefix: "section/figma-dedicated",
   });
-  const [assetUrl, setAssetUrl] = useState("/assets/gradient-bg.png");
 
-  useEffect(() => {
-    if (isMobile) {
-      setAssetUrl("/assets/mobile/mobile-gradient-blur-sm.png");
-    } else {
-      setAssetUrl("/assets/gradient-bg.png");
-    }
-  }, [isMobile]);
+  const assetUrl = "/assets/gradient-bg.png";
+  // const [assetUrl, setAssetUrl] = useState("/assets/gradient-bg.png");
+
+  // useEffect(() => {
+  //   if (isMobile) {
+  //     setAssetUrl("/assets/mobile/mobile-gradient-blur-sm.png");
+  //   } else {
+  //     setAssetUrl("/assets/gradient-bg.png");
+  //   }
+  // }, [isMobile]);
 
   return (
     <SectionLayout alignContent="start" backgroundColor="rgba(0,0,0,0)">
