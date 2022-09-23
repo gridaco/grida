@@ -7,7 +7,7 @@ import PAGES from "utils/seo/pages";
 export default function GlobalizationPage() {
   return (
     <div>
-      <PageHead pageMeta={PAGES.globalization} />
+      <PageHead type="data" {...PAGES.globalization} />
       <Sections.Hero />
       <Sections.Section2_quickd_demo_say_hi />
       <Sections.Section3_unlimit_your />

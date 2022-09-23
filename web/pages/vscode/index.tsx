@@ -15,7 +15,7 @@ import { breakpoints } from "sections/landingpage/_breakpoints";
 import MusicHome from "sections/landingpage/demo-app";
 import { getPageTranslations } from "utils/i18n";
 import { useTranslation } from "next-i18next";
-import Head from "next/head";
+import PageHead from "components/page-head";
 
 export const BackgroundGradient = css`
   background: linear-gradient(
@@ -43,11 +43,7 @@ export default function VSCodePage() {
   };
   return (
     <>
-      <Head>
-        <title>{t("title")}</title>
-        <meta name="description" content={t("description")} />
-        <meta name="keywords" content={t("keywords")} />
-      </Head>
+      <PageHead type="id" page="vscode" />
       <RootWrapper>
         <img
           style={{

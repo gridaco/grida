@@ -1,5 +1,4 @@
 import styled from "@emotion/styled";
-import Head from "next/head";
 import { useRouter } from "next/router";
 import React, { useState } from "react";
 
@@ -10,6 +9,7 @@ import { FooterCtaSection as SectionFooterCta } from "../../grida/section-footer
 import { SectionHero } from "../../grida/section-hero";
 import { useTranslation } from "next-i18next";
 import { getPageTranslations } from "utils/i18n";
+import PageHead from "components/page-head";
 
 export default function Home() {
   const router = useRouter();
@@ -30,12 +30,9 @@ export default function Home() {
 
   return (
     <>
-      <Head>
-        <title>{t("title")}</title>
-        <meta name="description" content={t("description")} />
-        <meta name="keywords" content={t("keywords")} />
-        <meta name="og:title" property="og:title" content={t("title")} />
-      </Head>
+      <PageHead type="id" page="cli">
+        <link rel="alternate" hrefLang="en" href={`https://grida.co/cli`} />
+      </PageHead>
       <div
         style={{
           display: "flex",

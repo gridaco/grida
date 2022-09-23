@@ -8,7 +8,7 @@ import { getPageTranslations } from "utils/i18n";
 export default function PricingPage() {
   return (
     <>
-      <PageHead pageMeta={PAGES.pricing} />
+      <PageHead type="data" {...PAGES.pricing} />
       <Sections.Hero_TryFreePlan />
       <Sections.ComparePlans />
       <Sections.FeaturesAndPricingTable />

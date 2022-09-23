@@ -5,8 +5,8 @@ import Header from "components/header";
 import { useRouter } from "next/router";
 import { getPageTranslations } from "utils/i18n";
 import { useTranslation } from "next-i18next";
-import Head from "next/head";
 import LandingpageText from "components/landingpage/text";
+import PageHead from "components/page-head";
 
 export default function CareersPage() {
   const { t } = useTranslation("page-careers");
@@ -16,11 +16,7 @@ export default function CareersPage() {
   };
   return (
     <>
-      <Head>
-        <title>{t("title")}</title>
-        <meta name="description" content={t("description")} />
-        <meta name="keywords" content={t("keywords")} />
-      </Head>
+      <PageHead type="id" page="careers" />
       <div style={{ textAlign: "center" }}>
         <Headings>
           <LandingpageText

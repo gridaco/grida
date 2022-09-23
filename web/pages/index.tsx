@@ -6,7 +6,7 @@ import { getPageTranslations } from "utils/i18n";
 
 import CookieAccept from "components/cookie-accept";
 import Sections from "sections/landingpage";
-import Head from "next/head";
+import PageHead from "components/page-head";
 
 interface MainPageAppProps {
   isMobileView: boolean;
@@ -42,9 +42,7 @@ const MainPage: NextPage<MainPageAppProps> = ({ isMobileView }) => {
 
   return (
     <React.Fragment>
-      <Head>
-        <title>Grida</title>
-      </Head>
+      <PageHead type="id" page="index" />
       <Sections.Hero />
       <Sections.DesignOnceRunAnywhere />
       <div style={{ height: 200 }} />

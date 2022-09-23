@@ -1,4 +1,6 @@
 {
+  "title": "Grida",
+  "description": "Figma to Code | Opensource, Headless design to code automation software. Supercharge your frontend development. Instantly convert your design to production ready code.",
   "section/hero": {
     "heading": "Figma to Code.",
     "p": "Grida is a Free and Open-source platform that will automatically transform your Figma design to developer-friendly code for Web & Mobile apps."

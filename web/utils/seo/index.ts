@@ -33,3 +33,7 @@ export const SEO_DEFAULTS: PageSeoMeta = {
   author: "grida.co team and community collaborators",
   og: SEO_OG_DEFAULTS,
 };
+
+export * from "./interface";
+
+export * from "./make-keywords";
