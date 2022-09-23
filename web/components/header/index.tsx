@@ -277,7 +277,9 @@ function Item({
   if (href) {
     return (
       <li style={{ listStyle: "none" }}>
-        <a href={href}>{content}</a>
+        <Link href={href}>
+          <a>{content}</a>
+        </Link>
       </li>
     );
   } else {
