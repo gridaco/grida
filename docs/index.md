@@ -5,7 +5,7 @@ title: Introduction
 
 # Introduction
 
-Grida is a Opensource Design to Code toolkit. To bring your imagination to life as fast as possible, Grida converts your design into human-level code, which dramatically reduces development time from hours to months. **You now Focus on the core.**
+Grida is a Opensource Design to Code toolkit. To bring your imagination to life as fast as possible, Grida converts your design into human-level code, which dramatically reduces hours and months of development time. **You now Focus on the core.**
 
 💸 Building UI applications from scratch costs a lot of time. Coding all the designs from scratch may seem like a conventional way, but it is not anymore. You can now focus on the core, and **let grida take care of the UI side.**
 
