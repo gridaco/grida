@@ -296,6 +296,7 @@ function Background() {
 
 const HeroGradientBgArtwork = styled.div`
   z-index: -99;
+  user-select: none;
   span {
     position: relative;
     transform: scale(120%);

@@ -288,11 +288,12 @@ function Item({
   }
 }
 
-const HeaderWrapper = styled.header`
+const HeaderWrapper = styled.header<{ border?: boolean }>`
   position: absolute;
   display: flex;
   z-index: 9;
-  border-bottom: 1px solid rgba(1, 1, 1, 0.03);
+  border-bottom: ${props =>
+    props.border ? "1px solid rgba(0, 0, 0, 0.025)" : "none"};
   width: 100%;
   height: 60px;
   justify-content: center;
