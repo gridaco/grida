@@ -84,7 +84,6 @@ const Wrapper = styled.div`
   flex-direction: column;
   align-items: center;
   gap: 48px;
-  background-color: rgba(255, 255, 255, 1);
   box-sizing: border-box;
   padding: 105px 191px;
 
@@ -96,7 +95,6 @@ const Wrapper = styled.div`
     flex-direction: column;
     align-items: center;
     gap: 51px;
-    background-color: rgba(255, 255, 255, 1);
     box-sizing: border-box;
     padding: 105px 128px;
   }
@@ -106,7 +104,6 @@ const Wrapper = styled.div`
     flex-direction: column;
     align-items: center;
     gap: 62px;
-    background-color: rgba(255, 255, 255, 1);
     box-sizing: border-box;
     padding: 105px 65px;
   }
@@ -116,7 +113,6 @@ const Wrapper = styled.div`
     flex-direction: column;
     align-items: center;
     gap: 65px;
-    background-color: rgba(255, 255, 255, 1);
     box-sizing: border-box;
     padding: 105px 42px;
   }
@@ -126,7 +122,6 @@ const Wrapper = styled.div`
     flex-direction: column;
     align-items: center;
     gap: 74px;
-    background-color: rgba(255, 255, 255, 1);
     box-sizing: border-box;
     padding: 105px 0px;
   }
