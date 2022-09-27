@@ -17,20 +17,21 @@ import {
 } from "utils/context/PopupContext";
 import { analytics } from "utils/firebase";
 import { BodyCustomStyleInAbosulteSectionLayout } from "utils/styled/styles";
-
 import { MDXProvider } from "@mdx-js/react";
-
 import { _MDX_COMPONENTS } from "components/mdx";
-
 import { Box } from "theme-ui";
 import { env } from "process";
-
 import "../styles/global.css";
 import Script from "next/script";
 import { RecoilRoot } from "recoil";
+import { appWithTranslation } from "next-i18next";
+import { PageLayoutConfig } from "layouts/index";
+
+type GetLayoutFunc = (page: ReactElement) => ReactNode;
 
 export type NextPageWithLayout<P = {}, IP = P> = NextPage<P, IP> & {
-  getLayout?: (page: ReactElement) => ReactNode;
+  getLayout?: GetLayoutFunc;
+  layoutConfig?: PageLayoutConfig;
   getTheme?: () => "light" | "dark" | undefined;
 };
 
@@ -38,12 +39,12 @@ type AppPropsWithLayout = AppProps & {
   Component: NextPageWithLayout;
 };
 
-function defaultLayout(page: ReactElement) {
+function defaultLayout(page: ReactElement, { mt = 60 }: PageLayoutConfig) {
   return (
     <>
       <Header />
       <BodyCustomStyleInAbosulteSectionLayout
-        mt="60px"
+        mt={mt}
         style={{ position: "relative" }}
       >
         {page}
@@ -56,7 +57,9 @@ function defaultLayout(page: ReactElement) {
 const App = ({ Component, pageProps }: AppPropsWithLayout) => {
   const router = useRouter();
 
-  const getLayout = Component.getLayout ?? defaultLayout;
+  const getLayout =
+    Component.getLayout ??
+    ((page: ReactElement) => defaultLayout(page, Component.layoutConfig || {}));
   const getTheme = Component.getTheme ?? (() => undefined);
 
   useEffect(() => {
@@ -148,7 +151,5 @@ const Providers = ({ children }: { children: React.ReactNode }) => {
     </PopupProvider>
   );
 };
-
-import { appWithTranslation } from "next-i18next";
 
 export default appWithTranslation(App);
