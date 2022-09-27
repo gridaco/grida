@@ -64,7 +64,8 @@ const App = ({ Component, pageProps }: AppPropsWithLayout) => {
 
   const getLayout =
     Component.getLayout ??
-    ((page: ReactElement) => defaultLayout(page, Component.layoutConfig));
+    ((page: ReactElement) =>
+      defaultLayout(page, Component.layoutConfig ?? ({} as any)));
   const getTheme = Component.getTheme ?? (() => undefined);
 
   useEffect(() => {
