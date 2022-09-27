@@ -39,10 +39,15 @@ type AppPropsWithLayout = AppProps & {
   Component: NextPageWithLayout;
 };
 
-function defaultLayout(page: ReactElement, { mt = 60 }: PageLayoutConfig) {
+function defaultLayout(
+  page: ReactElement,
+  { mt = 60, header }: PageLayoutConfig,
+) {
   return (
     <>
+      {/* <ThemeProvider theme={ }> */}
       <Header />
+      {/* </ThemeProvider> */}
       <BodyCustomStyleInAbosulteSectionLayout
         mt={mt}
         style={{ position: "relative" }}
@@ -59,7 +64,7 @@ const App = ({ Component, pageProps }: AppPropsWithLayout) => {
 
   const getLayout =
     Component.getLayout ??
-    ((page: ReactElement) => defaultLayout(page, Component.layoutConfig || {}));
+    ((page: ReactElement) => defaultLayout(page, Component.layoutConfig));
   const getTheme = Component.getTheme ?? (() => undefined);
 
   useEffect(() => {

@@ -3,10 +3,26 @@ import LandingpageText from "components/landingpage/text";
 import React from "react";
 import { getPageTranslations } from "utils/i18n";
 import { PageLayoutConfig } from "layouts/index";
+import PageHead from "components/page-head";
 
 export default function GamesPage() {
   return (
     <>
+      <PageHead
+        type="data"
+        title="Grida for Games"
+        route="/games"
+        description="Boost your game creation with Grida"
+        keywords={[
+          "game handoff",
+          "game asset management",
+          "unity handoff",
+          "unity i18n",
+          "game analytics",
+          "unity firebase alternative",
+          "playfab alternative",
+        ]}
+      />
       <Hero />
     </>
   );
@@ -78,6 +94,7 @@ const HeroWrapper = styled.div`
 
 GamesPage.layoutConfig = {
   mt: 0,
+  header: { theme: "dark" },
 } as PageLayoutConfig;
 
 export async function getStaticProps({ locale }) {
