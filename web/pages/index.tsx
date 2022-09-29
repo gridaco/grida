@@ -7,6 +7,7 @@ import { getPageTranslations } from "utils/i18n";
 import CookieAccept from "components/cookie-accept";
 import Sections from "sections/landingpage";
 import PageHead from "components/page-head";
+import { PageLayoutConfig } from "layouts";
 
 interface MainPageAppProps {
   isMobileView: boolean;
@@ -19,7 +20,7 @@ const motionVariants = {
 
 const COOKIE_CONSENT_ACCEPTENCE_STATUS_KEY = "cookieconsent_status";
 
-const MainPage: NextPage<MainPageAppProps> = ({ isMobileView }) => {
+function MainPage({ isMobileView }: MainPageAppProps) {
   const [cookie, setCookie] = useCookies([
     COOKIE_CONSENT_ACCEPTENCE_STATUS_KEY,
   ]);
@@ -65,7 +66,11 @@ const MainPage: NextPage<MainPageAppProps> = ({ isMobileView }) => {
       )}
     </React.Fragment>
   );
-};
+}
+
+MainPage.layoutConfig = {
+  mt: 0,
+} as PageLayoutConfig;
 
 export async function getStaticProps({ req, locale }: NextPageContext) {
   // LEGACY FEATURE - this was required to render different image on mobile device @ Section2_design_to_code

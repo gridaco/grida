@@ -1,0 +1,24 @@
+<html>
+  <head>
+    <script src="gradient.js"></script>
+  </head>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+    }
+    #gradient-canvas {
+      --gradient-color-1: #ffc1c1;
+      --gradient-color-2: #ffffff;
+      --gradient-color-3: #ffd8b4;
+      --gradient-color-4: #ffffff;
+    }
+  </style>
+  <body>
+    <canvas id="gradient-canvas" style="width: 100vw; height: 100vh"></canvas>
+    <script>
+      var gradient = new Gradient();
+      gradient.initGradient("#gradient-canvas");
+    </script>
+  </body>
+</html>

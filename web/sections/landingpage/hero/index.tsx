@@ -5,6 +5,7 @@ import { breakpoints } from "../_breakpoints";
 import MusicHome from "../demo-app";
 import { CtaArea } from "../shared-cta-tocode";
 import { useTranslation } from "next-i18next";
+import { Background } from "./components/background";
 
 export default function HeroResponsive() {
   const { t } = useTranslation("page-index", {
@@ -40,6 +41,7 @@ export default function HeroResponsive() {
 
 const Wrapper = styled.div`
   position: relative;
+  overflow: hidden;
 
   @media ${breakpoints.xl} {
     height: 1033px;
@@ -276,30 +278,5 @@ const IPhoneXFrame = styled.div`
   opacity: 0.9;
   @media ${breakpoints.xs} {
     display: none;
-  }
-`;
-
-function Background() {
-  return (
-    <HeroGradientBgArtwork>
-      <Image
-        priority
-        layout="fill"
-        src="/assets/landingpage-hero/hero-gradient-bg.png"
-        alt="image of HeroGradientBgArtwork"
-        objectFit="cover"
-        objectPosition="center"
-      />
-    </HeroGradientBgArtwork>
-  );
-}
-
-const HeroGradientBgArtwork = styled.div`
-  z-index: -99;
-  user-select: none;
-  span {
-    position: relative;
-    transform: scale(120%);
-    z-index: -99;
   }
 `;
