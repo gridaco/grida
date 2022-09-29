@@ -60,6 +60,11 @@ const RootWrapper = styled.div`
   ${BackgroundGradient}
   box-sizing: border-box;
   overflow: hidden;
+
+  height: 1100px;
+  @media ${breakpoints.xs} {
+    height: 800px;
+  }
 `;
 
 const Contents = styled.div`

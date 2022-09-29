@@ -51,7 +51,9 @@ function MainPage({ isMobileView }: MainPageAppProps) {
       {/* <Sections.Section3_how_engine_works /> */}
       {/* <Sections.Section__BornToBeHeadLess /> */}
       {/* <Sections.Section__Opensource /> */}
+      <div style={{ height: 80 }} />
       <Sections.Section__CTASeeTheMagic />
+      <div style={{ height: 80 }} />
       {/* <Sections.Section4_features_tab /> */}
       {/* <Sections.Section5_collaboration /> */}
       <Sections.FinalCta />

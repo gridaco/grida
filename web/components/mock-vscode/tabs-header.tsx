@@ -59,7 +59,6 @@ const RootWrapperTabsHeader = styled.div`
   justify-content: space-between;
   flex-direction: row;
   align-items: start;
-  flex: 1;
   gap: 54px;
   align-self: stretch;
   background-color: rgba(37, 37, 38, 1);
