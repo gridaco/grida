@@ -43,7 +43,7 @@ export const StyledInput = styled.input`
   position: relative;
   box-shadow: 0px 4px 48px rgba(0, 0, 0, 0.12);
   font-size: 21px;
-  font-family: "Helvetica Neue", sans-serif;
+  font-family: "Inter", sans-serif;
   font-weight: 400;
   ::placeholder {
     color: rgba(210, 210, 210, 1);

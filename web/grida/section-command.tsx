@@ -177,7 +177,7 @@ const Section2HeadingAsH2 = styled.h2`
   color: white;
   text-overflow: ellipsis;
   font-size: 40px;
-  font-family: "Helvetica Neue", sans-serif;
+  font-family: "Inter", sans-serif;
   font-weight: 700;
   letter-spacing: -1px;
   line-height: 95%;
@@ -211,7 +211,7 @@ const Tagline = styled.p`
   color: white;
   text-overflow: ellipsis;
   font-size: 16px;
-  font-family: "Helvetica Neue", sans-serif;
+  font-family: "Inter", sans-serif;
   font-weight: 700;
   line-height: 167%;
   text-align: center;
@@ -222,7 +222,7 @@ const Description = styled.p`
   color: white;
   text-overflow: ellipsis;
   font-size: 16px;
-  font-family: "Helvetica Neue", sans-serif;
+  font-family: "Inter", sans-serif;
   font-weight: 400;
   line-height: 167%;
   text-align: center;

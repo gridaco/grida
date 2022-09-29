@@ -82,7 +82,7 @@ const HeadingAsH3 = styled.h3`
   color: black;
   text-overflow: ellipsis;
   font-size: 74px;
-  font-family: "Helvetica Neue", sans-serif;
+  font-family: "Inter", sans-serif;
   font-weight: 700;
   letter-spacing: -1px;
   text-align: center;

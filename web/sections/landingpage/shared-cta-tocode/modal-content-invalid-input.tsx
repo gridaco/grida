@@ -41,7 +41,7 @@ const Title = styled.span`
   color: rgba(46, 46, 46, 1);
   text-overflow: ellipsis;
   font-size: 36px;
-  font-family: "Helvetica Neue", sans-serif;
+  font-family: "Inter", sans-serif;
   font-weight: 700;
   line-height: 87%;
   text-align: center;
@@ -52,7 +52,7 @@ const Body = styled.span`
   color: rgba(104, 104, 104, 1);
   text-overflow: ellipsis;
   font-size: 24px;
-  font-family: "Helvetica Neue", sans-serif;
+  font-family: "Inter", sans-serif;
   font-weight: 400;
   line-height: 141%;
   text-align: center;

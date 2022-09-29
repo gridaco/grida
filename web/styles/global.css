@@ -1,22 +1,4 @@
 @font-face {
-  font-family: "Helvetica Neue";
-  font-weight: 400;
-  src: url("/fonts/HelveticaNeue-Regular.ttf") format("truetype");
-}
-
-@font-face {
-  font-family: "Helvetica Neue";
-  font-weight: 500;
-  src: url("/fonts/HelveticaNeue-Medium.ttf") format("truetype");
-}
-
-@font-face {
-  font-family: "Helvetica Neue";
-  font-weight: 600;
-  src: url("/fonts/HelveticaNeue-Bold.ttf") format("truetype");
-}
-
-@font-face {
   font-family: "codicon";
   font-weight: 600;
   src: url("/fonts/codicon.ttf") format("truetype");
@@ -70,7 +52,7 @@ h3,
 h4,
 h5,
 h6 {
-  font-family: "Helvetica Neue", sans-serif !important;
+  font-family: "Inter", sans-serif !important;
 }
 
 button {

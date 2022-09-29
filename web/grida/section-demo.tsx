@@ -190,7 +190,7 @@ const ProjectsMyReactAppZsh = styled.span`
   color: rgba(0, 0, 0, 0.3);
   text-overflow: ellipsis;
   font-size: 16px;
-  font-family: "Helvetica Neue", sans-serif;
+  font-family: "Inter", sans-serif;
   font-weight: 400;
   line-height: 157%;
   text-align: center;

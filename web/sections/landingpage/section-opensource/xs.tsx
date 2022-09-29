@@ -210,7 +210,7 @@ const Heading = styled.span`
   color: rgba(0, 0, 0, 1);
   text-overflow: ellipsis;
   font-size: 32px;
-  font-family: "Helvetica Neue", sans-serif;
+  font-family: "Inter", sans-serif;
   font-weight: 700;
   letter-spacing: -1px;
   line-height: 98%;
@@ -222,7 +222,7 @@ const Description = styled.span`
   color: rgba(68, 69, 69, 1);
   text-overflow: ellipsis;
   font-size: 18px;
-  font-family: "Helvetica Neue", sans-serif;
+  font-family: "Inter", sans-serif;
   font-weight: 500;
   text-align: left;
   align-self: stretch;
@@ -287,7 +287,7 @@ const Label = styled.span`
   color: rgba(125, 125, 125, 1);
   text-overflow: ellipsis;
   font-size: 24px;
-  font-family: "Helvetica Neue", sans-serif;
+  font-family: "Inter", sans-serif;
   font-weight: 500;
   text-align: left;
 `;
@@ -370,7 +370,7 @@ const Label_0001 = styled.span`
   color: rgba(35, 35, 36, 1);
   text-overflow: ellipsis;
   font-size: 13px;
-  font-family: "Helvetica Neue", sans-serif;
+  font-family: "Inter", sans-serif;
   font-weight: 400;
   text-align: left;
 `;
@@ -411,7 +411,7 @@ const Label_0002 = styled.span`
   color: rgba(141, 142, 144, 1);
   text-overflow: ellipsis;
   font-size: 13px;
-  font-family: "Helvetica Neue", sans-serif;
+  font-family: "Inter", sans-serif;
   font-weight: 400;
   text-align: left;
 `;
@@ -452,7 +452,7 @@ const Label_0003 = styled.span`
   color: rgba(141, 142, 144, 1);
   text-overflow: ellipsis;
   font-size: 13px;
-  font-family: "Helvetica Neue", sans-serif;
+  font-family: "Inter", sans-serif;
   font-weight: 400;
   text-align: left;
 `;
@@ -493,7 +493,7 @@ const Label_0004 = styled.span`
   color: rgba(141, 142, 144, 1);
   text-overflow: ellipsis;
   font-size: 13px;
-  font-family: "Helvetica Neue", sans-serif;
+  font-family: "Inter", sans-serif;
   font-weight: 400;
   text-align: left;
 `;
@@ -534,7 +534,7 @@ const Label_0005 = styled.span`
   color: rgba(141, 142, 144, 1);
   text-overflow: ellipsis;
   font-size: 13px;
-  font-family: "Helvetica Neue", sans-serif;
+  font-family: "Inter", sans-serif;
   font-weight: 400;
   text-align: left;
 `;

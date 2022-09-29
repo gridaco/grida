@@ -129,7 +129,7 @@ const Title = styled.span<{ color: string }>`
   color: ${p => p.color};
   text-overflow: ellipsis;
   font-size: 21px;
-  font-family: "Helvetica Neue", sans-serif;
+  font-family: "Inter", sans-serif;
   font-weight: 400;
   line-height: 160%;
   text-align: left;

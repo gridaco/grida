@@ -44,13 +44,13 @@ const RootWrapperHeroPrimaryInput = styled.input`
     color: rgba(181, 181, 181, 1);
     text-overflow: ellipsis;
     font-size: 18px;
-    font-family: "Helvetica Neue", sans-serif;
+    font-family: "Inter", sans-serif;
     font-weight: 400;
     line-height: 98%;
     text-align: left;
   }
   font-size: 18px;
-  font-family: "Helvetica Neue", sans-serif;
+  font-family: "Inter", sans-serif;
   font-weight: 400;
   line-height: 98%;
   text-align: left;

@@ -163,7 +163,7 @@ const Heading = styled.h1`
   color: black;
   text-overflow: ellipsis;
   font-size: 74px;
-  font-family: "Helvetica Neue", sans-serif;
+  font-family: "Inter", sans-serif;
   font-weight: 700;
   letter-spacing: -1px;
   text-align: center;
@@ -178,7 +178,7 @@ const DescriptionAsP = styled.p`
   color: rgba(0, 0, 0, 0.6);
   text-overflow: ellipsis;
   font-size: 16px;
-  font-family: "Helvetica Neue", sans-serif;
+  font-family: "Inter", sans-serif;
   font-weight: 400;
   line-height: 167%;
   text-align: center;

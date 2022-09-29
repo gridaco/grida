@@ -106,7 +106,7 @@ const Heading = styled.span`
   color: rgba(222, 222, 222, 1);
   text-overflow: ellipsis;
   font-size: 64px;
-  font-family: "Helvetica Neue", sans-serif;
+  font-family: "Inter", sans-serif;
   font-weight: 700;
   line-height: 98%;
   text-align: center;
@@ -117,7 +117,7 @@ const Desc = styled.span`
   color: rgba(161, 162, 162, 1);
   text-overflow: ellipsis;
   font-size: 24px;
-  font-family: "Helvetica Neue", sans-serif;
+  font-family: "Inter", sans-serif;
   font-weight: 500;
   line-height: 160%;
   text-align: center;
@@ -220,7 +220,7 @@ const Title = styled.span`
   color: rgba(243, 243, 243, 1);
   text-overflow: ellipsis;
   font-size: 21px;
-  font-family: "Helvetica Neue", sans-serif;
+  font-family: "Inter", sans-serif;
   font-weight: 400;
   line-height: 160%;
   text-align: left;
@@ -285,7 +285,7 @@ const Title_0001 = styled.span`
   color: rgba(135, 135, 135, 1);
   text-overflow: ellipsis;
   font-size: 21px;
-  font-family: "Helvetica Neue", sans-serif;
+  font-family: "Inter", sans-serif;
   font-weight: 400;
   line-height: 160%;
   text-align: left;
@@ -378,7 +378,7 @@ const Label = styled.span`
   color: rgba(125, 125, 125, 1);
   text-overflow: ellipsis;
   font-size: 24px;
-  font-family: "Helvetica Neue", sans-serif;
+  font-family: "Inter", sans-serif;
   font-weight: 500;
   text-align: left;
 `;

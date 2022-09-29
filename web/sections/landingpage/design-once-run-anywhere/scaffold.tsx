@@ -124,7 +124,7 @@ const Heading1 = styled.h2`
   margin-block: 0px;
   text-overflow: ellipsis;
   font-size: 64px;
-  font-family: "Helvetica Neue", sans-serif;
+  font-family: "Inter", sans-serif;
   font-weight: 700;
   ${HeadingGradient}
   text-align: center;

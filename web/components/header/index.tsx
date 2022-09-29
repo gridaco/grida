@@ -88,7 +88,7 @@ const Header = () => {
                 className="cursor"
                 style={{
                   fontSize: "18px",
-                  fontWeight: "600",
+                  fontWeight: "800",
                 }}
                 ml="8px"
               >

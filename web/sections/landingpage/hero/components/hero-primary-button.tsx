@@ -35,7 +35,7 @@ const Label = styled.span`
   color: rgba(255, 255, 255, 1);
   text-overflow: ellipsis;
   font-size: 18px;
-  font-family: "Helvetica Neue", sans-serif;
+  font-family: "Inter", sans-serif;
   font-weight: 500;
   letter-spacing: -1px;
   line-height: 98%;

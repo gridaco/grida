@@ -130,7 +130,7 @@ const Heading1 = styled.h1`
   margin-block: 0px;
   text-overflow: ellipsis;
   font-size: 80px;
-  font-family: "Helvetica Neue", sans-serif;
+  font-family: "Inter", sans-serif;
   font-weight: 700;
   letter-spacing: -2px;
   line-height: 98%;
@@ -215,7 +215,7 @@ const HeroBodyText = styled.span`
   color: rgba(0, 0, 0, 0.55);
   text-overflow: ellipsis;
   font-size: 24px;
-  font-family: "Helvetica Neue", sans-serif;
+  font-family: "Inter", sans-serif;
   font-weight: 400;
   line-height: 160%;
   text-align: left;

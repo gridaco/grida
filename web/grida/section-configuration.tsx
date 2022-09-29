@@ -179,7 +179,7 @@ const FitsIntoYourConfiguration = styled.span`
   color: white;
   text-overflow: ellipsis;
   font-size: 48px;
-  font-family: "Helvetica Neue", sans-serif;
+  font-family: "Inter", sans-serif;
   font-weight: 700;
   letter-spacing: -1px;
   line-height: 95%;
@@ -191,7 +191,7 @@ const Description = styled.span`
   color: rgba(255, 255, 255, 0.6);
   text-overflow: ellipsis;
   font-size: 16px;
-  font-family: "Helvetica Neue", sans-serif;
+  font-family: "Inter", sans-serif;
   font-weight: 400;
   line-height: 167%;
   max-width: 500px;
@@ -239,7 +239,7 @@ const Label = styled.span`
   color: rgba(255, 255, 255, 0.9);
   text-overflow: ellipsis;
   font-size: 16px;
-  font-family: "Helvetica Neue", sans-serif;
+  font-family: "Inter", sans-serif;
   font-weight: 400;
   text-align: left;
 `;
@@ -316,7 +316,7 @@ const GetStartedWithThis5MinuteGuide = styled.span`
   color: white;
   text-overflow: ellipsis;
   font-size: 32px;
-  font-family: "Helvetica Neue", sans-serif;
+  font-family: "Inter", sans-serif;
   font-weight: 700;
   line-height: 95%;
   text-align: left;

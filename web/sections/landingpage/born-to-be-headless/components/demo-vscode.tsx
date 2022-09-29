@@ -175,7 +175,7 @@ const Label = styled.span`
   color: rgba(236, 236, 236, 1);
   text-overflow: ellipsis;
   font-size: 13px;
-  font-family: "Helvetica Neue", sans-serif;
+  font-family: "Inter", sans-serif;
   font-weight: 400;
   text-align: left;
 `;
@@ -216,7 +216,7 @@ const Label_0001 = styled.span`
   color: rgba(141, 142, 144, 1);
   text-overflow: ellipsis;
   font-size: 13px;
-  font-family: "Helvetica Neue", sans-serif;
+  font-family: "Inter", sans-serif;
   font-weight: 400;
   text-align: left;
 `;
@@ -257,7 +257,7 @@ const Label_0002 = styled.span`
   color: rgba(141, 142, 144, 1);
   text-overflow: ellipsis;
   font-size: 13px;
-  font-family: "Helvetica Neue", sans-serif;
+  font-family: "Inter", sans-serif;
   font-weight: 400;
   text-align: left;
 `;
@@ -298,7 +298,7 @@ const Label_0003 = styled.span`
   color: rgba(141, 142, 144, 1);
   text-overflow: ellipsis;
   font-size: 13px;
-  font-family: "Helvetica Neue", sans-serif;
+  font-family: "Inter", sans-serif;
   font-weight: 400;
   text-align: left;
 `;
@@ -339,7 +339,7 @@ const Label_0004 = styled.span`
   color: rgba(141, 142, 144, 1);
   text-overflow: ellipsis;
   font-size: 13px;
-  font-family: "Helvetica Neue", sans-serif;
+  font-family: "Inter", sans-serif;
   font-weight: 400;
   text-align: left;
 `;
