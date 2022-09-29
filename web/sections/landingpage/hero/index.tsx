@@ -212,7 +212,7 @@ const DescriptionHolder = styled.div`
 `;
 
 const HeroBodyText = styled.span`
-  color: #727272;
+  color: rgba(0, 0, 0, 0.55);
   text-overflow: ellipsis;
   font-size: 24px;
   font-family: "Helvetica Neue", sans-serif;
