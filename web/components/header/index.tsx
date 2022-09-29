@@ -4,27 +4,21 @@ import Link from "next/link";
 import { useRouter } from "next/router";
 import React, { useState, useEffect, useCallback } from "react";
 import { Box, Flex, Text, Button } from "theme-ui";
-
 import Icon from "components/icon";
-import { useAuthState } from "utils/hooks/use-auth-state";
-import { URLS } from "utils/landingpage/constants";
 import { media } from "utils/styled/media";
-import { center, pointer } from "utils/styled/styles";
-
 import { GroupEntity, HeaderMap } from "./headermap";
 import HoverMenu from "./hover-menu";
 import { useTheme } from "@emotion/react";
 import { useTranslation } from "next-i18next";
 import { LinkWithDocsFallback } from "components/fixme";
+import { HeaderCta } from "./header-cta";
 
 const Header = () => {
   const router = useRouter();
-  const auth = useAuthState();
   const theme = useTheme();
-  const { t } = useTranslation("header");
 
   const [hoveringItem, setHoveringItem] = useState<string>();
-  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [path, setPath] = useState<string>();
 
   useEffect(() => {
@@ -34,42 +28,26 @@ const Header = () => {
         : false;
 
     // disable overflow scrolling
-    if (isMenuOpen || is_hovering_item_has_group) {
+    if (isMobileMenuOpen || is_hovering_item_has_group) {
       document.getElementsByTagName("html")[0].style.overflowY = "hidden";
     } else {
       document.getElementsByTagName("html")[0].style.overflowY = "auto";
     }
-  }, [isMenuOpen, hoveringItem]);
+  }, [isMobileMenuOpen, hoveringItem]);
 
-  const handleClickMenu = useCallback(() => setIsMenuOpen(!isMenuOpen), [
-    isMenuOpen,
-  ]);
+  const handleClickMenu = useCallback(
+    () => setIsMobileMenuOpen(!isMobileMenuOpen),
+    [isMobileMenuOpen],
+  );
 
   const showHoverMenu = useCallback((key: string) => setHoveringItem(key), []);
   const hideHoverMenu = useCallback(() => setHoveringItem(undefined), []);
-
-  const handleSignupClick = () => {
-    if (auth == "signedin") {
-      window.location.href = URLS.landing.current_app;
-    } else {
-      window.location.href = URLS.landing.signup_with_return;
-    }
-  };
-
-  const handleSigninOrMoveAppClick = () => {
-    if (auth == "signedin") {
-      // move to app
-      window.location.href = URLS.landing.current_app;
-    } else {
-      window.location.href = URLS.landing.signin_with_return;
-    }
-  };
 
   useEffect(() => {
     setPath(router.asPath);
 
     if (path != router.asPath && path != "") {
-      setIsMenuOpen(false);
+      setIsMobileMenuOpen(false);
     }
   }, [router]);
 
@@ -86,7 +64,7 @@ const Header = () => {
           mx={["20px"]}
         >
           <ResponsiveMenu className="cursor" onClick={handleClickMenu}>
-            <Icon name={isMenuOpen ? "headerClose" : "headerMenu"} />
+            <Icon name={isMobileMenuOpen ? "headerClose" : "headerMenu"} />
           </ResponsiveMenu>
 
           <Flex
@@ -130,21 +108,10 @@ const Header = () => {
               ))}
             </MenuList>
           </Flex>
-
-          <SignupButton
-            onClick={handleSignupClick}
-            style={{ opacity: isMenuOpen ? 0 : 1 }}
-            sx={{
-              fontSize: ["13px", "13px", "15px"],
-            }}
-            p={["6px 10px", "6px 10px", "9px 20px", "9px 20px"]}
-            variant="noShadow"
-          >
-            {auth == "signedin" ? t("cta-go-to-app") : t("common:sign-up")}
-          </SignupButton>
+          <HeaderCta isMobileMenuOpen={isMobileMenuOpen} />
         </Flex>
 
-        {isMenuOpen && (
+        {isMobileMenuOpen && (
           <ResponsiveMenu
             style={{
               width: "100%",
@@ -172,46 +139,7 @@ const Header = () => {
               ))}
             </Flex>
 
-            <Box>
-              <Button
-                variant="noShadow"
-                bg={theme.header.accent}
-                mb="12px"
-                disabled={auth == "signedin"}
-                style={{
-                  width: "100%",
-                  height: "35px",
-                  fontSize: "13px",
-                  opacity: (auth == "signedin") != null ? 0 : 1,
-                }}
-                onClick={handleSignupClick}
-              >
-                {t("sign-up")}
-              </Button>
-              <Button
-                variant="noShadow"
-                color={theme.header.color}
-                backgroundColor="transparent"
-                style={{
-                  ...center,
-                  ...pointer,
-                  width: "100%",
-                  height: "35px",
-                  fontSize: "13px",
-                  fontWeight: 500,
-                }}
-                onClick={handleSigninOrMoveAppClick}
-              >
-                {auth == "signedin" ? (
-                  t("cta-go-to-app")
-                ) : (
-                  <React.Fragment>
-                    <Icon name="lock" isVerticalMiddle mr="6px" />
-                    {t("sign-in")}
-                  </React.Fragment>
-                )}
-              </Button>
-            </Box>
+            <HeaderCta mobile isMobileMenuOpen />
           </ResponsiveMenu>
         )}
       </HeaderWrapper>
@@ -321,26 +249,6 @@ const Label = styled(Text)`
   }
 
   transition: all 0.1s ease-in-out;
-`;
-
-const SignupButton = styled(Button)`
-  font-weight: 500 !important;
-  height: 35px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  opacity: 0 !important;
-  color: ${p => p.theme.header.accent} !important;
-  background: none;
-  padding: 0 !important;
-
-  ${props => media(props.theme.breakpoints[0], null)} {
-    height: 25px;
-    opacity: 1 !important;
-  }
-
-  ${props => media(props.theme.breakpoints[0], null)} {
-  }
 `;
 
 const MenuList = styled.ul`
