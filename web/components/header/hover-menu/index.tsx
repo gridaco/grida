@@ -10,19 +10,17 @@ import { ProductItem } from "../product";
 
 function HoverMenu({
   item,
-  isExpand,
   onExit,
   type,
 }: {
   item: GroupEntity;
-  isExpand: boolean;
-  onExit: () => void;
+  onExit?: () => void;
   type: "mobile" | "desktop";
 }) {
   const { t } = useTranslation(["common", "header"]);
 
   const close = useCallback(() => {
-    onExit();
+    onExit?.();
   }, []);
 
   const onModalInnerClick = useCallback((e: React.MouseEvent) => {
@@ -32,56 +30,48 @@ function HoverMenu({
   return (
     <React.Fragment>
       {type === "desktop" && (
-        <Container data-expanded={isExpand}>
-          <ModalBackground onClick={close}>
-            <HoverView
-              onMouseLeave={close}
-              bg="white"
-              onClick={onModalInnerClick}
-            >
-              <ExpandHeaderContent
-                sx={{
-                  height: "100%",
-                  width: ["320px", "730px", "985px", "1040px"],
-                }}
-              >
-                {item.children.map((i, index) => {
-                  const label = t(i.label);
-                  switch (i.layout) {
-                    case "module-group": {
-                      return <ModuleGroup key={index} {...i} />;
-                    }
-                    case "module-item":
-                      return (
-                        <ModuleItem
-                          key={index}
-                          label={label}
-                          icon={i.icon}
-                          href={i.href}
-                        />
-                      );
-                    case "product-item":
-                      return (
-                        <ProductItem
-                          key={index}
-                          label={label}
-                          href={i.href}
-                          tagline={t(i.tagline)}
-                        />
-                      );
-                    case "line-item":
-                    default:
-                      return <LineItem key={index} {...i} label={label} />;
+        <Flex>
+          <HoverView
+            onMouseLeave={close}
+            bg="white"
+            onClick={onModalInnerClick}
+          >
+            <ContainerLayout type={item.label as any}>
+              {item.children.map((i, index) => {
+                const label = t(i.label);
+                switch (i.layout) {
+                  case "module-group": {
+                    return <ModuleGroup key={index} {...i} />;
                   }
-                })}
-              </ExpandHeaderContent>
-            </HoverView>
-          </ModalBackground>
-        </Container>
+                  case "module-item":
+                    return (
+                      <ModuleItem
+                        key={index}
+                        label={label}
+                        icon={i.icon}
+                        href={i.href}
+                      />
+                    );
+                  case "product-item":
+                    return (
+                      <ProductItem
+                        key={index}
+                        label={label}
+                        href={i.href}
+                        tagline={t(i.tagline)}
+                      />
+                    );
+                  case "line-item":
+                  default:
+                    return <LineItem key={index} {...i} label={label} />;
+                }
+              })}
+            </ContainerLayout>
+          </HoverView>
+        </Flex>
       )}
       {type === "mobile" && (
-        <Container
-          data-expanded={isExpand}
+        <Flex
           style={{
             flexDirection: "column",
           }}
@@ -97,7 +87,7 @@ function HoverMenu({
               tagline="Tell customer about this product. Keep it simple"
             />
           ))}
-        </Container>
+        </Flex>
       )}
     </React.Fragment>
   );
@@ -105,44 +95,58 @@ function HoverMenu({
 
 export default HoverMenu;
 
-const Container = styled(Flex)`
-  opacity: 0;
-  pointer-events: none;
-
-  &[data-expanded="true"] {
-    opacity: 1;
-    pointer-events: auto;
+function ContainerLayout({
+  type,
+  children,
+}: React.PropsWithChildren<{
+  type: "products" | "resources" | "frameworks";
+}>) {
+  switch (type) {
+    case "products": {
+      return <ProductsLayout>{children}</ProductsLayout>;
+    }
+    case "frameworks": {
+      return <GridContentLayout>{children}</GridContentLayout>;
+    }
+    case "resources": {
+      return <ResourcesLayout>{children}</ResourcesLayout>;
+    }
+    default: {
+      return <GridContentLayout>{children}</GridContentLayout>;
+    }
   }
-
-  transition: all 0.1s ease-in-out;
-`;
-
-const ModalBackground = styled.div`
-  position: fixed;
-  top: 60px;
-  left: 0;
-  bottom: 0;
-  right: 0;
-  background-color: rgba(0, 0, 0, 0.3);
-  overflow: hidden;
-  z-index: 1050;
-`;
+}
 
 const HoverView = styled(Flex)`
   position: relative;
   width: 100%;
   overflow-y: scroll;
-  box-shadow: 4px 6px 20px 0 rgba(0, 0, 0, 0.09);
   align-items: center;
   justify-content: center;
+  border-radius: 12px;
+  box-shadow: 4px 12px 24px 4px rgba(0, 0, 0, 0.09);
 `;
 
-const ExpandHeaderContent = styled(Flex)`
+const ProductsLayout = styled(Flex)`
+  flex-direction: column;
+  gap: 8px;
+  padding: 24px;
+`;
+
+const ResourcesLayout = styled(Flex)`
+  flex-direction: column;
+
+  gap: 21px;
+  padding: 24px;
+`;
+
+const GridContentLayout = styled(Flex)`
+  height: 100%;
   display: grid;
   grid-auto-flow: row;
   grid-template-columns: 1fr 1fr 1fr;
   grid-template-rows: repeat(auto-fill, 1fr);
   grid-row-gap: 21px;
-  padding-top: 21px;
-  padding-bottom: 64px;
+  padding-top: 16px;
+  padding-bottom: 32px;
 `;

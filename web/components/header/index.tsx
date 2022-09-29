@@ -2,46 +2,47 @@ import styled from "@emotion/styled";
 import { event_click_header_menu } from "analytics";
 import Link from "next/link";
 import { useRouter } from "next/router";
-import React, { useState, useEffect, useCallback } from "react";
-import { Box, Flex, Text, Button } from "theme-ui";
+import React, { useState, useEffect, useCallback, useRef } from "react";
+import { Flex, Text } from "theme-ui";
 import Icon from "components/icon";
 import { media } from "utils/styled/media";
-import { GroupEntity, HeaderMap } from "./headermap";
+import { Entity, HeaderMap } from "./headermap";
 import HoverMenu from "./hover-menu";
 import { useTheme } from "@emotion/react";
 import { useTranslation } from "next-i18next";
 import { LinkWithDocsFallback } from "components/fixme";
 import { HeaderCta } from "./header-cta";
+import {
+  useFloating,
+  useInteractions,
+  useHover,
+  shift,
+  offset,
+  arrow,
+  autoUpdate,
+} from "@floating-ui/react-dom-interactions";
+import { Arrow } from "./arrow";
 
 const Header = () => {
   const router = useRouter();
   const theme = useTheme();
 
-  const [hoveringItem, setHoveringItem] = useState<string>();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [path, setPath] = useState<string>();
 
   useEffect(() => {
-    const is_hovering_item_has_group =
-      HeaderMap.find(i => i.label === hoveringItem)?.type === "group"
-        ? true
-        : false;
-
     // disable overflow scrolling
-    if (isMobileMenuOpen || is_hovering_item_has_group) {
+    if (isMobileMenuOpen) {
       document.getElementsByTagName("html")[0].style.overflowY = "hidden";
     } else {
       document.getElementsByTagName("html")[0].style.overflowY = "auto";
     }
-  }, [isMobileMenuOpen, hoveringItem]);
+  }, [isMobileMenuOpen]);
 
   const handleClickMenu = useCallback(
     () => setIsMobileMenuOpen(!isMobileMenuOpen),
     [isMobileMenuOpen],
   );
-
-  const showHoverMenu = useCallback((key: string) => setHoveringItem(key), []);
-  const hideHoverMenu = useCallback(() => setHoveringItem(undefined), []);
 
   useEffect(() => {
     setPath(router.asPath);
@@ -94,95 +95,110 @@ const Header = () => {
                 Grida
               </ResponsiveTitle>
             </Link>
-            <MenuList>
+            <HeaderMenuList>
               {HeaderMap.map(i => (
-                <Item
+                <HeaderMenuItem
                   key={i.label}
                   variant="desktop"
                   {...i}
-                  onHover={() => {
-                    showHoverMenu(i.label);
-                  }}
-                  selected={path === i.href || hoveringItem === i.label}
+                  selected={path === i.href}
                 />
               ))}
-            </MenuList>
+            </HeaderMenuList>
           </Flex>
           <HeaderCta isMobileMenuOpen={isMobileMenuOpen} />
         </Flex>
 
         {isMobileMenuOpen && (
-          <ResponsiveMenu
-            style={{
-              width: "100%",
-              flexDirection: "column",
-              justifyContent: "space-between",
-              position: "absolute",
-              top: 0,
-              paddingTop: 60,
-              zIndex: -1,
-              height: "100vh",
-            }}
-            bg={theme.header.bg}
-            px="20px"
-            pb="24px"
-          >
-            <Flex
-              mt="24px"
-              style={{
-                flexDirection: "column",
-                gap: 24,
-              }}
-            >
-              {HeaderMap.map(i => (
-                <Item variant="mobile" key={i.label} {...i} />
-              ))}
-            </Flex>
-
-            <HeaderCta mobile isMobileMenuOpen />
-          </ResponsiveMenu>
+          <MobileExpandedMenu background={theme.header.bg} />
         )}
       </HeaderWrapper>
-
-      <div
-        style={{
-          zIndex: 10,
-        }}
-      >
-        {HeaderMap.filter(i => i.type === "group").map(
-          (i: GroupEntity, index) => (
-            <HoverMenu
-              key={index}
-              item={i}
-              isExpand={i.label == hoveringItem}
-              onExit={function(): void {
-                hideHoverMenu();
-              }}
-              // TODO:
-              type={"desktop"}
-            />
-          ),
-        )}
-      </div>
     </>
   );
 };
 
 export default Header;
 
-function Item({
+function MobileExpandedMenu({ background }: { background: string }) {
+  return (
+    <ResponsiveMenu
+      style={{
+        width: "100%",
+        flexDirection: "column",
+        justifyContent: "space-between",
+        position: "absolute",
+        top: 0,
+        paddingTop: 60,
+        zIndex: -1,
+        height: "100vh",
+      }}
+      bg={background}
+      px="20px"
+      pb="24px"
+    >
+      <Flex
+        mt="24px"
+        style={{
+          flexDirection: "column",
+          gap: 24,
+        }}
+      >
+        {HeaderMap.map(i => (
+          <HeaderMenuItem variant="mobile" key={i.label} {...i} />
+        ))}
+      </Flex>
+
+      <HeaderCta mobile isMobileMenuOpen />
+    </ResponsiveMenu>
+  );
+}
+
+function HeaderMenuItem({
   label,
   href,
   selected,
-  onHover,
   variant,
+  ...entity
 }: {
   href?: string;
   label: string;
   selected?: boolean;
-  onHover?: () => void;
   variant: "desktop" | "mobile";
-}) {
+} & Entity) {
+  const arrowRef = useRef<HTMLDivElement>();
+  const [open, setOpen] = useState(false);
+  const {
+    context,
+    x,
+    y,
+    reference,
+    floating,
+    strategy,
+    middlewareData,
+  } = useFloating({
+    placement: "bottom",
+    strategy: "absolute",
+    open,
+    onOpenChange: setOpen,
+    whileElementsMounted: autoUpdate,
+    middleware: [
+      shift({
+        padding: 40,
+      }),
+      offset({
+        mainAxis: 25,
+      }),
+      arrow({ element: arrowRef }),
+    ],
+  });
+  const { getReferenceProps, getFloatingProps } = useInteractions([
+    useHover(context, {
+      delay: { close: 100 },
+    }),
+  ]);
+
+  const { x: arrowX, y: arrowY } = middlewareData?.arrow || { x: 0, y: 0 };
+
   const { t } = useTranslation();
   const content = (
     <Label
@@ -190,11 +206,10 @@ function Item({
         // log header menu click event
         event_click_header_menu({ menu: label });
       }}
-      onMouseOver={onHover}
       className="cursor"
       mx={variant === "desktop" ? "18px" : undefined}
       my={variant === "mobile" ? "12px" : undefined}
-      data-selected={selected}
+      data-selected={selected || open}
       style={{
         fontWeight: "bold",
         fontSize: "16px",
@@ -203,18 +218,72 @@ function Item({
       {t(label)}
     </Label>
   );
-  if (href) {
-    return (
-      <li style={{ listStyle: "none" }}>
-        <LinkWithDocsFallback href={href}>
-          <a>{content}</a>
-        </LinkWithDocsFallback>
-      </li>
-    );
-  } else {
-    return <li style={{ listStyle: "none" }}>{content}</li>;
-  }
+
+  return (
+    <div {...getReferenceProps({ ref: reference })}>
+      <Li>
+        {href ? (
+          <LinkWithDocsFallback href={href}>
+            <a>{content}</a>
+          </LinkWithDocsFallback>
+        ) : (
+          content
+        )}
+      </Li>
+
+      {entity.type == "group" && variant == "desktop" && (
+        <FloatingMenuContainer
+          {...getFloatingProps({ ref: floating })}
+          data-expanded={open}
+          style={{
+            position: strategy,
+            top: y ?? 0,
+            left: x ?? 0,
+          }}
+        >
+          <div
+            id="arrow"
+            ref={arrowRef}
+            style={{
+              visibility: open ? "visible" : "hidden",
+              position: "absolute",
+              top: arrowY,
+              left: arrowX,
+              transform: "translateY(-70%)",
+              zIndex: 99,
+            }}
+          >
+            <Arrow />
+          </div>
+          <HoverMenu
+            item={{
+              ...entity,
+              label,
+            }}
+            // isExpand={open}
+            type={"desktop"}
+          />
+        </FloatingMenuContainer>
+      )}
+    </div>
+  );
 }
+
+const FloatingMenuContainer = styled.div`
+  opacity: 0;
+  pointer-events: none;
+
+  &[data-expanded="true"] {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  transition: all 0.1s ease-in-out;
+`;
+
+const Li = styled.li`
+  list-style: none;
+`;
 
 const HeaderWrapper = styled.header<{ border?: boolean }>`
   position: absolute;
@@ -251,11 +320,11 @@ const Label = styled(Text)`
   transition: all 0.1s ease-in-out;
 `;
 
-const MenuList = styled.ul`
+const HeaderMenuList = styled.ul`
   display: flex;
-  margin-left: 20px;
   align-items: center;
-  height: 24px;
+  margin: 0;
+  margin-left: 20px;
 
   ${props => media(null, props.theme.breakpoints[0])} {
     display: none;
