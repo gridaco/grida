@@ -27,6 +27,8 @@
     "@emotion/css": "^11.10.0",
     "@emotion/react": "^11.10.4",
     "@emotion/styled": "^11.10.4",
+    "@floating-ui/react-dom": "^1.0.0",
+    "@floating-ui/react-dom-interactions": "^0.10.1",
     "@grida/link-downloads": "^0.0.2",
     "@grida/link-promotions": "^0.0.2",
     "@grida/link-social": "^0.0.2",
