@@ -1,15 +1,11 @@
 import React, { useRef, useEffect } from "react";
 import styled from "@emotion/styled";
-import ClientOnly from "components/clientonly";
 import { motion } from "framer-motion";
 export function Background() {
   return (
     <HeroGradientBgArtwork>
       {/* <StaticGradient /> */}
-      <ClientOnly>
-        {/* <DynamicGradient /> */}
-        <DynamicGradientIframe />
-      </ClientOnly>
+      <DynamicGradientIframe />
     </HeroGradientBgArtwork>
   );
 }
