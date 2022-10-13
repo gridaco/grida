@@ -1,1 +1,0 @@
-# Lean the Structural Design
