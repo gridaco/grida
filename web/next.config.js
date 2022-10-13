@@ -67,6 +67,23 @@ const nextconfig = {
         destination: "/careers",
         permanent: true,
       },
+      // legal documents
+      {
+        source: "/privacy-policy",
+        destination: "/docs/support/privacy-policy",
+        permanent: false,
+      },
+      {
+        source: "/terms-and-conditions",
+        destination: "/docs/support/terms-and-conditions",
+        permanent: false,
+      },
+      {
+        source: "/cookies-policy",
+        destination: "/docs/support/cookies-policy",
+        permanent: false,
+      },
+      //
       {
         source: "/cloud/cors",
         destination: "https://cors.sh",
