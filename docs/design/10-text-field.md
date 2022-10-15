@@ -9,11 +9,17 @@ In this guide, we will learn how to..
 
 ## Anatomy
 
+## Tokens
+
+- (color) input-value
+  - `input-value/placeholder`
+  - `input-value/default`
+
 ## Transformation
 
 ## FAQ
 
 - Q: How do I handle the password type field?
-  - A: Use a combo of text-field's trailing slot and your own show/hide toggle button - [follow this read](./text-form-field#combo---password-field)
+  - A: Use a combo of text-field's trailing slot and your own show/hide toggle button - [follow this read](./19-text-field-password)
 
 ## Next - TextFormField
