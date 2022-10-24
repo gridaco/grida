@@ -43,6 +43,8 @@ export default function FileEntryEditor() {
   );
 }
 
+const action_fetchfile_id = "fetchfile";
+
 function SetupEditor({
   filekey,
   nodeid,
@@ -112,6 +114,17 @@ function SetupEditor({
           pages: pages,
         },
         canvasMode: initialCanvasMode,
+        editorTaskQueue: {
+          isBusy: true,
+          tasks: [
+            {
+              id: action_fetchfile_id,
+              name: "Figma File",
+              description: "Refreshing remote file",
+              progress: null,
+            },
+          ],
+        },
       };
     }
 

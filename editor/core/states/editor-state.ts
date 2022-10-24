@@ -28,6 +28,7 @@ export interface EditorState {
   code?: CodeRepository;
   editingModule?: EditingModule;
   devtoolsConsole?: DevtoolsConsole;
+  editorTaskQueue: EditorTaskQueue;
 }
 
 export interface EditorSnapshot {
@@ -37,6 +38,7 @@ export interface EditorSnapshot {
   selectedNodesInitial?: string[] | null;
   design: FigmaReflectRepository;
   canvasMode: TCanvasMode;
+  editorTaskQueue: EditorTaskQueue;
 }
 
 export interface FigmaReflectRepository {
@@ -132,4 +134,26 @@ export interface ConsoleLog {
     | "timeEnd"
     | "count"
     | "assert";
+}
+
+export interface EditorTaskQueue {
+  isBusy: boolean;
+  tasks: EditorTask[];
+}
+
+export interface EditorTask {
+  id: string;
+  name: string;
+  /**
+   * If the task is short-lived, wait this much ms before displaying it.
+   * @default 200 (0.2s)
+   */
+  debounce?: number;
+  description?: string;
+  cancelable?: boolean;
+  onCancel?: () => void;
+  /**
+   * 0-1, if null, it is indeterminate
+   */
+  progress: number | null;
 }
