@@ -47,6 +47,7 @@
     "re-resizable": "^6.9.1",
     "react": "^18.0.0",
     "react-dom": "^18.0.0",
+    "react-hot-toast": "^2.4.0",
     "react-hotkeys-hook": "^3.4.4",
     "react-json-tree": "^0.15.0",
     "react-resizable": "^3.0.1",

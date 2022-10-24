@@ -2,12 +2,15 @@ import React from "react";
 import { useHotkeys } from "react-hotkeys-hook";
 import { EditorImageRepositoryProvider } from "./editor-image-repository-provider";
 import { EditorPreviewDataProvider } from "./editor-preview-provider";
+import { ToastProvider } from "./editor-toast-provider";
 
 export function EditorDefaultProviders(props: { children: React.ReactNode }) {
   return (
     <ShortcutsProvider>
       <EditorImageRepositoryProvider>
-        <EditorPreviewDataProvider>{props.children}</EditorPreviewDataProvider>
+        <EditorPreviewDataProvider>
+          <ToastProvider>{props.children}</ToastProvider>
+        </EditorPreviewDataProvider>
       </EditorImageRepositoryProvider>
     </ShortcutsProvider>
   );
