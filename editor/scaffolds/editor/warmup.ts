@@ -45,7 +45,7 @@ export function pagesFrom(
   filekey: string,
   file: FileResponse
 ): FigmaReflectRepository["pages"] {
-  return file.document.children.map((page) => ({
+  return (file.document.children as Array<Canvas>).map((page) => ({
     id: page.id,
     name: page.name,
     children: page["children"]?.map((child) => {

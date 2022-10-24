@@ -1,4 +1,4 @@
-import { colorFromFills } from "@design-sdk/core/utils/colors";
+import { colorFromFills } from "@design-sdk/core/utils";
 import type { ReflectSceneNode } from "@design-sdk/figma-node";
 
 export const blurred_bg_fill = (target: ReflectSceneNode) => {

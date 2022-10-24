@@ -2,9 +2,9 @@ import { designToCode } from "@designto/code";
 import {
   ImageRepository,
   MainImageRepository,
-} from "@design-sdk/core/assets-repository";
-import { RemoteImageRepositories } from "@design-sdk/figma-remote/lib/asset-repository/image-repository";
-import { config } from "@designto/config";
+} from "@design-sdk/asset-repository";
+import { RemoteImageRepositories } from "@design-sdk/figma-remote/asset-repository";
+import { config } from "@grida/builder-config";
 import { preview_presets } from "@grida/builder-config-preset";
 import { FigmaFileStore } from "@editor/figma-file-store";
 import { convert } from "@design-sdk/figma-node-conversion";

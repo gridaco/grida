@@ -20,7 +20,8 @@ export function WebWorkerD2CVanillaPreview({ target }: VanillaPreviewProps) {
     setTimeout(() => {
       dispose = wwpreview(
         {
-          page: target.page,
+          page: "", // TODO:
+          // page: target.page,
           target: target.id,
         },
         setPreview

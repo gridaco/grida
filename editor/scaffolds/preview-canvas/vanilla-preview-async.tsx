@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from "react";
-import { config } from "@designto/config";
+import { config } from "@grida/builder-config";
 import { preview_presets } from "@grida/builder-config-preset";
 import { designToCode, Result } from "@designto/code";
-import { MainImageRepository } from "@design-sdk/core/assets-repository";
+import { MainImageRepository } from "@design-sdk/asset-repository";
 import { cachekey, cache } from "./cache";
 import { blurred_bg_fill } from "./util";
 import { PreviewContent } from "./preview-content";
@@ -50,7 +50,7 @@ export function D2CVanillaPreview({
       }
     }
     setPreview(result);
-    cache.set(target.filekey, { ...result, __image });
+    cache.set(target.filekey as string, { ...result, __image });
   };
 
   const hide_preview = isZooming || isPanning;

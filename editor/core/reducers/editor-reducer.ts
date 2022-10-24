@@ -18,8 +18,8 @@ import type {
 import { EditorState } from "core/states";
 import { useRouter } from "next/router";
 import { CanvasStateStore } from "@code-editor/canvas/stores";
+import q from "@design-sdk/query";
 import assert from "assert";
-import { find_node_by_id_under_inpage_nodes } from "@design-sdk/core/utils/query";
 
 const _editor_path_name = "/files/[key]/";
 
@@ -117,7 +117,7 @@ export function editorReducer(state: EditorState, action: Action): EditorState {
         );
 
         node
-          .map((n) => find_node_by_id_under_inpage_nodes(n, page.children))
+          .map((n) => q.getNodeByIdFrom(n, page.children))
           .map((n) => {
             n.x += translate[0];
             n.y += translate[1];

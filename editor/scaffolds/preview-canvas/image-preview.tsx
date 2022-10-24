@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { remote } from "@design-sdk/figma";
+import { fetchNodeAsImage } from "@design-sdk/figma-remote";
 
 const DEV_ONLY_FIGMA_PAT =
   process.env.NEXT_PUBLIC_DEVELOPER_FIGMA_PERSONAL_ACCESS_TOKEN;
@@ -20,18 +20,16 @@ export function FigmaFrameImageView({
   useEffect(() => {
     // fetch image from figma
     // fetch smaller one first, then fatch the full scaled.
-    remote
-      .fetchNodeAsImage(
-        filekey,
-        { personalAccessToken: DEV_ONLY_FIGMA_PAT },
-        nodeid
-        // scale = 1
-      )
-      .then((r) => {
-        console.log("fetched image from figma", r);
-        setImage_1(r.__default);
-        setImage_s(r.__default);
-      });
+    fetchNodeAsImage(
+      filekey,
+      { personalAccessToken: DEV_ONLY_FIGMA_PAT },
+      nodeid
+      // scale = 1
+    ).then((r) => {
+      console.log("fetched image from figma", r);
+      setImage_1(r.__default);
+      setImage_s(r.__default);
+    });
   }, [filekey, nodeid]);
 
   let imgscale: 1 | 0.2 = 1;
