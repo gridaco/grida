@@ -4,11 +4,17 @@ import type { SolidPaint, Paint } from "@design-sdk/figma-types";
 import { InspectorSection } from "components/inspector";
 import { useTargetContainer } from "hooks/use-target-node";
 
+const rd = (d) => Math.round((d + Number.EPSILON) * 100) / 100;
+
 export function ColorsSection() {
   const { target } = useTargetContainer();
   const colors: ReadonlyArray<Paint> = target?.fills?.filter(
     (fill) => fill.visible
   ) as ReadonlyArray<Paint>;
+
+  if (!(colors?.length > 0)) {
+    return <></>;
+  }
 
   return (
     <InspectorSection label="Colors">
@@ -58,7 +64,7 @@ function ColorChip({
   };
 
   return (
-    <ColorChipContainer
+    <ChipContainer
       onClick={onclick}
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
@@ -82,13 +88,11 @@ function ColorChip({
       >
         {text}
       </label>
-    </ColorChipContainer>
+    </ChipContainer>
   );
 }
 
-const rd = (d) => Math.round((d + Number.EPSILON) * 100) / 100;
-
-const ColorChipContainer = styled.div`
+const ChipContainer = styled.div`
   cursor: pointer;
   background: transparent;
   display: flex;

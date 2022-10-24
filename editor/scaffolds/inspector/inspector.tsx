@@ -9,6 +9,7 @@ import { LayoutSection } from "./section-layout";
 import { ColorsSection } from "./section-colors";
 import { ContentSection } from "./section-content";
 import { TypographySection } from "./section-typography";
+import { AssetsSection } from "./section-assets";
 
 export function InspectorSegment() {
   const { target } = useTargetContainer();
@@ -20,6 +21,7 @@ export function InspectorSegment() {
         <InfoSection />
         <LayoutSection />
         <ColorsSection />
+        <AssetsSection />
         <TypographySection />
         <ContentSection />
       </InspectorContainer>
