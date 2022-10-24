@@ -151,7 +151,11 @@ export function HudSurface({
                 }
               })
             ) : (
-              <SelectionGroupHighlight selections={selectedNodes} zoom={zoom} />
+              <SelectionGroupHighlight
+                selections={selectedNodes}
+                zoom={zoom}
+                readonly={readonly}
+              />
             )
           ) : (
             <></>
@@ -166,7 +170,9 @@ function SelectionGroupHighlight({
   selections,
   zoom,
   disableSizeDisplay = false,
+  readonly,
 }: {
+  readonly: boolean;
   selections: DisplayNodeMeta[];
   zoom: number;
   disableSizeDisplay?: boolean;
@@ -211,13 +217,23 @@ function SelectionGroupHighlight({
           <></>
         )}
       </>
-      <SelectHightlight
-        key={"selections-highlight"}
-        type="xywhr"
-        xywh={xywh}
-        rotation={0}
-        zoom={zoom}
-      />
+      {readonly ? (
+        <ReadonlySelectHightlight
+          key={"selections-highlight"}
+          type="xywhr"
+          xywh={xywh}
+          rotation={0}
+          zoom={zoom}
+        />
+      ) : (
+        <SelectHightlight
+          key={"selections-highlight"}
+          type="xywhr"
+          xywh={xywh}
+          rotation={0}
+          zoom={zoom}
+        />
+      )}
     </>
   );
 }

@@ -392,8 +392,6 @@ export function Canvas({
     ?.map((id) => qdoc.getNodeById(id))
     .filter(Boolean);
 
-  console.log({ selectedNodes, highlightedLayer, selected_nodes });
-
   const items = useMemo(() => {
     return nodes?.map((node) => {
       return (
