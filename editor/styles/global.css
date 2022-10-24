@@ -2,11 +2,17 @@ body {
   margin: 0px;
   padding: 0;
   font-family: "Helvetica Nueue", "Roboto", sans-serif;
-
-  /* for editor canvas */
-  overscroll-behavior-x: none;
-  overscroll-behavior-y: none;
 }
+
+/* for editor canvas */
+html {
+  overscroll-behavior-x: none;
+}
+body {
+  overscroll-behavior-x: none;
+  touch-action: none;
+}
+/* ----------------- */
 
 iframe {
   border: none;
