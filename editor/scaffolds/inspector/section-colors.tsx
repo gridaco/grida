@@ -3,6 +3,7 @@ import styled from "@emotion/styled";
 import type { SolidPaint, Paint } from "@design-sdk/figma-types";
 import { InspectorSection } from "components/inspector";
 import { useTargetContainer } from "hooks/use-target-node";
+import { copy } from "utils/clipboard";
 
 const rd = (d) => Math.round((d + Number.EPSILON) * 100) / 100;
 
@@ -59,7 +60,7 @@ function ColorChip({
   const text = snippet || rgba;
   const onclick = () => {
     // copy to clipboard
-    navigator.clipboard.writeText(text);
+    copy(text, { notify: true });
     // show toast (todo)
   };
 
