@@ -15,7 +15,7 @@ import {
   edge_scrolling,
   target_of_area,
 } from "../math";
-import { find_node_by_id_under_inpage_nodes } from "@design-sdk/core/utils";
+import q from "@design-sdk/query";
 import { LazyFrame } from "@code-editor/canvas/lazy-frame";
 import { HudCustomRenderers, HudSurface } from "../hud";
 import type { Box, XY, CanvasTransform, XYWH } from "../types";
@@ -147,7 +147,9 @@ export function Canvas({
     xy: offset,
   };
 
-  const node = (id) => find_node_by_id_under_inpage_nodes(id, nodes);
+  const qdoc = useMemo(() => q.document(nodes), [nodes]);
+
+  const node = (id) => qdoc.getNodeById(id);
 
   const onSelectNode = (...nodes: ReflectSceneNode[]) => {
     _cb_onSelectNode?.(...nodes.filter(Boolean));
@@ -311,8 +313,10 @@ export function Canvas({
 
   const is_canvas_transforming = isPanning || isZooming;
   const selected_nodes = selectedNodes
-    ?.map((id) => find_node_by_id_under_inpage_nodes(id, nodes))
+    ?.map((id) => qdoc.getNodeById(id))
     .filter(Boolean);
+
+  console.log({ selectedNodes, highlightedLayer, selected_nodes });
 
   const items = useMemo(() => {
     return nodes?.map((node) => {

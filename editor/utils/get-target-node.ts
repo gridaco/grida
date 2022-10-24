@@ -1,9 +1,7 @@
 import type { EditorState } from "core/states";
 import { DesignInput } from "@grida/builder-config/input";
-import {
-  find_node_by_id_under_inpage_nodes,
-  find_node_by_id_under_entry,
-} from "@design-sdk/core/utils";
+import type { ReflectSceneNode } from "@design-sdk/figma-node";
+import q from "@design-sdk/query";
 
 export function getTargetContainer(state: EditorState) {
   const thisPageNodes = state.selectedPage
@@ -17,8 +15,8 @@ export function getTargetContainer(state: EditorState) {
     return { target: null, root: null };
   }
 
-  const container_of_target =
-    find_node_by_id_under_inpage_nodes(targetId, thisPageNodes) || null;
+  const { root: container_of_target } =
+    q.getNodeAndRootByIdFrom<ReflectSceneNode>(targetId, thisPageNodes) || null;
 
   const root = thisPageNodes
     ? container_of_target &&
@@ -34,7 +32,6 @@ export function getTargetContainer(state: EditorState) {
           }))
     : state.design?.input;
 
-  const target =
-    find_node_by_id_under_entry(targetId, root?.entry) ?? root?.entry;
+  const target = q.getNodeByIdFrom(targetId, root?.entry) ?? root?.entry;
   return { root, target };
 }

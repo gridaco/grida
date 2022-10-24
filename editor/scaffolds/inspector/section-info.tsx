@@ -6,7 +6,7 @@ export function InfoSection() {
   const { target } = useTargetContainer();
   return (
     <Section>
-      <SceneTitle>{target?.name}</SceneTitle>
+      <SceneTitle disabled value={target?.name} />
       <SceneDescription>{"No description"}</SceneDescription>
     </Section>
   );
@@ -19,8 +19,12 @@ const Section = styled.section`
   padding: 8px;
 `;
 
-const SceneTitle = styled.h4`
+const SceneTitle = styled.input`
   margin: 0;
+  background: transparent;
+  font-size: 18px;
+  outline: none;
+  border: none;
   color: white;
   cursor: default;
   font-weight: normal;
