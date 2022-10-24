@@ -1,8 +1,8 @@
 import type { ReflectSceneNode } from "@design-sdk/figma-node";
-import type { FrameworkConfig } from "@designto/config";
+import type { FrameworkConfig } from "@grida/builder-config";
 import type { RGBA, WidgetKey } from "@reflect-ui/core";
 import type { ComponentNode } from "@design-sdk/figma-types";
-import type { DesignInput } from "@designto/config/input";
+import type { DesignInput } from "@grida/builder-config/input";
 
 /**
  * View mode of the canvas.
@@ -28,6 +28,7 @@ export interface EditorState {
   code?: CodeRepository;
   editingModule?: EditingModule;
   devtoolsConsole?: DevtoolsConsole;
+  editorTaskQueue: EditorTaskQueue;
 }
 
 export interface EditorSnapshot {
@@ -37,6 +38,7 @@ export interface EditorSnapshot {
   selectedNodesInitial?: string[] | null;
   design: FigmaReflectRepository;
   canvasMode: TCanvasMode;
+  editorTaskQueue: EditorTaskQueue;
 }
 
 export interface FigmaReflectRepository {
@@ -77,24 +79,26 @@ export interface IScenePreviewData<T> {
   initialSize: { width: number; height: number };
   isBuilding: boolean;
   meta: {
-    bundler: "vanilla" | "esbuild-wasm" | "dart-services";
+    bundler: "vanilla" | "esbuild-wasm" | "dart-services" | "flutter-daemon";
     framework: FrameworkConfig["framework"];
     reason: "fill-assets" | "initial" | "update";
   };
   updatedAt: number;
 }
 
-interface IScenePreviewDataVanillaPreview extends IScenePreviewData<string> {
+export interface IScenePreviewDataVanillaPreview
+  extends IScenePreviewData<string> {
   loader: "vanilla-html";
   source: string;
 }
 
-interface IScenePreviewDataFlutterPreview extends IScenePreviewData<string> {
-  loader: "vanilla-flutter-template";
+export interface IScenePreviewDataFlutterPreview
+  extends IScenePreviewData<string> {
+  loader: "vanilla-flutter-template" | "flutter-daemon-view";
   source: string;
 }
 
-interface IScenePreviewDataEsbuildPreview
+export interface IScenePreviewDataEsbuildPreview
   extends IScenePreviewData<{
     html: string;
     javascript: string;
@@ -136,4 +140,26 @@ export interface ConsoleLog {
     | "timeEnd"
     | "count"
     | "assert";
+}
+
+export interface EditorTaskQueue {
+  isBusy: boolean;
+  tasks: EditorTask[];
+}
+
+export interface EditorTask {
+  id: string;
+  name: string;
+  /**
+   * If the task is short-lived, wait this much ms before displaying it.
+   * @default 200 (0.2s)
+   */
+  debounce?: number;
+  description?: string;
+  cancelable?: boolean;
+  onCancel?: () => void;
+  /**
+   * 0-1, if null, it is indeterminate
+   */
+  progress: number | null;
 }

@@ -1,5 +1,10 @@
-import type { FrameworkConfig } from "@designto/config";
-import type { ConsoleLog, EditorState, ScenePreviewData } from "core/states";
+import type { FrameworkConfig } from "@grida/builder-config";
+import type {
+  ConsoleLog,
+  EditorState,
+  EditorTask,
+  ScenePreviewData,
+} from "core/states";
 
 export type WorkspaceAction =
   //
@@ -22,7 +27,8 @@ export type Action =
   | CanvasModeAction
   | PreviewAction
   | CodeEditorAction
-  | DevtoolsAction;
+  | DevtoolsAction
+  | EditorTaskAction;
 
 export type ActionType = Action["type"];
 
@@ -93,4 +99,25 @@ export interface DevtoolsConsoleAction {
 
 export interface DevtoolsConsoleClearAction {
   type: "devtools-console-clear";
+}
+
+export type EditorTaskAction =
+  | EditorTaskPushAction
+  | EditorTaskPopAction
+  | EditorTaskUpdateProgressAction;
+
+export interface EditorTaskPushAction {
+  type: "editor-task-push";
+  task: EditorTask;
+}
+
+export interface EditorTaskPopAction {
+  type: "editor-task-pop";
+  task: EditorTask | { id: string };
+}
+
+export interface EditorTaskUpdateProgressAction {
+  type: "editor-task-update-progress";
+  id: string;
+  progress: number;
 }

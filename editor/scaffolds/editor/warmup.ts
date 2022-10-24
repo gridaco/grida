@@ -41,13 +41,16 @@ export function initialReducer(
   }
 }
 
-export function pagesFrom(file: FileResponse): FigmaReflectRepository["pages"] {
-  return file.document.children.map((page: Canvas) => ({
+export function pagesFrom(
+  filekey: string,
+  file: FileResponse
+): FigmaReflectRepository["pages"] {
+  return file.document.children.map((page) => ({
     id: page.id,
     name: page.name,
     children: page["children"]?.map((child) => {
       const _mapped = mapper.mapFigmaRemoteToFigma(child);
-      return convert.intoReflectNode(_mapped);
+      return convert.intoReflectNode(_mapped, null, "rest", filekey);
     }),
     flowStartingPoints: page.flowStartingPoints,
     backgroundColor: page.backgroundColor,

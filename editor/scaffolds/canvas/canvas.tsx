@@ -2,10 +2,7 @@ import React, { useCallback } from "react";
 import styled from "@emotion/styled";
 import { Canvas } from "@code-editor/canvas";
 import { useEditorState, useWorkspace } from "core/states";
-import {
-  D2CVanillaPreview,
-  WebWorkerD2CVanillaPreview,
-} from "scaffolds/preview-canvas";
+import { WebWorkerD2CVanillaPreview } from "scaffolds/preview-canvas";
 import useMeasure from "react-use-measure";
 import { useDispatch } from "core/dispatch";
 import { FrameTitleRenderer } from "./render/frame-title";
@@ -124,7 +121,7 @@ export function VisualContentArea() {
               onSelectNode={(...nodes) => {
                 dispatch({
                   type: "select-node",
-                  node: nodes.map((n) => n.id),
+                  node: nodes.map((n) => n?.id),
                 });
               }}
               // onMoveNodeEnd={([x, y], ...nodes) => {

@@ -1,5 +1,5 @@
 import React, { useRef, useState } from "react";
-import { FlutterAppRunner } from "./flutter-app-runner";
+import { VanillaFlutterRunner } from "./flutter-app-runner";
 import { features, types, hosting } from "@base-sdk/base";
 import { nanoid } from "nanoid";
 import { ReactAppRunner } from "./react-app-runner";
@@ -23,10 +23,11 @@ export function AppRunner(props: {
   src: string;
   componentName: string;
 }) {
-  const [viewportsize, setViewportsize] = useState<{
-    height: number;
-    width: number;
-  }>(DEFAULT_SIZE);
+  const [viewportsize, setViewportsize] =
+    useState<{
+      height: number;
+      width: number;
+    }>(DEFAULT_SIZE);
   const { platform, sceneSize, src, componentName } = props;
 
   return (
@@ -108,13 +109,11 @@ function DedicatedFrameworkRunner({
           >
             open in console
           </button>
-          <FlutterAppRunner
-            width="100%"
-            height="100%"
-            q={{
-              language: "dart",
-              src: src,
-            }}
+          {/* FIXME: */}
+          {/* @ts-ignore */}
+          <VanillaFlutterRunner
+            source={src}
+            loader="vanilla-flutter-template"
           />
         </div>
       );

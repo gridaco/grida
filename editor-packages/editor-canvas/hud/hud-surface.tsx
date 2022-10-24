@@ -12,7 +12,7 @@ import { Marquee } from "../marquee";
 import { boundingbox, box_to_xywh } from "../math";
 interface HudControls {
   onSelectNode: (node: string) => void;
-  onHoverNode: (node: string) => void;
+  onHoverNode: (node: string | null) => void;
 }
 
 export interface HudCustomRenderers {
@@ -54,7 +54,7 @@ export function HudSurface({
   labelDisplayNodes: DisplayNodeMeta[];
   selectedNodes: DisplayNodeMeta[];
   hide: boolean;
-  marquee?: XYWH;
+  marquee?: XYWH | null;
   disableMarquee?: boolean;
   disableGrouping?: boolean;
   readonly: boolean;

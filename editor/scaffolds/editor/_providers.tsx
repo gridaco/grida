@@ -3,6 +3,7 @@ import { useHotkeys } from "react-hotkeys-hook";
 import { EditorImageRepositoryProvider } from "./editor-image-repository-provider";
 import { EditorPreviewDataProvider } from "./editor-preview-provider";
 import { EditorCanvasPreviewProvider } from "scaffolds/preview-canvas/editor-canvas-preview-provider";
+import { ToastProvider } from "./editor-toast-provider";
 
 export function EditorDefaultProviders(props: { children: React.ReactNode }) {
   return (
@@ -10,7 +11,7 @@ export function EditorDefaultProviders(props: { children: React.ReactNode }) {
       <EditorImageRepositoryProvider>
         <EditorCanvasPreviewProvider>
           <EditorPreviewDataProvider>
-            {props.children}
+            <ToastProvider>{props.children}</ToastProvider>
           </EditorPreviewDataProvider>
         </EditorCanvasPreviewProvider>
       </EditorImageRepositoryProvider>

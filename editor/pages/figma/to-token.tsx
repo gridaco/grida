@@ -14,8 +14,8 @@ import { useDesign } from "hooks";
 import {
   ImageRepository,
   MainImageRepository,
-} from "@design-sdk/core/assets-repository";
-import { RemoteImageRepositories } from "@design-sdk/figma-remote/lib/asset-repository/image-repository";
+} from "@design-sdk/asset-repository";
+import { RemoteImageRepositories } from "@design-sdk/figma-remote/asset-repository";
 import LoadingLayout from "layouts/loading-overlay";
 
 export default function FigmaToReflectWidgetTokenPage() {
@@ -25,7 +25,6 @@ export default function FigmaToReflectWidgetTokenPage() {
     return <LoadingLayout />;
   }
 
-  //
   //
   MainImageRepository.instance = new RemoteImageRepositories(design.file);
   MainImageRepository.instance.register(
