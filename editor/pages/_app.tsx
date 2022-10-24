@@ -43,41 +43,39 @@ function HeadInjection() {
         name="viewport"
         content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
       />
-      <script
-        dangerouslySetInnerHTML={{
+      <Script>
+        {
           // wheel + ctrl        - disable zoom on chrome / safari
           // wheel + meta (cmd)  - disable zoom on firefox-mac
-          __html: `function init() { document.body.addEventListener("wheel", (event) => {const { ctrlKey, metaKey } = event; if (ctrlKey || metaKey) { event.preventDefault(); return; }}, { passive: false });} window.addEventListener("DOMContentLoaded", init, false);`,
-        }}
-      />
+          `function init() { document.body.addEventListener("wheel", (event) => {const { ctrlKey, metaKey } = event; if (ctrlKey || metaKey) { event.preventDefault(); return; }}, { passive: false });} window.addEventListener("DOMContentLoaded", init, false);`
+        }
+      </Script>
 
-      <script
-        dangerouslySetInnerHTML={{
+      <Script>
+        {
           // Disable native context menu on non-input element
 
           // This lets us open another context menu when one is currently open.
           // This may only be needed if the pointer is a pen.
           // >> document.body.style.pointerEvents = "";
-          __html: `function disablecontextmenu() { document.oncontextmenu = (event) => { if (event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement) { return; } event.preventDefault(); document.body.style.pointerEvents = ""; }; } window.addEventListener("DOMContentLoaded", disablecontextmenu, false);`,
-        }}
-      />
+          `function disablecontextmenu() { document.oncontextmenu = (event) => { if (event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement) { return; } event.preventDefault(); document.body.style.pointerEvents = ""; }; } window.addEventListener("DOMContentLoaded", disablecontextmenu, false);`
+        }
+      </Script>
 
       {/* region Google analytics */}
       {/* https://stackoverflow.com/a/62552263 */}
-      <script
+      <Script
         async
         src="https://www.googletagmanager.com/gtag/js?id=G-7Y9DGWF5RT"
       />
-      <script
-        dangerouslySetInnerHTML={{
-          __html: `
+      <Script>
+        {`
             window.dataLayer = window.dataLayer || [];
             function gtag(){dataLayer.push(arguments);}
             gtag('js', new Date());
             gtag('config', 'G-7Y9DGWF5RT');
-        `,
-        }}
-      />
+        `}
+      </Script>
       {/* end region */}
     </Head>
   );
