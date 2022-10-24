@@ -1,8 +1,8 @@
 import type { ReflectSceneNode } from "@design-sdk/figma-node";
-import type { FrameworkConfig } from "@designto/config";
+import type { FrameworkConfig } from "@grida/builder-config";
 import type { WidgetKey } from "@reflect-ui/core";
 import type { ComponentNode } from "@design-sdk/figma-types";
-import type { DesignInput } from "@designto/config/input";
+import type { DesignInput } from "@grida/builder-config/input";
 
 /**
  * View mode of the canvas.
@@ -73,24 +73,26 @@ export interface IScenePreviewData<T> {
   initialSize: { width: number; height: number };
   isBuilding: boolean;
   meta: {
-    bundler: "vanilla" | "esbuild-wasm" | "dart-services";
+    bundler: "vanilla" | "esbuild-wasm" | "dart-services" | "flutter-daemon";
     framework: FrameworkConfig["framework"];
     reason: "fill-assets" | "initial" | "update";
   };
   updatedAt: number;
 }
 
-interface IScenePreviewDataVanillaPreview extends IScenePreviewData<string> {
+export interface IScenePreviewDataVanillaPreview
+  extends IScenePreviewData<string> {
   loader: "vanilla-html";
   source: string;
 }
 
-interface IScenePreviewDataFlutterPreview extends IScenePreviewData<string> {
-  loader: "vanilla-flutter-template";
+export interface IScenePreviewDataFlutterPreview
+  extends IScenePreviewData<string> {
+  loader: "vanilla-flutter-template" | "flutter-daemon-view";
   source: string;
 }
 
-interface IScenePreviewDataEsbuildPreview
+export interface IScenePreviewDataEsbuildPreview
   extends IScenePreviewData<{
     html: string;
     javascript: string;

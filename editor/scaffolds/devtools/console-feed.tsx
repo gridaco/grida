@@ -10,6 +10,9 @@ export function EditorConsoleFeed({ style }: { style?: React.CSSProperties }) {
       <Console
         logs={state.devtoolsConsole?.logs ?? ([] as any)}
         variant="dark"
+        styles={{
+          BASE_BACKGROUND_COLOR: "transparent",
+        }}
       />
     </div>
   );

@@ -17,7 +17,9 @@ export function FrameTitleRenderer({
   onHoverChange,
   onSelect,
   onRunClick,
+  runnable = false,
 }: FrameTitleProps & {
+  runnable?: boolean;
   onRunClick: () => void;
 }) {
   const [x, y] = xy;
@@ -41,13 +43,16 @@ export function FrameTitleRenderer({
     <FrameTitleContainer
       id="frame-title"
       onClick={onSelect}
+      onContextMenu={onSelect}
       width={selected ? Math.max(w * zoom, 40) : w * zoom}
       height={view_height}
       zIndex={selected ? 1 : 0}
       xy={[x, height_considered_y_transform]}
       {...hoverProps}
     >
-      {selected && <SelectedStatePrimaryAction onClick={onRunClick} />}
+      {selected && runnable && (
+        <SelectedStatePrimaryAction onClick={onRunClick} />
+      )}
       <FrameTitleLabel
         color={
           selected || highlight || hoverred

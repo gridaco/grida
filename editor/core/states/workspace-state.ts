@@ -1,4 +1,4 @@
-import { config } from "@designto/config";
+import { config } from "@grida/builder-config";
 import { HistoryState } from "core/states/history-state";
 
 export interface WorkspaceState {

@@ -55,12 +55,14 @@ export function IsolatedCanvas({
   building = false,
   onExit,
   onFullscreen,
+  onReload,
 }: {
   defaultSize: { width: number; height: number };
   children?: React.ReactNode;
   building?: boolean;
   onExit?: () => void;
   onFullscreen?: () => void;
+  onReload?: () => void;
 }) {
   const _margin = 20;
   const [canvasSizingRef, canvasBounds] = useMeasure();
@@ -137,9 +139,8 @@ export function IsolatedCanvas({
           {onFullscreen && (
             <ActionButton onClick={onFullscreen}>Full Screen</ActionButton>
           )}
-          {onExit && (
-            <ActionButton onClick={onExit}>End Isolation</ActionButton>
-          )}
+          {onReload && <ActionButton onClick={onReload}>Reload</ActionButton>}
+          {onExit && <ActionButton onClick={onExit}>Exit</ActionButton>}
         </Controls>
         {/* <ScalingAreaStaticRoot> */}
         <TransformContainer
@@ -180,7 +181,7 @@ const ActionButton = styled.button`
   border: none;
   cursor: pointer;
   color: white;
-  border-radius: 4px;
+  /* border-radius: 4px; */
   height: 24px;
 `;
 
@@ -196,10 +197,15 @@ const InteractiveCanvasWrapper = styled.div`
 `;
 
 const Controls = styled.div`
+  position: relative;
+  top: 16px;
   z-index: 2;
+  background-color: ${colors.color_editor_bg_on_dark};
   display: flex;
   flex-direction: row;
   justify-content: flex-end;
+  border-radius: 32px;
+  padding-right: 16px;
 `;
 
 const TransformContainer = ({
@@ -219,7 +225,7 @@ const TransformContainer = ({
     <div
       style={{
         pointerEvents: isTransitioning ? "none" : undefined,
-        transform: `scale(${scale}) translateX(${xy[0]}px) translateY(${xy[1]}px)`,
+        transform: `scale(${scale}) translate3d(${xy[0]}px, ${xy[1]}px, 0)`,
         willChange: "transform",
         transformOrigin: transformOrigin,
       }}

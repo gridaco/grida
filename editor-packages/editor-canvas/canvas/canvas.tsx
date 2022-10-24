@@ -9,13 +9,19 @@ import {
   OnPointerDownHandler,
   OnDragHandler,
 } from "../canvas-event-target";
-import { get_hovering_target, centerOf } from "../math";
-import { utils } from "@design-sdk/core";
+import {
+  target_of_point,
+  centerOf,
+  edge_scrolling,
+  target_of_area,
+} from "../math";
+import q from "@design-sdk/query";
 import { LazyFrame } from "@code-editor/canvas/lazy-frame";
-import { HudCustomRenderers, HudSurface } from "./hud-surface";
+import { HudCustomRenderers, HudSurface } from "../hud";
 import type { Box, XY, CanvasTransform, XYWH } from "../types";
 import type { FrameOptimizationFactors } from "../frame";
-const designq = utils.query;
+import { ContextMenuRoot as ContextMenu } from "@editor-ui/context-menu";
+import styled from "@emotion/styled";
 
 const INITIAL_SCALE = 0.5;
 const INITIAL_XY: XY = [0, 0];
@@ -42,7 +48,7 @@ interface CanvasState {
 type CanvasCustomRenderers = HudCustomRenderers & {
   renderItem: (
     p: {
-      node: ReflectSceneNode & { filekey: string };
+      node: ReflectSceneNode;
     } & FrameOptimizationFactors
   ) => React.ReactNode;
 };
@@ -76,7 +82,7 @@ interface HovringNode {
 export function Canvas({
   viewbound,
   renderItem,
-  onSelectNode,
+  onSelectNode: _cb_onSelectNode,
   onClearSelection,
   filekey,
   pageid,
@@ -89,7 +95,7 @@ export function Canvas({
   ...props
 }: {
   viewbound: Box;
-  onSelectNode?: (node?: ReflectSceneNode) => void;
+  onSelectNode?: (...node: ReflectSceneNode[]) => void;
   onClearSelection?: () => void;
 } & CanvasCustomRenderers &
   CanvasState & {
@@ -124,21 +130,30 @@ export function Canvas({
   }, [viewbound]);
 
   const [transformIntitialized, setTransformInitialized] = useState(false);
-  const [zoom, setZoom] = useState(initialTransform?.scale);
+  const [zoom, setZoom] = useState(initialTransform?.scale || 1);
   const [isZooming, setIsZooming] = useState(false);
-  const [offset, setOffset] = useState<[number, number]>(initialTransform?.xy);
+  const [offset, setOffset] = useState<[number, number]>(
+    initialTransform?.xy || [0, 0]
+  );
   const nonscaled_offset: XY = offset
     ? [offset[0] / zoom, offset[1] / zoom]
     : [0, 0];
   const [isPanning, setIsPanning] = useState(false);
-  const [marquee, setMarquee] = useState<XYWH>(null);
+  const [isDraggomg, setIsDragging] = useState(false);
+  const [marquee, setMarquee] = useState<XYWH | null>(null);
 
   const cvtransform: CanvasTransform = {
     scale: zoom,
     xy: offset,
   };
 
-  const node = (id) => designq.find_node_by_id_under_inpage_nodes(id, nodes);
+  const qdoc = useMemo(() => q.document(nodes), [nodes]);
+
+  const node = (id) => qdoc.getNodeById(id);
+
+  const onSelectNode = (...nodes: ReflectSceneNode[]) => {
+    _cb_onSelectNode?.(...nodes.filter(Boolean));
+  };
 
   const wshighlight = highlightedLayer
     ? ({ node: node(highlightedLayer), reason: "external" } as HovringNode)
@@ -151,17 +166,46 @@ export function Canvas({
     setHoveringLayer(wshighlight);
   }, [highlightedLayer]);
 
+  // area selection hook
+  useEffect(() => {
+    if (marquee) {
+      const area: XYWH = [
+        marquee[0] / zoom,
+        marquee[1] / zoom,
+        marquee[2] / zoom,
+        marquee[3] / zoom,
+      ];
+
+      const selections = target_of_area({
+        area,
+        tree: nodes,
+        contain: false,
+      });
+
+      // https://stackoverflow.com/a/19746771
+      const same =
+        selectedNodes.length === selections?.length &&
+        selectedNodes.every((value, index) => value === selections[index].id);
+
+      if (!same) {
+        onSelectNode?.(...selections);
+      }
+    }
+    //
+  }, [marquee]);
+
   const onPointerMove: OnPointerMoveHandler = (state) => {
-    if (isPanning || isZooming) {
+    if (isPanning || isZooming || isDraggomg) {
       // don't perform hover calculation while transforming.
       return;
     }
-    const hovering = get_hovering_target({
+    const hovering = target_of_point({
       point: state.xy,
       tree: nodes,
       zoom: zoom,
       offset: nonscaled_offset,
       margin: LAYER_HOVER_HIT_MARGIN,
+      reverse: true,
     });
 
     if (!hovering) {
@@ -187,11 +231,11 @@ export function Canvas({
       switch (hoveringLayer.reason) {
         case "frame-title":
         case "raycast":
-          onSelectNode(hoveringLayer.node);
+          onSelectNode?.(hoveringLayer.node);
           break;
       }
     } else {
-      onClearSelection();
+      onClearSelection?.();
     }
   };
 
@@ -223,44 +267,66 @@ export function Canvas({
     setOffset([newx, newy]);
   };
 
+  const onDragStart: OnDragHandler = (s) => {
+    onClearSelection?.();
+    setIsDragging(true);
+    setHoveringLayer(null);
+
+    // set the marquee start point
+    const [x, y] = s.initial;
+    const [ox, oy] = offset;
+    const [x1, y1] = [x - ox, y - oy];
+    setMarquee([x1, y1, 0, 0]);
+  };
+
   const onDrag: OnDragHandler = (s) => {
-    const [x1, y1] = s.initial;
-    const [x2, y2] = [
+    const [ox, oy] = offset;
+    const [x, y] = [
       // @ts-ignore
       s.event.clientX,
       // @ts-ignore
       s.event.clientY,
     ];
 
-    const [ox, oy] = offset;
-    const [x, y, w, h] = [
-      x1 - ox,
-      y1 - oy,
-      x2 - x1, // w
-      y2 - y1, // h
-    ];
-    setMarquee([x, y, w, h]);
+    const [x1, y1] = [x - ox, y - oy];
+
+    if (marquee) {
+      const [w, h] = [
+        x1 - marquee[0], // w
+        y1 - marquee[1], // h
+      ];
+      setMarquee([marquee[0], marquee[1], w, h]);
+    }
+
+    // edge scrolling
+    const [cx, cy] = [x, y];
+    const [dx, dy] = edge_scrolling(cx, cy, viewbound);
+    if (dx || dy) {
+      setOffset([ox + dx, oy + dy]);
+    }
   };
 
   const onDragEnd: OnDragHandler = (s) => {
     setMarquee(null);
+    setIsDragging(false);
   };
 
   const is_canvas_transforming = isPanning || isZooming;
   const selected_nodes = selectedNodes
-    ?.map((id) => designq.find_node_by_id_under_inpage_nodes(id, nodes))
+    ?.map((id) => qdoc.getNodeById(id))
     .filter(Boolean);
+
+  console.log({ selectedNodes, highlightedLayer, selected_nodes });
 
   const items = useMemo(() => {
     return nodes?.map((node) => {
-      node["filekey"] = filekey;
       return (
         <LazyFrame key={node.id} xy={[node.x, node.y]} size={node}>
           {/* 👇 dev only (for performance tracking) 👇 */}
           {/* <div style={{ width: "100%", height: "100%", background: "grey" }} /> */}
           {/* 👆 ----------------------------------- 👆 */}
           {renderItem({
-            node: node as ReflectSceneNode & { filekey: string },
+            node: node as ReflectSceneNode,
             zoom, // ? use scaled_zoom ?
             inViewport: true, // TODO:
             isZooming: isZooming,
@@ -278,67 +344,93 @@ export function Canvas({
 
   return (
     <>
-      <CanvasEventTarget
-        onPanning={onPanning}
-        onPanningStart={() => {
-          setIsPanning(true);
+      <ContextMenu
+        items={[
+          { title: "Show all layers", value: "canvas-focus-all-to-fit" },
+          "separator",
+          { title: "Run", value: "run" },
+          { title: "Deploy", value: "deploy-to-vercel" },
+          { title: "Open in Figma", value: "open-in-figma" },
+          { title: "Get sharable link", value: "make-sharable-link" },
+          { title: "Copy CSS", value: "make-css" },
+          { title: "Refresh (fetch from origin)", value: "refresh" },
+        ]}
+        onSelect={(v) => {
+          console.log("exec canvas cmd", v);
         }}
-        onPanningEnd={() => {
-          setIsPanning(false);
-          _canvas_state_store.saveLastTransform(cvtransform);
-        }}
-        onZooming={onZooming}
-        onZoomingStart={() => {
-          setIsZooming(true);
-        }}
-        onZoomingEnd={() => {
-          _canvas_state_store.saveLastTransform(cvtransform);
-          setIsZooming(false);
-        }}
-        onPointerMove={onPointerMove}
-        onPointerMoveStart={() => {}}
-        onPointerMoveEnd={() => {}}
-        onPointerDown={onPointerDown}
-        onDrag={onDrag}
-        onDragStart={() => {}} // TODO:
-        onDragEnd={onDragEnd}
       >
-        <HudSurface
-          offset={nonscaled_offset}
-          zoom={zoom}
-          hide={is_canvas_transforming}
-          readonly={readonly}
-          disableMarquee={config.marquee.disabled}
-          marquee={marquee}
-          labelDisplayNodes={nodes}
-          selectedNodes={selected_nodes}
-          highlights={
-            hoveringLayer?.node
-              ? (config.can_highlight_selected_layer
-                  ? [hoveringLayer.node]
-                  : noduplicates([hoveringLayer.node], selected_nodes)
-                ).map((h) => ({
-                  id: h.id,
-                  xywh: [h.absoluteX, h.absoluteY, h.width, h.height],
-                  rotation: h.rotation,
-                }))
-              : []
-          }
-          onHoverNode={(id) => {
-            setHoveringLayer({ node: node(id), reason: "frame-title" });
-          }}
-          onSelectNode={(id) => {
-            onSelectNode(node(id));
-          }}
-          renderFrameTitle={props.renderFrameTitle}
-        />
-      </CanvasEventTarget>
+        <Container
+          width={viewbound[2] - viewbound[0]}
+          height={viewbound[3] - viewbound[1]}
+        >
+          <CanvasEventTarget
+            onPanning={onPanning}
+            onPanningStart={() => {
+              setIsPanning(true);
+            }}
+            onPanningEnd={() => {
+              setIsPanning(false);
+              _canvas_state_store.saveLastTransform(cvtransform);
+            }}
+            onZooming={onZooming}
+            onZoomingStart={() => {
+              setIsZooming(true);
+            }}
+            onZoomingEnd={() => {
+              _canvas_state_store.saveLastTransform(cvtransform);
+              setIsZooming(false);
+            }}
+            onPointerMove={onPointerMove}
+            onPointerMoveStart={() => {}}
+            onPointerMoveEnd={() => {}}
+            onPointerDown={onPointerDown}
+            onDragStart={onDragStart}
+            onDrag={onDrag}
+            onDragEnd={onDragEnd}
+          >
+            <HudSurface
+              offset={nonscaled_offset}
+              zoom={zoom}
+              hide={is_canvas_transforming}
+              readonly={readonly}
+              disableMarquee={config.marquee.disabled}
+              marquee={marquee}
+              labelDisplayNodes={nodes}
+              selectedNodes={selected_nodes}
+              highlights={
+                hoveringLayer?.node
+                  ? (config.can_highlight_selected_layer
+                      ? [hoveringLayer.node]
+                      : noduplicates([hoveringLayer.node], selected_nodes)
+                    ).map((h) => ({
+                      id: h.id,
+                      xywh: [h.absoluteX, h.absoluteY, h.width, h.height],
+                      rotation: h.rotation,
+                    }))
+                  : []
+              }
+              onHoverNode={(id) => {
+                setHoveringLayer({ node: node(id), reason: "frame-title" });
+              }}
+              onSelectNode={(id) => {
+                onSelectNode?.(node(id));
+              }}
+              renderFrameTitle={props.renderFrameTitle}
+            />
+          </CanvasEventTarget>
+        </Container>
+      </ContextMenu>
       <CanvasTransformRoot scale={zoom} xy={nonscaled_offset}>
         <DisableBackdropFilter>{items}</DisableBackdropFilter>
       </CanvasTransformRoot>
     </>
   );
 }
+
+const Container = styled.div<{ width: number; height: number }>`
+  width: ${(p) => p.width}px;
+  height: ${(p) => p.height}px;
+`;
 
 function noduplicates(
   a: ReflectSceneNode[],
@@ -363,7 +455,7 @@ function CanvasTransformRoot({
         width: 0,
         height: 0,
         willChange: "transform",
-        transform: `scale(${scale}) translateX(${xy[0]}px) translateY(${xy[1]}px)`,
+        transform: `scale(${scale}) translate3d(${xy[0]}px, ${xy[1]}px, 0)`,
         isolation: "isolate",
       }}
     >

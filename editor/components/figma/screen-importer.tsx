@@ -1,10 +1,10 @@
 import React, { useState } from "react";
-import { nodes } from "@design-sdk/figma";
+import { ReflectSceneNode } from "@design-sdk/figma-node";
 import { fetch } from "@design-sdk/figma-remote";
 import { FigmaTargetNodeConfig } from "@design-sdk/figma-url";
 import { personal } from "@design-sdk/figma-auth-store";
 
-export type OnImportedCallback = (reflect: nodes.ReflectSceneNode) => void;
+export type OnImportedCallback = (reflect: ReflectSceneNode) => void;
 type _OnPartiallyLoadedCallback = (pack: fetch.FigmaRemoteImportPack) => void;
 
 /**
@@ -16,7 +16,7 @@ export function FigmaScreenImporter(props: {
   onImported: OnImportedCallback;
   onTargetEnter?: (target: FigmaTargetNodeConfig) => void;
 }) {
-  const [reflect, setReflect] = useState<nodes.ReflectSceneNode>();
+  const [reflect, setReflect] = useState<ReflectSceneNode>();
 
   const handleLocalDataLoad = async (partial: fetch.FigmaRemoteImportPack) => {
     const final = await fetch.completePartialPack(partial);

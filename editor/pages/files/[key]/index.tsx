@@ -6,8 +6,8 @@ import { EditorSnapshot, StateProvider } from "core/states";
 import { WorkspaceAction } from "core/actions";
 import { useDesignFile, TUseDesignFile } from "hooks";
 import { warmup } from "scaffolds/editor";
-import { FileResponse } from "@design-sdk/figma-remote-types";
 import { EditorBrowserMetaHead } from "components/editor";
+import type { FileResponse } from "@design-sdk/figma-remote-types";
 
 export default function FileEntryEditor() {
   const router = useRouter();
@@ -80,7 +80,7 @@ function SetupEditor({
     // ->> file.styles;
 
     const components = warmup.componentsFrom(file);
-    const pages = warmup.pagesFrom(file);
+    const pages = warmup.pagesFrom(filekey, file);
 
     if (prevstate) {
       val = {

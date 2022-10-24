@@ -1,5 +1,5 @@
+import type { ReflectSceneNode } from "@design-sdk/figma-node";
 import { JsxWidget } from "@web-builder/core";
-import { ReflectSceneNode } from "@design-sdk/core";
 import { Figma } from "@design-sdk/figma";
 import { Widget as ReflectWidget } from "@reflect-ui/core";
 import React from "react";

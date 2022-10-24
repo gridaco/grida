@@ -52,6 +52,7 @@ export function FrameTitle({
     <FrameTitleContainer
       id="frame-title"
       onClick={onSelect}
+      onContextMenu={onSelect}
       width={w * zoom}
       height={view_height}
       xy={[x, height_considered_y_transform]}

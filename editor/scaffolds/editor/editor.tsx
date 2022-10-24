@@ -8,6 +8,7 @@ import { EditorSidebar } from "components/editor";
 import { useEditorState } from "core/states";
 import { Canvas } from "scaffolds/canvas";
 import { CodeSegment } from "scaffolds/code";
+import { Inspector } from "scaffolds/inspector";
 import { EditorSkeleton } from "./skeleton";
 import { colors } from "theme";
 import { Appbar } from "scaffolds/appbar";
@@ -56,7 +57,7 @@ export function Editor({
             <Canvas key={_refreshkey} />
           </WorkspaceContentPanel>
           <WorkspaceContentPanel
-            hidden={state.selectedNodes.length === 0}
+            hidden={state.selectedNodes.length !== 1}
             overflow="hidden"
             flex={4}
             resize={{
@@ -66,7 +67,8 @@ export function Editor({
             zIndex={1}
             backgroundColor={colors.color_editor_bg_on_dark}
           >
-            <CodeSegment />
+            <Inspector />
+            {/* <CodeSegment /> */}
           </WorkspaceContentPanel>
           {/* {wstate.preferences.debug_mode && (
             <WorkspaceBottomPanelDockLayout resizable>
