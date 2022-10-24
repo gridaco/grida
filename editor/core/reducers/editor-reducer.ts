@@ -6,6 +6,7 @@ import type {
   CodeEditorEditComponentCodeAction,
   CanvasModeSwitchAction,
   CanvasModeGobackAction,
+  TranslateNodeAction,
   PreviewBuildingStateUpdateAction,
   PreviewSetAction,
   DevtoolsConsoleAction,
@@ -17,6 +18,7 @@ import type {
 import { EditorState } from "core/states";
 import { useRouter } from "next/router";
 import { CanvasStateStore } from "@code-editor/canvas/stores";
+import q from "@design-sdk/query";
 import assert from "assert";
 
 const _editor_path_name = "/files/[key]/";
@@ -28,10 +30,27 @@ export function editorReducer(state: EditorState, action: Action): EditorState {
   switch (action.type) {
     case "select-node": {
       const { node } = <SelectNodeAction>action;
+      const ids = Array.isArray(node) ? node : [node];
+
+      const current_node = state.selectedNodes;
+
+      if (
+        ids.length <= 1 &&
+        current_node.length <= 1 &&
+        ids[0] === current_node[0]
+      ) {
+        // same selection (no selection or same 1 selection)
+        return produce(state, (draft) => {});
+      }
+
+      if (ids.length > 1 && ids.length === current_node.length) {
+        // the selection event is always triggered by user, which means selecting same amount of nodes (greater thatn 1, and having a different node array is impossible.)
+        return produce(state, (draft) => {});
+      }
+
       console.clear();
       console.info("cleard console by editorReducer#select-node");
 
-      const ids = Array.isArray(node) ? node : [node];
       const primary = ids?.[0];
 
       // update router
@@ -87,6 +106,22 @@ export function editorReducer(state: EditorState, action: Action): EditorState {
         );
         draft.selectedPage = page;
         draft.selectedNodes = last_known_selections_of_this_page;
+      });
+    }
+    case "node-transform-translate": {
+      const { translate, node } = <TranslateNodeAction>action;
+
+      return produce(state, (draft) => {
+        const page = draft.design.pages.find(
+          (p) => p.id === state.selectedPage
+        );
+
+        node
+          .map((n) => q.getNodeByIdFrom(n, page.children))
+          .map((n) => {
+            n.x += translate[0];
+            n.y += translate[1];
+          });
       });
     }
     case "code-editor-edit-component-code": {

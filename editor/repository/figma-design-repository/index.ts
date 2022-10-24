@@ -1,9 +1,6 @@
 import { fetch } from "@design-sdk/figma-remote";
 import { FileResponse } from "@design-sdk/figma-remote-types";
-import {
-  FigmaFileStore,
-  FileResponseRecord,
-} from "store/fimga-file-store/figma-file-store";
+import { FigmaFileStore, FileResponseRecord } from "@editor/figma-file-store";
 
 export type TFetchFileForApp = (
   | fetch.FetchFileGeneratorReturnType

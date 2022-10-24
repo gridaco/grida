@@ -29,7 +29,7 @@ export function MonacoEditor(props: MonacoEditorProps) {
 
     instance.current = { editor, format };
 
-    register.initEditor(editor, monaco);
+    const dispose = register.initEditor(editor, monaco);
 
     editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, function () {
       format.run();
@@ -65,6 +65,10 @@ export function MonacoEditor(props: MonacoEditorProps) {
     editor.onDidChangeModelContent(() =>
       debounce(() => editor.saveViewState(), 200)
     );
+
+    editor.onDidDispose(() => {
+      dispose();
+    });
   };
 
   return (

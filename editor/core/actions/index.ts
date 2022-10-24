@@ -23,6 +23,7 @@ export type Action =
   | PageAction
   | SelectNodeAction
   | HighlightLayerAction
+  | CanvasEditAction
   | CanvasModeAction
   | PreviewAction
   | CodeEditorAction
@@ -35,6 +36,14 @@ export type HierarchyAction = SelectNodeAction;
 export interface SelectNodeAction {
   type: "select-node";
   node: string | string[];
+}
+
+export type CanvasEditAction = TranslateNodeAction;
+
+export interface TranslateNodeAction {
+  type: "node-transform-translate";
+  translate: [number, number];
+  node: string[];
 }
 
 export type PageAction = SelectPageAction;
