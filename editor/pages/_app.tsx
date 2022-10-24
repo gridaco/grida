@@ -6,6 +6,7 @@ import { EditorThemeProvider } from "@editor-ui/theme";
 import { MuiThemeProvider } from "theme/mui";
 import { colors } from "theme";
 import { useRouter } from "next/router";
+import "../styles/global.css";
 
 function GlobalCss() {
   return (
@@ -14,34 +15,6 @@ function GlobalCss() {
         html {
           background-color: ${colors.color_editor_bg_on_dark};
           touch-action: none;
-        }
-
-        body {
-          margin: 0px;
-          padding: 0;
-          font-family: "Helvetica Nueue", "Roboto", sans-serif;
-
-          /* for editor canvas */
-          overscroll-behavior-x: none;
-          overscroll-behavior-y: none;
-        }
-
-        iframe {
-          border: none;
-        }
-
-        h1,
-        h2,
-        h3,
-        h4,
-        h5,
-        h6,
-        p {
-          color: black;
-        }
-
-        a {
-          color: blue;
         }
       `}
     />
