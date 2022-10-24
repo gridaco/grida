@@ -158,7 +158,7 @@ export function Canvas({
     ? [offset[0] / zoom, offset[1] / zoom]
     : [0, 0];
   const [isPanning, setIsPanning] = useState(false);
-  const [isDraggimg, setIsDragging] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
   const [isMovingSelections, setIsMovingSelections] = useState(false);
   const [marquee, setMarquee] = useState<XYWH>(null);
 
@@ -220,7 +220,7 @@ export function Canvas({
   }, [marquee]);
 
   const onPointerMove: OnPointerMoveHandler = (state) => {
-    if (isPanning || isZooming || isDraggimg) {
+    if (isPanning || isZooming || isDragging) {
       // don't perform hover calculation while transforming.
       return;
     }
