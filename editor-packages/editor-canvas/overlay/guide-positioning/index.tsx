@@ -2,6 +2,7 @@ import React from "react";
 import { box_to_xywh, scale, spacing_guide } from "../../math";
 import type { Box } from "../../types";
 import * as k from "../k";
+import { SizeMeterLabelBox } from "../size-meter-label-box";
 
 export function PositionGuide({
   a,
@@ -15,6 +16,17 @@ export function PositionGuide({
   const { spacing, box: __box } = spacing_guide(a, b);
   const box = scale(__box, zoom);
   const [_t, _r, _b, _l] = spacing;
+  const sizemeterprops = (size: number) => {
+    // TODO: drop the xywh use
+    let xywh = box_to_xywh(box);
+
+    return {
+      size: Math.round(size * 10) / 10 + "px",
+      background: "orange",
+      zoom: 1,
+      xywh,
+    };
+  };
 
   return (
     <div
@@ -24,10 +36,14 @@ export function PositionGuide({
         willChange: "transform, opacity",
       }}
     >
-      <SpacingGuideLine length={_t} side={"t"} box={box} zoom={zoom} />
-      <SpacingGuideLine length={_r} side={"r"} box={box} zoom={zoom} />
-      <SpacingGuideLine length={_b} side={"b"} box={box} zoom={zoom} />
-      <SpacingGuideLine length={_l} side={"l"} box={box} zoom={zoom} />
+      <SpacingGuideLine length={_t} side={"t"} box={box} zoom={zoom} label />
+      <SizeMeterLabelBox {...sizemeterprops(_t)} />
+      <SpacingGuideLine length={_r} side={"r"} box={box} zoom={zoom} label />
+      <SizeMeterLabelBox {...sizemeterprops(_r)} />
+      <SpacingGuideLine length={_b} side={"b"} box={box} zoom={zoom} label />
+      <SizeMeterLabelBox {...sizemeterprops(_b)} />
+      <SpacingGuideLine length={_l} side={"l"} box={box} zoom={zoom} label />
+      <SizeMeterLabelBox {...sizemeterprops(_l)} />
     </div>
   );
 }
@@ -38,7 +54,9 @@ function SpacingGuideLine({
   side,
   box,
   width = 1,
+  label,
 }: {
+  label?: boolean;
   width?: number;
   length: number;
   box: Box;

@@ -1,7 +1,7 @@
 import React, { useMemo } from "react";
-import styled from "@emotion/styled";
 import type { XYWH } from "../types";
 import { xywh_to_bounding_box } from "../math";
+import * as k from "./k";
 
 const font_size = 10;
 
@@ -11,8 +11,10 @@ export function SizeMeterLabelBox({
   margin = 0,
   xywh,
   zoom,
+  background = "rgb(0, 87, 255)",
 }: {
-  size: { width: number; height: number };
+  background?: React.CSSProperties["background"];
+  size: string | { width: number; height: number };
   anchor?: "w" | "n" | "s" | "e";
   margin?: number;
 } & {
@@ -30,7 +32,11 @@ export function SizeMeterLabelBox({
   const bottomY = y2;
   const boxWidth = x2 - x1; // use this to center position the label
 
-  const text = `${+size.width.toFixed(2)} x ${+size.height.toFixed()}`;
+  const text =
+    typeof size === "string"
+      ? size
+      : `${+size.width.toFixed(2)} x ${+size.height.toFixed()}`;
+
   const labelwidth = (text.length * font_size) / 1.8; // a view width assumption (we will not use flex box for faster painting)
   const viewwidth = labelwidth + 4; // 4 is for horizontal padding
 
@@ -48,13 +54,14 @@ export function SizeMeterLabelBox({
         boxSizing: "border-box",
         whiteSpace: "nowrap",
         borderRadius: 4,
-        background: "rgb(0, 87, 255)",
+        background: background,
         padding: "2px 4px",
         color: "white",
         fontSize: font_size,
         fontFamily: "Inter, sans-serif",
         fontWeight: 500,
         textAlign: "center",
+        zIndex: k.Z_INDEX_GUIDE_LABEL,
       }}
     >
       {text}
