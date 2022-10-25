@@ -231,7 +231,7 @@ export function Canvas({
       offset: nonscaled_offset,
       margin: CANVAS_LAYER_HOVER_HIT_MARGIN,
       reverse: true,
-      ignore: (n) => selectedNodes.includes(n.id),
+      // ignore: (n) => selectedNodes.includes(n.id),
     });
 
     if (!hovering) {
@@ -256,7 +256,7 @@ export function Canvas({
       return;
     }
 
-    if (shouldStartMoveSelections([x, y])) {
+    if (!readonly && shouldStartMoveSelections([x, y])) {
       return; // don't do anything. onDrag will handle this. only block the event.
     }
 
@@ -311,7 +311,7 @@ export function Canvas({
     const [x1, y1] = [x - ox, y - oy];
 
     // if dragging a selection group bounding box, move the selected items.
-    if (shouldStartMoveSelections([x, y])) {
+    if (!readonly && shouldStartMoveSelections([x, y])) {
       setIsMovingSelections(true);
       onMoveNodeStart?.(...selectedNodes);
       return;
@@ -418,21 +418,7 @@ export function Canvas({
 
   return (
     <>
-      <ContextMenu
-        items={[
-          { title: "Show all layers", value: "canvas-focus-all-to-fit" },
-          "separator",
-          { title: "Run", value: "run" },
-          { title: "Deploy", value: "deploy-to-vercel" },
-          { title: "Open in Figma", value: "open-in-figma" },
-          { title: "Get sharable link", value: "make-sharable-link" },
-          { title: "Copy CSS", value: "make-css" },
-          { title: "Refresh (fetch from origin)", value: "refresh" },
-        ]}
-        onSelect={(v) => {
-          console.log("exec canvas cmd", v);
-        }}
-      >
+      <ContextMenuProvider>
         <Container
           width={viewbound[2] - viewbound[0]}
           height={viewbound[3] - viewbound[1]}
@@ -477,6 +463,7 @@ export function Canvas({
               marquee={marquee}
               labelDisplayNodes={nodes}
               selectedNodes={selected_nodes}
+              positionGuides={[]} // TODO:
               highlights={
                 hoveringLayer?.node
                   ? (config.can_highlight_selected_layer
@@ -493,13 +480,13 @@ export function Canvas({
                 setHoveringLayer({ node: node(id), reason: "frame-title" });
               }}
               onSelectNode={(id) => {
-                onSelectNode(node(id));
+                onSelectNode?.(node(id));
               }}
               renderFrameTitle={props.renderFrameTitle}
             />
           </CanvasEventTarget>
         </Container>
-      </ContextMenu>
+      </ContextMenuProvider>
       <CanvasBackground backgroundColor={backgroundColor} />
       <CanvasTransformRoot scale={zoom} xy={nonscaled_offset}>
         <DisableBackdropFilter>{items}</DisableBackdropFilter>
@@ -512,6 +499,28 @@ const Container = styled.div<{ width: number; height: number }>`
   width: ${(p) => p.width}px;
   height: ${(p) => p.height}px;
 `;
+
+function ContextMenuProvider({ children }: React.PropsWithChildren<{}>) {
+  return (
+    <ContextMenu
+      items={[
+        { title: "Show all layers", value: "canvas-focus-all-to-fit" },
+        "separator",
+        { title: "Run", value: "run" },
+        { title: "Deploy", value: "deploy-to-vercel" },
+        { title: "Open in Figma", value: "open-in-figma" },
+        { title: "Get sharable link", value: "make-sharable-link" },
+        { title: "Copy CSS", value: "make-css" },
+        { title: "Refresh (fetch from origin)", value: "refresh" },
+      ]}
+      onSelect={(v) => {
+        console.log("exec canvas cmd", v);
+      }}
+    >
+      {children}
+    </ContextMenu>
+  );
+}
 
 function noduplicates(
   a: ReflectSceneNode[],
