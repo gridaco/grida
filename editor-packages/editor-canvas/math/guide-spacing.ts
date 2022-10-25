@@ -35,17 +35,17 @@ interface SpacingGuide {
  * l = abs(l1 - l2)
  *
  * For example
- * - a = [10, 10, 20, 20], b = [20, 20, 30, 30], then the spacing is [10, 0, 0, 10] and the base box is [10, 10, 20, 20]
+ * - a = [10, 10, 20, 20], b = [20, 20, 30, 30], then the spacing is [10, 10, 10, 10] and the base box is [20, 20, 20, 20]
  * - a = [10, 10, 20, 20], b = [15, 15, 25, 25], then the spacing is [5, 5, 5, 5] and the base box is [15, 15, 20, 20]
- * - a = [450, 450, 550, 550], b = [0, 0, 1000, 1000], then the spacing is [450, 540, 540, 450] and the base box is [450, 450, 550, 550]
- * - a = [0, 0, 1000, 1000], b = [450, 450, 550, 550], then the spacing is [450, 540, 540, 450] and the base box is [450, 450, 550, 550]
+ * - a = [450, 450, 550, 550], b = [0, 0, 1000, 1000], then the spacing is [450, 450, 450, 450] and the base box is [450, 450, 550, 550]
+ * - a = [0, 0, 1000, 1000], b = [450, 450, 550, 550], then the spacing is [450, 450, 450, 450] and the base box is [450, 450, 550, 550]
  * - a = [0, 0, 50, 50], b = [0, 0, 20, 20], then the spacing is [0, 30, 30, 0] and the base box is [0, 0, 20, 20]
  *
  */
 export function spacing_guide(a: Box, b: Box): SpacingGuide {
   let box: Box;
 
-  // no intersection
+  // no intersection (if the interecting space is 0, it is also considered as no intersection)
   if (a[0] > b[2] || a[2] < b[0] || a[1] > b[3] || a[3] < b[1]) {
     box = a;
   }
