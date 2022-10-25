@@ -17,8 +17,6 @@ export function PositionGuide({
   const box = scale(__box, zoom);
   const [_t, _r, _b, _l] = spacing;
 
-  console.log(spacing);
-
   return (
     <div
       id="position-guide"
@@ -50,7 +48,9 @@ export function PositionGuide({
 function Conditional({
   length,
   children,
-}: React.PropsWithChildren<{ length }>) {
+}: React.PropsWithChildren<{
+  length: number;
+}>) {
   if (length > 0) {
     return <>{children}</>;
   }
@@ -89,7 +89,7 @@ function SpacingMeterLabel({
 
   return (
     <MeterLabel
-      label={Math.round(length * 10) / 10 + "px"}
+      label={(Math.round(length * 10) / 10).toString()}
       background={"orange"}
       x={tx}
       y={ty}
@@ -182,4 +182,22 @@ function SpacingGuideLine({
   );
 }
 
-function AuxiliaryLine() {}
+function AuxiliaryLine() {
+  return (
+    <div
+      style={{
+        position: "fixed",
+        pointerEvents: "none",
+        opacity: 1,
+        background: `repeating-linear-gradient(
+          to right,
+          transparent,
+          transparent 10px,
+          black 10px,
+          black 20px
+        )`,
+        zIndex: 9,
+      }}
+    />
+  );
+}

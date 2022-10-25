@@ -537,6 +537,30 @@ function position_guide({
     2
   );
 
+  if (hover) {
+    const hover_box = boundingbox(
+      [
+        [
+          hover.absoluteX,
+          hover.absoluteY,
+          hover.width,
+          hover.height,
+          hover.rotation,
+        ],
+      ],
+      2
+    );
+
+    const guide_relative_to_hover = {
+      a: a,
+      b: hover_box,
+    };
+
+    // if hovering layer - do not show spacing to the parent,
+    // return only spacing of selection to hover
+    return [guide_relative_to_hover];
+  }
+
   if (selections.length === 1) {
     const parent = selections[0].parent;
     if (parent) {
@@ -559,28 +583,6 @@ function position_guide({
 
       guides.push(guide_relative_to_parent);
     }
-  }
-
-  if (hover) {
-    const hover_box = boundingbox(
-      [
-        [
-          hover.absoluteX,
-          hover.absoluteY,
-          hover.width,
-          hover.height,
-          hover.rotation,
-        ],
-      ],
-      2
-    );
-
-    const guide_relative_to_hover = {
-      a: a,
-      b: hover_box,
-    };
-
-    guides.push(guide_relative_to_hover);
   }
 
   return guides;
