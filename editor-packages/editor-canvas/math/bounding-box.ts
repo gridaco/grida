@@ -107,3 +107,16 @@ export function box_to_xywhr(box: Box): XYWHR {
   const [x1, y1, x2, y2] = box;
   return [x1, y1, x2 - x1, y2 - y1, 0];
 }
+
+/**
+ * intersection of two boxes in format of [x1, y1, x2, y2]
+ */
+export function intersection(a: Box, b: Box): Box {
+  const [x1, y1, x2, y2] = a;
+  const [x3, y3, x4, y4] = b;
+  const x5 = Math.max(x1, x3);
+  const y5 = Math.max(y1, y3);
+  const x6 = Math.min(x2, x4);
+  const y6 = Math.min(y2, y4);
+  return [x5, y5, x6, y6];
+}
