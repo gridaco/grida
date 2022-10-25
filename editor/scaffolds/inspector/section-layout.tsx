@@ -5,17 +5,22 @@ import React from "react";
 
 export function LayoutSection() {
   const { target, root } = useTargetContainer();
-  const isroot = root?.id === target?.id;
+
+  if (!target) {
+    return <></>;
+  }
+
+  const { isRoot, x, y, width, height } = target;
 
   return (
     <InspectorSection label="Layout">
       <Line>
-        <ReadonlyProperty label={"X"} value={isroot ? 0 : target?.x} />
-        <ReadonlyProperty label={"Y"} value={isroot ? 0 : target?.y} />
+        <ReadonlyProperty label={"X"} value={isRoot ? 0 : x} />
+        <ReadonlyProperty label={"Y"} value={isRoot ? 0 : y} />
       </Line>
       <Line>
-        <ReadonlyProperty label={"W"} value={target?.width} />
-        <ReadonlyProperty label={"H"} value={target?.height} />
+        <ReadonlyProperty label={"W"} value={width} />
+        <ReadonlyProperty label={"H"} value={height} />
       </Line>
     </InspectorSection>
   );

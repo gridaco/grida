@@ -4,7 +4,11 @@ type TResultCache = Result & { __image: boolean };
 
 export const cache = {
   set: (key: string, value: TResultCache) => {
-    sessionStorage.setItem(key, JSON.stringify(value));
+    try {
+      sessionStorage.setItem(key, JSON.stringify(value));
+    } catch (e) {
+      // - TypeError: Converting circular structure to JSON
+    }
   },
   get: (key: string): TResultCache => {
     const value = sessionStorage.getItem(key);

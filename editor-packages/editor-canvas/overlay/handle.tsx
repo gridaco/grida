@@ -1,4 +1,6 @@
 import React, { forwardRef } from "react";
+import * as k from "./k";
+
 export const Handle = forwardRef(function ({
   color,
   anchor,
@@ -59,7 +61,7 @@ export const Handle = forwardRef(function ({
         transform: `translate3d(${tx}px, ${ty}px, 0)`,
         backgroundColor: color,
         cursor: cursor,
-        zIndex: 2,
+        zIndex: k.Z_INDEX_GUIDE_POSITION,
         pointerEvents: readonly ? "none" : "auto",
       }}
     />
