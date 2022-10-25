@@ -41,15 +41,18 @@ export function spacing_guide(a: Box, b: Box): SpacingGuide {
   const [a_x, a_y, a_x2, a_y2] = a;
   const [b_x, b_y, b_x2, b_y2] = b;
 
-  // no intersection (if the interecting space is 0, it is also considered as no intersection)
-  if (a[0] > b[2] || a[2] < b[0] || a[1] > b[3] || a[3] < b[1]) {
+  const intersects_x = segments_intersect(a_x, a_x2, b_x, b_x2);
+  const intersects_y = segments_intersect(a_y, a_y2, b_y, b_y2);
+
+  // no intersection
+  if (!(intersects_x && intersects_y)) {
     let t = 0;
     let r = 0;
     let b = 0;
     let l = 0;
 
     // if x axis is not intersecting
-    if (!segments_intersect(a_x, a_x2, b_x, b_x2)) {
+    if (!intersects_x) {
       // if a is on the left of b (whille no intersection in x axis)
       if (a_x < b_x) {
         r = b_x - a_x2; // +
@@ -64,7 +67,7 @@ export function spacing_guide(a: Box, b: Box): SpacingGuide {
     }
 
     // if y axis is not intersecting
-    if (!segments_intersect(a_y, a_y2, b_y, b_y2)) {
+    if (!intersects_y) {
       // if a is on the top of b
       if (a_y < b_y) {
         b = b_y - a_y2; // +
@@ -102,6 +105,7 @@ export function spacing_guide(a: Box, b: Box): SpacingGuide {
 
   // intersection
   else {
+    // TODO: this needs a case handling
     return {
       // calculate the intersection of two boxes as a coordinate [x, y, x2, y2]
       box: intersection(a, b),

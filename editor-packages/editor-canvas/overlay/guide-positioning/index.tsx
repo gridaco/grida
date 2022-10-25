@@ -182,22 +182,70 @@ function SpacingGuideLine({
   );
 }
 
-function AuxiliaryLine() {
+/* 
+<AuxiliaryLine
+  point={[a[0] + (a[2] - a[0]) / 2, a[1] + _t]}
+  side={"t"}
+  b={b}
+  zoom={zoom}
+/>; 
+
+function AuxiliaryLine({
+  point,
+  side,
+  b,
+  zoom,
+  width = 1,
+}: {
+  // target raycast point. if the point intersects with the target, the line will not be drawn.
+  point: XY;
+  // original side of the guide. the auxiliary line will be drawn in other orientation (90 / -90).
+  side: Side;
+  // the target box that the a box is being positioned against.
+  b: Box;
+  zoom: number;
+  width?: number;
+}) {
+  const d = 100;
+
+  const isvert = side === "r" || side === "l";
+  const l_scalex = isvert ? width / d : (length / d) * zoom;
+  const l_scaley = isvert ? (length / d) * zoom : width / d;
+  const box = scale(b, zoom);
+  const [bx, by, bx2, by2] = box;
+  const [, , w, h] = box_to_xywh(box);
+
+  let trans = { x: 0, y: 0 };
+
   return (
     <div
       style={{
         position: "fixed",
-        pointerEvents: "none",
+        width: d,
+        height: d,
         opacity: 1,
+        pointerEvents: "none",
+        cursor: "none",
+        willChange: "transform",
+        transformOrigin: "0px, 0px",
+        transform: `translate3d(${trans.x}px, ${trans.y}px, 0) scaleX(${l_scalex}) scaleY(${l_scaley})`,
         background: `repeating-linear-gradient(
-          to right,
+          ${__gradient_dash_direction[side]},
           transparent,
-          transparent 10px,
-          black 10px,
-          black 20px
+          transparent 1px,
+          orange 1px,
+          orange 2px
         )`,
-        zIndex: 9,
+        zIndex: k.Z_INDEX_GUIDE_POSITION,
       }}
     />
   );
 }
+
+const __gradient_dash_direction = {
+  t: "to right",
+  r: "to bottom",
+  b: "to right",
+  l: "to bottom",
+} as const;
+*/

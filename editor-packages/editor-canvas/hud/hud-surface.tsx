@@ -91,6 +91,11 @@ export function HudSurface({
       {!disableMarquee && marquee && <Marquee rect={marquee} />}
       {!hide && (
         <>
+          {/* position guide above all other generic overlays */}
+          {positionGuides.length > 0 && (
+            <PositionGuides guides={positionGuides} zoom={zoom} />
+          )}
+
           {labelDisplayNodes && (
             <div id="labels">
               {labelDisplayNodes.map((node) => {
@@ -122,6 +127,7 @@ export function HudSurface({
               })}
             </div>
           )}
+
           {highlights &&
             highlights.map((h) => {
               return (
@@ -143,10 +149,6 @@ export function HudSurface({
               readonly={readonly}
               disableGrouping={disableGrouping}
             />
-          )}
-
-          {positionGuides.length > 0 && (
-            <PositionGuides guides={positionGuides} zoom={zoom} />
           )}
         </>
       )}
