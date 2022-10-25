@@ -120,3 +120,8 @@ export function intersection(a: Box, b: Box): Box {
   const y6 = Math.min(y2, y4);
   return [x5, y5, x6, y6];
 }
+
+export function scale(box: Box, scale: number): Box {
+  const [x1, y1, x2, y2] = box;
+  return [x1 * scale, y1 * scale, x2 * scale, y2 * scale];
+}

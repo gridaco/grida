@@ -388,9 +388,19 @@ export function Canvas({
   };
 
   const is_canvas_transforming = isPanning || isZooming;
-  const selected_nodes = selectedNodes
-    ?.map((id) => qdoc.getNodeById(id))
-    .filter(Boolean);
+  const selected_nodes = useMemo(
+    () => selectedNodes?.map((id) => qdoc.getNodeById(id)).filter(Boolean),
+    [selectedNodes]
+  );
+
+  const position_guides = useMemo(
+    () =>
+      position_guide({
+        selections: selected_nodes,
+        hover: hoveringLayer?.node,
+      }),
+    [selectedNodes, hoveringLayer?.node?.id]
+  );
 
   const items = useMemo(() => {
     return nodes?.map((node) => {
@@ -463,7 +473,7 @@ export function Canvas({
               marquee={marquee}
               labelDisplayNodes={nodes}
               selectedNodes={selected_nodes}
-              positionGuides={[]} // TODO:
+              positionGuides={position_guides}
               highlights={
                 hoveringLayer?.node
                   ? (config.can_highlight_selected_layer
@@ -499,6 +509,82 @@ const Container = styled.div<{ width: number; height: number }>`
   width: ${(p) => p.width}px;
   height: ${(p) => p.height}px;
 `;
+
+/**
+ * 1. container positioning guide (static per selection)
+ * 2. relative positioning to target (hovering layer) guide
+ */
+function position_guide({
+  selections,
+  hover,
+}: {
+  selections: ReflectSceneNode[];
+  hover: ReflectSceneNode;
+}) {
+  if (selections.length === 0) {
+    return [];
+  }
+
+  const guides = [];
+  const a = boundingbox(
+    selections.map((s) => [
+      s.absoluteX,
+      s.absoluteY,
+      s.width,
+      s.height,
+      s.rotation,
+    ]),
+    2
+  );
+
+  if (selections.length === 1) {
+    const parent = selections[0].parent;
+    if (parent) {
+      const parent_box = boundingbox(
+        [
+          [
+            parent.absoluteX,
+            parent.absoluteY,
+            parent.width,
+            parent.height,
+            parent.rotation,
+          ],
+        ],
+        2
+      );
+      const guide_relative_to_parent = {
+        a: a,
+        b: parent_box,
+      };
+
+      guides.push(guide_relative_to_parent);
+    }
+  }
+
+  if (hover) {
+    const hover_box = boundingbox(
+      [
+        [
+          hover.absoluteX,
+          hover.absoluteY,
+          hover.width,
+          hover.height,
+          hover.rotation,
+        ],
+      ],
+      2
+    );
+
+    const guide_relative_to_hover = {
+      a: a,
+      b: hover_box,
+    };
+
+    guides.push(guide_relative_to_hover);
+  }
+
+  return guides;
+}
 
 function ContextMenuProvider({ children }: React.PropsWithChildren<{}>) {
   return (

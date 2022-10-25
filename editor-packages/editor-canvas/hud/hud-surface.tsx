@@ -5,9 +5,10 @@ import {
   InSelectionGroupSelectHighlight,
   SelectHightlight,
   SizeMeterLabelBox,
+  PositionGuide,
 } from "../overlay";
 import { FrameTitle, FrameTitleProps } from "../frame-title";
-import type { XY, XYWH } from "../types";
+import type { Box, XY, XYWH } from "../types";
 import { Marquee } from "../marquee";
 import { boundingbox, box_to_xywh } from "../math";
 interface HudControls {
@@ -32,13 +33,22 @@ export interface DisplayNodeMeta {
   rotation: number;
 }
 
+/**
+ * Position guide display between a, b. where a, b represented as a bounding box.
+ */
+interface PositionGuideMeta {
+  a: Box;
+  b: Box;
+}
+
 export function HudSurface({
   offset,
-  highlights,
   zoom,
   hide,
-  labelDisplayNodes,
-  selectedNodes,
+  highlights = [],
+  labelDisplayNodes = [],
+  selectedNodes = [],
+  positionGuides = [],
   readonly,
   disableGrouping = false,
   onSelectNode,
@@ -50,9 +60,10 @@ export function HudSurface({
 }: {
   offset: XY;
   zoom: number;
-  highlights: { id: string; xywh: XYWH; rotation: number }[];
-  labelDisplayNodes: DisplayNodeMeta[];
-  selectedNodes: DisplayNodeMeta[];
+  highlights?: { id: string; xywh: XYWH; rotation: number }[];
+  positionGuides?: PositionGuideMeta[];
+  labelDisplayNodes?: DisplayNodeMeta[];
+  selectedNodes?: DisplayNodeMeta[];
   hide: boolean;
   marquee?: XYWH | null;
   disableMarquee?: boolean;
@@ -80,31 +91,37 @@ export function HudSurface({
       {!disableMarquee && marquee && <Marquee rect={marquee} />}
       {!hide && (
         <>
-          {labelDisplayNodes &&
-            labelDisplayNodes.map((node) => {
-              const absxy: XY = [node.absoluteX * zoom, node.absoluteY * zoom];
-              return renderFrameTitle({
-                id: node.id,
-                name: node.name,
-                xy: absxy,
-                wh: [node.width, node.height],
-                zoom: zoom,
-                selected: selectedNodes.some(
-                  (selectedNode) => selectedNode.id === node.id
-                ),
-                onSelect: () => onSelectNode(node.id),
-                onHoverChange: (hv) => {
-                  if (hv) {
-                    onHoverNode(node.id);
-                  } else {
-                    onHoverNode(null);
-                  }
-                },
-                highlight: !![...highlights, ...selectedNodes].find(
-                  (n) => n.id === node.id
-                ),
-              });
-            })}
+          {labelDisplayNodes && (
+            <div id="labels">
+              {labelDisplayNodes.map((node) => {
+                const absxy: XY = [
+                  node.absoluteX * zoom,
+                  node.absoluteY * zoom,
+                ];
+                return renderFrameTitle({
+                  id: node.id,
+                  name: node.name,
+                  xy: absxy,
+                  wh: [node.width, node.height],
+                  zoom: zoom,
+                  selected: selectedNodes.some(
+                    (selectedNode) => selectedNode.id === node.id
+                  ),
+                  onSelect: () => onSelectNode(node.id),
+                  onHoverChange: (hv) => {
+                    if (hv) {
+                      onHoverNode(node.id);
+                    } else {
+                      onHoverNode(null);
+                    }
+                  },
+                  highlight: !![...highlights, ...selectedNodes].find(
+                    (n) => n.id === node.id
+                  ),
+                });
+              })}
+            </div>
+          )}
           {highlights &&
             highlights.map((h) => {
               return (
@@ -118,47 +135,18 @@ export function HudSurface({
                 />
               );
             })}
-          {selectedNodes?.length ? (
-            disableGrouping ? (
-              selectedNodes.map((s) => {
-                const xywh: [number, number, number, number] = [
-                  s.absoluteX,
-                  s.absoluteY,
-                  s.width,
-                  s.height,
-                ];
-                if (readonly) {
-                  return (
-                    <ReadonlySelectHightlight
-                      key={s.id}
-                      type="xywhr"
-                      xywh={xywh}
-                      rotation={s.rotation}
-                      zoom={zoom}
-                      width={1}
-                    />
-                  );
-                } else {
-                  return (
-                    <SelectHightlight
-                      key={s.id}
-                      type="xywhr"
-                      xywh={xywh}
-                      rotation={s.rotation}
-                      zoom={zoom}
-                    />
-                  );
-                }
-              })
-            ) : (
-              <SelectionGroupHighlight
-                selections={selectedNodes}
-                zoom={zoom}
-                readonly={readonly}
-              />
-            )
-          ) : (
-            <></>
+
+          {selectedNodes.length > 0 && (
+            <SelectionsHighlight
+              selections={selectedNodes}
+              zoom={zoom}
+              readonly={readonly}
+              disableGrouping={disableGrouping}
+            />
+          )}
+
+          {positionGuides.length > 0 && (
+            <PositionGuides guides={positionGuides} zoom={zoom} />
           )}
         </>
       )}
@@ -166,17 +154,78 @@ export function HudSurface({
   );
 }
 
-function SelectionGroupHighlight({
+/**
+ * this only supports readonly mode for now.
+ */
+function PositionGuides({
+  guides,
+  zoom,
+}: {
+  guides: PositionGuideMeta[];
+  zoom: number;
+}) {
+  return (
+    <>
+      {guides.map((guide) => {
+        return <PositionGuide a={guide.a} b={guide.b} zoom={zoom} />;
+      })}
+    </>
+  );
+}
+
+// interface PositioningGuidePreferences{
+// }
+
+function SelectionsHighlight({
   selections,
   zoom,
   disableSizeDisplay = false,
+  disableGrouping,
   readonly,
 }: {
   readonly: boolean;
   selections: DisplayNodeMeta[];
   zoom: number;
+  disableGrouping?: boolean;
   disableSizeDisplay?: boolean;
 }) {
+  if (disableGrouping) {
+    return (
+      <>
+        {selections.map((s) => {
+          const xywh: [number, number, number, number] = [
+            s.absoluteX,
+            s.absoluteY,
+            s.width,
+            s.height,
+          ];
+          if (readonly) {
+            return (
+              <ReadonlySelectHightlight
+                key={s.id}
+                type="xywhr"
+                xywh={xywh}
+                rotation={s.rotation}
+                zoom={zoom}
+                width={1}
+              />
+            );
+          } else {
+            return (
+              <SelectHightlight
+                key={s.id}
+                type="xywhr"
+                xywh={xywh}
+                rotation={s.rotation}
+                zoom={zoom}
+              />
+            );
+          }
+        })}
+      </>
+    );
+  }
+
   const box = boundingbox(
     selections.map((d) => {
       return [d.absoluteX, d.absoluteY, d.width, d.height, d.rotation];
