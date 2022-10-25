@@ -51,11 +51,30 @@ export function spacing_guide(a: Box, b: Box): SpacingGuide {
   // a contains b
   else if (a[0] <= b[0] && a[1] <= b[1] && a[2] >= b[2] && a[3] >= b[3]) {
     box = b;
+
+    return {
+      box,
+      spacing: [
+        Math.abs(a[1] - b[1]),
+        Math.abs(a[2] - b[2]),
+        Math.abs(a[3] - b[3]),
+        Math.abs(a[0] - b[0]),
+      ],
+    };
   }
 
   // b contains a
   else if (a[0] >= b[0] && a[1] >= b[1] && a[2] <= b[2] && a[3] <= b[3]) {
     box = a;
+    return {
+      box,
+      spacing: [
+        Math.abs(a[1] - b[1]),
+        Math.abs(a[2] - b[2]),
+        Math.abs(a[3] - b[3]),
+        Math.abs(a[0] - b[0]),
+      ],
+    };
   }
 
   // intersection

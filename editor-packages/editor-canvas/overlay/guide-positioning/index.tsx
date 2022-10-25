@@ -2,7 +2,7 @@ import React from "react";
 import { box_to_xywh, scale, spacing_guide } from "../../math";
 import type { Box } from "../../types";
 import * as k from "../k";
-import { SizeMeterLabelBox } from "../size-meter-label-box";
+import { MeterLabel } from "../meter-label";
 
 export function PositionGuide({
   a,
@@ -16,17 +16,8 @@ export function PositionGuide({
   const { spacing, box: __box } = spacing_guide(a, b);
   const box = scale(__box, zoom);
   const [_t, _r, _b, _l] = spacing;
-  const sizemeterprops = (size: number) => {
-    // TODO: drop the xywh use
-    let xywh = box_to_xywh(box);
 
-    return {
-      size: Math.round(size * 10) / 10 + "px",
-      background: "orange",
-      zoom: 1,
-      xywh,
-    };
-  };
+  console.log(spacing);
 
   return (
     <div
@@ -36,17 +27,87 @@ export function PositionGuide({
         willChange: "transform, opacity",
       }}
     >
-      <SpacingGuideLine length={_t} side={"t"} box={box} zoom={zoom} label />
-      <SizeMeterLabelBox {...sizemeterprops(_t)} />
-      <SpacingGuideLine length={_r} side={"r"} box={box} zoom={zoom} label />
-      <SizeMeterLabelBox {...sizemeterprops(_r)} />
-      <SpacingGuideLine length={_b} side={"b"} box={box} zoom={zoom} label />
-      <SizeMeterLabelBox {...sizemeterprops(_b)} />
-      <SpacingGuideLine length={_l} side={"l"} box={box} zoom={zoom} label />
-      <SizeMeterLabelBox {...sizemeterprops(_l)} />
+      <Conditional length={_t}>
+        <SpacingGuideLine length={_t} side="t" box={box} zoom={zoom} />
+        <SpacingMeterLabel length={_t} side="t" box={__box} zoom={zoom} />
+      </Conditional>
+      <Conditional length={_r}>
+        <SpacingGuideLine length={_r} side="r" box={box} zoom={zoom} />
+        <SpacingMeterLabel length={_r} side="r" box={__box} zoom={zoom} />
+      </Conditional>
+      <Conditional length={_b}>
+        <SpacingGuideLine length={_b} side="b" box={box} zoom={zoom} />
+        <SpacingMeterLabel length={_b} side="b" box={__box} zoom={zoom} />
+      </Conditional>
+      <Conditional length={_l}>
+        <SpacingGuideLine length={_l} side="l" box={box} zoom={zoom} />
+        <SpacingMeterLabel length={_l} side="l" box={__box} zoom={zoom} />
+      </Conditional>
     </div>
   );
 }
+
+function Conditional({
+  length,
+  children,
+}: React.PropsWithChildren<{ length }>) {
+  if (length > 0) {
+    return <>{children}</>;
+  }
+  return <></>;
+}
+
+function SpacingMeterLabel({
+  side,
+  length,
+  box,
+  zoom,
+}: {
+  side: Side;
+  length: number;
+  box: Box;
+  zoom: number;
+}) {
+  const [x, y, x2, y2] = box;
+
+  let tx = x + (x2 - x) / 2;
+  let ty = y + (y2 - y) / 2;
+  switch (side) {
+    case "t":
+      ty = y - length / 2;
+      break;
+    case "r":
+      tx = x2 + length / 2;
+      break;
+    case "b":
+      ty = y2 + length / 2;
+      break;
+    case "l":
+      tx = x - length / 2;
+      break;
+  }
+
+  return (
+    <MeterLabel
+      label={Math.round(length * 10) / 10 + "px"}
+      background={"orange"}
+      x={tx}
+      y={ty}
+      margin={4}
+      anchor={__label_anchor_map[side]}
+      zoom={zoom}
+    />
+  );
+}
+
+const __label_anchor_map = {
+  t: "e",
+  r: "s",
+  b: "e",
+  l: "s",
+} as const;
+
+type Side = "t" | "r" | "b" | "l";
 
 function SpacingGuideLine({
   length,
@@ -54,14 +115,12 @@ function SpacingGuideLine({
   side,
   box,
   width = 1,
-  label,
 }: {
-  label?: boolean;
   width?: number;
   length: number;
   box: Box;
   zoom: number;
-  side: "t" | "r" | "b" | "l";
+  side: Side;
 }) {
   const d = 100;
 

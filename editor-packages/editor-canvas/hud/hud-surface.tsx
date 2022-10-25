@@ -4,7 +4,7 @@ import {
   ReadonlySelectHightlight,
   InSelectionGroupSelectHighlight,
   SelectHightlight,
-  SizeMeterLabelBox,
+  SizeMeterLabel,
   PositionGuide,
 } from "../overlay";
 import { FrameTitle, FrameTitleProps } from "../frame-title";
@@ -252,10 +252,9 @@ function SelectionsHighlight({
       </>
       <>
         {!disableSizeDisplay ? (
-          <SizeMeterLabelBox
-            xywh={xywh}
+          <SizeMeterLabel
+            box={box}
             zoom={zoom}
-            anchor="s"
             margin={8}
             size={{
               width: w,
