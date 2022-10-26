@@ -11,9 +11,10 @@ import type {
   PreviewSetAction,
   DevtoolsConsoleAction,
   DevtoolsConsoleClearAction,
-  EditorTaskPushAction,
-  EditorTaskPopAction,
-  EditorTaskUpdateProgressAction,
+  BackgroundTaskPushAction,
+  BackgroundTaskPopAction,
+  BackgroundTaskUpdateProgressAction,
+  EditorModeSwitchAction,
 } from "core/actions";
 import { EditorState } from "core/states";
 import { useRouter } from "next/router";
@@ -28,6 +29,22 @@ export function editorReducer(state: EditorState, action: Action): EditorState {
   const filekey = state.design.key;
 
   switch (action.type) {
+    case "mode": {
+      const { mode } = <EditorModeSwitchAction>action;
+      return produce(state, (draft) => {
+        switch (mode) {
+          case "code":
+            draft.canvasMode = "isolated-view";
+            break;
+          case "inspect":
+          case "view":
+          default:
+            draft.canvasMode = "free";
+        }
+
+        draft.mode = mode;
+      });
+    }
     case "select-node": {
       const { node } = <SelectNodeAction>action;
       const ids = Array.isArray(node) ? node : [node];
@@ -145,6 +162,14 @@ export function editorReducer(state: EditorState, action: Action): EditorState {
       });
 
       return produce(state, (draft) => {
+        if (mode === "isolated-view") {
+          // on isolation mode, switch the editor mode to code.
+          draft.mode = "code";
+        } else {
+          // needs to be fixed once more modes are added.
+          draft.mode = "view";
+        }
+
         draft.canvasMode_previous = draft.canvasMode;
         draft.canvasMode = mode;
       });
@@ -226,7 +251,7 @@ export function editorReducer(state: EditorState, action: Action): EditorState {
       break;
     }
     case "editor-task-push": {
-      const { task } = <EditorTaskPushAction>action;
+      const { task } = <BackgroundTaskPushAction>action;
       const { id } = task;
       // TODO: check id duplication
 
@@ -236,7 +261,7 @@ export function editorReducer(state: EditorState, action: Action): EditorState {
       break;
     }
     case "editor-task-pop": {
-      const { task } = <EditorTaskPopAction>action;
+      const { task } = <BackgroundTaskPopAction>action;
       const { id } = task;
 
       return produce(state, (draft) => {
@@ -248,7 +273,7 @@ export function editorReducer(state: EditorState, action: Action): EditorState {
       break;
     }
     case "editor-task-update-progress": {
-      const { id, progress } = <EditorTaskUpdateProgressAction>action;
+      const { id, progress } = <BackgroundTaskUpdateProgressAction>action;
       return produce(state, (draft) => {
         draft.editorTaskQueue.tasks.find((i) => i.id !== id).progress =
           progress;

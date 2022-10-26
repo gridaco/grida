@@ -6,18 +6,21 @@ import { useWorkspaceState } from "core/states";
 import { MonacoEditor } from "components/code-editor";
 import { InspectorSection } from "components/inspector";
 import { Button } from "@editor-ui/button";
-import styled from "@emotion/styled";
+import { useDispatch } from "core/dispatch";
 
 export function CodeSection() {
   const wstate = useWorkspaceState();
   const { target, root } = useTargetContainer();
   const [result, setResult] = useState<Result>();
+  const dispatch = useDispatch();
 
   const on_result = (result: Result) => {
     setResult(result);
   };
 
-  const on_open = () => {};
+  const on_open = () => {
+    dispatch({ type: "mode", mode: "code" });
+  };
 
   useEffect(() => {
     if (target) {

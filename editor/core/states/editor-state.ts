@@ -6,10 +6,18 @@ import type { DesignInput } from "@grida/builder-config/input";
 
 /**
  * View mode of the canvas.
- * - full - default
+ * - free - default
  * - isolated - focus to one scene
  */
 type TCanvasMode = "free" | "isolated-view" | "fullscreen-preview";
+
+/**
+ * Task mode of the editor.
+ * - view - default
+ * - code - with coding editor
+ * - inspect - with inspector
+ */
+type TUserTaskMode = "view" | "code" | "inspect";
 
 export interface EditorState {
   selectedPage: string;
@@ -22,6 +30,7 @@ export interface EditorState {
    */
   selectedNodesInitial?: string[] | null;
   design: FigmaReflectRepository;
+  mode: TUserTaskMode;
   canvasMode: TCanvasMode;
   canvasMode_previous?: TCanvasMode;
   currentPreview?: ScenePreviewData;

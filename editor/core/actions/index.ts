@@ -7,10 +7,9 @@ import type {
 } from "core/states";
 
 export type WorkspaceAction =
-  //
   | HistoryAction
-  //
-  | HighlightLayerAction;
+  | HighlightLayerAction
+  | EditorModeAction;
 
 export type HistoryAction =
   //
@@ -28,9 +27,16 @@ export type Action =
   | PreviewAction
   | CodeEditorAction
   | DevtoolsAction
-  | EditorTaskAction;
+  | BackgroundTaskAction
+  | EditorModeAction;
 
 export type ActionType = Action["type"];
+
+export type EditorModeAction = EditorModeSwitchAction;
+export type EditorModeSwitchAction = {
+  type: "mode";
+  mode: EditorState["mode"];
+};
 
 export type HierarchyAction = SelectNodeAction;
 export interface SelectNodeAction {
@@ -101,22 +107,22 @@ export interface DevtoolsConsoleClearAction {
   type: "devtools-console-clear";
 }
 
-export type EditorTaskAction =
-  | EditorTaskPushAction
-  | EditorTaskPopAction
-  | EditorTaskUpdateProgressAction;
+export type BackgroundTaskAction =
+  | BackgroundTaskPushAction
+  | BackgroundTaskPopAction
+  | BackgroundTaskUpdateProgressAction;
 
-export interface EditorTaskPushAction {
+export interface BackgroundTaskPushAction {
   type: "editor-task-push";
   task: EditorTask;
 }
 
-export interface EditorTaskPopAction {
+export interface BackgroundTaskPopAction {
   type: "editor-task-pop";
   task: EditorTask | { id: string };
 }
 
-export interface EditorTaskUpdateProgressAction {
+export interface BackgroundTaskUpdateProgressAction {
   type: "editor-task-update-progress";
   id: string;
   progress: number;
