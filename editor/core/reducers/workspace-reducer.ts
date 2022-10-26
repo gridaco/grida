@@ -8,7 +8,7 @@ export function workspaceReducer(
   action: WorkspaceAction
 ): WorkspaceState {
   switch (action.type) {
-    case "highlight-layer": {
+    case "highlight-node": {
       return produce(state, (draft) => {
         draft.highlightedLayer = action.id;
       });

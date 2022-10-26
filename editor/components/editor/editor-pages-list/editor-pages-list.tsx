@@ -11,16 +11,21 @@ const Container = styled.div<{ expanded: boolean }>(({ theme, expanded }) => ({
   flexDirection: "column",
 }));
 
-type PageInfo = {
+export type PageInfo = {
   id: string;
   name: string;
-  type: "design" | "components" | "styles" | "assets";
+  type: "home" | "canvas" | "components" | "styles" | "assets";
 };
 
 export function EditorPagesList() {
   const [state] = useEditorState();
   const dispatch = useDispatch();
-  const pages = state.design?.pages ?? [];
+  const pages = [
+    // default pages
+    { id: "home", name: "Home", type: "home" },
+    // design canvas pages
+    ...(state.design?.pages ?? []),
+  ];
 
   return (
     <Container expanded={true}>
@@ -35,6 +40,7 @@ export function EditorPagesList() {
             return (
               <EditorPageItem
                 key={page.id}
+                type={page.type}
                 selected={selected}
                 id={page.id}
                 name={page.name}

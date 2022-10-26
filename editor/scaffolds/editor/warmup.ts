@@ -54,7 +54,7 @@ export function pagesFrom(
     }),
     flowStartingPoints: page.flowStartingPoints,
     backgroundColor: page.backgroundColor,
-    type: "design",
+    type: "canvas",
   }));
 }
 

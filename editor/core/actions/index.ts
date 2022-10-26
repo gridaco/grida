@@ -8,7 +8,7 @@ import type {
 
 export type WorkspaceAction =
   | HistoryAction
-  | HighlightLayerAction
+  | HighlightNodeAction
   | EditorModeAction;
 
 export type HistoryAction =
@@ -21,7 +21,8 @@ export type HistoryAction =
 export type Action =
   | PageAction
   | SelectNodeAction
-  | HighlightLayerAction
+  | LocateNodeAction
+  | HighlightNodeAction
   | CanvasEditAction
   | CanvasModeAction
   | PreviewAction
@@ -38,10 +39,17 @@ export type EditorModeSwitchAction = {
   mode: EditorState["mode"];
 };
 
-export type HierarchyAction = SelectNodeAction;
 export interface SelectNodeAction {
   type: "select-node";
   node: string | string[];
+}
+
+/**
+ * Select and move to the node.
+ */
+export interface LocateNodeAction {
+  type: "locate-node";
+  node: string;
 }
 
 export type CanvasEditAction = TranslateNodeAction;
@@ -59,8 +67,8 @@ export interface SelectPageAction {
   page: string;
 }
 
-export interface HighlightLayerAction {
-  type: "highlight-layer";
+export interface HighlightNodeAction {
+  type: "highlight-node";
   id: string;
 }
 
