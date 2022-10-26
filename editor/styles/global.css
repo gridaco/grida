@@ -6,11 +6,15 @@ body {
 
 /* for editor canvas */
 html {
+  overflow: hidden;
+  height: 100%;
   overscroll-behavior-x: none;
 }
 body {
   overscroll-behavior-x: none;
   touch-action: none;
+  height: 100%;
+  overflow: auto;
 }
 /* ----------------- */
 

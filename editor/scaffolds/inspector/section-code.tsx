@@ -65,7 +65,7 @@ export function CodeSection() {
           readonly
           width={"100%"}
           value={code.raw}
-          height={400}
+          height={target.isRoot ? 800 : 400}
           options={{
             lineNumbers: "off",
             glyphMargin: false,
