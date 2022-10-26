@@ -6,14 +6,20 @@ import type {
   CodeEditorEditComponentCodeAction,
   CanvasModeSwitchAction,
   CanvasModeGobackAction,
+  TranslateNodeAction,
   PreviewBuildingStateUpdateAction,
   PreviewSetAction,
   DevtoolsConsoleAction,
   DevtoolsConsoleClearAction,
+  BackgroundTaskPushAction,
+  BackgroundTaskPopAction,
+  BackgroundTaskUpdateProgressAction,
+  EditorModeSwitchAction,
 } from "core/actions";
 import { EditorState } from "core/states";
 import { useRouter } from "next/router";
 import { CanvasStateStore } from "@code-editor/canvas/stores";
+import q from "@design-sdk/query";
 import assert from "assert";
 
 const _editor_path_name = "/files/[key]/";
@@ -23,12 +29,45 @@ export function editorReducer(state: EditorState, action: Action): EditorState {
   const filekey = state.design.key;
 
   switch (action.type) {
+    case "mode": {
+      const { mode } = <EditorModeSwitchAction>action;
+      return produce(state, (draft) => {
+        switch (mode) {
+          case "code":
+            draft.canvasMode = "isolated-view";
+            break;
+          case "inspect":
+          case "view":
+          default:
+            draft.canvasMode = "free";
+        }
+
+        draft.mode = mode;
+      });
+    }
     case "select-node": {
       const { node } = <SelectNodeAction>action;
+      const ids = Array.isArray(node) ? node : [node];
+
+      const current_node = state.selectedNodes;
+
+      if (
+        ids.length <= 1 &&
+        current_node.length <= 1 &&
+        ids[0] === current_node[0]
+      ) {
+        // same selection (no selection or same 1 selection)
+        return produce(state, (draft) => {});
+      }
+
+      if (ids.length > 1 && ids.length === current_node.length) {
+        // the selection event is always triggered by user, which means selecting same amount of nodes (greater thatn 1, and having a different node array is impossible.)
+        return produce(state, (draft) => {});
+      }
+
       console.clear();
       console.info("cleard console by editorReducer#select-node");
 
-      const ids = Array.isArray(node) ? node : [node];
       const primary = ids?.[0];
 
       // update router
@@ -86,6 +125,22 @@ export function editorReducer(state: EditorState, action: Action): EditorState {
         draft.selectedNodes = last_known_selections_of_this_page;
       });
     }
+    case "node-transform-translate": {
+      const { translate, node } = <TranslateNodeAction>action;
+
+      return produce(state, (draft) => {
+        const page = draft.design.pages.find(
+          (p) => p.id === state.selectedPage
+        );
+
+        node
+          .map((n) => q.getNodeByIdFrom(n, page.children))
+          .map((n) => {
+            n.x += translate[0];
+            n.y += translate[1];
+          });
+      });
+    }
     case "code-editor-edit-component-code": {
       const { ...rest } = <CodeEditorEditComponentCodeAction>action;
       return produce(state, (draft) => {
@@ -107,6 +162,14 @@ export function editorReducer(state: EditorState, action: Action): EditorState {
       });
 
       return produce(state, (draft) => {
+        if (mode === "isolated-view") {
+          // on isolation mode, switch the editor mode to code.
+          draft.mode = "code";
+        } else {
+          // needs to be fixed once more modes are added.
+          draft.mode = "view";
+        }
+
         draft.canvasMode_previous = draft.canvasMode;
         draft.canvasMode = mode;
       });
@@ -184,6 +247,36 @@ export function editorReducer(state: EditorState, action: Action): EditorState {
             },
           ];
         }
+      });
+      break;
+    }
+    case "editor-task-push": {
+      const { task } = <BackgroundTaskPushAction>action;
+      const { id } = task;
+      // TODO: check id duplication
+
+      return produce(state, (draft) => {
+        draft.editorTaskQueue.tasks.push(task);
+      });
+      break;
+    }
+    case "editor-task-pop": {
+      const { task } = <BackgroundTaskPopAction>action;
+      const { id } = task;
+
+      return produce(state, (draft) => {
+        draft.editorTaskQueue.tasks = draft.editorTaskQueue.tasks.filter(
+          (i) => i.id !== id
+        );
+        // TODO: handle isBusy property by the task
+      });
+      break;
+    }
+    case "editor-task-update-progress": {
+      const { id, progress } = <BackgroundTaskUpdateProgressAction>action;
+      return produce(state, (draft) => {
+        draft.editorTaskQueue.tasks.find((i) => i.id !== id).progress =
+          progress;
       });
       break;
     }

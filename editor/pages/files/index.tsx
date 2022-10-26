@@ -8,7 +8,7 @@ import {
   HomeSidebar,
 } from "components/home";
 import { WorkspaceRepository } from "repository";
-import { FileResponseRecord } from "store/fimga-file-store/figma-file-store";
+import { FileResponseRecord } from "@editor/figma-file-store";
 import { colors } from "theme";
 
 export default function FilesPage() {

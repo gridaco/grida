@@ -1,15 +1,23 @@
 import type { ReflectSceneNode } from "@design-sdk/figma-node";
 import type { FrameworkConfig } from "@grida/builder-config";
-import type { WidgetKey } from "@reflect-ui/core";
+import type { RGBA, WidgetKey } from "@reflect-ui/core";
 import type { ComponentNode } from "@design-sdk/figma-types";
 import type { DesignInput } from "@grida/builder-config/input";
 
 /**
  * View mode of the canvas.
- * - full - default
+ * - free - default
  * - isolated - focus to one scene
  */
 type TCanvasMode = "free" | "isolated-view" | "fullscreen-preview";
+
+/**
+ * Task mode of the editor.
+ * - view - default
+ * - code - with coding editor
+ * - inspect - with inspector
+ */
+type TUserTaskMode = "view" | "code" | "inspect";
 
 export interface EditorState {
   selectedPage: string;
@@ -22,12 +30,14 @@ export interface EditorState {
    */
   selectedNodesInitial?: string[] | null;
   design: FigmaReflectRepository;
+  mode: TUserTaskMode;
   canvasMode: TCanvasMode;
   canvasMode_previous?: TCanvasMode;
   currentPreview?: ScenePreviewData;
   code?: CodeRepository;
   editingModule?: EditingModule;
   devtoolsConsole?: DevtoolsConsole;
+  editorTaskQueue: EditorTaskQueue;
 }
 
 export interface EditorSnapshot {
@@ -37,6 +47,7 @@ export interface EditorSnapshot {
   selectedNodesInitial?: string[] | null;
   design: FigmaReflectRepository;
   canvasMode: TCanvasMode;
+  editorTaskQueue: EditorTaskQueue;
 }
 
 export interface FigmaReflectRepository {
@@ -51,7 +62,13 @@ export interface FigmaReflectRepository {
   key: string;
 
   // TODO:
-  pages: { id: string; name: string; children: ReflectSceneNode[] }[];
+  pages: {
+    id: string;
+    name: string;
+    children: ReflectSceneNode[];
+    backgroundColor: RGBA;
+    flowStartingPoints: any[];
+  }[];
   components: { [key: string]: ComponentNode };
   // styles: { [key: string]: {} };
   input: DesignInput;
@@ -132,4 +149,26 @@ export interface ConsoleLog {
     | "timeEnd"
     | "count"
     | "assert";
+}
+
+export interface EditorTaskQueue {
+  isBusy: boolean;
+  tasks: EditorTask[];
+}
+
+export interface EditorTask {
+  id: string;
+  name: string;
+  /**
+   * If the task is short-lived, wait this much ms before displaying it.
+   * @default 200 (0.2s)
+   */
+  debounce?: number;
+  description?: string;
+  cancelable?: boolean;
+  onCancel?: () => void;
+  /**
+   * 0-1, if null, it is indeterminate
+   */
+  progress: number | null;
 }

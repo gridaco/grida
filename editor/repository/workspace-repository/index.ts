@@ -1,7 +1,4 @@
-import {
-  FigmaFilesStore,
-  FileResponseRecord,
-} from "store/fimga-file-store/figma-file-store";
+import { FigmaFilesStore, FileResponseRecord } from "@editor/figma-file-store";
 
 export type LastUsedFileDisplay = FileResponseRecord & { type: "file" } & {
   lastUsed: Date;

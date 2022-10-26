@@ -1,5 +1,5 @@
 import { openDB, IDBPDatabase } from "idb";
-import { FileResponse } from "@design-sdk/figma-remote-api";
+import type { FileResponse } from "@design-sdk/figma-remote-api";
 
 // #region global db initialization
 const __db_pref = { name: "fimga-file-store", version: 1 };

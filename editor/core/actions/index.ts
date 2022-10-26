@@ -1,11 +1,15 @@
 import type { FrameworkConfig } from "@grida/builder-config";
-import type { ConsoleLog, EditorState, ScenePreviewData } from "core/states";
+import type {
+  ConsoleLog,
+  EditorState,
+  EditorTask,
+  ScenePreviewData,
+} from "core/states";
 
 export type WorkspaceAction =
-  //
   | HistoryAction
-  //
-  | HighlightLayerAction;
+  | HighlightLayerAction
+  | EditorModeAction;
 
 export type HistoryAction =
   //
@@ -18,17 +22,34 @@ export type Action =
   | PageAction
   | SelectNodeAction
   | HighlightLayerAction
+  | CanvasEditAction
   | CanvasModeAction
   | PreviewAction
   | CodeEditorAction
-  | DevtoolsAction;
+  | DevtoolsAction
+  | BackgroundTaskAction
+  | EditorModeAction;
 
 export type ActionType = Action["type"];
+
+export type EditorModeAction = EditorModeSwitchAction;
+export type EditorModeSwitchAction = {
+  type: "mode";
+  mode: EditorState["mode"];
+};
 
 export type HierarchyAction = SelectNodeAction;
 export interface SelectNodeAction {
   type: "select-node";
   node: string | string[];
+}
+
+export type CanvasEditAction = TranslateNodeAction;
+
+export interface TranslateNodeAction {
+  type: "node-transform-translate";
+  translate: [number, number];
+  node: string[];
 }
 
 export type PageAction = SelectPageAction;
@@ -84,4 +105,25 @@ export interface DevtoolsConsoleAction {
 
 export interface DevtoolsConsoleClearAction {
   type: "devtools-console-clear";
+}
+
+export type BackgroundTaskAction =
+  | BackgroundTaskPushAction
+  | BackgroundTaskPopAction
+  | BackgroundTaskUpdateProgressAction;
+
+export interface BackgroundTaskPushAction {
+  type: "editor-task-push";
+  task: EditorTask;
+}
+
+export interface BackgroundTaskPopAction {
+  type: "editor-task-pop";
+  task: EditorTask | { id: string };
+}
+
+export interface BackgroundTaskUpdateProgressAction {
+  type: "editor-task-update-progress";
+  id: string;
+  progress: number;
 }

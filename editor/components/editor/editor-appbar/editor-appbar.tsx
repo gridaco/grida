@@ -7,9 +7,9 @@ import { AppbarFragmentForCodeEditor } from "./editor-appbar-fragment-for-code-e
 export function Appbar() {
   return (
     <AppbarContainer>
-      <AppbarFragmentForSidebar></AppbarFragmentForSidebar>
-      <AppbarFragmentForCanvas></AppbarFragmentForCanvas>
-      <AppbarFragmentForCodeEditor></AppbarFragmentForCodeEditor>
+      <AppbarFragmentForSidebar />
+      <AppbarFragmentForCanvas />
+      <AppbarFragmentForCodeEditor />
     </AppbarContainer>
   );
 }

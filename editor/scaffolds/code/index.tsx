@@ -2,7 +2,6 @@ import React, { useEffect, useRef, useState } from "react";
 import styled from "@emotion/styled";
 import { useRouter } from "next/router";
 import { CodeEditor } from "components/code-editor";
-import { EditorAppbarFragments } from "components/editor";
 import { get_framework_config } from "query/to-code-options-from-query";
 import { CodeOptionsControl } from "components/codeui-code-options-control";
 import { designToCode, Result } from "@designto/code";
@@ -33,7 +32,7 @@ const preset_store = {
   },
 };
 
-export function CodeSegment() {
+export function Code() {
   const router = useRouter();
   const [result, setResult] = useState<Result>();
   const dispatch = useDispatch();
@@ -147,7 +146,6 @@ export function CodeSegment() {
   const { code, scaffold, name: componentName, framework } = result ?? {};
   return (
     <CodeEditorContainer>
-      <EditorAppbarFragments.CodeEditor />
       <ClientOnly>
         <CodeOptionsControl
           initialPreset={

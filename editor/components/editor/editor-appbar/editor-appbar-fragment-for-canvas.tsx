@@ -20,7 +20,6 @@ const RootWrapperAppbarFragmentForCanvas = styled.div`
   align-items: center;
   gap: 10px;
   align-self: stretch;
-  background-color: ${colors.color_editor_bg_on_dark};
   box-sizing: border-box;
   padding: 10px 24px;
 `;

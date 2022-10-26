@@ -1,0 +1,41 @@
+body {
+  margin: 0px;
+  padding: 0;
+  font-family: "Helvetica Nueue", "Roboto", sans-serif;
+}
+
+/* for editor canvas */
+html {
+  overflow: hidden;
+  height: 100%;
+  overscroll-behavior-x: none;
+}
+body {
+  overscroll-behavior-x: none;
+  touch-action: none;
+  height: 100%;
+  overflow: auto;
+}
+/* ----------------- */
+
+iframe {
+  border: none;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6,
+p {
+  color: black;
+}
+
+a {
+  color: blue;
+}
+
+.white {
+  color: #fff;
+}

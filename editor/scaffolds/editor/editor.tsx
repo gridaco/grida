@@ -7,7 +7,8 @@ import {
 import { EditorSidebar } from "components/editor";
 import { useEditorState } from "core/states";
 import { Canvas } from "scaffolds/canvas";
-import { CodeSegment } from "scaffolds/code";
+import { Code } from "scaffolds/code";
+import { Inspector } from "scaffolds/inspector";
 import { EditorSkeleton } from "./skeleton";
 import { colors } from "theme";
 
@@ -46,7 +47,6 @@ export function Editor({
           maxWidth: 600,
           children: <EditorSidebar />,
         }}
-        // rightbar={<Inspector />}
       >
         <WorkspaceContentPanelGridLayout>
           <WorkspaceContentPanel flex={6}>
@@ -63,7 +63,7 @@ export function Editor({
             zIndex={1}
             backgroundColor={colors.color_editor_bg_on_dark}
           >
-            <CodeSegment />
+            <RightPanelContent />
           </WorkspaceContentPanel>
           {/* {wstate.preferences.debug_mode && (
             <WorkspaceBottomPanelDockLayout resizable>
@@ -82,4 +82,17 @@ export function Editor({
       </DefaultEditorWorkspaceLayout>
     </>
   );
+}
+
+function RightPanelContent() {
+  const [state] = useEditorState();
+
+  switch (state.mode) {
+    case "code":
+      return <Code />;
+    case "inspect":
+    case "view":
+    default:
+      return <Inspector />;
+  }
 }

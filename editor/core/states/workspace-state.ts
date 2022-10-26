@@ -8,6 +8,16 @@ export interface WorkspaceState {
    */
   highlightedLayer?: string;
   preferences: WorkspacePreferences;
+
+  /**
+   * figma authentication data store state
+   * @deprecated - not implemented
+   */
+  authenticationFigma?: {
+    name?: string;
+    accessToken?: string;
+    personalAccessToken?: string;
+  };
 }
 
 export interface WorkspacePreferences {
