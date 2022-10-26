@@ -31,6 +31,7 @@ export function SizeMeterLabel({
       anchor="s"
       margin={margin}
       zoom={zoom}
+      zIndex={k.Z_INDEX_GUIDE_LABEL}
     />
   );
 }
@@ -43,6 +44,7 @@ export function MeterLabel({
   anchor,
   zoom,
   margin = 0,
+  zIndex = k.Z_INDEX_GUIDE_LABEL,
 }: {
   x: number;
   y: number;
@@ -51,6 +53,7 @@ export function MeterLabel({
   anchor: "w" | "n" | "s" | "e";
   margin?: number;
   zoom: number;
+  zIndex?: number;
 }) {
   const labelwidth = (label.length * font_size) / 1.8; // a view width assumption (we will not use flex box for faster painting)
   const viewwidth = labelwidth + 4; // 4 is for horizontal padding
@@ -97,7 +100,7 @@ export function MeterLabel({
         fontFamily: "Inter, sans-serif",
         fontWeight: 500,
         textAlign: "center",
-        zIndex: k.Z_INDEX_GUIDE_LABEL,
+        zIndex: zIndex,
       }}
     >
       {label}

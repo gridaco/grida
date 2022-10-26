@@ -70,7 +70,6 @@ export function OulineSide({
         pointerEvents: readonly ? "none" : "all",
         cursor: cursor,
         willChange: "transform",
-        transformOrigin: "0px, 0px",
         transform: `translate3d(${trans.x}px, ${trans.y}px, 0) scaleX(${l_scalex}) scaleY(${l_scaley})`,
         backgroundColor: color,
       }}

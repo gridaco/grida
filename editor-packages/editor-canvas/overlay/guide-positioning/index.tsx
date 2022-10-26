@@ -1,8 +1,9 @@
 import React from "react";
-import { box_to_xywh, scale, spacing_guide } from "../../math";
-import type { Box } from "../../types";
+import { scale, spacing_guide } from "../../math";
+import type { Box, XY } from "../../types";
 import * as k from "../k";
 import { MeterLabel } from "../meter-label";
+import { auxiliary_line_xylr, guide_line_xylr } from "./math";
 
 export function PositionGuide({
   a,
@@ -14,8 +15,16 @@ export function PositionGuide({
   zoom: number;
 }) {
   const { spacing, box: __box } = spacing_guide(a, b);
-  const box = scale(__box, zoom);
-  const [_t, _r, _b, _l] = spacing;
+  const [st, sr, sb, sl] = spacing;
+
+  const [tx, ty, tx2, ty2, tl, tr] = guide_line_xylr(__box, "t", st);
+  const [rx, ry, rx2, ry2, rl, rr] = guide_line_xylr(__box, "r", sr);
+  const [bx, by, bx2, by2, bl, br] = guide_line_xylr(__box, "b", sb);
+  const [lx, ly, lx2, ly2, ll, lr] = guide_line_xylr(__box, "l", sl);
+  const [tax, tay, , , tal, tar] = auxiliary_line_xylr([tx2, ty2], b, "t");
+  const [rax, ray, , , ral, rar] = auxiliary_line_xylr([rx2, ry2], b, "r");
+  const [bax, bay, , , bal, bar] = auxiliary_line_xylr([bx2, by2], b, "b");
+  const [lax, lay, , , lal, lar] = auxiliary_line_xylr([lx2, ly2], b, "l");
 
   return (
     <div
@@ -25,21 +34,57 @@ export function PositionGuide({
         willChange: "transform, opacity",
       }}
     >
-      <Conditional length={_t}>
-        <SpacingGuideLine length={_t} side="t" box={box} zoom={zoom} />
-        <SpacingMeterLabel length={_t} side="t" box={__box} zoom={zoom} />
+      <Conditional length={st}>
+        <SpacingGuideLine x={tx} y={ty} length={tl} rotation={tr} zoom={zoom} />
+        <Conditional length={tal}>
+          <AuxiliaryLine
+            x={tax}
+            y={tay}
+            length={tal}
+            rotation={tar}
+            zoom={zoom}
+          />
+        </Conditional>
+        <SpacingMeterLabel length={st} side="t" box={__box} zoom={zoom} />
       </Conditional>
-      <Conditional length={_r}>
-        <SpacingGuideLine length={_r} side="r" box={box} zoom={zoom} />
-        <SpacingMeterLabel length={_r} side="r" box={__box} zoom={zoom} />
+      <Conditional length={sr}>
+        <SpacingGuideLine x={rx} y={ry} length={rl} rotation={rr} zoom={zoom} />
+        <Conditional length={ral}>
+          <AuxiliaryLine
+            x={rax}
+            y={ray}
+            length={ral}
+            rotation={rar}
+            zoom={zoom}
+          />
+        </Conditional>
+        <SpacingMeterLabel length={sr} side="r" box={__box} zoom={zoom} />
       </Conditional>
-      <Conditional length={_b}>
-        <SpacingGuideLine length={_b} side="b" box={box} zoom={zoom} />
-        <SpacingMeterLabel length={_b} side="b" box={__box} zoom={zoom} />
+      <Conditional length={sb}>
+        <SpacingGuideLine x={bx} y={by} length={bl} rotation={br} zoom={zoom} />
+        <Conditional length={bal}>
+          <AuxiliaryLine
+            x={bax}
+            y={bay}
+            length={bal}
+            rotation={bar}
+            zoom={zoom}
+          />
+        </Conditional>
+        <SpacingMeterLabel length={sb} side="b" box={__box} zoom={zoom} />
       </Conditional>
-      <Conditional length={_l}>
-        <SpacingGuideLine length={_l} side="l" box={box} zoom={zoom} />
-        <SpacingMeterLabel length={_l} side="l" box={__box} zoom={zoom} />
+      <Conditional length={sl}>
+        <SpacingGuideLine x={lx} y={ly} length={ll} rotation={lr} zoom={zoom} />
+        <Conditional length={lal}>
+          <AuxiliaryLine
+            x={lax}
+            y={lay}
+            length={lal}
+            rotation={lar}
+            zoom={zoom}
+          />
+        </Conditional>
+        <SpacingMeterLabel length={sl} side="l" box={__box} zoom={zoom} />
       </Conditional>
     </div>
   );
@@ -96,6 +141,7 @@ function SpacingMeterLabel({
       margin={4}
       anchor={__label_anchor_map[side]}
       zoom={zoom}
+      zIndex={k.Z_INDEX_GUIDE_SPACING_LABEL}
     />
   );
 }
@@ -109,143 +155,109 @@ const __label_anchor_map = {
 
 type Side = "t" | "r" | "b" | "l";
 
+interface GuideLineProps {
+  x: number;
+  y: number;
+  zoom: number;
+  length: number;
+  direction: "n" | "s" | "e" | "w" | number;
+  width?: number;
+  color: React.CSSProperties["color"];
+  dashed?: boolean;
+}
+
+function GuideLine({
+  x,
+  y,
+  zoom,
+  direction,
+  length,
+  width,
+  color = "orange",
+  dashed,
+}: GuideLineProps) {
+  const tl = length * zoom;
+  const tx = x * zoom;
+  const ty = y * zoom;
+  const tr =
+    typeof direction === "number"
+      ? direction
+      : __line_rotation_by_direction_map[direction];
+
+  return (
+    <div
+      style={{
+        position: "absolute",
+        width: 1,
+        height: tl,
+        pointerEvents: "none",
+        cursor: "none",
+        willChange: "transform",
+        transformOrigin: "0px 0px",
+        transform: `translate3d(${tx}px, ${ty}px, 0) rotate(${tr}deg)`,
+        borderLeft: `${width}px ${dashed ? "dashed" : "solid"} ${color}`,
+        zIndex: k.Z_INDEX_GUIDE_POSITION,
+      }}
+    />
+  );
+}
+
+const __line_rotation_by_direction_map = {
+  n: 180,
+  e: 270,
+  s: 0,
+  w: 90,
+} as const;
+
 function SpacingGuideLine({
   length,
+  x,
+  y,
+  rotation,
   zoom,
-  side,
-  box,
-  width = 1,
 }: {
-  width?: number;
+  x: number;
+  y: number;
   length: number;
-  box: Box;
+  rotation: number;
   zoom: number;
-  side: Side;
 }) {
-  const d = 100;
-
-  // is vertical line
-  const isvert = side === "t" || side === "b";
-  const l_scalex = isvert ? width / d : (length / d) * zoom;
-  const l_scaley = isvert ? (length / d) * zoom : width / d;
-  const [, , w, h] = box_to_xywh(box);
-
-  let trans = { x: 0, y: 0 };
-  switch (side) {
-    case "t": {
-      trans = {
-        x: box[0] + (d * l_scalex - d) / 2 + w / 2,
-        y: box[1] - d / 2 - (length / 2) * zoom,
-      };
-      break;
-    }
-    case "r": {
-      trans = {
-        x: box[2] - d / 2 + (length / 2) * zoom,
-        y: box[1] + (d * l_scaley - d) / 2 + h / 2,
-      };
-      break;
-    }
-    case "b": {
-      trans = {
-        x: box[0] + (d * l_scalex - d) / 2 + w / 2,
-        y: box[3] - d / 2 + (length / 2) * zoom,
-      };
-      break;
-    }
-    case "l": {
-      trans = {
-        x: box[0] - d / 2 - (length / 2) * zoom,
-        y: box[1] + (d * l_scaley - d) / 2 + h / 2,
-      };
-      break;
-    }
-  }
-
   return (
-    <div
-      id={side}
-      style={{
-        position: "fixed",
-        width: d,
-        height: d,
-        opacity: 1,
-        pointerEvents: "none",
-        cursor: "none",
-        willChange: "transform",
-        transformOrigin: "0px, 0px",
-        transform: `translate3d(${trans.x}px, ${trans.y}px, 0) scaleX(${l_scalex}) scaleY(${l_scaley})`,
-        backgroundColor: "orange",
-        zIndex: k.Z_INDEX_GUIDE_POSITION,
-      }}
+    <GuideLine
+      x={x}
+      y={y}
+      zoom={zoom}
+      length={length}
+      direction={rotation}
+      width={1}
+      color={"orange"}
     />
   );
 }
-
-/* 
-<AuxiliaryLine
-  point={[a[0] + (a[2] - a[0]) / 2, a[1] + _t]}
-  side={"t"}
-  b={b}
-  zoom={zoom}
-/>; 
 
 function AuxiliaryLine({
-  point,
-  side,
-  b,
+  length,
+  x,
+  y,
+  rotation,
   zoom,
-  width = 1,
 }: {
-  // target raycast point. if the point intersects with the target, the line will not be drawn.
-  point: XY;
-  // original side of the guide. the auxiliary line will be drawn in other orientation (90 / -90).
-  side: Side;
-  // the target box that the a box is being positioned against.
-  b: Box;
+  x: number;
+  y: number;
+  length: number;
+  rotation: number;
   zoom: number;
-  width?: number;
 }) {
-  const d = 100;
-
-  const isvert = side === "r" || side === "l";
-  const l_scalex = isvert ? width / d : (length / d) * zoom;
-  const l_scaley = isvert ? (length / d) * zoom : width / d;
-  const box = scale(b, zoom);
-  const [bx, by, bx2, by2] = box;
-  const [, , w, h] = box_to_xywh(box);
-
-  let trans = { x: 0, y: 0 };
-
   return (
-    <div
-      style={{
-        position: "fixed",
-        width: d,
-        height: d,
-        opacity: 1,
-        pointerEvents: "none",
-        cursor: "none",
-        willChange: "transform",
-        transformOrigin: "0px, 0px",
-        transform: `translate3d(${trans.x}px, ${trans.y}px, 0) scaleX(${l_scalex}) scaleY(${l_scaley})`,
-        background: `repeating-linear-gradient(
-          ${__gradient_dash_direction[side]},
-          transparent,
-          transparent 1px,
-          orange 1px,
-          orange 2px
-        )`,
-        zIndex: k.Z_INDEX_GUIDE_POSITION,
-      }}
+    <GuideLine
+      x={x}
+      y={y}
+      zoom={zoom}
+      length={length}
+      direction={rotation}
+      width={1}
+      dashed
+      color={"orange"}
     />
   );
 }
-
-const __gradient_dash_direction = {
-  t: "to right",
-  r: "to bottom",
-  b: "to right",
-  l: "to bottom",
-} as const;
-*/
