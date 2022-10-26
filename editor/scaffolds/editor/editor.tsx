@@ -9,6 +9,7 @@ import { useEditorState } from "core/states";
 import { Canvas } from "scaffolds/canvas";
 import { Code } from "scaffolds/code";
 import { Inspector } from "scaffolds/inspector";
+import { EditorHome } from "scaffolds/editor-home";
 import { EditorSkeleton } from "./skeleton";
 import { colors } from "theme";
 
@@ -50,7 +51,7 @@ export function Editor({
       >
         <WorkspaceContentPanelGridLayout>
           <WorkspaceContentPanel flex={6}>
-            <Canvas key={_refreshkey} />
+            <PageView key={_refreshkey} />
           </WorkspaceContentPanel>
           <WorkspaceContentPanel
             hidden={state.selectedNodes.length !== 1}
@@ -94,5 +95,17 @@ function RightPanelContent() {
     case "view":
     default:
       return <Inspector />;
+  }
+}
+
+function PageView() {
+  const [state] = useEditorState();
+  const { selectedPage } = state;
+
+  switch (selectedPage) {
+    case "home":
+      return <EditorHome />;
+    default:
+      return <Canvas />;
   }
 }

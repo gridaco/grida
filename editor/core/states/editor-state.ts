@@ -20,7 +20,7 @@ type TCanvasMode = "free" | "isolated-view" | "fullscreen-preview";
 type TUserTaskMode = "view" | "code" | "inspect";
 
 export interface EditorState {
-  selectedPage: string;
+  selectedPage: string | "home";
   selectedNodes: string[];
   selectedLayersOnPreview: string[];
   /**
