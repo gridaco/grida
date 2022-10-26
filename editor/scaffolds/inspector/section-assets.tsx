@@ -13,7 +13,7 @@ export function AssetsSection() {
   }
 
   return (
-    <InspectorSection label="Assets">
+    <InspectorSection label="Assets" borderTop>
       {target.images.map((img) => (
         <Preview src={"https://via.placeholder.com/150"} />
       ))}

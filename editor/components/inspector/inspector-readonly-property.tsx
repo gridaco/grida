@@ -30,7 +30,8 @@ const PropertyLineContainer = styled.div`
   flex: 1;
   gap: 8px;
   background: transparent;
-  padding: 2px;
+  padding: 4px;
+  border-radius: 4px;
 
   label {
     font-size: 14px;

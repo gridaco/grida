@@ -11,7 +11,7 @@ export function ContentSection() {
     const txt = target.data;
 
     return (
-      <InspectorSection label="Content">
+      <InspectorSection label="Content" borderTop>
         <PropertyContainer
           background="rgba(255, 255, 255, 0.1)"
           onClick={() => {

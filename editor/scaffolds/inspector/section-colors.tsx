@@ -18,7 +18,7 @@ export function ColorsSection() {
   }
 
   return (
-    <InspectorSection label="Colors">
+    <InspectorSection label="Colors" borderTop>
       <ChipsContainer>
         {colors?.map((c) => {
           switch (c.type) {

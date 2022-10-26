@@ -10,8 +10,9 @@ import { ColorsSection } from "./section-colors";
 import { ContentSection } from "./section-content";
 import { TypographySection } from "./section-typography";
 import { AssetsSection } from "./section-assets";
+import { CodeSection } from "./section-code";
 
-export function InspectorSegment() {
+export function Inspector() {
   const { target } = useTargetContainer();
   const [state] = useEditorState();
 
@@ -19,11 +20,13 @@ export function InspectorSegment() {
     return (
       <InspectorContainer>
         <InfoSection />
+        <div style={{ height: 16 }} />
         <LayoutSection />
         <ColorsSection />
         <AssetsSection />
         <TypographySection />
         <ContentSection />
+        <CodeSection />
       </InspectorContainer>
     );
   }
@@ -34,6 +37,7 @@ export function InspectorSegment() {
 const InspectorContainer = styled.div`
   display: flex;
   z-index: 1;
+  overflow-y: scroll;
   flex-direction: column;
   height: 100%;
   background-color: ${colors.color_editor_bg_on_dark};

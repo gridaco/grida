@@ -8,14 +8,18 @@ import { debounce } from "utils/debounce";
 import { downloadFile } from "utils/download";
 
 type ICodeEditor = monaco.editor.IStandaloneCodeEditor;
-
+type Options = Omit<
+  monaco.editor.IStandaloneEditorConstructionOptions,
+  "readOnly"
+>;
 export interface MonacoEditorProps {
   value?: string;
   language?: string;
   onChange?: OnChange;
   width?: number | string;
   height?: number | string;
-  options?: monaco.editor.IStandaloneEditorConstructionOptions;
+  options?: Options;
+  readonly?: boolean;
 }
 
 export function MonacoEditor(props: MonacoEditorProps) {
@@ -92,6 +96,7 @@ export function MonacoEditor(props: MonacoEditorProps) {
       options={{
         ...props.options,
         // overrided default options
+        readOnly: props.readonly,
         wordWrap: "off",
         unusualLineTerminators: "off",
       }}

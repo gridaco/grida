@@ -16,11 +16,11 @@ const Section = styled.section`
   margin-top: 24px;
   display: flex;
   flex-direction: column;
-  padding: 8px;
+  padding: 14px;
 `;
 
 const SceneTitle = styled.input`
-  margin: 0;
+  margin: 4px 0;
   background: transparent;
   font-size: 18px;
   outline: none;
