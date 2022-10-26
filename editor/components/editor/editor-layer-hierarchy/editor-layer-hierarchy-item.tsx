@@ -1,10 +1,4 @@
-import React, {
-  forwardRef,
-  memo,
-  useCallback,
-  useState,
-  ReactNode,
-} from "react";
+import React, { forwardRef, memo, useCallback, ReactNode } from "react";
 import { TreeView } from "@editor-ui/hierarchy";
 import { Spacer } from "@editor-ui/spacer";
 import { withSeparatorElements } from "@editor-ui/utils";
@@ -12,18 +6,8 @@ import styled from "@emotion/styled";
 import { useTheme } from "@emotion/react";
 import "@editor-ui/theme";
 import { ReflectSceneNodeType } from "@design-sdk/figma-node";
-import {
-  FrameIcon,
-  DotsHorizontalIcon,
-  FileIcon,
-  TextIcon,
-  GroupIcon,
-  ComponentInstanceIcon,
-  Component1Icon,
-  BoxIcon,
-  CircleIcon,
-  ImageIcon,
-} from "@radix-ui/react-icons";
+import { DotsHorizontalIcon } from "@radix-ui/react-icons";
+import { SceneNodeIcon } from "components/icons";
 
 export const IconContainer = styled.span(({ theme }) => ({
   color: theme.colors.mask,
@@ -37,7 +21,7 @@ export const LayerIcon = memo(function LayerIcon({
   selected,
   variant,
 }: {
-  type: string;
+  type: ReflectSceneNodeType;
   selected?: boolean;
   variant?: "primary";
 }) {
@@ -50,42 +34,7 @@ export const LayerIcon = memo(function LayerIcon({
       ? colors.iconSelected
       : colors.icon;
 
-  switch (type as ReflectSceneNodeType) {
-    case ReflectSceneNodeType.group:
-      return <GroupIcon color={color} />;
-    case ReflectSceneNodeType.component:
-      return <Component1Icon color={color} />;
-    case ReflectSceneNodeType.instance:
-      return <ComponentInstanceIcon />;
-    case ReflectSceneNodeType.text:
-      return <TextIcon color={color} />;
-    case ReflectSceneNodeType.frame:
-      return <FrameIcon color={color} />;
-    case ReflectSceneNodeType.ellipse:
-      return <CircleIcon color={color} />;
-    case ReflectSceneNodeType.rectangle:
-      return <BoxIcon color={color} />;
-    case ReflectSceneNodeType.variant_set:
-      return <></>;
-    case ReflectSceneNodeType.constraint:
-      return <></>;
-    case ReflectSceneNodeType.line:
-      return <></>;
-    case ReflectSceneNodeType.vector:
-      return <></>;
-    case ReflectSceneNodeType.star:
-      return <></>;
-    case ReflectSceneNodeType.poligon:
-      return <></>;
-    case ReflectSceneNodeType.boolean_operation:
-      return <></>;
-    case ReflectSceneNodeType.image:
-      return <ImageIcon color={color} />;
-    case ReflectSceneNodeType.unknown:
-      return <></>;
-    default:
-      return <></>;
-  }
+  return <SceneNodeIcon type={type} color={color} />;
 });
 
 export const LayerRow = memo(
