@@ -3,8 +3,8 @@ import styled from "@emotion/styled";
 import { Canvas } from "@code-editor/canvas";
 import { useEditorState, useWorkspace } from "core/states";
 import {
-  WebWorkerD2CVanillaPreview,
   D2CVanillaPreview,
+  OptimizedPreviewCanvas,
 } from "scaffolds/preview-canvas";
 import useMeasure from "react-use-measure";
 import { useDispatch } from "core/dispatch";
@@ -145,6 +145,11 @@ export function VisualContentArea() {
                   //   {...p}
                   // />
                   <D2CVanillaPreview key={p.node.id} target={p.node} {...p} />
+                  // <OptimizedPreviewCanvas
+                  //   key={p.node.id}
+                  //   target={p.node}
+                  //   {...p}
+                  // />
                 );
               }}
               // readonly={false}

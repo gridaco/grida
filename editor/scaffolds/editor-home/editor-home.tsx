@@ -1,7 +1,7 @@
 import React from "react";
 import type { ReflectSceneNode } from "@design-sdk/figma-node";
 import { useEditorState } from "core/states";
-import { D2CVanillaPreview } from "scaffolds/preview-canvas";
+import { FigmaStaticImageFrameView } from "scaffolds/preview-canvas";
 import { SceneNodeIcon } from "components/icons";
 import styled from "@emotion/styled";
 import { useDispatch } from "core/dispatch";
@@ -121,7 +121,7 @@ function SceneCard({
             transform: `scale(${scale})`,
           }}
         >
-          <D2CVanillaPreview
+          <FigmaStaticImageFrameView
             key={scene.id}
             target={scene}
             isPanning={false}

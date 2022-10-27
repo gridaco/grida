@@ -1,68 +1,125 @@
 import React, { useState, useEffect } from "react";
+import { ReflectSceneNode } from "@design-sdk/figma-node";
+import type { FrameOptimizationFactors } from "@code-editor/canvas/frame";
 import { fetchNodeAsImage } from "@design-sdk/figma-remote";
+import { useFigmaAccessToken } from "hooks/use-figma-access-token";
+import { blurred_bg_fill } from "./util";
+import { CircularProgress } from "@mui/material";
 
-const DEV_ONLY_FIGMA_PAT =
-  process.env.NEXT_PUBLIC_DEVELOPER_FIGMA_PERSONAL_ACCESS_TOKEN;
+const cache = {
+  get: (key: string, variant?: ImageSizeVariant) => {
+    return localStorage.getItem(`${key}${!!variant ? "." + variant : ""}`);
+  },
+  set: (key: string, value: string, variant?: ImageSizeVariant) => {
+    localStorage.setItem(`${key}${!!variant ? "." + variant : ""}`, value);
+  },
+};
 
-export function FigmaFrameImageView({
-  filekey,
-  nodeid,
+/**
+ * 1 = 1 scale
+ * s = 0.2 scale
+ */
+type ImageSizeVariant = "1" | "s";
+
+export function FigmaStaticImageFrameView({
+  target,
   zoom,
+  inViewport,
 }: {
-  filekey: string;
-  nodeid: string;
-  zoom: number;
-}) {
+  target: ReflectSceneNode;
+} & FrameOptimizationFactors) {
+  const { filekey: _fk, id, width, height } = target;
+  const filekey = _fk as string;
+  const key = `${filekey}-${id}`;
   // fetch image
-  const [image_1, setImage_1] = useState<string>();
-  const [image_s, setImage_s] = useState<string>();
+  const [src, setsrc] = useState<string>();
+  const token = useFigmaAccessToken();
+  const [loaded, setloaded] = useState(false);
+
+  const set_image = (src: string, variant?: ImageSizeVariant) => {
+    setsrc(src);
+    cache.set(key, src, variant);
+  };
 
   useEffect(() => {
+    if (!token || !(token.personalAccessToken || token.accessToken.token)) {
+      return;
+    }
+
+    const cached_1 = cache.get(key, "1");
+
+    if (cached_1) {
+      set_image(cached_1, "1");
+      return;
+    }
+
     // fetch image from figma
     // fetch smaller one first, then fatch the full scaled.
     fetchNodeAsImage(
       filekey,
-      { personalAccessToken: DEV_ONLY_FIGMA_PAT },
-      nodeid
+      {
+        personalAccessToken: token.personalAccessToken,
+        accessToken: token.accessToken.token,
+      },
+      id
       // scale = 1
     ).then((r) => {
-      console.log("fetched image from figma", r);
-      setImage_1(r.__default);
-      setImage_s(r.__default);
+      set_image(r.__default, "1");
     });
-  }, [filekey, nodeid]);
+  }, [filekey, id, token]);
 
-  let imgscale: 1 | 0.2 = 1;
-  if (zoom > 1) {
-    return null;
-  } else if (zoom <= 1 && zoom > 0.3) {
-    imgscale = 1;
-    // display 1 scaled image
-  } else {
-    // display 0.2 scaled image
-    imgscale = 0.2;
-  }
+  const bg_color_str = blurred_bg_fill(target);
 
   return (
     <div
       style={{
-        top: 0,
-        left: 0,
-        position: "fixed",
-        width: "100%",
-        height: "100%",
+        width: width,
+        height: height,
+        borderRadius: 1,
+        backgroundColor: !(src && loaded) && bg_color_str,
+        contain: "layout style paint",
       }}
     >
-      <img
+      <div
         style={{
+          top: 0,
+          left: 0,
+          position: "fixed",
           width: "100%",
           height: "100%",
-          objectFit: "fill",
-          border: 0,
         }}
-        src={imgscale === 1 ? image_1 : image_s}
-        alt=""
-      />
+      ></div>
+      {src ? (
+        <img
+          onLoad={() => {
+            setloaded(true);
+          }}
+          loading="lazy"
+          style={{
+            width: "100%",
+            height: "100%",
+            objectFit: "none",
+            border: 0,
+          }}
+          src={src}
+          alt=""
+        />
+      ) : (
+        // loading view
+        <>
+          {/* center */}
+          <div
+            style={{
+              position: "absolute",
+              top: "50%",
+              left: "50%",
+              transform: "translate(-50%, -50%)",
+            }}
+          >
+            <CircularProgress />
+          </div>
+        </>
+      )}
     </div>
   );
 }
