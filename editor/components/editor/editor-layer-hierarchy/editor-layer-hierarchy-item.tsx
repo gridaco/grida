@@ -57,7 +57,7 @@ export const LayerRow = memo(
       onMenuClick: () => void;
       children?: ReactNode;
     },
-    forwardedRef: any
+    ref: any
   ) {
     const handleHoverChange = useCallback(
       (hovered: boolean) => {
@@ -69,7 +69,7 @@ export const LayerRow = memo(
     return (
       // @ts-ignore
       <TreeView.Row<PageMenuItemType>
-        ref={forwardedRef}
+        ref={ref}
         onHoverChange={handleHoverChange}
         hovered={hovered}
         selected={selected}
