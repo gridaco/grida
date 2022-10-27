@@ -23,8 +23,7 @@ export function EditorHomePageView() {
           s.origin === "COMPONENT_SET") &&
         s.visible &&
         s.children.length > 0
-    )
-    .slice(0, 20);
+    );
 
   return (
     <div

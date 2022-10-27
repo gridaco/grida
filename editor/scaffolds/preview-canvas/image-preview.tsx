@@ -1,19 +1,9 @@
 import React, { useState, useEffect } from "react";
 import { ReflectSceneNode } from "@design-sdk/figma-node";
 import type { FrameOptimizationFactors } from "@code-editor/canvas/frame";
-import { fetchNodeAsImage } from "@design-sdk/figma-remote";
-import { useFigmaAccessToken } from "hooks/use-figma-access-token";
 import { blurred_bg_fill } from "./util";
 import { CircularProgress } from "@mui/material";
-
-const cache = {
-  get: (key: string, variant?: ImageSizeVariant) => {
-    return localStorage.getItem(`${key}${!!variant ? "." + variant : ""}`);
-  },
-  set: (key: string, value: string, variant?: ImageSizeVariant) => {
-    localStorage.setItem(`${key}${!!variant ? "." + variant : ""}`, value);
-  },
-};
+import { useFigmaImageService } from "scaffolds/editor";
 
 /**
  * 1 = 1 scale
@@ -28,45 +18,29 @@ export function FigmaStaticImageFrameView({
 }: {
   target: ReflectSceneNode;
 } & FrameOptimizationFactors) {
+  const service = useFigmaImageService();
   const { filekey: _fk, id, width, height } = target;
   const filekey = _fk as string;
   const key = `${filekey}-${id}`;
   // fetch image
   const [src, setsrc] = useState<string>();
-  const token = useFigmaAccessToken();
   const [loaded, setloaded] = useState(false);
 
-  const set_image = (src: string, variant?: ImageSizeVariant) => {
+  const set_image = (src: string) => {
     setsrc(src);
-    cache.set(key, src, variant);
   };
 
   useEffect(() => {
-    if (!token || !(token.personalAccessToken || token.accessToken.token)) {
-      return;
-    }
-
-    const cached_1 = cache.get(key, "1");
-
-    if (cached_1) {
-      set_image(cached_1, "1");
-      return;
-    }
-
-    // fetch image from figma
-    // fetch smaller one first, then fatch the full scaled.
-    fetchNodeAsImage(
-      filekey,
-      {
-        personalAccessToken: token.personalAccessToken,
-        accessToken: token.accessToken.token,
-      },
-      id
-      // scale = 1
-    ).then((r) => {
-      set_image(r.__default, "1");
-    });
-  }, [filekey, id, token]);
+    service
+      .fetch(id, {
+        // debounce: true,
+        ensure: true,
+      })
+      .then((res) => {
+        const src = res[id];
+        set_image(src);
+      });
+  }, [filekey, id]);
 
   const bg_color_str = blurred_bg_fill(target);
 
@@ -96,6 +70,7 @@ export function FigmaStaticImageFrameView({
           }}
           loading="lazy"
           style={{
+            visibility: inViewport ? "visible" : "hidden",
             width: "100%",
             height: "100%",
             objectFit: "none",

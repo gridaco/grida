@@ -4,14 +4,20 @@ import { EditorImageRepositoryProvider } from "./editor-image-repository-provide
 import { EditorPreviewDataProvider } from "./editor-preview-provider";
 import { EditorCanvasPreviewProvider } from "scaffolds/preview-canvas/editor-canvas-preview-provider";
 import { ToastProvider } from "./editor-toast-provider";
+import { FigmaImageServiceProvider } from "./editor-figma-image-service-provider";
+import { useEditorState } from "core/states";
 
 export function EditorDefaultProviders(props: { children: React.ReactNode }) {
+  const [state] = useEditorState();
+
   return (
     <ShortcutsProvider>
       <EditorImageRepositoryProvider>
         <EditorCanvasPreviewProvider>
           <EditorPreviewDataProvider>
-            <ToastProvider>{props.children}</ToastProvider>
+            <FigmaImageServiceProvider filekey={state?.design?.key}>
+              <ToastProvider>{props.children}</ToastProvider>
+            </FigmaImageServiceProvider>
           </EditorPreviewDataProvider>
         </EditorCanvasPreviewProvider>
       </EditorImageRepositoryProvider>
