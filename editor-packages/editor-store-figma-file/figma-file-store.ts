@@ -12,6 +12,12 @@ export type FileResponseRecord = FileResponse & {
 
 const db: Promise<IDBPDatabase<StorableFileResponse>> = new Promise(
   (resolve) => {
+    // disable on ssr
+    if (typeof window === "undefined") {
+      resolve(null);
+      return;
+    }
+
     openDB<StorableFileResponse>(__db_pref.name, __db_pref.version, {
       upgrade(db) {
         db.createObjectStore(__table, {
