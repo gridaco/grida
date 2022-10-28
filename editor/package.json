@@ -37,6 +37,7 @@
     "codesandbox": "^2.2.3",
     "cuid": "^2.1.8",
     "dart-services": "^0.2.5",
+    "dayjs": "^1.11.6",
     "firebase": "^9.6.0",
     "framer-motion": "^5.3.1",
     "idb": "^6.1.2",

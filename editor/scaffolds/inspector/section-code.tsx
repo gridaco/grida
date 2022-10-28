@@ -35,6 +35,8 @@ export function CodeSection() {
         disable_components: true,
       };
 
+      // TODO: use worker - the inspector's code does not need to be instant.
+
       designToCode({
         input: _input,
         framework: wstate.preferences.framework_config,

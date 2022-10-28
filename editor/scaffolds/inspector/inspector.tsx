@@ -11,6 +11,7 @@ import { ContentSection } from "./section-content";
 import { TypographySection } from "./section-typography";
 import { AssetsSection } from "./section-assets";
 import { CodeSection } from "./section-code";
+import { Conversations } from "scaffolds/conversations";
 
 export function Inspector() {
   const { target } = useTargetContainer();
@@ -19,6 +20,7 @@ export function Inspector() {
   if (target) {
     return (
       <InspectorContainer>
+        <Conversations />
         <InfoSection />
         <div style={{ height: 16 }} />
         <LayoutSection />
