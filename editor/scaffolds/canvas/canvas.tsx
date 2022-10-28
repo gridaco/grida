@@ -144,12 +144,12 @@ export function VisualContentArea() {
                   //   target={p.node}
                   //   {...p}
                   // />
-                  <D2CVanillaPreview key={p.node.id} target={p.node} {...p} />
-                  // <OptimizedPreviewCanvas
-                  //   key={p.node.id}
-                  //   target={p.node}
-                  //   {...p}
-                  // />
+                  // <D2CVanillaPreview key={p.node.id} target={p.node} {...p} />
+                  <OptimizedPreviewCanvas
+                    key={p.node.id}
+                    target={p.node}
+                    {...p}
+                  />
                 );
               }}
               // readonly={false}

@@ -2,6 +2,7 @@ import type { TargetImage, FigmaImageType, ImageHashMap } from "./types";
 import { FigmaNodeImageStore, ImageHashmapCache } from "./figma-image-store";
 import { Client } from "@design-sdk/figma-remote-api";
 import { fetchNodeAsImage } from "@design-sdk/figma-remote";
+
 /**
  * if the new request is made within 0.1 second (100ms), merge the requests.
  */
@@ -24,7 +25,7 @@ export class FigmaImageService {
 
   constructor(
     readonly filekey: string,
-    readonly authentication: {
+    private readonly authentication: {
       personalAccessToken?: string;
       accessToken?: string;
     },
@@ -42,10 +43,15 @@ export class FigmaImageService {
    * current ongoing requests
    */
   private tasks = new Map<string, Promise<any>>();
+  private timeout: number;
+  private debounced: Promise<{ [key: string]: string }>;
+  resolve: (
+    value: { [key: string]: string } | PromiseLike<{ [key: string]: string }>
+  ) => void;
 
   private pushTask<T = any>(id: string, task: Promise<T>) {
     this.tasks.set(id, task);
-    task.then((res) => {
+    task.finally(() => {
       this.tasks.delete(id);
     });
     return task;
@@ -58,7 +64,7 @@ export class FigmaImageService {
   /**
    * next batch to run
    */
-  private next_debounced_tasks = new Map<string, Promise<string>>();
+  private next_targets_queue = new Set<string>();
 
   private async updateImageHashMap() {
     if (this.hasTask("update-image-hash-map")) {
@@ -78,7 +84,7 @@ export class FigmaImageService {
   async fetch(
     target: TargetImage,
     {
-      debounce = false,
+      debounce: do_debounce = false,
       ensure = false,
     }: {
       /**
@@ -107,7 +113,6 @@ export class FigmaImageService {
         // TODO: optimize with bulk get
         const image = await this.store.get({ id: t });
         if (image) {
-          console.log("loaded from db");
           // remove from task targets
           tasktargets = tasktargets.filter((tt) => tt !== t);
 
@@ -160,8 +165,43 @@ export class FigmaImageService {
       }
       // fetch bakes (handle debounce)
       if (bakes.length > 0) {
-        if (debounce) {
-          // TODO:
+        if (do_debounce) {
+          // fetch with merged queues
+          this.next_targets_queue = new Set([
+            ...this.next_targets_queue,
+            ...bakes,
+          ]);
+
+          if (this.timeout) {
+            clearTimeout(this.timeout);
+          }
+
+          if (!this.debounced) {
+            this.debounced = new Promise((resolve) => {
+              this.resolve = resolve;
+            });
+          }
+
+          // TODO: implement queue
+
+          const handler = async () => {
+            const targets = Array.from(this.next_targets_queue);
+            this.next_targets_queue = new Set();
+            const data = await this.fetch(targets, {
+              ensure: true,
+              debounce: false,
+            });
+            return { ...data, ...results };
+          };
+
+          this.timeout = setTimeout(async () => {
+            const data = await handler();
+            console.log("resolved");
+            this.resolve(data);
+            this.debounced = null;
+          }, DEBOUNCE);
+
+          return this.debounced;
         } else {
           // this does not support format, scale, ... (todo)
           const request = fetchNodeAsImage(
@@ -213,8 +253,8 @@ export class FigmaImageService {
           setTimeout(() => {
             r(
               this.fetch(target, {
-                debounce,
-                ensure,
+                debounce: false,
+                ensure: true,
               })
             );
           }, retry_after)

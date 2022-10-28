@@ -21,7 +21,7 @@ export function FigmaStaticImageFrameView({
   const service = useFigmaImageService();
   const { filekey: _fk, id, width, height } = target;
   const filekey = _fk as string;
-  const key = `${filekey}-${id}`;
+
   // fetch image
   const [src, setsrc] = useState<string>();
   const [loaded, setloaded] = useState(false);
@@ -33,12 +33,16 @@ export function FigmaStaticImageFrameView({
   useEffect(() => {
     service
       .fetch(id, {
-        // debounce: true,
+        debounce: true,
         ensure: true,
       })
       .then((res) => {
         const src = res[id];
         set_image(src);
+      })
+      .catch(console.error)
+      .finally(() => {
+        console.log("image loaded for ", id);
       });
   }, [filekey, id]);
 
