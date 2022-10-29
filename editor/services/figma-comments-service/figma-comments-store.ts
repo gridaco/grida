@@ -57,4 +57,8 @@ export class FigmaCommentsStore {
     const rec = await (await this.db).get(this.filekey, query.id);
     return rec;
   }
+
+  async delete(query: { id: string }) {
+    await (await this.db).delete(this.filekey, query.id);
+  }
 }

@@ -10,6 +10,7 @@ export function useFigmaComments(
     accessToken?: string;
   }
 ) {
+  const [raws, setRaws] = useState<RawComment[]>([]);
   const [comments, setComments] = useState<ReadonlyArray<Comment>>([]);
 
   const oncommentsload = (comments: Array<RawComment>) => {
@@ -35,6 +36,7 @@ export function useFigmaComments(
       return b.order_id - a.order_id;
     });
 
+    setRaws(comments);
     setComments(sorted);
   };
 
@@ -72,5 +74,46 @@ export function useFigmaComments(
     }
   }, [auth.accessToken, auth.personalAccessToken, filekey]);
 
-  return comments;
+  const dispatch = ({ type: action, ...p }: CommentActions) => {
+    const client = Client({
+      personalAccessToken: auth.personalAccessToken,
+      accessToken: auth.accessToken,
+    });
+
+    switch (action) {
+      case "post": {
+        const params = p as PostCommentAction;
+        client
+          .postComment(filekey, {
+            comment_id: params.comment_id,
+            message: params.message,
+          })
+          .then((d) => {
+            const reply = d.data;
+            // update records
+            store.upsert(reply);
+            // update state
+            oncommentsload(Array.from([...raws, reply]));
+          });
+        break;
+      }
+      case "delete": {
+        const params = p as DeleteCommentAction;
+        oncommentsload(raws.filter((c) => c.id !== params.comment_id));
+        client.deleteComment(filekey, params.comment_id).then((d) => {
+          const reply = d.data;
+          // update records
+          store.delete(reply);
+          // update state
+        });
+        break;
+      }
+    }
+  };
+
+  return [comments, dispatch] as const;
 }
+
+type PostCommentAction = { type: "post"; message: string; comment_id: string };
+type DeleteCommentAction = { type: "delete"; comment_id: string };
+type CommentActions = PostCommentAction | DeleteCommentAction;
