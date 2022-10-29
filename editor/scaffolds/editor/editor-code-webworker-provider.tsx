@@ -1,9 +1,13 @@
 import React, { useEffect } from "react";
 import { useFigmaAccessToken } from "hooks/use-figma-access-token";
 import { useEditorState } from "core/states";
-import { initialize } from "./canvas-preview-worker-messenger";
+import { initialize } from "../code/canvas-preview-worker-messenger";
 
-export function EditorCanvasPreviewProvider({
+/**
+ * d2c codegen with webworker provider
+ * @returns
+ */
+export function EditorCodeWebworkerProvider({
   children,
 }: {
   children?: React.ReactNode;

@@ -15,9 +15,12 @@ export function FigmaStaticImageFrameView({
   target,
   zoom,
   inViewport,
+  background,
 }: {
   target: ReflectSceneNode;
-} & FrameOptimizationFactors) {
+} & FrameOptimizationFactors & {
+    background?: React.CSSProperties["background"];
+  }) {
   const service = useFigmaImageService();
   const { filekey: _fk, id, width, height } = target;
   const filekey = _fk as string;
@@ -54,7 +57,11 @@ export function FigmaStaticImageFrameView({
         width: width,
         height: height,
         borderRadius: 1,
-        backgroundColor: !(src && loaded) && bg_color_str,
+        background: background
+          ? background
+          : !(src && loaded)
+          ? bg_color_str
+          : undefined,
         contain: "layout style paint",
       }}
     >

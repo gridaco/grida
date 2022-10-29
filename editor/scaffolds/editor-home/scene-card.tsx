@@ -19,7 +19,8 @@ export function SceneCard({
   q?: string;
 }) {
   const maxwidth = 300;
-  const scale = maxwidth / scene.width;
+  // max allowed zoom = 1
+  const scale = Math.min(maxwidth / scene.width, 1);
   const { height, type } = scene;
   return (
     <div
@@ -50,6 +51,7 @@ export function SceneCard({
           }}
         >
           <FigmaStaticImageFrameView
+            background={"white"}
             key={scene.id}
             target={scene}
             isPanning={false}
@@ -79,7 +81,6 @@ const Preview = styled.div`
   outline: 1px solid rgba(0, 0, 0, 0.1);
   border-radius: 2px;
   overflow: hidden;
-  background: white;
   overflow: hidden;
   box-sizing: border-box;
 

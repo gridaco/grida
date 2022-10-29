@@ -2,7 +2,7 @@ import React from "react";
 import { useHotkeys } from "react-hotkeys-hook";
 import { EditorImageRepositoryProvider } from "./editor-image-repository-provider";
 import { EditorPreviewDataProvider } from "./editor-preview-provider";
-import { EditorCanvasPreviewProvider } from "scaffolds/preview-canvas/editor-canvas-preview-provider";
+import { EditorCodeWebworkerProvider } from "scaffolds/editor/editor-code-webworker-provider";
 import { ToastProvider } from "./editor-toast-provider";
 import { FigmaImageServiceProvider } from "./editor-figma-image-service-provider";
 import { useEditorState } from "core/states";
@@ -13,13 +13,13 @@ export function EditorDefaultProviders(props: { children: React.ReactNode }) {
   return (
     <ShortcutsProvider>
       <EditorImageRepositoryProvider>
-        <EditorCanvasPreviewProvider>
+        <EditorCodeWebworkerProvider>
           <EditorPreviewDataProvider>
             <FigmaImageServiceProvider filekey={state?.design?.key}>
               <ToastProvider>{props.children}</ToastProvider>
             </FigmaImageServiceProvider>
           </EditorPreviewDataProvider>
-        </EditorCanvasPreviewProvider>
+        </EditorCodeWebworkerProvider>
       </EditorImageRepositoryProvider>
     </ShortcutsProvider>
   );
