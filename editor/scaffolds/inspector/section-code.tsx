@@ -7,6 +7,7 @@ import { MonacoEditor } from "components/code-editor";
 import { InspectorSection } from "components/inspector";
 import { Button } from "@editor-ui/button";
 import { useDispatch } from "core/dispatch";
+import { preview as wwpreview } from "../code/code-worker-messenger";
 
 export function CodeSection() {
   const wstate = useWorkspaceState();
@@ -23,29 +24,36 @@ export function CodeSection() {
   };
 
   useEffect(() => {
-    if (target) {
-      const _input = {
-        id: target.id,
-        name: target.name,
-        entry: target,
-        repository: root.repository,
-      };
-      const build_config = {
-        ...config.default_build_configuration,
-        disable_components: true,
-      };
-
-      // TODO: use worker - the inspector's code does not need to be instant.
-
-      designToCode({
-        input: _input,
-        framework: wstate.preferences.framework_config,
-        asset_config: { skip_asset_replacement: true },
-        build_config: build_config,
-      })
-        .then(on_result)
-        .catch(console.error);
+    if (!target) {
+      return;
     }
+    const _input = {
+      id: target.id,
+      name: target.name,
+      entry: target,
+      repository: root.repository,
+    };
+    const build_config = {
+      ...config.default_build_configuration,
+      disable_components: true,
+    };
+
+    let dispose;
+
+    setTimeout(() => {
+      dispose = wwpreview(
+        {
+          page: "", // TODO:
+          // page: target.page,
+          target: target.id,
+        },
+        on_result
+      );
+    }, 50);
+
+    return () => {
+      dispose?.();
+    };
   }, [target?.id]);
 
   const { code, scaffold, name: componentName, framework } = result ?? {};

@@ -1,7 +1,7 @@
 import React, { useEffect } from "react";
 import { useFigmaAccessToken } from "hooks/use-figma-access-token";
 import { useEditorState } from "core/states";
-import { initialize } from "../code/canvas-preview-worker-messenger";
+import { initialize } from "../code/code-worker-messenger";
 
 /**
  * d2c codegen with webworker provider

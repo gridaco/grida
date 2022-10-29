@@ -4,7 +4,7 @@ import { PreviewContent } from "./preview-content";
 import type { VanillaPreviewProps } from "./prop-type";
 import { blurred_bg_fill } from "./util";
 import { cachekey, cache } from "./cache";
-import { preview as wwpreview } from "../code/canvas-preview-worker-messenger";
+import { preview as wwpreview } from "../code/code-worker-messenger";
 
 export function WebWorkerD2CVanillaPreview({ target }: VanillaPreviewProps) {
   const [preview, setPreview] = useState<Result>();

@@ -13,7 +13,9 @@ import { mapper } from "@design-sdk/figma-remote";
 const placeholderimg =
   "https://bridged-service-static.s3.us-west-1.amazonaws.com/placeholder-images/image-placeholder-bw-tile-100.png";
 
-// : config.BuildConfiguration
+/**
+ * @type {config.BuildConfiguration}
+ */
 const build_config = {
   ...config.default_build_configuration,
   disable_components: true,
@@ -21,7 +23,9 @@ const build_config = {
   disable_flags_support: true,
 };
 
-// : config.VanillaPreviewFrameworkConfig
+/**
+ * @type {config.VanillaPreviewFrameworkConfig}
+ */
 const framework_config = {
   ...preview_presets.default,
   additional_css_declaration: {
