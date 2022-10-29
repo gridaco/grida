@@ -1,5 +1,6 @@
 import { createWorkerQueue } from "@code-editor/webworker-services-core";
 import type { Result } from "@designto/code";
+import { config } from "@designto/code/proc";
 
 let previewworker: Worker;
 export function initialize(
@@ -67,14 +68,14 @@ export function preview(
 }
 
 export function code(
-  { target, page }: { target: string; page: string },
+  { target, framework }: { target: string; framework: config.FrameworkConfig },
   onResult: (result: Result) => void,
   onError?: (error: Error) => void
 ) {
   previewworker.postMessage({
     $type: "code",
-    page,
     target,
+    framework,
   });
 
   const handler = (e) => {
