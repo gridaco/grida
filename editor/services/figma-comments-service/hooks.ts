@@ -108,6 +108,12 @@ export function useFigmaComments(
         });
         break;
       }
+      case "react": {
+        const params = p as ToggleReactionAction;
+        const comment = raws.find((c) => c.id === params.comment_id);
+        // check if user already has a reaction to the comment (with same emoji)
+        // todo
+      }
     }
   };
 
@@ -116,4 +122,12 @@ export function useFigmaComments(
 
 type PostCommentAction = { type: "post"; message: string; comment_id: string };
 type DeleteCommentAction = { type: "delete"; comment_id: string };
-type CommentActions = PostCommentAction | DeleteCommentAction;
+type ToggleReactionAction = {
+  type: "react";
+  comment_id: string;
+  emoji: string;
+};
+type CommentActions =
+  | PostCommentAction
+  | DeleteCommentAction
+  | ToggleReactionAction;

@@ -5,3 +5,12 @@ export interface Comment extends RawComment {
 }
 
 export type Reply = RawComment;
+
+export type ReactionEmoji =
+  | ":eyes:"
+  | ":heart_eyes:"
+  | ":heavy_plus_sign:"
+  | ":+1:"
+  | ":-1:"
+  | ":joy:"
+  | ":fire:";

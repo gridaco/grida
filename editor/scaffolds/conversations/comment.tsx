@@ -1,20 +1,35 @@
 import React from "react";
 import styled from "@emotion/styled";
 import type { User } from "@design-sdk/figma-remote-api";
-import type { Comment, Reply } from "services/figma-comments-service";
+import type {
+  Comment,
+  Reply,
+  ReactionEmoji,
+} from "services/figma-comments-service";
 import dayjs from "dayjs";
 import relativeTime from "dayjs/plugin/relativeTime";
 import { MessageInput } from "./message-input";
+import { DotsVerticalIcon } from "@radix-ui/react-icons";
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuContent,
+} from "@editor-ui/dropdown-menu";
+import { Reaction } from "./comment-reaction";
+import { emojimap } from "./k";
 
 dayjs.extend(relativeTime);
 
-type NoReadonlyProps = {
-  readonly: false;
-  onReply: (reply: string) => void;
-  // onDelete: (id: string) => void; // tood: add delete
+type CommentProps = {
+  onDelete?: (id: string) => void;
+  onReaction?: (id: string, emoji: ReactionEmoji) => void;
+  onCopyLink?: (id: string) => void;
 };
-type ReadonlyProps = {
-  readonly: true;
+
+type ThreadProps = CommentProps & {
+  onReply?: (reply: string) => void;
 };
 
 export function TopLevelComment({
@@ -31,14 +46,14 @@ export function TopLevelComment({
   file_key,
   parent_id,
   ...props
-}: Comment & (ReadonlyProps | NoReadonlyProps)) {
+}: Comment & { readonly?: boolean } & ThreadProps) {
   const ReplyMessageBox = () => {
     if (readonly === false) {
       return (
         <MessageInput
           placeholder="Reply..."
           onSend={(text: string) => {
-            (props as NoReadonlyProps).onReply(text);
+            (props as ThreadProps).onReply(text);
           }}
         />
       );
@@ -46,8 +61,48 @@ export function TopLevelComment({
     return <></>;
   };
 
+  const ReadonlyFalseCommentMenus = () => {
+    if (readonly === false) {
+      const { onCopyLink, onDelete, onReaction } = props as ThreadProps;
+      return (
+        <div className="hover-menus">
+          <CommentMenus
+            onCopyLinkClick={() => {
+              onCopyLink(id);
+            }}
+            onDeleteClick={() => {
+              onDelete(id);
+            }}
+            onReactionClick={(emoji) => {
+              onReaction(id, emoji);
+            }}
+          />
+        </div>
+      );
+    }
+    return <></>;
+  };
+
+  // map array of reactions by same emojis and count.
+  const reactions_by_emoji: Array<{ emoji: string; users: User[] }> =
+    reactions.reduce((acc, r) => {
+      const { user, emoji } = r;
+      const i = acc.findIndex((r) => r.emoji === emoji);
+      console.log(i);
+      if (i > -1) {
+        acc[i].users.push(user);
+      } else {
+        acc.push({
+          emoji: emoji,
+          users: [user],
+        });
+      }
+      return acc;
+    }, []);
+
   return (
     <TopLevelCommentContainer>
+      <ReadonlyFalseCommentMenus />
       <ThreadNumber>#{order_id}</ThreadNumber>
       <ThreadUserDisplay>
         <UserAvatar {...user} from="figma" size={30} />
@@ -59,13 +114,32 @@ export function TopLevelComment({
       </ThreadUserDisplay>
       <Message>{message}</Message>
       <ReactionsContainer>
-        {reactions.map((r, i) => {
-          return <Reaction key={i} emoji={r.emoji as any} user={r.user} />;
+        {reactions_by_emoji.map((r, i) => {
+          return (
+            <Reaction
+              key={i}
+              emoji={r.emoji as any}
+              users={r.users}
+              // todo if user = me, selected.
+              // selected
+              onClick={() => {
+                // todo . toggle
+              }}
+            />
+          );
         })}
       </ReactionsContainer>
       <RepliesContainer>
         {replies.map((r, i) => {
-          return <ThreadReplyComment key={i} {...r} />;
+          return (
+            <ThreadReplyComment
+              key={i}
+              {...r}
+              onCopyLink={props.onCopyLink}
+              onDelete={props.onDelete}
+              onReaction={props.onReaction}
+            />
+          );
         })}
       </RepliesContainer>
       <ReplyMessageBox />
@@ -82,6 +156,7 @@ const ThreadUserDisplay = styled.div`
 `;
 
 const TopLevelCommentContainer = styled.div`
+  position: relative;
   display: flex;
   flex-direction: column;
   padding: 16px;
@@ -92,6 +167,97 @@ const TopLevelCommentContainer = styled.div`
   }
 
   border-top: 1px solid rgba(255, 255, 255, 0.1);
+
+  .hover-menus {
+    pointer-events: none;
+    position: absolute;
+    opacity: 0;
+    margin: -12px 12px 0 0;
+    top: 0;
+    right: 0;
+  }
+
+  &:hover {
+    .hover-menus {
+      pointer-events: auto;
+      opacity: 1;
+    }
+  }
+`;
+
+const quick_reactions = [":eyes:", ":+1:", ":fire:"] as const;
+
+function CommentMenus({
+  onReactionClick,
+  onDeleteClick,
+  onCopyLinkClick,
+}: {
+  onCopyLinkClick: () => void;
+  onDeleteClick: () => void;
+  onReactionClick: (emoji: ReactionEmoji) => void;
+}) {
+  return (
+    <MenusContainer>
+      {quick_reactions.map((r, i) => {
+        return (
+          <MenuItem
+            key={i}
+            onClick={() => {
+              onReactionClick?.(r);
+            }}
+          >
+            {emojimap[r]}
+          </MenuItem>
+        );
+      })}
+      <MenuItem>
+        <DropdownMenu>
+          <DropdownMenuTrigger>
+            <DotsVerticalIcon color="white" />
+          </DropdownMenuTrigger>
+          <DropdownMenuContent>
+            <DropdownMenuItem onClick={onDeleteClick}>
+              <DropdownMenuLabel style={{ color: "red" }}>
+                Delete message
+              </DropdownMenuLabel>
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={onCopyLinkClick}>
+              <DropdownMenuLabel>Copy link</DropdownMenuLabel>
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </MenuItem>
+    </MenusContainer>
+  );
+}
+
+const MenusContainer = styled.div`
+  display: flex;
+  gap: 4px;
+  padding: 2px;
+  background: rgba(0, 0, 0, 0.8);
+  border-radius: 4px;
+  outline: 1px solid rgba(255, 255, 255, 0.1);
+`;
+
+const MenuItem = styled.span`
+  cursor: pointer;
+  display: flex;
+  font-size: 12px;
+  width: 16px;
+  height: 16px;
+  align-items: center;
+  justify-content: center;
+  padding: 4px;
+  :hover {
+    background: rgba(255, 255, 255, 0.1);
+  }
+
+  button {
+    background: transparent;
+    outline: none;
+    border: none;
+  }
 `;
 
 const UserLabel = styled.label`
@@ -120,7 +286,7 @@ const RepliesContainer = styled.div`
   display: flex;
   flex-direction: column;
   align-items: stretch;
-  gap: 8px;
+  gap: 4px;
 `;
 
 function UserAvatar({
@@ -168,50 +334,41 @@ const ReactionsContainer = styled.div`
   margin-bottom: 16px;
 `;
 
-function Reaction({
+function ThreadReplyComment({
+  id,
   user,
-  emoji,
-}: {
-  user: User;
-  emoji:
-    | ":eyes:"
-    | ":heart_eyes:"
-    | ":heavy_plus_sign:"
-    | ":+1:"
-    | ":-1:"
-    | ":joy:"
-    | ":fire:";
-}) {
-  return <Emoji title={user.handle}>{emojimap[emoji]}</Emoji>;
-}
+  message,
+  created_at,
+  reactions,
+  readonly,
+  order_id,
+  ...props
+}: Reply & CommentProps & { readonly?: boolean }) {
+  const NoReadonlyMenus = () => {
+    if (!readonly) {
+      const { onReaction, onDelete, onCopyLink } = props as CommentProps;
+      return (
+        <div className="reply-hover-menus">
+          <CommentMenus
+            onCopyLinkClick={() => {
+              onCopyLink(id);
+            }}
+            onDeleteClick={() => {
+              onDelete(id);
+            }}
+            onReactionClick={(emoji: ReactionEmoji) => {
+              onReaction(id, emoji);
+            }}
+          />
+        </div>
+      );
+    }
+    return <></>;
+  };
 
-const Emoji = styled.span`
-  cursor: default;
-  font-size: 16px;
-  border-radius: 50%;
-  padding: 4px;
-  width: 21px;
-  height: 21px;
-  background: rgba(255, 255, 255, 0.1);
-  text-align: center;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-`;
-
-const emojimap = {
-  ":eyes:": "👀",
-  ":heart_eyes:": "😍",
-  ":heavy_plus_sign:": "➕",
-  ":+1:": "👍",
-  ":-1:": "👎",
-  ":joy:": "😂",
-  ":fire:": "🔥",
-};
-
-function ThreadReplyComment({ user, message, created_at }: Reply) {
   return (
     <ReplyCommentContainer>
+      <NoReadonlyMenus />
       <ReplyUserDisplay>
         <UserAvatar {...user} from="figma" size={16} />
         <UserLabel>{user.handle}</UserLabel>
@@ -224,8 +381,27 @@ function ThreadReplyComment({ user, message, created_at }: Reply) {
 }
 
 const ReplyCommentContainer = styled.div`
+  position: relative;
+  border-radius: 2px;
+  padding: 8px;
   &:hover {
     background: rgba(0, 0, 0, 0.2);
+  }
+
+  .reply-hover-menus {
+    pointer-events: none;
+    position: absolute;
+    opacity: 0;
+    top: 0;
+    right: 0;
+    margin: -12px -6px 0 0;
+  }
+
+  &:hover {
+    .reply-hover-menus {
+      pointer-events: auto;
+      opacity: 1;
+    }
   }
 `;
 

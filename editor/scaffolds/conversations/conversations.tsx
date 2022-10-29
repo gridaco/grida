@@ -6,6 +6,7 @@ import styled from "@emotion/styled";
 
 import { useFigmaComments } from "services/figma-comments-service";
 import { TopLevelComment } from "./comment";
+import { copy } from "utils/clipboard";
 
 export function Conversations() {
   const [state] = useEditorState();
@@ -28,6 +29,16 @@ export function Conversations() {
               readonly={false}
               onReply={(message) => {
                 dispatch({ type: "post", message, comment_id: c.id });
+              }}
+              onCopyLink={(id) => {
+                const url = `https://www.figma.com/file/${filekey}?#${id}`;
+                copy(url, { notify: true });
+              }}
+              onDelete={(id) => {
+                dispatch({ type: "delete", comment_id: id });
+              }}
+              onReaction={(id, emoji) => {
+                dispatch({ type: "react", comment_id: id, emoji });
               }}
             />
           );
