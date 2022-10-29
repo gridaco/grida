@@ -1,35 +1,23 @@
-import React, { useEffect, useState } from "react";
-
-import { Client, Comment, User } from "@design-sdk/figma-remote-api";
+import React from "react";
+import type { Comment, User } from "@design-sdk/figma-remote-api";
 import { useEditorState } from "core/states";
 import { useFigmaAccessToken } from "hooks/use-figma-access-token";
 import styled from "@emotion/styled";
 import dayjs from "dayjs";
 import relativeTime from "dayjs/plugin/relativeTime";
 import { InspectorSection } from "components/inspector";
+import { useComments } from "services";
 
 dayjs.extend(relativeTime);
 
 export function Conversations() {
   const [state] = useEditorState();
-  const auth = useFigmaAccessToken();
+  const fat = useFigmaAccessToken();
   const filekey = state.design?.key;
-  const [comments, setComments] = useState<ReadonlyArray<Comment>>([]);
-
-  useEffect(() => {
-    if (filekey && (auth.personalAccessToken || auth.accessToken)) {
-      const client = Client({
-        personalAccessToken: auth.personalAccessToken,
-        accessToken: auth.accessToken.token,
-      });
-
-      client.comments(filekey).then((d) => {
-        const comments = d.data.comments;
-        setComments(comments);
-      });
-    }
-  }, [filekey, auth]);
-
+  const comments = useComments(filekey, {
+    personalAccessToken: fat.personalAccessToken,
+    accessToken: fat.accessToken.token,
+  });
   const toplevelcomments = comments.filter((c) => !!!c.parent_id);
 
   return (
