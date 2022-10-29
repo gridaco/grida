@@ -20,10 +20,10 @@ export function ColorsSection() {
   return (
     <InspectorSection label="Colors" borderTop>
       <ChipsContainer>
-        {colors?.map((c) => {
+        {colors?.map((c, i) => {
           switch (c.type) {
             case "SOLID":
-              return <ColorChip color={{ ...c.color, o: c.opacity }} />;
+              return <ColorChip key={i} color={{ ...c.color, o: c.opacity }} />;
             case "GRADIENT_RADIAL":
             case "GRADIENT_ANGULAR":
             case "GRADIENT_DIAMOND":

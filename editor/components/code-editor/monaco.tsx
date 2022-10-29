@@ -20,6 +20,7 @@ export interface MonacoEditorProps {
   height?: number | string;
   options?: Options;
   readonly?: boolean;
+  fold_comments_on_load?: boolean;
 }
 
 export function MonacoEditor(props: MonacoEditorProps) {
@@ -30,6 +31,8 @@ export function MonacoEditor(props: MonacoEditorProps) {
   const onMount: OnMount = (editor, monaco) => {
     const format = editor.getAction("editor.action.formatDocument");
     const rename = editor.getAction("editor.action.rename");
+    // fold all comments
+    const fold_comments = editor.getAction("editor.foldAllBlockComments");
 
     instance.current = { editor, format };
 
@@ -66,9 +69,17 @@ export function MonacoEditor(props: MonacoEditorProps) {
       },
     });
 
-    editor.onDidChangeModelContent(() =>
-      debounce(() => editor.saveViewState(), 200)
-    );
+    if (props.fold_comments_on_load) {
+      fold_comments.run();
+    }
+
+    editor.onDidChangeModelContent(() => {
+      debounce(() => editor.saveViewState(), 200);
+
+      if (props.fold_comments_on_load) {
+        fold_comments.run();
+      }
+    });
 
     editor.onDidDispose(() => {
       dispose();

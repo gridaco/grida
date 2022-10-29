@@ -7,7 +7,7 @@ import { MonacoEditor } from "components/code-editor";
 import { InspectorSection } from "components/inspector";
 import { Button } from "@editor-ui/button";
 import { useDispatch } from "core/dispatch";
-import { preview as wwpreview } from "../code/code-worker-messenger";
+import { code as wwcode } from "../code/code-worker-messenger";
 
 export function CodeSection() {
   const wstate = useWorkspaceState();
@@ -27,25 +27,14 @@ export function CodeSection() {
     if (!target) {
       return;
     }
-    const _input = {
-      id: target.id,
-      name: target.name,
-      entry: target,
-      repository: root.repository,
-    };
-    const build_config = {
-      ...config.default_build_configuration,
-      disable_components: true,
-    };
 
     let dispose;
 
     setTimeout(() => {
-      dispose = wwpreview(
+      dispose = wwcode(
         {
-          page: "", // TODO:
-          // page: target.page,
           target: target.id,
+          framework: wstate.preferences.framework_config,
         },
         on_result
       );
@@ -76,6 +65,7 @@ export function CodeSection() {
           width={"100%"}
           value={code.raw}
           height={target.isRoot ? 800 : 400}
+          fold_comments_on_load
           options={{
             lineNumbers: "off",
             glyphMargin: false,

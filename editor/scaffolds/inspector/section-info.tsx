@@ -6,7 +6,7 @@ export function InfoSection() {
   const { target } = useTargetContainer();
   return (
     <Section>
-      <SceneTitle disabled value={target?.name} />
+      <SceneTitle disabled value={target?.name ?? ""} />
       <SceneDescription>{"No description"}</SceneDescription>
     </Section>
   );
