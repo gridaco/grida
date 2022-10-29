@@ -1,2 +1,2 @@
 export { FigmaImageService } from "./figma-image-service";
-export { FigmaCommentsStore, useComments } from "./figma-comments-store";
+export { FigmaCommentsStore, useFigmaComments } from "./figma-comments-service";
