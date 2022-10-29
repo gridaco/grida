@@ -13,7 +13,6 @@ export function InfoSection() {
 }
 
 const Section = styled.section`
-  margin-top: 24px;
   display: flex;
   flex-direction: column;
   padding: 14px;

@@ -5,7 +5,6 @@ import { useFigmaAccessToken } from "hooks/use-figma-access-token";
 import styled from "@emotion/styled";
 import dayjs from "dayjs";
 import relativeTime from "dayjs/plugin/relativeTime";
-import { InspectorSection } from "components/inspector";
 import {
   useFigmaComments,
   Comment,
@@ -24,17 +23,13 @@ export function Conversations() {
     accessToken: fat.accessToken.token,
   });
 
-  // console.log("comments", comments);
-
   return (
     <>
-      <InspectorSection label="Comments" contentPadding={0}>
-        <CommentsListContainer>
-          {comments.map((c) => {
-            return <TopLevelComment key={c.id} {...c} />;
-          })}
-        </CommentsListContainer>
-      </InspectorSection>
+      <CommentsListContainer>
+        {comments.map((c) => {
+          return <TopLevelComment key={c.id} {...c} />;
+        })}
+      </CommentsListContainer>
     </>
   );
 }
