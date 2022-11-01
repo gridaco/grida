@@ -40,14 +40,9 @@ export class FigmaImageService {
   }
 
   /**
-   * current ongoing requests
+   * current ongoing requests (instant fetch)
    */
   private tasks = new Map<string, Promise<any>>();
-  private timeout: number;
-  private debounced: Promise<{ [key: string]: string }>;
-  resolve: (
-    value: { [key: string]: string } | PromiseLike<{ [key: string]: string }>
-  ) => void;
 
   private pushTask<T = any>(id: string, task: Promise<T>) {
     this.tasks.set(id, task);
@@ -61,10 +56,25 @@ export class FigmaImageService {
     return this.tasks.has(id);
   }
 
+  // #region queue debounced batch fetch
+  private timeout: number;
+  private queuedTasks = new Map<string, Promise<string>>();
+  private queuedResolvers: Map<
+    string,
+    (value: string | PromiseLike<string>) => void
+  > = new Map();
   /**
    * next batch to run
    */
-  private next_targets_queue = new Set<string>();
+  private queue = new Set<string>();
+  private async pushQueuedTask(id: string, task: Promise<string>) {
+    this.queuedTasks.set(id, task);
+    task.finally(() => {
+      this.queuedTasks.delete(id);
+    });
+    return task;
+  }
+  // #endregion
 
   private async updateImageHashMap() {
     if (this.hasTask("update-image-hash-map")) {
@@ -167,26 +177,13 @@ export class FigmaImageService {
       if (bakes.length > 0) {
         if (do_debounce) {
           // fetch with merged queues
-          this.next_targets_queue = new Set([
-            ...this.next_targets_queue,
-            ...bakes,
-          ]);
+          this.queue = new Set([...this.queue, ...bakes]);
 
           if (this.timeout) {
             clearTimeout(this.timeout);
           }
 
-          if (!this.debounced) {
-            this.debounced = new Promise((resolve) => {
-              this.resolve = resolve;
-            });
-          }
-
-          // TODO: implement queue
-
-          const handler = async () => {
-            const targets = Array.from(this.next_targets_queue);
-            this.next_targets_queue = new Set();
+          const handler = async (...targets) => {
             const data = await this.fetch(targets, {
               ensure: true,
               debounce: false,
@@ -195,13 +192,47 @@ export class FigmaImageService {
           };
 
           this.timeout = setTimeout(async () => {
-            const data = await handler();
-            console.log("resolved");
-            this.resolve(data);
-            this.debounced = null;
+            // copy queue
+            const targets = [...this.queue];
+
+            // reset queue
+            this.queue.clear();
+
+            const data = await handler(...targets);
+
+            for (const key of targets) {
+              const resolve = this.queuedResolvers.get(key);
+              if (resolve) {
+                resolve(data[key]);
+              } else {
+                throw new Error("no resolver found for " + key);
+              }
+              this.queuedResolvers.delete(key);
+            }
           }, DEBOUNCE);
 
-          return this.debounced;
+          const promises = bakes.map((b) => {
+            const key = b;
+            const promise = new Promise<string>((resolve) => {
+              this.queuedResolvers.set(key, resolve);
+            });
+            tasks[b] = promise;
+
+            return this.pushQueuedTask(b, promise);
+          });
+
+          return new Promise(async (resolve) => {
+            const datas: { [key: string]: string } = await (
+              await Promise.all(promises)
+            ).reduce((acc, data: string, i) => {
+              return {
+                ...acc,
+                [bakes[i]]: data,
+              };
+            }, {});
+
+            resolve({ ...datas, ...results });
+          });
         } else {
           // this does not support format, scale, ... (todo)
           const request = fetchNodeAsImage(
