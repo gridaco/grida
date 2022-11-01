@@ -6,7 +6,7 @@ import {
 import { RemoteImageRepositories } from "@design-sdk/figma-remote/asset-repository";
 import { config } from "@grida/builder-config";
 import { preview_presets } from "@grida/builder-config-preset";
-import { FigmaFileStore } from "@editor/figma-file-store";
+import { FigmaFileStore } from "@editor/figma-file";
 import { convert } from "@design-sdk/figma-node-conversion";
 import { mapper } from "@design-sdk/figma-remote";
 import q from "@design-sdk/query";

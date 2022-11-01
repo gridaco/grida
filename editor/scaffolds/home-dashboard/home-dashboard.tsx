@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import styled from "@emotion/styled";
 import { DefaultEditorWorkspaceLayout } from "layouts/default-editor-workspace-layout";
 import {
@@ -12,7 +12,8 @@ import { WorkspaceRepository } from "repository/workspace-repository";
 import { colors } from "theme";
 
 export function HomeDashboard() {
-  const repository = new WorkspaceRepository();
+  const repository = useMemo(() => new WorkspaceRepository(), []);
+
   const [recents, setRecents] = useState([]);
   const [files, setFiles] = useState([]);
   const [components, setComponents] = useState([]);

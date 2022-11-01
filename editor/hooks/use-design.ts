@@ -14,10 +14,7 @@ import { RemoteDesignSessionCacheStore } from "../store";
 import { convert } from "@design-sdk/figma-node-conversion";
 import { mapper } from "@design-sdk/figma-remote";
 import { useFigmaAuth } from "scaffolds/workspace/figma-auth";
-import {
-  FigmaDesignRepository,
-  TFetchFileForApp,
-} from "repository/figma-design-repository";
+import { FigmaDesignRepository, TFetchFileForApp } from "@editor/figma-file";
 
 // globally configure auth credentials for interacting with `@design-sdk/figma-remote`
 configure_auth_credentials({
