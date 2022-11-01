@@ -12,7 +12,6 @@ export function FigmaImageServiceProvider({
   filekey: string;
 }>) {
   const wssate = useWorkspaceState();
-  console.log("wssate.figmaAuthentication", wssate.figmaAuthentication);
   const service = useMemo(() => {
     if (!filekey || !wssate.figmaAuthentication) return;
 

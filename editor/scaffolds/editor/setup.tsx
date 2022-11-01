@@ -1,103 +1,107 @@
-import React, { useEffect, useCallback, useReducer, useState } from "react";
+import React, { useEffect, useCallback, useState } from "react";
 import { NextRouter } from "next/router";
-import { Editor, EditorDefaultProviders } from "scaffolds/editor";
-import { EditorSnapshot, StateProvider } from "core/states";
-import { WorkspaceAction } from "core/actions";
-import { TUseDesignFile } from "hooks";
+import { EditorDefaultProviders } from "scaffolds/editor";
+import { EditorSnapshot, useEditorState } from "core/states";
+import { useDesignFile } from "hooks";
 import { warmup } from "scaffolds/editor";
 import { EditorBrowserMetaHead } from "components/editor";
 import type { FileResponse } from "@design-sdk/figma-remote-types";
+import { useWorkspaceInitializerContext } from "scaffolds/workspace";
 
 const action_fetchfile_id = "fetchfile" as const;
+
+type EditorSetupState = {
+  /**
+   * explicitly set loading to block uesr interaction.
+   */
+  loading?: boolean;
+};
+
+export const EditorSetupContext = React.createContext<EditorSetupState>(null);
+
+export function useEditorSetupContext() {
+  return React.useContext(EditorSetupContext);
+}
 
 export function SetupEditor({
   filekey,
   nodeid,
   router,
-  file,
-}: {
+  children,
+}: React.PropsWithChildren<{
   nodeid: string;
   filekey: string;
   router: NextRouter;
-  file: TUseDesignFile;
-}) {
+}>) {
+  const { provideEditorSnapshot: initialize } =
+    useWorkspaceInitializerContext();
+
+  // background whole file fetching
+  const file = useDesignFile({ file: filekey });
+
   const [loading, setLoading] = useState<boolean>(true);
-
-  const [initialState, initialDispatcher] = useReducer(warmup.initialReducer, {
-    type: "pending",
-  });
-
-  const handleDispatch = useCallback((action: WorkspaceAction) => {
-    initialDispatcher({ type: "update", value: action });
-  }, []);
+  const [state] = useEditorState();
 
   const initialCanvasMode = q_map_canvas_mode_from_query(
     router.query.mode as string
   ); // TODO: change this to reflect the nodeid input
 
-  const initWith = (file: FileResponse) => {
-    const prevstate =
-      initialState.type == "success" && initialState.value.history.present;
+  const initWith = useCallback(
+    (file: FileResponse) => {
+      let val: EditorSnapshot;
 
-    let val: EditorSnapshot;
+      // TODO: seed this as well
+      // ->> file.styles;
 
-    // TODO: seed this as well
-    // ->> file.styles;
+      const components = warmup.componentsFrom(file);
+      const pages = warmup.pagesFrom(filekey, file);
 
-    const components = warmup.componentsFrom(file);
-    const pages = warmup.pagesFrom(filekey, file);
+      if (state.design) {
+        val = {
+          ...state,
+          design: {
+            ...state.design,
+            pages: pages,
+          },
+          selectedPage: warmup.selectedPage(state, pages, state.selectedNodes),
+        };
+      } else {
+        const initialSelections =
+          // set selected nodes initially only if the nodeid is the id of non-page node
+          pages.some((p) => p.id === nodeid) ? [] : nodeid ? [nodeid] : [];
 
-    if (prevstate) {
-      val = {
-        ...prevstate,
-        design: {
-          ...prevstate.design,
-          pages: pages,
-        },
-        selectedPage: warmup.selectedPage(
-          prevstate,
-          pages,
-          prevstate.selectedNodes
-        ),
-      };
-    } else {
-      const initialSelections =
-        // set selected nodes initially only if the nodeid is the id of non-page node
-        pages.some((p) => p.id === nodeid) ? [] : nodeid ? [nodeid] : [];
+        val = {
+          selectedNodes: initialSelections,
+          selectedNodesInitial: initialSelections,
+          selectedPage: warmup.selectedPage(state, pages, nodeid && [nodeid]),
+          selectedLayersOnPreview: [],
+          design: {
+            name: file.name,
+            input: null,
+            components: components,
+            // styles: null,
+            key: filekey,
+            pages: pages,
+          },
+          canvasMode: initialCanvasMode,
+          editorTaskQueue: {
+            isBusy: true,
+            tasks: [
+              {
+                id: action_fetchfile_id,
+                name: "Figma File",
+                description: "Refreshing remote file",
+                progress: null,
+              },
+            ],
+          },
+        };
+      }
 
-      val = {
-        selectedNodes: initialSelections,
-        selectedNodesInitial: initialSelections,
-        selectedPage: warmup.selectedPage(prevstate, pages, nodeid && [nodeid]),
-        selectedLayersOnPreview: [],
-        design: {
-          name: file.name,
-          input: null,
-          components: components,
-          // styles: null,
-          key: filekey,
-          pages: pages,
-        },
-        canvasMode: initialCanvasMode,
-        editorTaskQueue: {
-          isBusy: true,
-          tasks: [
-            {
-              id: action_fetchfile_id,
-              name: "Figma File",
-              description: "Refreshing remote file",
-              progress: null,
-            },
-          ],
-        },
-      };
-    }
-
-    initialDispatcher({
-      type: "set",
-      value: val,
-    });
-  };
+      initialize(val);
+    },
+    [initialize, state]
+  );
 
   useEffect(() => {
     if (!loading) {
@@ -146,16 +150,12 @@ export function SetupEditor({
     file.__type == "file-fetched-for-app" ? file.document?.children : null,
   ]);
 
-  const safe_value = warmup.safestate(initialState);
-
   return (
-    <StateProvider state={safe_value} dispatch={handleDispatch}>
+    <EditorSetupContext.Provider value={{ loading }}>
       <EditorDefaultProviders>
-        <EditorBrowserMetaHead>
-          <Editor loading={loading} />
-        </EditorBrowserMetaHead>
+        <EditorBrowserMetaHead>{children}</EditorBrowserMetaHead>
       </EditorDefaultProviders>
-    </StateProvider>
+    </EditorSetupContext.Provider>
   );
 }
 

@@ -1,20 +1,38 @@
 import React, { useEffect, useState } from "react";
 import { useRouter } from "next/router";
-import { SigninToContinueBannerPrmoptProvider } from "components/prompt-banner-signin-to-continue";
-import { SetupEditor } from "scaffolds/editor";
-import { useDesignFile } from "hooks";
-import { SetupWorkspace } from "scaffolds/workspace";
+import { SigninToContinuePrmoptProvider } from "components/prompt-banner-signin-to-continue";
+import { Editor, SetupEditor } from "scaffolds/editor";
+import { Workspace } from "scaffolds/workspace/workspace";
 
 export default function FileEntryEditor() {
   const router = useRouter();
+  const nodeid = useNodeID();
   const { key } = router.query;
 
-  const [nodeid, setNodeid] = useState<string>();
   const filekey = key as string;
 
-  // background whole file fetching
-  const file = useDesignFile({ file: filekey });
+  return (
+    <SigninToContinuePrmoptProvider>
+      <Workspace>
+        <SetupEditor
+          key={filekey}
+          filekey={filekey}
+          nodeid={nodeid}
+          router={router}
+        >
+          <Editor />
+        </SetupEditor>
+      </Workspace>
+    </SigninToContinuePrmoptProvider>
+  );
+}
 
+/**
+ * use target node id from query params.
+ */
+function useNodeID() {
+  const router = useRouter();
+  const [nodeid, setNodeid] = useState<string>();
   useEffect(() => {
     if (!router.isReady) return;
 
@@ -23,18 +41,5 @@ export default function FileEntryEditor() {
       setNodeid(router.query.node as string);
     }
   }, [router.isReady]);
-
-  return (
-    <SigninToContinueBannerPrmoptProvider>
-      <SetupWorkspace router={router}>
-        <SetupEditor
-          key={filekey}
-          file={file}
-          filekey={filekey}
-          nodeid={nodeid}
-          router={router}
-        />
-      </SetupWorkspace>
-    </SigninToContinueBannerPrmoptProvider>
-  );
+  return nodeid;
 }

@@ -11,6 +11,11 @@ export type WorkspaceAction =
   | HighlightNodeAction
   | EditorModeAction;
 
+/**
+ * actions that can be executed while workspace is being warmed up.
+ */
+export type WorkspaceWarmupAction = SetFigmaAuthAction | SetFigmaUserAction;
+
 export type HistoryAction =
   //
   | { type: "undo" }
@@ -19,6 +24,8 @@ export type HistoryAction =
   | Action;
 
 export type Action =
+  | SetFigmaAuthAction
+  | SetFigmaUserAction
   | PageAction
   | SelectNodeAction
   | LocateNodeAction
@@ -32,6 +39,23 @@ export type Action =
   | EditorModeAction;
 
 export type ActionType = Action["type"];
+
+export type SetFigmaAuthAction = {
+  type: "set-figma-auth";
+  authentication: {
+    personalAccessToken?: string;
+    accessToken?: string;
+  };
+};
+
+export type SetFigmaUserAction = {
+  type: "set-figma-user";
+  user: {
+    id: string;
+    name: string;
+    profile: string;
+  };
+};
 
 export type EditorModeAction = EditorModeSwitchAction;
 export type EditorModeSwitchAction = {

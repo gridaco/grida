@@ -1,12 +1,19 @@
+export type PendingState_Pending<T> = {
+  type: "pending";
+  value?: Partial<T>;
+};
+
+export type PendingState_Success<T> = {
+  type: "success";
+  value: T;
+};
+
+export type PendingState_Failure<T> = {
+  type: "failure";
+  value?: Error;
+};
+
 export type PendingState<T> =
-  | {
-      type: "pending";
-    }
-  | {
-      type: "success";
-      value: T;
-    }
-  | {
-      type: "failure";
-      value: Error;
-    };
+  | PendingState_Pending<T>
+  | PendingState_Success<T>
+  | PendingState_Failure<T>;

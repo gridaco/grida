@@ -12,16 +12,11 @@ import { Inspector } from "scaffolds/inspector";
 import { EditorHome } from "scaffolds/editor-home";
 import { EditorSkeleton } from "./skeleton";
 import { colors } from "theme";
+import { useEditorSetupContext } from "./setup";
 
-export function Editor({
-  loading = false,
-}: {
-  /**
-   * explicitly set loading to block uesr interaction.
-   */
-  loading?: boolean;
-}) {
+export function Editor() {
   const [state] = useEditorState();
+  const { loading } = useEditorSetupContext();
 
   const _initially_loaded = state.design?.pages?.length > 0;
   const _initial_load_progress =

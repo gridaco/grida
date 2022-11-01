@@ -1,22 +1,24 @@
 import {
-  createPendingWorkspaceState,
+  create_initial_pending_workspace_state,
   EditorSnapshot,
   FigmaReflectRepository,
   WorkspaceState,
 } from "core/states";
-import { createInitialWorkspaceState } from "core/states";
-import { workspaceReducer } from "core/reducers";
-import { PendingState } from "core/utility-types";
-import { WorkspaceAction } from "core/actions";
+import { merge_initial_workspace_state_with_editor_snapshot } from "core/states";
+import { workspaceWarmupReducer, workspaceReducer } from "core/reducers";
+import { PendingState, PendingState_Pending } from "core/utility-types";
+import { WorkspaceAction, WorkspaceWarmupAction } from "core/actions";
 import type { Canvas, FileResponse } from "@design-sdk/figma-remote-types";
 import { convert } from "@design-sdk/figma-node-conversion";
 import { mapper } from "@design-sdk/figma-remote";
 import { visit } from "tree-visit";
 
-const pending_workspace_state = createPendingWorkspaceState();
+const initial_pending_workspace_state =
+  create_initial_pending_workspace_state();
 //
 export type InitializationAction =
-  | { type: "set"; value: EditorSnapshot }
+  | { type: "warmup"; value: WorkspaceWarmupAction }
+  | { type: "setup-with-editor-snapshot"; value: EditorSnapshot }
   | { type: "update"; value: WorkspaceAction };
 
 export function initialReducer(
@@ -24,11 +26,36 @@ export function initialReducer(
   action: InitializationAction
 ): PendingState<WorkspaceState> {
   switch (action.type) {
-    case "set":
+    case "setup-with-editor-snapshot":
       return {
         type: "success",
-        value: createInitialWorkspaceState(action.value),
+        value: merge_initial_workspace_state_with_editor_snapshot(
+          state.value as WorkspaceState,
+          action.value
+        ),
       };
+    case "warmup": {
+      switch (state.type) {
+        case "success": {
+          return {
+            type: "success",
+            value: workspaceWarmupReducer(
+              state.value,
+              action.value
+            ) as WorkspaceState,
+          };
+        }
+        case "pending": {
+          return <PendingState_Pending<WorkspaceState>>{
+            type: "pending",
+            value: workspaceWarmupReducer(
+              state.value ?? initial_pending_workspace_state,
+              action.value
+            ),
+          };
+        }
+      }
+    }
     case "update":
       if (state.type === "success") {
         return {
@@ -102,9 +129,19 @@ export function componentsFrom(
 }
 
 export function safestate(initialState) {
-  return initialState.type === "success"
-    ? initialState.value
-    : pending_workspace_state;
+  switch (initialState.type) {
+    case "success":
+      return initialState.value;
+    case "pending": {
+      if (initialState.value) {
+        return initialState.value;
+      } else {
+        return initial_pending_workspace_state;
+      }
+    }
+    default:
+      return initial_pending_workspace_state;
+  }
 }
 
 export const selectedPage = (

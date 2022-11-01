@@ -4,9 +4,7 @@ import { useEditorState } from "core/states";
 
 export function EditorBrowserMetaHead({
   children,
-}: {
-  children: React.ReactChild;
-}) {
+}: React.PropsWithChildren<{}>) {
   const [state] = useEditorState();
 
   return (
