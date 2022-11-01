@@ -14,3 +14,5 @@ export type ReactionEmoji =
   | ":-1:"
   | ":joy:"
   | ":fire:";
+
+export type Reactions = RawComment["reactions"];

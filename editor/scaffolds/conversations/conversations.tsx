@@ -17,27 +17,35 @@ export function Conversations() {
     wssate.figmaAuthentication
   );
 
+  const me = wssate.figmaUser;
+
   return (
     <>
       <CommentsListContainer>
         {comments.map((c) => {
           return (
             <TopLevelComment
+              me={me}
               key={c.id}
               {...c}
               readonly={false}
               onReply={(message) => {
-                dispatch({ type: "post", message, comment_id: c.id });
+                dispatch({
+                  type: "post",
+                  message,
+                  comment_id: c.id,
+                  me: me.id,
+                });
               }}
               onCopyLink={(id) => {
                 const url = `https://www.figma.com/file/${filekey}?#${id}`;
                 copy(url, { notify: true });
               }}
               onDelete={(id) => {
-                dispatch({ type: "delete", comment_id: id });
+                dispatch({ type: "delete", comment_id: id, me: me.id });
               }}
               onReaction={(id, emoji) => {
-                dispatch({ type: "react", comment_id: id, emoji });
+                dispatch({ type: "react", comment_id: id, emoji, me: me.id });
               }}
             />
           );

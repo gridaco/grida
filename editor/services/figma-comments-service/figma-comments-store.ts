@@ -37,6 +37,10 @@ export class FigmaCommentsStore {
     return db(this.filekey);
   }
 
+  async clear() {
+    await (await this.db).clear(this.filekey);
+  }
+
   async upsert(image: IndexedComment) {
     try {
       await (

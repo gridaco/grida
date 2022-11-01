@@ -66,7 +66,8 @@ export function useFigmaComments(
         const comments = d.data.comments;
         oncommentsload(Array.from(comments));
 
-        // update records - todo: delete removed records (not in the response)
+        // update records after clearing all.
+        store.clear();
         comments.map((c) => {
           store.upsert(c);
         });
@@ -109,10 +110,77 @@ export function useFigmaComments(
         break;
       }
       case "react": {
-        const params = p as ToggleReactionAction;
-        const comment = raws.find((c) => c.id === params.comment_id);
+        const { comment_id, me, emoji } = p as ToggleReactionAction;
+        const comment = raws.find((c) => c.id === comment_id);
         // check if user already has a reaction to the comment (with same emoji)
-        // todo
+        if (comment) {
+          const reaction = comment.reactions.find(
+            (r) => r.user.id === me && r.emoji === emoji
+          );
+          if (reaction) {
+            // remove reaction
+            client
+              .deleteCommentReaction(filekey, comment_id, { emoji })
+              .then(() => {
+                // update records
+                store.upsert(updated);
+              });
+
+            // update comment with updated reaction
+            const updated = {
+              ...comment,
+              reactions: comment.reactions.filter(
+                (r) => !(r.user.id == me && r.emoji == emoji)
+              ),
+            };
+
+            // update state (syncronously)
+            oncommentsload(
+              raws.map((c) => {
+                if (c.id === comment_id) {
+                  return updated;
+                }
+                return c;
+              })
+            );
+          } else {
+            // add reaction
+            client
+              .postCommentReaction(filekey, comment_id, { emoji })
+              .then(() => {
+                // update records
+                store.upsert(updated);
+              });
+
+            // update comment with updated reaction
+            const updated = {
+              ...comment,
+              reactions: [
+                ...comment.reactions,
+                {
+                  user: {
+                    id: me,
+                    handle: "",
+                    img_url: "",
+                  },
+                  emoji,
+                  created_at: new Date(),
+                },
+              ],
+            };
+
+            // update state (syncronously)
+            oncommentsload(
+              raws.map((c) => {
+                if (c.id === comment_id) {
+                  return updated;
+                }
+                return c;
+              })
+            );
+          }
+        }
+        // client.postCommentReaction
       }
     }
   };
@@ -120,12 +188,18 @@ export function useFigmaComments(
   return [comments, dispatch] as const;
 }
 
-type PostCommentAction = { type: "post"; message: string; comment_id: string };
-type DeleteCommentAction = { type: "delete"; comment_id: string };
+type PostCommentAction = {
+  type: "post";
+  message: string;
+  comment_id: string;
+  me: string;
+};
+type DeleteCommentAction = { type: "delete"; comment_id: string; me: string };
 type ToggleReactionAction = {
   type: "react";
   comment_id: string;
   emoji: string;
+  me: string;
 };
 type CommentActions =
   | PostCommentAction

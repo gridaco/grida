@@ -5,6 +5,7 @@ import type {
   Comment,
   Reply,
   ReactionEmoji,
+  Reactions,
 } from "services/figma-comments-service";
 import dayjs from "dayjs";
 import relativeTime from "dayjs/plugin/relativeTime";
@@ -32,7 +33,12 @@ type ThreadProps = CommentProps & {
   onReply?: (reply: string) => void;
 };
 
+type MeProps = {
+  me?: { id: string; name: string; profile: string };
+};
+
 export function TopLevelComment({
+  me,
   user,
   message,
   client_meta,
@@ -46,7 +52,7 @@ export function TopLevelComment({
   file_key,
   parent_id,
   ...props
-}: Comment & { readonly?: boolean } & ThreadProps) {
+}: Comment & { readonly?: boolean } & ThreadProps & MeProps) {
   const ReplyMessageBox = () => {
     if (readonly === false) {
       return (
@@ -83,22 +89,7 @@ export function TopLevelComment({
     return <></>;
   };
 
-  // map array of reactions by same emojis and count.
-  const reactions_by_emoji: Array<{ emoji: string; users: User[] }> =
-    reactions.reduce((acc, r) => {
-      const { user, emoji } = r;
-      const i = acc.findIndex((r) => r.emoji === emoji);
-      console.log(i);
-      if (i > -1) {
-        acc[i].users.push(user);
-      } else {
-        acc.push({
-          emoji: emoji,
-          users: [user],
-        });
-      }
-      return acc;
-    }, []);
+  const reactions_by_emoji = map_reactions_for_display(reactions, me.id);
 
   return (
     <TopLevelCommentContainer>
@@ -118,12 +109,9 @@ export function TopLevelComment({
           return (
             <Reaction
               key={i}
-              emoji={r.emoji as any}
-              users={r.users}
-              // todo if user = me, selected.
-              // selected
+              {...r}
               onClick={() => {
-                // todo . toggle
+                props.onReaction(id, r.emoji);
               }}
             />
           );
@@ -135,6 +123,7 @@ export function TopLevelComment({
             <ThreadReplyComment
               key={i}
               {...r}
+              me={me}
               onCopyLink={props.onCopyLink}
               onDelete={props.onDelete}
               onReaction={props.onReaction}
@@ -146,6 +135,31 @@ export function TopLevelComment({
     </TopLevelCommentContainer>
   );
 }
+
+/**
+ * map array of reactions by same emojis and count.
+ */
+const map_reactions_for_display = (
+  reactions: Reactions,
+  me: string
+): Array<{ emoji: ReactionEmoji; users: User[]; selected: boolean }> => {
+  return reactions.reduce((acc, r) => {
+    const { user, emoji } = r;
+    const i = acc.findIndex((r) => r.emoji === emoji);
+
+    if (i > -1) {
+      acc[i].users.push(user);
+      acc[i].selected = acc[i].selected || user.id === me;
+    } else {
+      acc.push({
+        emoji: emoji,
+        users: [user],
+        selected: user.id === me,
+      });
+    }
+    return acc;
+  }, []);
+};
 
 const ThreadUserDisplay = styled.div`
   margin-top: 8px;
@@ -336,6 +350,7 @@ const ReactionsContainer = styled.div`
 
 function ThreadReplyComment({
   id,
+  me,
   user,
   message,
   created_at,
@@ -343,7 +358,7 @@ function ThreadReplyComment({
   readonly,
   order_id,
   ...props
-}: Reply & CommentProps & { readonly?: boolean }) {
+}: Reply & CommentProps & { readonly?: boolean } & MeProps) {
   const NoReadonlyMenus = () => {
     if (!readonly) {
       const { onReaction, onDelete, onCopyLink } = props as CommentProps;
@@ -366,6 +381,8 @@ function ThreadReplyComment({
     return <></>;
   };
 
+  const reactions_by_emoji = map_reactions_for_display(reactions, me.id);
+
   return (
     <ReplyCommentContainer>
       <NoReadonlyMenus />
@@ -376,6 +393,19 @@ function ThreadReplyComment({
         <DateMeta>{dayjs(created_at).fromNow()}</DateMeta>
       </ReplyUserDisplay>
       <Message>{message}</Message>
+      <ReactionsContainer>
+        {reactions_by_emoji.map((r, i) => {
+          return (
+            <Reaction
+              key={i}
+              {...r}
+              onClick={() => {
+                props.onReaction(id, r.emoji);
+              }}
+            />
+          );
+        })}
+      </ReactionsContainer>
     </ReplyCommentContainer>
   );
 }

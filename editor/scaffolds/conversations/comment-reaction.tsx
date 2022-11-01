@@ -16,7 +16,7 @@ export function Reaction({
   onClick?: () => void;
 }) {
   return (
-    <Emoji data-selected={selected}>
+    <Emoji data-selected={selected} onClick={onClick}>
       {emojimap[emoji]}
       <label>{users.length}</label>
     </Emoji>
@@ -36,7 +36,8 @@ const Emoji = styled.span`
   justify-content: center;
 
   &[data-selected="true"] {
-    background: rgba(80, 80, 255, 0.8);
+    background: rgba(0, 0, 0, 0.8);
+    outline: 1px solid rgba(255, 255, 255, 0.5);
   }
 
   label {
