@@ -20,9 +20,12 @@ export class FigmaDesignRepository {
   ) {}
 
   static async fetchCachedFile(fileId: string) {
+    const metastore = new FigmaFileMetaStore();
     const store = new FigmaFileStore(fileId);
     const existing = await store.get();
     if (existing) {
+      // everytime the file is consumed consider it as used, we upsert the file so that the lastUsed can be updated.
+      metastore.upsert(existing.key, existing);
       return { ...existing, __initial: false } as TFetchFileForApp;
     } else {
       throw new Error("file not found");
@@ -34,6 +37,8 @@ export class FigmaDesignRepository {
     const store = new FigmaFileStore(filekey);
     const existing = await store.get();
     if (existing) {
+      // everytime the file is consumed consider it as used, we upsert the file so that the lastUsed can be updated.
+      metastore.upsert(existing.key, existing);
       yield { ...existing, __initial: false } as TFetchFileForApp;
     }
 
