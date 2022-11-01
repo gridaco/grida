@@ -34,20 +34,22 @@ export function FigmaStaticImageFrameView({
   };
 
   useEffect(() => {
-    service
-      .fetch(id, {
-        debounce: true,
-        ensure: true,
-      })
-      .then((res) => {
-        const src = res[id];
-        set_image(src);
-      })
-      .catch(console.error)
-      .finally(() => {
-        console.log("image loaded for ", id);
-      });
-  }, [filekey, id]);
+    if (service) {
+      service
+        .fetch(id, {
+          debounce: true,
+          ensure: true,
+        })
+        .then((res) => {
+          const src = res[id];
+          set_image(src);
+        })
+        .catch(console.error)
+        .finally(() => {
+          console.log("image loaded for ", id);
+        });
+    }
+  }, [filekey, id, service]);
 
   const bg_color_str = blurred_bg_fill(target);
 

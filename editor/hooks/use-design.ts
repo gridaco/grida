@@ -13,7 +13,7 @@ import { FigmaRemoteErrors } from "@design-sdk/figma-remote";
 import { RemoteDesignSessionCacheStore } from "../store";
 import { convert } from "@design-sdk/figma-node-conversion";
 import { mapper } from "@design-sdk/figma-remote";
-import { useFigmaAccessToken } from ".";
+import { useFigmaAuth } from "scaffolds/workspace/figma-auth";
 import {
   FigmaDesignRepository,
   TFetchFileForApp,
@@ -60,7 +60,7 @@ export function useDesign({
   ...props
 }: UseDesignProp) {
   const [design, setDesign] = useState<TargetNodeConfig>(null);
-  const fat = useFigmaAccessToken();
+  const fat = useFigmaAuth();
   const router = (type === "use-router" && props["router"]) ?? useRouter();
 
   useEffect(() => {
@@ -188,7 +188,7 @@ export function useDesignFile({ file }: { file: string }) {
   const [designfile, setDesignFile] = useState<TUseDesignFile>({
     __type: "loading",
   });
-  const fat = useFigmaAccessToken();
+  const fat = useFigmaAuth();
   useEffect(() => {
     if (file) {
       if (fat.personalAccessToken || fat.accessToken.token) {

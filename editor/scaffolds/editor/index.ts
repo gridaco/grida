@@ -1,3 +1,4 @@
+export { SetupEditor } from "./setup";
 export { Editor } from "./editor";
 export { EditorDefaultProviders } from "./_providers";
 export { useFigmaImageService } from "./editor-figma-image-service-provider";

@@ -15,7 +15,7 @@ export function EditorCodeWebworkerProvider({
   const wssate = useWorkspaceState();
 
   useEffect(() => {
-    if (state.design?.key) {
+    if (state.design?.key && wssate.figmaAuthentication) {
       initialize(
         {
           filekey: state.design.key,
@@ -26,7 +26,7 @@ export function EditorCodeWebworkerProvider({
         }
       );
     }
-  }, [state.design?.key]);
+  }, [state.design?.key, wssate.figmaAuthentication]);
 
   return <>{children}</>;
 }

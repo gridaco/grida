@@ -12,11 +12,12 @@ export function FigmaImageServiceProvider({
   filekey: string;
 }>) {
   const wssate = useWorkspaceState();
+  console.log("wssate.figmaAuthentication", wssate.figmaAuthentication);
   const service = useMemo(() => {
-    if (!filekey) return;
+    if (!filekey || !wssate.figmaAuthentication) return;
 
     return new FigmaImageService(filekey, wssate.figmaAuthentication);
-  }, [filekey]);
+  }, [filekey, wssate.figmaAuthentication]);
 
   useEffect(() => {
     if (service) {

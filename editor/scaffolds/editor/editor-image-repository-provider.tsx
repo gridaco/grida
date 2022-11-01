@@ -28,7 +28,7 @@ export function EditorImageRepositoryProvider({
     // ------------------------------------------------------------
     // other platforms are not supported yet
     // set image repo for figma platform
-    if (state.design) {
+    if (state.design && wssate.figmaAuthentication) {
       MainImageRepository.instance = new RemoteImageRepositories(
         state.design.key,
         {
@@ -43,7 +43,7 @@ export function EditorImageRepositoryProvider({
       );
     }
     // ------------------------------------------------------------
-  }, [state.design?.key]);
+  }, [state.design?.key, wssate.figmaAuthentication]);
 
   return <>{children}</>;
 }
