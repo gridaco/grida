@@ -28,6 +28,11 @@ export function EditorHomePageView() {
         s.children.length > 0
     );
 
+  const components = Object.values(design.components)
+    //
+    // query by name first, since it's more efficient
+    .filter((s) => s.name.toLowerCase().includes(query?.toLowerCase() || ""));
+
   const handleQuery = (query: string) => {
     setQuery(query);
   };
@@ -41,6 +46,7 @@ export function EditorHomePageView() {
           padding: 40,
         }}
       >
+        <SectionLabel>Scenes</SectionLabel>
         <SceneGrid
           onClick={() => {
             dispatch({
@@ -77,6 +83,35 @@ export function EditorHomePageView() {
             );
           })}
         </SceneGrid>
+        <SectionLabel>Components</SectionLabel>
+        <SceneGrid>
+          {components.map((cmp) => (
+            <SceneCard
+              key={cmp.id}
+              // @ts-ignore // todo
+              scene={cmp}
+              q={query}
+              selected={selectedNodes.includes(cmp.id)}
+              onClick={(e) => {
+                dispatch({
+                  type: "select-node",
+                  node: cmp.id,
+                });
+                e.stopPropagation();
+              }}
+              onDoubleClick={() => {
+                dispatch({
+                  type: "locate-node",
+                  node: cmp.id,
+                });
+                dispatch({
+                  type: "mode",
+                  mode: "code",
+                });
+              }}
+            />
+          ))}
+        </SceneGrid>
       </div>
     </>
   );
@@ -88,4 +123,12 @@ const SceneGrid = styled.div`
   align-items: flex-start;
   flex-wrap: wrap;
   gap: 40px;
+`;
+
+const SectionLabel = styled.label`
+  display: inline-block;
+  color: white;
+  font-size: 14px;
+  font-weight: 500;
+  margin-bottom: 16px;
 `;
