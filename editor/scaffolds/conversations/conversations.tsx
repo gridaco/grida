@@ -1,7 +1,6 @@
 import React from "react";
 
-import { useEditorState } from "core/states";
-import { useFigmaAccessToken } from "hooks/use-figma-access-token";
+import { useEditorState, useWorkspaceState } from "core/states";
 import styled from "@emotion/styled";
 
 import { useFigmaComments } from "services/figma-comments-service";
@@ -9,14 +8,14 @@ import { TopLevelComment } from "./comment";
 import { copy } from "utils/clipboard";
 
 export function Conversations() {
+  const wssate = useWorkspaceState();
   const [state] = useEditorState();
-  const fat = useFigmaAccessToken();
   const filekey = state.design?.key;
 
-  const [comments, dispatch] = useFigmaComments(filekey, {
-    personalAccessToken: fat.personalAccessToken,
-    accessToken: fat.accessToken.token,
-  });
+  const [comments, dispatch] = useFigmaComments(
+    filekey,
+    wssate.figmaAuthentication
+  );
 
   return (
     <>

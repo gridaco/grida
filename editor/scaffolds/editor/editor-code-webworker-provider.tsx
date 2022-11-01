@@ -1,6 +1,5 @@
 import React, { useEffect } from "react";
-import { useFigmaAccessToken } from "hooks/use-figma-access-token";
-import { useEditorState } from "core/states";
+import { useEditorState, useWorkspaceState } from "core/states";
 import { initialize } from "../code/code-worker-messenger";
 
 /**
@@ -13,22 +12,21 @@ export function EditorCodeWebworkerProvider({
   children?: React.ReactNode;
 }) {
   const [state] = useEditorState();
-  const fat = useFigmaAccessToken();
+  const wssate = useWorkspaceState();
 
   useEffect(() => {
-    if (
-      state.design?.key &&
-      (fat.personalAccessToken || !fat.accessToken.loading)
-    ) {
-      const authentication = {
-        personalAccessToken: fat.personalAccessToken,
-        accessToken: fat.accessToken.token,
-      };
-      initialize({ filekey: state.design.key, authentication }, () => {
-        //
-      });
+    if (state.design?.key) {
+      initialize(
+        {
+          filekey: state.design.key,
+          authentication: wssate.figmaAuthentication,
+        },
+        () => {
+          //
+        }
+      );
     }
-  }, [fat.personalAccessToken, fat.accessToken.token, state.design?.key]);
+  }, [state.design?.key]);
 
   return <>{children}</>;
 }

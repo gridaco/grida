@@ -1,5 +1,5 @@
-import { useFigmaAccessToken } from "hooks/use-figma-access-token";
-import React, { useCallback, useEffect, useMemo } from "react";
+import { useWorkspaceState } from "core/states";
+import React, { useEffect, useMemo } from "react";
 import { FigmaImageService } from "services";
 
 export const FigmaImageServiceContext =
@@ -11,15 +11,12 @@ export function FigmaImageServiceProvider({
 }: React.PropsWithChildren<{
   filekey: string;
 }>) {
-  const { personalAccessToken, accessToken } = useFigmaAccessToken();
+  const wssate = useWorkspaceState();
   const service = useMemo(() => {
-    if (!filekey || (!personalAccessToken && !accessToken)) return;
+    if (!filekey) return;
 
-    return new FigmaImageService(filekey, {
-      personalAccessToken: personalAccessToken,
-      accessToken: accessToken.token,
-    });
-  }, [filekey, personalAccessToken, accessToken.token]);
+    return new FigmaImageService(filekey, wssate.figmaAuthentication);
+  }, [filekey]);
 
   useEffect(() => {
     if (service) {

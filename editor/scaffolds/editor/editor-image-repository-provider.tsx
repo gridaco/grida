@@ -4,8 +4,7 @@ import {
   ImageRepository,
   MainImageRepository,
 } from "@design-sdk/asset-repository";
-import { useEditorState } from "core/states";
-import { useFigmaAccessToken } from "hooks";
+import { useEditorState, useWorkspaceState } from "core/states";
 
 /**
  * This is a queue handler of d2c requests.
@@ -17,14 +16,13 @@ export function EditorImageRepositoryProvider({
 }: {
   children: React.ReactNode;
 }) {
+  const wssate = useWorkspaceState();
   const [state] = useEditorState();
 
   // listen to requests
 
   // handle requests, dispatch with results
   //
-
-  const fat = useFigmaAccessToken();
 
   useEffect(() => {
     // ------------------------------------------------------------
@@ -34,10 +32,7 @@ export function EditorImageRepositoryProvider({
       MainImageRepository.instance = new RemoteImageRepositories(
         state.design.key,
         {
-          authentication: {
-            personalAccessToken: fat.personalAccessToken,
-            accessToken: fat.accessToken.token,
-          },
+          authentication: wssate.figmaAuthentication,
         }
       );
       MainImageRepository.instance.register(
@@ -48,7 +43,7 @@ export function EditorImageRepositoryProvider({
       );
     }
     // ------------------------------------------------------------
-  }, [state.design?.key, fat.accessToken]);
+  }, [state.design?.key]);
 
   return <>{children}</>;
 }

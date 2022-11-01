@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { designToCode, Result } from "@designto/code";
-import { config } from "@grida/builder-config";
+import { Result } from "@designto/code";
 import { useTargetContainer } from "hooks/use-target-node";
 import { useWorkspaceState } from "core/states";
 import { MonacoEditor } from "components/code-editor";
