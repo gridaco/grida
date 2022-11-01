@@ -16,9 +16,9 @@ export function EditorHomePageView() {
     .reduce((acc, page) => {
       return acc.concat(page.children);
     }, [])
+    .filter(Boolean)
     // query by name first, since it's more efficient
     .filter((s) => s.name.toLowerCase().includes(query?.toLowerCase() || ""))
-    .filter(Boolean)
     .filter(
       (s: ReflectSceneNode) =>
         (s.origin === "FRAME" ||
@@ -29,7 +29,7 @@ export function EditorHomePageView() {
     );
 
   const components = Object.values(design.components)
-    //
+    .filter(Boolean)
     // query by name first, since it's more efficient
     .filter((s) => s.name.toLowerCase().includes(query?.toLowerCase() || ""));
 
