@@ -44,10 +44,7 @@ export function FigmaStaticImageFrameView({
           const src = res[id];
           set_image(src);
         })
-        .catch(console.error)
-        .finally(() => {
-          console.log("image loaded for ", id);
-        });
+        .catch(console.error);
     }
   }, [filekey, id, service]);
 
@@ -67,15 +64,6 @@ export function FigmaStaticImageFrameView({
         contain: "layout style paint",
       }}
     >
-      <div
-        style={{
-          top: 0,
-          left: 0,
-          position: "fixed",
-          width: "100%",
-          height: "100%",
-        }}
-      ></div>
       {src ? (
         <img
           onLoad={() => {
@@ -104,7 +92,12 @@ export function FigmaStaticImageFrameView({
               transform: "translate(-50%, -50%)",
             }}
           >
-            <CircularProgress />
+            <CircularProgress
+              sx={{
+                opacity: 0.2,
+                color: "black",
+              }}
+            />
           </div>
         </>
       )}
