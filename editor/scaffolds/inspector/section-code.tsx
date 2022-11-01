@@ -8,11 +8,12 @@ import { InspectorSection } from "components/inspector";
 import { Button } from "@editor-ui/button";
 import { useDispatch } from "core/dispatch";
 import { code as wwcode } from "../code/code-worker-messenger";
+import { CircularProgress } from "@mui/material";
 
 export function CodeSection() {
   const wstate = useWorkspaceState();
   const { target, root } = useTargetContainer();
-  const [result, setResult] = useState<Result>();
+  const [result, setResult] = useState<Result>(null);
   const dispatch = useDispatch();
 
   const on_result = (result: Result) => {
@@ -27,6 +28,9 @@ export function CodeSection() {
     if (!target) {
       return;
     }
+
+    // clear data.
+    setResult(null);
 
     let dispose;
 
@@ -45,36 +49,49 @@ export function CodeSection() {
     };
   }, [target?.id]);
 
-  const { code, scaffold, name: componentName, framework } = result ?? {};
-  if (code) {
-    return (
-      <InspectorSection
-        border
-        label={"Code"}
-        contentPadding="8px 0 0 0"
-        actions={
-          <>
-            <Button id="open-code-editor" onClick={on_open}>
-              Open Code editor
-            </Button>
-          </>
-        }
-      >
-        <MonacoEditor
-          readonly
-          width={"100%"}
-          value={code.raw}
-          height={target.isRoot ? 800 : 400}
-          fold_comments_on_load
-          options={{
-            lineNumbers: "off",
-            glyphMargin: false,
-            minimap: { enabled: false },
-          }}
-        />
-      </InspectorSection>
-    );
-  }
+  const { code } = result ?? {};
+  const viewheight = target?.isRoot ? 800 : 400;
 
-  return <></>;
+  return (
+    <InspectorSection
+      border
+      label={"Code"}
+      contentPadding="8px 0 0 0"
+      actions={
+        <>
+          <Button id="open-code-editor" onClick={on_open}>
+            Open Code editor
+          </Button>
+        </>
+      }
+    >
+      {code ? (
+        <>
+          <MonacoEditor
+            readonly
+            width={"100%"}
+            value={code.raw}
+            height={viewheight}
+            fold_comments_on_load
+            options={{
+              lineNumbers: "off",
+              glyphMargin: false,
+              minimap: { enabled: false },
+            }}
+          />
+        </>
+      ) : (
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "center",
+            alignItems: "center",
+            height: viewheight,
+          }}
+        >
+          <CircularProgress size={24} />
+        </div>
+      )}
+    </InspectorSection>
+  );
 }
