@@ -13,7 +13,9 @@ export function EditorBrowserMetaHead({
     <>
       <Head>
         <title>
-          {state?.design?.name ? `Grida | ${state?.design?.name}` : "Loading.."}
+          {state?.design?.name
+            ? `Grida | ${state?.design?.name}`
+            : "Grida Code"}
         </title>
       </Head>
       {children}
