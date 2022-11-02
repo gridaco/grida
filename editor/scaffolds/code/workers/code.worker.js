@@ -112,7 +112,6 @@ addEventListener("message", async (event) => {
 
 function serialize(result) {
   // the widget is a class with a recursive-referencing property, so it shall be removed before posting back to the client.
-  console.log(result);
   delete result["widget"];
   return result;
 }
