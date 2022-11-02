@@ -39,6 +39,19 @@ export function SetupEditor({
   // background whole file fetching
   const file = useDesignFile({ file: filekey });
 
+  // todo background file fetching to task queue
+  // useEffect(() => {
+  //   const task =
+  //     // initial task
+  //     {
+  //       id: action_fetchfile_id,
+  //       name: "Figma File",
+  //       description: "Refreshing with latest figma file from remote",
+  //       progress: null,
+  //       createdAt: new Date(),
+  //     };
+  // }, [file]);
+
   const [loading, setLoading] = useState<boolean>(true);
   const [state] = useEditorState();
 
@@ -85,15 +98,8 @@ export function SetupEditor({
           },
           canvasMode: initialCanvasMode,
           editorTaskQueue: {
-            isBusy: true,
-            tasks: [
-              {
-                id: action_fetchfile_id,
-                name: "Figma File",
-                description: "Refreshing remote file",
-                progress: null,
-              },
-            ],
+            isBusy: false,
+            tasks: [],
           },
         };
       }

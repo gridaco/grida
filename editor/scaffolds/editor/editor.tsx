@@ -4,7 +4,7 @@ import {
   WorkspaceContentPanel,
   WorkspaceContentPanelGridLayout,
 } from "layouts/panel";
-import { EditorSidebar } from "components/editor";
+import { EditorAppbar, EditorSidebar } from "components/editor";
 import { useEditorState } from "core/states";
 import { Canvas } from "scaffolds/canvas";
 import { Code } from "scaffolds/code";
@@ -37,6 +37,7 @@ export function Editor() {
 
       <DefaultEditorWorkspaceLayout
         backgroundColor={colors.color_editor_bg_on_dark}
+        appbar={<EditorAppbar />}
         leftbar={{
           _type: "resizable",
           minWidth: 240,

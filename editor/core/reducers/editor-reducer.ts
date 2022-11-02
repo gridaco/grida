@@ -233,10 +233,22 @@ export function editorReducer(state: EditorState, action: Action): EditorState {
     case "editor-task-push": {
       const { task } = <BackgroundTaskPushAction>action;
       const { id } = task;
-      // TODO: check id duplication
 
       return produce(state, (draft) => {
-        draft.editorTaskQueue.tasks.push(task);
+        // todo:
+        // 1. handle debounce.
+
+        // check id duplication
+        const exists = draft.editorTaskQueue.tasks.find((t) => t.id === id);
+        if (exists) {
+          // pass
+        } else {
+          if (!task.createdAt) {
+            task.createdAt = new Date();
+          }
+          draft.editorTaskQueue.tasks.push(task);
+          draft.editorTaskQueue.isBusy = true;
+        }
       });
       break;
     }
@@ -249,7 +261,10 @@ export function editorReducer(state: EditorState, action: Action): EditorState {
         draft.editorTaskQueue.tasks = draft.editorTaskQueue.tasks.filter(
           (i) => i.id !== id
         );
-        // TODO: handle isBusy property by the task
+
+        if (draft.editorTaskQueue.tasks.length === 0) {
+          draft.editorTaskQueue.isBusy = false;
+        }
       });
       break;
     }

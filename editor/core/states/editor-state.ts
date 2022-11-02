@@ -171,4 +171,5 @@ export interface EditorTask {
    * 0-1, if null, it is indeterminate
    */
   progress: number | null;
+  createdAt?: Date;
 }
