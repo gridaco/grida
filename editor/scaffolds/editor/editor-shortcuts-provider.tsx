@@ -1,4 +1,6 @@
-import React from "react";
+import { useDispatch } from "core/dispatch";
+import { EditorState } from "core/states";
+import React, { useCallback } from "react";
 import { useHotkeys } from "react-hotkeys-hook";
 
 const noop = (e) => {
@@ -10,15 +12,40 @@ const noop = (e) => {
 export function EditorShortcutsProvider({
   children,
 }: React.PropsWithChildren<{}>) {
+  const dispatch = useDispatch();
+
+  const setMode = useCallback(
+    (mode: EditorState["mode"]) => {
+      dispatch({ type: "mode", mode: mode });
+    },
+    [dispatch]
+  );
+
   const _save = keymap("ctrl-cmd", "s");
   const _preferences = keymap("ctrl-cmd", ",");
   const _toggle_comments = keymap("c");
+  const _toggle_view = keymap("v");
   const _escape = keymap("esc");
 
-  useHotkeys(_save.universal, noop);
-  useHotkeys(_preferences.universal, noop);
-  useHotkeys(_toggle_comments.universal, noop);
-  useHotkeys(_escape.universal, noop);
+  useHotkeys(_save.universal, () => {
+    // dispatch({ type: "editor-save" });
+  });
+
+  useHotkeys(_preferences.universal, () => {
+    // dispatch({ type: "editor-open-preference" });
+  });
+
+  useHotkeys(_toggle_comments.universal, () => {
+    setMode("comment");
+  });
+
+  useHotkeys(_toggle_view.universal, () => {
+    setMode("view");
+  });
+
+  useHotkeys(_escape.universal, () => {
+    setMode("view");
+  });
 
   return <>{children}</>;
 }
@@ -34,6 +61,7 @@ const keymap = (
     | "c"
     | "p"
     | "s"
+    | "v"
     | ","
   )[]
 ) => {

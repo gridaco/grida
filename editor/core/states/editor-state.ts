@@ -17,7 +17,7 @@ type TCanvasMode = "free" | "isolated-view" | "fullscreen-preview";
  * - code - with coding editor
  * - inspect - with inspector
  */
-type TUserTaskMode = "view" | "code" | "inspect";
+type TUserTaskMode = "view" | "comment" | "code" | "inspect";
 
 export interface EditorState {
   selectedPage: string | "home";

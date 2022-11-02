@@ -16,6 +16,7 @@ export function useWorkspaceInitializerContext() {
 
 export function Workspace({ children }: React.PropsWithChildren<{}>) {
   const router = useRouter();
+
   const [initialState, initialDispatcher] = useReducer(warmup.initialReducer, {
     type: "pending",
   });

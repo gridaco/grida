@@ -12,6 +12,7 @@ import { FrameTitleRenderer } from "./render/frame-title";
 import { IsolateModeCanvas } from "./isolate-mode";
 import { Dialog } from "@mui/material";
 import { FullScreenPreview } from "scaffolds/preview-full-screen";
+import { cursors } from "cursors";
 
 /**
  * Statefull canvas segment that contains canvas as a child, with state-data connected.
@@ -77,6 +78,8 @@ export function VisualContentArea() {
     `rgba(${thisPage.backgroundColor.r * 255}, ${
       thisPage.backgroundColor.g * 255
     }, ${thisPage.backgroundColor.b * 255}, ${thisPage.backgroundColor.a})`;
+
+  const cursor = state.mode === "comment" ? cursors.comment : "default";
 
   return (
     <CanvasContainer ref={canvasSizingRef} id="canvas">
@@ -163,6 +166,7 @@ export function VisualContentArea() {
                   disabled: false,
                 },
               }}
+              cursor={cursor}
               renderFrameTitle={(p) => (
                 <FrameTitleRenderer
                   key={p.id}

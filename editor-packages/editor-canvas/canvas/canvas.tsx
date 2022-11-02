@@ -81,6 +81,10 @@ interface GroupingOptions {
   disabled?: boolean;
 }
 
+interface CanvasCursorOptions {
+  cursor?: React.CSSProperties["cursor"];
+}
+
 const default_canvas_preferences: CanvsPreferences = {
   can_highlight_selected_layer: false,
   marquee: {
@@ -90,6 +94,18 @@ const default_canvas_preferences: CanvsPreferences = {
     disabled: false,
   },
 };
+
+type CanvasProps = CanvasCursorOptions & {
+  viewbound: Box;
+  onSelectNode?: (...node: ReflectSceneNode[]) => void;
+  onMoveNodeStart?: (...node: string[]) => void;
+  onMoveNode?: (delta: XY, ...node: string[]) => void;
+  onMoveNodeEnd?: (delta: XY, ...node: string[]) => void;
+  onClearSelection?: () => void;
+} & CanvasCustomRenderers &
+  CanvasState & {
+    config?: CanvsPreferences;
+  };
 
 interface HovringNode {
   node: ReflectSceneNode;
@@ -113,18 +129,9 @@ export function Canvas({
   readonly = true,
   config = default_canvas_preferences,
   backgroundColor,
+  cursor,
   ...props
-}: {
-  viewbound: Box;
-  onSelectNode?: (...node: ReflectSceneNode[]) => void;
-  onMoveNodeStart?: (...node: string[]) => void;
-  onMoveNode?: (delta: XY, ...node: string[]) => void;
-  onMoveNodeEnd?: (delta: XY, ...node: string[]) => void;
-  onClearSelection?: () => void;
-} & CanvasCustomRenderers &
-  CanvasState & {
-    config?: CanvsPreferences;
-  }) {
+}: CanvasProps) {
   useEffect(() => {
     if (transformIntitialized) {
       return;
@@ -462,6 +469,7 @@ export function Canvas({
             onDragStart={onDragStart}
             onDrag={onDrag}
             onDragEnd={onDragEnd}
+            cursor={cursor}
           >
             <HudSurface
               offset={nonscaled_offset}
