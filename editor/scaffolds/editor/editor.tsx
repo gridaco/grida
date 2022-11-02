@@ -37,7 +37,7 @@ export function Editor() {
 
       <DefaultEditorWorkspaceLayout
         backgroundColor={colors.color_editor_bg_on_dark}
-        appbar={<EditorAppbar />}
+        // appbar={<EditorAppbar />}
         leftbar={{
           _type: "resizable",
           minWidth: 240,
