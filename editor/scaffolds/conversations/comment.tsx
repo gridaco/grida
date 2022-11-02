@@ -73,6 +73,7 @@ export function TopLevelComment({
       return (
         <div className="hover-menus">
           <CommentMenus
+            disableDelete={me.id !== user.id}
             onCopyLinkClick={() => {
               onCopyLink(id);
             }}
@@ -202,10 +203,12 @@ const TopLevelCommentContainer = styled.div`
 const quick_reactions = [":eyes:", ":+1:", ":fire:"] as const;
 
 function CommentMenus({
+  disableDelete,
   onReactionClick,
   onDeleteClick,
   onCopyLinkClick,
 }: {
+  disableDelete: boolean;
   onCopyLinkClick: () => void;
   onDeleteClick: () => void;
   onReactionClick: (emoji: ReactionEmoji) => void;
@@ -230,11 +233,13 @@ function CommentMenus({
             <DotsVerticalIcon color="white" />
           </DropdownMenuTrigger>
           <DropdownMenuContent>
-            <DropdownMenuItem onClick={onDeleteClick}>
-              <DropdownMenuLabel style={{ color: "red" }}>
-                Delete message
-              </DropdownMenuLabel>
-            </DropdownMenuItem>
+            {!disableDelete && (
+              <DropdownMenuItem onClick={onDeleteClick}>
+                <DropdownMenuLabel style={{ color: "red" }}>
+                  Delete message
+                </DropdownMenuLabel>
+              </DropdownMenuItem>
+            )}
             <DropdownMenuItem onClick={onCopyLinkClick}>
               <DropdownMenuLabel>Copy link</DropdownMenuLabel>
             </DropdownMenuItem>
@@ -365,6 +370,7 @@ function ThreadReplyComment({
       return (
         <div className="reply-hover-menus">
           <CommentMenus
+            disableDelete={user.id !== me.id}
             onCopyLinkClick={() => {
               onCopyLink(id);
             }}
