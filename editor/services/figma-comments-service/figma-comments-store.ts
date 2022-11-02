@@ -50,11 +50,19 @@ export class FigmaCommentsStore {
   }
 
   async clear() {
-    // clear with index
-    const pdestroy = await (
-      await this.db
-    ).getAllKeysFromIndex(__table, __index, this.filekey);
-    await (await this.db).delete(__table, pdestroy);
+    // clear with index & cursor
+    const db = await this.db;
+    var tx = db.transaction(__table, "readwrite");
+    var index = tx.store.index(__index);
+    var pdestroy = index.openCursor(this.filekey);
+    pdestroy.then(async (cursor) => {
+      while (cursor) {
+        cursor.delete();
+        cursor = await cursor.continue();
+      }
+    });
+
+    await tx.done;
   }
 
   async upsert(image: Comment) {

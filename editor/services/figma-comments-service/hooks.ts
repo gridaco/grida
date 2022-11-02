@@ -99,12 +99,12 @@ export function useFigmaComments(
         break;
       }
       case "delete": {
-        const params = p as DeleteCommentAction;
-        oncommentsload(raws.filter((c) => c.id !== params.comment_id));
-        client.deleteComment(filekey, params.comment_id).then((d) => {
+        const { comment_id } = p as DeleteCommentAction;
+        oncommentsload(raws.filter((c) => c.id !== comment_id));
+        client.deleteComment(filekey, comment_id).then((d) => {
           const reply = d.data;
           // update records
-          store.delete(reply);
+          store.delete({ id: comment_id });
           // update state
         });
         break;
