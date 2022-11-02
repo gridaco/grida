@@ -1,6 +1,8 @@
 import { openDB, IDBPDatabase } from "idb";
 import type { ImageHashMap, IndexedImage, IndexedImageQuery } from "./types";
 
+// todo - add index with filekey.
+
 /**
  * image hash map is a json object per file.
  * we use localstorage to store this.
@@ -32,7 +34,7 @@ export const db: Promise<IDBPDatabase<IndexedImage>> = new Promise(
 
     openDB<IndexedImage>(__db_pref.name, __db_pref.version, {
       upgrade(db) {
-        db.createObjectStore(__table, {
+        const store = db.createObjectStore(__table, {
           keyPath: __pk,
         });
       },

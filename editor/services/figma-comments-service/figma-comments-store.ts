@@ -57,7 +57,7 @@ export class FigmaCommentsStore {
     await (await this.db).delete(__table, pdestroy);
   }
 
-  async upsert(image: IndexedComment) {
+  async upsert(image: Comment) {
     await (
       await this.db
     ).put(__table, <IndexedComment>{
