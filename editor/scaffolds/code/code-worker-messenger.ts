@@ -1,14 +1,30 @@
 import { createWorkerQueue } from "@code-editor/webworker-services-core";
 import type { Result } from "@designto/code";
 import { config } from "@designto/code/proc";
+import EventEmitter from "events";
 
 let previewworker: Worker;
+
+const bus = new EventEmitter();
+const initialized = new Promise<void>((resolve) => {
+  bus.once("initialized", () => {
+    resolve();
+  });
+});
+
 export function initialize(
   { filekey, authentication }: { filekey: string; authentication },
   onReady: () => void
 ) {
-  // initialize the worker and set the preferences.
+  console.info("initializing.. code ww");
+
+  const __onready = () => {
+    bus.emit("initialized");
+    onReady();
+  };
+
   if (!previewworker) {
+    // initialize the worker and set the preferences.
     const { worker } = createWorkerQueue(
       new Worker(new URL("./workers/code.worker.js", import.meta.url))
     );
@@ -23,8 +39,8 @@ export function initialize(
   });
 
   previewworker.addEventListener("message", (e) => {
-    if (e.data.$type === "data-readt") {
-      onReady();
+    if (e.data.$type === "data-ready") {
+      __onready();
     }
   });
 
@@ -67,34 +83,37 @@ export function preview(
   };
 }
 
-export function code(
-  { target, framework }: { target: string; framework: config.FrameworkConfig },
-  onResult: (result: Result) => void,
-  onError?: (error: Error) => void
-) {
-  previewworker.postMessage({
-    $type: "code",
-    target,
-    framework,
-  });
-
-  const handler = (e) => {
-    const id = e.data.id;
-    if (target === id) {
-      switch (e.data.$type) {
-        case "result":
-          onResult(e.data);
-          break;
-        case "error":
-          onError(new Error(e.data.message));
-          break;
+export async function code({
+  target,
+  framework,
+}: {
+  target: string;
+  framework: config.FrameworkConfig;
+}): Promise<Result> {
+  return new Promise((resolve, reject) => {
+    const handler = (e) => {
+      const id = e.data.id;
+      if (target === id) {
+        switch (e.data.$type) {
+          case "result":
+            resolve(e.data);
+            break;
+          case "error":
+            reject(new Error(e.data.message));
+            break;
+        }
+        previewworker.removeEventListener("message", handler);
       }
-    }
-  };
+    };
 
-  previewworker.addEventListener("message", handler);
+    previewworker.addEventListener("message", handler);
 
-  return () => {
-    previewworker.removeEventListener("message", handler);
-  };
+    initialized.then(() => {
+      previewworker.postMessage({
+        $type: "code",
+        target,
+        framework,
+      });
+    });
+  });
 }

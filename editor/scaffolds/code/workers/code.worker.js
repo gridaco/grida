@@ -28,7 +28,6 @@ let initialized = false;
 let pages = [];
 
 function initialize({ filekey, authentication }) {
-  console.info("initializing.. code ww");
   // ------- setup image repo with auth + filekey -------
   MainImageRepository.instance = new RemoteImageRepositories(filekey, {
     authentication: authentication,

@@ -24,28 +24,17 @@ export function CodeSection() {
   };
 
   useEffect(() => {
+    // clear data.
+    setResult(null);
+
     if (!target) {
       return;
     }
 
-    // clear data.
-    setResult(null);
-
-    let dispose;
-
-    setTimeout(() => {
-      dispose = wwcode(
-        {
-          target: target.id,
-          framework: wstate.preferences.framework_config,
-        },
-        on_result
-      );
-    }, 50);
-
-    return () => {
-      dispose?.();
-    };
+    wwcode({
+      target: target.id,
+      framework: wstate.preferences.framework_config,
+    }).then(on_result);
   }, [target?.id]);
 
   const { code } = result ?? {};
