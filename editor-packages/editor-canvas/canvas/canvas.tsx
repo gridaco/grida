@@ -437,8 +437,9 @@ export function Canvas({
     <>
       <ContextMenuProvider>
         <Container
-          width={viewbound[2] - viewbound[0]}
-          height={viewbound[3] - viewbound[1]}
+        // todo: viewbound not accurate.
+        // width={viewbound[2] - viewbound[0]}
+        // height={viewbound[3] - viewbound[1]}
         >
           <CanvasEventTarget
             onPanning={onPanning}
@@ -513,10 +514,12 @@ export function Canvas({
   );
 }
 
-const Container = styled.div<{ width: number; height: number }>`
-  width: ${(p) => p.width}px;
-  height: ${(p) => p.height}px;
+const Container = styled.div`
+  min-width: 240px;
+  min-height: 240px;
 `;
+/* width: ${(p) => p.width}px; */
+/* height: ${(p) => p.height}px; */
 
 /**
  * 1. container positioning guide (static per selection)
