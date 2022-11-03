@@ -62,7 +62,7 @@ const CommentsListContainer = styled.div`
   align-items: stretch;
   width: 100%;
 
-  div:first-child {
+  div:first-of-type {
     border-top: none;
   }
 `;
