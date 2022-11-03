@@ -22,7 +22,7 @@ export function EditorPagesList() {
   const dispatch = useDispatch();
   const pages = [
     // default pages
-    { id: "home", name: "Home", type: "home" },
+    { id: "home", name: "Dashboard", type: "home" },
     // design canvas pages
     ...(state.design?.pages ?? []),
   ];
