@@ -6,10 +6,12 @@ import { EditorFrameworkConfigOnAppbar } from "../editor-framework-config-on-app
 import { EditorProgressIndicator } from "scaffolds/editor-progress-indicator";
 import { colors } from "theme";
 
-export function AppbarFragmentForCodeEditor({
+export function AppbarFragmentForRightSidebar({
   background = false,
+  flex = 1,
 }: {
   background?: boolean;
+  flex?: number;
 }) {
   const hasNotification = false;
 
@@ -18,7 +20,7 @@ export function AppbarFragmentForCodeEditor({
       background={background ? colors.color_editor_bg_on_dark : "transparent"}
     >
       {/* disable temporarily */}
-      <div style={{ flex: 1 }} />
+      <div style={{ flex: flex }} />
       {/* <EditorFrameworkConfigOnAppbar /> */}
       <AppbarActions>
         {hasNotification && (
@@ -44,7 +46,7 @@ const RootWrapperAppbarFragmentForCodeEditor = styled.div<{
 }>`
   z-index: 10;
   display: flex;
-  justify-content: center;
+  justify-content: end;
   flex-direction: row;
   align-items: center;
   flex: 1;

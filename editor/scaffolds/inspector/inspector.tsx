@@ -1,6 +1,6 @@
-import React, { useState } from "react";
+import React, { useCallback, useState } from "react";
 import styled from "@emotion/styled";
-import { useEditorState } from "core/states";
+import { EditorState, useEditorState } from "core/states";
 import { colors } from "theme";
 import { useTargetContainer } from "hooks/use-target-node";
 
@@ -12,33 +12,58 @@ import { TypographySection } from "./section-typography";
 import { AssetsSection } from "./section-assets";
 import { CodeSection } from "./section-code";
 import { Conversations } from "scaffolds/conversations";
+import { EditorAppbarFragments } from "components/editor";
+import { useDispatch } from "core/dispatch";
 
-type Tab = "inspect" | "threads";
+type Tab = "inspect" | "comment";
 
 export function Inspector() {
-  const { target } = useTargetContainer();
   const [state] = useEditorState();
-  const [tab, setTab] = useState<Tab>("inspect");
+  const dispatch = useDispatch();
 
-  if (target) {
-    return (
-      <InspectorContainer>
-        <Tabs selectedTab={tab} onTabChange={setTab} />
-        <InfoSection />
-        <div style={{ height: 16 }} />
-        <Body type={tab} />
-      </InspectorContainer>
-    );
-  }
+  const tab = __mode(state.mode);
 
-  return <></>;
+  const switchMode = useCallback(
+    (mode: Tab) => {
+      dispatch({
+        type: "mode",
+        mode: mode,
+      });
+    },
+    [dispatch]
+  );
+
+  return (
+    <InspectorContainer>
+      <EditorAppbarFragments.RightSidebar flex={0} />
+      <Tabs selectedTab={tab} onTabChange={switchMode} />
+      <div style={{ height: 16 }} />
+      <Body type={tab} />
+    </InspectorContainer>
+  );
 }
 
+const __mode = (mode: EditorState["mode"]): Tab => {
+  switch (mode) {
+    case "comment":
+      return "comment";
+    case "inspect":
+    default:
+      return "inspect";
+  }
+};
+
 function Body({ type }: { type: Tab }) {
+  const { target } = useTargetContainer();
+
   switch (type) {
     case "inspect":
-      return <InspectorBody />;
-    case "threads":
+      if (target) {
+        return <InspectorBody />;
+      } else {
+        return <EmptyState />;
+      }
+    case "comment":
       return <ConversationsBody />;
   }
 }
@@ -50,6 +75,7 @@ function ConversationsBody() {
 function InspectorBody() {
   return (
     <>
+      <InfoSection />
       <LayoutSection />
       <ColorsSection />
       <AssetsSection />
@@ -60,11 +86,32 @@ function InspectorBody() {
   );
 }
 
+function EmptyState() {
+  return (
+    <EmptyStateContainer>
+      <EmptyStateText>Nothing selected</EmptyStateText>
+    </EmptyStateContainer>
+  );
+}
+
+const EmptyStateContainer = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+`;
+
+const EmptyStateText = styled.div`
+  font-size: 14px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.5);
+`;
+
 function Tabs({
   onTabChange,
   selectedTab,
 }: {
-  selectedTab: string;
+  selectedTab: Tab;
   onTabChange: (tab: Tab) => void;
 }) {
   return (
@@ -78,9 +125,9 @@ function Tabs({
         Inspect
       </Tab>
       <Tab
-        selected={selectedTab === "threads"}
+        selected={selectedTab === "comment"}
         onClick={() => {
-          onTabChange("threads");
+          onTabChange("comment");
         }}
       >
         Conversations

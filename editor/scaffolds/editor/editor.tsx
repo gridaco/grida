@@ -50,9 +50,8 @@ export function Editor() {
             <PageView key={_refreshkey} />
           </WorkspaceContentPanel>
           <WorkspaceContentPanel
-            hidden={state.selectedNodes.length !== 1}
             overflow="hidden"
-            flex={4}
+            flex={1}
             resize={{
               left: true,
             }}

@@ -2,14 +2,14 @@ import React from "react";
 import styled from "@emotion/styled";
 import { AppbarFragmentForSidebar } from "./editor-appbar-fragment-for-sidebar";
 import { AppbarFragmentForCanvas } from "./editor-appbar-fragment-for-canvas";
-import { AppbarFragmentForCodeEditor } from "./editor-appbar-fragment-for-code-editor";
+import { AppbarFragmentForRightSidebar } from "./editor-appbar-fragment-for-code-editor";
 
 export function Appbar() {
   return (
     <AppbarContainer>
       <AppbarFragmentForSidebar />
       <AppbarFragmentForCanvas />
-      <AppbarFragmentForCodeEditor />
+      <AppbarFragmentForRightSidebar />
     </AppbarContainer>
   );
 }
