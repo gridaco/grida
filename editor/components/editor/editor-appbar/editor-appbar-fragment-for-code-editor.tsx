@@ -17,10 +17,11 @@ export function AppbarFragmentForRightSidebar({
 
   return (
     <RootWrapperAppbarFragmentForCodeEditor
+      flex={flex}
       background={background ? colors.color_editor_bg_on_dark : "transparent"}
     >
       {/* disable temporarily */}
-      <div style={{ flex: flex }} />
+      <div style={{ flex: 1 }} />
       {/* <EditorFrameworkConfigOnAppbar /> */}
       <AppbarActions>
         {hasNotification && (
@@ -43,13 +44,14 @@ export function AppbarFragmentForRightSidebar({
 
 const RootWrapperAppbarFragmentForCodeEditor = styled.div<{
   background: React.CSSProperties["background"];
+  flex: number;
 }>`
   z-index: 10;
   display: flex;
   justify-content: end;
   flex-direction: row;
   align-items: center;
-  flex: 1;
+  flex: ${(props) => props.flex};
   gap: 10px;
   align-self: stretch;
   box-sizing: border-box;
