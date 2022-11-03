@@ -1,5 +1,5 @@
 import React from "react";
-import { WorkspaceAction } from "core/actions";
+import { WorkspaceWarmupAction } from "core/actions";
 import { NextRouter } from "next/router";
 import { WorkspaceFigmaAuthProvider } from "./figma-auth";
 
@@ -9,7 +9,7 @@ export function SetupWorkspace({
   dispatch,
 }: React.PropsWithChildren<{
   router: NextRouter;
-  dispatch: (action: WorkspaceAction) => void;
+  dispatch: (action: WorkspaceWarmupAction) => void;
 }>) {
   return (
     <>

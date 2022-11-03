@@ -1,25 +1,27 @@
-import { WorkspaceAction, WorkspaceWarmupAction } from "core/actions";
-import { EditorSnapshot, StateProvider } from "core/states";
+import React, {
+  useCallback,
+  useReducer,
+  useContext,
+  createContext,
+} from "react";
 import { useRouter } from "next/router";
-import React, { useCallback, useReducer } from "react";
-import { warmup } from "scaffolds/editor";
+import { StateProvider } from "core/states";
 import { SetupWorkspace } from "./setup";
+import * as warmup from "./warmup";
+import type { EditorSnapshot } from "core/states";
+import type { WorkspaceAction, WorkspaceWarmupAction } from "core/actions";
 
 const WorkspaceInitializerContext =
-  React.createContext<{
+  createContext<{
     provideEditorSnapshot: (snapshot: EditorSnapshot) => void;
   }>(null);
 
 export function useWorkspaceInitializerContext() {
-  return React.useContext(WorkspaceInitializerContext);
+  return useContext(WorkspaceInitializerContext);
 }
 
 export function Workspace({ children }: React.PropsWithChildren<{}>) {
   const router = useRouter();
-
-  const [initialState, initialDispatcher] = useReducer(warmup.initialReducer, {
-    type: "pending",
-  });
 
   const handleDispatch = useCallback((action: WorkspaceAction) => {
     initialDispatcher({ type: "update", value: action });
@@ -38,6 +40,10 @@ export function Workspace({ children }: React.PropsWithChildren<{}>) {
     },
     []
   );
+
+  const [initialState, initialDispatcher] = useReducer(warmup.initialReducer, {
+    type: "pending",
+  });
 
   const safe_value = warmup.safestate(initialState);
 
