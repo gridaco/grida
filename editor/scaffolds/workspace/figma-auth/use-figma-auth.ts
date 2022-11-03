@@ -13,7 +13,7 @@ import { personal } from "@design-sdk/figma-auth-store";
  * ```
  * @returns
  */
-export function useFigmaAccessToken(): {
+export function useFigmaAuth(): {
   accessToken: { token?: string; loading: boolean; verified: boolean };
   personalAccessToken: string;
 } {

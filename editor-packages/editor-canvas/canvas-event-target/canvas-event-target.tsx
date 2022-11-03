@@ -1,4 +1,4 @@
-import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { useGesture } from "@use-gesture/react";
 import type {
   Handler,
@@ -39,24 +39,28 @@ export function CanvasEventTarget({
   onDrag,
   onDragStart,
   onDragEnd,
+  cursor,
   children,
-}: {
-  onZoomToFit?: () => void;
-  onPanning: OnPanningHandler;
-  onPanningStart: OnPanningHandler;
-  onPanningEnd: OnPanningHandler;
-  onZooming: OnZoomingHandler;
-  onZoomingStart: OnZoomingHandler;
-  onZoomingEnd: OnZoomingHandler;
-  onPointerMove: OnPointerMoveHandler;
-  onPointerMoveStart: OnPointerMoveHandler;
-  onPointerMoveEnd: OnPointerMoveHandler;
-  onPointerDown: OnPointerDownHandler;
-  onDrag: OnDragHandler;
-  onDragStart: OnDragHandler;
-  onDragEnd: OnDragHandler;
-  children?: React.ReactNode;
-}) {
+}: React.PropsWithChildren<
+  {
+    onZoomToFit?: () => void;
+    onPanning: OnPanningHandler;
+    onPanningStart: OnPanningHandler;
+    onPanningEnd: OnPanningHandler;
+    onZooming: OnZoomingHandler;
+    onZoomingStart: OnZoomingHandler;
+    onZoomingEnd: OnZoomingHandler;
+    onPointerMove: OnPointerMoveHandler;
+    onPointerMoveStart: OnPointerMoveHandler;
+    onPointerMoveEnd: OnPointerMoveHandler;
+    onPointerDown: OnPointerDownHandler;
+    onDrag: OnDragHandler;
+    onDragStart: OnDragHandler;
+    onDragEnd: OnDragHandler;
+  } & {
+    cursor?: React.CSSProperties["cursor"];
+  }
+>) {
   const interactionEventTargetRef = useRef();
 
   const [isSpacebarPressed, setIsSpacebarPressed] = useState(false);
@@ -210,7 +214,7 @@ export function CanvasEventTarget({
         inset: 0,
         overflow: "hidden",
         touchAction: "none",
-        cursor: isSpacebarPressed ? "grab" : "default",
+        cursor: isSpacebarPressed ? "grab" : cursor,
         userSelect: "none",
         WebkitUserSelect: "none",
       }}

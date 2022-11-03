@@ -6,14 +6,13 @@ export function InfoSection() {
   const { target } = useTargetContainer();
   return (
     <Section>
-      <SceneTitle disabled value={target?.name} />
+      <SceneTitle disabled value={target?.name ?? ""} />
       <SceneDescription>{"No description"}</SceneDescription>
     </Section>
   );
 }
 
 const Section = styled.section`
-  margin-top: 24px;
   display: flex;
   flex-direction: column;
   padding: 14px;

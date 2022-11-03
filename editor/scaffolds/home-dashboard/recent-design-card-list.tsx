@@ -38,5 +38,6 @@ export function RecentDesignCardList({
 const ListWrap = styled.div`
   display: flex;
   flex-direction: row;
+  flex-wrap: wrap;
   gap: 20px;
 `;

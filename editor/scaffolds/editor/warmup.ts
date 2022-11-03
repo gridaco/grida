@@ -1,45 +1,8 @@
-import {
-  createPendingWorkspaceState,
-  EditorSnapshot,
-  FigmaReflectRepository,
-  WorkspaceState,
-} from "core/states";
-import { createInitialWorkspaceState } from "core/states";
-import { workspaceReducer } from "core/reducers";
-import { PendingState } from "core/utility-types";
-import { WorkspaceAction } from "core/actions";
+import { FigmaReflectRepository } from "core/states";
 import type { Canvas, FileResponse } from "@design-sdk/figma-remote-types";
 import { convert } from "@design-sdk/figma-node-conversion";
 import { mapper } from "@design-sdk/figma-remote";
 import { visit } from "tree-visit";
-
-const pending_workspace_state = createPendingWorkspaceState();
-//
-export type InitializationAction =
-  | { type: "set"; value: EditorSnapshot }
-  | { type: "update"; value: WorkspaceAction };
-
-export function initialReducer(
-  state: PendingState<WorkspaceState>,
-  action: InitializationAction
-): PendingState<WorkspaceState> {
-  switch (action.type) {
-    case "set":
-      return {
-        type: "success",
-        value: createInitialWorkspaceState(action.value),
-      };
-    case "update":
-      if (state.type === "success") {
-        return {
-          type: "success",
-          value: workspaceReducer(state.value, action.value),
-        };
-      } else {
-        return state;
-      }
-  }
-}
 
 export function pagesFrom(
   filekey: string,
@@ -54,7 +17,7 @@ export function pagesFrom(
     }),
     flowStartingPoints: page.flowStartingPoints,
     backgroundColor: page.backgroundColor,
-    type: "design",
+    type: "canvas",
   }));
 }
 
@@ -99,12 +62,6 @@ export function componentsFrom(
     })
     .filter((c) => c)
     .reduce(tomap, {});
-}
-
-export function safestate(initialState) {
-  return initialState.type === "success"
-    ? initialState.value
-    : pending_workspace_state;
 }
 
 export const selectedPage = (

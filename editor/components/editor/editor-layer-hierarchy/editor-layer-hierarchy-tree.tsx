@@ -1,5 +1,4 @@
-import React, { memo, useCallback, useMemo, useReducer, useState } from "react";
-import styled from "@emotion/styled";
+import React, { useCallback, useMemo, useState } from "react";
 import { TreeView } from "@editor-ui/editor";
 import {
   LayerRow,
@@ -16,9 +15,21 @@ import {
 // TODO:
 // - add navigate context menu
 // - add go to main component
-// - add reveal on select
+// - add reveal and focus to selected layers
 
 export function EditorLayerHierarchy() {
+  const [state] = useEditorState();
+  const { selectedPage } = state;
+
+  switch (selectedPage) {
+    case "home":
+      return <></>;
+    default:
+      return <CanvasLayerHierarchy />;
+  }
+}
+
+function CanvasLayerHierarchy() {
   const [state] = useEditorState();
   const { highlightLayer, highlightedLayer } = useWorkspace();
   const dispatch = useDispatch();
@@ -95,4 +106,5 @@ export function EditorLayerHierarchy() {
       renderItem={renderItem}
     />
   );
+  //
 }

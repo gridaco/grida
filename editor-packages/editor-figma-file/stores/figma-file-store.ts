@@ -1,22 +1,29 @@
 import { openDB, IDBPDatabase } from "idb";
 import type { FileResponse } from "@design-sdk/figma-remote-api";
+import * as k from "./k";
 
 // #region global db initialization
-const __db_pref = { name: "fimga-file-store", version: 1 };
+const __db_pref = { name: "fimga-file-store", version: k.DB_VER };
 const __pk = "key";
 const __table = "files";
 export type FileResponseRecord = FileResponse & {
   [__pk]: string;
-  lastUsed: Date;
 };
 
 const db: Promise<IDBPDatabase<StorableFileResponse>> = new Promise(
   (resolve) => {
+    // disable on ssr
+    if (typeof window === "undefined") {
+      return;
+    }
+
     openDB<StorableFileResponse>(__db_pref.name, __db_pref.version, {
       upgrade(db) {
-        db.createObjectStore(__table, {
-          keyPath: __pk,
-        });
+        if (!db.objectStoreNames.contains(__table)) {
+          db.createObjectStore(__table, {
+            keyPath: __pk,
+          });
+        }
       },
     }).then((_db) => {
       resolve(_db);
@@ -48,9 +55,8 @@ export class FigmaFileStore {
       await (
         await db
       ).put(__table, <StorableFileResponse>{
-        ...minimizeFileResponse(file),
+        ...optimize(file),
         [__pk]: this.filekey,
-        lastUsed: new Date(),
       });
     } catch (e) {
       if (process.env.NODE_ENV === "development") {
@@ -60,7 +66,9 @@ export class FigmaFileStore {
     }
   }
 
-  async get(options?: { nounwrap?: boolean }): Promise<FileResponseRecord> {
+  async get(options?: {
+    nounwrap?: boolean;
+  }): Promise<FileResponseRecord | null> {
     const rec = await (await db).get(__table, this.filekey);
     if (options?.nounwrap) {
       return rec;
@@ -79,13 +87,10 @@ type StorableFileResponse = {
   readonly schemaVersion: number;
   readonly thumbnailUrl: string;
   readonly version: string;
-  readonly lastUsed: Date;
 };
 
 type JSONString = string;
-function minimizeFileResponse(
-  file: FileResponse
-): Omit<StorableFileResponse, "lastUsed"> {
+function optimize(file: FileResponse): StorableFileResponse {
   return {
     components: JSON.stringify(file.components),
     styles: JSON.stringify(file.styles),
@@ -101,8 +106,8 @@ function minimizeFileResponse(
 
 function unwrapStorableFileResponse(
   stored: StorableFileResponse | undefined | null
-): FileResponseRecord {
-  if (!stored) return;
+): FileResponseRecord | null {
+  if (!stored) return null;
   const parsesafe = (s: string) => {
     try {
       return JSON.parse(s);
@@ -124,6 +129,5 @@ function unwrapStorableFileResponse(
     schemaVersion: stored.schemaVersion,
     thumbnailUrl: stored.thumbnailUrl,
     version: stored.version,
-    lastUsed: stored.lastUsed,
   };
 }

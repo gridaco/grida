@@ -81,6 +81,10 @@ interface GroupingOptions {
   disabled?: boolean;
 }
 
+interface CanvasCursorOptions {
+  cursor?: React.CSSProperties["cursor"];
+}
+
 const default_canvas_preferences: CanvsPreferences = {
   can_highlight_selected_layer: false,
   marquee: {
@@ -90,6 +94,18 @@ const default_canvas_preferences: CanvsPreferences = {
     disabled: false,
   },
 };
+
+type CanvasProps = CanvasCursorOptions & {
+  viewbound: Box;
+  onSelectNode?: (...node: ReflectSceneNode[]) => void;
+  onMoveNodeStart?: (...node: string[]) => void;
+  onMoveNode?: (delta: XY, ...node: string[]) => void;
+  onMoveNodeEnd?: (delta: XY, ...node: string[]) => void;
+  onClearSelection?: () => void;
+} & CanvasCustomRenderers &
+  CanvasState & {
+    config?: CanvsPreferences;
+  };
 
 interface HovringNode {
   node: ReflectSceneNode;
@@ -113,18 +129,9 @@ export function Canvas({
   readonly = true,
   config = default_canvas_preferences,
   backgroundColor,
+  cursor,
   ...props
-}: {
-  viewbound: Box;
-  onSelectNode?: (...node: ReflectSceneNode[]) => void;
-  onMoveNodeStart?: (...node: string[]) => void;
-  onMoveNode?: (delta: XY, ...node: string[]) => void;
-  onMoveNodeEnd?: (delta: XY, ...node: string[]) => void;
-  onClearSelection?: () => void;
-} & CanvasCustomRenderers &
-  CanvasState & {
-    config?: CanvsPreferences;
-  }) {
+}: CanvasProps) {
   useEffect(() => {
     if (transformIntitialized) {
       return;
@@ -430,8 +437,9 @@ export function Canvas({
     <>
       <ContextMenuProvider>
         <Container
-          width={viewbound[2] - viewbound[0]}
-          height={viewbound[3] - viewbound[1]}
+        // todo: viewbound not accurate.
+        // width={viewbound[2] - viewbound[0]}
+        // height={viewbound[3] - viewbound[1]}
         >
           <CanvasEventTarget
             onPanning={onPanning}
@@ -462,6 +470,7 @@ export function Canvas({
             onDragStart={onDragStart}
             onDrag={onDrag}
             onDragEnd={onDragEnd}
+            cursor={cursor}
           >
             <HudSurface
               offset={nonscaled_offset}
@@ -505,10 +514,12 @@ export function Canvas({
   );
 }
 
-const Container = styled.div<{ width: number; height: number }>`
-  width: ${(p) => p.width}px;
-  height: ${(p) => p.height}px;
+const Container = styled.div`
+  min-width: 240px;
+  min-height: 240px;
 `;
+/* width: ${(p) => p.width}px; */
+/* height: ${(p) => p.height}px; */
 
 /**
  * 1. container positioning guide (static per selection)

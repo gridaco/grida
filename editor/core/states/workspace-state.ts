@@ -11,12 +11,22 @@ export interface WorkspaceState {
 
   /**
    * figma authentication data store state
-   * @deprecated - not implemented
    */
-  authenticationFigma?: {
-    name?: string;
+  figmaAuthentication?: {
     accessToken?: string;
     personalAccessToken?: string;
+  };
+
+  /**
+   * figma user data
+   */
+  figmaUser?: {
+    /** Unique stable id of the user */
+    id: string;
+    /** Name of the user */
+    name: string;
+    /** URL link to the user's profile image */
+    profile: string;
   };
 }
 

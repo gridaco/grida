@@ -1,5 +1,5 @@
 export * from "./editor-state";
-export * from "./editor-context";
+export * from "./workspace-context";
 export * from "./state-provider";
 export * from "./workspace-state";
 export * from "./history-state";
