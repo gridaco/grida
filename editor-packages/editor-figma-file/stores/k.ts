@@ -1,1 +1,1 @@
-export const DB_VER = 2;
+export const DB_VER = 3;

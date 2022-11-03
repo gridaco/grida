@@ -19,9 +19,11 @@ const db: Promise<IDBPDatabase<StorableFileResponse>> = new Promise(
 
     openDB<StorableFileResponse>(__db_pref.name, __db_pref.version, {
       upgrade(db) {
-        db.createObjectStore(__table, {
-          keyPath: __pk,
-        });
+        if (!db.objectStoreNames.contains(__table)) {
+          db.createObjectStore(__table, {
+            keyPath: __pk,
+          });
+        }
       },
     }).then((_db) => {
       resolve(_db);
