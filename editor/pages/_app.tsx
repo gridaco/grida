@@ -25,7 +25,13 @@ function HeadInjection() {
   return (
     <Head>
       <GlobalCss />
-      <SeoMeta />
+
+      <title>Grida Code</title>
+      <link rel="shortcut icon" href="/favicon.png" />
+      <link rel="icon" href="/favicon.png" />
+      <meta property="title" content="Design to Codes" />
+      <meta property="description" content="Design to Codes description" />
+
       {/* safari 15 color */}
       <meta
         name="theme-color"
@@ -78,18 +84,6 @@ function HeadInjection() {
       </Script>
       {/* end region */}
     </Head>
-  );
-}
-
-function SeoMeta() {
-  return (
-    <>
-      <title>Grida code</title>
-      <link rel="shortcut icon" href="/favicon.png" />
-      <link rel="icon" href="/favicon.png" />
-      <meta property="title" content="Design to Codes" />
-      <meta property="description" content="Design to Codes description" />
-    </>
   );
 }
 
