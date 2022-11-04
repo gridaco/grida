@@ -188,6 +188,10 @@ async function handle_code(event, type) {
   const { target } = event.data;
   const node = q.getNodeByIdFrom(target, pages);
 
+  if (!node) {
+    throw new Error("node not found");
+  }
+
   const _input = {
     id: node.id,
     name: node.name,

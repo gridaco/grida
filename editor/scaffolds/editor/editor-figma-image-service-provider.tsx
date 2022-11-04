@@ -20,7 +20,7 @@ export function FigmaImageServiceProvider({
   const service = useMemo(() => {
     if (!filekey || !wssate.figmaAuthentication) return;
 
-    return new FigmaImageService(filekey, wssate.figmaAuthentication);
+    return new FigmaImageService(filekey, wssate.figmaAuthentication, null, 24);
   }, [filekey, wssate.figmaAuthentication]);
 
   const pushTask = useCallback(

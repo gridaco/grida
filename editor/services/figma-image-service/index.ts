@@ -29,7 +29,8 @@ export class FigmaImageService {
       personalAccessToken?: string;
       accessToken?: string;
     },
-    readonly version?: string | null
+    readonly version?: string | null,
+    readonly maxQueue = 100
   ) {}
 
   warmup() {
@@ -179,37 +180,46 @@ export class FigmaImageService {
           // fetch with merged queues
           this.queue = new Set([...this.queue, ...bakes]);
 
-          if (this.timeout) {
-            clearTimeout(this.timeout);
-          }
+          const handle_queue = async () => {
+            const fetchtargets = async (...targets) => {
+              console.log("fetching", targets, bakes);
+              const data = await this.fetch(targets, {
+                ensure: true,
+                debounce: false,
+              });
+              return { ...data, ...results };
+            };
 
-          const handler = async (...targets) => {
-            const data = await this.fetch(targets, {
-              ensure: true,
-              debounce: false,
-            });
-            return { ...data, ...results };
-          };
-
-          this.timeout = setTimeout(async () => {
             // copy queue
             const targets = [...this.queue];
 
             // reset queue
             this.queue.clear();
 
-            const data = await handler(...targets);
+            const data = await fetchtargets(...targets);
 
             for (const key of targets) {
               const resolve = this.queuedResolvers.get(key);
               if (resolve) {
                 resolve(data[key]);
+                this.queuedResolvers.delete(key);
               } else {
-                throw new Error("no resolver found for " + key);
+                // throw new Error("no resolver found for " + key);
               }
-              this.queuedResolvers.delete(key);
             }
-          }, DEBOUNCE);
+          };
+
+          if (this.timeout) {
+            clearTimeout(this.timeout);
+          }
+
+          // if the queue riched the max queue, run the queue immediately.
+          if (this.queue.size >= this.maxQueue) {
+            clearTimeout(this.timeout);
+            handle_queue();
+          } else {
+            this.timeout = setTimeout(handle_queue, DEBOUNCE);
+          }
 
           const promises = bakes.map((b) => {
             const key = b;
