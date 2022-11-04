@@ -103,14 +103,16 @@ const transformFiles = (dir) =>
     : {};
 
 const getFileMetaData = (dependency, version, depPath) =>
-  doFetch(
-    `https://data.jsdelivr.com/v1/package/npm/${dependency}@${version}/flat`
-  )
-    .then((response) => JSON.parse(response))
-    .then((response) =>
-      response.files.filter((f) => f.name.startsWith(depPath))
+  getVersion(version).then((version) =>
+    doFetch(
+      `https://data.jsdelivr.com/v1/package/npm/${dependency}@${version}/flat`
     )
-    .then(tempTransformFiles);
+      .then((response) => JSON.parse(response))
+      .then((response) =>
+        response.files.filter((f) => f.name.startsWith(depPath))
+      )
+      .then(tempTransformFiles)
+  );
 
 const resolveAppropiateFile = (fileMetaData, relativePath) => {
   const absolutePath = `/${relativePath}`;
@@ -164,7 +166,20 @@ const getFileTypes = (
   });
 };
 
-function fetchFromMeta(dependency, version, fetchedPaths) {
+async function getVersion(tag = "latest") {
+  const { tags, versions } = JSON.parse(
+    await doFetch(`https://data.jsdelivr.com/v1/package/npm/${dependency}`)
+  );
+
+  if (tags[tag]) {
+    return tags[tag];
+  }
+
+  return versions[0];
+}
+
+async function fetchFromMeta(dependency, version, fetchedPaths) {
+  version = await getVersion(version);
   const depUrl = `https://data.jsdelivr.com/v1/package/npm/${dependency}@${version}/flat`;
 
   return doFetch(depUrl)
