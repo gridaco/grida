@@ -30,9 +30,9 @@ export const scripting_and_preview_framework_config: {
     enabled: false,
   },
   flutter: {
-    nativePreview: false,
-    nativeScripting: false,
-    enabled: false,
+    nativePreview: true,
+    nativeScripting: true,
+    enabled: true,
   },
   "solid-js": {
     nativePreview: false,

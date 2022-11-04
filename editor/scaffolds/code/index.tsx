@@ -2,7 +2,6 @@ import React, { useEffect, useRef, useState } from "react";
 import styled from "@emotion/styled";
 import { useRouter } from "next/router";
 import { CodeEditor } from "components/code-editor";
-import { EditorAppbarFragments } from "components/editor";
 import { get_framework_config } from "query/to-code-options-from-query";
 import { CodeOptionsControl } from "components/codeui-code-options-control";
 import { designToCode, Result } from "@designto/code";
@@ -19,8 +18,21 @@ import { useTargetContainer } from "hooks/use-target-node";
 import assert from "assert";
 import { debounce } from "utils/debounce";
 import { supportsScripting } from "config";
+import ClientOnly from "components/client-only";
 
-export function CodeSegment() {
+const preset_store = {
+  get: () => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem("code-options-contro-preset");
+    }
+  },
+  set: (name: string) => {
+    typeof window !== "undefined" &&
+      localStorage.setItem("code-options-contro-preset", name);
+  },
+};
+
+export function Code() {
   const router = useRouter();
   const [result, setResult] = useState<Result>();
   const dispatch = useDispatch();
@@ -131,73 +143,77 @@ export function CodeSegment() {
     }
   }, 500);
 
-  const { code, scaffold, name: componentName } = result ?? {};
+  const { code, scaffold, name: componentName, framework } = result ?? {};
   return (
     <CodeEditorContainer>
-      <EditorAppbarFragments.CodeEditor />
-      <CodeOptionsControl
-        initialPreset={router.query.framework as string}
-        fallbackPreset="react_default"
-        onUseroptionChange={(o) => {
-          let c;
-          switch (o.framework) {
-            case "react": {
-              switch (o.styling) {
-                case "styled-components":
-                  c = get_framework_config("react-with-styled-components");
-                  break;
-                case "inline-css":
-                  c = get_framework_config("react-with-inline-css");
-                  break;
-                case "css-module":
-                  c = get_framework_config("react-with-css-module");
-                  break;
-                case "css":
-                  // TODO:
-                  break;
-              }
-              break;
-            }
-            case "react-native": {
-              switch (o.styling) {
-                case "style-sheet":
-                  c = get_framework_config("react-native-with-style-sheet");
-                  break;
-                case "styled-components":
-                  c = get_framework_config(
-                    "react-native-with-styled-components"
-                  );
-                  break;
-                case "inline-style":
-                  c = get_framework_config("react-native-with-inline-style");
-                  break;
-              }
-              break;
-            }
-            case "solid-js": {
-              switch (o.styling) {
-                case "styled-components":
-                  c = get_framework_config("solid-with-styled-components");
-                  break;
-                case "inline-css": {
-                  c = get_framework_config("solid-with-inline-css");
-                  break;
-                }
-              }
-              break;
-            }
-            case "flutter":
-              c = get_framework_config(o.framework);
-              break;
-            case "vanilla":
-              c = get_framework_config(o.framework);
-              break;
+      <ClientOnly>
+        <CodeOptionsControl
+          initialPreset={
+            (router.query.framework as string) ?? preset_store.get()
           }
+          fallbackPreset="react_default"
+          onUseroptionChange={(o) => {
+            preset_store.set(o.framework);
+            let c;
+            switch (o.framework) {
+              case "react": {
+                switch (o.styling) {
+                  case "styled-components":
+                    c = get_framework_config("react-with-styled-components");
+                    break;
+                  case "inline-css":
+                    c = get_framework_config("react-with-inline-css");
+                    break;
+                  case "css-module":
+                    c = get_framework_config("react-with-css-module");
+                    break;
+                  case "css":
+                    // TODO:
+                    break;
+                }
+                break;
+              }
+              case "react-native": {
+                switch (o.styling) {
+                  case "style-sheet":
+                    c = get_framework_config("react-native-with-style-sheet");
+                    break;
+                  case "styled-components":
+                    c = get_framework_config(
+                      "react-native-with-styled-components"
+                    );
+                    break;
+                  case "inline-style":
+                    c = get_framework_config("react-native-with-inline-style");
+                    break;
+                }
+                break;
+              }
+              case "solid-js": {
+                switch (o.styling) {
+                  case "styled-components":
+                    c = get_framework_config("solid-with-styled-components");
+                    break;
+                  case "inline-css": {
+                    c = get_framework_config("solid-with-inline-css");
+                    break;
+                  }
+                }
+                break;
+              }
+              case "flutter":
+                c = get_framework_config(o.framework);
+                break;
+              case "vanilla":
+                c = get_framework_config(o.framework);
+                break;
+            }
 
-          assert(c);
-          set_framework_config(c);
-        }}
-      />
+            assert(c);
+            set_framework_config(c);
+          }}
+        />
+      </ClientOnly>
       <CodeEditor
         key={code?.raw}
         height="100vh"
@@ -209,10 +225,10 @@ export function CodeSegment() {
           code
             ? {
                 // TODO: make this to match framework
-                "App.tsx": {
-                  raw: code.raw,
+                [filename[framework.framework]]: {
+                  raw: scaffold.raw,
                   language: framework_config.language,
-                  name: "App.tsx",
+                  name: filename[framework.framework],
                 },
               }
             : {
@@ -227,6 +243,14 @@ export function CodeSegment() {
     </CodeEditorContainer>
   );
 }
+
+const filename = {
+  vanilla: "index.html",
+  react: "app.tsx",
+  "solid-js": "app.tsx",
+  vue: "app.vue",
+  flutter: "main.dart",
+} as const;
 
 const CodeEditorContainer = styled.div`
   display: flex;

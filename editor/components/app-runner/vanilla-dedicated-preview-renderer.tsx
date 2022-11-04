@@ -1,7 +1,8 @@
 import React from "react";
 import { VanillaRunner } from "components/app-runner/vanilla-app-runner";
-import { ScenePreviewData } from "core/states";
+import type { ScenePreviewData } from "core/states";
 import { VanillaESBuildAppRunner } from "components/app-runner";
+import { VanillaFlutterRunner } from "./flutter-app-runner";
 
 export function VanillaDedicatedPreviewRenderer({
   widgetKey,
@@ -9,12 +10,13 @@ export function VanillaDedicatedPreviewRenderer({
   componentName,
   source,
   enableIspector = false,
+  ...props
 }: ScenePreviewData & {
   enableIspector?: boolean;
 }) {
-  return (
-    <>
-      {loader === "vanilla-esbuild-template" ? (
+  switch (loader) {
+    case "vanilla-esbuild-template": {
+      return (
         <VanillaESBuildAppRunner
           key={widgetKey.id}
           componentName={componentName}
@@ -23,7 +25,23 @@ export function VanillaDedicatedPreviewRenderer({
             javascript: source.javascript,
           }}
         />
-      ) : (
+      );
+    }
+    case "flutter-daemon-view":
+    case "vanilla-flutter-template": {
+      return (
+        <VanillaFlutterRunner
+          key={widgetKey.id}
+          componentName={componentName}
+          source={source}
+          widgetKey={widgetKey}
+          loader={loader}
+          {...props}
+        />
+      );
+    }
+    case "vanilla-html": {
+      return (
         <VanillaRunner
           key={widgetKey.id}
           style={{
@@ -34,7 +52,7 @@ export function VanillaDedicatedPreviewRenderer({
           source={source}
           componentName={componentName}
         />
-      )}
-    </>
-  );
+      );
+    }
+  }
 }

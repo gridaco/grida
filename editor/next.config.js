@@ -7,6 +7,7 @@ const withTM = require("next-transpile-modules")([
   "@code-editor/preview-pip", // TODO: remove me. this is for development. for production, use npm ver instead.
   "@code-editor/devtools",
   "@code-editor/canvas",
+  "@code-editor/property",
 
   // -----------------------------
   // region @designto-code

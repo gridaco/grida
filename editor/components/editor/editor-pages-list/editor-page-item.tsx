@@ -1,22 +1,35 @@
-import React from "react";
-import { FileIcon } from "@radix-ui/react-icons";
+import React, { useCallback } from "react";
+import { FileIcon, HomeIcon } from "@radix-ui/react-icons";
 import styled from "@emotion/styled";
 import { useTheme } from "@emotion/react";
 import { TreeView } from "@editor-ui/hierarchy";
+import type { PageInfo } from "./editor-pages-list";
 
 export function EditorPageItem({
   id,
   name,
+  type,
   selected,
   onPress,
-}: {
-  id: string;
-  name: string;
+}: PageInfo & {
   selected: boolean;
   onPress: () => void;
 }) {
   const { icon: iconColor, iconSelected: iconSelectedColor } =
     useTheme().colors;
+
+  const iconRenderer = (type: PageInfo["type"]) => {
+    switch (type) {
+      case "home":
+        return <HomeIcon color={selected ? iconSelectedColor : iconColor} />;
+      case "assets":
+      case "canvas":
+      case "components":
+      case "styles":
+      default:
+        return <FileIcon color={selected ? iconSelectedColor : iconColor} />;
+    }
+  };
 
   return (
     <TreeView.Row
@@ -28,7 +41,7 @@ export function EditorPageItem({
       selectedColor={"#494949"}
       onPress={onPress}
       onDoubleClick={() => {}}
-      icon={<FileIcon color={selected ? iconSelectedColor : iconColor} />}
+      icon={iconRenderer(type)}
     >
       {name}
     </TreeView.Row>

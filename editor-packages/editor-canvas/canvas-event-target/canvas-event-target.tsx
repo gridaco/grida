@@ -1,4 +1,4 @@
-import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { useGesture } from "@use-gesture/react";
 import type {
   Handler,
@@ -25,6 +25,7 @@ export type OnPointerDownHandler = (
 const ZOOM_WITH_SCROLL_SENSITIVITY = 0.001;
 
 export function CanvasEventTarget({
+  onZoomToFit,
   onPanning,
   onPanningStart,
   onPanningEnd,
@@ -38,23 +39,28 @@ export function CanvasEventTarget({
   onDrag,
   onDragStart,
   onDragEnd,
+  cursor,
   children,
-}: {
-  onPanning: OnPanningHandler;
-  onPanningStart: OnPanningHandler;
-  onPanningEnd: OnPanningHandler;
-  onZooming: OnZoomingHandler;
-  onZoomingStart: OnZoomingHandler;
-  onZoomingEnd: OnZoomingHandler;
-  onPointerMove: OnPointerMoveHandler;
-  onPointerMoveStart: OnPointerMoveHandler;
-  onPointerMoveEnd: OnPointerMoveHandler;
-  onPointerDown: OnPointerDownHandler;
-  onDrag: OnDragHandler;
-  onDragStart: OnDragHandler;
-  onDragEnd: OnDragHandler;
-  children?: React.ReactNode;
-}) {
+}: React.PropsWithChildren<
+  {
+    onZoomToFit?: () => void;
+    onPanning: OnPanningHandler;
+    onPanningStart: OnPanningHandler;
+    onPanningEnd: OnPanningHandler;
+    onZooming: OnZoomingHandler;
+    onZoomingStart: OnZoomingHandler;
+    onZoomingEnd: OnZoomingHandler;
+    onPointerMove: OnPointerMoveHandler;
+    onPointerMoveStart: OnPointerMoveHandler;
+    onPointerMoveEnd: OnPointerMoveHandler;
+    onPointerDown: OnPointerDownHandler;
+    onDrag: OnDragHandler;
+    onDragStart: OnDragHandler;
+    onDragEnd: OnDragHandler;
+  } & {
+    cursor?: React.CSSProperties["cursor"];
+  }
+>) {
   const interactionEventTargetRef = useRef();
 
   const [isSpacebarPressed, setIsSpacebarPressed] = useState(false);
@@ -68,6 +74,10 @@ export function CanvasEventTarget({
       // if spacebar is pressed, enable panning wirt dragging.
       if (e.code === "Space") {
         setIsSpacebarPressed(true);
+      }
+      // if shift + 0
+      else if (e.code === "Digit0" && e.shiftKey) {
+        onZoomToFit?.();
       }
     };
     const ku = (e) => {
@@ -202,10 +212,9 @@ export function CanvasEventTarget({
       style={{
         position: "absolute",
         inset: 0,
-        background: "transparent",
         overflow: "hidden",
         touchAction: "none",
-        cursor: isSpacebarPressed ? "grab" : "default",
+        cursor: isSpacebarPressed ? "grab" : cursor,
         userSelect: "none",
         WebkitUserSelect: "none",
       }}

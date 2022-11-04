@@ -49,7 +49,7 @@ export function HomeInput() {
                   }
                 }}
                 onChange={(e) => setInput(e.target.value)}
-                placeholder={"Type your Figma design url"}
+                placeholder={"Copy & paste your Figma design url"}
               />
               <HomePrimaryInputNextButton
                 onClick={onSubmit}

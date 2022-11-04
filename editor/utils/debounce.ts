@@ -5,7 +5,6 @@ export function debounce<T extends Function>(
 ) {
   var timeout;
   return function () {
-    // @ts-ignore
     var context = this,
       args = arguments;
     var later = function () {

@@ -176,6 +176,7 @@ export const all_preset_options_map__prod = {
   vanilla: vanilla_presets.vanilla_default,
   vanilla_default: vanilla_presets.vanilla_default,
   solid: solid_presets.solid_default,
+  "solid-js": solid_presets.solid_default,
   solid_default: solid_presets.solid_default,
   solid_with_inline_css: solid_presets.solid_with_inline_css,
   solid_with_styled_components: solid_presets.solid_with_styled_components,

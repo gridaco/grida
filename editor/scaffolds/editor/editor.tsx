@@ -4,22 +4,19 @@ import {
   WorkspaceContentPanel,
   WorkspaceContentPanelGridLayout,
 } from "layouts/panel";
-import { EditorSidebar } from "components/editor";
+import { EditorAppbar, EditorSidebar } from "components/editor";
 import { useEditorState } from "core/states";
 import { Canvas } from "scaffolds/canvas";
-import { CodeSegment } from "scaffolds/code";
+import { Code } from "scaffolds/code";
+import { Inspector } from "scaffolds/inspector";
+import { EditorHome } from "scaffolds/editor-home";
 import { EditorSkeleton } from "./skeleton";
 import { colors } from "theme";
+import { useEditorSetupContext } from "./setup";
 
-export function Editor({
-  loading = false,
-}: {
-  /**
-   * explicitly set loading to block uesr interaction.
-   */
-  loading?: boolean;
-}) {
+export function Editor() {
   const [state] = useEditorState();
+  const { loading } = useEditorSetupContext();
 
   const _initially_loaded = state.design?.pages?.length > 0;
   const _initial_load_progress =
@@ -40,22 +37,21 @@ export function Editor({
 
       <DefaultEditorWorkspaceLayout
         backgroundColor={colors.color_editor_bg_on_dark}
+        // appbar={<EditorAppbar />}
         leftbar={{
           _type: "resizable",
           minWidth: 240,
           maxWidth: 600,
           children: <EditorSidebar />,
         }}
-        // rightbar={<Inspector />}
       >
         <WorkspaceContentPanelGridLayout>
           <WorkspaceContentPanel flex={6}>
-            <Canvas key={_refreshkey} />
+            <PageView key={_refreshkey} />
           </WorkspaceContentPanel>
           <WorkspaceContentPanel
-            hidden={state.selectedNodes.length !== 1}
             overflow="hidden"
-            flex={4}
+            flex={1}
             resize={{
               left: true,
             }}
@@ -63,7 +59,7 @@ export function Editor({
             zIndex={1}
             backgroundColor={colors.color_editor_bg_on_dark}
           >
-            <CodeSegment />
+            <RightPanelContent />
           </WorkspaceContentPanel>
           {/* {wstate.preferences.debug_mode && (
             <WorkspaceBottomPanelDockLayout resizable>
@@ -82,4 +78,29 @@ export function Editor({
       </DefaultEditorWorkspaceLayout>
     </>
   );
+}
+
+function RightPanelContent() {
+  const [state] = useEditorState();
+
+  switch (state.mode) {
+    case "code":
+      return <Code />;
+    case "inspect":
+    case "view":
+    default:
+      return <Inspector />;
+  }
+}
+
+function PageView() {
+  const [state] = useEditorState();
+  const { selectedPage } = state;
+
+  switch (selectedPage) {
+    case "home":
+      return <EditorHome />;
+    default:
+      return <Canvas />;
+  }
 }

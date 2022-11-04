@@ -1,3 +1,4 @@
+import React from "react";
 import { color_layer_highlight } from "../theme";
 
 export function OulineSide({
@@ -7,46 +8,50 @@ export function OulineSide({
   width = 1,
   box,
   color = color_layer_highlight,
+  readonly = true,
+  cursor,
 }: {
   wh: [number, number];
   box: [number, number, number, number];
   zoom: number;
-  orientation: "l" | "t" | "r" | "b";
+  orientation: "w" | "n" | "e" | "s";
   width?: number;
   color?: string;
+  readonly?: boolean;
+  cursor?: React.CSSProperties["cursor"];
 }) {
   const d = 100;
   const [w, h] = wh;
 
   // is vertical line
-  const isvert = orientation === "l" || orientation === "r";
+  const isvert = orientation === "w" || orientation === "e";
   const l_scalex = isvert ? width / d : (w / d) * zoom;
   const l_scaley = isvert ? (h / d) * zoom : width / d;
 
   let trans = { x: 0, y: 0 };
   switch (orientation) {
-    case "l": {
+    case "w": {
       trans = {
         x: box[0] - d / 2,
         y: box[1] + (d * l_scaley - d) / 2,
       };
       break;
     }
-    case "r": {
+    case "e": {
       trans = {
         x: box[2] - d / 2,
         y: box[1] + (d * l_scaley - d) / 2,
       };
       break;
     }
-    case "t": {
+    case "n": {
       trans = {
         x: box[0] + (d * l_scalex - d) / 2,
         y: box[1] - d / 2,
       };
       break;
     }
-    case "b": {
+    case "s": {
       trans = {
         x: box[0] + (d * l_scalex - d) / 2,
         y: box[3] - d / 2,
@@ -62,10 +67,10 @@ export function OulineSide({
         width: d,
         height: d,
         opacity: 1,
-        pointerEvents: "none",
+        pointerEvents: readonly ? "none" : "all",
+        cursor: cursor,
         willChange: "transform",
-        transformOrigin: "0px, 0px",
-        transform: `translateX(${trans.x}px) translateY(${trans.y}px) translateZ(0px) scaleX(${l_scalex}) scaleY(${l_scaley})`,
+        transform: `translate3d(${trans.x}px, ${trans.y}px, 0) scaleX(${l_scalex}) scaleY(${l_scaley})`,
         backgroundColor: color,
       }}
     />

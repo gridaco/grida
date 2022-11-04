@@ -5,7 +5,7 @@ import { useRouter } from "next/router";
 
 const __is_dev = process.env.NODE_ENV == "development";
 
-export function SigninToContinueBannerPrmoptProvider({
+export function SigninToContinuePrmoptProvider({
   children,
 }: {
   children: React.ReactNode;

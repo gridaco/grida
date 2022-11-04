@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import styled from "@emotion/styled";
 import { DefaultEditorWorkspaceLayout } from "layouts/default-editor-workspace-layout";
 import {
@@ -12,7 +12,8 @@ import { WorkspaceRepository } from "repository/workspace-repository";
 import { colors } from "theme";
 
 export function HomeDashboard() {
-  const repository = new WorkspaceRepository();
+  const repository = useMemo(() => new WorkspaceRepository(), []);
+
   const [recents, setRecents] = useState([]);
   const [files, setFiles] = useState([]);
   const [components, setComponents] = useState([]);
@@ -33,18 +34,22 @@ export function HomeDashboard() {
       backgroundColor={colors.color_editor_bg_on_dark}
       leftbar={<HomeSidebar />}
     >
-      <div style={{ height: "100vh", overflow: "scroll" }}>
-        <div style={{ margin: 80 }}>
-          <HomeHeading>Home</HomeHeading>
-          <GroupsContainer>
-            <RecentDesignSection recents={recents} />
-            {files && !!files.length && <FilesSection files={files} />}
-            {scenes && !!scenes.length && <ScenesSection scenes={scenes} />}
-            {components && !!components.length && (
-              <ComponentsSection components={components} />
-            )}
-          </GroupsContainer>
-        </div>
+      <div
+        style={{
+          height: "100vh",
+          overflow: "scroll",
+          margin: 80,
+        }}
+      >
+        <HomeHeading>Home</HomeHeading>
+        <GroupsContainer>
+          <RecentDesignSection recents={recents} />
+          {files && !!files.length && <FilesSection files={files} />}
+          {scenes && !!scenes.length && <ScenesSection scenes={scenes} />}
+          {components && !!components.length && (
+            <ComponentsSection components={components} />
+          )}
+        </GroupsContainer>
       </div>
     </DefaultEditorWorkspaceLayout>
   );

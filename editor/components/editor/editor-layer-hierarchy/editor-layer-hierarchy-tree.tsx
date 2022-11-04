@@ -1,5 +1,4 @@
-import React, { memo, useCallback, useMemo, useReducer, useState } from "react";
-import styled from "@emotion/styled";
+import React, { useCallback, useMemo, useState } from "react";
 import { TreeView } from "@editor-ui/editor";
 import {
   LayerRow,
@@ -16,9 +15,21 @@ import {
 // TODO:
 // - add navigate context menu
 // - add go to main component
-// - add reveal on select
+// - add reveal and focus to selected layers
 
 export function EditorLayerHierarchy() {
+  const [state] = useEditorState();
+  const { selectedPage } = state;
+
+  switch (selectedPage) {
+    case "home":
+      return <></>;
+    default:
+      return <CanvasLayerHierarchy />;
+  }
+}
+
+function CanvasLayerHierarchy() {
   const [state] = useEditorState();
   const { highlightLayer, highlightedLayer } = useWorkspace();
   const dispatch = useDispatch();
@@ -52,6 +63,8 @@ export function EditorLayerHierarchy() {
 
       return (
         <LayerRow
+          key={id}
+          id={id}
           icon={
             <IconContainer>
               <LayerIcon type={data.origin} selected={selected} />
@@ -59,9 +72,7 @@ export function EditorLayerHierarchy() {
           }
           name={name}
           depth={depth + 1} // because the root is not a layer. it's the page, the array of roots.
-          id={id}
           expanded={expanded}
-          key={id}
           selected={selected}
           onClickChevron={() => {
             if (expands.includes(id)) {
@@ -79,6 +90,7 @@ export function EditorLayerHierarchy() {
           onPress={() => {
             dispatch({ type: "select-node", node: id });
           }}
+          menuItems={[]}
           onSelectMenuItem={() => {}}
           onContextMenu={() => {}}
         />
@@ -94,4 +106,5 @@ export function EditorLayerHierarchy() {
       renderItem={renderItem}
     />
   );
+  //
 }

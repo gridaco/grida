@@ -4,14 +4,15 @@ import { Canvas } from "@code-editor/canvas";
 import { useEditorState, useWorkspace } from "core/states";
 import {
   D2CVanillaPreview,
-  WebWorkerD2CVanillaPreview,
-} from "scaffolds/preview";
+  OptimizedPreviewCanvas,
+} from "scaffolds/preview-canvas";
 import useMeasure from "react-use-measure";
 import { useDispatch } from "core/dispatch";
 import { FrameTitleRenderer } from "./render/frame-title";
 import { IsolateModeCanvas } from "./isolate-mode";
 import { Dialog } from "@mui/material";
 import { FullScreenPreview } from "scaffolds/preview-full-screen";
+import { cursors } from "cursors";
 
 /**
  * Statefull canvas segment that contains canvas as a child, with state-data connected.
@@ -31,9 +32,8 @@ export function VisualContentArea() {
     canvasMode_previous,
   } = state;
 
-  const thisPageNodes = selectedPage
-    ? design.pages.find((p) => p.id == selectedPage).children.filter(Boolean)
-    : [];
+  const thisPage = design?.pages?.find((p) => p.id == selectedPage);
+  const thisPageNodes = selectedPage ? thisPage.children.filter(Boolean) : [];
 
   const isEmptyPage = thisPageNodes?.length === 0;
 
@@ -72,6 +72,14 @@ export function VisualContentArea() {
       }),
     [dispatch]
   );
+
+  const _bg =
+    thisPage?.backgroundColor &&
+    `rgba(${thisPage.backgroundColor.r * 255}, ${
+      thisPage.backgroundColor.g * 255
+    }, ${thisPage.backgroundColor.b * 255}, ${thisPage.backgroundColor.a})`;
+
+  const cursor = state.mode === "comment" ? cursors.comment : "default";
 
   return (
     <CanvasContainer ref={canvasSizingRef} id="canvas">
@@ -113,13 +121,22 @@ export function VisualContentArea() {
               ]}
               filekey={state.design.key}
               pageid={selectedPage}
+              backgroundColor={_bg}
               selectedNodes={selectedNodes}
               highlightedLayer={highlightedLayer}
               onSelectNode={(...nodes) => {
                 dispatch({ type: "select-node", node: nodes.map((n) => n.id) });
               }}
+              onMoveNodeEnd={([x, y], ...nodes) => {
+                dispatch({
+                  type: "node-transform-translate",
+                  node: nodes,
+                  translate: [x, y],
+                });
+              }}
+              // onMoveNode={() => {}}
               onClearSelection={() => {
-                dispatch({ type: "select-node", node: null });
+                dispatch({ type: "select-node", node: [] });
               }}
               nodes={thisPageNodes}
               // initialTransform={ } // TODO: if the initial selection is provided from first load, from the query param, we have to focus to fit that node.
@@ -130,15 +147,26 @@ export function VisualContentArea() {
                   //   target={p.node}
                   //   {...p}
                   // />
-                  <D2CVanillaPreview key={p.node.id} target={p.node} {...p} />
+                  // <D2CVanillaPreview key={p.node.id} target={p.node} {...p} />
+                  <OptimizedPreviewCanvas
+                    key={p.node.id}
+                    target={p.node}
+                    {...p}
+                  />
                 );
               }}
+              // readonly={false}
+              readonly
               config={{
                 can_highlight_selected_layer: true,
                 marquee: {
                   disabled: false,
                 },
+                grouping: {
+                  disabled: false,
+                },
               }}
+              cursor={cursor}
               renderFrameTitle={(p) => (
                 <FrameTitleRenderer
                   key={p.id}

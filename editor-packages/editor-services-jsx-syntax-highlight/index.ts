@@ -54,4 +54,12 @@ export function registerJsxHighlighter(
       oldDecor = editor.deltaDecorations(oldDecor, decorations);
     });
   });
+
+  return {
+    dispose() {
+      if (syntaxWorker) {
+        syntaxWorker.terminate();
+      }
+    },
+  };
 }

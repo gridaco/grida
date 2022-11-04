@@ -9,8 +9,7 @@ export function useWorkspace() {
   const { highlightedLayer, preferences } = state;
 
   const highlightLayer = useCallback(
-    (highlight?: string) =>
-      dispatch({ type: "highlight-layer", id: highlight }),
+    (highlight?: string) => dispatch({ type: "highlight-node", id: highlight }),
     [dispatch]
   );
 

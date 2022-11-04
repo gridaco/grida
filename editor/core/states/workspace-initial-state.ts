@@ -19,8 +19,12 @@ const _IS_DEV = process.env.NODE_ENV === "development";
 const _ENABLE_PREVIEW_FEATURE_COMPONENTS_SUPPORT =
   process.env.NEXT_PUBLIC_ENABLE_PREVIEW_FEATURE_COMPONENTS_SUPPORT === "true";
 
-export function createInitialWorkspaceState(
-  editor: EditorSnapshot
+/**
+ * this gets called when the editor snapshot is ready, returns the initial workspace state merged with editor snapshot's value.
+ */
+export function merge_initial_workspace_state_with_editor_snapshot(
+  base: Partial<WorkspaceState>,
+  snapshot: EditorSnapshot
 ): WorkspaceState {
   const pref_store = new WorkspacePreferenceStore();
   const saved_pref = pref_store.load();
@@ -34,12 +38,14 @@ export function createInitialWorkspaceState(
   if (!saved_pref) pref_store.set(default_pref);
 
   return {
-    history: createInitialHistoryState(editor),
+    ...base,
+    // below fields will be overwritten irrelevent to the existing base.
+    history: createInitialHistoryState(snapshot),
     preferences: saved_pref ?? default_pref,
   };
 }
 
-export function createPendingWorkspaceState(): WorkspaceState {
+export function create_initial_pending_workspace_state(): WorkspaceState {
   return {
     history: createPendingHistoryState(),
     preferences: {

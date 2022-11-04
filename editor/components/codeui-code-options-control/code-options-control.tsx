@@ -100,8 +100,13 @@ export function CodeOptionsControl(props: CodeOptionsControlProps) {
     ];
 
     /* !CURSOR! */
+    const _lw_presetname = presetname.toLowerCase();
     const sorted_plats: Option<string>[] = presets.sort((o) => {
-      if (o.value == presetname) {
+      const _lw_preset = o.value.toLowerCase();
+      if (
+        _lw_preset == _lw_presetname ||
+        _lw_preset == _lw_presetname + "_default"
+      ) {
         return -1;
       }
       return 1;
@@ -109,9 +114,6 @@ export function CodeOptionsControl(props: CodeOptionsControlProps) {
     return sorted_plats;
   };
 
-  /**
-   * actually platform preset
-   */
   const platform_field_config: IField = {
     tag: "@",
     name: "platform", // actually platform preset

@@ -8,6 +8,26 @@ export interface WorkspaceState {
    */
   highlightedLayer?: string;
   preferences: WorkspacePreferences;
+
+  /**
+   * figma authentication data store state
+   */
+  figmaAuthentication?: {
+    accessToken?: string;
+    personalAccessToken?: string;
+  };
+
+  /**
+   * figma user data
+   */
+  figmaUser?: {
+    /** Unique stable id of the user */
+    id: string;
+    /** Name of the user */
+    name: string;
+    /** URL link to the user's profile image */
+    profile: string;
+  };
 }
 
 export interface WorkspacePreferences {

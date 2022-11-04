@@ -8,14 +8,19 @@ import { debounce } from "utils/debounce";
 import { downloadFile } from "utils/download";
 
 type ICodeEditor = monaco.editor.IStandaloneCodeEditor;
-
+type Options = Omit<
+  monaco.editor.IStandaloneEditorConstructionOptions,
+  "readOnly"
+>;
 export interface MonacoEditorProps {
   value?: string;
   language?: string;
   onChange?: OnChange;
   width?: number | string;
   height?: number | string;
-  options?: monaco.editor.IStandaloneEditorConstructionOptions;
+  options?: Options;
+  readonly?: boolean;
+  fold_comments_on_load?: boolean;
 }
 
 export function MonacoEditor(props: MonacoEditorProps) {
@@ -26,10 +31,12 @@ export function MonacoEditor(props: MonacoEditorProps) {
   const onMount: OnMount = (editor, monaco) => {
     const format = editor.getAction("editor.action.formatDocument");
     const rename = editor.getAction("editor.action.rename");
+    // fold all comments
+    const fold_comments = editor.getAction("editor.foldAllBlockComments");
 
     instance.current = { editor, format };
 
-    register.initEditor(editor, monaco);
+    const dispose = register.initEditor(editor, monaco);
 
     editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, function () {
       format.run();
@@ -62,9 +69,21 @@ export function MonacoEditor(props: MonacoEditorProps) {
       },
     });
 
-    editor.onDidChangeModelContent(() =>
-      debounce(() => editor.saveViewState(), 200)
-    );
+    if (props.fold_comments_on_load) {
+      fold_comments.run();
+    }
+
+    editor.onDidChangeModelContent(() => {
+      debounce(() => editor.saveViewState(), 200);
+
+      if (props.fold_comments_on_load) {
+        fold_comments.run();
+      }
+    });
+
+    editor.onDidDispose(() => {
+      dispose();
+    });
   };
 
   return (
@@ -88,6 +107,7 @@ export function MonacoEditor(props: MonacoEditorProps) {
       options={{
         ...props.options,
         // overrided default options
+        readOnly: props.readonly,
         wordWrap: "off",
         unusualLineTerminators: "off",
       }}

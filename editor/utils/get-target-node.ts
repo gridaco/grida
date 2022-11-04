@@ -1,14 +1,17 @@
 import type { EditorState } from "core/states";
 import { DesignInput } from "@grida/builder-config/input";
-import {
-  find_node_by_id_under_inpage_nodes,
-  find_node_by_id_under_entry,
-} from "@design-sdk/core/utils";
+import type { ReflectSceneNode } from "@design-sdk/figma-node";
+import q from "@design-sdk/query";
 
 export function getTargetContainer(state: EditorState) {
-  const thisPageNodes = state.selectedPage
-    ? state.design.pages.find((p) => p.id == state.selectedPage).children
-    : null;
+  let searchpool;
+  if (state.selectedPage === "home") {
+    searchpool = state.design.pages.map((p) => p.children).flat();
+  } else {
+    searchpool = state.selectedPage
+      ? state.design.pages.find((p) => p.id == state.selectedPage).children
+      : null;
+  }
 
   const targetId =
     state?.selectedNodes?.length === 1 ? state.selectedNodes[0] : null;
@@ -17,24 +20,57 @@ export function getTargetContainer(state: EditorState) {
     return { target: null, root: null };
   }
 
-  const container_of_target =
-    find_node_by_id_under_inpage_nodes(targetId, thisPageNodes) || null;
+  try {
+    const { root: container_of_target } =
+      q.getNodeAndRootByIdFrom<ReflectSceneNode>(targetId, searchpool) || null;
 
-  const root = thisPageNodes
-    ? container_of_target &&
-      (container_of_target.origin === "COMPONENT"
-        ? DesignInput.forMasterComponent({
-            master: container_of_target,
-            all: state.design.pages,
-            components: state.design.components,
-          })
-        : DesignInput.fromDesignWithComponents({
-            design: container_of_target,
-            components: state.design.components,
-          }))
-    : state.design?.input;
+    const root = searchpool
+      ? container_of_target &&
+        (container_of_target.origin === "COMPONENT"
+          ? DesignInput.forMasterComponent({
+              master: container_of_target,
+              all: state.design.pages,
+              components: state.design.components,
+            })
+          : DesignInput.fromDesignWithComponents({
+              design: container_of_target,
+              components: state.design.components,
+            }))
+      : state.design?.input;
 
-  const target =
-    find_node_by_id_under_entry(targetId, root?.entry) ?? root?.entry;
-  return { root, target };
+    const target = q.getNodeByIdFrom(targetId, root?.entry) ?? root?.entry;
+    return { root, target };
+  } catch (_) {}
+
+  return { target: null, root: null };
+}
+
+export function getPageNode(of: string, from: EditorState) {
+  const pages = from.design.pages;
+
+  // loop trough pages's children recursively until find the node.
+
+  const find_recursively = (node: { id: string; children: any }) => {
+    if (node.id === of) {
+      return node;
+    }
+
+    if (node.children) {
+      for (const child of node.children) {
+        const found = find_recursively(child);
+        if (found) {
+          return found;
+        }
+      }
+    }
+  };
+
+  for (const page of pages) {
+    const found = find_recursively(page);
+    if (found) {
+      return page;
+    }
+  }
+
+  return null;
 }

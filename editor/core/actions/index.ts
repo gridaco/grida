@@ -1,11 +1,20 @@
 import type { FrameworkConfig } from "@grida/builder-config";
-import type { ConsoleLog, EditorState, ScenePreviewData } from "core/states";
+import type {
+  ConsoleLog,
+  EditorState,
+  EditorTask,
+  ScenePreviewData,
+} from "core/states";
 
 export type WorkspaceAction =
-  //
   | HistoryAction
-  //
-  | HighlightLayerAction;
+  | HighlightNodeAction
+  | EditorModeAction;
+
+/**
+ * actions that can be executed while workspace is being warmed up.
+ */
+export type WorkspaceWarmupAction = SetFigmaAuthAction | SetFigmaUserAction;
 
 export type HistoryAction =
   //
@@ -15,20 +24,64 @@ export type HistoryAction =
   | Action;
 
 export type Action =
+  | SetFigmaAuthAction
+  | SetFigmaUserAction
   | PageAction
   | SelectNodeAction
-  | HighlightLayerAction
+  | LocateNodeAction
+  | HighlightNodeAction
+  | CanvasEditAction
   | CanvasModeAction
   | PreviewAction
   | CodeEditorAction
-  | DevtoolsAction;
+  | DevtoolsAction
+  | BackgroundTaskAction
+  | EditorModeAction;
 
 export type ActionType = Action["type"];
 
-export type HierarchyAction = SelectNodeAction;
+export type SetFigmaAuthAction = {
+  type: "set-figma-auth";
+  authentication: {
+    personalAccessToken?: string;
+    accessToken?: string;
+  };
+};
+
+export type SetFigmaUserAction = {
+  type: "set-figma-user";
+  user: {
+    id: string;
+    name: string;
+    profile: string;
+  };
+};
+
+export type EditorModeAction = EditorModeSwitchAction;
+export type EditorModeSwitchAction = {
+  type: "mode";
+  mode: EditorState["mode"];
+};
+
 export interface SelectNodeAction {
   type: "select-node";
   node: string | string[];
+}
+
+/**
+ * Select and move to the node.
+ */
+export interface LocateNodeAction {
+  type: "locate-node";
+  node: string;
+}
+
+export type CanvasEditAction = TranslateNodeAction;
+
+export interface TranslateNodeAction {
+  type: "node-transform-translate";
+  translate: [number, number];
+  node: string[];
 }
 
 export type PageAction = SelectPageAction;
@@ -38,8 +91,8 @@ export interface SelectPageAction {
   page: string;
 }
 
-export interface HighlightLayerAction {
-  type: "highlight-layer";
+export interface HighlightNodeAction {
+  type: "highlight-node";
   id: string;
 }
 
@@ -84,4 +137,25 @@ export interface DevtoolsConsoleAction {
 
 export interface DevtoolsConsoleClearAction {
   type: "devtools-console-clear";
+}
+
+export type BackgroundTaskAction =
+  | BackgroundTaskPushAction
+  | BackgroundTaskPopAction
+  | BackgroundTaskUpdateProgressAction;
+
+export interface BackgroundTaskPushAction {
+  type: "editor-task-push";
+  task: EditorTask;
+}
+
+export interface BackgroundTaskPopAction {
+  type: "editor-task-pop";
+  task: EditorTask | { id: string };
+}
+
+export interface BackgroundTaskUpdateProgressAction {
+  type: "editor-task-update-progress";
+  id: string;
+  progress: number;
 }

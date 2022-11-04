@@ -1,14 +1,10 @@
-import {
-  FigmaFilesStore,
-  FileResponseRecord,
-} from "store/fimga-file-store/figma-file-store";
+import { FigmaFileMetaStore, FileMetaRecord } from "@editor/figma-file";
 
-export type LastUsedFileDisplay = FileResponseRecord & { type: "file" } & {
-  lastUsed: Date;
-};
+export type LastUsedFileDisplay = FileMetaRecord & { type: "file" };
 export type LastusedDisplayType = LastUsedFileDisplay;
 
 export class WorkspaceRepository {
+  private metastore = new FigmaFileMetaStore();
   constructor() {}
 
   async getRecents({ count = 4 }: { count?: number }) {
@@ -33,7 +29,7 @@ export class WorkspaceRepository {
   }
 
   async getFiles() {
-    return FigmaFilesStore.all();
+    return this.metastore.all();
   }
 
   async getRecentScenes() {
