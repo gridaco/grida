@@ -299,6 +299,8 @@ export class FigmaImageService {
             );
           }, retry_after)
         );
+      } else {
+        return {};
       }
     }
   }

@@ -19,6 +19,7 @@ import assert from "assert";
 import { debounce } from "utils/debounce";
 import { supportsScripting } from "config";
 import ClientOnly from "components/client-only";
+import { useFigmaImageService } from "scaffolds/editor";
 
 const preset_store = {
   get: () => {
@@ -41,6 +42,7 @@ export function Code() {
   const [framework_config, set_framework_config] = useState(
     wstate.preferences.framework_config
   );
+  const resolver = useFigmaImageService();
 
   const { target: targetted, root } = useTargetContainer();
 
@@ -99,22 +101,16 @@ export function Code() {
         disable_components: !enable_components,
       };
 
-      // build code without assets fetch
-      designToCode({
-        input: _input,
-        framework: __framework_config,
-        asset_config: { skip_asset_replacement: true },
-        build_config: build_config,
-      })
-        .then(on_result)
-        .catch(console.error);
-
       // build final code with asset fetch
       if (!MainImageRepository.instance.empty) {
         designToCode({
-          input: root,
+          input: _input,
           framework: __framework_config,
-          asset_config: { asset_repository: MainImageRepository.instance },
+          asset_config: {
+            asset_repository: MainImageRepository.instance,
+            resolver: ({ keys: key }) =>
+              resolver.fetch(key, { ensure: true, debounce: false }),
+          },
           build_config: build_config,
         })
           .then(on_result)
