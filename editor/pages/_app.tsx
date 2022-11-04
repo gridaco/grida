@@ -32,18 +32,6 @@ function HeadInjection() {
       <meta property="title" content="Design to Codes" />
       <meta property="description" content="Design to Codes description" />
 
-      {/* safari 15 color */}
-      <meta
-        name="theme-color"
-        content="white"
-        media="(prefers-color-scheme: light)"
-      />
-      <meta
-        name="theme-color"
-        content={colors.color_editor_bg_on_dark}
-        media="(prefers-color-scheme: dark)"
-      />
-
       {/* disable zoom */}
       <meta
         name="viewport"

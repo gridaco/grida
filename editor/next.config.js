@@ -1,4 +1,6 @@
-const TerserPlugin = require("terser-webpack-plugin");
+const IS_DEV = process.env.NODE_ENV === "development";
+
+const withPlugins = require("next-compose-plugins");
 const withTM = require("next-transpile-modules")([
   // region @editor-app
   "@editor-app/live-session",
@@ -58,49 +60,52 @@ const withTM = require("next-transpile-modules")([
   // -----------------------------
 ]);
 
-module.exports = withTM({
-  webpack: (config) => {
-    config.module.rules.push({
-      type: "javascript/auto",
-      test: /\.mjs$/,
-      include: /node_modules/,
-    });
-
-    config.resolve.fallback = {
-      fs: false, // used by handlebars
-      path: false, // used by handlebars
-      crypto: false, // or crypto-browserify (used for totp auth)
-      stream: false, // or stream-browserify (used for totp auth)
-    };
-
-    // -----------------------------
-    // for @flutter-builder classname issue
-    config.optimization.minimizer.push(
-      new TerserPlugin({
-        parallel: true,
-        terserOptions: {
-          // https://github.com/webpack-contrib/terser-webpack-plugin#terseroptions
-          keep_classnames: true,
-        },
-      })
-    );
-    // -----------------------------
-
-    return config;
-  },
-  async redirects() {
-    return [
-      {
-        // typo gaurd
-        source: "/preference",
-        destination: "/preferences",
-        permanent: true,
-      },
-      {
-        source: "/files/:key/:id",
-        destination: "/files/:key?node=:id",
-        permanent: false,
-      },
-    ];
+const withPWA = require("next-pwa")({
+  register: true,
+  dest: "public",
+  disable: IS_DEV,
+  fallbacks: {
+    image: "/images/fallback.png",
+    document: "/_offline",
   },
 });
+
+module.exports = withPlugins(
+  [
+    [withTM],
+    [
+      withPWA,
+      {
+        pwa: {
+          dest: "public",
+          // swSrc: "sw.js",
+        },
+      },
+    ],
+  ],
+  {
+    webpack: (config) => {
+      config.resolve.fallback = {
+        fs: false, // used by handlebars
+        path: false, // used by handlebars
+      };
+
+      return config;
+    },
+    async redirects() {
+      return [
+        {
+          // typo gaurd
+          source: "/preference",
+          destination: "/preferences",
+          permanent: true,
+        },
+        {
+          source: "/files/:key/:id",
+          destination: "/files/:key?node=:id",
+          permanent: false,
+        },
+      ];
+    },
+  }
+);
