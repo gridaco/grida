@@ -38,7 +38,7 @@ export function HomeDashboard() {
         style={{
           height: "100vh",
           overflow: "scroll",
-          margin: 80,
+          padding: 80,
         }}
       >
         <HomeHeading>Home</HomeHeading>
