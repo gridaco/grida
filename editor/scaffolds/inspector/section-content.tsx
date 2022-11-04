@@ -31,5 +31,6 @@ const TextContentContainer = styled.div`
   display: flex;
   padding: 8px;
   color: white;
+  word-break: break-word;
   width: 100%;
 `;

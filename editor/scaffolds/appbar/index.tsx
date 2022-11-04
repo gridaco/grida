@@ -16,7 +16,7 @@ export function Appbar() {
         flexDirection: "row",
       }}
     >
-      <EditorAppbarFragments.CodeEditor background={isCodeEditorShown} />
+      <EditorAppbarFragments.RightSidebar background={isCodeEditorShown} />
     </div>
   );
 }

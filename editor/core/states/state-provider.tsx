@@ -1,6 +1,6 @@
 import React, { memo, ReactNode } from "react";
 import { Dispatcher, DispatchContext } from "../dispatch";
-import { StateContext } from "./editor-context";
+import { StateContext } from "./workspace-context";
 import { WorkspaceState } from "./workspace-state";
 
 export const StateProvider = memo(function StateProvider({

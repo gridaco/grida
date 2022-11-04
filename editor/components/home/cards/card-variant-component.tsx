@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { useRouter } from "next/router";
 import { BaseHomeSceneCard } from "./base-home-scene-card";
 import { fetch } from "@design-sdk/figma-remote";
-import { useFigmaAccessToken } from "hooks/use-figma-access-token";
+import { useFigmaAuth } from "scaffolds/workspace/figma-auth";
 
 export function ComponentCard({
   label,
@@ -19,7 +19,7 @@ export function ComponentCard({
 }) {
   const router = useRouter();
 
-  const fat = useFigmaAccessToken();
+  const fat = useFigmaAuth();
 
   const [thumbnail, setThumbnail] = useState(initialThumbnail);
 

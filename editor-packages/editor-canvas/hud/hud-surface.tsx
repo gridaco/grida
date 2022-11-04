@@ -168,8 +168,8 @@ function PositionGuides({
 }) {
   return (
     <>
-      {guides.map((guide) => {
-        return <PositionGuide a={guide.a} b={guide.b} zoom={zoom} />;
+      {guides.map((guide, i) => {
+        return <PositionGuide key={i} a={guide.a} b={guide.b} zoom={zoom} />;
       })}
     </>
   );

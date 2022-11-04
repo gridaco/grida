@@ -135,9 +135,10 @@ function SpacingMeterLabel({
   return (
     <MeterLabel
       label={(Math.round(length * 10) / 10).toString()}
-      background={"orange"}
+      background={"darkorange"}
       x={tx}
       y={ty}
+      weight={"bolder"}
       margin={4}
       anchor={__label_anchor_map[side]}
       zoom={zoom}
@@ -173,7 +174,7 @@ function GuideLine({
   direction,
   length,
   width,
-  color = "orange",
+  color = "darkorange",
   dashed,
 }: GuideLineProps) {
   const tl = length * zoom;
@@ -230,7 +231,7 @@ function SpacingGuideLine({
       length={length}
       direction={rotation}
       width={1}
-      color={"orange"}
+      color={"darkorange"}
     />
   );
 }
@@ -257,7 +258,7 @@ function AuxiliaryLine({
       direction={rotation}
       width={1}
       dashed
-      color={"orange"}
+      color={"darkorange"}
     />
   );
 }

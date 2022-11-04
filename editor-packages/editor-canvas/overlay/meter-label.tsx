@@ -45,9 +45,11 @@ export function MeterLabel({
   zoom,
   margin = 0,
   zIndex = k.Z_INDEX_GUIDE_LABEL,
+  weight = 500,
 }: {
   x: number;
   y: number;
+  weight?: React.CSSProperties["fontWeight"];
   background?: React.CSSProperties["background"];
   label: string;
   anchor: "w" | "n" | "s" | "e";
@@ -98,7 +100,7 @@ export function MeterLabel({
         color: "white",
         fontSize: font_size,
         fontFamily: "Inter, sans-serif",
-        fontWeight: 500,
+        fontWeight: weight,
         textAlign: "center",
         zIndex: zIndex,
       }}

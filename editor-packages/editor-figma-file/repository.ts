@@ -1,6 +1,6 @@
 import { fetch } from "@design-sdk/figma-remote";
-import { FileResponse } from "@design-sdk/figma-remote-types";
-import { FigmaFileStore, FileResponseRecord } from "@editor/figma-file-store";
+import { FigmaFileStore, FigmaFileMetaStore } from "./stores";
+import type { FileResponseRecord } from "./stores";
 
 export type TFetchFileForApp = (
   | fetch.FetchFileGeneratorReturnType
@@ -20,23 +20,29 @@ export class FigmaDesignRepository {
   ) {}
 
   static async fetchCachedFile(fileId: string) {
+    const metastore = new FigmaFileMetaStore();
     const store = new FigmaFileStore(fileId);
     const existing = await store.get();
     if (existing) {
+      // everytime the file is consumed consider it as used, we upsert the file so that the lastUsed can be updated.
+      metastore.upsert(existing.key, existing);
       return { ...existing, __initial: false } as TFetchFileForApp;
     } else {
       throw new Error("file not found");
     }
   }
 
-  async *fetchFile(fileId: string) {
-    const store = new FigmaFileStore(fileId);
+  async *fetchFile(filekey: string) {
+    const metastore = new FigmaFileMetaStore();
+    const store = new FigmaFileStore(filekey);
     const existing = await store.get();
     if (existing) {
+      // everytime the file is consumed consider it as used, we upsert the file so that the lastUsed can be updated.
+      metastore.upsert(existing.key, existing);
       yield { ...existing, __initial: false } as TFetchFileForApp;
     }
 
-    const _iter = fetch.fetchFile({ file: fileId, auth: this.auth });
+    const _iter = fetch.fetchFile({ file: filekey, auth: this.auth });
     let next: IteratorResult<fetch.FetchFileGeneratorReturnType>;
     while ((next = await _iter.next()).done === false) {
       switch (next.value.__response_type) {
@@ -48,6 +54,7 @@ export class FigmaDesignRepository {
               __type: "file-fetched-for-app",
             } as TFetchFileForApp;
             store.upsert(next.value);
+            metastore.upsert(filekey, next.value);
           }
           break;
         case "roots":
@@ -58,6 +65,7 @@ export class FigmaDesignRepository {
               __type: "file-fetched-for-app",
             } as TFetchFileForApp;
             store.upsert(next.value);
+            metastore.upsert(filekey, next.value);
           }
           break;
         case "whole":
@@ -67,6 +75,7 @@ export class FigmaDesignRepository {
             __type: "file-fetched-for-app",
           } as TFetchFileForApp;
           store.upsert(next.value);
+          metastore.upsert(filekey, next.value);
           break;
       }
     }

@@ -17,10 +17,10 @@ type TCanvasMode = "free" | "isolated-view" | "fullscreen-preview";
  * - code - with coding editor
  * - inspect - with inspector
  */
-type TUserTaskMode = "view" | "code" | "inspect";
+type TUserTaskMode = "view" | "comment" | "code" | "inspect";
 
 export interface EditorState {
-  selectedPage: string;
+  selectedPage: string | "home";
   selectedNodes: string[];
   selectedLayersOnPreview: string[];
   /**
@@ -171,4 +171,5 @@ export interface EditorTask {
    * 0-1, if null, it is indeterminate
    */
   progress: number | null;
+  createdAt?: Date;
 }

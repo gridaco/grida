@@ -4,16 +4,16 @@ import { useEditorState } from "core/states";
 
 export function EditorBrowserMetaHead({
   children,
-}: {
-  children: React.ReactChild;
-}) {
+}: React.PropsWithChildren<{}>) {
   const [state] = useEditorState();
 
   return (
     <>
       <Head>
         <title>
-          {state?.design?.name ? `Grida | ${state?.design?.name}` : "Loading.."}
+          {state?.design?.name
+            ? `Grida | ${state?.design?.name}`
+            : "Grida Code"}
         </title>
       </Head>
       {children}

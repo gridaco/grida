@@ -8,8 +8,13 @@ import type {
 
 export type WorkspaceAction =
   | HistoryAction
-  | HighlightLayerAction
+  | HighlightNodeAction
   | EditorModeAction;
+
+/**
+ * actions that can be executed while workspace is being warmed up.
+ */
+export type WorkspaceWarmupAction = SetFigmaAuthAction | SetFigmaUserAction;
 
 export type HistoryAction =
   //
@@ -19,9 +24,12 @@ export type HistoryAction =
   | Action;
 
 export type Action =
+  | SetFigmaAuthAction
+  | SetFigmaUserAction
   | PageAction
   | SelectNodeAction
-  | HighlightLayerAction
+  | LocateNodeAction
+  | HighlightNodeAction
   | CanvasEditAction
   | CanvasModeAction
   | PreviewAction
@@ -32,16 +40,40 @@ export type Action =
 
 export type ActionType = Action["type"];
 
+export type SetFigmaAuthAction = {
+  type: "set-figma-auth";
+  authentication: {
+    personalAccessToken?: string;
+    accessToken?: string;
+  };
+};
+
+export type SetFigmaUserAction = {
+  type: "set-figma-user";
+  user: {
+    id: string;
+    name: string;
+    profile: string;
+  };
+};
+
 export type EditorModeAction = EditorModeSwitchAction;
 export type EditorModeSwitchAction = {
   type: "mode";
   mode: EditorState["mode"];
 };
 
-export type HierarchyAction = SelectNodeAction;
 export interface SelectNodeAction {
   type: "select-node";
   node: string | string[];
+}
+
+/**
+ * Select and move to the node.
+ */
+export interface LocateNodeAction {
+  type: "locate-node";
+  node: string;
 }
 
 export type CanvasEditAction = TranslateNodeAction;
@@ -59,8 +91,8 @@ export interface SelectPageAction {
   page: string;
 }
 
-export interface HighlightLayerAction {
-  type: "highlight-layer";
+export interface HighlightNodeAction {
+  type: "highlight-node";
   id: string;
 }
 

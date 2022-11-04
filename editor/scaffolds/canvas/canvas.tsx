@@ -3,8 +3,8 @@ import styled from "@emotion/styled";
 import { Canvas } from "@code-editor/canvas";
 import { useEditorState, useWorkspace } from "core/states";
 import {
-  WebWorkerD2CVanillaPreview,
   D2CVanillaPreview,
+  OptimizedPreviewCanvas,
 } from "scaffolds/preview-canvas";
 import useMeasure from "react-use-measure";
 import { useDispatch } from "core/dispatch";
@@ -12,6 +12,7 @@ import { FrameTitleRenderer } from "./render/frame-title";
 import { IsolateModeCanvas } from "./isolate-mode";
 import { Dialog } from "@mui/material";
 import { FullScreenPreview } from "scaffolds/preview-full-screen";
+import { cursors } from "cursors";
 
 /**
  * Statefull canvas segment that contains canvas as a child, with state-data connected.
@@ -77,6 +78,8 @@ export function VisualContentArea() {
     `rgba(${thisPage.backgroundColor.r * 255}, ${
       thisPage.backgroundColor.g * 255
     }, ${thisPage.backgroundColor.b * 255}, ${thisPage.backgroundColor.a})`;
+
+  const cursor = state.mode === "comment" ? cursors.comment : "default";
 
   return (
     <CanvasContainer ref={canvasSizingRef} id="canvas">
@@ -144,7 +147,12 @@ export function VisualContentArea() {
                   //   target={p.node}
                   //   {...p}
                   // />
-                  <D2CVanillaPreview key={p.node.id} target={p.node} {...p} />
+                  // <D2CVanillaPreview key={p.node.id} target={p.node} {...p} />
+                  <OptimizedPreviewCanvas
+                    key={p.node.id}
+                    target={p.node}
+                    {...p}
+                  />
                 );
               }}
               // readonly={false}
@@ -158,6 +166,7 @@ export function VisualContentArea() {
                   disabled: false,
                 },
               }}
+              cursor={cursor}
               renderFrameTitle={(p) => (
                 <FrameTitleRenderer
                   key={p.id}

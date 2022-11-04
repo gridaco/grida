@@ -65,7 +65,7 @@ export const PageRow = memo(
       onMenuClick: () => void;
       children?: ReactNode;
     },
-    forwardedRef: any
+    ref: any
   ) {
     const [hovered, setHovered] = useState(false);
 
@@ -80,7 +80,7 @@ export const PageRow = memo(
     return (
       // @ts-ignore
       <TreeView.Row<PageMenuItemType>
-        ref={forwardedRef}
+        ref={ref}
         onHoverChange={handleHoverChange}
         selected={selected}
         disabled={false}

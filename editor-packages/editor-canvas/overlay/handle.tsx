@@ -1,30 +1,33 @@
 import React, { forwardRef } from "react";
 import * as k from "./k";
 
-export const Handle = forwardRef(function ({
-  color,
-  anchor,
-  box,
-  outlineWidth = 1,
-  outlineColor = "transparent",
-  size = 4,
-  borderRadius = 0,
-  cursor,
-  readonly,
-}: {
-  color: string;
-  /**
-   * the width of the outline
-   */
-  outlineWidth?: number;
-  outlineColor?: string;
-  size: number;
-  anchor: "nw" | "ne" | "sw" | "se";
-  box: [number, number, number, number];
-  borderRadius?: React.CSSProperties["borderRadius"];
-  cursor?: React.CSSProperties["cursor"];
-  readonly?: boolean;
-}) {
+export const Handle = forwardRef(function (
+  {
+    color,
+    anchor,
+    box,
+    outlineWidth = 1,
+    outlineColor = "transparent",
+    size = 4,
+    borderRadius = 0,
+    cursor,
+    readonly,
+  }: {
+    color: string;
+    /**
+     * the width of the outline
+     */
+    outlineWidth?: number;
+    outlineColor?: string;
+    size: number;
+    anchor: "nw" | "ne" | "sw" | "se";
+    box: [number, number, number, number];
+    borderRadius?: React.CSSProperties["borderRadius"];
+    cursor?: React.CSSProperties["cursor"];
+    readonly?: boolean;
+  },
+  ref
+) {
   let dx = 0;
   let dy = 0;
   switch (anchor) {

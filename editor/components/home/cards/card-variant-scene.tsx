@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { BaseHomeSceneCard } from "./base-home-scene-card";
 import { fetch } from "@design-sdk/figma-remote";
-import { useFigmaAccessToken } from "hooks/use-figma-access-token";
+import { useFigmaAuth } from "scaffolds/workspace/figma-auth";
 
 export function SceneCard({
   label,
@@ -15,7 +15,7 @@ export function SceneCard({
     id: string;
   };
 }) {
-  const fat = useFigmaAccessToken();
+  const fat = useFigmaAuth();
 
   const [thumbnail, setThumbnail] = useState(initialThumbnail);
 
