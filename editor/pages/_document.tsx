@@ -1,4 +1,5 @@
 import { Html, Head, Main, NextScript } from "next/document";
+import { colors } from "theme";
 
 export default function Document() {
   return (
@@ -6,10 +7,40 @@ export default function Document() {
       <Head>
         {/* PWA manifest */}
         <link rel="manifest" href="/manifest.json" />
+        <meta name="application-name" content="PWA App" />
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+        <meta name="apple-mobile-web-app-title" content="PWA App" />
+        <meta name="description" content="Best PWA App in the world" />
+        <meta name="format-detection" content="telephone=no" />
+        <meta name="mobile-web-app-capable" content="yes" />
+        <meta name="msapplication-config" content="/icons/browserconfig.xml" />
+        <meta name="msapplication-TileColor" content="#2B5797" />
+        <meta name="msapplication-tap-highlight" content="no" />
+
+        {/* region Font */}
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link
-          href="https://fonts.googleapis.com/css2?family=Roboto:ital,wght@0,100;0,300;0,400;0,500;0,700;0,900;1,100;1,300;1,400;1,500;1,700;1,900&"
+          rel="preconnect"
+          href="https://fonts.gstatic.com"
+          crossOrigin=""
+        />
+        {/* (en) Nanum Pen Script (+ ko), Roboto Mono, Inter */}
+        <link
+          href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Nanum+Pen+Script&family=Roboto+Mono:wght@400;500;600;700&display=swap"
           rel="stylesheet"
-          type="text/css"
+        />
+
+        {/* safari 15 color */}
+        <meta
+          name="theme-color"
+          content="white"
+          media="(prefers-color-scheme: light)"
+        />
+        <meta
+          name="theme-color"
+          content={colors.color_editor_bg_on_dark}
+          media="(prefers-color-scheme: dark)"
         />
       </Head>
       <body>
