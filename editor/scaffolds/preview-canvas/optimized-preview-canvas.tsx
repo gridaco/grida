@@ -35,7 +35,16 @@ function optimized_preview_strategy(
   }
 
   if (children.length === 0) {
-    return "vanilla";
+    const hasimagefill = scene.fills
+      ?.filter(Boolean)
+      ?.filter((f) => f.visible)
+      ?.find((f) => f.type === "IMAGE");
+
+    if (hasimagefill) {
+      return "baked";
+    } else {
+      return "vanilla";
+    }
   } else if (children.length === 1) {
     return optimized_preview_strategy(children[0]);
   } else {
