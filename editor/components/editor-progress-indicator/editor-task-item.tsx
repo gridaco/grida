@@ -77,6 +77,7 @@ const RootWrapperProgressingItemReadonly = styled.div`
   cursor: default;
   padding: 20px;
   display: flex;
+  max-width: 400px;
   justify-content: center;
   flex-direction: column;
   align-items: flex-start;
@@ -134,11 +135,11 @@ const FooterContainer = styled.footer`
 const ThisDescription = styled.span`
   color: rgba(255, 255, 255, 0.5);
   text-overflow: ellipsis;
+  white-space: nowrap;
   font-size: 10px;
   font-weight: 400;
   text-align: left;
   flex: 1;
-  flex-shrink: 0;
 `;
 
 const EllapsedTimeLabel = styled.label`
