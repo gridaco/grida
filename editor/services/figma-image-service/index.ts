@@ -182,7 +182,6 @@ export class FigmaImageService {
 
           const handle_queue = async () => {
             const fetchtargets = async (...targets) => {
-              console.log("fetching", targets, bakes);
               const data = await this.fetch(targets, {
                 ensure: true,
                 debounce: false,

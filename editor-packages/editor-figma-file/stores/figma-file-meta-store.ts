@@ -9,7 +9,7 @@ import type { FileResponse, Canvas, Color } from "@design-sdk/figma-remote-api";
 import * as k from "./k";
 
 // #region global db initialization
-const __db_pref = { name: "fimga-file-store", version: k.DB_VER };
+const __db_pref = { name: "fimga-file-meta-store", version: k.DB_VER };
 const __table = "files-meta";
 
 export type FileMetaRecord = {
