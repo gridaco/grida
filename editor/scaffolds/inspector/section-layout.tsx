@@ -16,7 +16,7 @@ export function LayoutSection() {
     return <></>;
   }
 
-  const { isRoot, x, y, width, height } = target;
+  const { id, isRoot, x, y, width, height } = target;
 
   // round to 2 decimal places
   const dx = rd(x);
@@ -29,7 +29,7 @@ export function LayoutSection() {
       <PropertyGroupHeader>
         <h6>Layout</h6>
       </PropertyGroupHeader>
-      <PropertyLines>
+      <PropertyLines key={id}>
         <PropertyLine label="Position">
           <ReadonlyProperty suffix={"X"} value={isRoot ? 0 : dx} />
           <ReadonlyProperty suffix={"Y"} value={isRoot ? 0 : dy} />

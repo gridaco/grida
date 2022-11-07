@@ -4,6 +4,11 @@ import { useTargetContainer } from "hooks/use-target-node";
 import { useFigmaImageService } from "scaffolds/editor";
 import type { ImagePaint } from "@design-sdk/figma-types";
 import styled from "@emotion/styled";
+import {
+  PropertyGroup,
+  PropertyGroupHeader,
+  PropertyLines,
+} from "@editor-ui/property";
 
 export function AssetsSection() {
   // if the node itself is exportable
@@ -36,13 +41,18 @@ export function AssetsSection() {
   }
 
   return (
-    <InspectorSection label="Assets" borderTop>
-      <Body>
-        {srcs.map((src, i) => (
-          <Preview key={i} src={src} />
-        ))}
-      </Body>
-    </InspectorSection>
+    <PropertyGroup>
+      <PropertyGroupHeader>
+        <h6>Assets</h6>
+      </PropertyGroupHeader>
+      <PropertyLines>
+        <Body>
+          {srcs.map((src, i) => (
+            <Preview key={i} src={src} />
+          ))}
+        </Body>
+      </PropertyLines>
+    </PropertyGroup>
   );
 }
 

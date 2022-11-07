@@ -14,6 +14,7 @@ import { CodeSection } from "./section-code";
 import { Conversations } from "scaffolds/conversations";
 import { EditorAppbarFragments } from "components/editor";
 import { useDispatch } from "core/dispatch";
+import { EffectsSection } from "./section-effects";
 
 type Tab = "inspect" | "comment";
 
@@ -80,6 +81,7 @@ function InspectorBody() {
       <AssetsSection />
       <TypographySection />
       <ColorsSection />
+      <EffectsSection />
       <ContentSection />
       <CodeSection />
     </EditorPropertyThemeProvider>

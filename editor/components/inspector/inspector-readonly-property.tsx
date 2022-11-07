@@ -12,7 +12,7 @@ export function ReadonlyProperty({
   hideEmpty?: boolean;
 } & Omit<PropertyInputProps, "readonly" | "onClick">) {
   const snippet = pretty(value, unit);
-  const isempty = !value;
+  const isempty = !!!value;
   const onclick = () => {
     if (isempty) {
       return;
