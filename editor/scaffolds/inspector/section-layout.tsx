@@ -1,5 +1,11 @@
 import styled from "@emotion/styled";
-import { InspectorSection, ReadonlyProperty } from "components/inspector";
+import { ReadonlyProperty } from "components/inspector";
+import {
+  PropertyLine,
+  PropertyLines,
+  PropertyGroup,
+  PropertyGroupHeader,
+} from "@editor-ui/property";
 import { useTargetContainer } from "hooks/use-target-node";
 import React from "react";
 
@@ -19,16 +25,21 @@ export function LayoutSection() {
   const dh = rd(height);
 
   return (
-    <InspectorSection label="Layout" borderTop>
-      <Line>
-        <ReadonlyProperty label={"X"} value={isRoot ? 0 : dx} />
-        <ReadonlyProperty label={"Y"} value={isRoot ? 0 : dy} />
-      </Line>
-      <Line>
-        <ReadonlyProperty label={"W"} value={dw} />
-        <ReadonlyProperty label={"H"} value={dh} />
-      </Line>
-    </InspectorSection>
+    <PropertyGroup>
+      <PropertyGroupHeader>
+        <h6>Layout</h6>
+      </PropertyGroupHeader>
+      <PropertyLines>
+        <PropertyLine label="Position">
+          <ReadonlyProperty suffix={"X"} value={isRoot ? 0 : dx} />
+          <ReadonlyProperty suffix={"Y"} value={isRoot ? 0 : dy} />
+        </PropertyLine>
+        <PropertyLine label="Size">
+          <ReadonlyProperty suffix={"W"} value={dw} />
+          <ReadonlyProperty suffix={"H"} value={dh} />
+        </PropertyLine>
+      </PropertyLines>
+    </PropertyGroup>
   );
 }
 

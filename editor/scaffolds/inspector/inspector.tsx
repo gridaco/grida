@@ -3,7 +3,7 @@ import styled from "@emotion/styled";
 import { EditorState, useEditorState } from "core/states";
 import { colors } from "theme";
 import { useTargetContainer } from "hooks/use-target-node";
-
+import { EditorPropertyThemeProvider, one } from "@editor-ui/property";
 import { InfoSection } from "./section-info";
 import { LayoutSection } from "./section-layout";
 import { ColorsSection } from "./section-colors";
@@ -74,15 +74,15 @@ function ConversationsBody() {
 
 function InspectorBody() {
   return (
-    <>
+    <EditorPropertyThemeProvider theme={one.dark}>
       <InfoSection />
       <LayoutSection />
-      <ColorsSection />
       <AssetsSection />
       <TypographySection />
+      <ColorsSection />
       <ContentSection />
       <CodeSection />
-    </>
+    </EditorPropertyThemeProvider>
   );
 }
 

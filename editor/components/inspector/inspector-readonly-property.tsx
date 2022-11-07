@@ -1,90 +1,38 @@
-import styled from "@emotion/styled";
-import React, { CSSProperties } from "react";
+import React from "react";
 import { copy } from "utils/clipboard";
-
-export function PropertyContainer({
-  children,
-  disabled,
-  onClick,
-  background,
-}: React.PropsWithChildren<{
-  onClick?: () => void;
-  disabled?: boolean;
-  background?: CSSProperties["background"];
-}>) {
-  return (
-    <PropertyLineContainer
-      onClick={onClick}
-      data-disabled={disabled}
-      style={{
-        background,
-      }}
-    >
-      {children}
-    </PropertyLineContainer>
-  );
-}
-
-const PropertyLineContainer = styled.div`
-  display: flex;
-  flex: 1;
-  gap: 8px;
-  background: transparent;
-  padding: 4px;
-  border-radius: 4px;
-
-  label {
-    font-size: 14px;
-    color: rgba(255, 255, 255, 0.5);
-  }
-
-  span {
-    font-size: 14px;
-    color: white;
-  }
-
-  transition: all 0.2s ease;
-
-  &:hover {
-    background: rgba(255, 255, 255, 0.1) !important;
-  }
-
-  cursor: pointer;
-  &:active {
-    background: rgba(255, 255, 255, 0.2) !important;
-  }
-
-  &[data-disabled="true"] {
-    opacity: 0.5;
-    cursor: not-allowed;
-  }
-`;
+import { PropertyInput, PropertyInputProps } from "@editor-ui/property";
 
 export function ReadonlyProperty({
-  label,
   value,
   unit,
   hideEmpty,
+  ...props
 }: {
-  label: string;
-  value: number | string;
   unit?: "px" | "%";
   hideEmpty?: boolean;
-}) {
+} & Omit<PropertyInputProps, "readonly" | "onClick">) {
   const snippet = pretty(value, unit);
+  const isempty = !value;
   const onclick = () => {
+    if (isempty) {
+      return;
+    }
+
     copy(snippet, { notify: true });
   };
 
-  if (hideEmpty && !value) {
+  if (hideEmpty && isempty) {
     return <></>;
   }
 
   return (
-    <PropertyContainer onClick={onclick}>
-      <label>{label}</label>
-      <span title={`raw: ${value}`}>{snippet}</span>
-    </PropertyContainer>
+    <PropertyInput
+      readonly
+      disabled={isempty}
+      onClick={onclick}
+      value={snippet}
+      {...props}
+    />
   );
 }
 

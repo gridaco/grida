@@ -1,5 +1,5 @@
-import styled from "@emotion/styled";
 import React, { CSSProperties } from "react";
+import styled from "@emotion/styled";
 
 const _theme_section_border = "1px solid rgba(255, 255, 255, 0.05)";
 

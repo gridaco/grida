@@ -1,4 +1,9 @@
 import React, { useEffect, useState } from "react";
+import {
+  PropertyLine,
+  PropertyGroup,
+  PropertyGroupHeader,
+} from "@editor-ui/property";
 import { Result } from "@designto/code";
 import { useTargetContainer } from "hooks/use-target-node";
 import { useWorkspaceState } from "core/states";
@@ -41,18 +46,13 @@ export function CodeSection() {
   const viewheight = target?.isRoot ? 800 : 400;
 
   return (
-    <InspectorSection
-      border
-      label={"Code"}
-      contentPadding="8px 0 0 0"
-      actions={
-        <>
-          <Button id="open-code-editor" onClick={on_open}>
-            Open Code editor
-          </Button>
-        </>
-      }
-    >
+    <PropertyGroup>
+      <PropertyGroupHeader>
+        <h6>Code</h6>
+        <Button id="open-code-editor" onClick={on_open}>
+          Open Code editor
+        </Button>
+      </PropertyGroupHeader>
       {code ? (
         <>
           <MonacoEditor
@@ -80,6 +80,6 @@ export function CodeSection() {
           <CircularProgress size={24} />
         </div>
       )}
-    </InspectorSection>
+    </PropertyGroup>
   );
 }

@@ -1,10 +1,14 @@
 import React from "react";
 import styled from "@emotion/styled";
 import type { SolidPaint, Paint, GradientPaint } from "@design-sdk/figma-types";
-import { InspectorSection } from "components/inspector";
 import { useTargetContainer } from "hooks/use-target-node";
 import { copy } from "utils/clipboard";
 import { ColorChip, GradientChip } from "@code-editor/property";
+import {
+  PropertyLine,
+  PropertyGroup,
+  PropertyGroupHeader,
+} from "@editor-ui/property";
 
 export function ColorsSection() {
   const { target } = useTargetContainer();
@@ -17,7 +21,10 @@ export function ColorsSection() {
   }
 
   return (
-    <InspectorSection label="Colors" borderTop>
+    <PropertyGroup>
+      <PropertyGroupHeader>
+        <h6>Colors</h6>
+      </PropertyGroupHeader>
       <ChipsContainer>
         {paints?.map((c, i) => {
           switch (c.type) {
@@ -41,7 +48,7 @@ export function ColorsSection() {
           }
         })}
       </ChipsContainer>
-    </InspectorSection>
+    </PropertyGroup>
   );
 }
 
@@ -49,4 +56,5 @@ const ChipsContainer = styled.div`
   display: flex;
   flex-direction: row;
   gap: 4px;
+  padding: 4px 16px;
 `;
