@@ -7,7 +7,7 @@ export function InfoSection() {
   return (
     <Section>
       <SceneTitle disabled value={target?.name ?? ""} />
-      <SceneDescription>{"No description"}</SceneDescription>
+      {/* <SceneDescription>{"No description"}</SceneDescription> */}
     </Section>
   );
 }
@@ -21,10 +21,11 @@ const Section = styled.section`
 const SceneTitle = styled.input`
   margin: 4px 0;
   background: transparent;
-  font-size: 18px;
+  font-size: 16px;
+  font-weight: 600;
   outline: none;
   border: none;
-  color: white;
+  color: rgba(255, 255, 255, 0.8);
   cursor: default;
   font-weight: normal;
 `;

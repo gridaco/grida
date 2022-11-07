@@ -140,7 +140,7 @@ const TabsContainer = styled.div`
   display: flex;
   flex-direction: row;
   align-items: center;
-  gap: 8px;
+  gap: 4px;
   padding: 8px;
 `;
 
@@ -172,11 +172,13 @@ function Tab({
 }
 
 const TabContainer = styled.label`
-  padding: 4px;
+  padding: 6px;
   border-radius: 4px;
   color: rgba(255, 255, 255, 0.5);
+  font-size: 14px;
   &[data-selected="true"] {
-    color: white;
+    color: white !important;
+    font-weight: 500;
   }
 
   &[data-hover="true"] {

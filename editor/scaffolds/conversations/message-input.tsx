@@ -65,7 +65,7 @@ const MessageInputField = styled(TextareaAutosize)`
   padding: 12px;
   background-color: transparent;
   resize: none;
-  font-family: sans-serif;
+  font-family: Inter, sans-serif;
 
   &:hover {
     background-color: rgba(255, 255, 255, 0.1);
