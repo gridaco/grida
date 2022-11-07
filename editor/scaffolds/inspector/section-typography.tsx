@@ -16,28 +16,36 @@ export function TypographySection() {
     return <></>;
   }
 
-  const _lh = lineheight(target.lineHeight);
+  const {
+    id,
+    fontFamily,
+    fontSize,
+    fontWeight,
+    lineHeight: _lineHeight,
+    textAlign,
+  } = target;
+  const lineHeight = lineheight(_lineHeight);
 
   return (
     <PropertyGroup>
       <PropertyGroupHeader>
         <h6>Typography</h6>
       </PropertyGroupHeader>
-      <PropertyLines>
+      <PropertyLines key={id}>
         <PropertyLine label="Font">
-          <ReadonlyProperty value={target.fontFamily} />
+          <ReadonlyProperty value={fontFamily} />
         </PropertyLine>
         <PropertyLine label="Size">
-          <ReadonlyProperty value={target.fontSize} unit="px" />
+          <ReadonlyProperty value={fontSize} unit="px" />
         </PropertyLine>
         <PropertyLine label="Weight">
-          <ReadonlyProperty value={target.fontWeight} />
+          <ReadonlyProperty value={fontWeight} />
         </PropertyLine>
         <PropertyLine label="Line height">
-          <ReadonlyProperty value={_lh.value} unit={_lh.unit} />
+          <ReadonlyProperty value={lineHeight.value} unit={lineHeight.unit} />
         </PropertyLine>
         <PropertyLine label="Align">
-          <ReadonlyProperty value={target.textAlign} />
+          <ReadonlyProperty value={textAlign} />
         </PropertyLine>
       </PropertyLines>
     </PropertyGroup>
