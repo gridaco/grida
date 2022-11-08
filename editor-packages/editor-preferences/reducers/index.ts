@@ -1,4 +1,8 @@
-import type { Action, PreferenceSetRouteAction, PreferenceState } from "core";
+import type {
+  Action,
+  PreferenceSetRouteAction,
+  PreferenceState,
+} from "../core";
 
 export function reducer(
   state: PreferenceState,
