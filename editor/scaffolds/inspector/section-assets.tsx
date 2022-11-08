@@ -1,8 +1,12 @@
 import React, { useEffect, useState } from "react";
-import { InspectorSection } from "components/inspector";
 import { useTargetContainer } from "hooks/use-target-node";
 import { useFigmaImageService } from "scaffolds/editor";
-import type { ImagePaint } from "@design-sdk/figma-types";
+import { ImagePaint } from "@design-sdk/figma-types";
+import {
+  ReflectSceneNodeType,
+  ReflectVectorNode,
+  ReflectSceneNode,
+} from "@design-sdk/figma-node";
 import styled from "@emotion/styled";
 import {
   PropertyGroup,
@@ -15,9 +19,39 @@ export function AssetsSection() {
   // if the node has a complex gradient which is more effective to use asset than style code
   // if the node has a image fill
 
+  const { target } = useTargetContainer();
+
+  if (!target) {
+    return <></>;
+  }
+
+  const { type } = target;
+
+  switch (type) {
+    case ReflectSceneNodeType.vector:
+      return <VectorNodeAssetView node={target} />;
+    default: {
+      return <ImageFillNodeAssetView node={target} />;
+    }
+  }
+}
+
+function VectorNodeAssetView({ node }: { node: ReflectVectorNode }) {
+  // todo: support vector fetch
+  const service = useFigmaImageService();
+  return <></>;
+}
+
+/**
+ * the exportable config is not mapped from api response, this will be available once that statement is resolved.
+ */
+function ExportableNodeAssetView() {
+  //
+}
+
+function ImageFillNodeAssetView({ node: target }: { node: ReflectSceneNode }) {
   const service = useFigmaImageService();
   const [srcs, setSrcs] = useState<string[]>([]);
-  const { target } = useTargetContainer();
 
   useEffect(() => {
     if (target) {

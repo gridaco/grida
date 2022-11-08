@@ -27,7 +27,7 @@ export function LayoutSection() {
 
   let tr, tl, br, bl;
   if ("cornerRadius" in target) {
-    const numeric = (v: IRadius) => (typeof v === "number" ? v : null);
+    const numeric = (v: IRadius) => (typeof v === "number" ? rd(v) : null);
     const { bl: _bl, br: _br, tl: _tl, tr: _tr } = target.cornerRadius;
     tr = numeric(_tr);
     tl = numeric(_tl);

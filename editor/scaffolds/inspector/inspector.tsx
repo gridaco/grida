@@ -38,7 +38,7 @@ export function Inspector() {
     <InspectorContainer>
       <EditorAppbarFragments.RightSidebar flex={0} />
       <Tabs selectedTab={tab} onTabChange={switchMode} />
-      <div style={{ height: 16 }} />
+      <div style={{ height: 16, flexShrink: 0 }} />
       <Body type={tab} />
     </InspectorContainer>
   );

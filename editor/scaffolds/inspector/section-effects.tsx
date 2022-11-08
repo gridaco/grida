@@ -12,6 +12,7 @@ import { ReadonlyProperty } from "components/inspector";
 import { ColorChip } from "@code-editor/property";
 import * as css from "@web-builder/styles";
 import { BoxShadowManifest, Offset } from "@reflect-ui/core";
+import { copy } from "utils/clipboard";
 
 /**
  * Layer effects
@@ -43,7 +44,8 @@ export function EffectsSection() {
       <PropertyLines>
         <EffectPreview effects={effects} />
       </PropertyLines>
-      {!!blurs.length && <ListBlurs blurs={blurs} />}
+      {/* TODO: support blur effects */}
+      {/* {!!blurs.length && <ListBlurs blurs={blurs} />} */}
       {!!shadows.length && <ListShadows shadows={shadows} />}
     </PropertyGroup>
   );
@@ -63,10 +65,19 @@ function ListShadows({ shadows }: { shadows: Array<ShadowEffect> }) {
   return (
     <PropertyLines>
       {shadows.map(({ offset, radius, spread, color }, i) => {
-        console.log("c", color);
+        const onclick = (e) => {
+          const cssstr = css.boxshadow({
+            color: color,
+            blurRadius: radius,
+            offset: new Offset(offset.x, offset.y),
+            spreadRadius: spread,
+          });
+          copy(cssstr, { notify: true });
+        };
+
         return (
           <div key={i}>
-            <PropertyLine label={"Shade #" + (i + 1)}>
+            <PropertyLine label={"Shade #" + (i + 1)} onClick={onclick}>
               <ReadonlyProperty prefix={"X"} value={offset.x} />
               <ReadonlyProperty prefix={"Y"} value={offset.x} />
               <ReadonlyProperty prefix={"S."} value={spread ?? 0} />
@@ -117,14 +128,22 @@ function EffectPreview({ effects }: { effects: Array<Effect> }) {
     })
     .filter(Boolean);
 
+  const style = {
+    boxShadow: css.boxshadow(...boxshadows),
+  };
+
+  const onclick = () => {
+    copy(`box-shadow: ${style.boxShadow};`, { notify: true });
+  };
+
   return (
-    <EffectsPreviewContainer padding={14}>
+    <EffectsPreviewContainer padding={14} onClick={onclick}>
       <span
         className="application"
         style={{
           width: 40,
           height: 40,
-          boxShadow: css.boxshadow(...boxshadows),
+          ...style,
           backgroundColor: "white",
         }}
       />
