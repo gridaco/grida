@@ -48,6 +48,10 @@ export function CodeSection() {
   const { code } = result ?? {};
   const viewheight = target?.isRoot ? 800 : 400;
 
+  if (!target) {
+    return <></>;
+  }
+
   return (
     <PropertyGroup>
       <PropertyGroupHeader>

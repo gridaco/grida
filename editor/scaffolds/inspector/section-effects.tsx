@@ -86,6 +86,7 @@ function ListShadows({ shadows }: { shadows: Array<ShadowEffect> }) {
             <div style={{ height: 8 }} />
             <PropertyLine label=" " key={i}>
               <ColorChip
+                outline
                 color={{
                   r: color.r,
                   g: color.g,

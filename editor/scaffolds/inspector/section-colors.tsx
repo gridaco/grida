@@ -42,6 +42,7 @@ export function ColorsSection() {
               case "SOLID":
                 return (
                   <ColorChip
+                    outline
                     key={i}
                     color={{ ...c.color, o: c.opacity }}
                     onClick={({ text }) => {
@@ -68,5 +69,5 @@ const ChipsContainer = styled.div`
   display: flex;
   flex-direction: row;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 12px;
 `;
