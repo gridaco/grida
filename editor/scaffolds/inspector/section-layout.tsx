@@ -1,3 +1,4 @@
+import React from "react";
 import styled from "@emotion/styled";
 import { ReadonlyProperty } from "components/inspector";
 import {
@@ -7,7 +8,7 @@ import {
   PropertyGroupHeader,
 } from "@editor-ui/property";
 import { useTargetContainer } from "hooks/use-target-node";
-import React from "react";
+import { IRadius } from "@reflect-ui/core";
 
 export function LayoutSection() {
   const { target, root } = useTargetContainer();
@@ -16,13 +17,26 @@ export function LayoutSection() {
     return <></>;
   }
 
-  const { id, isRoot, x, y, width, height } = target;
+  const { id, isRoot, x, y, width, height, type } = target;
 
   // round to 2 decimal places
   const dx = rd(x);
   const dy = rd(y);
   const dw = rd(width);
   const dh = rd(height);
+
+  let tr, tl, br, bl;
+  if ("cornerRadius" in target) {
+    const numeric = (v: IRadius) => (typeof v === "number" ? v : null);
+    const { bl: _bl, br: _br, tl: _tl, tr: _tr } = target.cornerRadius;
+    tr = numeric(_tr);
+    tl = numeric(_tl);
+    br = numeric(_br);
+    bl = numeric(_bl);
+  }
+
+  const hasradius = tr || tl || br || bl;
+  const radiusone = tr === tl && tl === br && br === bl;
 
   return (
     <PropertyGroup>
@@ -38,6 +52,22 @@ export function LayoutSection() {
           <ReadonlyProperty suffix={"W"} value={dw} />
           <ReadonlyProperty suffix={"H"} value={dh} />
         </PropertyLine>
+        {!!hasradius && (
+          <PropertyLine label="Radius">
+            {radiusone ? (
+              <>
+                <ReadonlyProperty value={tr} />
+              </>
+            ) : (
+              <>
+                <ReadonlyProperty suffix={"tr"} value={tr} />
+                <ReadonlyProperty suffix={"tl"} value={tl} />
+                <ReadonlyProperty suffix={"br"} value={br} />
+                <ReadonlyProperty suffix={"bl"} value={bl} />
+              </>
+            )}
+          </PropertyLine>
+        )}
       </PropertyLines>
     </PropertyGroup>
   );
