@@ -1,27 +1,85 @@
-import React from "react";
+import React, { useCallback } from "react";
 import styled from "@emotion/styled";
-import { ArrowBack } from "@mui/icons-material";
+import { HamburgerMenuIcon, FigmaLogoIcon } from "@radix-ui/react-icons";
 import { useRouter } from "next/router";
 import { colors } from "theme";
-import ClientOnly from "components/client-only";
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuItemIndicator,
+  DropdownMenuCheckboxItem,
+  DropdownMenuLabel,
+} from "@editor-ui/dropdown-menu";
+import { useEditorState } from "core/states";
 
 export function AppbarFragmentForSidebar() {
+  const [state] = useEditorState();
   const router = useRouter();
+
+  const handleOpenFile = useCallback(() => {
+    open(`https://www.figma.com/file/${state.design.key}`);
+  }, [state?.design?.key]);
 
   return (
     <RootWrapperAppbarFragmentForSidebar>
-      <ClientOnly>
-        <ArrowBack
-          style={{
-            fontSize: "20px",
-            fill: "white",
-          }}
-          onClick={() => {
-            router.push("/");
-          }}
-        />
-      </ClientOnly>
+      <MenuButton
+        onGoToHome={() => {
+          router.push("/");
+        }}
+        onNewFile={() => {
+          router.push("/import");
+        }}
+        onOpenInFigma={handleOpenFile}
+      />
     </RootWrapperAppbarFragmentForSidebar>
+  );
+}
+
+function MenuButton({
+  onGoToHome,
+  onNewFile,
+  onOpenInFigma,
+}: {
+  onGoToHome?: () => void;
+  onNewFile?: () => void;
+  onOpenInFigma?: () => void;
+}) {
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger
+        style={{
+          cursor: "pointer",
+          outline: "none",
+          border: "none",
+          background: "transparent",
+        }}
+      >
+        <HamburgerMenuIcon color="white" />
+      </DropdownMenuTrigger>
+      <DropdownMenuContent>
+        <DropdownMenuItem onClick={onGoToHome}>
+          <DropdownMenuLabel>Go to projects</DropdownMenuLabel>
+        </DropdownMenuItem>
+        {/* TODO: */}
+        <DropdownMenuItem>
+          <DropdownMenuLabel>Preferences</DropdownMenuLabel>
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={onNewFile}>
+          <DropdownMenuLabel>New project</DropdownMenuLabel>
+        </DropdownMenuItem>
+        <DropdownMenuItem>
+          <DropdownMenuLabel>Shortcuts</DropdownMenuLabel>
+        </DropdownMenuItem>
+        <DropdownMenuCheckboxItem checked onClick={onOpenInFigma}>
+          <DropdownMenuItemIndicator>
+            <FigmaLogoIcon color="black" />
+          </DropdownMenuItemIndicator>
+          <DropdownMenuLabel>Open in Figma</DropdownMenuLabel>
+        </DropdownMenuCheckboxItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 
