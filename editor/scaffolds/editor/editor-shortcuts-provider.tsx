@@ -31,8 +31,9 @@ export function EditorShortcutsProvider({
     // dispatch({ type: "editor-save" });
   });
 
-  useHotkeys(_preferences.universal, () => {
-    // dispatch({ type: "editor-open-preference" });
+  useHotkeys(_preferences.universal, (e) => {
+    // this is required to prevent browser's from opening preference page.
+    e.preventDefault();
   });
 
   useHotkeys(_toggle_comments.universal, () => {
