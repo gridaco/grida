@@ -8,6 +8,7 @@ const withTM = require("next-transpile-modules")([
   "@code-editor/devtools",
   "@code-editor/canvas",
   "@code-editor/property",
+  "@code-editor/preferences",
 
   // -----------------------------
   // region @designto-code
