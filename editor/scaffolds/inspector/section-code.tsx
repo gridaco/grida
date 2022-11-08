@@ -115,7 +115,7 @@ function CliIntegrationSnippet({ node }: { node: ReflectSceneNode }) {
           title={actualcmd}
           style={{ color: "white", wordBreak: "keep-all" }}
         >
-          $ {snippet}
+          <span className="bash">➜</span> {snippet}
         </CodeLine>
       </ClipboardBox>
     </PropertyLines>
@@ -125,4 +125,8 @@ function CliIntegrationSnippet({ node }: { node: ReflectSceneNode }) {
 const CodeLine = styled.span`
   display: inline-block;
   font-family: "Courier New", Courier, monospace;
+
+  .bash {
+    color: green;
+  }
 `;
