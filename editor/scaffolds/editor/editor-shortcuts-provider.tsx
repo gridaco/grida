@@ -14,9 +14,9 @@ export function EditorShortcutsProvider({
 }: React.PropsWithChildren<{}>) {
   const dispatch = useDispatch();
 
-  const setMode = useCallback(
-    (mode: EditorState["mode"]) => {
-      dispatch({ type: "mode", mode: mode });
+  const setDesignerMode = useCallback(
+    (mode: EditorState["designerMode"]) => {
+      dispatch({ type: "designer-mode", mode: mode });
     },
     [dispatch]
   );
@@ -37,15 +37,15 @@ export function EditorShortcutsProvider({
   });
 
   useHotkeys(_toggle_comments.universal, () => {
-    setMode("comment");
+    setDesignerMode("comment");
   });
 
   useHotkeys(_toggle_view.universal, () => {
-    setMode("view");
+    setDesignerMode("inspect");
   });
 
   useHotkeys(_escape.universal, () => {
-    setMode("view");
+    setDesignerMode("inspect");
   });
 
   return <>{children}</>;

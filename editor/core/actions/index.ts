@@ -27,6 +27,8 @@ export type Action =
   | SetFigmaAuthAction
   | SetFigmaUserAction
   | PageAction
+  | EditorModeAction
+  | DesignerModeSwitchActon
   | SelectNodeAction
   | LocateNodeAction
   | HighlightNodeAction
@@ -35,8 +37,7 @@ export type Action =
   | PreviewAction
   | CodeEditorAction
   | DevtoolsAction
-  | BackgroundTaskAction
-  | EditorModeAction;
+  | BackgroundTaskAction;
 
 export type ActionType = Action["type"];
 
@@ -60,7 +61,12 @@ export type SetFigmaUserAction = {
 export type EditorModeAction = EditorModeSwitchAction;
 export type EditorModeSwitchAction = {
   type: "mode";
-  mode: EditorState["mode"];
+  mode: EditorState["mode"]["value"] | "goback";
+};
+
+export type DesignerModeSwitchActon = {
+  type: "designer-mode";
+  mode: EditorState["designerMode"];
 };
 
 export interface SelectNodeAction {
@@ -96,15 +102,10 @@ export interface HighlightNodeAction {
   id: string;
 }
 
-type CanvasModeAction = CanvasModeSwitchAction | CanvasModeGobackAction;
+type CanvasModeAction = CanvasModeSwitchAction;
 export interface CanvasModeSwitchAction {
-  type: "canvas-mode-switch";
-  mode: EditorState["canvasMode"];
-}
-
-export interface CanvasModeGobackAction {
-  type: "canvas-mode-goback";
-  fallback?: EditorState["canvasMode"];
+  type: "canvas-mode";
+  mode: EditorState["canvasMode"]["value"] | "goback";
 }
 
 export type PreviewAction = PreviewSetAction | PreviewBuildingStateUpdateAction;

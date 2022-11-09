@@ -7,7 +7,8 @@ export function createInitialEditorState(editor: EditorSnapshot): EditorState {
     selectedNodesInitial: editor.selectedNodes,
     selectedLayersOnPreview: editor.selectedLayersOnPreview,
     design: editor.design,
-    mode: "view",
+    mode: { value: "design" },
+    designerMode: "inspect",
     canvasMode: editor.canvasMode,
     editorTaskQueue: editor.editorTaskQueue,
   };
@@ -20,8 +21,9 @@ export function createPendingEditorState(): EditorState {
     selectedNodesInitial: null,
     selectedLayersOnPreview: [],
     design: null,
-    mode: "view",
-    canvasMode: "free",
+    mode: { value: "design" },
+    canvasMode: { value: "free" },
+    designerMode: "inspect",
     editorTaskQueue: {
       isBusy: true,
       tasks: [

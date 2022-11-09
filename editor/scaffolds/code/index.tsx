@@ -1,9 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import styled from "@emotion/styled";
-import { useRouter } from "next/router";
 import { CodeEditor } from "components/code-editor";
-import { get_framework_config } from "query/to-code-options-from-query";
-import { CodeOptionsControl } from "components/codeui-code-options-control";
 import { designToCode, Result } from "@designto/code";
 import { config } from "@grida/builder-config";
 import {
@@ -15,33 +12,19 @@ import { useDispatch } from "core/dispatch";
 import type { ReflectSceneNode } from "@design-sdk/figma-node";
 import { RemoteImageRepositories } from "@design-sdk/figma-remote/asset-repository";
 import { useTargetContainer } from "hooks/use-target-node";
-import assert from "assert";
 import { debounce } from "utils/debounce";
 import { supportsScripting } from "config";
-import ClientOnly from "components/client-only";
 import { useFigmaImageService } from "scaffolds/editor";
 
-const preset_store = {
-  get: () => {
-    if (typeof window !== "undefined") {
-      return localStorage.getItem("code-options-contro-preset");
-    }
-  },
-  set: (name: string) => {
-    typeof window !== "undefined" &&
-      localStorage.setItem("code-options-contro-preset", name);
-  },
-};
+export { CodeRunnerCanvas } from "./code-runner-canvas";
 
 export function Code() {
-  const router = useRouter();
   const [result, setResult] = useState<Result>();
   const dispatch = useDispatch();
   const wstate = useWorkspaceState();
   const [state] = useEditorState();
-  const [framework_config, set_framework_config] = useState(
-    wstate.preferences.framework_config
-  );
+  const framework_config = wstate.preferences.framework_config;
+
   const resolver = useFigmaImageService();
 
   const { target: targetted, root } = useTargetContainer();
@@ -142,79 +125,14 @@ export function Code() {
   const { code, scaffold, name: componentName, framework } = result ?? {};
   return (
     <CodeEditorContainer>
-      <ClientOnly>
-        <CodeOptionsControl
-          initialPreset={
-            (router.query.framework as string) ?? preset_store.get()
-          }
-          fallbackPreset="react_default"
-          onUseroptionChange={(o) => {
-            preset_store.set(o.framework);
-            let c;
-            switch (o.framework) {
-              case "react": {
-                switch (o.styling) {
-                  case "styled-components":
-                    c = get_framework_config("react-with-styled-components");
-                    break;
-                  case "inline-css":
-                    c = get_framework_config("react-with-inline-css");
-                    break;
-                  case "css-module":
-                    c = get_framework_config("react-with-css-module");
-                    break;
-                  case "css":
-                    // TODO:
-                    break;
-                }
-                break;
-              }
-              case "react-native": {
-                switch (o.styling) {
-                  case "style-sheet":
-                    c = get_framework_config("react-native-with-style-sheet");
-                    break;
-                  case "styled-components":
-                    c = get_framework_config(
-                      "react-native-with-styled-components"
-                    );
-                    break;
-                  case "inline-style":
-                    c = get_framework_config("react-native-with-inline-style");
-                    break;
-                }
-                break;
-              }
-              case "solid-js": {
-                switch (o.styling) {
-                  case "styled-components":
-                    c = get_framework_config("solid-with-styled-components");
-                    break;
-                  case "inline-css": {
-                    c = get_framework_config("solid-with-inline-css");
-                    break;
-                  }
-                }
-                break;
-              }
-              case "flutter":
-                c = get_framework_config(o.framework);
-                break;
-              case "vanilla":
-                c = get_framework_config(o.framework);
-                break;
-            }
-
-            assert(c);
-            set_framework_config(c);
-          }}
-        />
-      </ClientOnly>
       <CodeEditor
         key={code?.raw}
         height="100vh"
         options={{
           automaticLayout: true,
+          minimap: {
+            enabled: false,
+          },
         }}
         onChange={onChangeHandler}
         files={

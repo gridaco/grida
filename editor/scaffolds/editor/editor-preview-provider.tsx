@@ -199,9 +199,7 @@ export function EditorPreviewDataProvider({
     [dispatch]
   );
 
-  const _is_mode_requires_preview_build =
-    state.canvasMode === "fullscreen-preview" ||
-    state.canvasMode === "isolated-view";
+  const _is_mode_requires_preview_build = state.mode.value === "code";
 
   useEffect(() => {
     if (!_is_mode_requires_preview_build) {

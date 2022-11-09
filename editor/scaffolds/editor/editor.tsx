@@ -1,18 +1,22 @@
-import React from "react";
+import React, { useCallback } from "react";
 import { DefaultEditorWorkspaceLayout } from "layouts/default-editor-workspace-layout";
 import {
   WorkspaceContentPanel,
   WorkspaceContentPanelGridLayout,
 } from "layouts/panel";
 import { EditorAppbar, EditorSidebar } from "components/editor";
-import { useEditorState } from "core/states";
+import { EditorState, useEditorState } from "core/states";
 import { Canvas } from "scaffolds/canvas";
-import { Code } from "scaffolds/code";
+import { Code, CodeRunnerCanvas } from "scaffolds/code";
 import { Inspector } from "scaffolds/inspector";
 import { EditorHome } from "scaffolds/editor-home";
 import { EditorSkeleton } from "./skeleton";
 import { colors } from "theme";
 import { useEditorSetupContext } from "./setup";
+import { Dialog } from "@mui/material";
+import { FullScreenPreview } from "scaffolds/preview-full-screen";
+import { useDispatch } from "core/dispatch";
+import styled from "@emotion/styled";
 
 export function Editor() {
   const [state] = useEditorState();
@@ -49,6 +53,7 @@ export function Editor() {
           <WorkspaceContentPanel flex={6}>
             <PageView key={_refreshkey} />
           </WorkspaceContentPanel>
+          {/* <SideRightPanel /> */}
           <WorkspaceContentPanel
             overflow="hidden"
             flex={1}
@@ -57,9 +62,10 @@ export function Editor() {
             }}
             minWidth={300}
             zIndex={1}
+            hidden={state.mode.value !== "design"}
             backgroundColor={colors.color_editor_bg_on_dark}
           >
-            <RightPanelContent />
+            <SideRightPanel />
           </WorkspaceContentPanel>
           {/* {wstate.preferences.debug_mode && (
             <WorkspaceBottomPanelDockLayout resizable>
@@ -80,20 +86,7 @@ export function Editor() {
   );
 }
 
-function RightPanelContent() {
-  const [state] = useEditorState();
-
-  switch (state.mode) {
-    case "code":
-      return <Code />;
-    case "inspect":
-    case "view":
-    default:
-      return <Inspector />;
-  }
-}
-
-function PageView() {
+function ModeDesign() {
   const [state] = useEditorState();
   const { selectedPage } = state;
 
@@ -103,4 +96,114 @@ function PageView() {
     default:
       return <Canvas />;
   }
+}
+
+function ModeCode() {
+  const dispatch = useDispatch();
+
+  const startFullscreenRunnerMode = useCallback(
+    () =>
+      dispatch({
+        type: "mode",
+        mode: "run",
+      }),
+    [dispatch]
+  );
+
+  const endCodeSession = useCallback(
+    () =>
+      dispatch({
+        type: "mode",
+        mode: "design",
+      }),
+    [dispatch]
+  );
+
+  return (
+    <div
+      style={{
+        display: "flex",
+        flexDirection: "row",
+      }}
+    >
+      <WorkspaceContentPanel
+        overflow="hidden"
+        flex={1}
+        resize={{
+          right: true,
+        }}
+        minWidth={200}
+        zIndex={1}
+      >
+        <Code />
+      </WorkspaceContentPanel>
+      <WorkspaceContentPanel
+        overflow="hidden"
+        flex={1}
+        minWidth={300}
+        zIndex={1}
+      >
+        <CodeRunnerCanvas
+          onClose={endCodeSession}
+          onEnterFullscreen={startFullscreenRunnerMode}
+        />
+      </WorkspaceContentPanel>
+    </div>
+  );
+}
+
+function SideRightPanel() {
+  const [state] = useEditorState();
+
+  switch (state.mode.value) {
+    case "code":
+      return <></>;
+    case "design":
+      return <Inspector />;
+  }
+}
+
+function PageView() {
+  const [state] = useEditorState();
+  const { mode } = state;
+
+  const _Body = useCallback(
+    ({ mode }: { mode: EditorState["mode"]["value"] }) => {
+      switch (mode) {
+        case "code": {
+          return <ModeCode />;
+        }
+        case "design": {
+          return <ModeDesign />;
+        }
+      }
+    },
+    [mode.value]
+  );
+
+  return (
+    <>
+      <ModeRunnerOverlay />
+      <_Body mode={mode.value !== "run" ? mode.value : mode.last ?? "design"} />
+    </>
+  );
+}
+
+function ModeRunnerOverlay() {
+  const dispatch = useDispatch();
+  const [state] = useEditorState();
+  const exitSession = useCallback(
+    () =>
+      dispatch({
+        type: "mode",
+        mode: "goback",
+      }),
+    [dispatch]
+  );
+
+  return (
+    <Dialog fullScreen onClose={exitSession} open={state.mode.value == "run"}>
+      <FullScreenPreview onClose={exitSession} />
+    </Dialog>
+  );
 }

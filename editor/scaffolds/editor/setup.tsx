@@ -209,24 +209,13 @@ export function SetupEditor({
   }
  */
 
+/**
+ * legacy
+ * @deprecated - remove this, replace the url users with the new pattern
+ * @returns
+ */
 const q_map_canvas_mode_from_query = (
   mode: string
 ): EditorSnapshot["canvasMode"] => {
-  switch (mode) {
-    case "free":
-    case "isolated-view":
-    case "fullscreen-preview":
-      return mode;
-
-    // -------------------------
-    // legacy query param key
-    case "full":
-      return "free";
-    case "isolate":
-      return "isolated-view";
-    // -------------------------
-
-    default:
-      return "free";
-  }
+  return { value: "free" };
 };

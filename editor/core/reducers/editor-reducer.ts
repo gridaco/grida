@@ -5,7 +5,6 @@ import type {
   SelectPageAction,
   CodeEditorEditComponentCodeAction,
   CanvasModeSwitchAction,
-  CanvasModeGobackAction,
   TranslateNodeAction,
   PreviewBuildingStateUpdateAction,
   PreviewSetAction,
@@ -16,6 +15,7 @@ import type {
   BackgroundTaskUpdateProgressAction,
   EditorModeSwitchAction,
   LocateNodeAction,
+  DesignerModeSwitchActon,
 } from "core/actions";
 import { EditorState } from "core/states";
 import { NextRouter, useRouter } from "next/router";
@@ -33,18 +33,34 @@ export function editorReducer(state: EditorState, action: Action): EditorState {
   switch (action.type) {
     case "mode": {
       const { mode } = <EditorModeSwitchAction>action;
-      return produce(state, (draft) => {
-        switch (mode) {
-          case "code":
-            draft.canvasMode = "isolated-view";
-            break;
-          case "inspect":
-          case "view":
-          default:
-            draft.canvasMode = "free";
-        }
+      if (mode === "goback") {
+        return produce(state, (draft) => {
+          draft.mode = {
+            value: state.mode.last,
+            last: state.mode.value,
+            updated: new Date(),
+          };
+        });
+      } else {
+        return produce(state, (draft) => {
+          draft.mode = {
+            value: mode,
+            last: state.mode.value,
+            updated: new Date(),
+          };
+        });
+      }
+    }
 
-        draft.mode = mode;
+    case "designer-mode": {
+      const { mode } = <DesignerModeSwitchActon>action;
+      return produce(state, (draft) => {
+        draft.mode = {
+          value: "design",
+          last: state.mode.value,
+          updated: new Date(),
+        };
+        draft.designerMode = mode;
       });
     }
 
@@ -135,39 +151,35 @@ export function editorReducer(state: EditorState, action: Action): EditorState {
       //
     }
 
-    case "canvas-mode-switch": {
+    case "canvas-mode": {
       const { mode } = <CanvasModeSwitchAction>action;
 
-      update_route(router, { mode: mode }, false); // shallow false
+      update_route(router, { mode }, false); // shallow false
 
-      return produce(state, (draft) => {
-        if (mode === "isolated-view") {
-          // on isolation mode, switch the editor mode to code.
-          draft.mode = "code";
-        } else {
-          // needs to be fixed once more modes are added.
-          draft.mode = "view";
-        }
+      if (mode === "goback") {
+        const dest = state.canvasMode.last ?? state.canvasMode.value;
 
-        draft.canvasMode_previous = draft.canvasMode;
-        draft.canvasMode = mode;
-      });
-    }
-    case "canvas-mode-goback": {
-      const { fallback } = <CanvasModeGobackAction>action;
-
-      const dest = state.canvasMode_previous ?? fallback;
-
-      update_route(router, { mode: dest }, false); // shallow false
-
-      return produce(state, (draft) => {
         assert(
           dest,
           "canvas-mode-goback: cannot resolve destination. (no fallback provided)"
         );
-        draft.canvasMode_previous = draft.canvasMode; // swap
-        draft.canvasMode = dest; // previous or fallback
-      });
+
+        return produce(state, (draft) => {
+          draft.canvasMode = {
+            value: dest,
+            last: state.canvasMode.value,
+            updated: new Date(),
+          };
+        });
+      } else {
+        return produce(state, (draft) => {
+          draft.canvasMode = {
+            value: mode,
+            last: state.canvasMode.value,
+            updated: new Date(),
+          };
+        });
+      }
     }
 
     case "preview-update-building-state": {

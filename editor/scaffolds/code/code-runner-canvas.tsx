@@ -5,12 +5,10 @@ import { useEditorState } from "core/states";
 import { VanillaDedicatedPreviewRenderer } from "components/app-runner";
 import { Devtools } from "scaffolds/devtools";
 
-export function IsolateModeCanvas({
-  hidden = false,
+export function CodeRunnerCanvas({
   onClose,
   onEnterFullscreen,
 }: {
-  hidden?: boolean;
   onClose: () => void;
   onEnterFullscreen: () => void;
 }) {
@@ -30,7 +28,7 @@ export function IsolateModeCanvas({
   };
 
   return (
-    <div style={{ display: hidden && "hidden" }}>
+    <div style={{ flex: 1 }}>
       <IsolatedCanvas
         key={widgetKey?.id}
         building={isBuilding}

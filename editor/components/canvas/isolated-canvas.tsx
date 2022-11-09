@@ -186,8 +186,8 @@ const ActionButton = styled.button`
 `;
 
 const InteractiveCanvasWrapper = styled.div`
-  position: absolute;
-  width: 100%;
+  /* position: absolute; */
+  /* width: 100%; */
   height: 100%;
   display: flex;
   flex-direction: column;

@@ -22,12 +22,12 @@ export function Inspector() {
   const [state] = useEditorState();
   const dispatch = useDispatch();
 
-  const tab = __mode(state.mode);
+  const tab = __mode(state.designerMode);
 
   const switchMode = useCallback(
     (mode: Tab) => {
       dispatch({
-        type: "mode",
+        type: "designer-mode",
         mode: mode,
       });
     },
@@ -44,7 +44,7 @@ export function Inspector() {
   );
 }
 
-const __mode = (mode: EditorState["mode"]): Tab => {
+const __mode = (mode: EditorState["designerMode"]): Tab => {
   switch (mode) {
     case "comment":
       return "comment";

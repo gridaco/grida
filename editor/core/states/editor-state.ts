@@ -4,20 +4,27 @@ import type { RGBA, WidgetKey } from "@reflect-ui/core";
 import type { ComponentNode } from "@design-sdk/figma-types";
 import type { DesignInput } from "@grida/builder-config/input";
 
+type LastKnown<T> = {
+  value: T;
+  last?: T | undefined;
+  updated?: Date | undefined;
+};
+
 /**
  * View mode of the canvas.
  * - free - default
- * - isolated - focus to one scene
+ * - focus - focus to one scene
  */
-type TCanvasMode = "free" | "isolated-view" | "fullscreen-preview";
+type TCanvasMode = "free" | "focus";
 
 /**
  * Task mode of the editor.
- * - view - default
+ * - design - default (design view)
  * - code - with coding editor
- * - inspect - with inspector
+ * - run - run app, full screen
  */
-type TUserTaskMode = "view" | "comment" | "code" | "inspect";
+type TEditorMode = "design" | "code" | "run";
+type TDesignerMode = "inspect" | "comment"; // | "prototype";
 
 export interface EditorState {
   selectedPage: string | "home";
@@ -30,9 +37,9 @@ export interface EditorState {
    */
   selectedNodesInitial?: string[] | null;
   design: FigmaReflectRepository;
-  mode: TUserTaskMode;
-  canvasMode: TCanvasMode;
-  canvasMode_previous?: TCanvasMode;
+  mode: LastKnown<TEditorMode>;
+  designerMode: TDesignerMode;
+  canvasMode: LastKnown<TCanvasMode>;
   currentPreview?: ScenePreviewData;
   code?: CodeRepository;
   editingModule?: EditingModule;
@@ -46,7 +53,7 @@ export interface EditorSnapshot {
   selectedLayersOnPreview: string[];
   selectedNodesInitial?: string[] | null;
   design: FigmaReflectRepository;
-  canvasMode: TCanvasMode;
+  canvasMode: EditorState["canvasMode"];
   editorTaskQueue: EditorTaskQueue;
 }
 
