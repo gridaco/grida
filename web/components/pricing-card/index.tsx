@@ -1,138 +1,66 @@
+import React from "react";
 import styled from "@emotion/styled";
-import BlankArea from "components/blank-area";
 import Icon from "components/icon";
 import LandingpageText from "components/landingpage/text";
-import Link from "next/link";
-import React, { useCallback } from "react";
 import { Button, Flex, Text } from "theme-ui";
 import { usePopupContext } from "utils/context/PopupContext";
-import { LandingpageUrls } from "utils/landingpage/constants";
 import { media } from "utils/styled/media";
-import PricingCTAButton from "components/pricing-cta-button";
 
-function PricingCard(props: {
-  type: "paid" | "none-paid";
-  planList: string[];
+function PricingCard({
+  price,
+  features,
+  unitDescription,
+  name,
+  onHelp,
+  onStart,
+  highlight = false,
+  action,
+}: {
+  features: string[];
+  name: string;
+  unitDescription?: string;
+  price:
+    | {
+        monthly: number;
+        yearly: number;
+      }
+    | number;
+  onHelp?: () => void;
+  onStart?: () => void;
+  highlight?: boolean;
+  action: React.ReactNode;
 }) {
   const { addPopup, removePopup } = usePopupContext();
 
-  const handleClickQuestionMark = useCallback(() => {
-    addPopup({
-      title: "",
-      element: (
-        <Flex
-          style={{
-            width: "calc(100vw - 40px)",
-            alignItems: "center",
-            flexDirection: "column",
-          }}
-          p="48px"
-        >
-          <Icon
-            className="cursor"
-            name="headerClose"
-            ml="auto"
-            onClick={() => removePopup()}
-          />
-          <Flex
-            style={{
-              width: "80%",
-              flexDirection: "column",
-              alignItems: "center",
-            }}
-          >
-            <LandingpageText variant="h4" textAlign="center">
-              What are the limitations of free plan?
-            </LandingpageText>
-            <BlankArea height={[48, 48]} />
-            <LandingpageText variant="body1" textAlign="center">
-              To build an enterprise level application, you’ll need a paid plan.
-              Paid plan includes extra default storage and unlimited projects
-              count. Also cloud objects such as translation token can be stored
-              up to 1 million. The extra usage will be charged as Standard Cloud
-              Fee.
-            </LandingpageText>
-          </Flex>
-        </Flex>
-      ),
-    });
-  }, []);
-
-  const handleClickPaidPlan = useCallback(() => {
-    addPopup({
-      title: "",
-      element: (
-        <Flex
-          style={{
-            width: "calc(100vw - 40px)",
-            alignItems: "center",
-            flexDirection: "column",
-          }}
-          p="48px"
-        >
-          <Icon
-            className="cursor"
-            name="headerClose"
-            ml="auto"
-            onClick={() => removePopup()}
-          />
-          <Flex
-            style={{
-              width: "80%",
-              flexDirection: "column",
-              alignItems: "center",
-            }}
-          >
-            <LandingpageText variant="h4" textAlign="center">
-              Woopsy.
-            </LandingpageText>
-            <BlankArea height={[48, 48]} />
-            <LandingpageText variant="body1" textAlign="center">
-              Grida paid plans are disabled temporarily. Meanwhile, you can use
-              our free plan which basically does the same.
-              <Link href={LandingpageUrls.signup_with_return}>
-                <span style={{ margin: "0px 5px", color: "#172AD7" }}>
-                  Sign up
-                </span>
-              </Link>
-              here.
-            </LandingpageText>
-          </Flex>
-        </Flex>
-      ),
-    });
-  }, []);
+  const targetprice = typeof price === "number" ? price : price.yearly;
+  const monthlyprice = typeof price === "number" ? price : price.monthly;
 
   return (
-    // @ts-ignore
-    <Wrapper type={props.type}>
+    <Wrapper data-highlight={highlight}>
       <Heading>
-        <LandingpageText variant="h4">
-          {props.type != "none-paid" ? "For you team" : "For you"}
-        </LandingpageText>
-        {props.type === "none-paid" && (
-          <Icon
-            className="cursor"
-            name="questionMark"
-            onClick={handleClickQuestionMark}
-          />
+        <LandingpageText variant="h4">{name}</LandingpageText>
+        {onHelp && (
+          <Icon className="cursor" name="questionMark" onClick={onHelp} />
         )}
       </Heading>
       <PlanPricing>
-        <LandingpageText variant="h4">
-          {props.type != "none-paid" ? "$20" : "$0"}
-        </LandingpageText>
-        {props.type != "none-paid" && <Seat variant="body1">per seat/mo</Seat>}
+        <LandingpageText variant="h4">${targetprice}</LandingpageText>
+        {unitDescription && <Seat variant="body1">{unitDescription}</Seat>}
       </PlanPricing>
+      {!!monthlyprice && (
+        <AlternateBillingOptionDescription>
+          Billed annually or ${monthlyprice} month-to-month
+        </AlternateBillingOptionDescription>
+      )}
       <Flex
         style={{
           alignItems: "center",
           height: "100%",
         }}
-        my="30px"
+        my={24}
       >
         <PlanDescription>
-          {props.planList.map(i => (
+          {features.map(i => (
             <div className="planlist" key={i}>
               <div className="icon">
                 <Icon name="check" />
@@ -142,57 +70,40 @@ function PricingCard(props: {
           ))}
         </PlanDescription>
       </Flex>
-      {props.type === "none-paid" ? (
-        <PricingCTAButton
-          mt="auto"
-          style={{ borderRadius: 4, marginTop: "auto" }}
-        >
-          Start now
-        </PricingCTAButton>
-      ) : (
-        // @ts-ignore
-        <CardCTAButton
-          className="cursor"
-          type={props.type}
-          onClick={() => props.type != "none-paid" && handleClickPaidPlan()}
-        >
-          Start 14 Day Trial
-        </CardCTAButton>
-      )}
+      <CtaButton
+        className="cursor"
+        style={{
+          background: highlight ? undefined : "rgba(0, 0, 0, 0.9)",
+        }}
+        onClick={onStart}
+      >
+        {action}
+      </CtaButton>
     </Wrapper>
   );
 }
 
 export default PricingCard;
 
-type _Type = { type: "paid" | "none-paid" };
-
-// @ts-ignore
-const Wrapper = styled<_Type>(Flex)`
+const Wrapper = styled(Flex)`
   border-radius: 8px;
   margin: 27px;
   padding: 40px;
   flex-direction: column;
 
-  ${p => {
-    // @ts-ignore
-    if (p.type === "paid") {
-      return {
-        width: "100%",
-        height: "100%",
-        boxShadow: "0px 4px 128px 32px rgba(0, 0, 0, 0.08)",
-        backgroundColor: "#fff",
-      };
-      // @ts-ignore
-    } else if (p.type === "none-paid") {
-      return {
-        width: "90%",
-        height: "90%",
-        backgroundColor: "#FCFCFC",
-        border: "1px solid #F7F7F7",
-      };
-    }
-  }}
+  &[data-highlight="true"] {
+    width: 100%;
+    height: 100%;
+    box-shadow: 0px 4px 128px 32px rgba(0, 0, 0, 0.08);
+    background: white;
+  }
+
+  &[data-highlight="false"] {
+    width: 90%;
+    height: 90%;
+    background: #fcfcfc;
+    border: 1px solid #f7f7f7;
+  }
 
   ${props => media("0px", props.theme.breakpoints[0])} {
     width: 100%;
@@ -208,18 +119,16 @@ const Seat = styled(LandingpageText)`
   margin-left: 10px;
 `;
 
-// @ts-ignore
-const CardCTAButton = styled<_Type>(Button)`
+const CtaButton = styled(Button)`
   margin-top: auto;
   border-radius: 4px;
-  ${p => {
-    // @ts-ignore
-    if (p.type === "paid") {
-      return {
-        backgroundColor: "#D2D2D2",
-      };
-    }
-  }}
+`;
+
+const AlternateBillingOptionDescription = styled.span`
+  margin-top: 8px;
+  font-size: 14px;
+  line-height: 20px;
+  color: rgba(0, 0, 0, 0.5);
 `;
 
 const PlanDescription = styled(Flex)`

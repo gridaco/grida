@@ -1,11 +1,15 @@
-import React from "react";
+import React, { useCallback } from "react";
 import styled from "@emotion/styled";
 import { Flex, Heading, Text } from "theme-ui";
+import Icon from "components/icon";
 import SectionLayout from "layouts/section";
 import BlankArea from "components/blank-area";
 import { media } from "utils/styled/media";
 import LandingpageText from "components/landingpage/text";
 import PricingCard from "components/pricing-card";
+import { usePopupContext } from "utils/context/PopupContext";
+import Link from "next/link";
+import { LandingpageUrls } from "utils/landingpage/constants";
 
 const PersonalPlanList = [
   "Private git integration",
@@ -29,6 +33,98 @@ const TeamPlanList = [
 ];
 
 export default function PlanList() {
+  const { addPopup, removePopup } = usePopupContext();
+  const onFreeHelpClick = useCallback(() => {
+    addPopup({
+      title: "",
+      element: (
+        <Flex
+          style={{
+            width: "calc(100vw - 40px)",
+            alignItems: "center",
+            flexDirection: "column",
+          }}
+          p="48px"
+        >
+          <Icon
+            className="cursor"
+            name="headerClose"
+            ml="auto"
+            onClick={() => removePopup()}
+          />
+          <Flex
+            style={{
+              width: "80%",
+              flexDirection: "column",
+              alignItems: "center",
+            }}
+          >
+            <LandingpageText variant="h4" textAlign="center">
+              What are the limitations of free plan?
+            </LandingpageText>
+            <BlankArea height={[48, 48]} />
+            <LandingpageText variant="body1" textAlign="center">
+              To build an enterprise level application, you’ll need a paid plan.
+              Paid plan includes extra default storage and unlimited projects
+              count. Also cloud objects such as translation token can be stored
+              up to 1 million. The extra usage will be charged as Standard Cloud
+              Fee.
+            </LandingpageText>
+          </Flex>
+        </Flex>
+      ),
+    });
+  }, []);
+
+  const handleClickPaidPlan = useCallback(() => {
+    addPopup({
+      title: "",
+      element: (
+        <Flex
+          style={{
+            width: "calc(100vw - 40px)",
+            alignItems: "center",
+            flexDirection: "column",
+          }}
+          p="48px"
+        >
+          <Icon
+            className="cursor"
+            name="headerClose"
+            ml="auto"
+            onClick={() => removePopup()}
+          />
+          <Flex
+            style={{
+              width: "80%",
+              flexDirection: "column",
+              alignItems: "center",
+            }}
+          >
+            <LandingpageText variant="h4" textAlign="center">
+              Woopsy.
+            </LandingpageText>
+            <BlankArea height={[48, 48]} />
+            <LandingpageText variant="body1" textAlign="center">
+              Grida paid plans are disabled temporarily. Meanwhile, you can use
+              our free plan which basically does the same.
+              <Link href={LandingpageUrls.signup_with_return}>
+                <span style={{ margin: "0px 5px", color: "#172AD7" }}>
+                  Sign up
+                </span>
+              </Link>
+              here.
+            </LandingpageText>
+          </Flex>
+        </Flex>
+      ),
+    });
+  }, []);
+
+  const onFreeStartClick = () => {
+    window.location.href = LandingpageUrls.signup_with_return;
+  };
+
   return (
     <SectionLayout alignContent="center">
       <Title mb="43px">Pay as you grow</Title>
@@ -45,8 +141,26 @@ export default function PlanList() {
           flexDirection: ["column", "row", "row", "row"],
         }}
       >
-        <PricingCard type="none-paid" planList={PersonalPlanList} />
-        <PricingCard type="paid" planList={TeamPlanList} />
+        <PricingCard
+          name="For you"
+          onHelp={onFreeHelpClick}
+          price={0}
+          features={PersonalPlanList}
+          action="Start now"
+          onStart={onFreeStartClick}
+        />
+        <PricingCard
+          name="For you team"
+          highlight
+          price={{
+            monthly: 25,
+            yearly: 20,
+          }}
+          unitDescription={"per seat/mo"}
+          features={TeamPlanList}
+          action="Start 14 Day Trial"
+          onStart={handleClickPaidPlan}
+        />
       </Wrapper>
       <BlankArea height={[182, 264]} />
     </SectionLayout>

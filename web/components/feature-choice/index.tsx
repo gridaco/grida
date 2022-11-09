@@ -100,13 +100,13 @@ const FeatureChoice: React.FC<FeatureChoiceProps> = props => {
         </Text>
         {featureData.map((item, ix) => (
           <Item
+            key={ix}
             style={{
               flexDirection: "column",
             }}
             onClick={() => handleFeatureClick(ix)}
             className="cursor"
             mb="36px"
-            key={item.id}
           >
             <Text
               style={{
@@ -125,7 +125,7 @@ const FeatureChoice: React.FC<FeatureChoiceProps> = props => {
             >
               {item.feature.map((i, idx) => (
                 <Feature
-                  key={i.id}
+                  key={idx}
                   style={{
                     width: "100%",
                   }}
