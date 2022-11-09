@@ -28,7 +28,7 @@ export function CodeRunnerCanvas({
   };
 
   return (
-    <div style={{ flex: 1 }}>
+    <div>
       <IsolatedCanvas
         key={widgetKey?.id}
         building={isBuilding}

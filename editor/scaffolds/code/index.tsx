@@ -170,4 +170,5 @@ const CodeEditorContainer = styled.div`
   display: flex;
   flex-direction: column;
   align-items: stretch;
+  overflow: hidden;
 `;

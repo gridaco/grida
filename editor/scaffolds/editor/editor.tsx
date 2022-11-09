@@ -4,7 +4,7 @@ import {
   WorkspaceContentPanel,
   WorkspaceContentPanelGridLayout,
 } from "layouts/panel";
-import { EditorAppbar, EditorSidebar } from "components/editor";
+import { EditorSidebar } from "components/editor";
 import { EditorState, useEditorState } from "core/states";
 import { Canvas } from "scaffolds/canvas";
 import { Code, CodeRunnerCanvas } from "scaffolds/code";
@@ -124,25 +124,25 @@ function ModeCode() {
       style={{
         display: "flex",
         flexDirection: "row",
+        height: "100vh",
+        overflow: "hidden",
       }}
     >
       <WorkspaceContentPanel
-        overflow="hidden"
-        flex={1}
+        disableBorder
         resize={{
           right: true,
         }}
-        minWidth={200}
-        zIndex={1}
       >
-        <Code />
+        <div
+          style={{
+            paddingTop: 48,
+          }}
+        >
+          <Code />
+        </div>
       </WorkspaceContentPanel>
-      <WorkspaceContentPanel
-        overflow="hidden"
-        flex={1}
-        minWidth={300}
-        zIndex={1}
-      >
+      <WorkspaceContentPanel disableBorder>
         <CodeRunnerCanvas
           onClose={endCodeSession}
           onEnterFullscreen={startFullscreenRunnerMode}
