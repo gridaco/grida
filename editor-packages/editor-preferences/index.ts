@@ -1,1 +1,5 @@
-export { EditorPreference } from "./editor-preference";
+export {
+  EditorPreference,
+  useDispatch,
+  usePreferences,
+} from "./editor-preference";

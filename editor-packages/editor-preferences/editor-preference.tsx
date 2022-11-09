@@ -2,9 +2,10 @@ import React, { useReducer } from "react";
 import styled from "@emotion/styled";
 import { EditorPreferenceTree } from "./editor-preference-tree";
 import routes from "./routes";
-import type { Dispatcher, PreferenceState } from "./core";
+import type { Action, Dispatcher, PreferenceState } from "./core";
 import { reducer } from "./reducers";
 import { Router } from "./router";
+import { Dialog } from "@mui/material";
 
 const Context = React.createContext<PreferenceState>(null);
 
@@ -16,20 +17,34 @@ export function usePreferences() {
   return React.useContext(Context);
 }
 
-export function useDispatch() {
-  return React.useContext(DispatchContext);
-}
+export const useDispatch = (): ((action: Action) => void) => {
+  const dispatch = React.useContext(DispatchContext);
+  return React.useCallback(
+    (action: Action) => {
+      dispatch(action);
+    },
+    [dispatch]
+  );
+};
 
-export function EditorPreference() {
+export function EditorPreference({ children }: React.PropsWithChildren<{}>) {
   const [state, dispatch] = useReducer(reducer, {
+    open: false,
     route: "general",
     routes: routes,
   });
 
+  const onClose = () => {
+    dispatch({ type: "close" });
+  };
+
   return (
     <Context.Provider value={state}>
       <DispatchContext.Provider value={dispatch ?? __noop}>
-        <Preferences />
+        <Dialog open={state.open} maxWidth="lg" onClose={onClose}>
+          <Preferences />
+        </Dialog>
+        {children}
       </DispatchContext.Provider>
     </Context.Provider>
   );

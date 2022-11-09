@@ -1,5 +1,4 @@
 import React from "react";
-import { Dialog } from "@mui/material";
 import { EditorPreference } from "@code-editor/preferences";
 
 export function EditorPreferenceProvider({
@@ -7,10 +6,7 @@ export function EditorPreferenceProvider({
 }: React.PropsWithChildren<{}>) {
   return (
     <>
-      {children}
-      <Dialog open maxWidth="lg">
-        <EditorPreference />
-      </Dialog>
+      <EditorPreference>{children}</EditorPreference>
     </>
   );
 }

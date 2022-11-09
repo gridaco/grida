@@ -15,15 +15,13 @@ export function EditorDefaultProviders(props: { children: React.ReactNode }) {
     <EditorImageRepositoryProvider>
       <EditorCodeWebworkerProvider>
         <EditorPreviewDataProvider>
-          <EditorShortcutsProvider>
-            <FigmaImageServiceProvider filekey={state?.design?.key}>
-              <EditorToastProvider>
-                {/* <EditorPreferenceProvider> */}
-                {props.children}
-                {/* </EditorPreferenceProvider> */}
-              </EditorToastProvider>
-            </FigmaImageServiceProvider>
-          </EditorShortcutsProvider>
+          <EditorPreferenceProvider>
+            <EditorShortcutsProvider>
+              <FigmaImageServiceProvider filekey={state?.design?.key}>
+                <EditorToastProvider>{props.children}</EditorToastProvider>
+              </FigmaImageServiceProvider>
+            </EditorShortcutsProvider>
+          </EditorPreferenceProvider>
         </EditorPreviewDataProvider>
       </EditorCodeWebworkerProvider>
     </EditorImageRepositoryProvider>

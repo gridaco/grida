@@ -2,7 +2,7 @@ import { useDispatch } from "core/dispatch";
 import { EditorState } from "core/states";
 import React, { useCallback } from "react";
 import { useHotkeys } from "react-hotkeys-hook";
-
+import { useDispatch as usePreferencesDispatch } from "@code-editor/preferences";
 const noop = (e) => {
   e.preventDefault();
   e.stopPropagation();
@@ -13,6 +13,12 @@ export function EditorShortcutsProvider({
   children,
 }: React.PropsWithChildren<{}>) {
   const dispatch = useDispatch();
+  const preferencesDispatch = usePreferencesDispatch();
+
+  const openPreferences = useCallback(() => {
+    console.log("preferencesDispatch", preferencesDispatch);
+    preferencesDispatch({ type: "open" });
+  }, [preferencesDispatch]);
 
   const setDesignerMode = useCallback(
     (mode: EditorState["designerMode"]) => {
@@ -34,6 +40,7 @@ export function EditorShortcutsProvider({
   useHotkeys(_preferences.universal, (e) => {
     // this is required to prevent browser's from opening preference page.
     e.preventDefault();
+    openPreferences();
   });
 
   useHotkeys(_toggle_comments.universal, () => {

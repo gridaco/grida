@@ -13,14 +13,20 @@ import {
   DropdownMenuLabel,
 } from "@editor-ui/dropdown-menu";
 import { useEditorState } from "core/states";
+import { useDispatch as usePreferencesDispatch } from "@code-editor/preferences";
 
 export function AppbarFragmentForSidebar() {
   const [state] = useEditorState();
   const router = useRouter();
+  const preferencesDispatch = usePreferencesDispatch();
 
   const handleOpenFile = useCallback(() => {
     open(`https://www.figma.com/file/${state.design.key}`);
   }, [state?.design?.key]);
+
+  const openPreferences = useCallback(() => {
+    preferencesDispatch({ type: "open" });
+  }, [preferencesDispatch]);
 
   return (
     <RootWrapperAppbarFragmentForSidebar>
@@ -32,6 +38,7 @@ export function AppbarFragmentForSidebar() {
           router.push("/import");
         }}
         onOpenInFigma={handleOpenFile}
+        onOpenPreferences={openPreferences}
       />
     </RootWrapperAppbarFragmentForSidebar>
   );
@@ -41,10 +48,12 @@ function MenuButton({
   onGoToHome,
   onNewFile,
   onOpenInFigma,
+  onOpenPreferences,
 }: {
   onGoToHome?: () => void;
   onNewFile?: () => void;
   onOpenInFigma?: () => void;
+  onOpenPreferences?: () => void;
 }) {
   return (
     <DropdownMenu>
@@ -62,8 +71,7 @@ function MenuButton({
         <DropdownMenuItem onClick={onGoToHome}>
           <DropdownMenuLabel>Go to projects</DropdownMenuLabel>
         </DropdownMenuItem>
-        {/* TODO: */}
-        <DropdownMenuItem>
+        <DropdownMenuItem onClick={onOpenPreferences}>
           <DropdownMenuLabel>Preferences</DropdownMenuLabel>
         </DropdownMenuItem>
         <DropdownMenuItem onClick={onNewFile}>
