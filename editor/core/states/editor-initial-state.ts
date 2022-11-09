@@ -2,6 +2,7 @@ import { EditorSnapshot, EditorState } from "./editor-state";
 
 export function createInitialEditorState(editor: EditorSnapshot): EditorState {
   return {
+    pages: editor.pages,
     selectedPage: editor.selectedPage,
     selectedNodes: editor.selectedNodes,
     selectedNodesInitial: editor.selectedNodes,
@@ -16,6 +17,7 @@ export function createInitialEditorState(editor: EditorSnapshot): EditorState {
 
 export function createPendingEditorState(): EditorState {
   return {
+    pages: [],
     selectedPage: null,
     selectedNodes: [],
     selectedNodesInitial: null,

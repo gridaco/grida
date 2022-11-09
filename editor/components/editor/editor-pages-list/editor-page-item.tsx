@@ -1,9 +1,9 @@
 import React, { useCallback } from "react";
-import { FileIcon, HomeIcon } from "@radix-ui/react-icons";
+import { FigmaLogoIcon, HomeIcon, CodeIcon } from "@radix-ui/react-icons";
 import styled from "@emotion/styled";
 import { useTheme } from "@emotion/react";
 import { TreeView } from "@editor-ui/hierarchy";
-import type { PageInfo } from "./editor-pages-list";
+import { EditorPage } from "core/states";
 
 export function EditorPageItem({
   id,
@@ -11,23 +11,24 @@ export function EditorPageItem({
   type,
   selected,
   onPress,
-}: PageInfo & {
+}: EditorPage & {
   selected: boolean;
   onPress: () => void;
 }) {
   const { icon: iconColor, iconSelected: iconSelectedColor } =
     useTheme().colors;
 
-  const iconRenderer = (type: PageInfo["type"]) => {
+  const iconRenderer = (type: EditorPage["type"]) => {
+    const props = { color: selected ? iconSelectedColor : iconColor };
     switch (type) {
       case "home":
-        return <HomeIcon color={selected ? iconSelectedColor : iconColor} />;
-      case "assets":
-      case "canvas":
-      case "components":
-      case "styles":
+        return <HomeIcon {...props} />;
+      case "code":
+        return <CodeIcon {...props} />;
+      case "figma-canvas":
+        return <FigmaLogoIcon {...props} />;
       default:
-        return <FileIcon color={selected ? iconSelectedColor : iconColor} />;
+        return <></>;
     }
   };
 

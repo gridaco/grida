@@ -1,7 +1,7 @@
 import React, { useEffect, useCallback, useState } from "react";
 import { NextRouter } from "next/router";
 import { EditorDefaultProviders } from "scaffolds/editor";
-import { EditorSnapshot, useEditorState } from "core/states";
+import { EditorPage, EditorSnapshot, useEditorState } from "core/states";
 import { useDesignFile } from "hooks";
 import { warmup } from "scaffolds/editor";
 import { EditorBrowserMetaHead } from "components/editor";
@@ -84,6 +84,22 @@ export function SetupEditor({
           pages.some((p) => p.id === nodeid) ? [] : nodeid ? [nodeid] : [];
 
         val = {
+          pages: [
+            {
+              id: "home",
+              name: "Home",
+              type: "home",
+            } as EditorPage,
+          ].concat(
+            pages.map(
+              (p) =>
+                ({
+                  id: p.id,
+                  name: p.name,
+                  type: "figma-canvas",
+                } as EditorPage)
+            )
+          ),
           selectedNodes: initialSelections,
           selectedNodesInitial: initialSelections,
           selectedPage: warmup.selectedPage(state, pages, nodeid && [nodeid]),

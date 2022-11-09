@@ -4,13 +4,24 @@ import type { ReflectSceneNode } from "@design-sdk/figma-node";
 import q from "@design-sdk/query";
 
 export function getTargetContainer(state: EditorState) {
+  const { pages, selectedPage } = state;
+  const page = pages.find((p) => p.id === selectedPage);
+
   let searchpool;
-  if (state.selectedPage === "home") {
-    searchpool = state.design.pages.map((p) => p.children).flat();
-  } else {
+
+  if (!state.design) {
+    return {
+      root: null,
+      target: null,
+    };
+  }
+
+  if (page?.type === "figma-canvas") {
     searchpool = state.selectedPage
       ? state.design.pages.find((p) => p.id == state.selectedPage).children
       : null;
+  } else {
+    searchpool = state.design.pages.map((p) => p.children).flat();
   }
 
   const targetId =

@@ -2,7 +2,7 @@ import React, { useCallback } from "react";
 import styled from "@emotion/styled";
 import { TreeView } from "@editor-ui/hierarchy";
 import { EditorPageItem } from "./editor-page-item";
-import { useEditorState } from "core/states";
+import { EditorPage, useEditorState } from "core/states";
 import { useDispatch } from "core/dispatch";
 
 const Container = styled.div<{ expanded: boolean }>(({ theme, expanded }) => ({
@@ -11,21 +11,10 @@ const Container = styled.div<{ expanded: boolean }>(({ theme, expanded }) => ({
   flexDirection: "column",
 }));
 
-export type PageInfo = {
-  id: string;
-  name: string;
-  type: "home" | "canvas" | "components" | "styles" | "assets";
-};
-
 export function EditorPagesList() {
   const [state] = useEditorState();
   const dispatch = useDispatch();
-  const pages = [
-    // default pages
-    { id: "home", name: "Dashboard", type: "home" },
-    // design canvas pages
-    ...(state.design?.pages ?? []),
-  ];
+  const pages = state.pages;
 
   return (
     <Container expanded={true}>
@@ -33,9 +22,9 @@ export function EditorPagesList() {
         sortable={false}
         scrollable={false}
         data={pages}
-        keyExtractor={useCallback((item: PageInfo) => item.id, [])}
+        keyExtractor={useCallback((item: EditorPage) => item.id, [])}
         renderItem={useCallback(
-          (page: PageInfo, index) => {
+          (page: EditorPage, index) => {
             const selected = page.id === state.selectedPage;
             return (
               <EditorPageItem

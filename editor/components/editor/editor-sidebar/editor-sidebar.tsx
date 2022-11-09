@@ -2,7 +2,7 @@ import React from "react";
 import styled from "@emotion/styled";
 import { SideNavigation } from "components/side-navigation";
 import { EditorAppbarFragments } from "../editor-appbar";
-import { EditorLayerHierarchy } from "../editor-layer-hierarchy";
+import { EditorLayerHierarchy } from "../editor-hierarchy";
 import { EditorPagesList } from "../editor-pages-list";
 
 export function EditorSidebar() {

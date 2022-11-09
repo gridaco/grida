@@ -25,7 +25,7 @@ export function VisualContentArea() {
   const { selectedPage, design, selectedNodes, canvasMode } = state;
 
   const thisPage = design?.pages?.find((p) => p.id == selectedPage);
-  const thisPageNodes = selectedPage ? thisPage.children.filter(Boolean) : [];
+  const thisPageNodes = selectedPage ? thisPage?.children?.filter(Boolean) : [];
 
   const isEmptyPage = thisPageNodes?.length === 0;
 

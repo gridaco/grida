@@ -26,8 +26,15 @@ type TCanvasMode = "free" | "focus";
 type TEditorMode = "design" | "code" | "run";
 type TDesignerMode = "inspect" | "comment"; // | "prototype";
 
+export type EditorPage = {
+  id: string;
+  name: string;
+  type: "home" | "code" | "figma-canvas";
+};
+
 export interface EditorState {
-  selectedPage: string | "home";
+  pages: EditorPage[];
+  selectedPage: string;
   selectedNodes: string[];
   selectedLayersOnPreview: string[];
   /**
@@ -48,6 +55,7 @@ export interface EditorState {
 }
 
 export interface EditorSnapshot {
+  pages: EditorPage[];
   selectedPage: string;
   selectedNodes: string[];
   selectedLayersOnPreview: string[];

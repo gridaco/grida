@@ -33,6 +33,11 @@ export function WorkspaceContentPanel({
     <Resizable
       enable={resize}
       onResizeStart={() => setOFlex(undefined)}
+      onResize={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        e.stopImmediatePropagation();
+      }}
       minWidth={minWidth}
       style={{
         minWidth: minWidth,

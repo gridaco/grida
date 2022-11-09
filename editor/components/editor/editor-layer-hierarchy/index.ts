@@ -1,1 +1,1 @@
-export { EditorLayerHierarchy } from "./editor-layer-hierarchy-tree";
+export { DesignLayerHierarchy } from "./editor-layer-hierarchy-tree";

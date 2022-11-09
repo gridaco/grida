@@ -1,4 +1,5 @@
 import React, { useCallback } from "react";
+import styled from "@emotion/styled";
 import { DefaultEditorWorkspaceLayout } from "layouts/default-editor-workspace-layout";
 import {
   WorkspaceContentPanel,
@@ -7,7 +8,6 @@ import {
 import { EditorSidebar } from "components/editor";
 import { EditorState, useEditorState } from "core/states";
 import { Canvas } from "scaffolds/canvas";
-import { Code, CodeRunnerCanvas } from "scaffolds/code";
 import { Inspector } from "scaffolds/inspector";
 import { EditorHome } from "scaffolds/editor-home";
 import { EditorSkeleton } from "./skeleton";
@@ -16,7 +16,7 @@ import { useEditorSetupContext } from "./setup";
 import { Dialog } from "@mui/material";
 import { FullScreenPreview } from "scaffolds/preview-full-screen";
 import { useDispatch } from "core/dispatch";
-import styled from "@emotion/styled";
+import { Code } from "scaffolds/code";
 
 export function Editor() {
   const [state] = useEditorState();
@@ -99,57 +99,7 @@ function ModeDesign() {
 }
 
 function ModeCode() {
-  const dispatch = useDispatch();
-
-  const startFullscreenRunnerMode = useCallback(
-    () =>
-      dispatch({
-        type: "mode",
-        mode: "run",
-      }),
-    [dispatch]
-  );
-
-  const endCodeSession = useCallback(
-    () =>
-      dispatch({
-        type: "mode",
-        mode: "design",
-      }),
-    [dispatch]
-  );
-
-  return (
-    <div
-      style={{
-        display: "flex",
-        flexDirection: "row",
-        height: "100vh",
-        overflow: "hidden",
-      }}
-    >
-      <WorkspaceContentPanel
-        disableBorder
-        resize={{
-          right: true,
-        }}
-      >
-        <div
-          style={{
-            paddingTop: 48,
-          }}
-        >
-          <Code />
-        </div>
-      </WorkspaceContentPanel>
-      <WorkspaceContentPanel disableBorder>
-        <CodeRunnerCanvas
-          onClose={endCodeSession}
-          onEnterFullscreen={startFullscreenRunnerMode}
-        />
-      </WorkspaceContentPanel>
-    </div>
-  );
+  return <Code />;
 }
 
 function SideRightPanel() {

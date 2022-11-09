@@ -35,11 +35,17 @@ export function editorReducer(state: EditorState, action: Action): EditorState {
       const { mode } = <EditorModeSwitchAction>action;
       if (mode === "goback") {
         return produce(state, (draft) => {
+          const target = state.mode.last;
           draft.mode = {
-            value: state.mode.last,
+            value: target,
             last: state.mode.value,
             updated: new Date(),
           };
+
+          if (target === "design") {
+            // todo: this should be a last selection as well, not index 0.
+            draft.selectedPage = state.design.pages[0].id;
+          }
         });
       } else {
         return produce(state, (draft) => {
@@ -48,6 +54,29 @@ export function editorReducer(state: EditorState, action: Action): EditorState {
             last: state.mode.value,
             updated: new Date(),
           };
+
+          const code_default_drafts_page = "code-drafts";
+          switch (mode) {
+            case "code": {
+              if (
+                state.pages.some(
+                  (p) => p.type === "code" && p.id === code_default_drafts_page
+                )
+              ) {
+                draft.selectedPage = code_default_drafts_page;
+              } else {
+                draft.pages.push({
+                  id: code_default_drafts_page,
+                  name: "Code",
+                  type: "code",
+                });
+                draft.selectedPage = code_default_drafts_page;
+              }
+              break;
+            }
+            case "design":
+            case "run":
+          }
         });
       }
     }
@@ -110,7 +139,6 @@ export function editorReducer(state: EditorState, action: Action): EditorState {
 
       switch (page) {
         case "home": {
-          // update router
           update_route(router, { node: undefined });
         }
 
@@ -182,6 +210,7 @@ export function editorReducer(state: EditorState, action: Action): EditorState {
       }
     }
 
+    // todo move to other context
     case "preview-update-building-state": {
       const { isBuilding } = <PreviewBuildingStateUpdateAction>action;
       return produce(state, (draft) => {
@@ -204,6 +233,7 @@ export function editorReducer(state: EditorState, action: Action): EditorState {
       });
     }
 
+    // todo move to other context
     case "preview-set": {
       const { data } = <PreviewSetAction>action;
       return produce(state, (draft) => {
@@ -211,6 +241,7 @@ export function editorReducer(state: EditorState, action: Action): EditorState {
       });
     }
 
+    // todo: move to workspace state
     case "devtools-console": {
       const { log } = <DevtoolsConsoleAction>action;
       return produce(state, (draft) => {
@@ -226,6 +257,7 @@ export function editorReducer(state: EditorState, action: Action): EditorState {
       break;
     }
 
+    // todo: move to workspace state
     case "devtools-console-clear": {
       const {} = <DevtoolsConsoleClearAction>action;
       return produce(state, (draft) => {
@@ -242,6 +274,7 @@ export function editorReducer(state: EditorState, action: Action): EditorState {
       break;
     }
 
+    // todo: move to workspace state
     case "editor-task-push": {
       const { task } = <BackgroundTaskPushAction>action;
       const { id } = task;
@@ -265,6 +298,7 @@ export function editorReducer(state: EditorState, action: Action): EditorState {
       break;
     }
 
+    // todo: move to workspace state
     case "editor-task-pop": {
       const { task } = <BackgroundTaskPopAction>action;
       const { id } = task;
@@ -379,15 +413,36 @@ const reducers = {
     action: Omit<SelectPageAction, "type">
   ) => {
     return produce(state, (draft) => {
-      const { page } = <SelectPageAction>action;
+      const { page: pageid } = <SelectPageAction>action;
+      const page = state.pages.find((i) => i.id === pageid);
+
+      assert(page, "page not found");
+
       const filekey = state.design.key;
-      const _canvas_state_store = new CanvasStateStore(filekey, page);
+      const _canvas_state_store = new CanvasStateStore(filekey, pageid);
 
       const last_known_selections_of_this_page =
         _canvas_state_store.getLastSelection() ?? [];
-
-      draft.selectedPage = page;
+      draft.selectedPage = pageid;
       draft.selectedNodes = last_known_selections_of_this_page;
+
+      // update editor mode by page selection
+      let nextmode = state.mode.value;
+      switch (page.type) {
+        case "code": {
+          nextmode = "code";
+          break;
+        }
+        case "home":
+        case "figma-canvas": {
+          nextmode = "design";
+        }
+      }
+      draft.mode = {
+        value: nextmode,
+        last: state.mode.value,
+        updated: new Date(),
+      };
     });
   },
 };

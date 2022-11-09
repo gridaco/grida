@@ -91,7 +91,7 @@ function InspectorBody() {
 function EmptyState() {
   return (
     <EmptyStateContainer>
-      <EmptyStateText>Nothing selected</EmptyStateText>
+      <EmptyStateText>No selection</EmptyStateText>
     </EmptyStateContainer>
   );
 }

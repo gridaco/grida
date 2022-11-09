@@ -17,19 +17,7 @@ import {
 // - add go to main component
 // - add reveal and focus to selected layers
 
-export function EditorLayerHierarchy() {
-  const [state] = useEditorState();
-  const { selectedPage } = state;
-
-  switch (selectedPage) {
-    case "home":
-      return <></>;
-    default:
-      return <CanvasLayerHierarchy />;
-  }
-}
-
-function CanvasLayerHierarchy() {
+export function DesignLayerHierarchy() {
   const [state] = useEditorState();
   const { highlightLayer, highlightedLayer } = useWorkspace();
   const dispatch = useDispatch();
