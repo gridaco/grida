@@ -9,7 +9,11 @@ import { fetch } from "@design-sdk/figma-remote";
 import { personal } from "@design-sdk/figma-auth-store";
 import { configure_auth_credentials } from "@design-sdk/figma-remote";
 import { TargetNodeConfig } from "../query/target-node";
-import { FigmaRemoteErrors } from "@design-sdk/figma-remote";
+import {
+  FigmaRemoteErrors,
+  UnauthorizedError,
+  NotfoundError,
+} from "@design-sdk/figma-remote";
 import { RemoteDesignSessionCacheStore } from "../store";
 import { convert } from "@design-sdk/figma-node-conversion";
 import { mapper } from "@design-sdk/figma-remote";
@@ -143,20 +147,22 @@ export function useDesign({
               });
             })
             .catch((err: FigmaRemoteErrors) => {
-              switch (err.type) {
-                case "UnauthorizedError": {
-                  // unauthorized
-                  router.push("/preferences/access-tokens");
-                  console.info(`(ignored) error while fetching design`, err);
-                  break;
-                }
-                default:
-                  if (fat.accessToken) {
-                    // wait..
-                  } else {
-                    console.error(`error while fetching design`, err);
-                    throw err;
-                  }
+              if (err instanceof UnauthorizedError) {
+                // unauthorized
+                router.push("/preferences/access-tokens");
+                console.info(`(ignored) error while fetching design`, err);
+                return;
+              }
+
+              if (err instanceof NotfoundError) {
+                throw new Error("Target not found");
+              }
+
+              if (fat.accessToken) {
+                // wait..
+              } else {
+                console.error(`error while fetching design`, err);
+                throw err;
               }
             });
         } else {
