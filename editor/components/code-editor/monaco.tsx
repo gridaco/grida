@@ -109,6 +109,10 @@ export function MonacoEditor(props: MonacoEditorProps) {
         // overrided default options
         readOnly: props.readonly,
         wordWrap: "off",
+        scrollbar: {
+          verticalScrollbarSize: 4,
+          horizontalScrollbarSize: 4,
+        },
         unusualLineTerminators: "off",
       }}
     />
