@@ -6,7 +6,11 @@ import { Resizable } from "re-resizable";
 import { ZoomControl } from "./controller-zoom-control";
 import { colors } from "theme";
 import { RunnerLoadingIndicator } from "components/app-runner/loading-indicator";
-
+import {
+  ReloadIcon,
+  EnterFullScreenIcon,
+  Cross1Icon,
+} from "@radix-ui/react-icons";
 // TODO:
 // - add gesture debounce
 
@@ -137,10 +141,20 @@ export function IsolatedCanvas({
             onChange={setScale}
           />
           {onFullscreen && (
-            <ActionButton onClick={onFullscreen}>Full Screen</ActionButton>
+            <ActionButton onClick={onFullscreen}>
+              <EnterFullScreenIcon />
+            </ActionButton>
           )}
-          {onReload && <ActionButton onClick={onReload}>Reload</ActionButton>}
-          {onExit && <ActionButton onClick={onExit}>Exit</ActionButton>}
+          {onReload && (
+            <ActionButton onClick={onReload}>
+              <ReloadIcon />
+            </ActionButton>
+          )}
+          {onExit && (
+            <ActionButton onClick={onExit}>
+              <Cross1Icon />
+            </ActionButton>
+          )}
         </Controls>
         {/* <ScalingAreaStaticRoot> */}
         <TransformContainer
@@ -206,6 +220,7 @@ const Controls = styled.div`
   justify-content: flex-end;
   border-radius: 32px;
   padding-right: 16px;
+  box-shadow: 0px 0px 24px 4px rgba(0, 0, 0, 0.2);
 `;
 
 const TransformContainer = ({
@@ -252,6 +267,11 @@ function ResizableFrame({
           height: 500,
         }
       }
+      style={{
+        overflow: "hidden",
+        borderRadius: 4,
+        boxShadow: "0px 0px 48px 4px rgba(0, 0, 0, 0.25)",
+      }}
       scale={scale}
     >
       {children}
