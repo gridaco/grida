@@ -1,9 +1,10 @@
-import React from "react";
+import React, { useRef } from "react";
 import styled from "@emotion/styled";
 import type { ReflectSceneNode } from "@design-sdk/figma-node";
 import { FigmaStaticImageFrameView } from "scaffolds/preview-canvas";
 import { SceneNodeIcon } from "components/icons";
 import Highlighter from "react-highlight-words";
+import { useInViewport } from "react-in-viewport";
 
 export function SceneCard({
   scene,
@@ -18,12 +19,17 @@ export function SceneCard({
   onDoubleClick?: () => void;
   q?: string;
 }) {
+  const visibilityRef = useRef();
+  const { enterCount } = useInViewport(visibilityRef);
+
   const maxwidth = 300;
+
   // max allowed zoom = 1
   const scale = Math.min(maxwidth / scene.width, 1);
   const { height, type } = scene;
   return (
     <div
+      ref={visibilityRef}
       onClick={onClick}
       onDoubleClick={onDoubleClick}
       style={{
@@ -57,7 +63,7 @@ export function SceneCard({
             isPanning={false}
             isZooming={false}
             zoom={null}
-            inViewport
+            inViewport={enterCount > 0}
             focused={false}
           />
         </div>
