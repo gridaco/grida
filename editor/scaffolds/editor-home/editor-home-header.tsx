@@ -31,7 +31,7 @@ const EditorHomeHeaderWrapper = styled.div`
   padding: 24px 40px;
   z-index: 9;
   flex: 1;
-  background-color: rgba(30, 30, 30, 0.8);
+  background-color: rgba(20, 20, 20, 0.8);
   backdrop-filter: blur(40px);
 `;
 

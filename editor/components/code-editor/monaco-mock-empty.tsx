@@ -11,7 +11,7 @@ export function MonacoEmptyMock({ l = 100 }: { l?: number }) {
         width: "100%",
         textAlign: "right",
         color: "#858585",
-        background: "#1e1e1e",
+        background: "#141414",
       }}
     >
       {Array.from(Array(l).keys()).map((i) => (

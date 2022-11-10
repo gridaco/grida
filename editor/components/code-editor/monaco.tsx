@@ -96,7 +96,7 @@ export function MonacoEditor(props: MonacoEditorProps) {
       path={path}
       loading={<MonacoEmptyMock l={5} />}
       value={props.value ?? "// no content"}
-      theme="vs-dark"
+      theme="grida-dark"
       onChange={(...v) => {
         if (v[0] === __dangerous__lastFormattedValue__global) {
           // if change is caused by formatter, ignore.

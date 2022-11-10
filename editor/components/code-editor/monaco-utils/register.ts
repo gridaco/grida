@@ -27,7 +27,25 @@ export const initEditor = (
 };
 
 export const initMonaco = (monaco: Monaco) => {
+  definetheme(monaco);
   baseConfigure(monaco);
+};
+
+const definetheme = (monaco: Monaco) => {
+  // define theme
+  monaco.editor.defineTheme("grida-dark", {
+    base: "vs-dark",
+    colors: {
+      // line number
+      "editorLineNumber.foreground": "#555",
+      "editorLineNumber.activeForeground": "#fff",
+
+      // background
+      "editor.background": "#141414", // rgb(20, 20, 20)
+    },
+    inherit: true,
+    rules: [],
+  });
 };
 
 const baseConfigure = (monaco: Monaco) => {

@@ -92,7 +92,7 @@ function Preferences() {
 const Page = styled.div`
   display: flex;
   flex-direction: row;
-  background: #1e1e1e;
+  background: rgb(20, 20, 20);
 `;
 
 const Sidebar = styled.div`
@@ -101,7 +101,7 @@ const Sidebar = styled.div`
   flex: 2;
   min-width: 200px;
   max-width: 300px;
-  background: rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.04);
   overflow-y: scroll;
   overflow-x: hidden;
   padding: 8px;
