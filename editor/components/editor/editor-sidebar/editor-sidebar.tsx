@@ -4,13 +4,22 @@ import { SideNavigation } from "components/side-navigation";
 import { EditorAppbarFragments } from "../editor-appbar";
 import { EditorLayerHierarchy } from "../editor-hierarchy";
 import { EditorPagesList } from "../editor-pages-list";
+import { Resizable } from "layout/resizable";
 
 export function EditorSidebar() {
   return (
     <SideNavigation>
       <EditorAppbarFragments.Sidebar />
       <SidebarSegment flex={"none"}>
-        <EditorPagesList />
+        <Resizable
+          enable={{ bottom: true }}
+          minHeight={100}
+          handleClasses={{
+            bottom: "handle",
+          }}
+        >
+          <EditorPagesList />
+        </Resizable>
       </SidebarSegment>
       <SidebarSegment flex={1}>
         <EditorLayerHierarchy />

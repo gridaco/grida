@@ -5,6 +5,7 @@ import { Resizable as _Resizable, ResizableProps } from "re-resizable";
 // @ts-ignore
 export const Resizable = styled(_Resizable)`
   .handle {
+    z-index: 99;
     &:hover {
       background-color: rgba(255, 255, 255, 0.1);
     }
