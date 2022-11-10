@@ -16,19 +16,26 @@ import { CircularProgress } from "@mui/material";
 import { ReflectSceneNode } from "@design-sdk/figma-node";
 import { copy } from "utils/clipboard";
 import styled from "@emotion/styled";
+import { GearIcon, CodeIcon } from "@radix-ui/react-icons";
+import { useDispatch as usePreferencesDispatch } from "@code-editor/preferences";
 
 export function CodeSection() {
   const wstate = useWorkspaceState();
   const { target, root } = useTargetContainer();
   const [result, setResult] = useState<Result>(null);
   const dispatch = useDispatch();
+  const preferencesDispatch = usePreferencesDispatch();
 
   const on_result = (result: Result) => {
     setResult(result);
   };
 
-  const on_open = () => {
+  const onOpenClick = () => {
     dispatch({ type: "mode", mode: "code" });
+  };
+
+  const onOpenConfigClick = () => {
+    preferencesDispatch({ type: "open", route: "/framework" });
   };
 
   useEffect(() => {
@@ -56,9 +63,14 @@ export function CodeSection() {
     <PropertyGroup>
       <PropertyGroupHeader>
         <h6>Code</h6>
-        <Button id="open-code-editor" onClick={on_open}>
-          Open Code editor
-        </Button>
+        <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+          <IconButton onClick={onOpenClick}>
+            <CodeIcon color="white" />
+          </IconButton>
+          <IconButton onClick={onOpenConfigClick}>
+            <GearIcon color="white" />
+          </IconButton>
+        </div>
       </PropertyGroupHeader>
       <CliIntegrationSnippet node={target} />
       {code ? (
@@ -128,5 +140,24 @@ const CodeLine = styled.span`
 
   .bash {
     color: green;
+  }
+`;
+
+const IconButton = styled.button`
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: none;
+  cursor: pointer;
+  border-radius: 4px;
+  padding: 8px;
+
+  &:hover {
+    background: rgba(255, 255, 255, 0.1);
+  }
+
+  &:active {
+    background: rgba(255, 255, 255, 0.2);
   }
 `;
