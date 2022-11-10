@@ -1,11 +1,12 @@
 import React, { useReducer } from "react";
 import styled from "@emotion/styled";
 import { EditorPreferenceTree } from "./editor-preference-tree";
-import routes from "./routes";
+import routes from "./k/routes";
 import type { Action, Dispatcher, PreferenceState } from "./core";
 import { reducer } from "./reducers";
 import { Router } from "./router";
 import { Dialog } from "@mui/material";
+import { EditorPreferenceBreadcrumb } from "./editor-preference-breadcrumb";
 
 const Context = React.createContext<PreferenceState>(null);
 
@@ -51,6 +52,18 @@ export function EditorPreference({ children }: React.PropsWithChildren<{}>) {
 }
 
 function Preferences() {
+  const state = usePreferences();
+  const { route } = state;
+
+  const dispatch = useDispatch();
+
+  const onRouteChange = (route: string) => {
+    dispatch({ type: "route", route });
+  };
+
+  if (!state) {
+    return <></>;
+  }
   return (
     <Page
       style={{
@@ -62,6 +75,14 @@ function Preferences() {
         <EditorPreferenceTree />
       </Sidebar>
       <Content>
+        <ContentHeader>
+          <EditorPreferenceBreadcrumb
+            route={route}
+            onRoute={onRouteChange}
+            base="Preferences"
+            textTransform={"capitalize"}
+          />
+        </ContentHeader>
         <Router />
       </Content>
     </Page>
@@ -89,4 +110,12 @@ const Sidebar = styled.div`
 
 const Content = styled.div`
   flex: 8;
+`;
+
+const ContentHeader = styled.header`
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  align-self: stretch;
+  padding: 16px;
 `;

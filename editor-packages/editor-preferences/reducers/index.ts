@@ -16,10 +16,10 @@ export function reducer(
       const { route } = <OpenPreferenceAction>action;
 
       if (state.open) {
-        return state;
+        return handleroute(state, route);
       } else {
         return {
-          ...state,
+          ...handleroute(state, route),
           open: true,
         };
       }
@@ -34,8 +34,15 @@ export function reducer(
     }
     case "route": {
       const { route } = <PreferenceSetRouteAction>action;
-      return { ...state, route };
+      return handleroute(state, route);
     }
   }
   return state;
 }
+
+const handleroute = (state: PreferenceState, route: string) => {
+  if (route) {
+    return { ...state, route };
+  }
+  return state;
+};
