@@ -1,3 +1,5 @@
+import React from "react";
+import styled from "@emotion/styled";
 import { Resizable as _Resizable, ResizableProps } from "re-resizable";
 
 // @ts-ignore

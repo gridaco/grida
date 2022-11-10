@@ -1,6 +1,6 @@
 import styled from "@emotion/styled";
 import React, { useState } from "react";
-import { Resizable } from "re-resizable";
+import { Resizable } from "../resizable";
 
 /**
  * bottom docked layout. its content displays as row

@@ -44,7 +44,9 @@ export function editorReducer(state: EditorState, action: Action): EditorState {
 
           if (target === "design") {
             // todo: this should be a last selection as well, not index 0.
-            draft.selectedPage = state.design.pages[0].id;
+            draft.selectedPage = state.pages.find(
+              (p) => p.type === "figma-canvas"
+            ).id;
           }
         });
       } else {
@@ -74,7 +76,16 @@ export function editorReducer(state: EditorState, action: Action): EditorState {
               }
               break;
             }
-            case "design":
+            case "design": {
+              // if previous mode was somehing else.
+              if (state.mode.value !== "design") {
+                // todo: this should be a last selection as well, not index 0.
+                draft.selectedPage = state.pages.find(
+                  (p) => p.type === "figma-canvas"
+                ).id;
+                break;
+              }
+            }
             case "run":
           }
         });

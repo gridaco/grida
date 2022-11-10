@@ -6,11 +6,7 @@ import { Resizable } from "re-resizable";
 import { ZoomControl } from "./controller-zoom-control";
 import { colors } from "theme";
 import { RunnerLoadingIndicator } from "components/app-runner/loading-indicator";
-import {
-  ReloadIcon,
-  EnterFullScreenIcon,
-  Cross1Icon,
-} from "@radix-ui/react-icons";
+import { ReloadIcon, EnterFullScreenIcon } from "@radix-ui/react-icons";
 // TODO:
 // - add gesture debounce
 
@@ -57,14 +53,12 @@ export function IsolatedCanvas({
   children,
   defaultSize,
   building = false,
-  onExit,
   onFullscreen,
   onReload,
 }: {
   defaultSize: { width: number; height: number };
   children?: React.ReactNode;
   building?: boolean;
-  onExit?: () => void;
   onFullscreen?: () => void;
   onReload?: () => void;
 }) {
@@ -148,11 +142,6 @@ export function IsolatedCanvas({
           {onReload && (
             <ActionButton onClick={onReload}>
               <ReloadIcon />
-            </ActionButton>
-          )}
-          {onExit && (
-            <ActionButton onClick={onExit}>
-              <Cross1Icon />
             </ActionButton>
           )}
         </Controls>

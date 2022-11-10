@@ -74,6 +74,10 @@ function Sidebar(
               width: p.signature.minWidth,
               height: "100%",
             }}
+            handleClasses={{
+              right: "handle",
+              left: "handle",
+            }}
             style={{
               zIndex: 1,
               flexGrow: 0,
