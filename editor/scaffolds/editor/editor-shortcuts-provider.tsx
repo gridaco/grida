@@ -33,8 +33,9 @@ export function EditorShortcutsProvider({
   const _toggle_view = keymap("v");
   const _escape = keymap("esc");
 
-  useHotkeys(_save.universal, () => {
-    // dispatch({ type: "editor-save" });
+  useHotkeys(_save.universal, (e) => {
+    // disables the save html action on browser
+    e.preventDefault();
   });
 
   useHotkeys(_preferences.universal, (e) => {
@@ -65,9 +66,11 @@ const keymap = (
     | "cmd"
     | "ctrl-cmd"
     | "shift"
+    | "alt"
     | "a"
     | "c"
     | "p"
+    | "n"
     | "s"
     | "v"
     | ","
