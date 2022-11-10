@@ -65,7 +65,7 @@ function MenuButton({
           background: "transparent",
         }}
       >
-        <HamburgerMenuIcon color="white" />
+        <HamburguerMenu />
       </DropdownMenuTrigger>
       <DropdownMenuContent>
         <DropdownMenuItem onClick={onGoToHome}>
@@ -90,6 +90,17 @@ function MenuButton({
     </DropdownMenu>
   );
 }
+
+const HamburguerMenu = styled(HamburgerMenuIcon)`
+  border-radius: 4px;
+  padding: 8px;
+  color: rgba(255, 255, 255, 0.5);
+
+  &:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: rgba(255, 255, 255, 0.8);
+  }
+`;
 
 const RootWrapperAppbarFragmentForSidebar = styled.div`
   display: flex;
