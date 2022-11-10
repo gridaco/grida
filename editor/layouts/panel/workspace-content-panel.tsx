@@ -1,6 +1,6 @@
 import React, { CSSProperties } from "react";
-import styled from "@emotion/styled";
-import { Resizable, ResizableProps } from "re-resizable";
+import { Resizable, ResizableProps } from "../resizable";
+
 /**
  * Wrapper for WorkspaceContentPanelGridLayout
  * @param props
@@ -31,7 +31,7 @@ export function WorkspaceContentPanel({
   const [oflex, setOFlex] = React.useState(flex);
 
   return (
-    <StyledResizable
+    <Resizable
       enable={resize}
       handleClasses={{
         top: "handle",
@@ -59,7 +59,7 @@ export function WorkspaceContentPanel({
       }}
     >
       {children}
-    </StyledResizable>
+    </Resizable>
   );
 }
 
@@ -71,16 +71,3 @@ type WorkspaceCPanelStyleProps = {
   zIndex?: number;
   display: "none" | undefined;
 };
-
-// @ts-ignore
-const StyledResizable = styled(Resizable)`
-  .handle {
-    &:hover {
-      background-color: rgba(255, 255, 255, 0.1);
-    }
-    &:active {
-      background-color: rgba(255, 255, 255, 0.2);
-    }
-    transition: background-color 0.1s ease-in-out;
-  }
-`;

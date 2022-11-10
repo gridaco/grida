@@ -1,6 +1,6 @@
 import styled from "@emotion/styled";
 import React from "react";
-import { Resizable } from "re-resizable";
+import { Resizable } from "./resizable";
 
 type SidebarElementSignature =
   | JSX.Element
