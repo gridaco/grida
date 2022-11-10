@@ -3,7 +3,7 @@ import styled from "@emotion/styled";
 import { TreeView } from "@editor-ui/editor";
 import { PageRow } from "./home-side-bar-tree-item";
 import { useRouter } from "next/router";
-import { flatten } from "components/editor/editor-layer-hierarchy/editor-layer-heriarchy-controller";
+import { flatten } from "components/editor/editor-hierarchy-layers/editor-layer-heriarchy-controller";
 interface PresetPage {
   id: string;
   name: string;

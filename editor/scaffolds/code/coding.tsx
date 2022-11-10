@@ -1,6 +1,5 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import styled from "@emotion/styled";
-import { CodeEditor } from "components/code-editor";
 import { designToCode, Result } from "@designto/code";
 import { config } from "@grida/builder-config";
 import {
@@ -15,37 +14,23 @@ import { useTargetContainer } from "hooks/use-target-node";
 import { debounce } from "utils/debounce";
 import { supportsScripting } from "config";
 import { useFigmaImageService } from "scaffolds/editor";
+import { MonacoEditor } from "components/code-editor";
+import { downloadFile } from "utils/download";
+import { CodingToolbar } from "./codeing-toolbar";
+import { useDispatch as usePreferencesDispatch } from "@code-editor/preferences";
 
-export function Coding({ onChange }: { onChange?: (src: string) => void }) {
+function useCode() {
   const [result, setResult] = useState<Result>();
-  const dispatch = useDispatch();
   const wstate = useWorkspaceState();
   const [state] = useEditorState();
-  const framework_config = wstate.preferences.framework_config;
-
   const resolver = useFigmaImageService();
+  const enable_components =
+    wstate.preferences.enable_preview_feature_components_support;
+  const framework_config = wstate.preferences.framework_config;
 
   const { target: targetted, root } = useTargetContainer();
 
-  const enable_components =
-    wstate.preferences.enable_preview_feature_components_support;
-
-  const targetStateRef =
-    useRef<{
-      node: ReflectSceneNode;
-      config: config.FrameworkConfig;
-    }>();
-  targetStateRef.current = { node: targetted, config: framework_config };
-
   const on_result = (result: Result) => {
-    if (
-      result.framework.framework !==
-        targetStateRef?.current?.config.framework ||
-      result.id !== targetStateRef?.current?.node?.id
-    ) {
-      return;
-    }
-
     setResult(result);
   };
 
@@ -100,11 +85,42 @@ export function Coding({ onChange }: { onChange?: (src: string) => void }) {
     }
   }, [targetted?.id, framework_config]);
 
+  return result;
+}
+
+export function Coding() {
+  const wstate = useWorkspaceState();
+
+  const { framework_config } = wstate.preferences;
+
+  const preferencesDispatch = usePreferencesDispatch();
+
+  const dispatch = useDispatch();
+
+  const result = useCode();
+
+  const endCodeSession = useCallback(
+    () =>
+      dispatch({
+        type: "mode",
+        mode: "design",
+      }),
+    [dispatch]
+  );
+
+  const openPreferences = useCallback(() => {
+    preferencesDispatch({ type: "open", route: "/framework" });
+  }, [preferencesDispatch]);
+
+  const onDownloadClick = () => {
+    try {
+      // support non tsx files
+      downloadFile({ data: result.scaffold.raw, filename: "draft.tsx" });
+    } catch (e) {}
+  };
+
   const onChangeHandler = debounce((k, code) => {
     if (!result) {
-      return;
-    }
-    if (!targetted) {
       return;
     }
 
@@ -114,52 +130,35 @@ export function Coding({ onChange }: { onChange?: (src: string) => void }) {
         type: "code-editor-edit-component-code",
         framework: framework_config.framework,
         componentName: result.name,
-        id: targetted.id,
+        id: result.id,
         raw: code,
       });
     }
-
-    onChange?.(code);
   }, 500);
 
   const { code, scaffold, name: componentName, framework } = result ?? {};
 
-  useEffect(() => {
-    if (code?.raw) {
-      onChange?.(code.raw);
-    }
-  }, [code?.raw]);
-
   return (
     <CodeEditorContainer>
-      <CodeEditor
-        key={code?.raw}
+      <CodingToolbar
+        onCloseClick={endCodeSession}
+        onDownloadClick={onDownloadClick}
+        onOpenPreferencesClick={openPreferences}
+      />
+      <MonacoEditor
         height="100vh"
         options={{
           automaticLayout: true,
           minimap: {
             enabled: false,
           },
+          guides: {
+            indentation: false,
+          },
         }}
         onChange={onChangeHandler}
-        files={
-          code
-            ? {
-                // TODO: make this to match framework
-                [filename[framework.framework]]: {
-                  raw: scaffold.raw,
-                  language: framework_config.language,
-                  name: filename[framework.framework],
-                },
-              }
-            : {
-                loading: {
-                  raw: "\n".repeat(100),
-                  language: "text",
-                  name: "loading",
-                },
-              }
-        }
+        value={scaffold?.raw}
+        language={framework_config.language}
       />
     </CodeEditorContainer>
   );
@@ -178,4 +177,27 @@ const CodeEditorContainer = styled.div`
   flex-direction: column;
   align-items: stretch;
   overflow: hidden;
+`;
+
+function EmptyState() {
+  return (
+    <EmptyStateContainer>
+      <EmptyStateText>Open a file and edit to preview results</EmptyStateText>
+    </EmptyStateContainer>
+  );
+}
+
+const EmptyStateContainer = styled.div`
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  width: 100%;
+`;
+
+const EmptyStateText = styled.div`
+  font-size: 14px;
+  color: white;
+  opacity: 0.5;
 `;

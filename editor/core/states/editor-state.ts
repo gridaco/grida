@@ -3,6 +3,7 @@ import type { FrameworkConfig } from "@grida/builder-config";
 import type { RGBA, WidgetKey } from "@reflect-ui/core";
 import type { ComponentNode } from "@design-sdk/figma-types";
 import type { DesignInput } from "@grida/builder-config/input";
+import type { File } from "@grida/builder-config/output/output-file";
 
 type LastKnown<T> = {
   value: T;
@@ -48,7 +49,7 @@ export interface EditorState {
   designerMode: TDesignerMode;
   canvasMode: LastKnown<TCanvasMode>;
   currentPreview?: ScenePreviewData;
-  code?: CodeRepository;
+  code: CodeRepository;
   editingModule?: EditingModule;
   devtoolsConsole?: DevtoolsConsole;
   editorTaskQueue: EditorTaskQueue;
@@ -61,6 +62,7 @@ export interface EditorSnapshot {
   selectedLayersOnPreview: string[];
   selectedNodesInitial?: string[] | null;
   design: FigmaReflectRepository;
+  code: CodeRepository;
   canvasMode: EditorState["canvasMode"];
   editorTaskQueue: EditorTaskQueue;
 }
@@ -131,8 +133,7 @@ export interface IScenePreviewDataEsbuildPreview
 }
 
 export interface CodeRepository {
-  // TODO:
-  // files: { [key: string]: string };
+  files: { [key: string]: File };
 }
 
 type TEditingModuleType = "single-file-component";

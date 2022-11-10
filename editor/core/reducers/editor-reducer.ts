@@ -73,6 +73,20 @@ export function editorReducer(state: EditorState, action: Action): EditorState {
                   type: "code",
                 });
                 draft.selectedPage = code_default_drafts_page;
+
+                // test
+                draft.code.files["/component/index.ts"] = {
+                  content: `import React from "react";`,
+                  name: "index.ts",
+                  path: "<dir>/component/index.ts",
+                  type: "ts",
+                };
+                draft.code.files["/component/component.tsx"] = {
+                  content: `import React from "react";`,
+                  name: "component.tsx",
+                  path: "<dir>/component/component.tsx",
+                  type: "tsx",
+                };
               }
               break;
             }

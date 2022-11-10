@@ -10,6 +10,7 @@ export function createInitialEditorState(editor: EditorSnapshot): EditorState {
     design: editor.design,
     mode: { value: "design" },
     designerMode: "inspect",
+    code: editor.code,
     canvasMode: editor.canvasMode,
     editorTaskQueue: editor.editorTaskQueue,
   };
@@ -23,6 +24,9 @@ export function createPendingEditorState(): EditorState {
     selectedNodesInitial: null,
     selectedLayersOnPreview: [],
     design: null,
+    code: {
+      files: {},
+    },
     mode: { value: "design" },
     canvasMode: { value: "free" },
     designerMode: "inspect",

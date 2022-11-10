@@ -1,6 +1,7 @@
 import React from "react";
 import { useEditorState } from "core/states";
 import { DesignLayerHierarchy } from "../editor-hierarchy-layers";
+import { CodeFilesHierarchyTree } from "../editor-hierarchy-code-files";
 
 export function EditorLayerHierarchy() {
   const [state] = useEditorState();
@@ -13,7 +14,7 @@ export function EditorLayerHierarchy() {
     case "figma-canvas":
       return <DesignLayerHierarchy />;
     case "code":
-      return <></>;
+      return <CodeFilesHierarchyTree />;
     default:
       return <></>;
   }

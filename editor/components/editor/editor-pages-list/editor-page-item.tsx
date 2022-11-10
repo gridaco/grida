@@ -39,7 +39,7 @@ export function EditorPageItem({
       key={id}
       sortable={false}
       selected={selected}
-      selectedColor={"#494949"}
+      selectedColor={"rgba(255, 255, 255, 0.1)"}
       onPress={onPress}
       onDoubleClick={() => {}}
       icon={iconRenderer(type)}
