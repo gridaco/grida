@@ -16,7 +16,7 @@ import { debounce } from "utils/debounce";
 import { supportsScripting } from "config";
 import { useFigmaImageService } from "scaffolds/editor";
 
-export function Coding() {
+export function Coding({ onChange }: { onChange?: (src: string) => void }) {
   const [result, setResult] = useState<Result>();
   const dispatch = useDispatch();
   const wstate = useWorkspaceState();
@@ -118,9 +118,18 @@ export function Coding() {
         raw: code,
       });
     }
+
+    onChange?.(code);
   }, 500);
 
   const { code, scaffold, name: componentName, framework } = result ?? {};
+
+  useEffect(() => {
+    if (code?.raw) {
+      onChange?.(code.raw);
+    }
+  }, [code?.raw]);
+
   return (
     <CodeEditorContainer>
       <CodeEditor

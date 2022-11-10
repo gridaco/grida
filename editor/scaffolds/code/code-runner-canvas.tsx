@@ -6,10 +6,8 @@ import { VanillaDedicatedPreviewRenderer } from "components/app-runner";
 import { Devtools } from "scaffolds/devtools";
 
 export function CodeRunnerCanvas({
-  onClose,
   onEnterFullscreen,
 }: {
-  onClose: () => void;
   onEnterFullscreen: () => void;
 }) {
   const [state] = useEditorState();
@@ -32,7 +30,6 @@ export function CodeRunnerCanvas({
       <IsolatedCanvas
         key={widgetKey?.id}
         building={isBuilding}
-        onExit={onClose}
         onFullscreen={onEnterFullscreen}
         onReload={() => {
           setRenderkey(renderkey + 1);
