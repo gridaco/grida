@@ -69,13 +69,13 @@ function MenuButton({
       </DropdownMenuTrigger>
       <DropdownMenuContent>
         <DropdownMenuItem onClick={onGoToHome}>
-          <DropdownMenuLabel>Go to projects</DropdownMenuLabel>
+          <DropdownMenuLabel>Go to Files</DropdownMenuLabel>
         </DropdownMenuItem>
         <DropdownMenuItem onClick={onOpenPreferences}>
           <DropdownMenuLabel>Preferences</DropdownMenuLabel>
         </DropdownMenuItem>
         <DropdownMenuItem onClick={onNewFile}>
-          <DropdownMenuLabel>New project</DropdownMenuLabel>
+          <DropdownMenuLabel>New Project</DropdownMenuLabel>
         </DropdownMenuItem>
         <DropdownMenuItem>
           <DropdownMenuLabel>Shortcuts</DropdownMenuLabel>

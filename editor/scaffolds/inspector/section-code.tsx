@@ -85,6 +85,11 @@ export function CodeSection() {
               lineNumbers: "off",
               glyphMargin: false,
               minimap: { enabled: false },
+              showFoldingControls: "mouseover",
+              guides: {
+                indentation: false,
+                highlightActiveIndentation: false,
+              },
             }}
           />
         </>

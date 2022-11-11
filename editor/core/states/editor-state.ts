@@ -5,6 +5,8 @@ import type { ComponentNode } from "@design-sdk/figma-types";
 import type { DesignInput } from "@grida/builder-config/input";
 import type { File } from "@grida/builder-config/output/output-file";
 
+export type { File };
+
 type LastKnown<T> = {
   value: T;
   last?: T | undefined;
