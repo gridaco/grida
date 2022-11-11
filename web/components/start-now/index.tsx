@@ -1,9 +1,9 @@
 import React from "react";
 import styled from "@emotion/styled";
-import { Flex, Text, Heading } from "theme-ui";
+import { Flex, Text, Heading, Button } from "theme-ui";
 import Icon from "components/icon";
 import { media } from "utils/styled/media";
-import PricingCTAButton from "components/pricing-cta-button";
+import { LandingpageUrls } from "utils/landingpage/constants";
 
 const descList = [
   {
@@ -25,6 +25,10 @@ const descList = [
 
 // FUCKING NOT READY RESPONSIVE
 const StartNow: React.FC = () => {
+  const onFreeStartClick = () => {
+    window.location.href = LandingpageUrls.signup_with_return;
+  };
+
   return (
     <Card
       style={{
@@ -55,7 +59,7 @@ const StartNow: React.FC = () => {
           }}
         >
           {descList.map((item, ix) => (
-            <Flex mr="auto" ml="20px">
+            <Flex key={ix} mr="auto" ml="20px">
               <div>
                 <Icon style={{ flex: 1 }} name="okaySign" />
               </div>
@@ -67,7 +71,6 @@ const StartNow: React.FC = () => {
                 }}
                 ml="10px"
                 color="#5e5e5e"
-                key={ix}
               >
                 {item.title}
               </Desc>
@@ -111,7 +114,7 @@ const StartNow: React.FC = () => {
             /mo
           </Text>
         </Flex>
-        <PricingCTAButton
+        <Button
           sx={{
             width: ["232px", "337px", "337px", "337px"],
             height: "46px",
@@ -122,9 +125,10 @@ const StartNow: React.FC = () => {
           color="#ffffff"
           variant="secondary"
           mb="40px"
+          onClick={onFreeStartClick}
         >
           Start now
-        </PricingCTAButton>
+        </Button>
         <NoCredit
           style={{
             fontSize: "18px",

@@ -32,8 +32,8 @@ const FeatureListMobileView: React.FC<FeatureProps> = ({ data }) => {
           justifyContent: "space-between",
         }}
       >
-        {choice.map(i => (
-          <FeatureChoice titleList={i} featureData={data} key={i} />
+        {choice.map((i, ii) => (
+          <FeatureChoice key={ii} titleList={i} featureData={data} />
         ))}
       </Wrapper>
     </Flex>

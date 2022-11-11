@@ -90,7 +90,7 @@ const App = ({ Component, pageProps }: AppPropsWithLayout) => {
   };
 
   return (
-    <Providers>
+    <>
       <Head>
         {/* pinterest domain verify */}
         <meta
@@ -136,25 +136,28 @@ const App = ({ Component, pageProps }: AppPropsWithLayout) => {
       <Box
         style={{ display: "flex", flexDirection: "column", minHeight: "100vh" }}
       >
-        <ThemeProvider fallback="light" override={getTheme() ?? "light"}>
-          {/*  */}
-          {getLayout(<Component {...pageProps} />)}
-        </ThemeProvider>
+        <Providers>
+          <ThemeProvider fallback="light" override={getTheme() ?? "light"}>
+            <PopupProvider>
+              {getLayout(<Component {...pageProps} />)}
+              {renderPopups()}
+            </PopupProvider>
+          </ThemeProvider>
+        </Providers>
       </Box>
-      {renderPopups()}
-    </Providers>
+    </>
   );
 };
 
 const Providers = ({ children }: { children: React.ReactNode }) => {
   return (
-    <PopupProvider>
+    <>
       <CookiesProvider>
         <MDXProvider components={_MDX_COMPONENTS}>
           <RecoilRoot>{children}</RecoilRoot>
         </MDXProvider>
       </CookiesProvider>
-    </PopupProvider>
+    </>
   );
 };
 
