@@ -138,10 +138,15 @@ const lang2ext = (lang: string) => {
 
 const pollyfill_language = (lang: string) => {
   switch (lang) {
+    case "typescriptreact":
+    case "application/typescriptreact":
     case "tsx":
       return "typescript";
     case "jsx":
       return "javascript";
+    case "text/html":
+    case "html":
+      return "html";
     default:
       return lang;
   }

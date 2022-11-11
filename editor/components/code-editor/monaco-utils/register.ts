@@ -35,6 +35,8 @@ const definetheme = (monaco: Monaco) => {
   // define theme
   monaco.editor.defineTheme("grida-dark", {
     base: "vs-dark",
+    inherit: true,
+    rules: [],
     colors: {
       // line number
       "editorLineNumber.foreground": "#555",
@@ -42,9 +44,11 @@ const definetheme = (monaco: Monaco) => {
 
       // background
       "editor.background": "#141414", // rgb(20, 20, 20)
+
+      // selected line highlight
+      "editor.lineHighlightBackground": "#FFFFFF10",
+      "editor.lineHighlightBorder": "#00000000",
     },
-    inherit: true,
-    rules: [],
   });
 };
 

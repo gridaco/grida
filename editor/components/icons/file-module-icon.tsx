@@ -43,17 +43,22 @@ export function FileModuleIcon({
       return <EnvelopeOpenIcon {...props} />;
     case "directory-closed":
       return <EnvelopeClosedIcon {...props} />;
+    case "application/typescriptreact":
     case "jsx":
     case "tsx":
       return <ReactIcon {...props} />;
     case "dart":
       return <FlutterIcon {...props} />;
+    case "text/html":
     case "html":
       return <Html5Icon {...props} />;
+    case "text/css":
     case "css":
     case "scss":
       return <Css3Icon {...props} />;
+    case "application/javascript":
     case "js":
+    case "application/typescript":
     case "ts":
       return <CodeIcon {...props} />;
     default:
