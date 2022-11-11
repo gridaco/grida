@@ -136,6 +136,7 @@ export interface IScenePreviewDataEsbuildPreview
 
 export interface CodeRepository {
   files: { [key: string]: File };
+  loading?: boolean;
 }
 
 type TEditingModuleType = "single-file-component";

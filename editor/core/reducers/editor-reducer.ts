@@ -182,12 +182,13 @@ export function editorReducer(state: EditorState, action: Action): EditorState {
     }
 
     case "coding/initial-seed": {
-      const { files } = <CodingInitialFilesSeedAction>action;
+      const { files, open, focus } = <CodingInitialFilesSeedAction>action;
       return produce(state, (draft) => {
         const keys = Object.keys(files);
         if (keys.length > 0) {
           draft.code.files = files;
-          draft.selectedNodes = [keys[0]];
+          draft.code.loading = false;
+          draft.selectedNodes = [focus] ?? [keys[0]];
         }
 
         // test
@@ -221,8 +222,6 @@ export function editorReducer(state: EditorState, action: Action): EditorState {
       const { $id, files, framework, transpiler } = <
         CodingCompileRequestAction
       >action;
-
-      // TODO:
     }
 
     case "canvas-mode": {

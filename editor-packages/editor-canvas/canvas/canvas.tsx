@@ -29,7 +29,10 @@ import {
   CANVAS_INITIAL_SCALE,
   CANVAS_MIN_ZOOM,
 } from "../k";
-import { ContextMenuRoot as ContextMenu } from "@editor-ui/context-menu";
+import {
+  ContextMenuRoot as ContextMenu,
+  MenuItem,
+} from "@editor-ui/context-menu";
 import styled from "@emotion/styled";
 
 interface CanvasState {
@@ -435,7 +438,8 @@ export function Canvas({
 
   return (
     <>
-      <ContextMenuProvider>
+      <>
+        {/* <ContextMenuProvider> */}
         <Container
         // todo: viewbound not accurate.
         // width={viewbound[2] - viewbound[0]}
@@ -505,7 +509,8 @@ export function Canvas({
             />
           </CanvasEventTarget>
         </Container>
-      </ContextMenuProvider>
+        {/* </ContextMenuProvider> */}
+      </>
       <CanvasBackground backgroundColor={backgroundColor} />
       <CanvasTransformRoot scale={zoom} xy={nonscaled_offset}>
         <DisableBackdropFilter>{items}</DisableBackdropFilter>
@@ -600,18 +605,20 @@ function position_guide({
 }
 
 function ContextMenuProvider({ children }: React.PropsWithChildren<{}>) {
+  const items: MenuItem<string>[] = [
+    { title: "Show all layers", value: "canvas-focus-all-to-fit" },
+    "separator",
+    { title: "Run", value: "run" },
+    { title: "Deploy", value: "deploy-to-vercel" },
+    { title: "Open in Figma", value: "open-in-figma" },
+    { title: "Get sharable link", value: "make-sharable-link" },
+    { title: "Copy CSS", value: "make-css" },
+    { title: "Refresh (fetch from origin)", value: "refresh" },
+  ];
+
   return (
     <ContextMenu
-      items={[
-        { title: "Show all layers", value: "canvas-focus-all-to-fit" },
-        "separator",
-        { title: "Run", value: "run" },
-        { title: "Deploy", value: "deploy-to-vercel" },
-        { title: "Open in Figma", value: "open-in-figma" },
-        { title: "Get sharable link", value: "make-sharable-link" },
-        { title: "Copy CSS", value: "make-css" },
-        { title: "Refresh (fetch from origin)", value: "refresh" },
-      ]}
+      items={items}
       onSelect={(v) => {
         console.log("exec canvas cmd", v);
       }}

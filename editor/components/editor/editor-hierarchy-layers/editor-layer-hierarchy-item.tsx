@@ -85,8 +85,8 @@ export const LayerRow = memo(
             <TreeView.RowTitle>{name}</TreeView.RowTitle>,
             hovered && (
               <>
-                <DotsHorizontalIcon onClick={onMenuClick} />
-                <Spacer.Horizontal size={12} />
+                {/* <DotsHorizontalIcon onClick={onMenuClick} /> */}
+                {/* <Spacer.Horizontal size={12} /> */}
                 {/* <PlusIcon onClick={onAddClick} /> */}
               </>
             ),

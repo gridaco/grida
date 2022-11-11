@@ -112,7 +112,7 @@ export function SetupEditor({
             key: filekey,
             pages: pages,
           },
-          code: { files: {} },
+          code: { files: {}, loading: true },
           canvasMode: initialCanvasMode,
           editorTaskQueue: {
             isBusy: false,

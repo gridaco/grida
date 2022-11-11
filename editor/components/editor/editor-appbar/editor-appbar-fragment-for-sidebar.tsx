@@ -77,9 +77,9 @@ function MenuButton({
         <DropdownMenuItem onClick={onNewFile}>
           <DropdownMenuLabel>New Project</DropdownMenuLabel>
         </DropdownMenuItem>
-        <DropdownMenuItem>
+        {/* <DropdownMenuItem>
           <DropdownMenuLabel>Shortcuts</DropdownMenuLabel>
-        </DropdownMenuItem>
+        </DropdownMenuItem> */}
         <DropdownMenuCheckboxItem checked onClick={onOpenInFigma}>
           <DropdownMenuItemIndicator>
             <FigmaLogoIcon color="black" />

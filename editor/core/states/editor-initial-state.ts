@@ -26,6 +26,7 @@ export function createPendingEditorState(): EditorState {
     design: null,
     code: {
       files: {},
+      loading: true,
     },
     mode: { value: "design" },
     canvasMode: { value: "free" },
