@@ -122,15 +122,28 @@ export interface PreviewBuildingStateUpdateAction {
 }
 
 export type CodingAction =
+  | CodingNewTemplateSessionAction
   | CodingInitialFilesSeedAction
   | CodingUpdateFileAction
   | CodingCompileRequestAction;
 
 export type CodingInitialFilesSeedAction = {
   type: "coding/initial-seed";
-  files: { [key: string]: File };
+  files: {
+    [key: string]: File & {
+      exports?: string[];
+    };
+  };
   open?: string | string[] | "*";
   focus?: string;
+};
+
+export type CodingNewTemplateSessionAction = {
+  type: "coding/new-template-session";
+  template: {
+    type: "d2c";
+    target: string;
+  };
 };
 
 type RequestAction<T> = T & { $id: string };
@@ -153,8 +166,13 @@ export type CodingCompileRequestAction = RequestAction<
 
 export interface CodingUpdateFileAction {
   type: "codeing/update-file";
-  key: string;
-  content: string;
+  // key: string;
+  // content: string;
+
+  framework: FrameworkConfig["framework"];
+  componentName: string;
+  id: string;
+  raw: string;
 }
 
 export type DevtoolsAction = DevtoolsConsoleAction | DevtoolsConsoleClearAction;

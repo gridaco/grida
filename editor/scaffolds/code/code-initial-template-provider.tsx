@@ -40,6 +40,7 @@ export function CodeInitialTemplateProvider({
             path: "/component.tsx",
             type: "application/typescriptreact",
             content: result.scaffold.raw,
+            exports: [result.name],
           },
         },
         open: "*",

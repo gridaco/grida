@@ -30,10 +30,13 @@ export function VisualContentArea() {
   const isEmptyPage = thisPageNodes?.length === 0;
 
   const startCodeSession = useCallback(
-    () =>
+    (target: string) =>
       dispatch({
-        type: "mode",
-        mode: "code",
+        type: "coding/new-template-session",
+        template: {
+          type: "d2c",
+          target: target,
+        },
       }),
     [dispatch]
   );
@@ -120,7 +123,7 @@ export function VisualContentArea() {
                   key={p.id}
                   {...p}
                   runnable={selectedNodes.length === 1}
-                  onRunClick={startCodeSession}
+                  onRunClick={() => startCodeSession(p.id)}
                 />
               )}
             />

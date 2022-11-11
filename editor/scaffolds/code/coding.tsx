@@ -6,7 +6,7 @@ import {
   ImageRepository,
   MainImageRepository,
 } from "@design-sdk/asset-repository";
-import { useEditorState, useWorkspaceState } from "core/states";
+import { File, useEditorState, useWorkspaceState } from "core/states";
 import { RemoteImageRepositories } from "@design-sdk/figma-remote/asset-repository";
 import { useTargetContainer } from "hooks/use-target-node";
 import { debounce } from "utils/debounce";
@@ -15,6 +15,7 @@ import { useFigmaImageService } from "scaffolds/editor";
 import { MonacoEditor } from "components/code-editor";
 import { CodingToolbar } from "./codeing-toolbar";
 import { useCurrentFile } from "./hooks";
+import { useDispatch } from "core/dispatch";
 
 interface CodingState {
   /**
@@ -94,7 +95,10 @@ export const useCodingDispatch = (): FlatDispatcher => {
 };
 
 export function Coding() {
-  const file = useCurrentFile();
+  const wstate = useWorkspaceState();
+  const file = useCurrentFile<File & { exports: string[] }>();
+  const dispatch = useDispatch();
+  const { framework_config } = wstate.preferences;
 
   const [codingState, codingDispatch] = React.useReducer(reducer, {
     focus: null,
@@ -109,17 +113,19 @@ export function Coding() {
 
   // const result = useCode();
 
-  const onChangeHandler = debounce((k, code) => {
+  const onChangeHandler = debounce((code: string, e) => {
     // currently react and vanilla are supported
-    // if (supportsScripting(framework_config.framework)) {
-    //   dispatch({
-    //     type: "codeing/update-file",
-    //     framework: framework_config.framework,
-    //     componentName: result.name,
-    //     id: result.id,
-    //     raw: code,
-    //   });
-    // }
+    if (supportsScripting(framework_config.framework)) {
+      if (file.path === "/component.tsx") {
+        dispatch({
+          type: "codeing/update-file",
+          framework: framework_config.framework,
+          componentName: file.exports[0], // result.name,
+          id: "tmp",
+          raw: code,
+        });
+      }
+    }
   }, 500);
 
   // const { code, scaffold, name: componentName, framework } = result ?? {};

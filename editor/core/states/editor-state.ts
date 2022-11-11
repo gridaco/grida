@@ -135,6 +135,7 @@ export interface IScenePreviewDataEsbuildPreview
 }
 
 export interface CodeRepository {
+  target?: string;
   files: { [key: string]: File };
   loading?: boolean;
 }

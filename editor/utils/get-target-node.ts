@@ -3,12 +3,10 @@ import { DesignInput } from "@grida/builder-config/input";
 import type { ReflectSceneNode } from "@design-sdk/figma-node";
 import q from "@design-sdk/query";
 
-export function getTargetContainer(state: EditorState) {
+export function getTargetContainer(state: EditorState, target?: string) {
   const { pages, selectedPage } = state;
-  const page = pages.find((p) => p.id === selectedPage);
 
-  let searchpool;
-
+  // validators
   if (!state.design) {
     return {
       root: null,
@@ -16,6 +14,9 @@ export function getTargetContainer(state: EditorState) {
     };
   }
 
+  // init search pool
+  let searchpool;
+  const page = pages.find((p) => p.id === selectedPage);
   if (page?.type === "figma-canvas") {
     searchpool = state.selectedPage
       ? state.design.pages.find((p) => p.id == state.selectedPage).children
@@ -24,8 +25,12 @@ export function getTargetContainer(state: EditorState) {
     searchpool = state.design.pages.map((p) => p.children).flat();
   }
 
-  const targetId =
-    state?.selectedNodes?.length === 1 ? state.selectedNodes[0] : null;
+  // init target id
+  let targetId: string = target;
+  if (!targetId) {
+    targetId =
+      state?.selectedNodes?.length === 1 ? state.selectedNodes[0] : null;
+  }
 
   if (!targetId) {
     return { target: null, root: null };

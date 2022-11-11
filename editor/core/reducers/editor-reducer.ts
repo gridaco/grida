@@ -18,6 +18,7 @@ import type {
   DesignerModeSwitchActon,
   CodingInitialFilesSeedAction,
   CodingCompileRequestAction,
+  CodingNewTemplateSessionAction,
 } from "core/actions";
 import { EditorState } from "core/states";
 import { NextRouter, useRouter } from "next/router";
@@ -59,23 +60,8 @@ export function editorReducer(state: EditorState, action: Action): EditorState {
             updated: new Date(),
           };
 
-          const code_default_drafts_page = "code-drafts";
           switch (mode) {
             case "code": {
-              if (
-                state.pages.some(
-                  (p) => p.type === "code" && p.id === code_default_drafts_page
-                )
-              ) {
-                draft.selectedPage = code_default_drafts_page;
-              } else {
-                draft.pages.push({
-                  id: code_default_drafts_page,
-                  name: "Code",
-                  type: "code",
-                });
-                draft.selectedPage = code_default_drafts_page;
-              }
               break;
             }
             case "design": {
@@ -207,13 +193,59 @@ export function editorReducer(state: EditorState, action: Action): EditorState {
         // draft.selectedNodes = ["/component/component.tsx"];
       });
     }
-    case "codeing/update-file": {
-      const { key, content } = <CodingUpdateFileAction>action;
+    case "coding/new-template-session": {
+      const { template } = <CodingNewTemplateSessionAction>action;
+      const { type, target } = template;
+
       return produce(state, (draft) => {
-        const file = state.code.files[key];
-        draft.code.files[key] = {
-          ...file,
-          content,
+        switch (type) {
+          case "d2c": {
+            // init new page if required
+            const code_default_drafts_page = "code-drafts";
+            if (
+              state.pages.some(
+                (p) => p.type === "code" && p.id === code_default_drafts_page
+              )
+            ) {
+              draft.selectedPage = code_default_drafts_page;
+            } else {
+              draft.pages.push({
+                id: code_default_drafts_page,
+                name: "Code",
+                type: "code",
+              });
+              draft.selectedPage = code_default_drafts_page;
+            }
+
+            // reset files
+            draft.code.files = {};
+            draft.code.loading = true;
+            draft.code.target = target;
+            draft.mode = {
+              value: "code",
+              last: state.mode.value,
+              updated: new Date(),
+            };
+          }
+        }
+      });
+    }
+    case "codeing/update-file": {
+      // const { key, content } = <CodingUpdateFileAction>action;
+      // return produce(state, (draft) => {
+      //   const file = state.code.files[key];
+      //   draft.code.files[key] = {
+      //     ...file,
+      //     content,
+      //   };
+      // });
+
+      const { ...rest } = <CodingUpdateFileAction>action;
+      return produce(state, (draft) => {
+        draft.editingModule = {
+          ...rest,
+          type: "single-file-component",
+          lang: "unknown",
         };
       });
       //

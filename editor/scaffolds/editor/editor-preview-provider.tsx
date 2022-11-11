@@ -33,7 +33,8 @@ export function EditorPreviewDataProvider({
   const [state] = useEditorState();
   const dispatch = useDispatch();
 
-  const { target, root } = useTargetContainer();
+  const { target: targetid } = state.code;
+  const { target, root } = useTargetContainer(targetid);
 
   const updateBuildingState = useCallback(
     (isBuilding: boolean) => {
@@ -285,7 +286,8 @@ export function EditorPreviewDataProvider({
 
       switch (state.editingModule.framework) {
         case "react": {
-          bundler(transform(raw, componentName), "tsx")
+          const src = transform(raw, componentName);
+          bundler(src, "tsx")
             .then((d) => {
               if (d.err == null) {
                 if (d.code) {
