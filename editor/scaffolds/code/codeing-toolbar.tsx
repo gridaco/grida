@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import styled from "@emotion/styled";
 import {
   Cross1Icon,
@@ -9,32 +9,57 @@ import {
 import { Tooltip } from "@editor-ui/tooltip";
 import { Filetab } from "./filetab";
 import { useEditorState } from "core/states";
+import { useDispatch } from "core/dispatch";
+import { downloadFile } from "utils/download";
+import { useDispatch as usePreferencesDispatch } from "@code-editor/preferences";
+import { useCurrentFile } from "./hooks";
+import { useCodingDispatch, useCodingState } from "./coding";
 
-export function CodingToolbar({
-  onCloseClick,
-  onDownloadClick,
-  onOpenPreferencesClick,
-}: {
-  onCloseClick: () => void;
-  onOpenPreferencesClick: () => void;
-  onDownloadClick: () => void;
-}) {
+export function CodingToolbar() {
+  const file = useCurrentFile();
+
+  const codingDispatch = useCodingDispatch();
+
+  const preferencesDispatch = usePreferencesDispatch();
+
+  const dispatch = useDispatch();
+
+  const endCodeSession = useCallback(
+    () =>
+      dispatch({
+        type: "mode",
+        mode: "design",
+      }),
+    [dispatch]
+  );
+
+  const openPreferences = useCallback(() => {
+    preferencesDispatch({ type: "open", route: "/framework" });
+  }, [preferencesDispatch]);
+
+  const onDownloadClick = () => {
+    try {
+      // support non tsx files
+      downloadFile({ data: file.content, filename: file.name });
+    } catch (e) {}
+  };
+
   return (
     <CodingBarContainer>
       <div className="leading">
         <Tooltip content={"Close"}>
-          <IconButton onClick={onCloseClick}>
+          <IconButton onClick={endCodeSession}>
             <Cross1Icon />
           </IconButton>
         </Tooltip>
         <div style={{ width: 10 }} />
-        <SceneLabel style={{}}>/homescreen</SceneLabel>
+        <SceneLabel style={{}}>{"(sandbox)"}</SceneLabel>
         <CodingEditorTabs />
       </div>
       <div className="trailing">
         {/* TODO: add actions */}
         <Tooltip content={"Framework config"}>
-          <IconButton onClick={onOpenPreferencesClick}>
+          <IconButton onClick={openPreferences}>
             <GearIcon />
           </IconButton>
         </Tooltip>
@@ -108,26 +133,46 @@ const IconButton = styled.button`
 
 function CodingEditorTabs() {
   const [state] = useEditorState();
-  const [selection, setSelection] = React.useState();
+  const { files } = state.code;
+  const dispatch = useDispatch();
 
-  const { code } = state;
+  const codingDispatch = useCodingDispatch();
+
+  const { placements, focus } = useCodingState();
 
   const onselect = (id) => {
-    setSelection(id);
+    dispatch({
+      type: "select-node",
+      node: id,
+    });
   };
+
+  const tabs =
+    // if no focus or already placed, show placements. if not show focus also.
+    !focus || placements.includes(focus) ? placements : [...placements, focus];
 
   return (
     <Tabs>
-      {Object.values(code.files).map(({ name, path }) => (
-        <Filetab
-          key={path}
-          onClick={() => onselect(path)}
-          placed
-          selected={selection === path}
-        >
-          {name}
-        </Filetab>
-      ))}
+      {tabs.map((id, ix) => {
+        const { path, name } = files[id];
+        const placed = placements.includes(id);
+        return (
+          <Filetab
+            key={ix}
+            onClick={() => onselect(id)}
+            placed={placed}
+            onCloseClick={() => {
+              codingDispatch({ type: "close", path });
+            }}
+            onDoubleClick={() => {
+              if (!placed) codingDispatch({ type: "place", path });
+            }}
+            selected={id === focus}
+          >
+            {name}
+          </Filetab>
+        );
+      })}
     </Tabs>
   );
 }

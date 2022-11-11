@@ -4,6 +4,7 @@ import type {
   EditorState,
   EditorTask,
   ScenePreviewData,
+  File,
 } from "core/states";
 
 export type WorkspaceAction =
@@ -35,7 +36,7 @@ export type Action =
   | CanvasEditAction
   | CanvasModeAction
   | PreviewAction
-  | CodeEditorAction
+  | CodingAction
   | DevtoolsAction
   | BackgroundTaskAction;
 
@@ -120,14 +121,40 @@ export interface PreviewBuildingStateUpdateAction {
   isBuilding: boolean;
 }
 
-export type CodeEditorAction = CodeEditorEditComponentCodeAction;
+export type CodingAction =
+  | CodingInitialFilesSeedAction
+  | CodingUpdateFileAction
+  | CodingCompileRequestAction;
 
-export interface CodeEditorEditComponentCodeAction {
-  type: "code-editor-edit-component-code";
-  id: string;
-  framework: FrameworkConfig["framework"];
-  componentName: string;
-  raw: string;
+export type CodingInitialFilesSeedAction = {
+  type: "coding/initial-seed";
+  files: { [key: string]: File };
+  open?: string | string[] | "*";
+  focus?: string;
+};
+
+type RequestAction<T> = T & { $id: string };
+
+export type CodingCompileRequestAction = RequestAction<
+  {
+    type: "coding/compile-request";
+    files: { [key: string]: File };
+  } & (
+    | {
+        framework: "react";
+        transpiler: "auto" | "esbuild-wasm";
+      }
+    | {
+        framework: "flutter";
+        transpiler: "auto" | "dart-services";
+      }
+  )
+>;
+
+export interface CodingUpdateFileAction {
+  type: "codeing/update-file";
+  key: string;
+  content: string;
 }
 
 export type DevtoolsAction = DevtoolsConsoleAction | DevtoolsConsoleClearAction;

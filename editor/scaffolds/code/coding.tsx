@@ -7,170 +7,152 @@ import {
   MainImageRepository,
 } from "@design-sdk/asset-repository";
 import { useEditorState, useWorkspaceState } from "core/states";
-import { useDispatch } from "core/dispatch";
-import type { ReflectSceneNode } from "@design-sdk/figma-node";
 import { RemoteImageRepositories } from "@design-sdk/figma-remote/asset-repository";
 import { useTargetContainer } from "hooks/use-target-node";
 import { debounce } from "utils/debounce";
 import { supportsScripting } from "config";
 import { useFigmaImageService } from "scaffolds/editor";
 import { MonacoEditor } from "components/code-editor";
-import { downloadFile } from "utils/download";
 import { CodingToolbar } from "./codeing-toolbar";
-import { useDispatch as usePreferencesDispatch } from "@code-editor/preferences";
+import { useCurrentFile } from "./hooks";
 
-function useCode() {
-  const [result, setResult] = useState<Result>();
-  const wstate = useWorkspaceState();
-  const [state] = useEditorState();
-  const resolver = useFigmaImageService();
-  const enable_components =
-    wstate.preferences.enable_preview_feature_components_support;
-  const framework_config = wstate.preferences.framework_config;
-
-  const { target: targetted, root } = useTargetContainer();
-
-  const on_result = (result: Result) => {
-    setResult(result);
-  };
-
-  useEffect(() => {
-    const __target = targetted;
-    const __framework_config = framework_config;
-    if (__target && __framework_config) {
-      if (!MainImageRepository.isReady) {
-        // this is not the smartest way, but the image repo has a design flaw.
-        // this happens when the target node is setted on the query param on first load, when the image repo is not set by the higher editor container.
-        MainImageRepository.instance = new RemoteImageRepositories(
-          state.design.key,
-          {
-            // setting this won't load any image btw. (just to prevent errors)
-            authentication: { accessToken: "" },
-          }
-        );
-        MainImageRepository.instance.register(
-          new ImageRepository(
-            "fill-later-assets",
-            "grida://assets-reservation/images/"
-          )
-        );
-      }
-
-      const _input = {
-        id: __target.id,
-        name: __target.name,
-        entry: __target,
-        repository: root.repository,
-      };
-      const build_config = {
-        ...config.default_build_configuration,
-        disable_components: !enable_components,
-      };
-
-      // build final code with asset fetch
-      if (!MainImageRepository.instance.empty) {
-        designToCode({
-          input: _input,
-          framework: __framework_config,
-          asset_config: {
-            asset_repository: MainImageRepository.instance,
-            resolver: ({ keys: key }) =>
-              resolver.fetch(key, { ensure: true, debounce: false }),
-          },
-          build_config: build_config,
-        })
-          .then(on_result)
-          .catch(console.error);
-      }
-    }
-  }, [targetted?.id, framework_config]);
-
-  return result;
+interface CodingState {
+  /**
+   * current interactive file
+   */
+  focus: string;
+  /**
+   * list of files (paths) that are currently opened in the tab bar.
+   */
+  placements: string[];
 }
 
-export function Coding() {
-  const wstate = useWorkspaceState();
+type CodingAction = CloseFileTabAction | PlaceFileAction | FocusFileAction;
+type CloseFileTabAction = {
+  type: "close";
+  path: string;
+};
+type PlaceFileAction = { type: "place"; path: string };
+type FocusFileAction = { type: "focus"; path: string };
 
-  const { framework_config } = wstate.preferences;
+const CodingStateContext = React.createContext<CodingState | null>(null);
 
-  const preferencesDispatch = usePreferencesDispatch();
+export function useCodingState() {
+  const state = React.useContext(CodingStateContext);
+  if (!state) {
+    throw new Error("useCodingState must be used within a CodingProvider");
+  }
+  return state;
+}
 
-  const dispatch = useDispatch();
+type FlatDispatcher = (action: CodingAction) => void;
 
-  const result = useCode();
+const __noop = () => {};
 
-  const endCodeSession = useCallback(
-    () =>
-      dispatch({
-        type: "mode",
-        mode: "design",
-      }),
+function reducer(state: CodingState, action: CodingAction): CodingState {
+  switch (action.type) {
+    case "close": {
+      const placements = state.placements.filter((p) => p !== action.path); // it's like removing
+      const focus = placements[0] || null;
+      return {
+        ...state,
+        placements,
+        focus,
+      };
+    }
+    case "place": {
+      const placements = state.placements.includes(action.type)
+        ? state.placements
+        : [...state.placements, action.path];
+      const focus = action.path;
+      return {
+        ...state,
+        placements,
+        focus,
+      };
+    }
+    case "focus": {
+      // do not modify the placements
+      return {
+        ...state,
+        focus: action.path,
+      };
+    }
+  }
+}
+
+const DispatchContext = React.createContext<FlatDispatcher>(__noop);
+
+export const useCodingDispatch = (): FlatDispatcher => {
+  const dispatch = React.useContext(DispatchContext);
+  return useCallback(
+    (action: CodingAction) => {
+      dispatch(action);
+    },
     [dispatch]
   );
+};
 
-  const openPreferences = useCallback(() => {
-    preferencesDispatch({ type: "open", route: "/framework" });
-  }, [preferencesDispatch]);
+export function Coding() {
+  const file = useCurrentFile();
 
-  const onDownloadClick = () => {
-    try {
-      // support non tsx files
-      downloadFile({ data: result.scaffold.raw, filename: "draft.tsx" });
-    } catch (e) {}
-  };
+  const [codingState, codingDispatch] = React.useReducer(reducer, {
+    focus: null,
+    placements: [],
+  });
+
+  useEffect(() => {
+    if (file) {
+      codingDispatch({ type: "focus", path: file.path });
+    }
+  }, [file?.path]);
+
+  // const result = useCode();
 
   const onChangeHandler = debounce((k, code) => {
-    if (!result) {
-      return;
-    }
-
     // currently react and vanilla are supported
-    if (supportsScripting(framework_config.framework)) {
-      dispatch({
-        type: "code-editor-edit-component-code",
-        framework: framework_config.framework,
-        componentName: result.name,
-        id: result.id,
-        raw: code,
-      });
-    }
+    // if (supportsScripting(framework_config.framework)) {
+    //   dispatch({
+    //     type: "codeing/update-file",
+    //     framework: framework_config.framework,
+    //     componentName: result.name,
+    //     id: result.id,
+    //     raw: code,
+    //   });
+    // }
   }, 500);
 
-  const { code, scaffold, name: componentName, framework } = result ?? {};
+  // const { code, scaffold, name: componentName, framework } = result ?? {};
 
   return (
-    <CodeEditorContainer>
-      <CodingToolbar
-        onCloseClick={endCodeSession}
-        onDownloadClick={onDownloadClick}
-        onOpenPreferencesClick={openPreferences}
-      />
-      <MonacoEditor
-        height="100vh"
-        options={{
-          automaticLayout: true,
-          minimap: {
-            enabled: false,
-          },
-          guides: {
-            indentation: false,
-          },
-        }}
-        onChange={onChangeHandler}
-        value={scaffold?.raw}
-        language={framework_config.language}
-      />
-    </CodeEditorContainer>
+    <CodingStateContext.Provider value={codingState}>
+      <DispatchContext.Provider value={codingDispatch}>
+        <CodeEditorContainer>
+          <CodingToolbar />
+          {file && codingState.focus ? (
+            <MonacoEditor
+              height="100vh"
+              options={{
+                automaticLayout: true,
+                minimap: {
+                  enabled: false,
+                },
+                guides: {
+                  indentation: false,
+                },
+              }}
+              onChange={onChangeHandler}
+              value={file.content}
+              language={file.type}
+            />
+          ) : (
+            <EmptyState />
+          )}
+        </CodeEditorContainer>
+      </DispatchContext.Provider>
+    </CodingStateContext.Provider>
   );
 }
-
-const filename = {
-  vanilla: "index.html",
-  react: "app.tsx",
-  "solid-js": "app.tsx",
-  vue: "app.vue",
-  flutter: "main.dart",
-} as const;
 
 const CodeEditorContainer = styled.div`
   display: flex;
@@ -192,7 +174,7 @@ const EmptyStateContainer = styled.div`
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  height: 100%;
+  height: 100vh;
   width: 100%;
 `;
 

@@ -3,7 +3,7 @@ import type {
   Action,
   SelectNodeAction,
   SelectPageAction,
-  CodeEditorEditComponentCodeAction,
+  CodingUpdateFileAction,
   CanvasModeSwitchAction,
   TranslateNodeAction,
   PreviewBuildingStateUpdateAction,
@@ -16,6 +16,8 @@ import type {
   EditorModeSwitchAction,
   LocateNodeAction,
   DesignerModeSwitchActon,
+  CodingInitialFilesSeedAction,
+  CodingCompileRequestAction,
 } from "core/actions";
 import { EditorState } from "core/states";
 import { NextRouter, useRouter } from "next/router";
@@ -73,20 +75,6 @@ export function editorReducer(state: EditorState, action: Action): EditorState {
                   type: "code",
                 });
                 draft.selectedPage = code_default_drafts_page;
-
-                // test
-                draft.code.files["/component/index.ts"] = {
-                  content: `import React from "react";`,
-                  name: "index.ts",
-                  path: "<dir>/component/index.ts",
-                  type: "ts",
-                };
-                draft.code.files["/component/component.tsx"] = {
-                  content: `import React from "react";`,
-                  name: "component.tsx",
-                  path: "<dir>/component/component.tsx",
-                  type: "tsx",
-                };
               }
               break;
             }
@@ -192,16 +180,49 @@ export function editorReducer(state: EditorState, action: Action): EditorState {
           });
       });
     }
-    case "code-editor-edit-component-code": {
-      const { ...rest } = <CodeEditorEditComponentCodeAction>action;
+
+    case "coding/initial-seed": {
+      const { files } = <CodingInitialFilesSeedAction>action;
       return produce(state, (draft) => {
-        draft.editingModule = {
-          ...rest,
-          type: "single-file-component",
-          lang: "unknown",
+        const keys = Object.keys(files);
+        if (keys.length > 0) {
+          draft.code.files = files;
+          draft.selectedNodes = [keys[0]];
+        }
+
+        // test
+        // draft.code.files["/component/index.ts"] = {
+        //   content: `import React from "react";`,
+        //   name: "index.ts",
+        //   path: "/component/index.ts",
+        //   type: "application/typescript",
+        // };
+        // draft.code.files["/component/component.tsx"] = {
+        //   content: `import React from "react";`,
+        //   name: "component.tsx",
+        //   path: "/component/component.tsx",
+        //   type: "application/typescriptreact",
+        // };
+        // draft.selectedNodes = ["/component/component.tsx"];
+      });
+    }
+    case "codeing/update-file": {
+      const { key, content } = <CodingUpdateFileAction>action;
+      return produce(state, (draft) => {
+        const file = state.code.files[key];
+        draft.code.files[key] = {
+          ...file,
+          content,
         };
       });
       //
+    }
+    case "coding/compile-request": {
+      const { $id, files, framework, transpiler } = <
+        CodingCompileRequestAction
+      >action;
+
+      // TODO:
     }
 
     case "canvas-mode": {
