@@ -1,11 +1,8 @@
 import React, { forwardRef, memo, useCallback, ReactNode } from "react";
 import { TreeView } from "@editor-ui/hierarchy";
-import { Spacer } from "@editor-ui/spacer";
-import { withSeparatorElements } from "@editor-ui/utils";
 import styled from "@emotion/styled";
 import { useTheme } from "@emotion/react";
 import "@editor-ui/theme";
-import { DotsHorizontalIcon } from "@radix-ui/react-icons";
 import { FileModuleIcon } from "components/icons";
 
 export const IconContainer = styled.span(({ theme }) => ({
@@ -72,6 +69,8 @@ export const FileRow = memo(
         hovered={hovered}
         selected={selected}
         selectedColor="rgba(255, 255, 255, 0.1)"
+        hoverColor="rgba(255, 255, 255, 0.05)"
+        hoverOutlineColor="none"
         disabled={false}
         onPress={onPress}
         onClick={onClick}
