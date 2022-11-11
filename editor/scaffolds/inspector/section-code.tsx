@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import {
   PropertyLines,
   PropertyGroup,
@@ -30,9 +30,15 @@ export function CodeSection() {
     setResult(result);
   };
 
-  const onOpenClick = () => {
-    dispatch({ type: "mode", mode: "code" });
-  };
+  const onOpenClick = useCallback(() => {
+    dispatch({
+      type: "coding/new-template-session",
+      template: {
+        type: "d2c",
+        target: target.id,
+      },
+    });
+  }, [target, dispatch]);
 
   const onOpenConfigClick = () => {
     preferencesDispatch({ type: "open", route: "/framework" });

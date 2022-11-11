@@ -267,129 +267,134 @@ export function EditorPreviewDataProvider({
     if (!state.editingModule) {
       return;
     }
-
     if (supportsPreview(state.editingModule.framework)) {
-      const { raw, componentName } = state.editingModule;
-      assert(componentName, "component name is required");
-      assert(raw, "raw input code is required");
-      updateBuildingState(true);
+      try {
+        const { raw, componentName } = state.editingModule;
+        assert(componentName, "component name is required");
+        assert(raw, "raw input code is required");
+        updateBuildingState(true);
 
-      const wkey = new WidgetKey({
-        originName: target.name,
-        id: target.id,
-      });
+        const wkey = new WidgetKey({
+          originName: target.name,
+          id: target.id,
+        });
 
-      const initialSize = {
-        width: target.width,
-        height: target.height,
-      };
+        const initialSize = {
+          width: target.width,
+          height: target.height,
+        };
 
-      switch (state.editingModule.framework) {
-        case "react": {
-          const src = transform(raw, componentName);
-          bundler(src, "tsx")
-            .then((d) => {
-              if (d.err == null) {
-                if (d.code) {
-                  onEsbuildReactPreviewResult({
-                    key: wkey,
-                    initialSize: initialSize,
-                    bundledjs: d.code,
-                    componentName: componentName,
-                  });
+        switch (state.editingModule.framework) {
+          case "react": {
+            const src = transform(raw, componentName);
+            bundler(src, "tsx")
+              .then((d) => {
+                if (d.err == null) {
+                  if (d.code) {
+                    onEsbuildReactPreviewResult({
+                      key: wkey,
+                      initialSize: initialSize,
+                      bundledjs: d.code,
+                      componentName: componentName,
+                    });
+                  }
+                } else {
+                  consoleLog({ ...d.err });
                 }
-              } else {
-                consoleLog({ ...d.err });
-              }
-            })
-            .catch((e) => {
-              consoleLog({ method: "error", data: [e.message] });
-            })
-            .finally(() => {
-              updateBuildingState(false);
-            });
-          break;
-        }
-        case "vanilla": {
-          onVanillaPreviewResult({
-            key: wkey,
-            initialSize,
-            componentName,
-            raw: state.editingModule.raw,
-          });
-          break;
-        }
-        case "flutter": {
-          is_daemon_running(local_flutter_daemon_server_url).then(
-            (daemon_available) => {
-              consoleLog({
-                method: "info",
-                data: ["running flutter app with local daemon"],
+              })
+              .catch((e) => {
+                consoleLog({ method: "error", data: [e.message] });
+              })
+              .finally(() => {
+                updateBuildingState(false);
               });
-              if (daemon_available) {
-                FlutterDaemon.instance
-                  .initProject(state.editingModule.raw)
-                  .then(() => {
-                    setTimeout(() => {
-                      FlutterDaemon.instance
-                        .save(state.editingModule.raw)
-                        .then(() => {
-                          FlutterDaemon.instance.webLaunchUrl().then((url) => {
-                            updateBuildingState(false);
-                            dispatch({
-                              type: "preview-set",
-                              data: {
-                                loader: "flutter-daemon-view",
-                                viewtype: "unknown",
-                                widgetKey: wkey,
-                                componentName: componentName,
-                                fallbackSource:
-                                  state.currentPreview?.fallbackSource,
-                                source: url,
-                                initialSize: initialSize,
-                                isBuilding: false,
-                                meta: {
-                                  bundler: "flutter-daemon",
-                                  framework: "flutter",
-                                  reason: "update",
-                                },
-                                updatedAt: Date.now(),
-                              },
-                            });
+            break;
+          }
+          case "vanilla": {
+            onVanillaPreviewResult({
+              key: wkey,
+              initialSize,
+              componentName,
+              raw: state.editingModule.raw,
+            });
+            break;
+          }
+          case "flutter": {
+            is_daemon_running(local_flutter_daemon_server_url).then(
+              (daemon_available) => {
+                consoleLog({
+                  method: "info",
+                  data: ["running flutter app with local daemon"],
+                });
+                if (daemon_available) {
+                  FlutterDaemon.instance
+                    .initProject(state.editingModule.raw)
+                    .then(() => {
+                      setTimeout(() => {
+                        FlutterDaemon.instance
+                          .save(state.editingModule.raw)
+                          .then(() => {
+                            FlutterDaemon.instance
+                              .webLaunchUrl()
+                              .then((url) => {
+                                updateBuildingState(false);
+                                dispatch({
+                                  type: "preview-set",
+                                  data: {
+                                    loader: "flutter-daemon-view",
+                                    viewtype: "unknown",
+                                    widgetKey: wkey,
+                                    componentName: componentName,
+                                    fallbackSource:
+                                      state.currentPreview?.fallbackSource,
+                                    source: url,
+                                    initialSize: initialSize,
+                                    isBuilding: false,
+                                    meta: {
+                                      bundler: "flutter-daemon",
+                                      framework: "flutter",
+                                      reason: "update",
+                                    },
+                                    updatedAt: Date.now(),
+                                  },
+                                });
+                              });
                           });
+                      }, 500);
+                    });
+                } else {
+                  dartservices
+                    .compileComplete(state.editingModule.raw)
+                    .then((r) => {
+                      if (!r.error) {
+                        onDartServicesFlutterBuildComplete({
+                          key: wkey,
+                          initialSize: initialSize,
+                          componentName: componentName,
+                          js: r.result,
                         });
-                    }, 500);
-                  });
-              } else {
-                dartservices
-                  .compileComplete(state.editingModule.raw)
-                  .then((r) => {
-                    if (!r.error) {
-                      onDartServicesFlutterBuildComplete({
-                        key: wkey,
-                        initialSize: initialSize,
-                        componentName: componentName,
-                        js: r.result,
-                      });
-                    } else {
-                      consoleLog({ method: "error", data: [r.error] });
-                    }
-                  })
-                  .catch((e) => {
-                    consoleLog({ method: "error", data: [e.message] });
-                  })
-                  .finally(() => {
-                    updateBuildingState(false);
-                  });
+                      } else {
+                        consoleLog({ method: "error", data: [r.error] });
+                      }
+                    })
+                    .catch((e) => {
+                      consoleLog({ method: "error", data: [e.message] });
+                    })
+                    .finally(() => {
+                      updateBuildingState(false);
+                    });
+                }
               }
-            }
-          );
-          break;
+            );
+            break;
+          }
+          default:
+            throw new Error(
+              `Unsupported framework: ${state.editingModule.framework}`
+            );
         }
-        default:
-          throw new Error(
-            `Unsupported framework: ${state.editingModule.framework}`
-          );
+      } catch (e) {
+        console.error(e);
       }
     }
   }, [state.editingModule?.framework, state.editingModule?.raw]);
