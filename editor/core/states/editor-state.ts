@@ -52,7 +52,6 @@ export interface EditorState {
   canvasMode: LastKnown<TCanvasMode>;
   currentPreview?: ScenePreviewData;
   code: CodeRepository;
-  editingModule?: EditingModule;
   devtoolsConsole?: DevtoolsConsole;
   editorTaskQueue: EditorTaskQueue;
 }
@@ -135,19 +134,13 @@ export interface IScenePreviewDataEsbuildPreview
 }
 
 export interface CodeRepository {
-  target?: string;
   files: { [key: string]: File };
   loading?: boolean;
-}
-
-type TEditingModuleType = "single-file-component";
-
-export interface EditingModule {
-  type: TEditingModuleType;
-  componentName: string;
-  framework: FrameworkConfig["framework"];
-  lang: string;
-  raw: string;
+  runner?: {
+    type: "scene";
+    sceneId: string;
+    entry?: string;
+  };
 }
 
 interface DevtoolsConsole {

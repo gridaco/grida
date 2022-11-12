@@ -23,6 +23,12 @@ export function CodeInitialTemplateProvider({
         type: "coding/initial-seed",
         // todo:
         files: {
+          "/package.json": {
+            name: "package.json",
+            path: "/package.json",
+            type: "application/json",
+            content: JSON.stringify(package_json, null, 2),
+          },
           "/index.html": {
             name: "index.html",
             path: "/index.html",
@@ -43,6 +49,7 @@ export function CodeInitialTemplateProvider({
             exports: [result.name],
           },
         },
+        entry: "/app.tsx",
         open: "*",
         focus: "/component.tsx",
       });
@@ -63,4 +70,14 @@ const App = () => <${n}/>
 
 ReactDOM.render(<App />, document.querySelector('#root'));
 `;
+};
+
+const package_json = {
+  name: "sandbox",
+  version: "0.1.0",
+  private: true,
+  dependencies: {
+    react: "^18.2.0",
+    "react-dom": "^18.2.0",
+  },
 };

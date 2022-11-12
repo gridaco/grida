@@ -17,7 +17,6 @@ import type {
   LocateNodeAction,
   DesignerModeSwitchActon,
   CodingInitialFilesSeedAction,
-  CodingCompileRequestAction,
   CodingNewTemplateSessionAction,
 } from "core/actions";
 import { EditorState } from "core/states";
@@ -167,32 +166,6 @@ export function editorReducer(state: EditorState, action: Action): EditorState {
       });
     }
 
-    case "coding/initial-seed": {
-      const { files, open, focus } = <CodingInitialFilesSeedAction>action;
-      return produce(state, (draft) => {
-        const keys = Object.keys(files);
-        if (keys.length > 0) {
-          draft.code.files = files;
-          draft.code.loading = false;
-          draft.selectedNodes = [focus] ?? [keys[0]];
-        }
-
-        // test
-        // draft.code.files["/component/index.ts"] = {
-        //   content: `import React from "react";`,
-        //   name: "index.ts",
-        //   path: "/component/index.ts",
-        //   type: "application/typescript",
-        // };
-        // draft.code.files["/component/component.tsx"] = {
-        //   content: `import React from "react";`,
-        //   name: "component.tsx",
-        //   path: "/component/component.tsx",
-        //   type: "application/typescriptreact",
-        // };
-        // draft.selectedNodes = ["/component/component.tsx"];
-      });
-    }
     case "coding/new-template-session": {
       const { template } = <CodingNewTemplateSessionAction>action;
       const { type, target } = template;
@@ -220,7 +193,10 @@ export function editorReducer(state: EditorState, action: Action): EditorState {
             // reset files
             draft.code.files = {};
             draft.code.loading = true;
-            draft.code.target = target;
+            draft.code.runner = {
+              type: "scene",
+              sceneId: target,
+            };
             draft.mode = {
               value: "code",
               last: state.mode.value,
@@ -230,30 +206,33 @@ export function editorReducer(state: EditorState, action: Action): EditorState {
         }
       });
     }
-    case "codeing/update-file": {
-      // const { key, content } = <CodingUpdateFileAction>action;
-      // return produce(state, (draft) => {
-      //   const file = state.code.files[key];
-      //   draft.code.files[key] = {
-      //     ...file,
-      //     content,
-      //   };
-      // });
-
-      const { ...rest } = <CodingUpdateFileAction>action;
+    case "coding/initial-seed": {
+      const { files, open, focus, entry } = <CodingInitialFilesSeedAction>(
+        action
+      );
       return produce(state, (draft) => {
-        draft.editingModule = {
-          ...rest,
-          type: "single-file-component",
-          lang: "unknown",
+        const keys = Object.keys(files);
+        if (keys.length > 0) {
+          draft.code.files = files;
+          draft.code.loading = false;
+          // const
+          draft.code.runner = {
+            ...state.code.runner,
+            entry,
+          };
+          draft.selectedNodes = [focus] ?? [keys[0]];
+        }
+      });
+    }
+    case "codeing/update-file": {
+      const { key, content } = <CodingUpdateFileAction>action;
+      return produce(state, (draft) => {
+        const file = state.code.files[key];
+        draft.code.files[key] = {
+          ...file,
+          content,
         };
       });
-      //
-    }
-    case "coding/compile-request": {
-      const { $id, files, framework, transpiler } = <
-        CodingCompileRequestAction
-      >action;
     }
 
     case "canvas-mode": {

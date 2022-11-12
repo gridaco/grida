@@ -8,6 +8,7 @@ export function MonacoEmptyMock({ l = 100 }: { l?: number }) {
         height: 0,
         display: "flex",
         flexDirection: "column",
+        alignItems: "flex-start",
         width: "100%",
         textAlign: "right",
         color: "#858585",
@@ -16,6 +17,7 @@ export function MonacoEmptyMock({ l = 100 }: { l?: number }) {
     >
       {Array.from(Array(l).keys()).map((i) => (
         <span
+          key={i.toString()}
           style={{
             left: 0,
             width: 36,
@@ -24,7 +26,6 @@ export function MonacoEmptyMock({ l = 100 }: { l?: number }) {
             fontSize: 12,
             lineHeight: "18px",
           }}
-          key={i.toString()}
         >
           {i + 1}
         </span>

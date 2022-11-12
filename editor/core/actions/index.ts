@@ -124,8 +124,7 @@ export interface PreviewBuildingStateUpdateAction {
 export type CodingAction =
   | CodingNewTemplateSessionAction
   | CodingInitialFilesSeedAction
-  | CodingUpdateFileAction
-  | CodingCompileRequestAction;
+  | CodingUpdateFileAction;
 
 export type CodingInitialFilesSeedAction = {
   type: "coding/initial-seed";
@@ -134,6 +133,7 @@ export type CodingInitialFilesSeedAction = {
       exports?: string[];
     };
   };
+  entry: string;
   open?: string | string[] | "*";
   focus?: string;
 };
@@ -148,31 +148,26 @@ export type CodingNewTemplateSessionAction = {
 
 type RequestAction<T> = T & { $id: string };
 
-export type CodingCompileRequestAction = RequestAction<
-  {
-    type: "coding/compile-request";
-    files: { [key: string]: File };
-  } & (
-    | {
-        framework: "react";
-        transpiler: "auto" | "esbuild-wasm";
-      }
-    | {
-        framework: "flutter";
-        transpiler: "auto" | "dart-services";
-      }
-  )
->;
+// export type CodingCompileRequestAction = RequestAction<
+//   {
+//     type: "coding/compile-request";
+//     files: { [key: string]: File };
+//   } & (
+//     | {
+//         framework: "react";
+//         transpiler: "auto" | "esbuild-wasm";
+//       }
+//     | {
+//         framework: "flutter";
+//         transpiler: "auto" | "dart-services";
+//       }
+//   )
+// >;
 
 export interface CodingUpdateFileAction {
   type: "codeing/update-file";
-  // key: string;
-  // content: string;
-
-  framework: FrameworkConfig["framework"];
-  componentName: string;
-  id: string;
-  raw: string;
+  key: string;
+  content: string;
 }
 
 export type DevtoolsAction = DevtoolsConsoleAction | DevtoolsConsoleClearAction;

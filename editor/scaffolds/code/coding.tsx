@@ -1,17 +1,7 @@
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect } from "react";
 import styled from "@emotion/styled";
-import { designToCode, Result } from "@designto/code";
-import { config } from "@grida/builder-config";
-import {
-  ImageRepository,
-  MainImageRepository,
-} from "@design-sdk/asset-repository";
-import { File, useEditorState, useWorkspaceState } from "core/states";
-import { RemoteImageRepositories } from "@design-sdk/figma-remote/asset-repository";
-import { useTargetContainer } from "hooks/use-target-node";
+import { File } from "core/states";
 import { debounce } from "utils/debounce";
-import { supportsScripting } from "config";
-import { useFigmaImageService } from "scaffolds/editor";
 import { MonacoEditor } from "components/code-editor";
 import { CodingToolbar } from "./codeing-toolbar";
 import { useCurrentFile } from "./hooks";
@@ -95,11 +85,8 @@ export const useCodingDispatch = (): FlatDispatcher => {
 };
 
 export function Coding() {
-  const wstate = useWorkspaceState();
-  const file = useCurrentFile<File & { exports: string[] }>();
+  const file = useCurrentFile<File>();
   const dispatch = useDispatch();
-  const { framework_config } = wstate.preferences;
-
   const [codingState, codingDispatch] = React.useReducer(reducer, {
     focus: null,
     placements: [],
@@ -111,24 +98,16 @@ export function Coding() {
     }
   }, [file?.path]);
 
-  // const result = useCode();
-
-  const onChangeHandler = debounce((code: string, e) => {
-    // currently react and vanilla are supported
-    if (supportsScripting(framework_config.framework)) {
-      if (file.path === "/component.tsx") {
-        dispatch({
-          type: "codeing/update-file",
-          framework: framework_config.framework,
-          componentName: file.exports[0], // result.name,
-          id: "tmp",
-          raw: code,
-        });
-      }
-    }
-  }, 500);
-
-  // const { code, scaffold, name: componentName, framework } = result ?? {};
+  const onChangeHandler = useCallback(
+    debounce((code: string, e) => {
+      dispatch({
+        type: "codeing/update-file",
+        key: file.path,
+        content: code,
+      });
+    }, 500),
+    [file?.path]
+  );
 
   return (
     <CodingStateContext.Provider value={codingState}>
@@ -148,6 +127,7 @@ export function Coding() {
                 },
               }}
               onChange={onChangeHandler}
+              path={file.path}
               value={file.content}
               language={file.type}
             />
