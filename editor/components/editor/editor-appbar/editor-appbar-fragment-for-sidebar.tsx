@@ -70,9 +70,11 @@ function MenuButton({
       <DropdownMenuContent>
         <DropdownMenuItem onClick={onGoToHome}>
           <DropdownMenuLabel>Go to Files</DropdownMenuLabel>
+          <RightSlot>⌘Escape</RightSlot>
         </DropdownMenuItem>
         <DropdownMenuItem onClick={onOpenPreferences}>
           <DropdownMenuLabel>Preferences</DropdownMenuLabel>
+          <RightSlot>⌘,</RightSlot>
         </DropdownMenuItem>
         <DropdownMenuItem onClick={onNewFile}>
           <DropdownMenuLabel>New Project</DropdownMenuLabel>
@@ -90,6 +92,12 @@ function MenuButton({
     </DropdownMenu>
   );
 }
+
+const RightSlot = styled.span`
+  color: rgba(0, 0, 0, 0.5);
+  margin-left: auto;
+  padding-left: 20px;
+`;
 
 const HamburguerMenu = styled(HamburgerMenuIcon)`
   border-radius: 4px;
