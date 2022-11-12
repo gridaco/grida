@@ -13,6 +13,7 @@ import {
   PropertyGroupHeader,
   PropertyLines,
 } from "@editor-ui/property";
+import { saveAs } from "file-saver";
 
 export function AssetsSection() {
   // if the node itself is exportable
@@ -82,7 +83,20 @@ function ImageFillNodeAssetView({ node: target }: { node: ReflectSceneNode }) {
       <PropertyLines>
         <Body>
           {srcs.map((src, i) => (
-            <Preview key={i} src={src} />
+            <AssetCard
+              key={i}
+              src={src}
+              onClick={() => {
+                // downlaod image.
+                // this downloads as file, but this requires a cors proxy
+                // fetch(src).then((res) => {
+                //   res.blob().then((blob) => {
+                //     saveAs(blob, "image.png");
+                //   });
+                // });
+                saveAs(src, "image.png");
+              }}
+            />
           ))}
         </Body>
       </PropertyLines>
@@ -96,6 +110,14 @@ const Body = styled.div`
   gap: 16px;
   flex-wrap: wrap;
 `;
+
+function AssetCard({ src, onClick }: { src: string; onClick: () => void }) {
+  return (
+    <div onClick={onClick}>
+      <Preview src={src} />
+    </div>
+  );
+}
 
 function Preview({ src }: { src: string }) {
   return (

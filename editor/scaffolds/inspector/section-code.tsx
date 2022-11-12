@@ -38,7 +38,7 @@ export function CodeSection() {
         target: target.id,
       },
     });
-  }, [target, dispatch]);
+  }, [target?.id, dispatch]);
 
   const onOpenConfigClick = () => {
     preferencesDispatch({ type: "open", route: "/framework" });

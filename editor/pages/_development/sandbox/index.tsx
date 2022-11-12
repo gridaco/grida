@@ -29,7 +29,12 @@ export default function SandboxPage() {
 
   useEffect(() => {
     setIsbuilding(true);
-    bundler(script, "tsx")
+    bundler({
+      files: {
+        "app.tsx": script,
+      },
+      entry: "app.tsx",
+    })
       .then((d) => {
         console.log(d);
         if (d.err == null) {
