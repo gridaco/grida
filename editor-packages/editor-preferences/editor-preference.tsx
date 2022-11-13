@@ -42,7 +42,7 @@ export function EditorPreference({ children }: React.PropsWithChildren<{}>) {
   return (
     <Context.Provider value={state}>
       <DispatchContext.Provider value={dispatch ?? __noop}>
-        <Dialog open={state.open} maxWidth="lg" onClose={onClose}>
+        <Dialog open={state.open} maxWidth="xl" onClose={onClose}>
           <Preferences />
         </Dialog>
         {children}
@@ -65,12 +65,7 @@ function Preferences() {
     return <></>;
   }
   return (
-    <Page
-      style={{
-        width: "80vw",
-        height: "80vh",
-      }}
-    >
+    <Page>
       <Sidebar>
         <EditorPreferenceTree />
       </Sidebar>
@@ -93,6 +88,11 @@ const Page = styled.div`
   display: flex;
   flex-direction: row;
   background: rgb(20, 20, 20);
+
+  width: 100%;
+  min-width: 80vw;
+  height: 100%;
+  min-height: 80vh;
 `;
 
 const Sidebar = styled.div`
@@ -109,6 +109,8 @@ const Sidebar = styled.div`
 `;
 
 const Content = styled.div`
+  display: flex;
+  flex-direction: column;
   flex: 8;
 `;
 

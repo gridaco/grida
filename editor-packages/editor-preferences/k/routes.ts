@@ -1,14 +1,14 @@
 import type { PreferenceRouteInfo } from "../core";
 
 const routes: PreferenceRouteInfo[] = [
-  {
-    route: "/general",
-    name: "General",
-  },
-  {
-    route: "/access-control",
-    name: "Members",
-  },
+  // {
+  //   route: "/general",
+  //   name: "General",
+  // },
+  // {
+  //   route: "/access-control",
+  //   name: "Members",
+  // },
   {
     route: "/editor",
     name: "Editor",
