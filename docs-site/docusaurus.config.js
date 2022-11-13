@@ -79,6 +79,7 @@ const config = {
         logo: {
           alt: "Grida Logo",
           src: "img/logo.svg",
+          srcDark: "img/logo-on-dark.svg",
           href: "https://grida.co/",
           target: "_self",
         },
@@ -133,6 +134,7 @@ const config = {
       colorMode: {
         defaultMode: "light",
         disableSwitch: true,
+        respectPrefersColorScheme: true,
       },
       algolia: {
         appId: "1ZAWX8WPMC",
