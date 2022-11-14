@@ -15,13 +15,33 @@ export default function EditorPreferenceFigmaPersonalAccessTokenPage({
   state,
   dispatch,
 }: PreferencePageProps) {
+  const [token, setToken] = React.useState<string | null>(null);
+
+  useEffect(() => {
+    setToken(personal.get_safe());
+  }, []);
+
   return (
     <PageContentLayout direction="row" spacebetween>
       <div>
         <h1>Personal Access Tokens</h1>
-        <TextField disabled value="ftk_xxxxxxxx" />
+        <TextField
+          disabled
+          fullWidth
+          value={token ? masking(token) : ""}
+          placeholder={"No personal access token set"}
+        />
         <div>
-          <RegisterNewFpat onSuccess={() => {}} />
+          <RegisterNewFpat
+            onSuccess={(token) => {
+              setToken(token);
+              personal.set(token);
+              setTimeout(() => {
+                alert("Page will reload");
+                window.location.reload();
+              }, 1000);
+            }}
+          />
         </div>
       </div>
       <HelpPanel
@@ -40,10 +60,10 @@ export default function EditorPreferenceFigmaPersonalAccessTokenPage({
  */
 function masking(token: string): string {
   // reveal first 5 and last 5
-  const first = token.substring(0, 5);
-  const last = token.substring(token.length - 5, token.length);
-  const length = token.length - 10;
-  const masked = "x".repeat(length);
+  const first = token.substring(0, 10);
+  const last = token.substring(token.length - 10, token.length);
+  const length = token.length - 20;
+  const masked = "*".repeat(length);
   return first + masked + last;
 }
 

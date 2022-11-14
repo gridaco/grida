@@ -17,7 +17,7 @@ export function EditorPreferencesRoutesProvider({
 
     dispatch({
       type: "register",
-      route: "/figma/personal-access-tokens",
+      route: "/figma/personal-access-token",
       name: "Personal Access Tokens",
       icon: "@radix-ui/react-icons/FigmaLogoIcon",
       renderer: (p) => <PreferencesFigmaPersonalAccessTokens {...p} />,

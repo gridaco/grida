@@ -89,20 +89,6 @@ const preset_pages: PresetPage[] = [
       },
     ],
   },
-  {
-    id: "Figma",
-    name: "Figma",
-    path: "",
-    depth: 0,
-    children: [
-      {
-        id: "setup-figma-pat",
-        name: "Set Access Token",
-        path: "/preferences/access-tokens",
-        depth: 1,
-      },
-    ],
-  },
 ];
 
 export function HomeSidebarTree() {

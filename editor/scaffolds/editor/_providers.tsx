@@ -6,26 +6,23 @@ import { EditorCodeWebworkerProvider } from "scaffolds/editor/editor-code-webwor
 import { EditorToastProvider } from "./editor-toast-provider";
 import { FigmaImageServiceProvider } from "./editor-figma-image-service-provider";
 import { useEditorState } from "core/states";
-import { EditorPreferenceProvider } from "./editor-preference-provider";
 
 export function EditorDefaultProviders(props: { children: React.ReactNode }) {
   const [state] = useEditorState();
 
   return (
-    <EditorPreferenceProvider>
-      <EditorToastProvider>
-        <EditorImageRepositoryProvider>
-          <EditorCodeWebworkerProvider>
-            <EditorPreviewDataProvider>
-              <EditorShortcutsProvider>
-                <FigmaImageServiceProvider filekey={state?.design?.key}>
-                  {props.children}
-                </FigmaImageServiceProvider>
-              </EditorShortcutsProvider>
-            </EditorPreviewDataProvider>
-          </EditorCodeWebworkerProvider>
-        </EditorImageRepositoryProvider>
-      </EditorToastProvider>
-    </EditorPreferenceProvider>
+    <EditorToastProvider>
+      <EditorImageRepositoryProvider>
+        <EditorCodeWebworkerProvider>
+          <EditorPreviewDataProvider>
+            <EditorShortcutsProvider>
+              <FigmaImageServiceProvider filekey={state?.design?.key}>
+                {props.children}
+              </FigmaImageServiceProvider>
+            </EditorShortcutsProvider>
+          </EditorPreviewDataProvider>
+        </EditorCodeWebworkerProvider>
+      </EditorImageRepositoryProvider>
+    </EditorToastProvider>
   );
 }

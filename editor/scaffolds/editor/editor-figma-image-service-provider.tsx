@@ -52,6 +52,7 @@ export function FigmaImageServiceProvider({
   );
 
   const fetcher = useMemo(() => {
+    if (!service) return null;
     return {
       fetch: (...p: FetcherParams) => {
         const task = service.fetch(...p);

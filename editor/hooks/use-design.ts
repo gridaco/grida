@@ -149,8 +149,7 @@ export function useDesign({
             .catch((err: FigmaRemoteErrors) => {
               if (err instanceof UnauthorizedError) {
                 // unauthorized
-                router.push("/preferences/access-tokens");
-                console.info(`(ignored) error while fetching design`, err);
+                console.error(`(ignored) error while fetching design`, err);
                 return;
               }
 

@@ -7,6 +7,7 @@ import { warmup } from "scaffolds/editor";
 import { EditorBrowserMetaHead } from "components/editor";
 import type { FileResponse } from "@design-sdk/figma-remote-types";
 import { useWorkspaceInitializerContext } from "scaffolds/workspace";
+import { useDispatch } from "@code-editor/preferences";
 
 const action_fetchfile_id = "fetchfile" as const;
 
@@ -54,6 +55,14 @@ export function SetupEditor({
 
   const [loading, setLoading] = useState<boolean>(true);
   const [state] = useEditorState();
+  const prefDispatch = useDispatch();
+
+  const openFpatConfigurationPreference = useCallback(() => {
+    prefDispatch({
+      type: "open",
+      route: "/figma/personal-access-token",
+    });
+  }, [prefDispatch]);
 
   const initialCanvasMode = q_map_canvas_mode_from_query(
     router.query.mode as string
@@ -149,9 +158,9 @@ export function SetupEditor({
               "You will now see the cached version of this file. To view the latest version, setup your personall access token."
             );
             // TODO: show signin prompt
-            window.open("/preferences/access-tokens", "_blank");
+            openFpatConfigurationPreference();
           } else {
-            router.push("/preferences/access-tokens");
+            openFpatConfigurationPreference();
           }
           break;
         }
