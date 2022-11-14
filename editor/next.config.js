@@ -11,6 +11,7 @@ const withTM = require("next-transpile-modules")([
   "@code-editor/preferences",
   // "@code-editor/shortcuts",
   "@code-editor/module-icons",
+  "use-sys-theme",
 
   // -----------------------------
   // region @designto-code
