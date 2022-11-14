@@ -66,7 +66,7 @@ function RecentDesignSection({ recents }: { recents }) {
     <HomeCardGroup
       anchor={"#recents"}
       label={"Recents"}
-      cards={[<RecentDesignCardList recents={recents} />]}
+      cards={[<RecentDesignCardList key="recents" recents={recents} />]}
     />
   );
 }
