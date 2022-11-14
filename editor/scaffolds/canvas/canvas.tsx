@@ -9,10 +9,9 @@ import {
 import useMeasure from "react-use-measure";
 import { useDispatch } from "core/dispatch";
 import { FrameTitleRenderer } from "./render/frame-title";
-import { IsolateModeCanvas } from "./isolate-mode";
-import { Dialog } from "@mui/material";
-import { FullScreenPreview } from "scaffolds/preview-full-screen";
+
 import { cursors } from "cursors";
+import { usePreferences } from "@code-editor/preferences";
 
 /**
  * Statefull canvas segment that contains canvas as a child, with state-data connected.
@@ -20,55 +19,26 @@ import { cursors } from "cursors";
 export function VisualContentArea() {
   const [state] = useEditorState();
   const [canvasSizingRef, canvasBounds] = useMeasure();
+  const { config: preferences } = usePreferences();
 
   const { highlightedLayer, highlightLayer } = useWorkspace();
   const dispatch = useDispatch();
 
-  const {
-    selectedPage,
-    design,
-    selectedNodes,
-    canvasMode,
-    canvasMode_previous,
-  } = state;
+  const { selectedPage, design, selectedNodes, canvasMode } = state;
 
   const thisPage = design?.pages?.find((p) => p.id == selectedPage);
-  const thisPageNodes = selectedPage ? thisPage.children.filter(Boolean) : [];
+  const thisPageNodes = selectedPage ? thisPage?.children?.filter(Boolean) : [];
 
   const isEmptyPage = thisPageNodes?.length === 0;
 
-  const startIsolatedViewMode = useCallback(
-    () =>
+  const startCodeSession = useCallback(
+    (target: string) =>
       dispatch({
-        type: "canvas-mode-switch",
-        mode: "isolated-view",
-      }),
-    [dispatch]
-  );
-
-  const startFullscreenPreviewMode = useCallback(
-    () =>
-      dispatch({
-        type: "canvas-mode-switch",
-        mode: "fullscreen-preview",
-      }),
-    [dispatch]
-  );
-
-  const endIsolatedViewMode = useCallback(
-    () =>
-      dispatch({
-        type: "canvas-mode-switch",
-        mode: "free",
-      }),
-    [dispatch]
-  );
-
-  const exitFullscreenPreview = useCallback(
-    () =>
-      dispatch({
-        type: "canvas-mode-goback",
-        fallback: "isolated-view",
+        type: "coding/new-template-session",
+        template: {
+          type: "d2c",
+          target: target,
+        },
       }),
     [dispatch]
   );
@@ -79,7 +49,26 @@ export function VisualContentArea() {
       thisPage.backgroundColor.g * 255
     }, ${thisPage.backgroundColor.b * 255}, ${thisPage.backgroundColor.a})`;
 
-  const cursor = state.mode === "comment" ? cursors.comment : "default";
+  const cursor = state.designerMode === "comment" ? cursors.comment : "default";
+
+  const { renderer } = preferences.canvas;
+  const renderItem = useCallback(
+    (p) => {
+      switch (renderer) {
+        case "bitmap-renderer": {
+          return (
+            <OptimizedPreviewCanvas key={p.node.id} target={p.node} {...p} />
+          );
+        }
+        case "vanilla-renderer": {
+          return <D2CVanillaPreview key={p.node.id} target={p.node} {...p} />;
+        }
+        default:
+          throw new Error("Unknown renderer", renderer);
+      }
+    },
+    [renderer]
+  );
 
   return (
     <CanvasContainer ref={canvasSizingRef} id="canvas">
@@ -89,26 +78,9 @@ export function VisualContentArea() {
         <></>
       ) : (
         <>
-          <FullScreenPreviewContainer
-            show={canvasMode == "fullscreen-preview"}
-            onExit={exitFullscreenPreview}
-          />
-          {(canvasMode == "isolated-view" ||
-            (canvasMode == "fullscreen-preview" &&
-              canvasMode_previous === "isolated-view")) && (
-            <IsolateModeCanvas
-              hidden={
-                // if prev mode is this, hide, not remove.
-                canvasMode == "fullscreen-preview" &&
-                canvasMode_previous === "isolated-view"
-              }
-              onClose={endIsolatedViewMode}
-              onEnterFullscreen={startFullscreenPreviewMode}
-            />
-          )}
           <div
             style={{
-              display: canvasMode !== "free" && "none",
+              display: state.mode.value === "design" ? "block" : "none",
             }}
           >
             <Canvas
@@ -140,21 +112,7 @@ export function VisualContentArea() {
               }}
               nodes={thisPageNodes}
               // initialTransform={ } // TODO: if the initial selection is provided from first load, from the query param, we have to focus to fit that node.
-              renderItem={(p) => {
-                return (
-                  // <WebWorkerD2CVanillaPreview
-                  //   key={p.node.id}
-                  //   target={p.node}
-                  //   {...p}
-                  // />
-                  // <D2CVanillaPreview key={p.node.id} target={p.node} {...p} />
-                  <OptimizedPreviewCanvas
-                    key={p.node.id}
-                    target={p.node}
-                    {...p}
-                  />
-                );
-              }}
+              renderItem={renderItem}
               // readonly={false}
               readonly
               config={{
@@ -172,7 +130,7 @@ export function VisualContentArea() {
                   key={p.id}
                   {...p}
                   runnable={selectedNodes.length === 1}
-                  onRunClick={startIsolatedViewMode}
+                  onRunClick={() => startCodeSession(p.id)}
                 />
               )}
             />
@@ -180,20 +138,6 @@ export function VisualContentArea() {
         </>
       )}
     </CanvasContainer>
-  );
-}
-
-function FullScreenPreviewContainer({
-  onExit,
-  show,
-}: {
-  onExit: () => void;
-  show: boolean;
-}) {
-  return (
-    <Dialog fullScreen onClose={onExit} open={show}>
-      <FullScreenPreview onClose={onExit} />
-    </Dialog>
   );
 }
 

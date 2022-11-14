@@ -36,6 +36,9 @@ export function target_of_point<T extends Tree>(
   },
   depth = 0
 ): T | undefined {
+  // prevalidators
+  if (!tree) return;
+
   const [ox, oy] = offset;
 
   const items = reverse ? Array.from(tree).reverse() : tree;

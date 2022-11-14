@@ -1,6 +1,5 @@
 import React from "react";
 import styled from "@emotion/styled";
-import Link from "next/link";
 import { useRouter } from "next/router";
 
 export function HomeInputAppbar({ show_signin }: { show_signin: boolean }) {
@@ -8,7 +7,7 @@ export function HomeInputAppbar({ show_signin }: { show_signin: boolean }) {
 
   return (
     <RootWrapperHomeInputAppbar>
-      <Menu target="_blank" href="https://github.com/gridaco/designto-code">
+      <Menu target="_blank" href="https://github.com/gridaco/code">
         <MenuTetx>Github</MenuTetx>
       </Menu>
       <Menu target="_blank" href="https://grida.co">

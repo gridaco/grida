@@ -7,6 +7,7 @@ import { cachekey, cache } from "./cache";
 import { blurred_bg_fill } from "./util";
 import { PreviewContent } from "./preview-content";
 import type { VanillaPreviewProps } from "./prop-type";
+import { useFigmaImageService } from "scaffolds/editor";
 
 const placeholderimg =
   "https://bridged-service-static.s3.us-west-1.amazonaws.com/placeholder-images/image-placeholder-bw-tile-100.png";
@@ -42,6 +43,7 @@ export function D2CVanillaPreview({
 }: VanillaPreviewProps) {
   const [preview, setPreview] = useState<Result>();
   const key = cachekey(target);
+  const resolver = useFigmaImageService();
 
   const on_preview_result = (result: Result, __image: boolean) => {
     if (preview) {
@@ -87,7 +89,11 @@ export function D2CVanillaPreview({
           input: _input,
           build_config: build_config,
           framework: framework_config,
-          asset_config: { asset_repository: MainImageRepository.instance },
+          asset_config: {
+            asset_repository: MainImageRepository.instance,
+            resolver: ({ keys }) =>
+              resolver.fetch(keys, { ensure: true, debounce: false }),
+          },
         })
           .then((r) => {
             on_preview_result(r, true);

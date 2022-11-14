@@ -3,7 +3,7 @@ import styled from "@emotion/styled";
 import { TreeView } from "@editor-ui/editor";
 import { PageRow } from "./home-side-bar-tree-item";
 import { useRouter } from "next/router";
-import { flatten } from "components/editor/editor-layer-hierarchy/editor-layer-heriarchy-controller";
+import { flatten } from "components/editor/editor-hierarchy-layers/editor-layer-heriarchy-controller";
 interface PresetPage {
   id: string;
   name: string;
@@ -85,20 +85,6 @@ const preset_pages: PresetPage[] = [
         id: "docs",
         name: "Docs",
         path: "https://github.com/gridaco/designto-code/tree/main/docs",
-        depth: 1,
-      },
-    ],
-  },
-  {
-    id: "Figma",
-    name: "Figma",
-    path: "",
-    depth: 0,
-    children: [
-      {
-        id: "setup-figma-pat",
-        name: "Set Access Token",
-        path: "/preferences/access-tokens",
         depth: 1,
       },
     ],

@@ -3,7 +3,7 @@ import styled from "@emotion/styled";
 import { EditorState, useEditorState } from "core/states";
 import { colors } from "theme";
 import { useTargetContainer } from "hooks/use-target-node";
-
+import { EditorPropertyThemeProvider, one } from "@editor-ui/property";
 import { InfoSection } from "./section-info";
 import { LayoutSection } from "./section-layout";
 import { ColorsSection } from "./section-colors";
@@ -14,6 +14,7 @@ import { CodeSection } from "./section-code";
 import { Conversations } from "scaffolds/conversations";
 import { EditorAppbarFragments } from "components/editor";
 import { useDispatch } from "core/dispatch";
+import { EffectsSection } from "./section-effects";
 
 type Tab = "inspect" | "comment";
 
@@ -21,12 +22,12 @@ export function Inspector() {
   const [state] = useEditorState();
   const dispatch = useDispatch();
 
-  const tab = __mode(state.mode);
+  const tab = __mode(state.designerMode);
 
   const switchMode = useCallback(
     (mode: Tab) => {
       dispatch({
-        type: "mode",
+        type: "designer-mode",
         mode: mode,
       });
     },
@@ -37,13 +38,13 @@ export function Inspector() {
     <InspectorContainer>
       <EditorAppbarFragments.RightSidebar flex={0} />
       <Tabs selectedTab={tab} onTabChange={switchMode} />
-      <div style={{ height: 16 }} />
+      <div style={{ height: 16, flexShrink: 0 }} />
       <Body type={tab} />
     </InspectorContainer>
   );
 }
 
-const __mode = (mode: EditorState["mode"]): Tab => {
+const __mode = (mode: EditorState["designerMode"]): Tab => {
   switch (mode) {
     case "comment":
       return "comment";
@@ -74,22 +75,23 @@ function ConversationsBody() {
 
 function InspectorBody() {
   return (
-    <>
+    <EditorPropertyThemeProvider theme={one.dark}>
       <InfoSection />
       <LayoutSection />
-      <ColorsSection />
       <AssetsSection />
       <TypographySection />
+      <ColorsSection />
+      <EffectsSection />
       <ContentSection />
       <CodeSection />
-    </>
+    </EditorPropertyThemeProvider>
   );
 }
 
 function EmptyState() {
   return (
     <EmptyStateContainer>
-      <EmptyStateText>Nothing selected</EmptyStateText>
+      <EmptyStateText>No selection</EmptyStateText>
     </EmptyStateContainer>
   );
 }
@@ -140,7 +142,7 @@ const TabsContainer = styled.div`
   display: flex;
   flex-direction: row;
   align-items: center;
-  gap: 8px;
+  gap: 4px;
   padding: 8px;
 `;
 
@@ -172,11 +174,13 @@ function Tab({
 }
 
 const TabContainer = styled.label`
-  padding: 4px;
+  padding: 6px;
   border-radius: 4px;
   color: rgba(255, 255, 255, 0.5);
+  font-size: 14px;
   &[data-selected="true"] {
-    color: white;
+    color: white !important;
+    font-weight: 500;
   }
 
   &[data-hover="true"] {

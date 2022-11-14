@@ -8,13 +8,7 @@ export function ServerCanvas() {
   const { highlightedLayer, highlightLayer } = useWorkspace();
   const dispatch = useDispatch();
 
-  const {
-    selectedPage,
-    design,
-    selectedNodes,
-    canvasMode,
-    canvasMode_previous,
-  } = state;
+  const { selectedPage, design, selectedNodes, canvasMode } = state;
 
   useEffect(() => {
     //

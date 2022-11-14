@@ -1,6 +1,6 @@
-import { css, jsx } from "@emotion/react";
 import React, { CSSProperties } from "react";
-import { Resizable, ResizableProps } from "re-resizable";
+import { Resizable, ResizableProps } from "../resizable";
+
 /**
  * Wrapper for WorkspaceContentPanelGridLayout
  * @param props
@@ -33,7 +33,18 @@ export function WorkspaceContentPanel({
   return (
     <Resizable
       enable={resize}
+      handleClasses={{
+        top: "handle",
+        right: "handle",
+        bottom: "handle",
+        left: "handle",
+      }}
       onResizeStart={() => setOFlex(undefined)}
+      onResize={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        e.stopImmediatePropagation();
+      }}
       minWidth={minWidth}
       style={{
         minWidth: minWidth,

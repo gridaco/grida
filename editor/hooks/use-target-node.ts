@@ -4,7 +4,7 @@ import type { DesignInput } from "@grida/builder-config/input";
 import { useEditorState } from "core/states";
 import { getTargetContainer } from "utils/get-target-node";
 
-export function useTargetContainer() {
+export function useTargetContainer(id?: string) {
   const [t, setT] = useState<{ target: ReflectSceneNode; root: DesignInput }>({
     target: undefined,
     root: undefined,
@@ -12,8 +12,13 @@ export function useTargetContainer() {
   const [state] = useEditorState();
 
   useEffect(() => {
-    const { root, target } = getTargetContainer(state);
-    setT({ target, root });
+    if (id) {
+      const { target, root } = getTargetContainer(state, id);
+      setT({ target, root });
+    } else {
+      const { root, target } = getTargetContainer(state);
+      setT({ target, root });
+    }
   }, [state?.selectedNodes, state?.selectedPage, state?.design?.pages]);
 
   return t;

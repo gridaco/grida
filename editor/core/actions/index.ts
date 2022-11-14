@@ -4,6 +4,7 @@ import type {
   EditorState,
   EditorTask,
   ScenePreviewData,
+  File,
 } from "core/states";
 
 export type WorkspaceAction =
@@ -27,16 +28,17 @@ export type Action =
   | SetFigmaAuthAction
   | SetFigmaUserAction
   | PageAction
+  | EditorModeAction
+  | DesignerModeSwitchActon
   | SelectNodeAction
   | LocateNodeAction
   | HighlightNodeAction
   | CanvasEditAction
   | CanvasModeAction
   | PreviewAction
-  | CodeEditorAction
+  | CodingAction
   | DevtoolsAction
-  | BackgroundTaskAction
-  | EditorModeAction;
+  | BackgroundTaskAction;
 
 export type ActionType = Action["type"];
 
@@ -60,7 +62,12 @@ export type SetFigmaUserAction = {
 export type EditorModeAction = EditorModeSwitchAction;
 export type EditorModeSwitchAction = {
   type: "mode";
-  mode: EditorState["mode"];
+  mode: EditorState["mode"]["value"] | "goback";
+};
+
+export type DesignerModeSwitchActon = {
+  type: "designer-mode";
+  mode: EditorState["designerMode"];
 };
 
 export interface SelectNodeAction {
@@ -96,15 +103,10 @@ export interface HighlightNodeAction {
   id: string;
 }
 
-type CanvasModeAction = CanvasModeSwitchAction | CanvasModeGobackAction;
+type CanvasModeAction = CanvasModeSwitchAction;
 export interface CanvasModeSwitchAction {
-  type: "canvas-mode-switch";
-  mode: EditorState["canvasMode"];
-}
-
-export interface CanvasModeGobackAction {
-  type: "canvas-mode-goback";
-  fallback?: EditorState["canvasMode"];
+  type: "canvas-mode";
+  mode: EditorState["canvasMode"]["value"] | "goback";
 }
 
 export type PreviewAction = PreviewSetAction | PreviewBuildingStateUpdateAction;
@@ -119,14 +121,53 @@ export interface PreviewBuildingStateUpdateAction {
   isBuilding: boolean;
 }
 
-export type CodeEditorAction = CodeEditorEditComponentCodeAction;
+export type CodingAction =
+  | CodingNewTemplateSessionAction
+  | CodingInitialFilesSeedAction
+  | CodingUpdateFileAction;
 
-export interface CodeEditorEditComponentCodeAction {
-  type: "code-editor-edit-component-code";
-  id: string;
-  framework: FrameworkConfig["framework"];
-  componentName: string;
-  raw: string;
+export type CodingInitialFilesSeedAction = {
+  type: "coding/initial-seed";
+  files: {
+    [key: string]: File & {
+      exports?: string[];
+    };
+  };
+  entry: string;
+  open?: string | string[] | "*";
+  focus?: string;
+};
+
+export type CodingNewTemplateSessionAction = {
+  type: "coding/new-template-session";
+  template: {
+    type: "d2c";
+    target: string;
+  };
+};
+
+type RequestAction<T> = T & { $id: string };
+
+// export type CodingCompileRequestAction = RequestAction<
+//   {
+//     type: "coding/compile-request";
+//     files: { [key: string]: File };
+//   } & (
+//     | {
+//         framework: "react";
+//         transpiler: "auto" | "esbuild-wasm";
+//       }
+//     | {
+//         framework: "flutter";
+//         transpiler: "auto" | "dart-services";
+//       }
+//   )
+// >;
+
+export interface CodingUpdateFileAction {
+  type: "codeing/update-file";
+  key: string;
+  content: string;
 }
 
 export type DevtoolsAction = DevtoolsConsoleAction | DevtoolsConsoleClearAction;

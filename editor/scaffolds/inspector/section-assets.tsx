@@ -1,18 +1,58 @@
 import React, { useEffect, useState } from "react";
-import { InspectorSection } from "components/inspector";
 import { useTargetContainer } from "hooks/use-target-node";
 import { useFigmaImageService } from "scaffolds/editor";
-import type { ImagePaint } from "@design-sdk/figma-types";
+import { ImagePaint } from "@design-sdk/figma-types";
+import {
+  ReflectSceneNodeType,
+  ReflectVectorNode,
+  ReflectSceneNode,
+} from "@design-sdk/figma-node";
 import styled from "@emotion/styled";
+import {
+  PropertyGroup,
+  PropertyGroupHeader,
+  PropertyLines,
+} from "@editor-ui/property";
+import { saveAs } from "file-saver";
 
 export function AssetsSection() {
   // if the node itself is exportable
   // if the node has a complex gradient which is more effective to use asset than style code
   // if the node has a image fill
 
+  const { target } = useTargetContainer();
+
+  if (!target) {
+    return <></>;
+  }
+
+  const { type } = target;
+
+  switch (type) {
+    case ReflectSceneNodeType.vector:
+      return <VectorNodeAssetView node={target} />;
+    default: {
+      return <ImageFillNodeAssetView node={target} />;
+    }
+  }
+}
+
+function VectorNodeAssetView({ node }: { node: ReflectVectorNode }) {
+  // todo: support vector fetch
+  const service = useFigmaImageService();
+  return <></>;
+}
+
+/**
+ * the exportable config is not mapped from api response, this will be available once that statement is resolved.
+ */
+function ExportableNodeAssetView() {
+  //
+}
+
+function ImageFillNodeAssetView({ node: target }: { node: ReflectSceneNode }) {
   const service = useFigmaImageService();
   const [srcs, setSrcs] = useState<string[]>([]);
-  const { target } = useTargetContainer();
 
   useEffect(() => {
     if (target) {
@@ -36,13 +76,31 @@ export function AssetsSection() {
   }
 
   return (
-    <InspectorSection label="Assets" borderTop>
-      <Body>
-        {srcs.map((src, i) => (
-          <Preview key={i} src={src} />
-        ))}
-      </Body>
-    </InspectorSection>
+    <PropertyGroup>
+      <PropertyGroupHeader>
+        <h6>Assets</h6>
+      </PropertyGroupHeader>
+      <PropertyLines>
+        <Body>
+          {srcs.map((src, i) => (
+            <AssetCard
+              key={i}
+              src={src}
+              onClick={() => {
+                // downlaod image.
+                // this downloads as file, but this requires a cors proxy
+                // fetch(src).then((res) => {
+                //   res.blob().then((blob) => {
+                //     saveAs(blob, "image.png");
+                //   });
+                // });
+                saveAs(src, "image.png");
+              }}
+            />
+          ))}
+        </Body>
+      </PropertyLines>
+    </PropertyGroup>
   );
 }
 
@@ -52,6 +110,14 @@ const Body = styled.div`
   gap: 16px;
   flex-wrap: wrap;
 `;
+
+function AssetCard({ src, onClick }: { src: string; onClick: () => void }) {
+  return (
+    <div onClick={onClick}>
+      <Preview src={src} />
+    </div>
+  );
+}
 
 function Preview({ src }: { src: string }) {
   return (

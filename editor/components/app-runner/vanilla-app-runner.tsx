@@ -4,6 +4,7 @@ export const VanillaRunner = React.forwardRef(function (
   {
     width = "100%",
     height = "100%",
+    background,
     source,
     onLoad,
     enableInspector = true,
@@ -11,11 +12,12 @@ export const VanillaRunner = React.forwardRef(function (
   }: {
     width?: React.CSSProperties["width"];
     height?: React.CSSProperties["height"];
+    background?: React.CSSProperties["background"];
     source: string;
     onLoad?: ReactEventHandler<HTMLIFrameElement>;
     componentName: string;
     enableInspector?: boolean;
-    style?: React.CSSProperties;
+    style?: Omit<React.CSSProperties, "background">;
   },
   ref: React.MutableRefObject<HTMLIFrameElement>
 ) {
@@ -97,7 +99,7 @@ export const VanillaRunner = React.forwardRef(function (
     <iframe
       ref={cref}
       onLoad={onLoad}
-      style={style}
+      style={{ ...style, background }}
       sandbox="allow-same-origin allow-scripts"
       srcDoc={inlinesource}
       width={width}

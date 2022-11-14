@@ -1,6 +1,6 @@
 import React from "react";
 import styled from "@emotion/styled";
-import RefreshSharpIcon from "@mui/icons-material/RefreshSharp";
+import { ReloadIcon } from "@radix-ui/react-icons";
 import { colors } from "theme";
 
 export function ZoomControl({
@@ -59,11 +59,11 @@ export function ZoomControl({
             )}
           </Valuedisplay>
           {canReset && (
-            <RefreshSharpIcon
+            <ReloadIcon
               onClick={() => {
                 onReset?.();
               }}
-              style={{ color: "white", fontSize: 18 }}
+              color="white"
             />
           )}
         </ControlsContainer>

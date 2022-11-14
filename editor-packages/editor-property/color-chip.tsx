@@ -31,7 +31,7 @@ export function ColorChip({
   const text = snippet || csscolor;
 
   return (
-    <HoverCard openDelay={0}>
+    <HoverCard openDelay={0} closeDelay={0}>
       <ChipContainer
         onClick={() => {
           onClick?.({
@@ -41,16 +41,15 @@ export function ColorChip({
         }}
       >
         <HoverCardTrigger asChild>
-          <span
-            style={{
-              // todo - support alpha chanel bg
-              background: csscolor,
-              width: size,
-              height: size,
-              border: outline ? "1px solid white" : "none",
-              borderRadius: 2,
-            }}
-          />
+          <div>
+            <Chip
+              color={color}
+              value={csscolor}
+              size={size}
+              borderRadius={4}
+              outline={outline ? "1px solid white" : "none"}
+            />
+          </div>
         </HoverCardTrigger>
         <HoverCardContent>
           <CardBody>
@@ -59,6 +58,82 @@ export function ColorChip({
         </HoverCardContent>
       </ChipContainer>
     </HoverCard>
+  );
+}
+
+/**
+ * Color chip with alpha view
+ *
+ * if Alpha, display divided into 2 parts
+ */
+function Chip({
+  outline,
+  size = 24,
+  color,
+  value,
+  borderRadius = 4,
+}: {
+  color: Color;
+  value: string;
+  size: number;
+  outline?: React.CSSProperties["outline"];
+  borderRadius?: React.CSSProperties["borderRadius"];
+}) {
+  const { r, g, b, o } = color;
+
+  const Body = () => {
+    if (o < 1) {
+      return (
+        <>
+          <span
+            style={{
+              display: "block",
+              background: value,
+              width: size / 2,
+              height: size,
+            }}
+          />
+          <span
+            style={{
+              display: "block",
+              opacity: o,
+              background: k.alpha_channel_chess_image,
+              width: size / 2,
+              height: size,
+            }}
+          />
+        </>
+      );
+    } else {
+      return (
+        <span
+          style={{
+            // todo - support alpha chanel bg
+            background: value,
+            width: size,
+            height: size,
+            outline: outline,
+            borderRadius: borderRadius,
+          }}
+        />
+      );
+    }
+  };
+
+  return (
+    <div
+      style={{
+        display: "flex",
+        flexDirection: "row",
+        width: size,
+        height: size,
+        outline: outline,
+        background: `rgb(${rd(r * 255)}, ${rd(g * 255)}, ${rd(b * 255)})`,
+        borderRadius: borderRadius,
+      }}
+    >
+      <Body />
+    </div>
   );
 }
 

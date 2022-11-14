@@ -1,2 +1,2 @@
-export * from "./inspector-section";
 export * from "./inspector-readonly-property";
+export * from "./inspector-clipboard-box";

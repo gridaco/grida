@@ -2,7 +2,8 @@ import { useDispatch } from "core/dispatch";
 import { EditorState } from "core/states";
 import React, { useCallback } from "react";
 import { useHotkeys } from "react-hotkeys-hook";
-
+import { useOpenPreferences } from "@code-editor/preferences";
+import { useRouter } from "next/router";
 const noop = (e) => {
   e.preventDefault();
   e.stopPropagation();
@@ -12,39 +13,50 @@ const noop = (e) => {
 export function EditorShortcutsProvider({
   children,
 }: React.PropsWithChildren<{}>) {
+  const router = useRouter();
   const dispatch = useDispatch();
 
-  const setMode = useCallback(
-    (mode: EditorState["mode"]) => {
-      dispatch({ type: "mode", mode: mode });
+  const setDesignerMode = useCallback(
+    (mode: EditorState["designerMode"]) => {
+      dispatch({ type: "designer-mode", mode: mode });
     },
     [dispatch]
   );
 
+  const openPreferences = useOpenPreferences();
+
   const _save = keymap("ctrl-cmd", "s");
+  const _backtofiles = keymap("ctrl-cmd", "esc");
   const _preferences = keymap("ctrl-cmd", ",");
   const _toggle_comments = keymap("c");
   const _toggle_view = keymap("v");
   const _escape = keymap("esc");
 
-  useHotkeys(_save.universal, () => {
-    // dispatch({ type: "editor-save" });
+  useHotkeys(_save.universal, (e) => {
+    // disables the save html action on browser
+    e.preventDefault();
   });
 
-  useHotkeys(_preferences.universal, () => {
-    // dispatch({ type: "editor-open-preference" });
+  useHotkeys(_backtofiles.universal, (e) => {
+    router.push("/");
+  });
+
+  useHotkeys(_preferences.universal, (e) => {
+    // this is required to prevent browser's from opening preference page.
+    e.preventDefault();
+    openPreferences();
   });
 
   useHotkeys(_toggle_comments.universal, () => {
-    setMode("comment");
+    setDesignerMode("comment");
   });
 
   useHotkeys(_toggle_view.universal, () => {
-    setMode("view");
+    setDesignerMode("inspect");
   });
 
   useHotkeys(_escape.universal, () => {
-    setMode("view");
+    setDesignerMode("inspect");
   });
 
   return <>{children}</>;
@@ -57,9 +69,11 @@ const keymap = (
     | "cmd"
     | "ctrl-cmd"
     | "shift"
+    | "alt"
     | "a"
     | "c"
     | "p"
+    | "n"
     | "s"
     | "v"
     | ","

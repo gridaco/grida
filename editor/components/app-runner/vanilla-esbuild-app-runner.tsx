@@ -61,11 +61,7 @@ export function VanillaESBuildAppRunner({
     <VanillaRunner
       ref={ref}
       onLoad={(e) => loadCode(e.currentTarget)}
-      style={{
-        borderRadius: 4,
-        backgroundColor: "white",
-        boxShadow: "0px 0px 48px #00000020",
-      }}
+      background="white"
       source={_html}
       width="100%"
       height="100%"

@@ -3,9 +3,8 @@ import type {
   Action,
   SelectNodeAction,
   SelectPageAction,
-  CodeEditorEditComponentCodeAction,
+  CodingUpdateFileAction,
   CanvasModeSwitchAction,
-  CanvasModeGobackAction,
   TranslateNodeAction,
   PreviewBuildingStateUpdateAction,
   PreviewSetAction,
@@ -16,6 +15,9 @@ import type {
   BackgroundTaskUpdateProgressAction,
   EditorModeSwitchAction,
   LocateNodeAction,
+  DesignerModeSwitchActon,
+  CodingInitialFilesSeedAction,
+  CodingNewTemplateSessionAction,
 } from "core/actions";
 import { EditorState } from "core/states";
 import { NextRouter, useRouter } from "next/router";
@@ -33,18 +35,59 @@ export function editorReducer(state: EditorState, action: Action): EditorState {
   switch (action.type) {
     case "mode": {
       const { mode } = <EditorModeSwitchAction>action;
-      return produce(state, (draft) => {
-        switch (mode) {
-          case "code":
-            draft.canvasMode = "isolated-view";
-            break;
-          case "inspect":
-          case "view":
-          default:
-            draft.canvasMode = "free";
-        }
+      if (mode === "goback") {
+        return produce(state, (draft) => {
+          const target = state.mode.last;
+          draft.mode = {
+            value: target,
+            last: state.mode.value,
+            updated: new Date(),
+          };
 
-        draft.mode = mode;
+          if (target === "design") {
+            // todo: this should be a last selection as well, not index 0.
+            draft.selectedPage = state.pages.find(
+              (p) => p.type === "figma-canvas"
+            ).id;
+          }
+        });
+      } else {
+        return produce(state, (draft) => {
+          draft.mode = {
+            value: mode,
+            last: state.mode.value,
+            updated: new Date(),
+          };
+
+          switch (mode) {
+            case "code": {
+              break;
+            }
+            case "design": {
+              // if previous mode was somehing else.
+              if (state.mode.value !== "design") {
+                // todo: this should be a last selection as well, not index 0.
+                draft.selectedPage = state.pages.find(
+                  (p) => p.type === "figma-canvas"
+                ).id;
+                break;
+              }
+            }
+            case "run":
+          }
+        });
+      }
+    }
+
+    case "designer-mode": {
+      const { mode } = <DesignerModeSwitchActon>action;
+      return produce(state, (draft) => {
+        draft.mode = {
+          value: "design",
+          last: state.mode.value,
+          updated: new Date(),
+        };
+        draft.designerMode = mode;
       });
     }
 
@@ -94,7 +137,6 @@ export function editorReducer(state: EditorState, action: Action): EditorState {
 
       switch (page) {
         case "home": {
-          // update router
           update_route(router, { node: undefined });
         }
 
@@ -123,53 +165,108 @@ export function editorReducer(state: EditorState, action: Action): EditorState {
           });
       });
     }
-    case "code-editor-edit-component-code": {
-      const { ...rest } = <CodeEditorEditComponentCodeAction>action;
+
+    case "coding/new-template-session": {
+      const { template } = <CodingNewTemplateSessionAction>action;
+      const { type, target } = template;
+
       return produce(state, (draft) => {
-        draft.editingModule = {
-          ...rest,
-          type: "single-file-component",
-          lang: "unknown",
+        switch (type) {
+          case "d2c": {
+            // init new page if required
+            const code_default_drafts_page = "code-drafts";
+            if (
+              state.pages.some(
+                (p) => p.type === "code" && p.id === code_default_drafts_page
+              )
+            ) {
+              draft.selectedPage = code_default_drafts_page;
+            } else {
+              draft.pages.push({
+                id: code_default_drafts_page,
+                name: "Code",
+                type: "code",
+              });
+              draft.selectedPage = code_default_drafts_page;
+            }
+
+            // reset files
+            draft.code.files = {};
+            draft.code.loading = true;
+            draft.code.runner = {
+              type: "scene",
+              sceneId: target,
+            };
+            draft.mode = {
+              value: "code",
+              last: state.mode.value,
+              updated: new Date(),
+            };
+          }
+        }
+      });
+    }
+    case "coding/initial-seed": {
+      const { files, open, focus, entry } = <CodingInitialFilesSeedAction>(
+        action
+      );
+      return produce(state, (draft) => {
+        const keys = Object.keys(files);
+        if (keys.length > 0) {
+          draft.code.files = files;
+          draft.code.loading = false;
+          // const
+          draft.code.runner = {
+            ...state.code.runner,
+            entry,
+          };
+          draft.selectedNodes = [focus] ?? [keys[0]];
+        }
+      });
+    }
+    case "codeing/update-file": {
+      const { key, content } = <CodingUpdateFileAction>action;
+      return produce(state, (draft) => {
+        const file = state.code.files[key];
+        draft.code.files[key] = {
+          ...file,
+          content,
         };
       });
-      //
     }
 
-    case "canvas-mode-switch": {
+    case "canvas-mode": {
       const { mode } = <CanvasModeSwitchAction>action;
 
-      update_route(router, { mode: mode }, false); // shallow false
+      update_route(router, { mode }, false); // shallow false
 
-      return produce(state, (draft) => {
-        if (mode === "isolated-view") {
-          // on isolation mode, switch the editor mode to code.
-          draft.mode = "code";
-        } else {
-          // needs to be fixed once more modes are added.
-          draft.mode = "view";
-        }
+      if (mode === "goback") {
+        const dest = state.canvasMode.last ?? state.canvasMode.value;
 
-        draft.canvasMode_previous = draft.canvasMode;
-        draft.canvasMode = mode;
-      });
-    }
-    case "canvas-mode-goback": {
-      const { fallback } = <CanvasModeGobackAction>action;
-
-      const dest = state.canvasMode_previous ?? fallback;
-
-      update_route(router, { mode: dest }, false); // shallow false
-
-      return produce(state, (draft) => {
         assert(
           dest,
           "canvas-mode-goback: cannot resolve destination. (no fallback provided)"
         );
-        draft.canvasMode_previous = draft.canvasMode; // swap
-        draft.canvasMode = dest; // previous or fallback
-      });
+
+        return produce(state, (draft) => {
+          draft.canvasMode = {
+            value: dest,
+            last: state.canvasMode.value,
+            updated: new Date(),
+          };
+        });
+      } else {
+        return produce(state, (draft) => {
+          draft.canvasMode = {
+            value: mode,
+            last: state.canvasMode.value,
+            updated: new Date(),
+          };
+        });
+      }
     }
 
+    // todo move to other context
     case "preview-update-building-state": {
       const { isBuilding } = <PreviewBuildingStateUpdateAction>action;
       return produce(state, (draft) => {
@@ -192,6 +289,7 @@ export function editorReducer(state: EditorState, action: Action): EditorState {
       });
     }
 
+    // todo move to other context
     case "preview-set": {
       const { data } = <PreviewSetAction>action;
       return produce(state, (draft) => {
@@ -199,6 +297,7 @@ export function editorReducer(state: EditorState, action: Action): EditorState {
       });
     }
 
+    // todo: move to workspace state
     case "devtools-console": {
       const { log } = <DevtoolsConsoleAction>action;
       return produce(state, (draft) => {
@@ -214,6 +313,7 @@ export function editorReducer(state: EditorState, action: Action): EditorState {
       break;
     }
 
+    // todo: move to workspace state
     case "devtools-console-clear": {
       const {} = <DevtoolsConsoleClearAction>action;
       return produce(state, (draft) => {
@@ -230,6 +330,7 @@ export function editorReducer(state: EditorState, action: Action): EditorState {
       break;
     }
 
+    // todo: move to workspace state
     case "editor-task-push": {
       const { task } = <BackgroundTaskPushAction>action;
       const { id } = task;
@@ -253,6 +354,7 @@ export function editorReducer(state: EditorState, action: Action): EditorState {
       break;
     }
 
+    // todo: move to workspace state
     case "editor-task-pop": {
       const { task } = <BackgroundTaskPopAction>action;
       const { id } = task;
@@ -367,15 +469,36 @@ const reducers = {
     action: Omit<SelectPageAction, "type">
   ) => {
     return produce(state, (draft) => {
-      const { page } = <SelectPageAction>action;
+      const { page: pageid } = <SelectPageAction>action;
+      const page = state.pages.find((i) => i.id === pageid);
+
+      assert(page, "page not found");
+
       const filekey = state.design.key;
-      const _canvas_state_store = new CanvasStateStore(filekey, page);
+      const _canvas_state_store = new CanvasStateStore(filekey, pageid);
 
       const last_known_selections_of_this_page =
         _canvas_state_store.getLastSelection() ?? [];
-
-      draft.selectedPage = page;
+      draft.selectedPage = pageid;
       draft.selectedNodes = last_known_selections_of_this_page;
+
+      // update editor mode by page selection
+      let nextmode = state.mode.value;
+      switch (page.type) {
+        case "code": {
+          nextmode = "code";
+          break;
+        }
+        case "home":
+        case "figma-canvas": {
+          nextmode = "design";
+        }
+      }
+      draft.mode = {
+        value: nextmode,
+        last: state.mode.value,
+        updated: new Date(),
+      };
     });
   },
 };

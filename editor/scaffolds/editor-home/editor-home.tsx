@@ -76,7 +76,7 @@ export function EditorHomePageView() {
                   });
                   dispatch({
                     type: "mode",
-                    mode: "code",
+                    mode: "design",
                   });
                 }}
               />
@@ -106,7 +106,7 @@ export function EditorHomePageView() {
                 });
                 dispatch({
                   type: "mode",
-                  mode: "code",
+                  mode: "design",
                 });
               }}
             />

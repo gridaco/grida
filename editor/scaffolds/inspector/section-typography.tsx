@@ -1,8 +1,13 @@
 import React from "react";
-import { InspectorSection, ReadonlyProperty } from "components/inspector";
+import { ReadonlyProperty } from "components/inspector";
+import {
+  PropertyLine,
+  PropertyLines,
+  PropertyGroup,
+  PropertyGroupHeader,
+} from "@editor-ui/property";
 import { useTargetContainer } from "hooks/use-target-node";
 import type { ReflectTextNode } from "@design-sdk/figma-node";
-import { roundNumber } from "@reflect-ui/uiutils";
 
 export function TypographySection() {
   const { target } = useTargetContainer();
@@ -11,29 +16,39 @@ export function TypographySection() {
     return <></>;
   }
 
-  const _lh = lineheight(target.lineHeight);
+  const {
+    id,
+    fontFamily,
+    fontSize,
+    fontWeight,
+    lineHeight: _lineHeight,
+    textAlign,
+  } = target;
+  const lineHeight = lineheight(_lineHeight);
 
   return (
-    <InspectorSection label="Typography">
-      <div
-        style={{
-          display: "flex",
-          flexDirection: "column",
-          gap: "4px",
-        }}
-      >
-        <ReadonlyProperty label="Font" value={target.fontFamily} />
-        <ReadonlyProperty label="Size" value={target.fontSize} unit="px" />
-        <ReadonlyProperty label="Weight" value={target.fontWeight} />
-        <ReadonlyProperty
-          label="Line height"
-          value={_lh.value}
-          unit={_lh.unit}
-          hideEmpty
-        />
-        <ReadonlyProperty label="Align" value={target.textAlign} />
-      </div>
-    </InspectorSection>
+    <PropertyGroup>
+      <PropertyGroupHeader>
+        <h6>Typography</h6>
+      </PropertyGroupHeader>
+      <PropertyLines key={id}>
+        <PropertyLine label="Font">
+          <ReadonlyProperty value={fontFamily} />
+        </PropertyLine>
+        <PropertyLine label="Size">
+          <ReadonlyProperty value={fontSize} unit="px" />
+        </PropertyLine>
+        <PropertyLine label="Weight">
+          <ReadonlyProperty value={fontWeight} />
+        </PropertyLine>
+        <PropertyLine label="Line height">
+          <ReadonlyProperty value={lineHeight.value} unit={lineHeight.unit} />
+        </PropertyLine>
+        <PropertyLine label="Align">
+          <ReadonlyProperty value={textAlign} />
+        </PropertyLine>
+      </PropertyLines>
+    </PropertyGroup>
   );
 }
 

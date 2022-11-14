@@ -6,7 +6,28 @@ import { loadTypes } from "@code-editor/estypes-resolver";
 
 let serviceLoaded: boolean | null = null;
 
-const bundler = async (rawCode: string, lang: Loader) => {
+interface ESBuildRequest {
+  /**
+   * all input files to be bundled
+   */
+  files: {
+    [key: string]: string;
+  };
+  /**
+   * entry file, for example, app.tsx
+   */
+  entry: string;
+  /**
+   * tsconfig file path on {files}
+   */
+  tsconfig?: string | undefined;
+  /**
+   * extra definitions to be made, e.g. for setting process.env.X
+   */
+  define?: Record<string, string> | undefined;
+}
+
+const bundler = async ({ files, entry, tsconfig, define }: ESBuildRequest) => {
   if (!serviceLoaded) {
     await initialize({
       wasmURL: "https://unpkg.com/esbuild-wasm@0.14.34/esbuild.wasm",
@@ -18,19 +39,27 @@ const bundler = async (rawCode: string, lang: Loader) => {
 
   try {
     const result = await build({
-      entryPoints: ["index.js"],
+      entryPoints: [entry],
       bundle: true,
       write: false,
+      tsconfig,
+      loader: {
+        ".tsx": "tsx",
+        ".ts": "ts",
+        ".js": "jsx",
+        ".jsx": "jsx",
+        ".css": "css",
+      },
       metafile: true,
       legalComments: "none",
-      plugins: [unpkgPathPlugin(), fetchPlugin(rawCode, lang)],
+      plugins: [unpkgPathPlugin({ files }), fetchPlugin({ files })],
       define: {
         "process.env.NODE_ENV": `"production"`,
         global: "window",
       },
     });
 
-    const imports = result.metafile?.inputs["a:index.js"].imports
+    const imports = result.metafile?.inputs["a:" + entry].imports
       .map((el) => el.path.replace("a:https://unpkg.com/", ""))
       .filter((e) => !e.includes("/"));
 

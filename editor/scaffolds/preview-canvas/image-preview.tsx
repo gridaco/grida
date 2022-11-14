@@ -34,6 +34,14 @@ export function FigmaStaticImageFrameView({
   };
 
   useEffect(() => {
+    if (!inViewport) {
+      return;
+    }
+
+    if (src) {
+      return;
+    }
+
     if (service) {
       service
         .fetch(id, {
@@ -46,7 +54,7 @@ export function FigmaStaticImageFrameView({
         })
         .catch(console.error);
     }
-  }, [filekey, id, service]);
+  }, [filekey, id, service, inViewport]);
 
   const bg_color_str = blurred_bg_fill(target);
 

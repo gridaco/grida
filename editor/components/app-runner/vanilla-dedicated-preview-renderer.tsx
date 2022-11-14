@@ -44,10 +44,7 @@ export function VanillaDedicatedPreviewRenderer({
       return (
         <VanillaRunner
           key={widgetKey.id}
-          style={{
-            borderRadius: 4,
-            boxShadow: "0px 0px 48px #00000020",
-          }}
+          background="white"
           enableInspector={enableIspector}
           source={source}
           componentName={componentName}

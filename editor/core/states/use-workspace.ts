@@ -6,7 +6,7 @@ export function useWorkspace() {
   const state = useWorkspaceState();
   const dispatch = useDispatch();
 
-  const { highlightedLayer, preferences } = state;
+  const { highlightedLayer } = state;
 
   const highlightLayer = useCallback(
     (highlight?: string) => dispatch({ type: "highlight-node", id: highlight }),
@@ -17,8 +17,7 @@ export function useWorkspace() {
     () => ({
       highlightedLayer,
       highlightLayer,
-      preferences,
     }),
-    [highlightedLayer, highlightLayer, preferences]
+    [highlightedLayer, highlightLayer]
   );
 }

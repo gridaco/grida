@@ -3,24 +3,41 @@ import type { FrameworkConfig } from "@grida/builder-config";
 import type { RGBA, WidgetKey } from "@reflect-ui/core";
 import type { ComponentNode } from "@design-sdk/figma-types";
 import type { DesignInput } from "@grida/builder-config/input";
+import type { File } from "@grida/builder-config/output/output-file";
+
+export type { File };
+
+type LastKnown<T> = {
+  value: T;
+  last?: T | undefined;
+  updated?: Date | undefined;
+};
 
 /**
  * View mode of the canvas.
  * - free - default
- * - isolated - focus to one scene
+ * - focus - focus to one scene
  */
-type TCanvasMode = "free" | "isolated-view" | "fullscreen-preview";
+type TCanvasMode = "free" | "focus";
 
 /**
  * Task mode of the editor.
- * - view - default
+ * - design - default (design view)
  * - code - with coding editor
- * - inspect - with inspector
+ * - run - run app, full screen
  */
-type TUserTaskMode = "view" | "comment" | "code" | "inspect";
+type TEditorMode = "design" | "code" | "run";
+type TDesignerMode = "inspect" | "comment"; // | "prototype";
+
+export type EditorPage = {
+  id: string;
+  name: string;
+  type: "home" | "code" | "figma-canvas";
+};
 
 export interface EditorState {
-  selectedPage: string | "home";
+  pages: EditorPage[];
+  selectedPage: string;
   selectedNodes: string[];
   selectedLayersOnPreview: string[];
   /**
@@ -30,23 +47,24 @@ export interface EditorState {
    */
   selectedNodesInitial?: string[] | null;
   design: FigmaReflectRepository;
-  mode: TUserTaskMode;
-  canvasMode: TCanvasMode;
-  canvasMode_previous?: TCanvasMode;
+  mode: LastKnown<TEditorMode>;
+  designerMode: TDesignerMode;
+  canvasMode: LastKnown<TCanvasMode>;
   currentPreview?: ScenePreviewData;
-  code?: CodeRepository;
-  editingModule?: EditingModule;
+  code: CodeRepository;
   devtoolsConsole?: DevtoolsConsole;
   editorTaskQueue: EditorTaskQueue;
 }
 
 export interface EditorSnapshot {
+  pages: EditorPage[];
   selectedPage: string;
   selectedNodes: string[];
   selectedLayersOnPreview: string[];
   selectedNodesInitial?: string[] | null;
   design: FigmaReflectRepository;
-  canvasMode: TCanvasMode;
+  code: CodeRepository;
+  canvasMode: EditorState["canvasMode"];
   editorTaskQueue: EditorTaskQueue;
 }
 
@@ -60,6 +78,10 @@ export interface FigmaReflectRepository {
    * fileid; filekey
    */
   key: string;
+
+  version: string;
+
+  lastModified: Date;
 
   // TODO:
   pages: {
@@ -116,18 +138,13 @@ export interface IScenePreviewDataEsbuildPreview
 }
 
 export interface CodeRepository {
-  // TODO:
-  // files: { [key: string]: string };
-}
-
-type TEditingModuleType = "single-file-component";
-
-export interface EditingModule {
-  type: TEditingModuleType;
-  componentName: string;
-  framework: FrameworkConfig["framework"];
-  lang: string;
-  raw: string;
+  files: { [key: string]: File };
+  loading?: boolean;
+  runner?: {
+    type: "scene";
+    sceneId: string;
+    entry?: string;
+  };
 }
 
 interface DevtoolsConsole {

@@ -1,6 +1,7 @@
 import { createWorkerQueue } from "@code-editor/webworker-services-core";
 import type { Result } from "@designto/code";
 import { config } from "@designto/code/proc";
+import assert from "assert";
 import EventEmitter from "events";
 
 let previewworker: Worker;
@@ -90,6 +91,7 @@ export async function code({
   target: string;
   framework: config.FrameworkConfig;
 }): Promise<Result> {
+  assert(framework, "framework config is required");
   return new Promise((resolve, reject) => {
     const handler = (e) => {
       const id = e.data.id;
