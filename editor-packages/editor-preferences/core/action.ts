@@ -1,12 +1,14 @@
+import React from "react";
 import type { PreferenceState } from "./state";
-import type { Subset } from "./types";
+import type { PreferencePageProps, Subset } from "./types";
 type Preference = PreferenceState["config"];
 
 export type Action =
   | PreferenceSetRouteAction
   | OpenPreferenceAction
   | ClosePreferenceAction
-  | ConfigurationAction;
+  | ConfigurationAction
+  | RegisterPreferenceAction;
 
 export type ActionType = PreferenceSetRouteAction["type"];
 
@@ -27,4 +29,12 @@ export type ClosePreferenceAction = {
 export type ConfigurationAction = {
   type: "configure";
   update: Subset<Preference>;
+};
+
+export type RegisterPreferenceAction = {
+  type: "register";
+  route: string;
+  name: string;
+  icon?: string;
+  renderer: React.FC<PreferencePageProps>;
 };

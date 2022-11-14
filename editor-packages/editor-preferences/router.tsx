@@ -1,11 +1,16 @@
 import { useDispatch, usePreferences } from "./editor-preference";
 import React from "react";
-import EditorPreferenceFigmaPage from "./pages/figma";
-import EditorPreferenceFigmaPersonalAccessTokenPage from "./pages/figma/personal-access-token";
 import EditorPreferenceFrameworkProfilePage from "./pages/framework-profile";
 import { EditorPreferencePage } from "./pages/editor";
+import { PreferencePageProps } from "./core";
 
-export function Router() {
+export function Router({
+  customRenderers,
+}: {
+  customRenderers: {
+    [key: string]: React.FC<PreferencePageProps>;
+  };
+}) {
   const state = usePreferences();
   const dispatch = useDispatch();
   const { route } = state;
@@ -19,15 +24,15 @@ export function Router() {
     case "/editor": {
       return <EditorPreferencePage {...props} />;
     }
-    case "/figma": {
-      return <EditorPreferenceFigmaPage />;
-    }
-    case "/figma/personal-access-token": {
-      return <EditorPreferenceFigmaPersonalAccessTokenPage {...props} />;
-    }
     case "/framework": {
       return <EditorPreferenceFrameworkProfilePage {...props} />;
     }
+    default: {
+      const renderer = customRenderers[route];
+      if (renderer) {
+        return <>{renderer(props)}</>;
+      }
+    }
   }
-  return <></>;
+  throw new Error(`Route Not found: ${route}`);
 }

@@ -1,9 +1,12 @@
-import type { PreferenceRouteInfo } from "./types";
+import type { PreferencePageProps, PreferenceRouteInfo } from "./types";
 import type { FrameworkConfig } from "@grida/builder-config";
 export interface PreferenceState {
   open: boolean;
   route: string;
   routes: PreferenceRouteInfo[];
+  renderers: {
+    [key: string]: React.FC<PreferencePageProps>;
+  };
   config: {
     /**
      * @beta

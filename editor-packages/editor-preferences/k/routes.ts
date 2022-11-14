@@ -1,6 +1,6 @@
 import type { PreferenceRouteInfo } from "../core";
 
-const routes: PreferenceRouteInfo[] = [
+const initial_routes: PreferenceRouteInfo[] = [
   // {
   //   route: "/general",
   //   name: "General",
@@ -17,14 +17,6 @@ const routes: PreferenceRouteInfo[] = [
     route: "/framework",
     name: "Framework Profile",
   },
-  {
-    route: "/figma",
-    name: "Figma",
-  },
-  {
-    route: "/figma/personal-access-token",
-    name: "Personal Access Tokens",
-  },
 ];
 
-export default routes;
+export default initial_routes;

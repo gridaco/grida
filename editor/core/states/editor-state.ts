@@ -79,6 +79,10 @@ export interface FigmaReflectRepository {
    */
   key: string;
 
+  version: string;
+
+  lastModified: Date;
+
   // TODO:
   pages: {
     id: string;

@@ -1,7 +1,7 @@
 import React, { useReducer, useMemo, useCallback } from "react";
 import styled from "@emotion/styled";
 import { EditorPreferenceTree } from "./editor-preference-tree";
-import routes from "./k/routes";
+import initial_routes from "./k/routes";
 import type { Action, Dispatcher, PreferenceState } from "./core";
 import { reducer } from "./reducers";
 import { Router } from "./router";
@@ -55,8 +55,9 @@ export function EditorPreference({ children }: React.PropsWithChildren<{}>) {
 
   const [state, dispatch] = useReducer(reducer, {
     open: false,
-    route: "general",
-    routes: routes,
+    route: "/editor",
+    routes: initial_routes,
+    renderers: {},
     config: pref,
   });
 
@@ -78,7 +79,7 @@ export function EditorPreference({ children }: React.PropsWithChildren<{}>) {
 
 function Preferences() {
   const state = usePreferences();
-  const { route } = state;
+  const { route, renderers } = state;
 
   const dispatch = useDispatch();
 
@@ -103,7 +104,7 @@ function Preferences() {
             textTransform={"capitalize"}
           />
         </ContentHeader>
-        <Router />
+        <Router customRenderers={renderers} />
       </Content>
     </Page>
   );

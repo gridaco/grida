@@ -106,6 +106,8 @@ export function SetupEditor({
           selectedLayersOnPreview: [],
           design: {
             name: file.name,
+            version: file.version,
+            lastModified: new Date(file.lastModified),
             input: null,
             components: components,
             // styles: null,

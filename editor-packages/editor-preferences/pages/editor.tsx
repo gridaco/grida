@@ -2,7 +2,7 @@ import React from "react";
 import styled from "@emotion/styled";
 import { PageContentLayout } from "../layouts";
 import { CanvasModeSelectItem } from "../components";
-import { PreferencePageProps } from "core";
+import { PreferencePageProps } from "../core";
 
 export function EditorPreferencePage({ dispatch, state }: PreferencePageProps) {
   const { renderer } = state.config.canvas;

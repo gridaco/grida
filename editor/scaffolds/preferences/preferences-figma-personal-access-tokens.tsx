@@ -1,13 +1,15 @@
 import React, { useEffect, useCallback } from "react";
 import styled from "@emotion/styled";
-import { PageContentLayout } from "../../layouts";
-import { TextField } from "../../components";
 import { LinearProgress } from "@mui/material";
 import { Button } from "@editor-ui/button";
 import { Client, User } from "@design-sdk/figma-remote-api";
-import { PreferencePageProps } from "../../core";
+import {
+  PageContentLayout,
+  TextField,
+  PreferencePageProps,
+  HelpPanel,
+} from "@code-editor/preferences";
 import { personal } from "@design-sdk/figma-auth-store";
-import { HelpPanel } from "../../components";
 
 export default function EditorPreferenceFigmaPersonalAccessTokenPage({
   state,

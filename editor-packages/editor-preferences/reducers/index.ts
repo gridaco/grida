@@ -5,6 +5,7 @@ import type {
   PreferenceState,
   ConfigurationAction,
   Subset,
+  RegisterPreferenceAction,
 } from "../core";
 import { PreferencesStore } from "../store";
 
@@ -50,6 +51,22 @@ export function reducer(
       return {
         ...state,
         config,
+      };
+    }
+    case "register": {
+      const {
+        route,
+        name,
+        renderer: pageRenderer,
+        icon,
+      } = <RegisterPreferenceAction>action;
+      const { routes } = state;
+      const new_routes = [...routes, { route, name, icon }];
+      const new_renderers = { ...state.renderers, [route]: pageRenderer };
+      return {
+        ...state,
+        routes: new_routes,
+        renderers: new_renderers,
       };
     }
   }

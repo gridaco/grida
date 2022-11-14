@@ -7,7 +7,7 @@ export type Dispatcher = (action: Action) => void;
 export type PreferenceRouteInfo = {
   route: string;
   name: string;
-  hidden?: boolean;
+  icon?: string;
 };
 
 export interface PreferencePageProps {
