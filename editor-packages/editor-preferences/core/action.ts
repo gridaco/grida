@@ -1,7 +1,13 @@
+import type { PreferenceState } from "./state";
+import type { Subset } from "./types";
+type Preference = PreferenceState["config"];
+
 export type Action =
   | PreferenceSetRouteAction
   | OpenPreferenceAction
-  | ClosePreferenceAction;
+  | ClosePreferenceAction
+  | ConfigurationAction;
+
 export type ActionType = PreferenceSetRouteAction["type"];
 
 export type PreferenceSetRouteAction = {
@@ -16,4 +22,9 @@ export type OpenPreferenceAction = {
 
 export type ClosePreferenceAction = {
   type: "close";
+};
+
+export type ConfigurationAction = {
+  type: "configure";
+  update: Subset<Preference>;
 };

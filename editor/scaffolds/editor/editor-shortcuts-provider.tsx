@@ -2,7 +2,7 @@ import { useDispatch } from "core/dispatch";
 import { EditorState } from "core/states";
 import React, { useCallback } from "react";
 import { useHotkeys } from "react-hotkeys-hook";
-import { useDispatch as usePreferencesDispatch } from "@code-editor/preferences";
+import { useOpenPreferences } from "@code-editor/preferences";
 import { useRouter } from "next/router";
 const noop = (e) => {
   e.preventDefault();
@@ -15,12 +15,6 @@ export function EditorShortcutsProvider({
 }: React.PropsWithChildren<{}>) {
   const router = useRouter();
   const dispatch = useDispatch();
-  const preferencesDispatch = usePreferencesDispatch();
-
-  const openPreferences = useCallback(() => {
-    console.log("preferencesDispatch", preferencesDispatch);
-    preferencesDispatch({ type: "open" });
-  }, [preferencesDispatch]);
 
   const setDesignerMode = useCallback(
     (mode: EditorState["designerMode"]) => {
@@ -28,6 +22,8 @@ export function EditorShortcutsProvider({
     },
     [dispatch]
   );
+
+  const openPreferences = useOpenPreferences();
 
   const _save = keymap("ctrl-cmd", "s");
   const _backtofiles = keymap("ctrl-cmd", "esc");

@@ -1,17 +1,17 @@
 import React, { useCallback, useEffect, useMemo } from "react";
-import { useEditorState, useWorkspaceState } from "core/states";
+import { useEditorState } from "core/states";
+import { usePreferences } from "@code-editor/preferences";
+import { useTargetContainer } from "hooks";
+import { useDispatch } from "core/dispatch";
 import { preview_presets } from "@grida/builder-config-preset";
 import { designToCode, Result } from "@designto/code";
 import { config } from "@grida/builder-config";
 import { MainImageRepository } from "@design-sdk/asset-repository";
-import bundler from "@code-editor/esbuild-services";
-import assert from "assert";
-import { useDispatch } from "core/dispatch";
-import { useTargetContainer } from "hooks";
 import { WidgetKey } from "@reflect-ui/core";
 import { supportsPreview } from "config";
 import { stable as dartservices } from "dart-services";
 import Client, { FlutterProject } from "@flutter-daemon/client";
+import bundler from "@code-editor/esbuild-services";
 
 const esbuild_base_html_code = `<div id="root"></div>`;
 
@@ -30,7 +30,7 @@ export function EditorPreviewDataProvider({
   // listen to changes
   // handle changes, dispatch with results
 
-  const { preferences } = useWorkspaceState();
+  const { config: preferences } = usePreferences();
   const [state] = useEditorState();
   const dispatch = useDispatch();
 
@@ -293,10 +293,13 @@ export function EditorPreviewDataProvider({
   //   // ------------------------
   //   // ------ for esbuild -----
   useEffect(() => {
+    if (!preferences.framework) {
+      return;
+    }
     if (!state.code.runner) {
       return;
     }
-    if (supportsPreview(preferences.framework_config.framework)) {
+    if (supportsPreview(preferences.framework.framework)) {
       try {
         updateBuildingState(true);
 
@@ -310,7 +313,7 @@ export function EditorPreviewDataProvider({
           height: target.height,
         };
 
-        switch (preferences.framework_config.framework) {
+        switch (preferences.framework.framework) {
           case "react": {
             bundler({
               files: Object.keys(files).reduce((acc, key) => {
@@ -400,14 +403,14 @@ export function EditorPreviewDataProvider({
           }
           default:
             throw new Error(
-              `Unsupported framework: ${preferences.framework_config.framework}`
+              `Unsupported framework: ${preferences.framework.framework}`
             );
         }
       } catch (e) {
         console.error(e);
       }
     }
-  }, [JSON.stringify(state.code.files), entry]);
+  }, [JSON.stringify(state.code.files), entry, preferences.framework]);
 
   return <>{children}</>;
 }

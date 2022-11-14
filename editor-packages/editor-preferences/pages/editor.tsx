@@ -16,15 +16,20 @@ export function EditorPreferencePage() {
   );
 }
 
+const renderer_engines = [
+  "bitmap-renderer",
+  "figma-renderer",
+  // "vanilla-renderer",
+] as const;
+
 function CanvasModeSelection() {
-  const items = ["bake", "figma-renderer", "vanilla-renderer"] as const;
   const [selection, setSelection] = React.useState<string>(
     canvas_mode_card_meta.default
   );
 
   return (
     <SelectionLayout>
-      {items.map((item) => {
+      {renderer_engines.map((item) => {
         const { name } = canvas_mode_card_meta[item];
         return (
           <CanvasModeSelectItem
@@ -48,9 +53,9 @@ const SelectionLayout = styled.div`
 `;
 
 const canvas_mode_card_meta = {
-  default: "bake",
-  bake: {
-    name: "Static Preview",
+  default: "bitmap-renderer",
+  "bitmap-renderer": {
+    name: "Bitmap Renderer",
   },
   "figma-renderer": {
     name: "Figma Renderer",

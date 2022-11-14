@@ -6,10 +6,8 @@ import {
 } from "@editor-ui/property";
 import { Result } from "@designto/code";
 import { useTargetContainer } from "hooks/use-target-node";
-import { useWorkspaceState } from "core/states";
 import { MonacoEditor } from "components/code-editor";
 import { ClipboardBox } from "components/inspector";
-import { Button } from "@editor-ui/button";
 import { useDispatch } from "core/dispatch";
 import { code as wwcode } from "../code/code-worker-messenger";
 import { CircularProgress } from "@mui/material";
@@ -17,14 +15,13 @@ import { ReflectSceneNode } from "@design-sdk/figma-node";
 import { copy } from "utils/clipboard";
 import styled from "@emotion/styled";
 import { GearIcon, CodeIcon } from "@radix-ui/react-icons";
-import { useDispatch as usePreferencesDispatch } from "@code-editor/preferences";
+import { useOpenPreferences, usePreferences } from "@code-editor/preferences";
 
 export function CodeSection() {
-  const wstate = useWorkspaceState();
+  const { config: preferences } = usePreferences();
   const { target, root } = useTargetContainer();
   const [result, setResult] = useState<Result>(null);
   const dispatch = useDispatch();
-  const preferencesDispatch = usePreferencesDispatch();
 
   const on_result = (result: Result) => {
     setResult(result);
@@ -40,9 +37,7 @@ export function CodeSection() {
     });
   }, [target?.id, dispatch]);
 
-  const onOpenConfigClick = () => {
-    preferencesDispatch({ type: "open", route: "/framework" });
-  };
+  const onOpenConfigClick = useOpenPreferences("/framework");
 
   useEffect(() => {
     // clear data.
@@ -52,11 +47,15 @@ export function CodeSection() {
       return;
     }
 
+    if (!preferences.framework) {
+      return;
+    }
+
     wwcode({
       target: target.id,
-      framework: wstate.preferences.framework_config,
+      framework: preferences.framework,
     }).then(on_result);
-  }, [target?.id]);
+  }, [target?.id, preferences.framework.framework]);
 
   const { code } = result ?? {};
   const viewheight = target?.isRoot ? 800 : 400;

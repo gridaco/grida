@@ -13,20 +13,17 @@ import {
   DropdownMenuLabel,
 } from "@editor-ui/dropdown-menu";
 import { useEditorState } from "core/states";
-import { useDispatch as usePreferencesDispatch } from "@code-editor/preferences";
+import { useOpenPreferences } from "@code-editor/preferences";
 
 export function AppbarFragmentForSidebar() {
   const [state] = useEditorState();
   const router = useRouter();
-  const preferencesDispatch = usePreferencesDispatch();
 
   const handleOpenFile = useCallback(() => {
     open(`https://www.figma.com/file/${state.design.key}`);
   }, [state?.design?.key]);
 
-  const openPreferences = useCallback(() => {
-    preferencesDispatch({ type: "open" });
-  }, [preferencesDispatch]);
+  const openPreferences = useOpenPreferences();
 
   return (
     <RootWrapperAppbarFragmentForSidebar>

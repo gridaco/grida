@@ -3,15 +3,27 @@ import styled from "@emotion/styled";
 import { config } from "@grida/builder-config";
 import { BaseFrameworkSelectItem } from "../components";
 import { PageContentLayout } from "../layouts";
+import type { PreferencePageProps } from "../core";
 
 type BaseFramework = config.FrameworkConfig["framework"];
 
-export default function EditorPreferenceFrameworkProfilePage() {
-  const [baseframework, setBaseframework] =
-    React.useState<BaseFramework>("react");
+export default function EditorPreferenceFrameworkProfilePage({
+  state,
+  dispatch,
+}: PreferencePageProps) {
+  const [baseframework, setBaseframework] = React.useState<BaseFramework>(
+    state.config.framework.framework
+  );
 
   useEffect(() => {
-    //
+    dispatch({
+      type: "configure",
+      update: {
+        framework: {
+          framework: baseframework,
+        },
+      },
+    });
   }, [baseframework]);
 
   return (

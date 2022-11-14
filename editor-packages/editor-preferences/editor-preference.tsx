@@ -1,4 +1,4 @@
-import React, { useReducer } from "react";
+import React, { useReducer, useMemo, useCallback } from "react";
 import styled from "@emotion/styled";
 import { EditorPreferenceTree } from "./editor-preference-tree";
 import routes from "./k/routes";
@@ -7,6 +7,7 @@ import { reducer } from "./reducers";
 import { Router } from "./router";
 import { Dialog } from "@mui/material";
 import { EditorPreferenceBreadcrumb } from "./editor-preference-breadcrumb";
+import { PreferencesStore } from "./store";
 
 const Context = React.createContext<PreferenceState>(null);
 
@@ -15,8 +16,28 @@ const DispatchContext = React.createContext<Dispatcher>(null);
 const __noop = () => {};
 
 export function usePreferences() {
-  return React.useContext(Context);
+  const context = React.useContext(Context);
+  if (!context) {
+    throw new Error(
+      "usePreferences must be used within a PreferencesProvider. Are you sure you are not using it above the <EditorPreference>?"
+    );
+  }
+  return context;
 }
+
+export const useOpenPreferences = (route?: string) => {
+  const dispatch = useDispatch();
+  return useCallback(() => {
+    dispatch({ type: "open", route });
+  }, [dispatch, route]);
+};
+
+export const useClosePreferences = () => {
+  const dispatch = useDispatch();
+  return useCallback(() => {
+    dispatch({ type: "close" });
+  }, [dispatch]);
+};
 
 export const useDispatch = (): ((action: Action) => void) => {
   const dispatch = React.useContext(DispatchContext);
@@ -29,10 +50,14 @@ export const useDispatch = (): ((action: Action) => void) => {
 };
 
 export function EditorPreference({ children }: React.PropsWithChildren<{}>) {
+  const pref_store = useMemo(() => new PreferencesStore(), []);
+  const pref = useMemo(() => pref_store.load(), [pref_store]);
+
   const [state, dispatch] = useReducer(reducer, {
     open: false,
     route: "general",
     routes: routes,
+    config: pref,
   });
 
   const onClose = () => {

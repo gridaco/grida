@@ -8,7 +8,7 @@ export function CanvasModeSelectItem({
   selected = false,
   onClick,
 }: {
-  mode: "bake" | "figma-renderer" | "vanilla-renderer";
+  mode: "bitmap-renderer" | "figma-renderer" | "vanilla-renderer";
   selected?: boolean;
   label: string;
   preview: React.ReactNode;

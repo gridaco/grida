@@ -12,20 +12,20 @@ export function EditorDefaultProviders(props: { children: React.ReactNode }) {
   const [state] = useEditorState();
 
   return (
-    <EditorToastProvider>
-      <EditorImageRepositoryProvider>
-        <EditorCodeWebworkerProvider>
-          <EditorPreviewDataProvider>
-            <EditorPreferenceProvider>
+    <EditorPreferenceProvider>
+      <EditorToastProvider>
+        <EditorImageRepositoryProvider>
+          <EditorCodeWebworkerProvider>
+            <EditorPreviewDataProvider>
               <EditorShortcutsProvider>
                 <FigmaImageServiceProvider filekey={state?.design?.key}>
                   {props.children}
                 </FigmaImageServiceProvider>
               </EditorShortcutsProvider>
-            </EditorPreferenceProvider>
-          </EditorPreviewDataProvider>
-        </EditorCodeWebworkerProvider>
-      </EditorImageRepositoryProvider>
-    </EditorToastProvider>
+            </EditorPreviewDataProvider>
+          </EditorCodeWebworkerProvider>
+        </EditorImageRepositoryProvider>
+      </EditorToastProvider>
+    </EditorPreferenceProvider>
   );
 }

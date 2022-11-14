@@ -11,16 +11,12 @@ import { Filetab } from "./filetab";
 import { useEditorState } from "core/states";
 import { useDispatch } from "core/dispatch";
 import { downloadFile } from "utils/download";
-import { useDispatch as usePreferencesDispatch } from "@code-editor/preferences";
+import { useOpenPreferences } from "@code-editor/preferences";
 import { useCurrentFile } from "./hooks";
 import { useCodingDispatch, useCodingState } from "./coding";
 
 export function CodingToolbar() {
   const file = useCurrentFile();
-
-  const codingDispatch = useCodingDispatch();
-
-  const preferencesDispatch = usePreferencesDispatch();
 
   const dispatch = useDispatch();
 
@@ -33,9 +29,7 @@ export function CodingToolbar() {
     [dispatch]
   );
 
-  const openPreferences = useCallback(() => {
-    preferencesDispatch({ type: "open", route: "/framework" });
-  }, [preferencesDispatch]);
+  const openPreferences = useOpenPreferences();
 
   const onDownloadClick = () => {
     try {

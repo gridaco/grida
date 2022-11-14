@@ -10,6 +10,11 @@ export function Router() {
   const dispatch = useDispatch();
   const { route } = state;
 
+  const props = {
+    dispatch,
+    state,
+  };
+
   switch (route) {
     case "/editor": {
       return <EditorPreferencePage />;
@@ -18,15 +23,10 @@ export function Router() {
       return <EditorPreferenceFigmaPage />;
     }
     case "/figma/personal-access-token": {
-      return (
-        <EditorPreferenceFigmaPersonalAccessTokenPage
-          state={state}
-          dispatch={dispatch}
-        />
-      );
+      return <EditorPreferenceFigmaPersonalAccessTokenPage {...props} />;
     }
     case "/framework": {
-      return <EditorPreferenceFrameworkProfilePage />;
+      return <EditorPreferenceFrameworkProfilePage {...props} />;
     }
   }
   return <></>;

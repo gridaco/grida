@@ -3,7 +3,10 @@ import type {
   OpenPreferenceAction,
   PreferenceSetRouteAction,
   PreferenceState,
+  ConfigurationAction,
+  Subset,
 } from "../core";
+import { PreferencesStore } from "../store";
 
 export function reducer(
   state: PreferenceState,
@@ -36,8 +39,41 @@ export function reducer(
       const { route } = <PreferenceSetRouteAction>action;
       return handleroute(state, route);
     }
+    case "configure": {
+      const { update } = <ConfigurationAction>action;
+      // update provided values from state.config with Subset "update", recursively.
+      const config = merge(state.config, update);
+
+      const store = new PreferencesStore();
+      store.set(config);
+
+      return {
+        ...state,
+        config,
+      };
+    }
   }
   return state;
+}
+
+/**
+ * replace only provided value from b: Subset<T>
+ * @param a
+ * @param b
+ * @returns
+ */
+function merge<T>(a: T, b: Subset<T>): T {
+  for (const key in b) {
+    if (typeof b[key] === "object") {
+      if (a[key] === undefined) {
+        (a[key] as unknown) = {};
+      }
+      merge(a[key], b[key]);
+    } else {
+      (a[key] as unknown) = b[key];
+    }
+  }
+  return a;
 }
 
 const handleroute = (state: PreferenceState, route: string) => {

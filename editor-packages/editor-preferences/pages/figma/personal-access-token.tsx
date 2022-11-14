@@ -5,14 +5,9 @@ import { TextField } from "../../components";
 import { LinearProgress } from "@mui/material";
 import { Button } from "@editor-ui/button";
 import { Client, User } from "@design-sdk/figma-remote-api";
-import { PreferenceState, Dispatcher } from "../../core";
+import { PreferencePageProps } from "../../core";
 import { personal } from "@design-sdk/figma-auth-store";
 import { HelpPanel } from "../../components";
-
-interface PreferencePageProps {
-  state: PreferenceState;
-  dispatch: Dispatcher;
-}
 
 export default function EditorPreferenceFigmaPersonalAccessTokenPage({
   state,
