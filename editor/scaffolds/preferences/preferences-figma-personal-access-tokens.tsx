@@ -130,6 +130,7 @@ function RegisterNewFpat({
         <div style={{ width: "100%" }}>
           <TextField
             fullWidth
+            autofocus
             placeholder="figd_xxxxxxxxxxxxx"
             value={value}
             onChange={setValue}

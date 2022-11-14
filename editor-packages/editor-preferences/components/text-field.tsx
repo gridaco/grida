@@ -6,6 +6,7 @@ export function TextField({
   value,
   disabled,
   fullWidth,
+  autofocus,
   onChange,
   onSubmit,
 }: {
@@ -13,11 +14,13 @@ export function TextField({
   value?: string;
   disabled?: boolean;
   fullWidth?: boolean;
+  autofocus?: boolean;
   onChange?: (value: string) => void;
   onSubmit?: () => void;
 }) {
   return (
     <InputWrapper
+      autoFocus={autofocus}
       disabled={disabled}
       value={value}
       placeholder={placeholder}
