@@ -23,7 +23,7 @@ const SelectWrapper = styled.div`
   flex-direction: column;
   align-items: center;
   flex: none;
-  gap: 6px;
+  gap: 12px;
   box-sizing: border-box;
 
   &[data-selected="true"] {

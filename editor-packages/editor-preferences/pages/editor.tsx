@@ -2,31 +2,61 @@ import React from "react";
 import styled from "@emotion/styled";
 import { PageContentLayout } from "../layouts";
 import { CanvasModeSelectItem } from "../components";
+import { PreferencePageProps } from "core";
 
-export function EditorPreferencePage() {
+export function EditorPreferencePage({ dispatch, state }: PreferencePageProps) {
+  const { renderer } = state.config.canvas;
   return (
     <PageContentLayout>
       <h1>Editor</h1>
 
       <section>
-        <h2>Canvas</h2>
-        <CanvasModeSelection />
+        <h2>Canvas Renderer</h2>
+        <div style={{ height: 16 }} />
+        <CanvasModeSelection
+          selection={renderer}
+          onSelectionChange={(renderer) => {
+            dispatch({
+              type: "configure",
+              update: {
+                canvas: {
+                  renderer,
+                },
+              },
+            });
+          }}
+        />
+        <div style={{ height: 20 }} />
+        <Description>
+          💁‍♀️ <strong>What is it?</strong>
+          <br />
+          {canvas_mode_card_meta[renderer].description}
+        </Description>
       </section>
     </PageContentLayout>
   );
 }
 
+const Description = styled.p`
+  max-width: 260px;
+  color: white;
+  opacity: 0.8;
+  font-size: 0.8em;
+`;
+
 const renderer_engines = [
   "bitmap-renderer",
-  "figma-renderer",
-  // "vanilla-renderer",
+  // "figma-renderer",
+  "vanilla-renderer",
 ] as const;
 
-function CanvasModeSelection() {
-  const [selection, setSelection] = React.useState<string>(
-    canvas_mode_card_meta.default
-  );
-
+function CanvasModeSelection({
+  selection,
+  onSelectionChange,
+}: {
+  selection: typeof renderer_engines[number];
+  onSelectionChange: (selection: typeof renderer_engines[number]) => void;
+}) {
   return (
     <SelectionLayout>
       {renderer_engines.map((item) => {
@@ -36,9 +66,8 @@ function CanvasModeSelection() {
             key={item}
             mode={item}
             label={name}
-            onClick={() => setSelection(item)}
+            onClick={() => onSelectionChange(item)}
             selected={selection === item}
-            preview={<div />}
           />
         );
       })}
@@ -53,14 +82,17 @@ const SelectionLayout = styled.div`
 `;
 
 const canvas_mode_card_meta = {
-  default: "bitmap-renderer",
   "bitmap-renderer": {
     name: "Bitmap Renderer",
+    description:
+      "[Bitmap Renderer] renders canvas with static bitmap images, bootups slower, efficient on large canvas",
   },
-  "figma-renderer": {
-    name: "Figma Renderer",
-  },
+  // "figma-renderer": {
+  //   name: "Figma Renderer",
+  // },
   "vanilla-renderer": {
-    name: "Vanilla Renderer",
+    name: "Vanilla Renderer (Beta)",
+    description:
+      "[Vanilla Renderer] renders canvas with code-translated html/css iframes, bootups faster, can be heavy on large canvas.",
   },
 } as const;

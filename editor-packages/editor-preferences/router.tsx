@@ -17,7 +17,7 @@ export function Router() {
 
   switch (route) {
     case "/editor": {
-      return <EditorPreferencePage />;
+      return <EditorPreferencePage {...props} />;
     }
     case "/figma": {
       return <EditorPreferenceFigmaPage />;

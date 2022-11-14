@@ -3,7 +3,7 @@ import styled from "@emotion/styled";
 import { useTheme } from "@emotion/react";
 import { TreeView } from "@editor-ui/hierarchy";
 import type { PreferenceRouteInfo } from "./core";
-
+import { GearIcon } from "@radix-ui/react-icons";
 export function EditorPreferenceRouteItem({
   route,
   name,
@@ -25,6 +25,7 @@ export function EditorPreferenceRouteItem({
   return (
     <TreeView.Row
       depth={depth}
+      icon={<GearIcon color={selected ? iconSelectedColor : iconColor} />}
       id={route}
       key={route}
       onClickChevron={onExpandToggle}

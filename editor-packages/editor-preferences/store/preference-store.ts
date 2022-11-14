@@ -23,11 +23,10 @@ const default_pref: Preferences = {
   },
   experimental: {
     preview_feature_components_support:
-      _ENABLE_PREVIEW_FEATURE_COMPONENTS_SUPPORT
-        ? ("enabled" as const)
-        : ("disabled" as const),
+      _ENABLE_PREVIEW_FEATURE_COMPONENTS_SUPPORT ? "enabled" : "disabled",
   },
   framework: react_presets.react_default,
+  theme: "dark",
 };
 
 export class PreferencesStore {
