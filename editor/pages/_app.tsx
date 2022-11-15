@@ -37,6 +37,14 @@ function HeadInjection() {
         name="viewport"
         content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
       />
+    </Head>
+  );
+}
+
+function DefaultScripts() {
+  return (
+    <>
+      {/* disable zoom */}
       <Script>
         {
           // wheel + ctrl        - disable zoom on chrome / safari
@@ -71,7 +79,7 @@ function HeadInjection() {
         `}
       </Script>
       {/* end region */}
-    </Head>
+    </>
   );
 }
 
@@ -109,14 +117,15 @@ function EditorApp({ Component, pageProps }) {
   }, [analyzed]);
 
   return (
-    <React.Fragment>
+    <>
       <HeadInjection />
+      <DefaultScripts />
       <MuiThemeProvider>
         <EditorThemeProvider dark>
           <Component {...pageProps} />
         </EditorThemeProvider>
       </MuiThemeProvider>
-    </React.Fragment>
+    </>
   );
 }
 
