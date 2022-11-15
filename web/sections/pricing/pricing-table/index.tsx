@@ -8,7 +8,6 @@ import { media } from "utils/styled/media";
 import LandingpageText from "components/landingpage/text";
 import PricingCard from "components/pricing-card";
 import { usePopupContext } from "utils/context/PopupContext";
-import Link from "next/link";
 import { LandingpageUrls } from "utils/landingpage/constants";
 
 const PersonalPlanList = [
@@ -77,48 +76,7 @@ export default function PlanList() {
   }, []);
 
   const handleClickPaidPlan = useCallback(() => {
-    addPopup({
-      title: "",
-      element: (
-        <Flex
-          style={{
-            width: "calc(100vw - 40px)",
-            alignItems: "center",
-            flexDirection: "column",
-          }}
-          p="48px"
-        >
-          <Icon
-            className="cursor"
-            name="headerClose"
-            ml="auto"
-            onClick={() => removePopup()}
-          />
-          <Flex
-            style={{
-              width: "80%",
-              flexDirection: "column",
-              alignItems: "center",
-            }}
-          >
-            <LandingpageText variant="h4" textAlign="center">
-              Woopsy.
-            </LandingpageText>
-            <BlankArea height={[48, 48]} />
-            <LandingpageText variant="body1" textAlign="center">
-              Grida paid plans are disabled temporarily. Meanwhile, you can use
-              our free plan which basically does the same.
-              <Link href={LandingpageUrls.signup_with_return}>
-                <span style={{ margin: "0px 5px", color: "#172AD7" }}>
-                  Sign up
-                </span>
-              </Link>
-              here.
-            </LandingpageText>
-          </Flex>
-        </Flex>
-      ),
-    });
+    open("https://buy.stripe.com/bIY28petCa7e5YkcMP");
   }, []);
 
   const onFreeStartClick = () => {
