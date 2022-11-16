@@ -29,10 +29,7 @@ export default function LandingMainCtaButton() {
     }
   };
   return (
-    <Box
-      mt={["24px", "24px", "40px", "40px"]}
-      mb={["134px", "84px", "100px", "145px"]}
-    >
+    <Box>
       <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
         <MainButton onClick={handleCta}>{t("start-now")}</MainButton>
       </motion.div>
