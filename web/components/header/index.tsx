@@ -11,7 +11,7 @@ import HoverMenu from "./hover-menu";
 import { useTheme } from "@emotion/react";
 import { useTranslation } from "next-i18next";
 import { LinkWithDocsFallback } from "components/fixme";
-import { HeaderCta } from "./header-cta";
+import { HeaderCta, HeaderMobileExpandedCta } from "./header-cta";
 import {
   useFloating,
   useInteractions,
@@ -64,14 +64,19 @@ const Header = () => {
           }}
           mx={["20px"]}
         >
-          <ResponsiveMenu className="cursor" onClick={handleClickMenu}>
+          <ForMobile className="cursor" onClick={handleClickMenu}>
             <Icon name={isMobileMenuOpen ? "headerClose" : "headerMenu"} />
-          </ResponsiveMenu>
+          </ForMobile>
 
           <Flex
             as={"nav"}
             style={{
+              alignSelf: "stretch",
+              flex: 1,
               alignItems: "center",
+            }}
+            sx={{
+              justifyContent: ["center", "flex-start"],
             }}
           >
             <Link href="/">
@@ -80,7 +85,7 @@ const Header = () => {
                 name={theme.type === "light" ? "grida_black" : "grida_white"}
                 width={32}
                 height={32}
-                ml={["8px", "8px", "8px", "8px"]}
+                mr={["32px", 0]}
               />
             </Link>
             <Link href="/">
@@ -106,7 +111,9 @@ const Header = () => {
               ))}
             </HeaderMenuList>
           </Flex>
-          <HeaderCta isMobileMenuOpen={isMobileMenuOpen} />
+          <NotForMobile>
+            <HeaderCta isMobileMenuOpen={isMobileMenuOpen} />
+          </NotForMobile>
         </Flex>
 
         {isMobileMenuOpen && (
@@ -121,7 +128,7 @@ export default Header;
 
 function MobileExpandedMenu({ background }: { background: string }) {
   return (
-    <ResponsiveMenu
+    <ForMobile
       style={{
         width: "100%",
         flexDirection: "column",
@@ -147,9 +154,8 @@ function MobileExpandedMenu({ background }: { background: string }) {
           <HeaderMenuItem variant="mobile" key={i.label} {...i} />
         ))}
       </Flex>
-
-      <HeaderCta mobile isMobileMenuOpen />
-    </ResponsiveMenu>
+      <HeaderMobileExpandedCta />
+    </ForMobile>
   );
 }
 
@@ -210,9 +216,11 @@ function HeaderMenuItem({
       mx={variant === "desktop" ? "18px" : undefined}
       my={variant === "mobile" ? "12px" : undefined}
       data-selected={selected || open}
+      sx={{
+        fontSize: ["13px", "14px", "16px"],
+      }}
       style={{
         fontWeight: "bold",
-        fontSize: "16px",
       }}
     >
       {t(label)}
@@ -324,18 +332,29 @@ const HeaderMenuList = styled.ul`
   display: flex;
   align-items: center;
   margin: 0;
-  margin-left: 20px;
+  padding-left: 40px;
+  ${props => media(null, props.theme.breakpoints[1])} {
+    padding-left: 12px;
+  }
 
   ${props => media(null, props.theme.breakpoints[0])} {
     display: none;
   }
 `;
 
-const ResponsiveMenu = styled(Flex)`
+const ForMobile = styled(Flex)`
   display: none;
 
   ${props => media(null, props.theme.breakpoints[0])} {
     display: flex;
+  }
+`;
+
+const NotForMobile = styled(Flex)`
+  display: flex;
+
+  ${props => media(null, props.theme.breakpoints[0])} {
+    display: none;
   }
 `;
 
