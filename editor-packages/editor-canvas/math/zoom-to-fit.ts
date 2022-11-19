@@ -1,4 +1,4 @@
-import type { Box, XY } from "types";
+import type { Box, XY } from "../types";
 
 /**
  * this function provides a new offset for the canvas when user executes zoom-to-fit action, which resetting the canvas zoom to 1.
