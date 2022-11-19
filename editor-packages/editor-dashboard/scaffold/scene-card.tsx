@@ -1,8 +1,8 @@
 import React, { useRef } from "react";
 import styled from "@emotion/styled";
 import type { ReflectSceneNode } from "@design-sdk/figma-node";
-import { FigmaStaticImageFrameView } from "scaffolds/preview-canvas";
-import { SceneNodeIcon } from "components/icons";
+import { FigmaNodeBitmapView } from "@code-editor/canvas-renderer-bitmap";
+import { SceneNodeIcon } from "@code-editor/node-icons";
 import Highlighter from "react-highlight-words";
 import { useInViewport } from "react-in-viewport";
 
@@ -56,7 +56,7 @@ export function SceneCard({
             transform: `scale(${scale})`,
           }}
         >
-          <FigmaStaticImageFrameView
+          <FigmaNodeBitmapView
             background={"white"}
             key={scene.id}
             target={scene}

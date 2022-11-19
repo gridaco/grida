@@ -1,9 +1,36 @@
 import React, { useState, useEffect } from "react";
 import { ReflectSceneNode } from "@design-sdk/figma-node";
 import type { FrameOptimizationFactors } from "@code-editor/canvas/frame";
-import { blurred_bg_fill } from "./util";
+import { blurred_bg_fill } from "@code-editor/canvas-renderer-core";
 import { CircularProgress } from "@mui/material";
-import { useFigmaImageService } from "scaffolds/editor";
+
+interface BitmapPreviewService {
+  fetch: (
+    id: string,
+    options?: {
+      scale?: number;
+    }
+  ) => Promise<string>;
+}
+
+const Context = React.createContext<BitmapPreviewService>(null);
+
+const usefigmaBitmapPreviewService = () => {
+  const context = React.useContext(Context);
+  if (!context || typeof context.fetch !== "function") {
+    throw new Error(
+      "Bitmap service is not available. Are you sure you have an <FigmaNodeBitmapPreviewServiceProvider> above your consumers?"
+    );
+  }
+  return context;
+};
+
+export function FigmaNodeBitmapPreviewServiceProvider({
+  children,
+  service,
+}: React.PropsWithChildren<{ service: BitmapPreviewService }>) {
+  return <Context.Provider value={service}>{children}</Context.Provider>;
+}
 
 /**
  * 1 = 1 scale
@@ -11,7 +38,7 @@ import { useFigmaImageService } from "scaffolds/editor";
  */
 type ImageSizeVariant = "1" | "s";
 
-export function FigmaStaticImageFrameView({
+export function FigmaNodeBitmapView({
   target,
   zoom,
   inViewport,
@@ -21,7 +48,7 @@ export function FigmaStaticImageFrameView({
 } & FrameOptimizationFactors & {
     background?: React.CSSProperties["background"];
   }) {
-  const service = useFigmaImageService();
+  const service = usefigmaBitmapPreviewService();
   const { filekey: _fk, id, width, height } = target;
   const filekey = _fk as string;
 
@@ -44,12 +71,9 @@ export function FigmaStaticImageFrameView({
 
     if (service) {
       service
-        .fetch(id, {
-          debounce: true,
-          ensure: true,
-        })
+        .fetch(id)
         .then((res) => {
-          const src = res[id];
+          const src = res;
           set_image(src);
         })
         .catch(console.error);

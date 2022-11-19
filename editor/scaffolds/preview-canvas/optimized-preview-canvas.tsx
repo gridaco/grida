@@ -1,6 +1,6 @@
 import { ReflectSceneNode, ReflectSceneNodeType } from "@design-sdk/figma-node";
 import type { FrameOptimizationFactors } from "@code-editor/canvas/frame";
-import { FigmaStaticImageFrameView } from "./image-preview";
+import { FigmaNodeBitmapView } from "@code-editor/canvas-renderer-bitmap";
 import { D2CVanillaPreview } from "./vanilla-preview-async";
 
 function _check_by_type(type: ReflectSceneNodeType) {
@@ -68,7 +68,7 @@ export function OptimizedPreviewCanvas({
 } & FrameOptimizationFactors) {
   switch (optimized_preview_strategy(target)) {
     case "baked":
-      return <FigmaStaticImageFrameView target={target} {...props} />;
+      return <FigmaNodeBitmapView target={target} {...props} />;
     case "vanilla":
       return <D2CVanillaPreview target={target} {...props} />;
     default:

@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import type { Result } from "@designto/code";
 import { PreviewContent } from "./preview-content";
 import type { VanillaPreviewProps } from "./prop-type";
-import { blurred_bg_fill } from "./util";
+import { blurred_bg_fill } from "@code-editor/canvas-renderer-core";
 import { cachekey, cache } from "./cache";
 import { preview as wwpreview } from "../code/code-worker-messenger";
 
