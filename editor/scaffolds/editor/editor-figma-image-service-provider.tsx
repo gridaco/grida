@@ -28,21 +28,41 @@ export function FigmaImageServiceProvider({
       fetch: (...p: FetcherParams) => {
         const task = service.fetch(...p);
         const key = p[0];
-        pushTask({
-          id: `services.figma.fetch-image.${key}`,
-          debounce: 1000,
-          name: `Fetch image`,
-          description: `Fetching image of ${
-            Array.isArray(key) ? key.join(", ") : key
-          }`,
-          progress: null,
-        }),
-          task.finally(() => {
-            const key = p[0];
-            popTask({
+
+        // region push task to display queue with debounce
+        // debounce 500 ms.
+        // after 500 ms, if the task is not finished, push to the task queue for display.
+
+        let timer: number;
+        const start = () => {
+          timer = window.setTimeout(() => {
+            pushTask({
               id: `services.figma.fetch-image.${key}`,
+              debounce: 1000,
+              name: `Fetch image`,
+              description: `Fetching image of ${
+                Array.isArray(key) ? key.join(", ") : key
+              }`,
+              progress: null,
             });
+          }, 500);
+        };
+
+        const stop = () => {
+          window.clearTimeout(timer);
+        };
+
+        task.finally(() => {
+          stop();
+          const key = p[0];
+          popTask({
+            id: `services.figma.fetch-image.${key}`,
           });
+        });
+
+        start();
+        // endregion
+
         return task;
       },
     };
