@@ -9,6 +9,7 @@ import {
 } from "@editor-ui/property";
 import { useTargetContainer } from "hooks/use-target-node";
 import { IRadius } from "@reflect-ui/core";
+import { InspectLayout } from "./inspect-layout";
 
 export function LayoutSection() {
   const { target, root } = useTargetContainer();
@@ -69,6 +70,7 @@ export function LayoutSection() {
           </PropertyLine>
         )}
       </PropertyLines>
+      <InspectLayout />
     </PropertyGroup>
   );
 }
