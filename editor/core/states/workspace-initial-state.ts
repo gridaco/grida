@@ -26,14 +26,8 @@ export function merge_initial_workspace_state_with_editor_snapshot(
 export function create_initial_pending_workspace_state(): WorkspaceState {
   return {
     taskQueue: {
-      isBusy: true,
-      tasks: [
-        {
-          id: "pending",
-          name: "loading",
-          progress: null,
-        },
-      ],
+      isBusy: false,
+      tasks: [],
     },
     history: createPendingHistoryState(),
   };
