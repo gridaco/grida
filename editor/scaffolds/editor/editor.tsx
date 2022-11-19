@@ -9,7 +9,7 @@ import { EditorSidebar } from "components/editor";
 import { EditorState, useEditorState } from "core/states";
 import { Canvas } from "scaffolds/canvas";
 import { Inspector } from "scaffolds/inspector";
-import { EditorHome } from "@code-editor/dashboard";
+import { EditorHome, DashboardStateProvider } from "@code-editor/dashboard";
 import { EditorSkeleton } from "./skeleton";
 import { colors } from "theme";
 import { useEditorSetupContext } from "./setup";
@@ -92,7 +92,11 @@ function ModeDesign() {
 
   switch (selectedPage) {
     case "home":
-      return <EditorHome />;
+      return (
+        <DashboardStateProvider design={state.design}>
+          <EditorHome />
+        </DashboardStateProvider>
+      );
     default:
       return <Canvas />;
   }

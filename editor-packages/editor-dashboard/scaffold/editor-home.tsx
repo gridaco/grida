@@ -1,6 +1,5 @@
-import React, { useCallback, useState } from "react";
+import React, { useCallback, useMemo, useState } from "react";
 import styled from "@emotion/styled";
-import type { ReflectSceneNode } from "@design-sdk/figma-node";
 import { useEditorState } from "editor/core/states";
 import { useDispatch } from "editor/core/dispatch";
 import { SceneCard, SceneCardProps } from "./scene-card";
@@ -11,99 +10,88 @@ import {
   ContextMenuRoot as ContextMenu,
   MenuItem,
 } from "@editor-ui/context-menu";
+import { useDashboard } from "../core/provider";
 
 export function EditorHomePageView() {
-  const [state] = useEditorState();
-  const { design, selectedNodes } = state;
-  const dispatch = useDispatch();
-  const [query, setQuery] = useState(null);
-
-  const scenes: ReadonlyArray<ReflectSceneNode> = design.pages
-    .reduce((acc, page) => {
-      return acc.concat(page.children);
-    }, [])
-    .filter(Boolean)
-    // query by name first, since it's more efficient
-    .filter((s) => s.name.toLowerCase().includes(query?.toLowerCase() || ""))
-    .filter(
-      (s: ReflectSceneNode) =>
-        (s.origin === "FRAME" ||
-          s.origin === "COMPONENT" ||
-          s.origin === "COMPONENT_SET") &&
-        s.visible &&
-        s.children.length > 0
-    );
-
-  const components = Object.values(design.components)
-    .filter(Boolean)
-    // query by name first, since it's more efficient
-    .filter((s) => s.name.toLowerCase().includes(query?.toLowerCase() || ""));
+  const [__editorstate] = useEditorState();
+  const { selectedNodes } = __editorstate;
+  const _editor_dispatch = useDispatch();
+  const { hierarchy, filter, dispatch } = useDashboard();
 
   const handleQuery = (query: string) => {
-    setQuery(query);
+    dispatch({
+      type: "filter",
+      query: query,
+    });
   };
 
   const selectNode = useCallback(
     (node: string) => {
-      dispatch({
+      _editor_dispatch({
         type: "select-node",
         node,
       });
     },
-    [dispatch]
+    [_editor_dispatch]
   );
 
   const enterNode = useCallback(
     (node: string) => {
-      dispatch({
+      _editor_dispatch({
         type: "canvas/focus",
         node,
       });
-      dispatch({
+      _editor_dispatch({
         type: "mode",
         mode: "design",
       });
     },
-    [dispatch]
+    [_editor_dispatch]
   );
 
   const blur = useCallback(() => {
-    dispatch({
+    _editor_dispatch({
       type: "select-node",
       node: null,
     });
-  }, [dispatch]);
+  }, [_editor_dispatch]);
 
   return (
     <Providers>
       <EditorHomeHeader onQueryChange={handleQuery} />
-      <ContextMenuProvider>
-        <div
-          style={{
-            marginTop: 80,
-            padding: 40,
-          }}
-        >
-          <ScenesSector
-            label="Scenes"
-            scenes={scenes}
-            query={query}
-            selections={selectedNodes}
-            onBlur={blur}
-            onSelect={selectNode}
-            onEnter={enterNode}
-          />
-          <ScenesSector
-            label="Components"
-            scenes={components}
-            query={query}
-            selections={selectedNodes}
-            onBlur={blur}
-            onSelect={selectNode}
-            onEnter={enterNode}
-          />
-        </div>
-      </ContextMenuProvider>
+
+      <div
+        style={{
+          marginTop: 80,
+          padding: 40,
+        }}
+      >
+        {hierarchy.sections.map((section, i) => {
+          const { name, items } = section;
+          return (
+            <ScenesSector
+              key={i}
+              label={name}
+              scenes={items}
+              query={filter.query}
+              selections={selectedNodes}
+              onBlur={blur}
+              onSelect={selectNode}
+              onEnter={enterNode}
+            />
+          );
+        })}
+
+        {/* <ScenesSector
+          label="Components"
+          scenes={components}
+          query={filter.query}
+          selections={selectedNodes}
+          onBlur={blur}
+          onSelect={selectNode}
+          onEnter={enterNode}
+        /> */}
+      </div>
     </Providers>
   );
 }
@@ -133,25 +121,29 @@ function ScenesSector({
 }) {
   return (
     <>
-      <SectionLabel>{label}</SectionLabel>
-      <SceneGrid onClick={onBlur}>
-        {scenes.map((i) => (
-          <DraggableSceneCard
-            key={i.id}
-            // @ts-ignore // todo
-            scene={i}
-            q={query}
-            selected={selections.includes(i.id)}
-            onClick={(e) => {
-              onSelect(i.id);
-              e.stopPropagation();
-            }}
-            onDoubleClick={() => {
-              onEnter(i.id);
-            }}
-          />
-        ))}
-      </SceneGrid>
+      <ContextMenuProvider>
+        <div>
+          <SectionLabel>{label}</SectionLabel>
+          <SceneGrid onClick={onBlur}>
+            {scenes.map((i) => (
+              <DraggableSceneCard
+                key={i.id}
+                // @ts-ignore // todo
+                scene={i}
+                q={query}
+                selected={selections.includes(i.id)}
+                onClick={(e) => {
+                  onSelect(i.id);
+                  e.stopPropagation();
+                }}
+                onDoubleClick={() => {
+                  onEnter(i.id);
+                }}
+              />
+            ))}
+          </SceneGrid>
+        </div>
+      </ContextMenuProvider>
     </>
   );
 }
