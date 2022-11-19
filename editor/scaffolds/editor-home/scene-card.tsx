@@ -76,6 +76,7 @@ export function SceneCard({
             highlightClassName="name"
             searchWords={q ? [q] : []}
             textToHighlight={scene.name}
+            autoEscape // required to escape regex special characters, like, `+`, `(`, `)`, etc.
           />
         </Label>
       </footer>
