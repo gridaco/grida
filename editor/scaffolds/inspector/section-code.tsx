@@ -51,10 +51,14 @@ export function CodeSection() {
       return;
     }
 
-    wwcode({
-      target: target.id,
-      framework: preferences.framework,
-    }).then(on_result);
+    setTimeout(() => {
+      // execute after 500 ms for better ux (render the ui smoothly first).
+      // it uses the webworker but, still heavy operations holds the ui thread.
+      wwcode({
+        target: target.id,
+        framework: preferences.framework,
+      }).then(on_result);
+    }, 500);
   }, [target?.id, preferences.framework.framework]);
 
   const { code } = result ?? {};

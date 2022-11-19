@@ -23,6 +23,8 @@ type FlatScebeBode = {
   depth: number;
 };
 
+const _CONTENT_MARGIN_TOP = 80;
+
 const flatten = (node: ReflectSceneNode) => {
   const [rx, ry] = [node.absoluteX, node.absoluteY];
   const result: FlatScebeBode[] = [];
@@ -76,7 +78,7 @@ export function InspectLayout() {
 
   useEffect(() => {
     if (target?.width && bound.width > 0) {
-      const margin = 100;
+      const margin = _CONTENT_MARGIN_TOP;
       const s = bound.width / (target.width + margin);
       setScale(s);
     }
@@ -97,6 +99,7 @@ export function InspectLayout() {
         ref={ref}
         projection="perspective"
         scale={scale}
+        height={target.height * scale + _CONTENT_MARGIN_TOP}
         contentMeta={{
           width: target.width,
           height: target.height,
@@ -179,7 +182,7 @@ const minmax = (min: number, max: number, value: number) => {
 
 const initialtransform = {
   offsetX: 0,
-  offsetY: 100,
+  offsetY: _CONTENT_MARGIN_TOP,
   rotateX: 0,
   rotateY: 0,
   scale: 1,
@@ -191,10 +194,12 @@ const Canvas = forwardRef(function (
     children,
     projection,
     contentMeta,
+    height = 0,
     scale = 0.5,
   }: React.PropsWithChildren<{
     projection: Projection;
     scale?: number;
+    height?: number;
     contentMeta: {
       width: number;
       height: number;
@@ -334,7 +339,8 @@ const Canvas = forwardRef(function (
           justifyContent: "center",
           userSelect: "none",
           width: "100%",
-          height: 300,
+          height,
+          maxHeight: 300,
           overflow: "hidden",
         }}
       >
