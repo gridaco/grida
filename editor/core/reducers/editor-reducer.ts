@@ -25,8 +25,18 @@ import { CanvasStateStore } from "@code-editor/canvas/stores";
 import q from "@design-sdk/query";
 import assert from "assert";
 import { getPageNode } from "utils/get-target-node";
+import { nanoid } from "nanoid";
 
 const _editor_path_name = "/files/[key]/";
+
+const _DEV_CLEAR_LOG = false;
+
+const clearlog = (by: string) => {
+  if (_DEV_CLEAR_LOG) {
+    console.clear();
+    console.log(`cleard console by ${by}`);
+  }
+};
 
 export function editorReducer(state: EditorState, action: Action): EditorState {
   const router = useRouter();
@@ -94,8 +104,7 @@ export function editorReducer(state: EditorState, action: Action): EditorState {
     case "select-node": {
       const { node } = <SelectNodeAction>action;
 
-      console.clear();
-      console.info("cleard console by editorReducer#select-node");
+      clearlog("editorReducer#select-node");
 
       // update router
       update_route(router, {
@@ -123,17 +132,24 @@ export function editorReducer(state: EditorState, action: Action): EditorState {
           page: page.id,
         });
 
-        // TODO: move canvas to the node
+        const final = _2_select_page;
 
-        return { ..._1_select_node, ..._2_select_page };
+        // refresh canvas focus to the target.
+        final.focus = {
+          refreshkey: nanoid(4),
+          nodes: [node],
+        };
+
+        final.selectedNodes = [node];
+
+        return final;
       });
     }
 
     case "select-page": {
       const { page } = <SelectPageAction>action;
 
-      console.clear();
-      console.info("cleard console by editorReducer#select-page");
+      clearlog("editorReducer#select-page");
 
       switch (page) {
         case "home": {

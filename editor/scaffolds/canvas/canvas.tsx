@@ -24,7 +24,7 @@ export function VisualContentArea() {
   const { highlightedLayer, highlightLayer } = useWorkspace();
   const dispatch = useDispatch();
 
-  const { selectedPage, design, selectedNodes, canvasMode } = state;
+  const { selectedPage, design, selectedNodes, focus, canvasMode } = state;
 
   const thisPage = design?.pages?.find((p) => p.id == selectedPage);
   const thisPageNodes = selectedPage ? thisPage?.children?.filter(Boolean) : [];
@@ -95,6 +95,8 @@ export function VisualContentArea() {
               pageid={selectedPage}
               backgroundColor={_bg}
               selectedNodes={selectedNodes}
+              focusRefreshkey={focus.refreshkey}
+              focus={focus.nodes}
               highlightedLayer={highlightedLayer}
               onSelectNode={(...nodes) => {
                 dispatch({ type: "select-node", node: nodes.map((n) => n.id) });
