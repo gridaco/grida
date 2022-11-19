@@ -139,6 +139,8 @@ function EffectPreview({ effects }: { effects: Array<Effect> }) {
 
   return (
     <EffectsPreviewContainer padding={14} onClick={onclick}>
+      <span className="cross vertical" />
+      <span className="cross horizontal" />
       <span
         className="application"
         style={{
@@ -153,6 +155,7 @@ function EffectPreview({ effects }: { effects: Array<Effect> }) {
 }
 
 const EffectsPreviewContainer = styled.div<{ padding: number }>`
+  position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -160,8 +163,35 @@ const EffectsPreviewContainer = styled.div<{ padding: number }>`
   background: white;
   border-radius: 4px;
   padding: ${(p) => p.padding}px;
+  overflow: hidden;
+
+  .cross {
+    opacity: 0.5;
+    position: absolute;
+    background: magenta;
+    z-index: 0;
+    transition: opacity 0.2s ease-in-out;
+  }
+
+  .vertical {
+    width: 1px;
+    height: 100%;
+    transform: translateX(-50%);
+  }
+  .horizontal {
+    width: 100%;
+    height: 1px;
+    transform: translateY(-50%);
+  }
 
   .application {
     border-radius: 4px;
+    z-index: 9;
+  }
+
+  &:hover {
+    .cross {
+      opacity: 0;
+    }
   }
 `;
