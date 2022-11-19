@@ -52,6 +52,8 @@ const StyledTrigger = styled(Popover.Trigger)`
   outline: none;
   border: none;
   background: none;
+  padding: 0;
+  margin: 0;
 `;
 
 const scaleIn = keyframes({
