@@ -1,7 +1,6 @@
 const IS_DEV = process.env.NODE_ENV === "development";
 
-const withPlugins = require("next-compose-plugins");
-const withTM = require("next-transpile-modules")([
+const packages = [
   // region @editor-app
   "@editor-app/live-session",
   "@code-editor/preview-pip", // TODO: remove me. this is for development. for production, use npm ver instead.
@@ -65,7 +64,10 @@ const withTM = require("next-transpile-modules")([
   "@web-builder/styles",
   // endregion web builders
   // -----------------------------
-]);
+];
+
+const withPlugins = require("next-compose-plugins");
+const withTM = require("next-transpile-modules")(packages);
 
 const withPWA = require("next-pwa")({
   register: true,

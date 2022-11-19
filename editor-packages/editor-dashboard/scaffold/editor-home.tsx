@@ -1,10 +1,12 @@
 import React, { useState } from "react";
 import styled from "@emotion/styled";
 import type { ReflectSceneNode } from "@design-sdk/figma-node";
-import { useEditorState } from "core/states";
-import { useDispatch } from "core/dispatch";
-import { SceneCard } from "./scene-card";
+import { useEditorState } from "editor/core/states";
+import { useDispatch } from "editor/core/dispatch";
+import { SceneCard, SceneCardProps } from "./scene-card";
 import { EditorHomeHeader } from "./editor-home-header";
+import { DndProvider, useDrag, useDrop } from "react-dnd";
+import { HTML5Backend } from "react-dnd-html5-backend";
 
 export function EditorHomePageView() {
   const [state] = useEditorState();
@@ -38,7 +40,7 @@ export function EditorHomePageView() {
   };
 
   return (
-    <>
+    <Providers>
       <EditorHomeHeader onQueryChange={handleQuery} />
       <div
         style={{
@@ -57,7 +59,7 @@ export function EditorHomePageView() {
         >
           {scenes.map((s) => {
             return (
-              <SceneCard
+              <DraggableSceneCard
                 key={s.id}
                 scene={s}
                 q={query}
@@ -86,7 +88,7 @@ export function EditorHomePageView() {
         <SectionLabel>Components</SectionLabel>
         <SceneGrid>
           {components.map((cmp) => (
-            <SceneCard
+            <DraggableSceneCard
               key={cmp.id}
               // @ts-ignore // todo
               scene={cmp}
@@ -113,7 +115,54 @@ export function EditorHomePageView() {
           ))}
         </SceneGrid>
       </div>
-    </>
+    </Providers>
+  );
+}
+
+function Providers({ children }: React.PropsWithChildren<{}>) {
+  return <DndProvider backend={HTML5Backend}>{children}</DndProvider>;
+}
+
+function DraggableSceneCard({ ...props }: SceneCardProps) {
+  const [{ isActive }, drop] = useDrop(() => ({
+    accept: "scene-card",
+    collect: (monitor) => ({
+      isActive: monitor.canDrop() && monitor.isOver(),
+    }),
+    canDrop<ReflectSceneNode>(item, monitor) {
+      return item.id !== props.scene.id;
+    },
+    drop(item, monitor) {
+      console.log("drop", item, monitor);
+      // todo:
+    },
+  }));
+
+  const [{ opacity }, drag] = useDrag(
+    () => ({
+      type: "scene-card",
+      item: props.scene,
+      collect: (monitor) => ({
+        opacity: monitor.isDragging() ? 0.5 : 1,
+      }),
+    }),
+    []
+  );
+
+  function attachRef(el) {
+    drag(el);
+    drop(el);
+  }
+
+  return (
+    <SceneCard
+      ref={attachRef}
+      style={{
+        opacity,
+      }}
+      isOver={isActive}
+      {...props}
+    />
   );
 }
 

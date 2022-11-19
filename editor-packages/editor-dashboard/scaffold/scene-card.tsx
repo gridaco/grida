@@ -5,20 +5,33 @@ import { FigmaNodeBitmapView } from "@code-editor/canvas-renderer-bitmap";
 import { SceneNodeIcon } from "@code-editor/node-icons";
 import Highlighter from "react-highlight-words";
 import { useInViewport } from "react-in-viewport";
+import { mergeRefs } from "react-merge-refs";
 
-export function SceneCard({
-  scene,
-  selected,
-  onClick,
-  onDoubleClick,
-  q,
-}: {
+export interface SceneCardProps {
   scene: ReflectSceneNode;
   selected?: boolean;
   onClick?: (e) => void;
   onDoubleClick?: () => void;
   q?: string;
-}) {
+  style?: React.CSSProperties;
+  /**
+   * an explicit field to set the view as accepting drag state view.
+   */
+  isOver?: boolean;
+}
+
+export const SceneCard = React.forwardRef(function (
+  {
+    style = {},
+    scene,
+    selected,
+    onClick,
+    onDoubleClick,
+    q,
+    isOver,
+  }: SceneCardProps,
+  ref
+) {
   const visibilityRef = useRef();
   const { enterCount } = useInViewport(visibilityRef);
 
@@ -29,18 +42,20 @@ export function SceneCard({
   const { height, type } = scene;
   return (
     <div
-      ref={visibilityRef}
+      ref={mergeRefs([visibilityRef, ref])}
       onClick={onClick}
       onDoubleClick={onDoubleClick}
       style={{
         display: "flex",
         flexDirection: "column",
         flex: 0,
+        ...style,
       }}
     >
       {/* sizer */}
       <Preview
         data-selected={selected}
+        data-over={isOver}
         style={{
           height: height * scale,
           width: maxwidth,
@@ -49,10 +64,8 @@ export function SceneCard({
         <span id="overlay" />
         {/* transformer */}
         <div
+          id="view"
           style={{
-            pointerEvents: "none",
-            userSelect: "none",
-            transformOrigin: "top left",
             transform: `scale(${scale})`,
           }}
         >
@@ -82,7 +95,7 @@ export function SceneCard({
       </footer>
     </div>
   );
-}
+});
 
 const Preview = styled.div`
   outline: 1px solid rgba(0, 0, 0, 0.1);
@@ -100,6 +113,13 @@ const Preview = styled.div`
     background: rgba(0, 0, 255, 0.1);
   }
 
+  #view {
+    pointer-events: none;
+    user-select: none;
+    transform-origin: top left;
+    transition: all 0.2s ease-in-out;
+  }
+
   &[data-selected="true"] {
     outline: 4px solid rgb(0, 179, 255);
 
@@ -107,6 +127,16 @@ const Preview = styled.div`
       display: block;
     }
   }
+
+  &[data-over="true"] {
+    outline: 4px solid rgb(0, 179, 255);
+
+    #view {
+      opacity: 0.5;
+    }
+  }
+
+  transition: all 0.2s ease-in-out;
 `;
 
 const Label = styled.span`

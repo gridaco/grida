@@ -1,4 +1,11 @@
 {
   "name": "@code-editor/dashboard",
-  "version": "0.0.0"
+  "version": "0.0.0",
+  "devDependencies": {
+    "react-dnd": "^16.0.1"
+  },
+  "peerDependencies": {
+    "react": "^18.2.0",
+    "react-dnd": "16.0.1"
+  }
 }
