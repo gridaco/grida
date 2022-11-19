@@ -71,7 +71,7 @@ export function EditorHomePageView() {
                 }}
                 onDoubleClick={() => {
                   dispatch({
-                    type: "locate-node",
+                    type: "canvas/focus",
                     node: s.id,
                   });
                   dispatch({
@@ -101,7 +101,7 @@ export function EditorHomePageView() {
               }}
               onDoubleClick={() => {
                 dispatch({
-                  type: "locate-node",
+                  type: "canvas/focus",
                   node: cmp.id,
                 });
                 dispatch({

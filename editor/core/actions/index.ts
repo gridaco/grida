@@ -31,7 +31,7 @@ export type Action =
   | EditorModeAction
   | DesignerModeSwitchActon
   | SelectNodeAction
-  | LocateNodeAction
+  | CanvasFocusNodeAction
   | HighlightNodeAction
   | CanvasEditAction
   | CanvasModeAction
@@ -78,8 +78,8 @@ export interface SelectNodeAction {
 /**
  * Select and move to the node.
  */
-export interface LocateNodeAction {
-  type: "locate-node";
+export interface CanvasFocusNodeAction {
+  type: "canvas/focus";
   node: string;
 }
 

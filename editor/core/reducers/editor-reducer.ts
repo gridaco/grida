@@ -14,7 +14,7 @@ import type {
   BackgroundTaskPopAction,
   BackgroundTaskUpdateProgressAction,
   EditorModeSwitchAction,
-  LocateNodeAction,
+  CanvasFocusNodeAction,
   DesignerModeSwitchActon,
   CodingInitialFilesSeedAction,
   CodingNewTemplateSessionAction,
@@ -105,8 +105,8 @@ export function editorReducer(state: EditorState, action: Action): EditorState {
       return reducers["select-node"](state, action);
     }
 
-    case "locate-node": {
-      const { node } = <LocateNodeAction>action;
+    case "canvas/focus": {
+      const { node } = <CanvasFocusNodeAction>action;
 
       update_route(router, { node });
 
