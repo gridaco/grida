@@ -1,1 +1,1 @@
-export { EditorHomePageView as EditorHome } from "./editor-home";
+export { Dashboard as EditorHome } from "./editor-dashboard";

@@ -2,8 +2,8 @@ import React, { useCallback, useMemo, useState } from "react";
 import styled from "@emotion/styled";
 import { useEditorState } from "editor/core/states";
 import { useDispatch } from "editor/core/dispatch";
-import { SceneCard, SceneCardProps } from "./scene-card";
-import { EditorHomeHeader } from "./editor-home-header";
+import { SceneCard, SceneCardProps } from "../components";
+import { EditorHomeHeader } from "./editor-dashboard-header";
 import { DndProvider, useDrag, useDrop } from "react-dnd";
 import { HTML5Backend } from "react-dnd-html5-backend";
 import {
@@ -12,7 +12,7 @@ import {
 } from "@editor-ui/context-menu";
 import { useDashboard } from "../core/provider";
 
-export function EditorHomePageView() {
+export function Dashboard() {
   const [__editorstate] = useEditorState();
   const { selectedNodes } = __editorstate;
   const _editor_dispatch = useDispatch();
