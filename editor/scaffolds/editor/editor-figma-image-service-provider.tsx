@@ -1,5 +1,4 @@
-import { useDispatch } from "core/dispatch";
-import { useWorkspaceState } from "core/states";
+import { useWorkspace, useWorkspaceState } from "core/states";
 import React, { useCallback, useEffect, useMemo } from "react";
 import { FigmaImageService } from "services";
 
@@ -15,7 +14,7 @@ export function FigmaImageServiceProvider({
   filekey: string;
 }>) {
   const wssate = useWorkspaceState();
-  const dispatch = useDispatch();
+  const { pushTask, popTask } = useWorkspace();
 
   const service = useMemo(() => {
     if (!filekey || !wssate.figmaAuthentication) return;
@@ -23,11 +22,13 @@ export function FigmaImageServiceProvider({
     return new FigmaImageService(filekey, wssate.figmaAuthentication, null, 24);
   }, [filekey, wssate.figmaAuthentication]);
 
-  const pushTask = useCallback(
-    (key: string | string[]) =>
-      dispatch({
-        type: "editor-task-push",
-        task: {
+  const fetcher = useMemo(() => {
+    if (!service) return null;
+    return {
+      fetch: (...p: FetcherParams) => {
+        const task = service.fetch(...p);
+        const key = p[0];
+        pushTask({
           id: `services.figma.fetch-image.${key}`,
           debounce: 1000,
           name: `Fetch image`,
@@ -35,31 +36,13 @@ export function FigmaImageServiceProvider({
             Array.isArray(key) ? key.join(", ") : key
           }`,
           progress: null,
-        },
-      }),
-    [dispatch]
-  );
-
-  const popTask = useCallback(
-    (key: string | string[]) =>
-      dispatch({
-        type: "editor-task-pop",
-        task: {
-          id: `services.figma.fetch-image.${key}`,
-        },
-      }),
-    [dispatch]
-  );
-
-  const fetcher = useMemo(() => {
-    if (!service) return null;
-    return {
-      fetch: (...p: FetcherParams) => {
-        const task = service.fetch(...p);
-        pushTask(p[0]);
-        task.finally(() => {
-          popTask(p[0]);
-        });
+        }),
+          task.finally(() => {
+            const key = p[0];
+            popTask({
+              id: `services.figma.fetch-image.${key}`,
+            });
+          });
         return task;
       },
     };

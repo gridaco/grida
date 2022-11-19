@@ -2,7 +2,7 @@ import type { FrameworkConfig } from "@grida/builder-config";
 import type {
   ConsoleLog,
   EditorState,
-  EditorTask,
+  BackgroundTask,
   ScenePreviewData,
   File,
 } from "core/states";
@@ -186,17 +186,17 @@ export type BackgroundTaskAction =
   | BackgroundTaskUpdateProgressAction;
 
 export interface BackgroundTaskPushAction {
-  type: "editor-task-push";
-  task: EditorTask;
+  type: "tasks/push";
+  task: BackgroundTask;
 }
 
 export interface BackgroundTaskPopAction {
-  type: "editor-task-pop";
-  task: EditorTask | { id: string };
+  type: "tasks/pop";
+  task: BackgroundTask | { id: string };
 }
 
 export interface BackgroundTaskUpdateProgressAction {
-  type: "editor-task-update-progress";
+  type: "tasks/update-progress";
   id: string;
   progress: number;
 }

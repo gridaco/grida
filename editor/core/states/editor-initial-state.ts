@@ -16,7 +16,6 @@ export function createInitialEditorState(editor: EditorSnapshot): EditorState {
     designerMode: "inspect",
     code: editor.code,
     canvasMode: editor.canvasMode,
-    editorTaskQueue: editor.editorTaskQueue,
   };
 }
 
@@ -39,15 +38,5 @@ export function createPendingEditorState(): EditorState {
     mode: { value: "design" },
     canvasMode: { value: "free" },
     designerMode: "inspect",
-    editorTaskQueue: {
-      isBusy: true,
-      tasks: [
-        {
-          id: "pending",
-          name: "loading",
-          progress: null,
-        },
-      ],
-    },
   };
 }

@@ -14,6 +14,10 @@ export function merge_initial_workspace_state_with_editor_snapshot(
 ): WorkspaceState {
   return {
     ...base,
+    taskQueue: base.taskQueue ?? {
+      isBusy: false,
+      tasks: [],
+    },
     // below fields will be overwritten irrelevent to the existing base.
     history: createInitialHistoryState(snapshot),
   };
@@ -21,6 +25,16 @@ export function merge_initial_workspace_state_with_editor_snapshot(
 
 export function create_initial_pending_workspace_state(): WorkspaceState {
   return {
+    taskQueue: {
+      isBusy: true,
+      tasks: [
+        {
+          id: "pending",
+          name: "loading",
+          progress: null,
+        },
+      ],
+    },
     history: createPendingHistoryState(),
   };
 }

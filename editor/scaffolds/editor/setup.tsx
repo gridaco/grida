@@ -125,10 +125,6 @@ export function SetupEditor({
           },
           code: { files: {}, loading: true },
           canvasMode: initialCanvasMode,
-          editorTaskQueue: {
-            isBusy: false,
-            tasks: [],
-          },
         };
       }
 
