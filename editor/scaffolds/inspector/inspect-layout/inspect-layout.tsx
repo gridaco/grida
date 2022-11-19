@@ -1,10 +1,13 @@
-import React, { useCallback, useMemo } from "react";
+import React, { forwardRef, useCallback, useEffect, useMemo } from "react";
 import styled from "@emotion/styled";
 import { useDrag, useGesture } from "@use-gesture/react";
 import { useTargetContainer } from "hooks/use-target-node";
 import { visit } from "tree-visit";
 import type { ReflectSceneNode } from "@design-sdk/figma-node";
 import { useDispatch } from "core/dispatch";
+import { ReloadIcon } from "@radix-ui/react-icons";
+import { motion } from "framer-motion";
+import useMeasure from "react-use-measure";
 
 type FlatScebeBode = {
   id: string;
@@ -52,6 +55,9 @@ export function InspectLayout() {
   const dispatch = useDispatch();
   const { target } = useTargetContainer();
   const [selected, setSelected] = React.useState<string>(null);
+  const [scale, setScale] = React.useState(0);
+
+  const [ref, bound] = useMeasure();
 
   const highlight = useCallback(
     (id: string) => {
@@ -68,36 +74,61 @@ export function InspectLayout() {
     [target?.id]
   );
 
+  useEffect(() => {
+    if (target?.width && bound.width > 0) {
+      const margin = 100;
+      const s = bound.width / (target.width + margin);
+      setScale(s);
+    }
+  }, [bound.width, target?.width]);
+
   if (!(target?.children?.length > 0 && flattened.length > 0)) return <></>;
 
   return (
-    <Canvas projection="perspective" scale={0.5}>
-      <Container
-        style={{
+    <motion.div
+      initial={{
+        opacity: 0,
+      }}
+      animate={{
+        opacity: 1,
+      }}
+    >
+      <Canvas
+        ref={ref}
+        projection="perspective"
+        scale={scale}
+        contentMeta={{
           width: target.width,
           height: target.height,
-          background: "rgba(0,0,0,0.5)",
         }}
       >
-        {flattened.map((node: FlatScebeBode) => {
-          return (
-            <Layer
-              key={node.id}
-              width={node.width}
-              height={node.height}
-              depth={node.depth}
-              x={node.absoluteX}
-              y={node.absoluteY}
-              selected={selected === node.id}
-              onClick={() => {
-                highlight(node.id);
-                setSelected(node.id);
-              }}
-            />
-          );
-        })}
-      </Container>
-    </Canvas>
+        <Container
+          style={{
+            width: target.width,
+            height: target.height,
+            background: "rgba(0,0,0,0.5)",
+          }}
+        >
+          {flattened.map((node: FlatScebeBode) => {
+            return (
+              <Layer
+                key={node.id}
+                width={node.width}
+                height={node.height}
+                depth={node.depth}
+                x={node.absoluteX}
+                y={node.absoluteY}
+                selected={selected === node.id}
+                onClick={() => {
+                  highlight(node.id);
+                  setSelected(node.id);
+                }}
+              />
+            );
+          })}
+        </Container>
+      </Canvas>
+    </motion.div>
   );
 }
 
@@ -146,25 +177,80 @@ const minmax = (min: number, max: number, value: number) => {
   return Math.min(Math.max(min, value), max);
 };
 
+const initialtransform = {
+  offsetX: 0,
+  offsetY: 100,
+  rotateX: 0,
+  rotateY: 0,
+  scale: 1,
+};
+
 type Projection = "perspective" | "orthographic";
-function Canvas({
-  children,
-  projection,
-  scale = 1,
-}: React.PropsWithChildren<{ projection: Projection; scale?: number }>) {
-  const ref = React.useRef<HTMLDivElement>(null);
+const Canvas = forwardRef(function (
+  {
+    children,
+    projection,
+    contentMeta,
+    scale = 0.5,
+  }: React.PropsWithChildren<{
+    projection: Projection;
+    scale?: number;
+    contentMeta: {
+      width: number;
+      height: number;
+    };
+  }>,
+  fref: React.Ref<HTMLDivElement>
+) {
+  const gestureref = React.useRef<HTMLDivElement>(null);
 
   const [transform, setTransform] = React.useState<{
     offsetX: number;
     offsetY: number;
     rotateX: number;
     rotateY: number;
-  }>({
-    offsetX: 0,
-    offsetY: 100,
-    rotateX: 0,
-    rotateY: 0,
-  });
+    scale: number;
+  }>({ ...initialtransform, scale });
+
+  const [helpinfo, setHelpInfo] = React.useState("");
+
+  useEffect(() => {
+    setTransform({ ...initialtransform, scale });
+  }, [scale]);
+
+  const canReset = React.useMemo(() => {
+    return (
+      transform.offsetX !== initialtransform.offsetX ||
+      transform.offsetY !== initialtransform.offsetY ||
+      transform.rotateX !== initialtransform.rotateX ||
+      transform.rotateY !== initialtransform.rotateY
+    );
+  }, [JSON.stringify(transform)]);
+
+  const mode3d = React.useMemo(() => {
+    return (
+      transform.rotateX !== initialtransform.rotateX ||
+      transform.rotateY !== initialtransform.rotateY
+    );
+  }, [JSON.stringify(transform)]);
+
+  const reset = () => {
+    setTransform({
+      ...initialtransform,
+      scale: scale,
+    });
+  };
+
+  const displayhelp = (info: string) => {
+    if (!helpinfo) {
+      setHelpInfo(info);
+      setTimeout(() => {
+        setHelpInfo("");
+      }, 1000);
+    }
+  };
+
+  const appliedscale = transform.scale;
 
   useGesture(
     {
@@ -172,10 +258,11 @@ function Canvas({
         if (metaKey) {
           const [dx, dy] = delta;
           const _new = {
-            offsetX: minmax(-2000, 2000, transform.offsetX + dx / scale),
-            offsetY: minmax(-2000, 100, transform.offsetY + dy / scale),
+            offsetX: minmax(-2000, 2000, transform.offsetX + dx / appliedscale),
+            offsetY: minmax(-2000, 100, transform.offsetY + dy / appliedscale),
             rotateX: transform.rotateX,
             rotateY: transform.rotateY,
+            scale: transform.scale,
           };
           setTransform(_new);
         } else {
@@ -186,6 +273,7 @@ function Canvas({
             offsetY: transform.offsetY,
             rotateX: minmax(-95, 95, rotateX - dy * 0.5),
             rotateY: minmax(-95, 95, rotateY + dx * 0.5),
+            scale: transform.scale,
           };
           setTransform(_new);
 
@@ -195,34 +283,147 @@ function Canvas({
         }
         //
       },
+      onPinch: ({ delta: [d], _delta: [_d], event }) => {
+        const _new = {
+          offsetX: transform.offsetX,
+          offsetY: transform.offsetY,
+          rotateX: transform.rotateX,
+          rotateY: transform.rotateY,
+          scale: minmax(0.1, 10, transform.scale + d),
+        };
+        setTransform(_new);
+
+        event.stopImmediatePropagation();
+        event.stopPropagation();
+        event.preventDefault();
+      },
+      onWheel: ({ delta: [dx, dy], event, metaKey }) => {
+        if (metaKey) {
+          const _new = {
+            offsetX: minmax(-2000, 2000, transform.offsetX - dx / appliedscale),
+            offsetY: minmax(-2000, 100, transform.offsetY - dy / appliedscale),
+            rotateX: transform.rotateX,
+            rotateY: transform.rotateY,
+            scale: transform.scale,
+          };
+          setTransform(_new);
+
+          event.stopImmediatePropagation();
+          event.stopPropagation();
+          event.preventDefault();
+        } else {
+          displayhelp("Hold ⌘ to pan. Drag to tilt.");
+        }
+      },
     },
     {
-      target: ref,
+      target: gestureref,
+      eventOptions: {
+        passive: false,
+      },
     }
   );
 
   return (
-    <div
-      ref={ref}
-      style={{
-        userSelect: "none",
-        width: "100%",
-        height: 300,
-        overflow: "hidden",
-      }}
-    >
+    <div ref={fref}>
       <div
+        ref={gestureref}
         style={{
-          willChange: "transform",
-          transformStyle: "preserve-3d",
-          perspective: projection === "perspective" ? 1000 : undefined,
           position: "relative",
-          transformOrigin: "top center",
-          transform: `rotateX(${transform.rotateX}deg) rotateY(${transform.rotateY}deg) scale(${scale}) translate3d(${transform.offsetX}px, ${transform.offsetY}px, 0)`,
+          display: "flex",
+          justifyContent: "center",
+          userSelect: "none",
+          width: "100%",
+          height: 300,
+          overflow: "hidden",
         }}
       >
-        {children}
+        <HelpDisplay
+          style={{
+            opacity: helpinfo ? 1 : 0,
+          }}
+        >
+          {helpinfo}
+        </HelpDisplay>
+        <div
+          style={{
+            position: "absolute",
+            bottom: 16,
+            right: 16,
+            zIndex: 9,
+          }}
+        >
+          {canReset && (
+            <IconButton
+              onClick={reset}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.5, duration: 0.2 }}
+            >
+              <ReloadIcon color="white" />
+            </IconButton>
+          )}
+        </div>
+        <TransformContainer
+          style={{
+            width: contentMeta.width,
+            height: contentMeta.height,
+            perspective:
+              projection === "perspective"
+                ? mode3d
+                  ? 1000
+                  : undefined
+                : undefined,
+            transform: `rotateX(${transform.rotateX}deg) rotateY(${transform.rotateY}deg) scale(${transform.scale}) translate3d(${transform.offsetX}px, ${transform.offsetY}px, 0)`,
+          }}
+        >
+          {children}
+        </TransformContainer>
       </div>
     </div>
   );
-}
+});
+
+const HelpDisplay = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  pointer-events: none;
+  position: absolute;
+  opacity: 0;
+  background: rgba(0, 0, 0, 0.5);
+  color: white;
+
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+
+  z-index: 99;
+
+  transition: opacity 0.2s ease-in-out;
+`;
+
+const TransformContainer = styled.div`
+  position: relative;
+  will-change: transform;
+  transform-style: preserve-3d;
+  transform-origin: top center;
+  perspective: none;
+  transition: transform 0.12s ease;
+`;
+
+const IconButton = styled(motion.button)`
+  display: flex;
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 4px;
+  border: none;
+  padding: 8px;
+  cursor: pointer;
+  outline: none;
+
+  &:hover {
+    background: rgba(255, 255, 255, 0.3);
+  }
+`;
