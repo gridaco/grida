@@ -86,6 +86,7 @@ export function CodeSection() {
             value={code.raw}
             height={viewheight}
             fold_comments_on_load
+            path={dummy_file_name_map[preferences.framework.framework]}
             options={{
               lineNumbers: "off",
               glyphMargin: false,
@@ -113,6 +114,13 @@ export function CodeSection() {
     </PropertyGroup>
   );
 }
+
+const dummy_file_name_map = {
+  flutter: "main.dart",
+  react: "app.tsx",
+  "react-native": "app.tsx",
+  vue: "app.vue",
+} as const;
 
 function CliIntegrationSnippet({ node }: { node: ReflectSceneNode }) {
   const { id, filekey } = node;
