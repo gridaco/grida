@@ -31,13 +31,27 @@ const useDispatch = (): Dispatcher => {
 
 const StateContext = createContext<DashboardState | undefined>(undefined);
 
-export const DashboardStateProvider = memo(function StateProvider({
+export const DashboardStateProvider = function Awaiter({
+  children,
+  design,
+}: React.PropsWithChildren<{ design?: FigmaReflectRepository }>) {
+  if (!design) {
+    return <>{children}</>;
+  }
+
+  return <Provider design={design}>{children}</Provider>;
+};
+
+const Provider = memo(function StateProvider({
   children,
   design,
 }: React.PropsWithChildren<{
   design: FigmaReflectRepository;
 }>) {
-  const [value, dispatch] = useReducer(reducer, initialDashboardState(design));
+  const [value, dispatch] = useReducer(
+    reducer,
+    design ? initialDashboardState(design) : undefined
+  );
 
   return (
     <StateContext.Provider value={value}>
