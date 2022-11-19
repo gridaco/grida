@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useCallback, useState } from "react";
 import styled from "@emotion/styled";
 import type { ReflectSceneNode } from "@design-sdk/figma-node";
 import { useEditorState } from "editor/core/states";
@@ -7,6 +7,10 @@ import { SceneCard, SceneCardProps } from "./scene-card";
 import { EditorHomeHeader } from "./editor-home-header";
 import { DndProvider, useDrag, useDrop } from "react-dnd";
 import { HTML5Backend } from "react-dnd-html5-backend";
+import {
+  ContextMenuRoot as ContextMenu,
+  MenuItem,
+} from "@editor-ui/context-menu";
 
 export function EditorHomePageView() {
   const [state] = useEditorState();
@@ -39,88 +43,145 @@ export function EditorHomePageView() {
     setQuery(query);
   };
 
+  const selectNode = useCallback(
+    (node: string) => {
+      dispatch({
+        type: "select-node",
+        node,
+      });
+    },
+    [dispatch]
+  );
+
+  const enterNode = useCallback(
+    (node: string) => {
+      dispatch({
+        type: "canvas/focus",
+        node,
+      });
+      dispatch({
+        type: "mode",
+        mode: "design",
+      });
+    },
+    [dispatch]
+  );
+
+  const blur = useCallback(() => {
+    dispatch({
+      type: "select-node",
+      node: null,
+    });
+  }, [dispatch]);
+
   return (
     <Providers>
       <EditorHomeHeader onQueryChange={handleQuery} />
-      <div
-        style={{
-          marginTop: 80,
-          padding: 40,
-        }}
-      >
-        <SectionLabel>Scenes</SectionLabel>
-        <SceneGrid
-          onClick={() => {
-            dispatch({
-              type: "select-node",
-              node: null,
-            });
+      <ContextMenuProvider>
+        <div
+          style={{
+            marginTop: 80,
+            padding: 40,
           }}
         >
-          {scenes.map((s) => {
-            return (
-              <DraggableSceneCard
-                key={s.id}
-                scene={s}
-                q={query}
-                selected={selectedNodes.includes(s.id)}
-                onClick={(e) => {
-                  dispatch({
-                    type: "select-node",
-                    node: s.id,
-                  });
-                  e.stopPropagation();
-                }}
-                onDoubleClick={() => {
-                  dispatch({
-                    type: "canvas/focus",
-                    node: s.id,
-                  });
-                  dispatch({
-                    type: "mode",
-                    mode: "design",
-                  });
-                }}
-              />
-            );
-          })}
-        </SceneGrid>
-        <SectionLabel>Components</SectionLabel>
-        <SceneGrid>
-          {components.map((cmp) => (
-            <DraggableSceneCard
-              key={cmp.id}
-              // @ts-ignore // todo
-              scene={cmp}
-              q={query}
-              selected={selectedNodes.includes(cmp.id)}
-              onClick={(e) => {
-                dispatch({
-                  type: "select-node",
-                  node: cmp.id,
-                });
-                e.stopPropagation();
-              }}
-              onDoubleClick={() => {
-                dispatch({
-                  type: "canvas/focus",
-                  node: cmp.id,
-                });
-                dispatch({
-                  type: "mode",
-                  mode: "design",
-                });
-              }}
-            />
-          ))}
-        </SceneGrid>
-      </div>
+          <ScenesSector
+            label="Scenes"
+            scenes={scenes}
+            query={query}
+            selections={selectedNodes}
+            onBlur={blur}
+            onSelect={selectNode}
+            onEnter={enterNode}
+          />
+          <ScenesSector
+            label="Components"
+            scenes={components}
+            query={query}
+            selections={selectedNodes}
+            onBlur={blur}
+            onSelect={selectNode}
+            onEnter={enterNode}
+          />
+        </div>
+      </ContextMenuProvider>
     </Providers>
+  );
+}
+
+interface SceneCardMeta {
+  id: string;
+  name: string;
+  type: unknown;
+}
+
+function ScenesSector({
+  label,
+  scenes,
+  query,
+  selections,
+  onBlur,
+  onSelect,
+  onEnter,
+}: {
+  label: string;
+  scenes: ReadonlyArray<SceneCardMeta>;
+  query: string;
+  selections: string[];
+  onBlur: () => void;
+  onSelect: (id: string) => void;
+  onEnter: (id: string) => void;
+}) {
+  return (
+    <>
+      <SectionLabel>{label}</SectionLabel>
+      <SceneGrid onClick={onBlur}>
+        {scenes.map((i) => (
+          <DraggableSceneCard
+            key={i.id}
+            // @ts-ignore // todo
+            scene={i}
+            q={query}
+            selected={selections.includes(i.id)}
+            onClick={(e) => {
+              onSelect(i.id);
+              e.stopPropagation();
+            }}
+            onDoubleClick={() => {
+              onEnter(i.id);
+            }}
+          />
+        ))}
+      </SceneGrid>
+    </>
   );
 }
 
 function Providers({ children }: React.PropsWithChildren<{}>) {
   return <DndProvider backend={HTML5Backend}>{children}</DndProvider>;
+}
+
+function ContextMenuProvider({ children }: React.PropsWithChildren<{}>) {
+  const items: MenuItem<string>[] = [
+    { title: "New Folder", value: "new-folder" },
+    "separator",
+    { title: "Run", value: "run" },
+    { title: "Deploy", value: "deploy-to-vercel" },
+    { title: "Open in Figma", value: "open-in-figma" },
+    { title: "Get sharable link", value: "make-sharable-link" },
+    { title: "Copy CSS", value: "make-css" },
+    { title: "Refresh (fetch from origin)", value: "refresh" },
+  ];
+
+  return (
+    <ContextMenu
+      items={items}
+      onSelect={(v) => {
+        console.log("exec canvas cmd", v);
+      }}
+    >
+      {children}
+    </ContextMenu>
+  );
 }
 
 function DraggableSceneCard({ ...props }: SceneCardProps) {
