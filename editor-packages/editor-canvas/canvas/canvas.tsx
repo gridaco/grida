@@ -20,7 +20,7 @@ import {
 import q from "@design-sdk/query";
 import { LazyFrame } from "@code-editor/canvas/lazy-frame";
 import { HudCustomRenderers, HudSurface } from "../hud";
-import type { Box, XY, CanvasTransform, XYWH } from "../types";
+import type { Box, XY, CanvasTransform, XYWH, XYWHR } from "../types";
 import type { FrameOptimizationFactors } from "../frame";
 // import { TransformDraftingStore } from "../drafting";
 import {
@@ -98,21 +98,42 @@ const default_canvas_preferences: CanvsPreferences = {
   },
 };
 
-type CanvasProps = CanvasCursorOptions & {
-  viewbound: Box;
-  onSelectNode?: (...node: ReflectSceneNode[]) => void;
-  onMoveNodeStart?: (...node: string[]) => void;
-  onMoveNode?: (delta: XY, ...node: string[]) => void;
-  onMoveNodeEnd?: (delta: XY, ...node: string[]) => void;
-  onClearSelection?: () => void;
-} & CanvasCustomRenderers &
+type CanvasProps = CanvasFocusProps &
+  CanvasCursorOptions & {
+    viewbound: Box;
+    onSelectNode?: (...node: ReflectSceneNode[]) => void;
+    onMoveNodeStart?: (...node: string[]) => void;
+    onMoveNode?: (delta: XY, ...node: string[]) => void;
+    onMoveNodeEnd?: (delta: XY, ...node: string[]) => void;
+    onClearSelection?: () => void;
+  } & CanvasCustomRenderers &
   CanvasState & {
     config?: CanvsPreferences;
   };
 
+type CanvasFocusProps = {
+  /**
+   * IDs of focus nodes.
+   *
+   * @default []
+   */
+  focus?: string[];
+  focusRefreshkey?: string;
+};
+
 interface HovringNode {
   node: ReflectSceneNode;
   reason: "frame-title" | "raycast" | "external";
+}
+
+function xywhr_of(node: ReflectSceneNode): XYWHR {
+  return [
+    node.absoluteX,
+    node.absoluteY,
+    node.width,
+    node.height,
+    node.rotation,
+  ] as XYWHR;
 }
 
 export function Canvas({
@@ -126,6 +147,8 @@ export function Canvas({
   filekey,
   pageid,
   nodes,
+  focus = [],
+  focusRefreshkey: focusRefreshKey,
   initialTransform,
   highlightedLayer,
   selectedNodes,
@@ -135,6 +158,11 @@ export function Canvas({
   cursor,
   ...props
 }: CanvasProps) {
+  const viewboundmeasured = useMemo(
+    () => !viewbound_not_measured(viewbound),
+    viewbound
+  );
+
   useEffect(() => {
     if (transformIntitialized) {
       return;
@@ -148,7 +176,7 @@ export function Canvas({
       return;
     }
 
-    if (viewbound_not_measured(viewbound)) {
+    if (!viewboundmeasured) {
       return;
     }
 
@@ -157,6 +185,39 @@ export function Canvas({
     setOffset(t.xy);
     setTransformInitialized(true);
   }, [viewbound]);
+
+  useEffect(() => {
+    // change the canvas transform to visually fit the focus nodes.
+
+    if (!viewboundmeasured) {
+      return;
+    }
+
+    if (focus.length == 0) {
+      return;
+    }
+
+    // TODO: currently only the root nodes are supported to be focused.
+    const _focus_nodes = nodes.filter((n) => focus.includes(n.id));
+    if (_focus_nodes.length == 0) {
+      return;
+    }
+
+    const _focus_center = centerOf(
+      viewbound,
+      200,
+      ..._focus_nodes.map((n) => ({
+        x: n.absoluteX,
+        y: n.absoluteY,
+        width: n.width,
+        height: n.height,
+        rotation: n.rotation,
+      }))
+    );
+
+    setOffset(_focus_center.translate);
+    setZoom(_focus_center.scale);
+  }, [...focus, focusRefreshKey, viewboundmeasured]);
 
   const [transformIntitialized, setTransformInitialized] = useState(false);
   const [zoom, setZoom] = useState(initialTransform?.scale || 1);
@@ -339,9 +400,7 @@ export function Canvas({
     const [x, y] = [cx / zoom, cy / zoom];
 
     const box = boundingbox(
-      selected_nodes.map((d) => {
-        return [d.absoluteX, d.absoluteY, d.width, d.height, d.rotation];
-      }),
+      selected_nodes.map((d) => xywhr_of(d)),
       2
     );
 
@@ -543,29 +602,12 @@ function position_guide({
 
   const guides = [];
   const a = boundingbox(
-    selections.map((s) => [
-      s.absoluteX,
-      s.absoluteY,
-      s.width,
-      s.height,
-      s.rotation,
-    ]),
+    selections.map((s) => xywhr_of(s)),
     2
   );
 
   if (hover) {
-    const hover_box = boundingbox(
-      [
-        [
-          hover.absoluteX,
-          hover.absoluteY,
-          hover.width,
-          hover.height,
-          hover.rotation,
-        ],
-      ],
-      2
-    );
+    const hover_box = boundingbox([xywhr_of(hover)], 2);
 
     const guide_relative_to_hover = {
       a: a,
@@ -580,18 +622,7 @@ function position_guide({
   if (selections.length === 1) {
     const parent = selections[0].parent;
     if (parent) {
-      const parent_box = boundingbox(
-        [
-          [
-            parent.absoluteX,
-            parent.absoluteY,
-            parent.width,
-            parent.height,
-            parent.rotation,
-          ],
-        ],
-        2
-      );
+      const parent_box = boundingbox([xywhr_of(parent)], 2);
       const guide_relative_to_parent = {
         a: a,
         b: parent_box,
@@ -702,7 +733,7 @@ function auto_initial_transform(
   }
 
   const fit_single_node = (n: ReflectSceneNode) => {
-    return centerOf(viewbound, n);
+    return centerOf(viewbound, 0, n);
   };
 
   if (nodes.length === 0) {
@@ -716,7 +747,7 @@ function auto_initial_transform(
     };
   } else if (nodes.length < 20) {
     // fit bounds
-    const c = centerOf(viewbound, ...nodes);
+    const c = centerOf(viewbound, 0, ...nodes);
     return {
       xy: c.translate,
       scale: c.scale,

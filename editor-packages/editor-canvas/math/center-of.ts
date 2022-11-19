@@ -18,9 +18,13 @@ type Rect = {
  */
 export function centerOf(
   viewbound: Box,
+  m: number = 0,
   ...rects: Rect[]
 ): {
   box: Box;
+  /**
+   * center of the givven rects
+   */
   center: XY;
   translate: XY;
   scale: number;
@@ -46,7 +50,7 @@ export function centerOf(
   // center of the box, viewbound not considered.
   const boxcenter: XY = [(x1 + x2) / 2, (y1 + y2) / 2];
   // scale factor to fix the box to the viewbound.
-  const scale = Math.min(scaleToFit(box, viewbound), 1); // no need to zoom-in
+  const scale = scaleToFit(viewbound, box, m);
   // center of the viewbound.
   const vbcenter: XY = [
     viewbound[0] + (viewbound[0] + viewbound[2]) / 2,
@@ -73,16 +77,55 @@ function rotate(x: number, y: number, r: number): [number, number] {
   return [x * cos - y * sin, x * sin + y * cos];
 }
 
-function scaleToFit(a: Box, b: Box): number {
+/**
+ * scale to fit a box into b box. with optional margin.
+ * @param a box a container
+ * @param b box b contained
+ * @param m optional margin @default 0 (does not get affected by the scale)
+ * @returns how much to scale should be applied to b to fit a
+ *
+ * @example
+ * const a = [0, 0, 100, 100];
+ * const b = [0, 0, 200, 200];
+ * const m = 50;
+ * => scaleToFit(a, b, m) === 0.4
+ *
+ * const a = [0, 0, 100, 100];
+ * const b = [0, 0, 50, 50];
+ * const m = 50;
+ * => scaleToFit(a, b, m) === 1
+ *
+ */
+export function scaleToFit(a: Box, b: Box, m: number = 0): number {
   if (!a || !b) {
     return 1;
   }
+
   const [ax1, ay1, ax2, ay2] = a;
   const [bx1, by1, bx2, by2] = b;
+
   const aw = ax2 - ax1;
   const ah = ay2 - ay1;
   const bw = bx2 - bx1;
   const bh = by2 - by1;
-  const scale = Math.min(bw / aw, bh / ah);
-  return scale;
+
+  const sw = scaleToFit1D(aw, bw, m);
+  const sh = scaleToFit1D(ah, bh, m);
+
+  return Math.min(sw, sh);
+}
+
+/**
+ *
+ * @param a line a
+ * @param b line b
+ * @param m margin
+ *
+ * @returns the scale factor to be applied to b to fit a with margin
+ */
+export function scaleToFit1D(a: number, b: number, m: number = 0): number {
+  const aw = a;
+  const bw = b + m * 2;
+
+  return aw / bw;
 }

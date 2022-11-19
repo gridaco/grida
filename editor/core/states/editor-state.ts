@@ -39,6 +39,7 @@ export interface EditorState {
   pages: EditorPage[];
   selectedPage: string;
   selectedNodes: string[];
+  focus: CanvasFocusData;
   selectedLayersOnPreview: string[];
   /**
    * this is the initial node selection triggered by the url param, not caused by the user interaction.
@@ -95,6 +96,15 @@ export interface FigmaReflectRepository {
   // styles: { [key: string]: {} };
   input: DesignInput;
 }
+
+export type CanvasFocusData = {
+  /**
+   * refresh key is passed to the canvas to force the focus update, event the last focus is same as the current focus.
+   * this is required because the canvas has indipendent transform state, and it can loose focus to the focus node.
+   */
+  refreshkey: string;
+  nodes: string[];
+};
 
 export type ScenePreviewData =
   | IScenePreviewDataVanillaPreview
