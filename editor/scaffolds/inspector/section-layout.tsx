@@ -70,7 +70,9 @@ export function LayoutSection() {
           </PropertyLine>
         )}
       </PropertyLines>
-      <InspectLayout />
+      <PropertyLines padding={0}>
+        <InspectLayout />
+      </PropertyLines>
     </PropertyGroup>
   );
 }
