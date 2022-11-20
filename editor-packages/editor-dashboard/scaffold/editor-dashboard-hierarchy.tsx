@@ -8,9 +8,9 @@ export function DashboardHierarchy() {
   const { hierarchy, selectNode, selection } = useDashboard();
   const { sections } = hierarchy;
 
-  const data = sections.reduce((acc, item) => {
-    return [...acc, ...item.items];
-  }, []);
+  // const data = sections.reduce((acc, item) => {
+  //   return [...acc, ...item.items];
+  // }, []);
 
   const renderItem = useCallback(
     (item: DashboardItem, i: number) => {
@@ -41,7 +41,7 @@ export function DashboardHierarchy() {
 
   return (
     <TreeView.Root
-      data={data}
+      data={sections}
       keyExtractor={useCallback((item: any) => item.id, [])}
       renderItem={renderItem}
     />

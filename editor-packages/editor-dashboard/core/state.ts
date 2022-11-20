@@ -5,18 +5,12 @@ export interface DashboardState {
 }
 
 export interface DashboardHierarchy {
-  sections: Array<DashboardSection>;
+  sections: Array<DashboardFolderItem>;
   components: Array<SceneItem>;
 }
 
 export interface DashboardFilter {
   query: string;
-}
-
-export interface DashboardSection {
-  name: string;
-  path: string;
-  items: Array<DashboardItem>;
 }
 
 export type DashboardItem = DashboardFolderItem | SceneItem;

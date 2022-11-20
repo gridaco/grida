@@ -41,12 +41,12 @@ export function Dashboard() {
         }}
       >
         {hierarchy.sections.map((section, i) => {
-          const { name, items } = section;
+          const { name, contents } = section;
           return (
             <ScenesSector
               key={i}
               label={name}
-              scenes={items}
+              scenes={contents}
               query={filter.query}
               selections={selection}
               onBlur={blurSelection}

@@ -13,9 +13,11 @@ export function reducer(state: DashboardState, action: Action): DashboardState {
       const { name } = <NewSectionAction>action;
       return produce(state, (draft) => {
         draft.hierarchy.sections.push({
+          type: "folder",
           name: name,
+          id: name, // add confliction check
           path: name, // add confliction check
-          items: [],
+          contents: [],
         });
       });
     }
@@ -38,7 +40,7 @@ export function reducer(state: DashboardState, action: Action): DashboardState {
         const parent = parts.join("/");
         const section = draft.hierarchy.sections.find((s) => s.name === parent);
         if (section) {
-          section.items.push({
+          section.contents.push({
             type: "folder",
             id: path, // other than path ?
             path: path,

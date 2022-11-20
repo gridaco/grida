@@ -1,5 +1,6 @@
 import type { FigmaReflectRepository } from "editor/core/states";
 import type { ReflectSceneNode } from "@design-sdk/figma-node";
+import { groupByPath } from "./group-by-path-name";
 
 type SceneMeta<T extends string = string> = {
   id: string;
@@ -12,7 +13,7 @@ type SceneMeta<T extends string = string> = {
 export function group(
   design: FigmaReflectRepository,
   { filter }: { filter: string }
-) {
+): Map<string, Array<SceneMeta>> {
   // group by...
   // 1. path split by "/"
   // 2. type
@@ -39,27 +40,17 @@ export function group(
       s.children.length > 0
   );
 
-  const map = groupByPath(scenes);
-  return map;
-}
+  const maps = design.pages.map((p) => {
+    return groupByPath(p.children, {
+      key: "name",
+      base: p.name,
+    });
+  });
 
-/**
- * @example
- * ["a", "/", "/a", "/b", "/", "/a/b", "/a/a"]
- * => {"a": ["a"], "/": ["/", "/a" ,"/b", "/"], "/a": ["/a/b", "/a/a"]}
- */
-function groupByPath(nodes: ReadonlyArray<SceneMeta>) {
-  const map = new Map<string, SceneMeta[]>();
-  for (const node of nodes) {
-    const path = node.name.split("/");
-    let currentPath = "";
-    for (const p of path) {
-      currentPath += p;
-      const arr = map.get(currentPath) || [];
-      arr.push(node);
-      map.set(currentPath, arr);
-      currentPath += "/";
-    }
-  }
-  return map;
+  // merge maps in to one
+  const merged = maps.reduce((acc, map) => {
+    return new Map([...acc, ...map]);
+  }, new Map());
+
+  return merged;
 }

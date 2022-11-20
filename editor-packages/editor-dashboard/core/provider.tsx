@@ -39,10 +39,10 @@ export const DashboardStateProvider = function Awaiter({
     return <>{children}</>;
   }
 
-  return <Provider design={design}>{children}</Provider>;
+  return <_Provider design={design}>{children}</_Provider>;
 };
 
-const Provider = memo(function StateProvider({
+const _Provider = function StateProvider({
   children,
   design,
 }: React.PropsWithChildren<{
@@ -60,7 +60,7 @@ const Provider = memo(function StateProvider({
       </DispatchContext.Provider>
     </StateContext.Provider>
   );
-});
+};
 
 export function useDashboardState(): [DashboardState, Dispatcher] {
   const state = useContext(StateContext);

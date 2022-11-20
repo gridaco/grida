@@ -1,8 +1,8 @@
 import type { FigmaReflectRepository } from "editor/core/states";
 import type {
   ComponentItem,
+  DashboardFolderItem,
   DashboardHierarchy,
-  DashboardSection,
   DashboardState,
 } from "./state";
 import { group } from "../q";
@@ -26,17 +26,22 @@ export function initialHierarchy(
 
   const grouped = group(design, { filter: null });
 
-  const sections: Array<DashboardSection> = Array.from(grouped.keys()).map(
-    (k): DashboardSection => {
+  const sections: Array<DashboardFolderItem> = Array.from(grouped.keys()).map(
+    (k): DashboardFolderItem => {
       const items = grouped.get(k);
       return {
+        id: k,
+        type: "folder",
         name: k,
         path: k,
-        items: items.map((i) => ({
-          ...i,
-          type: "FRAME",
+        contents: items.map((i) => ({
           $type: "frame-scene",
+          id: i.id,
+          name: i.name,
           path: k + "/" + i.name,
+          type: "FRAME",
+          width: i.width,
+          height: i.height,
         })),
       };
     }
