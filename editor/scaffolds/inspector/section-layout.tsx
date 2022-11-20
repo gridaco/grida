@@ -10,9 +10,17 @@ import {
 import { useTargetContainer } from "hooks/use-target-node";
 import { IRadius } from "@reflect-ui/core";
 import { InspectLayout } from "./inspect-layout";
+import {
+  Collapsible,
+  CollapsibleTrigger,
+  CollapsibleContent,
+} from "@radix-ui/react-collapsible";
+
+import { ChevronUpIcon, ChevronDownIcon } from "@radix-ui/react-icons";
 
 export function LayoutSection() {
   const { target, root } = useTargetContainer();
+  const [inspectorOpen, setInspectorOpen] = React.useState(false);
 
   if (!target) {
     return <></>;
@@ -71,7 +79,21 @@ export function LayoutSection() {
         )}
       </PropertyLines>
       <PropertyLines padding={0}>
-        <InspectLayout />
+        <Collapsible open={inspectorOpen} onOpenChange={setInspectorOpen}>
+          <CollapsibleTrigger asChild>
+            <PropertyGroupHeader>
+              <h6>Inspect Layout</h6>
+              {inspectorOpen ? (
+                <ChevronUpIcon color="white" />
+              ) : (
+                <ChevronDownIcon color="white" />
+              )}
+            </PropertyGroupHeader>
+          </CollapsibleTrigger>
+          <CollapsibleContent>
+            <InspectLayout />
+          </CollapsibleContent>
+        </Collapsible>
       </PropertyLines>
     </PropertyGroup>
   );
