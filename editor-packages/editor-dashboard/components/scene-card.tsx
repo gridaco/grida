@@ -41,14 +41,13 @@ export const SceneCard = React.forwardRef(function (
   const scale = Math.min(maxwidth / scene.width, 1);
   const { height, type } = scene;
   return (
-    <div
+    <Card
       ref={mergeRefs([visibilityRef, ref])}
       onClick={onClick}
       onDoubleClick={onDoubleClick}
+      data-selected={selected}
+      data-over={isOver}
       style={{
-        display: "flex",
-        flexDirection: "column",
-        flex: 0,
         ...style,
       }}
     >
@@ -82,7 +81,7 @@ export const SceneCard = React.forwardRef(function (
         </div>
       </Preview>
       <footer>
-        <Label>
+        <label>
           <SceneNodeIcon type={type} color="white" />
           <Highlighter
             className="name"
@@ -91,11 +90,46 @@ export const SceneCard = React.forwardRef(function (
             textToHighlight={scene.name}
             autoEscape // required to escape regex special characters, like, `+`, `(`, `)`, etc.
           />
-        </Label>
+        </label>
       </footer>
-    </div>
+    </Card>
   );
 });
+
+const Card = styled.div`
+  display: flex;
+  flex-direction: column;
+  flex: 0;
+
+  label {
+    padding: 16px 0;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .name {
+    opacity: 0.6;
+    font-size: 12px;
+    font-weight: 500;
+    color: white;
+    mark {
+      background: white;
+      color: black;
+    }
+
+    transition: all 0.2s ease-in-out;
+  }
+
+  &:hover,
+  &[data-selected="true"],
+  &[data-over="true"] {
+    .name {
+      opacity: 1;
+    }
+  }
+`;
 
 const Preview = styled.div`
   outline: 1px solid rgba(0, 0, 0, 0.1);
@@ -137,22 +171,4 @@ const Preview = styled.div`
   }
 
   transition: all 0.2s ease-in-out;
-`;
-
-const Label = styled.span`
-  padding: 16px 0;
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-  gap: 8px;
-
-  .name {
-    font-size: 12px;
-    font-weight: 500;
-    color: white;
-    mark {
-      background: white;
-      color: black;
-    }
-  }
 `;
