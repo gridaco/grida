@@ -45,6 +45,7 @@ export function Dashboard() {
           return (
             <ScenesSector
               key={i}
+              path={section.path}
               label={name}
               scenes={contents}
               query={filter.query}
@@ -81,6 +82,7 @@ function ScenesSector({
   scenes,
   query,
   selections,
+  path,
   onBlur,
   onSelect,
   onEnter,
@@ -89,17 +91,18 @@ function ScenesSector({
   scenes: ReadonlyArray<SceneCardMeta>;
   query: string;
   selections: string[];
+  path: string;
   onBlur: () => void;
   onSelect: (id: string) => void;
   onEnter: (id: string) => void;
 }) {
-  const [open, setOpen] = React.useState(false);
+  const [open, setOpen] = React.useState(true);
 
   return (
     <div style={{ marginBottom: 32 }}>
       <ContextMenuProvider>
         <Collapsible.Root open={open} onOpenChange={setOpen}>
-          <SectionHeader expanded={open} label={label} q={query} />
+          <SectionHeader id={path} expanded={open} label={label} q={query} />
           <Collapsible.Content>
             <SceneGrid onClick={onBlur}>
               {scenes.map((i) => (
@@ -211,10 +214,12 @@ function SectionHeader({
   label,
   expanded = true,
   q,
+  id,
 }: {
   expanded?: boolean;
   label: string;
   q?: string;
+  id: string;
 }) {
   const iconprops = {
     color: "white",
@@ -224,7 +229,7 @@ function SectionHeader({
 
   return (
     <Collapsible.Trigger asChild>
-      <SectionHeaderContainer>
+      <SectionHeaderContainer id={id}>
         <div className="toggle">
           <ToggleIcon />
         </div>
