@@ -15,6 +15,7 @@ export interface DashboardFilter {
 
 export interface DashboardSection {
   name: string;
+  path: string;
   items: Array<DashboardItem>;
 }
 
@@ -35,6 +36,7 @@ export type FrameSceneItem = {
   $type: "frame-scene";
   id: string;
   name: string;
+  path: string;
   type: "FRAME";
   width: number;
   height: number;
@@ -46,10 +48,11 @@ export type FrameSceneItem = {
 export type VariantItem = GroupedSceneItem;
 
 export type GroupedSceneItem = {
+  $type: "grouped";
   id: string;
+  path: string;
   name: string;
   type: "FRAME";
-  $type: "grouped";
   scenes: Array<FrameSceneItem>;
 };
 
@@ -57,6 +60,7 @@ export type ComponentItem = {
   $type: "component";
   id: string;
   name: string;
+  path: string;
   type: "COMPONENT";
   width: number;
   height: number;

@@ -2,15 +2,16 @@ import React from "react";
 import { useEditorState } from "core/states";
 import { DesignLayerHierarchy } from "../editor-hierarchy-layers";
 import { CodeFilesHierarchyTree } from "../editor-hierarchy-code-files";
+import { DashboardHierarchy } from "@code-editor/dashboard";
 
-export function EditorLayerHierarchy() {
+export function EditorHierarchy() {
   const [state] = useEditorState();
   const { selectedPage, pages } = state;
   const page = pages.find((p) => p.id == selectedPage);
 
   switch (page?.type) {
     case "home":
-      return <></>;
+      return <DashboardHierarchy />;
     case "figma-canvas":
       return <DesignLayerHierarchy />;
     case "code":

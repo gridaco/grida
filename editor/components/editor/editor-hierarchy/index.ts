@@ -1,1 +1,1 @@
-export { EditorLayerHierarchy } from "./editor-hierarchy";
+export { EditorHierarchy as EditorLayerHierarchy } from "./editor-hierarchy";

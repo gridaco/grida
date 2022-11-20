@@ -11,8 +11,8 @@ import type { DashboardState } from "./state";
 import type { Action } from "./action";
 import { reducer } from "./reducer";
 import { initialDashboardState } from "./initial";
-import { FigmaReflectRepository } from "editor/core/states";
-
+import { FigmaReflectRepository, useEditorState } from "editor/core/states";
+import { useDispatch as useEditorDispatch } from "editor/core/dispatch";
 const __noop = () => {};
 
 type Dispatcher = (action: Action) => void;
@@ -69,6 +69,47 @@ export function useDashboardState(): [DashboardState, Dispatcher] {
 }
 
 export function useDashboard() {
+  const [editorState] = useEditorState();
+  const editordispatch = useEditorDispatch();
   const [state, dispatch] = useDashboardState();
-  return { ...state, dispatch };
+
+  const selectNode = useCallback(
+    (node: string) => {
+      editordispatch({
+        type: "select-node",
+        node,
+      });
+    },
+    [editordispatch]
+  );
+
+  const enterNode = useCallback(
+    (node: string) => {
+      editordispatch({
+        type: "canvas/focus",
+        node,
+      });
+      editordispatch({
+        type: "mode",
+        mode: "design",
+      });
+    },
+    [editordispatch]
+  );
+
+  const blurSelection = useCallback(() => {
+    editordispatch({
+      type: "select-node",
+      node: null,
+    });
+  }, [editordispatch]);
+
+  return {
+    ...state,
+    selection: editorState.selectedNodes,
+    dispatch,
+    selectNode,
+    enterNode,
+    blurSelection,
+  };
 }

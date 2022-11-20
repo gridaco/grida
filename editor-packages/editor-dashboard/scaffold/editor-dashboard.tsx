@@ -13,10 +13,15 @@ import {
 import { useDashboard } from "../core/provider";
 
 export function Dashboard() {
-  const [__editorstate] = useEditorState();
-  const { selectedNodes } = __editorstate;
-  const _editor_dispatch = useDispatch();
-  const { hierarchy, filter, dispatch } = useDashboard();
+  const {
+    hierarchy,
+    filter,
+    dispatch,
+    enterNode,
+    selectNode,
+    blurSelection,
+    selection,
+  } = useDashboard();
 
   const handleQuery = (query: string) => {
     dispatch({
@@ -24,37 +29,6 @@ export function Dashboard() {
       query: query,
     });
   };
-
-  const selectNode = useCallback(
-    (node: string) => {
-      _editor_dispatch({
-        type: "select-node",
-        node,
-      });
-    },
-    [_editor_dispatch]
-  );
-
-  const enterNode = useCallback(
-    (node: string) => {
-      _editor_dispatch({
-        type: "canvas/focus",
-        node,
-      });
-      _editor_dispatch({
-        type: "mode",
-        mode: "design",
-      });
-    },
-    [_editor_dispatch]
-  );
-
-  const blur = useCallback(() => {
-    _editor_dispatch({
-      type: "select-node",
-      node: null,
-    });
-  }, [_editor_dispatch]);
 
   return (
     <Providers>
@@ -74,8 +48,8 @@ export function Dashboard() {
               label={name}
               scenes={items}
               query={filter.query}
-              selections={selectedNodes}
-              onBlur={blur}
+              selections={selection}
+              onBlur={blurSelection}
               onSelect={selectNode}
               onEnter={enterNode}
             />

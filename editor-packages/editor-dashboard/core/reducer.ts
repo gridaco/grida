@@ -14,6 +14,7 @@ export function reducer(state: DashboardState, action: Action): DashboardState {
       return produce(state, (draft) => {
         draft.hierarchy.sections.push({
           name: name,
+          path: name, // add confliction check
           items: [],
         });
       });

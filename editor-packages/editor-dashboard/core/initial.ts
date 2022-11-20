@@ -1,5 +1,6 @@
 import type { FigmaReflectRepository } from "editor/core/states";
 import type {
+  ComponentItem,
   DashboardHierarchy,
   DashboardSection,
   DashboardState,
@@ -25,19 +26,29 @@ export function initialHierarchy(
 
   const grouped = group(design, { filter: null });
 
-  const sections = Array.from(grouped.keys()).map((k) => {
-    const items = grouped.get(k);
-    return <DashboardSection>{
-      name: k,
-      items: items,
-    };
-  });
+  const sections: Array<DashboardSection> = Array.from(grouped.keys()).map(
+    (k): DashboardSection => {
+      const items = grouped.get(k);
+      return {
+        name: k,
+        path: k,
+        items: items.map((i) => ({
+          ...i,
+          type: "FRAME",
+          $type: "frame-scene",
+          path: k + "/" + i.name,
+        })),
+      };
+    }
+  );
 
-  const components = Object.values(design.components)
+  const components: Array<ComponentItem> = Object.values(design.components)
     .filter(Boolean)
     .map((c) => ({
-      $type: "component" as const,
       ...c,
+      type: "COMPONENT",
+      path: "components" + "/" + c.id,
+      $type: "component" as const,
     }));
 
   return {
