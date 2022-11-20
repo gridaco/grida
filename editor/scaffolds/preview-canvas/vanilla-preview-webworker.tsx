@@ -8,7 +8,7 @@ import { preview as wwpreview } from "../code/code-worker-messenger";
 
 export function WebWorkerD2CVanillaPreview({ target }: VanillaPreviewProps) {
   const [preview, setPreview] = useState<Result>();
-  const bg_color_str = blurred_bg_fill(target);
+  const bg_color_str = blurred_bg_fill(target.fills);
 
   useEffect(() => {
     if (preview) {

@@ -140,7 +140,7 @@ export function D2CVanillaPreview({
     }
   }, [target?.id, isZooming, isPanning]);
 
-  const bg_color_str = blurred_bg_fill(target);
+  const bg_color_str = blurred_bg_fill(target.fills);
 
   return (
     <PreviewContent

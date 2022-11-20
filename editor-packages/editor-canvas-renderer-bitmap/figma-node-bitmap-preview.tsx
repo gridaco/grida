@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { ReflectSceneNode } from "@design-sdk/figma-node";
+import type { ReflectSceneNode } from "@design-sdk/figma-node";
 import type { FrameOptimizationFactors } from "@code-editor/canvas/frame";
 import { blurred_bg_fill } from "@code-editor/canvas-renderer-core";
 import { CircularProgress } from "@mui/material";
@@ -32,6 +32,14 @@ export function FigmaNodeBitmapPreviewServiceProvider({
   return <Context.Provider value={service}>{children}</Context.Provider>;
 }
 
+type TargetSceneMeta = {
+  id: string;
+  filekey: ReflectSceneNode["filekey"];
+  name: string;
+  width: number;
+  height: number;
+};
+
 /**
  * 1 = 1 scale
  * s = 0.2 scale
@@ -44,7 +52,7 @@ export function FigmaNodeBitmapView({
   inViewport,
   background,
 }: {
-  target: ReflectSceneNode;
+  target: TargetSceneMeta;
 } & FrameOptimizationFactors & {
     background?: React.CSSProperties["background"];
   }) {
@@ -80,7 +88,8 @@ export function FigmaNodeBitmapView({
     }
   }, [filekey, id, service, inViewport]);
 
-  const bg_color_str = blurred_bg_fill(target);
+  const bg_color_str =
+    "fills" in target ? blurred_bg_fill(target["fills"] as any) : "white";
 
   return (
     <div
