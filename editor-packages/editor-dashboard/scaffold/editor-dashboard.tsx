@@ -1,7 +1,5 @@
-import React, { useCallback, useMemo, useState } from "react";
+import React from "react";
 import styled from "@emotion/styled";
-import { useEditorState } from "editor/core/states";
-import { useDispatch } from "editor/core/dispatch";
 import { SceneCard, SceneCardProps } from "../components";
 import { EditorHomeHeader } from "./editor-dashboard-header";
 import { DndProvider, useDrag, useDrop } from "react-dnd";
@@ -10,6 +8,8 @@ import {
   ContextMenuRoot as ContextMenu,
   MenuItem,
 } from "@editor-ui/context-menu";
+import * as Collapsible from "@radix-ui/react-collapsible";
+import { ChevronRightIcon, ChevronDownIcon } from "@radix-ui/react-icons";
 import { useDashboard } from "../core/provider";
 
 export function Dashboard() {
@@ -93,32 +93,36 @@ function ScenesSector({
   onSelect: (id: string) => void;
   onEnter: (id: string) => void;
 }) {
+  const [open, setOpen] = React.useState(false);
+
   return (
-    <>
+    <div style={{ marginBottom: 32 }}>
       <ContextMenuProvider>
-        <div>
-          <SectionLabel>{label}</SectionLabel>
-          <SceneGrid onClick={onBlur}>
-            {scenes.map((i) => (
-              <DraggableSceneCard
-                key={i.id}
-                // @ts-ignore // todo
-                scene={i}
-                q={query}
-                selected={selections.includes(i.id)}
-                onClick={(e) => {
-                  onSelect(i.id);
-                  e.stopPropagation();
-                }}
-                onDoubleClick={() => {
-                  onEnter(i.id);
-                }}
-              />
-            ))}
-          </SceneGrid>
-        </div>
+        <Collapsible.Root open={open} onOpenChange={setOpen}>
+          <SectionHeader expanded={open} label={label} q={query} />
+          <Collapsible.Content>
+            <SceneGrid onClick={onBlur}>
+              {scenes.map((i) => (
+                <DraggableSceneCard
+                  key={i.id}
+                  // @ts-ignore // todo
+                  scene={i}
+                  q={query}
+                  selected={selections.includes(i.id)}
+                  onClick={(e) => {
+                    onSelect(i.id);
+                    e.stopPropagation();
+                  }}
+                  onDoubleClick={() => {
+                    onEnter(i.id);
+                  }}
+                />
+              ))}
+            </SceneGrid>
+          </Collapsible.Content>
+        </Collapsible.Root>
       </ContextMenuProvider>
-    </>
+    </div>
   );
 }
 
@@ -201,10 +205,71 @@ const SceneGrid = styled.div`
   gap: 40px;
 `;
 
-const SectionLabel = styled.label`
-  display: inline-block;
-  color: white;
-  font-size: 14px;
-  font-weight: 500;
+import Highlighter from "react-highlight-words";
+
+function SectionHeader({
+  label,
+  expanded = true,
+  q,
+}: {
+  expanded?: boolean;
+  label: string;
+  q?: string;
+}) {
+  const iconprops = {
+    color: "white",
+  };
+
+  const ToggleIcon = expanded ? ChevronDownIcon : ChevronRightIcon;
+
+  return (
+    <Collapsible.Trigger asChild>
+      <SectionHeaderContainer>
+        <div className="toggle">
+          <ToggleIcon />
+        </div>
+        <Highlighter
+          className="label"
+          highlightClassName="label"
+          searchWords={q ? [q] : []}
+          textToHighlight={label}
+          autoEscape // required to escape regex special characters, like, `+`, `(`, `)`, etc.
+        />
+      </SectionHeaderContainer>
+    </Collapsible.Trigger>
+  );
+}
+
+const SectionHeaderContainer = styled.div`
+  padding: 16px;
+  display: flex;
+  align-items: center;
+  flex-direction: row;
   margin-bottom: 16px;
+  border-radius: 4px;
+  cursor: pointer;
+
+  background: transparent;
+
+  &:hover {
+    background: rgba(255, 255, 255, 0.05);
+  }
+
+  .toggle {
+    margin-right: 16px;
+    color: white;
+  }
+
+  .label {
+    user-select: none;
+    display: inline-block;
+    opacity: 0.8;
+    color: white;
+    font-size: 18px;
+    font-weight: 500;
+    mark {
+      background: white;
+      color: black;
+    }
+  }
 `;

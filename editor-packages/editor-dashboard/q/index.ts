@@ -12,39 +12,22 @@ type SceneMeta<T extends string = string> = {
 
 export function group(
   design: FigmaReflectRepository,
-  { filter }: { filter: string }
+  { filter: query }: { filter: string }
 ): Map<string, Array<SceneMeta>> {
   // group by...
   // 1. path split by "/"
   // 2. type
 
-  let scenes: ReadonlyArray<ReflectSceneNode> = design.pages
-    .reduce((acc, page) => {
-      return acc.concat(page.children);
-    }, [])
-    .filter(Boolean);
-
-  if (filter) {
-    // query by name first, since it's more efficient
-    scenes = scenes.filter((s) =>
-      s.name.toLowerCase().includes(filter?.toLowerCase() || "")
-    );
-  }
-
-  scenes.filter(
-    (s: ReflectSceneNode) =>
-      (s.origin === "FRAME" ||
-        s.origin === "COMPONENT" ||
-        s.origin === "COMPONENT_SET") &&
-      s.visible &&
-      s.children.length > 0
-  );
-
   const maps = design.pages.map((p) => {
-    return groupByPath(p.children, {
-      key: "name",
-      base: p.name,
-    });
+    return groupByPath(
+      filter(p.children, {
+        query,
+      }),
+      {
+        key: "name",
+        base: p.name,
+      }
+    );
   });
 
   // merge maps in to one
@@ -53,4 +36,26 @@ export function group(
   }, new Map());
 
   return merged;
+}
+
+function filter(scenes: ReflectSceneNode[], { query }: { query: string }) {
+  scenes = scenes.filter(Boolean);
+
+  if (query) {
+    // query by name first, since it's more efficient
+    scenes = scenes.filter((s) =>
+      s.name.toLowerCase().includes(query?.toLowerCase() || "")
+    );
+  }
+
+  scenes = scenes.filter(
+    (s: ReflectSceneNode) =>
+      (s.origin === "FRAME" ||
+        s.origin === "COMPONENT" ||
+        s.origin === "COMPONENT_SET") &&
+      s.visible &&
+      s.children.length > 0
+  );
+
+  return scenes;
 }

@@ -12,5 +12,8 @@
   "peerDependencies": {
     "react": "^18.2.0",
     "react-dnd": "16.0.1"
+  },
+  "dependencies": {
+    "@radix-ui/react-collapsible": "^1.0.1"
   }
 }
