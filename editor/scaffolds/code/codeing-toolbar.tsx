@@ -29,7 +29,7 @@ export function CodingToolbar() {
     [dispatch]
   );
 
-  const openPreferences = useOpenPreferences();
+  const openFrameworkConfigPreference = useOpenPreferences("/framework");
 
   const onDownloadClick = () => {
     try {
@@ -53,7 +53,7 @@ export function CodingToolbar() {
       <div className="trailing">
         {/* TODO: add actions */}
         <Tooltip content={"Framework config"}>
-          <IconButton onClick={openPreferences}>
+          <IconButton onClick={openFrameworkConfigPreference}>
             <GearIcon />
           </IconButton>
         </Tooltip>
