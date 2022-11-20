@@ -8,12 +8,21 @@ import {
   DashboardItemCardProps,
 } from "./dashboard-item-card";
 
+type SceneMeta = {
+  id: string;
+  filekey: string;
+  name: string;
+  width: number;
+  height: number;
+  type: any;
+};
+
 function SceneCardPreview({
   maxWidth,
   scene,
 }: {
   maxWidth: number;
-  scene: ReflectSceneNode;
+  scene: SceneMeta;
 }) {
   const visibilityRef = useRef();
 
@@ -57,7 +66,7 @@ function SceneCardPreview({
 
 export interface SceneCardProps
   extends Omit<DashboardItemCardProps, "icon" | "preview" | "label"> {
-  scene: ReflectSceneNode;
+  scene: SceneMeta;
 }
 
 export const SceneCard = React.forwardRef(function (

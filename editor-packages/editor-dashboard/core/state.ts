@@ -1,4 +1,5 @@
 import type { ReflectSceneNode } from "@design-sdk/figma-node";
+import type { ComponentNode } from "@design-sdk/figma";
 
 export interface DashboardState {
   selection: Array<string>;
@@ -51,7 +52,8 @@ export type GroupedSceneItem = {
   path: string;
   name: string;
   type: "FRAME";
-  scenes: Array<FrameSceneItem>;
+  scene: ReflectSceneNode;
+  alias: Array<FrameSceneItem>;
 };
 
 export type ComponentItem = {
@@ -60,6 +62,7 @@ export type ComponentItem = {
   name: string;
   path: string;
   type: "COMPONENT";
+  scene: ComponentNode & { filekey: string };
   width: number;
   height: number;
 };

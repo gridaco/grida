@@ -58,6 +58,7 @@ export function initialHierarchy(
       type: "COMPONENT",
       path: "components" + "/" + c.id,
       $type: "component" as const,
+      scene: c as any,
     }));
 
   return {

@@ -1,8 +1,8 @@
 import React, { useCallback } from "react";
 import styled from "@emotion/styled";
 import {
-  FolderCard,
-  SceneCard,
+  FolderCard as _FolderCard,
+  SceneCard as _SceneCard,
   SectionHeaderAction,
   SectionHeader,
   DashboardItemCardProps,
@@ -15,7 +15,12 @@ import {
   MenuItem,
 } from "@editor-ui/context-menu";
 import * as Collapsible from "@radix-ui/react-collapsible";
-import { useDashboard, DashboardItem } from "../core";
+import {
+  useDashboard,
+  DashboardItem,
+  DashboardFolderItem,
+  SceneItem,
+} from "../core";
 
 export function Dashboard() {
   const {
@@ -105,12 +110,6 @@ export function Dashboard() {
       </div>
     </Providers>
   );
-}
-
-interface SceneCardMeta {
-  id: string;
-  name: string;
-  $type: unknown;
 }
 
 function RootDirectory({
@@ -223,15 +222,30 @@ function DashboardItemCard(
   props: DashboardItem &
     Omit<DashboardItemCardProps, "label" | "preview" | "icon">
 ) {
+  switch (props.$type) {
+    case "frame-scene":
+    case "component": {
+      return <SceneCard {...props} />;
+    }
+    case "folder": {
+      return <FolderCard {...props} />;
+    }
+    default: {
+      throw new Error(`Unknown item type ${props.$type}`);
+    }
+  }
+}
+
+function SceneCard(
+  props: SceneItem & Omit<DashboardItemCardProps, "label" | "preview" | "icon">
+) {
   const [{ isActive }, drop] = useDrop(() => ({
-    accept: "frame-scene", // todo
+    accept: "scene",
     collect: (monitor) => ({
       isActive: monitor.canDrop() && monitor.isOver(),
     }),
     canDrop(item: DndMetaItem, monitor) {
-      if (item.$type === props.$type) {
-        return item.id !== props.id;
-      }
+      return item.id !== props.id;
     },
     drop(item, monitor) {
       console.log("drop", item, monitor);
@@ -240,22 +254,9 @@ function DashboardItemCard(
   }));
 
   const [{ opacity }, drag] = useDrag(() => {
-    let item: unknown = props;
-    switch (props.$type) {
-      case "frame-scene": {
-        item = props.scene;
-        Object.assign(item, { $type: props.$type });
-        break;
-      }
-      case "folder": {
-        item = props;
-        break;
-      }
-    }
-
     return {
-      type: props.$type,
-      item: item,
+      type: "scene",
+      item: props.scene,
       collect: (monitor) => ({
         opacity: monitor.isDragging() ? 0.5 : 1,
       }),
@@ -272,44 +273,66 @@ function DashboardItemCard(
     style: { opacity },
   };
 
-  switch (props.$type) {
-    case "frame-scene": {
-      return (
-        <SceneCard
-          scene={props.scene}
-          ref={attachRef}
-          {...defaultprops}
-          {...props}
-        />
-      );
-    }
-    case "component": {
-      return (
-        <SceneCard
-          scene={props as any} // todo
-          ref={attachRef}
-          {...defaultprops}
-          {...props}
-        />
-      );
-    }
-    case "folder": {
-      return (
-        <FolderCard
-          ref={attachRef}
-          id={props.id}
-          path={props.path}
-          name={props.name}
-          contents={props.contents}
-          {...defaultprops}
-          {...props}
-        />
-      );
-    }
-    default: {
-      throw new Error(`Unknown item type ${props.$type}`);
-    }
+  return (
+    <_SceneCard
+      // @ts-ignore
+      scene={props.scene as any}
+      ref={attachRef}
+      {...defaultprops}
+      {...props}
+    />
+  );
+}
+
+function FolderCard(
+  props: DashboardFolderItem &
+    Omit<DashboardItemCardProps, "label" | "preview" | "icon">
+) {
+  const [{ isActive }, drop] = useDrop(() => ({
+    accept: ["scene", "folder"],
+    collect: (monitor) => ({
+      isActive: monitor.canDrop() && monitor.isOver(),
+    }),
+    canDrop(item: DndMetaItem, monitor) {
+      return item.id !== props.id;
+    },
+    drop(item, monitor) {
+      console.log("drop", item, monitor);
+      // todo:
+    },
+  }));
+
+  const [{ opacity }, drag] = useDrag(() => {
+    return {
+      type: props.$type,
+      item: props,
+      collect: (monitor) => ({
+        opacity: monitor.isDragging() ? 0.5 : 1,
+      }),
+    };
+  }, []);
+
+  function attachRef(el) {
+    drag(el);
+    drop(el);
   }
+
+  const defaultprops = {
+    isOver: isActive,
+    style: { opacity },
+  };
+
+  return (
+    <_FolderCard
+      ref={attachRef}
+      id={props.id}
+      path={props.path}
+      name={props.name}
+      contents={props.contents}
+      {...defaultprops}
+      {...props}
+    />
+  );
 }
 
 const SceneGrid = styled.div`
