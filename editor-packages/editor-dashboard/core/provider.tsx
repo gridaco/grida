@@ -136,6 +136,17 @@ export function useDashboard() {
     [dispatch]
   );
 
+  const mkdir = useCallback(
+    (cwd: string, name?: string) => {
+      dispatch({
+        type: "hierarchy/mkdir",
+        cwd,
+        name,
+      });
+    },
+    [dispatch]
+  );
+
   return {
     ...state,
     selection: editorState.selectedNodes,
@@ -147,5 +158,6 @@ export function useDashboard() {
     unfoldAll,
     fold,
     unfold,
+    mkdir,
   };
 }

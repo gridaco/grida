@@ -10,10 +10,10 @@ type SceneMeta<T extends string = string> = {
   height: number;
 };
 
-export function group(
+export function group<T extends SceneMeta>(
   design: FigmaReflectRepository,
   { filter: query }: { filter: string }
-): Map<string, Array<SceneMeta>> {
+): Map<string, Array<T>> {
   // group by...
   // 1. path split by "/"
   // 2. type

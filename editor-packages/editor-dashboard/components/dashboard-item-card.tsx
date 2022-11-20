@@ -1,14 +1,8 @@
-import React, { useRef } from "react";
+import React from "react";
 import styled from "@emotion/styled";
-import type { ReflectSceneNode } from "@design-sdk/figma-node";
-import { FigmaNodeBitmapView } from "@code-editor/canvas-renderer-bitmap";
-import { SceneNodeIcon } from "@code-editor/node-icons";
 import Highlighter from "react-highlight-words";
-import { useInViewport } from "react-in-viewport";
-import { mergeRefs } from "react-merge-refs";
 
-export interface SceneCardProps {
-  scene: ReflectSceneNode;
+export interface DashboardItemCardProps {
   selected?: boolean;
   onClick?: (e) => void;
   onDoubleClick?: () => void;
@@ -18,31 +12,28 @@ export interface SceneCardProps {
    * an explicit field to set the view as accepting drag state view.
    */
   isOver?: boolean;
+  preview: React.ReactNode;
+  label: string;
+  icon?: React.ReactNode;
 }
 
-export const SceneCard = React.forwardRef(function (
+export const DashboardItemCard = React.forwardRef(function (
   {
-    style = {},
-    scene,
-    selected,
     onClick,
     onDoubleClick,
-    q,
+    selected,
     isOver,
-  }: SceneCardProps,
-  ref
+    style = {},
+    label,
+    q,
+    icon,
+    preview,
+  }: DashboardItemCardProps,
+  ref: React.Ref<HTMLDivElement>
 ) {
-  const visibilityRef = useRef();
-  const { enterCount } = useInViewport(visibilityRef);
-
-  const maxwidth = 300;
-
-  // max allowed zoom = 1
-  const scale = Math.min(maxwidth / scene.width, 1);
-  const { height, type } = scene;
   return (
     <Card
-      ref={mergeRefs([visibilityRef, ref])}
+      ref={ref}
       onClick={onClick}
       onDoubleClick={onDoubleClick}
       data-selected={selected}
@@ -51,43 +42,18 @@ export const SceneCard = React.forwardRef(function (
         ...style,
       }}
     >
-      {/* sizer */}
-      <Preview
-        data-selected={selected}
-        data-over={isOver}
-        style={{
-          height: height * scale,
-          width: maxwidth,
-        }}
-      >
+      <PreviewContainer data-selected={selected} data-over={isOver}>
         <span id="overlay" />
-        {/* transformer */}
-        <div
-          id="view"
-          style={{
-            transform: `scale(${scale})`,
-          }}
-        >
-          <FigmaNodeBitmapView
-            background={"white"}
-            key={scene.id}
-            target={scene}
-            isPanning={false}
-            isZooming={false}
-            zoom={null}
-            inViewport={enterCount > 0}
-            focused={false}
-          />
-        </div>
-      </Preview>
+        {preview}
+      </PreviewContainer>
       <footer>
         <label>
-          <SceneNodeIcon type={type} color="white" />
+          {!!icon && icon}
           <Highlighter
             className="name"
             highlightClassName="name"
             searchWords={q ? [q] : []}
-            textToHighlight={scene.name}
+            textToHighlight={label}
             autoEscape // required to escape regex special characters, like, `+`, `(`, `)`, etc.
           />
         </label>
@@ -131,7 +97,7 @@ const Card = styled.div`
   }
 `;
 
-const Preview = styled.div`
+const PreviewContainer = styled.div`
   outline: 1px solid rgba(0, 0, 0, 0.1);
   border-radius: 2px;
   overflow: hidden;

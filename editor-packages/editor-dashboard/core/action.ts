@@ -1,6 +1,6 @@
 export type Action =
   | NewSectionAction
-  | NewFolderAction
+  | MakeDirAction
   | FilterAction
   | FoldUnfoldAction
   | FoldUnfoldAllAction;
@@ -17,9 +17,13 @@ export type FilterAction = {
   query: string;
 };
 
-export type NewFolderAction = {
-  type: "hierarchy/new-directory";
-  path: string;
+export type MakeDirAction = {
+  type: "hierarchy/mkdir";
+  cwd: string;
+  /**
+   * name of the directory. if non provided, it will automatically assign a name like "Untitled 1"
+   */
+  name?: string;
 };
 
 export type FoldUnfoldAllAction = FoldAllAction | UnfoldAllAction;

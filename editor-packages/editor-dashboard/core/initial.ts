@@ -1,4 +1,5 @@
 import type { FigmaReflectRepository } from "editor/core/states";
+import type { ReflectSceneNode } from "@design-sdk/figma-node";
 import type {
   ComponentItem,
   DashboardFolderItem,
@@ -26,7 +27,7 @@ export function initialHierarchy(
 ): DashboardHierarchy {
   //
 
-  const grouped = group(design, { filter: null });
+  const grouped = group<ReflectSceneNode>(design, { filter: null });
 
   const sections: Array<DashboardFolderItem> = Array.from(grouped.keys()).map(
     (k): DashboardFolderItem => {
@@ -39,6 +40,7 @@ export function initialHierarchy(
         contents: items.map((i) => ({
           $type: "frame-scene",
           id: i.id,
+          scene: i,
           name: i.name,
           path: k + "/" + i.name,
           type: "FRAME",

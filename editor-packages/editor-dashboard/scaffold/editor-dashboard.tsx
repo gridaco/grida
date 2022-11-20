@@ -1,10 +1,11 @@
 import React, { useCallback } from "react";
 import styled from "@emotion/styled";
 import {
+  FolderCard,
   SceneCard,
-  SceneCardProps,
   SectionHeaderAction,
   SectionHeader,
+  DashboardItemCardProps,
 } from "../components";
 import { EditorHomeHeader } from "./editor-dashboard-header";
 import { DndProvider, useDrag, useDrop } from "react-dnd";
@@ -14,7 +15,7 @@ import {
   MenuItem,
 } from "@editor-ui/context-menu";
 import * as Collapsible from "@radix-ui/react-collapsible";
-import { useDashboard } from "../core/provider";
+import { useDashboard, DashboardItem } from "../core";
 
 export function Dashboard() {
   const {
@@ -65,11 +66,11 @@ export function Dashboard() {
         {hierarchy.sections.map((section, i) => {
           const { name, contents } = section;
           return (
-            <ScenesSector
+            <RootDirectory
               key={i}
               path={section.path}
               label={name}
-              scenes={contents}
+              contents={contents}
               query={filter.query}
               selections={selection}
               expanded={!hierarchyFoldings.includes(section.path)}
@@ -89,10 +90,10 @@ export function Dashboard() {
           );
         })}
 
-        <ScenesSector
+        <RootDirectory
           label="Components"
           path={"/components"}
-          scenes={hierarchy.components}
+          contents={hierarchy.components}
           query={filter.query}
           selections={selection}
           expanded
@@ -112,9 +113,9 @@ interface SceneCardMeta {
   $type: unknown;
 }
 
-function ScenesSector({
+function RootDirectory({
   label,
-  scenes,
+  contents,
   query,
   selections,
   path,
@@ -126,7 +127,7 @@ function ScenesSector({
   headerActions,
 }: {
   label: string;
-  scenes: ReadonlyArray<SceneCardMeta>;
+  contents: ReadonlyArray<DashboardItem>;
   query: string;
   selections: string[];
   path: string;
@@ -139,7 +140,7 @@ function ScenesSector({
 }) {
   return (
     <div style={{ marginBottom: 32 }}>
-      <ContextMenuProvider>
+      <RootDirectoryContextMenuProvider cwd={path}>
         <Collapsible.Root open={expanded} onOpenChange={onExpandChange}>
           <SectionHeader
             id={path}
@@ -150,12 +151,11 @@ function ScenesSector({
           />
           <Collapsible.Content>
             <SceneGrid onClick={onBlur}>
-              {scenes.map((i) => (
-                <DraggableSceneCard
+              {contents.map((i) => (
+                <DashboardItemCard
                   key={i.id}
-                  // @ts-ignore // todo
-                  scene={i}
                   q={query}
+                  {...i}
                   selected={selections.includes(i.id)}
                   onClick={(e) => {
                     onSelect(i.id);
@@ -169,7 +169,7 @@ function ScenesSector({
             </SceneGrid>
           </Collapsible.Content>
         </Collapsible.Root>
-      </ContextMenuProvider>
+      </RootDirectoryContextMenuProvider>
     </div>
   );
 }
@@ -178,38 +178,60 @@ function Providers({ children }: React.PropsWithChildren<{}>) {
   return <DndProvider backend={HTML5Backend}>{children}</DndProvider>;
 }
 
-function ContextMenuProvider({ children }: React.PropsWithChildren<{}>) {
+function RootDirectoryContextMenuProvider({
+  children,
+  cwd,
+}: React.PropsWithChildren<{
+  cwd: string;
+}>) {
+  const { mkdir } = useDashboard();
   const items: MenuItem<string>[] = [
     { title: "New Folder", value: "new-folder" },
-    "separator",
-    { title: "Run", value: "run" },
-    { title: "Deploy", value: "deploy-to-vercel" },
-    { title: "Open in Figma", value: "open-in-figma" },
-    { title: "Get sharable link", value: "make-sharable-link" },
-    { title: "Copy CSS", value: "make-css" },
-    { title: "Refresh (fetch from origin)", value: "refresh" },
+    // "separator",
+    // { title: "Run", value: "run" },
+    // { title: "Deploy", value: "deploy-to-vercel" },
+    // { title: "Open in Figma", value: "open-in-figma" },
+    // { title: "Get sharable link", value: "make-sharable-link" },
+    // { title: "Copy CSS", value: "make-css" },
+    // { title: "Refresh (fetch from origin)", value: "refresh" },
   ];
 
+  const onselect = useCallback(
+    (value: string) => {
+      switch (value) {
+        case "new-folder":
+          mkdir(cwd);
+          break;
+      }
+    },
+    [mkdir]
+  );
+
   return (
-    <ContextMenu
-      items={items}
-      onSelect={(v) => {
-        console.log("exec canvas cmd", v);
-      }}
-    >
+    <ContextMenu items={items} onSelect={onselect}>
       {children}
     </ContextMenu>
   );
 }
 
-function DraggableSceneCard({ ...props }: SceneCardProps) {
+type DndMetaItem<T = object> = T & {
+  id: string;
+  $type: DashboardItem["$type"];
+};
+
+function DashboardItemCard(
+  props: DashboardItem &
+    Omit<DashboardItemCardProps, "label" | "preview" | "icon">
+) {
   const [{ isActive }, drop] = useDrop(() => ({
-    accept: "scene-card",
+    accept: "frame-scene", // todo
     collect: (monitor) => ({
       isActive: monitor.canDrop() && monitor.isOver(),
     }),
-    canDrop<ReflectSceneNode>(item, monitor) {
-      return item.id !== props.scene.id;
+    canDrop(item: DndMetaItem, monitor) {
+      if (item.$type === props.$type) {
+        return item.id !== props.id;
+      }
     },
     drop(item, monitor) {
       console.log("drop", item, monitor);
@@ -217,32 +239,77 @@ function DraggableSceneCard({ ...props }: SceneCardProps) {
     },
   }));
 
-  const [{ opacity }, drag] = useDrag(
-    () => ({
-      type: "scene-card",
-      item: props.scene,
+  const [{ opacity }, drag] = useDrag(() => {
+    let item: unknown = props;
+    switch (props.$type) {
+      case "frame-scene": {
+        item = props.scene;
+        Object.assign(item, { $type: props.$type });
+        break;
+      }
+      case "folder": {
+        item = props;
+        break;
+      }
+    }
+
+    return {
+      type: props.$type,
+      item: item,
       collect: (monitor) => ({
         opacity: monitor.isDragging() ? 0.5 : 1,
       }),
-    }),
-    []
-  );
+    };
+  }, []);
 
   function attachRef(el) {
     drag(el);
     drop(el);
   }
 
-  return (
-    <SceneCard
-      ref={attachRef}
-      style={{
-        opacity,
-      }}
-      isOver={isActive}
-      {...props}
-    />
-  );
+  const defaultprops = {
+    isOver: isActive,
+    style: { opacity },
+  };
+
+  switch (props.$type) {
+    case "frame-scene": {
+      return (
+        <SceneCard
+          scene={props.scene}
+          ref={attachRef}
+          {...defaultprops}
+          {...props}
+        />
+      );
+    }
+    case "component": {
+      return (
+        <SceneCard
+          scene={props as any} // todo
+          ref={attachRef}
+          {...defaultprops}
+          {...props}
+        />
+      );
+    }
+    case "folder": {
+      return (
+        <FolderCard
+          ref={attachRef}
+          id={props.id}
+          path={props.path}
+          name={props.name}
+          contents={props.contents}
+          {...defaultprops}
+          {...props}
+        />
+      );
+    }
+    default: {
+      throw new Error(`Unknown item type ${props.$type}`);
+    }
+  }
 }
 
 const SceneGrid = styled.div`

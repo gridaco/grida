@@ -1,3 +1,5 @@
+import type { ReflectSceneNode } from "@design-sdk/figma-node";
+
 export interface DashboardState {
   selection: Array<string>;
   hierarchy: DashboardHierarchy;
@@ -35,6 +37,7 @@ export type FrameSceneItem = {
   type: "FRAME";
   width: number;
   height: number;
+  scene: ReflectSceneNode;
 };
 
 /**
@@ -60,3 +63,13 @@ export type ComponentItem = {
   width: number;
   height: number;
 };
+
+// export abstract class UndecudedNane {
+//   constructor(public readonly name: string) {}
+// }
+
+// /**
+//  * this class is an utility class for telling the view that it should initially trigger the name editing state.
+//  * It's used instead of a symbol so that it can contain the initial value.
+//  */
+// export class UndecidedFolderName extends UndecudedNane {}

@@ -4,7 +4,7 @@ import type {
   FilterAction,
   FoldAction,
   FoldAllAction,
-  NewFolderAction,
+  MakeDirAction,
   NewSectionAction,
   UnfoldAction,
   UnfoldAllAction,
@@ -35,20 +35,24 @@ export function reducer(state: DashboardState, action: Action): DashboardState {
       });
     }
 
-    case "hierarchy/new-directory": {
-      const { path } = <NewFolderAction>action;
+    case "hierarchy/mkdir": {
+      const { cwd: dirname, name: seedname } = <MakeDirAction>action;
       return produce(state, (draft) => {
-        // not tested
-        const parts = path.split("/");
-        const name = parts.pop();
-        const parent = parts.join("/");
-        const section = draft.hierarchy.sections.find((s) => s.name === parent);
-        if (section) {
-          section.contents.push({
+        const dir = draft.hierarchy.sections.find((s) => s.path === dirname);
+
+        const siblings = dir?.contents.filter((c) => c.$type == "folder") || [];
+        const name = newDirName({
+          seed: seedname,
+          siblings: siblings.map((s) => s.name as string),
+        });
+
+        const path = `${dirname}/${name}`;
+        if (dir) {
+          dir.contents.push({
             $type: "folder",
-            id: path, // other than path ?
-            path: path,
             name: name,
+            id: path,
+            path: path,
             contents: [],
           });
         }
@@ -89,4 +93,31 @@ export function reducer(state: DashboardState, action: Action): DashboardState {
   throw new Error(
     `[dashboard/reducer] - unknown action type "${action["type"]}"`
   );
+}
+
+/**
+ * if seedname not provided, get confliction free initial name with format "Untitled" or "Untitled (n)"
+ * if seedname provided, get confliction free name with format "seedname" or "seedname (n)"
+ * @param seed
+ * @param siblings
+ */
+function newDirName({
+  seed = "Untitled folder",
+  siblings,
+}: {
+  seed?: string | undefined;
+  siblings: Array<string>;
+}): string {
+  if (siblings.indexOf(seed) === -1) {
+    return seed;
+  }
+
+  let i = 1;
+  while (true) {
+    const name = `${seed} (${i})`;
+    if (siblings.indexOf(name) === -1) {
+      return name;
+    }
+    i++;
+  }
 }
