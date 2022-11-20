@@ -17,7 +17,7 @@ export type DashboardItem = DashboardFolderItem | SceneItem;
 
 export type DashboardFolderItem = {
   id: string;
-  type: "folder";
+  $type: "folder";
   path: string;
   name: string;
   contents: Array<DashboardItem>;

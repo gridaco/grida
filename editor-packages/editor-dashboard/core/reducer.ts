@@ -13,7 +13,7 @@ export function reducer(state: DashboardState, action: Action): DashboardState {
       const { name } = <NewSectionAction>action;
       return produce(state, (draft) => {
         draft.hierarchy.sections.push({
-          type: "folder",
+          $type: "folder",
           name: name,
           id: name, // add confliction check
           path: name, // add confliction check
@@ -41,7 +41,7 @@ export function reducer(state: DashboardState, action: Action): DashboardState {
         const section = draft.hierarchy.sections.find((s) => s.name === parent);
         if (section) {
           section.contents.push({
-            type: "folder",
+            $type: "folder",
             id: path, // other than path ?
             path: path,
             name: name,

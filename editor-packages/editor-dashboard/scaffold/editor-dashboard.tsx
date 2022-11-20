@@ -74,7 +74,7 @@ export function Dashboard() {
 interface SceneCardMeta {
   id: string;
   name: string;
-  type: unknown;
+  $type: unknown;
 }
 
 function ScenesSector({

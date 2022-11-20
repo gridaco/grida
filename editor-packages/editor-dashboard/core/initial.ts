@@ -31,7 +31,7 @@ export function initialHierarchy(
       const items = grouped.get(k);
       return {
         id: k,
-        type: "folder",
+        $type: "folder",
         name: k,
         path: k,
         contents: items.map((i) => ({
