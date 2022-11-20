@@ -1,6 +1,11 @@
-import React from "react";
+import React, { useCallback } from "react";
 import styled from "@emotion/styled";
-import { SceneCard, SceneCardProps } from "../components";
+import {
+  SceneCard,
+  SceneCardProps,
+  SectionHeaderAction,
+  SectionHeader,
+} from "../components";
 import { EditorHomeHeader } from "./editor-dashboard-header";
 import { DndProvider, useDrag, useDrop } from "react-dnd";
 import { HTML5Backend } from "react-dnd-html5-backend";
@@ -9,17 +14,21 @@ import {
   MenuItem,
 } from "@editor-ui/context-menu";
 import * as Collapsible from "@radix-ui/react-collapsible";
-import { ChevronRightIcon, ChevronDownIcon } from "@radix-ui/react-icons";
 import { useDashboard } from "../core/provider";
 
 export function Dashboard() {
   const {
     hierarchy,
+    hierarchyFoldings,
     filter,
     dispatch,
     enterNode,
     selectNode,
     blurSelection,
+    fold,
+    unfold,
+    foldAll,
+    unfoldAll,
     selection,
   } = useDashboard();
 
@@ -29,6 +38,19 @@ export function Dashboard() {
       query: query,
     });
   };
+
+  const headerActions = [
+    {
+      id: "sections/unfold-all",
+      label: "Unfold All Sections",
+      handler: unfoldAll,
+    },
+    {
+      id: "sections/fold-all",
+      label: "Fold All Section",
+      handler: foldAll,
+    },
+  ];
 
   return (
     <Providers>
@@ -50,22 +72,35 @@ export function Dashboard() {
               scenes={contents}
               query={filter.query}
               selections={selection}
+              expanded={!hierarchyFoldings.includes(section.path)}
+              onExpandChange={(expand) => {
+                console.log("onExpandChange", expand, section.path);
+                if (expand) {
+                  unfold(section.path);
+                } else {
+                  fold(section.path);
+                }
+              }}
               onBlur={blurSelection}
               onSelect={selectNode}
               onEnter={enterNode}
+              headerActions={headerActions}
             />
           );
         })}
 
-        {/* <ScenesSector
+        <ScenesSector
           label="Components"
-          scenes={components}
+          path={"/components"}
+          scenes={hierarchy.components}
           query={filter.query}
-          selections={selectedNodes}
-          onBlur={blur}
+          selections={selection}
+          expanded
+          onBlur={blurSelection}
           onSelect={selectNode}
           onEnter={enterNode}
-        /> */}
+          headerActions={headerActions}
+        />
       </div>
     </Providers>
   );
@@ -83,26 +118,36 @@ function ScenesSector({
   query,
   selections,
   path,
+  expanded,
+  onExpandChange,
   onBlur,
   onSelect,
   onEnter,
+  headerActions,
 }: {
   label: string;
   scenes: ReadonlyArray<SceneCardMeta>;
   query: string;
   selections: string[];
   path: string;
+  expanded?: boolean;
+  onExpandChange?: (expanded: boolean) => void;
   onBlur: () => void;
   onSelect: (id: string) => void;
   onEnter: (id: string) => void;
+  headerActions?: SectionHeaderAction[];
 }) {
-  const [open, setOpen] = React.useState(true);
-
   return (
     <div style={{ marginBottom: 32 }}>
       <ContextMenuProvider>
-        <Collapsible.Root open={open} onOpenChange={setOpen}>
-          <SectionHeader id={path} expanded={open} label={label} q={query} />
+        <Collapsible.Root open={expanded} onOpenChange={onExpandChange}>
+          <SectionHeader
+            id={path}
+            expanded={expanded}
+            label={label}
+            q={query}
+            actions={headerActions}
+          />
           <Collapsible.Content>
             <SceneGrid onClick={onBlur}>
               {scenes.map((i) => (
@@ -206,75 +251,4 @@ const SceneGrid = styled.div`
   align-items: flex-start;
   flex-wrap: wrap;
   gap: 40px;
-`;
-
-import Highlighter from "react-highlight-words";
-
-function SectionHeader({
-  label,
-  expanded = true,
-  q,
-  id,
-}: {
-  expanded?: boolean;
-  label: string;
-  q?: string;
-  id: string;
-}) {
-  const iconprops = {
-    color: "white",
-  };
-
-  const ToggleIcon = expanded ? ChevronDownIcon : ChevronRightIcon;
-
-  return (
-    <Collapsible.Trigger asChild>
-      <SectionHeaderContainer id={id}>
-        <div className="toggle">
-          <ToggleIcon />
-        </div>
-        <Highlighter
-          className="label"
-          highlightClassName="label"
-          searchWords={q ? [q] : []}
-          textToHighlight={label}
-          autoEscape // required to escape regex special characters, like, `+`, `(`, `)`, etc.
-        />
-      </SectionHeaderContainer>
-    </Collapsible.Trigger>
-  );
-}
-
-const SectionHeaderContainer = styled.div`
-  padding: 16px;
-  display: flex;
-  align-items: center;
-  flex-direction: row;
-  margin-bottom: 16px;
-  border-radius: 4px;
-  cursor: pointer;
-
-  background: transparent;
-
-  &:hover {
-    background: rgba(255, 255, 255, 0.05);
-  }
-
-  .toggle {
-    margin-right: 16px;
-    color: white;
-  }
-
-  .label {
-    user-select: none;
-    display: inline-block;
-    opacity: 0.8;
-    color: white;
-    font-size: 18px;
-    font-weight: 500;
-    mark {
-      background: white;
-      color: black;
-    }
-  }
 `;

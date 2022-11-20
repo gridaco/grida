@@ -104,6 +104,38 @@ export function useDashboard() {
     });
   }, [editordispatch]);
 
+  const foldAll = useCallback(() => {
+    dispatch({
+      type: "hierarchy/fold-all",
+    });
+  }, [dispatch]);
+
+  const unfoldAll = useCallback(() => {
+    dispatch({
+      type: "hierarchy/unfold-all",
+    });
+  }, [dispatch]);
+
+  const fold = useCallback(
+    (path: string) => {
+      dispatch({
+        type: "hierarchy/fold",
+        path,
+      });
+    },
+    [dispatch]
+  );
+
+  const unfold = useCallback(
+    (path: string) => {
+      dispatch({
+        type: "hierarchy/unfold",
+        path,
+      });
+    },
+    [dispatch]
+  );
+
   return {
     ...state,
     selection: editorState.selectedNodes,
@@ -111,5 +143,9 @@ export function useDashboard() {
     selectNode,
     enterNode,
     blurSelection,
+    foldAll,
+    unfoldAll,
+    fold,
+    unfold,
   };
 }

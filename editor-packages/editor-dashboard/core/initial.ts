@@ -10,12 +10,14 @@ import { group } from "../q";
 export function initialDashboardState(
   design: FigmaReflectRepository
 ): DashboardState {
+  const hierarchy = initialHierarchy(design);
   return {
     selection: [],
     filter: {
       query: "",
     },
-    hierarchy: initialHierarchy(design),
+    hierarchy: hierarchy,
+    hierarchyFoldings: [],
   };
 }
 

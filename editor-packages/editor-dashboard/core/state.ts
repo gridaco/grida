@@ -1,6 +1,7 @@
 export interface DashboardState {
   selection: Array<string>;
   hierarchy: DashboardHierarchy;
+  hierarchyFoldings: ReadonlyArray<string>;
   filter: DashboardFilter;
 }
 
