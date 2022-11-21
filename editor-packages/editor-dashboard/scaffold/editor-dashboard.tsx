@@ -288,6 +288,7 @@ function FolderCard(
   props: DashboardFolderItem &
     Omit<DashboardItemCardProps, "label" | "preview" | "icon">
 ) {
+  const { mv } = useDashboard();
   const [{ isActive }, drop] = useDrop(() => ({
     accept: ["scene", "folder"],
     collect: (monitor) => ({
@@ -297,8 +298,8 @@ function FolderCard(
       return item.id !== props.id;
     },
     drop(item, monitor) {
-      console.log("drop", item, monitor);
-      // todo:
+      // @ts-ignore
+      mv([item.path], props.path);
     },
   }));
 

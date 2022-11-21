@@ -1,10 +1,12 @@
 import produce from "immer";
+import path from "path";
 import type {
   Action,
   FilterAction,
   FoldAction,
   FoldAllAction,
   MakeDirAction,
+  MoveAction,
   NewSectionAction,
   UnfoldAction,
   UnfoldAllAction,
@@ -56,6 +58,43 @@ export function reducer(state: DashboardState, action: Action): DashboardState {
             contents: [],
           });
         }
+      });
+    }
+
+    case "hierarchy/mv": {
+      const { source, dest } = <MoveAction>action;
+
+      console.log("move", source, dest);
+      return produce(state, (draft) => {
+        // // 1. check if dest is a valid directory
+        // const destFolder = findFolder(dest, {
+        //   directories: state.hierarchy.sections,
+        // });
+        // console.log("destDir", destFolder);
+        // if (!destFolder) {
+        //   return;
+        // }
+        // // 2. move each source under dest
+        // for (const src of source) {
+        //   console.log("moving", src, "to", dest);
+        //   const srcFolder = draft.hierarchy.sections.find(
+        //     (s) => s.path === src
+        //   );
+        //   const srcParent = draft.hierarchy.sections.find((s) =>
+        //     s.contents.find((c) => c.path === src)
+        //   );
+        //   if (!srcParent) {
+        //     continue;
+        //   }
+        //   // 2.1 remove src from srcParent
+        //   srcParent.contents = srcParent.contents.filter(
+        //     (c) => c.path !== srcFolder.path
+        //   );
+        //   // 2.2 add src to dest
+        //   destFolder.contents.push(srcFolder);
+        //   console.log("srcParent", srcParent);
+        //   console.log("destDir", destFolder);
+        // }
       });
     }
 
@@ -121,3 +160,41 @@ function newDirName({
     i++;
   }
 }
+
+/**
+ * find item under hierarchy
+ *
+ * @param directories the root directories to begin search with. it will loop recursively through all directories
+ */
+function findFolder(
+  path: string,
+  { directories }: { directories: Array<DashboardFolderItem> }
+) {
+  for (const dir of directories) {
+    if (dir.path === path) {
+      return dir;
+    }
+
+    if (dir.$type === "folder") {
+      const found = findFolder(path, {
+        directories: dir.contents.filter(
+          (d) => d.$type === "folder"
+        ) as Array<DashboardFolderItem>,
+      });
+      if (found) {
+        return found;
+      }
+    }
+  }
+}
+
+// Visual File system
+// mv
+// mkdir
+// rm
+// rename
+// fold
+// unfold
+// order
+// tag
+// search

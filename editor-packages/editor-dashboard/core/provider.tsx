@@ -147,6 +147,17 @@ export function useDashboard() {
     [dispatch]
   );
 
+  const mv = useCallback(
+    (src: string[], dst: string) => {
+      dispatch({
+        type: "hierarchy/mv",
+        source: src,
+        dest: dst,
+      });
+    },
+    [dispatch]
+  );
+
   return {
     ...state,
     selection: editorState.selectedNodes,
@@ -159,5 +170,6 @@ export function useDashboard() {
     fold,
     unfold,
     mkdir,
+    mv,
   };
 }

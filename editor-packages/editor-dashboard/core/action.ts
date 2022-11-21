@@ -1,6 +1,7 @@
 export type Action =
   | NewSectionAction
   | MakeDirAction
+  | MoveAction
   | FilterAction
   | FoldUnfoldAction
   | FoldUnfoldAllAction;
@@ -24,6 +25,12 @@ export type MakeDirAction = {
    * name of the directory. if non provided, it will automatically assign a name like "Untitled 1"
    */
   name?: string;
+};
+
+export type MoveAction = {
+  type: "hierarchy/mv";
+  source: string[];
+  dest: string;
 };
 
 export type FoldUnfoldAllAction = FoldAllAction | UnfoldAllAction;
