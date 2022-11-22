@@ -4,10 +4,10 @@ import { EditorTaskItem } from "./editor-task-item";
 import { EditorProgressIndicatorButton } from "./editor-progress-indicator-trigger-button";
 import { EditorProgressIndicatorPopoverContent } from "./editor-progress-indicator-popover-content";
 import * as Popover from "@radix-ui/react-popover";
-import { EditorTaskQueue } from "core/states";
+import { TaskQueue } from "core/states";
 import { styled as s, keyframes } from "@stitches/react";
 
-export function EditorProgressIndicator({ isBusy, tasks }: EditorTaskQueue) {
+export function EditorProgressIndicator({ isBusy, tasks }: TaskQueue) {
   const TasksBody = () => {
     if (tasks.length === 0) {
       return <Empty>No background tasks</Empty>;
@@ -52,6 +52,8 @@ const StyledTrigger = styled(Popover.Trigger)`
   outline: none;
   border: none;
   background: none;
+  padding: 0;
+  margin: 0;
 `;
 
 const scaleIn = keyframes({

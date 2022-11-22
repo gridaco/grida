@@ -34,8 +34,9 @@ export function componentsFrom(
   // only fetch in-file components. components from shared-library (external file) won't be loaded.
   const components_in_file = [];
   visit<{ id: string; type: string }>(file.document, {
-    getChildren: (node) => {
-      if ("children" in node) return node["children"];
+    getChildren: (node, indexPath) => {
+      if ("children" in node)
+        return node["children"] as Array<{ id: string; type: string }>;
       return [];
     },
     onEnter: (node) => {

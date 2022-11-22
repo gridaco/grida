@@ -1,5 +1,5 @@
 import styled from "@emotion/styled";
-import { SceneNodeIcon } from "components/icons";
+import { SceneNodeIcon } from "@code-editor/node-icons";
 import { useTargetContainer } from "hooks/use-target-node";
 
 import React from "react";

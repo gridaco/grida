@@ -51,10 +51,14 @@ export function CodeSection() {
       return;
     }
 
-    wwcode({
-      target: target.id,
-      framework: preferences.framework,
-    }).then(on_result);
+    setTimeout(() => {
+      // execute after 500 ms for better ux (render the ui smoothly first).
+      // it uses the webworker but, still heavy operations holds the ui thread.
+      wwcode({
+        target: target.id,
+        framework: preferences.framework,
+      }).then(on_result);
+    }, 500);
   }, [target?.id, preferences.framework.framework]);
 
   const { code } = result ?? {};
@@ -86,6 +90,7 @@ export function CodeSection() {
             value={code.raw}
             height={viewheight}
             fold_comments_on_load
+            path={dummy_file_name_map[preferences.framework.framework]}
             options={{
               lineNumbers: "off",
               glyphMargin: false,
@@ -113,6 +118,13 @@ export function CodeSection() {
     </PropertyGroup>
   );
 }
+
+const dummy_file_name_map = {
+  flutter: "main.dart",
+  react: "app.tsx",
+  "react-native": "app.tsx",
+  vue: "app.vue",
+} as const;
 
 function CliIntegrationSnippet({ node }: { node: ReflectSceneNode }) {
   const { id, filekey } = node;

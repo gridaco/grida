@@ -9,7 +9,7 @@ import { EditorSidebar } from "components/editor";
 import { EditorState, useEditorState } from "core/states";
 import { Canvas } from "scaffolds/canvas";
 import { Inspector } from "scaffolds/inspector";
-import { EditorHome } from "scaffolds/editor-home";
+import { EditorHome } from "@code-editor/dashboard";
 import { EditorSkeleton } from "./skeleton";
 import { colors } from "theme";
 import { useEditorSetupContext } from "./setup";

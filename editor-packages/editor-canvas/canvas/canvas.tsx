@@ -16,6 +16,7 @@ import {
   target_of_area,
   boundingbox,
   is_point_inside_box,
+  zoomToFit,
 } from "../math";
 import q from "@design-sdk/query";
 import { LazyFrame } from "@code-editor/canvas/lazy-frame";
@@ -119,6 +120,11 @@ type CanvasFocusProps = {
    */
   focus?: string[];
   focusRefreshkey?: string;
+};
+
+type CanvasFocusSnap = {
+  damping?: number;
+  bounds?: Box;
 };
 
 interface HovringNode {
@@ -515,7 +521,8 @@ export function Canvas({
             }}
             onZoomToFit={() => {
               setZoom(1);
-              // setOffset([newx, newy]); // TODO: set offset to center of the viewport
+              // const newoffset = zoomToFit(viewbound, offset, zoom, 1);
+              // setOffset(newoffset);
               _canvas_state_store.saveLastTransform(cvtransform);
             }}
             onZooming={onZooming}

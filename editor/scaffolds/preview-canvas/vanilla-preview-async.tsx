@@ -4,7 +4,7 @@ import { preview_presets } from "@grida/builder-config-preset";
 import { designToCode, Result } from "@designto/code";
 import { MainImageRepository } from "@design-sdk/asset-repository";
 import { cachekey, cache } from "./cache";
-import { blurred_bg_fill } from "./util";
+import { blurred_bg_fill } from "@code-editor/canvas-renderer-core";
 import { PreviewContent } from "./preview-content";
 import type { VanillaPreviewProps } from "./prop-type";
 import { useFigmaImageService } from "scaffolds/editor";
@@ -140,7 +140,7 @@ export function D2CVanillaPreview({
     }
   }, [target?.id, isZooming, isPanning]);
 
-  const bg_color_str = blurred_bg_fill(target);
+  const bg_color_str = blurred_bg_fill(target.fills);
 
   return (
     <PreviewContent

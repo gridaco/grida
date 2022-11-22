@@ -346,56 +346,6 @@ export function editorReducer(state: EditorState, action: Action): EditorState {
       break;
     }
 
-    // todo: move to workspace state
-    case "editor-task-push": {
-      const { task } = <BackgroundTaskPushAction>action;
-      const { id } = task;
-
-      return produce(state, (draft) => {
-        // todo:
-        // 1. handle debounce.
-
-        // check id duplication
-        const exists = draft.editorTaskQueue.tasks.find((t) => t.id === id);
-        if (exists) {
-          // pass
-        } else {
-          if (!task.createdAt) {
-            task.createdAt = new Date();
-          }
-          draft.editorTaskQueue.tasks.push(task);
-          draft.editorTaskQueue.isBusy = true;
-        }
-      });
-      break;
-    }
-
-    // todo: move to workspace state
-    case "editor-task-pop": {
-      const { task } = <BackgroundTaskPopAction>action;
-      const { id } = task;
-
-      return produce(state, (draft) => {
-        draft.editorTaskQueue.tasks = draft.editorTaskQueue.tasks.filter(
-          (i) => i.id !== id
-        );
-
-        if (draft.editorTaskQueue.tasks.length === 0) {
-          draft.editorTaskQueue.isBusy = false;
-        }
-      });
-      break;
-    }
-
-    case "editor-task-update-progress": {
-      const { id, progress } = <BackgroundTaskUpdateProgressAction>action;
-      return produce(state, (draft) => {
-        draft.editorTaskQueue.tasks.find((i) => i.id !== id).progress =
-          progress;
-      });
-      break;
-    }
-
     default:
       throw new Error(`Unhandled action type: ${action["type"]}`);
   }

@@ -6,8 +6,7 @@ import styled from "@emotion/styled";
 import { useTheme } from "@emotion/react";
 import "@editor-ui/theme";
 import { ReflectSceneNodeType } from "@design-sdk/figma-node";
-import { DotsHorizontalIcon } from "@radix-ui/react-icons";
-import { SceneNodeIcon } from "components/icons";
+import { SceneNodeIcon } from "@code-editor/node-icons";
 
 export const IconContainer = styled.span(({ theme }) => ({
   color: theme.colors.mask,

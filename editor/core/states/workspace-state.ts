@@ -8,6 +8,8 @@ export interface WorkspaceState {
    */
   highlightedLayer?: string;
 
+  taskQueue: TaskQueue;
+
   /**
    * figma authentication data store state
    */
@@ -27,4 +29,27 @@ export interface WorkspaceState {
     /** URL link to the user's profile image */
     profile: string;
   };
+}
+
+export interface TaskQueue {
+  isBusy: boolean;
+  tasks: BackgroundTask[];
+}
+
+export interface BackgroundTask {
+  id: string;
+  name: string;
+  /**
+   * If the task is short-lived, wait this much ms before displaying it.
+   * @default 200 (0.2s)
+   */
+  debounce?: number;
+  description?: string;
+  cancelable?: boolean;
+  onCancel?: () => void;
+  /**
+   * 0-1, if null, it is indeterminate
+   */
+  progress: number | null;
+  createdAt?: Date;
 }
