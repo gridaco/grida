@@ -1,5 +1,4 @@
 import React, { useRef } from "react";
-import type { ReflectSceneNode } from "@design-sdk/figma-node";
 import { FigmaNodeBitmapView } from "@code-editor/canvas-renderer-bitmap";
 import { SceneNodeIcon } from "@code-editor/node-icons";
 import { useInViewport } from "react-in-viewport";
@@ -76,6 +75,7 @@ export const SceneCard = React.forwardRef(function (
   return (
     <DashboardItemCard
       ref={ref}
+      id={props.id}
       {...props}
       label={scene.name}
       icon={<SceneNodeIcon type={scene.type} color="white" />}

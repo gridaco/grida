@@ -47,6 +47,7 @@ export const FolderCard = React.forwardRef(function (
   return (
     <DashboardItemCard
       ref={ref}
+      id={props.id}
       {...props}
       label={name}
       icon={<SquareIcon color="white" />}

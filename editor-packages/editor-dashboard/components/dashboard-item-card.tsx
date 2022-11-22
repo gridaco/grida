@@ -2,7 +2,13 @@ import React from "react";
 import styled from "@emotion/styled";
 import Highlighter from "react-highlight-words";
 
+const DASHBOARD_ITEM_CARD_CLASSNAME = "dashboard-item-card";
+export const DASHBOARD_ITEM_CARD_SELECTOR = "." + DASHBOARD_ITEM_CARD_CLASSNAME;
+export const DASHBOARD_ITEM_PATH_ATTRIBUTE = "data-path";
+
 export interface DashboardItemCardProps {
+  id?: string;
+  path: string;
   selected?: boolean;
   onClick?: (e) => void;
   onDoubleClick?: () => void;
@@ -19,8 +25,10 @@ export interface DashboardItemCardProps {
 
 export const DashboardItemCard = React.forwardRef(function (
   {
+    id,
     onClick,
     onDoubleClick,
+    path,
     selected,
     isOver,
     style = {},
@@ -31,9 +39,17 @@ export const DashboardItemCard = React.forwardRef(function (
   }: DashboardItemCardProps,
   ref: React.Ref<HTMLDivElement>
 ) {
+  const _p = {
+    // the data-path works as a unique identifier of the item for drag selection ev listeners
+    id: id,
+    className: DASHBOARD_ITEM_CARD_CLASSNAME,
+    [DASHBOARD_ITEM_PATH_ATTRIBUTE]: path,
+  };
+
   return (
     <Card
       ref={ref}
+      {..._p}
       onClick={onClick}
       onDoubleClick={onDoubleClick}
       data-selected={selected}

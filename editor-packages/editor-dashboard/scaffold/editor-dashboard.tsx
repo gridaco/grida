@@ -6,6 +6,8 @@ import {
   SectionHeaderAction,
   SectionHeader,
   DashboardItemCardProps,
+  DASHBOARD_ITEM_CARD_SELECTOR,
+  DASHBOARD_ITEM_PATH_ATTRIBUTE,
 } from "../components";
 import { EditorHomeHeader } from "./editor-dashboard-header";
 import { DndProvider, useDrag, useDrop } from "react-dnd";
@@ -21,6 +23,7 @@ import {
   DashboardFolderItem,
   SceneItem,
 } from "../core";
+import Selecto from "react-selecto";
 
 export function Dashboard() {
   const {
@@ -63,6 +66,7 @@ export function Dashboard() {
       <EditorHomeHeader onQueryChange={handleQuery} />
 
       <div
+        id={"selection-container"}
         style={{
           marginTop: 80,
           padding: 40,
@@ -106,6 +110,35 @@ export function Dashboard() {
           onSelect={selectNode}
           onEnter={enterNode}
           headerActions={headerActions}
+        />
+        <Selecto
+          container={document.querySelector("#selection-container")}
+          dragContainer={document.querySelector("#selection-container")}
+          selectableTargets={[DASHBOARD_ITEM_CARD_SELECTOR]}
+          selectByClick={true}
+          selectFromInside={true}
+          continueSelect={true}
+          toggleContinueSelect={"shift"}
+          keyContainer={window}
+          hitRate={0}
+          scrollOptions={{
+            container: document.querySelector(
+              "#selection-container"
+            ) as HTMLDivElement,
+          }}
+          onSelect={(e) => {
+            // TODO: incomplete
+            e.added.forEach((el) => {
+              const id = el.id;
+              // const path = el.getAttribute(DASHBOARD_ITEM_PATH_ATTRIBUTE);
+              selectNode([...selection, id]);
+            });
+            e.removed.forEach((el) => {
+              const id = el.id;
+              // const path = el.getAttribute(DASHBOARD_ITEM_PATH_ATTRIBUTE);
+              selectNode(selection.filter((p) => p !== id));
+            });
+          }}
         />
       </div>
     </Providers>

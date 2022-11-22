@@ -74,7 +74,7 @@ export function useDashboard() {
   const [state, dispatch] = useDashboardState();
 
   const selectNode = useCallback(
-    (node: string) => {
+    (node: string | string[]) => {
       editordispatch({
         type: "select-node",
         node,
