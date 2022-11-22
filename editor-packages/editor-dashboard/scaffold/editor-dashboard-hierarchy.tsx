@@ -17,7 +17,7 @@ export function DashboardHierarchy() {
   const renderItem = useCallback(
     (item: DashboardItem, i: number) => {
       const selected = selection.includes(item.id);
-      const depth = item.path.split("/").length - 1;
+      const depth = getHierarchyDepth(item.path);
 
       return (
         <HierarchyRow
@@ -76,4 +76,17 @@ function pushhash(router: NextRouter, hash: string) {
         throw e;
       }
     });
+}
+
+/**
+ * get the depth via the path (ignore the first slash)
+ * @param path
+ * @returns
+ */
+function getHierarchyDepth(path: string): number {
+  const splits = path.split("/");
+  if (splits[0] === "") {
+    return splits.length - 2;
+  }
+  return splits.length - 1;
 }

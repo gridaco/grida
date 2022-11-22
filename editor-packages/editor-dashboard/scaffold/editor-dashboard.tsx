@@ -172,7 +172,7 @@ function RootDirectory({
 }) {
   return (
     <div style={{ marginBottom: 32 }}>
-      <RootDirectoryContextMenuProvider cwd={path}>
+      <RootDirectoryContextMenuProvider cwd={path} disabled>
         <Collapsible.Root open={expanded} onOpenChange={onExpandChange}>
           <SectionHeader
             id={path}
@@ -212,9 +212,11 @@ function Providers({ children }: React.PropsWithChildren<{}>) {
 
 function RootDirectoryContextMenuProvider({
   children,
+  disabled,
   cwd,
 }: React.PropsWithChildren<{
   cwd: string;
+  disabled?: boolean;
 }>) {
   const { mkdir } = useDashboard();
   const items: MenuItem<string>[] = [
@@ -238,6 +240,10 @@ function RootDirectoryContextMenuProvider({
     },
     [mkdir]
   );
+
+  if (disabled) {
+    return <>{children}</>;
+  }
 
   return (
     <ContextMenu items={items} onSelect={onselect}>
