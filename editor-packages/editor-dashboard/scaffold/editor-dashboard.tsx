@@ -84,7 +84,6 @@ export function Dashboard() {
               selections={selection}
               expanded={!hierarchyFoldings.includes(section.path)}
               onExpandChange={(expand) => {
-                console.log("onExpandChange", expand, section.path);
                 if (expand) {
                   unfold(section.path);
                 } else {
