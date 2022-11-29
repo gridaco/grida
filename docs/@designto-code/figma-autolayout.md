@@ -144,6 +144,6 @@ We use Stretched Token for specifing specific widget to be stretched. Learn more
 ## Hug contents item (Not having any intrinsic size)
 
 > Hug contents will follow its items size, not having a intrinsic size of its own.
-> Learn how to hanlde this here at [box-sizing#Not having-any-intrinsic-size](./css-box-sizing.md)
+> Learn how to handle this here at [box-sizing#Not having-any-intrinsic-size](./css-box-sizing.md)
 
 <!-- Code examples WIP -->
