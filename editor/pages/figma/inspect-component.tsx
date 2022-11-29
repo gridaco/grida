@@ -32,7 +32,7 @@ export default function InspectComponent() {
       <div style={{ margin: 60 }}>
         <h2>Not a component</h2>
         <p>
-          This page cannot hanlde other types than <code>COMPONENT</code> or
+          This page cannot handle other types than <code>COMPONENT</code> or
           <code>INSTANCE</code>
         </p>
         <p>
