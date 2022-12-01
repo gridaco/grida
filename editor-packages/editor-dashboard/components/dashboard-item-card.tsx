@@ -114,6 +114,7 @@ const Card = styled.div`
 `;
 
 const PreviewContainer = styled.div`
+  --color-highlight: rgb(0, 179, 255);
   outline: 1px solid rgba(0, 0, 0, 0.1);
   border-radius: 2px;
   overflow: hidden;
@@ -136,8 +137,14 @@ const PreviewContainer = styled.div`
     transition: all 0.2s ease-in-out;
   }
 
+  .scale-on-over {
+    overflow: hidden;
+    will-change: transform;
+    transition: all 0.2s ease-in-out;
+  }
+
   &[data-selected="true"] {
-    outline: 4px solid rgb(0, 179, 255);
+    outline: 4px solid var(--color-highlight);
 
     #overlay {
       display: block;
@@ -145,10 +152,15 @@ const PreviewContainer = styled.div`
   }
 
   &[data-over="true"] {
-    outline: 4px solid rgb(0, 179, 255);
+    outline: 4px solid var(--color-highlight);
 
     #view {
       opacity: 0.5;
+    }
+
+    .scale-on-over {
+      border-radius: 5px;
+      transform: scale(0.85);
     }
   }
 
