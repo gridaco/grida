@@ -9,6 +9,7 @@ const packages = [
   "@code-editor/property",
   "@code-editor/preferences",
   "@code-editor/dashboard",
+  "@code-editor/isolated-inspection",
   "@code-editor/node-icons",
   "@code-editor/canvas-renderer-bitmap",
   // "@code-editor/shortcuts",
