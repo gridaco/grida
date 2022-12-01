@@ -33,7 +33,7 @@
   ],
   "repository": "https://github.com/gridaco/designto-code",
   "dependencies": {
-    "@radix-ui/react-context-menu": "^2.0.1",
+    "@radix-ui/react-context-menu": "^0.1.1",
     "react-draggable": "^4.4.4",
     "react-resizable": "^3.0.4"
   },
