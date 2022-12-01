@@ -429,19 +429,25 @@ export function Canvas({
       onMoveNode?.([dx / zoom, dy / zoom], ...selectedNodes);
     }
 
-    if (marquee) {
-      const [w, h] = [
-        x1 - marquee[0], // w
-        y1 - marquee[1], // h
-      ];
-      setMarquee([marquee[0], marquee[1], w, h]);
-    }
+    if (config.marquee.disabled) {
+      // skip
+    } else {
+      // edge scrolling
+      // edge scrolling is only enabled when config#marquee is enabled
+      const [cx, cy] = [x, y];
+      const [dx, dy] = edge_scrolling(cx, cy, viewbound);
+      if (dx || dy) {
+        setOffset([ox + dx, oy + dy]);
+      }
 
-    // edge scrolling
-    const [cx, cy] = [x, y];
-    const [dx, dy] = edge_scrolling(cx, cy, viewbound);
-    if (dx || dy) {
-      setOffset([ox + dx, oy + dy]);
+      // update marquee & following selections via effect
+      if (marquee) {
+        const [w, h] = [
+          x1 - marquee[0], // w
+          y1 - marquee[1], // h
+        ];
+        setMarquee([marquee[0], marquee[1], w, h]);
+      }
     }
   };
 

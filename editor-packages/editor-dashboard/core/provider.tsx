@@ -83,6 +83,16 @@ export function useDashboard() {
     [editordispatch]
   );
 
+  const isolateNode = useCallback(
+    (node: string) => {
+      editordispatch({
+        type: "design/enter-isolation",
+        node,
+      });
+    },
+    [editordispatch]
+  );
+
   const focusNodeOnCanvas = useCallback(
     (node: string) => {
       editordispatch({
@@ -164,6 +174,7 @@ export function useDashboard() {
     dispatch,
     selectNode,
     focusNodeOnCanvas,
+    isolateNode,
     blurSelection,
     foldAll,
     unfoldAll,

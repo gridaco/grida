@@ -33,7 +33,7 @@ export function Dashboard() {
     hierarchyFoldings,
     filter,
     dispatch,
-    focusNodeOnCanvas: enterNode,
+    isolateNode: enterNode,
     selectNode,
     blurSelection,
     fold,
