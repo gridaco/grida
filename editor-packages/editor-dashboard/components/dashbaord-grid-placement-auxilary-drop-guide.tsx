@@ -45,7 +45,7 @@ const Guide = styled.div`
   position: absolute;
   width: ${GUIDE_ACCESSIBLE_WIDTH}px;
   top: var(--guide-margin-vertical);
-  bottom: var(--guide-margin-vertical);
+  bottom: calc(var(--guide-margin-vertical) + 44px);
 
   &[data-left="true"] {
     left: ${-(GUIDE_MARGIN + GUIDE_ACCESSIBLE_WIDTH)}px;

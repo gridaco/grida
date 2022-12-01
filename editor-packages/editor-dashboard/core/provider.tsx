@@ -83,7 +83,7 @@ export function useDashboard() {
     [editordispatch]
   );
 
-  const enterNode = useCallback(
+  const focusNodeOnCanvas = useCallback(
     (node: string) => {
       editordispatch({
         type: "canvas/focus",
@@ -163,7 +163,7 @@ export function useDashboard() {
     selection: editorState.selectedNodes,
     dispatch,
     selectNode,
-    enterNode,
+    focusNodeOnCanvas,
     blurSelection,
     foldAll,
     unfoldAll,

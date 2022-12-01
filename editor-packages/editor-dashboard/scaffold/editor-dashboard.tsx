@@ -33,7 +33,7 @@ export function Dashboard() {
     hierarchyFoldings,
     filter,
     dispatch,
-    enterNode,
+    focusNodeOnCanvas: enterNode,
     selectNode,
     blurSelection,
     fold,
@@ -182,7 +182,7 @@ function Directory({
 }) {
   return (
     <div style={{ marginBottom: 32 }}>
-      <RootDirectoryContextMenuProvider cwd={path} disabled>
+      <RootDirectoryContextMenuProvider cwd={path}>
         <Collapsible.Root open={expanded} onOpenChange={onExpandChange}>
           <SectionHeader
             id={path}
@@ -299,6 +299,8 @@ function PlacementGuide({
     },
   }));
 
+  // TODO: add on click handler with new-section command
+
   return (
     <AuxilaryDashbaordGridPlacementGuide
       ref={drop}
@@ -329,6 +331,8 @@ function DashboardItemCard(
 function SceneCard(
   props: SceneItem & Omit<DashboardItemCardProps, "label" | "preview" | "icon">
 ) {
+  const { focusNodeOnCanvas: enterNode } = useDashboard();
+
   const [{ isActive }, drop] = useDrop(() => ({
     accept: "scene",
     collect: (monitor) => ({
@@ -363,14 +367,35 @@ function SceneCard(
     style: { opacity },
   };
 
+  const items: MenuItem<string>[] = [
+    { title: "View on Canvas", value: "focus" },
+    { title: "Open in Figma", value: "open-in-figma" },
+  ];
+
+  const onContextSelect = useCallback(
+    (value: string) => {
+      switch (value) {
+        case "focus": {
+          enterNode(props.scene.id);
+          break;
+        }
+      }
+    },
+    [enterNode, props.scene.id]
+  );
+
   return (
-    <_SceneCard
-      // @ts-ignore
-      scene={props.scene as any}
-      ref={attachRef}
-      {...defaultprops}
-      {...props}
-    />
+    <ContextMenu items={items} onSelect={onContextSelect}>
+      <div>
+        <_SceneCard
+          // @ts-ignore
+          scene={props.scene as any}
+          ref={attachRef}
+          {...defaultprops}
+          {...props}
+        />
+      </div>
+    </ContextMenu>
   );
 }
 
