@@ -18,6 +18,8 @@ import type {
   DesignerModeSwitchActon,
   CodingInitialFilesSeedAction,
   CodingNewTemplateSessionAction,
+  EnterIsolatedInspectionAction,
+  ExitIsolatedInspectionAction,
 } from "core/actions";
 import { EditorState } from "core/states";
 import { NextRouter, useRouter } from "next/router";
@@ -134,15 +136,41 @@ export function editorReducer(state: EditorState, action: Action): EditorState {
 
         const final = _2_select_page;
 
-        // refresh canvas focus to the target.
-        final.canvas.focus = {
-          refreshkey: nanoid(4),
-          nodes: [node],
+        return <EditorState>{
+          ...final,
+          canvas: {
+            // refresh canvas focus to the target.
+            focus: {
+              refreshkey: nanoid(4),
+              nodes: [node],
+            },
+            // update selection
+            selectedNodes: [node],
+          },
+        };
+      });
+    }
+
+    case "design/enter-isolation": {
+      const { node } = <EnterIsolatedInspectionAction>action;
+      return produce(state, (draft) => {
+        draft.isolation = {
+          isolated: true,
+          node: node,
         };
 
-        final.selectedNodes = [node];
+        // (todo: update router)
+        draft.selectedNodes = [node];
+      });
+    }
 
-        return final;
+    case "design/exit-isolation": {
+      const {} = <ExitIsolatedInspectionAction>action;
+      return produce(state, (draft) => {
+        draft.isolation = {
+          isolated: false,
+          node: null,
+        };
       });
     }
 
@@ -447,6 +475,12 @@ const reducers = {
         _canvas_state_store.getLastSelection() ?? [];
       draft.selectedPage = pageid;
       draft.selectedNodes = last_known_selections_of_this_page;
+
+      // when page is seleced, force exit the isolation mode.
+      draft.isolation = {
+        isolated: false,
+        node: null,
+      };
 
       // update editor mode by page selection
       let nextmode = state.mode.value;

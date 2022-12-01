@@ -90,8 +90,9 @@ export function Editor() {
 function ModeDesign() {
   const [state] = useEditorState();
   const { selectedPage, isolation } = state;
+  const { isolated } = isolation;
 
-  if (isolation) {
+  if (isolated) {
     return <ModeIsolateDesign />;
   }
 

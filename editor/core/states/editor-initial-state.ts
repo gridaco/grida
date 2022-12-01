@@ -33,7 +33,10 @@ export function createPendingEditorState(): EditorState {
         nodes: [],
       },
     },
-    isolation: false,
+    isolation: {
+      isolated: false,
+      node: null,
+    },
     selectedNodesInitial: null,
     selectedLayersOnPreview: [],
     design: null,
