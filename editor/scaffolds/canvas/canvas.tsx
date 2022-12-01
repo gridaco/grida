@@ -49,6 +49,15 @@ export function VisualContentArea() {
     [dispatch]
   );
 
+  const enterIsolation = useCallback(
+    (node: string) =>
+      dispatch({
+        type: "design/enter-isolation",
+        node,
+      }),
+    [dispatch]
+  );
+
   const _bg =
     thisPage?.backgroundColor &&
     `rgba(${thisPage.backgroundColor.r * 255}, ${
@@ -139,6 +148,7 @@ export function VisualContentArea() {
                   {...p}
                   runnable={selectedNodes.length === 1}
                   onRunClick={() => startCodeSession(p.id)}
+                  onDoubleClick={() => enterIsolation(p.id)}
                 />
               )}
             />
