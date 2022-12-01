@@ -9,8 +9,7 @@ import {
 import useMeasure from "react-use-measure";
 import { useDispatch } from "core/dispatch";
 import { FrameTitleRenderer } from "./render/frame-title";
-
-import { cursors } from "cursors";
+import { cursors } from "@code-editor/ui";
 import { usePreferences } from "@code-editor/preferences";
 
 /**
