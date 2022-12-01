@@ -11,7 +11,7 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
 } from "@editor-ui/dropdown-menu";
-import { IconButton } from "../components";
+import { IconButton } from "@code-editor/ui";
 import Highlighter from "react-highlight-words";
 import * as Collapsible from "@radix-ui/react-collapsible";
 
