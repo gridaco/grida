@@ -24,7 +24,14 @@ export function VisualContentArea() {
   const { highlightedLayer, highlightLayer } = useWorkspace();
   const dispatch = useDispatch();
 
-  const { selectedPage, design, selectedNodes, focus, canvasMode } = state;
+  const {
+    selectedPage,
+    design,
+    selectedNodes,
+    canvas: canvasMeta,
+    canvasMode,
+  } = state;
+  const { focus } = canvasMeta;
 
   const thisPage = design?.pages?.find((p) => p.id == selectedPage);
   const thisPageNodes = selectedPage ? thisPage?.children?.filter(Boolean) : [];

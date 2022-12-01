@@ -135,7 +135,7 @@ export function editorReducer(state: EditorState, action: Action): EditorState {
         const final = _2_select_page;
 
         // refresh canvas focus to the target.
-        final.focus = {
+        final.canvas.focus = {
           refreshkey: nanoid(4),
           nodes: [node],
         };

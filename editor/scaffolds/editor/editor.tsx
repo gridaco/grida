@@ -10,6 +10,7 @@ import { EditorState, useEditorState } from "core/states";
 import { Canvas } from "scaffolds/canvas";
 import { Inspector } from "scaffolds/inspector";
 import { EditorHome } from "@code-editor/dashboard";
+import { EditorIsolatedInspection } from "@code-editor/isolated-inspection";
 import { EditorSkeleton } from "./skeleton";
 import { colors } from "theme";
 import { useEditorSetupContext } from "./setup";
@@ -88,7 +89,11 @@ export function Editor() {
 
 function ModeDesign() {
   const [state] = useEditorState();
-  const { selectedPage } = state;
+  const { selectedPage, isolation } = state;
+
+  if (isolation) {
+    return <ModeIsolateDesign />;
+  }
 
   switch (selectedPage) {
     case "home":
@@ -100,6 +105,10 @@ function ModeDesign() {
 
 function ModeCode() {
   return <Code />;
+}
+
+function ModeIsolateDesign() {
+  return <EditorIsolatedInspection />;
 }
 
 function SideRightPanel() {

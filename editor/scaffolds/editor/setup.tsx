@@ -123,6 +123,7 @@ export function SetupEditor({
             key: filekey,
             pages: pages,
           },
+          isolation: false,
           code: { files: {}, loading: true },
           canvasMode: initialCanvasMode,
         };
