@@ -45,6 +45,10 @@ interface CanvasState {
   selectedNodes: string[];
   readonly?: boolean;
   /**
+   * displays the debug info on the canvas.
+   */
+  debug?: boolean;
+  /**
    * when provided, it will override the saved value or centering logic and use this transform as initial instead.
    *
    * Canvas automatically saves the last transform and also automatically calculates the initial transform based on the input's complexity.
@@ -158,6 +162,7 @@ export function Canvas({
   initialTransform,
   highlightedLayer,
   selectedNodes,
+  debug,
   readonly = true,
   config = default_canvas_preferences,
   backgroundColor,
@@ -225,7 +230,9 @@ export function Canvas({
     setZoom(_focus_center.scale);
   }, [...focus, focusRefreshKey, viewboundmeasured]);
 
-  const [transformIntitialized, setTransformInitialized] = useState(false);
+  const [transformIntitialized, setTransformInitialized] = useState(
+    !!initialTransform
+  );
   const [zoom, setZoom] = useState(initialTransform?.scale || 1);
   const [isZooming, setIsZooming] = useState(false);
   const [offset, setOffset] = useState<[number, number]>(
@@ -510,6 +517,26 @@ export function Canvas({
   return (
     <>
       <>
+        {debug === true && (
+          <DebugInfoContainer>
+            <div>zoom: {zoom}</div>
+            <div>offset: {offset.join(", ")}</div>
+            <div>isPanning: {isPanning ? "true" : "false"}</div>
+            <div>isZooming: {isZooming ? "true" : "false"}</div>
+            <div>isDragging: {isDragging ? "true" : "false"}</div>
+            <div>
+              isMovingSelections: {isMovingSelections ? "true" : "false"}
+            </div>
+            <div>
+              isTransforming: {is_canvas_transforming ? "true" : "false"}
+            </div>
+            <div>marquee: {marquee ? marquee.join(", ") : "null"}</div>
+            <div>hoveringLayer: {hoveringLayer?.node?.id}</div>
+            <div>selectedNodes: {selectedNodes.join(", ")}</div>
+            <div>initial-transform (xy): {initialTransform.xy.join(", ")}</div>
+            <div>initial-transform (scale): {initialTransform.scale}</div>
+          </DebugInfoContainer>
+        )}
         {/* <ContextMenuProvider> */}
         <Container
         // todo: viewbound not accurate.
@@ -792,3 +819,18 @@ const viewbound_not_measured = (viewbound: Box) => {
       viewbound[3] === 0)
   );
 };
+
+const DebugInfoContainer = styled.div`
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  z-index: 9999;
+  background: rgba(0, 0, 0, 0.5);
+  border-radius: 4px;
+  color: white;
+  padding: 0.5rem;
+  font-size: 0.8rem;
+  font-family: monospace;
+  line-height: 1.2;
+  white-space: pre;
+`;
