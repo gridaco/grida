@@ -8,6 +8,8 @@ import {
   DashboardItemCardProps,
   DASHBOARD_ITEM_CARD_SELECTOR,
   DASHBOARD_ITEM_PATH_ATTRIBUTE,
+  AuxilaryDashbaordGridPlacementGuide,
+  AuxilaryGridDropGuideLeftOrRightSpecification,
 } from "../components";
 import { EditorHomeHeader } from "./editor-dashboard-header";
 import { DndProvider, useDrag, useDrop } from "react-dnd";
@@ -38,6 +40,7 @@ export function Dashboard() {
     unfold,
     foldAll,
     unfoldAll,
+    mkdir,
     selection,
   } = useDashboard();
 
@@ -59,6 +62,14 @@ export function Dashboard() {
       label: "Fold All Section",
       handler: foldAll,
     },
+    {
+      id: "sections/new",
+      label: "New Folder",
+      handler: () => {
+        // TODO:
+        mkdir("/");
+      },
+    },
   ];
 
   return (
@@ -75,7 +86,7 @@ export function Dashboard() {
         {hierarchy.sections.map((section, i) => {
           const { name, contents } = section;
           return (
-            <RootDirectory
+            <Directory
               key={i}
               path={section.path}
               label={name}
@@ -98,7 +109,7 @@ export function Dashboard() {
           );
         })}
 
-        <RootDirectory
+        <Directory
           label="Components"
           path={"/components"}
           contents={hierarchy.components}
@@ -110,7 +121,7 @@ export function Dashboard() {
           onEnter={enterNode}
           headerActions={headerActions}
         />
-        <Selecto
+        {/* <Selecto
           container={document.querySelector("#selection-container")}
           dragContainer={document.querySelector("#selection-container")}
           selectableTargets={[DASHBOARD_ITEM_CARD_SELECTOR]}
@@ -138,13 +149,13 @@ export function Dashboard() {
               selectNode(selection.filter((p) => p !== id));
             });
           }}
-        />
+        /> */}
       </div>
     </Providers>
   );
 }
 
-function RootDirectory({
+function Directory({
   label,
   contents,
   query,
@@ -183,19 +194,20 @@ function RootDirectory({
           <Collapsible.Content>
             <SceneGrid onClick={onBlur}>
               {contents.map((i) => (
-                <DashboardItemCard
-                  key={i.id}
-                  q={query}
-                  {...i}
-                  selected={selections.includes(i.id)}
-                  onClick={(e) => {
-                    onSelect(i.id);
-                    e.stopPropagation();
-                  }}
-                  onDoubleClick={() => {
-                    onEnter(i.id);
-                  }}
-                />
+                <DashboardItemCardWrapper key={i.id}>
+                  <DashboardItemCard
+                    q={query}
+                    {...i}
+                    selected={selections.includes(i.id)}
+                    onClick={(e) => {
+                      onSelect(i.id);
+                      e.stopPropagation();
+                    }}
+                    onDoubleClick={() => {
+                      onEnter(i.id);
+                    }}
+                  />
+                </DashboardItemCardWrapper>
               ))}
             </SceneGrid>
           </Collapsible.Content>
@@ -255,6 +267,46 @@ type DndMetaItem<T = object> = T & {
   id: string;
   $type: DashboardItem["$type"];
 };
+
+function DashboardItemCardWrapper({ children }: React.PropsWithChildren<{}>) {
+  return (
+    <div
+      style={{
+        position: "relative",
+      }}
+    >
+      <PlacementGuide left />
+      {children}
+      <PlacementGuide right />
+    </div>
+  );
+}
+
+function PlacementGuide({
+  ...props
+}: AuxilaryGridDropGuideLeftOrRightSpecification) {
+  const [{ isActive }, drop] = useDrop(() => ({
+    accept: "scene",
+    collect: (monitor) => ({
+      isActive: monitor.canDrop() && monitor.isOver(),
+    }),
+    canDrop(item: DndMetaItem, monitor) {
+      return true;
+    },
+    drop(item, monitor) {
+      console.log("drop", item, monitor);
+      // todo:
+    },
+  }));
+
+  return (
+    <AuxilaryDashbaordGridPlacementGuide
+      ref={drop}
+      {...props}
+      over={isActive}
+    />
+  );
+}
 
 function DashboardItemCard(
   props: DashboardItem &
