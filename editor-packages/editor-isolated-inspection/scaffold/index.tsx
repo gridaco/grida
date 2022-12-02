@@ -157,48 +157,42 @@ function VisualContentArea() {
     <CanvasContainer ref={canvasSizingRef} id="canvas">
       {/* <EditorAppbarFragments.Canvas /> */}
 
-      <div
-        style={{
-          display: state.mode.value === "design" ? "block" : "none",
+      <Canvas
+        key={id}
+        viewbound={[
+          canvasBounds.left,
+          canvasBounds.top,
+          canvasBounds.right,
+          canvasBounds.bottom,
+        ]}
+        filekey={state.design.key}
+        pageid={"isolation"}
+        backgroundColor={"transparent"}
+        selectedNodes={selectedNodes}
+        highlightedLayer={highlightedLayer}
+        onSelectNode={(...nodes) => {
+          dispatch({ type: "select-node", node: nodes.map((n) => n.id) });
         }}
-      >
-        <Canvas
-          key={id}
-          viewbound={[
-            canvasBounds.left,
-            canvasBounds.top,
-            canvasBounds.bottom,
-            canvasBounds.right,
-          ]}
-          filekey={state.design.key}
-          pageid={"isolation"}
-          backgroundColor={"transparent"}
-          selectedNodes={selectedNodes}
-          highlightedLayer={highlightedLayer}
-          onSelectNode={(...nodes) => {
-            dispatch({ type: "select-node", node: nodes.map((n) => n.id) });
-          }}
-          onClearSelection={() => {
-            dispatch({ type: "select-node", node: [] });
-          }}
-          nodes={[scene]}
-          focus={[id]}
-          renderItem={renderItem}
-          renderFrameTitle={() => <></>}
-          readonly
-          // debug
-          config={{
-            can_highlight_selected_layer: true,
-            marquee: {
-              disabled: true,
-            },
-            grouping: {
-              disabled: false,
-            },
-          }}
-          cursor={cursor}
-        />
-      </div>
+        onClearSelection={() => {
+          dispatch({ type: "select-node", node: [] });
+        }}
+        nodes={[scene]}
+        focus={[id]}
+        renderItem={renderItem}
+        renderFrameTitle={() => <></>}
+        readonly
+        // debug
+        config={{
+          can_highlight_selected_layer: true,
+          marquee: {
+            disabled: true,
+          },
+          grouping: {
+            disabled: false,
+          },
+        }}
+        cursor={cursor}
+      />
     </CanvasContainer>
   );
 }
@@ -206,6 +200,7 @@ function VisualContentArea() {
 const CanvasContainer = styled.div`
   display: flex;
   flex-direction: column;
+  width: 100%;
   height: 100vh;
 `;
 

@@ -93,66 +93,60 @@ export function VisualContentArea() {
         <></>
       ) : (
         <>
-          <div
-            style={{
-              display: state.mode.value === "design" ? "block" : "none",
+          <Canvas
+            key={selectedPage}
+            viewbound={[
+              canvasBounds.left,
+              canvasBounds.top,
+              canvasBounds.right,
+              canvasBounds.bottom,
+            ]}
+            filekey={state.design.key}
+            pageid={selectedPage}
+            backgroundColor={_bg}
+            selectedNodes={selectedNodes}
+            focusRefreshkey={focus.refreshkey}
+            focus={focus.nodes}
+            highlightedLayer={highlightedLayer}
+            onSelectNode={(...nodes) => {
+              dispatch({ type: "select-node", node: nodes.map((n) => n.id) });
             }}
-          >
-            <Canvas
-              key={selectedPage}
-              viewbound={[
-                canvasBounds.left,
-                canvasBounds.top,
-                canvasBounds.bottom,
-                canvasBounds.right,
-              ]}
-              filekey={state.design.key}
-              pageid={selectedPage}
-              backgroundColor={_bg}
-              selectedNodes={selectedNodes}
-              focusRefreshkey={focus.refreshkey}
-              focus={focus.nodes}
-              highlightedLayer={highlightedLayer}
-              onSelectNode={(...nodes) => {
-                dispatch({ type: "select-node", node: nodes.map((n) => n.id) });
-              }}
-              onMoveNodeEnd={([x, y], ...nodes) => {
-                dispatch({
-                  type: "node-transform-translate",
-                  node: nodes,
-                  translate: [x, y],
-                });
-              }}
-              // onMoveNode={() => {}}
-              onClearSelection={() => {
-                dispatch({ type: "select-node", node: [] });
-              }}
-              nodes={thisPageNodes}
-              // initialTransform={ } // TODO: if the initial selection is provided from first load, from the query param, we have to focus to fit that node.
-              renderItem={renderItem}
-              // readonly={false}
-              readonly
-              config={{
-                can_highlight_selected_layer: true,
-                marquee: {
-                  disabled: false,
-                },
-                grouping: {
-                  disabled: false,
-                },
-              }}
-              cursor={cursor}
-              renderFrameTitle={(p) => (
-                <FrameTitleRenderer
-                  key={p.id}
-                  {...p}
-                  runnable={selectedNodes.length === 1}
-                  onRunClick={() => startCodeSession(p.id)}
-                  onDoubleClick={() => enterIsolation(p.id)}
-                />
-              )}
-            />
-          </div>
+            onMoveNodeEnd={([x, y], ...nodes) => {
+              dispatch({
+                type: "node-transform-translate",
+                node: nodes,
+                translate: [x, y],
+              });
+            }}
+            // onMoveNode={() => {}}
+            onClearSelection={() => {
+              dispatch({ type: "select-node", node: [] });
+            }}
+            nodes={thisPageNodes}
+            // initialTransform={ } // TODO: if the initial selection is provided from first load, from the query param, we have to focus to fit that node.
+            renderItem={renderItem}
+            // readonly={false}
+            readonly
+            config={{
+              can_highlight_selected_layer: true,
+              marquee: {
+                disabled: false,
+              },
+              grouping: {
+                disabled: false,
+              },
+            }}
+            cursor={cursor}
+            renderFrameTitle={(p) => (
+              <FrameTitleRenderer
+                key={p.id}
+                {...p}
+                runnable={selectedNodes.length === 1}
+                onRunClick={() => startCodeSession(p.id)}
+                onDoubleClick={() => enterIsolation(p.id)}
+              />
+            )}
+          />
         </>
       )}
     </CanvasContainer>

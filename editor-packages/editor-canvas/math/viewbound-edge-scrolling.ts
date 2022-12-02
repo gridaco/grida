@@ -16,7 +16,7 @@
  *
  * @param cx x coordinate of the cursor
  * @param cy y coordinate of the cursor
- * @param viewbound the viewbound of the canvas (l, t, b, r)
+ * @param viewbound the viewbound of the canvas (l x1, t y1, r x2, b y2)
  * @param margin the margin value (default 40px)
  * @param factor the returned value will be multiplied by this factor (default 1/4)
  *
@@ -29,7 +29,7 @@ export function edge_scrolling(
   margin = 40,
   factor = 1 / 4
 ): [number, number] {
-  const [l, t, b, r] = viewbound;
+  const [l, t, r, b] = viewbound;
   let [dx, dy] = [0, 0];
 
   if (cx < l + margin) {

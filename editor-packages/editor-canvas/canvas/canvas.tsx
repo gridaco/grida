@@ -105,6 +105,10 @@ const default_canvas_preferences: CanvsPreferences = {
 
 type CanvasProps = CanvasFocusProps &
   CanvasCursorOptions & {
+    /**
+     * canvas view bound.
+     * [(x1) left, (y1) top, (x2) right, (y2) bottom]
+     */
     viewbound: Box;
     onSelectNode?: (...node: ReflectSceneNode[]) => void;
     onMoveNodeStart?: (...node: string[]) => void;
@@ -539,9 +543,8 @@ export function Canvas({
         )}
         {/* <ContextMenuProvider> */}
         <Container
-        // todo: viewbound not accurate.
-        // width={viewbound[2] - viewbound[0]}
-        // height={viewbound[3] - viewbound[1]}
+          width={viewbound[2] - viewbound[0]}
+          height={viewbound[3] - viewbound[1]}
         >
           <CanvasEventTarget
             onPanning={onPanning}
@@ -618,12 +621,10 @@ export function Canvas({
   );
 }
 
-const Container = styled.div`
-  min-width: 240px;
-  min-height: 240px;
+const Container = styled.div<{ width: number; height: number }>`
+  /* width: ${(p) => p.width}px; */
+  /* height: ${(p) => p.height}px; */
 `;
-/* width: ${(p) => p.width}px; */
-/* height: ${(p) => p.height}px; */
 
 /**
  * 1. container positioning guide (static per selection)
@@ -746,9 +747,10 @@ function DisableBackdropFilter({ children }: { children: React.ReactNode }) {
 function CanvasBackground({ backgroundColor }: { backgroundColor?: string }) {
   return (
     <div
+      id="canvas-background"
       style={{
         zIndex: -2,
-        position: "fixed",
+        position: "absolute",
         top: 0,
         left: 0,
         width: "100%",
