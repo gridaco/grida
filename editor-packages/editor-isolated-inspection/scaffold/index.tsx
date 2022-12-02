@@ -77,6 +77,7 @@ function Navigation() {
 }
 
 const NavigationPositioner = styled.div`
+  pointer-events: none;
   z-index: 9;
 
   position: absolute;
@@ -90,6 +91,7 @@ const NavigationPositioner = styled.div`
 `;
 
 const NavigationBar = styled.div`
+  pointer-events: all;
   margin: 24px;
 
   display: flex;
