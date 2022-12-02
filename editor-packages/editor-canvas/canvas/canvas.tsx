@@ -522,24 +522,29 @@ export function Canvas({
     <>
       <>
         {debug === true && (
-          <DebugInfoContainer>
-            <div>zoom: {zoom}</div>
-            <div>offset: {offset.join(", ")}</div>
-            <div>isPanning: {isPanning ? "true" : "false"}</div>
-            <div>isZooming: {isZooming ? "true" : "false"}</div>
-            <div>isDragging: {isDragging ? "true" : "false"}</div>
-            <div>
-              isMovingSelections: {isMovingSelections ? "true" : "false"}
-            </div>
-            <div>
-              isTransforming: {is_canvas_transforming ? "true" : "false"}
-            </div>
-            <div>marquee: {marquee ? marquee.join(", ") : "null"}</div>
-            <div>hoveringLayer: {hoveringLayer?.node?.id}</div>
-            <div>selectedNodes: {selectedNodes.join(", ")}</div>
-            <div>initial-transform (xy): {initialTransform.xy.join(", ")}</div>
-            <div>initial-transform (scale): {initialTransform.scale}</div>
-          </DebugInfoContainer>
+          <Debug
+            infos={[
+              { label: "zoom", value: zoom },
+              { label: "offset", value: offset.join(", ") },
+              { label: "isPanning", value: isPanning },
+              { label: "isZooming", value: isZooming },
+              { label: "isDragging", value: isDragging },
+              { label: "isMovingSelections", value: isMovingSelections },
+              { label: "isTransforming", value: is_canvas_transforming },
+              { label: "selectedNodes", value: selectedNodes.join(", ") },
+              { label: "hoveringLayer", value: hoveringLayer?.node?.id },
+              { label: "marquee", value: marquee?.join(", ") },
+              { label: "viewbound", value: viewbound.join(", ") },
+              {
+                label: "initial-transform (xy)",
+                value: initialTransform ? initialTransform.xy.join(", ") : null,
+              },
+              {
+                label: "initial-transform (zoom)",
+                value: initialTransform ? initialTransform.scale : null,
+              },
+            ]}
+          />
         )}
         {/* <ContextMenuProvider> */}
         <Container
@@ -821,6 +826,27 @@ const viewbound_not_measured = (viewbound: Box) => {
       viewbound[3] === 0)
   );
 };
+
+function Debug({
+  infos,
+}: {
+  infos: { label: string; value: string | number | boolean }[];
+}) {
+  return (
+    <DebugInfoContainer>
+      {infos.map(({ label, value }, i) => {
+        if (value === undefined || value === null) {
+          return <></>;
+        }
+        return (
+          <div key={i}>
+            {label}: {JSON.stringify(value)}
+          </div>
+        );
+      })}
+    </DebugInfoContainer>
+  );
+}
 
 const DebugInfoContainer = styled.div`
   position: absolute;

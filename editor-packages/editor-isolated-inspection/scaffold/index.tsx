@@ -183,7 +183,7 @@ function VisualContentArea() {
         renderItem={renderItem}
         renderFrameTitle={() => <></>}
         readonly
-        // debug
+        debug
         config={{
           can_highlight_selected_layer: true,
           marquee: {
