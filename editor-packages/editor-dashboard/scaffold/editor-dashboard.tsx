@@ -33,7 +33,8 @@ export function Dashboard() {
     hierarchyFoldings,
     filter,
     dispatch,
-    isolateNode: enterNode,
+    focusNodeOnCanvas: enterNode,
+    // isolateNode: enterNode,
     selectNode,
     blurSelection,
     fold,
@@ -331,7 +332,7 @@ function DashboardItemCard(
 function SceneCard(
   props: SceneItem & Omit<DashboardItemCardProps, "label" | "preview" | "icon">
 ) {
-  const { focusNodeOnCanvas: enterNode } = useDashboard();
+  const { isolateNode, focusNodeOnCanvas } = useDashboard();
 
   const [{ isActive }, drop] = useDrop(() => ({
     accept: "scene",
@@ -369,6 +370,7 @@ function SceneCard(
 
   const items: MenuItem<string>[] = [
     { title: "View on Canvas", value: "focus" },
+    { title: "View Details", value: "isolate" },
     { title: "Open in Figma", value: "open-in-figma" },
   ];
 
@@ -376,12 +378,15 @@ function SceneCard(
     (value: string) => {
       switch (value) {
         case "focus": {
-          enterNode(props.scene.id);
+          focusNodeOnCanvas(props.scene.id);
           break;
+        }
+        case "isolate": {
+          isolateNode(props.scene.id);
         }
       }
     },
-    [enterNode, props.scene.id]
+    [focusNodeOnCanvas, isolateNode, props.scene.id]
   );
 
   return (
