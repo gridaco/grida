@@ -55,7 +55,7 @@ export function Dashboard() {
   const headerActions = [
     {
       id: "sections/unfold-all",
-      label: "Unfold All Sections",
+      label: "Expand All Sections",
       handler: unfoldAll,
     },
     {
