@@ -2,11 +2,29 @@ import React from "react";
 import styled from "@emotion/styled";
 
 export const IconButton = React.forwardRef(function (
-  { children, ...props }: React.PropsWithChildren<{}>,
+  {
+    children,
+    outline,
+    onClick,
+    disabled,
+    ...props
+  }: React.PropsWithChildren<{
+    outline?: React.CSSProperties["outline"];
+    onClick?: React.MouseEventHandler<HTMLButtonElement>;
+    disabled?: boolean;
+  }>,
   ref: React.Ref<HTMLButtonElement>
 ) {
   return (
-    <IconButtonContainer ref={ref} {...props}>
+    <IconButtonContainer
+      ref={ref}
+      onClick={onClick}
+      disabled={disabled}
+      {...props}
+      style={{
+        outline,
+      }}
+    >
       {children}
     </IconButtonContainer>
   );
@@ -33,5 +51,10 @@ const IconButtonContainer = styled.button`
 
   &:focus {
     outline: 1px solid rgba(255, 255, 255, 0.5);
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
   }
 `;
