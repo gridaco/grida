@@ -4,6 +4,7 @@ import { ReflectSceneNode } from "@design-sdk/figma-node";
 import { visualize_node } from "@code-editor/devtools/components/visualization";
 import { JsonTree } from "@code-editor/devtools/components/visualization/json-visualization/json-tree";
 import { useReflectTargetNode } from "../../query/from-figma";
+import { TreeNode } from "@code-editor/devtools/components/visualization/node-visualization";
 
 export default function FigmaToReflectNodePage() {
   //
@@ -37,9 +38,9 @@ function nodeToTreeVisualData(node: ReflectSceneNode): visualize_node.TreeNode {
     return fullName.slice(0, 40);
   };
 
-  let _visualizedChildren;
+  let _visualizedChildren: TreeNode[] | undefined;
   if ("children" in node) {
-    _visualizedChildren = (node as any).children.map((c) => {
+    _visualizedChildren = node.children.map((c) => {
       return nodeToTreeVisualData(c);
     });
   }
