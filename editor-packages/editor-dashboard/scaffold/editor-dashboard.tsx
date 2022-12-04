@@ -8,6 +8,8 @@ import {
   DashboardItemCardProps,
   DASHBOARD_ITEM_CARD_SELECTOR,
   DASHBOARD_ITEM_PATH_ATTRIBUTE,
+  AuxilaryDashbaordGridPlacementGuide,
+  AuxilaryGridDropGuideLeftOrRightSpecification,
 } from "../components";
 import { EditorHomeHeader } from "./editor-dashboard-header";
 import { DndProvider, useDrag, useDrop } from "react-dnd";
@@ -31,13 +33,15 @@ export function Dashboard() {
     hierarchyFoldings,
     filter,
     dispatch,
-    enterNode,
+    focusNodeOnCanvas: enterNode,
+    // isolateNode: enterNode,
     selectNode,
     blurSelection,
     fold,
     unfold,
     foldAll,
     unfoldAll,
+    mkdir,
     selection,
   } = useDashboard();
 
@@ -51,13 +55,21 @@ export function Dashboard() {
   const headerActions = [
     {
       id: "sections/unfold-all",
-      label: "Unfold All Sections",
+      label: "Expand All Sections",
       handler: unfoldAll,
     },
     {
       id: "sections/fold-all",
       label: "Fold All Section",
       handler: foldAll,
+    },
+    {
+      id: "sections/new",
+      label: "New Folder",
+      handler: () => {
+        // TODO:
+        mkdir("/");
+      },
     },
   ];
 
@@ -75,7 +87,7 @@ export function Dashboard() {
         {hierarchy.sections.map((section, i) => {
           const { name, contents } = section;
           return (
-            <RootDirectory
+            <Directory
               key={i}
               path={section.path}
               label={name}
@@ -98,7 +110,7 @@ export function Dashboard() {
           );
         })}
 
-        <RootDirectory
+        <Directory
           label="Components"
           path={"/components"}
           contents={hierarchy.components}
@@ -110,7 +122,7 @@ export function Dashboard() {
           onEnter={enterNode}
           headerActions={headerActions}
         />
-        <Selecto
+        {/* <Selecto
           container={document.querySelector("#selection-container")}
           dragContainer={document.querySelector("#selection-container")}
           selectableTargets={[DASHBOARD_ITEM_CARD_SELECTOR]}
@@ -138,13 +150,13 @@ export function Dashboard() {
               selectNode(selection.filter((p) => p !== id));
             });
           }}
-        />
+        /> */}
       </div>
     </Providers>
   );
 }
 
-function RootDirectory({
+function Directory({
   label,
   contents,
   query,
@@ -171,7 +183,7 @@ function RootDirectory({
 }) {
   return (
     <div style={{ marginBottom: 32 }}>
-      <RootDirectoryContextMenuProvider cwd={path} disabled>
+      <RootDirectoryContextMenuProvider cwd={path}>
         <Collapsible.Root open={expanded} onOpenChange={onExpandChange}>
           <SectionHeader
             id={path}
@@ -183,19 +195,20 @@ function RootDirectory({
           <Collapsible.Content>
             <SceneGrid onClick={onBlur}>
               {contents.map((i) => (
-                <DashboardItemCard
-                  key={i.id}
-                  q={query}
-                  {...i}
-                  selected={selections.includes(i.id)}
-                  onClick={(e) => {
-                    onSelect(i.id);
-                    e.stopPropagation();
-                  }}
-                  onDoubleClick={() => {
-                    onEnter(i.id);
-                  }}
-                />
+                <DashboardItemCardWrapper key={i.id}>
+                  <DashboardItemCard
+                    q={query}
+                    {...i}
+                    selected={selections.includes(i.id)}
+                    onClick={(e) => {
+                      onSelect(i.id);
+                      e.stopPropagation();
+                    }}
+                    onDoubleClick={() => {
+                      onEnter(i.id);
+                    }}
+                  />
+                </DashboardItemCardWrapper>
               ))}
             </SceneGrid>
           </Collapsible.Content>
@@ -256,6 +269,48 @@ type DndMetaItem<T = object> = T & {
   $type: DashboardItem["$type"];
 };
 
+function DashboardItemCardWrapper({ children }: React.PropsWithChildren<{}>) {
+  return (
+    <div
+      style={{
+        position: "relative",
+      }}
+    >
+      <PlacementGuide left />
+      {children}
+      <PlacementGuide right />
+    </div>
+  );
+}
+
+function PlacementGuide({
+  ...props
+}: AuxilaryGridDropGuideLeftOrRightSpecification) {
+  const [{ isActive }, drop] = useDrop(() => ({
+    accept: "scene",
+    collect: (monitor) => ({
+      isActive: monitor.canDrop() && monitor.isOver(),
+    }),
+    canDrop(item: DndMetaItem, monitor) {
+      return true;
+    },
+    drop(item, monitor) {
+      console.log("drop", item, monitor);
+      // todo:
+    },
+  }));
+
+  // TODO: add on click handler with new-section command
+
+  return (
+    <AuxilaryDashbaordGridPlacementGuide
+      ref={drop}
+      {...props}
+      over={isActive}
+    />
+  );
+}
+
 function DashboardItemCard(
   props: DashboardItem &
     Omit<DashboardItemCardProps, "label" | "preview" | "icon">
@@ -277,6 +332,8 @@ function DashboardItemCard(
 function SceneCard(
   props: SceneItem & Omit<DashboardItemCardProps, "label" | "preview" | "icon">
 ) {
+  const { isolateNode, focusNodeOnCanvas } = useDashboard();
+
   const [{ isActive }, drop] = useDrop(() => ({
     accept: "scene",
     collect: (monitor) => ({
@@ -311,14 +368,39 @@ function SceneCard(
     style: { opacity },
   };
 
+  const items: MenuItem<string>[] = [
+    { title: "View on Canvas", value: "focus" },
+    { title: "View Details", value: "isolate" },
+    { title: "Open in Figma", value: "open-in-figma" },
+  ];
+
+  const onContextSelect = useCallback(
+    (value: string) => {
+      switch (value) {
+        case "focus": {
+          focusNodeOnCanvas(props.scene.id);
+          break;
+        }
+        case "isolate": {
+          isolateNode(props.scene.id);
+        }
+      }
+    },
+    [focusNodeOnCanvas, isolateNode, props.scene.id]
+  );
+
   return (
-    <_SceneCard
-      // @ts-ignore
-      scene={props.scene as any}
-      ref={attachRef}
-      {...defaultprops}
-      {...props}
-    />
+    <ContextMenu items={items} onSelect={onContextSelect}>
+      <div>
+        <_SceneCard
+          // @ts-ignore
+          scene={props.scene as any}
+          ref={attachRef}
+          {...defaultprops}
+          {...props}
+        />
+      </div>
+    </ContextMenu>
   );
 }
 

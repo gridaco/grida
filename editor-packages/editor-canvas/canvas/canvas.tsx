@@ -35,6 +35,7 @@ import {
   MenuItem,
 } from "@editor-ui/context-menu";
 import styled from "@emotion/styled";
+import toast from "react-hot-toast";
 
 interface CanvasState {
   pageid: string;
@@ -44,6 +45,10 @@ interface CanvasState {
   highlightedLayer?: string;
   selectedNodes: string[];
   readonly?: boolean;
+  /**
+   * displays the debug info on the canvas.
+   */
+  debug?: boolean;
   /**
    * when provided, it will override the saved value or centering logic and use this transform as initial instead.
    *
@@ -101,6 +106,10 @@ const default_canvas_preferences: CanvsPreferences = {
 
 type CanvasProps = CanvasFocusProps &
   CanvasCursorOptions & {
+    /**
+     * canvas view bound.
+     * [(x1) left, (y1) top, (x2) right, (y2) bottom]
+     */
     viewbound: Box;
     onSelectNode?: (...node: ReflectSceneNode[]) => void;
     onMoveNodeStart?: (...node: string[]) => void;
@@ -158,6 +167,7 @@ export function Canvas({
   initialTransform,
   highlightedLayer,
   selectedNodes,
+  debug,
   readonly = true,
   config = default_canvas_preferences,
   backgroundColor,
@@ -225,7 +235,9 @@ export function Canvas({
     setZoom(_focus_center.scale);
   }, [...focus, focusRefreshKey, viewboundmeasured]);
 
-  const [transformIntitialized, setTransformInitialized] = useState(false);
+  const [transformIntitialized, setTransformInitialized] = useState(
+    !!initialTransform
+  );
   const [zoom, setZoom] = useState(initialTransform?.scale || 1);
   const [isZooming, setIsZooming] = useState(false);
   const [offset, setOffset] = useState<[number, number]>(
@@ -429,19 +441,25 @@ export function Canvas({
       onMoveNode?.([dx / zoom, dy / zoom], ...selectedNodes);
     }
 
-    if (marquee) {
-      const [w, h] = [
-        x1 - marquee[0], // w
-        y1 - marquee[1], // h
-      ];
-      setMarquee([marquee[0], marquee[1], w, h]);
-    }
+    if (config.marquee.disabled) {
+      // skip
+    } else {
+      // edge scrolling
+      // edge scrolling is only enabled when config#marquee is enabled
+      const [cx, cy] = [x, y];
+      const [dx, dy] = edge_scrolling(cx, cy, viewbound);
+      if (dx || dy) {
+        setOffset([ox + dx, oy + dy]);
+      }
 
-    // edge scrolling
-    const [cx, cy] = [x, y];
-    const [dx, dy] = edge_scrolling(cx, cy, viewbound);
-    if (dx || dy) {
-      setOffset([ox + dx, oy + dy]);
+      // update marquee & following selections via effect
+      if (marquee) {
+        const [w, h] = [
+          x1 - marquee[0], // w
+          y1 - marquee[1], // h
+        ];
+        setMarquee([marquee[0], marquee[1], w, h]);
+      }
     }
   };
 
@@ -504,11 +522,35 @@ export function Canvas({
   return (
     <>
       <>
+        {debug === true && (
+          <Debug
+            infos={[
+              { label: "zoom", value: zoom },
+              { label: "offset", value: offset.join(", ") },
+              { label: "isPanning", value: isPanning },
+              { label: "isZooming", value: isZooming },
+              { label: "isDragging", value: isDragging },
+              { label: "isMovingSelections", value: isMovingSelections },
+              { label: "isTransforming", value: is_canvas_transforming },
+              { label: "selectedNodes", value: selectedNodes.join(", ") },
+              { label: "hoveringLayer", value: hoveringLayer?.node?.id },
+              { label: "marquee", value: marquee?.join(", ") },
+              { label: "viewbound", value: viewbound.join(", ") },
+              {
+                label: "initial-transform (xy)",
+                value: initialTransform ? initialTransform.xy.join(", ") : null,
+              },
+              {
+                label: "initial-transform (zoom)",
+                value: initialTransform ? initialTransform.scale : null,
+              },
+            ]}
+          />
+        )}
         {/* <ContextMenuProvider> */}
         <Container
-        // todo: viewbound not accurate.
-        // width={viewbound[2] - viewbound[0]}
-        // height={viewbound[3] - viewbound[1]}
+          width={viewbound[2] - viewbound[0]}
+          height={viewbound[3] - viewbound[1]}
         >
           <CanvasEventTarget
             onPanning={onPanning}
@@ -524,6 +566,7 @@ export function Canvas({
               // const newoffset = zoomToFit(viewbound, offset, zoom, 1);
               // setOffset(newoffset);
               _canvas_state_store.saveLastTransform(cvtransform);
+              toast("Zoom to 100%");
             }}
             onZooming={onZooming}
             onZoomingStart={() => {
@@ -585,12 +628,10 @@ export function Canvas({
   );
 }
 
-const Container = styled.div`
-  min-width: 240px;
-  min-height: 240px;
+const Container = styled.div<{ width: number; height: number }>`
+  /* width: ${(p) => p.width}px; */
+  /* height: ${(p) => p.height}px; */
 `;
-/* width: ${(p) => p.width}px; */
-/* height: ${(p) => p.height}px; */
 
 /**
  * 1. container positioning guide (static per selection)
@@ -713,9 +754,10 @@ function DisableBackdropFilter({ children }: { children: React.ReactNode }) {
 function CanvasBackground({ backgroundColor }: { backgroundColor?: string }) {
   return (
     <div
+      id="canvas-background"
       style={{
         zIndex: -2,
-        position: "fixed",
+        position: "absolute",
         top: 0,
         left: 0,
         width: "100%",
@@ -786,3 +828,39 @@ const viewbound_not_measured = (viewbound: Box) => {
       viewbound[3] === 0)
   );
 };
+
+function Debug({
+  infos,
+}: {
+  infos: { label: string; value: string | number | boolean }[];
+}) {
+  return (
+    <DebugInfoContainer>
+      {infos.map(({ label, value }, i) => {
+        if (value === undefined || value === null) {
+          return <></>;
+        }
+        return (
+          <div key={i}>
+            {label}: {JSON.stringify(value)}
+          </div>
+        );
+      })}
+    </DebugInfoContainer>
+  );
+}
+
+const DebugInfoContainer = styled.div`
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  z-index: 9999;
+  background: rgba(0, 0, 0, 0.5);
+  border-radius: 4px;
+  color: white;
+  padding: 0.5rem;
+  font-size: 0.8rem;
+  font-family: monospace;
+  line-height: 1.2;
+  white-space: pre;
+`;

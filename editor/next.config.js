@@ -2,6 +2,7 @@ const IS_DEV = process.env.NODE_ENV === "development";
 
 const packages = [
   // region @editor-app
+  "@code-editor/ui",
   "@editor-app/live-session",
   "@code-editor/preview-pip", // TODO: remove me. this is for development. for production, use npm ver instead.
   "@code-editor/devtools",
@@ -9,6 +10,7 @@ const packages = [
   "@code-editor/property",
   "@code-editor/preferences",
   "@code-editor/dashboard",
+  "@code-editor/isolated-inspection",
   "@code-editor/node-icons",
   "@code-editor/canvas-renderer-bitmap",
   // "@code-editor/shortcuts",

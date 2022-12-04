@@ -16,11 +16,13 @@ export function FrameTitleRenderer({
   selected,
   onHoverChange,
   onSelect,
+  onDoubleClick,
   onRunClick,
   runnable = false,
 }: FrameTitleProps & {
   runnable?: boolean;
-  onRunClick: () => void;
+  onRunClick?: () => void;
+  onDoubleClick?: () => void;
 }) {
   const [x, y] = xy;
   const [w, h] = wh;
@@ -54,6 +56,7 @@ export function FrameTitleRenderer({
         <SelectedStatePrimaryAction onClick={onRunClick} />
       )}
       <FrameTitleLabel
+        onDoubleClick={onDoubleClick}
         color={
           selected || highlight || hoverred
             ? color_frame_title.highlight

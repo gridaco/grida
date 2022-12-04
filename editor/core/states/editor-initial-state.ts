@@ -5,10 +5,13 @@ export function createInitialEditorState(editor: EditorSnapshot): EditorState {
     pages: editor.pages,
     selectedPage: editor.selectedPage,
     selectedNodes: editor.selectedNodes,
-    focus: {
-      refreshkey: "initial",
-      nodes: editor.selectedNodes,
-    }, // auto focus to selection
+    canvas: {
+      focus: {
+        refreshkey: "initial",
+        nodes: editor.selectedNodes,
+      }, // auto focus to selection
+    },
+    isolation: editor.isolation,
     selectedNodesInitial: editor.selectedNodes,
     selectedLayersOnPreview: editor.selectedLayersOnPreview,
     design: editor.design,
@@ -24,9 +27,15 @@ export function createPendingEditorState(): EditorState {
     pages: [],
     selectedPage: null,
     selectedNodes: [],
-    focus: {
-      refreshkey: "initial",
-      nodes: [],
+    canvas: {
+      focus: {
+        refreshkey: "initial",
+        nodes: [],
+      },
+    },
+    isolation: {
+      isolated: false,
+      node: null,
     },
     selectedNodesInitial: null,
     selectedLayersOnPreview: [],

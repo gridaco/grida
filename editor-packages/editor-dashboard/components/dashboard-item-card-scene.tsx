@@ -7,6 +7,8 @@ import {
   DashboardItemCardProps,
 } from "./dashboard-item-card";
 
+const MAX_WIDTH = 240;
+
 type SceneMeta = {
   id: string;
   filekey: string;
@@ -34,6 +36,7 @@ function SceneCardPreview({
   return (
     <div
       ref={visibilityRef}
+      className="scale-on-over"
       style={{
         height: height * scale,
         width: maxWidth,
@@ -79,7 +82,7 @@ export const SceneCard = React.forwardRef(function (
       {...props}
       label={scene.name}
       icon={<SceneNodeIcon type={scene.type} color="white" />}
-      preview={<SceneCardPreview scene={scene} maxWidth={300} />}
+      preview={<SceneCardPreview scene={scene} maxWidth={MAX_WIDTH} />}
     />
   );
 });

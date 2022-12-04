@@ -63,6 +63,11 @@ export function centerOf(
     vbcenter[1] - boxcenter[1] * scale,
   ];
 
+  // apply viewbound's offset to the translate.
+  // (this works, but not fully tested)
+  translate[0] -= viewbound[0];
+  translate[1] -= viewbound[1];
+
   return {
     box: box,
     center: boxcenter,

@@ -83,7 +83,17 @@ export function useDashboard() {
     [editordispatch]
   );
 
-  const enterNode = useCallback(
+  const isolateNode = useCallback(
+    (node: string) => {
+      editordispatch({
+        type: "design/enter-isolation",
+        node,
+      });
+    },
+    [editordispatch]
+  );
+
+  const focusNodeOnCanvas = useCallback(
     (node: string) => {
       editordispatch({
         type: "canvas/focus",
@@ -163,7 +173,8 @@ export function useDashboard() {
     selection: editorState.selectedNodes,
     dispatch,
     selectNode,
-    enterNode,
+    focusNodeOnCanvas,
+    isolateNode,
     blurSelection,
     foldAll,
     unfoldAll,

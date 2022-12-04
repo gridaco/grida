@@ -19,6 +19,7 @@ export function CodeInitialTemplateProvider({
 
   useEffect(() => {
     if (result) {
+      console.info("triggering initial seed");
       dispath({
         type: "coding/initial-seed",
         // todo:

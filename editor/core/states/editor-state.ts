@@ -39,7 +39,10 @@ export interface EditorState {
   pages: EditorPage[];
   selectedPage: string;
   selectedNodes: string[];
-  focus: CanvasFocusData;
+  canvas: {
+    focus: CanvasFocusData;
+  };
+  isolation: NodeIsolationData;
   selectedLayersOnPreview: string[];
   /**
    * this is the initial node selection triggered by the url param, not caused by the user interaction.
@@ -63,6 +66,7 @@ export interface EditorSnapshot {
   selectedLayersOnPreview: string[];
   selectedNodesInitial?: string[] | null;
   design: FigmaReflectRepository;
+  isolation: NodeIsolationData;
   code: CodeRepository;
   canvasMode: EditorState["canvasMode"];
 }
@@ -103,6 +107,11 @@ export type CanvasFocusData = {
   refreshkey: string;
   nodes: string[];
 };
+
+export interface NodeIsolationData {
+  isolated: boolean;
+  node: string;
+}
 
 export type ScenePreviewData =
   | IScenePreviewDataVanillaPreview

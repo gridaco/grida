@@ -33,6 +33,8 @@ export type Action =
   | SelectNodeAction
   | CanvasFocusNodeAction
   | HighlightNodeAction
+  | EnterIsolatedInspectionAction
+  | ExitIsolatedInspectionAction
   | CanvasEditAction
   | CanvasModeAction
   | PreviewAction
@@ -89,6 +91,15 @@ export interface TranslateNodeAction {
   type: "node-transform-translate";
   translate: [number, number];
   node: string[];
+}
+
+export interface EnterIsolatedInspectionAction {
+  type: "design/enter-isolation";
+  node: string;
+}
+
+export interface ExitIsolatedInspectionAction {
+  type: "design/exit-isolation";
 }
 
 export type PageAction = SelectPageAction;

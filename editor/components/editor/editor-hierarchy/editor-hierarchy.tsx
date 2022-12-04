@@ -6,7 +6,12 @@ import { DashboardHierarchy } from "@code-editor/dashboard";
 
 export function EditorHierarchy() {
   const [state] = useEditorState();
-  const { selectedPage, pages } = state;
+  const { selectedPage, pages, isolation } = state;
+
+  if (isolation.isolated) {
+    return <DesignLayerHierarchy rootNodeIDs={[isolation.node]} expandAll />;
+  }
+
   const page = pages.find((p) => p.id == selectedPage);
 
   switch (page?.type) {
