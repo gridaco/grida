@@ -183,7 +183,6 @@ function VisualContentArea() {
         renderItem={renderItem}
         renderFrameTitle={() => <></>}
         readonly
-        debug
         config={{
           can_highlight_selected_layer: true,
           marquee: {
@@ -208,6 +207,7 @@ const CanvasContainer = styled.div`
 
 /**
  * This only supports root frame at the moment.
+ * partof: nodeQ
  * @param node
  * @param design
  * @returns
