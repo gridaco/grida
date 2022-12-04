@@ -35,6 +35,7 @@ import {
   MenuItem,
 } from "@editor-ui/context-menu";
 import styled from "@emotion/styled";
+import toast from "react-hot-toast";
 
 interface CanvasState {
   pageid: string;
@@ -565,6 +566,7 @@ export function Canvas({
               // const newoffset = zoomToFit(viewbound, offset, zoom, 1);
               // setOffset(newoffset);
               _canvas_state_store.saveLastTransform(cvtransform);
+              toast("Zoom to 100%");
             }}
             onZooming={onZooming}
             onZoomingStart={() => {
