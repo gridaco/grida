@@ -57,13 +57,12 @@ function ImageFillNodeAssetView({ node: target }: { node: ReflectSceneNode }) {
   useEffect(() => {
     if (target) {
       const images = target.fills
-        .filter(Boolean)
-        .filter((f) => f.visible)
-        .filter((f) => f.type === "IMAGE")
-        .reverse()
-        .map((f: ImagePaint) => {
-          return f.imageHash;
-        });
+        ?.flatMap((fill => {
+          if (!!fill && fill.visible && fill.type === "IMAGE") {
+            return fill.imageHash || []
+          }
+          return [];
+        })).reverse() || []
 
       service.fetch(images, { debounce: false, ensure: true }).then((data) => {
         setSrcs(Object.values(data));
