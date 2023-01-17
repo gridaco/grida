@@ -141,7 +141,7 @@ export function DesignLayerHierarchy({
  */
 function findUnder(node: string, design: FigmaReflectRepository) {
   for (const page of design.pages) {
-    for (const frame of page.children) {
+    for (const frame of page.children.filter(Boolean)) {
       if (frame.id === node) {
         return frame;
       }

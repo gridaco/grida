@@ -214,7 +214,7 @@ const CanvasContainer = styled.div`
  */
 function findUnder(node: string, design: FigmaReflectRepository) {
   for (const page of design.pages) {
-    for (const frame of page.children) {
+    for (const frame of page.children.filter(Boolean)) {
       if (frame.id === node) {
         return frame;
       }
@@ -224,7 +224,7 @@ function findUnder(node: string, design: FigmaReflectRepository) {
 
 function findShifted(node: string, design: FigmaReflectRepository, shift = 0) {
   for (const page of design.pages) {
-    for (let i = 0; i < page.children.length; i++) {
+    for (let i = 0; i < page.children.filter(Boolean).length; i++) {
       const frame = page.children[i];
       if (frame.id === node) {
         return page.children[i + shift];
