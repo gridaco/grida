@@ -16,11 +16,43 @@ import { copy } from "utils/clipboard";
 import styled from "@emotion/styled";
 import { GearIcon, CodeIcon } from "@radix-ui/react-icons";
 import { useOpenPreferences, usePreferences } from "@code-editor/preferences";
+import { colors } from "theme";
+
+/**
+ * a debounced state for hiding the monaco view, since it blinks after loading
+ */
+function useExtraLoading(result: Result | null, delay = 800) {
+  const [loading, setLoading] = useState(true);
+
+  // set loading to false after delay, if result is givven.
+  useEffect(() => {
+    if (!result?.code) {
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      setLoading(false);
+    }, delay);
+
+    return () => {
+      clearTimeout(timer);
+    };
+  }, [result?.code]);
+
+  // reset loading to true on result change.
+  useEffect(() => {
+    setLoading(true);
+  }, [result?.code]);
+
+  return loading;
+}
 
 export function CodeSection() {
   const { config: preferences } = usePreferences();
   const { target, root } = useTargetContainer();
   const [result, setResult] = useState<Result>(null);
+  const loading = useExtraLoading(result);
+
   const dispatch = useDispatch();
 
   const on_result = (result: Result) => {
@@ -82,42 +114,63 @@ export function CodeSection() {
         </div>
       </PropertyGroupHeader>
       <CliIntegrationSnippet node={target} />
-      {code ? (
-        <>
-          <MonacoEditor
-            readonly
-            width={"100%"}
-            value={code.raw}
-            height={viewheight}
-            fold_comments_on_load
-            path={dummy_file_name_map[preferences.framework.framework]}
-            options={{
-              lineNumbers: "off",
-              glyphMargin: false,
-              minimap: { enabled: false },
-              showFoldingControls: "mouseover",
-              guides: {
-                indentation: false,
-                highlightActiveIndentation: false,
-              },
-            }}
-          />
-        </>
-      ) : (
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "center",
-            alignItems: "center",
-            height: viewheight,
-          }}
-        >
+      <CodeView
+        style={{
+          height: viewheight,
+        }}
+      >
+        <div className="loading-overlay" data-loading={loading}>
           <CircularProgress size={24} />
         </div>
-      )}
+        <MonacoEditor
+          readonly
+          width={"100%"}
+          value={code?.raw ?? ""}
+          height={"100%"}
+          fold_comments_on_load
+          path={dummy_file_name_map[preferences.framework.framework]}
+          options={{
+            lineNumbers: "off",
+            glyphMargin: false,
+            minimap: { enabled: false },
+            showFoldingControls: "mouseover",
+            guides: {
+              indentation: false,
+              highlightActiveIndentation: false,
+            },
+          }}
+        />
+      </CodeView>
     </PropertyGroup>
   );
 }
+
+const CodeView = styled.div`
+  position: relative;
+
+  .loading-overlay {
+    user-select: none;
+    pointer-events: none;
+    background-color: ${colors.color_editor_bg_on_dark};
+    position: absolute;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100%;
+    width: 100%;
+    z-index: 9;
+    opacity: 1;
+
+    &[data-loading="false"] {
+      opacity: 0;
+      transition: opacity 0.2s ease-in-out;
+    }
+
+    &[data-loading="true"] {
+      opacity: 1;
+    }
+  }
+`;
 
 const dummy_file_name_map = {
   flutter: "main.dart",

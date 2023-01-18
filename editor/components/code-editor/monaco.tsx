@@ -101,7 +101,7 @@ export function MonacoEditor({ path, ...props }: MonacoEditorProps) {
           // if change is caused by formatter, ignore.
           return;
         }
-        props.onChange(...v);
+        props.onChange?.(...v);
       }}
       options={{
         ...props.options,

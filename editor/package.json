@@ -29,6 +29,7 @@
     "@mui/material": "^5.6.1",
     "@radix-ui/react-toast": "^1.1.1",
     "@reflect-blocks/figma-embed": "^0.0.5",
+    "@tree-/q": "^0.0.0",
     "@use-gesture/react": "^10.2.11",
     "@visx/gradient": "^1.7.0",
     "@visx/group": "^1.7.0",
