@@ -16,11 +16,15 @@ import {
   FlattenedDisplayItemNode,
 } from "./editor-layer-heriarchy-controller";
 import type { ReflectSceneNode } from "@design-sdk/figma-node";
+import type { IVirtualizedList } from "@editor-ui/listview";
+import useMeasure from "react-use-measure";
 
 // TODO:
 // - add navigate context menu
 // - add go to main component
-// - add reveal and focus to selected layers
+// - add expand and focus to selected layers
+//    - expand
+//    - ✅ focus (scroll to)
 
 /**
  *
@@ -35,12 +39,17 @@ export function DesignLayerHierarchy({
   rootNodeIDs?: string[];
   expandAll?: boolean;
 }) {
+  const [sizeRef, { height, width }] = useMeasure({
+    debounce: { scroll: 100, resize: 100 },
+  });
   const [state] = useEditorState();
   const { selectedNodes, selectedPage, design } = state;
   const { highlightLayer, highlightedLayer } = useWorkspace();
   const dispatch = useDispatch();
 
   const [expands, setExpands] = useState<string[]>(state?.selectedNodes ?? []);
+
+  const ref = React.useRef<IVirtualizedList>(null);
 
   // get the root nodes (if the rootNodeIDs is not specified, use the selected page's children)
   let roots: ReflectSceneNode[] = [];
@@ -122,14 +131,39 @@ export function DesignLayerHierarchy({
     [dispatch, selectedNodes, layers, expands, highlightedLayer]
   );
 
+  useEffect(() => {
+    // auto focus to selection
+    const focusnode = selectedNodes[0];
+    if (focusnode) {
+      const index = layers.flat().findIndex((i) => i.id == focusnode);
+      if (index) {
+        ref.current?.scrollToIndex(index);
+      }
+    }
+  }, [ref, selectedNodes]);
+
   return (
-    <TreeView.Root
-      data={layers.flat()}
-      keyExtractor={useCallback((item: any) => item.id, [])}
-      renderItem={renderItem}
-    />
+    <div
+      style={{
+        width: "100%",
+        height: "100%",
+      }}
+      ref={sizeRef}
+    >
+      <TreeView.Root
+        ref={ref}
+        data={layers.flat()}
+        keyExtractor={useCallback((item: any) => item.id, [])}
+        renderItem={renderItem}
+        scrollable
+        expandable
+        virtualized={{
+          width: width,
+          height: height,
+        }}
+      />
+    </div>
   );
-  //
 }
 
 /**
