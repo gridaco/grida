@@ -1,4 +1,10 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useState,
+} from "react";
 import { TreeView } from "@editor-ui/editor";
 import {
   LayerRow,
@@ -23,10 +29,6 @@ import { p } from "@tree-/q";
 // TODO:
 // - add navigate context menu
 // - add go to main component
-// - add expand and focus to selected layers
-//    - ✅ expand
-//    - ✅ focus (scroll to)
-//    - 🚫 expand & focus (scroll to)
 
 function useAutoFocus({
   ref,
@@ -37,7 +39,9 @@ function useAutoFocus({
   targets: string[];
   layers: FlattenedDisplayItemNode[][];
 }) {
-  useEffect(() => {
+  // TODO: we use useLayoutEffect to focus to the selection, because it relates to auto expand & layer calculation.
+  // this can be simplified. and we can use plain old useEffect.
+  useLayoutEffect(() => {
     // auto focus to selection
     const focusnode = targets[0];
     if (focusnode) {
@@ -46,7 +50,7 @@ function useAutoFocus({
         ref.current?.scrollToIndex(index);
       }
     }
-  }, [ref, targets]);
+  }, [ref, targets, layers]);
 }
 
 /**
