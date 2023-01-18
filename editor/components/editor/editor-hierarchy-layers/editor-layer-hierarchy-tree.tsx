@@ -18,13 +18,36 @@ import {
 import type { ReflectSceneNode } from "@design-sdk/figma-node";
 import type { IVirtualizedList } from "@editor-ui/listview";
 import useMeasure from "react-use-measure";
+import { p } from "@tree-/q";
 
 // TODO:
 // - add navigate context menu
 // - add go to main component
 // - add expand and focus to selected layers
-//    - expand
+//    - ✅ expand
 //    - ✅ focus (scroll to)
+//    - 🚫 expand & focus (scroll to)
+
+function useAutoFocus({
+  ref,
+  layers,
+  targets,
+}: {
+  ref: React.RefObject<IVirtualizedList>;
+  targets: string[];
+  layers: FlattenedDisplayItemNode[][];
+}) {
+  useEffect(() => {
+    // auto focus to selection
+    const focusnode = targets[0];
+    if (focusnode) {
+      const index = layers.flat().findIndex((i) => i.id == focusnode);
+      if (index) {
+        ref.current?.scrollToIndex(index);
+      }
+    }
+  }, [ref, targets]);
+}
 
 /**
  *
@@ -72,6 +95,13 @@ export function DesignLayerHierarchy({
       : [];
   }, [roots, state?.selectedNodes, expands]);
 
+  useAutoFocus({
+    ref,
+    layers,
+    targets: selectedNodes,
+  });
+
+  // exapnd all nodes
   useEffect(() => {
     if (expandAll) {
       const ids = layers.reduce((acc, item) => {
@@ -81,6 +111,26 @@ export function DesignLayerHierarchy({
       setExpands(ids);
     }
   }, [layers, expandAll]);
+
+  // automatically expand the selected nodes' parents
+  useEffect(() => {
+    const newexpands = [];
+
+    // loop through all roots
+    for (const child of roots) {
+      // if the node contains the selected node, add to expands.
+      selectedNodes.forEach((id) => {
+        const path = p(id, { data: child });
+        if (path.length > 0) {
+          newexpands.push(...path);
+        }
+      });
+    }
+
+    setExpands(
+      Array.from(new Set([...expands, ...newexpands])).filter(Boolean)
+    );
+  }, [selectedNodes]);
 
   const renderItem = useCallback(
     ({
@@ -130,17 +180,6 @@ export function DesignLayerHierarchy({
     },
     [dispatch, selectedNodes, layers, expands, highlightedLayer]
   );
-
-  useEffect(() => {
-    // auto focus to selection
-    const focusnode = selectedNodes[0];
-    if (focusnode) {
-      const index = layers.flat().findIndex((i) => i.id == focusnode);
-      if (index) {
-        ref.current?.scrollToIndex(index);
-      }
-    }
-  }, [ref, selectedNodes]);
 
   return (
     <div
