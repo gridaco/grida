@@ -125,7 +125,7 @@ export function CodeSection() {
         <MonacoEditor
           readonly
           width={"100%"}
-          value={code?.raw}
+          value={code?.raw ?? ""}
           height={"100%"}
           fold_comments_on_load
           path={dummy_file_name_map[preferences.framework.framework]}
