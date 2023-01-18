@@ -28,6 +28,7 @@ import q from "@design-sdk/query";
 import assert from "assert";
 import { getPageNode } from "utils/get-target-node";
 import { nanoid } from "nanoid";
+import { last_page_by_mode } from "core/stores";
 
 const _editor_path_name = "/files/[key]/";
 
@@ -57,10 +58,9 @@ export function editorReducer(state: EditorState, action: Action): EditorState {
           };
 
           if (target === "design") {
-            // todo: this should be a last selection as well, not index 0.
-            draft.selectedPage = state.pages.find(
-              (p) => p.type === "figma-canvas"
-            ).id;
+            draft.selectedPage =
+              last_page_by_mode.get(target) ||
+              state.pages.find((p) => p.type === "figma-canvas").id;
           }
         });
       } else {
@@ -78,10 +78,9 @@ export function editorReducer(state: EditorState, action: Action): EditorState {
             case "design": {
               // if previous mode was somehing else.
               if (state.mode.value !== "design") {
-                // todo: this should be a last selection as well, not index 0.
-                draft.selectedPage = state.pages.find(
-                  (p) => p.type === "figma-canvas"
-                ).id;
+                draft.selectedPage =
+                  last_page_by_mode.get(mode) ||
+                  state.pages.find((p) => p.type === "figma-canvas").id;
                 break;
               }
             }
@@ -473,6 +472,8 @@ const reducers = {
 
       const last_known_selections_of_this_page =
         _canvas_state_store.getLastSelection() ?? [];
+
+      last_page_by_mode.set(state.mode.value, pageid);
       draft.selectedPage = pageid;
       draft.selectedNodes = last_known_selections_of_this_page;
 
