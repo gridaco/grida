@@ -31,14 +31,15 @@ function SceneCardPreview({
 
   // max allowed zoom = 1
   const scale = Math.min(maxWidth / scene.width, 1);
-  const { height, type } = scene;
+  const { height: h, type } = scene;
+  const height = h * scale; // fixme: this is somethimes NaN
 
   return (
     <div
       ref={visibilityRef}
       className="scale-on-over"
       style={{
-        height: height * scale,
+        height: isNaN(height) ? "auto" : height,
         width: maxWidth,
       }}
     >
