@@ -15,7 +15,7 @@ import type { DashboardFolderItem, DashboardState } from "./state";
 
 export function reducer(state: DashboardState, action: Action): DashboardState {
   switch (action.type) {
-    case "hierarchy/new-section": {
+    case "fsv/new-section": {
       const { name } = <NewSectionAction>action;
       return produce(state, (draft) => {
         draft.hierarchy.sections.push({
@@ -37,7 +37,7 @@ export function reducer(state: DashboardState, action: Action): DashboardState {
       });
     }
 
-    case "hierarchy/mkdir": {
+    case "fsv/mkdir": {
       const { cwd: dirname, name: seedname } = <MakeDirAction>action;
       return produce(state, (draft) => {
         const dir = draft.hierarchy.sections.find((s) => s.path === dirname);
@@ -61,7 +61,7 @@ export function reducer(state: DashboardState, action: Action): DashboardState {
       });
     }
 
-    case "hierarchy/mv": {
+    case "fsv/mv": {
       const { source, dest } = <MoveAction>action;
 
       console.log("move", source, dest);
@@ -98,14 +98,14 @@ export function reducer(state: DashboardState, action: Action): DashboardState {
       });
     }
 
-    case "hierarchy/fold": {
+    case "fsv/fold": {
       const { path } = <FoldAction>action;
       return produce(state, (draft) => {
         draft.hierarchyFoldings.push(path);
       });
     }
 
-    case "hierarchy/unfold": {
+    case "fsv/unfold": {
       const { path } = <UnfoldAction>action;
       return produce(state, (draft) => {
         draft.hierarchyFoldings = draft.hierarchyFoldings.filter(
@@ -114,14 +114,14 @@ export function reducer(state: DashboardState, action: Action): DashboardState {
       });
     }
 
-    case "hierarchy/fold-all": {
+    case "fsv/fold-all": {
       const {} = <FoldAllAction>action;
       return produce(state, (draft) => {
         draft.hierarchyFoldings = state.hierarchy.sections.map((s) => s.path);
       });
     }
 
-    case "hierarchy/unfold-all": {
+    case "fsv/unfold-all": {
       const {} = <UnfoldAllAction>action;
       return produce(state, (draft) => {
         draft.hierarchyFoldings.length = 0;

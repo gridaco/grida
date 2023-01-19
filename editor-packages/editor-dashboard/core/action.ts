@@ -9,7 +9,7 @@ export type Action =
 export type ActionTypes = Action["type"];
 
 export type NewSectionAction = {
-  type: "hierarchy/new-section";
+  type: "fsv/new-section";
   name: string;
 };
 
@@ -19,7 +19,7 @@ export type FilterAction = {
 };
 
 export type MakeDirAction = {
-  type: "hierarchy/mkdir";
+  type: "fsv/mkdir";
   cwd: string;
   /**
    * name of the directory. if non provided, it will automatically assign a name like "Untitled 1"
@@ -28,7 +28,7 @@ export type MakeDirAction = {
 };
 
 export type MoveAction = {
-  type: "hierarchy/mv";
+  type: "fsv/mv";
   source: string[];
   dest: string;
 };
@@ -36,21 +36,21 @@ export type MoveAction = {
 export type FoldUnfoldAllAction = FoldAllAction | UnfoldAllAction;
 
 export type FoldAllAction = {
-  type: "hierarchy/fold-all";
+  type: "fsv/fold-all";
 };
 
 export type UnfoldAllAction = {
-  type: "hierarchy/unfold-all";
+  type: "fsv/unfold-all";
 };
 
 export type FoldUnfoldAction = FoldAction | UnfoldAction;
 
 export type FoldAction = {
-  type: "hierarchy/fold";
+  type: "fsv/fold";
   path: string;
 };
 
 export type UnfoldAction = {
-  type: "hierarchy/unfold";
+  type: "fsv/unfold";
   path: string;
 };

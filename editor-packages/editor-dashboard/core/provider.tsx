@@ -116,20 +116,20 @@ export function useDashboard() {
 
   const foldAll = useCallback(() => {
     dispatch({
-      type: "hierarchy/fold-all",
+      type: "fsv/fold-all",
     });
   }, [dispatch]);
 
   const unfoldAll = useCallback(() => {
     dispatch({
-      type: "hierarchy/unfold-all",
+      type: "fsv/unfold-all",
     });
   }, [dispatch]);
 
   const fold = useCallback(
     (path: string) => {
       dispatch({
-        type: "hierarchy/fold",
+        type: "fsv/fold",
         path,
       });
     },
@@ -139,7 +139,7 @@ export function useDashboard() {
   const unfold = useCallback(
     (path: string) => {
       dispatch({
-        type: "hierarchy/unfold",
+        type: "fsv/unfold",
         path,
       });
     },
@@ -149,7 +149,7 @@ export function useDashboard() {
   const mkdir = useCallback(
     (cwd: string, name?: string) => {
       dispatch({
-        type: "hierarchy/mkdir",
+        type: "fsv/mkdir",
         cwd,
         name,
       });
@@ -160,7 +160,7 @@ export function useDashboard() {
   const mv = useCallback(
     (src: string[], dst: string) => {
       dispatch({
-        type: "hierarchy/mv",
+        type: "fsv/mv",
         source: src,
         dest: dst,
       });
