@@ -471,7 +471,7 @@ class FlutterDaemon {
     return FlutterDaemon.project;
   }
 
-  async save(content) {
+  async save(content: string) {
     await FlutterDaemon.project.writeFile("lib/main.dart", content, true);
   }
 
