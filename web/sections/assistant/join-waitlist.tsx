@@ -26,6 +26,12 @@ const CardWrapper = styled.div`
   justify-content: center;
   text-align: center;
 
+  background-image: url("_/assistant/featured-cta-background.png");
+  background-repeat: no-repeat;
+  background-position: right;
+  background-size: 600px;
+
+  max-height: 600px;
   padding: 160px 80px;
 
   background-color: white;

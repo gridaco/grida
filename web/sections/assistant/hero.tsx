@@ -1,10 +1,17 @@
 import styled from "@emotion/styled";
 import React from "react";
+import Image from "next/image";
 import { FigmaLogoIcon, GitHubLogoIcon } from "@radix-ui/react-icons";
 
 export function HeroSection() {
   return (
     <HeroWrapper>
+      {/* <Image
+        className="background"
+        src="/_/assistant/hero-background.png"
+        width={1100}
+        height={1100}
+      /> */}
       <span className="scribble">Early Access</span>
       <h1>
         Your Figma
@@ -22,9 +29,21 @@ export function HeroSection() {
 
 const HeroWrapper = styled.div`
   padding: 240px 40px;
+  min-height: 1100px;
 
-  /* tmp */
-  background-color: black;
+  .background {
+    position: absolute;
+    z-index: -1;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  } /* tmp */
+  background-image: url("/_/assistant/hero-background.png");
+  background-size: 1100px;
+  background-position: center;
+  background-repeat: no-repeat;
 
   color: white !important;
   display: flex;
