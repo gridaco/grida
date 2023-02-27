@@ -29,13 +29,6 @@ const nextconfig = {
         destination: "/",
         permanent: false,
       },
-      // redirecting docs to docs/getting-started since docs main page is not yet implemented.
-      {
-        source: "/assistant",
-        destination:
-          "https://www.figma.com/community/plugin/896445082033423994",
-        permanent: false,
-      },
       {
         source: "/code",
         destination: "https://code.grida.co",
