@@ -26,7 +26,7 @@ export function JoinWithCodeSection() {
             marginTop: 24,
           }}
         >
-          <input placeholder="000000" style={{ width: 140 }} />
+          <input id="totp" placeholder="000000" style={{ width: 140 }} />
           <button className="primary">Enter</button>
         </form>
         <div
@@ -35,7 +35,7 @@ export function JoinWithCodeSection() {
           }}
         >
           <Link href="/assistant">
-            <a>Not a member yet?</a>
+            <a>Not Invited yet?</a>
           </Link>
         </div>
       </FeaturedCard>

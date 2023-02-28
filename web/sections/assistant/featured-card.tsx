@@ -80,7 +80,7 @@ export const FeaturedCard = styled.div`
     border-radius: 4px;
     padding: 10px 16px;
     box-sizing: border-box;
-    color: rgba(0, 0, 0, 0.5);
+    color: rgba(0, 0, 0, 0.8);
     font-size: 18px;
     font-family: "Roboto Mono", sans-serif;
     font-weight: 400;

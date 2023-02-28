@@ -18,7 +18,9 @@ export function JoinWaitlistSection() {
           Join our waitlist for the full access.
         </p>
         <div style={{ marginTop: 24 }}>
-          <button className="primary">Join the waitlist</button>
+          <a href="https://forms.gle/82jRrbopnSBLDw568">
+            <button className="primary">Join the waitlist</button>
+          </a>
         </div>
       </FeaturedCard>
     </div>

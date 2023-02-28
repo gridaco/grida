@@ -1,7 +1,12 @@
+import LandingpageText from "components/landingpage/text";
 import PricingCard from "components/pricing-card";
+import { useRouter } from "next/router";
 import React from "react";
+import { Flex } from "theme-ui";
 
 export function PricingSection() {
+  const router = useRouter();
+
   return (
     <div
       style={{
@@ -12,7 +17,26 @@ export function PricingSection() {
         alignItems: "center",
       }}
     >
-      <h1>Pricing</h1>
+      <Flex
+        style={{
+          flexDirection: "column",
+          maxWidth: 400,
+          textAlign: "center",
+          gap: 16,
+          marginBottom: 40,
+        }}
+      >
+        <LandingpageText variant="h2">Pricing</LandingpageText>
+        <p
+          style={{
+            maxWidth: 320,
+            textAlign: "center",
+          }}
+        >
+          *Assistant Earlybird aceess is only available to invited users at this
+          moment.
+        </p>
+      </Flex>
       <div>
         <PricingCard
           features={[
@@ -29,6 +53,8 @@ export function PricingSection() {
           normal={15}
           price={9}
           onStart={() => {
+            // move to invited page
+            router.push("/assistant/invited");
             //
           }}
           action={"Start Free Trial"}

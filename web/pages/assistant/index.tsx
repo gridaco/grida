@@ -17,7 +17,9 @@ export default function AssistantLandingpage() {
       <main>
         <HeroSection />
         <JoinWaitlistSection />
+        <div style={{ height: 210 }} />
         <PricingSection />
+        <div style={{ height: 160 }} />
       </main>
     </>
   );
