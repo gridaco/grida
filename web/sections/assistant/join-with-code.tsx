@@ -3,6 +3,8 @@ import React from "react";
 import { FeaturedCard } from "./featured-card";
 
 export function JoinWithCodeSection() {
+  const [verified, setVerified] = React.useState(false);
+
   return (
     <div
       id="start"
@@ -18,27 +20,53 @@ export function JoinWithCodeSection() {
           <br />
           private beta program
         </h2>
-        <p>Please enter the OTP from Google Authenticator app to continue.</p>
-        <form
-          style={{
-            display: "flex",
-            flexDirection: "row",
-            gap: 8,
-            marginTop: 24,
-          }}
-        >
-          <input id="totp" placeholder="000000" style={{ width: 140 }} />
-          <button className="primary">Enter</button>
-        </form>
-        <div
-          style={{
-            marginTop: 80,
-          }}
-        >
-          <Link href="/assistant#join-the-waitlist">
-            <a>Not Invited yet?</a>
-          </Link>
-        </div>
+        {verified ? (
+          <>
+            <a href="https://docs.google.com/forms/d/e/1FAIpQLSfcv2k1oddtM30nCN7xCE_dAw41ZhagzBEAtEuVLuOXKziJlQ/viewform?usp=sf_link">
+              <button className="primary">Start your subscription</button>
+            </a>
+          </>
+        ) : (
+          <>
+            <p>
+              Please enter the OTP from Google Authenticator app to continue.
+            </p>
+            <form
+              onSubmit={e => {
+                e.preventDefault();
+                const totp = e.target["totp"].value;
+                // TODO: add a server side check
+                if (totp.length == 6) {
+                  setVerified(true);
+                }
+              }}
+              style={{
+                display: "flex",
+                flexDirection: "row",
+                gap: 8,
+                marginTop: 24,
+              }}
+            >
+              <input
+                id="totp"
+                minLength={6}
+                maxLength={6}
+                placeholder="000000"
+                style={{ width: 140 }}
+              />
+              <button className="primary">Enter</button>
+            </form>
+            <div
+              style={{
+                marginTop: 80,
+              }}
+            >
+              <Link href="/assistant#join-the-waitlist">
+                <a>Not Invited yet?</a>
+              </Link>
+            </div>
+          </>
+        )}
       </FeaturedCard>
     </div>
   );
