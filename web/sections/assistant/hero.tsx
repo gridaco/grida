@@ -15,12 +15,18 @@ const stats_manually_updated = {
 export function HeroSection() {
   return (
     <HeroWrapper>
-      {/* <Image
-        className="background"
-        src="/_/assistant/hero-background.png"
-        width={1100}
-        height={1100}
-      /> */}
+      <div className="background" style={{ width: 1100 }}>
+        <Image
+          layout="fill"
+          src="/_/assistant/hero-background.png"
+          placeholder="blur"
+          width={1100}
+          height={1100}
+          objectFit="cover"
+          objectPosition="center"
+        />
+      </div>
+
       <span className="scribble">Early Access</span>
       <h1>
         Your Figma
@@ -37,22 +43,22 @@ export function HeroSection() {
 }
 
 const HeroWrapper = styled.div`
+  position: relative;
   padding: 240px 40px;
   min-height: 1100px;
 
   .background {
-    position: absolute;
     z-index: -1;
-    top: 0;
-    left: 0;
-    width: 100%;
+    -webkit-user-drag: none;
+    -khtml-user-drag: none;
+    -moz-user-drag: none;
+    -o-user-drag: none;
+    pointer-events: none;
+    user-select: none;
+    position: absolute;
     height: 100%;
-    object-fit: cover;
-  } /* tmp */
-  background-image: url("/_/assistant/hero-background.png");
-  background-size: 1100px;
-  background-position: center;
-  background-repeat: no-repeat;
+    overflow: hidden;
+  }
 
   color: white !important;
   display: flex;
