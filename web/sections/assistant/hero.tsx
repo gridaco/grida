@@ -3,6 +3,7 @@ import React from "react";
 import Image from "next/image";
 import { FigmaLogoIcon, GitHubLogoIcon } from "@radix-ui/react-icons";
 import Link from "next/link";
+import herobackground from "../../public/_/assistant/hero-background.png";
 
 const figma_plugin_url =
   "https://www.figma.com/community/plugin/896445082033423994";
@@ -18,7 +19,7 @@ export function HeroSection() {
       <div className="background" style={{ width: 1100 }}>
         <Image
           layout="fill"
-          src="/_/assistant/hero-background.png"
+          src={herobackground}
           placeholder="blur"
           width={1100}
           height={1100}
