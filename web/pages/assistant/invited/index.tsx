@@ -8,7 +8,7 @@ export default function AssistantInvitedPage() {
   return (
     <>
       <Head>
-        <title>Grida Assistant</title>
+        <title>Grida Assistant Early bird</title>
       </Head>
       <main>
         <HeroSection />
