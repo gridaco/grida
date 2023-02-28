@@ -3,10 +3,10 @@ import styled from "@emotion/styled";
 import Icon from "components/icon";
 import LandingpageText from "components/landingpage/text";
 import { Button, Flex, Text } from "theme-ui";
-import { usePopupContext } from "utils/context/PopupContext";
 import { media } from "utils/styled/media";
 
 function PricingCard({
+  normal,
   price,
   features,
   unitDescription,
@@ -19,6 +19,7 @@ function PricingCard({
   features: string[];
   name: string;
   unitDescription?: string;
+  normal?: number;
   price:
     | {
         monthly: number;
@@ -30,8 +31,6 @@ function PricingCard({
   highlight?: boolean;
   action: React.ReactNode;
 }) {
-  const { addPopup, removePopup } = usePopupContext();
-
   const targetprice = typeof price === "number" ? price : price.yearly;
   const monthlyprice = typeof price === "number" ? price : price.monthly;
 
@@ -43,7 +42,12 @@ function PricingCard({
           <Icon className="cursor" name="questionMark" onClick={onHelp} />
         )}
       </Heading>
-      <PlanPricing>
+      <PlanPricing style={{ gap: 4 }}>
+        {normal && (
+          <LandingpageText strikeThrough variant="h4" opacity={0.4}>
+            ${normal}
+          </LandingpageText>
+        )}
         <LandingpageText variant="h4">${targetprice}</LandingpageText>
         {unitDescription && <Seat variant="body1">{unitDescription}</Seat>}
       </PlanPricing>
