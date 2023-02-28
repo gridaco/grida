@@ -5,6 +5,7 @@ import { FeaturedCard } from "./featured-card";
 export function JoinWithCodeSection() {
   return (
     <div
+      id="start"
       style={{
         display: "flex",
         padding: "40px",
@@ -34,7 +35,7 @@ export function JoinWithCodeSection() {
             marginTop: 80,
           }}
         >
-          <Link href="/assistant">
+          <Link href="/assistant#join-the-waitlist">
             <a>Not Invited yet?</a>
           </Link>
         </div>

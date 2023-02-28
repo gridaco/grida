@@ -54,7 +54,7 @@ export function PricingSection() {
           price={9}
           onStart={() => {
             // move to invited page
-            router.push("/assistant/invited");
+            router.push("/assistant/invited#start");
             //
           }}
           action={"Start Free Trial"}

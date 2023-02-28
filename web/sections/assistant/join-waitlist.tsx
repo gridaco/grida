@@ -1,10 +1,10 @@
-import styled from "@emotion/styled";
 import React from "react";
 import { FeaturedCard } from "./featured-card";
 
 export function JoinWaitlistSection() {
   return (
     <div
+      id="join-the-waitlist"
       style={{
         display: "flex",
         padding: "40px",
