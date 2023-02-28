@@ -12,7 +12,9 @@ export default function AssistantInvitedPage() {
       </Head>
       <main>
         <HeroSection />
-        <JoinWithCodeSection />
+        <div style={{ position: "relative", top: -240 }}>
+          <JoinWithCodeSection />
+        </div>
       </main>
     </>
   );

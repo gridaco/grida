@@ -73,4 +73,24 @@ export const FeaturedCard = styled.div`
     background-color: rgba(0, 0, 0, 0.9);
     color: white;
   }
+
+  input {
+    background-color: rgba(0, 0, 0, 0.02);
+    border: solid 1px rgba(0, 0, 0, 0.04);
+    border-radius: 4px;
+    padding: 10px 16px;
+    box-sizing: border-box;
+    color: rgba(0, 0, 0, 0.5);
+    font-size: 18px;
+    font-family: "Roboto Mono", sans-serif;
+    font-weight: 400;
+    text-align: start;
+
+    ::placeholder {
+      color: rgba(0, 0, 0, 0.5);
+      font-size: 18px;
+      font-family: "Roboto Mono", sans-serif;
+      font-weight: 400;
+    }
+  }
 `;

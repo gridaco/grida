@@ -26,7 +26,11 @@ export function PricingSection() {
             "Many more in Toolbox",
           ]}
           name={""}
+          normal={15}
           price={9}
+          onStart={() => {
+            //
+          }}
           action={"Start Free Trial"}
         />
       </div>

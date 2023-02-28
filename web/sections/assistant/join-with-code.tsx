@@ -1,3 +1,4 @@
+import Link from "next/link";
 import React from "react";
 import { FeaturedCard } from "./featured-card";
 
@@ -16,11 +17,27 @@ export function JoinWithCodeSection() {
           <br />
           private beta program
         </h2>
-        <p>
-          From the Authenticator App, please enter your one-time-password to
-          continue.
-        </p>
-        <button className="primary">Register</button>
+        <p>Please enter the OTP from Google Authenticator app to continue.</p>
+        <form
+          style={{
+            display: "flex",
+            flexDirection: "row",
+            gap: 8,
+            marginTop: 24,
+          }}
+        >
+          <input placeholder="000000" style={{ width: 140 }} />
+          <button className="primary">Enter</button>
+        </form>
+        <div
+          style={{
+            marginTop: 80,
+          }}
+        >
+          <Link href="/assistant">
+            <a>Not a member yet?</a>
+          </Link>
+        </div>
       </FeaturedCard>
     </div>
   );
