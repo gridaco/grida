@@ -2,6 +2,12 @@ import styled from "@emotion/styled";
 import React from "react";
 import Image from "next/image";
 import { FigmaLogoIcon, GitHubLogoIcon } from "@radix-ui/react-icons";
+import Link from "next/link";
+
+const stats_manually_updated = {
+  github_stars: 400,
+  installs: "8K",
+};
 
 export function HeroSection() {
   return (
@@ -78,12 +84,18 @@ const HeroWrapper = styled.div`
 function InstallOnFigmaAsButton() {
   return (
     <RootWrapperInstallOnFigmaAsButton>
+      <FigmaLogoIcon />
       Install on Figma
     </RootWrapperInstallOnFigmaAsButton>
   );
 }
 
 const RootWrapperInstallOnFigmaAsButton = styled.button`
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+
   box-shadow: 0px 4px 16px 0px rgba(0, 0, 0, 0.04);
   background-color: rgba(255, 255, 255, 0.1);
   border: solid 1px white;
@@ -115,14 +127,21 @@ const RootWrapperInstallOnFigmaAsButton = styled.button`
 function Stats() {
   return (
     <RootWrapperStats>
-      <Item>
-        <GitHubLogoIcon />
-        <Label>430 Stars</Label>
-      </Item>
-      <Item>
-        <FigmaLogoIcon />
-        <Label>10K Installs</Label>
-      </Item>
+      <Link target="_blank" href="https://github.com/gridaco/assistant">
+        <Item>
+          <GitHubLogoIcon />
+          <Label>{stats_manually_updated.github_stars} Stars</Label>
+        </Item>
+      </Link>
+      <Link
+        target="_blank"
+        href="https://www.figma.com/community/plugin/896445082033423994/"
+      >
+        <Item>
+          <FigmaLogoIcon />
+          <Label>{stats_manually_updated.installs} Installs</Label>
+        </Item>
+      </Link>
     </RootWrapperStats>
   );
 }
@@ -138,6 +157,7 @@ const RootWrapperStats = styled.div`
 `;
 
 const Item = styled.div`
+  cursor: pointer;
   display: flex;
   justify-content: flex-start;
   flex-direction: row;

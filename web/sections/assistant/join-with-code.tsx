@@ -20,7 +20,7 @@ export function JoinWithCodeSection() {
           From the Authenticator App, please enter your one-time-password to
           continue.
         </p>
-        <button>Register</button>
+        <button className="primary">Register</button>
       </FeaturedCard>
     </div>
   );

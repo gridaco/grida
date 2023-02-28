@@ -15,6 +15,7 @@ export const FeaturedCard = styled.div`
   background-size: 600px;
 
   max-height: 600px;
+  max-width: 1200px;
   padding: 160px 80px;
 
   background-color: white;
@@ -40,5 +41,36 @@ export const FeaturedCard = styled.div`
   p {
     font-size: 18px;
     max-width: 400px;
+  }
+
+  button {
+    border-radius: 4px;
+    padding: 10px 16px;
+    font-size: 18px;
+    font-family: "Roboto Mono", sans-serif;
+    font-weight: 500;
+    border: none;
+    outline: none;
+    cursor: pointer;
+
+    :hover {
+      opacity: 0.8;
+    }
+
+    :disabled {
+      opacity: 0.5;
+    }
+
+    :active {
+      opacity: 1;
+    }
+
+    :focus {
+    }
+  }
+
+  button.primary {
+    background-color: rgba(0, 0, 0, 0.9);
+    color: white;
   }
 `;

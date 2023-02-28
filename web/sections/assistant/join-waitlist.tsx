@@ -13,7 +13,13 @@ export function JoinWaitlistSection() {
     >
       <FeaturedCard>
         <h1>Join the waitlist</h1>
-        <button>Register</button>
+        <p>
+          AI Powered Assistant is available to invited users at this moment.
+          Join our waitlist for the full access.
+        </p>
+        <div style={{ marginTop: 24 }}>
+          <button className="primary">Join the waitlist</button>
+        </div>
       </FeaturedCard>
     </div>
   );
