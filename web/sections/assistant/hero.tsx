@@ -4,6 +4,9 @@ import Image from "next/image";
 import { FigmaLogoIcon, GitHubLogoIcon } from "@radix-ui/react-icons";
 import Link from "next/link";
 
+const figma_plugin_url =
+  "https://www.figma.com/community/plugin/896445082033423994";
+
 const stats_manually_updated = {
   github_stars: 400,
   installs: "8K",
@@ -83,10 +86,12 @@ const HeroWrapper = styled.div`
 
 function InstallOnFigmaAsButton() {
   return (
-    <RootWrapperInstallOnFigmaAsButton>
-      <FigmaLogoIcon />
-      Install on Figma
-    </RootWrapperInstallOnFigmaAsButton>
+    <a target="_blank" href={figma_plugin_url}>
+      <RootWrapperInstallOnFigmaAsButton>
+        <FigmaLogoIcon />
+        Install on Figma
+      </RootWrapperInstallOnFigmaAsButton>
+    </a>
   );
 }
 
