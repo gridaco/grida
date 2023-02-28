@@ -1,6 +1,8 @@
 import React from "react";
 import Head from "next/head";
 import { getPageTranslations } from "utils/i18n";
+import { HeroSection } from "sections/assistant/hero";
+import { JoinWithCodeSection } from "sections/assistant/join-with-code";
 
 export default function AssistantInvitedPage() {
   return (
@@ -8,7 +10,10 @@ export default function AssistantInvitedPage() {
       <Head>
         <title>Grida Assistant</title>
       </Head>
-      <main>Hi</main>
+      <main>
+        <HeroSection />
+        <JoinWithCodeSection />
+      </main>
     </>
   );
 }

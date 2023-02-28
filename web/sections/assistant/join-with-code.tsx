@@ -1,8 +1,7 @@
-import styled from "@emotion/styled";
 import React from "react";
 import { FeaturedCard } from "./featured-card";
 
-export function JoinWaitlistSection() {
+export function JoinWithCodeSection() {
   return (
     <div
       style={{
@@ -12,7 +11,15 @@ export function JoinWaitlistSection() {
       }}
     >
       <FeaturedCard>
-        <h1>Join the waitlist</h1>
+        <h2>
+          Welcome to our
+          <br />
+          private beta program
+        </h2>
+        <p>
+          From the Authenticator App, please enter your one-time-password to
+          continue.
+        </p>
         <button>Register</button>
       </FeaturedCard>
     </div>
