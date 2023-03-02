@@ -84,7 +84,8 @@ export function LogosSection() {
         ))}
       </LogosContainer>
       <div className="cta">
-        <Link href="/contact/sales">
+        {/* TODO: update to /contact/sales */}
+        <Link href="https://calendly.com/universe-at-grida/meet-grida">
           <button>
             Contact Sales
             <ArrowRightIcon />
