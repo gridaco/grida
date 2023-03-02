@@ -12,9 +12,13 @@ export default function LandingpageText({
   className,
   fontWeight,
   fontFamily,
+  opacity = 1,
+  strikeThrough = false,
 }: {
   variant: "h1" | "h2" | "h4" | "body1";
   color?: string;
+  opacity?: number;
+  strikeThrough?: boolean;
   fontWeight?: React.CSSProperties["fontWeight"];
   fontFamily?: React.CSSProperties["fontFamily"];
   className?: string;
@@ -35,6 +39,8 @@ export default function LandingpageText({
           as="h1"
           className={className}
           sx={{
+            textDecoration: strikeThrough ? "line-through" : "none",
+            opacity,
             textAlign: textAlign,
             fontSize: h1FontSizes,
             letterSpacing: "-0.03em",
@@ -53,7 +59,9 @@ export default function LandingpageText({
           as="h2"
           className={className}
           sx={{
+            textDecoration: strikeThrough ? "line-through" : "none",
             textAlign: textAlign,
+            opacity,
             fontSize: h2FontSizes,
             letterSpacing: "0em",
             lineHeight: "98.1%",
@@ -71,6 +79,8 @@ export default function LandingpageText({
           as="h4"
           className={className}
           sx={{
+            textDecoration: strikeThrough ? "line-through" : "none",
+            opacity,
             letterSpacing: "0em",
             color: color,
             textAlign: textAlign,
@@ -88,6 +98,8 @@ export default function LandingpageText({
           as="p"
           className={className}
           sx={{
+            textDecoration: strikeThrough ? "line-through" : "none",
+            opacity,
             lineHeight: "38px",
             letterSpacing: "0em",
             color: color ?? "#444545",

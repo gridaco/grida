@@ -2084,6 +2084,11 @@
   resolved "https://registry.yarnpkg.com/@protobufjs/utf8/-/utf8-1.1.0.tgz#a777360b5b39a1a2e5106f8e858f2fd2d060c570"
   integrity sha512-Vvn3zZrhQZkkBE8LSuW3em98c0FwgO4nxzv6OdSxPKJIEKY2bGbHn+mhGIPerzI4twdxaP8/0+06HBpwf345Lw==
 
+"@radix-ui/react-icons@^1.2.0":
+  version "1.2.0"
+  resolved "https://registry.yarnpkg.com/@radix-ui/react-icons/-/react-icons-1.2.0.tgz#aec2b19e84a9997617fbbe0863c8e78ee870dbfa"
+  integrity sha512-NqrZxn+Ig6c6MypUt84/Nab9WBFXH75T1mhEhFjPlIYaNkp113pqlo6QdK5r7zb3b7RckDAPgUQACes0aKwcFA==
+
 "@samverschueren/stream-to-observable@^0.3.0":
   version "0.3.1"
   resolved "https://registry.yarnpkg.com/@samverschueren/stream-to-observable/-/stream-to-observable-0.3.1.tgz#a21117b19ee9be70c379ec1877537ef2e1c63301"
