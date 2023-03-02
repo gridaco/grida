@@ -41,6 +41,9 @@ export const FeaturedCard = styled.div`
   p {
     font-size: 18px;
     max-width: 400px;
+    opacity: 0.7;
+    margin-top: 16px;
+    margin-bottom: 24px;
   }
 
   button {

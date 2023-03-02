@@ -28,9 +28,7 @@ export function JoinWithCodeSection() {
           </>
         ) : (
           <>
-            <p>
-              Please enter the OTP from Google Authenticator app to continue.
-            </p>
+            <p>Enter the OTP from Google Authenticator to continue.</p>
             <form
               onSubmit={e => {
                 e.preventDefault();
