@@ -13,7 +13,7 @@ export default function GlobalizationUnimitYourStoryTellingSection() {
       <Flex style={{ width: "100%" }}>
         <Flex style={{ width: "50%" }}>
           <Image
-            src="https://via.placeholder.com/1440"
+            src="https://via.placeholder.com/1440.png"
             height="480px"
             width="100%"
           />

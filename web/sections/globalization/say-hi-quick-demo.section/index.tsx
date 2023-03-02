@@ -20,7 +20,7 @@ export default function GlobalizationQuickDemoSayHiSection() {
         {/* todo: sizing */}
         <Image
           loading="eager"
-          src="https://via.placeholder.com/1440"
+          src="https://via.placeholder.com/1440.png"
           height="800px"
           width="100%"
         />
