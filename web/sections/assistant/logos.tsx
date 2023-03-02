@@ -73,7 +73,13 @@ export function LogosSection() {
       <LogosContainer>
         {logos.map(({ src, alt, width, secondary }) => (
           <div key={src} className={"logo" + (secondary ? " secondary" : "")}>
-            <Image src={src} alt={alt} height={40} width={width} />
+            <Image
+              loading="eager"
+              src={src}
+              alt={alt}
+              height={40}
+              width={width}
+            />
           </div>
         ))}
       </LogosContainer>
