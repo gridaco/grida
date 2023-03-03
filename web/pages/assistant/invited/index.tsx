@@ -3,6 +3,7 @@ import Head from "next/head";
 import { getPageTranslations } from "utils/i18n";
 import { HeroSection } from "sections/assistant/hero";
 import { JoinWithCodeSection } from "sections/assistant/join-with-code";
+import { LogosSection } from "sections/assistant/logos";
 
 export default function AssistantInvitedPage() {
   return (
@@ -15,6 +16,8 @@ export default function AssistantInvitedPage() {
         <div style={{ position: "relative", top: -240 }}>
           <JoinWithCodeSection />
         </div>
+        <LogosSection />
+        <div style={{ height: 240 }} />
       </main>
     </>
   );
