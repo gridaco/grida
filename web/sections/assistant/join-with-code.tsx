@@ -21,11 +21,11 @@ export function JoinWithCodeSection() {
           private beta program
         </h2>
         {verified ? (
-          <>
+          <div className="cta">
             <a href="https://docs.google.com/forms/d/e/1FAIpQLSfcv2k1oddtM30nCN7xCE_dAw41ZhagzBEAtEuVLuOXKziJlQ/viewform?usp=sf_link">
               <button className="primary">Start your subscription</button>
             </a>
-          </>
+          </div>
         ) : (
           <>
             <p>Enter the OTP from Google Authenticator to continue.</p>
