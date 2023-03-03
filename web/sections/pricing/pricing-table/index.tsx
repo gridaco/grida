@@ -93,6 +93,7 @@ export default function PlanList() {
         style={{
           width: "100%",
           alignItems: "center",
+          gap: 40,
         }}
         sx={{
           justifyContent: ["space-between", "center", "center", "center"],

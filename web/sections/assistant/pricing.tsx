@@ -38,7 +38,11 @@ export function PricingSection() {
           moment.
         </p>
       </Flex>
-      <div>
+      <div
+        style={{
+          marginTop: 40,
+        }}
+      >
         <PricingCard
           features={[
             "7 Day free trial",
@@ -62,6 +66,9 @@ export function PricingSection() {
             //
           }}
           action={"Start Free Trial"}
+          style={{
+            minWidth: 360,
+          }}
         />
       </div>
     </div>

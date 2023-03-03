@@ -16,6 +16,7 @@ function PricingCard({
   onStart,
   highlight = false,
   action,
+  style = {},
 }: {
   features: string[];
   name: string;
@@ -32,13 +33,14 @@ function PricingCard({
   onStart?: () => void;
   highlight?: boolean;
   action: React.ReactNode;
+  style?: React.CSSProperties;
 }) {
   const targetprice = typeof price === "number" ? price : price.yearly;
   const monthlyprice = typeof price === "number" ? price : price.monthly;
   const hasAnnualPromotion = typeof price === "number" ? false : !!price.yearly;
 
   return (
-    <Wrapper data-highlight={highlight}>
+    <Wrapper data-highlight={highlight} style={style}>
       <Heading>
         <LandingpageText variant="h4">{name}</LandingpageText>
         {onHelp && (
@@ -93,7 +95,6 @@ export default PricingCard;
 
 const Wrapper = styled(Flex)`
   border-radius: 8px;
-  margin: 27px;
   padding: 40px;
   flex-direction: column;
 

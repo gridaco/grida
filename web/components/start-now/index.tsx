@@ -33,7 +33,7 @@ const StartNow: React.FC = () => {
     <Card
       style={{
         width: "100%",
-        height: "368px",
+        minHeight: "368px",
       }}
       sx={{
         flexDirection: ["column", "row", "row", "row"],
@@ -45,6 +45,7 @@ const StartNow: React.FC = () => {
           width: ["100%", "50%", "50%", "50%"],
         }}
         style={{
+          padding: 24,
           alignItems: "center",
           justifyContent: "center",
         }}
@@ -83,6 +84,7 @@ const StartNow: React.FC = () => {
           width: ["100%", "50%", "50%", "50%"],
         }}
         style={{
+          padding: 24,
           flexDirection: "column",
           alignItems: "center",
           justifyContent: "center",
