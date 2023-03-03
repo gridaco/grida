@@ -44,6 +44,7 @@ export function HeroSection() {
 }
 
 const HeroWrapper = styled.div`
+  overflow: hidden;
   position: relative;
   padding: 240px 40px;
   min-height: 1100px;
