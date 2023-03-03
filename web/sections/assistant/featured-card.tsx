@@ -1,4 +1,3 @@
-import { css } from "@emotion/react";
 import styled from "@emotion/styled";
 
 export const FeaturedCard = styled.div`
@@ -29,6 +28,10 @@ export const FeaturedCard = styled.div`
     font-family: "Helvetica Neue", sans-serif;
     font-weight: 700;
     line-height: 95%;
+
+    @media screen and (max-width: 768px) {
+      font-size: 40px;
+    }
   }
 
   h2 {
