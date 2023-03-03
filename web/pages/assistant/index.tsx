@@ -11,6 +11,10 @@ export default function AssistantLandingpage() {
     <>
       <Head>
         <title>Grida Assistant</title>
+        <meta
+          name="description"
+          content="Your AI Powered Figma Assistant - Join the waitlist now"
+        />
       </Head>
       <main>
         <HeroSection />
