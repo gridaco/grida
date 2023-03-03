@@ -30,6 +30,7 @@ export function JoinWithCodeSection() {
           <>
             <p>Enter the OTP from Google Authenticator to continue.</p>
             <form
+              className="cta"
               onSubmit={e => {
                 e.preventDefault();
                 const totp = e.target["totp"].value;

@@ -84,8 +84,7 @@ export function LogosSection() {
         ))}
       </LogosContainer>
       <div className="cta">
-        {/* TODO: update to /contact/sales */}
-        <Link href="https://calendly.com/universe-at-grida/meet-grida">
+        <Link href="/contact/sales">
           <button>
             Contact Sales
             <ArrowRightIcon />
@@ -105,6 +104,9 @@ const Layout = styled.div`
   max-width: 1200px;
 
   .cta {
+    display: flex;
+    flex-direction: row;
+    gap: 16px;
     font-size: 16px;
     margin-top: 32px;
     button {

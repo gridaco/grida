@@ -1,5 +1,7 @@
 import React from "react";
 import { FeaturedCard } from "./featured-card";
+import Link from "next/link";
+import { ArrowRightIcon } from "@radix-ui/react-icons";
 
 export function JoinWaitlistSection() {
   return (
@@ -17,10 +19,16 @@ export function JoinWaitlistSection() {
           AI Powered Assistant is available to invited users at this moment.
           Join our waitlist for the full access.
         </p>
-        <div style={{ marginTop: 24 }}>
-          <a href="https://forms.gle/82jRrbopnSBLDw568">
+        <div className="cta" style={{ marginTop: 24 }}>
+          <Link href="https://forms.gle/82jRrbopnSBLDw568">
             <button className="primary">Join the waitlist</button>
-          </a>
+          </Link>
+          <Link href="https://calendly.com/universe-at-grida/meet-grida">
+            <button>
+              Book a Demo
+              <ArrowRightIcon />
+            </button>
+          </Link>
         </div>
       </FeaturedCard>
     </div>
