@@ -1,3 +1,4 @@
+import styled from "@emotion/styled";
 import LandingpageText from "components/landingpage/text";
 import PricingCard from "components/pricing-card";
 import { useRouter } from "next/router";
@@ -50,7 +51,10 @@ export function PricingSection() {
             "Many more in Toolbox",
           ]}
           name={""}
+          highlight
+          description={<SpecialBadge>Early bird offer - Save 40%</SpecialBadge>}
           normal={15}
+          unitDescription={"per month"}
           price={9}
           onStart={() => {
             // move to invited page
@@ -63,3 +67,24 @@ export function PricingSection() {
     </div>
   );
 }
+
+const SpecialBadge = styled.div`
+  margin: 8px 0;
+  align-self: flex-start;
+  display: flex;
+  justify-content: flex-start;
+  flex-direction: row;
+  align-items: flex-start;
+  flex: none;
+  gap: 10px;
+  border-radius: 8px;
+  background-color: rgba(37, 98, 255, 0.16);
+  box-sizing: border-box;
+  padding: 10px;
+
+  /* text */
+  color: rgb(37, 98, 255);
+  font-size: 14px;
+  font-family: Inter, sans-serif;
+  font-weight: 800;
+`;

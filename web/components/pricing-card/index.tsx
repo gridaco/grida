@@ -1,6 +1,6 @@
 import React from "react";
 import styled from "@emotion/styled";
-import Icon from "components/icon";
+import { CheckIcon, QuestionMarkCircledIcon } from "@radix-ui/react-icons";
 import LandingpageText from "components/landingpage/text";
 import { Button, Flex, Text } from "theme-ui";
 import { media } from "utils/styled/media";
@@ -11,6 +11,7 @@ function PricingCard({
   features,
   unitDescription,
   name,
+  description,
   onHelp,
   onStart,
   highlight = false,
@@ -19,6 +20,7 @@ function PricingCard({
   features: string[];
   name: string;
   unitDescription?: string;
+  description?: React.ReactNode;
   normal?: number;
   price:
     | {
@@ -33,13 +35,14 @@ function PricingCard({
 }) {
   const targetprice = typeof price === "number" ? price : price.yearly;
   const monthlyprice = typeof price === "number" ? price : price.monthly;
+  const hasAnnualPromotion = typeof price === "number" ? false : !!price.yearly;
 
   return (
     <Wrapper data-highlight={highlight}>
       <Heading>
         <LandingpageText variant="h4">{name}</LandingpageText>
         {onHelp && (
-          <Icon className="cursor" name="questionMark" onClick={onHelp} />
+          <QuestionMarkCircledIcon className="cursor" onClick={onHelp} />
         )}
       </Heading>
       <PlanPricing style={{ gap: 4 }}>
@@ -51,11 +54,12 @@ function PricingCard({
         <LandingpageText variant="h4">${targetprice}</LandingpageText>
         {unitDescription && <Seat variant="body1">{unitDescription}</Seat>}
       </PlanPricing>
-      {!!monthlyprice && (
+      {hasAnnualPromotion && !!monthlyprice && (
         <AlternateBillingOptionDescription>
           Billed annually or ${monthlyprice} month-to-month
         </AlternateBillingOptionDescription>
       )}
+      {description && description}
       <Flex
         style={{
           alignItems: "center",
@@ -66,9 +70,7 @@ function PricingCard({
         <PlanDescription>
           {features.map(i => (
             <div className="planlist" key={i}>
-              <div className="icon">
-                <Icon name="check" />
-              </div>
+              <CheckIcon className="icon" />
               <span className="desc">{i}</span>
             </div>
           ))}
@@ -144,15 +146,14 @@ const PlanDescription = styled(Flex)`
     align-items: center;
 
     .icon {
-      display: flex;
-      align-items: center;
-      justify-content: center;
+      color: #a9a9a9;
       width: 24px;
       height: 24px;
       margin-right: 8px;
     }
 
     .desc {
+      font-size: 18px;
       flex: 1;
       font-size: 18px;
       color: #535353;
