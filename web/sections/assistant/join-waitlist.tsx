@@ -8,7 +8,7 @@ import styled from "@emotion/styled";
 
 day.extend(RelativeTime);
 
-const list_close_at = day("2023-03-15T00:00:00.000Z");
+const list_close_at = day("2023-03-24T00:00:00.000Z");
 
 export function JoinWaitlistSection() {
   const [closein, setClosein] = React.useState<string>(list_close_at.fromNow());
