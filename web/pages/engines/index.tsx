@@ -20,6 +20,7 @@ import { NextPageContext } from "next";
 import SectionLayout from "layouts/section";
 import Footer from "components/footer";
 import Header from "components/header";
+import { DRACOLoader } from "three/examples/jsm/loaders/DRACOLoader";
 
 export default function EnginesPage() {
   return (
@@ -106,7 +107,12 @@ const Model = () => {
   // location of the 3D model
   const gltf = useLoader(
     GLTFLoader,
-    "/models/rocket_engine_no_textures/engine.glb",
+    "/models/rocket_engine_no_textures/compressed.glb",
+    loader => {
+      const dracoLoader = new DRACOLoader();
+      dracoLoader.setDecoderPath("https://www.gstatic.com/draco/v1/decoders/");
+      loader.setDRACOLoader(dracoLoader);
+    },
   );
 
   return (
