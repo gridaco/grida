@@ -37,9 +37,12 @@ export default function EnginesPage() {
               Grida Engine
             </LandingpageText>
             <div style={{ height: 21 }} />
-            <LandingpageText color="rgba(255, 255, 255, 0.8)" variant="body1">
-              Explore the cutting edge engine techs by Grida, open to public.
-            </LandingpageText>
+            <div style={{ width: "80%" }}>
+              <LandingpageText color="rgba(255, 255, 255, 0.8)" variant="body1">
+                Explore the cutting-edge Design & Code engine techs by Grida,
+                open to public.
+              </LandingpageText>
+            </div>
             <Link href={"https://github.com/gridaco/engines"}>
               <button>
                 <GitHubLogoIcon />
@@ -145,9 +148,9 @@ function Scene() {
             <Model />
           </Float>
           <Float
-            floatingRange={[0, 0.2]}
+            floatingRange={[0, 0.01]}
             rotation={[0.1, Math.PI, 1]}
-            speed={0.1}
+            speed={0.05}
           >
             <Grid cellColor="white" args={[100, 100]} />
           </Float>
