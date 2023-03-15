@@ -133,13 +133,13 @@ function Scene() {
           penumbra={1}
           position={[10, 15, 10]}
         />
-        <Stars />
+        <Stars speed={0.1} />
         <Suspense fallback={null}>
           <Float speed={0.5}>
             <Model />
           </Float>
           <Float
-            floatingRange={[0, 0.1]}
+            floatingRange={[0, 0.2]}
             rotation={[0, Math.PI, 1]}
             speed={0.1}
           >
