@@ -140,7 +140,7 @@ function Scene() {
           </Float>
           <Float
             floatingRange={[0, 0.2]}
-            rotation={[0, Math.PI, 1]}
+            rotation={[0.1, Math.PI, 1]}
             speed={0.1}
           >
             <Grid cellColor="white" args={[100, 100]} />
