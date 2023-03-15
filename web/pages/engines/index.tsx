@@ -78,7 +78,7 @@ const Main = styled.main`
   width: 100vw;
 
   .layout {
-    max-width: 440px;
+    max-width: 600px;
     position: absolute;
     display: flex;
     flex-direction: column;
