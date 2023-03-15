@@ -37,7 +37,10 @@
     "@next/bundle-analyzer": "^12.3.1",
     "@next/mdx": "^10.0.9",
     "@radix-ui/react-icons": "^1.2.0",
+    "@react-three/drei": "^9.57.3",
+    "@react-three/fiber": "^8.12.0",
     "@typeform/embed-react": "^1.20.0",
+    "@types/three": "^0.149.0",
     "@zeit/next-css": "^1.0.1",
     "axios": "^0.21.2",
     "dayjs": "^1.11.7",
@@ -64,7 +67,8 @@
     "refractor": "^4.2.1",
     "remark-html": "^13.0.1",
     "styled-system": "^5.1.0",
-    "theme-ui": "^0.14.7"
+    "theme-ui": "^0.14.7",
+    "three": "^0.150.1"
   },
   "devDependencies": {
     "@babel/core": "^7.15.5",
