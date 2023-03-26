@@ -28,6 +28,7 @@ import q from "@design-sdk/query";
 import assert from "assert";
 import { getPageNode } from "utils/get-target-node";
 import { nanoid } from "nanoid";
+import { track } from "@code-editor/analytics";
 
 const _editor_path_name = "/files/[key]/";
 
@@ -105,6 +106,8 @@ export function editorReducer(state: EditorState, action: Action): EditorState {
 
     case "select-node": {
       const { node } = <SelectNodeAction>action;
+
+      track("select-node", {});
 
       clearlog("editorReducer#select-node");
 

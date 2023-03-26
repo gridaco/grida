@@ -1,0 +1,8 @@
+{
+  "name": "@code-editor/analytics",
+  "version": "0.0.0",
+  "description": "Analytics for the editor",
+  "dependencies": {
+    "@segment/analytics-next": "^1.51.3"
+  }
+}
