@@ -9,6 +9,7 @@ import LandingpageText from "components/landingpage/text";
 import { useTranslation } from "next-i18next";
 import { media } from "utils/styled/media";
 import { useRouter } from "next/router";
+import { links } from "k/links";
 
 const Slogan = () => {
   const router = useRouter();
@@ -49,7 +50,7 @@ const Slogan = () => {
           <ContactSalesButton
             onClick={() => {
               // router.push("/contact/sales");
-              router.push("https://calendly.com/universe-at-grida/meet-grida");
+              router.push(links.book_a_demo);
             }}
           >
             {t_common("book-a-demo")}

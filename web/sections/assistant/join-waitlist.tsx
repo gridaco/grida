@@ -5,6 +5,7 @@ import { ArrowRightIcon } from "@radix-ui/react-icons";
 import day from "dayjs";
 import RelativeTime from "dayjs/plugin/relativeTime";
 import styled from "@emotion/styled";
+import { links } from "k/links";
 
 day.extend(RelativeTime);
 
@@ -59,7 +60,7 @@ export function JoinWaitlistSection() {
           <Link href="https://forms.gle/82jRrbopnSBLDw568">
             <button className="primary">Join the waitlist</button>
           </Link>
-          <Link href="https://calendly.com/universe-at-grida/meet-grida">
+          <Link href={links.book_a_demo}>
             <button>
               Book a Demo
               <ArrowRightIcon />
