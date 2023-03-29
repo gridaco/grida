@@ -125,7 +125,6 @@ function PreviewState({
         borderRadius={0}
         origin_size={size}
         type="scaling"
-        parentWidth={undefined} // TODO: fix this
       />
     </>
   );

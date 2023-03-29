@@ -19,7 +19,7 @@ const Container = styled.div<{ height: number }>`
 
 export type ScalingContentProps = Omit<
   ScalingHtmlContentFrameProps,
-  "parentSize"
+  "parentWidth"
 >;
 
 export function ScalingContent(props: ScalingContentProps) {
