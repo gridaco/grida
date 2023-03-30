@@ -20,6 +20,7 @@ const packages = [
 
   // -----------------------------
   // region @designto-code
+  "@grida/code",
   "@designto/debugger",
   "@grida/builder-config",
   "@grida/builder-config-preset",
