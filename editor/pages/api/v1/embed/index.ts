@@ -17,7 +17,7 @@ export default async function handler(req: Request, res: Response) {
   }
 
   try {
-    const src = await code({
+    const { src } = await code({
       uri: figma as string,
       framework: {
         framework: "preview",

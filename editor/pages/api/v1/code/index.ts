@@ -26,13 +26,13 @@ export default async function handler(req, res) {
     const figma_access_token_type: FigmaAccessTokenType =
       figma_access_token.startsWith("figd") ? "fpat" : "fat";
 
-    const { figma, framework } = req.body as CodeRequest;
+    const { figma: figmaInput, framework } = req.body as CodeRequest;
 
-    assert(typeof figma === "string", "`body.figma` must be a string");
+    assert(typeof figmaInput === "string", "`body.figma` must be a string");
 
     try {
-      const src = await code({
-        uri: figma,
+      const coderes = await code({
+        uri: figmaInput,
         framework: framework as FrameworkConfig,
         auth:
           figma_access_token_type === "fat"
@@ -44,22 +44,29 @@ export default async function handler(req, res) {
               },
       });
 
+      const { src: spchar_src, figma, target } = coderes;
+
+      const src = replaceSpecialChars(spchar_src);
+
       const response: FigmaToVanillaResponse = {
         figma: {
-          file: {
-            name: "",
-            lastModified: "",
-            thumbnailUrl: "",
-            version: "",
-          },
-          filekey: "",
-          entry: "",
-          node: undefined,
-          json: "",
+          file:
+            // null, // TODO:
+            {
+              name: undefined,
+              lastModified: undefined,
+              thumbnailUrl: undefined,
+              version: undefined,
+            },
+
+          filekey: figma.filekey,
+          entry: figma.node,
+          node: target.figma,
+          json: target.remote,
         },
         framework: framework as VanillaFrameworkConfig,
-        src: "",
-        srcdoc: "",
+        src: null, // TODO:
+        srcdoc: src,
         srcmap: null, // TODO:
         files: {
           "index.html": src,
@@ -90,4 +97,8 @@ export default async function handler(req, res) {
       stacktrace: e.stack,
     });
   }
+}
+
+function replaceSpecialChars(input: string): string {
+  return input.replace(/\\t/g, "\t").replace(/\\n/g, "\n");
 }
