@@ -44,9 +44,7 @@ export default async function handler(req, res) {
               },
       });
 
-      const { src: spchar_src, figma, target } = coderes;
-
-      const src = replaceSpecialChars(spchar_src);
+      const { src, figma, target } = coderes;
 
       const response: FigmaToVanillaResponse = {
         figma: {
@@ -97,8 +95,4 @@ export default async function handler(req, res) {
       stacktrace: e.stack,
     });
   }
-}
-
-function replaceSpecialChars(input: string): string {
-  return input.replace(/\\t/g, "\t").replace(/\\n/g, "\n");
 }
