@@ -26,7 +26,7 @@ export default async function handler(req, res) {
     const figma_access_token_type: FigmaAccessTokenType =
       figma_access_token.startsWith("figd") ? "fpat" : "fat";
 
-    const { figma: figmaInput, framework } = req.body as CodeRequest;
+    const { figma: figmaInput, framework, raw } = req.body as CodeRequest;
 
     assert(typeof figmaInput === "string", "`body.figma` must be a string");
 
@@ -80,7 +80,12 @@ export default async function handler(req, res) {
         warnings: [],
       };
 
-      res.status(200).json(response);
+      if (raw) {
+        // if debug option raw is set, return raw html
+        res.status(200).send(src);
+      } else {
+        res.status(200).json(response);
+      }
     } catch (e) {
       res.status(500).json({
         message: e.message,
