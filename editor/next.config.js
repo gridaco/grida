@@ -43,6 +43,9 @@ const packages = [
   "@code-features/flags",
   "@code-features/fonts",
   // -----------------------------
+  "@code-plugin/core",
+  "@code-plugin/text-fit",
+  // -----------------------------
 
   // reflect-ui ui framework
   // @editor-ui ui components
