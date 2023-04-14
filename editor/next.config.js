@@ -43,6 +43,7 @@ const packages = [
   "@code-features/flags",
   "@code-features/fonts",
   // -----------------------------
+  // plugins
   "@code-plugin/core",
   "@code-plugin/text-fit",
   // -----------------------------

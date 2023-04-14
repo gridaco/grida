@@ -26,7 +26,12 @@ export default async function handler(req, res) {
     const figma_access_token_type: FigmaAccessTokenType =
       figma_access_token.startsWith("figd") ? "fpat" : "fat";
 
-    const { figma: figmaInput, framework, raw } = req.body as CodeRequest;
+    const {
+      figma: figmaInput,
+      framework,
+      plugins,
+      raw,
+    } = req.body as CodeRequest;
 
     assert(typeof figmaInput === "string", "`body.figma` must be a string");
 
@@ -34,6 +39,7 @@ export default async function handler(req, res) {
       const coderes = await code({
         uri: figmaInput,
         framework: framework as FrameworkConfig,
+        plugins,
         auth:
           figma_access_token_type === "fat"
             ? {
