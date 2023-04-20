@@ -9,7 +9,7 @@ import { links } from "k/links";
 
 day.extend(RelativeTime);
 
-const list_close_at = day("2023-04-14T00:00:00.000Z");
+const list_close_at = day("2023-05-01T00:00:00.000Z");
 
 export function JoinWaitlistSection() {
   const [closein, setClosein] = React.useState<string>(list_close_at.fromNow());
