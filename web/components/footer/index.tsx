@@ -52,6 +52,8 @@ const Footer = () => {
   return (
     <Flex
       style={{
+        position: "relative",
+        zIndex: 1,
         width: "100%",
         alignItems: "center",
         justifyContent: "center",
