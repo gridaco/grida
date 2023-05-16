@@ -87,3 +87,7 @@ export function event_cta__to_code({
     });
   } catch (e) {}
 }
+
+export function event_vscode_cta_join_waitlist_click() {
+  safelyLogEvent("vscode_cta_join_waitlist_click");
+}

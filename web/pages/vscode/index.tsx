@@ -1,8 +1,7 @@
-import { css } from "@emotion/react";
-import styled from "@emotion/styled";
-import { useRouter } from "next/router";
 import React, { ReactElement } from "react";
-
+import styled from "@emotion/styled";
+import { css } from "@emotion/react";
+import { useRouter } from "next/router";
 import Footer from "components/footer";
 import Header from "components/header";
 import {
@@ -17,6 +16,7 @@ import { getPageTranslations } from "utils/i18n";
 import { useTranslation } from "next-i18next";
 import PageHead from "components/page-head";
 import { links } from "k/links";
+import { event_vscode_cta_join_waitlist_click } from "analytics";
 
 export const BackgroundGradient = css`
   background: linear-gradient(
@@ -39,6 +39,7 @@ export default function VSCodePage() {
   const { t } = useTranslation("page-vscode");
   const onCTA = () => {
     router.push(links.join_the_vscode_extension_waitlist);
+    event_vscode_cta_join_waitlist_click();
   };
   return (
     <>
