@@ -3,5 +3,6 @@
   "description": "VSCode extension for Grida",
   "keywords": "vscode, extension, grida, handoff, figma, design",
   "heading": "VSCode X Grida",
-  "cta-install": "Grida VSCode Extension のインストール"
+  "cta-install": "Grida VSCode Extension のインストール",
+  "cta-waitlist": "ベータ版に参加する"
 }

@@ -16,6 +16,7 @@ import MusicHome from "sections/landingpage/demo-app";
 import { getPageTranslations } from "utils/i18n";
 import { useTranslation } from "next-i18next";
 import PageHead from "components/page-head";
+import { links } from "k/links";
 
 export const BackgroundGradient = css`
   background: linear-gradient(
@@ -36,10 +37,8 @@ export const HeadingGradient = css`
 export default function VSCodePage() {
   const router = useRouter();
   const { t } = useTranslation("page-vscode");
-  const onInstall = () => {
-    router.push(
-      "https://marketplace.visualstudio.com/items?itemName=grida.grida-vscode",
-    );
+  const onCTA = () => {
+    router.push(links.join_the_vscode_extension_waitlist);
   };
   return (
     <>
@@ -60,7 +59,7 @@ export default function VSCodePage() {
           <Spacer />
           <Spacer />
           <Heading1>{t("heading")}</Heading1>
-          <InstallButton onClick={onInstall}>{t("cta-install")}</InstallButton>
+          <CTAButton onClick={onCTA}>{t("cta-waitlist")}</CTAButton>
           {/* <p>Convert your figma design to React, Flutter, TS & HTML/CSS code.</p> */}
           <VscodeDemo>
             <WindowHandle />
@@ -117,7 +116,7 @@ const RootWrapper = styled.div`
   overflow: hidden;
 `;
 
-const InstallButton = styled.button`
+const CTAButton = styled.button`
   background-color: rgba(0, 102, 222, 0.54);
   border-radius: 2px;
   padding: 10px 16px;
