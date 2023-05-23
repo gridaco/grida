@@ -334,16 +334,16 @@ export const HeaderMap: Sitemap = [
       },
     ],
   },
-  {
-    type: "link",
-    label: "docs",
-    href: "/docs",
-  },
-  {
-    type: "group",
-    label: "frameworks",
-    children: Frameworks,
-  },
+  // {
+  //   type: "link",
+  //   label: "docs",
+  //   href: "/docs",
+  // },
+  // {
+  //   type: "group",
+  //   label: "frameworks",
+  //   children: Frameworks,
+  // },
   {
     type: "group",
     label: "resources",
