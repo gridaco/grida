@@ -41,6 +41,11 @@ const packages = [
   "@code-features/documentation",
   "@code-features/component",
   "@code-features/flags",
+  "@code-features/fonts",
+  // -----------------------------
+  // plugins
+  "@code-plugin/core",
+  "@code-plugin/text-fit",
   // -----------------------------
 
   // reflect-ui ui framework
