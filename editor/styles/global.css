@@ -29,13 +29,25 @@ h4,
 h5,
 h6,
 p {
-  color: black;
+  color: rgba(0, 0, 0, 0.9);
 }
 
 a {
-  color: blue;
+  color: rgba(0, 0, 0, 0.7);
+}
+
+a:hover {
+  color: rgba(0, 0, 0, 0.9);
 }
 
 .white {
   color: #fff;
+}
+
+.no-scroll-bar {
+  -ms-overflow-style: none;
+}
+
+.no-scroll-bar::-webkit-scrollbar {
+  display: none;
 }
