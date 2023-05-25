@@ -1,24 +1,31 @@
 import React, { useEffect, useMemo, useState } from "react";
-import Axios from "axios";
 import Head from "next/head";
 import { SigninToContinuePrmoptProvider } from "components/prompt-banner-signin-to-continue";
 import { Editor, SetupEditor } from "scaffolds/editor";
 import { Workspace, useWorkspaceInitializerContext } from "scaffolds/workspace";
 import { useRouter } from "next/router";
+import { InferGetStaticPropsType } from "next";
+import { Dialog } from "@mui/material";
+import { Readme } from "components/community-files/readme";
+import { FigmaArchiveMetaFile } from "ssg/community-files";
 
-export default function FigmaCommunityFileEditorPage({
-  id,
-  file,
-  name,
-  description,
-}: {
-  id: string;
-  file: any;
-  name: any;
-  description: any;
-}) {
-  const data = useMemo(() => JSON.parse(file), []);
+type FigmaCommunityFileMeta = InferGetStaticPropsType<typeof getStaticProps>;
+
+export default function FigmaCommunityFileEditorPage(
+  props: FigmaCommunityFileMeta
+) {
+  const {
+    id,
+    // file,
+    name,
+    description,
+    thumbnail_url,
+    tags,
+    publisher,
+  } = props;
+  // const data = useMemo(() => JSON.parse(file), []);
   const router = useRouter();
+  const [readme, setReadme] = useState(true);
 
   useEffect(() => {
     // initialize({
@@ -30,9 +37,16 @@ export default function FigmaCommunityFileEditorPage({
     <>
       <Head>
         <title>{name}</title>
+        <meta property="og:title" content={name} />
+        <meta property="og:image" content={thumbnail_url} />
+        <meta property="og:description" content={description} />
         <meta name="description" content={description} />
+        <meta name="tags" content={(tags || []).join(", ")} />
       </Head>
-      <SigninToContinuePrmoptProvider>
+      <Dialog open={readme} maxWidth="lg">
+        <Readme {...props} />
+      </Dialog>
+      {/* <SigninToContinuePrmoptProvider>
         <Workspace>
           <CachedFileSetup>
             <SetupEditor
@@ -46,8 +60,7 @@ export default function FigmaCommunityFileEditorPage({
             </SetupEditor>
           </CachedFileSetup>
         </Workspace>
-      </SigninToContinuePrmoptProvider>
-      <pre style={{ color: "white" }}>{JSON.stringify(data, null, 2)}</pre>;
+      </SigninToContinuePrmoptProvider> */}
     </>
   );
 }
@@ -60,21 +73,39 @@ function CachedFileSetup({ children }: React.PropsWithChildren<{}>) {
   return <>{children}</>;
 }
 
-export async function getServerSideProps(context) {
-  const id = context.params.id;
-  const s3_base = `https://figma-community-files.s3.us-west-1.amazonaws.com`;
-  const s3_file = `${s3_base}/${id}/file.json`;
-  const s3_meta = `${s3_base}/${id}/meta.json`;
+export async function getStaticPaths() {
+  const fs = require("fs");
+  const path = require("path");
+  const stage =
+    process.env.FIGMA_COMMUNITY_FILES_STAGE === "production" ? "prod" : "dev";
+  const metafile = path.join(
+    process.cwd(),
+    `../data/figma-archives/${stage}/meta.json`
+  );
 
-  const { data: filedata } = await Axios.get(s3_file);
-  const { data: metadata } = await Axios.get(s3_meta);
+  // read meta.json from data/figma-archives/meta.json
+  const meta = JSON.parse(fs.readFileSync(metafile));
+
+  const paths = meta.map(({ id }) => ({
+    params: {
+      id,
+    },
+  }));
 
   return {
-    props: {
-      id,
-      name: metadata.name,
-      tags: metadata.tags,
-      file: JSON.stringify(filedata),
-    },
+    paths: paths,
+    fallback: true,
+  };
+}
+
+export async function getStaticProps(context) {
+  const id = context.params.id;
+
+  const file = new FigmaArchiveMetaFile();
+
+  const props = file.getStaticProps(id);
+
+  return {
+    props: props,
   };
 }
