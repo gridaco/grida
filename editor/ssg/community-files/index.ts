@@ -101,6 +101,20 @@ export class FigmaArchiveMetaFile {
     return this.meta;
   }
 
+  tags(): ReadonlyArray<string> {
+    // set of all tags
+    const tags = new Set<string>();
+    this.meta.forEach((meta) => {
+      meta.tags.forEach((tag) => tags.add(tag));
+    });
+
+    return Array.from(tags);
+  }
+
+  query_tag(tag: string) {
+    return this.meta.filter((meta) => meta.tags.includes(tag));
+  }
+
   getStaticProps(id: string) {
     const meta = this.find(id);
 
