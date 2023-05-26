@@ -4,7 +4,7 @@ import { Avatar } from "@mui/material";
 import {
   FigmaCommunityFileRelatedContentMeta,
   FigmaCommunityFileMeta,
-} from "ssg/community-files";
+} from "ssg/community";
 import Link from "next/link";
 import { FileCard } from "./file-cards";
 import { Tag } from "./tags";

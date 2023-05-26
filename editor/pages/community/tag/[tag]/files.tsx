@@ -1,9 +1,10 @@
 import React from "react";
-import { FigmaArchiveMetaFile } from "ssg/community-files";
+import { FigmaCommunityArchiveMetaRepository } from "ssg/community";
 import { InferGetServerSidePropsType } from "next";
 import Head from "next/head";
 import { FileCard } from "components/community-files/file-cards";
 import styled from "@emotion/styled";
+import Link from "next/link";
 export default function TagScopedFilesPage({
   tag,
   files,
@@ -21,7 +22,19 @@ export default function TagScopedFilesPage({
         <h1>Files with #{tag}</h1>
         <div className="grid">
           {files.map((f, i) => (
-            <FileCard key={i} {...f} />
+            <Link
+              href={{
+                pathname: "/community/file/[id]",
+                query: {
+                  id: f.id,
+                },
+              }}
+              key={i}
+            >
+              <div>
+                <FileCard {...f} />
+              </div>
+            </Link>
           ))}
         </div>
       </Main>
@@ -34,6 +47,7 @@ const Main = styled.main`
   display: flex;
   flex-direction: column;
   align-items: center;
+  justify-content: center;
   padding: 80px;
 
   .grid {
@@ -48,7 +62,7 @@ export async function getServerSideProps(context) {
   // we use serverside props here, since there are too many of them.
   const tag = context.params.tag;
   // get all files with the tag
-  const repo = new FigmaArchiveMetaFile();
+  const repo = new FigmaCommunityArchiveMetaRepository();
   const files = repo.query_tag(tag);
 
   return {

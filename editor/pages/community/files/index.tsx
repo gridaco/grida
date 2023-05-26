@@ -3,7 +3,7 @@ import styled from "@emotion/styled";
 import Head from "next/head";
 import Link from "next/link";
 import { InferGetStaticPropsType } from "next";
-import { FigmaArchiveMetaFile } from "ssg/community-files";
+import { FigmaCommunityArchiveMetaRepository } from "ssg/community";
 import { FileCard } from "components/community-files/file-cards";
 
 export default function FigmaCommunityFilesIndexPage({
@@ -44,19 +44,21 @@ const Main = styled.main`
   display: flex;
   flex-direction: column;
   align-items: center;
+  justify-content: center;
+  padding: 80px;
+
   background: white;
 
   .grid {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    grid-gap: 24px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 24px;
+    align-items: center;
   }
-
-  padding: 100px;
 `;
 
 export async function getStaticProps() {
-  const repo = new FigmaArchiveMetaFile();
+  const repo = new FigmaCommunityArchiveMetaRepository();
   const files = repo.page(1, 200);
 
   return {

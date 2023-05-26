@@ -7,7 +7,7 @@ import { useRouter } from "next/router";
 import { InferGetStaticPropsType } from "next";
 import { Dialog } from "@mui/material";
 import { Readme } from "components/community-files/readme";
-import { FigmaArchiveMetaFile } from "ssg/community-files";
+import { FigmaCommunityArchiveMetaRepository } from "ssg/community";
 
 type FigmaCommunityFileMeta = InferGetStaticPropsType<typeof getStaticProps>;
 
@@ -119,7 +119,7 @@ export async function getStaticPaths() {
 export async function getStaticProps(context) {
   const id = context.params.id;
 
-  const file = new FigmaArchiveMetaFile();
+  const file = new FigmaCommunityArchiveMetaRepository();
 
   const props = file.getStaticProps(id);
 
