@@ -23,7 +23,7 @@ export default function FigmaCommunityFilesIndexPage({
             <Link
               key={file.id}
               href={{
-                pathname: "/figma/community/file/[id]",
+                pathname: "/community/file/[id]",
                 query: {
                   id: file.id,
                 },

@@ -6,7 +6,7 @@ export function Tag({ children }: { children: string }) {
   return (
     <Link
       href={{
-        pathname: "/figma/community/tag/[tag]/files",
+        pathname: "/community/tag/[tag]/files",
         query: { tag: children },
       }}
     >

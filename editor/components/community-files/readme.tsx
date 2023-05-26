@@ -49,7 +49,7 @@ export function Readme({
   return (
     <ReadmeWrapper>
       <header className="inner">
-        <Link href="/figma/community/files">
+        <Link href="/community/files">
           <button className="back">
             <ArrowLeftIcon width={24} height={24} />
             Community Files
@@ -158,7 +158,7 @@ export function Readme({
                   key={content.id}
                   scroll
                   href={{
-                    pathname: "/figma/community/file/[id]",
+                    pathname: "/community/file/[id]",
                     query: { id: content.id },
                   }}
                 >
