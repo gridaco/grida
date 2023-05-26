@@ -41,7 +41,11 @@ export function Readme({
   tags,
   support_contact,
   related_contents,
-}: Partial<CommunityFileReadmeProps>) {
+  // CBs
+  onProceed,
+}: Partial<CommunityFileReadmeProps> & {
+  onProceed?: () => void;
+}) {
   return (
     <ReadmeWrapper>
       <header className="inner">
@@ -94,7 +98,7 @@ export function Readme({
             </div>
           </div>
           <div className="cta">
-            <button onClick={() => {}}>Open in Grida</button>
+            <button onClick={onProceed}>Explore in Code</button>
           </div>
         </div>
       </header>
@@ -187,6 +191,7 @@ const ReadmeWrapper = styled.main`
     gap: 8px;
 
     button {
+      cursor: pointer;
       display: flex;
       background: black;
       color: white;
