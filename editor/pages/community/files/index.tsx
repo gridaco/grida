@@ -60,13 +60,12 @@ export default function FigmaCommunityFilesIndexPage({
           useWindow={false}
           getScrollParent={() => document.querySelector("body")}
           loader={
-            <>
-              {data.loading && (
-                <div className="loader" key={0}>
-                  Loading ...
-                </div>
-              )}
-            </>
+            // Note: https://github.com/danbovey/react-infinite-scroller/issues/306
+            data.loading && (
+              <div className="loader" key={0}>
+                Loading ...
+              </div>
+            )
           }
         >
           <div className="grid">
