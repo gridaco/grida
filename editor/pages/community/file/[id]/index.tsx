@@ -92,26 +92,14 @@ function CommunityFileSetup({
 }
 
 export async function getStaticPaths() {
-  const fs = require("fs");
-  const path = require("path");
-  const stage =
-    process.env.FIGMA_COMMUNITY_FILES_STAGE === "production" ? "prod" : "dev";
-  const metafile = path.join(
-    process.cwd(),
-    `../data/figma-archives/${stage}/meta.json`
-  );
-
-  // read meta.json from data/figma-archives/meta.json
-  const meta = JSON.parse(fs.readFileSync(metafile));
-
-  const paths = meta.map(({ id }) => ({
-    params: {
-      id,
-    },
-  }));
+  const repo = new FigmaCommunityArchiveMetaRepository();
 
   return {
-    paths: paths,
+    paths: repo.ids().map((id) => ({
+      params: {
+        id,
+      },
+    })),
     fallback: true,
   };
 }

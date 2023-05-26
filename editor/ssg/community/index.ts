@@ -1,6 +1,8 @@
 import fs from "fs";
 import path from "path";
 
+type TMetaFileStage = "development" | "production";
+
 export type FigmaCommunityFileId = string;
 export type FigmaCommunityPublisherId = string;
 
@@ -63,11 +65,13 @@ export interface FigmaCommunityFileRelatedContentMeta {
   duplicate_count: number;
 }
 
-function read_meta_file(): ReadonlyArray<FigmaCommunityFileMeta> {
+function read_meta_file(
+  stage: TMetaFileStage
+): ReadonlyArray<FigmaCommunityFileMeta> {
   // read meta.json from data/figma-archives/meta.json
   const meta = JSON.parse(
     fs.readFileSync(
-      path.join(process.cwd(), "../data/figma-archives/prod/meta.json"),
+      path.join(process.cwd(), `../data/figma-archives/${stage}/meta.json`),
       "utf-8"
     )
   );
@@ -104,16 +108,25 @@ let __meta = null;
 
 export class FigmaCommunityArchiveMetaRepository {
   readonly meta: ReadonlyArray<FigmaCommunityFileMeta>;
+  readonly stage: TMetaFileStage;
+  constructor(stage: TMetaFileStage = null) {
+    this.stage =
+      stage ||
+      (process.env.FIGMA_COMMUNITY_FILES_STAGE as any) ||
+      "development";
 
-  constructor() {
     if (!__meta) {
-      __meta = read_meta_file();
+      __meta = read_meta_file(this.stage);
     }
     this.meta = __meta;
   }
 
   find(id: string): FigmaCommunityFileMeta {
     return this.meta.find((file) => file.id === id);
+  }
+
+  ids() {
+    return this.meta.map((file) => file.id);
   }
 
   q({
