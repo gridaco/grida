@@ -26,12 +26,13 @@ export default function FigmaCommunityFileEditorPage(
   // const data = useMemo(() => JSON.parse(file), []);
   const router = useRouter();
   const [readme, setReadme] = useState(true);
+  const [startup, setStartup] = useState(false);
 
   useEffect(() => {
-    // initialize({
-    //   ''
-    // });
-  }, []);
+    if (startup) {
+      // setup the editor
+    }
+  }, [startup]);
 
   return (
     <>
@@ -44,11 +45,18 @@ export default function FigmaCommunityFileEditorPage(
         <meta name="tags" content={(tags || []).join(", ")} />
       </Head>
       <Dialog open={readme} maxWidth="lg">
-        <Readme key={id} {...props} />
+        <Readme
+          key={id}
+          {...props}
+          onProceed={() => {
+            setStartup(true);
+            setReadme(false);
+          }}
+        />
       </Dialog>
-      {/* <SigninToContinuePrmoptProvider>
+      <SigninToContinuePrmoptProvider>
         <Workspace>
-          <CachedFileSetup>
+          <CommunityFileSetup id={id}>
             <SetupEditor
               //
               key={id}
@@ -58,14 +66,24 @@ export default function FigmaCommunityFileEditorPage(
             >
               <Editor />
             </SetupEditor>
-          </CachedFileSetup>
+          </CommunityFileSetup>
         </Workspace>
-      </SigninToContinuePrmoptProvider> */}
+      </SigninToContinuePrmoptProvider>
     </>
   );
 }
 
-function CachedFileSetup({ children }: React.PropsWithChildren<{}>) {
+interface CommunityFileSetupProps {
+  /**
+   * The file id of the community file.
+   */
+  id: string;
+}
+
+function CommunityFileSetup({
+  children,
+  id,
+}: React.PropsWithChildren<CommunityFileSetupProps>) {
   const { provideEditorSnapshot: initialize } =
     useWorkspaceInitializerContext();
 
