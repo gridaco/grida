@@ -9,6 +9,8 @@ import { FileCard } from "components/community-files/file-cards";
 export default function FigmaCommunityFilesIndexPage({
   files,
 }: InferGetStaticPropsType<typeof getStaticProps>) {
+  // TODO: infinite scrolling, load more
+
   return (
     <>
       <Head>

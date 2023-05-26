@@ -109,7 +109,7 @@ export class FigmaArchiveMetaFile {
     limit: number = 100,
     shorten: boolean = true
   ): ReadonlyArray<Partial<FigmaCommunityFileMeta>> {
-    const start = page * limit;
+    const start = (page - 1) * limit;
     const end = start + limit;
     if (shorten) {
       return minify(...this.meta.slice(start, end));
@@ -118,7 +118,7 @@ export class FigmaArchiveMetaFile {
   }
 
   all() {
-    return this.meta;
+    return minify(...this.meta);
   }
 
   tags(): ReadonlyArray<string> {
