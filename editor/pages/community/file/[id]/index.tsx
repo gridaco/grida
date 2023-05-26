@@ -10,7 +10,7 @@ import { Readme } from "components/community-files/readme";
 import { FigmaCommunityArchiveMetaRepository } from "ssg/community";
 
 type FigmaCommunityFileMeta = InferGetServerSidePropsType<
-  typeof getServersideProps
+  typeof getServerSideProps
 >;
 
 export default function FigmaCommunityFileEditorPage(
@@ -93,16 +93,10 @@ function CommunityFileSetup({
   return <>{children}</>;
 }
 
-//
-
-export async function getServersideProps(context) {
-  const id = context.params.id as string;
-
-  const file = new FigmaCommunityArchiveMetaRepository();
-
-  const props = file.getStaticProps(id);
-
+export async function getServerSideProps(context) {
   return {
-    props: props,
+    props: new FigmaCommunityArchiveMetaRepository().getProps(
+      context.params.id
+    ),
   };
 }
