@@ -4,12 +4,16 @@ import path from "path";
 export type FigmaCommunityFileId = string;
 export type FigmaCommunityPublisherId = string;
 
-export interface FigmaCommunityFileQueryParams {
-  page?: number;
-  limit?: number;
+export type FigmaCommunityFileQueryParams = {
   sort?: "popular" | "latest"; // TODO: add trending
   q?: string;
   tag?: string;
+} & PaginationParams;
+
+interface PaginationParams {
+  page?: number;
+  limit?: number;
+  skip?: number;
 }
 
 export interface FigmaCommunityFileMeta {
@@ -99,7 +103,7 @@ function minify(
 let __meta = null;
 
 export class FigmaCommunityArchiveMetaRepository {
-  readonly meta: any;
+  readonly meta: ReadonlyArray<FigmaCommunityFileMeta>;
 
   constructor() {
     if (!__meta) {
@@ -115,6 +119,7 @@ export class FigmaCommunityArchiveMetaRepository {
   q({
     page = 1,
     limit = 100,
+    skip = 0,
     q,
     tag,
     sort = "popular",
@@ -153,16 +158,27 @@ export class FigmaCommunityArchiveMetaRepository {
     }
     //
 
+    // pagination
+    const start = (page - 1) * limit + (skip || 0);
+    const end = start + limit;
+
     const pass = () => true;
     const results = this.meta
-      // q
-      .filter(q ? (meta) => meta.name.includes(q) : pass)
-      // tag
-      .filter(tag ? (meta) => meta.tags.includes(tag) : pass)
+      // q (lowercase both)
+      .filter(
+        q
+          ? (meta) =>
+              meta.name.toLocaleLowerCase().includes(q.toLocaleLowerCase())
+          : pass
+      )
+      // tag (lowercase only input - data is already lowercased)
+      .filter(
+        tag ? (meta) => meta.tags.includes(tag.toLocaleLowerCase()) : pass
+      )
       // sort
       .sort(sorting)
       // pagination
-      .slice((page - 1) * limit, page * limit);
+      .slice(start, end);
 
     if (shorten) {
       return minify(...results);
