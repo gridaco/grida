@@ -2,6 +2,10 @@ import fs from "fs";
 import path from "path";
 
 type TMetaFileStage = "development" | "production";
+const _staged_file_dir_map = {
+  development: "dev",
+  production: "prod",
+} as const;
 
 export type FigmaCommunityFileId = string;
 export type FigmaCommunityPublisherId = string;
@@ -71,7 +75,10 @@ function read_meta_file(
   // read meta.json from data/figma-archives/meta.json
   const meta = JSON.parse(
     fs.readFileSync(
-      path.join(process.cwd(), `../data/figma-archives/${stage}/meta.json`),
+      path.join(
+        process.cwd(),
+        `../data/figma-archives/${_staged_file_dir_map[stage]}/meta.json`
+      ),
       "utf-8"
     )
   );

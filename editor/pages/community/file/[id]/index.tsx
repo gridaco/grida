@@ -1,15 +1,17 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useState } from "react";
 import Head from "next/head";
 import { SigninToContinuePrmoptProvider } from "components/prompt-banner-signin-to-continue";
 import { Editor, SetupEditor } from "scaffolds/editor";
 import { Workspace, useWorkspaceInitializerContext } from "scaffolds/workspace";
 import { useRouter } from "next/router";
-import { InferGetStaticPropsType } from "next";
+import { InferGetServerSidePropsType } from "next";
 import { Dialog } from "@mui/material";
 import { Readme } from "components/community-files/readme";
 import { FigmaCommunityArchiveMetaRepository } from "ssg/community";
 
-type FigmaCommunityFileMeta = InferGetStaticPropsType<typeof getStaticProps>;
+type FigmaCommunityFileMeta = InferGetServerSidePropsType<
+  typeof getServersideProps
+>;
 
 export default function FigmaCommunityFileEditorPage(
   props: FigmaCommunityFileMeta
@@ -91,21 +93,10 @@ function CommunityFileSetup({
   return <>{children}</>;
 }
 
-export async function getStaticPaths() {
-  const repo = new FigmaCommunityArchiveMetaRepository();
+//
 
-  return {
-    paths: repo.ids().map((id) => ({
-      params: {
-        id,
-      },
-    })),
-    fallback: true,
-  };
-}
-
-export async function getStaticProps(context) {
-  const id = context.params.id;
+export async function getServersideProps(context) {
+  const id = context.params.id as string;
 
   const file = new FigmaCommunityArchiveMetaRepository();
 
