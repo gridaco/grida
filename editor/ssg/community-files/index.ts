@@ -87,11 +87,17 @@ function minify(
   }) as ReadonlyArray<Partial<FigmaCommunityFileMeta>>;
 }
 
+// cache meta file
+let __meta = null;
+
 export class FigmaArchiveMetaFile {
   readonly meta: any;
 
   constructor() {
-    this.meta = read_meta_file();
+    if (!__meta) {
+      __meta = read_meta_file();
+    }
+    this.meta = __meta;
   }
 
   find(id: string): FigmaCommunityFileMeta {
