@@ -7,21 +7,32 @@ import Link from "next/link";
 import { FileCard } from "components/community-files/file-cards";
 import { MagnifyingGlassIcon } from "@radix-ui/react-icons";
 import { useRouter } from "next/router";
+import InfiniteScroll from "react-infinite-scroller";
+import { useCommunityFiles } from "services/community/hooks";
+
 export default function FigmaCommunityFilesIndexPage({
   page: pageStart,
-  files,
+  files: initialFiles,
 }: InferGetStaticPropsType<typeof getStaticProps>) {
   const router = useRouter();
-  const [page, setPage] = React.useState(pageStart);
+  const scrollRef = React.useRef<HTMLDivElement>(null);
+  const [data, update] = useCommunityFiles({
+    initial: {
+      query: {
+        page: pageStart,
+      },
+      files: initialFiles,
+    },
+  });
 
   return (
     <>
       <Head>
         <title>Grida Code - Figma Community Files</title>
       </Head>
-      <Main>
+      <Main ref={scrollRef}>
         <h1>Community Files</h1>
-        <p>Explore 20,000+ Code-Ready Community Files from Figma</p>
+        <p>Explore 30,000+ Code-Ready Community Files from Figma</p>
         <form
           className="search"
           onSubmit={(e) => {
@@ -39,9 +50,27 @@ export default function FigmaCommunityFilesIndexPage({
           <MagnifyingGlassIcon />
           <input id="q" type="search" placeholder="Search" autoComplete="off" />
         </form>
-        <div>
+        <InfiniteScroll
+          pageStart={pageStart}
+          hasMore={data.hasMore}
+          loadMore={() => {
+            if (data.loading) return;
+            update.loadMore();
+          }}
+          useWindow={false}
+          getScrollParent={() => document.querySelector("body")}
+          loader={
+            <>
+              {data.loading && (
+                <div className="loader" key={0}>
+                  Loading ...
+                </div>
+              )}
+            </>
+          }
+        >
           <div className="grid">
-            {files.map((file) => (
+            {data.files.map((file) => (
               <Link
                 key={file.id}
                 href={{
@@ -57,7 +86,7 @@ export default function FigmaCommunityFilesIndexPage({
               </Link>
             ))}
           </div>
-        </div>
+        </InfiniteScroll>
       </Main>
     </>
   );
