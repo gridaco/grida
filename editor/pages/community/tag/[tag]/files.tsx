@@ -1,10 +1,9 @@
 import React from "react";
-import { FigmaCommunityArchiveMetaRepository } from "ssg/community";
-import { InferGetServerSidePropsType } from "next";
 import Head from "next/head";
-import { FileCard } from "components/community-files/file-cards";
-import styled from "@emotion/styled";
-import Link from "next/link";
+import { InferGetServerSidePropsType } from "next";
+import { FigmaCommunityArchiveMetaRepository } from "ssg/community";
+import { CommunityResultsLayout } from "layout/community/results-layout";
+
 export default function TagScopedFilesPage({
   tag,
   files,
@@ -18,45 +17,13 @@ export default function TagScopedFilesPage({
           content={`Figma community files with tag ${tag}`}
         />
       </Head>
-      <Main>
-        <h1>Files with #{tag}</h1>
-        <div className="grid">
-          {files.map((f, i) => (
-            <Link
-              href={{
-                pathname: "/community/file/[id]",
-                query: {
-                  id: f.id,
-                },
-              }}
-              key={i}
-            >
-              <div>
-                <FileCard {...f} />
-              </div>
-            </Link>
-          ))}
-        </div>
-      </Main>
+      <CommunityResultsLayout
+        heading={<h1>Files with #{tag}</h1>}
+        files={files}
+      />
     </>
   );
 }
-
-const Main = styled.main`
-  background: white;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 80px;
-
-  .grid {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 24px;
-    align-items: center;
-  }
-`;
 
 export async function getServerSideProps(context) {
   // we use serverside props here, since there are too many of them.
