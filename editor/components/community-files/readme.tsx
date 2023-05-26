@@ -163,7 +163,7 @@ export function Readme({
                   }}
                 >
                   <div>
-                    <FileCard {...content} />
+                    <FileCard {...content} theme="light" />
                   </div>
                 </Link>
               ))}

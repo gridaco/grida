@@ -9,17 +9,20 @@ export const FileCard = React.forwardRef(function (
     thumbnail_url,
     like_count,
     duplicate_count,
+    theme = "dark",
   }: Partial<{
     id: string;
     name: string;
     thumbnail_url: string;
     like_count: number;
     duplicate_count: number;
-  }>,
+  }> & {
+    theme?: "light" | "dark";
+  },
   ref: React.Ref<HTMLDivElement>
 ) {
   return (
-    <ItemWrapper ref={ref} data-id={id}>
+    <ItemWrapper ref={ref} data-id={id} data-theme={theme}>
       <span className="thumb">
         <img src={thumbnail_url} />
       </span>
@@ -43,6 +46,35 @@ export const FileCard = React.forwardRef(function (
 });
 
 const ItemWrapper = styled.div`
+  --forground-rgb-light: 0, 0, 0;
+  --background-rgb-light: 255, 255, 255;
+  --forground-rgb-dark: 255, 255, 255;
+  --background-rgb-dark: 0, 0, 0;
+
+  color: var(--forground-rgb-light);
+
+  &[data-theme="dark"] {
+    color: var(--forground-rgb-dark);
+    border: 1px solid rgba(var(--forground-rgb-dark), 0.1);
+    box-shadow: 0 0 16px 4px rgba(var(--forground-rgb-dark), 0);
+
+    &:hover {
+      box-shadow: 0 0 16px 4px rgba(var(--forground-rgb-dark), 0.04);
+      border: 1px solid rgba(var(--forground-rgb-dark), 0.2);
+    }
+  }
+
+  &[data-theme="light"] {
+    color: var(--forground-rgb-light);
+    border: 1px solid rgba(var(--forground-rgb-light), 0.1);
+    box-shadow: 0 0 16px 4px rgba(var(--forground-rgb-light), 0);
+
+    &:hover {
+      box-shadow: 0 0 16px 4px rgba(var(--forground-rgb-light), 0.04);
+      border: 1px solid rgba(var(--forground-rgb-light), 0.2);
+    }
+  }
+
   display: flex;
   flex-direction: column;
   align-items: flex-start;
@@ -50,17 +82,11 @@ const ItemWrapper = styled.div`
   border-radius: 4px;
   overflow: hidden;
 
-  border: 1px solid rgba(0, 0, 0, 0.1);
-  box-shadow: 0 0 16px 4px rgba(0, 0, 0, 0);
-
   width: 380px;
 
   transition: all 0.2s ease-in-out;
 
   &:hover {
-    box-shadow: 0 0 16px 4px rgba(0, 0, 0, 0.04);
-    border: 1px solid rgba(0, 0, 0, 0.2);
-
     img {
       transform: scale(1.03);
     }
