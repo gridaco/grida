@@ -4,6 +4,13 @@ import path from "path";
 export type FigmaCommunityFileId = string;
 export type FigmaCommunityPublisherId = string;
 
+export interface FigmaCommunityFileQueryParams {
+  page?: number;
+  limit?: number;
+  q?: string;
+  tag?: string;
+}
+
 export interface FigmaCommunityFileMeta {
   id: FigmaCommunityFileId;
   name: string;
@@ -90,7 +97,7 @@ function minify(
 // cache meta file
 let __meta = null;
 
-export class FigmaArchiveMetaFile {
+export class FigmaCommunityArchiveMetaRepository {
   readonly meta: any;
 
   constructor() {
@@ -102,6 +109,34 @@ export class FigmaArchiveMetaFile {
 
   find(id: string): FigmaCommunityFileMeta {
     return this.meta.find((file) => file.id === id);
+  }
+
+  q({
+    page,
+    limit = 100,
+    q,
+    tag,
+    shorten = true,
+  }: FigmaCommunityFileQueryParams & {
+    shorten?: boolean;
+  }) {
+    // if q is provided, search by q
+    // if tag is provided, search by tag
+    // do pagination
+
+    const pass = () => true;
+    const results = this.meta
+      // q
+      .filter(q ? (meta) => meta.name.includes(q) : pass)
+      // tag
+      .filter(tag ? (meta) => meta.tags.includes(tag) : pass)
+      // pagination
+      .slice((page - 1) * limit, page * limit);
+
+    if (shorten) {
+      return minify(...results);
+    }
+    return results;
   }
 
   page(
