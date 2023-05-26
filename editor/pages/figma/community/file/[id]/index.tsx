@@ -44,7 +44,7 @@ export default function FigmaCommunityFileEditorPage(
         <meta name="tags" content={(tags || []).join(", ")} />
       </Head>
       <Dialog open={readme} maxWidth="lg">
-        <Readme {...props} />
+        <Readme key={id} {...props} />
       </Dialog>
       {/* <SigninToContinuePrmoptProvider>
         <Workspace>

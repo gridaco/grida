@@ -64,11 +64,27 @@ function read_meta_file(): ReadonlyArray<FigmaCommunityFileMeta> {
 }
 
 function shorten_description(description: string, length: number = 64) {
+  if (!description) return null;
   // 1. parse & remove html tags
   const plain = description.replace(/<[^>]*>?/gm, "");
   // 2. shorten to length
   // 3. add ... if needed
   return plain.slice(0, length) + "...";
+}
+
+function minify(
+  ...files: FigmaCommunityFileMeta[]
+): ReadonlyArray<Partial<FigmaCommunityFileMeta>> {
+  return files.map((meta) => {
+    return {
+      id: meta.id,
+      name: meta.name,
+      thumbnail_url: meta.thumbnail_url,
+      duplicate_count: meta.duplicate_count,
+      like_count: meta.like_count,
+      publisher: meta.publisher,
+    };
+  }) as ReadonlyArray<Partial<FigmaCommunityFileMeta>>;
 }
 
 export class FigmaArchiveMetaFile {
@@ -86,15 +102,13 @@ export class FigmaArchiveMetaFile {
     page: number = 1,
     limit: number = 100,
     shorten: boolean = true
-  ): ReadonlyArray<FigmaCommunityFileMeta> {
+  ): ReadonlyArray<Partial<FigmaCommunityFileMeta>> {
     const start = page * limit;
     const end = start + limit;
-    return this.meta.slice(start, end).map((meta) => ({
-      ...meta,
-      description: shorten
-        ? shorten_description(meta.description)
-        : meta.description,
-    }));
+    if (shorten) {
+      return minify(...this.meta.slice(start, end));
+    }
+    return this.meta.slice(start, end);
   }
 
   all() {
@@ -111,8 +125,9 @@ export class FigmaArchiveMetaFile {
     return Array.from(tags);
   }
 
-  query_tag(tag: string) {
-    return this.meta.filter((meta) => meta.tags.includes(tag));
+  query_tag(tag: string): ReadonlyArray<Partial<FigmaCommunityFileMeta>> {
+    const files = this.meta.filter((meta) => meta.tags.includes(tag));
+    return minify(...files);
   }
 
   getStaticProps(id: string) {

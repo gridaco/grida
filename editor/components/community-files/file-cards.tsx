@@ -9,13 +9,13 @@ export const FileCard = React.forwardRef(function (
     thumbnail_url,
     like_count,
     duplicate_count,
-  }: {
+  }: Partial<{
     id: string;
     name: string;
     thumbnail_url: string;
     like_count: number;
     duplicate_count: number;
-  },
+  }>,
   ref: React.Ref<HTMLDivElement>
 ) {
   return (
