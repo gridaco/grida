@@ -161,6 +161,7 @@ function ControllerBar({
 }
 
 const ControllerBarActionArea = styled.div`
+  color: white;
   display: flex;
   gap: 10px;
 `;
