@@ -7,6 +7,7 @@ export type FigmaCommunityPublisherId = string;
 export interface FigmaCommunityFileQueryParams {
   page?: number;
   limit?: number;
+  sort?: "popular" | "latest"; // TODO: add trending
   q?: string;
   tag?: string;
 }
@@ -112,10 +113,11 @@ export class FigmaCommunityArchiveMetaRepository {
   }
 
   q({
-    page,
+    page = 1,
     limit = 100,
     q,
     tag,
+    sort = "popular",
     shorten = true,
   }: FigmaCommunityFileQueryParams & {
     shorten?: boolean;
@@ -124,12 +126,41 @@ export class FigmaCommunityArchiveMetaRepository {
     // if tag is provided, search by tag
     // do pagination
 
+    // sorting
+    const sort_by_popularity = (a, b) => {
+      // 1. sort by like_count, if same, sort by duplicate_count
+      if (a.like_count === b.like_count) {
+        return b.duplicate_count - a.duplicate_count;
+      }
+      return b.like_count - a.like_count;
+    };
+
+    const sort_by_latest = (a, b) => {
+      // 1. sort by created_at
+      return (
+        new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      );
+    };
+
+    let sorting = sort_by_popularity;
+    switch (sort) {
+      case "latest":
+        sorting = sort_by_latest;
+        break;
+      case "popular":
+      default:
+        sorting = sort_by_popularity;
+    }
+    //
+
     const pass = () => true;
     const results = this.meta
       // q
       .filter(q ? (meta) => meta.name.includes(q) : pass)
       // tag
       .filter(tag ? (meta) => meta.tags.includes(tag) : pass)
+      // sort
+      .sort(sorting)
       // pagination
       .slice((page - 1) * limit, page * limit);
 

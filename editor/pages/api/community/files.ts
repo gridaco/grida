@@ -13,6 +13,7 @@ export default async function handler(req, res) {
     page: q_page,
     limit: q_limit,
     q,
+    sort,
     tag,
   } = req.query as SearchParams;
 
@@ -23,7 +24,7 @@ export default async function handler(req, res) {
   switch (origin) {
     case "figma": {
       const service = new FigmaCommunityArchiveMetaRepository();
-      const results = service.q({ page, limit, q, tag });
+      const results = service.q({ page, limit, q, tag, sort });
       res.status(200).json(results);
       return;
     }
