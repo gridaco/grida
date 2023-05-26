@@ -6,10 +6,12 @@ import styled from "@emotion/styled";
 import Link from "next/link";
 import { FileCard } from "components/community-files/file-cards";
 import { MagnifyingGlassIcon } from "@radix-ui/react-icons";
+import { useRouter } from "next/router";
 export default function FigmaCommunityFilesIndexPage({
   page: pageStart,
   files,
 }: InferGetStaticPropsType<typeof getStaticProps>) {
+  const router = useRouter();
   const [page, setPage] = React.useState(pageStart);
 
   return (
@@ -20,10 +22,23 @@ export default function FigmaCommunityFilesIndexPage({
       <Main>
         <h1>Community Files</h1>
         <p>Explore 20,000+ Code-Ready Community Files from Figma</p>
-        <div className="search">
+        <form
+          className="search"
+          onSubmit={(e) => {
+            e.preventDefault();
+            // get with id 'q'
+            const q = e.target["elements"]["q"].value;
+            router.push({
+              pathname: "/community/search",
+              query: {
+                q,
+              },
+            });
+          }}
+        >
           <MagnifyingGlassIcon />
-          <input placeholder="Search" />
-        </div>
+          <input id="q" type="search" placeholder="Search" autoComplete="off" />
+        </form>
         <div>
           <div className="grid">
             {files.map((file) => (
