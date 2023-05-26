@@ -9,10 +9,13 @@ const client = Axios.create({
 });
 
 export async function query(p: FigmaCommunityFileQueryParams) {
-  return await client.get<ReadonlyArray<Partial<FigmaCommunityFileMeta>>>("/", {
-    params: {
-      origin: "figma",
-      ...p,
-    },
-  });
+  return await client.get<ReadonlyArray<Partial<FigmaCommunityFileMeta>>>(
+    "/files",
+    {
+      params: {
+        origin: "figma",
+        ...p,
+      },
+    }
+  );
 }
