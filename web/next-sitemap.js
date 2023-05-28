@@ -4,7 +4,7 @@ module.exports = {
   priority: 1,
   sitemapSize: 5000,
   generateRobotsTxt: true,
-  exclude: ["/legacy-docs/*"],
+  exclude: ["/legacy-docs/*", "/figma-instant-auth-callback"],
   robotsTxtOptions: {
     policies: [
       {
