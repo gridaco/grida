@@ -111,7 +111,10 @@ function minify(
 }
 
 // cache meta file
-let __meta = null;
+let __meta: {
+  data: ReadonlyArray<FigmaCommunityFileMeta>;
+  stage: TMetaFileStage;
+} = null;
 
 export class FigmaCommunityArchiveMetaRepository {
   readonly meta: ReadonlyArray<FigmaCommunityFileMeta>;
@@ -122,10 +125,11 @@ export class FigmaCommunityArchiveMetaRepository {
       (process.env.FIGMA_COMMUNITY_FILES_STAGE as any) ||
       "development";
 
-    if (!__meta) {
-      __meta = read_meta_file(this.stage);
+    // load from cache or read from file
+    if (!__meta || __meta.stage !== this.stage) {
+      __meta = { data: read_meta_file(this.stage), stage: this.stage };
     }
-    this.meta = __meta;
+    this.meta = __meta.data;
   }
 
   find(id: string): FigmaCommunityFileMeta {
@@ -238,7 +242,7 @@ export class FigmaCommunityArchiveMetaRepository {
     return minify(...files);
   }
 
-  getStaticProps(id: string) {
+  getProps(id: string) {
     const meta = this.find(id);
 
     const {
