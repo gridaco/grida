@@ -1,7 +1,7 @@
 module.exports = {
   siteUrl: process.env.SITE_URL || "https://grida.co",
   changefreq: "weekly",
-  priority: 0.7,
+  priority: 1,
   sitemapSize: 5000,
   generateRobotsTxt: true,
   exclude: ["/legacy-docs/*"],
