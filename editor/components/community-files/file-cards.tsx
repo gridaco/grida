@@ -24,7 +24,15 @@ export const FileCard = React.forwardRef(function (
   return (
     <ItemWrapper ref={ref} data-id={id} data-theme={theme}>
       <span className="thumb">
-        <img src={thumbnail_url} />
+        <img
+          src={thumbnail_url}
+          alt={name}
+          style={{
+            maxHeight: 200,
+            height: "100%",
+            width: "100%",
+          }}
+        />
       </span>
       <div className="content">
         <div>
