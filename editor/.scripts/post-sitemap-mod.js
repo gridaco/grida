@@ -9,8 +9,11 @@ const xml = fs.readFileSync(filePath, "utf-8");
 const HOST = "https://code.grida.co";
 
 const additionals = [
-  // Add more below for custom sitemap references
-  { loc: HOST + "/community/sitemap.xml" },
+  //
+  // 👇 update here 👇
+  //
+  { loc: HOST + "/community/files/sitemap.xml" },
+  { loc: HOST + "/community/tag/sitemap.xml" },
 ];
 
 // Parse the XML into a JavaScript object
