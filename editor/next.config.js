@@ -111,6 +111,14 @@ module.exports = withPlugins(
 
       return config;
     },
+    async rewrites() {
+      return [
+        {
+          source: "/community/sitemap.xml",
+          destination: "/api/sitemap/community",
+        },
+      ];
+    },
     async redirects() {
       return [
         {

@@ -223,8 +223,11 @@ export class FigmaCommunityArchiveMetaRepository {
     return this.meta.slice(start, end);
   }
 
-  all() {
-    return minify(...this.meta);
+  all(option?: { shorten?: boolean }) {
+    if (option?.shorten) {
+      return minify(...this.meta);
+    }
+    return this.meta;
   }
 
   tags(): ReadonlyArray<string> {
