@@ -26,6 +26,8 @@ import {
   SceneItem,
 } from "../core";
 import Selecto from "react-selecto";
+import { openInFigma } from "@code-editor/external-links";
+import toast from "react-hot-toast";
 
 export function Dashboard() {
   const {
@@ -329,6 +331,16 @@ function DashboardItemCard(
   }
 }
 
+const scene_card_context_menu_items = [
+  { title: "View on Canvas", value: "focus" },
+  { title: "View Details", value: "isolate" },
+  { title: "Open in Diff View", value: "diff" },
+  { title: "Open in Figma", value: "open-in-figma" },
+] as const;
+
+type TSceneCardContextMenuKey =
+  typeof scene_card_context_menu_items[number]["value"];
+
 function SceneCard(
   props: SceneItem & Omit<DashboardItemCardProps, "label" | "preview" | "icon">
 ) {
@@ -368,14 +380,8 @@ function SceneCard(
     style: { opacity },
   };
 
-  const items: MenuItem<string>[] = [
-    { title: "View on Canvas", value: "focus" },
-    { title: "View Details", value: "isolate" },
-    { title: "Open in Figma", value: "open-in-figma" },
-  ];
-
   const onContextSelect = useCallback(
-    (value: string) => {
+    (value: TSceneCardContextMenuKey) => {
       switch (value) {
         case "focus": {
           focusNodeOnCanvas(props.scene.id);
@@ -383,6 +389,21 @@ function SceneCard(
         }
         case "isolate": {
           isolateNode(props.scene.id);
+          break;
+        }
+        case "open-in-figma": {
+          if (typeof props.scene.filekey === "string") {
+            openInFigma(props.scene.filekey, props.scene.id);
+          } else {
+            toast("This file can't be opened in Figma.");
+          }
+          break;
+        }
+        case "diff": {
+          // todo
+        }
+        default: {
+          throw new Error(`Unknown context menu item ${value}`);
         }
       }
     },
@@ -390,7 +411,10 @@ function SceneCard(
   );
 
   return (
-    <ContextMenu items={items} onSelect={onContextSelect}>
+    <ContextMenu
+      items={scene_card_context_menu_items}
+      onSelect={onContextSelect}
+    >
       <div>
         <_SceneCard
           // @ts-ignore
