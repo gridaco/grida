@@ -1,3 +1,4 @@
+import zlib from "zlib";
 import { FigmaCommunityArchiveMetaRepository } from "ssg/community";
 import { template_urlset } from "utils/sitemap";
 /**
@@ -31,10 +32,12 @@ export default async function handler(req, res) {
   const urls = _urls_tag.splice(index * 50000, (index + 1) * 50000);
 
   const xml = template_urlset(urls);
+  const xmlgz = zlib.gzipSync(xml);
 
   res.statusCode = 200;
-  res.setHeader("Content-Type", "text/xml");
-  res.setHeader("Cache-control", "stale-while-revalidate, s-maxage=3600");
-  res.write(xml);
+  res.setHeader("Content-Encoding", "gzip");
+  res.setHeader("Content-Type", "application/xml");
+  res.setHeader("Cache-Control", "public, max-age=604800"); // 1 week
+  res.write(xmlgz);
   res.end();
 }
