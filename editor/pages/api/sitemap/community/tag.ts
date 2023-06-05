@@ -37,6 +37,7 @@ export default async function handler(req, res) {
   res.statusCode = 200;
   res.setHeader("Content-Encoding", "gzip");
   res.setHeader("Content-Type", "application/xml");
+  res.setHeader("Content-Length", xmlgz.length);
   res.setHeader("Cache-Control", "public, max-age=604800"); // 1 week
   res.write(xmlgz);
   res.end();
