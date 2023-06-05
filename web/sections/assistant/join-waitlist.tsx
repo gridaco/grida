@@ -9,7 +9,14 @@ import { links } from "k/links";
 
 day.extend(RelativeTime);
 
-const list_close_at = day("2023-05-31T00:00:00.000Z");
+// get the first day of the next 2 weeks friday
+const list_close_at = day()
+  .day(5)
+  .add(2, "week")
+  .hour(0)
+  .minute(0)
+  .second(0)
+  .millisecond(0);
 
 export function JoinWaitlistSection() {
   const [closein, setClosein] = React.useState<string>(list_close_at.fromNow());
@@ -21,18 +28,25 @@ export function JoinWaitlistSection() {
       // get the time difference between now and the list close time
       const diff = list_close_at.diff(day(), "second");
 
-      // format
-      const days = Math.floor(diff / (3600 * 24));
-      const hours = Math.floor((diff % (3600 * 24)) / 3600);
-      const minutes = Math.floor((diff % 3600) / 60);
-      const seconds = Math.floor(diff % 60);
+      const isPast = diff < 0;
 
-      // set the state
-      setClosein(
-        `${
-          days > 0 ? `${days} days ` : ""
-        }${hours} hours ${minutes} minutes and ${seconds} seconds`,
-      );
+      if (isPast) {
+        // set the state
+        setClosein(undefined);
+      } else {
+        // format
+        const days = Math.floor(diff / (3600 * 24));
+        const hours = Math.floor((diff % (3600 * 24)) / 3600);
+        const minutes = Math.floor((diff % 3600) / 60);
+        const seconds = Math.floor(diff % 60);
+
+        // set the state
+        setClosein(
+          `${
+            days > 0 ? `${days} days ` : ""
+          }${hours} hours ${minutes} minutes and ${seconds} seconds`,
+        );
+      }
     }, 1000);
     return () => clearInterval(interval);
   }, []);
@@ -47,10 +61,12 @@ export function JoinWaitlistSection() {
       }}
     >
       <FeaturedCard>
-        <TickerText>
-          <span className="text">The list will close in </span>
-          <span className="time">{closein}</span>
-        </TickerText>
+        {closein && (
+          <TickerText>
+            <span className="text">The list will close in </span>
+            <span className="time">{closein}</span>
+          </TickerText>
+        )}
         <h1>Join the waitlist</h1>
         <p>
           AI Powered Assistant is available to invited users at this moment.
