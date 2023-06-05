@@ -1,12 +1,12 @@
 import React from "react";
 import styled from "@emotion/styled";
-import { SettingGearOutlinedIcon } from "icons";
+import { GearIcon } from "@radix-ui/react-icons";
 
 export function EditorFrameworkConfigOnAppbar() {
   return (
     <Wrapper>
       <FrameworkName>Flutter</FrameworkName>
-      <SettingGearOutlinedIcon color={"#787878"} size={16} />
+      <GearIcon color={"#787878"} width={16} />
     </Wrapper>
   );
 }

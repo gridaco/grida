@@ -1,10 +1,8 @@
 import React, { useEffect, useCallback, useState } from "react";
 import { NextRouter } from "next/router";
-import { EditorDefaultProviders } from "scaffolds/editor";
 import { EditorPage, EditorSnapshot, useEditorState } from "core/states";
 import { useDesignFile } from "hooks";
 import { warmup } from "scaffolds/editor";
-import { EditorBrowserMetaHead } from "components/editor";
 import type { FileResponse } from "@design-sdk/figma-remote-types";
 import { useWorkspaceInitializerContext } from "scaffolds/workspace";
 import { useDispatch } from "@code-editor/preferences";
@@ -18,7 +16,7 @@ type EditorSetupState = {
   loading?: boolean;
 };
 
-export const EditorSetupContext = React.createContext<EditorSetupState>(null);
+const EditorSetupContext = React.createContext<EditorSetupState>(null);
 
 export function useEditorSetupContext() {
   return React.useContext(EditorSetupContext);
@@ -186,9 +184,7 @@ export function SetupEditor({
 
   return (
     <EditorSetupContext.Provider value={{ loading }}>
-      <EditorDefaultProviders>
-        <EditorBrowserMetaHead>{children}</EditorBrowserMetaHead>
-      </EditorDefaultProviders>
+      {children}
     </EditorSetupContext.Provider>
   );
 }

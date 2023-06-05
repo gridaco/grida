@@ -11,6 +11,7 @@ import { useDispatch } from "core/dispatch";
 import { FrameTitleRenderer } from "./render/frame-title";
 import { cursors } from "@code-editor/ui";
 import { usePreferences } from "@code-editor/preferences";
+import { useRenderItemWithPreference } from "./hooks";
 
 /**
  * Statefull canvas segment that contains canvas as a child, with state-data connected.
@@ -18,10 +19,9 @@ import { usePreferences } from "@code-editor/preferences";
 export function VisualContentArea() {
   const [state] = useEditorState();
   const [canvasSizingRef, canvasBounds] = useMeasure();
-  const { config: preferences } = usePreferences();
-
   const { highlightedLayer, highlightLayer } = useWorkspace();
   const dispatch = useDispatch();
+  const renderItem = useRenderItemWithPreference();
 
   const {
     selectedPage,
@@ -65,25 +65,6 @@ export function VisualContentArea() {
     }, ${thisPage.backgroundColor.b * 255}, ${thisPage.backgroundColor.a})`;
 
   const cursor = state.designerMode === "comment" ? cursors.comment : "default";
-
-  const { renderer } = preferences.canvas;
-  const renderItem = useCallback(
-    (p) => {
-      switch (renderer) {
-        case "bitmap-renderer": {
-          return (
-            <OptimizedPreviewCanvas key={p.node.id} target={p.node} {...p} />
-          );
-        }
-        case "vanilla-renderer": {
-          return <D2CVanillaPreview key={p.node.id} target={p.node} {...p} />;
-        }
-        default:
-          throw new Error("Unknown renderer", renderer);
-      }
-    },
-    [renderer]
-  );
 
   return (
     <CanvasContainer ref={canvasSizingRef} id="canvas">

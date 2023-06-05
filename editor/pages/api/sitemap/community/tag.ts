@@ -1,0 +1,40 @@
+import { FigmaCommunityArchiveMetaRepository } from "ssg/community";
+import { template_urlset } from "utils/sitemap";
+/**
+ * Generates sitemap urlset for community tag pages
+ *
+ * This sitemap is referenced from sitemap.xml, post modified by `.scripts/post-sitemap-mod.js`,
+ * which the url is rewrited from next.config.js
+ *
+ * @see
+ * - https://vercel.com/guides/how-do-i-generate-a-sitemap-for-my-nextjs-app-on-vercel
+ *
+ */
+export default async function handler(req, res) {
+  const { query } = req;
+  const index = query.i || 0;
+
+  const service = new FigmaCommunityArchiveMetaRepository();
+  const tags = service.tags();
+
+  const _urls_tag = tags.map((tag) => {
+    try {
+      return {
+        loc: `https://code.grida.co/community/tag/${tag}/files`,
+        lastmod: new Date().toISOString(),
+        changefreq: "weekly",
+        priority: 0.6,
+      };
+    } catch (e) {}
+  });
+
+  const urls = _urls_tag.splice(index * 50000, (index + 1) * 50000);
+
+  const xml = template_urlset(urls);
+
+  res.statusCode = 200;
+  res.setHeader("Content-Type", "text/xml");
+  res.setHeader("Cache-control", "stale-while-revalidate, s-maxage=3600");
+  res.write(xml);
+  res.end();
+}

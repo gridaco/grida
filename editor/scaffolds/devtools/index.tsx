@@ -3,9 +3,7 @@ import styled from "@emotion/styled";
 import { DevtoolsTab } from "@code-editor/devtools";
 import { colors } from "theme";
 import { Resizable } from "re-resizable";
-import { AngleDownIcon } from "icons/icon-angle-down";
-import { AngleUpIcon } from "icons/icon-angle-up";
-import { TrashIcon } from "icons/icon-trash";
+import { CaretDownIcon, CaretUpIcon, TrashIcon } from "@radix-ui/react-icons";
 import { useDispatch } from "core/dispatch";
 import { EditorConsoleFeed } from "./console-feed";
 import { useEditorState } from "core/states";
@@ -150,12 +148,12 @@ function ControllerBar({
           <TrashIcon onClick={onClearConsole} style={{ cursor: "pointer" }} />
         ) : null}
         {expanded ? (
-          <AngleDownIcon
+          <CaretDownIcon
             onClick={onToggleExpand}
             style={{ cursor: "pointer" }}
           />
         ) : (
-          <AngleUpIcon onClick={onToggleExpand} style={{ cursor: "pointer" }} />
+          <CaretUpIcon onClick={onToggleExpand} style={{ cursor: "pointer" }} />
         )}
       </ControllerBarActionArea>
     </div>
@@ -163,6 +161,7 @@ function ControllerBar({
 }
 
 const ControllerBarActionArea = styled.div`
+  color: white;
   display: flex;
   gap: 10px;
 `;

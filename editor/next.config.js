@@ -111,6 +111,20 @@ module.exports = withPlugins(
 
       return config;
     },
+    async rewrites() {
+      return [
+        // custom sitemaps
+        // TODO: add pagination
+        {
+          source: "/community/files/sitemap.xml",
+          destination: "/api/sitemap/community/files",
+        },
+        {
+          source: "/community/tag/sitemap.xml",
+          destination: "/api/sitemap/community/tag",
+        },
+      ];
+    },
     async redirects() {
       return [
         {

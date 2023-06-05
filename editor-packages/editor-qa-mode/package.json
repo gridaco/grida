@@ -1,0 +1,6 @@
+{
+  "name": "@code-editor/qa-mode",
+  "version": "0.0.0",
+  "description": "Internal QA mode related package",
+  "license": "MIT"
+}

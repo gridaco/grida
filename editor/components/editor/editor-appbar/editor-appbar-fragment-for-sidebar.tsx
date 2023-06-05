@@ -14,13 +14,14 @@ import {
 } from "@editor-ui/dropdown-menu";
 import { useEditorState } from "core/states";
 import { useOpenPreferences } from "@code-editor/preferences";
+import { openInFigma } from "@code-editor/external-links";
 
 export function AppbarFragmentForSidebar() {
   const [state] = useEditorState();
   const router = useRouter();
 
   const handleOpenFile = useCallback(() => {
-    open(`https://www.figma.com/file/${state.design.key}`);
+    openInFigma(state.design.key);
   }, [state?.design?.key]);
 
   const openPreferences = useOpenPreferences();

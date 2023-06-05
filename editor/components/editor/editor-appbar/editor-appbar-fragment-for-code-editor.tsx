@@ -1,7 +1,7 @@
 import React from "react";
 import styled from "@emotion/styled";
 import { EditorAppbarIconButton } from "./editor-appbar-icon-button";
-import { GithubIcon, NotificationBellIcon } from "icons";
+import { GitHubLogoIcon, BellIcon } from "@radix-ui/react-icons";
 import { EditorFrameworkConfigOnAppbar } from "../editor-framework-config-on-appbar";
 import { EditorProgressIndicator } from "scaffolds/editor-progress-indicator";
 import { colors } from "theme";
@@ -26,7 +26,7 @@ export function AppbarFragmentForRightSidebar({
       <AppbarActions>
         {hasNotification && (
           <EditorAppbarIconButton onClick={() => {}}>
-            <NotificationBellIcon size={24} color="#787878" />
+            <BellIcon width={24} color="#787878" />
           </EditorAppbarIconButton>
         )}
         <EditorProgressIndicator />
@@ -35,7 +35,7 @@ export function AppbarFragmentForRightSidebar({
             window.open("https://github.com/gridaco/designto-code/", "_blank");
           }}
         >
-          <GithubIcon size={18} color="#787878" />
+          <GitHubLogoIcon width={18} color="#787878" />
         </EditorAppbarIconButton>
       </AppbarActions>
     </RootWrapperAppbarFragmentForCodeEditor>
