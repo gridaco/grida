@@ -334,7 +334,7 @@ function DashboardItemCard(
 const scene_card_context_menu_items = [
   { title: "View on Canvas", value: "focus" },
   { title: "View Details", value: "isolate" },
-  { title: "Open in Diff View", value: "diff" },
+  // { title: "Open in Diff View", value: "diff" },
   { title: "Open in Figma", value: "open-in-figma" },
 ] as const;
 
@@ -399,9 +399,9 @@ function SceneCard(
           }
           break;
         }
-        case "diff": {
-          // todo
-        }
+        // case "diff": {
+        //   // todo
+        // }
         default: {
           throw new Error(`Unknown context menu item ${value}`);
         }

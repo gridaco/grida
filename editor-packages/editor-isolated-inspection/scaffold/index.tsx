@@ -7,7 +7,7 @@ import useMeasure from "react-use-measure";
 import { cursors } from "@code-editor/ui";
 import assert from "assert";
 import { Navigation } from "./navigation";
-import { Toolbar } from "./toolbar";
+// import { Toolbar } from "./toolbar";
 import { findUnder } from "../utils/find-under";
 import { useRenderItemWithPreference } from "editor/scaffolds/canvas/hooks";
 
@@ -20,7 +20,8 @@ export function EditorIsolatedInspection() {
         display: "flex",
       }}
     >
-      <Toolbar />
+      {/* TODO: Add toolbar */}
+      {/* <Toolbar /> */}
       <Navigation />
       <VisualContentArea />
     </div>
