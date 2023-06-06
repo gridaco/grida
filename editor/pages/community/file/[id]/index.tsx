@@ -1,7 +1,11 @@
 import React, { useEffect, useState } from "react";
 import Head from "next/head";
 import { SigninToContinuePrmoptProvider } from "components/prompt-banner-signin-to-continue";
-import { Editor, SetupEditor } from "scaffolds/editor";
+import {
+  Editor,
+  EditorDefaultProviders,
+  SetupFigmaCommunityFileEditor,
+} from "scaffolds/editor";
 import { Workspace, useWorkspaceInitializerContext } from "scaffolds/workspace";
 import { useRouter } from "next/router";
 import { InferGetServerSidePropsType } from "next";
@@ -58,17 +62,16 @@ export default function FigmaCommunityFileEditorPage(
       </Dialog>
       <SigninToContinuePrmoptProvider>
         <Workspace>
-          <CommunityFileSetup id={id}>
-            <SetupEditor
-              //
-              key={id}
-              filekey={id}
-              nodeid={undefined}
-              router={router}
-            >
+          <SetupFigmaCommunityFileEditor
+            key={id}
+            filekey={id}
+            nodeid={undefined}
+            router={router}
+          >
+            <EditorDefaultProviders>
               <Editor />
-            </SetupEditor>
-          </CommunityFileSetup>
+            </EditorDefaultProviders>
+          </SetupFigmaCommunityFileEditor>
         </Workspace>
       </SigninToContinuePrmoptProvider>
     </>
@@ -80,17 +83,6 @@ interface CommunityFileSetupProps {
    * The file id of the community file.
    */
   id: string;
-}
-
-function CommunityFileSetup({
-  children,
-  id,
-}: React.PropsWithChildren<CommunityFileSetupProps>) {
-  const { provideEditorSnapshot: initialize } =
-    useWorkspaceInitializerContext();
-
-  // TODO:
-  return <>{children}</>;
 }
 
 export async function getServerSideProps(context) {
