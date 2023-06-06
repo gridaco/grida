@@ -1,7 +1,7 @@
 import React, { useEffect, useCallback, useState } from "react";
 import { NextRouter } from "next/router";
 import { EditorPage, EditorSnapshot, useEditorState } from "core/states";
-import { useDesignFile } from "hooks";
+import { useFigmaFile } from "hooks";
 import { warmup } from "scaffolds/editor";
 import type { FileResponse } from "@design-sdk/figma-remote-types";
 import { useWorkspaceInitializerContext } from "scaffolds/workspace";
@@ -36,7 +36,7 @@ export function SetupEditor({
     useWorkspaceInitializerContext();
 
   // background whole file fetching
-  const file = useDesignFile({ file: filekey });
+  const file = useFigmaFile({ file: filekey });
 
   // todo background file fetching to task queue
   // useEffect(() => {

@@ -30,36 +30,36 @@ configure_auth_credentials({
  */
 export const P_DESIGN = "design";
 
-type UseDesignProp =
-  | (UseDesignFromRouter & UseDesingOptions)
-  | (UseDesingFromUrl & UseDesingOptions)
-  | (UseDesignFromFileAndNode & UseDesingOptions);
+type UseFigmaInput =
+  | (UseFigmaFromRouter & UseFigmaOptions)
+  | (UseFimgaFromUrl & UseFigmaOptions)
+  | (UseFigmaFromFileNodeKey & UseFigmaOptions);
 
-interface UseDesingOptions {
+interface UseFigmaOptions {
   use_session_cache?: boolean;
 }
 
-interface UseDesignFromRouter {
+interface UseFigmaFromRouter {
   type: "use-router";
   router?: NextRouter;
 }
 
-interface UseDesingFromUrl {
+interface UseFimgaFromUrl {
   type: "use-url";
   url: string;
 }
 
-interface UseDesignFromFileAndNode {
+interface UseFigmaFromFileNodeKey {
   type: "use-file-node-id";
   file: string;
   node: string;
 }
 
-export function useDesign({
+export function useFigmaNode({
   use_session_cache = false,
   type,
   ...props
-}: UseDesignProp) {
+}: UseFigmaInput) {
   const [design, setDesign] = useState<TargetNodeConfig>(null);
   const fat = useFigmaAuth();
   const router = (type === "use-router" && props["router"]) ?? useRouter();
@@ -79,7 +79,7 @@ export function useDesign({
       }
       case "use-router": {
         const designparam: string = router.query[P_DESIGN] as string;
-        const _r = designparam && analyze(designparam);
+        const _r = designparam && analyzeRouterQuery(designparam);
         switch (_r) {
           case "figma": {
             targetnodeconfig = parseFileAndNodeId(designparam);
@@ -96,7 +96,7 @@ export function useDesign({
         break;
       }
       case "use-url": {
-        targetnodeconfig = parseFileAndNodeId((props as UseDesingFromUrl).url);
+        targetnodeconfig = parseFileAndNodeId((props as UseFimgaFromUrl).url);
         break;
       }
     }
@@ -186,7 +186,7 @@ export type TUseDesignFile =
   | { __type: "error"; reason: "no-file" }
   | { __type: "loading" };
 
-export function useDesignFile({ file }: { file: string }) {
+export function useFigmaFile({ file }: { file: string }) {
   const [designfile, setDesignFile] = useState<TUseDesignFile>({
     __type: "loading",
   });
@@ -240,7 +240,7 @@ export function useDesignFile({ file }: { file: string }) {
   return designfile;
 }
 
-const analyze = (query: string): "id" | DesignProvider => {
+const analyzeRouterQuery = (query: string): "id" | DesignProvider => {
   const _r = analyzeDesignUrl(query);
   if (_r == "unknown") {
     return "id";
