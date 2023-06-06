@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import Pusher from "pusher-js";
 import LoadingLayout from "layouts/loading-overlay";
-import { useDesign } from "hooks";
+import { useFigmaNode } from "hooks";
 import { designToCode, Result } from "@designto/code";
 import { TargetNodeConfig } from "../../query/target-node";
 import {
@@ -71,7 +71,7 @@ export default function LiveSessionPage() {
 }
 
 function DesignProxyPage({ file, node }: { file: string; node: string }) {
-  const design = useDesign({
+  const design = useFigmaNode({
     type: "use-file-node-id",
     file: file,
     node: node,

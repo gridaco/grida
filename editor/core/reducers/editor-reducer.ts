@@ -21,7 +21,7 @@ import type {
   EnterIsolatedInspectionAction,
   ExitIsolatedInspectionAction,
 } from "core/actions";
-import { EditorState } from "core/states";
+import { EditorState, EssentialWorkspaceInfo } from "core/states";
 import { NextRouter, useRouter } from "next/router";
 import { CanvasStateStore } from "@code-editor/canvas/stores";
 import q from "@design-sdk/query";
@@ -30,8 +30,6 @@ import { getPageNode } from "utils/get-target-node";
 import { nanoid } from "nanoid";
 import { last_page_by_mode } from "core/stores";
 import { track } from "@code-editor/analytics";
-
-const _editor_path_name = "/files/[key]/";
 
 const _DEV_CLEAR_LOG = false;
 
@@ -42,7 +40,10 @@ const clearlog = (by: string) => {
   }
 };
 
-export function editorReducer(state: EditorState, action: Action): EditorState {
+export function editorReducer(
+  state: EditorState & EssentialWorkspaceInfo,
+  action: Action
+): EditorState {
   const router = useRouter();
   const filekey = state.design.key;
 
@@ -395,10 +396,8 @@ function update_route(
 
   // remove undefined fields
   Object.keys(q).forEach((k) => q[k] === undefined && delete q[k]);
-
   router.push(
     {
-      pathname: _editor_path_name,
       query: { ...router.query, ...q },
     },
     undefined,

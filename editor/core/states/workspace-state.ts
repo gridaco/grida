@@ -1,7 +1,11 @@
 import { config } from "@grida/builder-config";
 import { HistoryState } from "core/states/history-state";
 
-export interface WorkspaceState {
+export interface EssentialWorkspaceInfo {
+  // Add workspace seed data here, which cannot be automatically filled on initial state.
+}
+
+export interface WorkspaceState extends EssentialWorkspaceInfo {
   history: HistoryState;
   /**
    * hovered layer; single or none.

@@ -5,7 +5,7 @@ import React, {
   createContext,
 } from "react";
 import { useRouter } from "next/router";
-import { StateProvider } from "core/states";
+import { EssentialWorkspaceInfo, StateProvider } from "core/states";
 import { SetupWorkspace } from "./setup";
 import { WorkspaceDefaultProviders } from "./_providers";
 import * as warmup from "./warmup";
@@ -21,7 +21,10 @@ export function useWorkspaceInitializerContext() {
   return useContext(WorkspaceInitializerContext);
 }
 
-export function Workspace({ children }: React.PropsWithChildren<{}>) {
+export function Workspace({
+  children,
+  ...seed
+}: React.PropsWithChildren<EssentialWorkspaceInfo>) {
   const router = useRouter();
 
   const handleDispatch = useCallback((action: WorkspaceAction) => {
@@ -46,7 +49,10 @@ export function Workspace({ children }: React.PropsWithChildren<{}>) {
     type: "pending",
   });
 
-  const safe_value = warmup.safestate(initialState);
+  const safe_value = warmup.safestate({
+    ...initialState,
+    ...seed,
+  });
 
   return (
     <>

@@ -1,6 +1,6 @@
 import React from "react";
 import { MonacoEditor } from "components/code-editor";
-import { useDesign } from "hooks";
+import { useFigmaNode } from "hooks";
 import LoadingLayout from "layouts/loading-overlay";
 
 /**
@@ -9,7 +9,7 @@ import LoadingLayout from "layouts/loading-overlay";
  */
 export default function InspectRaw() {
   //
-  const design = useDesign({ type: "use-router" });
+  const design = useFigmaNode({ type: "use-router" });
   if (!design) {
     return <LoadingLayout />;
   }

@@ -39,7 +39,11 @@ export class FigmaDesignRepository {
     if (existing) {
       // everytime the file is consumed consider it as used, we upsert the file so that the lastUsed can be updated.
       metastore.upsert(existing.key, existing);
-      yield { ...existing, __initial: false } as TFetchFileForApp;
+      yield {
+        ...existing,
+        __initial: false,
+        __type: "file-fetched-for-app",
+      } as TFetchFileForApp;
     }
 
     const _iter = fetch.fetchFile({ file: filekey, auth: this.auth });

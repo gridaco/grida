@@ -1,25 +1,42 @@
-import { useWorkspace, useWorkspaceState } from "core/states";
-import React, { useCallback, useEffect, useMemo } from "react";
-import { FigmaImageService } from "services";
+import { WorkspaceState, useWorkspace, useWorkspaceState } from "core/states";
+import React, { useEffect, useMemo } from "react";
+import { FigmaImageService, ImageClientInterface } from "services";
 
 type Fetcher = { fetch: FigmaImageService["fetch"] };
 type FetcherParams = Parameters<Fetcher["fetch"]>;
+type ApiClientResolver = ({
+  filekey,
+  authentication,
+}: {
+  filekey: string;
+  authentication?: WorkspaceState["figmaAuthentication"];
+}) => ImageClientInterface | undefined | "reject";
 
 export const FigmaImageServiceContext = React.createContext<Fetcher>(null);
 
 export function FigmaImageServiceProvider({
   filekey,
   children,
+  resolveApiClient,
 }: React.PropsWithChildren<{
+  resolveApiClient: ApiClientResolver;
   filekey: string;
 }>) {
   const wssate = useWorkspaceState();
   const { pushTask, popTask } = useWorkspace();
 
   const service = useMemo(() => {
-    if (!filekey || !wssate.figmaAuthentication) return;
+    const client = resolveApiClient({
+      filekey: filekey,
+      authentication: wssate.figmaAuthentication,
+    });
 
-    return new FigmaImageService(filekey, wssate.figmaAuthentication, null, 24);
+    if (client === "reject" || !client) {
+      // do not create service without valid client.
+      return;
+    }
+
+    return new FigmaImageService(filekey, client, null, 24);
   }, [filekey, wssate.figmaAuthentication]);
 
   const fetcher = useMemo(() => {

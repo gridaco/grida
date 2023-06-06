@@ -10,7 +10,7 @@ import { LayerHierarchy } from "components/editor-hierarchy";
 import { WorkspaceContentPanelGridLayout } from "layouts/panel/workspace-content-panel-grid-layout";
 import { WorkspaceContentPanel } from "layouts/panel";
 import { WorkspaceBottomPanelDockLayout } from "layouts/panel/workspace-bottom-panel-dock-layout";
-import { useDesign } from "hooks";
+import { useFigmaNode } from "hooks";
 import {
   ImageRepository,
   MainImageRepository,
@@ -19,7 +19,7 @@ import { RemoteImageRepositories } from "@design-sdk/figma-remote/asset-reposito
 import LoadingLayout from "layouts/loading-overlay";
 
 export default function FigmaToReflectWidgetTokenPage() {
-  const design = useDesign({ type: "use-router" });
+  const design = useFigmaNode({ type: "use-router" });
 
   if (!design) {
     return <LoadingLayout />;
