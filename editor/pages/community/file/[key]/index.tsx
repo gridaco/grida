@@ -78,17 +78,10 @@ export default function FigmaCommunityFileEditorPage(
   );
 }
 
-interface CommunityFileSetupProps {
-  /**
-   * The file id of the community file.
-   */
-  id: string;
-}
-
 export async function getServerSideProps(context) {
   return {
     props: new FigmaCommunityArchiveMetaRepository().getProps(
-      context.params.id
+      context.params.key
     ),
   };
 }
