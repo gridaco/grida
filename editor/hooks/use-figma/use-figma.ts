@@ -1,4 +1,4 @@
-import { NextRouter, useRouter } from "next/router";
+import { useRouter } from "next/router";
 import { useEffect, useState } from "react";
 import { DesignProvider, analyzeDesignUrl } from "@design-sdk/url-analysis";
 import {
@@ -19,6 +19,7 @@ import { convert } from "@design-sdk/figma-node-conversion";
 import { mapper } from "@design-sdk/figma-remote";
 import { useFigmaAuth } from "scaffolds/workspace/figma-auth";
 import { FigmaDesignRepository, TFetchFileForApp } from "@editor/figma-file";
+import type { TUseDesignFile, UseFigmaInput, UseFimgaFromUrl } from "./types";
 
 // globally configure auth credentials for interacting with `@design-sdk/figma-remote`
 configure_auth_credentials({
@@ -29,31 +30,6 @@ configure_auth_credentials({
  * query param for design input
  */
 export const P_DESIGN = "design";
-
-type UseFigmaInput =
-  | (UseFigmaFromRouter & UseFigmaOptions)
-  | (UseFimgaFromUrl & UseFigmaOptions)
-  | (UseFigmaFromFileNodeKey & UseFigmaOptions);
-
-interface UseFigmaOptions {
-  use_session_cache?: boolean;
-}
-
-interface UseFigmaFromRouter {
-  type: "use-router";
-  router?: NextRouter;
-}
-
-interface UseFimgaFromUrl {
-  type: "use-url";
-  url: string;
-}
-
-interface UseFigmaFromFileNodeKey {
-  type: "use-file-node-id";
-  file: string;
-  node: string;
-}
 
 export function useFigmaNode({
   use_session_cache = false,
@@ -176,36 +152,28 @@ export function useFigmaNode({
   return design;
 }
 
-export type TUseDesignFile =
-  | TFetchFileForApp
-  | {
-      __type: "error";
-      reason: "no-auth" | "unauthorized";
-      cached?: TFetchFileForApp;
-    }
-  | { __type: "error"; reason: "no-file" }
-  | { __type: "loading" };
-
 export function useFigmaFile({ file }: { file: string }) {
   const [designfile, setDesignFile] = useState<TUseDesignFile>({
     __type: "loading",
   });
   const fat = useFigmaAuth();
+
+  async function iterator() {
+    const repo = new FigmaDesignRepository({
+      personalAccessToken: fat.personalAccessToken,
+      accessToken: fat.accessToken.token,
+    });
+    const iterator = repo.fetchFile(file);
+    let next: IteratorResult<TFetchFileForApp>;
+    while ((next = await iterator.next()).done === false) {
+      setDesignFile(next.value);
+    }
+  }
+
   useEffect(() => {
     if (file) {
       if (fat.personalAccessToken || fat.accessToken.token) {
-        async function handle() {
-          const repo = new FigmaDesignRepository({
-            personalAccessToken: fat.personalAccessToken,
-            accessToken: fat.accessToken.token,
-          });
-          const iterator = repo.fetchFile(file);
-          let next: IteratorResult<TFetchFileForApp>;
-          while ((next = await iterator.next()).done === false) {
-            setDesignFile(next.value);
-          }
-        }
-        handle();
+        iterator();
       } else {
         if (fat.accessToken.loading) {
           setDesignFile({
