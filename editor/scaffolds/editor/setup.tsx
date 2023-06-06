@@ -6,6 +6,7 @@ import { warmup } from "scaffolds/editor";
 import type { FileResponse } from "@design-sdk/figma-remote-types";
 import { useWorkspaceInitializerContext } from "scaffolds/workspace";
 import { useDispatch } from "@code-editor/preferences";
+import { FigmaImageServiceProvider } from "./editor-figma-image-service-provider";
 
 const action_fetchfile_id = "fetchfile" as const;
 
@@ -139,9 +140,11 @@ function FigmaEditorBaseSetup({
   }, [file]);
 
   return (
-    <EditorSetupContext.Provider value={{ loading: !loaded }}>
-      {children}
-    </EditorSetupContext.Provider>
+    <FigmaImageServiceProvider filekey={filekey}>
+      <EditorSetupContext.Provider value={{ loading: !loaded }}>
+        {children}
+      </EditorSetupContext.Provider>
+    </FigmaImageServiceProvider>
   );
 }
 

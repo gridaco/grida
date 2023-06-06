@@ -4,7 +4,6 @@ import { EditorImageRepositoryProvider } from "./editor-image-repository-provide
 import { EditorPreviewDataProvider } from "./editor-preview-provider";
 import { EditorCodeWebworkerProvider } from "scaffolds/editor/editor-code-webworker-provider";
 import { EditorToastProvider } from "./editor-toast-provider";
-import { FigmaImageServiceProvider } from "./editor-figma-image-service-provider";
 import { FigmaImageServiceProviderForCanvasRenderer } from "./editor-figma-image-service-for-canvas-provider";
 import { DashboardStateProvider } from "@code-editor/dashboard";
 import { EditorState, useEditorState } from "core/states";
@@ -34,13 +33,11 @@ export function EditorDefaultProviders(props: { children: React.ReactNode }) {
         <EditorCodeWebworkerProvider>
           <EditorPreviewDataProvider>
             <EditorShortcutsProvider>
-              <FigmaImageServiceProvider filekey={state?.design?.key}>
-                <FigmaImageServiceProviderForCanvasRenderer>
-                  <DashboardProvider design={state.design}>
-                    {props.children}
-                  </DashboardProvider>
-                </FigmaImageServiceProviderForCanvasRenderer>
-              </FigmaImageServiceProvider>
+              <FigmaImageServiceProviderForCanvasRenderer>
+                <DashboardProvider design={state.design}>
+                  {props.children}
+                </DashboardProvider>
+              </FigmaImageServiceProviderForCanvasRenderer>
             </EditorShortcutsProvider>
           </EditorPreviewDataProvider>
         </EditorCodeWebworkerProvider>
