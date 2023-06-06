@@ -1,5 +1,5 @@
 import { EditorSnapshot } from "./editor-state";
-import { WorkspaceState } from "./workspace-state";
+import { WorkspaceState, EssentialWorkspaceInfo } from "./workspace-state";
 import {
   createInitialHistoryState,
   createPendingHistoryState,
@@ -23,7 +23,7 @@ export function merge_initial_workspace_state_with_editor_snapshot(
   };
 }
 
-export function create_initial_pending_workspace_state(): WorkspaceState {
+export function create_initial_pending_workspace_state({}: EssentialWorkspaceInfo): WorkspaceState {
   return {
     taskQueue: {
       isBusy: false,
