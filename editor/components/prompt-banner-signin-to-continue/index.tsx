@@ -1,9 +1,10 @@
 import styled from "@emotion/styled";
-import React, { useEffect } from "react";
+import React from "react";
 import { useAuthState } from "hooks";
 import { useRouter } from "next/router";
-
-const __is_dev = process.env.NODE_ENV == "development";
+import { ArrowRightIcon } from "@radix-ui/react-icons";
+const __is_prod = process.env.NODE_ENV == "production";
+const __overide_show_if_dev = true;
 
 export function SigninToContinuePrmoptProvider({
   children,
@@ -17,7 +18,9 @@ export function SigninToContinuePrmoptProvider({
   return (
     <>
       {children}
-      {!__is_dev && shouldshow && <SigninToContinueBannerPrmopt />}
+      {((__is_prod && shouldshow) || (!__is_prod && __overide_show_if_dev)) && (
+        <SigninToContinueBannerPrmopt />
+      )}
     </>
   );
 }
@@ -31,34 +34,30 @@ export function SigninToContinueBannerPrmopt() {
 
   return (
     <Positioner>
-      <Contents>
-        <Desc>Ready to build your apps with Grida?</Desc>
-        <NextButton onClick={onnextclick}>Next</NextButton>
-      </Contents>
+      <Container>
+        <h5>Ready to build your Apps with Grida?</h5>
+        <CTAButton onClick={onnextclick}>
+          Sign Up
+          <ArrowRightIcon width={20} height={20} />
+        </CTAButton>
+      </Container>
     </Positioner>
   );
 }
 
 const Positioner = styled.div`
-  display: flex;
-  align-items: center;
-  flex-direction: column;
-  justify-content: center;
-  align-items: flex-end;
-
   position: fixed;
   bottom: 0;
-  left: 0px;
-  right: 0px;
+  left: 0;
+  right: 0;
+  padding: 40px 40px;
 
-  background-color: #fff;
   z-index: 998;
-
+  display: flex;
   justify-content: center;
   flex-direction: column;
-  align-items: end;
+  align-items: center;
   box-sizing: border-box;
-  padding: 16px 20px;
 
   a {
     margin: 0px 2px;
@@ -66,56 +65,62 @@ const Positioner = styled.div`
   }
 `;
 
-const Contents = styled.div`
+const Container = styled.div`
+  width: 100%;
+  max-width: 600px;
+  min-width: 400px;
+  background-color: rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(21px);
+  color: white;
   display: flex;
-  justify-content: flex-end;
+  justify-content: space-between;
   flex-direction: row;
   align-items: center;
   flex: none;
+  padding: 16px 24px;
+  border-radius: 48px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
   gap: 48px;
-  width: 439px;
-  height: 59px;
   box-sizing: border-box;
+  box-shadow: 0px 4px 32px rgba(0, 0, 0, 0.24);
+
+  h5 {
+    color: white;
+    margin: 0;
+    text-overflow: ellipsis;
+    font-weight: 500;
+  }
 `;
 
-const Desc = styled.span`
-  color: rgba(0, 0, 0, 1);
-  text-overflow: ellipsis;
-  font-size: 16px;
-  font-family: "Helvetica Neue", sans-serif;
-  font-weight: 500;
-  text-align: center;
-`;
-
-const NextButton = styled.button`
+const CTAButton = styled.button`
+  cursor: pointer;
   display: flex;
   justify-content: center;
   flex-direction: row;
   align-items: center;
   flex: none;
-  gap: 10px;
-  border-radius: 4px;
-  width: 116px;
-  height: 59px;
-  background-color: rgba(45, 66, 255, 1);
+  gap: 4px;
+  border-radius: 24px;
+  background-color: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.4);
   box-sizing: border-box;
-  padding: 10px 10px;
+  padding: 8px 16px;
 
   outline: none;
-  border: none;
 
-  color: rgba(255, 255, 255, 1);
+  color: white;
   text-overflow: ellipsis;
-  font-size: 21px;
-  font-family: "Helvetica Neue", sans-serif;
-  font-weight: 400;
+  font-weight: 500;
   text-align: left;
 
   :hover {
     opacity: 0.9;
+    scale: 1.02;
   }
 
   :focus {
     opacity: 0.9;
   }
+
+  transition: all 0.1s ease-in-out;
 `;
