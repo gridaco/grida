@@ -8,13 +8,13 @@ import {
 import { fetch } from "@design-sdk/figma-remote";
 import { personal } from "@design-sdk/figma-auth-store";
 import { configure_auth_credentials } from "@design-sdk/figma-remote";
-import { TargetNodeConfig } from "../query/target-node";
+import { TargetNodeConfig } from "query/target-node";
 import {
   FigmaRemoteErrors,
   UnauthorizedError,
   NotfoundError,
 } from "@design-sdk/figma-remote";
-import { RemoteDesignSessionCacheStore } from "../store";
+import { RemoteDesignSessionCacheStore } from "store";
 import { convert } from "@design-sdk/figma-node-conversion";
 import { mapper } from "@design-sdk/figma-remote";
 import { useFigmaAuth } from "scaffolds/workspace/figma-auth";
