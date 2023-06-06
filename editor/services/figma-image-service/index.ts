@@ -133,25 +133,25 @@ export class FigmaImageService {
       }
 
       const tasktargetsmap: {
-        bakes: string[];
+        exports: string[];
         images: string[];
       } = tasktargets.reduce(
         (acc, id) => {
           if (is_node_id(id)) {
-            acc["bakes"].push(id);
+            acc["exports"].push(id);
           } else {
             acc["images"].push(id);
           }
           return acc;
         },
         {
-          bakes: [],
+          exports: [],
           images: [],
         }
       );
 
       //
-      const { bakes, images } = tasktargetsmap;
+      const { exports, images } = tasktargetsmap;
       const tasks: { [key: string]: Promise<string> } = {};
 
       //
@@ -174,11 +174,11 @@ export class FigmaImageService {
           });
         }
       }
-      // fetch bakes (handle debounce)
-      if (bakes.length > 0) {
+      // fetch exports (handle debounce)
+      if (exports.length > 0) {
         if (do_debounce) {
           // fetch with merged queues
-          this.queue = new Set([...this.queue, ...bakes]);
+          this.queue = new Set([...this.queue, ...exports]);
 
           const handle_queue = async () => {
             const fetchtargets = async (...targets) => {
@@ -220,7 +220,7 @@ export class FigmaImageService {
             this.timeout = setTimeout(handle_queue, DEBOUNCE);
           }
 
-          const promises = bakes.map((b) => {
+          const promises = exports.map((b) => {
             const key = b;
             const promise = new Promise<string>((resolve) => {
               this.queuedResolvers.set(key, resolve);
@@ -236,7 +236,7 @@ export class FigmaImageService {
             ).reduce((acc, data: string, i) => {
               return {
                 ...acc,
-                [bakes[i]]: data,
+                [exports[i]]: data,
               };
             }, {});
 
@@ -247,10 +247,10 @@ export class FigmaImageService {
           const request = fetchNodeAsImage(
             this.filekey,
             this.authentication,
-            ...bakes
+            ...exports
           );
 
-          for (const t of bakes) {
+          for (const t of exports) {
             tasks[t] = this.pushTask(
               t,
               new Promise((resolve) => {
