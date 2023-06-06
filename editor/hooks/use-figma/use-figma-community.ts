@@ -27,7 +27,7 @@ export function useFigmaCommunityFile({ id }: { id: string }) {
         __type: "file-fetched-for-app",
       });
     });
-  }, [file]);
+  }, [id]);
 
   //
   return file;
