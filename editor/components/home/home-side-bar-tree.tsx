@@ -89,6 +89,12 @@ const preset_pages: PresetPage[] = [
       },
     ],
   },
+  {
+    id: "/community/files",
+    name: "Community Files",
+    path: "/community/files",
+    depth: 0,
+  },
 ];
 
 export function HomeSidebarTree() {
