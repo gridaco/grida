@@ -7,6 +7,8 @@ import type { FileResponse } from "@design-sdk/figma-remote-types";
 import { useWorkspaceInitializerContext } from "scaffolds/workspace";
 import { useDispatch } from "@code-editor/preferences";
 import { FigmaImageServiceProvider } from "./editor-figma-image-service-provider";
+import { Client as FigmaImageClient } from "@design-sdk/figma-remote-api";
+import { Client as FigmaCommunityImageClient } from "@figma-api/community";
 
 const action_fetchfile_id = "fetchfile" as const;
 
@@ -140,11 +142,9 @@ function FigmaEditorBaseSetup({
   }, [file]);
 
   return (
-    <FigmaImageServiceProvider filekey={filekey}>
-      <EditorSetupContext.Provider value={{ loading: !loaded }}>
-        {children}
-      </EditorSetupContext.Provider>
-    </FigmaImageServiceProvider>
+    <EditorSetupContext.Provider value={{ loading: !loaded }}>
+      {children}
+    </EditorSetupContext.Provider>
   );
 }
 
@@ -185,7 +185,12 @@ export function SetupFigmaCommunityFileEditor({
       file={file}
       loaded={loaded}
     >
-      {children}
+      <FigmaImageServiceProvider
+        filekey={filekey}
+        resolveApiClient={() => FigmaCommunityImageClient()}
+      >
+        {children}
+      </FigmaImageServiceProvider>
     </FigmaEditorBaseSetup>
   );
 }
@@ -266,7 +271,17 @@ export function SetupFigmaFileEditor({
       router={router}
       loaded={loaded}
     >
-      {children}
+      <FigmaImageServiceProvider
+        filekey={filekey}
+        resolveApiClient={({ filekey, authentication }) => {
+          if (!filekey || !authentication) return "reject";
+          return FigmaImageClient({
+            ...authentication,
+          });
+        }}
+      >
+        {children}
+      </FigmaImageServiceProvider>
     </FigmaEditorBaseSetup>
   );
 }

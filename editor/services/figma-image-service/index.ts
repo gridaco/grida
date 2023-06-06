@@ -1,21 +1,25 @@
-import type { TargetImage, FigmaImageType, ImageHashMap } from "./types";
+import type { TargetImage, ImageHashMap } from "./types";
 import { FigmaNodeImageStore, ImageHashmapCache } from "./figma-image-store";
 import { Client } from "@design-sdk/figma-remote-api";
-import { fetchNodeAsImage } from "@design-sdk/figma-remote";
+
+type TClientInterface = ReturnType<typeof Client>;
+export type ImageClientInterface = {
+  fileImages: TClientInterface["fileImages"];
+  fileImageFills: TClientInterface["fileImageFills"];
+};
 
 /**
  * if the new request is made within 0.1 second (100ms), merge the requests.
  */
 const DEBOUNCE = 100;
 
+const ACTION_UPDATE_IMAGE_HASH_MAP = "update-image-hash-map";
+
 /**
  * Top level Figma image service to fetch images in a safe, promised and request efficient way.
  */
 export class FigmaImageService {
   private store = new FigmaNodeImageStore(this.filekey);
-  private api = Client({
-    ...this.authentication,
-  });
   private retries: number;
 
   /**
@@ -25,10 +29,11 @@ export class FigmaImageService {
 
   constructor(
     readonly filekey: string,
-    private readonly authentication: {
-      personalAccessToken?: string;
-      accessToken?: string;
-    },
+    readonly api: ImageClientInterface,
+    // private readonly authentication: {
+    //   personalAccessToken?: string;
+    //   accessToken?: string;
+    // },
     readonly version?: string | null,
     readonly maxQueue = 100
   ) {}
@@ -78,11 +83,11 @@ export class FigmaImageService {
   // #endregion
 
   private async updateImageHashMap() {
-    if (this.hasTask("update-image-hash-map")) {
-      return this.tasks.get("update-image-hash-map");
+    if (this.hasTask(ACTION_UPDATE_IMAGE_HASH_MAP)) {
+      return this.tasks.get(ACTION_UPDATE_IMAGE_HASH_MAP);
     } else {
       const { data } = await this.pushTask(
-        "update-image-hash-map",
+        ACTION_UPDATE_IMAGE_HASH_MAP,
         this.api.fileImageFills(this.filekey)
       );
 
@@ -243,12 +248,16 @@ export class FigmaImageService {
             resolve({ ...datas, ...results });
           });
         } else {
-          // this does not support format, scale, ... (todo)
-          const request = fetchNodeAsImage(
-            this.filekey,
-            this.authentication,
-            ...exports
-          );
+          // fetcher promise with data un-wrapping
+          const request = new Promise(async (resolve) => {
+            this.api
+              .fileImages(this.filekey, {
+                ids: exports,
+              })
+              .then(({ data }) => {
+                resolve(data.images);
+              });
+          });
 
           for (const t of exports) {
             tasks[t] = this.pushTask(
