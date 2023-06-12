@@ -4,7 +4,7 @@ import { useAuthState } from "hooks";
 import { useRouter } from "next/router";
 import { ArrowRightIcon } from "@radix-ui/react-icons";
 const __is_prod = process.env.NODE_ENV == "production";
-const __overide_show_if_dev = true;
+const __overide_show_if_dev = false;
 
 export function SigninToContinuePrmoptProvider({
   children,
