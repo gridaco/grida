@@ -25,6 +25,7 @@ export type HistoryAction =
   | Action;
 
 export type Action =
+  | SetDebugModeAction
   | SetFigmaAuthAction
   | SetFigmaUserAction
   | PageAction
@@ -211,3 +212,8 @@ export interface BackgroundTaskUpdateProgressAction {
   id: string;
   progress: number;
 }
+
+export type SetDebugModeAction = {
+  type: "debug-mode/enable";
+  enabled: boolean;
+};

@@ -25,6 +25,11 @@ export function useWorkspace() {
     [dispatch]
   );
 
+  const setDebugMode = useCallback(
+    (enabled: boolean) => dispatch({ type: "debug-mode/enable", enabled }),
+    [dispatch]
+  );
+
   return useMemo(
     () => ({
       highlightedLayer,
@@ -32,7 +37,15 @@ export function useWorkspace() {
       taskQueue,
       pushTask,
       popTask,
+      setDebugMode,
     }),
-    [highlightedLayer, highlightLayer, taskQueue, pushTask, popTask]
+    [
+      highlightedLayer,
+      highlightLayer,
+      taskQueue,
+      pushTask,
+      popTask,
+      setDebugMode,
+    ]
   );
 }
