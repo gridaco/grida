@@ -1,6 +1,7 @@
 import { useDispatch, usePreferences } from "./editor-preference";
 import React from "react";
 import EditorPreferenceFrameworkProfilePage from "./pages/framework-profile";
+import AdvancedPreferencesPage from "./pages/advanced";
 import { EditorPreferencePage } from "./pages/editor";
 import { PreferencePageProps } from "./core";
 
@@ -26,6 +27,9 @@ export function Router({
     }
     case "/framework": {
       return <EditorPreferenceFrameworkProfilePage {...props} />;
+    }
+    case "/advanced": {
+      return <AdvancedPreferencesPage {...props} />;
     }
     default: {
       const renderer = customRenderers[route];

@@ -17,6 +17,10 @@ const initial_routes: PreferenceRouteInfo[] = [
     route: "/framework",
     name: "Framework Profile",
   },
+  {
+    route: "/advanced",
+    name: "Advanced",
+  },
 ];
 
 export default initial_routes;
