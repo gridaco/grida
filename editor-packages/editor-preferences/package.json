@@ -1,4 +1,7 @@
 {
   "name": "@code-editor/preferences",
-  "version": "0.0.0"
+  "version": "0.0.0",
+  "dependencies": {
+    "react-markdown": "^8.0.7"
+  }
 }
