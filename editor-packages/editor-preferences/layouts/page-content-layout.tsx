@@ -31,7 +31,8 @@ const Container = styled.div`
   h3,
   h4,
   h5,
-  h6 {
+  h6,
+  p {
     color: white;
     h1 {
       font-size: 21px;

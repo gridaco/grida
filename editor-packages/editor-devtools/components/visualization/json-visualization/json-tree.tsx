@@ -4,6 +4,8 @@ import { Figma } from "@design-sdk/figma";
 import { Widget as ReflectWidget } from "@reflect-ui/core";
 import React from "react";
 import JSONTree from "react-json-tree";
+import type { Theme } from "react-base16-styling";
+import assert from "assert";
 
 interface CompactNodeTree {
   id: string;
@@ -11,7 +13,7 @@ interface CompactNodeTree {
   children?: CompactNodeTree[];
 }
 
-const theme = {
+const monokai: Theme = {
   scheme: "monokai",
   author: "wimer hazenberg (http://www.monokai.nl)",
   base00: "#272822",
@@ -30,15 +32,84 @@ const theme = {
   base0D: "#66d9ef",
   base0E: "#ae81ff",
   base0F: "#cc6633",
-  "background-color": "transparent",
 };
 
-export function JsonTree(props: { data: any; hideRoot?: boolean }) {
+export function JsonTree({
+  data,
+  hideRoot,
+  expandRoot = false,
+  expandParent = false,
+  theme = monokai,
+  backgroundColor,
+  sortkeys = false,
+  expandMaxLevel = 5,
+  omitkeys = [],
+}: {
+  data: any;
+  hideRoot?: boolean;
+  expandRoot?: boolean;
+  expandParent?: boolean;
+  expandMaxLevel?: number;
+  theme?: Theme;
+  backgroundColor?: React.CSSProperties["backgroundColor"];
+  sortkeys?: ReadonlyArray<string> | boolean;
+  // not used
+  omitkeys?: ReadonlyArray<string>;
+}) {
+  const sorter = (a: string, b: string) => {
+    assert(sortkeys instanceof Array, "keysort must be an array");
+    const aindex = sortkeys.indexOf(a);
+    const bindex = sortkeys.indexOf(b);
+    // the sortkeys may not contain all keys.
+
+    // if a is not in sortkeys, it should be placed after b
+    if (aindex === -1) {
+      return 1;
+    }
+
+    // if b is not in sortkeys, it should be placed after a
+    if (bindex === -1) {
+      return -1;
+    }
+
+    // if both are not in sortkeys, they should be placed in the order of appearance
+    if (aindex === -1 && bindex === -1) {
+      return 0;
+    }
+
+    // if both are in sortkeys, they should be placed in the order of sortkeys
+    return aindex - bindex;
+  };
+
   return (
     <JSONTree
-      data={props.data}
-      theme={theme}
-      hideRoot={props.hideRoot}
+      data={data}
+      theme={{
+        ...(theme as object),
+        ...(backgroundColor ? { base00: backgroundColor } : {}),
+        tree: ({ style }) => ({
+          style: {
+            ...style,
+            fontFamily: "Monaco, monospace",
+            fontSize: 14,
+          },
+        }),
+      }}
+      invertTheme={false}
+      hideRoot={hideRoot}
+      sortObjectKeys={typeof sortkeys === "boolean" ? sortkeys : sorter}
+      shouldExpandNode={(keypath, data, level) => {
+        if (level === 0) {
+          return expandRoot;
+        }
+        if (expandMaxLevel > 0 && level > expandMaxLevel) {
+          return false;
+        }
+        if (keypath[keypath.length - 1] === "parent") {
+          return expandParent;
+        }
+        return true;
+      }}
       getItemString={(type, data, itemType, itemString) => {
         return (
           <span>
@@ -85,7 +156,7 @@ export function WidgetTree(props: {
   return (
     <JSONTree
       data={props.data}
-      theme={theme}
+      theme={monokai}
       hideRoot={props.hideRoot}
       getItemString={(type, data: WidgetDataLike, itemType, itemString) => {
         return (

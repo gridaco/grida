@@ -1,4 +1,5 @@
 import React from "react";
+import styled from "@emotion/styled";
 import * as Toggle from "@radix-ui/react-toggle";
 
 export function IconToggleButton({
@@ -23,7 +24,7 @@ export function IconToggleButton({
   }, [pressed]);
 
   return (
-    <Toggle.Root
+    <IconButton
       name={tooltip}
       onPressedChange={(pressed) => {
         setPressed(pressed);
@@ -33,6 +34,26 @@ export function IconToggleButton({
       aria-label={ariaLabel}
     >
       {pressed ? <>{on}</> : <>{off}</>}
-    </Toggle.Root>
+    </IconButton>
   );
 }
+
+const IconButton = styled(Toggle.Root)`
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: none;
+  cursor: pointer;
+  border-radius: 4px;
+  padding: 8px;
+  color: inherit;
+
+  &:hover {
+    background: rgba(255, 255, 255, 0.1);
+  }
+
+  &:active {
+    background: rgba(255, 255, 255, 0.2);
+  }
+`;

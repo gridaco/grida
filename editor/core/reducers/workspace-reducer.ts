@@ -4,6 +4,7 @@ import {
   BackgroundTaskPopAction,
   BackgroundTaskPushAction,
   BackgroundTaskUpdateProgressAction,
+  SetDebugModeAction,
   WorkspaceAction,
   WorkspaceWarmupAction,
 } from "../actions";
@@ -65,8 +66,15 @@ export function workspaceReducer(
       return produce(state, (draft) => {
         draft.taskQueue.tasks.find((i) => i.id !== id).progress = progress;
       });
-      break;
     }
+
+    case "debug-mode/enable": {
+      const { enabled } = <SetDebugModeAction>action;
+      return produce(state, (draft) => {
+        draft.debugMode = enabled;
+      });
+    }
+
     // default fallback - use history reducer
     case "redo":
     case "undo":

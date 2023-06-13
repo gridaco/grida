@@ -1,6 +1,6 @@
 import React, { useCallback, useState } from "react";
 import styled from "@emotion/styled";
-import { EditorState, useEditorState } from "core/states";
+import { EditorState, useEditorState, useWorkspaceState } from "core/states";
 import { colors } from "theme";
 import { useTargetContainer } from "hooks/use-target-node";
 import { EditorPropertyThemeProvider, one } from "@editor-ui/property";
@@ -15,10 +15,15 @@ import { Conversations } from "scaffolds/conversations";
 import { EditorAppbarFragments } from "components/editor";
 import { useDispatch } from "core/dispatch";
 import { EffectsSection } from "./section-effects";
+import { MixIcon, Cross1Icon } from "@radix-ui/react-icons";
+import { DebugInspector } from "./inspector-debug";
+import { IconToggleButton } from "@code-editor/ui";
 
 type Tab = "inspect" | "comment";
 
 export function Inspector() {
+  const { debugMode } = useWorkspaceState();
+  const [debugView, setDebugView] = useState(false);
   const [state] = useEditorState();
   const dispatch = useDispatch();
 
@@ -37,9 +42,20 @@ export function Inspector() {
   return (
     <InspectorContainer>
       <EditorAppbarFragments.RightSidebar flex={0} />
-      <Tabs selectedTab={tab} onTabChange={switchMode} />
-      <div style={{ height: 16, flexShrink: 0 }} />
-      <Body type={tab} />
+      <div className="header">
+        <Tabs selectedTab={tab} onTabChange={switchMode} />
+        {debugMode && (
+          <IconToggleButton
+            on={<Cross1Icon color="white" />}
+            off={<MixIcon color="white" />}
+            onChange={(value) => {
+              setDebugView(value);
+            }}
+          />
+        )}
+      </div>
+      {/* <div style={{ height: 16, flexShrink: 0 }} /> */}
+      <Body type={tab} debug={debugView} />
     </InspectorContainer>
   );
 }
@@ -54,13 +70,13 @@ const __mode = (mode: EditorState["designerMode"]): Tab => {
   }
 };
 
-function Body({ type }: { type: Tab }) {
+function Body({ type, debug }: { type: Tab; debug?: boolean }) {
   const { target } = useTargetContainer();
 
   switch (type) {
     case "inspect":
       if (target) {
-        return <InspectorBody />;
+        return <InspectorBody debug={debug} />;
       } else {
         return <EmptyState />;
       }
@@ -73,7 +89,11 @@ function ConversationsBody() {
   return <Conversations />;
 }
 
-function InspectorBody() {
+function InspectorBody({ debug }: { debug?: boolean }) {
+  if (debug) {
+    return <DebugInspector />;
+  }
+
   return (
     <EditorPropertyThemeProvider theme={one.dark}>
       <InfoSection />
@@ -196,5 +216,13 @@ const InspectorContainer = styled.div`
   flex-direction: column;
   height: 100%;
   background-color: ${colors.color_editor_bg_on_dark};
+
+  .header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 0;
+    padding-right: 16px;
+  }
 `;
 /* background-color: ${(props) => props.theme.colors.background}; */

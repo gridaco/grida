@@ -33,6 +33,8 @@ export interface WorkspaceState extends EssentialWorkspaceInfo {
     /** URL link to the user's profile image */
     profile: string;
   };
+
+  debugMode?: boolean;
 }
 
 export interface TaskQueue {
