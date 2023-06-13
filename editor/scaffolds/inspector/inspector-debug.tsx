@@ -6,10 +6,7 @@ import { LayoutSection } from "./section-layout";
 import { ColorsSection } from "./section-colors";
 import { TypographySection } from "./section-typography";
 import { useTargetContainer } from "hooks/use-target-node";
-import {
-  HorizontalHierarchyTreeVisualization,
-  JsonTree,
-} from "@code-editor/devtools";
+import { NodeGraph, JsonTree } from "@code-editor/devtools";
 import useMeasure from "react-use-measure";
 
 const figma_json_sortkeys = [
@@ -53,61 +50,72 @@ export function DebugInspector() {
     <div ref={ref}>
       <EditorPropertyThemeProvider theme={one.dark}>
         <InfoSection />
-        <GraphInspectionSection>
-          <h5>document - api-response</h5>
-          <JsonTree
-            sortkeys={figma_json_sortkeys}
-            backgroundColor="transparent"
-            data={{}}
-          />
-        </GraphInspectionSection>
-        <GraphInspectionSection>
-          <h5>document - mapped</h5>
-          <JsonTree
-            sortkeys={figma_json_sortkeys}
-            backgroundColor="transparent"
-            data={{}}
-          />
-        </GraphInspectionSection>
-        <GraphInspectionSection>
-          <h5>token - figma-to-reflect</h5>
-          <JsonTree
-            sortkeys={figma_json_sortkeys}
-            backgroundColor="transparent"
-            data={target}
-          />
-        </GraphInspectionSection>
-        <GraphInspectionSection>
-          <h5>widget - widget-tree</h5>
-          <JsonTree
-            sortkeys={figma_json_sortkeys}
-            backgroundColor="transparent"
-            data={{}}
-          />
-        </GraphInspectionSection>
-        <GraphInspectionSection>
-          <h5>widget - framework-dedicated</h5>
-          <JsonTree
-            sortkeys={figma_json_sortkeys}
-            backgroundColor="transparent"
-            data={{}}
-          />
-        </GraphInspectionSection>
+        <LayoutSection />
         <GraphInspectionSection>
           <h5>graph</h5>
           {target && (
-            <div data-no-padding>
-              <HorizontalHierarchyTreeVisualization
+            <div data-no-padding style={{ marginTop: 16 }}>
+              <NodeGraph
+                key={target.id}
                 width={width}
-                height={400}
-                tree={target}
+                height={800}
+                data={target}
               />
             </div>
           )}
         </GraphInspectionSection>
-        <LayoutSection />
         <TypographySection />
         <ColorsSection />
+        <GraphInspectionSection>
+          <h5>document - api-response</h5>
+          <div>
+            <JsonTree
+              sortkeys={figma_json_sortkeys}
+              backgroundColor="transparent"
+              data={{}}
+            />
+          </div>
+        </GraphInspectionSection>
+        <GraphInspectionSection>
+          <h5>document - mapped</h5>
+          <div>
+            <JsonTree
+              sortkeys={figma_json_sortkeys}
+              backgroundColor="transparent"
+              data={{}}
+            />
+          </div>
+        </GraphInspectionSection>
+        <GraphInspectionSection>
+          <h5>token - figma-to-reflect</h5>
+          <div>
+            <JsonTree
+              sortkeys={figma_json_sortkeys}
+              backgroundColor="transparent"
+              data={target}
+            />
+          </div>
+        </GraphInspectionSection>
+        <GraphInspectionSection>
+          <h5>widget - widget-tree</h5>
+          <div>
+            <JsonTree
+              sortkeys={figma_json_sortkeys}
+              backgroundColor="transparent"
+              data={{}}
+            />
+          </div>
+        </GraphInspectionSection>
+        <GraphInspectionSection>
+          <h5>widget - framework-dedicated</h5>
+          <div>
+            <JsonTree
+              sortkeys={figma_json_sortkeys}
+              backgroundColor="transparent"
+              data={{}}
+            />
+          </div>
+        </GraphInspectionSection>
       </EditorPropertyThemeProvider>
     </div>
   );
@@ -121,6 +129,7 @@ const Section = styled.section`
   display: flex;
   flex-direction: column;
 
+  padding: 14px 0;
   margin: 16px 0;
 
   h1,
@@ -132,14 +141,13 @@ const Section = styled.section`
     cursor: default;
     color: white;
     margin: 0;
-    padding: 0;
     font-family: "Monaco", "Menlo", "Ubuntu Mono", "Consolas", "source-code-pro",
       monospace;
   }
 
   /* apply padding to top level elements */
   > * {
-    padding: 14px;
+    padding: 0 14px;
   }
 
   * {
