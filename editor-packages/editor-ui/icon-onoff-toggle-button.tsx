@@ -47,6 +47,7 @@ const IconButton = styled(Toggle.Root)`
   cursor: pointer;
   border-radius: 4px;
   padding: 8px;
+  color: inherit;
 
   &:hover {
     background: rgba(255, 255, 255, 0.1);
