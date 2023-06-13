@@ -42,12 +42,14 @@ export function JsonTree({
   theme = monokai,
   backgroundColor,
   sortkeys = false,
+  expandMaxLevel = 5,
   omitkeys = [],
 }: {
   data: any;
   hideRoot?: boolean;
   expandRoot?: boolean;
   expandParent?: boolean;
+  expandMaxLevel?: number;
   theme?: Theme;
   backgroundColor?: React.CSSProperties["backgroundColor"];
   sortkeys?: ReadonlyArray<string> | boolean;
@@ -99,6 +101,9 @@ export function JsonTree({
       shouldExpandNode={(keypath, data, level) => {
         if (level === 0) {
           return expandRoot;
+        }
+        if (expandMaxLevel > 0 && level > expandMaxLevel) {
+          return false;
         }
         if (keypath[keypath.length - 1] === "parent") {
           return expandParent;
