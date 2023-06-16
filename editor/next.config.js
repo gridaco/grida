@@ -74,6 +74,9 @@ const packages = [
   "@web-builder/styles",
   // endregion web builders
   // -----------------------------
+
+  // region codetest
+  "@codetest/editor-client",
 ];
 
 const withPlugins = require("next-compose-plugins");
