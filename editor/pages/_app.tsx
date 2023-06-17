@@ -13,7 +13,6 @@ function GlobalCss() {
     <Global
       styles={css`
         html {
-          background-color: ${colors.color_editor_bg_on_dark};
           touch-action: none;
         }
       `}
