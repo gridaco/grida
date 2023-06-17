@@ -4,11 +4,13 @@ import styled from "@emotion/styled";
 export const IconButton = React.forwardRef(function (
   {
     children,
+    title,
     outline,
     onClick,
     disabled,
     ...props
   }: React.PropsWithChildren<{
+    title?: string;
     outline?: React.CSSProperties["outline"];
     onClick?: React.MouseEventHandler<HTMLButtonElement>;
     disabled?: boolean;
@@ -20,6 +22,7 @@ export const IconButton = React.forwardRef(function (
       ref={ref}
       onClick={onClick}
       disabled={disabled}
+      title={title}
       {...props}
       style={{
         outline,

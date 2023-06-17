@@ -3,11 +3,15 @@ import Head from "next/head";
 import { InferGetServerSidePropsType } from "next";
 import styled from "@emotion/styled";
 import { Client, NodeReportCoverage } from "@codetest/editor-client";
-import { CircleIcon } from "@radix-ui/react-icons";
-
+import { CircleIcon, LightningBoltIcon, CodeIcon } from "@radix-ui/react-icons";
+import { IconButton } from "@code-editor/ui";
 type P = InferGetServerSidePropsType<typeof getServerSideProps>;
 
-export default function ReportPage({ data }: P) {
+export default function ReportPage({ _key, data }: P) {
+  const onRegenerate = () => {
+    alert("regenerate (not implemented)");
+  };
+
   return (
     <>
       <Head>
@@ -15,9 +19,17 @@ export default function ReportPage({ data }: P) {
         {/*  */}
       </Head>
       <Main>
-        <h1>
-          <code>@codetest/reports</code>
-        </h1>
+        <header className="header">
+          <span>
+            <code>@codetest/reports</code>
+            <h1>{_key}</h1>
+          </span>
+          <div>
+            <IconButton title="regenerate" onClick={onRegenerate}>
+              <LightningBoltIcon />
+            </IconButton>
+          </div>
+        </header>
         {/* <code>
           <pre>{JSON.stringify(data, null, 2)}</pre>
         </code> */}
@@ -34,6 +46,7 @@ export default function ReportPage({ data }: P) {
 }
 
 const Main = styled.main`
+  color: white;
   font-family: monospace;
   width: 400px;
   margin: auto;
@@ -45,6 +58,23 @@ const Main = styled.main`
     gap: 16px;
   }
 
+  header.header {
+    margin: 120px 0 40px 0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+
+    h1 {
+      margin: 0;
+    }
+
+    .actions {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+  }
+
   footer {
     height: 200px;
   }
@@ -53,6 +83,14 @@ const Main = styled.main`
 function Item({ id, a, b, diff, report }: NodeReportCoverage & { id: string }) {
   const [focus, setFocus] = React.useState<"a" | "b" | null>(null);
 
+  const onInspect = () => {
+    alert("inspect (not implemented)");
+  };
+
+  const onRegenerate = () => {
+    alert("regenerate (not implemented)");
+  };
+
   return (
     <ItemContainer>
       <header>
@@ -60,6 +98,14 @@ function Item({ id, a, b, diff, report }: NodeReportCoverage & { id: string }) {
           <CircleIcon />
           {id} {focus && <span>({focus})</span>}
         </p>
+        <div className="actions">
+          <IconButton title="inspect" onClick={onInspect}>
+            <CodeIcon />
+          </IconButton>
+          <IconButton title="regenerate" onClick={onRegenerate}>
+            <LightningBoltIcon />
+          </IconButton>
+        </div>
       </header>
       <div className="view" data-focus={focus}>
         <img className="a" src={a} alt="A" />
@@ -92,11 +138,22 @@ const ItemContainer = styled.div`
   height: 100%;
 
   header {
+    color: white;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
     padding: 16px;
     .title {
       display: flex;
       align-items: center;
       gap: 8px;
+    }
+
+    .actions {
+      display: flex;
+      align-items: center;
+      gap: 4px;
     }
   }
 
@@ -173,6 +230,7 @@ export async function getServerSideProps(context: any) {
 
     return {
       props: {
+        _key: key,
         data,
       },
     };
