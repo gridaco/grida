@@ -20,7 +20,7 @@ export default function QAFilesPage({ files }) {
           {files.map((file) => (
             <Link
               href={{
-                pathname: `/qa/files/[key]`,
+                pathname: `/test/reports/[key]`,
                 query: {
                   key: file,
                 },
