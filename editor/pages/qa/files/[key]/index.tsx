@@ -23,9 +23,11 @@ export default function QAEditor({ key, data }: P) {
             return (
               <div className="item" key={k}>
                 <p>{k}</p>
-                <img src={record.a} alt="A" />
-                <img src={record.b} alt="B" />
-                <img src={record.diff} alt="B" />
+                <div className="images">
+                  <img src={record.b} alt="B" />
+                  <img src={record.diff} alt="C" />
+                  <img src={record.a} alt="A" />
+                </div>
               </div>
             );
           })}
@@ -55,6 +57,11 @@ const Main = styled.main`
     img {
       width: 100%;
       height: auto;
+    }
+
+    .images {
+      display: flex;
+      flex-direction: row;
     }
   }
 `;
