@@ -176,12 +176,35 @@ export function Readme({
 }
 
 const ReadmeWrapper = styled.main`
+  color: black;
   margin: auto;
 
   width: 100%;
 
   overflow: hidden;
   overflow-y: scroll;
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    color: black;
+  }
+
+  p {
+    color: black;
+  }
+
+  a {
+    color: black;
+    opacity: 0.8;
+
+    &:hover {
+      opacity: 1;
+    }
+  }
 
   .cta {
     display: flex;
