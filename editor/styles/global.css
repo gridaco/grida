@@ -9,6 +9,7 @@ html {
   overflow: hidden;
   height: 100%;
   overscroll-behavior-x: none;
+  background-color: rgb(20, 20, 20);
 }
 body {
   overscroll-behavior-x: none;
@@ -29,15 +30,15 @@ h4,
 h5,
 h6,
 p {
-  color: rgba(0, 0, 0, 0.9);
+  color: white;
 }
 
 a {
-  color: rgba(0, 0, 0, 0.7);
+  color: rgba(255, 255, 255, 0.7);
 }
 
 a:hover {
-  color: rgba(0, 0, 0, 0.9);
+  color: rgba(255, 255, 255, 0.9);
 }
 
 .white {
