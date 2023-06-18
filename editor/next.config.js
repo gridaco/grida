@@ -1,6 +1,7 @@
 const IS_DEV = process.env.NODE_ENV === "development";
 
 const packages = [
+  "@engine/core",
   // region @editor-app
   "@code-editor/analytics",
   "@code-editor/ui",
