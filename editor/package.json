@@ -23,7 +23,7 @@
     "@emotion/react": "^11.11.0",
     "@emotion/server": "^11.11.0",
     "@emotion/styled": "^11.11.0",
-    "@figma-api/community": "^0.0.6",
+    "@figma-api/community": "^0.0.7",
     "@floating-ui/core": "^1.0.1",
     "@floating-ui/react-dom": "^1.0.0",
     "@floating-ui/react-dom-interactions": "^0.10.2",
