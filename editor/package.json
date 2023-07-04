@@ -35,7 +35,7 @@
     "@radix-ui/react-toast": "^1.1.1",
     "@radix-ui/react-toolbar": "^1.0.3",
     "@reflect-blocks/figma-embed": "^0.0.5",
-    "@tree-/q": "^0.0.0",
+    "@tree-/q": "^0.0.1",
     "@use-gesture/react": "^10.2.11",
     "@visx/gradient": "^1.7.0",
     "@visx/group": "^1.7.0",
