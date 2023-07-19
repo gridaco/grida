@@ -20,6 +20,10 @@ const nextconfig = {
         destination: `${process.env.NEXT_PUBLIC_DOCS_URL}/:path*`,
       },
       {
+        source: "/lsd",
+        destination: `https://lsd-web.vercel.app/lsd`,
+      },
+      {
         source: "/lsd/:path*",
         destination: `https://lsd-web.vercel.app/lsd/:path*`,
       },
