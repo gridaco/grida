@@ -21,7 +21,7 @@ const nextconfig = {
       },
       {
         source: "/lsd/:path*",
-        destination: `https://lsd-web.vercel.app/:path*`,
+        destination: `https://lsd-web.vercel.app/lsd/:path*`,
       },
     ];
   },
