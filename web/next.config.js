@@ -19,6 +19,10 @@ const nextconfig = {
         source: "/docs/:path*",
         destination: `${process.env.NEXT_PUBLIC_DOCS_URL}/:path*`,
       },
+      {
+        source: "/lsd/:path*",
+        destination: `https://lsd-web.vercel.app/:path*`,
+      },
     ];
   },
   async redirects() {
