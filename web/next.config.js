@@ -27,6 +27,14 @@ const nextconfig = {
         source: "/lsd/:path*",
         destination: `https://lsd-web.vercel.app/lsd/:path*`,
       },
+      {
+        source: "/bundle",
+        destination: `https://the-bundle-web.vercel.app/bundle`,
+      },
+      {
+        source: "/bundle/:path*",
+        destination: `https://the-bundle-web.vercel.app/bundle/:path*`,
+      },
     ];
   },
   async redirects() {
