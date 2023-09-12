@@ -37,7 +37,7 @@
     "@next/bundle-analyzer": "^12.3.1",
     "@next/mdx": "^10.0.9",
     "@radix-ui/react-icons": "^1.2.0",
-    "@react-three/drei": "^9.57.3",
+    "@react-three/drei": "^9.83.9",
     "@react-three/fiber": "^8.12.0",
     "@typeform/embed-react": "^1.20.0",
     "@types/three": "^0.149.0",
