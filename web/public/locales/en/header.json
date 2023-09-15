@@ -16,6 +16,10 @@
     "cli": {
       "label": "CLI / API",
       "tagline": "Import your design as a module"
+    },
+    "bundle": {
+      "label": "The Bundle",
+      "tagline": "3D Rendered PNGs Library"
     }
   },
   "resources": {

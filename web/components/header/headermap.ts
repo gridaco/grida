@@ -332,6 +332,13 @@ export const HeaderMap: Sitemap = [
         tagline: "header:products.cli.tagline",
         layout: "product-item",
       },
+      {
+        type: "link",
+        label: "header:products.bundle.label",
+        href: "/bundle",
+        tagline: "header:products.bundle.tagline",
+        layout: "product-item",
+      },
     ],
   },
   // {

@@ -16,6 +16,10 @@
     "cli": {
       "label": "CLI / API",
       "tagline": "디자인을 모듈처럼 임포트"
+    },
+    "bundle": {
+      "label": "번들",
+      "tagline": "3D 렌더 PNGs 라이브러리"
     }
   },
   "resources": {
