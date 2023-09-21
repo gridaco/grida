@@ -26,6 +26,8 @@ import Script from "next/script";
 import { RecoilRoot } from "recoil";
 import { appWithTranslation } from "next-i18next";
 import { PageLayoutConfig } from "layouts/index";
+import { HeaderBanner } from "components/banner";
+import Link from "next/link";
 
 type GetLayoutFunc = (page: ReactElement) => ReactNode;
 
@@ -46,7 +48,39 @@ function defaultLayout(
   return (
     <>
       {/* <ThemeProvider theme={ }> */}
-      <Header />
+
+      <Header
+        banner={
+          // promotional banner
+          <Link href={"/bundle"}>
+            <a>
+              <HeaderBanner>
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    background: "black",
+                    color: "white",
+                    padding: 12,
+                  }}
+                >
+                  <p
+                    style={{
+                      maxWidth: 500,
+                      fontSize: 14,
+                    }}
+                  >
+                    <strong>Check out our latest release</strong> | The Bundle
+                    by Grida, A Massive library of 3D Rendered PNGs for UI and
+                    Graphics Designs.
+                  </p>
+                </div>
+              </HeaderBanner>
+            </a>
+          </Link>
+        }
+      />
       {/* </ThemeProvider> */}
       <BodyCustomStyleInAbosulteSectionLayout
         mt={mt}

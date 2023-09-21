@@ -23,7 +23,7 @@ import {
 } from "@floating-ui/react-dom-interactions";
 import { Arrow } from "./arrow";
 
-const Header = () => {
+const Header = ({ banner }: { banner?: React.ReactNode }) => {
   const router = useRouter();
   const theme = useTheme();
 
@@ -53,7 +53,8 @@ const Header = () => {
   }, [router]);
 
   return (
-    <>
+    <HeaderMaster>
+      {banner}
       <HeaderWrapper>
         <Flex
           sx={{
@@ -120,7 +121,7 @@ const Header = () => {
           <MobileExpandedMenu background={theme.header.bg} />
         )}
       </HeaderWrapper>
-    </>
+    </HeaderMaster>
   );
 };
 
@@ -293,13 +294,16 @@ const Li = styled.li`
   list-style: none;
 `;
 
-const HeaderWrapper = styled.header<{ border?: boolean }>`
+const HeaderMaster = styled.header<{ border?: boolean }>`
   position: absolute;
-  display: flex;
   z-index: 9;
   border-bottom: ${props =>
     props.border ? "1px solid rgba(0, 0, 0, 0.025)" : "none"};
   width: 100%;
+`;
+
+const HeaderWrapper = styled.div`
+  display: flex;
   height: 60px;
   justify-content: center;
   align-items: center;
