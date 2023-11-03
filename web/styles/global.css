@@ -19,6 +19,10 @@ body {
 .cursor {
   cursor: pointer;
 }
+.cursor-hover:hover{
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
 
 .no-drag {
   user-select: none;
