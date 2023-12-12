@@ -24,11 +24,6 @@ input {
   box-sizing: border-box;
 }
 
-a {
-  text-decoration: none;
-  color: inherit;
-}
-
 p {
   margin-block-start: 0.3em;
   margin-block-end: 0.3em;
@@ -45,6 +40,15 @@ h4,
 h5,
 h6 {
   font-family: "Inter", sans-serif !important;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-weight: bold;
 }
 
 button {
