@@ -37,11 +37,11 @@ const nextconfig = {
       },
       {
         source: "/kits",
-        destination: `https://kits.grida.vercel.app/bundle`,
+        destination: `https://kits.grida.vercel.app/kits`,
       },
       {
         source: "/kits/:path*",
-        destination: `https://kits.grida.vercel.app/bundle/:path*`,
+        destination: `https://kits.grida.vercel.app/kits/:path*`,
       },
     ];
   },
