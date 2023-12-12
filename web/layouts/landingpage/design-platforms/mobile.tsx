@@ -29,11 +29,10 @@ const DesignPlatformsMobile = () => {
               loading="eager"
               alt="Grida supported platfrom icons"
               key={i}
-              className="cursor"
+              className="cursor-pointer"
               onClick={() => setCurrentPlatform(i)}
-              src={`/assets/platform-icons/${i}/${
-                currentPlatform === i ? "default" : "grey"
-              }.png`}
+              src={`/assets/platform-icons/${i}/${currentPlatform === i ? "default" : "grey"
+                }.png`}
               width="24"
               height="24"
             />

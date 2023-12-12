@@ -91,7 +91,7 @@ function ElevatedVideoPlayer() {
       </div>
       {/* play button click motion */}
       <PlayButtonFrame
-        className="cursor"
+        className="cursor-pointer"
         whileTap={{ scale: 0.9 }}
         whileHover={{ scale: 1.1 }}
         onClick={handleClickLogin}

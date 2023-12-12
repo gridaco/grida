@@ -49,7 +49,7 @@ const SitemapList: React.FC<SitemapListProps> = ({ sitemap }) => {
               // log footer menu item click
               event_click_footer_menu({ menu: i.label });
             }}
-            className="cursor cursor-hover"
+            className="cursor-pointer hover:cursor-pointer"
             mb="15px"
             color={theme.footer.menu.color}
             style={{

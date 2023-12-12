@@ -40,7 +40,7 @@ const FeatureChoice: React.FC<FeatureChoiceProps> = props => {
           p="48px"
         >
           <Icon
-            className="cursor"
+            className="cursor-pointer"
             name="headerClose"
             ml="auto"
             onClick={() => removePopup()}
@@ -91,7 +91,7 @@ const FeatureChoice: React.FC<FeatureChoiceProps> = props => {
           {titleList}{" "}
           {titleList === "Extra Usage" && (
             <Icon
-              className="cursor"
+              className="cursor-pointer"
               onClick={handleClickQuestionMark}
               isVerticalMiddle
               name="questionMark"
@@ -105,7 +105,7 @@ const FeatureChoice: React.FC<FeatureChoiceProps> = props => {
               flexDirection: "column",
             }}
             onClick={() => handleFeatureClick(ix)}
-            className="cursor"
+            className="cursor-pointer"
             mb="36px"
           >
             <Text
@@ -137,7 +137,7 @@ const FeatureChoice: React.FC<FeatureChoiceProps> = props => {
           </Item>
         ))}
 
-        {/* <Text className="cursor" fontSize="16px" fontWeight="bold">
+        {/* <Text className="cursor-pointer" fontSize="16px" fontWeight="bold">
           View all <Icon name="arrowDown" isVerticalMiddle />
         </Text> */}
       </Flex>

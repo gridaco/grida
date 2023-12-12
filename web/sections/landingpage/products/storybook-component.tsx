@@ -47,7 +47,7 @@ export const ProductMotion = () => {
   }
   return (
     <RowFrame animate={{ x: x }} transition={spring}>
-      <LandingpageText variant="h2" className="no-drag">
+      <LandingpageText variant="h2" className="select-none">
         {PRODUCT_LIST.map((item, i) => {
           return (
             <List

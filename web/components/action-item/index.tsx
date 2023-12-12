@@ -34,7 +34,7 @@ const ActionItem = ({
 }) => {
   const Content = (
     <Text
-      className="cursor"
+      className="cursor-pointer"
       color={Colors[theme]["default"]}
       whileHover={{ color: Colors[theme]["hover"] }}
     >
@@ -54,7 +54,7 @@ const ActionItem = ({
   );
 };
 
-const Text = styled(motion.span)<{ color: string }>`
+const Text = styled(motion.span) <{ color: string }>`
   max-width: calc(100vw - 40px);
   width: 100vw;
   margin-right: auto;

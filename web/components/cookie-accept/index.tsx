@@ -60,7 +60,7 @@ const CookieAccept: React.FC<CookieAcceptProps> = ({ accpetCookie }) => {
             )}
           </Flex>
 
-          <Button className="cursor" onClick={() => accpetCookie()}>
+          <Button className="cursor-pointer" onClick={() => accpetCookie()}>
             {width < replaceStylePxToNumber(breakpoints[0])
               ? tc("ok")
               : tc("accept")}

@@ -68,7 +68,7 @@ const OnlineApp: React.FC = () => {
           </OnlineTitle>
           <MobileView style={{ marginTop: 40, position: "relative" }}>
             <ApplicationPreview />
-            <div className="gradient-view no-drag">
+            <div className="gradient-view select-none">
               <Image
                 src="/assets/mobile/mobile-gradient-blur-xs.png"
                 loading="eager"
@@ -91,7 +91,7 @@ const OnlineApp: React.FC = () => {
         </Flex>
         <DesktopView style={{ position: "relative" }}>
           <ApplicationPreview />
-          <div className="gradient-view no-drag">
+          <div className="gradient-view select-none">
             <Image
               loading="eager"
               src={assetUrl}

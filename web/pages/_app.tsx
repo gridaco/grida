@@ -21,13 +21,13 @@ import { MDXProvider } from "@mdx-js/react";
 import { _MDX_COMPONENTS } from "components/mdx";
 import { Box } from "theme-ui";
 import { env } from "process";
-import "../styles/global.css";
 import Script from "next/script";
 import { RecoilRoot } from "recoil";
 import { appWithTranslation } from "next-i18next";
 import { PageLayoutConfig } from "layouts/index";
 import { HeaderBanner } from "components/banner";
 import Link from "next/link";
+import "../styles/global.css";
 
 type GetLayoutFunc = (page: ReactElement) => ReactNode;
 

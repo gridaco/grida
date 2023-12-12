@@ -23,8 +23,8 @@ export function WasThisPostHelpful() {
         Was this page helpful?
       </Text>
       <Flex mt="16px">
-        <Icon className="cursor" name="thumbsup" mx="16px" />
-        <Icon className="cursor" name="thumbsdown" mx="16px" />
+        <Icon className="cursor-pointer" name="thumbsup" mx="16px" />
+        <Icon className="cursor-pointer" name="thumbsdown" mx="16px" />
       </Flex>
     </Flex>
   );

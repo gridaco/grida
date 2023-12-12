@@ -18,31 +18,31 @@ const iconList: Array<{
   icon: keyof IconList;
   href: string;
 }> = [
-  {
-    icon: "youtube",
-    href: URLS.social.youtube,
-  },
-  {
-    icon: "instagram",
-    href: URLS.social.instagram,
-  },
-  {
-    icon: "twitter",
-    href: URLS.social.twitter,
-  },
-  {
-    icon: "facebook",
-    href: URLS.social.facebook,
-  },
-  {
-    icon: "dribble",
-    href: URLS.social.dribbble,
-  },
-  {
-    icon: "github",
-    href: URLS.social.github,
-  },
-];
+    {
+      icon: "youtube",
+      href: URLS.social.youtube,
+    },
+    {
+      icon: "instagram",
+      href: URLS.social.instagram,
+    },
+    {
+      icon: "twitter",
+      href: URLS.social.twitter,
+    },
+    {
+      icon: "facebook",
+      href: URLS.social.facebook,
+    },
+    {
+      icon: "dribble",
+      href: URLS.social.dribbble,
+    },
+    {
+      icon: "github",
+      href: URLS.social.github,
+    },
+  ];
 
 const Footer = () => {
   const theme = useTheme();
@@ -82,7 +82,7 @@ const Footer = () => {
         <Box mt="80px">
           {iconList.map(i => (
             <Link href={i.href} key={i.icon}>
-              <Icon className="cursor" key={i.icon} name={i.icon} mr="12px" />
+              <Icon className="cursor-pointer" key={i.icon} name={i.icon} mr="12px" />
             </Link>
           ))}
         </Box>
@@ -109,13 +109,13 @@ const Footer = () => {
           </Flex>
           <Flex className="policys">
             <Link href={URLS.landing.cookies_policy} locale="en">
-              <span className="cursor">{t("cookie-policy")}</span>
+              <span className="cursor-pointer">{t("cookie-policy")}</span>
             </Link>
             <Link href={URLS.landing.privacy_policy} locale="en">
-              <span className="cursor">{t("privacy-policy")}</span>
+              <span className="cursor-pointer">{t("privacy-policy")}</span>
             </Link>
             <Link href={URLS.landing.terms_and_conditions} locale="en">
-              <span className="cursor">{t("terms-and-conditions")}</span>
+              <span className="cursor-pointer">{t("terms-and-conditions")}</span>
             </Link>
           </Flex>
         </FooterBottom>

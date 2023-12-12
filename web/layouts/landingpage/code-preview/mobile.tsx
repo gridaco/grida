@@ -44,11 +44,10 @@ const CodePreviewMobile = () => {
             loading="eager"
             alt="Grida supported platforms icon"
             key={i.name}
-            className="cursor"
+            className="cursor-pointer"
             onClick={() => setCurrentPlatform(i)}
-            src={`/assets/platform-icons/${i.name}/${
-              currentPlatform.name === i.name ? "default" : "grey"
-            }.png`}
+            src={`/assets/platform-icons/${i.name}/${currentPlatform.name === i.name ? "default" : "grey"
+              }.png`}
             width="24"
             height="24"
           />
