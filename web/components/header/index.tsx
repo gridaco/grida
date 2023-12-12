@@ -232,9 +232,7 @@ function HeaderMenuItem({
     <div {...getReferenceProps({ ref: reference })}>
       <Li>
         {href ? (
-          <LinkWithDocsFallback href={href}>
-            <a>{content}</a>
-          </LinkWithDocsFallback>
+          <LinkWithDocsFallback href={href}>{content}</LinkWithDocsFallback>
         ) : (
           content
         )}

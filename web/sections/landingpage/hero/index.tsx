@@ -27,9 +27,9 @@ export default function HeroResponsive() {
       <DesignToolExampleContainer>
         <Image
           src="/assets/design-platforms/figma.png"
+          alt="figma"
           width={907}
           height={571}
-          layout="fill"
         />
       </DesignToolExampleContainer>
       <IPhoneXFrame>

@@ -12,8 +12,8 @@ const ApplicationPreview = () => {
         loading="eager"
         className="app"
         src="/assets/sample-app-as-image.png"
-        width="390px"
-        height="788px"
+        width={390}
+        height={788}
         alt="Grida demo app - design to code"
       />
       {/* <Preview>

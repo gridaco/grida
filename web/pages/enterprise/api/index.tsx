@@ -24,7 +24,7 @@ export default function APIPage() {
       <Main>
         <MainCard />
         <div className="bg">
-          <Image src={sifigrid} />
+          <Image src={sifigrid} alt="background" />
         </div>
       </Main>
     </>

@@ -21,8 +21,9 @@ export default function GlobalizationQuickDemoSayHiSection() {
         <Image
           loading="eager"
           src="https://via.placeholder.com/1440.png"
-          height="800px"
-          width="100%"
+          alt="placeholder"
+          height={800}
+          width={800}
         />
       </SectionLayout>
       <BlankArea height={[150, 300]} />

@@ -39,8 +39,11 @@ const CookieAccept: React.FC<CookieAcceptProps> = ({ accpetCookie }) => {
             {width < replaceStylePxToNumber(breakpoints[0]) ? (
               <Title>
                 {t("mobile.we-use")}{" "}
-                <Link href={LandingpageUrls.cookies_policy}>
-                  <a className="lowercase">{tc("cookies")}</a>
+                <Link
+                  href={LandingpageUrls.cookies_policy}
+                  className="lowercase"
+                >
+                  {tc("cookies")}
                 </Link>{" "}
                 {t("mobile.for")}
               </Title>

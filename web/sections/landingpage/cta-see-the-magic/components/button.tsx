@@ -9,8 +9,8 @@ export function MagicButton({ onClick }: { onClick?: () => void }) {
     <Button onClick={onClick}>
       <Texts>
         <Image
-          width="46px"
-          height="46px"
+          width={46}
+          height={46}
           src="/assets/magic-wond-emoji.png"
           alt="image of EmojiWond"
         />

@@ -23,14 +23,14 @@ const ActionItem = ({
   as,
   locale,
   theme = "light",
-  openInNewTab = false,
+  target,
 }: {
   label: string;
   href: string;
   as?: string;
   locale?: string;
   theme?: "light" | "dark";
-  openInNewTab?: boolean;
+  target?: string;
 }) => {
   const Content = (
     <Text
@@ -48,8 +48,8 @@ const ActionItem = ({
   );
 
   return (
-    <Link href={href} as={as} locale={locale} passHref>
-      <a target={openInNewTab ? "_blank" : undefined}>{Content}</a>
+    <Link href={href} as={as} locale={locale} target={target}>
+      {Content}
     </Link>
   );
 };
