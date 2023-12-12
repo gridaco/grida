@@ -35,6 +35,14 @@ const nextconfig = {
         source: "/bundle/:path*",
         destination: `https://the-bundle-web.vercel.app/bundle/:path*`,
       },
+      {
+        source: "/kits",
+        destination: `https://kits.grida.vercel.app/bundle`,
+      },
+      {
+        source: "/kits/:path*",
+        destination: `https://kits.grida.vercel.app/bundle/:path*`,
+      },
     ];
   },
   async redirects() {
