@@ -12,8 +12,6 @@
 
 The design of grida.co website is oppenned and shared, can be found [here](https://www.figma.com/file/Gaznaw1QHppxvs9UkqNOb0/bridged.xyz?node-id=0%3A1)
 
-> This is a [Next.js](https://nextjs.org/) project bootstrapped with [`create-next-app`](https://github.com/vercel/next.js/tree/canary/packages/create-next-app).
-
 ## Getting Started
 
 First, run the development server:
@@ -31,70 +29,30 @@ Open [http://localhost:3000](http://localhost:3000) with your browser to see the
 
 You can start editing the page by modifying `pages/index.js`. The page auto-updates as you edit the file.
 
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js/) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/import?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/deployment) for more details.
-
 ## Sitemap
 
-- [code.grida.co](https://code.grida.co)
-- [design.grida.co](https://design.grida.co)
-- [console.grida.co](https://console.grida.co)
-- [labs.grida.co](https://labs.grida.co)
-- [grida.co/roadmap](https://grida.co/roadmap)
-- [grida.co/github](https://grida.co/github)
-- [grida.co/products](https://grida.co/products)
-- [grida.co/products/dynamic](https://grida.co/products/dynamic)
-- [grida.co/products/inappbridge](https://grida.co/products/inappbridge)
-- [grida.co/products/schema-studio](https://grida.co/tools/schema-studio)
-- [grida.co/products/react](https://grida.co/products/react)
-- [grida.co/platforms/flutter](https://grida.co/platforms/flutter)
-- [grida.co/plugins](https://grida.co/plugins)
-- [grida.co/plugins/figma](https://grida.co/plugins/figma)
-- [grida.co/plugins/sketch](https://grida.co/plugins/sketch)
-- [grida.co/tools](https://grida.co/tools)
+<!-- table -->
 
-### Sitemap Generate Shell Script
-
-```sh
-#!/bin/sh
-
-# After deleting the previous contents, create an empty folder
-cd public && rm -rf sitemap && mkdir sitemap
-cd .. && cd scripts
-printf "\n"
-
-
-# Code definitions that should be executed
-for SITEMAP in 'common' 'whatsnew'; do
-    echo "Generating sitemap-${SITEMAP}.xml..."
-    # Excute
-    node ./sitemap-${SITEMAP}.js
-    printf "\n"
-done
-
-# compress xml files with gz extension
-echo "Compressing generated xml files..."
-node ./compress.js
-printf "\n"
-
-# Create a representative sitemap.xml file to define which sites are located
-echo "Generating sitemap index files..."
-node ./sitemap.js
-printf "\n"
-cd ..
-
-# Send update request to Google based on sitemap uploaded to server
-curl http://google.com/ping?sitemap=http://grida.co/sitemap.xml
-```
+| path                                                            | desc                          | repo                                                            | type       |
+| --------------------------------------------------------------- | ----------------------------- | --------------------------------------------------------------- | ---------- |
+| [/](https://grida.co/)                                          | main page                     | -                                                               | `page`     |
+| [/kits](https://grida.co/kits)                                  | kits                          | [gridaco/kits](https://github.com/gridaco/kits)                 | `page`     |
+| [/bundle](https://grida.co/plugins/bundle)                      | The Bundle by Grida           | [gridaco/The-Bundle](https://github.com/gridaco/The-Bundle)     | `app`      |
+| [code.grida.co](https://code.grida.co)                          | code                          | [gridaco/code](https://github.com/gridaco/code)                 | `app`      |
+| [app.grida.co](https://app.grida.co)                            | Grida                         | [gridaco/grida](https://github.com/gridaco/grida)               | `app`      |
+| [console.grida.co](https://console.grida.co)                    | console                       | [gridaco/console](https://github.com/gridaco/console)           | `app`      |
+| [grida.studio](https://grida.studio)                            | Grida Studios Creative Agency | [gridaco/grida.studio](https://github.com/gridaco/grida.studio) | `app`      |
+| [/roadmap](https://grida.co/roadmap)                            | development roadmap           | -                                                               | `page`     |
+| [/github](https://grida.co/github)                              | github                        | -                                                               | `redirect` |
+| [/join-slack](https://grida.co/join-slack)                      | slack community link          | -                                                               | `redirect` |
+| [/products](https://grida.co/products)                          | products                      | -                                                               | `page`     |
+| [/products/dynamic](https://grida.co/products/dynamic)          | dynamic                       | -                                                               | `page`     |
+| [/products/inappbridge](https://grida.co/products/inappbridge)  | inappbridge                   | -                                                               | `page`     |
+| [/products/schema-studio](https://grida.co/tools/schema-studio) | schema-studio                 | -                                                               | `page`     |
+| [/products/react](https://grida.co/products/react)              | react                         | -                                                               | `page`     |
+| [/platforms/flutter](https://grida.co/platforms/flutter)        | flutter                       | -                                                               | `page`     |
+| [/tools](https://grida.co/tools)                                | tools                         | -                                                               | `page`     |
+| [/plugins](https://grida.co/plugins)                            | plugins                       | -                                                               | `page`     |
+| [/plugins/figma](https://grida.co/plugins/figma)                | figma                         | -                                                               | `page`     |
+| [/plugins/sketch](https://grida.co/plugins/sketch)              | sketch                        | -                                                               | `page`     |
+| [/engines](https://grida.co/plugins/engines)                    | engines                       | -                                                               | `page`     |
