@@ -1,6 +1,6 @@
 # [grida.co](https://grida.co/)
 
-![](./readme/images/web-landing-main-example.png)
+![](./.readme/images/web-landing-main-example.png)
 
 ## In case you are looking for roadmap or contribution
 
