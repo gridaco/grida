@@ -1,5 +1,7 @@
 # [grida.co](https://grida.co/)
 
+> ## ⚠️ Archived! - This repository has been archived and moved to [grida/www](https://github.com/gridaco/grida/tree/main/www)
+
 ![](./.readme/images/web-landing-main-example.png)
 
 ## In case you are looking for roadmap or contribution
