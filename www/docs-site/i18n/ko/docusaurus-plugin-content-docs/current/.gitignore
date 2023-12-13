@@ -1,3 +1,0 @@
-# other than README.md will be copied from /docs/**/~ dir, we don't include translations in this directory in git.
-*
-!README.md
