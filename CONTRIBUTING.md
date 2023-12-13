@@ -31,11 +31,6 @@ Join slack via link on README, contact maintaners for rapid contribution. otherw
 - XS
   - 320 (iPhone SE)
 
-### Interactive checkist
-
-- css `cursor: pointer` for clickable elements
-- hover state (color or scale or underline) for dynamic link elements
-
 ### Component checklist
 
 - component on storyboard
