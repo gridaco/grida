@@ -47,6 +47,18 @@ const nextconfig = {
   },
   async redirects() {
     return [
+      {
+        source: "/terms",
+        destination: "/docs/support/terms-and-conditions",
+        permanent: true,
+        locale: false,
+      },
+      {
+        source: "/privacy",
+        destination: "/docs/support/privacy-policy",
+        permanent: true,
+        locale: false,
+      },
       // disabling globalization page access since it's not fully implemented. (temporary)
       {
         source: "/globalization",
