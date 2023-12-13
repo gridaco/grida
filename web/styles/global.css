@@ -1,3 +1,7 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
 @font-face {
   font-family: "codicon";
   font-weight: 600;
@@ -14,22 +18,6 @@ body {
   @media (prefers-reduced-motion: reduce) {
     scroll-behavior: auto;
   }
-}
-
-.cursor {
-  cursor: pointer;
-}
-.cursor-hover:hover{
-  text-decoration: underline;
-  text-underline-offset: 3px;
-}
-
-.no-drag {
-  user-select: none;
-}
-
-.lowercase {
-  text-transform: lowercase;
 }
 
 input {

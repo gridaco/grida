@@ -22,7 +22,7 @@ function DocsNavigationSection(props: { route: DocsRoute; level?: number }) {
         {routeConfig.path ? (
           <Link href={routeConfig.path ?? ""}>
             <Heading
-              className="cursor"
+              className="cursor-pointer"
               style={{
                 fontSize: "16px",
               }}
@@ -41,7 +41,7 @@ function DocsNavigationSection(props: { route: DocsRoute; level?: number }) {
             ) : (
               <Link href={i.path} key={ix}>
                 <Heading
-                  className="cursor"
+                  className="cursor-pointer"
                   style={{
                     fontSize: "16px",
                     fontWeight: 400,
@@ -69,7 +69,7 @@ const SidebarController = styled.div<{ level: number }>`
     }};
 `;
 
-const SectionWrapper = styled(Flex)<{ level: number }>`
+const SectionWrapper = styled(Flex) <{ level: number }>`
   padding-top: 8px;
 
   h4 {

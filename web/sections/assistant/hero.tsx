@@ -18,8 +18,8 @@ export function HeroSection() {
     <HeroWrapper>
       <div className="background" style={{ width: 1100 }}>
         <Image
-          layout="fill"
           src={herobackground}
+          alt="background"
           placeholder="blur"
           width={1100}
           height={1100}

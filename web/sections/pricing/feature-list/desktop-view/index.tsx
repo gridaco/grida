@@ -36,7 +36,7 @@ const FeatureListDesktopView: React.FC<FeatureProps> = ({ data }) => {
           p="48px"
         >
           <Icon
-            className="cursor"
+            className="cursor-pointer"
             name="headerClose"
             ml="auto"
             onClick={() => removePopup()}
@@ -116,7 +116,7 @@ const FeatureListDesktopView: React.FC<FeatureProps> = ({ data }) => {
           >
             Extra usage
             <Icon
-              className="cursor"
+              className="cursor-pointer"
               onClick={handleClickQuestionMark}
               name="questionMark"
               ml="5px"

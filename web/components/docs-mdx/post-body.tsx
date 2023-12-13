@@ -39,7 +39,7 @@ export default function PostBody({ content }) {
         mt="90px"
       >
         <Flex
-          className="cursor"
+          className="cursor-pointer"
           style={{
             alignItems: "center",
           }}
@@ -58,9 +58,8 @@ export default function PostBody({ content }) {
             Prev
           </Text>
         </Flex>
-
         <Flex
-          className="cursor"
+          className="cursor-pointer"
           style={{
             alignItems: "center",
           }}
@@ -86,7 +85,7 @@ export default function PostBody({ content }) {
       >
         <Link href="https://github.com/gridaco/grida.co">
           <Text
-            className="cursor"
+            className="cursor-pointer"
             pt="24px"
             style={{
               fontSize: "16px",

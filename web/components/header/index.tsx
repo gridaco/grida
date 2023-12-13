@@ -65,7 +65,7 @@ const Header = ({ banner }: { banner?: React.ReactNode }) => {
           }}
           mx={["20px"]}
         >
-          <ForMobile className="cursor" onClick={handleClickMenu}>
+          <ForMobile className="cursor-pointer" onClick={handleClickMenu}>
             <Icon name={isMobileMenuOpen ? "headerClose" : "headerMenu"} />
           </ForMobile>
 
@@ -82,7 +82,7 @@ const Header = ({ banner }: { banner?: React.ReactNode }) => {
           >
             <Link href="/">
               <Logo
-                className="cursor"
+                className="cursor-pointer"
                 name={theme.type === "light" ? "grida_black" : "grida_white"}
                 width={32}
                 height={32}
@@ -91,7 +91,7 @@ const Header = ({ banner }: { banner?: React.ReactNode }) => {
             </Link>
             <Link href="/">
               <ResponsiveTitle
-                className="cursor"
+                className="cursor-pointer"
                 style={{
                   fontSize: "18px",
                   fontWeight: "800",
@@ -213,7 +213,7 @@ function HeaderMenuItem({
         // log header menu click event
         event_click_header_menu({ menu: label });
       }}
-      className="cursor"
+      className="cursor-pointer"
       mx={variant === "desktop" ? "18px" : undefined}
       my={variant === "mobile" ? "12px" : undefined}
       data-selected={selected || open}
@@ -232,9 +232,7 @@ function HeaderMenuItem({
     <div {...getReferenceProps({ ref: reference })}>
       <Li>
         {href ? (
-          <LinkWithDocsFallback href={href}>
-            <a>{content}</a>
-          </LinkWithDocsFallback>
+          <LinkWithDocsFallback href={href}>{content}</LinkWithDocsFallback>
         ) : (
           content
         )}

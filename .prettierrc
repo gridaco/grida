@@ -3,5 +3,8 @@
   "singleQuote": false,
   "printWidth": 80,
   "trailingComma": "all",
-  "arrowParens": "avoid"
+  "arrowParens": "avoid",
+  "plugins": [
+    "prettier-plugin-tailwindcss"
+  ]
 }

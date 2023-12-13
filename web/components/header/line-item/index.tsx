@@ -5,9 +5,7 @@ import React from "react";
 export function LineItem({ label, href }: { label: string; href: string }) {
   return (
     <LinkWithDocsFallback href={href}>
-      <a>
-        <Label>{label}</Label>
-      </a>
+      <Label>{label}</Label>
     </LinkWithDocsFallback>
   );
 }

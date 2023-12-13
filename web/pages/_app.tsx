@@ -21,13 +21,13 @@ import { MDXProvider } from "@mdx-js/react";
 import { _MDX_COMPONENTS } from "components/mdx";
 import { Box } from "theme-ui";
 import { env } from "process";
-import "../styles/global.css";
 import Script from "next/script";
 import { RecoilRoot } from "recoil";
 import { appWithTranslation } from "next-i18next";
 import { PageLayoutConfig } from "layouts/index";
 import { HeaderBanner } from "components/banner";
 import Link from "next/link";
+import "../styles/global.css";
 
 type GetLayoutFunc = (page: ReactElement) => ReactNode;
 
@@ -53,31 +53,29 @@ function defaultLayout(
         banner={
           // promotional banner
           <Link href={"/bundle"}>
-            <a>
-              <HeaderBanner>
-                <div
+            <HeaderBanner>
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  background: "black",
+                  color: "white",
+                  padding: 12,
+                }}
+              >
+                <p
                   style={{
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    background: "black",
-                    color: "white",
-                    padding: 12,
+                    maxWidth: 500,
+                    fontSize: 14,
                   }}
                 >
-                  <p
-                    style={{
-                      maxWidth: 500,
-                      fontSize: 14,
-                    }}
-                  >
-                    <strong>Check out our latest release</strong> | The Bundle
-                    by Grida, A Massive library of 3D Rendered PNGs for UI and
-                    Graphics Designs.
-                  </p>
-                </div>
-              </HeaderBanner>
-            </a>
+                  <strong>Check out our latest release</strong> | The Bundle
+                  by Grida, A Massive library of 3D Rendered PNGs for UI and
+                  Graphics Designs.
+                </p>
+              </div>
+            </HeaderBanner>
           </Link>
         }
       />

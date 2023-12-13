@@ -7,11 +7,9 @@ import { Sitemap } from "components/footer/sitemap";
 import { useTheme } from "@emotion/react";
 import { useTranslation } from "next-i18next";
 
-interface SitemapListProps {
+export default function SitemapList({ sitemap }: {
   sitemap: Sitemap;
-}
-
-const SitemapList: React.FC<SitemapListProps> = ({ sitemap }) => {
+}) {
   const { label, href, child } = sitemap;
 
   const theme = useTheme();
@@ -20,9 +18,7 @@ const SitemapList: React.FC<SitemapListProps> = ({ sitemap }) => {
   const Header = () => {
     const HeaderText = (
       <Text
-        className={href && "cursor"}
         color={theme.footer.group.color}
-        mb="40px"
         style={{
           fontWeight: 700, // 500?
           fontSize: "18px",
@@ -32,7 +28,15 @@ const SitemapList: React.FC<SitemapListProps> = ({ sitemap }) => {
         {t(label)}
       </Text>
     );
-    return href ? <Link href={href}>{HeaderText}</Link> : HeaderText;
+    return (
+      <span className="cursor-default mb-10">
+        {
+          href ?
+            <Link href={href} className="cursor-pointer">{HeaderText}</Link>
+            : HeaderText
+        }
+      </span>
+    )
   };
 
   return (
@@ -43,27 +47,24 @@ const SitemapList: React.FC<SitemapListProps> = ({ sitemap }) => {
     >
       <Header />
       {child.map(i => (
-        <LinkWithDocsFallback href={i.href} key={i.label}>
-          <Text
+        <LinkWithDocsFallback
+          key={i.label}
+          className="mb-3 cursor-pointer hover:underline"
+          href={i.href}
+        >
+          <span
+            className="text-sm"
             onClick={() => {
               // log footer menu item click
               event_click_footer_menu({ menu: i.label });
             }}
-            className="cursor cursor-hover"
-            mb="15px"
             color={theme.footer.menu.color}
-            style={{
-              fontSize: "14px",
-              letterSpacing: "0em",
-              fontWeight: 400,
-            }}
           >
             {t(i.label)}
-          </Text>
+          </span>
         </LinkWithDocsFallback>
       ))}
     </Flex>
   );
 };
 
-export default SitemapList;

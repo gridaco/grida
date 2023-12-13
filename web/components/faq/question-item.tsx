@@ -19,7 +19,7 @@ export default function QuestionItem(props: { question: FaqQnaItem }) {
       }}
     >
       <Flex
-        className="cursor"
+        className="cursor-pointer"
         style={{
           width: "100%",
           alignItems: "center",
@@ -37,7 +37,7 @@ export default function QuestionItem(props: { question: FaqQnaItem }) {
             justifyContent: "center",
           }}
         >
-          <Icon name={isOpen ? "faqClose" : "plus"} className="cursor" />
+          <Icon name={isOpen ? "faqClose" : "plus"} className="cursor-pointer" />
         </Flex>
       </Flex>
       {isOpen && (

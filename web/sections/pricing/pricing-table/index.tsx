@@ -46,7 +46,7 @@ export default function PlanList() {
           p="48px"
         >
           <Icon
-            className="cursor"
+            className="cursor-pointer"
             name="headerClose"
             ml="auto"
             onClick={() => removePopup()}

@@ -4,10 +4,12 @@ import Link from "next/link";
 export function LinkWithDocsFallback({
   href,
   children,
-}: React.PropsWithChildren<{ href: string }>) {
-  const do_fallback_docs = href.startsWith("/docs");
+  ...props
+}: React.ComponentProps<typeof Link>) {
+  const do_fallback_docs = String(href).startsWith("/docs");
+
   return (
-    <Link href={href} locale={do_fallback_docs ? "en" : undefined}>
+    <Link href={href} locale={do_fallback_docs ? "en" : undefined} {...props}>
       {children}
     </Link>
   );

@@ -48,8 +48,6 @@ const Collaborate = () => {
             <Image
               loading="eager"
               src="/assets/collaborate-background-img.png"
-              width="100%"
-              height="100%"
               alt="collaborate-background-img"
             />
           </div>
@@ -64,8 +62,6 @@ const Collaborate = () => {
                   loading="eager"
                   key="notification"
                   src="/assets/notification.png"
-                  width="auto"
-                  height="auto"
                   alt="Grida collaboration slack notification"
                 />
               </div>
@@ -75,8 +71,6 @@ const Collaborate = () => {
             <Image
               src="/assets/application-image-view.png"
               loading="eager"
-              width="auto"
-              height="auto"
               alt="Grida collaboration for app developers"
             />
           </div>

@@ -60,9 +60,7 @@ export function JoinWithCodeSection() {
                 marginTop: 80,
               }}
             >
-              <Link href="/assistant#join-the-waitlist">
-                <a>Not Invited yet?</a>
-              </Link>
+              <Link href="/assistant#join-the-waitlist">Not Invited yet?</Link>
             </div>
           </>
         )}

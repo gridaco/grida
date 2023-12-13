@@ -56,7 +56,7 @@ function DocsNavigation() {
               fontSize: "18px",
               fontWeight: "bold",
             }}
-            className="cursor"
+            className="cursor-pointer"
             onClick={() => setIsOpen(!isOpen)}
           >
             <Icon

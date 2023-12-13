@@ -24,11 +24,11 @@ function PricingCard({
   description?: React.ReactNode;
   normal?: number;
   price:
-    | {
-        monthly: number;
-        yearly: number;
-      }
-    | number;
+  | {
+    monthly: number;
+    yearly: number;
+  }
+  | number;
   onHelp?: () => void;
   onStart?: () => void;
   highlight?: boolean;
@@ -44,7 +44,7 @@ function PricingCard({
       <Heading>
         <LandingpageText variant="h4">{name}</LandingpageText>
         {onHelp && (
-          <QuestionMarkCircledIcon className="cursor" onClick={onHelp} />
+          <QuestionMarkCircledIcon className="cursor-pointer" onClick={onHelp} />
         )}
       </Heading>
       <PlanPricing style={{ gap: 4 }}>
@@ -79,7 +79,7 @@ function PricingCard({
         </PlanDescription>
       </Flex>
       <CtaButton
-        className="cursor"
+        className="cursor-pointer"
         style={{
           background: highlight ? undefined : "rgba(0, 0, 0, 0.9)",
         }}

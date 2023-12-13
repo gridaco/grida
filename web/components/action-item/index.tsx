@@ -23,18 +23,18 @@ const ActionItem = ({
   as,
   locale,
   theme = "light",
-  openInNewTab = false,
+  target,
 }: {
   label: string;
   href: string;
   as?: string;
   locale?: string;
   theme?: "light" | "dark";
-  openInNewTab?: boolean;
+  target?: string;
 }) => {
   const Content = (
     <Text
-      className="cursor"
+      className="cursor-pointer"
       color={Colors[theme]["default"]}
       whileHover={{ color: Colors[theme]["hover"] }}
     >
@@ -48,13 +48,13 @@ const ActionItem = ({
   );
 
   return (
-    <Link href={href} as={as} locale={locale} passHref>
-      <a target={openInNewTab ? "_blank" : undefined}>{Content}</a>
+    <Link href={href} as={as} locale={locale} target={target}>
+      {Content}
     </Link>
   );
 };
 
-const Text = styled(motion.span)<{ color: string }>`
+const Text = styled(motion.span) <{ color: string }>`
   max-width: calc(100vw - 40px);
   width: 100vw;
   margin-right: auto;

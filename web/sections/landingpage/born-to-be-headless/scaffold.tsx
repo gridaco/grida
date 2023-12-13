@@ -27,7 +27,7 @@ export function SectionBornToBeHeadlessScaffold() {
           <ActionArea>
             <ActionItem
               theme="dark"
-              openInNewTab
+              target="_blank"
               label="Get the VSCode Extension?"
               href={"https://grida.co/vscode"}
             />
