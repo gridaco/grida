@@ -1,6 +1,6 @@
 # [grida.co](https://grida.co/)
 
-> ## ⚠️ Archived! - This repository has been archived and moved to [grida/www](https://github.com/gridaco/grida/tree/main/www)
+> ⚠️ Archived! - This repository has been and moved from [grida/grida.co](https://github.com/gridaco/grida.co)
 
 ![](./.readme/images/web-landing-main-example.png)
 
