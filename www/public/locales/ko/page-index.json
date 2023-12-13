@@ -1,0 +1,34 @@
+{
+  "section/hero": {
+    "heading": "피그마, 코드로.",
+    "p": "Grida 는 앱개발을 위한 오픈소스 플렛폼으로, 여러분의 피그마 디자인을 개발자 친화적인 코드로 변환합니다."
+  },
+  "section/run-anywhere": {
+    "heading": "디자인은 한번만, 실행은 어디에서나"
+  },
+  "section/instant": {
+    "heading": "눈 깜짝할 사이에",
+    "p": "프레임 전체에서 부터 작은 컴포넌트 까지, Grida 는 여러분의 클릭에 즉시 반응합니다. 헤드레스 작업플로우로 여러분의 작업을 굉장히 빠르게 완료할수 있습니다. 프로젝트의 모든 스텝을 Grida 로 부스트 해보세요."
+  },
+  "section/figma-dedicated": {
+    "heading": "하나에만 집중합니다.",
+    "p": "Grida 는 오직 Figma 를 완벽 지원하기 위하여 만들어졌습니다. 여러분께 가장 발전되고, 리스폰시브한 개발 경험을 제공하기 위함이죠. 피그마에서 프로덕션까지 가기 위한 모든 도구가, 이곳에 모였습니다.",
+    "cta-how-it-works": "Design to code 는 어떻게 작동하나요?",
+    "cta-try-demo": "데모 체험"
+  },
+  "section/see-the-magic": {
+    "heading": "마법을 보여줄게요",
+    "tagline": "클릭 한번으로 얼마나 생산성이 높아질수 있는지 놀라실 겁니다.",
+    "cta-paste-link": "피그마 디자인 링크 붙여넣기."
+  },
+  "section/final-cta": {
+    "heading": {
+      "focus": "본질에만 집중하세요",
+      "do-the-rest": "가 나머지를 할게요"
+    }
+  },
+  "demo-cta-input": {
+    "placeholder": "Figma 디자인 링크를 붙어넣으세요",
+    "action": "코드로"
+  }
+}

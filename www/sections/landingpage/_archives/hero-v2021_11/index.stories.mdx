@@ -1,0 +1,34 @@
+import { Meta, Story, Preview, Props } from "@storybook/addon-docs/blocks";
+import Hero from "./";
+import BlankArea from "components/blank-area";
+import { ElevatedVideoPlayer } from "components/landingpage/effect";
+import LandingMainCtaButton from "components/landingpage/main-cta-button";
+import LandingpageText from "components/landingpage/text";
+import { media } from "utils/styled/media";
+
+import SectionLayout from "layouts/section";
+import { HeroText, Description } from "./storybook-style";
+
+<Meta title="section/hero" />
+
+section-layout
+
+# Preview
+
+<Preview>
+  <Story name="default">
+    <SectionLayout alignContent="center">
+      <HeroText variant="h1" textAlign="center">
+        Your Figma Designs to
+        <br />
+        Flutter Code.
+      </HeroText>
+      <Description variant="body1" textAlign="center">
+        Don’t waste time repeating yourself.
+        <br />
+        UI Development? - We’ve got it. Sit back and relax.
+      </Description>
+      <LandingMainCtaButton />
+    </SectionLayout>
+  </Story>
+</Preview>

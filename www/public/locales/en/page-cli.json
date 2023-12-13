@@ -1,0 +1,32 @@
+{
+  "title": "Grida CLI",
+  "description": "Grida CLI for integrating your figma design direcly in your codebase",
+  "keywords": "figma, grida ,cli ,command line interface, figma cli, figma to code, figma handoff cli, zeplin cli",
+  "cta-start": "Start Coding",
+  "cta-command": "npx grida init",
+  "cta-docs": "Read the docs",
+  "section/hero": {
+    "tagline": "_ Grida CLI // Beta",
+    "heading": "<span class='mono'>CI</span> your design.",
+    "description": "Grida CLI generates code from Design input and saves it directly into your workspace. Use your design like a package."
+  },
+  "section/command": {
+    "heading": "One command to add designs as a module to your existing projects.",
+    "tagline": "Be the Maestro.",
+    "description": "You can import your design like a well-coded library, with full documentations.<br />We play the details // you play the orchestra."
+  },
+  "section/config": {
+    "heading": "Fits into your configuration.",
+    "description": "Configure grida with grida.confg.js. You can define plugins, output code styles and customize the behaviour deep down to AST level.",
+    "features": [
+      "secure, runs locally",
+      "zero dependency by default",
+      "works with svelte",
+      "works with solid-js",
+      "works with vanilla html/css",
+      "works with react & react-native",
+      "works with flutter"
+    ]
+  },
+  "this-page-was-made-with-grida-cli": "This page was made with grida CLI under 7 minutes<br/>with NextJS & @emotion/styled"
+}

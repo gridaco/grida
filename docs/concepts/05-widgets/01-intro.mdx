@@ -1,0 +1,48 @@
+# Widgets
+
+> A Widget, or also knwon as Built-in Standard Components is a Grida standard for shorthanding the code, and making the result more reliable.
+
+## Example - Buttons and TextFields are Widget
+
+## Widget Catalog
+
+Here are some popular widgets that you will end up using in a daily basis.
+
+- Icon
+- Button
+- TextField
+- Typography
+
+## The philosophy behind Widgets
+
+> "Only use widgets when they are inevidable"
+
+Behind the scene, the layout is also a widget internally. But you don't want to use untrusted code just for representing the layout.
+e.g.
+
+```tsx
+// (1) with Layout also as Widget
+import { Stack, TextField, Button } from "@reflect-ui/react";
+
+const AllInOne = () => {
+  return (
+    <Stack flex={1}>
+      <TextField />
+      <Button />
+    </Stack>
+  );
+};
+
+// (2) with Only primal Widgets as Widgets
+import { TextField, Button } from "@reflect-ui/react";
+const Minimal = () => {
+  return (
+    <div style={{ flex: 0 }}>
+      <TextField />
+      <Button />
+    </div>
+  );
+};
+```
+
+Ofcourse the first (1) option is shorter, but deeply, this is not what you want. This makes all of your code depend on Grida, and that is not what we want.

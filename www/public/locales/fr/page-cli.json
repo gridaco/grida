@@ -1,0 +1,31 @@
+{
+  "title": "Grida CLI",
+  "description": "Grida CLI pour intégrer votre conception figma directement dans votre base de code",
+  "cta-start": "Commencer à coder",
+  "cta-command": "npx grida init",
+  "cta-docs": "Lisez les docs",
+  "section/hero": {
+    "tagline": "_ Grida CLI // Bêta",
+    "heading": "<span class='mono'>CI</span> ton design.",
+    "description": "Grida CLI génère du code à partir de l'entrée Design et l'enregistre directement dans votre espace de travail. Utilisez votre conception comme un package."
+  },
+  "section/command": {
+    "heading": "Une commande pour ajouter des conceptions en tant que module à vos projets existants.",
+    "tagline": "Soyez le maestro.",
+    "description": "Vous pouvez importer votre design comme une bibliothèque bien codée, avec des documentations complètes.<br />Nous jouons les détails // vous jouez l'orchestre."
+  },
+  "section/config": {
+    "heading": "S'adapte à votre configuration.",
+    "description": "Configurez la grille avec grida.config.js. Vous pouvez définir des plugins, des styles de code de sortie et personnaliser le comportement jusqu'au niveau AST.",
+    "features": [
+      "sécurisé, s'exécute localement",
+      "zéro dépendance par défaut",
+      "fonctionne avec svelte",
+      "fonctionne avec solid-js",
+      "fonctionne avec vanilla html/css",
+      "fonctionne avec react & react-native",
+      "fonctionne avec flutter"
+    ]
+  },
+  "this-page-was-made-with-grida-cli": "Cette page a été réalisée avec grida CLI en moins de 7 minutes<br/>avec NextJS & @emotion/styled"
+}

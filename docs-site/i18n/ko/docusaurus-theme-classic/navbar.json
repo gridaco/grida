@@ -1,0 +1,26 @@
+{
+  "item.label.GitHub": {
+    "message": "GitHub",
+    "description": "Navbar item with label GitHub"
+  },
+  "item.label.Docs": {
+    "message": "문서",
+    "description": "Navbar item with label Docs"
+  },
+  "item.label.Flags": {
+    "message": "플래그",
+    "description": "Navbar item with label Flags"
+  },
+  "item.label.Reference": {
+    "message": "레퍼런스",
+    "description": "Navbar item with label Reference"
+  },
+  "item.label.Together": {
+    "message": "함께해요",
+    "description": "Navbar item with label Together"
+  },
+  "item.label.Sign in": {
+    "message": "가입하기",
+    "description": "Navbar item with label Sign in"
+  }
+}
