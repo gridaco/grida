@@ -6,7 +6,6 @@
         "app",
         "desktop",
         "web",
-        "site",
         "packages/app-*",
         "packages/core-*",
         "packages/lib/*",
