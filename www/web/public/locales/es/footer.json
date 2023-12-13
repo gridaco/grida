@@ -1,0 +1,44 @@
+{
+  "products": {
+    "label": "Products",
+    "assistant": "Assistant",
+    "code": "Code",
+    "cli": "CLI",
+    "cloud": "Cloud",
+    "globalization": "Globalization",
+    "reflect-ui": "Reflect UI",
+    "vscode": "VSCode"
+  },
+  "solutions": {
+    "label": "Solutions",
+    "showcase": "Showcase",
+    "handoff": "Handoff"
+  },
+  "resources": {
+    "label": "Resources",
+    "getting-started": "Getting Started",
+    "docs": "Docs",
+    "api-docs": "API Docs",
+    "blogs": "Blogs"
+  },
+  "platforms": {
+    "label": "Platforms",
+    "figma": "Figma",
+    "react": "React",
+    "react-native": "React Native",
+    "flutter": "Flutter",
+    "vanilla": "HTML/CSS",
+    "reflect-ui": "Reflect UI"
+  },
+  "together": {
+    "label": "Together",
+    "github": "Github",
+    "projects": "Projects",
+    "support": "Support",
+    "slack": "Join us on Slack",
+    "reddit": "Reddit"
+  },
+  "cookie-policy": "Cookies",
+  "privacy-policy": "Política de privacidad",
+  "terms-and-conditions": "Termos y condiciones"
+}

@@ -1,0 +1,32 @@
+{
+  "title": "Grida CLI",
+  "description": "Grida CLI 는 여러분의 피그마 디자인을 기존 코드베이스에 바로 연결할수 있도록 도와줍니다.",
+  "keywords": "피그마, 그리다, 커멘드라인인터페이스, 피그마 cli, 피그마 투 코드, 피그마 핸드오프 cli, 제플린 cli",
+  "cta-start": "시작하기",
+  "cta-command": "npx grida init",
+  "cta-docs": "문서 보기",
+  "section/hero": {
+    "tagline": "_ 그리다 CLI // 베타",
+    "heading": "디자인을 위한 <span class='mono'>CI</span>",
+    "description": "Grida CLI 를 통해 디자인에서 바로 코드를 생성하고 작업공간에 바로 추가해 보세요. 이제, 디자인을 패키지 처럼 사용하세요."
+  },
+  "section/command": {
+    "heading": "디자인을 모듈로 임포트하기까지, 커맨드 하나로 가능합니다.",
+    "tagline": "지휘자가 되세요.",
+    "description": "마치 잘 짜여진 라이브러리 처럼 여러분의 디자인을 임포트 하여 사용하세요.<br />디테일은 저희가 잡겠습니다. // 여러분은 오케스트라를 연주하세요."
+  },
+  "section/config": {
+    "heading": "어떤 모듈을 사용하더라도.",
+    "description": "grida.confg.js 로 커스텀하게 설정할수 있습니다. 플러그인을 사용하거나, 결과물의 코드 스타일을 AST 수준에서 까지 사용자 정의 할수 있습니다.",
+    "features": [
+      "로컬에서 실행되며 안전합니다.",
+      "제로-디펜던시 로 사용 가능합니다",
+      "svelte 와 호환",
+      "solid-js 와 호환",
+      "vanilla html/css 와 호환",
+      "react & react-native 와 호환",
+      "flutter 와 호환"
+    ]
+  },
+  "this-page-was-made-with-grida-cli": "이 페이지는 grida CLI 를 통해 7 분안에 만들어졌습니다.<br/>NextJS 와 @emotion/styled 사용"
+}

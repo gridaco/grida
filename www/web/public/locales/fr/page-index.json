@@ -1,0 +1,36 @@
+{
+  "title": "Grida",
+  "description": "Figma à coder | Opensource, conception Headless pour coder le logiciel d'automatisation. Boostez votre développement frontend. Convertissez instantanément votre conception en code prêt pour la production.",
+  "section/hero": {
+    "heading": "Figma à Code.",
+    "p": "Grida est une plate-forme gratuite et open source qui transformera automatiquement votre désign Figma en code adapté aux développeurs pour les applications Web et mobiles."
+  },
+  "section/run-anywhere": {
+    "heading": "Design une fois, exécutez n'importe où."
+  },
+  "section/instant": {
+    "heading": "Tout Instantané.",
+    "p": "Des frames entiers à un seul component, Grida répondra instantanément à votre clic. Le headless workflow rendra votre travail encore plus rapide. Accélérez chaque étape de votre projet avec Grida."
+  },
+  "section/figma-dedicated": {
+    "heading": "Moins est plus.",
+    "p": "Grida est uniquement dédié à la plate-forme Figma pour vous offrir l'expérience de développement la plus avancée et la plus réactive qui soit. Vous trouverez tout ce dont vous avez besoin pour passer à l'antenne avec Figma.",
+    "cta-how-it-works": "Comment fonctionne le Design to Code ?",
+    "cta-try-demo": "Essayez la démo"
+  },
+  "section/see-the-magic": {
+    "heading": "Voir la magie",
+    "tagline": "Boostez votre productivité en un clic.",
+    "cta-paste-link": "Collez votre figma design url."
+  },
+  "section/final-cta": {
+    "heading": {
+      "focus": "Concentrez-vous sur le noyau",
+      "do-the-rest": "fera le reste"
+    }
+  },
+  "demo-cta-input": {
+    "placeholder": "Entrez votre Figma design url",
+    "action": "To code"
+  }
+}

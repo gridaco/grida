@@ -1,0 +1,36 @@
+{
+  "title": "Grida",
+  "description": "Figma to Code | Opensource, Headless design to code automation software. Supercharge your frontend development. Instantly convert your design to production ready code.",
+  "section/hero": {
+    "heading": "Figma to Code.",
+    "p": "Grida is a Free and Open-source platform that will automatically transform your Figma design to developer-friendly code for Web & Mobile apps."
+  },
+  "section/run-anywhere": {
+    "heading": "Design once, Run anywhere."
+  },
+  "section/instant": {
+    "heading": "Everything Instant.",
+    "p": "From entire frames to a single component, Grida will respond to your click instantly. The headless workflow will make your job even faster. Speed up every step of your project with Grida."
+  },
+  "section/figma-dedicated": {
+    "heading": "Less is more.",
+    "p": "Grida is solely dedicated to Figma platform to bring you the most advanced, responsive development experience ever. You will find everything you need to go on-air with Figma.",
+    "cta-how-it-works": "How does Design to code work?",
+    "cta-try-demo": "Try the demo"
+  },
+  "section/see-the-magic": {
+    "heading": "See the magic",
+    "tagline": "Supercharge your productivity with one click.",
+    "cta-paste-link": "Paste your figma design url."
+  },
+  "section/final-cta": {
+    "heading": {
+      "focus": "Focus on the core",
+      "do-the-rest": "will do the rest"
+    }
+  },
+  "demo-cta-input": {
+    "placeholder": "Enter your Figma design url",
+    "action": "To code"
+  }
+}

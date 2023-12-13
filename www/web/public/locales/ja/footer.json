@@ -1,0 +1,44 @@
+{
+  "products": {
+    "label": "製品",
+    "assistant": "アシスタント",
+    "code": "コード",
+    "cli": "CLI",
+    "cloud": "Cloud",
+    "globalization": "グローバリゼーション",
+    "reflect-ui": "Reflect UI",
+    "vscode": "VSCode"
+  },
+  "solutions": {
+    "label": "ソリューション",
+    "showcase": "ショーケース",
+    "handoff": "ハンドオフ"
+  },
+  "resources": {
+    "label": "リソース",
+    "getting-started": "始める",
+    "docs": "文書",
+    "api-docs": "API 文書",
+    "blogs": "ブログ"
+  },
+  "platforms": {
+    "label": "プラットホーム",
+    "figma": "Figma",
+    "react": "React",
+    "react-native": "React Native",
+    "flutter": "Flutter",
+    "vanilla": "HTML/CSS",
+    "reflect-ui": "Reflect UI"
+  },
+  "together": {
+    "label": "一緒にする。",
+    "github": "Github",
+    "projects": "プロジェクト",
+    "support": "サポート",
+    "slack": "Slackに参加してください",
+    "reddit": "レディット"
+  },
+  "cookie-policy": "クッキー政策",
+  "privacy-policy": "個人情報政策",
+  "terms-and-conditions": "契約条件"
+}

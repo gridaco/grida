@@ -1,0 +1,53 @@
+# Layout Management
+
+In this document, we'll have few notes about concepts of a Layout, and short principles of how to manage them.
+
+## Always use Frame
+
+## `Group` is not a Layout (in most times)
+
+We oftem misunderstand that group is a representation of a layout. But this is wrong.
+Technically, under the hood, A group is a Abstract concepts that locks its children to move and position in a grouped way.
+
+To be more clear, here is an example.
+
+- SceneRoot
+  - Group
+    - Item 1 - Aligns to Left
+    - Item 2 - Aligns to Right
+    - Item 3 - Aligns to Top
+
+Group does not have a alignment property (not even in your design tool). It only shows the alignment if all its children have the same alignment.
+So what really happens when you align a Group, let's say to the left, is that all its children are aligned to the left, relative to Root, not Group.
+
+This is why we should always use Frame instead of group, otherwise, your layout will break both in your design tool and in your production.
+
+Also under the same reason, you should avoid using Masks. Yet, [we do support them](../../@designto-code/figma-mask-layer), but the results may differ as your expectations.
+
+<!-- You can learn about this in more details in ["how we handle groups"](../../@designto-code/) -->
+
+## `Frame` is a Layout
+
+## Advanced Layout composition
+
+- Column
+- Row
+- Flex
+- Stack
+- Positioned
+- Aligned
+- Complex Cases
+
+### Autolayout and Concept of `Flex`
+
+Learn more about this in the [next document](./autolayout)
+
+### Stack and Alignment
+
+### Complex Cases
+
+Above, you have all the support for representing layouts with built-in Figma features, Yet, you might encounter some cases that simply can't-be-done only using Figma.
+
+**Enter: Flags.**
+
+[Learn more about flags here](../flags/intro)
