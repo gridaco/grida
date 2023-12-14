@@ -1,7 +1,7 @@
 import { UnconstrainedTemplate } from "@boring.so/template-provider";
 import { BoringContent, BoringTitle } from "@boring.so/document-model";
-import { DesignProvider } from "@design-sdk/core-types";
-import { nodes } from "@design-sdk/core";
+import type { DesignProvider } from "@design-sdk/core-types";
+import type { ReflectSceneNode } from "@design-sdk/figma-node";
 
 interface PlatformCode {
   raw: string;
@@ -16,7 +16,7 @@ interface ImportedScreenConfig {
     id: string;
     url: string;
     source: DesignProvider;
-    node: nodes.ReflectSceneNode;
+    node: ReflectSceneNode;
   };
   code: {
     flutter?: PlatformCode;

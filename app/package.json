@@ -15,6 +15,7 @@
     "@design-sdk/figma-remote-api": "^0.0.43",
     "@design-sdk/universal": "^0.0.43",
     "@design-sdk/url-analysis": "^0.0.43",
+    "@design-sdk/core-types": "^0.0.43",
     "@editor-ui/dialog": "0.0.0",
     "@editor-ui/editor": "0.0.0",
     "@editor-ui/workspace": "0.0.0",

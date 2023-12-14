@@ -1,18 +1,18 @@
 import React, { useEffect, useState } from "react";
 import styled from "@emotion/styled";
 import { useRouter } from "next/router";
-import { buildFlutterFrameUrl } from "@base-sdk/base/frame-embed";
+import { buildFlutterFrameUrl } from "@base-sdk/base/dist/frame-embed";
 import Editor, { useMonaco } from "@monaco-editor/react";
 import CircularProgress from "@material-ui/core/CircularProgress";
-import { checkFrameSourceMode } from "@base-sdk/base/frame-embed";
-import { AppFramework, AppLanguage } from "@base-sdk/base/types";
+import { checkFrameSourceMode } from "@base-sdk/base/dist/frame-embed";
+import { AppFramework, AppLanguage } from "@base-sdk/base/dist/types";
 import Background from "@app/scene-view/components/canves/background";
 import { EditorThemeProvider } from "../../../../ui/editor-ui/packages/editor-ui-theme";
 import { TopBar } from "../../../../app/components";
 import { ShareModalContents } from "@app/scene-view";
 import { makeService } from "services/scenes-store";
 import { SceneRecord } from "@base-sdk/scene-store";
-import { __PutSharingPolicy } from "@base-sdk/scene-store/__api/server-types";
+import { __PutSharingPolicy } from "@base-sdk/scene-store/dist/__api/server-types";
 import { ResizableIframeAppRunnerFrame } from "@app/scene-view/components";
 import { useAuthState } from "@base-sdk-fp/auth-components-react";
 import { redirectionSignin } from "util/auth";
@@ -23,7 +23,7 @@ import { UserProfile } from "../../../../app/3rd-party-api/type";
 import { ScaffoldSceneView } from "@app/scene-view/components/scaffold";
 import { ElevatedSceneWrap } from "@app/scene-view/components/elevated-scene-wrapper";
 import { IPlayer } from "../../../../app/components/top-bar/player-type";
-import { ScenePreviewParams } from "@base-sdk/base/features/scene-preview";
+import { ScenePreviewParams } from "@base-sdk/base/dist/features/scene-preview";
 /**
  * frame or url is required
  * @param frame the frame id of selected node, which uploaded to default bridged quicklook s3 buket.

@@ -95,6 +95,7 @@ export const PageRow = memo(
       >
         {withSeparatorElements(
           [
+            // @ts-ignore
             <TreeView.RowTitle>{name}</TreeView.RowTitle>,
             hovered && (
               <>

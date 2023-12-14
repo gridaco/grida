@@ -10,9 +10,9 @@ import CircularProgress from "@material-ui/core/CircularProgress";
 // import FrameFlutter from "../../components/frame-flutter";
 
 import Toolbar from "@app/scene-view/components/toolbar";
-import { checkFrameSourceMode } from "@base-sdk/base/frame-embed";
-import { ScenePreviewParams } from "@base-sdk/base/features/scene-preview";
-import { AppFramework, AppLanguage } from "@base-sdk/base/types";
+import { checkFrameSourceMode } from "@base-sdk/base/dist/frame-embed";
+import { ScenePreviewParams } from "@base-sdk/base/dist/features/scene-preview";
+import { AppFramework, AppLanguage } from "@base-sdk/base/dist/types";
 import Background from "@app/scene-view/components/canves/background";
 import { EditorThemeProvider } from "../../../ui/editor-ui/packages/editor-ui-theme";
 import { IPlayer, TopBar } from "../../../app/components";
