@@ -1,37 +1,37 @@
 {
-    "name": "bridged",
-    "private": true,
-    "license": "Apache 2.0",
-    "workspaces": [
-        "app",
-        "desktop",
-        "web",
-        "packages/app-*",
-        "packages/core-*",
-        "packages/lib/*",
-        "externals/base-sdk/*",
-        "externals/base-sdk/_firstparty/*",
-        "externals/reflect-core/packages/*",
-        "externals/design-sdk/*",
-        "externals/design-to-code/packages/*",
-        "externals/design-to-code/externals/coli/packages/*",
-        "externals/design-to-code/packages/*",
-        "boring/packages/*",
-        "ui/editor-ui/packages/*",
-        "ui/*"
-    ],
-    "scripts": {
-        "web": "yarn workspace web run dev",
-        "desktop": "yarn workspace @grida.co/desktop run start",
-        "site": "yarn workspace grida.site run dev",
-        "clean": "rimraf node_modules yarn.lock",
-        "clean:install": "yarn clean && yarn"
-    },
-    "resolutions": {
-        "react": "^18.1.0",
-        "react-dom": "^18.1.0"
-    },
-    "devDependencies": {
-        "typescript": "4.2.4"
-    }
+  "name": "grida",
+  "private": true,
+  "license": "Apache 2.0",
+  "workspaces": [
+    "app",
+    "web",
+    "packages/app-*",
+    "packages/core-*",
+    "packages/lib/*",
+    "externals/base-sdk/*",
+    "externals/base-sdk/_firstparty/*",
+    "externals/reflect-core/packages/*",
+    "externals/design-sdk/*",
+    "externals/design-to-code/packages/*",
+    "externals/design-to-code/externals/coli/packages/*",
+    "externals/design-to-code/packages/*",
+    "boring/packages/*",
+    "ui/editor-ui/packages/*",
+    "ui/*"
+  ],
+  "scripts": {
+    "web": "yarn workspace web run dev",
+    "desktop": "yarn workspace @grida.co/desktop run start",
+    "site": "yarn workspace grida.site run dev",
+    "clean": "rimraf node_modules yarn.lock",
+    "clean:install": "yarn clean && yarn"
+  },
+  "resolutions": {
+    "react": "^18.1.0",
+    "react-dom": "^18.1.0",
+    "@reflect-ui/core": "^0.0.12"
+  },
+  "devDependencies": {
+    "typescript": "4.2.4"
+  }
 }
