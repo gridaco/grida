@@ -4,3 +4,6 @@
 [submodule "externals/code"]
 	path = externals/code
 	url = https://github.com/gridaco/code
+[submodule "externals/boring"]
+	path = externals/boring
+	url = https://github.com/gridaco/boring
