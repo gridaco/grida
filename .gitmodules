@@ -4,9 +4,6 @@
 [submodule "externals/design-to-code"]
 	path = externals/design-to-code
 	url = https://github.com/gridaco/designto-code
-[submodule "externals/design-sdk"]
-	path = externals/design-sdk
-	url = https://github.com/gridaco/design-sdk
 [submodule "ui/editor-ui"]
 	path = ui/editor-ui
 	url = https://github.com/reflect-ui/reflect-editor-ui

@@ -22,7 +22,7 @@
   "dependencies": {
     "@base-sdk-fp/auth-components-react": "^0.1.4",
     "@code-editor/vanilla-preview": "^0.0.2",
-    "@design-sdk/figma-url": "^0.0.6",
+    "@design-sdk/figma-url": "^0.0.43",
     "@emotion/core": "^11.0.0",
     "@emotion/css": "^11.10.0",
     "@emotion/react": "^11.10.4",

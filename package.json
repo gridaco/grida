@@ -29,7 +29,8 @@
   "resolutions": {
     "react": "^18.1.0",
     "react-dom": "^18.1.0",
-    "@reflect-ui/core": "^0.0.12"
+    "@reflect-ui/core": "^0.0.12",
+    "@design-sdk/core": "^0.0.43"
   },
   "devDependencies": {
     "typescript": "4.2.4"
