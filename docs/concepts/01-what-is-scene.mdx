@@ -1,0 +1,28 @@
+---
+title: "What is Scene?"
+---
+
+# What is Scene?
+
+We have this terminology - "Scene". Scene is a collection of layers, which can be represented as a Screen or a Component.
+
+**Examples**
+
+- Text or Shape is **not** a Scene.
+- Frame **is** a Scene. (optionally)
+- Page or Screen **is** a Scene. (which is Frame)
+- A Component **is** a Scene.
+- A Variant Set is **not** a Scene.
+- A Variant **is** a Scene.
+- A Instance is **not** a Scene.
+
+## What's special about the Scene?
+
+- Scene is a unit of sharing
+  - Once a Node or a Layer is registered as a Scene, you can share
+  - You cannot share a Single Text Node.
+- Scene is a root, a absolute positioner reletive to its' children
+  - When you convert a lyer inside some frame to code, Let's say a Frame, this frame's position will be relative to it's first scene-parent.
+- Scene is a unit of processing, This is to prevent recursive generation of code.
+
+_Now we have a clear understanding among layers, scenes and components, we can move on to the next step._

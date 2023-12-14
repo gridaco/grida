@@ -1,0 +1,38 @@
+import { Meta, Story, Preview, Props } from "@storybook/addon-docs/blocks";
+import { Description } from "./storybook-style";
+import LandingpageText from "components/landingpage/text";
+import { Flex } from "theme-ui";
+
+<Meta title="section/collaborate" />
+
+section-layout
+
+# Preview
+
+<Preview>
+  <Story name="default">
+    <div>
+      <Flex
+        mt="20px"
+        mx="20px"
+        sx={{
+          flexDirection: ["column", "column", "row", "row"]
+        }}
+      >
+        <SyncIcon name="loading" mr="20px" />
+        <LandingpageText variant="h2">
+          Collaborate as
+          <br />
+          the way it should be
+        </LandingpageText>
+        <Description variant="body1">
+          With Grida’s super intuitive workflow, you’ll find out how blazing-fast
+        the collaborating can get. Create your products as the way it make
+        sense. When the cycle gets shorter, the good thing happens. Forget all
+        the time you’ve spent repeating    yourself.
+        </Description>
+       </Flex>
+
+    </div>
+  </Story>
+</Preview>

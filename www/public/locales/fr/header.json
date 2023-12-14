@@ -1,0 +1,24 @@
+{
+  "cta-go-to-app": "Aller à l'App",
+  "products": {
+    "code": {
+      "label": "Code",
+      "tagline": "Figma à coder"
+    },
+    "assistant": {
+      "label": "Assistant",
+      "tagline": "Plugin Figma tout-en-un"
+    },
+    "vscode": {
+      "label": "VSCode Extension",
+      "tagline": "Copilote + Connaissances en Design"
+    },
+    "cli": {
+      "label": "CLI / API",
+      "tagline": "Importez votre design en tant que module"
+    }
+  },
+  "resources": {
+    "join-slack": "Rejoignez la communauté Slack"
+  }
+}

@@ -1,0 +1,28 @@
+{
+  "cta-go-to-app": "앱 열기",
+  "products": {
+    "code": {
+      "label": "코드",
+      "tagline": "피그마 투 코드"
+    },
+    "assistant": {
+      "label": "어시스턴트",
+      "tagline": "모든 피그마 플러그인을 하나로"
+    },
+    "vscode": {
+      "label": "VSCode 익스텐션",
+      "tagline": "당신의 디자인을 이해하는 코파일럿"
+    },
+    "cli": {
+      "label": "CLI / API",
+      "tagline": "디자인을 모듈처럼 임포트"
+    },
+    "bundle": {
+      "label": "번들",
+      "tagline": "3D 렌더 PNGs 라이브러리"
+    }
+  },
+  "resources": {
+    "join-slack": "슬랙 커뮤니티"
+  }
+}
