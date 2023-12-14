@@ -4,3 +4,6 @@
 [submodule "ui/editor-ui"]
 	path = ui/editor-ui
 	url = https://github.com/reflect-ui/reflect-editor-ui
+[submodule "externals/code"]
+	path = externals/code
+	url = https://github.com/gridaco/code
