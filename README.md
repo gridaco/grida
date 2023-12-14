@@ -12,12 +12,14 @@ _For whom eager to create, design, develop and share with the world._
 - plugin sdk and core engine api is mapped 1:1
 - right on to production code
 
-## This application is under development and will be available on stable channel on early 2022
+## `Alpha` - This project is under development and Unstable
 
-This project, `Grida` is under development with foundation technologies. We are looking forward that Grida will change the industry design/development standard by this piece of OSS Project. For updates, please subscribe our news letter on [grida.co](https://grida.co) or [bridged.xyz](https://bridged.xyz)
+This project, `Grida` is under development with preview technologies. We are looking forward that Grida will change the industry design/development standard by this piece of OSS Project. For updates, please subscribe our news letter on [grida.co](https://grida.co)
+
+**Stable Ecosystem Projects**
 
 - [Grida Assistant](https://github.com/gridaco/assistant) - A plugin fro figma that allows to import designs to Grida.
-- [Bridged Console](https://github.com/bridgedxyz/console.bridged.xyz) - A Bridged console for content management used for both design & development
+- [Grida Code](https://github.com/gridaco/code) - Design to Code Engine. A design ✌️ code standard.
 
 ## Engine & Foundation
 
