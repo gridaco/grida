@@ -1,6 +1,6 @@
 import React from "react";
 import styled from "@emotion/styled";
-import css from "@emotion/css";
+import { css } from "@emotion/react";
 import TextareaAutosize from "react-textarea-autosize";
 
 export function EditSummarySegment({
