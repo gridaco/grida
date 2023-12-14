@@ -1,6 +1,3 @@
-[submodule "boring"]
-	path = boring
-	url = https://github.com/gridaco/boring
 [submodule "ui/editor-ui"]
 	path = ui/editor-ui
 	url = https://github.com/reflect-ui/reflect-editor-ui
