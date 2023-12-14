@@ -8,8 +8,8 @@
     "packages/app-*",
     "packages/core-*",
     "packages/lib/*",
-    "externals/design-to-code/packages/*",
-    "boring/packages/*",
+    "externals/code/packages/*",
+    "externals/boring/packages/*",
     "ui/editor-ui/packages/*",
     "ui/*"
   ],
