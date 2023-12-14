@@ -1,7 +1,7 @@
-import type { AppFramework } from "@base-sdk/base/types/app-frameworks";
-import type { AppLanguage } from "@base-sdk/base/types/app-languages";
-import type { ScenePreviewParams } from "@base-sdk/base/features/scene-preview";
-import { buildFlutterFrameUrl } from "@base-sdk/base/frame-embed";
+import type { AppFramework } from "@base-sdk/base/dist/types/app-frameworks";
+import type { AppLanguage } from "@base-sdk/base/dist/types/app-languages";
+import type { ScenePreviewParams } from "@base-sdk/base/dist/features/scene-preview";
+import { buildFlutterFrameUrl } from "@base-sdk/base/dist/frame-embed";
 import React from "react";
 import styled from "@emotion/styled";
 import { ResizableIframeAppRunnerFrame } from "@app/scene-view/components";
@@ -21,8 +21,8 @@ export function ScaffoldSceneappRunnerView(props: Props) {
         url: data.url, // TODO:
         preview: data.url,
         language: data.language,
-        width: data.w,
-        height: data.h,
+        width: data.w ?? 1000,
+        height: data.h ?? 1000,
       })}
     </>
   );

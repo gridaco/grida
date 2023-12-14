@@ -7,7 +7,6 @@ import { figmaloader } from "./figma-loader";
 import { DesignImporterLoaderResult } from "./o";
 import { analyzeDesignUrl, DesignProvider } from "@design-sdk/url-analysis";
 import { designToCode } from "@designto/code";
-import { input } from "@designto/config";
 import { linkedaccounts } from "@base-sdk-fp/accounts";
 import { show_dialog_import_figma_design_after_authentication } from "../../../modals/import-figma-design-after-authentication";
 import { isOneOfDemoDesignUrl, loadDemoDesign } from "../../../built-in-demos";
@@ -18,6 +17,7 @@ import {
   vanilla_presets,
 } from "@grida/builder-config-preset";
 import { BrowserClient } from "@base-sdk-fp/core";
+import { input } from "@grida/builder-config";
 
 export function ImportDesignWithUrl() {
   const addPage = useAddPage();

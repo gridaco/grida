@@ -20,7 +20,7 @@ const Container = styled.div(({ theme }) => ({
 }));
 
 const Header = styled.div(({ theme }) => ({
-  ...theme.textStyles.small,
+  ...(theme.textStyles.small as any),
   userSelect: "none",
   cursor: "pointer",
   fontWeight: 500,
@@ -118,6 +118,7 @@ const PageListContent = memo(function PageListContent({
   );
 
   function getpage(id): IPageData {
+    // @ts-ignore
     return pageInfo.find((p) => p.id == id);
   }
 
@@ -171,12 +172,14 @@ const PageListContent = memo(function PageListContent({
       </Header>
       <TreeView.Root
         sortable={true}
+        // @ts-ignore
         data={pageInfo}
         // pressEventName="onClick"
         keyExtractor={useCallback((item: any) => item.id, [])}
         onMoveItem={useCallback(
           (originindex, targetindex, pos) => {
             console.log("on move item", originindex, targetindex, pos);
+            // @ts-ignore
             const movingitem = pageInfo[originindex];
             dispatch({
               type: "move-page",

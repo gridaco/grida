@@ -2,12 +2,13 @@ import { SceneRecord } from "@base-sdk/scene-store";
 import React, { useEffect } from "react";
 import { ScaffoldSceneSnapshotView } from "../scaffold-scene-snapshot-view";
 import { ScaffoldSceneappRunnerView } from "..";
-import { ScenePreviewParams } from "@base-sdk/base/features/scene-preview";
 
 interface Props {
   scene: SceneRecord;
   mode: "design" | "run";
-  appRunnerConfig?: ScenePreviewParams;
+  // import { ScenePreviewParams } from "@base-sdk/base/features/scene-preview";
+  // TODO: declare type
+  appRunnerConfig?: any;
 }
 
 export function ScaffoldSceneView(props: Props) {
