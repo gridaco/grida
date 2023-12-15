@@ -36,6 +36,14 @@ const nextconfig = {
         destination: `https://the-bundle-web.vercel.app/bundle/:path*`,
       },
       {
+        source: "/dynamix",
+        destination: `https://dynamix-www.vercel.app/dynamix`,
+      },
+      {
+        source: "/dynamix/:path*",
+        destination: `https://dynamix-www.vercel.app/dynamix/:path*`,
+      },
+      {
         source: "/kits",
         destination: `https://kits.grida.vercel.app/kits`,
       },
