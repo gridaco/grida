@@ -10,6 +10,7 @@ const config: ForgeConfig = {
   packagerConfig: {
     name: 'Grida',
     appBundleId: 'co.grida.desktop',
+    executableName: 'Grida',
     icon: './images/icon',
   },
   rebuildConfig: {},
