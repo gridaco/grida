@@ -4,6 +4,7 @@
   "version": "0.0.0",
   "description": "Grida Desktop App",
   "main": ".vite/build/main.js",
+  "repository": "https://github.com/gridaco/grida",
   "scripts": {
     "start": "electron-forge start",
     "package": "electron-forge package",
@@ -25,6 +26,7 @@
     "@electron-forge/maker-zip": "^7.2.0",
     "@electron-forge/plugin-auto-unpack-natives": "^7.2.0",
     "@electron-forge/plugin-vite": "^7.2.0",
+    "@electron-forge/publisher-github": "^7.2.0",
     "@typescript-eslint/eslint-plugin": "^5.0.0",
     "@typescript-eslint/parser": "^5.0.0",
     "electron": "28.0.0",
@@ -34,6 +36,7 @@
     "typescript": "~4.5.4"
   },
   "dependencies": {
-    "electron-squirrel-startup": "^1.0.0"
+    "electron-squirrel-startup": "^1.0.0",
+    "update-electron-app": "^3.0.0"
   }
 }

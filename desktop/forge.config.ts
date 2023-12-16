@@ -37,6 +37,18 @@ const config: ForgeConfig = {
       ],
     }),
   ],
+   publishers: [
+    {
+      name: '@electron-forge/publisher-github',
+      config: {
+        repository: {
+          owner: 'gridaco',
+          name: 'grida'
+        },
+        prerelease: true
+      }
+    }
+  ]
 };
 
 export default config;
