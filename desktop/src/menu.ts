@@ -54,17 +54,17 @@ export default class MenuBuilder {
 
   buildDarwinTemplate(): MenuItemConstructorOptions[] {
     const subMenuAbout: DarwinMenuItemConstructorOptions = {
-      label: 'Bridged',
+      label: 'Grida',
       submenu: [
         {
-          label: 'About Bridged',
+          label: 'About Grida',
           selector: 'orderFrontStandardAboutPanel:',
         },
         { type: 'separator' },
         { label: 'Services', submenu: [] },
         { type: 'separator' },
         {
-          label: 'Hide Bridged',
+          label: 'Hide Grida',
           accelerator: 'Command+H',
           selector: 'hide:',
         },
@@ -157,25 +157,25 @@ export default class MenuBuilder {
         {
           label: 'Learn More',
           click() {
-            shell.openExternal('https://bridged.xyz');
+            shell.openExternal('https://grida.co');
           },
         },
         {
           label: 'Documentation',
           click() {
-            shell.openExternal('https://bridged.xyz/docs');
+            shell.openExternal('https://grida.co/docs');
           },
         },
         {
           label: 'Community Discussions',
           click() {
-            shell.openExternal('https://github.com/bridgedxyz/bridged');
+            shell.openExternal('https://github.com/gridaco/grida');
           },
         },
         {
           label: 'Search Issues',
           click() {
-            shell.openExternal('https://github.com/bridgedxyz/bridged/issues');
+            shell.openExternal('https://github.com/gridaco/grida/issues');
           },
         },
       ],
@@ -256,26 +256,26 @@ export default class MenuBuilder {
           {
             label: 'Learn More',
             click() {
-              shell.openExternal('https://bridged.xyz');
+              shell.openExternal('https://grida.co');
             },
           },
           {
             label: 'Documentation',
             click() {
-              shell.openExternal('https://bridged.xyz/docs');
+              shell.openExternal('https://grida.co/docs');
             },
           },
           {
             label: 'Community Discussions',
             click() {
-              shell.openExternal('https://github.com/bridgedxyz/bridged');
+              shell.openExternal('https://github.com/gridaco/grida');
             },
           },
           {
             label: 'Search Issues',
             click() {
               shell.openExternal(
-                'https://github.com/bridgedxyz/bridged/issues'
+                'https://github.com/gridaco/grida/issues'
               );
             },
           },
