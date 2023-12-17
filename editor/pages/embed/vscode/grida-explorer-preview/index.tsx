@@ -131,7 +131,7 @@ function PreviewState({
 }
 
 function LoadingOverlay() {
-  return <ProgressBar />;
+  return <ProgressBar placeholder={"loading"} />;
 }
 
 const __eventfromclient__signature = "event-from-client";

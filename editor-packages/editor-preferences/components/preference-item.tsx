@@ -119,6 +119,7 @@ function PreferenceCheckboxItem({
   return (
     <div className="checkbox">
       <Checkbox
+        placeholder={props.description}
         style={{
           color: "white",
         }}

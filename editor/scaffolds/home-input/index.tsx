@@ -67,7 +67,7 @@ const isValidInput = (input) => {
   if (!input) return false;
   try {
     const _ = analyze(input);
-    switch (_) {
+    switch (_ as any) {
       case "empty":
         return false;
       case "embed":

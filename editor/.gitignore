@@ -42,3 +42,4 @@ public/fallback*.js
 # sitemap
 public/sitemap.xml
 public/sitemap-*.xml
+.env*.local

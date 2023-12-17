@@ -17,7 +17,7 @@ export default function VanillaFrameContextManuProvider({
     <ContextMenu.Root>
       <ContextMenuTrigger>{children}</ContextMenuTrigger>
 
-      <ContextMenuContent>
+      <ContextMenuContent placeholder={undefined}>
         <AllowInteractionPreferenceMenu />
       </ContextMenuContent>
     </ContextMenu.Root>
@@ -31,6 +31,7 @@ function AllowInteractionPreferenceMenu() {
 
   return (
     <ContextMenuCheckboxItem
+      placeholder={"Allow interaction"}
       checked={allowInteraction}
       onSelect={() => {
         const inverted = !allowInteraction;
