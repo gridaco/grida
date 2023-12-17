@@ -1,0 +1,20 @@
+{
+  "name": "@code-editor/dashboard",
+  "version": "0.0.0",
+  "scripts": {
+    "test": "jest"
+  },
+  "devDependencies": {
+    "jest": "^29.3.1",
+    "react-dnd": "^16.0.1",
+    "ts-jest": "^29.0.3"
+  },
+  "peerDependencies": {
+    "react": "^18.2.0",
+    "react-dnd": "16.0.1"
+  },
+  "dependencies": {
+    "@radix-ui/react-collapsible": "^1.0.1",
+    "react-selecto": "^1.20.2"
+  }
+}

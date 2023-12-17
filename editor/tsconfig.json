@@ -1,0 +1,39 @@
+{
+  "compilerOptions": {
+    "target": "es2015",
+    "lib": ["dom", "dom.iterable", "esnext"],
+    "allowJs": true,
+    "skipLibCheck": true,
+    "strict": false,
+    "forceConsistentCasingInFileNames": true,
+    "noEmit": true,
+    "esModuleInterop": true,
+    "module": "esnext",
+    "moduleResolution": "node",
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "jsx": "preserve",
+    "incremental": true,
+    "baseUrl": ".",
+    "paths": {
+      "components/*": ["./components/*"],
+      "icons/*": ["./icons/*"],
+      "layout/*": ["./layouts/*"],
+      "scaffolds/*": ["./scaffolds/*"],
+      "core/*": ["./core/*"],
+      "store/*": ["./store/*"],
+      "repository/*": ["./repository/*"],
+      "utils/*": ["./utils/*"],
+      "public/*": ["./public/*"],
+      "hooks/*": ["./hooks/*"]
+    }
+  },
+  "include": [
+    "next-env.d.ts",
+    "**/*.ts",
+    "**/*.tsx",
+    "../editor-packages/editor-canvas-renderer-core/util.ts",
+    "../editor-packages/editor-canvas-renderer-bitmap/image-preview.tsx"
+  ],
+  "exclude": ["node_modules"]
+}

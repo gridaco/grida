@@ -1,0 +1,9 @@
+# *
+User-agent: *
+Allow: /
+
+# Host
+Host: https://code.grida.co
+
+# Sitemaps
+Sitemap: https://code.grida.co/sitemap.xml

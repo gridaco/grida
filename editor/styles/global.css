@@ -1,0 +1,54 @@
+body {
+  margin: 0px;
+  padding: 0;
+  font-family: "Helvetica Nueue", "Roboto", sans-serif;
+}
+
+/* for editor canvas */
+html {
+  overflow: hidden;
+  height: 100%;
+  overscroll-behavior-x: none;
+  background-color: rgb(20, 20, 20);
+}
+body {
+  overscroll-behavior-x: none;
+  touch-action: none;
+  height: 100%;
+  overflow: auto;
+}
+/* ----------------- */
+
+iframe {
+  border: none;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6,
+p {
+  color: white;
+}
+
+a {
+  color: rgba(255, 255, 255, 0.7);
+}
+
+a:hover {
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.white {
+  color: #fff;
+}
+
+.no-scroll-bar {
+  -ms-overflow-style: none;
+}
+
+.no-scroll-bar::-webkit-scrollbar {
+  display: none;
+}
