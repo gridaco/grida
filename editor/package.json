@@ -13,6 +13,7 @@
     "@babel/runtime": "^7.14.0",
     "@base-sdk-fp/auth-components-react": "^0.1.4",
     "@base-sdk/base": "^0.1.8",
+    "@base-sdk/g11n": "^0.1.6",
     "@code-editor/preview-pip": "^0.0.2",
     "@code-editor/vanilla-preview": "^0.0.2",
     "@code-ui/docstring": "^0.0.12",
