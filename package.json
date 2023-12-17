@@ -5,10 +5,13 @@
   "workspaces": [
     "app",
     "web",
+    "editor",
+    "editor-packages/*",
     "packages/app-*",
     "packages/core-*",
     "packages/lib/*",
     "externals/code/packages/*",
+    "externals/code/code",
     "externals/boring/packages/*",
     "ui/editor-ui/packages/*",
     "ui/*"
@@ -21,14 +24,16 @@
     "clean:install": "yarn clean && yarn"
   },
   "resolutions": {
-    "react": "^18.1.0",
-    "react-dom": "^18.1.0",
+    "@design-sdk/figma-node": "0.0.25",
+    "@reflect-ui/core": "0.0.12",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
     "@types/react": "^18.2.45",
-    "@types/react-dom": "18.2.17",
-    "@reflect-ui/core": "^0.0.12",
-    "@design-sdk/core": "^0.0.43"
+    "@types/react-dom": "^18.2.18",
+    "typescript": "^5.3.3",
+    "csstype": "3.1.0"
   },
   "devDependencies": {
-    "typescript": "4.2.4"
+    "typescript": "^5.3.3"
   }
 }
