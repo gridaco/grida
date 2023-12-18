@@ -98,7 +98,7 @@ export function ScaffoldCodeBlock(props: ScaffoldCodeBlockProps) {
             // disable minimap a.k.a preview
             enabled: false,
           },
-          renderIndentGuides: true, // need color customization
+          // renderIndentGuides: true, // need color customization
           scrollbar: {
             // allow parent scoll
             alwaysConsumeMouseWheel: false,

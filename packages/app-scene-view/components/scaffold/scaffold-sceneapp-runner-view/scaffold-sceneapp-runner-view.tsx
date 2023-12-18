@@ -57,7 +57,7 @@ function AppRunnerFrame(props: {
     <>
       {/* TODO: add max width & initial height based on aspect ratio = w/h */}
       <ResizableIframeAppRunnerFrame width={props.width} height={props.height}>
-        {/* <IFrame id={props.id} src={_emb_url} /> */}
+        <IFrame id={props.id} src={_emb_url} />
       </ResizableIframeAppRunnerFrame>
     </>
   );
