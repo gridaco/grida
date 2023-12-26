@@ -17,7 +17,11 @@ export default function BuilderEditor() {
     <>
       <ReadmeModal />
       <SigninToContinuePrmoptProvider>
-        <Workspace>
+        <Workspace
+          initial={{
+            editor_mode: "craft",
+          }}
+        >
           <SetupFigmaFileEditor
             key={filekey}
             filekey={filekey}

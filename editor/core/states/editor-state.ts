@@ -26,7 +26,7 @@ type TCanvasMode = "free" | "focus";
  * - code - with coding editor
  * - run - run app, full screen
  */
-type TEditorMode = "design" | "code" | "run";
+export type TEditorMode = "design" | "code" | "run" | "craft";
 type TDesignerMode = "inspect" | "comment"; // | "prototype";
 
 export type EditorPage = {

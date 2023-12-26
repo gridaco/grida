@@ -1,11 +1,21 @@
-import { config } from "@grida/builder-config";
 import { HistoryState } from "core/states/history-state";
+import type { EditorState } from "./editor-state";
+import { EditorStateSeed } from "./editor-initial-state";
 
-export interface EssentialWorkspaceInfo {
-  // Add workspace seed data here, which cannot be automatically filled on initial state.
-}
+/**
+ * these values will be used for overriding workspace state when initialy setting one if provided.
+ */
+export type WorkspaceStateSeed = Partial<
+  Omit<WorkspaceState, "history"> & {
+    // configurable initial editor state
+    editor: EditorStateSeed;
+    // ...
+    // Add workspace seed data here, which cannot be automatically filled on initial state.
+    // ...
+  }
+>;
 
-export interface WorkspaceState extends EssentialWorkspaceInfo {
+export interface WorkspaceState {
   history: HistoryState;
   /**
    * hovered layer; single or none.

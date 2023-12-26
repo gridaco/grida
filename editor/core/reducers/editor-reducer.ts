@@ -21,7 +21,7 @@ import type {
   EnterIsolatedInspectionAction,
   ExitIsolatedInspectionAction,
 } from "core/actions";
-import { EditorState, EssentialWorkspaceInfo } from "core/states";
+import { EditorState, WorkspaceStateSeed } from "core/states";
 import { NextRouter, useRouter } from "next/router";
 import { CanvasStateStore } from "@code-editor/canvas/stores";
 import q from "@design-sdk/query";
@@ -41,7 +41,7 @@ const clearlog = (by: string) => {
 };
 
 export function editorReducer(
-  state: EditorState & EssentialWorkspaceInfo,
+  state: EditorState & WorkspaceStateSeed,
   action: Action
 ): EditorState {
   const router = useRouter();

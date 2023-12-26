@@ -1,28 +1,66 @@
 import { EditorSnapshot, EditorState } from "./editor-state";
 
-export function createInitialEditorState(editor: EditorSnapshot): EditorState {
+export type EditorStateSeed = Partial<{
+  mode: EditorState["mode"]["value"];
+  canvasMode: EditorState["canvasMode"]["value"];
+}>;
+
+function map_seed(seed?: EditorStateSeed): Partial<EditorState> {
+  if (!seed) {
+    return {};
+  }
+
+  // the field should not ne set unless the corresponding value is set.
+  const mode: EditorState["mode"] = seed.mode
+    ? { value: seed.mode }
+    : undefined;
+
+  const canvasMode: EditorState["canvasMode"] = seed.canvasMode
+    ? { value: seed.canvasMode }
+    : undefined;
+
+  const partial: Partial<EditorState> = {
+    mode: mode,
+    canvasMode: canvasMode,
+  };
+
+  // remove undefined fields
+  Object.keys(partial).forEach((key) => {
+    if (partial[key] === undefined) {
+      delete partial[key];
+    }
+  });
+
+  return partial;
+}
+
+export function createInitialEditorState(
+  snapshot: EditorSnapshot,
+  seed?: EditorStateSeed
+): EditorState {
   return {
-    pages: editor.pages,
-    selectedPage: editor.selectedPage,
-    selectedNodes: editor.selectedNodes,
+    pages: snapshot.pages,
+    selectedPage: snapshot.selectedPage,
+    selectedNodes: snapshot.selectedNodes,
     canvas: {
       focus: {
         refreshkey: "initial",
-        nodes: editor.selectedNodes,
+        nodes: snapshot.selectedNodes,
       }, // auto focus to selection
     },
-    isolation: editor.isolation,
-    selectedNodesInitial: editor.selectedNodes,
-    selectedLayersOnPreview: editor.selectedLayersOnPreview,
-    design: editor.design,
+    isolation: snapshot.isolation,
+    selectedNodesInitial: snapshot.selectedNodes,
+    selectedLayersOnPreview: snapshot.selectedLayersOnPreview,
+    design: snapshot.design,
     mode: { value: "design" },
     designerMode: "inspect",
-    code: editor.code,
-    canvasMode: editor.canvasMode,
+    code: snapshot.code,
+    canvasMode: snapshot.canvasMode,
+    ...map_seed(seed),
   };
 }
 
-export function createPendingEditorState(): EditorState {
+export function createPendingEditorState(seed?: EditorStateSeed): EditorState {
   return {
     pages: [],
     selectedPage: null,
@@ -47,5 +85,6 @@ export function createPendingEditorState(): EditorState {
     mode: { value: "design" },
     canvasMode: { value: "free" },
     designerMode: "inspect",
+    ...map_seed(seed),
   };
 }
