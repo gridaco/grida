@@ -16,26 +16,26 @@ export default function BuilderEditor() {
   return (
     <>
       <ReadmeModal />
-      <SigninToContinuePrmoptProvider>
-        <Workspace
-          initial={{
-            editor_mode: "craft",
-          }}
+      <Workspace
+        initial={{
+          editor: {
+            mode: "craft",
+          },
+        }}
+      >
+        <SetupFigmaFileEditor
+          key={filekey}
+          filekey={filekey}
+          nodeid={undefined}
+          router={router}
         >
-          <SetupFigmaFileEditor
-            key={filekey}
-            filekey={filekey}
-            nodeid={undefined}
-            router={router}
-          >
-            <EditorDefaultProviders>
-              <EditorBrowserMetaHead>
-                <Editor />
-              </EditorBrowserMetaHead>
-            </EditorDefaultProviders>
-          </SetupFigmaFileEditor>
-        </Workspace>
-      </SigninToContinuePrmoptProvider>
+          <EditorDefaultProviders>
+            <EditorBrowserMetaHead>
+              <Editor />
+            </EditorBrowserMetaHead>
+          </EditorDefaultProviders>
+        </SetupFigmaFileEditor>
+      </Workspace>
     </>
   );
 }

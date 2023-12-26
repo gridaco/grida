@@ -1,5 +1,4 @@
 import React, { useCallback } from "react";
-import styled from "@emotion/styled";
 import { DefaultEditorWorkspaceLayout } from "layouts/default-editor-workspace-layout";
 import {
   WorkspaceContentPanel,
@@ -7,7 +6,7 @@ import {
 } from "layouts/panel";
 import { EditorSidebar } from "components/editor";
 import { EditorState, useEditorState } from "core/states";
-import { Canvas } from "scaffolds/canvas";
+import { CanvasInteractive, CanvasReadonly } from "scaffolds/canvas";
 import { Inspector } from "scaffolds/inspector";
 import { EditorHome } from "@code-editor/dashboard";
 import { EditorIsolatedInspection } from "@code-editor/isolated-inspection";
@@ -100,8 +99,14 @@ function ModeDesign() {
     case "home":
       return <EditorHome />;
     default:
-      return <Canvas />;
+      return <CanvasReadonly />;
   }
+}
+
+function ModeCraft() {
+  const [state] = useEditorState();
+
+  return <CanvasInteractive />;
 }
 
 function ModeCode() {
@@ -129,12 +134,16 @@ function PageView() {
 
   const _Body = useCallback(
     ({ mode }: { mode: EditorState["mode"]["value"] }) => {
+      console.log("mode", mode);
       switch (mode) {
         case "code": {
           return <ModeCode />;
         }
         case "design": {
           return <ModeDesign />;
+        }
+        case "craft": {
+          return <ModeCraft />;
         }
       }
     },

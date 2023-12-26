@@ -16,7 +16,7 @@ import { useRenderItemWithPreference } from "./hooks";
 /**
  * Statefull canvas segment that contains canvas as a child, with state-data connected.
  */
-export function VisualContentArea() {
+export function CanvasReadonly() {
   const [state] = useEditorState();
   const [canvasSizingRef, canvasBounds] = useMeasure();
   const { highlightedLayer, highlightLayer } = useWorkspace();
@@ -131,6 +131,14 @@ export function VisualContentArea() {
         </>
       )}
     </CanvasContainer>
+  );
+}
+
+export function CanvasInteractive() {
+  return (
+    <div className="bg-white">
+      <h1 className="text-black">Interactive canvas</h1>
+    </div>
   );
 }
 
