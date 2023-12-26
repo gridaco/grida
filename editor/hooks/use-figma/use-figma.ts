@@ -163,10 +163,25 @@ export function useFigmaFile({ file }: { file: string }) {
       personalAccessToken: fat.personalAccessToken,
       accessToken: fat.accessToken.token,
     });
-    const iterator = repo.fetchFile(file);
-    let next: IteratorResult<TFetchFileForApp>;
-    while ((next = await iterator.next()).done === false) {
-      setDesignFile(next.value);
+
+    try {
+      const iterator = repo.fetchFile(file);
+      let next: IteratorResult<TFetchFileForApp>;
+      while ((next = await iterator.next()).done === false) {
+        setDesignFile(next.value);
+      }
+    } catch (e) {
+      if (e instanceof fetch.TokenExpiredUnauthorizedError) {
+        setDesignFile({
+          __type: "error",
+          reason: "token-expired",
+        });
+      } else if (e instanceof fetch.UnauthorizedError) {
+        setDesignFile({
+          __type: "error",
+          reason: "unauthorized",
+        });
+      }
     }
   }
 
