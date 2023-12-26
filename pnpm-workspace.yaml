@@ -1,0 +1,13 @@
+packages:
+  - "app"
+  - "web"
+  - "editor"
+  - "editor-packages/*"
+  - "packages/app-*"
+  - "packages/core-*"
+  - "packages/lib/*"
+  - "externals/code/packages/*"
+  - "externals/code/code"
+  - "externals/boring/packages/*"
+  - "ui/editor-ui/packages/*"
+  - "ui/*"
