@@ -30,7 +30,7 @@ export type TUseDesignFile =
   | TFetchFileForApp
   | {
       __type: "error";
-      reason: "no-auth" | "unauthorized";
+      reason: "no-auth" | "unauthorized" | "token-expired";
       cached?: TFetchFileForApp;
     }
   | { __type: "error"; reason: "no-file" }

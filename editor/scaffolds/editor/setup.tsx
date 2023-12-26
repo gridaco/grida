@@ -228,6 +228,11 @@ export function SetupFigmaFileEditor({
     if (fig.__type === "error") {
       // handle error by reason
       switch (fig.reason) {
+        case "token-expired":{
+          alert("The token is expired. Please re-authenticate.");
+          openFpatConfigurationPreference();
+          break;
+        }
         case "unauthorized":
         case "no-auth": {
           if (fig.cached) {
