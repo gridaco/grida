@@ -52,6 +52,13 @@ export function createInitialEditorState(
     selectedNodesInitial: snapshot.selectedNodes,
     selectedLayersOnPreview: snapshot.selectedLayersOnPreview,
     design: snapshot.design,
+    // TODO: this needs to be merged into 'document' (which is not ready yet)
+    craft: {
+      width: 1000,
+      height: 1000,
+      children: [],
+      pages: [],
+    },
     mode: { value: "design" },
     designerMode: "inspect",
     code: snapshot.code,
@@ -78,6 +85,7 @@ export function createPendingEditorState(seed?: EditorStateSeed): EditorState {
     selectedNodesInitial: null,
     selectedLayersOnPreview: [],
     design: null,
+    craft: null,
     code: {
       files: {},
       loading: true,

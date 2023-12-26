@@ -4,6 +4,7 @@ import type { RGBA, WidgetKey } from "@reflect-ui/core";
 import type { ComponentNode } from "@design-sdk/figma-types";
 import type { DesignInput } from "@grida/builder-config/input";
 import type { File } from "@grida/builder-config/output/output-file";
+import type { CraftDocument } from "@code-editor/craft/core";
 
 export type { File };
 
@@ -51,6 +52,7 @@ export interface EditorState {
    */
   selectedNodesInitial?: string[] | null;
   design: FigmaReflectRepository;
+  craft: CraftDocument;
   mode: LastKnown<TEditorMode>;
   designerMode: TDesignerMode;
   canvasMode: LastKnown<TCanvasMode>;
