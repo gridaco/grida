@@ -37,11 +37,11 @@ const nextconfig = {
       },
       {
         source: "/dynamix",
-        destination: `https://dynamix-www.vercel.app/dynamix`,
+        destination: `https://dynamix-www.vercel.app`,
       },
       {
         source: "/dynamix/:path*",
-        destination: `https://dynamix-www.vercel.app/dynamix/:path*`,
+        destination: `https://dynamix-www.vercel.app/:path*`,
       },
       {
         source: "/kits",
