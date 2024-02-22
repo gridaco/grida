@@ -13,6 +13,7 @@ interface IconProps extends BoxProps {
   height?: any;
   isClickable?: boolean;
   isVerticalMiddle?: boolean;
+  style?: React.CSSProperties;
 }
 
 const Icon = (props: IconProps, ref) => {

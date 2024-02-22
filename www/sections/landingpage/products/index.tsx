@@ -117,6 +117,7 @@ const Products = () => {
           variants={videoPlayerMotionAnimationVariants}
           animate={isVideoPlayerReady ? "loaded" : "loading"}
         >
+          {/* @ts-ignore */}
           <ReactPlayer
             onReady={() => setIsVideoPlayerReady(true)}
             onEnded={() => setIsVideoPlayerReady(true)}

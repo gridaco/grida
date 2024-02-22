@@ -38,7 +38,7 @@ export default function VSCodePage() {
   const { t } = useTranslation("page-vscode");
   const onCTA = () => {
     router.push(links.join_the_vscode_extension_waitlist);
-    event_vscode_cta_join_waitlist_click();
+    // event_vscode_cta_join_waitlist_click();
   };
   return (
     <>

@@ -161,6 +161,7 @@ const App = ({ Component, pageProps }: AppPropsWithLayout) => {
         <Providers>
           <ThemeProvider fallback="light" override={getTheme() ?? "light"}>
             <PopupProvider>
+              {/* @ts-ignore */}
               {getLayout(<Component {...pageProps} />)}
               {renderPopups()}
             </PopupProvider>
