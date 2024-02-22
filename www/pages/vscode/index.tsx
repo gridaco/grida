@@ -16,7 +16,6 @@ import { getPageTranslations } from "utils/i18n";
 import { useTranslation } from "next-i18next";
 import PageHead from "components/page-head";
 import { links } from "k/links";
-import { event_vscode_cta_join_waitlist_click } from "analytics";
 
 export const BackgroundGradient = css`
   background: linear-gradient(

@@ -45,7 +45,6 @@
     "axios": "^0.21.2",
     "dayjs": "^1.11.7",
     "eslint-config-next": "^14.0.4",
-    "firebase": "^8.2.10",
     "fontfaceobserver": "^2.1.0",
     "framer-motion": "^3.10.0",
     "gray-matter": "^4.0.2",

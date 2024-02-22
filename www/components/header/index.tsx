@@ -1,5 +1,4 @@
 import styled from "@emotion/styled";
-import { event_click_header_menu } from "analytics";
 import Link from "next/link";
 import { useRouter } from "next/router";
 import React, { useState, useEffect, useCallback, useRef } from "react";
@@ -211,7 +210,7 @@ function HeaderMenuItem({
     <Label
       onClick={() => {
         // log header menu click event
-        event_click_header_menu({ menu: label });
+        // event_click_header_menu({ menu: label });
       }}
       className="cursor-pointer"
       mx={variant === "desktop" ? "18px" : undefined}
