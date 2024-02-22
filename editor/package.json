@@ -16,6 +16,7 @@
     "@base-sdk/g11n": "^0.1.6",
     "@code-editor/preview-pip": "^0.0.2",
     "@code-editor/vanilla-preview": "^0.0.2",
+    "@code-editor/craft": "*",
     "@code-ui/docstring": "^0.0.12",
     "@designto/code": "0.0.1",
     "@emotion/cache": "^11.11.0",

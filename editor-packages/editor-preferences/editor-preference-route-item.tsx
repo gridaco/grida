@@ -1,6 +1,5 @@
 import React, { useMemo, useState, useEffect } from "react";
-import styled from "@emotion/styled";
-import { useTheme } from "@emotion/react";
+import styled, { useTheme } from "@editor-ui/theme";
 import { TreeView } from "@editor-ui/hierarchy";
 import type { PreferenceRouteInfo } from "./core";
 import { GearIcon } from "@radix-ui/react-icons";

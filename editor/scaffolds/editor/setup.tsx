@@ -187,7 +187,10 @@ export function SetupFigmaCommunityFileEditor({
     >
       <FigmaImageServiceProvider
         filekey={filekey}
-        resolveApiClient={() => FigmaCommunityImageClient()}
+        resolveApiClient={() =>
+          // @ts-ignore
+          FigmaCommunityImageClient()
+        }
       >
         {children}
       </FigmaImageServiceProvider>
@@ -228,7 +231,7 @@ export function SetupFigmaFileEditor({
     if (fig.__type === "error") {
       // handle error by reason
       switch (fig.reason) {
-        case "token-expired":{
+        case "token-expired": {
           alert("The token is expired. Please re-authenticate.");
           openFpatConfigurationPreference();
           break;

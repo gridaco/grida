@@ -152,6 +152,9 @@ importers:
       '@base-sdk/g11n':
         specifier: ^0.1.6
         version: 0.1.6(@reflect-ui/core@0.0.12)
+      '@code-editor/craft':
+        specifier: '*'
+        version: link:../editor-packages/editor-craft
       '@code-editor/preview-pip':
         specifier: ^0.0.2
         version: link:../editor-packages/editor-preview-pip

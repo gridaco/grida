@@ -2,11 +2,10 @@ import React, { forwardRef, memo, useCallback, ReactNode } from "react";
 import { TreeView } from "@editor-ui/hierarchy";
 import { Spacer } from "@editor-ui/spacer";
 import { withSeparatorElements } from "@editor-ui/utils";
-import styled from "@emotion/styled";
-import { useTheme } from "@emotion/react";
 import "@editor-ui/theme";
 import { ReflectSceneNodeType } from "@design-sdk/figma-node";
 import { SceneNodeIcon } from "@code-editor/node-icons";
+import styled, { useTheme } from "@editor-ui/theme";
 
 export const IconContainer = styled.span(({ theme }) => ({
   color: theme.colors.mask,
