@@ -4,7 +4,6 @@ import Head from "next/head";
 import Script from "next/script";
 import { EditorThemeProvider } from "@editor-ui/theme";
 import { MuiThemeProvider } from "theme/mui";
-import { colors } from "theme";
 import { useRouter } from "next/router";
 import "../styles/global.css";
 

@@ -5,16 +5,45 @@
     "test": "jest"
   },
   "devDependencies": {
+    "@emotion/styled": "^11.11.0",
+    "@types/node": "^20.11.20",
+    "@types/react": "18.2.58",
+    "@types/react-highlight-words": "^0.16.4",
     "jest": "^29.3.1",
+    "next": "^14.1.0",
+    "react": "^18.2.0",
     "react-dnd": "^16.0.1",
     "ts-jest": "^29.0.3"
   },
   "peerDependencies": {
+    "@emotion/styled": "^11.11.0",
+    "@types/react": "18.2.58",
     "react": "^18.2.0",
     "react-dnd": "16.0.1"
   },
   "dependencies": {
-    "@radix-ui/react-collapsible": "^1.0.1",
+    "@code-editor/canvas-renderer-bitmap": "workspace:^",
+    "@code-editor/external-links": "workspace:^",
+    "@code-editor/node-icons": "workspace:^",
+    "@code-editor/ui": "workspace:^",
+    "@design-sdk/figma": "^0.0.53",
+    "@design-sdk/figma-node": "^0.0.53",
+    "@editor-ui/context-menu": "workspace:^",
+    "@editor-ui/dropdown-menu": "workspace:^",
+    "@editor-ui/editor": "workspace:^",
+    "@editor-ui/hierarchy": "workspace:^",
+    "@editor-ui/spacer": "workspace:^",
+    "@editor-ui/theme": "workspace:^",
+    "@editor-ui/utils": "workspace:^",
+    "@radix-ui/react-collapsible": "^1.0.3",
+    "@radix-ui/react-icons": "^1.0.3",
+    "editor": "workspace:^",
+    "immer": "^9.0.3",
+    "react-dnd": "^16.0.1",
+    "react-dnd-html5-backend": "^16.0.1",
+    "react-highlight-words": "^0.18.0",
+    "react-hot-toast": "^2.4.0",
+    "react-in-viewport": "^1.0.0-alpha.20",
     "react-selecto": "^1.20.2"
   }
 }

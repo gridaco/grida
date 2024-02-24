@@ -22,11 +22,11 @@ export function Conversations() {
   return (
     <>
       <CommentsListContainer>
-        {comments.map((c) => {
+        {comments.map((c, i) => {
           return (
             <TopLevelComment
               me={me}
-              key={c.id}
+              key={i}
               {...c}
               readonly={false}
               onReply={(message) => {

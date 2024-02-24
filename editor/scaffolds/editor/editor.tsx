@@ -76,6 +76,25 @@ export function Editor() {
                   type={root?.entry?.origin}
                   entry={root?.entry}
                   widget={result?.widget}
+                  controls={
+                    <>
+                     <ClearRemoteDesignSessionCache key={id} file={file} node={id} />
+                      <br />
+                      {(type === "INSTANCE" || type === "COMPONENT") && (
+                        <Link
+                          href={{
+                            pathname: "/figma/inspect-component",
+                            query: {
+                              // e.g. https://www.figma.com/file/iypAHagtcSp3Osfo2a7EDz/engine?node-id=3098%3A4097
+                              design: `https://www.figma.com/file/${file}/?node-id=${id}`,
+                            },
+                          }}
+                        >
+                          inspect component
+                        </Link>
+                      )}
+                    </>
+                  }
                 />
               </WorkspaceContentPanel>
             </WorkspaceBottomPanelDockLayout>

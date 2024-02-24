@@ -2,6 +2,27 @@
   "name": "@code-editor/preferences",
   "version": "0.0.0",
   "dependencies": {
-    "react-markdown": "^8.0.7"
+    "@code-editor/module-icons": "workspace:^",
+    "@editor-ui/hierarchy": "workspace:^",
+    "@editor-ui/theme": "workspace:0.0.0",
+    "@grida/builder-config": "workspace:^",
+    "@grida/builder-config-preset": "workspace:^",
+    "@modulz/design-system": "^1.0.0",
+    "@mui/material": "^5.15.10",
+    "@radix-ui/react-icons": "^1.0.3",
+    "editor": "workspace:^",
+    "react-markdown": "^8.0.7",
+    "tree-visit": "^0.1.0",
+    "use-sys-theme": "workspace:^"
+  },
+  "devDependencies": {
+    "@emotion/styled": "^11.11.0",
+    "@types/react": "18.2.58",
+    "react": "^18.2.0"
+  },
+  "peerDependencies": {
+    "@emotion/styled": "^11.11.0",
+    "@types/react": "18.2.58",
+    "react": "^18.2.0"
   }
 }

@@ -6,7 +6,7 @@ const packages = [
   "@code-editor/analytics",
   "@code-editor/ui",
   "@editor-app/live-session",
-  "@code-editor/preview-pip", // TODO: remove me. this is for development. for production, use npm ver instead.
+  // "@code-editor/preview-pip", // TODO: remove me. this is for development. for production, use npm ver instead.
   "@code-editor/devtools",
   "@code-editor/canvas",
   "@code-editor/property",
@@ -76,69 +76,40 @@ const packages = [
   // -----------------------------
 ];
 
-const withPlugins = require("next-compose-plugins");
-const withTM = require("next-transpile-modules")(packages);
-
-const withPWA = require("next-pwa")({
-  register: true,
-  dest: "public",
-  disable: IS_DEV,
-  fallbacks: {
-    image: "/images/fallback.png",
-    document: "/_offline",
-  },
-});
-
-module.exports = withPlugins(
-  [
-    [withTM],
-    [
-      withPWA,
+/**
+ * @type {import('next').NextConfig}
+ */
+const nextconfig = {
+  transpilePackages: packages,
+  async rewrites() {
+    return [
+      // custom sitemaps
+      // TODO: add pagination
       {
-        pwa: {
-          dest: "public",
-          // swSrc: "sw.js",
-        },
+        source: "/community/files/sitemap.xml",
+        destination: "/api/sitemap/community/files",
       },
-    ],
-  ],
-  {
-    webpack: (config) => {
-      config.resolve.fallback = {
-        fs: false, // used by handlebars
-        path: false, // used by handlebars
-      };
+      {
+        source: "/community/tag/sitemap.xml",
+        destination: "/api/sitemap/community/tag",
+      },
+    ];
+  },
+  async redirects() {
+    return [
+      {
+        // typo gaurd
+        source: "/preference",
+        destination: "/preferences",
+        permanent: true,
+      },
+      {
+        source: "/files/:key/:id",
+        destination: "/files/:key?node=:id",
+        permanent: false,
+      },
+    ];
+  },
+};
 
-      return config;
-    },
-    async rewrites() {
-      return [
-        // custom sitemaps
-        // TODO: add pagination
-        {
-          source: "/community/files/sitemap.xml",
-          destination: "/api/sitemap/community/files",
-        },
-        {
-          source: "/community/tag/sitemap.xml",
-          destination: "/api/sitemap/community/tag",
-        },
-      ];
-    },
-    async redirects() {
-      return [
-        {
-          // typo gaurd
-          source: "/preference",
-          destination: "/preferences",
-          permanent: true,
-        },
-        {
-          source: "/files/:key/:id",
-          destination: "/files/:key?node=:id",
-          permanent: false,
-        },
-      ];
-    },
-  }
-);
+module.exports = nextconfig;
