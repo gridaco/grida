@@ -5,9 +5,10 @@
   "scripts": {
     "dev": "next dev -p 6626",
     "build": "next build",
+    "lint": "next lint",
+    "start": "next start -p 6626",
     "sitemap": "next-sitemap && node ./.scripts/post-sitemap-mod.js",
-    "postbuild": "npm run sitemap",
-    "start": "next start -p 6626"
+    "postbuild": "npm run sitemap"
   },
   "dependencies": {
     "@base-sdk-fp/auth-components-react": "^0.1.4",
@@ -116,8 +117,8 @@
     "pouchdb-adapter-idb": "^7.2.2",
     "pusher-js": "^7.0.3",
     "re-resizable": "^6.9.1",
-    "react": "^18.2.0",
-    "react-dom": "^18.2.0",
+    "react": "^18",
+    "react-dom": "^18",
     "react-hot-toast": "^2.4.0",
     "react-hotkeys-hook": "^3.4.4",
     "react-infinite-scroller": "^1.2.6",
@@ -135,10 +136,11 @@
   "devDependencies": {
     "@emotion/babel-preset-css-prop": "^11.2.0",
     "@types/file-saver": "^2.0.5",
-    "@types/node": "^14.14.37",
-    "@types/react": "^18.0.25",
     "@types/react-infinite-scroller": "^1.2.3",
     "@types/react-resizable": "^1.7.2",
+    "@types/node": "^20",
+    "@types/react": "^18",
+    "@types/react-dom": "^18",
     "autoprefixer": "^10.0.1",
     "babel-plugin-module-resolver": "^4.1.0",
     "css-loader": "^5.2.4",

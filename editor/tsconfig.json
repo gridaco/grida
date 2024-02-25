@@ -28,12 +28,6 @@
       "hooks/*": ["./hooks/*"]
     }
   },
-  "include": [
-    "next-env.d.ts",
-    "**/*.ts",
-    "**/*.tsx",
-    "../editor-packages/editor-canvas-renderer-core/util.ts",
-    "../editor-packages/editor-canvas-renderer-bitmap/image-preview.tsx"
-  ],
+  "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
   "exclude": ["node_modules"]
 }

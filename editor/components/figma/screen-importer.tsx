@@ -34,7 +34,7 @@ export function FigmaScreenImporter(props: {
               props.onImported(reflect);
             }}
           >
-            use loaded node "{reflect.name}"
+            use loaded node &quot;{reflect.name}&quot;
           </button>
         </>
       ) : (

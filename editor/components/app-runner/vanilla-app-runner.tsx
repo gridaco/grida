@@ -1,6 +1,6 @@
 import React, { ReactEventHandler, useEffect, useRef } from "react";
 
-export const VanillaRunner = React.forwardRef(function (
+export const VanillaRunner = React.forwardRef(function VanillaRunner (
   {
     width = "100%",
     height = "100%",

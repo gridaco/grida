@@ -92,7 +92,7 @@ export const PageRow = memo(
       >
         {withSeparatorElements(
           [
-            <TreeView.RowTitle>{name}</TreeView.RowTitle>,
+            <TreeView.RowTitle key="title">{name}</TreeView.RowTitle>,
             // hovered && (
             //   <>
             //     <DotsHorizontalIcon onClick={onMenuClick} />

@@ -2,7 +2,7 @@ import React from "react";
 import styled from "@emotion/styled";
 import { HeartIcon, DownloadIcon } from "@radix-ui/react-icons";
 
-export const FileCard = React.forwardRef(function (
+export const FileCard = React.forwardRef(function FileCard(
   {
     id,
     name,

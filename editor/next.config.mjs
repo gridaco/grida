@@ -112,4 +112,4 @@ const nextconfig = {
   },
 };
 
-module.exports = nextconfig;
+export default nextconfig;
