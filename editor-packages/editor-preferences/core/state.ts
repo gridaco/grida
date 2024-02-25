@@ -14,7 +14,10 @@ export interface PreferenceState {
      */
     debug: boolean;
     canvas: {
-      renderer: "vanilla-renderer" | "bitmap-renderer"; // "figma-renderer"
+      renderer:
+        | "vanilla-renderer"
+        | "bitmap-renderer"
+        | "reflect-ui-core-renderer"; // "figma-renderer"
     };
     framework: FrameworkConfig;
     experimental: {

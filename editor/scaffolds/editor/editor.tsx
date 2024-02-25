@@ -6,7 +6,7 @@ import {
 } from "layouts/panel";
 import { EditorSidebar } from "components/editor";
 import { EditorState, useEditorState } from "core/states";
-import { CanvasInteractive, CanvasReadonly } from "scaffolds/canvas";
+import { EditorCanvas } from "scaffolds/canvas";
 import { Inspector } from "scaffolds/inspector";
 import { EditorHome } from "@code-editor/dashboard";
 import { EditorIsolatedInspection } from "@code-editor/isolated-inspection";
@@ -111,14 +111,14 @@ function ModeDesign() {
     case "home":
       return <EditorHome />;
     default:
-      return <CanvasReadonly />;
+      return <EditorCanvas />;
   }
 }
 
 function ModeCraft() {
   const [state] = useEditorState();
 
-  return <CanvasInteractive />;
+  return <EditorCanvas renderer="reflect-ui-core-renderer" />;
 }
 
 function ModeCode() {

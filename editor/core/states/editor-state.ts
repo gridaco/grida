@@ -33,7 +33,7 @@ type TDesignerMode = "inspect" | "comment"; // | "prototype";
 export type EditorPage = {
   id: string;
   name: string;
-  type: "home" | "code" | "figma-canvas";
+  type: "home" | "code" | "figma-canvas" | "craft";
 };
 
 export interface EditorState {
@@ -67,11 +67,13 @@ export interface EditorSnapshot {
   selectedNodes: string[];
   selectedLayersOnPreview: string[];
   selectedNodesInitial?: string[] | null;
-  design: FigmaReflectRepository;
+  design: DesignRepository;
   isolation: NodeIsolationData;
   code: CodeRepository;
   canvasMode: EditorState["canvasMode"];
 }
+
+type DesignRepository = FigmaReflectRepository | CraftDesignRepository;
 
 export interface FigmaReflectRepository {
   /**
@@ -99,6 +101,18 @@ export interface FigmaReflectRepository {
   components: { [key: string]: ComponentNode };
   // styles: { [key: string]: {} };
   input: DesignInput;
+}
+
+export interface CraftDesignRepository {
+  name: string;
+  key: string;
+  pages: {
+    id: string;
+    name: string;
+    children: ReflectSceneNode[];
+    backgroundColor: RGBA;
+  }[];
+  components: { [key: string]: ComponentNode };
 }
 
 export type CanvasFocusData = {

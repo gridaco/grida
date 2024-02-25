@@ -6,7 +6,7 @@ import { blurred_bg_fill } from "@code-editor/canvas-renderer-core";
 import { cachekey, cache } from "./cache";
 import { preview as wwpreview } from "../code/code-worker-messenger";
 
-export function WebWorkerD2CVanillaPreview({ target }: VanillaPreviewProps) {
+export function D2CWebWorkerVanillaPreview({ target }: VanillaPreviewProps) {
   const [preview, setPreview] = useState<Result>();
   const bg_color_str = blurred_bg_fill(target.fills);
 

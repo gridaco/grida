@@ -39,9 +39,11 @@ export function AppbarFragmentForSidebar() {
         onOpenInFigma={handleOpenFile}
         onOpenPreferences={openPreferences}
       />
-      <div>
-        <EditorAppbarModeCraftAddButton />
-      </div>
+      {state.mode.value === "craft" && (
+        <div>
+          <EditorAppbarModeCraftAddButton />
+        </div>
+      )}
     </div>
   );
 }

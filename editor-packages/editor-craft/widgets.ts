@@ -1,4 +1,5 @@
 export const widgets = [
+  ["container", "Container"],
   ["text", "Text"],
   ["link", "Link"],
   ["button", "Button"],

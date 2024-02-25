@@ -30,6 +30,54 @@ export function useEditorSetupContext() {
 }
 
 export function SetupNoopEditor({ children }: React.PropsWithChildren<{}>) {
+  const { provideEditorSnapshot: initialize } =
+    useWorkspaceInitializerContext();
+
+  useEffect(() => {
+    initialize({
+      selectedPage: "component",
+      pages: [
+        {
+          id: "component",
+          name: "Component",
+          type: "craft",
+        },
+      ],
+      selectedNodes: [],
+      selectedLayersOnPreview: [],
+      design: {
+        name: "Untitled",
+        components: {},
+        key: "untitled",
+        pages: [
+          {
+            id: "component",
+            name: "Component",
+            backgroundColor: { r: 1, g: 1, b: 1, a: 1 },
+            children: [
+              {
+                x: 0,
+                y: 0,
+                width: 100,
+                height: 100,
+              },
+            ],
+          },
+        ],
+      },
+      isolation: {
+        isolated: false,
+        node: "component",
+      },
+      code: { files: {}, loading: true },
+      canvasMode: {
+        value: "free",
+        last: "free",
+        updated: undefined,
+      },
+    });
+  }, [initialize]);
+
   return (
     <EditorSetupContext.Provider
       value={{

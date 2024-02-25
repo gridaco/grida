@@ -2,10 +2,6 @@ import React, { useCallback } from "react";
 import styled from "@emotion/styled";
 import { Canvas } from "@code-editor/canvas";
 import { useEditorState, useWorkspace } from "core/states";
-import {
-  D2CVanillaPreview,
-  OptimizedPreviewCanvas,
-} from "scaffolds/preview-canvas";
 import useMeasure from "react-use-measure";
 import { useDispatch } from "core/dispatch";
 import { FrameTitleRenderer } from "./render/frame-title";
@@ -16,12 +12,23 @@ import { useRenderItemWithPreference } from "./hooks";
 /**
  * Statefull canvas segment that contains canvas as a child, with state-data connected.
  */
-export function CanvasReadonly() {
+export function EditorCanvas({
+  readonly,
+  renderer,
+}: {
+  readonly?: boolean;
+  renderer?:
+    | "bitmap-renderer"
+    | "vanilla-renderer"
+    | "reflect-ui-core-renderer";
+}) {
   const [state] = useEditorState();
   const [canvasSizingRef, canvasBounds] = useMeasure();
   const { highlightedLayer, highlightLayer } = useWorkspace();
   const dispatch = useDispatch();
-  const renderItem = useRenderItemWithPreference();
+  const renderItem = useRenderItemWithPreference(
+    renderer ? { force_use_renderer: renderer } : undefined
+  );
 
   const {
     selectedPage,
@@ -131,14 +138,6 @@ export function CanvasReadonly() {
         </>
       )}
     </CanvasContainer>
-  );
-}
-
-export function CanvasInteractive() {
-  return (
-    <div className="bg-white">
-      <h1 className="text-black">Interactive canvas</h1>
-    </div>
   );
 }
 

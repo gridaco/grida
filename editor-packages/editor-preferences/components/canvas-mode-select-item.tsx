@@ -9,7 +9,11 @@ export function CanvasModeSelectItem({
   selected = false,
   onClick,
 }: {
-  mode: "bitmap-renderer" | "figma-renderer" | "vanilla-renderer";
+  mode:
+    | "bitmap-renderer"
+    | "figma-renderer"
+    | "vanilla-renderer"
+    | "reflect-ui-core-renderer";
   selected?: boolean;
   label: string;
   onClick?: () => void;
@@ -27,7 +31,11 @@ export function CanvasModeSelectItem({
 function CanvasModeIcon({
   mode,
 }: {
-  mode: "bitmap-renderer" | "figma-renderer" | "vanilla-renderer";
+  mode:
+    | "bitmap-renderer"
+    | "figma-renderer"
+    | "vanilla-renderer"
+    | "reflect-ui-core-renderer";
 }) {
   const props = {
     color: "white",
@@ -45,6 +53,9 @@ function CanvasModeIcon({
     }
     case "vanilla-renderer": {
       return <Html5Icon {...props} />;
+    }
+    case "reflect-ui-core-renderer": {
+      return <div>Reflect UI Core Renderer</div>;
     }
   }
 }

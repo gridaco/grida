@@ -25,7 +25,8 @@
       "repository/*": ["./repository/*"],
       "utils/*": ["./utils/*"],
       "public/*": ["./public/*"],
-      "hooks/*": ["./hooks/*"]
+      "hooks/*": ["./hooks/*"],
+      "@/*": ["./*"]
     }
   },
   "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],

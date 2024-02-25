@@ -9,7 +9,7 @@ import {
  * this gets called when the editor snapshot is ready, returns the initial workspace state merged with editor snapshot's value.
  */
 export function merge_initial_workspace_state_with_editor_snapshot(
-  base: Partial<WorkspaceState>,
+  base: Partial<WorkspaceState> = {},
   snapshot: EditorSnapshot,
   seed?: WorkspaceStateSeed
 ): WorkspaceState {

@@ -48,6 +48,7 @@ const renderer_engines = [
   "bitmap-renderer",
   // "figma-renderer",
   "vanilla-renderer",
+  "reflect-ui-core-renderer",
 ] as const;
 
 function CanvasModeSelection({
