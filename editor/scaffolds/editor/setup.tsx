@@ -17,6 +17,10 @@ type EditorSetupState = {
    * explicitly set loading to block uesr interaction.
    */
   loading?: boolean;
+  /**
+   * 0 to 1
+   */
+  progress: number;
 };
 
 const EditorSetupContext = React.createContext<EditorSetupState>(null);
@@ -25,7 +29,20 @@ export function useEditorSetupContext() {
   return React.useContext(EditorSetupContext);
 }
 
-interface EssentialEditorSetupProps {
+export function SetupNoopEditor({ children }: React.PropsWithChildren<{}>) {
+  return (
+    <EditorSetupContext.Provider
+      value={{
+        loading: false,
+        progress: 1,
+      }}
+    >
+      {children}
+    </EditorSetupContext.Provider>
+  );
+}
+
+interface EssentialFigmaEditorSetupProps {
   nodeid: string;
   filekey: string;
   router: NextRouter;
@@ -39,7 +56,7 @@ function FigmaEditorBaseSetup({
   children,
   loaded,
 }: React.PropsWithChildren<
-  EssentialEditorSetupProps & {
+  EssentialFigmaEditorSetupProps & {
     file: FileResponse;
     loaded?: boolean;
   }
@@ -61,6 +78,16 @@ function FigmaEditorBaseSetup({
   // }, [file]);
 
   const [state] = useEditorState();
+
+  // loading progress
+  const loading = !loaded;
+  const _initially_loaded = state.design?.pages?.length > 0;
+  const _initial_load_progress =
+    [!!state.design?.input, state.design?.pages?.length > 0, !loading].filter(
+      Boolean
+    ).length /
+      3 +
+    0.2;
 
   const initialCanvasMode = q_map_canvas_mode_from_query(
     router.query.mode as string
@@ -142,7 +169,9 @@ function FigmaEditorBaseSetup({
   }, [file]);
 
   return (
-    <EditorSetupContext.Provider value={{ loading: !loaded }}>
+    <EditorSetupContext.Provider
+      value={{ loading: loading, progress: _initial_load_progress }}
+    >
       {children}
     </EditorSetupContext.Provider>
   );
@@ -153,7 +182,7 @@ export function SetupFigmaCommunityFileEditor({
   nodeid,
   router,
   children,
-}: React.PropsWithChildren<EssentialEditorSetupProps>) {
+}: React.PropsWithChildren<EssentialFigmaEditorSetupProps>) {
   const fig = useFigmaCommunityFile({ id: filekey });
   const [file, setFile] = useState<FileResponse>(null);
   const [loaded, setLoaded] = useState<boolean>(false);
@@ -203,7 +232,7 @@ export function SetupFigmaFileEditor({
   nodeid,
   router,
   children,
-}: React.PropsWithChildren<EssentialEditorSetupProps>) {
+}: React.PropsWithChildren<EssentialFigmaEditorSetupProps>) {
   const [file, setFile] = useState<FileResponse>(null);
   const [loaded, setLoaded] = useState<boolean>(false);
 

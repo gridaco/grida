@@ -20,23 +20,16 @@ import { Code } from "scaffolds/code";
 
 export function Editor() {
   const [state] = useEditorState();
-  const { loading } = useEditorSetupContext();
+  const { loading, progress } = useEditorSetupContext();
 
-  const _initially_loaded = state.design?.pages?.length > 0;
-  const _initial_load_progress =
-    [!!state.design?.input, state.design?.pages?.length > 0, !loading].filter(
-      Boolean
-    ).length /
-      3 +
-    0.2;
-
+  const initiallyLoaded = progress > 0;
   // this key is used for force re-rendering canvas after the whole file is fetched.
-  const _refreshkey = loading || !_initially_loaded ? "1" : "0";
+  const _refreshkey = loading || !initiallyLoaded ? "1" : "0";
 
   return (
     <>
-      {(loading || !_initially_loaded) && (
-        <EditorSkeleton percent={_initial_load_progress * 100} />
+      {(loading || !initiallyLoaded) && (
+        <EditorSkeleton percent={progress * 100} />
       )}
 
       <DefaultEditorWorkspaceLayout

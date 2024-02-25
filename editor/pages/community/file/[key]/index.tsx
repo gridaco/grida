@@ -3,8 +3,8 @@ import Head from "next/head";
 import { SigninToContinuePrmoptProvider } from "components/prompt-banner-signin-to-continue";
 import {
   Editor,
-  EditorDefaultProviders,
   SetupFigmaCommunityFileEditor,
+  FigmaDesignReadonlyProviders,
 } from "scaffolds/editor";
 import { Workspace, useWorkspaceInitializerContext } from "scaffolds/workspace";
 import { useRouter } from "next/router";
@@ -61,16 +61,16 @@ export default function FigmaCommunityFileEditorPage(
         />
       </Dialog>
       <SigninToContinuePrmoptProvider>
-        <Workspace>
+        <Workspace designer="figma">
           <SetupFigmaCommunityFileEditor
             key={id}
             filekey={id}
             nodeid={undefined}
             router={router}
           >
-            <EditorDefaultProviders>
+            <FigmaDesignReadonlyProviders>
               <Editor />
-            </EditorDefaultProviders>
+            </FigmaDesignReadonlyProviders>
           </SetupFigmaCommunityFileEditor>
         </Workspace>
       </SigninToContinuePrmoptProvider>

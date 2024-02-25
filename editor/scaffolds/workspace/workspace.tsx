@@ -6,7 +6,7 @@ import React, {
 } from "react";
 import { useRouter } from "next/router";
 import { WorkspaceStateSeed, StateProvider } from "core/states";
-import { SetupWorkspace } from "./setup";
+import { SetupFigmaWorkspace } from "./setup";
 import { WorkspaceDefaultProviders } from "./_providers";
 import * as warmup from "./warmup";
 import type { EditorSnapshot } from "core/states";
@@ -24,7 +24,11 @@ export function useWorkspaceInitializerContext() {
 export function Workspace({
   children,
   initial,
-}: React.PropsWithChildren<{ initial?: WorkspaceStateSeed }>) {
+  designer,
+}: React.PropsWithChildren<{
+  initial?: WorkspaceStateSeed;
+  designer: "figma" | "builder";
+}>) {
   const router = useRouter();
 
   const handleDispatch = useCallback((action: WorkspaceAction) => {
@@ -61,9 +65,13 @@ export function Workspace({
       >
         <StateProvider state={safe_value} dispatch={handleDispatch}>
           <WorkspaceDefaultProviders>
-            <SetupWorkspace router={router} dispatch={handleWarmup}>
-              {children}
-            </SetupWorkspace>
+            {designer === "figma" ? (
+              <SetupFigmaWorkspace router={router} dispatch={handleWarmup}>
+                {children}
+              </SetupFigmaWorkspace>
+            ) : (
+              <>{children}</>
+            )}
           </WorkspaceDefaultProviders>
         </StateProvider>
       </WorkspaceInitializerContext.Provider>
