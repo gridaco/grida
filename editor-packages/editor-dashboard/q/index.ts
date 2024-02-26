@@ -1,4 +1,7 @@
-import type { FigmaReflectRepository } from "editor/core/states";
+import type {
+  DesignRepository,
+  FigmaReflectRepository,
+} from "editor/core/states";
 import type { ReflectSceneNode } from "@design-sdk/figma-node";
 import { groupByPath } from "./group-by-path-name";
 
@@ -11,7 +14,7 @@ type SceneMeta<T extends string = string> = {
 };
 
 export function group<T extends SceneMeta>(
-  design: FigmaReflectRepository,
+  design: DesignRepository,
   { filter: query }: { filter: string }
 ): Map<string, Array<T>> {
   // group by...

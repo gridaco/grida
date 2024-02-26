@@ -11,7 +11,11 @@ import type { DashboardState } from "./state";
 import type { Action } from "./action";
 import { reducer } from "./reducer";
 import { initialDashboardState } from "./initial";
-import { FigmaReflectRepository, useEditorState } from "editor/core/states";
+import {
+  DesignRepository,
+  FigmaReflectRepository,
+  useEditorState,
+} from "editor/core/states";
 import { useDispatch as useEditorDispatch } from "editor/core/dispatch";
 const __noop = () => {};
 
@@ -34,7 +38,7 @@ const StateContext = createContext<DashboardState | undefined>(undefined);
 export const DashboardStateProvider = function Awaiter({
   children,
   design,
-}: React.PropsWithChildren<{ design?: FigmaReflectRepository }>) {
+}: React.PropsWithChildren<{ design?: DesignRepository }>) {
   if (!design) {
     return <>{children}</>;
   }
@@ -46,7 +50,7 @@ const _Provider = function StateProvider({
   children,
   design,
 }: React.PropsWithChildren<{
-  design: FigmaReflectRepository;
+  design: DesignRepository;
 }>) {
   const [value, dispatch] = useReducer(
     reducer,

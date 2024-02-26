@@ -11,11 +11,7 @@ import {
   IconContainer,
   LayerIcon,
 } from "./editor-layer-hierarchy-item";
-import {
-  FigmaReflectRepository,
-  useEditorState,
-  useWorkspace,
-} from "core/states";
+import { DesignRepository, useEditorState, useWorkspace } from "core/states";
 import { useDispatch } from "core/dispatch";
 import {
   flattenNodeTree,
@@ -88,7 +84,7 @@ export function DesignLayerHierarchy({
   } else {
     roots = selectedPage
       ? design.pages.find((p) => p.id == selectedPage).children
-      : [design?.input?.entry];
+      : [];
   }
 
   const layers: FlattenedDisplayItemNode[][] = useMemo(() => {
@@ -216,7 +212,7 @@ export function DesignLayerHierarchy({
  * @param design
  * @returns
  */
-function findUnder(node: string, design: FigmaReflectRepository) {
+function findUnder(node: string, design: DesignRepository) {
   for (const page of design.pages) {
     for (const frame of page.children.filter(Boolean)) {
       if (frame.id === node) {

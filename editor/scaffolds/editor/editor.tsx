@@ -6,7 +6,7 @@ import {
 } from "layouts/panel";
 import { EditorSidebar } from "components/editor";
 import { EditorState, useEditorState } from "core/states";
-import { EditorCanvas } from "scaffolds/canvas";
+import { EditorCraftCanvas, EditorFigmaCanvas } from "scaffolds/canvas";
 import { Inspector } from "scaffolds/inspector";
 import { EditorHome } from "@code-editor/dashboard";
 import { EditorIsolatedInspection } from "@code-editor/isolated-inspection";
@@ -111,14 +111,14 @@ function ModeDesign() {
     case "home":
       return <EditorHome />;
     default:
-      return <EditorCanvas />;
+      return <EditorFigmaCanvas />;
   }
 }
 
 function ModeCraft() {
   const [state] = useEditorState();
 
-  return <EditorCanvas renderer="reflect-ui-core-renderer" />;
+  return <EditorCraftCanvas />;
 }
 
 function ModeCode() {
@@ -146,7 +146,6 @@ function PageView() {
 
   const _Body = useCallback(
     ({ mode }: { mode: EditorState["mode"]["value"] }) => {
-      console.log("mode", mode);
       switch (mode) {
         case "code": {
           return <ModeCode />;

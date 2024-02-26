@@ -47,8 +47,8 @@ const Description = styled.p`
 const renderer_engines = [
   "bitmap-renderer",
   // "figma-renderer",
-  "vanilla-renderer",
-  "reflect-ui-core-renderer",
+  "d2c-vanilla-iframe-renderer",
+  "htmlcss-vanilla-renderer",
 ] as const;
 
 function CanvasModeSelection({
@@ -91,7 +91,7 @@ const canvas_mode_card_meta = {
   // "figma-renderer": {
   //   name: "Figma Renderer",
   // },
-  "vanilla-renderer": {
+  "d2c-vanilla-iframe-renderer": {
     name: "Vanilla Renderer (Beta)",
     description:
       "[Vanilla Renderer] renders canvas with code-translated html/css iframes, bootups faster, can be heavy on large canvas.",

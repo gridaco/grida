@@ -1,6 +1,11 @@
 import React, { useEffect, useCallback, useState } from "react";
 import { NextRouter } from "next/router";
-import { EditorPage, EditorSnapshot, useEditorState } from "core/states";
+import {
+  useEditorState,
+  type EditorPage,
+  type EditorSnapshot,
+  type FigmaReflectRepository,
+} from "core/states";
 import { useFigmaCommunityFile, useFigmaFile } from "hooks";
 import { warmup } from "scaffolds/editor";
 import type { FileResponse } from "@design-sdk/figma-remote-types";
@@ -29,7 +34,7 @@ export function useEditorSetupContext() {
   return React.useContext(EditorSetupContext);
 }
 
-export function SetupNoopEditor({ children }: React.PropsWithChildren<{}>) {
+export function SetupCraftNoopEditor({ children }: React.PropsWithChildren<{}>) {
   const { provideEditorSnapshot: initialize } =
     useWorkspaceInitializerContext();
 
@@ -45,6 +50,7 @@ export function SetupNoopEditor({ children }: React.PropsWithChildren<{}>) {
       ],
       selectedNodes: [],
       selectedLayersOnPreview: [],
+      // TODO: remove me
       design: {
         name: "Untitled",
         components: {},
@@ -54,16 +60,16 @@ export function SetupNoopEditor({ children }: React.PropsWithChildren<{}>) {
             id: "component",
             name: "Component",
             backgroundColor: { r: 1, g: 1, b: 1, a: 1 },
-            children: [
-              {
-                x: 0,
-                y: 0,
-                width: 100,
-                height: 100,
-              },
-            ],
+            children: [],
+            flowStartingPoints: [],
           },
         ],
+        version: "",
+        lastModified: new Date(),
+        input: undefined
+      },
+      craft: {
+        children: []
       },
       isolation: {
         isolated: false,
@@ -131,9 +137,11 @@ function FigmaEditorBaseSetup({
   const loading = !loaded;
   const _initially_loaded = state.design?.pages?.length > 0;
   const _initial_load_progress =
-    [!!state.design?.input, state.design?.pages?.length > 0, !loading].filter(
-      Boolean
-    ).length /
+    [
+      !!(state.design as FigmaReflectRepository)?.input,
+      state.design?.pages?.length > 0,
+      !loading,
+    ].filter(Boolean).length /
       3 +
     0.2;
 

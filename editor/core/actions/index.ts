@@ -1,3 +1,4 @@
+import { CraftAction } from "@code-editor/craft/core";
 import type { FrameworkConfig } from "@grida/builder-config";
 import type {
   ConsoleLog,
@@ -41,7 +42,10 @@ export type Action =
   | PreviewAction
   | CodingAction
   | DevtoolsAction
-  | BackgroundTaskAction;
+  | BackgroundTaskAction
+  // craft mode
+  | CraftAction;
+//
 
 export type ActionType = Action["type"];
 

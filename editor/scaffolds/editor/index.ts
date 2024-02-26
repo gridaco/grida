@@ -1,7 +1,7 @@
 export {
   SetupFigmaFileEditor,
   SetupFigmaCommunityFileEditor,
-  SetupNoopEditor,
+  SetupCraftNoopEditor as SetupNoopEditor,
   useEditorSetupContext,
 } from "./setup";
 export { Editor } from "./editor";

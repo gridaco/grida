@@ -17,6 +17,10 @@ export function craftReducer(
         case "container": {
           return produce(state, (draft) => {
             draft.craft.children.push({
+              id: new Date().getTime().toString(),
+              name: "container",
+              x: 0,
+              y: 0,
               tag: "div",
               attributes: {
                 class: [],
@@ -27,6 +31,11 @@ export function craftReducer(
                 backgroundColor: "black",
               },
               children: [],
+              width: 100,
+              height: 100,
+              absoluteX: 0,
+              absoluteY: 0,
+              rotation: 0,
             });
           });
         }

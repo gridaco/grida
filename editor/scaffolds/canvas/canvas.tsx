@@ -12,15 +12,15 @@ import { useRenderItemWithPreference } from "./hooks";
 /**
  * Statefull canvas segment that contains canvas as a child, with state-data connected.
  */
-export function EditorCanvas({
+export function EditorFigmaCanvas({
   readonly,
   renderer,
 }: {
   readonly?: boolean;
   renderer?:
     | "bitmap-renderer"
-    | "vanilla-renderer"
-    | "reflect-ui-core-renderer";
+    | "d2c-vanilla-iframe-renderer"
+    | "htmlcss-vanilla-renderer";
 }) {
   const [state] = useEditorState();
   const [canvasSizingRef, canvasBounds] = useMeasure();
@@ -137,6 +137,111 @@ export function EditorCanvas({
           />
         </>
       )}
+    </CanvasContainer>
+  );
+}
+
+export function EditorCraftCanvas() {
+  const [state] = useEditorState();
+  const [canvasSizingRef, canvasBounds] = useMeasure();
+  const { highlightedLayer, highlightLayer } = useWorkspace();
+  const dispatch = useDispatch();
+  const renderItem = useRenderItemWithPreference({
+    force_use_renderer: "htmlcss-vanilla-renderer",
+  });
+
+  const {
+    selectedPage,
+    // design,
+    selectedNodes,
+    canvas: canvasMeta,
+    craft,
+    canvasMode,
+  } = state;
+  const { focus } = canvasMeta;
+
+  const startCodeSession = useCallback(
+    (target: string) =>
+      dispatch({
+        type: "coding/new-template-session",
+        template: {
+          type: "d2c",
+          target: target,
+        },
+      }),
+    [dispatch]
+  );
+
+  const enterIsolation = useCallback(
+    (node: string) =>
+      dispatch({
+        type: "design/enter-isolation",
+        node,
+      }),
+    [dispatch]
+  );
+
+  const cursor = state.designerMode === "comment" ? cursors.comment : "default";
+
+  return (
+    <CanvasContainer ref={canvasSizingRef} id="canvas">
+      {/* <EditorAppbarFragments.Canvas /> */}
+
+      <Canvas
+        key={selectedPage}
+        viewbound={[
+          canvasBounds.left,
+          canvasBounds.top,
+          canvasBounds.right,
+          canvasBounds.bottom,
+        ]}
+        filekey={"craft"}
+        pageid={selectedPage}
+        backgroundColor={"white"}
+        selectedNodes={selectedNodes}
+        focusRefreshkey={focus.refreshkey}
+        focus={focus.nodes}
+        highlightedLayer={highlightedLayer}
+        onSelectNode={(...nodes) => {
+          dispatch({ type: "select-node", node: nodes.map((n) => n.id) });
+        }}
+        onMoveNodeEnd={([x, y], ...nodes) => {
+          dispatch({
+            type: "node-transform-translate",
+            node: nodes,
+            translate: [x, y],
+          });
+        }}
+        // onMoveNode={() => {}}
+        onClearSelection={() => {
+          dispatch({ type: "select-node", node: [] });
+        }}
+        nodes={craft.children}
+        // initialTransform={ } // TODO: if the initial selection is provided from first load, from the query param, we have to focus to fit that node.
+        renderItem={renderItem}
+        // readonly={false}
+        readonly
+        config={{
+          can_highlight_selected_layer: true,
+          marquee: {
+            disabled: false,
+          },
+          grouping: {
+            disabled: false,
+          },
+        }}
+        debug
+        cursor={cursor}
+        renderFrameTitle={(p) => (
+          <FrameTitleRenderer
+            key={p.id}
+            {...p}
+            runnable={selectedNodes.length === 1}
+            onRunClick={() => startCodeSession(p.id)}
+            onDoubleClick={() => enterIsolation(p.id)}
+          />
+        )}
+      />
     </CanvasContainer>
   );
 }

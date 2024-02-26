@@ -1,5 +1,4 @@
 import React, { useEffect, useRef, useState, useMemo } from "react";
-import { ReflectSceneNode } from "@design-sdk/figma-node";
 import { CanvasStateStore } from "../stores";
 import {
   CanvasEventTarget,
@@ -20,7 +19,7 @@ import {
 } from "../math";
 import q from "@design-sdk/query";
 import { LazyFrame } from "@code-editor/canvas/lazy-frame";
-import { HudCustomRenderers, HudSurface } from "../hud";
+import { DisplayNodeMeta, HudCustomRenderers, HudSurface } from "../hud";
 import type { Box, XY, CanvasTransform, XYWH, XYWHR } from "../types";
 import type { FrameOptimizationFactors } from "../frame";
 // import { TransformDraftingStore } from "../drafting";
@@ -37,11 +36,24 @@ import {
 import styled from "@emotion/styled";
 import toast from "react-hot-toast";
 
-interface CanvasState {
+interface TCanvasNode extends DisplayNodeMeta {
+  id: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  absoluteX: number;
+  absoluteY: number;
+  rotation: number;
+  children?: TCanvasNode[];
+  parent?: TCanvasNode;
+}
+
+interface CanvasState<T extends TCanvasNode> {
   pageid: string;
   filekey: string;
   backgroundColor?: React.CSSProperties["backgroundColor"];
-  nodes: ReflectSceneNode[];
+  nodes: T[];
   highlightedLayer?: string;
   selectedNodes: string[];
   readonly?: boolean;
@@ -59,10 +71,10 @@ interface CanvasState {
   initialTransform?: CanvasTransform;
 }
 
-type CanvasCustomRenderers = HudCustomRenderers & {
+type CanvasCustomRenderers<T extends TCanvasNode> = HudCustomRenderers & {
   renderItem: (
     p: {
-      node: ReflectSceneNode;
+      node: T;
     } & FrameOptimizationFactors
   ) => React.ReactNode;
 };
@@ -104,20 +116,20 @@ const default_canvas_preferences: CanvsPreferences = {
   },
 };
 
-type CanvasProps = CanvasFocusProps &
+type CanvasProps<T extends TCanvasNode> = CanvasFocusProps &
   CanvasCursorOptions & {
     /**
      * canvas view bound.
      * [(x1) left, (y1) top, (x2) right, (y2) bottom]
      */
     viewbound: Box;
-    onSelectNode?: (...node: ReflectSceneNode[]) => void;
+    onSelectNode?: (...node: TCanvasNode[]) => void;
     onMoveNodeStart?: (...node: string[]) => void;
     onMoveNode?: (delta: XY, ...node: string[]) => void;
     onMoveNodeEnd?: (delta: XY, ...node: string[]) => void;
     onClearSelection?: () => void;
-  } & CanvasCustomRenderers &
-  CanvasState & {
+  } & CanvasCustomRenderers<T> &
+  CanvasState<T> & {
     config?: CanvsPreferences;
   };
 
@@ -137,11 +149,11 @@ type CanvasFocusSnap = {
 };
 
 interface HovringNode {
-  node: ReflectSceneNode;
+  node: TCanvasNode;
   reason: "frame-title" | "raycast" | "external";
 }
 
-function xywhr_of(node: ReflectSceneNode): XYWHR {
+function xywhr_of(node: TCanvasNode): XYWHR {
   return [
     node.absoluteX,
     node.absoluteY,
@@ -151,7 +163,7 @@ function xywhr_of(node: ReflectSceneNode): XYWHR {
   ] as XYWHR;
 }
 
-export function Canvas({
+export function Canvas<T extends TCanvasNode>({
   viewbound,
   renderItem,
   onMoveNodeStart,
@@ -173,7 +185,7 @@ export function Canvas({
   backgroundColor,
   cursor,
   ...props
-}: CanvasProps) {
+}: CanvasProps<T>) {
   const viewboundmeasured = useMemo(
     () => !viewbound_not_measured(viewbound),
     viewbound
@@ -265,7 +277,7 @@ export function Canvas({
 
   const node = (id) => qdoc.getNodeById(id);
 
-  const onSelectNode = (...nodes: ReflectSceneNode[]) => {
+  const onSelectNode = (...nodes: TCanvasNode[]) => {
     _cb_onSelectNode?.(...nodes.filter(Boolean));
   };
 
@@ -503,7 +515,7 @@ export function Canvas({
           {/* <div style={{ width: "100%", height: "100%", background: "grey" }} /> */}
           {/* 👆 ----------------------------------- 👆 */}
           {renderItem({
-            node: node as ReflectSceneNode,
+            node: node,
             zoom, // ? use scaled_zoom ?
             inViewport: true, // TODO:
             isZooming: isZooming,
@@ -641,8 +653,8 @@ function position_guide({
   selections,
   hover,
 }: {
-  selections: ReflectSceneNode[];
-  hover: ReflectSceneNode;
+  selections: TCanvasNode[];
+  hover: TCanvasNode;
 }) {
   if (selections.length === 0) {
     return [];
@@ -707,10 +719,7 @@ function ContextMenuProvider({ children }: React.PropsWithChildren<{}>) {
   );
 }
 
-function noduplicates(
-  a: ReflectSceneNode[],
-  b: ReflectSceneNode[]
-): ReflectSceneNode[] {
+function noduplicates(a: TCanvasNode[], b: TCanvasNode[]): TCanvasNode[] {
   // compare contents and return array of unique items
   return a.filter((item) => b.indexOf(item) === -1);
 }
@@ -770,7 +779,7 @@ function CanvasBackground({ backgroundColor }: { backgroundColor?: string }) {
 
 function auto_initial_transform(
   viewbound: Box,
-  nodes: ReflectSceneNode[]
+  nodes: TCanvasNode[]
 ): CanvasTransform {
   const _default = {
     scale: CANVAS_INITIAL_SCALE,
@@ -781,7 +790,7 @@ function auto_initial_transform(
     return _default;
   }
 
-  const fit_single_node = (n: ReflectSceneNode) => {
+  const fit_single_node = (n: TCanvasNode) => {
     return centerOf(viewbound, 0, n);
   };
 

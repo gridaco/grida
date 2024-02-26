@@ -4,7 +4,7 @@ import type { RGBA, WidgetKey } from "@reflect-ui/core";
 import type { ComponentNode } from "@design-sdk/figma-types";
 import type { DesignInput } from "@grida/builder-config/input";
 import type { File } from "@grida/builder-config/output/output-file";
-import type { CraftDocument } from "@code-editor/craft/core";
+import { CraftHtmlElement } from "@code-editor/craft/core";
 
 export type { File };
 
@@ -51,15 +51,21 @@ export interface EditorState {
    * > only set by the url pararm or other programatic cause, not caused by after-load user interaction.
    */
   selectedNodesInitial?: string[] | null;
-  design: FigmaReflectRepository;
-  craft: CraftDocument;
+  design: DesignRepository;
   mode: LastKnown<TEditorMode>;
   designerMode: TDesignerMode;
   canvasMode: LastKnown<TCanvasMode>;
   currentPreview?: ScenePreviewData;
   code: CodeRepository;
   devtoolsConsole?: DevtoolsConsole;
+
+  // v2 (with craft mode)
+  craft?: {
+    children: EditorNode[];
+  };
 }
+
+type EditorNode = CraftHtmlElement;
 
 export interface EditorSnapshot {
   pages: EditorPage[];
@@ -71,9 +77,10 @@ export interface EditorSnapshot {
   isolation: NodeIsolationData;
   code: CodeRepository;
   canvasMode: EditorState["canvasMode"];
+  craft?: EditorState["craft"];
 }
 
-type DesignRepository = FigmaReflectRepository | CraftDesignRepository;
+export type DesignRepository = FigmaReflectRepository; // | CraftDesignRepository;
 
 export interface FigmaReflectRepository {
   /**
@@ -103,17 +110,18 @@ export interface FigmaReflectRepository {
   input: DesignInput;
 }
 
-export interface CraftDesignRepository {
-  name: string;
-  key: string;
-  pages: {
-    id: string;
-    name: string;
-    children: ReflectSceneNode[];
-    backgroundColor: RGBA;
-  }[];
-  components: { [key: string]: ComponentNode };
-}
+// export interface CraftDesignRepository {
+//   name: string;
+//   key: string;
+//   version: string;
+//   lastModified: Date;
+//   pages: {
+//     id: string;
+//     name: string;
+//     children: ReflectSceneNode[];
+//     backgroundColor: RGBA;
+//   }[];
+// }
 
 export type CanvasFocusData = {
   /**

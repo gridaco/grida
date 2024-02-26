@@ -15,9 +15,9 @@ export interface PreferenceState {
     debug: boolean;
     canvas: {
       renderer:
-        | "vanilla-renderer"
+        | "d2c-vanilla-iframe-renderer"
         | "bitmap-renderer"
-        | "reflect-ui-core-renderer"; // "figma-renderer"
+        | "htmlcss-vanilla-renderer"; // "figma-renderer"
     };
     framework: FrameworkConfig;
     experimental: {

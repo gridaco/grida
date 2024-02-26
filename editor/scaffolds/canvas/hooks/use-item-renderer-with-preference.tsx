@@ -4,7 +4,7 @@ import {
   D2CVanillaPreview,
   OptimizedPreviewCanvas,
 } from "scaffolds/preview-canvas";
-import { ReflectCoreRenderer } from "@/renderers";
+import { HtmlCssVanillaRenderer } from "@/renderers";
 
 /**
  * Returns a dedicated funtion to render a node with preferred renderer component.
@@ -13,8 +13,8 @@ import { ReflectCoreRenderer } from "@/renderers";
 export function useRenderItemWithPreference(props?: {
   force_use_renderer?:
     | "bitmap-renderer"
-    | "vanilla-renderer"
-    | "reflect-ui-core-renderer";
+    | "d2c-vanilla-iframe-renderer"
+    | "htmlcss-vanilla-renderer";
 }) {
   const { config: preferences } = usePreferences();
   const { renderer: _preferred_renderer } = preferences.canvas;
@@ -29,11 +29,13 @@ export function useRenderItemWithPreference(props?: {
             <OptimizedPreviewCanvas key={p.node.id} target={p.node} {...p} />
           );
         }
-        case "vanilla-renderer": {
+        case "d2c-vanilla-iframe-renderer": {
           return <D2CVanillaPreview key={p.node.id} target={p.node} {...p} />;
         }
-        case "reflect-ui-core-renderer": {
-          return <ReflectCoreRenderer key={p.node.id} target={p.node} {...p} />;
+        case "htmlcss-vanilla-renderer": {
+          return (
+            <HtmlCssVanillaRenderer key={p.node.id} target={p.node} {...p} />
+          );
         }
         default:
           throw new Error("Unknown renderer", renderer as unknown);

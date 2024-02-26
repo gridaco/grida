@@ -7,6 +7,7 @@ import { Canvas } from "@code-editor/canvas";
 import useMeasure from "react-use-measure";
 import { FrameTitleRenderer } from "scaffolds/canvas/render/frame-title";
 import { useRouter } from "next/router";
+import { ReflectSceneNode } from "@design-sdk/figma-node";
 
 export default function CanvasServerPage() {
   const router = useRouter();
@@ -25,7 +26,7 @@ export default function CanvasServerPage() {
 
   return (
     <div ref={canvasSizingRef}>
-      <Canvas
+      <Canvas<ReflectSceneNode>
         key={selectedPage}
         viewbound={[
           canvasBounds.left,
