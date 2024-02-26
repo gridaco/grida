@@ -1,12 +1,13 @@
-export interface CraftDocument {
-  width: number;
-  height: number;
-  children: string[];
-  pages: Array<{
-    id: string;
-    name: string;
-    children: any[];
-  }>;
+export interface CraftHtmlElement {
+  tag: "div" | "h1" | "span";
+  attributes: {
+    class: string[];
+  };
+  style: {
+    width?: number;
+    height?: number;
+    backgroundColor?: string;
+  };
+  text?: string;
+  children?: CraftHtmlElement[];
 }
-
-export interface State extends CraftDocument {}

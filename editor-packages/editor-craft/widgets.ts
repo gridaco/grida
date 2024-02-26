@@ -76,3 +76,5 @@ export const widgets = [
   ["builder-conditional", "Conditional"],
   ["builder-stream", "Stream"],
 ] as const;
+
+export type WidgetType = typeof widgets[number][0];

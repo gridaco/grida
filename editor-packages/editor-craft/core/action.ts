@@ -1,9 +1,16 @@
-export type Action = any;
+import { WidgetType } from "../widgets";
 
-export type NewTextNodeAction = {
-  type: "(craft)/nodes/text/new";
+export type CraftAction = NewWidgetAction | NewTextWidgetAction;
+
+export type NewTextWidgetAction = {
+  type: "(craft)/widget/text/new";
   initial: {
     value: string;
     color: string;
   };
+};
+
+export type NewWidgetAction = {
+  type: "(craft)/widget/new";
+  widget: WidgetType;
 };
