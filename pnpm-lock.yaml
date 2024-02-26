@@ -631,7 +631,14 @@ importers:
         specifier: ^0.0.53
         version: 0.0.53(@design-sdk/figma-core@0.0.53)(@reflect-ui/cg@0.1.1)(@reflect-ui/core@0.0.12)(@reflect-ui/font-utils@0.0.1)(axios@1.6.7)
 
-  editor-packages/editor-craft: {}
+  editor-packages/editor-craft:
+    dependencies:
+      editor:
+        specifier: workspace:^
+        version: link:../../editor
+      immer:
+        specifier: ^9.0.3
+        version: 9.0.21
 
   editor-packages/editor-dashboard:
     dependencies:
