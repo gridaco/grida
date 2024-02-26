@@ -1,8 +1,22 @@
 import * as Popover from "@radix-ui/react-popover";
-import { widgets } from "@code-editor/craft";
+import { WidgetType, widgets } from "@code-editor/craft";
 import { PlusIcon } from "@radix-ui/react-icons";
+import { useDispatch } from "@/core/dispatch";
+import { useCallback } from "react";
 
 export function EditorAppbarModeCraftAddButton() {
+  const dispatch = useDispatch();
+
+  const handleAddWidget = useCallback(
+    (widget: WidgetType) => {
+      dispatch({
+        type: "(craft)/widget/new",
+        widget,
+      });
+    },
+    [dispatch]
+  );
+
   return (
     <Popover.Root>
       <Popover.Trigger asChild>
@@ -19,7 +33,8 @@ export function EditorAppbarModeCraftAddButton() {
                 className="cursor-pointer hover:bg-gray-100 p-2 rounded"
                 key={key}
                 onClick={() => {
-                  //
+                  console.log("craft: add new node", key);
+                  handleAddWidget(key);
                 }}
               >
                 {label}
