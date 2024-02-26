@@ -17,6 +17,7 @@ import { Dialog } from "@mui/material";
 import { FullScreenPreview } from "scaffolds/preview-full-screen";
 import { useDispatch } from "core/dispatch";
 import { Code } from "scaffolds/code";
+import { CraftInspector } from "scaffolds/inspector/inspector";
 
 export function Editor() {
   const [state] = useEditorState();
@@ -55,7 +56,9 @@ export function Editor() {
             }}
             minWidth={300}
             zIndex={1}
-            hidden={state.mode.value !== "design"}
+            hidden={
+              state.mode.value !== "design" && state.mode.value !== "craft"
+            }
             backgroundColor={colors.color_editor_bg_on_dark}
           >
             <SideRightPanel />
@@ -137,6 +140,8 @@ function SideRightPanel() {
       return <></>;
     case "design":
       return <Inspector />;
+    case "craft":
+      return <CraftInspector />;
   }
 }
 
