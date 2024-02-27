@@ -62,7 +62,7 @@ export function flattenNodeTree<T extends HierarchyTreeNode>(
   visit<T>(root, {
     getChildren: (layer): T[] => {
       if (expands.includes(layer.id)) {
-        return layer.children;
+        return layer.children ?? [];
       }
       return [];
     },
@@ -72,9 +72,9 @@ export function flattenNodeTree<T extends HierarchyTreeNode>(
         id: layer.id,
         name: layer.name,
         parent: layer.parent?.id,
-        depth: indexPath.length - 1,
+        depth: indexPath ? indexPath.length - 1 : 0,
         expanded:
-          layer.children.length <= 0
+          (layer.children?.length ?? 0) <= 0
             ? undefined
             : expands.includes(layer.id)
             ? true

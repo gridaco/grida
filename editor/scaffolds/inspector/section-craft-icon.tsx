@@ -3,6 +3,12 @@ import { useDispatch } from "core/dispatch";
 import { useCallback, useState } from "react";
 import * as RadixIcons from "@radix-ui/react-icons";
 import { useInspectorElement } from "hooks/use-inspector-element";
+import {
+  PropertyGroup,
+  PropertyGroupHeader,
+  PropertyLine,
+  PropertyLines,
+} from "@editor-ui/property";
 export function CraftIconSection() {
   const dispatch = useDispatch();
   const element = useInspectorElement();
@@ -24,17 +30,26 @@ export function CraftIconSection() {
   const Icon = RadixIcons[element.icon];
 
   return (
-    <Popover.Root>
-      <Popover.Trigger>
-        <button className="px-4 py-2 flex justify-center items-center gap-2 bg-transparent border-none">
-          <Icon />
-          {element.icon}
-        </button>
-      </Popover.Trigger>
-      <Popover.Content>
-        <RadixIconExplorer onSelect={onSelect} />
-      </Popover.Content>
-    </Popover.Root>
+    <PropertyGroup>
+      <PropertyGroupHeader>
+        <h6>Icon</h6>
+      </PropertyGroupHeader>
+      <PropertyLines>
+        <PropertyLine>
+          <Popover.Root>
+            <Popover.Trigger>
+              <button className="px-4 py-2 flex justify-center items-center gap-2 bg-transparent border-none">
+                <Icon />
+                {element.icon}
+              </button>
+            </Popover.Trigger>
+            <Popover.Content side="bottom" align="start" className="bg-black">
+              <RadixIconExplorer onSelect={onSelect} />
+            </Popover.Content>
+          </Popover.Root>
+        </PropertyLine>
+      </PropertyLines>
+    </PropertyGroup>
   );
 }
 

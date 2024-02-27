@@ -4,6 +4,7 @@ import {
   PropertyGroup,
   PropertyGroupHeader,
   PropertyInput,
+  PropertyLines,
 } from "@editor-ui/property";
 import { useInspectorElement } from "hooks/use-inspector-element";
 import { useDispatch } from "core/dispatch";
@@ -27,15 +28,17 @@ export function CrafContentSection() {
         <PropertyGroupHeader>
           <h6>Content</h6>
         </PropertyGroupHeader>
-        <PropertyLine>
-          <PropertyInput
-            value={txt}
-            stopPropagation
-            onChange={(txt) => {
-              onChange(txt);
-            }}
-          />
-        </PropertyLine>
+        <PropertyLines>
+          <PropertyLine>
+            <PropertyInput
+              value={txt}
+              stopPropagation
+              onChange={(txt) => {
+                onChange(txt);
+              }}
+            />
+          </PropertyLine>
+        </PropertyLines>
       </PropertyGroup>
     );
   }

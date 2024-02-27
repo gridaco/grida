@@ -16,6 +16,8 @@ import { CrafContentSection } from "./section-craft-text";
 import { CraftForegroundColorSection } from "./section-craft-foreground-color";
 import { CraftIconSection } from "./section-craft-icon";
 import { CraftOpacitySection } from "./section-craft-opacity";
+import { CraftBorderSection } from "./section-craft-border";
+import { CraftBorderRadiusSection } from "./section-craft-border-radius";
 
 export function CraftInspector() {
   const { debugMode } = useWorkspaceState();
@@ -66,10 +68,12 @@ function InspectorBody({ debug }: { debug?: boolean }) {
     <EditorPropertyThemeProvider theme={one.dark}>
       <CrafInfoSection />
       <CraftLayoutSection />
+      <CraftBorderRadiusSection />
       <CraftOpacitySection />
       <CraftBackgroundColorSection />
       <CraftForegroundColorSection />
       <CraftIconSection />
+      <CraftBorderSection />
       {/* <AssetsSection /> */}
       {/* <TypographySection /> */}
       {/* <ColorsSection /> */}

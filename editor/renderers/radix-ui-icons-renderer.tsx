@@ -7,5 +7,5 @@ export function RadixIconRenderer({
   target: CraftRadixIconElement;
 }) {
   const Component = RadixIcons[target.icon];
-  return <Component color={target.color} />;
+  return <Component color={target.color} style={target.style} />;
 }

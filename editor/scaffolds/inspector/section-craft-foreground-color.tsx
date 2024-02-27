@@ -4,6 +4,12 @@ import type { RGBA, RGBAF } from "@reflect-ui/core";
 import { ColorChip, GradientChip } from "@code-editor/property";
 import { useDispatch } from "core/dispatch";
 import { useCallback, useState } from "react";
+import {
+  PropertyGroup,
+  PropertyGroupHeader,
+  PropertyLine,
+  PropertyLines,
+} from "@editor-ui/property";
 
 export function CraftForegroundColorSection() {
   const dispatch = useDispatch();
@@ -25,23 +31,29 @@ export function CraftForegroundColorSection() {
   );
 
   return (
-    <section className="flex flex-col p-3">
-      {/* popover */}
-      <Popover.Root>
-        <Popover.Trigger>
-          <ColorChip outline color={color ? rgba2rgbo(color) : undefined} />
-        </Popover.Trigger>
-        <Popover.Content>
-          <ColorPicker
-            color={color}
-            onChange={(color) => {
-              setColor(color);
-              draftColor(color);
-            }}
-          />
-        </Popover.Content>
-      </Popover.Root>
-    </section>
+    <PropertyGroup>
+      <PropertyGroupHeader>
+        <h6>Foreground</h6>
+      </PropertyGroupHeader>
+      <PropertyLines>
+        <PropertyLine label="Color">
+          <Popover.Root>
+            <Popover.Trigger>
+              <ColorChip outline color={color ? rgba2rgbo(color) : undefined} />
+            </Popover.Trigger>
+            <Popover.Content>
+              <ColorPicker
+                color={color}
+                onChange={(color) => {
+                  setColor(color);
+                  draftColor(color);
+                }}
+              />
+            </Popover.Content>
+          </Popover.Root>
+        </PropertyLine>
+      </PropertyLines>
+    </PropertyGroup>
   );
 }
 
