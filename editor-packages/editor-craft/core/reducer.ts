@@ -35,6 +35,19 @@ export function craftDraftReducer(
         });
       });
     }
+    case "(draft)/(craft)/node/border/color": {
+      const { color } = action;
+      return produce(state, (draft) => {
+        const selected = draft.selectedNodes[0];
+        draft.craft.children.forEach((c) => {
+          if (c.id === selected) {
+            console.log("draft color", color);
+            const colorstr = `rgba(${color.r},${color.g},${color.b},${color.a})`;
+            (c as CraftHtmlElement).style.borderColor = colorstr;
+          }
+        });
+      });
+    }
   }
 }
 
@@ -71,6 +84,28 @@ export function craftHistoryReducer(
         draft.craft.children.forEach((c) => {
           if (c.id === selected) {
             c.style.borderRadius = radius;
+          }
+        });
+      });
+    }
+    case "(craft)/node/border/add": {
+      return produce(state, (draft) => {
+        const selected = draft.selectedNodes[0];
+        draft.craft.children.forEach((c) => {
+          if (c.id === selected) {
+            c.style.borderWidth = 1;
+            c.style.borderColor = "black";
+          }
+        });
+      });
+    }
+    case "(craft)/node/border/width": {
+      return produce(state, (draft) => {
+        const { width } = action;
+        const selected = draft.selectedNodes[0];
+        draft.craft.children.forEach((c) => {
+          if (c.id === selected) {
+            c.style.borderWidth = width;
           }
         });
       });

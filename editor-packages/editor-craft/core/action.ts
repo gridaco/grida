@@ -5,7 +5,8 @@ export type CraftAction = CraftDraftAction | CraftHistoryAction;
 
 export type CraftDraftAction =
   | CraftPreviewNodeBackgroundColorAction
-  | CraftPreviewNodeForegroundColorAction;
+  | CraftPreviewNodeForegroundColorAction
+  | CraftPreviewNodeBorderColorAction;
 
 export type CraftPreviewNodeBackgroundColorAction = {
   type: "(draft)/(craft)/node/background-color";
@@ -17,9 +18,16 @@ export type CraftPreviewNodeForegroundColorAction = {
   color: RGBA;
 };
 
+export type CraftPreviewNodeBorderColorAction = {
+  type: "(draft)/(craft)/node/border/color";
+  color: RGBA;
+};
+
 export type CraftHistoryAction =
   | CraftNodeOpacityAction
   | CraftNodeCornerRadiusAction
+  | CraftNodeAddBorderAction
+  | CraftNodeBorderWidthAction
   | CraftNewWidgetAction
   | CraftDeleteNodeAction
   | CraftCommitNodeBackgroundAction
@@ -34,6 +42,15 @@ export type CraftNodeOpacityAction = {
 export type CraftNodeCornerRadiusAction = {
   type: "(craft)/node/corners";
   radius: number;
+};
+
+export type CraftNodeAddBorderAction = {
+  type: "(craft)/node/border/add";
+};
+
+export type CraftNodeBorderWidthAction = {
+  type: "(craft)/node/border/width";
+  width: number;
 };
 
 export type CraftNewWidgetAction = {
