@@ -7,7 +7,6 @@ import { EditorPropertyThemeProvider, one } from "@editor-ui/property";
 import { CrafInfoSection, InfoSection } from "./section-info";
 import { CraftLayoutSection, LayoutSection } from "./section-layout";
 import { ColorsSection } from "./section-colors";
-import { ContentSection, CrafContentSection } from "./section-content";
 import { TypographySection } from "./section-typography";
 import { AssetsSection } from "./section-assets";
 import { CodeSection } from "./section-code";
@@ -19,6 +18,10 @@ import { MixIcon, Cross1Icon } from "@radix-ui/react-icons";
 import { DebugInspector } from "./inspector-debug";
 import { IconToggleButton } from "@code-editor/ui";
 import { EmptyState, InspectorContainer } from "./inspector-readonly";
+import { CraftBackgroundColorSection } from "./section-craft-background-color";
+import { CrafContentSection } from "./section-craft-text";
+import { CraftForegroundColorSection } from "./section-craft-foreground-color";
+import { CraftIconSection } from "./section-craft-icon";
 
 export function CraftInspector() {
   const { debugMode } = useWorkspaceState();
@@ -70,6 +73,8 @@ function InspectorBody({ debug }: { debug?: boolean }) {
       <CrafInfoSection />
       <CraftLayoutSection />
       <CraftBackgroundColorSection />
+      <CraftForegroundColorSection />
+      <CraftIconSection />
       {/* <AssetsSection /> */}
       {/* <TypographySection /> */}
       {/* <ColorsSection /> */}
@@ -79,61 +84,3 @@ function InspectorBody({ debug }: { debug?: boolean }) {
     </EditorPropertyThemeProvider>
   );
 }
-
-import { ColorPicker } from "@editor-ui/color-picker";
-import * as Popover from "@radix-ui/react-popover";
-import type { RGBA, RGBAF } from "@reflect-ui/core";
-import { ColorChip, GradientChip } from "@code-editor/property";
-
-function CraftBackgroundColorSection() {
-  const dispatch = useDispatch();
-  const [color, setColor] = useState<RGBA>({
-    r: 255,
-    g: 255,
-    b: 255,
-    a: 1,
-  });
-
-  const draftColor = useCallback(
-    (color: RGBA) => {
-      dispatch({
-        type: "(draft)/(craft)/node/background-color",
-        color: color,
-      });
-    },
-    [dispatch]
-  );
-
-  return (
-    <section className="flex flex-col p-3">
-      {/* popover */}
-      <Popover.Root>
-        <Popover.Trigger>
-          <ColorChip outline color={color ? rgba2rgbo(color) : undefined} />
-        </Popover.Trigger>
-        <Popover.Content>
-          <ColorPicker
-            color={color}
-            onChange={(color) => {
-              setColor(color);
-              draftColor(color);
-            }}
-          />
-        </Popover.Content>
-      </Popover.Root>
-    </section>
-  );
-}
-
-/**
- * 255 rgba to 1 rgbo
- * @param rgba
- */
-const rgba2rgbo = (rgba: RGBA) => {
-  return {
-    r: rgba.r / 255,
-    g: rgba.g / 255,
-    b: rgba.b / 255,
-    o: 1 - rgba.a,
-  };
-};

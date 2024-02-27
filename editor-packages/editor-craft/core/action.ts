@@ -3,10 +3,17 @@ import { WidgetType } from "../widgets";
 
 export type CraftAction = CraftDraftAction | CraftHistoryAction;
 
-export type CraftDraftAction = CraftPreviewNodeBackgroundColorAction;
+export type CraftDraftAction =
+  | CraftPreviewNodeBackgroundColorAction
+  | CraftPreviewNodeForegroundColorAction;
 
 export type CraftPreviewNodeBackgroundColorAction = {
   type: "(draft)/(craft)/node/background-color";
+  color: RGBA;
+};
+
+export type CraftPreviewNodeForegroundColorAction = {
+  type: "(draft)/(craft)/node/foreground-color";
   color: RGBA;
 };
 
@@ -14,7 +21,8 @@ export type CraftHistoryAction =
   | CraftNewWidgetAction
   | CraftNewTextWidgetAction
   | CraftDeleteNodeAction
-  | CraftCommitNodeBackgroundAction;
+  | CraftCommitNodeBackgroundAction
+  | CraftCommitTextChangeAction;
 
 export type CraftNewTextWidgetAction = {
   type: "(craft)/widget/text/new";
@@ -37,4 +45,9 @@ export type CraftDeleteNodeAction = {
 export type CraftCommitNodeBackgroundAction = {
   type: "(craft)/node/background-color";
   color: RGBA;
+};
+
+export type CraftCommitTextChangeAction = {
+  type: "(craft)/node/text/data";
+  data: string;
 };
