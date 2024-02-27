@@ -1,11 +1,22 @@
+import type { RGBA } from "@reflect-ui/core";
 import { WidgetType } from "../widgets";
 
-export type CraftAction =
-  | NewWidgetAction
-  | NewTextWidgetAction
-  | DeleteNodeAction;
+export type CraftAction = CraftDraftAction | CraftHistoryAction;
 
-export type NewTextWidgetAction = {
+export type CraftDraftAction = CraftPreviewNodeBackgroundColorAction;
+
+export type CraftPreviewNodeBackgroundColorAction = {
+  type: "(draft)/(craft)/node/background-color";
+  color: RGBA;
+};
+
+export type CraftHistoryAction =
+  | CraftNewWidgetAction
+  | CraftNewTextWidgetAction
+  | CraftDeleteNodeAction
+  | CraftCommitNodeBackgroundAction;
+
+export type CraftNewTextWidgetAction = {
   type: "(craft)/widget/text/new";
   initial: {
     value: string;
@@ -13,12 +24,17 @@ export type NewTextWidgetAction = {
   };
 };
 
-export type NewWidgetAction = {
+export type CraftNewWidgetAction = {
   type: "(craft)/widget/new";
   widget: WidgetType;
 };
 
-export type DeleteNodeAction = {
+export type CraftDeleteNodeAction = {
   type: "(craft)/node/delete";
   id?: string;
+};
+
+export type CraftCommitNodeBackgroundAction = {
+  type: "(craft)/node/background-color";
+  color: RGBA;
 };

@@ -1,11 +1,32 @@
 import produce from "immer";
-import { CraftAction } from "./action";
+import { CraftHistoryAction, CraftDraftAction } from "./action";
 import { EditorState } from "editor/core/states";
 import { CraftHtmlElement } from "./state";
 
-export function craftReducer(
+export function craftDraftReducer(
   state: EditorState,
-  action: CraftAction
+  action: CraftDraftAction
+): EditorState {
+  switch (action.type) {
+    case "(draft)/(craft)/node/background-color": {
+      const { color } = action;
+      return produce(state, (draft) => {
+        const selected = draft.selectedNodes[0];
+        draft.craft.children.forEach((c) => {
+          if (c.id === selected) {
+            console.log("draft color", color);
+            const colorstr = `rgba(${color.r},${color.g},${color.b},${color.a})`;
+            (c as CraftHtmlElement).style.backgroundColor = colorstr;
+          }
+        });
+      });
+    }
+  }
+}
+
+export function craftHistoryReducer(
+  state: EditorState,
+  action: CraftHistoryAction
 ): EditorState {
   // console.log("reducer", action);
   switch (action.type) {
@@ -17,6 +38,19 @@ export function craftReducer(
         draft.craft.children = draft.craft.children.filter(
           (c) => c.id !== target
         );
+      });
+    }
+    case "(craft)/node/background-color": {
+      return produce(state, (draft) => {
+        const { color } = action;
+        const selected = draft.selectedNodes[0];
+        draft.craft.children.forEach((c) => {
+          if (c.id === selected) {
+            console.log("draft color", color);
+            const colorstr = `rgba(${color.r},${color.g},${color.b},${color.a})`;
+            (c as CraftHtmlElement).style.backgroundColor = colorstr;
+          }
+        });
       });
     }
     case "(craft)/widget/text/new": {

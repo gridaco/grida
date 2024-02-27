@@ -12,3 +12,7 @@ export function useInspectorElement() {
 
   return t;
 }
+
+export function useInspectorElementColor() {
+  //
+}

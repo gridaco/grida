@@ -273,6 +273,9 @@ importers:
       '@editor-ui/button':
         specifier: workspace:^
         version: link:../ui/editor-ui/packages/editor-ui-button
+      '@editor-ui/color-picker':
+        specifier: workspace:^
+        version: link:../ui/editor-ui/packages/editor-ui-color-picker
       '@editor-ui/dropdown-menu':
         specifier: workspace:^
         version: link:../ui/editor-ui/packages/editor-ui-dropdown-menu
@@ -636,6 +639,9 @@ importers:
 
   editor-packages/editor-craft:
     dependencies:
+      '@reflect-ui/core':
+        specifier: 0.0.12
+        version: 0.0.12(@reflect-ui/cg@0.1.1)
       editor:
         specifier: workspace:^
         version: link:../../editor
@@ -2374,6 +2380,9 @@ importers:
       '@editor-ui/foundation':
         specifier: 0.0.0
         version: link:../editor-ui-foundation
+      react-colorful:
+        specifier: ^5.6.1
+        version: 5.6.1(react-dom@18.2.0)(react@18.2.0)
 
   ui/editor-ui/packages/editor-ui-context-menu:
     dependencies:
@@ -26415,6 +26424,16 @@ packages:
       color: 3.2.1
       csstype: 3.1.0
       lodash.curry: 4.1.1
+    dev: false
+
+  /react-colorful@5.6.1(react-dom@18.2.0)(react@18.2.0):
+    resolution: {integrity: sha512-1exovf0uGTGyq5mXQT0zgQ80uvj2PCwvF8zY1RN9/vbJVSjSo3fsB/4L3ObbF7u70NduSiK4xu4Y6q1MHoUGEw==}
+    peerDependencies:
+      react: ^18.2.0
+      react-dom: ^18.2.0
+    dependencies:
+      react: 18.2.0
+      react-dom: 18.2.0(react@18.2.0)
     dev: false
 
   /react-contextmenu@2.14.0(prop-types@15.8.1)(react-dom@18.2.0)(react@18.2.0):

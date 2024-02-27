@@ -2,6 +2,7 @@
   "name": "@code-editor/craft",
   "version": "0.0.0",
   "dependencies": {
+    "@reflect-ui/core": "0.0.12",
     "editor": "workspace:^",
     "immer": "^9.0.3"
   }

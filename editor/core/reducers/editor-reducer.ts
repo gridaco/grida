@@ -30,7 +30,12 @@ import { getPageNode } from "utils/get-target-node";
 import { nanoid } from "nanoid";
 import { last_page_by_mode } from "core/stores";
 import { track } from "@code-editor/analytics";
-import { CraftAction, craftReducer } from "@code-editor/craft/core";
+import {
+  CraftHistoryAction,
+  craftHistoryReducer,
+  craftDraftReducer,
+  CraftDraftAction,
+} from "@code-editor/craft/core";
 
 const _DEV_CLEAR_LOG = false;
 
@@ -51,7 +56,11 @@ export function editorReducer(
 
   // craft mode
   if (action.type.startsWith("(craft)")) {
-    return craftReducer(state, action as CraftAction);
+    return craftHistoryReducer(state, action as CraftHistoryAction);
+  }
+
+  if (action.type.startsWith("(draft)")) {
+    return craftDraftReducer(state, action as CraftDraftAction);
   }
 
   switch (action.type) {

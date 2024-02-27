@@ -55,6 +55,7 @@
     "@designto/token": "workspace:^",
     "@editor-app/live-session": "workspace:^",
     "@editor-ui/button": "workspace:^",
+    "@editor-ui/color-picker": "workspace:^",
     "@editor-ui/dropdown-menu": "workspace:^",
     "@editor-ui/editor": "workspace:^",
     "@editor-ui/hierarchy": "workspace:^",
