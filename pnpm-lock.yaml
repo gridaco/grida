@@ -639,6 +639,9 @@ importers:
 
   editor-packages/editor-craft:
     dependencies:
+      '@code-editor/canvas':
+        specifier: workspace:^
+        version: link:../editor-canvas
       '@reflect-ui/core':
         specifier: 0.0.12
         version: 0.0.12(@reflect-ui/cg@0.1.1)

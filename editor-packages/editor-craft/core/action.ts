@@ -22,7 +22,8 @@ export type CraftHistoryAction =
   | CraftNewTextWidgetAction
   | CraftDeleteNodeAction
   | CraftCommitNodeBackgroundAction
-  | CraftCommitTextChangeAction;
+  | CraftCommitTextChangeAction
+  | CraftCommitIconDataAction;
 
 export type CraftNewTextWidgetAction = {
   type: "(craft)/widget/text/new";
@@ -49,5 +50,10 @@ export type CraftCommitNodeBackgroundAction = {
 
 export type CraftCommitTextChangeAction = {
   type: "(craft)/node/text/data";
+  data: string;
+};
+
+export type CraftCommitIconDataAction = {
+  type: "(craft)/node/icon/data";
   data: string;
 };

@@ -26,11 +26,11 @@ export function EditorAppbarModeCraftAddButton() {
         </button>
       </Popover.Trigger>
       <Popover.Portal>
-        <Popover.Content className="z-30 bg-white elevated rounded">
+        <Popover.Content className="bg-black z-30 elevated rounded">
           <div className="flex gap-2 flex-col p-4 max-h-80 overflow-scroll">
             {widgets.map(([key, label]) => (
               <button
-                className="cursor-pointer hover:bg-gray-100 p-2 rounded"
+                className="cursor-pointer hover:bg-white/10 p-2 rounded"
                 key={key}
                 onClick={() => {
                   console.log("craft: add new node", key);

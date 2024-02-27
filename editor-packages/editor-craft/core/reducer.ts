@@ -1,7 +1,8 @@
 import produce from "immer";
 import { CraftHistoryAction, CraftDraftAction } from "./action";
 import { EditorState } from "editor/core/states";
-import { CraftHtmlElement } from "./state";
+import { CraftHtmlElement, CraftRadixIconElement } from "./state";
+import { math, XYWH } from "@code-editor/canvas";
 
 export function craftDraftReducer(
   state: EditorState,
@@ -45,11 +46,10 @@ export function craftHistoryReducer(
   switch (action.type) {
     case "(craft)/node/delete": {
       const { id } = action;
-      const selected = state.selectedNodes[0];
-      const target = id || selected;
+      const targets = id ? [id] : state.selectedNodes;
       return produce(state, (draft) => {
         draft.craft.children = draft.craft.children.filter(
-          (c) => c.id !== target
+          (c) => !targets.includes(c.id)
         );
       });
     }
@@ -60,6 +60,17 @@ export function craftHistoryReducer(
         draft.craft.children.forEach((c) => {
           if (c.id === selected) {
             (c as CraftHtmlElement).text = data;
+          }
+        });
+      });
+    }
+    case "(craft)/node/icon/data": {
+      return produce(state, (draft) => {
+        const { data } = action;
+        const selected = draft.selectedNodes[0];
+        draft.craft.children.forEach((c) => {
+          if (c.id === selected) {
+            (c as CraftRadixIconElement).icon = data;
           }
         });
       });
@@ -81,29 +92,32 @@ export function craftHistoryReducer(
       break;
     }
     case "(craft)/widget/new": {
+      const id = new Date().getTime().toString();
+      const point = next_placement(state, [0, 0, 100, 100]);
+      const [x, y, w, h] = point;
       switch (action.widget) {
         case "container": {
           return produce(state, (draft) => {
             draft.craft.children.push({
               type: "html",
-              id: new Date().getTime().toString(),
+              id,
               name: "container",
-              x: 0,
-              y: 0,
+              x: x,
+              y: y,
               tag: "div",
               attributes: {
                 class: [],
               },
               style: {
-                width: 100,
-                height: 100,
+                width: w,
+                height: h,
                 backgroundColor: "black",
               },
               children: [],
-              width: 100,
-              height: 100,
-              absoluteX: 0,
-              absoluteY: 0,
+              width: w,
+              height: h,
+              absoluteX: x,
+              absoluteY: y,
               rotation: 0,
             });
           });
@@ -112,10 +126,10 @@ export function craftHistoryReducer(
           return produce(state, (draft) => {
             draft.craft.children.push({
               type: "html",
-              id: new Date().getTime().toString(),
+              id,
               name: "input",
-              x: 0,
-              y: 0,
+              x: x,
+              y: y,
               tag: "input",
               attributes: {
                 type: "text",
@@ -124,10 +138,10 @@ export function craftHistoryReducer(
               },
               style: {},
               children: [],
-              width: 100,
-              height: 100,
-              absoluteX: 0,
-              absoluteY: 0,
+              width: w,
+              height: h,
+              absoluteX: x,
+              absoluteY: y,
               rotation: 0,
             });
           });
@@ -136,18 +150,17 @@ export function craftHistoryReducer(
           return produce(state, (draft) => {
             draft.craft.children.push({
               type: "@radix-ui/react-icons",
-              id: new Date().getTime().toString(),
-              name: "PlusIcon",
-              style: {
-                width: 15,
-                height: 15,
-                color: "black",
-              },
+              id,
+              name: "icon",
+              x: x,
+              y: y,
+              icon: "PlusIcon",
+              color: "black",
               children: [],
               width: 15,
               height: 15,
-              absoluteX: 0,
-              absoluteY: 0,
+              absoluteX: x,
+              absoluteY: y,
               rotation: 0,
             });
           });
@@ -156,25 +169,25 @@ export function craftHistoryReducer(
           return produce(state, (draft) => {
             draft.craft.children.push({
               type: "html",
-              id: new Date().getTime().toString(),
+              id,
               name: "text",
-              x: 0,
-              y: 0,
+              x: x,
+              y: y,
               tag: "span",
               attributes: {
                 class: [],
               },
               style: {
-                width: 100,
-                height: 100,
+                width: w,
+                height: h,
                 color: "black",
               },
               text: "Hello, World!",
               children: [],
-              width: 100,
-              height: 100,
-              absoluteX: 0,
-              absoluteY: 0,
+              width: w,
+              height: h,
+              absoluteX: x,
+              absoluteY: y,
               rotation: 0,
             });
           });
@@ -183,10 +196,10 @@ export function craftHistoryReducer(
           return produce(state, (draft) => {
             draft.craft.children.push({
               type: "html",
-              id: new Date().getTime().toString(),
+              id,
               name: "image",
-              x: 0,
-              y: 0,
+              x,
+              y,
               tag: "img",
               attributes: {
                 class: [],
@@ -198,10 +211,10 @@ export function craftHistoryReducer(
                 backgroundColor: "black",
               },
               children: [],
-              width: 100,
-              height: 100,
-              absoluteX: 0,
-              absoluteY: 0,
+              width: w,
+              height: h,
+              absoluteX: x,
+              absoluteY: y,
               rotation: 0,
             });
           });
@@ -210,10 +223,10 @@ export function craftHistoryReducer(
           return produce(state, (draft) => {
             draft.craft.children.push(<CraftHtmlElement<"img">>{
               type: "html",
-              id: new Date().getTime().toString(),
+              id,
               name: "circle image",
-              x: 0,
-              y: 0,
+              x: x,
+              y: y,
               tag: "img",
               attributes: {
                 src: "https://via.placeholder.com/150",
@@ -233,10 +246,10 @@ export function craftHistoryReducer(
               },
 
               children: [],
-              width: 100,
-              height: 100,
-              absoluteX: 0,
-              absoluteY: 0,
+              width: w,
+              height: h,
+              absoluteX: x,
+              absoluteY: y,
               rotation: 0,
             });
           });
@@ -245,10 +258,10 @@ export function craftHistoryReducer(
           return produce(state, (draft) => {
             draft.craft.children.push({
               type: "html",
-              id: new Date().getTime().toString(),
+              id,
               name: "video",
-              x: 0,
-              y: 0,
+              x: x,
+              y: y,
               tag: "video",
               attributes: {
                 src: "https://www.w3schools.com/html/mov_bbb.mp4",
@@ -259,10 +272,10 @@ export function craftHistoryReducer(
                 backgroundColor: "black",
               },
               children: [],
-              width: 100,
-              height: 100,
-              absoluteX: 0,
-              absoluteY: 0,
+              width: w,
+              height: h,
+              absoluteX: x,
+              absoluteY: y,
               rotation: 0,
             });
           });
@@ -271,10 +284,10 @@ export function craftHistoryReducer(
           return produce(state, (draft) => {
             draft.craft.children.push({
               type: "html",
-              id: new Date().getTime().toString(),
+              id,
               name: "button",
-              x: 0,
-              y: 0,
+              x: x,
+              y: y,
               tag: "button",
               attributes: {
                 tw: [
@@ -291,10 +304,10 @@ export function craftHistoryReducer(
               },
               children: [],
               text: "Button",
-              width: 100,
-              height: 100,
-              absoluteX: 0,
-              absoluteY: 0,
+              width: w,
+              height: h,
+              absoluteX: x,
+              absoluteY: y,
               rotation: 0,
             });
           });
@@ -309,4 +322,19 @@ export function craftHistoryReducer(
   }
 
   return { ...state };
+}
+
+function next_placement(state: EditorState, item: XYWH) {
+  return math.no_overlap_placement(
+    item,
+    state.craft.children.map((c) => [
+      c.absoluteX,
+      c.absoluteY,
+      c.width,
+      c.height,
+    ]),
+    {
+      padding: 100,
+    }
+  );
 }

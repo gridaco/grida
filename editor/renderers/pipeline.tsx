@@ -6,7 +6,7 @@ export function CraftRenderPipeline({ target }: { target: CraftElement }) {
   if (!target) return <></>;
   switch (target.type) {
     case "@radix-ui/react-icons": {
-      return <RadixIconRenderer name={target.name} />;
+      return <RadixIconRenderer target={target} />;
     }
     case "html": {
       return <HtmlCssVanillaRenderer target={target} />;

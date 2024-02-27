@@ -24,7 +24,7 @@ interface BaseNode {
 
 type ElementAttributes<T extends keyof JSX.IntrinsicElements> = {
   tag: T;
-  attributes: JSX.IntrinsicElements[T];
+  attributes?: JSX.IntrinsicElements[T];
   style?: React.CSSProperties;
   text?: string;
   children?: CraftHtmlElement<any>[];
@@ -40,12 +40,15 @@ export type CraftHtmlElement<T extends keyof JSX.IntrinsicElements = any> =
       type: "html";
     };
 
-export type RadixIconElement = BaseNode &
+export type CraftRadixIconElement = Omit<ElementAttributes<"svg">, "tag"> &
+  BaseNode &
+  Position &
   Size &
   AbsolutePosition &
   Rotation & {
     type: "@radix-ui/react-icons";
-    name: string;
+    icon: string;
+    color: string;
   };
 
-export type CraftElement = CraftHtmlElement | RadixIconElement;
+export type CraftElement = CraftHtmlElement | CraftRadixIconElement;
