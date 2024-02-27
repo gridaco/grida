@@ -1,1 +1,1 @@
-export * from "./htmlcss-vanilla-renderer";
+export * from "./craft-renderer";

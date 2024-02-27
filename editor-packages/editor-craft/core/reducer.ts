@@ -18,6 +18,7 @@ export function craftReducer(
         case "container": {
           return produce(state, (draft) => {
             draft.craft.children.push({
+              type: "html",
               id: new Date().getTime().toString(),
               name: "container",
               x: 0,
@@ -40,9 +41,30 @@ export function craftReducer(
             });
           });
         }
+        case "icon": {
+          return produce(state, (draft) => {
+            draft.craft.children.push({
+              type: "@radix-ui/react-icons",
+              id: new Date().getTime().toString(),
+              name: "PlusIcon",
+              style: {
+                width: 15,
+                height: 15,
+                color: "black",
+              },
+              children: [],
+              width: 15,
+              height: 15,
+              absoluteX: 0,
+              absoluteY: 0,
+              rotation: 0,
+            });
+          });
+        }
         case "text": {
           return produce(state, (draft) => {
             draft.craft.children.push({
+              type: "html",
               id: new Date().getTime().toString(),
               name: "text",
               x: 0,
@@ -69,6 +91,7 @@ export function craftReducer(
         case "image": {
           return produce(state, (draft) => {
             draft.craft.children.push({
+              type: "html",
               id: new Date().getTime().toString(),
               name: "image",
               x: 0,
@@ -95,6 +118,7 @@ export function craftReducer(
         case "image-circle": {
           return produce(state, (draft) => {
             draft.craft.children.push(<CraftHtmlElement<"img">>{
+              type: "html",
               id: new Date().getTime().toString(),
               name: "circle image",
               x: 0,
@@ -129,6 +153,7 @@ export function craftReducer(
         case "video": {
           return produce(state, (draft) => {
             draft.craft.children.push({
+              type: "html",
               id: new Date().getTime().toString(),
               name: "video",
               x: 0,
@@ -154,6 +179,7 @@ export function craftReducer(
         case "button": {
           return produce(state, (draft) => {
             draft.craft.children.push({
+              type: "html",
               id: new Date().getTime().toString(),
               name: "button",
               x: 0,

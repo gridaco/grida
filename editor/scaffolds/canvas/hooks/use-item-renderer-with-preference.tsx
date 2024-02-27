@@ -4,7 +4,7 @@ import {
   D2CVanillaPreview,
   OptimizedPreviewCanvas,
 } from "scaffolds/preview-canvas";
-import { HtmlCssVanillaRenderer } from "@/renderers";
+import { CraftRenderPipeline } from "@/renderers/pipeline";
 
 /**
  * Returns a dedicated funtion to render a node with preferred renderer component.
@@ -14,7 +14,7 @@ export function useRenderItemWithPreference(props?: {
   force_use_renderer?:
     | "bitmap-renderer"
     | "d2c-vanilla-iframe-renderer"
-    | "htmlcss-vanilla-renderer";
+    | "craft-renderer";
 }) {
   const { config: preferences } = usePreferences();
   const { renderer: _preferred_renderer } = preferences.canvas;
@@ -32,10 +32,8 @@ export function useRenderItemWithPreference(props?: {
         case "d2c-vanilla-iframe-renderer": {
           return <D2CVanillaPreview key={p.node.id} target={p.node} {...p} />;
         }
-        case "htmlcss-vanilla-renderer": {
-          return (
-            <HtmlCssVanillaRenderer key={p.node.id} target={p.node} {...p} />
-          );
+        case "craft-renderer": {
+          return <CraftRenderPipeline key={p.node.id} target={p.node} {...p} />;
         }
         default:
           throw new Error("Unknown renderer", renderer as unknown);

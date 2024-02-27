@@ -13,7 +13,7 @@ export function CanvasModeSelectItem({
     | "bitmap-renderer"
     | "figma-renderer"
     | "d2c-vanilla-iframe-renderer"
-    | "htmlcss-vanilla-renderer";
+    | "craft-renderer";
   selected?: boolean;
   label: string;
   onClick?: () => void;
@@ -35,7 +35,7 @@ function CanvasModeIcon({
     | "bitmap-renderer"
     | "figma-renderer"
     | "d2c-vanilla-iframe-renderer"
-    | "htmlcss-vanilla-renderer";
+    | "craft-renderer";
 }) {
   const props = {
     color: "white",
@@ -54,7 +54,7 @@ function CanvasModeIcon({
     case "d2c-vanilla-iframe-renderer": {
       return <Html5Icon {...props} />;
     }
-    case "htmlcss-vanilla-renderer": {
+    case "craft-renderer": {
       return <div>Reflect UI Core Renderer</div>;
     }
   }

@@ -36,4 +36,13 @@ export type CraftHtmlElement<T extends keyof JSX.IntrinsicElements = any> =
     Position &
     Size &
     AbsolutePosition &
-    Rotation;
+    Rotation & {
+      type: "html";
+    };
+
+export type RadixIconElement = BaseNode & {
+  type: "@radix-ui/react-icons";
+  name: string;
+};
+
+export type CraftElement = CraftHtmlElement | RadixIconElement;

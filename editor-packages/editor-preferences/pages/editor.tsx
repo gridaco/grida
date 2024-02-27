@@ -48,7 +48,7 @@ const renderer_engines = [
   "bitmap-renderer",
   // "figma-renderer",
   "d2c-vanilla-iframe-renderer",
-  "htmlcss-vanilla-renderer",
+  "craft-renderer",
 ] as const;
 
 function CanvasModeSelection({

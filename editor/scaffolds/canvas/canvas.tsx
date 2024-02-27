@@ -20,7 +20,7 @@ export function EditorFigmaCanvas({
   renderer?:
     | "bitmap-renderer"
     | "d2c-vanilla-iframe-renderer"
-    | "htmlcss-vanilla-renderer";
+    | "craft-renderer";
 }) {
   const [state] = useEditorState();
   const [canvasSizingRef, canvasBounds] = useMeasure();
@@ -147,7 +147,7 @@ export function EditorCraftCanvas() {
   const { highlightedLayer, highlightLayer } = useWorkspace();
   const dispatch = useDispatch();
   const renderItem = useRenderItemWithPreference({
-    force_use_renderer: "htmlcss-vanilla-renderer",
+    force_use_renderer: "craft-renderer",
   });
 
   const {

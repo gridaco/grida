@@ -17,7 +17,7 @@ export interface PreferenceState {
       renderer:
         | "d2c-vanilla-iframe-renderer"
         | "bitmap-renderer"
-        | "htmlcss-vanilla-renderer"; // "figma-renderer"
+        | "craft-renderer"; // "figma-renderer"
     };
     framework: FrameworkConfig;
     experimental: {

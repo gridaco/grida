@@ -4,7 +4,7 @@ import type { RGBA, WidgetKey } from "@reflect-ui/core";
 import type { ComponentNode } from "@design-sdk/figma-types";
 import type { DesignInput } from "@grida/builder-config/input";
 import type { File } from "@grida/builder-config/output/output-file";
-import { CraftHtmlElement } from "@code-editor/craft/core";
+import { type CraftElement } from "@code-editor/craft/core";
 
 export type { File };
 
@@ -65,7 +65,7 @@ export interface EditorState {
   };
 }
 
-type EditorNode = CraftHtmlElement;
+type EditorNode = CraftElement;
 
 export interface EditorSnapshot {
   pages: EditorPage[];
