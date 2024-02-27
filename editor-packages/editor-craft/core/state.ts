@@ -22,21 +22,18 @@ interface BaseNode {
   name: string;
 }
 
-export interface CraftHtmlElement
-  extends BaseNode,
-    Position,
-    Size,
-    AbsolutePosition,
-    Rotation {
-  tag: "div" | "h1" | "span";
-  attributes: {
-    class: string[];
-  };
-  style: {
-    width?: number;
-    height?: number;
-    backgroundColor?: string;
-  };
+type ElementAttributes<T extends keyof JSX.IntrinsicElements> = {
+  tag: T;
+  attributes: JSX.IntrinsicElements[T];
+  style?: React.CSSProperties;
   text?: string;
-  children?: CraftHtmlElement[];
-}
+  children?: CraftHtmlElement<any>[];
+};
+
+export type CraftHtmlElement<T extends keyof JSX.IntrinsicElements = any> =
+  ElementAttributes<T> &
+    BaseNode &
+    Position &
+    Size &
+    AbsolutePosition &
+    Rotation;

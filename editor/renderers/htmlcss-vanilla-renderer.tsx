@@ -5,5 +5,15 @@ export function HtmlCssVanillaRenderer({
 }: {
   target: CraftHtmlElement;
 }) {
-  return <div id={target.id} style={target.style}></div>;
+  const Tag = target.tag;
+  return (
+    <Tag
+      id={target.id}
+      tw={target.attributes.tw}
+      style={target.style}
+      src={target.attributes.src}
+    >
+      {target.text}
+    </Tag>
+  );
 }
