@@ -19,6 +19,7 @@ export type CraftPreviewNodeForegroundColorAction = {
 
 export type CraftHistoryAction =
   | CraftNodeOpacityAction
+  | CraftNodeCornerRadiusAction
   | CraftNewWidgetAction
   | CraftDeleteNodeAction
   | CraftCommitNodeBackgroundAction
@@ -28,6 +29,11 @@ export type CraftHistoryAction =
 export type CraftNodeOpacityAction = {
   type: "(craft)/node/opacity";
   opacity: number;
+};
+
+export type CraftNodeCornerRadiusAction = {
+  type: "(craft)/node/corners";
+  radius: number;
 };
 
 export type CraftNewWidgetAction = {

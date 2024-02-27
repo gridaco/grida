@@ -64,6 +64,17 @@ export function craftHistoryReducer(
         });
       });
     }
+    case "(craft)/node/corners": {
+      return produce(state, (draft) => {
+        const { radius } = action;
+        const selected = draft.selectedNodes[0];
+        draft.craft.children.forEach((c) => {
+          if (c.id === selected) {
+            c.style.borderRadius = radius;
+          }
+        });
+      });
+    }
     case "(craft)/node/text/data": {
       return produce(state, (draft) => {
         const { data } = action;
@@ -163,7 +174,7 @@ export function craftHistoryReducer(
               y: y,
               icon: "PlusIcon",
               color: "black",
-              children: [],
+              style: {},
               width: 15,
               height: 15,
               absoluteX: x,
