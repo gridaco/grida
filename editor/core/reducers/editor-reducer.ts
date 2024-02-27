@@ -45,7 +45,8 @@ export function editorReducer(
   state: EditorState & WorkspaceStateSeed,
   action: Action
 ): EditorState {
-  const router = useRouter();
+  // const router = useRouter();
+  const router = { push: () => {} } as any;
   const filekey = state.design.key;
 
   // craft mode
@@ -428,22 +429,20 @@ const reducers = {
     state: EditorState,
     action: Omit<SelectNodeAction, "type">
   ) => {
+    const { node } = <SelectNodeAction>action;
+    const ids = Array.isArray(node) ? node : [node];
+
+    const changed = !value_identical(state.selectedNodes, ids);
+
+    if (!changed) {
+      console.log("no change in selection");
+      return state;
+    }
+
     return produce(state, (draft) => {
       const filekey = state.design.key;
 
-      const { node } = <SelectNodeAction>action;
-      const ids = Array.isArray(node) ? node : [node];
-
       const current_node = state.selectedNodes;
-
-      if (
-        ids.length <= 1 &&
-        current_node.length <= 1 &&
-        ids[0] === current_node[0]
-      ) {
-        // same selection (no selection or same 1 selection)
-        return produce(state, (draft) => {});
-      }
 
       if (ids.length > 1 && ids.length === current_node.length) {
         // the selection event is always triggered by user, which means selecting same amount of nodes (greater thatn 1, and having a different node array is impossible.)
@@ -510,4 +509,15 @@ const reducers = {
       };
     });
   },
+};
+
+/**
+ * compare items in two arrays and return the difference.
+ * order does not matter.
+ * @param a
+ * @param b
+ * @returns `boolean`
+ */
+const value_identical = (a: string[], b: string[]) => {
+  return a.length === b.length && a.every((v) => b.includes(v));
 };

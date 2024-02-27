@@ -60,32 +60,6 @@ export function Inspector() {
   );
 }
 
-export function CraftInspector() {
-  const { debugMode } = useWorkspaceState();
-  const [debugView, setDebugView] = useState(false);
-  const [state] = useEditorState();
-  const dispatch = useDispatch();
-
-  return (
-    <InspectorContainer>
-      <EditorAppbarFragments.RightSidebar flex={0} />
-      <div className="header">
-        {debugMode && (
-          <IconToggleButton
-            on={<Cross1Icon color="white" />}
-            off={<MixIcon color="white" />}
-            onChange={(value) => {
-              setDebugView(value);
-            }}
-          />
-        )}
-      </div>
-      {/* <div style={{ height: 16, flexShrink: 0 }} /> */}
-      <CraftBody type={"inspect"} />
-    </InspectorContainer>
-  );
-}
-
 const __mode = (mode: EditorState["designerMode"]): Tab => {
   switch (mode) {
     case "comment":
@@ -108,20 +82,6 @@ function Body({ type, debug }: { type: Tab; debug?: boolean }) {
       }
     case "comment":
       return <ConversationsBody />;
-  }
-}
-
-function CraftBody({ type, debug }: { type: Tab; debug?: boolean }) {
-  const [state] = useEditorState();
-
-  const target = state.craft.children.find(
-    (c) => c.id === state.selectedNodes[0]
-  );
-
-  if (target) {
-    return <InspectorBody debug={debug} />;
-  } else {
-    return <EmptyState />;
   }
 }
 
@@ -148,7 +108,7 @@ function InspectorBody({ debug }: { debug?: boolean }) {
   );
 }
 
-function EmptyState() {
+export function EmptyState() {
   return (
     <div className="flex items-center justify-center h-full">
       <span className="text-sm font-medium text-white opacity-50">
@@ -238,7 +198,7 @@ const TabContainer = styled.label`
   }
 `;
 
-const InspectorContainer = styled.div`
+export const InspectorContainer = styled.div`
   display: flex;
   z-index: 1;
   overflow-y: scroll;

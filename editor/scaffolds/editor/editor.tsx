@@ -17,7 +17,7 @@ import { Dialog } from "@mui/material";
 import { FullScreenPreview } from "scaffolds/preview-full-screen";
 import { useDispatch } from "core/dispatch";
 import { Code } from "scaffolds/code";
-import { CraftInspector } from "scaffolds/inspector/inspector";
+import { CraftInspector } from "scaffolds/inspector/inspector-craft";
 
 export function Editor() {
   const [state] = useEditorState();

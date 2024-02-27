@@ -23,8 +23,18 @@ export function EditorShortcutsProvider({
     [dispatch]
   );
 
+  const redo = useCallback(() => {
+    dispatch({ type: "redo" });
+  }, [dispatch]);
+
+  const undo = useCallback(() => {
+    dispatch({ type: "undo" });
+  }, [dispatch]);
+
   const openPreferences = useOpenPreferences();
 
+  const _undo = keymap("ctrl-cmd", "z");
+  const _redo = keymap("ctrl-cmd", "shift", "z");
   const _save = keymap("ctrl-cmd", "s");
   const _backtofiles = keymap("ctrl-cmd", "esc");
   const _preferences = keymap("ctrl-cmd", ",");
@@ -35,6 +45,14 @@ export function EditorShortcutsProvider({
   useHotkeys(_save.universal, (e) => {
     // disables the save html action on browser
     e.preventDefault();
+  });
+
+  useHotkeys(_undo.universal, (e) => {
+    undo();
+  });
+
+  useHotkeys(_redo.universal, (e) => {
+    redo();
   });
 
   useHotkeys(_backtofiles.universal, (e) => {
@@ -70,6 +88,7 @@ const keymap = (
     | "ctrl-cmd"
     | "shift"
     | "alt"
+    | "z"
     | "a"
     | "c"
     | "p"

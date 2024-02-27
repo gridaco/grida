@@ -7,8 +7,18 @@ export function craftReducer(
   state: EditorState,
   action: CraftAction
 ): EditorState {
-  console.log("reducer", action);
+  // console.log("reducer", action);
   switch (action.type) {
+    case "(craft)/node/delete": {
+      const { id } = action;
+      const selected = state.selectedNodes[0];
+      const target = id || selected;
+      return produce(state, (draft) => {
+        draft.craft.children = draft.craft.children.filter(
+          (c) => c.id !== target
+        );
+      });
+    }
     case "(craft)/widget/text/new": {
       //
       break;
@@ -32,6 +42,30 @@ export function craftReducer(
                 height: 100,
                 backgroundColor: "black",
               },
+              children: [],
+              width: 100,
+              height: 100,
+              absoluteX: 0,
+              absoluteY: 0,
+              rotation: 0,
+            });
+          });
+        }
+        case "textfield": {
+          return produce(state, (draft) => {
+            draft.craft.children.push({
+              type: "html",
+              id: new Date().getTime().toString(),
+              name: "input",
+              x: 0,
+              y: 0,
+              tag: "input",
+              attributes: {
+                type: "text",
+                placeholder: "Enter your text",
+                class: [],
+              },
+              style: {},
               children: [],
               width: 100,
               height: 100,

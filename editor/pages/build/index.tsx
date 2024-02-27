@@ -1,7 +1,8 @@
-import React from "react";
+import React, { useEffect } from "react";
 import { Editor, SetupNoopEditor } from "scaffolds/editor";
 import { Workspace } from "scaffolds/workspace/workspace";
 import { BuilderProviders } from "scaffolds/editor";
+import { useDispatch } from "core/dispatch";
 
 export default function BuilderEditor() {
   return (
@@ -16,11 +17,34 @@ export default function BuilderEditor() {
       >
         <SetupNoopEditor>
           <BuilderProviders>
-            <Editor />
-            {/* <CanvasInteractive /> */}
+            <DeleteKeyProvider>
+              <Editor />
+            </DeleteKeyProvider>
           </BuilderProviders>
         </SetupNoopEditor>
       </Workspace>
     </>
   );
+}
+
+function DeleteKeyProvider({ children }: React.PropsWithChildren<{}>) {
+  const dispatch = useDispatch();
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Backspace" || e.key === "Delete") {
+        dispatch({
+          type: "(craft)/node/delete",
+        });
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [dispatch]);
+
+  return <>{children}</>;
 }

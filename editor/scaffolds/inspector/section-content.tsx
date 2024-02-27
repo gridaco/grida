@@ -8,6 +8,7 @@ import {
 import { useTargetContainer } from "hooks/use-target-node";
 import { copy } from "utils/clipboard";
 import { ClipboardBox } from "components/inspector";
+import { useInspectorElement } from "hooks/use-inspector-element";
 
 export function ContentSection() {
   const { target } = useTargetContainer();
@@ -35,6 +36,27 @@ export function ContentSection() {
   } else {
     return <></>;
   }
+}
+
+export function CrafContentSection() {
+  const target = useInspectorElement();
+
+  if (target && "text" in target) {
+    const txt = target.text;
+
+    return (
+      <PropertyGroup>
+        <PropertyGroupHeader>
+          <h6>Content</h6>
+        </PropertyGroupHeader>
+        <PropertyLine>
+          <TextContentContainer>{txt}</TextContentContainer>
+        </PropertyLine>
+      </PropertyGroup>
+    );
+  }
+
+  return <></>;
 }
 
 const TextContentContainer = styled.div`
