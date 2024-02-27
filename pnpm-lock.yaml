@@ -2610,6 +2610,9 @@ importers:
       '@radix-ui/react-select':
         specifier: ^1.2.0
         version: 1.2.2(@types/react@18.2.58)(react-dom@18.2.0)(react@18.2.0)
+      '@radix-ui/react-slider':
+        specifier: ^0.0.11
+        version: 0.0.11(react@18.2.0)
     devDependencies:
       '@emotion/react':
         specifier: ^11.10.5

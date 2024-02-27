@@ -18,19 +18,16 @@ export type CraftPreviewNodeForegroundColorAction = {
 };
 
 export type CraftHistoryAction =
+  | CraftNodeOpacityAction
   | CraftNewWidgetAction
-  | CraftNewTextWidgetAction
   | CraftDeleteNodeAction
   | CraftCommitNodeBackgroundAction
   | CraftCommitTextChangeAction
   | CraftCommitIconDataAction;
 
-export type CraftNewTextWidgetAction = {
-  type: "(craft)/widget/text/new";
-  initial: {
-    value: string;
-    color: string;
-  };
+export type CraftNodeOpacityAction = {
+  type: "(craft)/node/opacity";
+  opacity: number;
 };
 
 export type CraftNewWidgetAction = {

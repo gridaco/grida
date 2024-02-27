@@ -53,6 +53,17 @@ export function craftHistoryReducer(
         );
       });
     }
+    case "(craft)/node/opacity": {
+      return produce(state, (draft) => {
+        const { opacity } = action;
+        const selected = draft.selectedNodes[0];
+        draft.craft.children.forEach((c) => {
+          if (c.id === selected) {
+            c.style.opacity = opacity;
+          }
+        });
+      });
+    }
     case "(craft)/node/text/data": {
       return produce(state, (draft) => {
         const { data } = action;
@@ -86,10 +97,6 @@ export function craftHistoryReducer(
           }
         });
       });
-    }
-    case "(craft)/widget/text/new": {
-      //
-      break;
     }
     case "(craft)/widget/new": {
       const id = new Date().getTime().toString();
