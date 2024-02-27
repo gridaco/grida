@@ -111,7 +111,7 @@ export function craftHistoryReducer(
               style: {
                 width: w,
                 height: h,
-                backgroundColor: "black",
+                backgroundColor: "grey",
               },
               children: [],
               width: w,

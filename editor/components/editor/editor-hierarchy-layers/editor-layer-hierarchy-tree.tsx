@@ -16,8 +16,8 @@ import { useDispatch } from "core/dispatch";
 import {
   flattenNodeTree,
   FlattenedDisplayItemNode,
+  HierarchyTreeNode,
 } from "./editor-layer-heriarchy-controller";
-import type { ReflectSceneNode } from "@design-sdk/figma-node";
 import type { IVirtualizedList } from "@editor-ui/listview";
 import useMeasure from "react-use-measure";
 import { p } from "@tree-/q";
@@ -66,7 +66,7 @@ export function DesignLayerHierarchy({
     debounce: { scroll: 100, resize: 100 },
   });
   const [state] = useEditorState();
-  const { selectedNodes, selectedPage, design } = state;
+  const { selectedNodes, selectedPage } = state;
   const { highlightLayer, highlightedLayer } = useWorkspace();
   const dispatch = useDispatch();
 
@@ -75,16 +75,24 @@ export function DesignLayerHierarchy({
   const ref = React.useRef<IVirtualizedList>(null);
 
   // get the root nodes (if the rootNodeIDs is not specified, use the selected page's children)
-  let roots: ReflectSceneNode[] = [];
-  if (rootNodeIDs?.length > 0) {
-    roots = rootNodeIDs.reduce((acc, item) => {
-      acc.push(findUnder(item, design));
-      return acc;
-    }, []);
-  } else {
-    roots = selectedPage
-      ? design.pages.find((p) => p.id == selectedPage).children
-      : [];
+  let roots: HierarchyTreeNode[] = [];
+  switch (state.mode.value) {
+    case "design": {
+      if (rootNodeIDs?.length > 0) {
+        roots = rootNodeIDs.reduce((acc, item) => {
+          acc.push(findUnder(item, state.design));
+          return acc;
+        }, []);
+      } else {
+        roots = selectedPage
+          ? state.design.pages.find((p) => p.id == selectedPage).children
+          : [];
+      }
+      break;
+    }
+    case "craft": {
+      roots = state.craft.children;
+    }
   }
 
   const layers: FlattenedDisplayItemNode[][] = useMemo(() => {
