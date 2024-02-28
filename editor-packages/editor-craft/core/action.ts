@@ -28,6 +28,7 @@ export type CraftHistoryAction =
   | CraftNodeOverflowAction
   | CraftNodeCornerRadiusAction
   | CraftNodeBoxShadowAction
+  | CraftNodeBoxSizingAction
   | CraftNodeFlexBoxAction
   | CraftNodeAddBorderAction
   | CraftNodeBorderWidthAction
@@ -105,6 +106,20 @@ export type CraftNodeFlexDirectionAction = {
 export type CraftNodeFlexGapAction = {
   type: "(craft)/node/flex/gap";
   gap: number;
+};
+
+export type CraftNodeBoxSizingAction =
+  | CraftNodeBoxPaddingAction
+  | CraftNodeBoxMarginAction;
+
+export type CraftNodeBoxPaddingAction = {
+  type: "(craft)/node/box/padding";
+  padding: number;
+};
+
+export type CraftNodeBoxMarginAction = {
+  type: "(craft)/node/box/margin";
+  margin: number;
 };
 
 export type CraftNewWidgetAction = {

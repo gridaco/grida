@@ -182,6 +182,28 @@ export function craftHistoryReducer(
         });
       });
     }
+    case "(craft)/node/box/padding": {
+      const { padding } = action;
+      return produce(state, (draft) => {
+        const selected = draft.selectedNodes[0];
+        draft.craft.children.forEach((c) => {
+          if (c.id === selected) {
+            c.style.padding = padding;
+          }
+        });
+      });
+    }
+    case "(craft)/node/box/margin": {
+      const { margin } = action;
+      return produce(state, (draft) => {
+        const selected = draft.selectedNodes[0];
+        draft.craft.children.forEach((c) => {
+          if (c.id === selected) {
+            c.style.margin = margin;
+          }
+        });
+      });
+    }
     case "(craft)/node/flex/direction": {
       const { direction } = action;
       return produce(state, (draft) => {
@@ -484,6 +506,11 @@ export function craftHistoryReducer(
             });
           });
         }
+        case "flex":
+        case "flex flex-row wrap":
+        case "flex flex-col":
+        case "flex wrap":
+        case "flex flex-col wrap":
         case "flex flex-row": {
           const point = next_canvas_placement(state, [0, 0, 200, 100]);
           const [x, y, w, h] = point;

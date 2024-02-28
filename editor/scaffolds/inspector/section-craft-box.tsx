@@ -52,11 +52,31 @@ export function CraftBoxLayoutSection() {
     [dispatch]
   );
 
+  const onPaddingChange = useCallback(
+    (padding: number) => {
+      dispatch({
+        type: "(craft)/node/box/padding",
+        padding,
+      });
+    },
+    [dispatch]
+  );
+
+  const onMarginChange = useCallback(
+    (margin: number) => {
+      dispatch({
+        type: "(craft)/node/box/margin",
+        margin,
+      });
+    },
+    [dispatch]
+  );
+
   if (!element || !element.style) {
     return <></>;
   }
 
-  const { flexDirection, gap } = element.style;
+  const { flexDirection, gap, padding, margin } = element.style;
 
   return (
     <PropertyGroup>
@@ -98,10 +118,20 @@ export function CraftBoxLayoutSection() {
           />
         </PropertyLine>
         <PropertyLine label="Padding">
-          <PropertyNumericInput prefix={<PaddingIcon />} />
+          <PropertyNumericInput
+            stopPropagation
+            value={padding ?? 0}
+            onChange={onPaddingChange}
+            prefix={<PaddingIcon />}
+          />
         </PropertyLine>
         <PropertyLine label="Margin">
-          <PropertyNumericInput prefix={<MarginIcon />} />
+          <PropertyNumericInput
+            stopPropagation
+            value={padding ?? 0}
+            onChange={onMarginChange}
+            prefix={<MarginIcon />}
+          />
         </PropertyLine>
       </PropertyLines>
     </PropertyGroup>
