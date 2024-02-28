@@ -648,6 +648,9 @@ importers:
       '@reflect-ui/core':
         specifier: 0.0.12
         version: 0.0.12(@reflect-ui/cg@0.1.1)
+      '@web-builder/styles':
+        specifier: workspace:^
+        version: link:../../externals/code/packages/builder-css-styles
       editor:
         specifier: workspace:^
         version: link:../../editor

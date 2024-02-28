@@ -4,6 +4,7 @@
   "dependencies": {
     "@code-editor/canvas": "workspace:^",
     "@reflect-ui/core": "0.0.12",
+    "@web-builder/styles": "workspace:^",
     "editor": "workspace:^",
     "immer": "^9.0.3"
   }
