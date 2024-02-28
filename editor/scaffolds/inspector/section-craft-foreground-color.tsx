@@ -10,8 +10,11 @@ import {
   PropertyLine,
   PropertyLines,
 } from "@editor-ui/property";
+import { rgb255to_rgb1 } from "utils/color-convert";
+import { useInspectorElement } from "hooks/use-inspector-element";
 
 export function CraftForegroundColorSection() {
+  const element = useInspectorElement();
   const dispatch = useDispatch();
   const [color, setColor] = useState<RGBA>({
     r: 255,
@@ -30,6 +33,10 @@ export function CraftForegroundColorSection() {
     [dispatch]
   );
 
+  if (!element || !element.style.color) {
+    return <></>;
+  }
+
   return (
     <PropertyGroup>
       <PropertyGroupHeader>
@@ -39,7 +46,10 @@ export function CraftForegroundColorSection() {
         <PropertyLine label="Color">
           <Popover.Root>
             <Popover.Trigger>
-              <ColorChip outline color={color ? rgba2rgbo(color) : undefined} />
+              <ColorChip
+                outline
+                color={color ? rgb255to_rgb1(color) : undefined}
+              />
             </Popover.Trigger>
             <Popover.Content>
               <ColorPicker
@@ -56,16 +66,3 @@ export function CraftForegroundColorSection() {
     </PropertyGroup>
   );
 }
-
-/**
- * 255 rgba to 1 rgbo
- * @param rgba
- */
-const rgba2rgbo = (rgba: RGBA) => {
-  return {
-    r: rgba.r / 255,
-    g: rgba.g / 255,
-    b: rgba.b / 255,
-    o: 1 - rgba.a,
-  };
-};

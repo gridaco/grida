@@ -3,6 +3,7 @@ import { CraftHistoryAction, CraftDraftAction } from "./action";
 import { EditorState } from "editor/core/states";
 import { CraftHtmlElement, CraftRadixIconElement } from "./state";
 import { math, XYWH } from "@code-editor/canvas";
+import * as core from "@reflect-ui/core";
 
 export function craftDraftReducer(
   state: EditorState,
@@ -106,6 +107,69 @@ export function craftHistoryReducer(
         draft.craft.children.forEach((c) => {
           if (c.id === selected) {
             c.style.borderWidth = width;
+          }
+        });
+      });
+    }
+    case "(craft)/node/box-shadow/add": {
+      return produce(state, (draft) => {
+        const selected = draft.selectedNodes[0];
+        draft.craft.children.forEach((c) => {
+          if (c.id === selected) {
+            c.style.boxShadow = {
+              color: { r: 0, g: 0, b: 0, a: 0.25 },
+              blurRadius: 4,
+              offset: new core.Offset(0, 4),
+              spreadRadius: 0,
+            };
+          }
+        });
+      });
+    }
+    case "(craft)/node/box-shadow/color": {
+      return produce(state, (draft) => {
+        const { color } = action;
+        const selected = draft.selectedNodes[0];
+        draft.craft.children.forEach((c) => {
+          if (c.id === selected) {
+            c.style.boxShadow.color = color;
+          }
+        });
+      });
+    }
+    case "(craft)/node/box-shadow/blur-radius": {
+      return produce(state, (draft) => {
+        const { radius } = action;
+        const selected = draft.selectedNodes[0];
+        draft.craft.children.forEach((c) => {
+          if (c.id === selected) {
+            c.style.boxShadow.blurRadius = radius;
+          }
+        });
+      });
+    }
+    case "(craft)/node/box-shadow/spread": {
+      return produce(state, (draft) => {
+        const { radius } = action;
+        const selected = draft.selectedNodes[0];
+        draft.craft.children.forEach((c) => {
+          if (c.id === selected) {
+            c.style.boxShadow.spreadRadius = radius;
+          }
+        });
+      });
+    }
+    case "(craft)/node/box-shadow/offset": {
+      return produce(state, (draft) => {
+        const { dx, dy } = action;
+        const selected = draft.selectedNodes[0];
+        draft.craft.children.forEach((c) => {
+          if (c.id === selected) {
+            const offset = new core.Offset(
+              dx ?? c.style.boxShadow.offset.dx ?? 0,
+              dy ?? c.style.boxShadow.offset.dy ?? 0
+            );
+            c.style.boxShadow.offset = offset;
           }
         });
       });

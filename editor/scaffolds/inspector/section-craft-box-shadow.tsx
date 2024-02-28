@@ -13,33 +13,64 @@ import { ColorPicker } from "@editor-ui/color-picker";
 import { useDispatch } from "core/dispatch";
 import { useInspectorElement } from "hooks/use-inspector-element";
 import { ColorChip } from "@code-editor/property";
+import { rgb255to_rgb1 } from "utils/color-convert";
 
 export function CraftBoxShadowSection() {
   const element = useInspectorElement();
   const dispatch = useDispatch();
 
-  const onBoxShadowAdd = useCallback(() => {}, [dispatch]);
+  const onBoxShadowAdd = useCallback(() => {
+    dispatch({
+      type: "(craft)/node/box-shadow/add",
+    });
+  }, [dispatch]);
 
-  const onBoxShadowColorChange = useCallback(() => {}, [dispatch]);
-
-  const onBoxShadowOffsetChange = useCallback(() => {}, [dispatch]);
-
-  const onBoxShadowBlurChange = useCallback(
-    (blur: number) => {
-      blur;
+  const onBoxShadowColorChange = useCallback(
+    (color: RGBA) => {
+      dispatch({
+        type: "(craft)/node/box-shadow/color",
+        color,
+      });
     },
     [dispatch]
   );
 
-  const onBoxShadowSpreadChange = useCallback(() => {}, [dispatch]);
+  const onBoxShadowOffsetChange = useCallback(
+    (dx?: number, dy?: number) => {
+      dispatch({
+        type: "(craft)/node/box-shadow/offset",
+        dx,
+        dy,
+      });
+    },
+    [dispatch]
+  );
+
+  const onBoxShadowBlurRadiusChange = useCallback(
+    (radius: number) => {
+      dispatch({
+        type: "(craft)/node/box-shadow/blur-radius",
+        radius,
+      });
+    },
+    [dispatch]
+  );
+
+  const onBoxShadowSpreadChange = useCallback(
+    (radius: number) => {
+      dispatch({
+        type: "(craft)/node/box-shadow/spread",
+        radius,
+      });
+    },
+    [dispatch]
+  );
 
   if (!element) {
     return <></>;
   }
 
-  const hasBoxShadow = element.style.boxShadow;
-
-  const boxShadowBlur = 0;
+  const hasBoxShadow = !!element.style.boxShadow;
 
   if (!hasBoxShadow) {
     return (
@@ -54,15 +85,53 @@ export function CraftBoxShadowSection() {
     );
   }
 
+  const { color, blurRadius, offset, spreadRadius } = element.style.boxShadow;
+
   return (
     <PropertyGroup>
       <PropertyGroupHeader>
-        <h6>Border</h6>
+        <h6>Box Shadow</h6>
       </PropertyGroupHeader>
       <PropertyLines>
-        <PropertyLine label="Width">
+        <PropertyLine label="Offset">
           <PropertyInput
-            value={boxShadowBlur}
+            value={offset.dx}
+            min={0}
+            stopPropagation
+            type="number"
+            suffix={"px"}
+            prefix="x"
+            onChange={(text) => {
+              const val = Number(text);
+
+              if (isNaN(val)) {
+                return;
+              }
+
+              onBoxShadowOffsetChange(val, undefined);
+            }}
+          />
+          <PropertyInput
+            value={offset.dy}
+            min={0}
+            stopPropagation
+            type="number"
+            suffix={"px"}
+            prefix="y"
+            onChange={(text) => {
+              const val = Number(text);
+
+              if (isNaN(val)) {
+                return;
+              }
+
+              onBoxShadowOffsetChange(undefined, val);
+            }}
+          />
+        </PropertyLine>
+        <PropertyLine label="Blur">
+          <PropertyInput
+            value={blurRadius}
             min={0}
             stopPropagation
             type="number"
@@ -74,24 +143,44 @@ export function CraftBoxShadowSection() {
                 return;
               }
 
-              onBoxShadowBlurChange(val);
+              onBoxShadowBlurRadiusChange(val);
+            }}
+          />
+        </PropertyLine>
+        <PropertyLine label="Spread">
+          <PropertyInput
+            value={spreadRadius}
+            min={0}
+            stopPropagation
+            type="number"
+            suffix={"px"}
+            onChange={(text) => {
+              const val = Number(text);
+
+              if (isNaN(val)) {
+                return;
+              }
+
+              onBoxShadowSpreadChange(val);
             }}
           />
         </PropertyLine>
         <PropertyLine label="Color">
           <Popover.Root>
-            {/* <Popover.Trigger>
-              <ColorChip outline color={color ? rgba2rgbo(color) : undefined} />
+            <Popover.Trigger>
+              <ColorChip
+                outline
+                color={color ? rgb255to_rgb1(color as RGBA) : undefined}
+              />
             </Popover.Trigger>
             <Popover.Content>
               <ColorPicker
-                color={color}
+                color={color as RGBA}
                 onChange={(color) => {
-                  setColor(color);
-                  draftBorderColor(color);
+                  onBoxShadowColorChange(color);
                 }}
               />
-            </Popover.Content> */}
+            </Popover.Content>
           </Popover.Root>
         </PropertyLine>
       </PropertyLines>

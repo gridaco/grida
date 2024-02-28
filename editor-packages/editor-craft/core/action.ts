@@ -26,6 +26,7 @@ export type CraftPreviewNodeBorderColorAction = {
 export type CraftHistoryAction =
   | CraftNodeOpacityAction
   | CraftNodeCornerRadiusAction
+  | CraftNodeBoxShadowAction
   | CraftNodeAddBorderAction
   | CraftNodeBorderWidthAction
   | CraftNewWidgetAction
@@ -51,6 +52,38 @@ export type CraftNodeAddBorderAction = {
 export type CraftNodeBorderWidthAction = {
   type: "(craft)/node/border/width";
   width: number;
+};
+
+export type CraftNodeBoxShadowAction =
+  | CraftNodeAddBoxShadowAction
+  | CraftNodeBoxShadowColorAction
+  | CraftNodeBoxShadowBlurRadiusAction
+  | CraftNodeBoxShadowOffsetAction
+  | CraftNodeBoxShadowSpreadAction;
+
+export type CraftNodeAddBoxShadowAction = {
+  type: "(craft)/node/box-shadow/add";
+};
+
+export type CraftNodeBoxShadowColorAction = {
+  type: "(craft)/node/box-shadow/color";
+  color: RGBA;
+};
+
+export type CraftNodeBoxShadowBlurRadiusAction = {
+  type: "(craft)/node/box-shadow/blur-radius";
+  radius: number;
+};
+
+export type CraftNodeBoxShadowOffsetAction = {
+  type: "(craft)/node/box-shadow/offset";
+  dx?: number;
+  dy?: number;
+};
+
+export type CraftNodeBoxShadowSpreadAction = {
+  type: "(craft)/node/box-shadow/spread";
+  radius: number;
 };
 
 export type CraftNewWidgetAction = {

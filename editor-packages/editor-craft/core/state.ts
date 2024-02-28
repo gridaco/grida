@@ -22,10 +22,15 @@ interface BaseNode {
   name: string;
 }
 
+import * as core from "@reflect-ui/core";
+type CraftStyle = Omit<React.CSSProperties, "boxShadow"> & {
+  boxShadow?: core.BoxShadowManifest;
+};
+
 type ElementAttributes<T extends keyof JSX.IntrinsicElements> = {
   tag: T;
   attributes?: JSX.IntrinsicElements[T];
-  style?: React.CSSProperties;
+  style?: CraftStyle;
   text?: string;
   children?: CraftHtmlElement<any>[];
 };
