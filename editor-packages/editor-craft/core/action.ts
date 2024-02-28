@@ -93,11 +93,18 @@ export type CraftNodeBoxShadowSpreadAction = {
   radius: number;
 };
 
-export type CraftNodeFlexBoxAction = CraftNodeFlexDirectionAction;
+export type CraftNodeFlexBoxAction =
+  | CraftNodeFlexDirectionAction
+  | CraftNodeFlexGapAction;
 
 export type CraftNodeFlexDirectionAction = {
   type: "(craft)/node/flex/direction";
   direction?: "column" | "row";
+};
+
+export type CraftNodeFlexGapAction = {
+  type: "(craft)/node/flex/gap";
+  gap: number;
 };
 
 export type CraftNewWidgetAction = {

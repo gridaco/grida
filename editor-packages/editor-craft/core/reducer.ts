@@ -191,6 +191,15 @@ export function craftHistoryReducer(
         });
       });
     }
+    case "(craft)/node/flex/gap": {
+      const { gap } = action;
+      return produce(state, (draft) => {
+        const selected = draft.selectedNodes[0];
+        draft.craft.children.forEach((c) => {
+          c.style.gap = gap;
+        });
+      });
+    }
     case "(craft)/node/text/data": {
       return produce(state, (draft) => {
         const { data } = action;

@@ -9,8 +9,11 @@ import {
 import {
   PaddingIcon,
   MarginIcon,
+  SpaceBetweenVerticallyIcon,
+  SpaceBetweenHorizontallyIcon,
   ArrowRightIcon,
   ArrowDownIcon,
+  SpaceEvenlyVerticallyIcon,
 } from "@radix-ui/react-icons";
 import * as ToggleGroup from "@radix-ui/react-toggle-group";
 import { useDispatch } from "core/dispatch";
@@ -39,11 +42,21 @@ export function CraftBoxLayoutSection() {
     [dispatch]
   );
 
-  if (!element) {
+  const onGapChange = useCallback(
+    (gap: number) => {
+      dispatch({
+        type: "(craft)/node/flex/gap",
+        gap,
+      });
+    },
+    [dispatch]
+  );
+
+  if (!element || !element.style) {
     return <></>;
   }
 
-  const flexDirection = element.style?.flexDirection;
+  const { flexDirection, gap } = element.style;
 
   return (
     <PropertyGroup>
@@ -76,6 +89,14 @@ export function CraftBoxLayoutSection() {
             </ToggleGroup.Item>
           </ToggleGroup.Root>
         </PropertyLine>
+        <PropertyLine label="Gap">
+          <PropertyNumericInput
+            stopPropagation
+            value={gap}
+            onChange={onGapChange}
+            prefix={<GapIcon direction={flexDirection as any} />}
+          />
+        </PropertyLine>
         <PropertyLine label="Padding">
           <PropertyNumericInput prefix={<PaddingIcon />} />
         </PropertyLine>
@@ -85,4 +106,15 @@ export function CraftBoxLayoutSection() {
       </PropertyLines>
     </PropertyGroup>
   );
+}
+
+function GapIcon({ direction }: { direction?: "column" | "row" }) {
+  switch (direction) {
+    case "column":
+      return <SpaceEvenlyVerticallyIcon />;
+    case "row":
+      return <SpaceBetweenHorizontallyIcon />;
+    default:
+      return <SpaceBetweenHorizontallyIcon />;
+  }
 }
