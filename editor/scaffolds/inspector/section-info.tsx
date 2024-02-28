@@ -32,6 +32,9 @@ export function CrafInfoSection() {
       <SceneTitle>
         {/* <SceneNodeIcon color="white" type={type} /> */}
         <input disabled value={name} />
+        <pre className="text-xs">
+          {type} {type === "html" ? element["tag"] : ""}
+        </pre>
       </SceneTitle>
       {/* <SceneDescription>{"No description"}</SceneDescription> */}
     </section>

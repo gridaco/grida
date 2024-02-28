@@ -217,7 +217,6 @@ export function EditorCraftCanvas() {
             disabled: false,
           },
         }}
-        debug
         renderFrameTitle={(p) => (
           <FrameTitleRenderer
             key={p.id}

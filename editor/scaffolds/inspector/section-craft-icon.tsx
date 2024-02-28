@@ -35,12 +35,12 @@ export function CraftIconSection() {
         <h6>Icon</h6>
       </PropertyGroupHeader>
       <PropertyLines>
-        <PropertyLine>
+        <PropertyLine label="Icon">
           <Popover.Root>
             <Popover.Trigger>
-              <button className="px-4 py-2 flex justify-center items-center gap-2 bg-transparent border-none">
+              <button className="px-4 py-2 flex justify-center items-center gap-2 bg-transparent rounded border border-white/10">
                 <Icon />
-                {element.icon}
+                <pre className="text-xs">{element.icon}</pre>
               </button>
             </Popover.Trigger>
             <Popover.Content side="bottom" align="start" className="bg-black">
