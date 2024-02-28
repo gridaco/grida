@@ -1,4 +1,4 @@
-import type { RGBA } from "@reflect-ui/core";
+import type { FontWeight, RGBA } from "@reflect-ui/core";
 import { WidgetType } from "../widgets";
 
 export type CraftAction = CraftDraftAction | CraftHistoryAction;
@@ -30,12 +30,12 @@ export type CraftHistoryAction =
   | CraftNodeBoxShadowAction
   | CraftNodeBoxSizingAction
   | CraftNodeFlexBoxAction
+  | CraftTextAction
   | CraftNodeAddBorderAction
   | CraftNodeBorderWidthAction
   | CraftNewWidgetAction
   | CraftDeleteNodeAction
   | CraftCommitNodeBackgroundAction
-  | CraftCommitTextChangeAction
   | CraftCommitIconDataAction;
 
 export type CraftNodeOpacityAction = {
@@ -137,9 +137,30 @@ export type CraftCommitNodeBackgroundAction = {
   color: RGBA;
 };
 
+export type CraftTextAction =
+  | CraftCommitTextChangeAction
+  | CraftTextAlignAction
+  | CraftTextFontWeightAction
+  | CraftTextFontSizeAction;
+
 export type CraftCommitTextChangeAction = {
   type: "(craft)/node/text/data";
   data: string;
+};
+
+export type CraftTextAlignAction = {
+  type: "(craft)/node/text/align";
+  align?: "left" | "center" | "right";
+};
+
+export type CraftTextFontWeightAction = {
+  type: "(craft)/node/text/font/weight";
+  weight: FontWeight;
+};
+
+export type CraftTextFontSizeAction = {
+  type: "(craft)/node/text/font/size";
+  size: number;
 };
 
 export type CraftCommitIconDataAction = {

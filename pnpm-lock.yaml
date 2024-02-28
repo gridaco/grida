@@ -2616,6 +2616,9 @@ importers:
       '@radix-ui/react-slider':
         specifier: ^0.0.11
         version: 0.0.11(react@18.2.0)
+      '@radix-ui/react-toggle-group':
+        specifier: ^1.0.4
+        version: 1.0.4(@types/react-dom@18.2.19)(@types/react@18.2.58)(react-dom@18.2.0)(react@18.2.0)
     devDependencies:
       '@emotion/react':
         specifier: ^11.10.5
@@ -2626,9 +2629,18 @@ importers:
       '@types/react':
         specifier: 18.2.58
         version: 18.2.58
+      autoprefixer:
+        specifier: ^10.0.1
+        version: 10.4.17(postcss@8.4.35)
+      postcss:
+        specifier: ^8
+        version: 8.4.35
       react:
         specifier: ^18.2.0
         version: 18.2.0
+      tailwindcss:
+        specifier: ^3.3.0
+        version: 3.4.1
 
   ui/editor-ui/packages/editor-ui-scroll-area:
     dependencies:
@@ -16337,7 +16349,7 @@ packages:
   /broadcast-channel@4.4.0:
     resolution: {integrity: sha512-25UGbuDUqVnMVy+wEFT2eSDWBVncpxiHnGmFqb1r4lYNuC7YUN7gcsXQlTUlaHsP51leOQ007K+d44aN0qrGtg==}
     dependencies:
-      '@babel/runtime': 7.16.3
+      '@babel/runtime': 7.23.9
       detect-node: 2.1.0
       microseconds: 0.2.0
       nano-time: 1.0.0
@@ -29963,7 +29975,7 @@ packages:
   /unload@2.3.1:
     resolution: {integrity: sha512-MUZEiDqvAN9AIDRbbBnVYVvfcR6DrjCqeU2YQMmliFZl9uaBUjTkhuDQkBiyAy8ad5bx1TXVbqZ3gg7namsWjA==}
     dependencies:
-      '@babel/runtime': 7.16.3
+      '@babel/runtime': 7.23.9
       detect-node: 2.1.0
     dev: false
 

@@ -6,7 +6,7 @@ import { EditorAppbarFragments } from "components/editor";
 import { DebugInspector } from "./inspector-debug";
 import { EmptyState, InspectorContainer } from "./inspector-readonly";
 import { CraftBackgroundColorSection } from "./section-craft-background-color";
-import { CrafTextDataSection } from "./section-craft-text";
+import { CrafTextSection } from "./section-craft-text";
 import { CraftForegroundColorSection } from "./section-craft-foreground-color";
 import { CraftIconSection } from "./section-craft-icon";
 import { CraftBorderSection } from "./section-craft-border";
@@ -46,13 +46,13 @@ function InspectorBody({ debug }: { debug?: boolean }) {
     <EditorPropertyThemeProvider theme={one.dark}>
       <CrafInfoSection />
       <CraftLayerSection />
+      <CrafTextSection />
       <CraftBoxLayoutSection />
       <CraftBackgroundColorSection />
       <CraftForegroundColorSection />
       <CraftIconSection />
       <CraftBorderSection />
       <CraftBoxShadowSection />
-      <CrafTextDataSection />
       {/* <CodeSection /> */}
     </EditorPropertyThemeProvider>
   );

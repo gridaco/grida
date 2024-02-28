@@ -60,7 +60,7 @@ export interface EditorState {
   devtoolsConsole?: DevtoolsConsole;
 
   // v2 (with craft mode)
-  craft?: {
+  craft: {
     children: EditorNode[];
   };
 }

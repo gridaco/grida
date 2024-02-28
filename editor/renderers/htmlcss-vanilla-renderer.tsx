@@ -25,7 +25,11 @@ export function HtmlCssVanillaRenderer({
       }}
       src={target.attributes?.src}
     >
-      {target.text || target.children.map((target) => renderer({ target }))}
+      {target.text ? (
+        <span>{target.text}</span>
+      ) : (
+        <>{target.children.map((target) => renderer({ target }))}</>
+      )}
     </Tag>
   );
 }

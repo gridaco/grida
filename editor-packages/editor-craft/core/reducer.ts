@@ -4,7 +4,7 @@ import { EditorState } from "editor/core/states";
 import { CraftHtmlElement, CraftRadixIconElement } from "./state";
 import { math, XYWH } from "@code-editor/canvas";
 import * as core from "@reflect-ui/core";
-
+import * as css from "@web-builder/styles";
 export function craftDraftReducer(
   state: EditorState,
   action: CraftDraftAction
@@ -233,6 +233,40 @@ export function craftHistoryReducer(
         });
       });
     }
+    case "(craft)/node/text/align": {
+      const { align } = action;
+      console.log("align", align);
+      return produce(state, (draft) => {
+        const selected = draft.selectedNodes[0];
+        draft.craft.children.forEach((c) => {
+          if (c.id === selected) {
+            c.style.textAlign = align;
+          }
+        });
+      });
+    }
+    case "(craft)/node/text/font/size": {
+      const { size } = action;
+      return produce(state, (draft) => {
+        const selected = draft.selectedNodes[0];
+        draft.craft.children.forEach((c) => {
+          if (c.id === selected) {
+            c.style.fontSize = size;
+          }
+        });
+      });
+    }
+    case "(craft)/node/text/font/weight": {
+      const { weight } = action;
+      return produce(state, (draft) => {
+        const selected = draft.selectedNodes[0];
+        draft.craft.children.forEach((c) => {
+          if (c.id === selected) {
+            c.style.fontWeight = css.numericFontWeight(weight);
+          }
+        });
+      });
+    }
     case "(craft)/node/icon/data": {
       return produce(state, (draft) => {
         const { data } = action;
@@ -347,7 +381,7 @@ export function craftHistoryReducer(
                 height: h,
                 color: "black",
               },
-              text: "Hello, World!",
+              text: "Text",
               children: [],
               width: w,
               height: h,

@@ -2,6 +2,7 @@ import {
   PropertyGroup,
   PropertyGroupHeader,
   PropertyInput,
+  PropertyInputToggleGroup,
   PropertyLine,
   PropertyLines,
   PropertyNumericInput,
@@ -15,7 +16,6 @@ import {
   ArrowDownIcon,
   SpaceEvenlyVerticallyIcon,
 } from "@radix-ui/react-icons";
-import * as ToggleGroup from "@radix-ui/react-toggle-group";
 import { useDispatch } from "core/dispatch";
 import { useInspectorElement } from "hooks/use-inspector-element";
 import { useCallback } from "react";
@@ -85,29 +85,21 @@ export function CraftBoxLayoutSection() {
       </PropertyGroupHeader>
       <PropertyLines>
         <PropertyLine label="Direction">
-          <ToggleGroup.Root
-            className="flex gap-2"
-            type="single"
-            defaultValue="col"
-            aria-label="display"
+          <PropertyInputToggleGroup
+            defaultValue="row"
             value={flexDirection}
             onValueChange={onDirectionChange}
-          >
-            <ToggleGroup.Item
-              className="p-2 rounded-md data-[state='on']:bg-white/20"
-              value="row"
-              aria-label="Row"
-            >
-              <ArrowRightIcon />
-            </ToggleGroup.Item>
-            <ToggleGroup.Item
-              className="p-2 rounded-md data-[state='on']:bg-white/20"
-              value="column"
-              aria-label="Column"
-            >
-              <ArrowDownIcon />
-            </ToggleGroup.Item>
-          </ToggleGroup.Root>
+            options={[
+              {
+                value: "row",
+                icon: <ArrowRightIcon />,
+              },
+              {
+                value: "column",
+                icon: <ArrowDownIcon />,
+              },
+            ]}
+          />
         </PropertyLine>
         <PropertyLine label="Gap">
           <PropertyNumericInput
