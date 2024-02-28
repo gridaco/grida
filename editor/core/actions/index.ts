@@ -9,6 +9,7 @@ import type {
 } from "core/states";
 
 export type WorkspaceAction =
+  | { type: "copy" } // copy does not need to be handled by the history.
   | HistoryAction
   | HighlightNodeAction
   | EditorModeAction;
@@ -19,10 +20,10 @@ export type WorkspaceAction =
 export type WorkspaceWarmupAction = SetFigmaAuthAction | SetFigmaUserAction;
 
 export type HistoryAction =
-  //
   | { type: "undo" }
-  //
   | { type: "redo" }
+  | { type: "cut" }
+  | { type: "paste" }
   | Action;
 
 export type Action =

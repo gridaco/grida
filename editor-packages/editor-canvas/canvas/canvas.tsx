@@ -611,7 +611,7 @@ export function Canvas<T extends TCanvasNode>({
             <HudSurface
               offset={nonscaled_offset}
               zoom={zoom}
-              hide={is_canvas_transforming}
+              hide={is_canvas_transforming || isMovingSelections}
               readonly={readonly}
               disableMarquee={config.marquee.disabled}
               disableGrouping={config.grouping.disabled}

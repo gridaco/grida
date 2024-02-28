@@ -146,7 +146,7 @@ export function craftHistoryReducer(
     }
     case "(craft)/widget/new": {
       const id = new Date().getTime().toString();
-      const point = next_placement(state, [0, 0, 100, 100]);
+      const point = next_canvas_placement(state, [0, 0, 100, 100]);
       const [x, y, w, h] = point;
       switch (action.widget) {
         case "container": {
@@ -365,6 +365,34 @@ export function craftHistoryReducer(
             });
           });
         }
+        case "divider": {
+          const point = next_canvas_placement(state, [0, 0, 100, 1]);
+          const [x, y, w, h] = point;
+
+          return produce(state, (draft) => {
+            draft.craft.children.push({
+              type: "html",
+              id,
+              name: "divider",
+              x: x,
+              y: y,
+              tag: "hr",
+              attributes: {
+                tw: ["border-2", "border-gray-300", "w-full", "my-4"].join(" "),
+              },
+              style: {
+                width: 100,
+                height: 1,
+              },
+              children: [],
+              width: w,
+              height: h,
+              absoluteX: x,
+              absoluteY: y,
+              rotation: 0,
+            });
+          });
+        }
         default: {
           throw new Error(`Not implemented widget type: ${action.widget}`);
         }
@@ -377,7 +405,7 @@ export function craftHistoryReducer(
   return { ...state };
 }
 
-function next_placement(state: EditorState, item: XYWH) {
+function next_canvas_placement(state: EditorState, item: XYWH) {
   return math.no_overlap_placement(
     item,
     state.craft.children.map((c) => [

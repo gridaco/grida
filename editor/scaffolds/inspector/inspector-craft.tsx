@@ -12,12 +12,13 @@ import { DebugInspector } from "./inspector-debug";
 import { IconToggleButton } from "@code-editor/ui";
 import { EmptyState, InspectorContainer } from "./inspector-readonly";
 import { CraftBackgroundColorSection } from "./section-craft-background-color";
-import { CrafContentSection } from "./section-craft-text";
+import { CrafTextDataSection } from "./section-craft-text";
 import { CraftForegroundColorSection } from "./section-craft-foreground-color";
 import { CraftIconSection } from "./section-craft-icon";
 import { CraftOpacitySection } from "./section-craft-opacity";
 import { CraftBorderSection } from "./section-craft-border";
 import { CraftBorderRadiusSection } from "./section-craft-border-radius";
+import { CraftBoxShadowSection } from "./section-craft-box-shadow";
 
 export function CraftInspector() {
   const { debugMode } = useWorkspaceState();
@@ -74,11 +75,12 @@ function InspectorBody({ debug }: { debug?: boolean }) {
       <CraftForegroundColorSection />
       <CraftIconSection />
       <CraftBorderSection />
+      <CraftBoxShadowSection />
       {/* <AssetsSection /> */}
       {/* <TypographySection /> */}
       {/* <ColorsSection /> */}
       {/* <EffectsSection /> */}
-      <CrafContentSection />
+      <CrafTextDataSection />
       {/* <CodeSection /> */}
     </EditorPropertyThemeProvider>
   );

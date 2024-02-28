@@ -9,7 +9,7 @@ import {
 import { useInspectorElement } from "hooks/use-inspector-element";
 import { useDispatch } from "core/dispatch";
 
-export function CrafContentSection() {
+export function CrafTextDataSection() {
   const dispatch = useDispatch();
   const target = useInspectorElement();
 
@@ -26,7 +26,7 @@ export function CrafContentSection() {
     return (
       <PropertyGroup>
         <PropertyGroupHeader>
-          <h6>Content</h6>
+          <h6>Text</h6>
         </PropertyGroupHeader>
         <PropertyLines>
           <PropertyLine>

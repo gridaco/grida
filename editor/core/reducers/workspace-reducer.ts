@@ -76,6 +76,14 @@ export function workspaceReducer(
       });
     }
 
+    case "copy": {
+      return produce(state, (draft) => {
+        // TODO:
+      });
+
+      return state;
+    }
+
     // default fallback - use history reducer
     case "redo":
     case "undo":

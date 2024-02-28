@@ -22,6 +22,9 @@ export interface WorkspaceState {
    */
   highlightedLayer?: string;
 
+  // clipboard
+  clipboard?: any | null;
+
   taskQueue: TaskQueue;
 
   /**
