@@ -508,7 +508,7 @@ const reducers = {
     const changed = !value_identical(state.selectedNodes, ids);
 
     if (!changed) {
-      console.log("no change in selection");
+      // console.log("no change in selection");
       return state;
     }
 
@@ -519,7 +519,7 @@ const reducers = {
 
       if (ids.length > 1 && ids.length === current_node.length) {
         // the selection event is always triggered by user, which means selecting same amount of nodes (greater thatn 1, and having a different node array is impossible.)
-        return produce(state, (draft) => {});
+        return;
       }
 
       const _canvas_state_store = new CanvasStateStore(

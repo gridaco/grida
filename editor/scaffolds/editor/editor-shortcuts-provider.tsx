@@ -43,6 +43,40 @@ export function EditorShortcutsProvider({
     dispatch({ type: "paste" });
   }, [dispatch]);
 
+  const up = useCallback(
+    (scale = 1) => {
+      dispatch({
+        type: "node-transform-translate",
+        translate: [0, -1 * scale],
+      });
+    },
+    [dispatch]
+  );
+
+  const left = useCallback(
+    (scale = 1) => {
+      dispatch({
+        type: "node-transform-translate",
+        translate: [-1 * scale, 0],
+      });
+    },
+    [dispatch]
+  );
+
+  const down = useCallback(
+    (scale = 1) => {
+      dispatch({ type: "node-transform-translate", translate: [0, 1 * scale] });
+    },
+    [dispatch]
+  );
+
+  const right = useCallback(
+    (scale = 1) => {
+      dispatch({ type: "node-transform-translate", translate: [1 * scale, 0] });
+    },
+    [dispatch]
+  );
+
   const openPreferences = useOpenPreferences();
 
   const _copy = keymap("ctrl-cmd", "c");
@@ -62,6 +96,10 @@ export function EditorShortcutsProvider({
   const _down = keymap("down");
   const _left = keymap("left");
   const _right = keymap("right");
+  const _shift_up = keymap("shift", "up");
+  const _shift_down = keymap("shift", "down");
+  const _shift_left = keymap("shift", "left");
+  const _shift_right = keymap("shift", "right");
 
   useHotkeys(_save.universal, (e) => {
     // disables the save html action on browser
@@ -89,10 +127,30 @@ export function EditorShortcutsProvider({
   // });
 
   // translate
-  useHotkeys(_up.universal, noop);
-  useHotkeys(_down.universal, noop);
-  useHotkeys(_left.universal, noop);
-  useHotkeys(_right.universal, noop);
+  useHotkeys(_up.universal, () => {
+    up();
+  });
+  useHotkeys(_down.universal, () => {
+    down();
+  });
+  useHotkeys(_left.universal, () => {
+    left();
+  });
+  useHotkeys(_right.universal, () => {
+    right();
+  });
+  useHotkeys(_shift_up.universal, () => {
+    up(10);
+  });
+  useHotkeys(_shift_down.universal, () => {
+    down(10);
+  });
+  useHotkeys(_shift_left.universal, () => {
+    left(10);
+  });
+  useHotkeys(_shift_right.universal, () => {
+    right(10);
+  });
 
   useHotkeys(_backtofiles.universal, (e) => {
     router.push("/");
