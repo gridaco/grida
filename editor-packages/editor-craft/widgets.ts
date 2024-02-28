@@ -56,7 +56,6 @@ export const widgets = [
 
   // embeddings
   ["iframe", "iFrame"],
-  ["map-marker", "Map Marker"],
   ["html", "HTML"],
   ["markdown", "Markdown"],
   ["code", "Code"],
@@ -67,7 +66,8 @@ export const widgets = [
   ["signature", "Signature"],
 
   // map
-  ["map", "Map"],
+  // ["map", "Map"],
+  // ["map-marker", "Map Marker"],
 
   // context
   ["locale-select", "Locale Select"],
