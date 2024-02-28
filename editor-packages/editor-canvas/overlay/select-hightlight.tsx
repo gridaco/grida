@@ -1,5 +1,5 @@
 import React, { useRef } from "react";
-import type { OutlineProps } from "./types";
+import type { OutlineProps, ResizeHandleOrigin } from "./types";
 import { color_layer_highlight } from "../theme";
 import { xywh_to_bounding_box } from "../math";
 import { OulineSide } from "./outline-side";
@@ -10,7 +10,9 @@ import type { OnDragHandler } from "../canvas-event-target";
 
 export function SelectHightlight({
   ...props
-}: Omit<OutlineProps, "width"> & {}) {
+}: Omit<OutlineProps, "width"> & {
+  // onResize?: (handle: ResizeHandleOrigin, delta: [number, number]) => void;
+}) {
   const { xywh, zoom, rotation } = props;
   const bbox = xywh_to_bounding_box({ xywh, scale: zoom });
   const wh: [number, number] = [xywh[2], xywh[3]];
@@ -63,7 +65,8 @@ const resize_cursor_map = {
 function ResizeHandle({
   anchor,
   box,
-}: {
+  ...props
+}: Partial<React.ComponentProps<typeof Handle>> & {
   anchor: "nw" | "ne" | "sw" | "se";
   box: [number, number, number, number];
 }) {
@@ -77,6 +80,7 @@ function ResizeHandle({
       outlineWidth={1}
       outlineColor={color_layer_highlight}
       size={8}
+      {...props}
     />
   );
 }

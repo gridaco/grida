@@ -57,6 +57,12 @@ export function EditorShortcutsProvider({
   const _toggle_view = keymap("v");
   const _escape = keymap("esc");
 
+  // translate
+  const _up = keymap("up");
+  const _down = keymap("down");
+  const _left = keymap("left");
+  const _right = keymap("right");
+
   useHotkeys(_save.universal, (e) => {
     // disables the save html action on browser
     e.preventDefault();
@@ -70,17 +76,23 @@ export function EditorShortcutsProvider({
     redo();
   });
 
-  useHotkeys(_cut.universal, (e) => {
-    cut();
-  });
+  // useHotkeys(_cut.universal, (e) => {
+  //   cut();
+  // });
 
-  useHotkeys(_copy.universal, (e) => {
-    copy();
-  });
+  // useHotkeys(_copy.universal, (e) => {
+  //   copy();
+  // });
 
-  useHotkeys(_paste.universal, (e) => {
-    paste();
-  });
+  // useHotkeys(_paste.universal, (e) => {
+  //   paste();
+  // });
+
+  // translate
+  useHotkeys(_up.universal, noop);
+  useHotkeys(_down.universal, noop);
+  useHotkeys(_left.universal, noop);
+  useHotkeys(_right.universal, noop);
 
   useHotkeys(_backtofiles.universal, (e) => {
     router.push("/");
@@ -110,11 +122,18 @@ export function EditorShortcutsProvider({
 const keymap = (
   ...c: (
     | "esc"
+    // meta keys
     | "ctrl"
     | "cmd"
     | "ctrl-cmd"
     | "shift"
     | "alt"
+    // arrow keys
+    | "up"
+    | "down"
+    | "left"
+    | "right"
+    //
     | "z"
     | "x"
     | "a"

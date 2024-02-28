@@ -13,7 +13,6 @@ export const useDispatch = (): FlatDispatcher => {
   const dispatch = useContext(DispatchContext);
   return useCallback(
     (action: HistoryAction) => {
-      console.log("dispatch", action);
       dispatch(action);
     },
     [dispatch]
