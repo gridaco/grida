@@ -409,7 +409,6 @@ export function craftHistoryReducer(
                 height: 100,
                 backgroundColor: "black",
               },
-              children: [],
               width: w,
               height: h,
               absoluteX: x,
@@ -427,15 +426,15 @@ export function craftHistoryReducer(
               x: x,
               y: y,
               tag: "img",
+              style: {
+                width: 100,
+                height: 100,
+                borderRadius: 999,
+                overflow: "hidden",
+                backgroundColor: "black",
+              },
               attributes: {
                 src: "https://via.placeholder.com/150",
-                style: {
-                  width: 100,
-                  height: 100,
-                  borderRadius: 999,
-                  overflow: "hidden",
-                  backgroundColor: "black",
-                },
                 tw: [
                   "rounded-full",
                   "overflow-hidden",

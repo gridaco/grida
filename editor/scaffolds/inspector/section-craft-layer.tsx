@@ -138,7 +138,7 @@ export function CraftLayerSection() {
         </PropertyLine>
         <PropertyLine label="Corner">
           <PropertyNumericInput
-            value={element.style.borderRadius || 0}
+            value={element.style?.borderRadius || 0}
             stopPropagation
             min={0}
             suffix={<CornersIcon />}
