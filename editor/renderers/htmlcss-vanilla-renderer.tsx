@@ -1,10 +1,13 @@
-import { CraftHtmlElement } from "@code-editor/craft/core";
+import React from "react";
+import { CraftElement, CraftHtmlElement } from "@code-editor/craft/core";
 import * as css from "@web-builder/styles";
 
 export function HtmlCssVanillaRenderer({
   target,
+  renderer,
 }: {
   target: CraftHtmlElement;
+  renderer: (props: { target: CraftElement }) => React.ReactNode;
 }) {
   const Tag = target.tag;
 
@@ -15,11 +18,14 @@ export function HtmlCssVanillaRenderer({
   return (
     <Tag
       id={target.id}
-      tw={target.attributes.tw}
-      style={{ ...target.style, boxShadow }}
-      src={target.attributes.src}
+      tw={target.attributes?.tw}
+      style={{
+        ...target.style,
+        boxShadow,
+      }}
+      src={target.attributes?.src}
     >
-      {target.text}
+      {target.text || target.children.map((target) => renderer({ target }))}
     </Tag>
   );
 }

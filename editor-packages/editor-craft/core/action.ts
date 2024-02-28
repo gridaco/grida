@@ -28,6 +28,7 @@ export type CraftHistoryAction =
   | CraftNodeOverflowAction
   | CraftNodeCornerRadiusAction
   | CraftNodeBoxShadowAction
+  | CraftNodeFlexBoxAction
   | CraftNodeAddBorderAction
   | CraftNodeBorderWidthAction
   | CraftNewWidgetAction
@@ -90,6 +91,13 @@ export type CraftNodeBoxShadowOffsetAction = {
 export type CraftNodeBoxShadowSpreadAction = {
   type: "(craft)/node/box-shadow/spread";
   radius: number;
+};
+
+export type CraftNodeFlexBoxAction = CraftNodeFlexDirectionAction;
+
+export type CraftNodeFlexDirectionAction = {
+  type: "(craft)/node/flex/direction";
+  direction?: "column" | "row";
 };
 
 export type CraftNewWidgetAction = {

@@ -12,6 +12,15 @@ export const widgets = [
   ["video", "Video"],
   ["audio", "Audio"],
 
+  // Layout
+  ["flex", "Flex"],
+  ["flex flex-col", "Column"],
+  ["flex flex-row", "Row"],
+  ["flex wrap", "Wrap"],
+  ["flex flex-col wrap", "Wrap Column"],
+  ["flex flex-row wrap", "Wrap Row"],
+  ["self-stretch", "Spacer"],
+
   // basic
   ["chip", "Chip"],
   ["chip-select", "Choice Chips"],
@@ -41,15 +50,6 @@ export const widgets = [
 
   ["tooltip", "ToolTip"],
   ["badge", "Badge"],
-
-  // Layout
-  ["flex", "Flex"],
-  ["flex flex-col", "Column"],
-  ["flex flex-row", "Row"],
-  ["flex wrap", "Wrap"],
-  ["flex flex-col wrap", "Wrap Column"],
-  ["flex flex-row wrap", "Wrap Row"],
-  ["self-stretch", "Spacer"],
 
   ["divider", "Divider"],
   ["divider-vertical", "Vertical Divider"],

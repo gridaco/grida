@@ -182,6 +182,15 @@ export function craftHistoryReducer(
         });
       });
     }
+    case "(craft)/node/flex/direction": {
+      const { direction } = action;
+      return produce(state, (draft) => {
+        const selected = draft.selectedNodes[0];
+        draft.craft.children.forEach((c) => {
+          c.style.flexDirection = direction;
+        });
+      });
+    }
     case "(craft)/node/text/data": {
       return produce(state, (draft) => {
         const { data } = action;

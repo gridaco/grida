@@ -9,7 +9,12 @@ export function CraftRenderPipeline({ target }: { target: CraftElement }) {
       return <RadixIconRenderer target={target} />;
     }
     case "html": {
-      return <HtmlCssVanillaRenderer target={target} />;
+      return (
+        <HtmlCssVanillaRenderer
+          target={target}
+          renderer={CraftRenderPipeline}
+        />
+      );
     }
   }
 }
