@@ -102,8 +102,10 @@ interface GroupingOptions {
   disabled?: boolean;
 }
 
+type Cursor = React.CSSProperties["cursor"];
+
 interface CanvasCursorOptions {
-  cursor?: React.CSSProperties["cursor"];
+  cursor?: Cursor;
 }
 
 const default_canvas_preferences: CanvsPreferences = {
@@ -183,7 +185,7 @@ export function Canvas<T extends TCanvasNode>({
   readonly = true,
   config = default_canvas_preferences,
   backgroundColor,
-  cursor,
+  cursor: _cursor,
   ...props
 }: CanvasProps<T>) {
   const viewboundmeasured = useMemo(
@@ -247,6 +249,7 @@ export function Canvas<T extends TCanvasNode>({
     setZoom(_focus_center.scale);
   }, [...focus, focusRefreshKey, viewboundmeasured]);
 
+  const [cursor, setCursor] = useState<Cursor>(_cursor);
   const [transformIntitialized, setTransformInitialized] = useState(
     !!initialTransform
   );
@@ -291,6 +294,15 @@ export function Canvas<T extends TCanvasNode>({
   useEffect(() => {
     setHoveringLayer(wshighlight);
   }, [highlightedLayer]);
+
+  // cursor change effect
+  useEffect(() => {
+    if (isMovingSelections) {
+      setCursor("grab");
+    } else {
+      setCursor(_cursor);
+    }
+  }, [isMovingSelections]);
 
   // area selection hook
   useEffect(() => {
@@ -402,9 +414,7 @@ export function Canvas<T extends TCanvasNode>({
   };
 
   const onDragStart: OnDragHandler = (s) => {
-    onClearSelection?.();
     setIsDragging(true);
-    setHoveringLayer(null);
 
     // set the marquee start point
     const [x, y] = s.initial;
@@ -419,7 +429,8 @@ export function Canvas<T extends TCanvasNode>({
     }
 
     // else, clear and start a marquee
-    onClearSelection();
+    onClearSelection?.();
+    setHoveringLayer(null);
     setMarquee([x1, y1, 0, 0]);
   };
 

@@ -5,7 +5,7 @@ import type {
   SelectPageAction,
   CodingUpdateFileAction,
   CanvasModeSwitchAction,
-  TranslateNodeAction,
+  TranslateSelectedNodeAction,
   PreviewBuildingStateUpdateAction,
   PreviewSetAction,
   DevtoolsConsoleAction,
@@ -213,20 +213,41 @@ export function editorReducer(
     }
 
     case "node-transform-translate": {
-      const { translate, node } = <TranslateNodeAction>action;
+      const { translate, node } = <TranslateSelectedNodeAction>action;
 
-      return produce(state, (draft) => {
-        const page = draft.design.pages.find(
-          (p) => p.id === state.selectedPage
-        );
+      switch (state.mode.value) {
+        case "design": {
+          return produce(state, (draft) => {
+            const page = draft.design.pages.find(
+              (p) => p.id === state.selectedPage
+            );
 
-        node
-          .map((n) => q.getNodeByIdFrom(n, page.children))
-          .map((n) => {
-            n.x += translate[0];
-            n.y += translate[1];
+            node
+              .map((n) => q.getNodeByIdFrom(n, page.children))
+              .map((n) => {
+                n.x += translate[0];
+                n.y += translate[1];
+              });
           });
-      });
+        }
+        case "craft": {
+          return produce(state, (draft) => {
+            state.selectedNodes
+              .map((n) => q.getNodeByIdFrom(n, draft.craft.children))
+              .map((n) => {
+                n.x += translate[0];
+                n.y += translate[1];
+                n.absoluteX += translate[0];
+                n.absoluteY += translate[1];
+              });
+          });
+        }
+        default: {
+          throw new Error(
+            `node-transform-translate: mode not supported: ${state.mode.value}`
+          );
+        }
+      }
     }
 
     case "coding/new-template-session": {

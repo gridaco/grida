@@ -99,14 +99,6 @@ export function EditorFigmaCanvas({
             onSelectNode={(...nodes) => {
               dispatch({ type: "select-node", node: nodes.map((n) => n.id) });
             }}
-            onMoveNodeEnd={([x, y], ...nodes) => {
-              dispatch({
-                type: "node-transform-translate",
-                node: nodes,
-                translate: [x, y],
-              });
-            }}
-            // onMoveNode={() => {}}
             onClearSelection={() => {
               dispatch({ type: "select-node", node: [] });
             }}
@@ -181,8 +173,6 @@ export function EditorCraftCanvas() {
     [dispatch]
   );
 
-  const cursor = state.designerMode === "comment" ? cursors.comment : "default";
-
   return (
     <CanvasContainer ref={canvasSizingRef} id="canvas">
       {/* <EditorAppbarFragments.Canvas /> */}
@@ -205,22 +195,19 @@ export function EditorCraftCanvas() {
         onSelectNode={(...nodes) => {
           dispatch({ type: "select-node", node: nodes.map((n) => n.id) });
         }}
-        onMoveNodeEnd={([x, y], ...nodes) => {
+        onMoveNode={([x, y], ...nodes) => {
           dispatch({
             type: "node-transform-translate",
-            node: nodes,
             translate: [x, y],
           });
         }}
-        // onMoveNode={() => {}}
         onClearSelection={() => {
           dispatch({ type: "select-node", node: [] });
         }}
         nodes={craft.children}
         // initialTransform={ } // TODO: if the initial selection is provided from first load, from the query param, we have to focus to fit that node.
         renderItem={renderItem}
-        // readonly={false}
-        readonly
+        readonly={false}
         config={{
           can_highlight_selected_layer: true,
           marquee: {
@@ -231,7 +218,6 @@ export function EditorCraftCanvas() {
           },
         }}
         debug
-        cursor={cursor}
         renderFrameTitle={(p) => (
           <FrameTitleRenderer
             key={p.id}

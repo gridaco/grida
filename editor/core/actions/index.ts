@@ -83,20 +83,19 @@ export interface SelectNodeAction {
   node: string | string[];
 }
 
-/**
- * Select and move to the node.
- */
 export interface CanvasFocusNodeAction {
   type: "canvas/focus";
   node: string;
 }
 
-export type CanvasEditAction = TranslateNodeAction;
+export type CanvasEditAction = TranslateSelectedNodeAction;
 
-export interface TranslateNodeAction {
+/**
+ * Select and move to the node.
+ */
+export interface TranslateSelectedNodeAction {
   type: "node-transform-translate";
   translate: [number, number];
-  node: string[];
 }
 
 export interface EnterIsolatedInspectionAction {
