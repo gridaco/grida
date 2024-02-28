@@ -365,7 +365,9 @@ export function Canvas<T extends TCanvasNode>({
   const onPointerDown: OnPointerDownHandler = (state) => {
     const [x, y] = [state.event.clientX, state.event.clientY];
 
-    if (isPanning || isZooming) {
+    const isPanningStarting = state.event.button === 1; // middle click
+
+    if (isPanningStarting || isPanning || isZooming) {
       return;
     }
 
@@ -499,6 +501,7 @@ export function Canvas<T extends TCanvasNode>({
       ];
 
       onMoveNodeEnd?.([(fx - ix) / zoom, (fy - iy) / zoom], ...selectedNodes);
+      setHoveringLayer(null);
       setIsMovingSelections(false);
     }
   };
@@ -506,7 +509,7 @@ export function Canvas<T extends TCanvasNode>({
   const is_canvas_transforming = isPanning || isZooming;
   const selected_nodes = useMemo(
     () => selectedNodes?.map((id) => qdoc.getNodeById(id)).filter(Boolean),
-    [selectedNodes]
+    [selectedNodes, isDragging]
   );
 
   const position_guides = useMemo(
