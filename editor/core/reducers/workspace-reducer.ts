@@ -21,6 +21,11 @@ export function workspaceReducer(
         draft.highlightedLayer = action.id;
       });
     }
+    case "highlight-node/remove": {
+      return produce(state, (draft) => {
+        draft.highlightedLayer = undefined;
+      });
+    }
     // todo: move to workspace state
     case "tasks/push": {
       const { task } = <BackgroundTaskPushAction>action;

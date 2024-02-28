@@ -36,6 +36,9 @@ function DeleteKeyProvider({ children }: React.PropsWithChildren<{}>) {
         dispatch({
           type: "(craft)/node/delete",
         });
+        dispatch({
+          type: "highlight-node/remove",
+        });
       }
     };
 

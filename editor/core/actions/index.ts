@@ -12,6 +12,7 @@ export type WorkspaceAction =
   | { type: "copy" } // copy does not need to be handled by the history.
   | HistoryAction
   | HighlightNodeAction
+  | RemoveSelectedNodeFromHighlightAction
   | EditorModeAction;
 
 /**
@@ -35,7 +36,6 @@ export type Action =
   | DesignerModeSwitchActon
   | SelectNodeAction
   | CanvasFocusNodeAction
-  | HighlightNodeAction
   | EnterIsolatedInspectionAction
   | ExitIsolatedInspectionAction
   | CanvasEditAction
@@ -137,6 +137,10 @@ export interface SelectPageAction {
 export interface HighlightNodeAction {
   type: "highlight-node";
   id: string;
+}
+
+export interface RemoveSelectedNodeFromHighlightAction {
+  type: "highlight-node/remove";
 }
 
 type CanvasModeAction = CanvasModeSwitchAction;

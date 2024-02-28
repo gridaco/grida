@@ -63,6 +63,9 @@ export function craftHistoryReducer(
         draft.craft.children = draft.craft.children.filter(
           (c) => !targets.includes(c.id)
         );
+        draft.selectedNodes = draft.selectedNodes.filter(
+          (c) => !targets.includes(c)
+        );
       });
     }
     case "(craft)/node/opacity": {
