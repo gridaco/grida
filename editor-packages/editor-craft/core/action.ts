@@ -25,6 +25,7 @@ export type CraftPreviewNodeBorderColorAction = {
 
 export type CraftHistoryAction =
   | CraftNodeOpacityAction
+  | CraftNodeOverflowAction
   | CraftNodeCornerRadiusAction
   | CraftNodeBoxShadowAction
   | CraftNodeAddBorderAction
@@ -38,6 +39,11 @@ export type CraftHistoryAction =
 export type CraftNodeOpacityAction = {
   type: "(craft)/node/opacity";
   opacity: number;
+};
+
+export type CraftNodeOverflowAction = {
+  type: "(craft)/node/overflow";
+  value: "hidden" | "visible";
 };
 
 export type CraftNodeCornerRadiusAction = {

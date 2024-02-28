@@ -75,6 +75,17 @@ export function craftHistoryReducer(
         });
       });
     }
+    case "(craft)/node/overflow": {
+      const { value } = action;
+      return produce(state, (draft) => {
+        const selected = draft.selectedNodes[0];
+        draft.craft.children.forEach((c) => {
+          if (c.id === selected) {
+            c.style.overflow = value;
+          }
+        });
+      });
+    }
     case "(craft)/node/corners": {
       return produce(state, (draft) => {
         const { radius } = action;
@@ -413,8 +424,9 @@ export function craftHistoryReducer(
                 ].join(" "),
               },
               style: {
-                width: 100,
-                height: 100,
+                padding: 10,
+                backgroundColor: "black",
+                color: "white",
               },
               children: [],
               text: "Button",
@@ -446,6 +458,73 @@ export function craftHistoryReducer(
                 height: 1,
               },
               children: [],
+              width: w,
+              height: h,
+              absoluteX: x,
+              absoluteY: y,
+              rotation: 0,
+            });
+          });
+        }
+        case "flex flex-row": {
+          const point = next_canvas_placement(state, [0, 0, 200, 100]);
+          const [x, y, w, h] = point;
+          return produce(state, (draft) => {
+            draft.craft.children.push({
+              type: "html",
+              id,
+              name: "flex flex-row",
+              x: x,
+              y: y,
+              tag: "div",
+              attributes: {
+                tw: ["flex", "flex-row"].join(" "),
+              },
+              style: {
+                width: w,
+                height: h,
+                display: "flex",
+                flexDirection: "row",
+                gap: 10,
+              },
+              children: [
+                {
+                  type: "html",
+                  id: id + "-1",
+                  name: "child 1",
+                  x: 0,
+                  y: 0,
+                  width: w / 2,
+                  height: h,
+                  tag: "div",
+                  style: {
+                    flex: 1,
+                    backgroundColor: "rgba(0, 0, 0, 0.1)",
+                  },
+                  children: [],
+                  absoluteX: x,
+                  absoluteY: y,
+                  rotation: 0,
+                },
+                {
+                  type: "html",
+                  id: id + "-2",
+                  name: "child 2",
+                  x: x + w / 2,
+                  y: 0,
+                  width: w / 2,
+                  height: h,
+                  tag: "div",
+                  style: {
+                    flex: 1,
+                    backgroundColor: "rgba(0, 0, 0, 0.2)",
+                  },
+                  children: [],
+                  absoluteX: x + w / 2,
+                  absoluteY: y,
+                  rotation: 0,
+                },
+              ],
               width: w,
               height: h,
               absoluteX: x,

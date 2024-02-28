@@ -11,7 +11,8 @@ import { CraftForegroundColorSection } from "./section-craft-foreground-color";
 import { CraftIconSection } from "./section-craft-icon";
 import { CraftBorderSection } from "./section-craft-border";
 import { CraftBoxShadowSection } from "./section-craft-box-shadow";
-import { CraftLayoutSection } from "./section-craft-layout";
+import { CraftLayerSection } from "./section-craft-layer";
+import { CraftBoxLayoutSection } from "./section-craft-box";
 
 export function CraftInspector() {
   return (
@@ -44,7 +45,8 @@ function InspectorBody({ debug }: { debug?: boolean }) {
   return (
     <EditorPropertyThemeProvider theme={one.dark}>
       <CrafInfoSection />
-      <CraftLayoutSection />
+      <CraftLayerSection />
+      <CraftBoxLayoutSection />
       <CraftBackgroundColorSection />
       <CraftForegroundColorSection />
       <CraftIconSection />

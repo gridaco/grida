@@ -1,4 +1,5 @@
 import {
+  PropertyCheckboxInput,
   PropertyGroup,
   PropertyGroupHeader,
   PropertyInput,
@@ -12,7 +13,7 @@ import { useDispatch } from "core/dispatch";
 import { useInspectorElement } from "hooks/use-inspector-element";
 import { useCallback } from "react";
 
-export function CraftLayoutSection() {
+export function CraftLayerSection() {
   const dispatch = useDispatch();
   const element = useInspectorElement();
 
@@ -59,6 +60,16 @@ export function CraftLayoutSection() {
     [dispatch]
   );
 
+  const onClipChange = useCallback(
+    (clip: boolean) => {
+      dispatch({
+        type: "(craft)/node/overflow",
+        value: clip ? "hidden" : "visible",
+      });
+    },
+    [dispatch]
+  );
+
   if (!element) {
     return <></>;
   }
@@ -73,6 +84,7 @@ export function CraftLayoutSection() {
 
   const opacity100 = ((element?.style?.opacity as number) || 1) * 100;
 
+  const clipsContent = element?.style?.overflow === "hidden";
   // let tr, tl, br, bl;
   // if ("cornerRadius" in element) {
   //   const { bl: _bl, br: _br, tl: _tl, tr: _tr } = element.cornerRadius;
@@ -87,9 +99,6 @@ export function CraftLayoutSection() {
 
   return (
     <PropertyGroup>
-      <PropertyGroupHeader>
-        <h6>Layout</h6>
-      </PropertyGroupHeader>
       <PropertyLines key={id}>
         <PropertyLine label="Position">
           <PropertyNumericInput
@@ -160,23 +169,17 @@ export function CraftLayoutSection() {
             step={1}
             onValueChange={(value) => {}}
           /> */}
-          <PropertyInput
+          <PropertyNumericInput
             min={0}
             max={100}
             stopPropagation
-            type="number"
             suffix={"%"}
-            onChange={(text) => {
-              const val = Number(text);
-
-              if (isNaN(val)) {
-                return;
-              }
-
-              onOpacityChange(val);
-            }}
+            onChange={onOpacityChange}
             value={opacity100}
           />
+        </PropertyLine>
+        <PropertyLine label="Clip">
+          <PropertyCheckboxInput onChange={onClipChange} value={clipsContent} />
         </PropertyLine>
       </PropertyLines>
     </PropertyGroup>
