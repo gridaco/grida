@@ -16,7 +16,6 @@ export function craftDraftReducer(
         const selected = draft.selectedNodes[0];
         draft.craft.children.forEach((c) => {
           if (c.id === selected) {
-            console.log("draft color", color);
             const colorstr = `rgba(${color.r},${color.g},${color.b},${color.a})`;
             (c as CraftHtmlElement).style.backgroundColor = colorstr;
           }
@@ -29,7 +28,6 @@ export function craftDraftReducer(
         const selected = draft.selectedNodes[0];
         draft.craft.children.forEach((c) => {
           if (c.id === selected) {
-            console.log("draft color", color);
             const colorstr = `rgba(${color.r},${color.g},${color.b},${color.a})`;
             (c as CraftHtmlElement).style.color = colorstr;
           }
@@ -42,7 +40,6 @@ export function craftDraftReducer(
         const selected = draft.selectedNodes[0];
         draft.craft.children.forEach((c) => {
           if (c.id === selected) {
-            console.log("draft color", color);
             const colorstr = `rgba(${color.r},${color.g},${color.b},${color.a})`;
             (c as CraftHtmlElement).style.borderColor = colorstr;
           }

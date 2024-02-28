@@ -90,27 +90,32 @@ export interface CanvasFocusNodeAction {
 }
 
 export type CanvasEditAction =
-  | TranslateSelectedNodeAction
+  | TranslateDeltaSelectedNodeAction
+  | PositionSelectedNodeAction
   | ResizeSelectedNodeAction;
 
 /**
  * Select and move to the node.
  */
-export interface TranslateSelectedNodeAction {
+export interface TranslateDeltaSelectedNodeAction {
   type: "node-transform-translate";
   /**
    * delta value
    */
-  translate: [number, number];
+  translate: [number | undefined, number | undefined];
+}
+
+export interface PositionSelectedNodeAction {
+  type: "node-transform-position";
+  x?: number;
+  y?: number;
 }
 
 export interface ResizeSelectedNodeAction {
   type: "node-resize";
   origin: "center" | "nw" | "ne" | "sw" | "se" | "n" | "s" | "w" | "e";
-  /**
-   * delta value
-   */
-  delta: [number, number];
+  width?: number;
+  height?: number;
 }
 
 export interface EnterIsolatedInspectionAction {

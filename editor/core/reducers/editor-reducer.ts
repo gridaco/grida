@@ -5,7 +5,7 @@ import type {
   SelectPageAction,
   CodingUpdateFileAction,
   CanvasModeSwitchAction,
-  TranslateSelectedNodeAction,
+  TranslateDeltaSelectedNodeAction,
   PreviewBuildingStateUpdateAction,
   PreviewSetAction,
   DevtoolsConsoleAction,
@@ -20,6 +20,8 @@ import type {
   CodingNewTemplateSessionAction,
   EnterIsolatedInspectionAction,
   ExitIsolatedInspectionAction,
+  ResizeSelectedNodeAction,
+  PositionSelectedNodeAction,
 } from "core/actions";
 import { EditorState, WorkspaceStateSeed } from "core/states";
 import { NextRouter, useRouter } from "next/router";
@@ -213,33 +215,74 @@ export function editorReducer(
     }
 
     case "node-transform-translate": {
-      const { translate, node } = <TranslateSelectedNodeAction>action;
+      const { translate } = <TranslateDeltaSelectedNodeAction>action;
+      const [dx, dy] = translate;
+      return produce(state, (draft) => {
+        const nodes =
+          state.mode.value === "craft"
+            ? draft.craft.children
+            : draft.design.pages.find((p) => p.id === state.selectedPage)
+                .children;
+
+        state.selectedNodes
+          .map((n) => q.getNodeByIdFrom(n, nodes as any))
+          .map((n) => {
+            n.x += dx;
+            n.y += dy;
+            n.absoluteX += dx;
+            n.absoluteY += dy;
+          });
+      });
+    }
+    case "node-transform-position": {
+      const { x, y } = <PositionSelectedNodeAction>action;
+
+      return produce(state, (draft) => {
+        const nodes =
+          state.mode.value === "craft"
+            ? draft.craft.children
+            : draft.design.pages.find((p) => p.id === state.selectedPage)
+                .children;
+
+        state.selectedNodes
+          .map((n) => q.getNodeByIdFrom(n, nodes as any))
+          .map((n) => {
+            if (x) {
+              const dx = x - n.x;
+              n.x += dx;
+              n.absoluteX += dx;
+            }
+            if (y) {
+              const dy = y - n.y;
+              n.y += dy;
+              n.absoluteY += dy;
+            }
+          });
+      });
+    }
+    case "node-resize": {
+      const { origin, width, height } = <ResizeSelectedNodeAction>action;
 
       switch (state.mode.value) {
         case "design": {
-          return produce(state, (draft) => {
-            const page = draft.design.pages.find(
-              (p) => p.id === state.selectedPage
-            );
-
-            node
-              .map((n) => q.getNodeByIdFrom(n, page.children))
-              .map((n) => {
-                n.x += translate[0];
-                n.y += translate[1];
-              });
-          });
+          throw new Error(
+            `node-resize: mode not supported: ${state.mode.value}`
+          );
         }
         case "craft": {
           return produce(state, (draft) => {
-            state.selectedNodes
-              .map((n) => q.getNodeByIdFrom(n, draft.craft.children))
-              .map((n) => {
-                n.x += translate[0];
-                n.y += translate[1];
-                n.absoluteX += translate[0];
-                n.absoluteY += translate[1];
-              });
+            if (origin === "nw") {
+              state.selectedNodes
+                .map((n) => q.getNodeByIdFrom(n, draft.craft.children))
+                .map((n) => {
+                  if (width) n.width = width;
+                  if (width) n.style.width = width;
+                  if (height) n.height = height;
+                  if (height) n.style.height = height;
+                });
+            } else {
+              throw new Error(`node-resize: origin not supported: ${origin}`);
+            }
           });
         }
         default: {

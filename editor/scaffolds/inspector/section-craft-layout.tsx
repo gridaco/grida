@@ -4,6 +4,7 @@ import {
   PropertyInput,
   PropertyLine,
   PropertyLines,
+  PropertyNumericInput,
 } from "@editor-ui/property";
 import { CornersIcon } from "@radix-ui/react-icons";
 import type { IRadius } from "@reflect-ui/core";
@@ -16,15 +17,24 @@ export function CraftLayoutSection() {
   const element = useInspectorElement();
 
   const onPositionChange = useCallback(
-    (w?: number, h?: number) => {
-      //
+    (x?: number, y?: number) => {
+      dispatch({
+        type: "node-transform-position",
+        x,
+        y,
+      });
     },
     [dispatch]
   );
 
   const onSizeChange = useCallback(
     (w?: number, h?: number) => {
-      //
+      dispatch({
+        type: "node-resize",
+        origin: "nw",
+        width: w,
+        height: h,
+      });
     },
     [dispatch]
   );
@@ -82,27 +92,48 @@ export function CraftLayoutSection() {
       </PropertyGroupHeader>
       <PropertyLines key={id}>
         <PropertyLine label="Position">
-          <PropertyInput stopPropagation suffix={"X"} value={dx} />
-          <PropertyInput stopPropagation suffix={"Y"} value={dy} />
+          <PropertyNumericInput
+            stopPropagation
+            suffix={"X"}
+            value={dx}
+            onChange={(x) => {
+              onPositionChange(x, undefined);
+            }}
+          />
+          <PropertyNumericInput
+            stopPropagation
+            suffix={"Y"}
+            value={dy}
+            onChange={(y) => {
+              onPositionChange(undefined, y);
+            }}
+          />
         </PropertyLine>
         <PropertyLine label="Size">
-          <PropertyInput stopPropagation suffix={"W"} value={dw} />
-          <PropertyInput stopPropagation suffix={"H"} value={dh} />
+          <PropertyNumericInput
+            stopPropagation
+            suffix={"W"}
+            value={dw}
+            onChange={(w) => {
+              onSizeChange(w);
+            }}
+          />
+          <PropertyNumericInput
+            stopPropagation
+            suffix={"H"}
+            value={dh}
+            onChange={(h) => {
+              onSizeChange(undefined, h);
+            }}
+          />
         </PropertyLine>
         <PropertyLine label="Corner">
-          <PropertyInput
+          <PropertyNumericInput
             value={element.style.borderRadius || 0}
             stopPropagation
             min={0}
-            type="number"
             suffix={<CornersIcon />}
-            onChange={(txt) => {
-              const val = Number(txt);
-              if (isNaN(val)) {
-                return;
-              }
-              onCornerRadiusChange(val);
-            }}
+            onChange={onCornerRadiusChange}
           />
         </PropertyLine>
         {/* {!!hasradius && (
