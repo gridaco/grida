@@ -1,7 +1,7 @@
 import React, { useEffect } from "react";
 import { Editor, SetupNoopEditor } from "scaffolds/editor";
 import { Workspace } from "scaffolds/workspace/workspace";
-import { BuilderProviders } from "scaffolds/editor";
+import { CraftEditorProviders } from "scaffolds/editor";
 import { useDispatch } from "core/dispatch";
 
 export default function BuilderEditor() {
@@ -16,11 +16,11 @@ export default function BuilderEditor() {
         }}
       >
         <SetupNoopEditor>
-          <BuilderProviders>
+          <CraftEditorProviders>
             <DeleteKeyProvider>
               <Editor />
             </DeleteKeyProvider>
-          </BuilderProviders>
+          </CraftEditorProviders>
         </SetupNoopEditor>
       </Workspace>
     </>

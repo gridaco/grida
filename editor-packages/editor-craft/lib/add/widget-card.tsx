@@ -1,28 +1,22 @@
 import React from "react";
 import { widget_production_stage } from "../k";
 import { WidgetIcon } from "./widget-icon";
-import type { WidgetType } from "../widgets";
-export function WidgetCard({
-  value,
-  label,
-  ...props
-}: React.HTMLAttributes<HTMLButtonElement> & {
-  value: WidgetType;
-  label: string;
-}) {
-  // const { attributes, listeners, setNodeRef, transform } = useDraggable({
-  //   id: "craft::widgets/add/" + value,
-  // });
-  // const style: React.CSSProperties = transform
-  //   ? {
-  //       transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`,
-  //     }
-  //   : undefined;
-
+import { widgets, type WidgetType } from "../widgets";
+export const WidgetCard = React.forwardRef(function WidgetCard(
+  {
+    value,
+    label,
+    ...props
+  }: React.HTMLAttributes<HTMLButtonElement> & {
+    value: WidgetType;
+    label?: string;
+  },
+  ref: React.Ref<HTMLButtonElement>
+) {
   const badge = widget_production_stage_label[widget_production_stage[value]];
   return (
     <button
-      // ref={setNodeRef}
+      ref={ref}
       // style={style}
       // {...listeners}
       // {...attributes}
@@ -41,10 +35,10 @@ export function WidgetCard({
         </span>
       )}
       <WidgetIcon name={value} />
-      <span className="text-sm">{label}</span>
+      {label && <span className="text-sm">{label}</span>}
     </button>
   );
-}
+});
 
 const widget_production_stage_label = {
   prod: null,

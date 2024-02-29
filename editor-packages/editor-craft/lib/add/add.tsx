@@ -4,6 +4,7 @@ import { WidgetType, widgets } from "../widgets";
 import { widget_production_stage } from "../k";
 import { PlusIcon } from "@radix-ui/react-icons";
 import { WidgetCard } from "./widget-card";
+import { useDraggable } from "@dnd-kit/core";
 
 export function CraftAddButton({
   onAddWidget,
@@ -65,7 +66,8 @@ export function CraftAddButton({
             </div>
             <div className="w-full flex flex-wrap gap-2 justify-center items-center">
               {display_widgets.map(([key, label]) => (
-                <WidgetCard
+                <DraggableWidgetCard
+                  dragId={"craft::widgets/add/" + key}
                   key={key}
                   value={key}
                   label={label}
@@ -82,6 +84,23 @@ export function CraftAddButton({
     </Popover.Root>
   );
 }
+
+function DraggableWidgetCard({
+  dragId,
+  ...props
+}: React.ComponentProps<typeof WidgetCard> & {
+  dragId: string;
+}) {
+  const { attributes, listeners, setNodeRef } = useDraggable({
+    id: dragId,
+    data: { ns: "craft/widget", widget: props.value },
+  });
+
+  return (
+    <WidgetCard ref={setNodeRef} {...listeners} {...attributes} {...props} />
+  );
+}
+
 const widget_production_stage_priority = {
   prod: 0,
   beta: 1,
