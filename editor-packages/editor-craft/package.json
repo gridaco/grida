@@ -3,6 +3,7 @@
   "version": "0.0.0",
   "dependencies": {
     "@code-editor/canvas": "workspace:^",
+    "@dnd-kit/core": "^6.1.0",
     "@radix-ui/react-icons": "^1.0.3",
     "@radix-ui/react-popover": "^1.0.7",
     "@reflect-ui/core": "0.0.12",
