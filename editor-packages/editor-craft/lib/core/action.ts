@@ -36,7 +36,8 @@ export type CraftHistoryAction =
   | CraftNewWidgetAction
   | CraftDeleteNodeAction
   | CraftCommitNodeBackgroundAction
-  | CraftCommitIconDataAction;
+  | CraftCommitIconDataAction
+  | CraftSrcDataAction;
 
 export type CraftNodeOpacityAction = {
   type: "(craft)/node/opacity";
@@ -165,5 +166,10 @@ export type CraftTextFontSizeAction = {
 
 export type CraftCommitIconDataAction = {
   type: "(craft)/node/icon/data";
+  data: string;
+};
+
+export type CraftSrcDataAction = {
+  type: "(craft)/node/src/data";
   data: string;
 };

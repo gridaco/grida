@@ -513,6 +513,9 @@ importers:
       tree-visit:
         specifier: ^0.1.0
         version: 0.1.4
+      unsplash-js:
+        specifier: ^7.0.19
+        version: 7.0.19
     devDependencies:
       '@emotion/babel-preset-css-prop':
         specifier: ^11.2.0
@@ -30019,6 +30022,11 @@ packages:
       has-value: 0.3.1
       isobject: 3.0.1
     dev: true
+
+  /unsplash-js@7.0.19:
+    resolution: {integrity: sha512-j6qT2floy5Q2g2d939FJpwey1yw/GpQecFiSouyJtsHQPj3oqmqq3K4rI+GF8vU1zwGCT7ZwIGQd2dtCQLjYJw==}
+    engines: {node: '>=10'}
+    dev: false
 
   /untildify@2.1.0:
     resolution: {integrity: sha512-sJjbDp2GodvkB0FZZcn7k6afVisqX5BZD7Yq3xp4nN2O15BBK0cLm3Vwn2vQaF7UDS0UUsrQMkkplmDI5fskig==}

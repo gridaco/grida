@@ -282,6 +282,17 @@ export function craftHistoryReducer(
         });
       });
     }
+    case "(craft)/node/src/data": {
+      return produce(state, (draft) => {
+        const { data } = action;
+        const selected = draft.selectedNodes[0];
+        draft.craft.children.forEach((c) => {
+          if (c.id === selected) {
+            c.attributes.src = data;
+          }
+        });
+      });
+    }
     case "(craft)/node/background-color": {
       return produce(state, (draft) => {
         const { color } = action;

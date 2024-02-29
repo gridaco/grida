@@ -13,6 +13,7 @@ import { CraftBorderSection } from "./section-craft-border";
 import { CraftBoxShadowSection } from "./section-craft-box-shadow";
 import { CraftLayerSection } from "./section-craft-layer";
 import { CraftBoxLayoutSection } from "./section-craft-box";
+import { CraftSrcSection } from "./section-craft-src";
 
 export function CraftInspector() {
   return (
@@ -50,6 +51,7 @@ function InspectorBody({ debug }: { debug?: boolean }) {
       <CraftBoxLayoutSection />
       <CraftBackgroundColorSection />
       <CraftForegroundColorSection />
+      <CraftSrcSection />
       <CraftIconSection />
       <CraftBorderSection />
       <CraftBoxShadowSection />

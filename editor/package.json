@@ -134,7 +134,8 @@
     "recoil": "^0.2.0",
     "rxdb": "^10.5.4",
     "rxjs": "^7.4.0",
-    "tree-visit": "^0.1.0"
+    "tree-visit": "^0.1.0",
+    "unsplash-js": "^7.0.19"
   },
   "devDependencies": {
     "@emotion/babel-preset-css-prop": "^11.2.0",
