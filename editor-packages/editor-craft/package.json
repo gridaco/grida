@@ -3,9 +3,19 @@
   "version": "0.0.0",
   "dependencies": {
     "@code-editor/canvas": "workspace:^",
+    "@radix-ui/react-icons": "^1.0.3",
+    "@radix-ui/react-popover": "^1.0.7",
     "@reflect-ui/core": "0.0.12",
     "@web-builder/styles": "workspace:^",
     "editor": "workspace:^",
     "immer": "^9.0.3"
+  },
+  "devDependencies": {
+    "@types/react": "18.2.58",
+    "react": "^18.2.0"
+  },
+  "peerDependencies": {
+    "@types/react": "18.2.58",
+    "react": "^18.2.0"
   }
 }

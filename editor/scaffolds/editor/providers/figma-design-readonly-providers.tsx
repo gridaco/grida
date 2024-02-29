@@ -7,6 +7,7 @@ import { EditorToastProvider } from "../editor-toast-provider";
 import { FigmaImageServiceProviderForCanvasRenderer } from "../editor-figma-image-service-for-canvas-provider";
 import { DashboardStateProvider } from "@code-editor/dashboard";
 import { EditorState, useEditorState } from "core/states";
+import { EditorGlobalDndContextProvider } from "../editor-global-dnd-context-provider";
 
 export function FigmaDesignReadonlyProviders(props: {
   children: React.ReactNode;
@@ -31,19 +32,21 @@ export function FigmaDesignReadonlyProviders(props: {
 
   return (
     <EditorToastProvider>
-      <EditorShortcutsProvider>
-        <EditorPreviewDataProvider>
-          <EditorImageRepositoryProvider>
-            <EditorCodeWebworkerProvider>
-              <FigmaImageServiceProviderForCanvasRenderer>
-                <DashboardProvider design={state.design}>
-                  {props.children}
-                </DashboardProvider>
-              </FigmaImageServiceProviderForCanvasRenderer>
-            </EditorCodeWebworkerProvider>
-          </EditorImageRepositoryProvider>
-        </EditorPreviewDataProvider>
-      </EditorShortcutsProvider>
+      <EditorGlobalDndContextProvider>
+        <EditorShortcutsProvider>
+          <EditorPreviewDataProvider>
+            <EditorImageRepositoryProvider>
+              <EditorCodeWebworkerProvider>
+                <FigmaImageServiceProviderForCanvasRenderer>
+                  <DashboardProvider design={state.design}>
+                    {props.children}
+                  </DashboardProvider>
+                </FigmaImageServiceProviderForCanvasRenderer>
+              </EditorCodeWebworkerProvider>
+            </EditorImageRepositoryProvider>
+          </EditorPreviewDataProvider>
+        </EditorShortcutsProvider>
+      </EditorGlobalDndContextProvider>
     </EditorToastProvider>
   );
 }

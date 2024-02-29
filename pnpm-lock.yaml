@@ -267,6 +267,9 @@ importers:
       '@designto/token':
         specifier: workspace:^
         version: link:../externals/code/packages/designto-token
+      '@dnd-kit/core':
+        specifier: ^6.1.0
+        version: 6.1.0(react-dom@18.2.0)(react@18.2.0)
       '@editor-app/live-session':
         specifier: workspace:^
         version: link:../editor-packages/editor-live-session
@@ -645,6 +648,12 @@ importers:
       '@code-editor/canvas':
         specifier: workspace:^
         version: link:../editor-canvas
+      '@radix-ui/react-icons':
+        specifier: ^1.0.3
+        version: 1.3.0(react@18.2.0)
+      '@radix-ui/react-popover':
+        specifier: ^1.0.7
+        version: 1.0.7(@types/react-dom@18.2.19)(@types/react@18.2.58)(react-dom@18.2.0)(react@18.2.0)
       '@reflect-ui/core':
         specifier: 0.0.12
         version: 0.0.12(@reflect-ui/cg@0.1.1)
@@ -657,6 +666,13 @@ importers:
       immer:
         specifier: ^9.0.3
         version: 9.0.21
+    devDependencies:
+      '@types/react':
+        specifier: 18.2.58
+        version: 18.2.58
+      react:
+        specifier: ^18.2.0
+        version: 18.2.0
 
   editor-packages/editor-dashboard:
     dependencies:
