@@ -146,30 +146,34 @@ export function editorReducer(
       // 2. select page containing the node
       // 3. move canvas to the node (if page is canvas)
 
-      return produce(state, (draft) => {
-        const page = getPageNode(node, state);
-        const _1_select_node = reducers["select-node"](draft, {
-          node: node,
-        });
-        const _2_select_page = reducers["select-page"](_1_select_node, {
-          page: page.id,
-        });
+      return produce(
+        state,
+        // @ts-ignore
+        (draft) => {
+          const page = getPageNode(node, state);
+          const _1_select_node = reducers["select-node"](state, {
+            node: node,
+          });
+          const _2_select_page = reducers["select-page"](_1_select_node, {
+            page: page.id,
+          });
 
-        const final = _2_select_page;
+          const final = _2_select_page;
 
-        return <EditorState>{
-          ...final,
-          canvas: {
-            // refresh canvas focus to the target.
-            focus: {
-              refreshkey: nanoid(4),
-              nodes: [node],
+          return <EditorState>{
+            ...final,
+            canvas: {
+              // refresh canvas focus to the target.
+              focus: {
+                refreshkey: nanoid(4),
+                nodes: [node],
+              },
+              // update selection
+              selectedNodes: [node],
             },
-            // update selection
-            selectedNodes: [node],
-          },
-        };
-      });
+          };
+        }
+      );
     }
 
     case "design/enter-isolation": {
@@ -509,7 +513,7 @@ const reducers = {
 
     if (!changed) {
       // console.log("no change in selection");
-      return state;
+      return produce(state, (draft) => {});
     }
 
     return produce(state, (draft) => {
