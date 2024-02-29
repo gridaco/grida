@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useEditorState } from "core/states";
-import { CraftElement } from "@code-editor/craft/core";
+import { CraftElement } from "@code-editor/craft";
 
 export function useInspectorElement() {
   const [t, setT] = useState<CraftElement>();

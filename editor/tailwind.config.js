@@ -6,6 +6,7 @@ module.exports = {
     "./components/**/*.{js,ts,jsx,tsx,mdx}",
     "./scaffolds/**/*.{js,ts,jsx,tsx,mdx}",
     "../ui/**/*.{js,ts,jsx,tsx}",
+    "../editor-packages/editor-craft/lib/**/*.{js,ts,jsx,tsx}",
   ],
   theme: {
     extend: {},

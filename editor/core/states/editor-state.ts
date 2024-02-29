@@ -4,7 +4,7 @@ import type { RGBA, WidgetKey } from "@reflect-ui/core";
 import type { ComponentNode } from "@design-sdk/figma-types";
 import type { DesignInput } from "@grida/builder-config/input";
 import type { File } from "@grida/builder-config/output/output-file";
-import { type CraftElement } from "@code-editor/craft/core";
+import type { CraftElement } from "@code-editor/craft";
 
 export type { File };
 

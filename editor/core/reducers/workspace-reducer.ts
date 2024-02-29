@@ -9,7 +9,6 @@ import {
   WorkspaceWarmupAction,
 } from "../actions";
 import { historyReducer } from "./history";
-import { craftDraftReducer } from "@code-editor/craft/core";
 
 export function workspaceReducer(
   state: WorkspaceState,

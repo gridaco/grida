@@ -1,4 +1,4 @@
-import { CraftElement } from "@code-editor/craft/core";
+import { CraftElement } from "@code-editor/craft";
 import { RadixIconRenderer } from "./radix-ui-icons-renderer";
 import { HtmlCssVanillaRenderer } from "./htmlcss-vanilla-renderer";
 

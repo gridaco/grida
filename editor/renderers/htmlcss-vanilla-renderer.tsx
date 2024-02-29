@@ -1,5 +1,5 @@
 import React from "react";
-import { CraftElement, CraftHtmlElement } from "@code-editor/craft/core";
+import { CraftElement, CraftHtmlElement } from "@code-editor/craft";
 import * as css from "@web-builder/styles";
 
 export function HtmlCssVanillaRenderer({

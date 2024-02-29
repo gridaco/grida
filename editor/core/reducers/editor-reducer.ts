@@ -37,7 +37,7 @@ import {
   craftHistoryReducer,
   craftDraftReducer,
   CraftDraftAction,
-} from "@code-editor/craft/core";
+} from "@code-editor/craft";
 
 const _DEV_CLEAR_LOG = false;
 

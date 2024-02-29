@@ -1,4 +1,4 @@
-import { CraftRadixIconElement } from "@code-editor/craft/core";
+import { CraftRadixIconElement } from "@code-editor/craft";
 import * as RadixIcons from "@radix-ui/react-icons";
 
 export function RadixIconRenderer({

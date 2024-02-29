@@ -1,4 +1,4 @@
-import { CraftHistoryAction, CraftDraftAction } from "@code-editor/craft/core";
+import { CraftHistoryAction, CraftDraftAction } from "@code-editor/craft";
 import type { FrameworkConfig } from "@grida/builder-config";
 import type {
   ConsoleLog,
