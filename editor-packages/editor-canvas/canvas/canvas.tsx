@@ -35,7 +35,7 @@ import {
 } from "@editor-ui/context-menu";
 import styled from "@emotion/styled";
 import toast from "react-hot-toast";
-import { ResizeHandleOrigin } from "overlay/types";
+import type { ResizeHandleOrigin } from "../overlay/types";
 
 interface TCanvasNode extends DisplayNodeMeta {
   id: string;
@@ -276,7 +276,7 @@ export function Canvas<T extends TCanvasNode>({
   const [isDragging, setIsDragging] = useState(false);
   const [isMovingSelections, setIsMovingSelections] = useState(false);
   const [isResizingSelections, setIsResizingSelections] = useState(false);
-  const [marquee, setMarquee] = useState<XYWH>(null);
+  const [marquee, setMarquee] = useState<XYWH | null>(null);
 
   const _canvas_state_store = useMemo(
     () => new CanvasStateStore(filekey, pageid),
@@ -455,7 +455,7 @@ export function Canvas<T extends TCanvasNode>({
     const [x, y] = [cx / zoom, cy / zoom];
 
     const box = boundingbox(
-      selected_nodes.map((d) => xywhr_of(d)),
+      selected_nodes.map((d) => xywhr_of(d!)),
       2
     );
 
@@ -519,9 +519,15 @@ export function Canvas<T extends TCanvasNode>({
   };
 
   const is_canvas_transforming = isPanning || isZooming;
+
+  const hud_hidden =
+    is_canvas_transforming || isMovingSelections || isResizingSelections;
+
+  const hud_interaction_disabled = is_canvas_transforming || isMovingSelections;
+
   const selected_nodes = useMemo(
     () => selectedNodes?.map((id) => qdoc.getNodeById(id)).filter(Boolean),
-    [selectedNodes, isDragging]
+    [selectedNodes, isDragging, hud_hidden]
   );
 
   const position_guides = useMemo(
@@ -530,8 +536,21 @@ export function Canvas<T extends TCanvasNode>({
         selections: selected_nodes,
         hover: hoveringLayer?.node,
       }),
-    [selectedNodes, hoveringLayer?.node?.id]
+    [selectedNodes, hoveringLayer?.node?.id, hud_hidden]
   );
+
+  const highlights = useMemo(() => {
+    return hoveringLayer?.node
+      ? (config.can_highlight_selected_layer
+          ? [hoveringLayer.node]
+          : noduplicates([hoveringLayer.node], selected_nodes)
+        ).map((h) => ({
+          id: h.id,
+          xywh: [h.absoluteX, h.absoluteY, h.width, h.height] as XYWH,
+          rotation: h.rotation,
+        }))
+      : [];
+  }, [hoveringLayer, selectedNodes, hud_hidden]);
 
   const items = useMemo(() => {
     return nodes?.map((node) => {
@@ -618,6 +637,13 @@ export function Canvas<T extends TCanvasNode>({
             onPointerMoveStart={() => {}}
             onPointerMoveEnd={() => {}}
             onPointerDown={onPointerDown}
+            onPointerUp={() => {
+              setIsDragging(false);
+              setIsMovingSelections(false);
+              setIsPanning(false);
+              setIsResizingSelections(false);
+              setHoveringLayer(null);
+            }}
             onDragStart={onDragStart}
             onDrag={onDrag}
             onDragEnd={onDragEnd}
@@ -626,12 +652,8 @@ export function Canvas<T extends TCanvasNode>({
             <HudSurface
               offset={nonscaled_offset}
               zoom={zoom}
-              hidden={
-                is_canvas_transforming ||
-                isMovingSelections ||
-                isResizingSelections
-              }
-              disabled={is_canvas_transforming || isMovingSelections}
+              hidden={hud_hidden}
+              disabled={hud_interaction_disabled}
               readonly={readonly}
               disableMarquee={config.marquee.disabled}
               disableGrouping={config.grouping.disabled}
@@ -639,18 +661,7 @@ export function Canvas<T extends TCanvasNode>({
               labelDisplayNodes={nodes}
               selectedNodes={selected_nodes}
               positionGuides={position_guides}
-              highlights={
-                hoveringLayer?.node
-                  ? (config.can_highlight_selected_layer
-                      ? [hoveringLayer.node]
-                      : noduplicates([hoveringLayer.node], selected_nodes)
-                    ).map((h) => ({
-                      id: h.id,
-                      xywh: [h.absoluteX, h.absoluteY, h.width, h.height],
-                      rotation: h.rotation,
-                    }))
-                  : []
-              }
+              highlights={highlights}
               onHoverNode={(id) => {
                 setHoveringLayer({ node: node(id), reason: "frame-title" });
               }}
