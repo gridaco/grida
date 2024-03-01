@@ -275,6 +275,7 @@ export function Canvas<T extends TCanvasNode>({
   const [isPanning, setIsPanning] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const [isMovingSelections, setIsMovingSelections] = useState(false);
+  const [isResizingSelections, setIsResizingSelections] = useState(false);
   const [marquee, setMarquee] = useState<XYWH>(null);
 
   const _canvas_state_store = useMemo(
@@ -625,7 +626,12 @@ export function Canvas<T extends TCanvasNode>({
             <HudSurface
               offset={nonscaled_offset}
               zoom={zoom}
-              hide={is_canvas_transforming || isMovingSelections}
+              hidden={
+                is_canvas_transforming ||
+                isMovingSelections ||
+                isResizingSelections
+              }
+              disabled={is_canvas_transforming || isMovingSelections}
               readonly={readonly}
               disableMarquee={config.marquee.disabled}
               disableGrouping={config.grouping.disabled}
@@ -670,6 +676,12 @@ export function Canvas<T extends TCanvasNode>({
                   },
                   ...selectedNodes
                 );
+              }}
+              onResizeStart={() => {
+                setIsResizingSelections(true);
+              }}
+              onResizeEnd={() => {
+                setIsResizingSelections(false);
               }}
               renderFrameTitle={props.renderFrameTitle}
             />

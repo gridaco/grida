@@ -10,6 +10,8 @@ import type { OnDragHandler } from "../canvas-event-target";
 
 export function SelectHightlight({
   onResize,
+  onResizeStart,
+  onResizeEnd,
   ...props
 }: Omit<OutlineProps, "width"> & {
   onResize?: (
@@ -17,6 +19,8 @@ export function SelectHightlight({
     delta: [number, number],
     meta: { altKey: boolean; shiftKey: boolean }
   ) => void;
+  onResizeStart?: () => void;
+  onResizeEnd?: () => void;
 }) {
   const { xywh, zoom, rotation } = props;
   const bbox = xywh_to_bounding_box({ xywh, scale: zoom });
@@ -65,10 +69,34 @@ export function SelectHightlight({
         <RotateHandle box={bbox} anchor="sw" onDrag={onrotatecb("sw")} />
       </> */}
       <>
-        <ResizeHandle box={bbox} anchor="ne" onDrag={onResizeHandleDragNE} />
-        <ResizeHandle box={bbox} anchor="nw" onDrag={onResizeHandleDragNW} />
-        <ResizeHandle box={bbox} anchor="se" onDrag={onResizeHandleDragSE} />
-        <ResizeHandle box={bbox} anchor="sw" onDrag={onResizeHandleDragSW} />
+        <ResizeHandle
+          box={bbox}
+          anchor="ne"
+          onDrag={onResizeHandleDragNE}
+          onDragStart={onResizeStart}
+          onDragEnd={onResizeEnd}
+        />
+        <ResizeHandle
+          box={bbox}
+          anchor="nw"
+          onDrag={onResizeHandleDragNW}
+          onDragStart={onResizeStart}
+          onDragEnd={onResizeEnd}
+        />
+        <ResizeHandle
+          box={bbox}
+          anchor="se"
+          onDrag={onResizeHandleDragSE}
+          onDragStart={onResizeStart}
+          onDragEnd={onResizeEnd}
+        />
+        <ResizeHandle
+          box={bbox}
+          anchor="sw"
+          onDrag={onResizeHandleDragSW}
+          onDragStart={onResizeStart}
+          onDragEnd={onResizeEnd}
+        />
       </>
       <>
         <OulineSide
@@ -76,24 +104,32 @@ export function SelectHightlight({
           {...sideprops}
           cursor="ew-resize"
           onDrag={onResizeHandleDragW}
+          onDragStart={onResizeStart}
+          onDragEnd={onResizeEnd}
         />
         <OulineSide
           orientation="n"
           {...sideprops}
           cursor="ns-resize"
           onDrag={onResizeHandleDragN}
+          onDragStart={onResizeStart}
+          onDragEnd={onResizeEnd}
         />
         <OulineSide
           orientation="s"
           {...sideprops}
           cursor="ns-resize"
           onDrag={onResizeHandleDragS}
+          onDragStart={onResizeStart}
+          onDragEnd={onResizeEnd}
         />
         <OulineSide
           orientation="e"
           {...sideprops}
           cursor="ew-resize"
           onDrag={onResizeHandleDragE}
+          onDragStart={onResizeStart}
+          onDragEnd={onResizeEnd}
         />
       </>
     </OverlayContainer>
@@ -115,11 +151,15 @@ function ResizeHandle({
   anchor,
   box,
   onDrag,
+  onDragStart,
+  onDragEnd,
   ...props
 }: Partial<Omit<React.ComponentProps<typeof Handle>, "onDrag">> & {
   anchor: "nw" | "ne" | "sw" | "se";
   box: [number, number, number, number];
   onDrag?: OnDragHandler;
+  onDragStart?: () => void;
+  onDragEnd?: () => void;
 }) {
   const ref = useRef();
 
@@ -127,13 +167,15 @@ function ResizeHandle({
     {
       onDragStart: (e) => {
         e.event.stopPropagation();
+        onDragStart?.();
       },
       onDragEnd: (e) => {
         e.event.stopPropagation();
+        onDragEnd?.();
       },
       onDrag: (e) => {
-        onDrag?.(e);
         e.event.stopPropagation();
+        onDrag?.(e);
       },
     },
     {

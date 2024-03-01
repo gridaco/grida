@@ -13,6 +13,8 @@ export function OulineSide({
   readonly = true,
   cursor,
   onDrag,
+  onDragStart,
+  onDragEnd,
 }: {
   wh: [number, number];
   box: [number, number, number, number];
@@ -23,14 +25,18 @@ export function OulineSide({
   readonly?: boolean;
   cursor?: React.CSSProperties["cursor"];
   onDrag?: OnDragHandler;
+  onDragStart?: () => void;
+  onDragEnd?: () => void;
 }) {
   const ref = useRef();
   useGesture(
     {
       onDragStart: (e) => {
+        onDragStart?.();
         e.event.stopPropagation();
       },
       onDragEnd: (e) => {
+        onDragEnd?.();
         e.event.stopPropagation();
       },
       onDrag: (e) => {

@@ -46,7 +46,8 @@ interface PositionGuideMeta {
 export function HudSurface({
   offset,
   zoom,
-  hide,
+  hidden: hide,
+  disabled,
   highlights = [],
   labelDisplayNodes = [],
   selectedNodes = [],
@@ -60,6 +61,8 @@ export function HudSurface({
   //
   renderFrameTitle = frame_title_default_renderer,
   onSelectionResize,
+  onResizeStart,
+  onResizeEnd,
 }: {
   offset: XY;
   zoom: number;
@@ -67,7 +70,8 @@ export function HudSurface({
   positionGuides?: PositionGuideMeta[];
   labelDisplayNodes?: DisplayNodeMeta[];
   selectedNodes?: DisplayNodeMeta[];
-  hide: boolean;
+  hidden: boolean;
+  disabled?: boolean;
   marquee?: XYWH | null;
   disableMarquee?: boolean;
   disableGrouping?: boolean;
@@ -77,6 +81,8 @@ export function HudSurface({
     delta: [number, number],
     meta: { altKey: boolean; shiftKey: boolean }
   ) => void;
+  onResizeStart?: () => void;
+  onResizeEnd?: () => void;
 } & HudControls &
   HudCustomRenderers) {
   const [ox, oy] = offset;
@@ -97,7 +103,7 @@ export function HudSurface({
       id="hud-surface"
     >
       {!disableMarquee && marquee && <Marquee rect={marquee} />}
-      {!hide && (
+      {!disabled && (
         <>
           {/* position guide above all other generic overlays */}
           {positionGuides.length > 0 && (
@@ -157,6 +163,8 @@ export function HudSurface({
               readonly={readonly}
               disableGrouping={disableGrouping}
               onResize={onSelectionResize}
+              onResizeStart={onResizeStart}
+              onResizeEnd={onResizeEnd}
             />
           )}
         </>
@@ -194,6 +202,8 @@ function SelectionsHighlight({
   disableGrouping,
   readonly,
   onResize,
+  onResizeStart,
+  onResizeEnd,
 }: {
   readonly: boolean;
   selections: DisplayNodeMeta[];
@@ -205,6 +215,8 @@ function SelectionsHighlight({
     delta: [number, number],
     meta: { altKey: boolean; shiftKey: boolean }
   ) => void;
+  onResizeStart?: () => void;
+  onResizeEnd?: () => void;
 }) {
   if (disableGrouping) {
     return (
@@ -297,6 +309,8 @@ function SelectionsHighlight({
           xywh={xywh}
           rotation={0}
           zoom={zoom}
+          onResizeStart={onResizeStart}
+          onResizeEnd={onResizeEnd}
           onResize={onResize}
         />
       )}
