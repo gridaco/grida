@@ -6,3 +6,4 @@ export * from "./center-of";
 export * from "./viewbound-edge-scrolling";
 export * from "./zoom-to-fit";
 export * from "./placement";
+export * from "./transform-resize";

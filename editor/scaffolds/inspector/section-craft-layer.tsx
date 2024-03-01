@@ -39,7 +39,6 @@ export function CraftLayerSection() {
     (w?: number, h?: number) => {
       dispatch({
         type: "node-resize",
-        origin: "nw",
         width: w,
         height: h,
       });

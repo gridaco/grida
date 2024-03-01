@@ -39,6 +39,14 @@ export function SelectHightlight({
 
   const onResizeHandleDragSW = (e) => onResize?.("sw", e.delta, e.shiftKey);
 
+  const onResizeHandleDragN = (e) => onResize?.("n", e.delta, e.shiftKey);
+
+  const onResizeHandleDragS = (e) => onResize?.("s", e.delta, e.shiftKey);
+
+  const onResizeHandleDragW = (e) => onResize?.("w", e.delta, e.shiftKey);
+
+  const onResizeHandleDragE = (e) => onResize?.("e", e.delta, e.shiftKey);
+
   return (
     <OverlayContainer xywh={bbox} rotation={rotation}>
       {/* TODO: add rotation knob */}
@@ -55,10 +63,30 @@ export function SelectHightlight({
         <ResizeHandle box={bbox} anchor="sw" onDrag={onResizeHandleDragSW} />
       </>
       <>
-        <OulineSide orientation="w" {...sideprops} cursor="ew-resize" />
-        <OulineSide orientation="n" {...sideprops} cursor="ns-resize" />
-        <OulineSide orientation="s" {...sideprops} cursor="ns-resize" />
-        <OulineSide orientation="e" {...sideprops} cursor="ew-resize" />
+        <OulineSide
+          orientation="w"
+          {...sideprops}
+          cursor="ew-resize"
+          onDrag={onResizeHandleDragW}
+        />
+        <OulineSide
+          orientation="n"
+          {...sideprops}
+          cursor="ns-resize"
+          onDrag={onResizeHandleDragN}
+        />
+        <OulineSide
+          orientation="s"
+          {...sideprops}
+          cursor="ns-resize"
+          onDrag={onResizeHandleDragS}
+        />
+        <OulineSide
+          orientation="e"
+          {...sideprops}
+          cursor="ew-resize"
+          onDrag={onResizeHandleDragE}
+        />
       </>
     </OverlayContainer>
   );

@@ -39,6 +39,10 @@ import {
   craftDraftReducer,
   CraftDraftAction,
 } from "@code-editor/craft";
+import {
+  cvt_delta_by_resize_handle_origin,
+  resize,
+} from "@code-editor/canvas/math";
 
 const _DEV_CLEAR_LOG = false;
 
@@ -266,40 +270,7 @@ export function editorReducer(
       });
     }
     case "node-resize": {
-      const { origin, width, height } = <ResizeSelectedNodeAction>action;
-
-      switch (state.mode.value) {
-        case "design": {
-          throw new Error(
-            `node-resize: mode not supported: ${state.mode.value}`
-          );
-        }
-        case "craft": {
-          return produce(state, (draft) => {
-            if (origin === "nw") {
-              state.selectedNodes
-                .map((n) => q.getNodeByIdFrom(n, draft.craft.children))
-                .map((n) => {
-                  if (n && width) n.width = width;
-                  if (n && width) n.style!.width = width;
-                  if (n && height) n.height = height;
-                  if (n && height) n.style!.height = height;
-                });
-            } else {
-              throw new Error(`node-resize: origin not supported: ${origin}`);
-            }
-          });
-        }
-        default: {
-          throw new Error(
-            `node-transform-translate: mode not supported: ${state.mode.value}`
-          );
-        }
-      }
-    }
-    case "node-resize-delta": {
-      const { origin, delta, shiftKey } = <DeltaResizeNodeAction>action;
-      const [dx, dy] = delta;
+      const { width, height } = <ResizeSelectedNodeAction>action;
 
       switch (state.mode.value) {
         case "design": {
@@ -312,10 +283,59 @@ export function editorReducer(
             state.selectedNodes
               .map((n) => q.getNodeByIdFrom(n, draft.craft.children))
               .map((n) => {
-                if (n) n.width += dx;
-                if (n) n.height += dy;
-                if (n) n.style!.width = n.width;
-                if (n) n.style!.height = n.height;
+                if (n && width) n.width = width;
+                if (n && width) n.style!.width = width;
+                if (n && height) n.height = height;
+                if (n && height) n.style!.height = height;
+              });
+          });
+        }
+        default: {
+          throw new Error(
+            `node-transform-translate: mode not supported: ${state.mode.value}`
+          );
+        }
+      }
+    }
+    case "node-resize-delta": {
+      const { origin, delta, shiftKey } = <DeltaResizeNodeAction>action;
+      switch (state.mode.value) {
+        case "design": {
+          throw new Error(
+            `node-resize: mode not supported: ${state.mode.value}`
+          );
+        }
+        case "craft": {
+          return produce(state, (draft) => {
+            state.selectedNodes
+              .map((n) => q.getNodeByIdFrom(n, draft.craft.children))
+              .map((n) => {
+                if (!n) return;
+                const { origin: transform_origin, delta: transform_delta } =
+                  cvt_delta_by_resize_handle_origin(origin, delta, {
+                    shiftKey,
+                  });
+
+                const {
+                  value: [x, y, w, h],
+                  diff: [dx, dy],
+                } = resize(
+                  [n.x, n.y, n.width, n.height],
+                  transform_delta,
+                  transform_origin
+                );
+
+                // xy
+                n.x += dx;
+                n.y += dy;
+                n.absoluteX = x;
+                n.absoluteY = y;
+
+                // wh
+                n.width = w;
+                n.height = h;
+                n.style!.width = w;
+                n.style!.height = h;
               });
           });
         }

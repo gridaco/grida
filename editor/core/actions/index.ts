@@ -114,14 +114,13 @@ export interface PositionSelectedNodeAction {
 
 export interface ResizeSelectedNodeAction {
   type: "node-resize";
-  origin: "center" | "nw" | "ne" | "sw" | "se" | "n" | "s" | "w" | "e";
   width?: number;
   height?: number;
 }
 
 export interface DeltaResizeNodeAction {
   type: "node-resize-delta";
-  origin: "center" | "nw" | "ne" | "sw" | "se" | "n" | "s" | "w" | "e";
+  origin: "nw" | "ne" | "sw" | "se" | "n" | "s" | "w" | "e";
   delta: [number, number];
   shiftKey?: boolean;
 }

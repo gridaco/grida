@@ -1,5 +1,7 @@
-import React from "react";
+import React, { useRef } from "react";
 import { color_layer_highlight } from "../theme";
+import { useGesture } from "@use-gesture/react";
+import type { OnDragHandler } from "../canvas-event-target";
 
 export function OulineSide({
   wh,
@@ -10,6 +12,7 @@ export function OulineSide({
   color = color_layer_highlight,
   readonly = true,
   cursor,
+  onDrag,
 }: {
   wh: [number, number];
   box: [number, number, number, number];
@@ -19,7 +22,31 @@ export function OulineSide({
   color?: string;
   readonly?: boolean;
   cursor?: React.CSSProperties["cursor"];
+  onDrag?: OnDragHandler;
 }) {
+  const ref = useRef();
+  useGesture(
+    {
+      onDragStart: (e) => {
+        e.event.stopPropagation();
+      },
+      onDragEnd: (e) => {
+        e.event.stopPropagation();
+      },
+      onDrag: (e) => {
+        onDrag(e);
+        e.event.stopPropagation();
+      },
+    },
+    {
+      enabled: !readonly,
+      target: ref,
+      eventOptions: {
+        capture: false,
+      },
+    }
+  );
+
   const d = 100;
   const [w, h] = wh;
 
@@ -62,6 +89,7 @@ export function OulineSide({
 
   return (
     <div
+      ref={ref}
       style={{
         position: "fixed",
         width: d,

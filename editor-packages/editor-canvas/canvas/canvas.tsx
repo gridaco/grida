@@ -653,6 +653,13 @@ export function Canvas<T extends TCanvasNode>({
               onSelectionResize={(handle, delta, shiftKey) => {
                 // transform with zoom
                 delta = [delta[0] / zoom, delta[1] / zoom];
+
+                // cancel out unuseful delta
+                if (handle == "s") delta = [0, delta[1]];
+                if (handle == "n") delta = [0, delta[1]];
+                if (handle == "e") delta = [delta[0], 0];
+                if (handle == "w") delta = [delta[0], 0];
+
                 _cb_onResizeNode?.(
                   delta,
                   {
