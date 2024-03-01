@@ -75,7 +75,7 @@ export function HudSurface({
   onSelectionResize?: (
     handle: ResizeHandleOrigin,
     delta: [number, number],
-    shiftKey: boolean
+    meta: { altKey: boolean; shiftKey: boolean }
   ) => void;
 } & HudControls &
   HudCustomRenderers) {
@@ -203,7 +203,7 @@ function SelectionsHighlight({
   onResize?: (
     handle: ResizeHandleOrigin,
     delta: [number, number],
-    shiftKey: boolean
+    meta: { altKey: boolean; shiftKey: boolean }
   ) => void;
 }) {
   if (disableGrouping) {

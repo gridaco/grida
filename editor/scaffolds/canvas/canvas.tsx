@@ -201,12 +201,13 @@ export function EditorCraftCanvas() {
             translate: [x, y],
           });
         }}
-        onResizeNode={([w, h], { origin, shiftKey }, ...nodes) => {
+        onResizeNode={([w, h], { origin, shiftKey, altKey }, ...nodes) => {
           dispatch({
             type: "node-resize-delta",
             origin,
             delta: [w, h],
             shiftKey,
+            altKey,
           });
         }}
         onClearSelection={() => {

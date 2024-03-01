@@ -93,14 +93,34 @@ export function cvt_delta_by_resize_handle_origin(
   let [dx, dy] = delta;
 
   const handleEffects = {
-    nw: () => ({ dx: -dx, dy: -dy, origin: [1, 1] }),
-    ne: () => ({ dx: dx, dy: -dy, origin: [0, 1] }),
-    sw: () => ({ dx: -dx, dy: dy, origin: [1, 0] }),
-    se: () => ({ dx: dx, dy: dy, origin: [0, 0] }),
-    n: () => ({ dx: 0, dy: -dy, origin: [0.5, 1] }),
-    s: () => ({ dx: 0, dy: dy, origin: [0.5, 0] }),
-    e: () => ({ dx: dx, dy: 0, origin: [0, 0.5] }),
-    w: () => ({ dx: -dx, dy: 0, origin: [1, 0.5] }),
+    nw: () => ({
+      dx: -dx,
+      dy: -dy,
+      origin: meta?.altKey ? [0.5, 0.5] : [1, 1],
+    }),
+    ne: () => ({ dx: dx, dy: -dy, origin: meta?.altKey ? [0.5, 0.5] : [0, 1] }),
+    sw: () => ({ dx: -dx, dy: dy, origin: meta?.altKey ? [0.5, 0.5] : [1, 0] }),
+    se: () => ({ dx: dx, dy: dy, origin: meta?.altKey ? [0.5, 0.5] : [0, 0] }),
+    n: () => ({
+      dx: meta?.altKey ? dx * 2 : 0,
+      dy: -dy,
+      origin: meta?.altKey ? [0.5, 0.5] : [0.5, 1],
+    }),
+    s: () => ({
+      dx: meta?.altKey ? dx * 2 : 0,
+      dy: dy,
+      origin: meta?.altKey ? [0.5, 0.5] : [0.5, 0],
+    }),
+    e: () => ({
+      dx: dx,
+      dy: meta?.altKey ? dy * 2 : 0,
+      origin: meta?.altKey ? [0.5, 0.5] : [0, 0.5],
+    }),
+    w: () => ({
+      dx: -dx,
+      dy: meta?.altKey ? dy * 2 : 0,
+      origin: meta?.altKey ? [0.5, 0.5] : [1, 0.5],
+    }),
   };
 
   const effect = handleEffects[origin]();
@@ -113,6 +133,16 @@ export function cvt_delta_by_resize_handle_origin(
     const uniformDelta = Math.max(Math.abs(dx), Math.abs(dy));
     dx = dx < 0 ? -uniformDelta : uniformDelta;
     dy = dy < 0 ? -uniformDelta : uniformDelta;
+  }
+
+  // Adjust deltas for altKey (resize from center)
+  if (meta?.altKey) {
+    // For non-corner handles, we need to adjust delta to effectively double the impact
+    // since the resize will occur symmetrically from the center.
+    if (!["nw", "ne", "sw", "se"].includes(origin)) {
+      dx *= 2;
+      dy *= 2;
+    }
   }
 
   return {

@@ -123,6 +123,7 @@ export interface DeltaResizeNodeAction {
   origin: "nw" | "ne" | "sw" | "se" | "n" | "s" | "w" | "e";
   delta: [number, number];
   shiftKey?: boolean;
+  altKey?: boolean;
 }
 
 export interface EnterIsolatedInspectionAction {

@@ -298,7 +298,7 @@ export function editorReducer(
       }
     }
     case "node-resize-delta": {
-      const { origin, delta, shiftKey } = <DeltaResizeNodeAction>action;
+      const { origin, delta, shiftKey, altKey } = <DeltaResizeNodeAction>action;
       switch (state.mode.value) {
         case "design": {
           throw new Error(
@@ -314,6 +314,7 @@ export function editorReducer(
                 const { origin: transform_origin, delta: transform_delta } =
                   cvt_delta_by_resize_handle_origin(origin, delta, {
                     shiftKey,
+                    altKey,
                   });
 
                 const {

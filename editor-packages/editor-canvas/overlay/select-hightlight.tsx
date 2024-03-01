@@ -15,7 +15,7 @@ export function SelectHightlight({
   onResize?: (
     handle: ResizeHandleOrigin,
     delta: [number, number],
-    shiftKey?: boolean
+    meta: { altKey: boolean; shiftKey: boolean }
   ) => void;
 }) {
   const { xywh, zoom, rotation } = props;
@@ -31,21 +31,29 @@ export function SelectHightlight({
     color: color_layer_highlight,
   };
 
-  const onResizeHandleDragNE = (e) => onResize?.("ne", e.delta, e.shiftKey);
+  const onResizeHandleDragNE = (e) =>
+    onResize?.("ne", e.delta, { shiftKey: e.shiftKey, altKey: e.altKey });
 
-  const onResizeHandleDragNW = (e) => onResize?.("nw", e.delta, e.shiftKey);
+  const onResizeHandleDragNW = (e) =>
+    onResize?.("nw", e.delta, { shiftKey: e.shiftKey, altKey: e.altKey });
 
-  const onResizeHandleDragSE = (e) => onResize?.("se", e.delta, e.shiftKey);
+  const onResizeHandleDragSE = (e) =>
+    onResize?.("se", e.delta, { shiftKey: e.shiftKey, altKey: e.altKey });
 
-  const onResizeHandleDragSW = (e) => onResize?.("sw", e.delta, e.shiftKey);
+  const onResizeHandleDragSW = (e) =>
+    onResize?.("sw", e.delta, { shiftKey: e.shiftKey, altKey: e.altKey });
 
-  const onResizeHandleDragN = (e) => onResize?.("n", e.delta, e.shiftKey);
+  const onResizeHandleDragN = (e) =>
+    onResize?.("n", e.delta, { shiftKey: e.shiftKey, altKey: e.altKey });
 
-  const onResizeHandleDragS = (e) => onResize?.("s", e.delta, e.shiftKey);
+  const onResizeHandleDragS = (e) =>
+    onResize?.("s", e.delta, { shiftKey: e.shiftKey, altKey: e.altKey });
 
-  const onResizeHandleDragW = (e) => onResize?.("w", e.delta, e.shiftKey);
+  const onResizeHandleDragW = (e) =>
+    onResize?.("w", e.delta, { shiftKey: e.shiftKey, altKey: e.altKey });
 
-  const onResizeHandleDragE = (e) => onResize?.("e", e.delta, e.shiftKey);
+  const onResizeHandleDragE = (e) =>
+    onResize?.("e", e.delta, { shiftKey: e.shiftKey, altKey: e.altKey });
 
   return (
     <OverlayContainer xywh={bbox} rotation={rotation}>

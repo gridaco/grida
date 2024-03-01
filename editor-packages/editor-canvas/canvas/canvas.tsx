@@ -135,6 +135,7 @@ type CanvasProps<T extends TCanvasNode> = CanvasFocusProps &
       meta: {
         origin: ResizeHandleOrigin;
         shiftKey: boolean;
+        altKey: boolean;
       },
       ...node: string[]
     ) => void;
@@ -650,7 +651,7 @@ export function Canvas<T extends TCanvasNode>({
               onSelectNode={(id) => {
                 onSelectNode?.(node(id));
               }}
-              onSelectionResize={(handle, delta, shiftKey) => {
+              onSelectionResize={(handle, delta, { shiftKey, altKey }) => {
                 // transform with zoom
                 delta = [delta[0] / zoom, delta[1] / zoom];
 
@@ -665,6 +666,7 @@ export function Canvas<T extends TCanvasNode>({
                   {
                     origin: handle,
                     shiftKey,
+                    altKey,
                   },
                   ...selectedNodes
                 );
