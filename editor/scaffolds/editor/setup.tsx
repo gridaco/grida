@@ -28,15 +28,20 @@ type EditorSetupState = {
   progress: number;
 };
 
-const EditorSetupContext = React.createContext<EditorSetupState>(null);
+const EditorSetupContext = React.createContext<EditorSetupState | null>(null);
 
 export function useEditorSetupContext() {
   return React.useContext(EditorSetupContext);
 }
 
-export function SetupCraftNoopEditor({ children }: React.PropsWithChildren<{}>) {
+export function SetupCraftCraftEditor({ children }: React.PropsWithChildren<{}>) {
   const { provideEditorSnapshot: initialize } =
     useWorkspaceInitializerContext();
+
+    const initial_frame_size = {
+      width: 1920,
+      height: 1080,
+    }
 
   useEffect(() => {
     initialize({
@@ -66,10 +71,26 @@ export function SetupCraftNoopEditor({ children }: React.PropsWithChildren<{}>) 
         ],
         version: "",
         lastModified: new Date(),
+        // @ts-ignore
         input: undefined
       },
       craft: {
-        children: []
+        children: [
+          {
+            'type': 'viewport',
+            x: - initial_frame_size.width / 2,
+            y: - initial_frame_size.height / 2,
+            width: initial_frame_size.width,
+            height: initial_frame_size.height,
+            'name': 'Viewport',
+            'absoluteX': - initial_frame_size.width / 2,
+            'absoluteY': - initial_frame_size.height / 2,
+            id: 'viewport',
+            'appearance': 'light',
+            'breakpoint': 'xl',
+            children: []
+          }
+        ]
       },
       isolation: {
         isolated: false,

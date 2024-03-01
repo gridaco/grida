@@ -7,7 +7,11 @@ export function useInspectorElement() {
   const [state] = useEditorState();
 
   useEffect(() => {
-    setT(state.craft.children.find((c) => c.id === state.selectedNodes[0]));
+    setT(
+      state.craft.children.find(
+        (c) => c.type !== "viewport" && c.id === state.selectedNodes[0]
+      )
+    );
   }, [state.craft.children, state.selectedNodes]);
 
   return t;

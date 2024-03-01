@@ -311,6 +311,9 @@ export function editorReducer(
               .map((n) => q.getNodeByIdFrom(n, draft.craft.children))
               .map((n) => {
                 if (!n) return;
+                if (n.type == "viewport") {
+                  return;
+                }
                 const { origin: transform_origin, delta: transform_delta } =
                   cvt_delta_by_resize_handle_origin(origin, delta, {
                     shiftKey,

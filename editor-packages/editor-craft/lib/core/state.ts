@@ -59,4 +59,16 @@ export type CraftRadixIconElement = Omit<ElementAttributes<"svg">, "tag"> &
     color: string;
   };
 
+export type CraftViewportNode = BaseNode &
+  Position &
+  Size &
+  AbsolutePosition & {
+    type: "viewport";
+    appearance: "light" | "dark";
+    breakpoint: "sm" | "md" | "lg" | "xl" | "2xl";
+    children: CraftElement[];
+  };
+
+export type CraftNode = CraftElement | CraftViewportNode;
+
 export type CraftElement = CraftHtmlElement | CraftRadixIconElement;

@@ -36,7 +36,7 @@ export function useRenderItemWithPreference(props?: {
           return <CraftRenderPipeline key={p.node.id} target={p.node} {...p} />;
         }
         default:
-          throw new Error("Unknown renderer", renderer as unknown);
+          throw new Error("Unknown renderer", renderer as any);
       }
     },
     [renderer]

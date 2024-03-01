@@ -8,6 +8,7 @@ import { FrameTitleRenderer } from "./render/frame-title";
 import { cursors } from "@code-editor/ui";
 import { usePreferences } from "@code-editor/preferences";
 import { useRenderItemWithPreference } from "./hooks";
+import { ViewportTitleRenderer } from "@/renderers/viewport-title-renderer";
 
 /**
  * Statefull canvas segment that contains canvas as a child, with state-data connected.
@@ -187,7 +188,7 @@ export function EditorCraftCanvas() {
         ]}
         filekey={"craft"}
         pageid={selectedPage}
-        backgroundColor={"white"}
+        backgroundColor={"#E5E5E5"}
         selectedNodes={selectedNodes}
         focusRefreshkey={focus.refreshkey}
         focus={focus.nodes}
@@ -226,15 +227,30 @@ export function EditorCraftCanvas() {
             disabled: false,
           },
         }}
-        renderFrameTitle={(p) => (
-          <FrameTitleRenderer
-            key={p.id}
-            {...p}
-            runnable={selectedNodes.length === 1}
-            onRunClick={() => startCodeSession(p.id!)}
-            onDoubleClick={() => enterIsolation(p.id!)}
-          />
-        )}
+        renderFrameTitle={(p) => {
+          if (p.type === "viewport") {
+            return (
+              <ViewportTitleRenderer
+                key={p.id}
+                {...p}
+                runnable={true}
+                onRunClick={() => startCodeSession(p.id!)}
+                onDoubleClick={() => enterIsolation(p.id!)}
+              />
+            );
+          }
+          // TODO: consider removing title for non viewport nodes?
+          return <></>;
+          return (
+            <FrameTitleRenderer
+              key={p.id}
+              {...p}
+              runnable={false}
+              onRunClick={() => startCodeSession(p.id!)}
+              onDoubleClick={() => enterIsolation(p.id!)}
+            />
+          );
+        }}
       />
     </CanvasContainer>
   );

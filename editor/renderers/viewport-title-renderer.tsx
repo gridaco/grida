@@ -6,8 +6,8 @@ import {
   FrameTitleLabel,
 } from "@code-editor/canvas/frame-title";
 import { color_frame_title } from "@code-editor/canvas/theme";
-
-export function FrameTitleRenderer({
+import { PlayIcon } from "@radix-ui/react-icons";
+export function ViewportTitleRenderer({
   name,
   xy,
   wh,
@@ -26,7 +26,7 @@ export function FrameTitleRenderer({
 }) {
   const [x, y] = xy;
   const [w, h] = wh;
-  const view_height = 24;
+  const view_height = 80;
 
   const height_considered_y_transform = y - view_height;
 
@@ -43,7 +43,7 @@ export function FrameTitleRenderer({
 
   return (
     <FrameTitleContainer
-      id="frame-title"
+      id="viewport-title"
       onClick={onSelect}
       onContextMenu={onSelect}
       width={selected ? Math.max(w * zoom, 40) : w * zoom}
@@ -52,49 +52,33 @@ export function FrameTitleRenderer({
       xy={[x, height_considered_y_transform]}
       {...hoverProps}
     >
-      {selected && runnable && (
-        <SelectedStatePrimaryAction onClick={onRunClick} />
-      )}
-      <FrameTitleLabel
-        onDoubleClick={onDoubleClick}
-        color={
-          selected || highlight || hoverred
-            ? color_frame_title.highlight
-            : color_frame_title.default
-        }
+      <div
+        data-selected={selected}
+        className="flex flex-row p-4 gap-4 rounded-xl w-full shadow-md items-center bg-neutral-500 data-[selected=true]:bg-blue-400"
       >
-        {name}
-      </FrameTitleLabel>
+        {selected && runnable && (
+          <button
+            onPointerDown={(e) => {
+              // this is required to prevent the canvas' event listener being called first.
+              e.stopPropagation();
+              e.preventDefault();
+            }}
+            onClick={onRunClick}
+          >
+            <PlayIcon color="white" width={24} height={24} />
+          </button>
+        )}
+        <FrameTitleLabel
+          onDoubleClick={onDoubleClick}
+          color={
+            selected || highlight || hoverred
+              ? "rgba(255,255,255,1)"
+              : "rgba(255,255,255,0.5)"
+          }
+        >
+          {name}
+        </FrameTitleLabel>
+      </div>
     </FrameTitleContainer>
-  );
-}
-
-function SelectedStatePrimaryAction({ onClick }: { onClick?: () => void }) {
-  return (
-    <span
-      onClick={onClick}
-      onPointerDown={(e) => {
-        // this is required to prevent the canvas' event listener being called first.
-        e.stopPropagation();
-        e.preventDefault();
-      }}
-      style={{
-        marginRight: 4,
-        cursor: "pointer",
-      }}
-    >
-      <svg
-        width="20"
-        height="20"
-        viewBox="0 0 20 20"
-        fill="none"
-        xmlns="http://www.w3.org/2000/svg"
-      >
-        <path
-          d="M10 0C4.48 0 0 4.48 0 10C0 15.52 4.48 20 10 20C15.52 20 20 15.52 20 10C20 4.48 15.52 0 10 0ZM8 14.5V5.5L14 10L8 14.5Z"
-          fill="#52A1FF"
-        />
-      </svg>
-    </span>
   );
 }

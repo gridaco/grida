@@ -10,9 +10,12 @@ import {
   PropertyLine,
   PropertyLines,
 } from "@editor-ui/property";
+import { useInspectorElement } from "hooks/use-inspector-element";
 
 export function CraftBackgroundColorSection() {
   const dispatch = useDispatch();
+  const element = useInspectorElement();
+
   const [color, setColor] = useState<RGBA>({
     r: 255,
     g: 255,
@@ -29,6 +32,10 @@ export function CraftBackgroundColorSection() {
     },
     [dispatch]
   );
+
+  if (!element) {
+    return <></>;
+  }
 
   return (
     <PropertyGroup>

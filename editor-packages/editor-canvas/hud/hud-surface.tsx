@@ -26,6 +26,7 @@ export interface HudCustomRenderers {
  * minimum meta of displaying nodes for hud surface
  */
 export interface DisplayNodeMeta {
+  type: string; // TODO: type safe T
   id: string;
   name: string;
   absoluteX: number;
@@ -119,6 +120,7 @@ export function HudSurface({
                 ];
                 return renderFrameTitle({
                   id: node.id,
+                  type: node.type,
                   name: node.name,
                   xy: absxy,
                   wh: [node.width, node.height],
