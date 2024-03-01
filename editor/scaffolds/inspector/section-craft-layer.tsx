@@ -6,8 +6,15 @@ import {
   PropertyLine,
   PropertyLines,
   PropertyNumericInput,
+  PropertySliderInput,
 } from "@editor-ui/property";
-import { CornersIcon } from "@radix-ui/react-icons";
+import {
+  CornerBottomLeftIcon,
+  CornerBottomRightIcon,
+  CornerTopLeftIcon,
+  CornerTopRightIcon,
+  CornersIcon,
+} from "@radix-ui/react-icons";
 import type { IRadius } from "@reflect-ui/core";
 import { useDispatch } from "core/dispatch";
 import { useInspectorElement } from "hooks/use-inspector-element";
@@ -40,21 +47,11 @@ export function CraftLayerSection() {
     [dispatch]
   );
 
-  const onCornerRadiusChange = useCallback(
-    (value: number) => {
-      dispatch({
-        type: "(craft)/node/corners",
-        radius: value,
-      });
-    },
-    [dispatch]
-  );
-
   const onOpacityChange = useCallback(
     (value100: number) => {
       dispatch({
         type: "(craft)/node/opacity",
-        opacity: value100 / 100,
+        opacity: value100 === 0 ? 0 : value100 / 100,
       });
     },
     [dispatch]
@@ -85,17 +82,6 @@ export function CraftLayerSection() {
   const opacity100 = ((element?.style?.opacity as number) || 1) * 100;
 
   const clipsContent = element?.style?.overflow === "hidden";
-  // let tr, tl, br, bl;
-  // if ("cornerRadius" in element) {
-  //   const { bl: _bl, br: _br, tl: _tl, tr: _tr } = element.cornerRadius;
-  //   tr = numeric(_tr);
-  //   tl = numeric(_tl);
-  //   br = numeric(_br);
-  //   bl = numeric(_bl);
-  // }
-
-  // const hasradius = tr || tl || br || bl;
-  // const radiusone = tr === tl && tl === br && br === bl;
 
   return (
     <PropertyGroup>
@@ -136,39 +122,18 @@ export function CraftLayerSection() {
             }}
           />
         </PropertyLine>
-        <PropertyLine label="Corner">
-          <PropertyNumericInput
-            value={element.style?.borderRadius || 0}
-            stopPropagation
-            min={0}
-            suffix={<CornersIcon />}
-            onChange={onCornerRadiusChange}
-          />
-        </PropertyLine>
-        {/* {!!hasradius && (
-          <PropertyLine label="Radius">
-            {radiusone ? (
-              <>
-                <ReadonlyProperty value={tr} />
-              </>
-            ) : (
-              <>
-                <ReadonlyProperty suffix={"tr"} value={tr} />
-                <ReadonlyProperty suffix={"tl"} value={tl} />
-                <ReadonlyProperty suffix={"br"} value={br} />
-                <ReadonlyProperty suffix={"bl"} value={bl} />
-              </>
-            )}
-          </PropertyLine>
-        )} */}
+        <PropertyCornerRadiusLine />
         <PropertyLine label="Opacity">
-          {/* <PropertySliderInput
-            value={[100]}
+          <PropertySliderInput
+            stopPropagation
+            value={[opacity100]}
             min={0}
             max={100}
             step={1}
-            onValueChange={(value) => {}}
-          /> */}
+            onValueChange={(value) => {
+              onOpacityChange(value[0]);
+            }}
+          />
           <PropertyNumericInput
             min={0}
             max={100}
@@ -186,5 +151,116 @@ export function CraftLayerSection() {
   );
 }
 
-const numeric = (v: IRadius) => (typeof v === "number" ? rd(v) : null);
+function PropertyCornerRadiusLine() {
+  const dispatch = useDispatch();
+  const element = useInspectorElement();
+
+  const cornerRadius: number = (element?.style?.borderRadius || 0) as number;
+  // element?.style?.;
+  const {
+    borderRadius: _radius,
+    borderTopLeftRadius: _tl,
+    borderTopRightRadius: _tr,
+    borderBottomLeftRadius: _bl,
+    borderBottomRightRadius: _br,
+  } = element?.style || {};
+
+  const tr = numeric(_tr);
+  const tl = numeric(_tl);
+  const br = numeric(_br);
+  const bl = numeric(_bl);
+
+  const hasradius = tr || tl || br || bl;
+  const radiusone = tr === tl && tl === br && br === bl;
+
+  const onCornerRadiusChange = useCallback(
+    (value: number) => {
+      dispatch({
+        type: "(craft)/node/corner-radius/all",
+        radius: value,
+      });
+    },
+    [dispatch]
+  );
+
+  const onCornerRadiusEachChange = useCallback(
+    (corners: { tl?: number; tr?: number; br?: number; bl?: number }) => {
+      dispatch({
+        type: "(craft)/node/corner-radius/each",
+        radius: corners,
+      });
+    },
+    [dispatch]
+  );
+
+  return (
+    <>
+      <PropertyLine label="Corner">
+        <PropertyNumericInput
+          value={cornerRadius}
+          stopPropagation
+          min={0}
+          suffix={<CornersIcon />}
+          onChange={onCornerRadiusChange}
+        />
+      </PropertyLine>
+      <PropertyLine label="Corners" gap={4}>
+        <PropertyNumericInput
+          stopPropagation
+          min={0}
+          suffix={<CornerTopLeftIcon />}
+          value={tl}
+          onChange={(v) => onCornerRadiusEachChange({ tl: v })}
+        />
+        <PropertyNumericInput
+          stopPropagation
+          min={0}
+          suffix={<CornerTopRightIcon />}
+          value={tr}
+          onChange={(v) => onCornerRadiusEachChange({ tr: v })}
+        />
+        <PropertyNumericInput
+          stopPropagation
+          min={0}
+          suffix={<CornerBottomRightIcon />}
+          value={br}
+          onChange={(v) => onCornerRadiusEachChange({ br: v })}
+        />
+        <PropertyNumericInput
+          stopPropagation
+          min={0}
+          suffix={<CornerBottomLeftIcon />}
+          value={bl}
+          onChange={(v) => onCornerRadiusEachChange({ bl: v })}
+        />
+      </PropertyLine>
+    </>
+  );
+
+  // return (
+  //   <>
+  //     {radiusone ? (
+  //       <PropertyLine label="Corner">
+  //         <PropertyNumericInput
+  //           value={cornerRadius}
+  //           stopPropagation
+  //           min={0}
+  //           suffix={<CornersIcon />}
+  //           onChange={onCornerRadiusChange}
+  //         />
+  //       </PropertyLine>
+  //     ) : (
+  //       <PropertyLine label="Corners">
+  //         <PropertyNumericInput suffix={"tr"} value={tr} />
+  //         <PropertyNumericInput suffix={"tl"} value={tl} />
+  //         <PropertyNumericInput suffix={"br"} value={br} />
+  //         <PropertyNumericInput suffix={"bl"} value={bl} />
+  //       </PropertyLine>
+  //     )}
+  //   </>
+  // );
+}
+
+const numeric = (v: number | string | undefined) =>
+  typeof v === "number" ? rd(v) : undefined;
 const rd = (v: number) => Math.round(v * 100) / 100;

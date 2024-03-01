@@ -26,7 +26,8 @@ export type CraftPreviewNodeBorderColorAction = {
 export type CraftHistoryAction =
   | CraftNodeOpacityAction
   | CraftNodeOverflowAction
-  | CraftNodeCornerRadiusAction
+  | CraftNodeAllCornerRadiusAction
+  | CraftNodeEachCornerRadiusAction
   | CraftNodeBoxShadowAction
   | CraftNodeBoxSizingAction
   | CraftNodeFlexBoxAction
@@ -49,9 +50,19 @@ export type CraftNodeOverflowAction = {
   value: "hidden" | "visible";
 };
 
-export type CraftNodeCornerRadiusAction = {
-  type: "(craft)/node/corners";
+export type CraftNodeAllCornerRadiusAction = {
+  type: "(craft)/node/corner-radius/all";
   radius: number;
+};
+
+export type CraftNodeEachCornerRadiusAction = {
+  type: "(craft)/node/corner-radius/each";
+  radius: {
+    tl?: number;
+    tr?: number;
+    br?: number;
+    bl?: number;
+  };
 };
 
 export type CraftNodeAddBorderAction = {

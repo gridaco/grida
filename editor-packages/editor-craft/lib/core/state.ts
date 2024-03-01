@@ -20,6 +20,8 @@ interface Rotation {
 interface BaseNode {
   id: string;
   name: string;
+  disabled?: boolean;
+  locked?: boolean;
 }
 
 import * as core from "@reflect-ui/core";
@@ -52,6 +54,7 @@ export type CraftRadixIconElement = Omit<ElementAttributes<"svg">, "tag"> &
   AbsolutePosition &
   Rotation & {
     type: "@radix-ui/react-icons";
+    tag: "svg";
     icon: string;
     color: string;
   };

@@ -13,24 +13,35 @@ import {
 import Image from "next/image";
 import { RandomPhoto } from "@/lib/unsplash";
 
-export function CraftSrcSection() {
+export function CraftImageSection() {
   const dispatch = useDispatch();
   const element = useInspectorElement();
 
-  const onPhotoClick = useCallback(
-    (photo: RandomPhoto) => {
+  const onSrcChange = useCallback(
+    (src: string) => {
       dispatch({
         type: "(craft)/node/src/data",
-        data: photo.urls.regular,
+        data: src,
       });
     },
     [dispatch]
   );
 
+  const onPhotoClick = useCallback(
+    (photo: RandomPhoto) => {
+      onSrcChange(photo.urls.regular);
+    },
+    [onSrcChange]
+  );
+
+  if (!element || element.tag !== "img") {
+    return <></>;
+  }
+
   return (
     <PropertyGroup>
       <PropertyGroupHeader>
-        <h6>Graphic</h6>
+        <h6>Image</h6>
       </PropertyGroupHeader>
       <PropertyLines>
         <PropertyLine label="src">

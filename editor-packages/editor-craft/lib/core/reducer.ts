@@ -18,7 +18,7 @@ export function craftDraftReducer(
         draft.craft.children.forEach((c) => {
           if (c.id === selected) {
             const colorstr = `rgba(${color.r},${color.g},${color.b},${color.a})`;
-            (c as CraftHtmlElement).style.backgroundColor = colorstr;
+            (c as CraftHtmlElement).style!.backgroundColor = colorstr;
           }
         });
       });
@@ -30,7 +30,7 @@ export function craftDraftReducer(
         draft.craft.children.forEach((c) => {
           if (c.id === selected) {
             const colorstr = `rgba(${color.r},${color.g},${color.b},${color.a})`;
-            (c as CraftHtmlElement).style.color = colorstr;
+            (c as CraftHtmlElement).style!.color = colorstr;
           }
         });
       });
@@ -42,7 +42,7 @@ export function craftDraftReducer(
         draft.craft.children.forEach((c) => {
           if (c.id === selected) {
             const colorstr = `rgba(${color.r},${color.g},${color.b},${color.a})`;
-            (c as CraftHtmlElement).style.borderColor = colorstr;
+            (c as CraftHtmlElement).style!.borderColor = colorstr;
           }
         });
       });
@@ -74,7 +74,7 @@ export function craftHistoryReducer(
         const selected = draft.selectedNodes[0];
         draft.craft.children.forEach((c) => {
           if (c.id === selected) {
-            c.style.opacity = opacity;
+            c.style!.opacity = opacity;
           }
         });
       });
@@ -85,18 +85,33 @@ export function craftHistoryReducer(
         const selected = draft.selectedNodes[0];
         draft.craft.children.forEach((c) => {
           if (c.id === selected) {
-            c.style.overflow = value;
+            c.style!.overflow = value;
           }
         });
       });
     }
-    case "(craft)/node/corners": {
+    case "(craft)/node/corner-radius/all": {
       return produce(state, (draft) => {
         const { radius } = action;
         const selected = draft.selectedNodes[0];
         draft.craft.children.forEach((c) => {
           if (c.id === selected) {
-            c.style.borderRadius = radius;
+            c.style!.borderRadius = radius;
+          }
+        });
+      });
+    }
+    case "(craft)/node/corner-radius/each": {
+      return produce(state, (draft) => {
+        const { radius } = action;
+        const selected = draft.selectedNodes[0];
+        draft.craft.children.forEach((c) => {
+          if (c.id === selected) {
+            const { tl, tr, bl, br } = radius;
+            if (tl) c.style!.borderTopLeftRadius = tl;
+            if (tr) c.style!.borderTopRightRadius = tr;
+            if (bl) c.style!.borderBottomLeftRadius = bl;
+            if (br) c.style!.borderBottomRightRadius = br;
           }
         });
       });
@@ -106,8 +121,8 @@ export function craftHistoryReducer(
         const selected = draft.selectedNodes[0];
         draft.craft.children.forEach((c) => {
           if (c.id === selected) {
-            c.style.borderWidth = 1;
-            c.style.borderColor = "black";
+            c.style!.borderWidth = 1;
+            c.style!.borderColor = "black";
           }
         });
       });
@@ -118,7 +133,7 @@ export function craftHistoryReducer(
         const selected = draft.selectedNodes[0];
         draft.craft.children.forEach((c) => {
           if (c.id === selected) {
-            c.style.borderWidth = width;
+            c.style!.borderWidth = width;
           }
         });
       });
@@ -128,7 +143,7 @@ export function craftHistoryReducer(
         const selected = draft.selectedNodes[0];
         draft.craft.children.forEach((c) => {
           if (c.id === selected) {
-            c.style.boxShadow = {
+            c.style!.boxShadow = {
               color: { r: 0, g: 0, b: 0, a: 0.25 },
               blurRadius: 4,
               offset: new core.Offset(0, 4),
@@ -144,7 +159,7 @@ export function craftHistoryReducer(
         const selected = draft.selectedNodes[0];
         draft.craft.children.forEach((c) => {
           if (c.id === selected) {
-            c.style.boxShadow.color = color;
+            c.style!.boxShadow!.color = color;
           }
         });
       });
@@ -155,7 +170,7 @@ export function craftHistoryReducer(
         const selected = draft.selectedNodes[0];
         draft.craft.children.forEach((c) => {
           if (c.id === selected) {
-            c.style.boxShadow.blurRadius = radius;
+            c.style!.boxShadow!.blurRadius = radius;
           }
         });
       });
@@ -166,7 +181,7 @@ export function craftHistoryReducer(
         const selected = draft.selectedNodes[0];
         draft.craft.children.forEach((c) => {
           if (c.id === selected) {
-            c.style.boxShadow.spreadRadius = radius;
+            c.style!.boxShadow!.spreadRadius = radius;
           }
         });
       });
@@ -178,10 +193,10 @@ export function craftHistoryReducer(
         draft.craft.children.forEach((c) => {
           if (c.id === selected) {
             const offset = new core.Offset(
-              dx ?? c.style.boxShadow.offset.dx ?? 0,
-              dy ?? c.style.boxShadow.offset.dy ?? 0
+              dx ?? c.style!.boxShadow!.offset.dx ?? 0,
+              dy ?? c.style!.boxShadow!.offset.dy ?? 0
             );
-            c.style.boxShadow.offset = offset;
+            c.style!.boxShadow!.offset = offset;
           }
         });
       });
@@ -192,7 +207,7 @@ export function craftHistoryReducer(
         const selected = draft.selectedNodes[0];
         draft.craft.children.forEach((c) => {
           if (c.id === selected) {
-            c.style.padding = padding;
+            c.style!.padding = padding;
           }
         });
       });
@@ -203,7 +218,7 @@ export function craftHistoryReducer(
         const selected = draft.selectedNodes[0];
         draft.craft.children.forEach((c) => {
           if (c.id === selected) {
-            c.style.margin = margin;
+            c.style!.margin = margin;
           }
         });
       });
@@ -213,7 +228,7 @@ export function craftHistoryReducer(
       return produce(state, (draft) => {
         const selected = draft.selectedNodes[0];
         draft.craft.children.forEach((c) => {
-          c.style.flexDirection = direction;
+          c.style!.flexDirection = direction;
         });
       });
     }
@@ -222,7 +237,7 @@ export function craftHistoryReducer(
       return produce(state, (draft) => {
         const selected = draft.selectedNodes[0];
         draft.craft.children.forEach((c) => {
-          c.style.gap = gap;
+          c.style!.gap = gap;
         });
       });
     }
@@ -244,7 +259,7 @@ export function craftHistoryReducer(
         const selected = draft.selectedNodes[0];
         draft.craft.children.forEach((c) => {
           if (c.id === selected) {
-            c.style.textAlign = align;
+            c.style!.textAlign = align;
           }
         });
       });
@@ -255,7 +270,7 @@ export function craftHistoryReducer(
         const selected = draft.selectedNodes[0];
         draft.craft.children.forEach((c) => {
           if (c.id === selected) {
-            c.style.fontSize = size;
+            c.style!.fontSize = size;
           }
         });
       });
@@ -266,7 +281,7 @@ export function craftHistoryReducer(
         const selected = draft.selectedNodes[0];
         draft.craft.children.forEach((c) => {
           if (c.id === selected) {
-            c.style.fontWeight = css.numericFontWeight(weight);
+            c.style!.fontWeight = css.numericFontWeight(weight);
           }
         });
       });
@@ -300,7 +315,7 @@ export function craftHistoryReducer(
         draft.craft.children.forEach((c) => {
           if (c.id === selected) {
             const colorstr = `rgba(${color.r},${color.g},${color.b},${color.a})`;
-            (c as CraftHtmlElement).style.backgroundColor = colorstr;
+            (c as CraftHtmlElement).style!.backgroundColor = colorstr;
           }
         });
       });
@@ -366,6 +381,7 @@ export function craftHistoryReducer(
               type: "@radix-ui/react-icons",
               id,
               name: "icon",
+              tag: "svg",
               x: x,
               y: y,
               icon: "PlusIcon",
@@ -392,9 +408,8 @@ export function craftHistoryReducer(
                 class: [],
               },
               style: {
-                width: w,
-                height: h,
                 color: "black",
+                fontWeight: 400,
               },
               text: "Text",
               children: [],
@@ -422,7 +437,7 @@ export function craftHistoryReducer(
               style: {
                 width: 100,
                 height: 100,
-                backgroundColor: "black",
+                objectFit: "cover",
               },
               width: w,
               height: h,
@@ -446,7 +461,7 @@ export function craftHistoryReducer(
                 height: 100,
                 borderRadius: 999,
                 overflow: "hidden",
-                backgroundColor: "black",
+                objectFit: "cover",
               },
               attributes: {
                 src: "https://via.placeholder.com/150",
@@ -650,5 +665,5 @@ function next_canvas_placement(state: EditorState, item: XYWH) {
     {
       padding: 100,
     }
-  );
+  )!;
 }
