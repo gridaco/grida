@@ -92,7 +92,8 @@ export interface CanvasFocusNodeAction {
 export type CanvasEditAction =
   | TranslateDeltaSelectedNodeAction
   | PositionSelectedNodeAction
-  | ResizeSelectedNodeAction;
+  | ResizeSelectedNodeAction
+  | DeltaResizeNodeAction;
 
 /**
  * Select and move to the node.
@@ -116,6 +117,13 @@ export interface ResizeSelectedNodeAction {
   origin: "center" | "nw" | "ne" | "sw" | "se" | "n" | "s" | "w" | "e";
   width?: number;
   height?: number;
+}
+
+export interface DeltaResizeNodeAction {
+  type: "node-resize-delta";
+  origin: "center" | "nw" | "ne" | "sw" | "se" | "n" | "s" | "w" | "e";
+  delta: [number, number];
+  shiftKey?: boolean;
 }
 
 export interface EnterIsolatedInspectionAction {

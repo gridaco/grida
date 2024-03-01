@@ -22,6 +22,7 @@ import type {
   ExitIsolatedInspectionAction,
   ResizeSelectedNodeAction,
   PositionSelectedNodeAction,
+  DeltaResizeNodeAction,
 } from "core/actions";
 import { EditorState, WorkspaceStateSeed } from "core/states";
 import { NextRouter, useRouter } from "next/router";
@@ -279,14 +280,43 @@ export function editorReducer(
               state.selectedNodes
                 .map((n) => q.getNodeByIdFrom(n, draft.craft.children))
                 .map((n) => {
-                  if (width) n.width = width;
-                  if (width) n.style.width = width;
-                  if (height) n.height = height;
-                  if (height) n.style.height = height;
+                  if (n && width) n.width = width;
+                  if (n && width) n.style!.width = width;
+                  if (n && height) n.height = height;
+                  if (n && height) n.style!.height = height;
                 });
             } else {
               throw new Error(`node-resize: origin not supported: ${origin}`);
             }
+          });
+        }
+        default: {
+          throw new Error(
+            `node-transform-translate: mode not supported: ${state.mode.value}`
+          );
+        }
+      }
+    }
+    case "node-resize-delta": {
+      const { origin, delta, shiftKey } = <DeltaResizeNodeAction>action;
+      const [dx, dy] = delta;
+
+      switch (state.mode.value) {
+        case "design": {
+          throw new Error(
+            `node-resize: mode not supported: ${state.mode.value}`
+          );
+        }
+        case "craft": {
+          return produce(state, (draft) => {
+            state.selectedNodes
+              .map((n) => q.getNodeByIdFrom(n, draft.craft.children))
+              .map((n) => {
+                if (n) n.width += dx;
+                if (n) n.height += dy;
+                if (n) n.style!.width = n.width;
+                if (n) n.style!.height = n.height;
+              });
           });
         }
         default: {

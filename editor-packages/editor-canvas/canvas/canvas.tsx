@@ -35,6 +35,7 @@ import {
 } from "@editor-ui/context-menu";
 import styled from "@emotion/styled";
 import toast from "react-hot-toast";
+import { ResizeHandleOrigin } from "overlay/types";
 
 interface TCanvasNode extends DisplayNodeMeta {
   id: string;
@@ -129,6 +130,14 @@ type CanvasProps<T extends TCanvasNode> = CanvasFocusProps &
     onMoveNodeStart?: (...node: string[]) => void;
     onMoveNode?: (delta: XY, ...node: string[]) => void;
     onMoveNodeEnd?: (delta: XY, ...node: string[]) => void;
+    onResizeNode?: (
+      delta: XY,
+      meta: {
+        origin: ResizeHandleOrigin;
+        shiftKey: boolean;
+      },
+      ...node: string[]
+    ) => void;
     onClearSelection?: () => void;
   } & CanvasCustomRenderers<T> &
   CanvasState<T> & {
@@ -172,6 +181,7 @@ export function Canvas<T extends TCanvasNode>({
   onMoveNode,
   onMoveNodeEnd,
   onSelectNode: _cb_onSelectNode,
+  onResizeNode: _cb_onResizeNode,
   onClearSelection,
   filekey,
   pageid,
@@ -639,6 +649,18 @@ export function Canvas<T extends TCanvasNode>({
               }}
               onSelectNode={(id) => {
                 onSelectNode?.(node(id));
+              }}
+              onSelectionResize={(handle, delta, shiftKey) => {
+                // transform with zoom
+                delta = [delta[0] / zoom, delta[1] / zoom];
+                _cb_onResizeNode?.(
+                  delta,
+                  {
+                    origin: handle,
+                    shiftKey,
+                  },
+                  ...selectedNodes
+                );
               }}
               renderFrameTitle={props.renderFrameTitle}
             />

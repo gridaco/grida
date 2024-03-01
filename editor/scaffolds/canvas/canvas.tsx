@@ -201,6 +201,14 @@ export function EditorCraftCanvas() {
             translate: [x, y],
           });
         }}
+        onResizeNode={([w, h], { origin, shiftKey }, ...nodes) => {
+          dispatch({
+            type: "node-resize-delta",
+            origin,
+            delta: [w, h],
+            shiftKey,
+          });
+        }}
         onClearSelection={() => {
           dispatch({ type: "select-node", node: [] });
         }}
@@ -222,8 +230,8 @@ export function EditorCraftCanvas() {
             key={p.id}
             {...p}
             runnable={selectedNodes.length === 1}
-            onRunClick={() => startCodeSession(p.id)}
-            onDoubleClick={() => enterIsolation(p.id)}
+            onRunClick={() => startCodeSession(p.id!)}
+            onDoubleClick={() => enterIsolation(p.id!)}
           />
         )}
       />

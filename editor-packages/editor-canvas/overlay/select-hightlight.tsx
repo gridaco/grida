@@ -9,9 +9,14 @@ import { useGesture } from "@use-gesture/react";
 import type { OnDragHandler } from "../canvas-event-target";
 
 export function SelectHightlight({
+  onResize,
   ...props
 }: Omit<OutlineProps, "width"> & {
-  // onResize?: (handle: ResizeHandleOrigin, delta: [number, number]) => void;
+  onResize?: (
+    handle: ResizeHandleOrigin,
+    delta: [number, number],
+    shiftKey?: boolean
+  ) => void;
 }) {
   const { xywh, zoom, rotation } = props;
   const bbox = xywh_to_bounding_box({ xywh, scale: zoom });
@@ -26,6 +31,14 @@ export function SelectHightlight({
     color: color_layer_highlight,
   };
 
+  const onResizeHandleDragNE = (e) => onResize?.("ne", e.delta, e.shiftKey);
+
+  const onResizeHandleDragNW = (e) => onResize?.("nw", e.delta, e.shiftKey);
+
+  const onResizeHandleDragSE = (e) => onResize?.("se", e.delta, e.shiftKey);
+
+  const onResizeHandleDragSW = (e) => onResize?.("sw", e.delta, e.shiftKey);
+
   return (
     <OverlayContainer xywh={bbox} rotation={rotation}>
       {/* TODO: add rotation knob */}
@@ -36,10 +49,10 @@ export function SelectHightlight({
         <RotateHandle box={bbox} anchor="sw" onDrag={onrotatecb("sw")} />
       </> */}
       <>
-        <ResizeHandle box={bbox} anchor="ne" />
-        <ResizeHandle box={bbox} anchor="nw" />
-        <ResizeHandle box={bbox} anchor="se" />
-        <ResizeHandle box={bbox} anchor="sw" />
+        <ResizeHandle box={bbox} anchor="ne" onDrag={onResizeHandleDragNE} />
+        <ResizeHandle box={bbox} anchor="nw" onDrag={onResizeHandleDragNW} />
+        <ResizeHandle box={bbox} anchor="se" onDrag={onResizeHandleDragSE} />
+        <ResizeHandle box={bbox} anchor="sw" onDrag={onResizeHandleDragSW} />
       </>
       <>
         <OulineSide orientation="w" {...sideprops} cursor="ew-resize" />
@@ -65,13 +78,39 @@ const resize_cursor_map = {
 function ResizeHandle({
   anchor,
   box,
+  onDrag,
   ...props
-}: Partial<React.ComponentProps<typeof Handle>> & {
+}: Partial<Omit<React.ComponentProps<typeof Handle>, "onDrag">> & {
   anchor: "nw" | "ne" | "sw" | "se";
   box: [number, number, number, number];
+  onDrag?: OnDragHandler;
 }) {
+  const ref = useRef();
+
+  useGesture(
+    {
+      onDragStart: (e) => {
+        e.event.stopPropagation();
+      },
+      onDragEnd: (e) => {
+        e.event.stopPropagation();
+      },
+      onDrag: (e) => {
+        onDrag?.(e);
+        e.event.stopPropagation();
+      },
+    },
+    {
+      target: ref,
+      eventOptions: {
+        capture: false,
+      },
+    }
+  );
+
   return (
     <Handle
+      ref={ref}
       cursor={resize_cursor_map[anchor]}
       readonly={false}
       color={"white"}
