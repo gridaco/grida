@@ -8,7 +8,7 @@ import {
 } from "@editor-ui/property";
 import type { RGBA } from "@reflect-ui/core";
 import * as Popover from "@radix-ui/react-popover";
-import { PlusIcon } from "@radix-ui/react-icons";
+import { MinusIcon, PlusIcon } from "@radix-ui/react-icons";
 import { ColorPicker } from "@editor-ui/color-picker";
 import { useDispatch } from "core/dispatch";
 import { useInspectorElement } from "hooks/use-inspector-element";
@@ -25,9 +25,15 @@ export function CraftBorderSection() {
     a: 1,
   });
 
-  const onBorderAdd = useCallback(() => {
+  const onAddBorder = useCallback(() => {
     dispatch({
       type: "(craft)/node/border/add",
+    });
+  }, [dispatch]);
+
+  const onRemoveBorder = useCallback(() => {
+    dispatch({
+      type: "(craft)/node/border/remove",
     });
   }, [dispatch]);
 
@@ -55,12 +61,10 @@ export function CraftBorderSection() {
     return <></>;
   }
 
-  const hasBorder = element.style.borderWidth;
-
-  if (!hasBorder) {
+  if (!element.style || !element.style.borderWidth) {
     return (
       <PropertyGroup>
-        <PropertyGroupHeader onClick={onBorderAdd} dividers asButton>
+        <PropertyGroupHeader onClick={onAddBorder} dividers asButton>
           <h6>Border</h6>
           <button>
             <PlusIcon />
@@ -74,6 +78,9 @@ export function CraftBorderSection() {
     <PropertyGroup>
       <PropertyGroupHeader>
         <h6>Border</h6>
+        <button onClick={onRemoveBorder}>
+          <MinusIcon />
+        </button>
       </PropertyGroupHeader>
       <PropertyLines>
         <PropertyLine label="Width">

@@ -6,7 +6,7 @@ import {
   PropertyGroupHeader,
   PropertyInput,
 } from "@editor-ui/property";
-import { PlusIcon } from "@radix-ui/react-icons";
+import { MinusIcon, PlusIcon } from "@radix-ui/react-icons";
 import type { RGBA } from "@reflect-ui/core";
 import * as Popover from "@radix-ui/react-popover";
 import { ColorPicker } from "@editor-ui/color-picker";
@@ -19,9 +19,15 @@ export function CraftBoxShadowSection() {
   const element = useInspectorElement();
   const dispatch = useDispatch();
 
-  const onBoxShadowAdd = useCallback(() => {
+  const onBoxAddShadow = useCallback(() => {
     dispatch({
       type: "(craft)/node/box-shadow/add",
+    });
+  }, [dispatch]);
+
+  const onRemoveBoxShadow = useCallback(() => {
+    dispatch({
+      type: "(craft)/node/box-shadow/remove",
     });
   }, [dispatch]);
 
@@ -70,12 +76,10 @@ export function CraftBoxShadowSection() {
     return <></>;
   }
 
-  const hasBoxShadow = !!element.style.boxShadow;
-
-  if (!hasBoxShadow) {
+  if (!element?.style || !element?.style?.boxShadow) {
     return (
       <PropertyGroup>
-        <PropertyGroupHeader onClick={onBoxShadowAdd} dividers asButton>
+        <PropertyGroupHeader onClick={onBoxAddShadow} dividers asButton>
           <h6>Box Shadow</h6>
           <button>
             <PlusIcon />
@@ -85,12 +89,15 @@ export function CraftBoxShadowSection() {
     );
   }
 
-  const { color, blurRadius, offset, spreadRadius } = element.style.boxShadow;
+  const { color, blurRadius, offset, spreadRadius } = element?.style?.boxShadow;
 
   return (
     <PropertyGroup>
       <PropertyGroupHeader>
         <h6>Box Shadow</h6>
+        <button onClick={onRemoveBoxShadow}>
+          <MinusIcon />
+        </button>
       </PropertyGroupHeader>
       <PropertyLines>
         <PropertyLine label="Offset">

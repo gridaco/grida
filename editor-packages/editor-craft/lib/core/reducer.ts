@@ -127,6 +127,34 @@ export function craftHistoryReducer(
         });
       });
     }
+    case "(craft)/node/border/remove": {
+      return produce(state, (draft) => {
+        const selected = draft.selectedNodes[0];
+        draft.craft.children.forEach((c) => {
+          if (c.id === selected) {
+            delete c.style?.borderWidth;
+            delete c.style?.borderColor;
+            delete c.style?.borderStyle;
+            delete c.style?.borderTop;
+            delete c.style?.borderBottom;
+            delete c.style?.borderLeft;
+            delete c.style?.borderRight;
+            delete c.style?.borderTopWidth;
+            delete c.style?.borderBottomWidth;
+            delete c.style?.borderLeftWidth;
+            delete c.style?.borderRightWidth;
+            delete c.style?.borderTopColor;
+            delete c.style?.borderBottomColor;
+            delete c.style?.borderLeftColor;
+            delete c.style?.borderRightColor;
+            delete c.style?.borderTopStyle;
+            delete c.style?.borderBottomStyle;
+            delete c.style?.borderLeftStyle;
+            delete c.style?.borderRightStyle;
+          }
+        });
+      });
+    }
     case "(craft)/node/border/width": {
       return produce(state, (draft) => {
         const { width } = action;
@@ -149,6 +177,16 @@ export function craftHistoryReducer(
               offset: new core.Offset(0, 4),
               spreadRadius: 0,
             };
+          }
+        });
+      });
+    }
+    case "(craft)/node/box-shadow/remove": {
+      return produce(state, (draft) => {
+        const selected = draft.selectedNodes[0];
+        draft.craft.children.forEach((c) => {
+          if (c.id === selected) {
+            delete c.style!.boxShadow;
           }
         });
       });
