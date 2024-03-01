@@ -4,6 +4,9 @@ import { EditorPreviewDataProvider } from "../editor-preview-provider";
 import { EditorToastProvider } from "../editor-toast-provider";
 import { EditorGlobalDndContextProvider } from "../editor-global-dnd-context-provider";
 import { CraftAddWidgetDndContextProvider } from "@code-editor/craft";
+import { EditorShortcutOverlayProvider } from "../editor-shortcut-overlay-provider";
+
+const IS_DEV = process.env.NODE_ENV === "development";
 
 export function CraftEditorProviders(props: { children: React.ReactNode }) {
   return (
@@ -11,10 +14,12 @@ export function CraftEditorProviders(props: { children: React.ReactNode }) {
       <EditorGlobalDndContextProvider>
         <CraftAddWidgetDndContextProvider>
           <EditorShortcutsProvider>
-            <EditorPreviewDataProvider>
-              {/*  */}
-              {props.children}
-            </EditorPreviewDataProvider>
+            <EditorShortcutOverlayProvider disabled={!IS_DEV}>
+              <EditorPreviewDataProvider>
+                {/*  */}
+                {props.children}
+              </EditorPreviewDataProvider>
+            </EditorShortcutOverlayProvider>
           </EditorShortcutsProvider>
         </CraftAddWidgetDndContextProvider>
       </EditorGlobalDndContextProvider>
