@@ -4,7 +4,6 @@ import styled from "@emotion/styled";
 import { color_frame_title } from "../theme";
 
 export interface FrameTitleProps {
-  type: string; // TODO: type safe T
   id?: string;
   name: string;
   /**

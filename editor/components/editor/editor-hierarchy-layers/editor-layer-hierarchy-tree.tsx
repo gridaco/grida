@@ -56,7 +56,7 @@ function useAutoFocus({
  * @returns
  */
 export function DesignLayerHierarchy({
-  rootNodeIDs = null,
+  rootNodeIDs,
   expandAll = false,
 }: {
   rootNodeIDs?: string[];
@@ -78,7 +78,7 @@ export function DesignLayerHierarchy({
   let roots: HierarchyTreeNode[] = [];
   switch (state.mode.value) {
     case "design": {
-      if (rootNodeIDs?.length > 0) {
+      if (rootNodeIDs && (rootNodeIDs?.length ?? 0 > 0)) {
         roots = rootNodeIDs.reduce((acc, item) => {
           acc.push(findUnder(item, state.design));
           return acc;

@@ -45,7 +45,7 @@ interface TCanvasNode extends DisplayNodeMeta {
   height: number;
   absoluteX: number;
   absoluteY: number;
-  rotation: number;
+  rotation?: number;
   children?: TCanvasNode[];
   parent?: TCanvasNode;
 }
@@ -72,7 +72,7 @@ interface CanvasState<T extends TCanvasNode> {
   initialTransform?: CanvasTransform;
 }
 
-type CanvasCustomRenderers<T extends TCanvasNode> = HudCustomRenderers & {
+type CanvasCustomRenderers<T extends TCanvasNode> = HudCustomRenderers<T> & {
   renderItem: (
     p: {
       node: T;
@@ -649,7 +649,7 @@ export function Canvas<T extends TCanvasNode>({
             onDragEnd={onDragEnd}
             cursor={cursor}
           >
-            <HudSurface
+            <HudSurface<T>
               offset={nonscaled_offset}
               zoom={zoom}
               hidden={hud_hidden}

@@ -18,22 +18,21 @@ interface HudControls {
   onHoverNode: (node: string | null) => void;
 }
 
-export interface HudCustomRenderers {
-  renderFrameTitle?: (props: FrameTitleProps) => React.ReactNode;
+export interface HudCustomRenderers<T> {
+  renderFrameTitle?: (props: Partial<T> & FrameTitleProps) => React.ReactNode;
 }
 
 /**
  * minimum meta of displaying nodes for hud surface
  */
 export interface DisplayNodeMeta {
-  type: string; // TODO: type safe T
   id: string;
   name: string;
   absoluteX: number;
   absoluteY: number;
   width: number;
   height: number;
-  rotation: number;
+  rotation?: number;
 }
 
 /**
@@ -44,7 +43,7 @@ interface PositionGuideMeta {
   b: Box;
 }
 
-export function HudSurface({
+export function HudSurface<T>({
   offset,
   zoom,
   hidden: hide,
@@ -85,7 +84,7 @@ export function HudSurface({
   onResizeStart?: () => void;
   onResizeEnd?: () => void;
 } & HudControls &
-  HudCustomRenderers) {
+  HudCustomRenderers<T>) {
   const [ox, oy] = offset;
   return (
     <div
@@ -119,8 +118,8 @@ export function HudSurface({
                   node.absoluteY * zoom,
                 ];
                 return renderFrameTitle({
+                  ...(node as T),
                   id: node.id,
-                  type: node.type,
                   name: node.name,
                   xy: absxy,
                   wh: [node.width, node.height],
