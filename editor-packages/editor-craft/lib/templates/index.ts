@@ -1,4 +1,5 @@
 import { CraftHtmlElement, CraftRadixIconElement } from "../core";
+import type { WidgetType } from "../widgets";
 
 type TemplateInitProps = {
   id: string;
@@ -10,6 +11,71 @@ type TemplateInitProps = {
   width: number;
   height: number;
 };
+
+export function new_widget(
+  widget: WidgetType,
+  init: {
+    id: string;
+    x: number;
+    y: number;
+    absoluteX: number;
+    absoluteY: number;
+    width: number;
+    height: number;
+  }
+) {
+  const p = {
+    id: init.id,
+    name: widget,
+    x: init.x,
+    y: init.y,
+    absoluteX: init.absoluteX,
+    absoluteY: init.absoluteY,
+    width: init.width,
+    height: init.height,
+  };
+
+  switch (widget) {
+    case "container": {
+      return new_container_widget(p);
+    }
+    case "textfield": {
+      return new_textfield_widget(p);
+    }
+    case "icon": {
+      return new_radix_icon_widget(p);
+    }
+    case "text": {
+      return new_text_widget(p);
+    }
+    case "image": {
+      return new_image_widget(p);
+    }
+    case "image-circle": {
+      return new_circle_image_widget(p);
+    }
+    case "video": {
+      return new_video_widget(p);
+    }
+    case "button": {
+      return new_button_widget(p);
+    }
+    case "divider": {
+      return new_divider_widget(p);
+    }
+    case "flex":
+    case "flex flex-row wrap":
+    case "flex flex-col":
+    case "flex wrap":
+    case "flex flex-col wrap":
+    case "flex flex-row": {
+      return new_flex_row_widget(p);
+    }
+    default: {
+      throw new Error(`Not implemented widget type: ${widget}`);
+    }
+  }
+}
 
 export function new_container_widget({
   id,

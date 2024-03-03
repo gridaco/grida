@@ -7,8 +7,9 @@ export function CraftViewportRenderer({
   target: CraftViewportNode;
   renderer: (props: { target: CraftElement }) => React.ReactNode;
 }) {
+  console.log("viewport children", target.children);
   return (
-    <iframe
+    <div
       id={target.id}
       style={{
         width: target.width,
@@ -20,7 +21,7 @@ export function CraftViewportRenderer({
       }}
     >
       {target.children?.map((target) => renderer({ target }))}
-    </iframe>
+    </div>
   );
 }
 

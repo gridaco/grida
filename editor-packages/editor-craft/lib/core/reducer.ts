@@ -3,7 +3,7 @@ import { CraftHistoryAction, CraftDraftAction } from "./action";
 import { EditorState } from "editor/core/states";
 import { CraftHtmlElement, CraftNode, CraftRadixIconElement } from "./state";
 import { math, XYWH } from "@code-editor/canvas";
-import { visit } from "tree-visit";
+import { visit, access, findIndexPath, IndexPath } from "tree-visit";
 import { nanoid } from "nanoid";
 import * as core from "@reflect-ui/core";
 import * as css from "@web-builder/styles";
@@ -377,6 +377,7 @@ export function craftHistoryReducer(
     case "(craft)/widget/new": {
       const id = new_node_id();
 
+      let parent_path: IndexPath = [];
       let parent_ref: NewNodePlacementParentReference = canvas;
       let point = next_sequential_canvas_placement(state, [0, 0, 100, 100]);
 
@@ -391,10 +392,17 @@ export function craftHistoryReducer(
           ? can_node_have_children(selection)
           : false;
         if (can_have_children) {
-          // TODO: insert new widget under a selected node if applicable
-          // calculate the next placement under the selected node (parent)
           const parent = selection as CraftNode;
+
           parent_ref = parent.id;
+
+          parent_path =
+            findIndexPath(state.craft, {
+              getChildren: (node) => node.children,
+              predicate: (node) => node.id === parent_ref,
+            }) ?? [];
+
+          // calculate the next placement under the selected node (parent)
           point = node_placement_under_parent(
             [0, 0, 100, 100],
             [parent.absoluteX, parent.absoluteY, parent.width, parent.height]
@@ -403,163 +411,10 @@ export function craftHistoryReducer(
       }
 
       const [x, y, w, h] = point;
-
-      // return produce(state, (draft) => {
-      //   visit(state.craft, {
-      //     getChildren: (node) => node.children ?? [],
-      //     onEnter: (node: CraftNode) => {
-      //       //
-      //     },
-      //   });
-      // });
-
       switch (action.widget) {
-        case "container": {
-          return produce(state, (draft) => {
-            draft.craft.children.push(
-              templates.new_container_widget({
-                id,
-                name: "container",
-                x,
-                y,
-                width: w,
-                height: h,
-                absoluteX: x,
-                absoluteY: y,
-              })
-            );
-          });
-        }
-        case "textfield": {
-          return produce(state, (draft) => {
-            draft.craft.children.push(
-              templates.new_textfield_widget({
-                id,
-                name: "textfield",
-                x,
-                y,
-                width: w,
-                height: h,
-                absoluteX: x,
-                absoluteY: y,
-              })
-            );
-          });
-        }
-        case "icon": {
-          return produce(state, (draft) => {
-            draft.craft.children.push(
-              templates.new_radix_icon_widget({
-                id,
-                name: "icon",
-                x,
-                y,
-                width: w,
-                height: h,
-                absoluteX: x,
-                absoluteY: y,
-              })
-            );
-          });
-        }
-        case "text": {
-          return produce(state, (draft) => {
-            draft.craft.children.push(
-              templates.new_text_widget({
-                id,
-                name: "text",
-                x,
-                y,
-                width: w,
-                height: h,
-                absoluteX: x,
-                absoluteY: y,
-              })
-            );
-          });
-        }
-        case "image": {
-          return produce(state, (draft) => {
-            draft.craft.children.push(
-              templates.new_image_widget({
-                id,
-                name: "image",
-                x,
-                y,
-                width: w,
-                height: h,
-                absoluteX: x,
-                absoluteY: y,
-              })
-            );
-          });
-        }
-        case "image-circle": {
-          return produce(state, (draft) => {
-            draft.craft.children.push(
-              templates.new_circle_image_widget({
-                id,
-                name: "image-circle",
-                x,
-                y,
-                width: w,
-                height: h,
-                absoluteX: x,
-                absoluteY: y,
-              })
-            );
-          });
-        }
-        case "video": {
-          return produce(state, (draft) => {
-            draft.craft.children.push(
-              templates.new_video_widget({
-                id,
-                name: "video",
-                x,
-                y,
-                width: w,
-                height: h,
-                absoluteX: x,
-                absoluteY: y,
-              })
-            );
-          });
-        }
-        case "button": {
-          return produce(state, (draft) => {
-            draft.craft.children.push(
-              templates.new_button_widget({
-                id,
-                name: "button",
-                x,
-                y,
-                width: w,
-                height: h,
-                absoluteX: x,
-                absoluteY: y,
-              })
-            );
-          });
-        }
         case "divider": {
-          const point = next_sequential_canvas_placement(state, [0, 0, 100, 1]);
-          const [x, y, w, h] = point;
-
-          return produce(state, (draft) => {
-            draft.craft.children.push(
-              templates.new_divider_widget({
-                id,
-                name: "divider",
-                x,
-                y,
-                width: w,
-                height: h,
-                absoluteX: x,
-                absoluteY: y,
-              })
-            );
-          });
+          point = next_sequential_canvas_placement(state, [0, 0, 100, 1]);
+          break;
         }
         case "flex":
         case "flex flex-row wrap":
@@ -567,32 +422,28 @@ export function craftHistoryReducer(
         case "flex wrap":
         case "flex flex-col wrap":
         case "flex flex-row": {
-          const point = next_sequential_canvas_placement(
-            state,
-            [0, 0, 200, 100]
-          );
-          const [x, y, w, h] = point;
-          return produce(state, (draft) => {
-            draft.craft.children.push(
-              templates.new_flex_row_widget({
-                id,
-                name: "flex",
-                x,
-                y,
-                width: w,
-                height: h,
-                absoluteX: x,
-                absoluteY: y,
-              })
-            );
-          });
-        }
-        default: {
-          throw new Error(`Not implemented widget type: ${action.widget}`);
+          point = next_sequential_canvas_placement(state, [0, 0, 200, 100]);
+          break;
         }
       }
-      break;
-      // //
+
+      return produce(state, (draft) => {
+        const parent = access(draft.craft, parent_path!, {
+          getChildren: (node) => node.children,
+        });
+
+        const widget = templates.new_widget(action.widget, {
+          id,
+          x,
+          y,
+          absoluteX: x,
+          absoluteY: y,
+          width: w,
+          height: h,
+        });
+
+        parent.children.push(widget);
+      });
     }
   }
 
