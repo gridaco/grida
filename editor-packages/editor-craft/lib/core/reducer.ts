@@ -1,10 +1,15 @@
 import produce from "immer";
 import { CraftHistoryAction, CraftDraftAction } from "./action";
 import { EditorState } from "editor/core/states";
-import { CraftHtmlElement, CraftRadixIconElement } from "./state";
+import { CraftHtmlElement, CraftNode, CraftRadixIconElement } from "./state";
 import { math, XYWH } from "@code-editor/canvas";
+import { visit } from "tree-visit";
+import { nanoid } from "nanoid";
 import * as core from "@reflect-ui/core";
 import * as css from "@web-builder/styles";
+
+const canvas = Symbol("canvas");
+type NewNodePlacementParentReference = typeof canvas | string;
 
 export function craftDraftReducer(
   state: EditorState,
@@ -104,54 +109,64 @@ export function craftHistoryReducer(
     case "(craft)/node/corner-radius/each": {
       return produce(state, (draft) => {
         const { radius } = action;
-        const selected = draft.selectedNodes[0];
-        draft.craft.children.forEach((c) => {
-          if (c.id === selected) {
-            const { tl, tr, bl, br } = radius;
-            if (tl) c.style!.borderTopLeftRadius = tl;
-            if (tr) c.style!.borderTopRightRadius = tr;
-            if (bl) c.style!.borderBottomLeftRadius = bl;
-            if (br) c.style!.borderBottomRightRadius = br;
-          }
+
+        visit(draft.craft, {
+          getChildren: (node) => node.children ?? [],
+          onEnter: (c: CraftNode) => {
+            if (draft.selectedNodes.includes(c.id)) {
+              const { tl, tr, bl, br } = radius;
+              if (tl) c.style!.borderTopLeftRadius = tl;
+              if (tr) c.style!.borderTopRightRadius = tr;
+              if (bl) c.style!.borderBottomLeftRadius = bl;
+              if (br) c.style!.borderBottomRightRadius = br;
+              return "skip";
+            }
+          },
         });
       });
     }
     case "(craft)/node/border/add": {
       return produce(state, (draft) => {
-        const selected = draft.selectedNodes[0];
-        draft.craft.children.forEach((c) => {
-          if (c.id === selected) {
-            c.style!.borderWidth = 1;
-            c.style!.borderColor = "black";
-          }
+        visit(draft.craft, {
+          getChildren: (node) => node.children ?? [],
+          onEnter: (node: CraftNode) => {
+            if (draft.selectedNodes.includes(node.id)) {
+              node.style!.borderWidth = 1;
+              node.style!.borderColor = "black";
+              return "skip";
+            }
+          },
         });
       });
     }
     case "(craft)/node/border/remove": {
       return produce(state, (draft) => {
-        const selected = draft.selectedNodes[0];
-        draft.craft.children.forEach((c) => {
-          if (c.id === selected) {
-            delete c.style?.borderWidth;
-            delete c.style?.borderColor;
-            delete c.style?.borderStyle;
-            delete c.style?.borderTop;
-            delete c.style?.borderBottom;
-            delete c.style?.borderLeft;
-            delete c.style?.borderRight;
-            delete c.style?.borderTopWidth;
-            delete c.style?.borderBottomWidth;
-            delete c.style?.borderLeftWidth;
-            delete c.style?.borderRightWidth;
-            delete c.style?.borderTopColor;
-            delete c.style?.borderBottomColor;
-            delete c.style?.borderLeftColor;
-            delete c.style?.borderRightColor;
-            delete c.style?.borderTopStyle;
-            delete c.style?.borderBottomStyle;
-            delete c.style?.borderLeftStyle;
-            delete c.style?.borderRightStyle;
-          }
+        visit(draft.craft, {
+          getChildren: (node) => node.children ?? [],
+          onEnter: (c: CraftNode) => {
+            if (draft.selectedNodes.includes(c.id)) {
+              delete c.style?.borderWidth;
+              delete c.style?.borderColor;
+              delete c.style?.borderStyle;
+              delete c.style?.borderTop;
+              delete c.style?.borderBottom;
+              delete c.style?.borderLeft;
+              delete c.style?.borderRight;
+              delete c.style?.borderTopWidth;
+              delete c.style?.borderBottomWidth;
+              delete c.style?.borderLeftWidth;
+              delete c.style?.borderRightWidth;
+              delete c.style?.borderTopColor;
+              delete c.style?.borderBottomColor;
+              delete c.style?.borderLeftColor;
+              delete c.style?.borderRightColor;
+              delete c.style?.borderTopStyle;
+              delete c.style?.borderBottomStyle;
+              delete c.style?.borderLeftStyle;
+              delete c.style?.borderRightStyle;
+              return "skip";
+            }
+          },
         });
       });
     }
@@ -359,8 +374,33 @@ export function craftHistoryReducer(
       });
     }
     case "(craft)/widget/new": {
-      const id = new Date().getTime().toString();
-      const point = next_canvas_placement(state, [0, 0, 100, 100]);
+      const id = new_node_id();
+
+      let parent_ref: NewNodePlacementParentReference = canvas;
+      let point = next_sequential_canvas_placement(state, [0, 0, 100, 100]);
+
+      const is_single_selected = state.selectedNodes.length === 1;
+
+      if (is_single_selected) {
+        const selection_id = state.selectedNodes[0];
+        const selection = state.craft.children.find(
+          (c) => c.id === selection_id
+        );
+        const can_have_children = selection
+          ? can_node_have_children(selection)
+          : false;
+        if (can_have_children) {
+          // TODO: insert new widget under a selected node if applicable
+          // calculate the next placement under the selected node (parent)
+          const parent = selection as CraftNode;
+          parent_ref = parent.id;
+          point = node_placement_under_parent(
+            [0, 0, 100, 100],
+            [parent.absoluteX, parent.absoluteY, parent.width, parent.height]
+          );
+        }
+      }
+
       const [x, y, w, h] = point;
       switch (action.widget) {
         case "container": {
@@ -580,7 +620,7 @@ export function craftHistoryReducer(
           });
         }
         case "divider": {
-          const point = next_canvas_placement(state, [0, 0, 100, 1]);
+          const point = next_sequential_canvas_placement(state, [0, 0, 100, 1]);
           const [x, y, w, h] = point;
 
           return produce(state, (draft) => {
@@ -613,7 +653,10 @@ export function craftHistoryReducer(
         case "flex wrap":
         case "flex flex-col wrap":
         case "flex flex-row": {
-          const point = next_canvas_placement(state, [0, 0, 200, 100]);
+          const point = next_sequential_canvas_placement(
+            state,
+            [0, 0, 200, 100]
+          );
           const [x, y, w, h] = point;
           return produce(state, (draft) => {
             draft.craft.children.push({
@@ -691,7 +734,13 @@ export function craftHistoryReducer(
   return { ...state };
 }
 
-function next_canvas_placement(state: EditorState, item: XYWH) {
+/**
+ * use this to calculate the next sequential placement of a new node in the canvas
+ */
+function next_sequential_canvas_placement(
+  state: EditorState,
+  item: XYWH
+): XYWH {
   return math.no_overlap_placement(
     item,
     state.craft.children.map((c) => [
@@ -704,4 +753,21 @@ function next_canvas_placement(state: EditorState, item: XYWH) {
       padding: 100,
     }
   )!;
+}
+
+function node_placement_under_parent(item: XYWH, parent: XYWH): XYWH {
+  const [ix, iy, iw, ih] = item;
+  const [px, py, pw, ph] = parent;
+  // TODO: implement this
+  return [px, py, iw, ih];
+}
+
+function can_node_have_children(node: CraftNode): boolean {
+  // atm, we are checking the availability of children to be added by the object having a children field set.
+  // to be more safe, this should be checked by the type of the object.
+  return !!node.children;
+}
+
+function new_node_id(): string {
+  return nanoid();
 }

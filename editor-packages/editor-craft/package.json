@@ -9,7 +9,8 @@
     "@reflect-ui/core": "0.0.12",
     "@web-builder/styles": "workspace:^",
     "editor": "workspace:^",
-    "immer": "^9.0.3"
+    "immer": "^9.0.3",
+    "tree-visit": "^0.1.0"
   },
   "devDependencies": {
     "@types/react": "18.2.58",
