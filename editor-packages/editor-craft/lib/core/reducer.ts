@@ -7,6 +7,7 @@ import { visit } from "tree-visit";
 import { nanoid } from "nanoid";
 import * as core from "@reflect-ui/core";
 import * as css from "@web-builder/styles";
+import * as templates from "../templates";
 
 const canvas = Symbol("canvas");
 type NewNodePlacementParentReference = typeof canvas | string;
@@ -402,221 +403,143 @@ export function craftHistoryReducer(
       }
 
       const [x, y, w, h] = point;
+
+      // return produce(state, (draft) => {
+      //   visit(state.craft, {
+      //     getChildren: (node) => node.children ?? [],
+      //     onEnter: (node: CraftNode) => {
+      //       //
+      //     },
+      //   });
+      // });
+
       switch (action.widget) {
         case "container": {
           return produce(state, (draft) => {
-            draft.craft.children.push({
-              type: "html",
-              id,
-              name: "container",
-              x: x,
-              y: y,
-              tag: "div",
-              attributes: {
-                class: [],
-              },
-              style: {
+            draft.craft.children.push(
+              templates.new_container_widget({
+                id,
+                name: "container",
+                x,
+                y,
                 width: w,
                 height: h,
-                backgroundColor: "grey",
-              },
-              children: [],
-              width: w,
-              height: h,
-              absoluteX: x,
-              absoluteY: y,
-              rotation: 0,
-            });
+                absoluteX: x,
+                absoluteY: y,
+              })
+            );
           });
         }
         case "textfield": {
           return produce(state, (draft) => {
-            draft.craft.children.push({
-              type: "html",
-              id,
-              name: "input",
-              x: x,
-              y: y,
-              tag: "input",
-              attributes: {
-                type: "text",
-                placeholder: "Enter your text",
-                class: [],
-              },
-              style: {},
-              children: [],
-              width: w,
-              height: h,
-              absoluteX: x,
-              absoluteY: y,
-              rotation: 0,
-            });
+            draft.craft.children.push(
+              templates.new_textfield_widget({
+                id,
+                name: "textfield",
+                x,
+                y,
+                width: w,
+                height: h,
+                absoluteX: x,
+                absoluteY: y,
+              })
+            );
           });
         }
         case "icon": {
           return produce(state, (draft) => {
-            draft.craft.children.push({
-              type: "@radix-ui/react-icons",
-              id,
-              name: "icon",
-              tag: "svg",
-              x: x,
-              y: y,
-              icon: "PlusIcon",
-              color: "black",
-              style: {},
-              width: 15,
-              height: 15,
-              absoluteX: x,
-              absoluteY: y,
-              rotation: 0,
-            });
+            draft.craft.children.push(
+              templates.new_radix_icon_widget({
+                id,
+                name: "icon",
+                x,
+                y,
+                width: w,
+                height: h,
+                absoluteX: x,
+                absoluteY: y,
+              })
+            );
           });
         }
         case "text": {
           return produce(state, (draft) => {
-            draft.craft.children.push({
-              type: "html",
-              id,
-              name: "text",
-              x: x,
-              y: y,
-              tag: "span",
-              attributes: {
-                class: [],
-              },
-              style: {
-                color: "black",
-                fontWeight: 400,
-              },
-              text: "Text",
-              children: [],
-              width: w,
-              height: h,
-              absoluteX: x,
-              absoluteY: y,
-              rotation: 0,
-            });
+            draft.craft.children.push(
+              templates.new_text_widget({
+                id,
+                name: "text",
+                x,
+                y,
+                width: w,
+                height: h,
+                absoluteX: x,
+                absoluteY: y,
+              })
+            );
           });
         }
         case "image": {
           return produce(state, (draft) => {
-            draft.craft.children.push({
-              type: "html",
-              id,
-              name: "image",
-              x,
-              y,
-              tag: "img",
-              attributes: {
-                class: [],
-                src: "https://via.placeholder.com/150",
-              },
-              style: {
-                width: 100,
-                height: 100,
-                objectFit: "cover",
-              },
-              width: w,
-              height: h,
-              absoluteX: x,
-              absoluteY: y,
-              rotation: 0,
-            });
+            draft.craft.children.push(
+              templates.new_image_widget({
+                id,
+                name: "image",
+                x,
+                y,
+                width: w,
+                height: h,
+                absoluteX: x,
+                absoluteY: y,
+              })
+            );
           });
         }
         case "image-circle": {
           return produce(state, (draft) => {
-            draft.craft.children.push(<CraftHtmlElement<"img">>{
-              type: "html",
-              id,
-              name: "circle image",
-              x: x,
-              y: y,
-              tag: "img",
-              style: {
-                width: 100,
-                height: 100,
-                borderRadius: 999,
-                overflow: "hidden",
-                objectFit: "cover",
-              },
-              attributes: {
-                src: "https://via.placeholder.com/150",
-                tw: [
-                  "rounded-full",
-                  "overflow-hidden",
-                  "border-4",
-                  "border-white",
-                ].join(" "),
-              },
-
-              children: [],
-              width: w,
-              height: h,
-              absoluteX: x,
-              absoluteY: y,
-              rotation: 0,
-            });
+            draft.craft.children.push(
+              templates.new_circle_image_widget({
+                id,
+                name: "image-circle",
+                x,
+                y,
+                width: w,
+                height: h,
+                absoluteX: x,
+                absoluteY: y,
+              })
+            );
           });
         }
         case "video": {
           return produce(state, (draft) => {
-            draft.craft.children.push({
-              type: "html",
-              id,
-              name: "video",
-              x: x,
-              y: y,
-              tag: "video",
-              attributes: {
-                src: "https://www.w3schools.com/html/mov_bbb.mp4",
-              },
-              style: {
-                width: 100,
-                height: 100,
-                backgroundColor: "black",
-              },
-              children: [],
-              width: w,
-              height: h,
-              absoluteX: x,
-              absoluteY: y,
-              rotation: 0,
-            });
+            draft.craft.children.push(
+              templates.new_video_widget({
+                id,
+                name: "video",
+                x,
+                y,
+                width: w,
+                height: h,
+                absoluteX: x,
+                absoluteY: y,
+              })
+            );
           });
         }
         case "button": {
           return produce(state, (draft) => {
-            draft.craft.children.push({
-              type: "html",
-              id,
-              name: "button",
-              x: x,
-              y: y,
-              tag: "button",
-              attributes: {
-                tw: [
-                  "bg-blue-500",
-                  "text-white",
-                  "p-2",
-                  "rounded",
-                  "shadow-md",
-                ].join(" "),
-              },
-              style: {
-                padding: 10,
-                backgroundColor: "black",
-                color: "white",
-              },
-              children: [],
-              text: "Button",
-              width: w,
-              height: h,
-              absoluteX: x,
-              absoluteY: y,
-              rotation: 0,
-            });
+            draft.craft.children.push(
+              templates.new_button_widget({
+                id,
+                name: "button",
+                x,
+                y,
+                width: w,
+                height: h,
+                absoluteX: x,
+                absoluteY: y,
+              })
+            );
           });
         }
         case "divider": {
@@ -624,27 +547,18 @@ export function craftHistoryReducer(
           const [x, y, w, h] = point;
 
           return produce(state, (draft) => {
-            draft.craft.children.push({
-              type: "html",
-              id,
-              name: "divider",
-              x: x,
-              y: y,
-              tag: "hr",
-              attributes: {
-                tw: ["border-2", "border-gray-300", "w-full", "my-4"].join(" "),
-              },
-              style: {
-                width: 100,
-                height: 1,
-              },
-              children: [],
-              width: w,
-              height: h,
-              absoluteX: x,
-              absoluteY: y,
-              rotation: 0,
-            });
+            draft.craft.children.push(
+              templates.new_divider_widget({
+                id,
+                name: "divider",
+                x,
+                y,
+                width: w,
+                height: h,
+                absoluteX: x,
+                absoluteY: y,
+              })
+            );
           });
         }
         case "flex":
@@ -659,67 +573,18 @@ export function craftHistoryReducer(
           );
           const [x, y, w, h] = point;
           return produce(state, (draft) => {
-            draft.craft.children.push({
-              type: "html",
-              id,
-              name: "flex flex-row",
-              x: x,
-              y: y,
-              tag: "div",
-              attributes: {
-                tw: ["flex", "flex-row"].join(" "),
-              },
-              style: {
+            draft.craft.children.push(
+              templates.new_flex_row_widget({
+                id,
+                name: "flex",
+                x,
+                y,
                 width: w,
                 height: h,
-                display: "flex",
-                flexDirection: "row",
-                gap: 10,
-              },
-              children: [
-                {
-                  type: "html",
-                  id: id + "-1",
-                  name: "child 1",
-                  x: 0,
-                  y: 0,
-                  width: w / 2,
-                  height: h,
-                  tag: "div",
-                  style: {
-                    flex: 1,
-                    backgroundColor: "rgba(0, 0, 0, 0.1)",
-                  },
-                  children: [],
-                  absoluteX: x,
-                  absoluteY: y,
-                  rotation: 0,
-                },
-                {
-                  type: "html",
-                  id: id + "-2",
-                  name: "child 2",
-                  x: x + w / 2,
-                  y: 0,
-                  width: w / 2,
-                  height: h,
-                  tag: "div",
-                  style: {
-                    flex: 1,
-                    backgroundColor: "rgba(0, 0, 0, 0.2)",
-                  },
-                  children: [],
-                  absoluteX: x + w / 2,
-                  absoluteY: y,
-                  rotation: 0,
-                },
-              ],
-              width: w,
-              height: h,
-              absoluteX: x,
-              absoluteY: y,
-              rotation: 0,
-            });
+                absoluteX: x,
+                absoluteY: y,
+              })
+            );
           });
         }
         default: {
@@ -727,7 +592,7 @@ export function craftHistoryReducer(
         }
       }
       break;
-      //
+      // //
     }
   }
 

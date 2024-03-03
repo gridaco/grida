@@ -47,8 +47,7 @@ export type CraftHtmlElement<T extends keyof JSX.IntrinsicElements = any> =
       type: "html";
     };
 
-export type CraftRadixIconElement = Omit<ElementAttributes<"svg">, "tag"> &
-  BaseNode &
+export type CraftRadixIconElement = BaseNode &
   Position &
   Size &
   AbsolutePosition &
