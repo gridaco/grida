@@ -2414,13 +2414,6 @@ importers:
       react-colorful:
         specifier: ^5.6.1
         version: 5.6.1(react-dom@18.2.0)(react@18.2.0)
-    devDependencies:
-      '@types/react':
-        specifier: 18.2.58
-        version: 18.2.58
-      react:
-        specifier: ^18.2.0
-        version: 18.2.0
 
   ui/editor-ui/packages/editor-ui-context-menu:
     dependencies:

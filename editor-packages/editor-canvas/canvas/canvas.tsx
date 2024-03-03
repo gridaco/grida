@@ -252,7 +252,7 @@ export function Canvas<T extends TCanvasNode>({
         y: n.absoluteY,
         width: n.width,
         height: n.height,
-        rotation: n.rotation,
+        rotation: n.rotation ?? 0,
       }))
     );
 
@@ -717,12 +717,12 @@ const Container = styled.div<{ width: number; height: number }>`
  * 1. container positioning guide (static per selection)
  * 2. relative positioning to target (hovering layer) guide
  */
-function position_guide({
+function position_guide<T extends TCanvasNode>({
   selections,
   hover,
 }: {
-  selections: TCanvasNode[];
-  hover: TCanvasNode;
+  selections: T[];
+  hover: T;
 }) {
   if (selections.length === 0) {
     return [];

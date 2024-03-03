@@ -5,7 +5,6 @@ import {
   FrameTitleContainer,
   FrameTitleLabel,
 } from "@code-editor/canvas/frame-title";
-import { color_frame_title } from "@code-editor/canvas/theme";
 import { PlayIcon } from "@radix-ui/react-icons";
 export function ViewportTitleRenderer({
   name,
@@ -56,7 +55,7 @@ export function ViewportTitleRenderer({
         data-selected={selected}
         className="flex flex-row p-4 gap-4 rounded-xl w-full shadow-md items-center bg-neutral-500 data-[selected=true]:bg-blue-400"
       >
-        {selected && runnable && (
+        {runnable && (
           <button
             onPointerDown={(e) => {
               // this is required to prevent the canvas' event listener being called first.
