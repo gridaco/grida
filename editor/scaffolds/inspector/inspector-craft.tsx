@@ -14,6 +14,7 @@ import { CraftBoxShadowSection } from "./section-craft-box-shadow";
 import { CraftLayerSection } from "./section-craft-layer";
 import { CraftBoxLayoutSection } from "./section-craft-box";
 import { CraftImageSection } from "./section-craft-image";
+import { useInspectorElement } from "hooks/use-inspector-element";
 
 export function CraftInspector() {
   return (
@@ -25,13 +26,9 @@ export function CraftInspector() {
 }
 
 function CraftBody({ debug }: { debug?: boolean }) {
-  const [state] = useEditorState();
+  const element = useInspectorElement();
 
-  const target = state.craft.children.find(
-    (c) => c.id === state.selectedNodes[0]
-  );
-
-  if (target) {
+  if (element) {
     return <InspectorBody debug={debug} />;
   } else {
     return <EmptyState />;

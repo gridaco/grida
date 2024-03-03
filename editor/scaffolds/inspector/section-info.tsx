@@ -26,14 +26,16 @@ export function InfoSection() {
 export function CrafInfoSection() {
   const element = useInspectorElement();
 
-  const { type, name } = element ?? {};
+  const { id, type, name, tag } = element ?? {};
   return (
     <section className="flex flex-col p-3">
       <SceneTitle>
         {/* <SceneNodeIcon color="white" type={type} /> */}
         <input disabled value={name} />
         <pre className="text-xs">
-          {type} {type === "html" ? element["tag"] : ""}
+          {type} {type === "html" ? tag : ""}
+          <br />
+          {id}
         </pre>
       </SceneTitle>
       {/* <SceneDescription>{"No description"}</SceneDescription> */}

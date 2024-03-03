@@ -33,7 +33,7 @@ export function CraftForegroundColorSection() {
     [dispatch]
   );
 
-  if (!element || !element.style.color) {
+  if (!element || !element.style || !element.style.color) {
     return <></>;
   }
 

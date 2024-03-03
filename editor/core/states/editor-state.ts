@@ -61,6 +61,8 @@ export interface EditorState {
 
   // v2 (with craft mode)
   craft: {
+    id: string;
+    type: "document";
     children: EditorNode[];
   };
 }
