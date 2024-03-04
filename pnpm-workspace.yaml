@@ -3,6 +3,7 @@ packages:
   - "web"
   - "editor"
   - "editor-packages/*"
+  - "apps/*"
   - "packages/app-*"
   - "packages/core-*"
   - "packages/lib/*"
