@@ -71,3 +71,26 @@ export type CraftViewportNode = BaseNode &
 export type CraftNode = CraftElement | CraftViewportNode;
 
 export type CraftElement = CraftHtmlElement | CraftRadixIconElement;
+
+// type CraftComponentNode = {
+//   interface: { [key: string]: CraftParameterType };
+// };
+
+// type CraftParameterType =
+//   | CraftLiteralStringParameterDefinition
+//   | "number"
+//   | "boolean"
+//   | "color"
+//   | "enum";
+
+// type CraftLiteralStringParameterDefinition =
+//   | {
+//       type: "string";
+//       value: string;
+//       optional: false;
+//     }
+//   | {
+//       type: "string";
+//       value?: string | null;
+//       optional: true;
+//     };

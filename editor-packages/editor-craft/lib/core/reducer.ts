@@ -1,7 +1,12 @@
 import produce from "immer";
 import { CraftHistoryAction, CraftDraftAction } from "./action";
 import { EditorState } from "editor/core/states";
-import { CraftHtmlElement, CraftNode, CraftRadixIconElement } from "./state";
+import {
+  CraftElement,
+  CraftHtmlElement,
+  CraftNode,
+  CraftRadixIconElement,
+} from "./state";
 import { math, XYWH } from "@code-editor/canvas";
 import { visit, access, findIndexPath, IndexPath } from "tree-visit";
 import { nanoid } from "nanoid";
@@ -20,36 +25,45 @@ export function craftDraftReducer(
     case "(draft)/(craft)/node/background-color": {
       const { color } = action;
       return produce(state, (draft) => {
-        const selected = draft.selectedNodes[0];
-        draft.craft.children.forEach((c) => {
-          if (c.id === selected) {
-            const colorstr = `rgba(${color.r},${color.g},${color.b},${color.a})`;
-            (c as CraftHtmlElement).style!.backgroundColor = colorstr;
-          }
+        visit<CraftElement>(draft.craft, {
+          getChildren: (node) => node["children"] ?? [],
+          onEnter: (node: CraftHtmlElement) => {
+            if (draft.selectedNodes.includes(node.id)) {
+              const colorstr = `rgba(${color.r},${color.g},${color.b},${color.a})`;
+              node.style!.backgroundColor = colorstr;
+              return "skip";
+            }
+          },
         });
       });
     }
     case "(draft)/(craft)/node/foreground-color": {
       const { color } = action;
       return produce(state, (draft) => {
-        const selected = draft.selectedNodes[0];
-        draft.craft.children.forEach((c) => {
-          if (c.id === selected) {
-            const colorstr = `rgba(${color.r},${color.g},${color.b},${color.a})`;
-            (c as CraftHtmlElement).style!.color = colorstr;
-          }
+        visit<CraftElement>(draft.craft, {
+          getChildren: (node) => node["children"] ?? [],
+          onEnter: (node: CraftHtmlElement) => {
+            if (draft.selectedNodes.includes(node.id)) {
+              const colorstr = `rgba(${color.r},${color.g},${color.b},${color.a})`;
+              node.style!.color = colorstr;
+              return "skip";
+            }
+          },
         });
       });
     }
     case "(draft)/(craft)/node/border/color": {
       const { color } = action;
       return produce(state, (draft) => {
-        const selected = draft.selectedNodes[0];
-        draft.craft.children.forEach((c) => {
-          if (c.id === selected) {
-            const colorstr = `rgba(${color.r},${color.g},${color.b},${color.a})`;
-            (c as CraftHtmlElement).style!.borderColor = colorstr;
-          }
+        visit<CraftElement>(draft.craft, {
+          getChildren: (node) => node["children"] ?? [],
+          onEnter: (node: CraftHtmlElement) => {
+            if (draft.selectedNodes.includes(node.id)) {
+              const colorstr = `rgba(${color.r},${color.g},${color.b},${color.a})`;
+              node.style!.borderColor = colorstr;
+              return "skip";
+            }
+          },
         });
       });
     }
@@ -74,36 +88,47 @@ export function craftHistoryReducer(
         );
       });
     }
+
     case "(craft)/node/opacity": {
       return produce(state, (draft) => {
         const { opacity } = action;
-        const selected = draft.selectedNodes[0];
-        draft.craft.children.forEach((c) => {
-          if (c.id === selected) {
-            c.style!.opacity = opacity;
-          }
+        visit<CraftHtmlElement>(draft.craft, {
+          getChildren: (node) => node.children ?? [],
+          onEnter: (node: CraftHtmlElement) => {
+            if (draft.selectedNodes.includes(node.id)) {
+              node.style!.opacity = opacity;
+              return "skip";
+            }
+          },
         });
       });
     }
     case "(craft)/node/overflow": {
       const { value } = action;
       return produce(state, (draft) => {
-        const selected = draft.selectedNodes[0];
-        draft.craft.children.forEach((c) => {
-          if (c.id === selected) {
-            c.style!.overflow = value;
-          }
+        visit<CraftHtmlElement>(draft.craft, {
+          getChildren: (node) => node.children ?? [],
+          onEnter: (node: CraftHtmlElement) => {
+            if (draft.selectedNodes.includes(node.id)) {
+              node.style!.overflow = value;
+              return "skip";
+            }
+          },
         });
       });
     }
     case "(craft)/node/corner-radius/all": {
       return produce(state, (draft) => {
         const { radius } = action;
-        const selected = draft.selectedNodes[0];
-        draft.craft.children.forEach((c) => {
-          if (c.id === selected) {
-            c.style!.borderRadius = radius;
-          }
+
+        visit<CraftHtmlElement>(draft.craft, {
+          getChildren: (node) => node.children ?? [],
+          onEnter: (node: CraftHtmlElement) => {
+            if (draft.selectedNodes.includes(node.id)) {
+              node.style!.borderRadius = radius;
+              return "skip";
+            }
+          },
         });
       });
     }
@@ -111,9 +136,9 @@ export function craftHistoryReducer(
       return produce(state, (draft) => {
         const { radius } = action;
 
-        visit(draft.craft, {
+        visit<CraftHtmlElement>(draft.craft, {
           getChildren: (node) => node.children ?? [],
-          onEnter: (c: CraftNode) => {
+          onEnter: (c: CraftHtmlElement) => {
             if (draft.selectedNodes.includes(c.id)) {
               const { tl, tr, bl, br } = radius;
               if (tl) c.style!.borderTopLeftRadius = tl;
@@ -128,9 +153,9 @@ export function craftHistoryReducer(
     }
     case "(craft)/node/border/add": {
       return produce(state, (draft) => {
-        visit(draft.craft, {
+        visit<CraftHtmlElement>(draft.craft, {
           getChildren: (node) => node.children ?? [],
-          onEnter: (node: CraftNode) => {
+          onEnter: (node: CraftHtmlElement) => {
             if (draft.selectedNodes.includes(node.id)) {
               node.style!.borderWidth = 1;
               node.style!.borderColor = "black";
@@ -142,9 +167,9 @@ export function craftHistoryReducer(
     }
     case "(craft)/node/border/remove": {
       return produce(state, (draft) => {
-        visit(draft.craft, {
+        visit<CraftHtmlElement>(draft.craft, {
           getChildren: (node) => node.children ?? [],
-          onEnter: (c: CraftNode) => {
+          onEnter: (c: CraftHtmlElement) => {
             if (draft.selectedNodes.includes(c.id)) {
               delete c.style?.borderWidth;
               delete c.style?.borderColor;
@@ -174,203 +199,269 @@ export function craftHistoryReducer(
     case "(craft)/node/border/width": {
       return produce(state, (draft) => {
         const { width } = action;
-        const selected = draft.selectedNodes[0];
-        draft.craft.children.forEach((c) => {
-          if (c.id === selected) {
-            c.style!.borderWidth = width;
-          }
+
+        visit<CraftHtmlElement>(draft.craft, {
+          getChildren: (node) => node.children ?? [],
+          onEnter: (node: CraftHtmlElement) => {
+            if (draft.selectedNodes.includes(node.id)) {
+              node.style!.borderWidth = width;
+              return "skip";
+            }
+          },
         });
       });
     }
     case "(craft)/node/box-shadow/add": {
       return produce(state, (draft) => {
-        const selected = draft.selectedNodes[0];
-        draft.craft.children.forEach((c) => {
-          if (c.id === selected) {
-            c.style!.boxShadow = {
-              color: { r: 0, g: 0, b: 0, a: 0.25 },
-              blurRadius: 4,
-              offset: new core.Offset(0, 4),
-              spreadRadius: 0,
-            };
-          }
+        visit<CraftHtmlElement>(draft.craft, {
+          getChildren: (node) => node.children ?? [],
+          onEnter: (node: CraftHtmlElement) => {
+            if (draft.selectedNodes.includes(node.id)) {
+              node.style!.boxShadow = {
+                color: { r: 0, g: 0, b: 0, a: 0.25 },
+                blurRadius: 4,
+                offset: new core.Offset(0, 4),
+                spreadRadius: 0,
+              };
+              return "skip";
+            }
+          },
         });
       });
     }
     case "(craft)/node/box-shadow/remove": {
       return produce(state, (draft) => {
-        const selected = draft.selectedNodes[0];
-        draft.craft.children.forEach((c) => {
-          if (c.id === selected) {
-            delete c.style!.boxShadow;
-          }
+        visit<CraftHtmlElement>(draft.craft, {
+          getChildren: (node) => node.children ?? [],
+          onEnter: (node: CraftHtmlElement) => {
+            if (draft.selectedNodes.includes(node.id)) {
+              delete node.style!.boxShadow;
+              return "skip";
+            }
+          },
         });
       });
     }
     case "(craft)/node/box-shadow/color": {
       return produce(state, (draft) => {
         const { color } = action;
-        const selected = draft.selectedNodes[0];
-        draft.craft.children.forEach((c) => {
-          if (c.id === selected) {
-            c.style!.boxShadow!.color = color;
-          }
+
+        visit<CraftHtmlElement>(draft.craft, {
+          getChildren: (node) => node.children ?? [],
+          onEnter: (node: CraftHtmlElement) => {
+            if (draft.selectedNodes.includes(node.id)) {
+              node.style!.boxShadow!.color = color;
+              return "skip";
+            }
+          },
         });
       });
     }
     case "(craft)/node/box-shadow/blur-radius": {
       return produce(state, (draft) => {
         const { radius } = action;
-        const selected = draft.selectedNodes[0];
-        draft.craft.children.forEach((c) => {
-          if (c.id === selected) {
-            c.style!.boxShadow!.blurRadius = radius;
-          }
+
+        visit<CraftHtmlElement>(draft.craft, {
+          getChildren: (node) => node.children ?? [],
+          onEnter: (node: CraftHtmlElement) => {
+            if (draft.selectedNodes.includes(node.id)) {
+              node.style!.boxShadow!.blurRadius = radius;
+              return "skip";
+            }
+          },
         });
       });
     }
     case "(craft)/node/box-shadow/spread": {
       return produce(state, (draft) => {
         const { radius } = action;
-        const selected = draft.selectedNodes[0];
-        draft.craft.children.forEach((c) => {
-          if (c.id === selected) {
-            c.style!.boxShadow!.spreadRadius = radius;
-          }
+
+        visit<CraftHtmlElement>(draft.craft, {
+          getChildren: (node) => node.children ?? [],
+          onEnter: (node: CraftHtmlElement) => {
+            if (draft.selectedNodes.includes(node.id)) {
+              node.style!.boxShadow!.spreadRadius = radius;
+              return "skip";
+            }
+          },
         });
       });
     }
     case "(craft)/node/box-shadow/offset": {
       return produce(state, (draft) => {
         const { dx, dy } = action;
-        const selected = draft.selectedNodes[0];
-        draft.craft.children.forEach((c) => {
-          if (c.id === selected) {
-            const offset = new core.Offset(
-              dx ?? c.style!.boxShadow!.offset.dx ?? 0,
-              dy ?? c.style!.boxShadow!.offset.dy ?? 0
-            );
-            c.style!.boxShadow!.offset = offset;
-          }
+
+        visit<CraftHtmlElement>(draft.craft, {
+          getChildren: (node) => node.children ?? [],
+          onEnter: (node: CraftHtmlElement) => {
+            if (draft.selectedNodes.includes(node.id)) {
+              const offset = new core.Offset(
+                dx ?? node.style!.boxShadow!.offset.dx ?? 0,
+                dy ?? node.style!.boxShadow!.offset.dy ?? 0
+              );
+              node.style!.boxShadow!.offset = offset;
+              return "skip";
+            }
+          },
         });
       });
     }
     case "(craft)/node/box/padding": {
       const { padding } = action;
       return produce(state, (draft) => {
-        const selected = draft.selectedNodes[0];
-        draft.craft.children.forEach((c) => {
-          if (c.id === selected) {
-            c.style!.padding = padding;
-          }
+        visit<CraftHtmlElement>(draft.craft, {
+          getChildren: (node) => node.children ?? [],
+          onEnter: (node: CraftHtmlElement) => {
+            if (draft.selectedNodes.includes(node.id)) {
+              node.style!.padding = padding;
+              return "skip";
+            }
+          },
         });
       });
     }
     case "(craft)/node/box/margin": {
       const { margin } = action;
       return produce(state, (draft) => {
-        const selected = draft.selectedNodes[0];
-        draft.craft.children.forEach((c) => {
-          if (c.id === selected) {
-            c.style!.margin = margin;
-          }
+        visit<CraftHtmlElement>(draft.craft, {
+          getChildren: (node) => node.children ?? [],
+          onEnter: (node: CraftHtmlElement) => {
+            if (draft.selectedNodes.includes(node.id)) {
+              node.style!.margin = margin;
+              return "skip";
+            }
+          },
         });
       });
     }
     case "(craft)/node/flex/direction": {
       const { direction } = action;
       return produce(state, (draft) => {
-        const selected = draft.selectedNodes[0];
-        draft.craft.children.forEach((c) => {
-          c.style!.flexDirection = direction;
+        visit<CraftHtmlElement>(draft.craft, {
+          getChildren: (node) => node.children ?? [],
+          onEnter: (node: CraftHtmlElement) => {
+            if (draft.selectedNodes.includes(node.id)) {
+              node.style!.flexDirection = direction;
+              return "skip";
+            }
+          },
         });
       });
     }
     case "(craft)/node/flex/gap": {
       const { gap } = action;
       return produce(state, (draft) => {
-        const selected = draft.selectedNodes[0];
-        draft.craft.children.forEach((c) => {
-          c.style!.gap = gap;
+        visit<CraftHtmlElement>(draft.craft, {
+          getChildren: (node) => node.children ?? [],
+          onEnter: (node: CraftHtmlElement) => {
+            if (draft.selectedNodes.includes(node.id)) {
+              node.style!.gap = gap;
+              return "skip";
+            }
+          },
         });
       });
     }
     case "(craft)/node/text/data": {
       return produce(state, (draft) => {
         const { data } = action;
-        const selected = draft.selectedNodes[0];
-        draft.craft.children.forEach((c) => {
-          if (c.id === selected) {
-            (c as CraftHtmlElement).text = data;
-          }
+
+        visit<CraftHtmlElement>(draft.craft, {
+          getChildren: (node) => node.children ?? [],
+          onEnter: (node: CraftHtmlElement) => {
+            if (draft.selectedNodes.includes(node.id)) {
+              node.text = data;
+              return "skip";
+            }
+          },
         });
       });
     }
     case "(craft)/node/text/align": {
-      const { align } = action;
-      console.log("align", align);
       return produce(state, (draft) => {
-        const selected = draft.selectedNodes[0];
-        draft.craft.children.forEach((c) => {
-          if (c.id === selected) {
-            c.style!.textAlign = align;
-          }
+        const { align } = action;
+        visit<CraftHtmlElement>(draft.craft, {
+          getChildren: (node) => node.children ?? [],
+          onEnter: (node: CraftHtmlElement) => {
+            if (draft.selectedNodes.includes(node.id)) {
+              node.style!.textAlign = align;
+              return "skip";
+            }
+          },
         });
       });
     }
     case "(craft)/node/text/font/size": {
       const { size } = action;
       return produce(state, (draft) => {
-        const selected = draft.selectedNodes[0];
-        draft.craft.children.forEach((c) => {
-          if (c.id === selected) {
-            c.style!.fontSize = size;
-          }
+        visit<CraftHtmlElement>(draft.craft, {
+          getChildren: (node) => node.children ?? [],
+          onEnter: (node: CraftHtmlElement) => {
+            if (draft.selectedNodes.includes(node.id)) {
+              node.style!.fontSize = size;
+              return "skip";
+            }
+          },
         });
       });
     }
     case "(craft)/node/text/font/weight": {
       const { weight } = action;
       return produce(state, (draft) => {
-        const selected = draft.selectedNodes[0];
-        draft.craft.children.forEach((c) => {
-          if (c.id === selected) {
-            c.style!.fontWeight = css.numericFontWeight(weight);
-          }
+        visit<CraftHtmlElement>(draft.craft, {
+          getChildren: (node) => node.children ?? [],
+          onEnter: (node: CraftHtmlElement) => {
+            if (draft.selectedNodes.includes(node.id)) {
+              node.style!.fontWeight = css.numericFontWeight(weight);
+              return "skip";
+            }
+          },
         });
       });
     }
     case "(craft)/node/icon/data": {
       return produce(state, (draft) => {
         const { data } = action;
-        const selected = draft.selectedNodes[0];
-        draft.craft.children.forEach((c) => {
-          if (c.id === selected) {
-            (c as CraftRadixIconElement).icon = data;
-          }
+
+        visit<CraftElement>(draft.craft, {
+          getChildren: (node) => node["children"] ?? [],
+          onEnter: (node: CraftRadixIconElement) => {
+            if (draft.selectedNodes.includes(node.id)) {
+              node.icon = data;
+              return "skip";
+            }
+          },
         });
       });
     }
     case "(craft)/node/src/data": {
       return produce(state, (draft) => {
         const { data } = action;
-        const selected = draft.selectedNodes[0];
-        draft.craft.children.forEach((c) => {
-          if (c.id === selected) {
-            c.attributes.src = data;
-          }
+
+        visit<CraftElement>(draft.craft, {
+          getChildren: (node) => node["children"] ?? [],
+          onEnter: (node: CraftHtmlElement) => {
+            if (draft.selectedNodes.includes(node.id)) {
+              node.attributes.src = data;
+              return "skip";
+            }
+          },
         });
       });
     }
     case "(craft)/node/background-color": {
       return produce(state, (draft) => {
         const { color } = action;
-        const selected = draft.selectedNodes[0];
-        draft.craft.children.forEach((c) => {
-          if (c.id === selected) {
-            const colorstr = `rgba(${color.r},${color.g},${color.b},${color.a})`;
-            (c as CraftHtmlElement).style!.backgroundColor = colorstr;
-          }
+
+        visit<CraftElement>(draft.craft, {
+          getChildren: (node) => node["children"] ?? [],
+          onEnter: (node: CraftHtmlElement) => {
+            if (draft.selectedNodes.includes(node.id)) {
+              const colorstr = `rgba(${color.r},${color.g},${color.b},${color.a})`;
+              node.style!.backgroundColor = colorstr;
+              return "skip";
+            }
+          },
         });
       });
     }
