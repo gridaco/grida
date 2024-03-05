@@ -6,7 +6,7 @@ export async function GET(request: NextRequest) {
   const { data, error } = await client
     .from("form")
     .insert({
-      project_id: 1,
+      project_id: 2,
     })
     .select("id")
     .single();
