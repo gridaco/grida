@@ -182,7 +182,7 @@ async function submit({
     .single();
 
   if (select_response_error) {
-    console.log(select_response_error);
+    console.error(select_response_error);
   }
 
   // build info

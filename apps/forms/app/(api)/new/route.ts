@@ -1,6 +1,8 @@
 import { client } from "@/lib/supabase";
 import { NextRequest, NextResponse } from "next/server";
 
+export const revalidate = 0;
+
 export async function GET(request: NextRequest) {
   const origin = request.nextUrl.origin;
   const { data, error } = await client
