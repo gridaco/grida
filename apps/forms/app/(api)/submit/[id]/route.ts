@@ -146,6 +146,7 @@ async function submit({
           form_id: form_id,
           name: key,
           type: "text" as const,
+          description: "Automatically created",
         }))
       )
       .select("*");
