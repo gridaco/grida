@@ -9,11 +9,40 @@ export async function GET(
 ) {
   const form_id = context.params.id;
 
+  // #region 1 prevalidate request form data (query)
+  const keys = Array.from(req.nextUrl.searchParams.keys());
+  if (!keys.length) {
+    return NextResponse.json(
+      { error: "You must submit form with query params" },
+      { status: 400 }
+    );
+  }
+  // #endregion
+
+  const meta = {
+    useragent: req.headers.get("user-agent"),
+    ip: req.headers.get("x-real-ip") || req.headers.get("x-forwarded-for"),
+    referer: req.headers.get("referer"),
+    browser: req.headers.get("sec-ch-ua"),
+  };
+
+  return submit({ data: req.nextUrl.searchParams as any, form_id, meta });
+}
+
+export async function POST(
+  req: NextRequest,
+  context: {
+    params: { id: string };
+  }
+) {
+  const form_id = context.params.id;
+
   // #region 1 prevalidate request form data
   let data: FormData;
   try {
     data = await req.formData();
   } catch (e) {
+    console.error(e);
     return NextResponse.json(
       { error: "You must submit form with formdata attatched" },
       { status: 400 }
@@ -21,6 +50,30 @@ export async function GET(
   }
   // #endregion
 
+  const meta = {
+    useragent: req.headers.get("user-agent"),
+    ip: req.headers.get("x-real-ip") || req.headers.get("x-forwarded-for"),
+    referer: req.headers.get("referer"),
+    browser: req.headers.get("sec-ch-ua"),
+  };
+
+  return submit({ data, form_id, meta });
+}
+
+async function submit({
+  data,
+  form_id,
+  meta,
+}: {
+  form_id: string;
+  data: FormData;
+  meta: {
+    useragent: string | null;
+    ip: string | null;
+    referer: string | null;
+    browser: string | null;
+  };
+}) {
   // check if form exists
   const { data: form_reference } = await client
     .from("form")
@@ -43,6 +96,11 @@ export async function GET(
     .insert({
       raw: JSON.stringify(Object.fromEntries(entries)),
       form_id: form_id,
+      browser: meta.browser,
+      ip: meta.ip,
+      x_referer: meta.referer,
+      x_useragent: meta.useragent,
+      platform_powered_by: "web_client",
     })
     .select("id")
     .single();
@@ -109,27 +167,57 @@ export async function GET(
     .select();
 
   // finally fetch the response for pingback
-  const { data: response } = await client
+  const { data: response, error: select_response_error } = await client
     .from("response")
     .select(
       `
         *,
         response_field (
-          *,
-          form_field (
-            *
-          )
+          *
         )
       `
     )
     .eq("id", response_reference_obj!.id)
     .single();
 
-  return Response.json({
+  if (select_response_error) {
+    console.log(select_response_error);
+  }
+
+  // build info
+  let info: any = {};
+
+  // if there are new fields
+  if (needs_to_be_created) {
+    info.new_keys = {
+      message:
+        "There were new unknown fields in the request and the definitions are created automatically. To disable them, set is_unknown_field_allowed to false in the form settings.",
+      data: {
+        keys: needs_to_be_created,
+        fields: form_fields!.filter((field) =>
+          needs_to_be_created!.includes(field.name)
+        ),
+      },
+    };
+  }
+
+  // build warning
+  let warning: any = {};
+
+  // if there are ignored fields
+  if (ignored_names.length > 0) {
+    warning.ignored_keys = {
+      message:
+        "There were unknown fields in the request. To allow them, set is_unknown_field_allowed to true in the form settings.",
+      data: { keys: ignored_names },
+    };
+  }
+
+  return NextResponse.json({
     data: response,
     raw: JSON.stringify(Object.fromEntries(entries)),
-    warning: {
-      ignored_keys: ignored_names,
-    },
+    warning: Object.keys(warning).length > 0 ? warning : null,
+    info: Object.keys(info).length > 0 ? info : null,
+    error: null,
   });
 }
