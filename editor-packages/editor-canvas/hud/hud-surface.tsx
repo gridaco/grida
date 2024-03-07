@@ -258,7 +258,7 @@ function SelectionsHighlight({
 
   const box = boundingbox(
     selections.map((d) => {
-      return [d.absoluteX, d.absoluteY, d.width, d.height, d.rotation];
+      return [d.absoluteX, d.absoluteY, d.width, d.height, d.rotation ?? 0];
     }),
     2
   );

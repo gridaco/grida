@@ -20,7 +20,7 @@ import {
 import q from "@design-sdk/query";
 import { LazyFrame } from "@code-editor/canvas/lazy-frame";
 import { DisplayNodeMeta, HudCustomRenderers, HudSurface } from "../hud";
-import type { Box, XY, CanvasTransform, XYWH, XYWHR } from "../types";
+import type { Box, XY, CanvasTransform, XYWH, XYWHR, X1Y1X2Y2 } from "../types";
 import type { FrameOptimizationFactors } from "../frame";
 // import { TransformDraftingStore } from "../drafting";
 import {
@@ -45,7 +45,7 @@ interface TCanvasNode extends DisplayNodeMeta {
   height: number;
   absoluteX: number;
   absoluteY: number;
-  rotation?: number;
+  rotation: number;
   children?: TCanvasNode[];
   parent?: TCanvasNode;
 }
@@ -525,8 +525,9 @@ export function Canvas<T extends TCanvasNode>({
 
   const hud_interaction_disabled = is_canvas_transforming || isMovingSelections;
 
-  const selected_nodes = useMemo(
-    () => selectedNodes?.map((id) => qdoc.getNodeById(id)).filter(Boolean),
+  const selected_nodes: T[] = useMemo(
+    () =>
+      selectedNodes?.map((id) => qdoc.getNodeById(id)).filter(Boolean) as T[],
     [selectedNodes, isDragging, hud_hidden]
   );
 
@@ -663,10 +664,10 @@ export function Canvas<T extends TCanvasNode>({
               positionGuides={position_guides}
               highlights={highlights}
               onHoverNode={(id) => {
-                setHoveringLayer({ node: node(id), reason: "frame-title" });
+                setHoveringLayer({ node: node(id)!, reason: "frame-title" });
               }}
               onSelectNode={(id) => {
-                onSelectNode?.(node(id));
+                onSelectNode?.(node(id)!);
               }}
               onSelectionResize={(handle, delta, { shiftKey, altKey }) => {
                 // transform with zoom
@@ -722,13 +723,17 @@ function position_guide<T extends TCanvasNode>({
   hover,
 }: {
   selections: T[];
-  hover: T;
+  hover?: T;
 }) {
   if (selections.length === 0) {
     return [];
   }
 
-  const guides = [];
+  const guides: {
+    a: X1Y1X2Y2;
+    b: X1Y1X2Y2;
+  }[] = [];
+
   const a = boundingbox(
     selections.map((s) => xywhr_of(s)),
     2
@@ -909,7 +914,7 @@ const viewbound_not_measured = (viewbound: Box) => {
 function Debug({
   infos,
 }: {
-  infos: { label: string; value: string | number | boolean }[];
+  infos: { label: string; value?: string | number | boolean | null }[];
 }) {
   return (
     <DebugInfoContainer>
