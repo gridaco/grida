@@ -17,6 +17,7 @@ export type Database = {
           id: string
           is_edit_after_submission_allowed: boolean
           is_multiple_response_allowed: boolean
+          is_unknown_field_allowed: boolean
           posted_at: string | null
           project_id: number
           thumbnail_image: string | null
@@ -29,6 +30,7 @@ export type Database = {
           id?: string
           is_edit_after_submission_allowed?: boolean
           is_multiple_response_allowed?: boolean
+          is_unknown_field_allowed?: boolean
           posted_at?: string | null
           project_id: number
           thumbnail_image?: string | null
@@ -41,6 +43,7 @@ export type Database = {
           id?: string
           is_edit_after_submission_allowed?: boolean
           is_multiple_response_allowed?: boolean
+          is_unknown_field_allowed?: boolean
           posted_at?: string | null
           project_id?: number
           thumbnail_image?: string | null
@@ -94,7 +97,7 @@ export type Database = {
           pattern?: Json | null
           placeholder?: string | null
           required?: boolean
-          type: Database["grida_forms"]["Enums"]["form_field_type"]
+          type?: Database["grida_forms"]["Enums"]["form_field_type"]
           updated_at?: string
         }
         Update: {
@@ -131,39 +134,42 @@ export type Database = {
         Row: {
           browser: string | null
           created_at: string
-          customer_uuid: string
+          customer_uuid: string | null
           form_id: string | null
           id: string
           ip: string | null
           platform_powered_by:
             | Database["grida_forms"]["Enums"]["response_platform_powered_by"]
             | null
+          raw: Json
           x_referer: string | null
           x_useragent: string | null
         }
         Insert: {
           browser?: string | null
           created_at?: string
-          customer_uuid?: string
+          customer_uuid?: string | null
           form_id?: string | null
           id?: string
           ip?: string | null
           platform_powered_by?:
             | Database["grida_forms"]["Enums"]["response_platform_powered_by"]
             | null
+          raw: Json
           x_referer?: string | null
           x_useragent?: string | null
         }
         Update: {
           browser?: string | null
           created_at?: string
-          customer_uuid?: string
+          customer_uuid?: string | null
           form_id?: string | null
           id?: string
           ip?: string | null
           platform_powered_by?:
             | Database["grida_forms"]["Enums"]["response_platform_powered_by"]
             | null
+          raw?: Json
           x_referer?: string | null
           x_useragent?: string | null
         }
@@ -187,25 +193,28 @@ export type Database = {
       response_field: {
         Row: {
           created_at: string
+          form_field_id: string
           id: string
           response_id: string
-          type: Database["grida_forms"]["Enums"]["form_field_type"] | null
+          type: Database["grida_forms"]["Enums"]["form_field_type"]
           updated_at: string
           value: Json | null
         }
         Insert: {
           created_at?: string
+          form_field_id: string
           id?: string
           response_id: string
-          type?: Database["grida_forms"]["Enums"]["form_field_type"] | null
+          type?: Database["grida_forms"]["Enums"]["form_field_type"]
           updated_at?: string
           value?: Json | null
         }
         Update: {
           created_at?: string
+          form_field_id?: string
           id?: string
           response_id?: string
-          type?: Database["grida_forms"]["Enums"]["form_field_type"] | null
+          type?: Database["grida_forms"]["Enums"]["form_field_type"]
           updated_at?: string
           value?: Json | null
         }
@@ -317,6 +326,42 @@ export type Database = {
           }
         ]
       }
+      organization_member: {
+        Row: {
+          created_at: string
+          id: number
+          organization_id: number
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: number
+          organization_id: number
+          user_id?: string
+        }
+        Update: {
+          created_at?: string
+          id?: number
+          organization_id?: number
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "public_organization_member_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organization"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "public_organization_member_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
       project: {
         Row: {
           created_at: string
@@ -351,7 +396,18 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      get_organizations_for_user: {
+        Args: {
+          user_id: string
+        }
+        Returns: number[]
+      }
+      get_projects_for_user: {
+        Args: {
+          user_id: string
+        }
+        Returns: number[]
+      }
     }
     Enums: {
       [_ in never]: never
