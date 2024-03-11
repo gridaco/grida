@@ -4,6 +4,10 @@
 # Production
 /build
 
+# sync
+/docs
+/i18n/*/docusaurus-plugin-content-docs
+
 # Generated files
 .docusaurus
 .cache-loader

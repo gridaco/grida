@@ -2,6 +2,7 @@ packages:
   - "app"
   - "web"
   - "editor"
+  - "docs-site"
   - "editor-packages/*"
   - "apps/*"
   - "packages/app-*"
