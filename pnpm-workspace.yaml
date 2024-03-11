@@ -1,6 +1,7 @@
 packages:
   - "app"
   - "web"
+  - "www"
   - "editor"
   - "docs-site"
   - "editor-packages/*"

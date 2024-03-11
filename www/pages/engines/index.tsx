@@ -131,7 +131,7 @@ function Scene() {
       <Canvas
         dpr={[1, 2]}
         camera={{
-          position: [0, 1, 6],
+          position: [0, 1, 6] as [number, number, number],
           fov: 50,
         }}
       >

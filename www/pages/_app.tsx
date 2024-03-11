@@ -16,7 +16,6 @@ import {
   PopupProvider,
 } from "utils/context/PopupContext";
 import { BodyCustomStyleInAbosulteSectionLayout } from "utils/styled/styles";
-import { MDXProvider } from "@mdx-js/react";
 import { _MDX_COMPONENTS } from "components/mdx";
 import { Box } from "theme-ui";
 import { env } from "process";
@@ -176,9 +175,7 @@ const Providers = ({ children }: { children: React.ReactNode }) => {
   return (
     <>
       <CookiesProvider>
-        <MDXProvider components={_MDX_COMPONENTS}>
           <RecoilRoot>{children}</RecoilRoot>
-        </MDXProvider>
       </CookiesProvider>
     </>
   );
