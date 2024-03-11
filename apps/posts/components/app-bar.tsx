@@ -1,6 +1,6 @@
 import React from "react";
 import styled from "@emotion/styled";
-import { SavingIndicator } from "@grida.co/app/components/saving-indicator";
+import { SavingIndicator } from "./saving-indocator";
 import { RoundPrimaryButton } from "../components";
 
 const publish_mode_labels = {
