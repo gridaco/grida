@@ -76,7 +76,7 @@ _References_
 
 **Border in design and box-sizing: border-box**
 
-> [(from mdn)](https://developer.mozilla.org/en-US/docs/Web/CSS/box-sizing#values) The width and height properties include the content, padding, and border, but do not include the margin. Note that padding and border will be inside of the box. For example, .box {width: 350px; border: 10px solid black;} renders a box that is 350px wide, with the area for content being 330px wide. The content box can't be negative and is floored to 0, making it impossible to use border-box to make the element disappear.
+> [(from mdn)](https://developer.mozilla.org/en-US/docs/Web/CSS/box-sizing#values) The width and height properties include the content, padding, and border, but do not include the margin. Note that padding and border will be inside of the box. For example, `.box {width: 350px; border: 10px solid black;}` renders a box that is 350px wide, with the area for content being 330px wide. The content box can't be negative and is floored to 0, making it impossible to use border-box to make the element disappear.
 
 In design editors, we often see that border (or stroke) alignment can be either `inside` | `center` | `outside`. But this is not a valid porperty in css. css border in assumed `inside` border, a outside border is a `outline`. border and outline are similar yet different. we can handle outside stroke in design as a outline in css, but not all properties will be compatitable. This is a separate subject, lean more at [figma-strokes.md](./figma-strokes.md).
 
