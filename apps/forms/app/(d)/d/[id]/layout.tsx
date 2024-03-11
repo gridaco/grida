@@ -1,6 +1,6 @@
 import { Inter } from "next/font/google";
 import Link from "next/link";
-import { EditableFormTitle } from "@/components/editable-form-title";
+import { EditableFormTitle } from "@/scaffolds/editable-form-title";
 import { notFound } from "next/navigation";
 import { cookies } from "next/headers";
 import { createServerClient } from "@/lib/supabase";
@@ -39,7 +39,7 @@ export default async function Layout({
             </span>
           </Link>
           <SlashIcon />
-          <EditableFormTitle value={data.title} />
+          <EditableFormTitle form_id={id} defaultValue={data.title} />
         </div>
         <div className="justify-self-center flex gap-4">
           <Link href={`/d/${id}/edit`}>

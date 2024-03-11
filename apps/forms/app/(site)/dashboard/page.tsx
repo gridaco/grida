@@ -6,6 +6,9 @@ import { createServerClient } from "@/lib/supabase";
 import { DashboardFormCard } from "@/components/dashboard-form-card";
 import { GridaLogo } from "@/components/grida-logo";
 import { PlusIcon } from "@radix-ui/react-icons";
+
+export const revalidate = 0;
+
 export default async function FormsDashboardPage() {
   const cookieStore = cookies();
   const supabase = createServerClient(cookieStore);
