@@ -25,8 +25,8 @@
     "axios": "1.6.7",
     "dayjs": "^1.11.10",
     "next": "12.1.6",
-    "react": "18.1.0",
-    "react-dom": "18.1.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
     "react-textarea-autosize": "^8.5.3",
     "url-pattern": "^1.0.3"
   },
