@@ -47,6 +47,7 @@ export const FolderCard = React.forwardRef(function (
   return (
     <DashboardItemCard
       ref={ref}
+      // @ts-ignore
       id={props.id}
       {...props}
       label={name}

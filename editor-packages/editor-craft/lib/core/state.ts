@@ -56,6 +56,7 @@ export type CraftRadixIconElement = BaseNode &
     tag: "svg";
     icon: string;
     color: string;
+    style?: CraftStyle;
   };
 
 export type CraftViewportNode = BaseNode &

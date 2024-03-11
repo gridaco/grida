@@ -14,7 +14,7 @@ export interface DashboardHierarchy {
 }
 
 export interface DashboardFilter {
-  query: string;
+  query?: string;
 }
 
 export type DashboardItem = DashboardFolderItem | SceneItem;

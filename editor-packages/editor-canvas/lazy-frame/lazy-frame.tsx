@@ -9,7 +9,7 @@ export function LazyFrame({
   xy: [number, number];
   size: { width: number; height: number };
 }) {
-  const visibilityRef = useRef();
+  const visibilityRef = useRef<HTMLDivElement>(null);
   const { inViewport, enterCount } = useInViewport(visibilityRef);
   const [x, y] = xy;
 

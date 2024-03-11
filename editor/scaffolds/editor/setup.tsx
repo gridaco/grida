@@ -75,6 +75,8 @@ export function SetupCraftCraftEditor({ children }: React.PropsWithChildren<{}>)
         input: undefined
       },
       craft: {
+        'id': '0',
+        'type': 'document',
         children: [
           {
             'type': 'viewport',

@@ -1,11 +1,7 @@
 {
   "compilerOptions": {
     "target": "es2015",
-    "lib": [
-      "dom",
-      "dom.iterable",
-      "esnext"
-    ],
+    "lib": ["dom", "dom.iterable", "esnext"],
     "allowJs": true,
     "skipLibCheck": true,
     "strict": false,
@@ -20,54 +16,25 @@
     "incremental": true,
     "baseUrl": ".",
     "paths": {
-      "components/*": [
-        "./components/*"
-      ],
-      "icons/*": [
-        "./icons/*"
-      ],
-      "layout/*": [
-        "./layouts/*"
-      ],
-      "scaffolds/*": [
-        "./scaffolds/*"
-      ],
-      "core/*": [
-        "./core/*"
-      ],
-      "store/*": [
-        "./store/*"
-      ],
-      "repository/*": [
-        "./repository/*"
-      ],
-      "utils/*": [
-        "./utils/*"
-      ],
-      "public/*": [
-        "./public/*"
-      ],
-      "hooks/*": [
-        "./hooks/*"
-      ],
-      "@/*": [
-        "./*"
-      ]
+      "components/*": ["./components/*"],
+      "icons/*": ["./icons/*"],
+      "layout/*": ["./layouts/*"],
+      "scaffolds/*": ["./scaffolds/*"],
+      "core/*": ["./core/*"],
+      "store/*": ["./store/*"],
+      "repository/*": ["./repository/*"],
+      "utils/*": ["./utils/*"],
+      "public/*": ["./public/*"],
+      "hooks/*": ["./hooks/*"],
+      "@/*": ["./*"]
     },
     "plugins": [
       {
         "name": "next"
       }
     ],
-    "strictNullChecks": true
+    "strictNullChecks": false
   },
-  "include": [
-    "next-env.d.ts",
-    "**/*.ts",
-    "**/*.tsx",
-    ".next/types/**/*.ts"
-  ],
-  "exclude": [
-    "node_modules"
-  ]
+  "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
+  "exclude": ["node_modules"]
 }

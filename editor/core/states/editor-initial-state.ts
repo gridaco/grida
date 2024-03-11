@@ -87,6 +87,8 @@ export function createPendingEditorState(seed?: EditorStateSeed): EditorState {
     canvasMode: { value: "free" },
     designerMode: "inspect",
     craft: {
+      id: "0",
+      type: "document",
       children: [],
     },
     ...map_seed(seed),

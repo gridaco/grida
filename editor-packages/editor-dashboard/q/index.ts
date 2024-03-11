@@ -15,7 +15,7 @@ type SceneMeta<T extends string = string> = {
 
 export function group<T extends SceneMeta>(
   design: DesignRepository,
-  { filter: query }: { filter: string }
+  { filter: query }: { filter?: string }
 ): Map<string, Array<T>> {
   // group by...
   // 1. path split by "/"
@@ -41,7 +41,7 @@ export function group<T extends SceneMeta>(
   return merged;
 }
 
-function filter(scenes: ReflectSceneNode[], { query }: { query: string }) {
+function filter(scenes: ReflectSceneNode[], { query }: { query?: string }) {
   scenes = scenes.filter(Boolean);
 
   if (query) {

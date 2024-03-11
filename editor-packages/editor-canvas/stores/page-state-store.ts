@@ -11,10 +11,13 @@ export class CanvasStateStore {
   constructor(readonly filekey: string, readonly pageid: string) {}
 
   saveLastSelection(...nodes: string[]) {
-    sessionStorage.setItem(
-      `canvas-page-state-store/${this.filekey}/${this.pageid}/last-selection`,
-      nodes ? JSON.stringify(nodes) : null
-    );
+    const d = nodes ? JSON.stringify(nodes) : null;
+    if (d) {
+      sessionStorage.setItem(
+        `canvas-page-state-store/${this.filekey}/${this.pageid}/last-selection`,
+        d
+      );
+    }
   }
 
   getLastSelection(): string[] | null {

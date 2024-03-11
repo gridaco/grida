@@ -10,6 +10,7 @@
     "@web-builder/styles": "workspace:^",
     "editor": "workspace:^",
     "immer": "^9.0.3",
+    "nanoid": "^3.1.23",
     "tree-visit": "^0.1.0"
   },
   "devDependencies": {

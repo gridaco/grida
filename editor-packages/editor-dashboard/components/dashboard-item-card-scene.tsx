@@ -25,7 +25,7 @@ function SceneCardPreview({
   maxWidth: number;
   scene: SceneMeta;
 }) {
-  const visibilityRef = useRef();
+  const visibilityRef = useRef<HTMLDivElement>(null);
 
   const { enterCount } = useInViewport(visibilityRef);
 
@@ -56,7 +56,7 @@ function SceneCardPreview({
           target={scene}
           isPanning={false}
           isZooming={false}
-          zoom={null}
+          zoom={1}
           inViewport={enterCount > 0}
           focused={false}
         />

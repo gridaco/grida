@@ -161,7 +161,7 @@ function ResizeHandle({
   onDragStart?: () => void;
   onDragEnd?: () => void;
 }) {
-  const ref = useRef();
+  const ref = useRef<HTMLDivElement>(null);
 
   useGesture(
     {
@@ -211,7 +211,7 @@ function RotateHandle({
   box: [number, number, number, number];
   onDrag: OnDragHandler;
 }) {
-  const ref = useRef();
+  const ref = useRef<HTMLDivElement>(null);
   useGesture(
     {
       onDragStart: (e) => {

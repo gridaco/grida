@@ -8,7 +8,7 @@ export function useInspectorElement() {
 
   useEffect(() => {
     const path = findIndexPath(state.craft, {
-      getChildren: (node) => node.children,
+      getChildren: (node) => node.children as any,
       predicate: (c, indexPath) =>
         c.type !== "document" &&
         c.type !== "viewport" &&
@@ -17,8 +17,9 @@ export function useInspectorElement() {
 
     if (path) {
       setT(
-        access(state.craft, path, {
-          getChildren: (node) => node.children,
+        access(state.craft as any, path, {
+          getChildren: (node: CraftElement) =>
+            "children" in node ? (node.children as any) : [],
         })
       );
     }

@@ -28,11 +28,11 @@ export function initialDashboardState(
 export function initialHierarchy(design: DesignRepository): DashboardHierarchy {
   //
 
-  const grouped = group<ReflectSceneNode>(design, { filter: null });
+  const grouped = group<ReflectSceneNode>(design, { filter: undefined });
 
   const sections: Array<DashboardFolderItem> = Array.from(grouped.keys()).map(
     (k): DashboardFolderItem => {
-      const items = grouped.get(k);
+      const items = grouped.get(k)!;
       return {
         id: k,
         $type: "folder",

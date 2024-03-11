@@ -28,7 +28,7 @@ export function OulineSide({
   onDragStart?: () => void;
   onDragEnd?: () => void;
 }) {
-  const ref = useRef();
+  const ref = useRef<HTMLDivElement>(null);
   useGesture(
     {
       onDragStart: (e) => {
@@ -40,7 +40,7 @@ export function OulineSide({
         e.event.stopPropagation();
       },
       onDrag: (e) => {
-        onDrag(e);
+        onDrag?.(e);
         e.event.stopPropagation();
       },
     },

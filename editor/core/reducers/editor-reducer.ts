@@ -38,6 +38,8 @@ import {
   craftHistoryReducer,
   craftDraftReducer,
   CraftDraftAction,
+  CraftHtmlElement,
+  CraftViewportNode,
 } from "@code-editor/craft";
 import {
   cvt_delta_by_resize_handle_origin,
@@ -282,7 +284,7 @@ export function editorReducer(
           return produce(state, (draft) => {
             state.selectedNodes
               .map((n) => q.getNodeByIdFrom(n, draft.craft.children))
-              .map((n) => {
+              .map((n: CraftHtmlElement) => {
                 if (n && width) n.width = width;
                 if (n && width) n.style!.width = width;
                 if (n && height) n.height = height;
@@ -309,11 +311,9 @@ export function editorReducer(
           return produce(state, (draft) => {
             state.selectedNodes
               .map((n) => q.getNodeByIdFrom(n, draft.craft.children))
-              .map((n) => {
+              .filter((n) => !!n && n.type !== "viewport")
+              .map((n: CraftHtmlElement) => {
                 if (!n) return;
-                if (n.type == "viewport") {
-                  return;
-                }
                 const { origin: transform_origin, delta: transform_delta } =
                   cvt_delta_by_resize_handle_origin(origin, delta, {
                     shiftKey,

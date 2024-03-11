@@ -776,6 +776,9 @@ importers:
       immer:
         specifier: ^9.0.3
         version: 9.0.21
+      nanoid:
+        specifier: ^3.1.23
+        version: 3.3.7
       tree-visit:
         specifier: ^0.1.0
         version: 0.1.4

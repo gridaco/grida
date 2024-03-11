@@ -45,7 +45,7 @@ interface TCanvasNode extends DisplayNodeMeta {
   height: number;
   absoluteX: number;
   absoluteY: number;
-  rotation: number;
+  rotation?: number;
   children?: TCanvasNode[];
   parent?: TCanvasNode;
 }

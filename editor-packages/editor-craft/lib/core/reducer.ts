@@ -25,7 +25,7 @@ export function craftDraftReducer(
     case "(draft)/(craft)/node/background-color": {
       const { color } = action;
       return produce(state, (draft) => {
-        visit<CraftElement>(draft.craft, {
+        visit<CraftElement>(draft.craft as any, {
           getChildren: (node) => node["children"] ?? [],
           onEnter: (node: CraftHtmlElement) => {
             if (draft.selectedNodes.includes(node.id)) {
@@ -40,7 +40,7 @@ export function craftDraftReducer(
     case "(draft)/(craft)/node/foreground-color": {
       const { color } = action;
       return produce(state, (draft) => {
-        visit<CraftElement>(draft.craft, {
+        visit<CraftElement>(draft.craft as any, {
           getChildren: (node) => node["children"] ?? [],
           onEnter: (node: CraftHtmlElement) => {
             if (draft.selectedNodes.includes(node.id)) {
@@ -55,7 +55,7 @@ export function craftDraftReducer(
     case "(draft)/(craft)/node/border/color": {
       const { color } = action;
       return produce(state, (draft) => {
-        visit<CraftElement>(draft.craft, {
+        visit<CraftElement>(draft.craft as any, {
           getChildren: (node) => node["children"] ?? [],
           onEnter: (node: CraftHtmlElement) => {
             if (draft.selectedNodes.includes(node.id)) {
@@ -92,7 +92,7 @@ export function craftHistoryReducer(
     case "(craft)/node/opacity": {
       return produce(state, (draft) => {
         const { opacity } = action;
-        visit<CraftHtmlElement>(draft.craft, {
+        visit<CraftHtmlElement>(draft.craft as any as any, {
           getChildren: (node) => node.children ?? [],
           onEnter: (node: CraftHtmlElement) => {
             if (draft.selectedNodes.includes(node.id)) {
@@ -106,7 +106,7 @@ export function craftHistoryReducer(
     case "(craft)/node/overflow": {
       const { value } = action;
       return produce(state, (draft) => {
-        visit<CraftHtmlElement>(draft.craft, {
+        visit<CraftHtmlElement>(draft.craft as any as any, {
           getChildren: (node) => node.children ?? [],
           onEnter: (node: CraftHtmlElement) => {
             if (draft.selectedNodes.includes(node.id)) {
@@ -121,7 +121,7 @@ export function craftHistoryReducer(
       return produce(state, (draft) => {
         const { radius } = action;
 
-        visit<CraftHtmlElement>(draft.craft, {
+        visit<CraftHtmlElement>(draft.craft as any, {
           getChildren: (node) => node.children ?? [],
           onEnter: (node: CraftHtmlElement) => {
             if (draft.selectedNodes.includes(node.id)) {
@@ -136,7 +136,7 @@ export function craftHistoryReducer(
       return produce(state, (draft) => {
         const { radius } = action;
 
-        visit<CraftHtmlElement>(draft.craft, {
+        visit<CraftHtmlElement>(draft.craft as any, {
           getChildren: (node) => node.children ?? [],
           onEnter: (c: CraftHtmlElement) => {
             if (draft.selectedNodes.includes(c.id)) {
@@ -153,7 +153,7 @@ export function craftHistoryReducer(
     }
     case "(craft)/node/border/add": {
       return produce(state, (draft) => {
-        visit<CraftHtmlElement>(draft.craft, {
+        visit<CraftHtmlElement>(draft.craft as any, {
           getChildren: (node) => node.children ?? [],
           onEnter: (node: CraftHtmlElement) => {
             if (draft.selectedNodes.includes(node.id)) {
@@ -167,7 +167,7 @@ export function craftHistoryReducer(
     }
     case "(craft)/node/border/remove": {
       return produce(state, (draft) => {
-        visit<CraftHtmlElement>(draft.craft, {
+        visit<CraftHtmlElement>(draft.craft as any, {
           getChildren: (node) => node.children ?? [],
           onEnter: (c: CraftHtmlElement) => {
             if (draft.selectedNodes.includes(c.id)) {
@@ -200,7 +200,7 @@ export function craftHistoryReducer(
       return produce(state, (draft) => {
         const { width } = action;
 
-        visit<CraftHtmlElement>(draft.craft, {
+        visit<CraftHtmlElement>(draft.craft as any, {
           getChildren: (node) => node.children ?? [],
           onEnter: (node: CraftHtmlElement) => {
             if (draft.selectedNodes.includes(node.id)) {
@@ -213,7 +213,7 @@ export function craftHistoryReducer(
     }
     case "(craft)/node/box-shadow/add": {
       return produce(state, (draft) => {
-        visit<CraftHtmlElement>(draft.craft, {
+        visit<CraftHtmlElement>(draft.craft as any, {
           getChildren: (node) => node.children ?? [],
           onEnter: (node: CraftHtmlElement) => {
             if (draft.selectedNodes.includes(node.id)) {
@@ -231,7 +231,7 @@ export function craftHistoryReducer(
     }
     case "(craft)/node/box-shadow/remove": {
       return produce(state, (draft) => {
-        visit<CraftHtmlElement>(draft.craft, {
+        visit<CraftHtmlElement>(draft.craft as any, {
           getChildren: (node) => node.children ?? [],
           onEnter: (node: CraftHtmlElement) => {
             if (draft.selectedNodes.includes(node.id)) {
@@ -246,7 +246,7 @@ export function craftHistoryReducer(
       return produce(state, (draft) => {
         const { color } = action;
 
-        visit<CraftHtmlElement>(draft.craft, {
+        visit<CraftHtmlElement>(draft.craft as any, {
           getChildren: (node) => node.children ?? [],
           onEnter: (node: CraftHtmlElement) => {
             if (draft.selectedNodes.includes(node.id)) {
@@ -261,7 +261,7 @@ export function craftHistoryReducer(
       return produce(state, (draft) => {
         const { radius } = action;
 
-        visit<CraftHtmlElement>(draft.craft, {
+        visit<CraftHtmlElement>(draft.craft as any, {
           getChildren: (node) => node.children ?? [],
           onEnter: (node: CraftHtmlElement) => {
             if (draft.selectedNodes.includes(node.id)) {
@@ -276,7 +276,7 @@ export function craftHistoryReducer(
       return produce(state, (draft) => {
         const { radius } = action;
 
-        visit<CraftHtmlElement>(draft.craft, {
+        visit<CraftHtmlElement>(draft.craft as any, {
           getChildren: (node) => node.children ?? [],
           onEnter: (node: CraftHtmlElement) => {
             if (draft.selectedNodes.includes(node.id)) {
@@ -291,7 +291,7 @@ export function craftHistoryReducer(
       return produce(state, (draft) => {
         const { dx, dy } = action;
 
-        visit<CraftHtmlElement>(draft.craft, {
+        visit<CraftHtmlElement>(draft.craft as any, {
           getChildren: (node) => node.children ?? [],
           onEnter: (node: CraftHtmlElement) => {
             if (draft.selectedNodes.includes(node.id)) {
@@ -309,7 +309,7 @@ export function craftHistoryReducer(
     case "(craft)/node/box/padding": {
       const { padding } = action;
       return produce(state, (draft) => {
-        visit<CraftHtmlElement>(draft.craft, {
+        visit<CraftHtmlElement>(draft.craft as any, {
           getChildren: (node) => node.children ?? [],
           onEnter: (node: CraftHtmlElement) => {
             if (draft.selectedNodes.includes(node.id)) {
@@ -323,7 +323,7 @@ export function craftHistoryReducer(
     case "(craft)/node/box/margin": {
       const { margin } = action;
       return produce(state, (draft) => {
-        visit<CraftHtmlElement>(draft.craft, {
+        visit<CraftHtmlElement>(draft.craft as any, {
           getChildren: (node) => node.children ?? [],
           onEnter: (node: CraftHtmlElement) => {
             if (draft.selectedNodes.includes(node.id)) {
@@ -337,7 +337,7 @@ export function craftHistoryReducer(
     case "(craft)/node/flex/direction": {
       const { direction } = action;
       return produce(state, (draft) => {
-        visit<CraftHtmlElement>(draft.craft, {
+        visit<CraftHtmlElement>(draft.craft as any, {
           getChildren: (node) => node.children ?? [],
           onEnter: (node: CraftHtmlElement) => {
             if (draft.selectedNodes.includes(node.id)) {
@@ -351,7 +351,7 @@ export function craftHistoryReducer(
     case "(craft)/node/flex/gap": {
       const { gap } = action;
       return produce(state, (draft) => {
-        visit<CraftHtmlElement>(draft.craft, {
+        visit<CraftHtmlElement>(draft.craft as any, {
           getChildren: (node) => node.children ?? [],
           onEnter: (node: CraftHtmlElement) => {
             if (draft.selectedNodes.includes(node.id)) {
@@ -366,7 +366,7 @@ export function craftHistoryReducer(
       return produce(state, (draft) => {
         const { data } = action;
 
-        visit<CraftHtmlElement>(draft.craft, {
+        visit<CraftHtmlElement>(draft.craft as any, {
           getChildren: (node) => node.children ?? [],
           onEnter: (node: CraftHtmlElement) => {
             if (draft.selectedNodes.includes(node.id)) {
@@ -380,7 +380,7 @@ export function craftHistoryReducer(
     case "(craft)/node/text/align": {
       return produce(state, (draft) => {
         const { align } = action;
-        visit<CraftHtmlElement>(draft.craft, {
+        visit<CraftHtmlElement>(draft.craft as any, {
           getChildren: (node) => node.children ?? [],
           onEnter: (node: CraftHtmlElement) => {
             if (draft.selectedNodes.includes(node.id)) {
@@ -394,7 +394,7 @@ export function craftHistoryReducer(
     case "(craft)/node/text/font/size": {
       const { size } = action;
       return produce(state, (draft) => {
-        visit<CraftHtmlElement>(draft.craft, {
+        visit<CraftHtmlElement>(draft.craft as any, {
           getChildren: (node) => node.children ?? [],
           onEnter: (node: CraftHtmlElement) => {
             if (draft.selectedNodes.includes(node.id)) {
@@ -408,7 +408,7 @@ export function craftHistoryReducer(
     case "(craft)/node/text/font/weight": {
       const { weight } = action;
       return produce(state, (draft) => {
-        visit<CraftHtmlElement>(draft.craft, {
+        visit<CraftHtmlElement>(draft.craft as any, {
           getChildren: (node) => node.children ?? [],
           onEnter: (node: CraftHtmlElement) => {
             if (draft.selectedNodes.includes(node.id)) {
@@ -423,7 +423,7 @@ export function craftHistoryReducer(
       return produce(state, (draft) => {
         const { data } = action;
 
-        visit<CraftElement>(draft.craft, {
+        visit<CraftElement>(draft.craft as any, {
           getChildren: (node) => node["children"] ?? [],
           onEnter: (node: CraftRadixIconElement) => {
             if (draft.selectedNodes.includes(node.id)) {
@@ -438,7 +438,7 @@ export function craftHistoryReducer(
       return produce(state, (draft) => {
         const { data } = action;
 
-        visit<CraftElement>(draft.craft, {
+        visit<CraftElement>(draft.craft as any, {
           getChildren: (node) => node["children"] ?? [],
           onEnter: (node: CraftHtmlElement) => {
             if (draft.selectedNodes.includes(node.id)) {
@@ -453,7 +453,7 @@ export function craftHistoryReducer(
       return produce(state, (draft) => {
         const { color } = action;
 
-        visit<CraftElement>(draft.craft, {
+        visit<CraftElement>(draft.craft as any, {
           getChildren: (node) => node["children"] ?? [],
           onEnter: (node: CraftHtmlElement) => {
             if (draft.selectedNodes.includes(node.id)) {
@@ -489,7 +489,7 @@ export function craftHistoryReducer(
 
           parent_path =
             findIndexPath(state.craft, {
-              getChildren: (node) => node.children,
+              getChildren: (node) => node.children as any,
               predicate: (node) => node.id === parent_ref,
             }) ?? [];
 
@@ -520,7 +520,7 @@ export function craftHistoryReducer(
 
       return produce(state, (draft) => {
         const parent = access(draft.craft, parent_path!, {
-          getChildren: (node) => node.children,
+          getChildren: (node) => node.children as any,
         });
 
         const widget = templates.new_widget(action.widget, {
@@ -572,7 +572,7 @@ function node_placement_under_parent(item: XYWH, parent: XYWH): XYWH {
 function can_node_have_children(node: CraftNode): boolean {
   // atm, we are checking the availability of children to be added by the object having a children field set.
   // to be more safe, this should be checked by the type of the object.
-  return !!node.children;
+  return "children" in node && !!node.children;
 }
 
 function new_node_id(): string {
