@@ -8,6 +8,9 @@
     "start": "next start -p 3315"
   },
   "dependencies": {
+    "@emotion/react": "^11.11.4",
+    "@emotion/styled": "^11.11.0",
+    "axios": "1.6.7",
     "next": "12.1.6",
     "react": "18.1.0",
     "react-dom": "18.1.0",
