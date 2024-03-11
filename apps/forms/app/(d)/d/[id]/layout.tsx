@@ -47,7 +47,7 @@ export default async function Layout({
               Design
             </button>
           </Link>
-          <Link href={`/d/${id}/edit`}>
+          <Link href={`/d/${id}/share`}>
             <button className="px-4 py-2 border-b-2 border-transparent hover:border-black">
               Share
             </button>
