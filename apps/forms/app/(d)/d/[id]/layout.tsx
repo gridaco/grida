@@ -5,7 +5,7 @@ import { notFound } from "next/navigation";
 import { cookies } from "next/headers";
 import { createServerClient } from "@/lib/supabase/server";
 import { GridaLogo } from "@/components/grida-logo";
-import { SlashIcon } from "@radix-ui/react-icons";
+import { EyeOpenIcon, SlashIcon } from "@radix-ui/react-icons";
 export default async function Layout({
   params,
   children,
@@ -31,7 +31,7 @@ export default async function Layout({
   return (
     <main className="p-4">
       <header className="flex w-full gap-4">
-        <div className="flex gap-4 items-center justify-self-start">
+        <div className="w-1/3 flex gap-4 items-center justify-start">
           <Link href="/dashboard">
             <span className="flex items-center gap-2 text-2xl font-black select-none">
               <GridaLogo />
@@ -41,7 +41,7 @@ export default async function Layout({
           <SlashIcon />
           <EditableFormTitle form_id={id} defaultValue={data.title} />
         </div>
-        <div className="justify-self-center flex gap-4">
+        <div className="w-1/3 flex items-center justify-center gap-4">
           <Link href={`/d/${id}/edit`}>
             <button className="px-4 py-2 border-b-2 border-transparent hover:border-black">
               Design
@@ -62,6 +62,17 @@ export default async function Layout({
               Developer
             </button>
           </Link>
+        </div>
+        <div className="w-1/3 flex gap-4 items-center justify-end">
+          <button className="p-3 rounded bg-neutral-200" title="Preview">
+            <EyeOpenIcon width={20} height={20} />
+          </button>
+          <button
+            className="px-4 py-2 self-stretch rounded bg-neutral-200"
+            title="Publish"
+          >
+            Publish
+          </button>
         </div>
       </header>
       {children}

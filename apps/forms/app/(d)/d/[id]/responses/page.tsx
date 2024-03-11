@@ -18,7 +18,7 @@ export default async function FormResponsesPage({
     .from("form")
     .select(
       `
-        *, 
+        *,
         fields:form_field(*),
         responses: response(*, fields:response_field(*))
       `
