@@ -20,6 +20,7 @@
 
   "search.exclude": {
     ".git": true,
+    "**/.next": true,
     ".eslintcache": true,
     "src/dist": true,
     "src/main.prod.js": true,

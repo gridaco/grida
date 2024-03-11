@@ -19,7 +19,7 @@
     "@emotion/css": "^11.11.2",
     "@emotion/react": "^11.11.4",
     "@emotion/styled": "^11.11.0",
-    "@mui/material": "^5.15.10",
+    "@radix-ui/react-dialog": "^1.0.5",
     "@ui/date-picker": "workspace:^",
     "@ui/tags-input": "workspace:^",
     "axios": "1.6.7",

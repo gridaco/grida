@@ -6,11 +6,8 @@ import {
   AlertDialogDescription,
   AlertDialogCancel,
   AlertDialogAction,
-  AlertDialogPrimitive,
-  AlertDialogOverlay,
 } from "@editor-ui/alert-dialog";
 import styled from "@emotion/styled";
-import { Dialog } from "@mui/material";
 
 export function DeletePostConfirmAlertDialog({
   open,
@@ -23,39 +20,28 @@ export function DeletePostConfirmAlertDialog({
 }) {
   return (
     // TODO: this dialog contains non english content - this is for testing i18n, will be updated soon.
-    <Dialog open={open} onClose={onCancel}>
-      <Body>
-        {/* <AlertDialogContent> */}
-        <Title>
-          포스트 삭제
-          {/* Delete Post */}
-        </Title>
-        <Description>
-          {/* This will permanently delete the post. This action cannot be undone. */}
-          정말 삭제하시겠습니까? 삭제된 포스트는 복구할 수 없습니다.
-        </Description>
-
-        {/* <AlertDialogTitle>Delete Post</AlertDialogTitle> */}
-        {/* <AlertDialogDescription>
-        This will permanently delete this post. (This action cannot be undone. )
-      </AlertDialogDescription> */}
-        <ActionsContainer>
-          {/* <AlertDialogCancel asChild> */}
-          <CancelButton onClick={onCancel}>
-            취소
-            {/* Cancel */}
-          </CancelButton>
-          {/* </AlertDialogCancel> */}
-          {/* <AlertDialogAction asChild> */}
-          <DeleteButton onClick={onDeleteConfirm}>
-            삭제
-            {/* Delete */}
-          </DeleteButton>
-          {/* </AlertDialogAction> */}
+    <AlertDialog open={open} onOpenChange={(open) => {
+      if (!open) onCancel();
+    }} >
+      <AlertDialogContent>
+        <AlertDialogTitle>Delete Post</AlertDialogTitle>
+          <AlertDialogDescription>
+            This will permanently delete this post. (This action cannot be undone. )
+          </AlertDialogDescription>
+          <ActionsContainer>
+            <AlertDialogCancel asChild>
+              <CancelButton onClick={onCancel}>
+                Cancel
+              </CancelButton>
+            </AlertDialogCancel>
+            <AlertDialogAction asChild>
+            <DeleteButton onClick={onDeleteConfirm}>
+              Delete
+            </DeleteButton>
+          </AlertDialogAction>
         </ActionsContainer>
-        {/* </AlertDialogContent> */}
-      </Body>
-    </Dialog>
+      </AlertDialogContent>
+    </AlertDialog>
   );
 }
 

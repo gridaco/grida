@@ -14,7 +14,7 @@ import styled from "@emotion/styled";
 import { buildViewPostOnPublicationUrl } from "../urls";
 import { summarize } from "../utils";
 import Axios from "axios";
-import { Dialog } from "@mui/material";
+import * as Dialog from "@radix-ui/react-dialog"
 
 function useBoringDocumentStore() {
   const [store, setStore] = useState<BoringDocumentsStore>();
@@ -174,81 +174,88 @@ export default function PostEditPage({
 
   return (
     <PostsAppThemeProvider theme={theme}>
-      <Dialog
-        maxWidth="xl"
+      <Dialog.Root
         open={publishDialog}
-        onClose={() => {
-          setPublishDialog(false);
-        }}
+        onOpenChange={setPublishDialog}
       >
-        {data && (
-          <PublishPostReviewDialogBody
-            title={data.title}
-            summary={data.summary ?? summarize(data.body)}
-            tags={data.tags}
-            thumbnail={data.thumbnail}
-            onPublish={async (p) => {
-              setData((d) => ({ ...d, ...p }));
+        <Dialog.Portal>
+          <Dialog.Content
+          style={{
+            position: "fixed",
+            inset: 0,
+            width: "100%",
+          }}
+          >
+            {data && (
+              <PublishPostReviewDialogBody
+                title={data.title}
+                summary={data.summary ?? summarize(data.body)}
+                tags={data.tags}
+                thumbnail={data.thumbnail}
+                onPublish={async (p) => {
+                  setData((d) => ({ ...d, ...p }));
 
-              // updte
-              await client.updateSummary(id, { ...p });
+                  // updte
+                  await client.updateSummary(id, { ...p });
 
-              // 1. update with value (TODO:)
-              client.publish(id).then(({ id }) => {
-                // 2. then => publish
-                setPublishDialog(false);
-                if (primaryHost) {
-                  open(
-                    buildViewPostOnPublicationUrl(primaryHost, { id }, false)
-                  );
-                }
-              });
+                  // 1. update with value (TODO:)
+                  client.publish(id).then(({ id }) => {
+                    // 2. then => publish
+                    setPublishDialog(false);
+                    if (primaryHost) {
+                      open(
+                        buildViewPostOnPublicationUrl(primaryHost, { id }, false)
+                      );
+                    }
+                  });
 
-              return true;
-            }}
-            onDisplayTitleChange={onDisplayTitleChange}
-            onSummaryChange={onSummaryChange}
-            onSchedule={(p) => {
-              // TODO:
-              // 1. update with value
-              // 2. them => schedule
-              setPublishDialog(false);
-            }}
-            onThumbnailChange={(f) => {
-              setSaving("saving");
-              //
-              client
-                .putThumbnail(id, f)
-                .then(() => {
-                  setSaving("saved");
+                  return true;
+                }}
+                onDisplayTitleChange={onDisplayTitleChange}
+                onSummaryChange={onSummaryChange}
+                onSchedule={(p) => {
+                  // TODO:
+                  // 1. update with value
+                  // 2. them => schedule
+                  setPublishDialog(false);
+                }}
+                onThumbnailChange={(f) => {
+                  setSaving("saving");
                   //
-                })
-                .catch((e) => {
-                  setSaving("error");
-                  //
-                });
-            }}
-            onCancel={() => {
-              setPublishDialog(false);
-            }}
-            onTagsEdit={(tags: string[]) => {
-              setSaving("saving");
-              client
-                .updateTags(id, tags)
-                .then(() => {
-                  setSaving("saved");
-                })
-                .catch((e) => {
-                  setSaving("error");
-                });
-            }}
-            publication={{
-              name: "Grida",
-            }}
-            disableSchedule
-          />
-        )}
-      </Dialog>
+                  client
+                    .putThumbnail(id, f)
+                    .then(() => {
+                      setSaving("saved");
+                      //
+                    })
+                    .catch((e) => {
+                      setSaving("error");
+                      //
+                    });
+                }}
+                onCancel={() => {
+                  setPublishDialog(false);
+                }}
+                onTagsEdit={(tags: string[]) => {
+                  setSaving("saving");
+                  client
+                    .updateTags(id, tags)
+                    .then(() => {
+                      setSaving("saved");
+                    })
+                    .catch((e) => {
+                      setSaving("error");
+                    });
+                }}
+                publication={{
+                  name: "Grida",
+                }}
+                disableSchedule
+              />
+            )}
+          </Dialog.Content>
+        </Dialog.Portal>
+      </Dialog.Root>
       <Appbar
         logo={
           publication.logo ? <LogoContainer src={publication.logo} /> : null
