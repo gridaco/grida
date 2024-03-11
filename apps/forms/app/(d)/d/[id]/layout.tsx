@@ -64,9 +64,11 @@ export default async function Layout({
           </Link>
         </div>
         <div className="w-1/3 flex gap-4 items-center justify-end">
-          <button className="p-3 rounded bg-neutral-200" title="Preview">
-            <EyeOpenIcon width={20} height={20} />
-          </button>
+          <Link href={"preview"} target="_blank">
+            <button className="p-3 rounded bg-neutral-200" title="Preview">
+              <EyeOpenIcon width={20} height={20} />
+            </button>
+          </Link>
           <button
             className="px-4 py-2 self-stretch rounded bg-neutral-200"
             title="Publish"
