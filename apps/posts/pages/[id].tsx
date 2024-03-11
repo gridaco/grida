@@ -1,9 +1,10 @@
 import React, { useEffect, useState } from "react";
-import { EditPage } from "@app/cms-posts/scaffolds";
+import { GetServerSideProps } from "next";
 import Head from "next/head";
-import { themeFrom } from "@app/cms-posts/theme";
-import { PostsClient } from "@app/cms-posts/api";
-import type { Post, Publication } from "@app/cms-posts/types";
+import { EditPage } from "../scaffolds";
+import { themeFrom } from "../theme";
+import { PostsClient } from "../api";
+import type { Post, Publication } from "../types";
 
 export default function PostEditPage({
   id,
@@ -33,13 +34,13 @@ export default function PostEditPage({
   );
 }
 
-import { GetServerSideProps } from "next";
 export const getServerSideProps: GetServerSideProps = async ({
   req,
   res,
   query,
 }) => {
   const { id } = query as { id: string };
+  // FIXME: make me dynamic
   const client = new PostsClient("627c481391a5de075f80a177");
 
   res.setHeader(

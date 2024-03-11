@@ -8,14 +8,26 @@
     "start": "next start -p 3315"
   },
   "dependencies": {
+    "@app/blocks": "workspace:0.0.0",
+    "@app/fp-customer-support": "workspace:^",
+    "@boring.so/document-model": "workspace:0.0.0",
+    "@boring.so/store": "workspace:^",
+    "@boringso/react-core": "workspace:0.0.0",
+    "@editor-ui/alert-dialog": "workspace:^",
     "@editor-ui/dropdown-menu": "workspace:^",
+    "@editor-ui/theme": "workspace:^",
+    "@emotion/css": "^11.11.2",
     "@emotion/react": "^11.11.4",
     "@emotion/styled": "^11.11.0",
+    "@mui/material": "^5.15.10",
+    "@ui/date-picker": "workspace:^",
+    "@ui/tags-input": "workspace:^",
     "axios": "1.6.7",
     "dayjs": "^1.11.10",
     "next": "12.1.6",
     "react": "18.1.0",
     "react-dom": "18.1.0",
+    "react-textarea-autosize": "^8.5.3",
     "url-pattern": "^1.0.3"
   },
   "devDependencies": {

@@ -1,5 +1,4 @@
 import React from "react";
-import styled from "@emotion/styled";
 import { nanoid } from "nanoid";
 
 export function ContentCard(props: {
@@ -8,7 +7,5 @@ export function ContentCard(props: {
   description: string;
 }) {
   let key = props.id ?? nanoid();
-  return <Root key={key}>{props.title}</Root>;
+  return <div key={key}>{props.title}</div>;
 }
-
-const Root = styled.div``;

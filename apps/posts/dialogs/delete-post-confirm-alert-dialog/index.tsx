@@ -10,7 +10,7 @@ import {
   AlertDialogOverlay,
 } from "@editor-ui/alert-dialog";
 import styled from "@emotion/styled";
-import Dialog from "@material-ui/core/Dialog";
+import { Dialog } from "@mui/material";
 
 export function DeletePostConfirmAlertDialog({
   open,

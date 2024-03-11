@@ -50,5 +50,3 @@ const ClientOnly = ({
 
   return <React.Fragment {...delegated}>{children}</React.Fragment>;
 };
-
-export default ClientOnly;

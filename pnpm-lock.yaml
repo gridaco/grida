@@ -199,15 +199,48 @@ importers:
 
   apps/posts:
     dependencies:
+      '@app/blocks':
+        specifier: workspace:0.0.0
+        version: link:../../packages/app-blocks
+      '@app/fp-customer-support':
+        specifier: workspace:^
+        version: link:../../packages/app-fp-customer-support
+      '@boring.so/document-model':
+        specifier: workspace:0.0.0
+        version: link:../../externals/boring/packages/boring-document-model
+      '@boring.so/store':
+        specifier: workspace:^
+        version: link:../../externals/boring/packages/boring-core-store
+      '@boringso/react-core':
+        specifier: workspace:0.0.0
+        version: link:../../externals/boring/packages/core-react
+      '@editor-ui/alert-dialog':
+        specifier: workspace:^
+        version: link:../../ui/editor-ui/packages/editor-ui-alert-dialog
       '@editor-ui/dropdown-menu':
         specifier: workspace:^
         version: link:../../ui/editor-ui/packages/editor-ui-dropdown-menu
+      '@editor-ui/theme':
+        specifier: workspace:^
+        version: link:../../ui/editor-ui/packages/editor-ui-theme
+      '@emotion/css':
+        specifier: ^11.11.2
+        version: 11.11.2
       '@emotion/react':
         specifier: ^11.11.4
         version: 11.11.4(@types/react@18.2.58)(react@18.2.0)
       '@emotion/styled':
         specifier: ^11.11.0
         version: 11.11.0(@emotion/react@11.11.4)(@types/react@18.2.58)(react@18.2.0)
+      '@mui/material':
+        specifier: ^5.15.10
+        version: 5.15.12(@emotion/react@11.11.4)(@emotion/styled@11.11.0)(@types/react@18.2.58)(react-dom@18.2.0)(react@18.2.0)
+      '@ui/date-picker':
+        specifier: workspace:^
+        version: link:../../ui/date-picker
+      '@ui/tags-input':
+        specifier: workspace:^
+        version: link:../../ui/tags-input
       axios:
         specifier: 1.6.7
         version: 1.6.7(debug@4.3.1)
@@ -223,6 +256,9 @@ importers:
       react-dom:
         specifier: ^18.2.0
         version: 18.2.0(react@18.2.0)
+      react-textarea-autosize:
+        specifier: ^8.5.3
+        version: 8.5.3(@types/react@18.2.58)(react@18.2.0)
       url-pattern:
         specifier: ^1.0.3
         version: 1.0.3
@@ -1398,8 +1434,16 @@ importers:
       idb:
         specifier: ^6.1.2
         version: 6.1.5
+    devDependencies:
+      '@boring.so/document-model':
+        specifier: workspace:^
+        version: link:../boring-document-model
 
-  externals/boring/packages/boring-document-model: {}
+  externals/boring/packages/boring-document-model:
+    dependencies:
+      nanoid:
+        specifier: ^3.1.23
+        version: 3.3.7
 
   externals/boring/packages/boring-loader:
     dependencies:
@@ -1420,9 +1464,18 @@ importers:
 
   externals/boring/packages/core-react:
     dependencies:
+      '@boring.so/config':
+        specifier: workspace:^
+        version: link:../boring-core-config
+      '@boring.so/document-model':
+        specifier: workspace:^
+        version: link:../boring-document-model
+      '@boring.so/store':
+        specifier: workspace:^
+        version: link:../boring-core-store
       '@floating-ui/react-dom-interactions':
         specifier: ^0.6.1
-        version: 0.6.6(react-dom@18.2.0)(react@18.2.0)
+        version: 0.6.6(@types/react@18.2.58)(react-dom@18.2.0)(react@18.2.0)
       '@tippyjs/react':
         specifier: ^4.2.6
         version: 4.2.6(react-dom@18.2.0)(react@18.2.0)
@@ -1477,9 +1530,15 @@ importers:
       prosemirror-state:
         specifier: ^1.4.3
         version: 1.4.3
+      prosemirror-view:
+        specifier: ^1.33.1
+        version: 1.33.1
       react-textarea-autosize:
         specifier: ^8.3.3
         version: 8.5.3(@types/react@18.2.58)(react@18.2.0)
+      tippy.js:
+        specifier: ^6.3.7
+        version: 6.3.7
       y-indexeddb:
         specifier: ^9.0.7
         version: 9.0.12(yjs@13.6.14)
@@ -1492,6 +1551,16 @@ importers:
       yjs:
         specifier: ^13.5.38
         version: 13.6.14
+    devDependencies:
+      '@emotion/styled':
+        specifier: ^11.11.0
+        version: 11.11.0(@emotion/react@11.11.4)(@types/react@18.2.58)(react@18.2.0)
+      '@types/react':
+        specifier: 18.2.58
+        version: 18.2.58
+      react:
+        specifier: ^18.2.0
+        version: 18.2.0
 
   externals/code/code: {}
 
@@ -2338,6 +2407,15 @@ importers:
       '@base-sdk/functions-code-format':
         specifier: ^0.0.0
         version: 0.0.0(@reflect-ui/cg@0.1.1)
+      '@design-sdk/core-types':
+        specifier: ^0.0.53
+        version: 0.0.53
+      '@design-sdk/url-analysis':
+        specifier: ^0.0.53
+        version: 0.0.53
+      '@emotion/styled':
+        specifier: ^11.11.0
+        version: 11.11.0(@emotion/react@11.11.4)(@types/react@18.2.58)(react@18.2.0)
       '@monaco-editor/react':
         specifier: ^4.2.2
         version: 4.6.0(monaco-editor@0.26.1)(react-dom@18.2.0)(react@18.2.0)
@@ -2350,6 +2428,16 @@ importers:
       monaco-editor:
         specifier: ^0.26.1
         version: 0.26.1
+      nanoid:
+        specifier: ^3.1.23
+        version: 3.3.7
+    devDependencies:
+      '@types/react':
+        specifier: 18.2.58
+        version: 18.2.58
+      react:
+        specifier: ^18.2.0
+        version: 18.2.0
 
   packages/app-cms-forms:
     dependencies:
@@ -2357,7 +2445,21 @@ importers:
         specifier: 8.0.0-beta.9
         version: 8.0.0-beta.9(react-dom@18.2.0)(react@18.2.0)
 
-  packages/app-fp-customer-support: {}
+  packages/app-fp-customer-support:
+    dependencies:
+      '@editor-ui/dropdown-menu':
+        specifier: workspace:^
+        version: link:../../ui/editor-ui/packages/editor-ui-dropdown-menu
+      '@emotion/styled':
+        specifier: ^11.11.0
+        version: 11.11.0(@emotion/react@11.11.4)(@types/react@18.2.58)(react@18.2.0)
+    devDependencies:
+      '@types/react':
+        specifier: 18.2.58
+        version: 18.2.58
+      react:
+        specifier: ^18.2.0
+        version: 18.2.0
 
   packages/app-scene-view: {}
 
@@ -2410,10 +2512,19 @@ importers:
 
   ui/date-picker:
     dependencies:
+      '@emotion/react':
+        specifier: ^11.11.4
+        version: 11.11.4(@types/react@18.2.58)(react@18.2.0)
+      '@emotion/styled':
+        specifier: ^11.11.0
+        version: 11.11.0(@emotion/react@11.11.4)(@types/react@18.2.58)(react@18.2.0)
       react-datepicker:
         specifier: ^4.8.0
         version: 4.25.0(react-dom@18.2.0)(react@18.2.0)
     devDependencies:
+      '@types/react':
+        specifier: 18.2.58
+        version: 18.2.58
       '@types/react-datepicker':
         specifier: ^4.4.1
         version: 4.19.6(react-dom@18.2.0)(react@18.2.0)
@@ -2545,7 +2656,14 @@ importers:
     dependencies:
       '@radix-ui/react-alert-dialog':
         specifier: ^0.1.7
-        version: 0.1.7(react-dom@18.2.0)(react@18.2.0)
+        version: 0.1.7(@types/react@18.2.58)(react-dom@18.2.0)(react@18.2.0)
+      '@stitches/react':
+        specifier: ^1.2.8
+        version: 1.2.8(react@18.2.0)
+    devDependencies:
+      '@types/react':
+        specifier: 18.2.58
+        version: 18.2.58
 
   ui/editor-ui/packages/editor-ui-breadcrumb: {}
 
@@ -2969,10 +3087,16 @@ importers:
 
   ui/tags-input:
     dependencies:
+      '@emotion/styled':
+        specifier: ^11.11.0
+        version: 11.11.0(@emotion/react@11.11.4)(@types/react@18.2.58)(react@18.2.0)
       react-tag-input:
         specifier: ^6.8.0
         version: 6.9.0(react-dnd-html5-backend@14.1.0)(react-dnd@14.0.5)(react-dom@18.2.0)(react@18.2.0)
     devDependencies:
+      '@types/react':
+        specifier: 18.2.58
+        version: 18.2.58
       '@types/react-tag-input':
         specifier: ^6.1.3
         version: 6.6.6
@@ -7840,7 +7964,7 @@ packages:
       '@floating-ui/core': 1.6.0
       '@floating-ui/utils': 0.2.1
 
-  /@floating-ui/react-dom-interactions@0.6.6(react-dom@18.2.0)(react@18.2.0):
+  /@floating-ui/react-dom-interactions@0.6.6(@types/react@18.2.58)(react-dom@18.2.0)(react@18.2.0):
     resolution: {integrity: sha512-qnao6UPjSZNHnXrF+u4/n92qVroQkx0Umlhy3Avk1oIebm/5ee6yvDm4xbHob0OjY7ya8WmUnV3rQlPwX3Atwg==}
     deprecated: Package renamed to @floating-ui/react
     peerDependencies:
@@ -9536,7 +9660,7 @@ packages:
       react: 18.2.0
       react-dom: 18.2.0(react@18.2.0)
 
-  /@radix-ui/react-alert-dialog@0.1.7(react-dom@18.2.0)(react@18.2.0):
+  /@radix-ui/react-alert-dialog@0.1.7(@types/react@18.2.58)(react-dom@18.2.0)(react@18.2.0):
     resolution: {integrity: sha512-b0+TWr0VRWMWM7QcXvvcwbMGNzpTmvPBSBpYcoaD+QnVo3jdJt0k0bghwbYBuywzdyuRNUFf33xwah/57w09QA==}
     peerDependencies:
       react: ^18.2.0
@@ -9546,7 +9670,7 @@ packages:
       '@radix-ui/primitive': 0.1.0
       '@radix-ui/react-compose-refs': 0.1.0(react@18.2.0)
       '@radix-ui/react-context': 0.1.1(react@18.2.0)
-      '@radix-ui/react-dialog': 0.1.7(react-dom@18.2.0)(react@18.2.0)
+      '@radix-ui/react-dialog': 0.1.7(@types/react@18.2.58)(react-dom@18.2.0)(react@18.2.0)
       '@radix-ui/react-primitive': 0.1.4(react@18.2.0)
       '@radix-ui/react-slot': 0.1.2(react@18.2.0)
       react: 18.2.0
@@ -9993,7 +10117,7 @@ packages:
       - '@types/react'
     dev: false
 
-  /@radix-ui/react-dialog@0.1.7(react-dom@18.2.0)(react@18.2.0):
+  /@radix-ui/react-dialog@0.1.7(@types/react@18.2.58)(react-dom@18.2.0)(react@18.2.0):
     resolution: {integrity: sha512-jXt8srGhHBRvEr9jhEAiwwJzWCWZoGRJ030aC9ja/gkRJbZdy0iD3FwXf+Ff4RtsZyLUMHW7VUwFOlz3Ixe1Vw==}
     peerDependencies:
       react: ^18.2.0
@@ -30992,7 +31116,7 @@ packages:
       dnd-core: 16.0.1
     dev: false
 
-  /react-dnd@14.0.5(react@18.2.0):
+  /react-dnd@14.0.5(@types/react@18.2.58)(react@18.2.0):
     resolution: {integrity: sha512-9i1jSgbyVw0ELlEVt/NkCUkxy1hmhJOkePoCH713u75vzHGyXhPDm28oLfc2NMSBjZRM1Y+wRjHXJT3sPrTy+A==}
     peerDependencies:
       '@types/hoist-non-react-statics': '>= 3.3.1'
@@ -31009,6 +31133,7 @@ packages:
     dependencies:
       '@react-dnd/invariant': 2.0.0
       '@react-dnd/shallowequal': 2.0.0
+      '@types/react': 18.2.58
       dnd-core: 14.0.1
       fast-deep-equal: 3.1.3
       hoist-non-react-statics: 3.3.2
@@ -31658,7 +31783,7 @@ packages:
       lodash: 4.17.21
       prop-types: 15.8.1
       react: 18.2.0
-      react-dnd: 14.0.5(react@18.2.0)
+      react-dnd: 14.0.5(@types/react@18.2.58)(react@18.2.0)
       react-dnd-html5-backend: 14.1.0
       react-dom: 18.2.0(react@18.2.0)
     dev: false

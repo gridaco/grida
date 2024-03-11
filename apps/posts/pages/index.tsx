@@ -1,13 +1,12 @@
 import React, { useEffect, useState } from "react";
 import { useRouter } from "next/router";
-import { GetServerSideProps } from "next";
 import Head from "next/head";
-
-import { TablePage } from "@app/cms-posts/scaffolds";
-import { themeFrom } from "@app/cms-posts/theme";
-import { PostsClient } from "@app/cms-posts/api";
-import { buildViewPostOnPublicationUrl } from "@app/cms-posts/urls";
-import type { Post } from "@app/cms-posts/types";
+import { GetServerSideProps } from "next";
+import { TablePage } from "../scaffolds";
+import { themeFrom } from "../theme";
+import { PostsClient } from "../api";
+import { buildViewPostOnPublicationUrl } from "../urls";
+import type { Post } from "../types";
 
 export default function WebPostsPage({ publication, theme }) {
   const router = useRouter();

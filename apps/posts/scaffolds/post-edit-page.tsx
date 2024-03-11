@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from "react";
-import Dialog from "@material-ui/core/Dialog";
 import { useRouter } from "next/router";
-import { BoringScaffold } from "@grida.co/app/boring-scaffold";
+import { Scaffold } from "@boringso/react-core";
 import { PublishPostReviewDialogBody } from "../dialogs";
 import { PostsClient } from "../api";
 import { BoringDocumentsStore } from "@boring.so/store";
@@ -15,6 +14,7 @@ import styled from "@emotion/styled";
 import { buildViewPostOnPublicationUrl } from "../urls";
 import { summarize } from "../utils";
 import Axios from "axios";
+import { Dialog } from "@mui/material";
 
 function useBoringDocumentStore() {
   const [store, setStore] = useState<BoringDocumentsStore>();
@@ -323,7 +323,7 @@ function Editor({
   theme?: PostCmsAppTheme["app_posts_cms"]["editor"];
 }) {
   return (
-    <BoringScaffold
+    <Scaffold
       readonly={readonly}
       initial={id}
       onContentChange={onContentChange}

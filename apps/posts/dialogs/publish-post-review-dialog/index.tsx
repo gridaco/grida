@@ -5,7 +5,6 @@ import { EditThumbnailSegment } from "./edit-thumbnail";
 import { EditTagsSegment } from "./edit-tags";
 import { RoundPrimaryButton } from "../../components";
 import { DatePicker } from "@ui/date-picker";
-import css from "@emotion/css";
 
 type PostVisibility = "public" | "private" | "password_protected";
 
