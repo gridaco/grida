@@ -1,4 +1,4 @@
-import { createServerClient } from "@/lib/supabase";
+import { createServerClient } from "@/lib/supabase/server";
 import { DownloadIcon } from "@radix-ui/react-icons";
 import { cookies } from "next/headers";
 

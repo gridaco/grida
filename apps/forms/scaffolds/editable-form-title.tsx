@@ -1,5 +1,6 @@
 "use client";
 
+import { createClientClient } from "@/lib/supabase/client";
 import { Database } from "@/types/supabase";
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
 import React, { useState, useEffect, useCallback } from "react";
@@ -11,19 +12,13 @@ export function EditableFormTitle({
   form_id: string;
   defaultValue?: string;
 }) {
-  const [value, setValue] = useState(defaultValue);
+  const [value, setValue] = useState<string>(defaultValue || "");
 
-  const supabase = createClientComponentClient<Database, "grida_forms">({
-    options: {
-      db: {
-        schema: "grida_forms",
-      },
-    },
-  });
+  const supabase = createClientClient();
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const updateTitle = useCallback(
-    debounce(async (newValue) => {
+    debounce(async (newValue: string) => {
       console.log("updateTitle", newValue);
       const { error } = await supabase
         .from("form")

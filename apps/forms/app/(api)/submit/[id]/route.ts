@@ -1,4 +1,4 @@
-import { client } from "@/lib/supabase";
+import { client } from "@/lib/supabase/server";
 import { NextRequest, NextResponse } from "next/server";
 
 export async function GET(
@@ -113,11 +113,11 @@ async function submit({
 
   // group by existing and new fields
   const known_names = keys.filter((key) => {
-    return form_fields!.some((field) => field.name === key);
+    return form_fields!.some((field: any) => field.name === key);
   });
 
   const unknown_names = keys.filter((key) => {
-    return !form_fields!.some((field) => field.name === key);
+    return !form_fields!.some((field: any) => field.name === key);
   });
   const ignored_names: string[] = [];
   const target_names: string[] = [];
@@ -195,7 +195,7 @@ async function submit({
         "There were new unknown fields in the request and the definitions are created automatically. To disable them, set is_unknown_field_allowed to false in the form settings.",
       data: {
         keys: needs_to_be_created,
-        fields: form_fields!.filter((field) =>
+        fields: form_fields!.filter((field: any) =>
           needs_to_be_created!.includes(field.name)
         ),
       },

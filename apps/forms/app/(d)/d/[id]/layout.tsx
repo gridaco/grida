@@ -3,7 +3,7 @@ import Link from "next/link";
 import { EditableFormTitle } from "@/scaffolds/editable-form-title";
 import { notFound } from "next/navigation";
 import { cookies } from "next/headers";
-import { createServerClient } from "@/lib/supabase";
+import { createServerClient } from "@/lib/supabase/server";
 import { GridaLogo } from "@/components/grida-logo";
 import { SlashIcon } from "@radix-ui/react-icons";
 export default async function Layout({
