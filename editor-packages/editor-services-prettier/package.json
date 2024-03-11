@@ -12,5 +12,8 @@
     "@code-editor/webworker-services-core": "workspace:^",
     "dart-style": "1.3.2-dev",
     "monaco-editor": "^0.46.0"
+  },
+  "dependencies": {
+    "prettier": "^3.2.5"
   }
 }
