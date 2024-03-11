@@ -1,5 +1,4 @@
 import React, { useRef, useState } from "react";
-import styled from "@emotion/styled";
 import { ThumbnailView } from "./edit-thumbnail-view";
 export function EditThumbnailSegment({
   onFileUpload,

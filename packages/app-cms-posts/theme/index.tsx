@@ -1,7 +1,5 @@
 import { ThemeProvider } from "@emotion/react";
-import styled, { CreateStyled } from "@emotion/styled";
 import { Theme as EditorTheme, useTheme } from "@editor-ui/theme";
-// import "@emotion/react";
 
 interface _Theme {
   app_posts_cms: {
