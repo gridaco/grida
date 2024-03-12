@@ -4,6 +4,7 @@ import { createClientClient } from "@/lib/supabase/client";
 import { Database } from "@/types/supabase";
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
 import React, { useState, useEffect, useCallback } from "react";
+import toast, { Toaster } from "react-hot-toast";
 
 export function EditableFormTitle({
   form_id,
@@ -19,16 +20,17 @@ export function EditableFormTitle({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const updateTitle = useCallback(
     debounce(async (newValue: string) => {
-      console.log("updateTitle", newValue);
       const { error } = await supabase
         .from("form")
         .update({ title: newValue })
         .eq("id", form_id);
 
       if (error) {
-        console.error(error);
+        toast.error("Failed to save");
+      } else {
+        toast.success("Saved");
       }
-    }, 500), // 500ms debounce period
+    }, 1000),
 
     [form_id, supabase]
   );
@@ -45,12 +47,23 @@ export function EditableFormTitle({
   }, [defaultValue, value, updateTitle]);
 
   return (
-    <input
-      className="shadow appearance-none border rounded py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
-      type="text"
-      value={value}
-      onChange={onChange}
-    />
+    <>
+      <Toaster position="bottom-center" />
+      <input
+        className="
+          text-lg
+          hover:shadow focus:shadow
+        hover:border-black/10 focus:border-black/10
+          focus:outline-none focus:shadow-outline
+          border border-transparent
+          box-border appearance-none rounded py-2 px-3 text-gray-700 leading-tight transition-all
+        "
+        type="text"
+        placeholder="Form title"
+        value={value}
+        onChange={onChange}
+      />
+    </>
   );
 }
 
