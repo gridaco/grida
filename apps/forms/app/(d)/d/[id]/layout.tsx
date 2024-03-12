@@ -6,6 +6,7 @@ import { cookies } from "next/headers";
 import { createServerClient } from "@/lib/supabase/server";
 import { GridaLogo } from "@/components/grida-logo";
 import { EyeOpenIcon, SlashIcon } from "@radix-ui/react-icons";
+import { Toaster } from "react-hot-toast";
 export default async function Layout({
   params,
   children,
@@ -30,6 +31,7 @@ export default async function Layout({
 
   return (
     <main className="p-4 min-h-screen h-full">
+      <Toaster position="bottom-center" />
       <header className="flex w-full gap-4">
         <div className="w-1/3 flex gap-2 items-center justify-start">
           <Link href="/dashboard">

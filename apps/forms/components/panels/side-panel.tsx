@@ -100,6 +100,10 @@ export function PanelContent({ children }: React.PropsWithChildren<{}>) {
   return <div className=" relative flex-1 overflow-y-auto ">{children}</div>;
 }
 
+export function PanelClose({ children }: React.PropsWithChildren<{}>) {
+  return <Dialog.Close asChild>{children}</Dialog.Close>;
+}
+
 export function PanelFooter({ children }: React.PropsWithChildren<{}>) {
   return (
     <footer className="flex w-full justify-end space-x-3 border-t border-default px-3 py-4">

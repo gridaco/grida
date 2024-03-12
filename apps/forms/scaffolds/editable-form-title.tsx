@@ -4,7 +4,7 @@ import { createClientClient } from "@/lib/supabase/client";
 import { Database } from "@/types/supabase";
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
 import React, { useState, useEffect, useCallback } from "react";
-import toast, { Toaster } from "react-hot-toast";
+import toast from "react-hot-toast";
 
 export function EditableFormTitle({
   form_id,
@@ -48,7 +48,6 @@ export function EditableFormTitle({
 
   return (
     <>
-      <Toaster position="bottom-center" />
       <input
         className="
           text-lg
