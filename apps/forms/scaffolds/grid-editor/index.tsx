@@ -36,6 +36,14 @@ export function GridEditor({
   form_id: string;
 }) {
   const [newFieldPanelOpen, setNewFieldPanelOpen] = useState(false);
+  const [newFieldPanelRefreshKey, setNewFieldPanelRefreshKey] = useState(0);
+
+  const closeNewFieldPanel = (options: { refresh: boolean }) => {
+    setNewFieldPanelOpen(false);
+    if (options.refresh) {
+      setNewFieldPanelRefreshKey((k) => k + 1);
+    }
+  };
 
   const supabase = createClientClient();
 
@@ -51,8 +59,21 @@ export function GridEditor({
         help_text: init.helpText,
         required: init.required,
       })
-      .then((res) => {
-        toast.success("New field added");
+      .select()
+      .single()
+      .then(({ data, error }) => {
+        if (data) {
+          toast.success("New field added");
+          closeNewFieldPanel({ refresh: true });
+        } else {
+          if (error.code === "23505") {
+            toast.error(`field with name "${init.name}" already exists`);
+            console.error(error);
+            return;
+          }
+          toast.error("Failed to add new field");
+          console.error(error);
+        }
       });
   };
 
@@ -61,6 +82,7 @@ export function GridEditor({
       <CreateNewFieldPanel
         open={newFieldPanelOpen}
         onOpenChange={setNewFieldPanelOpen}
+        formResetKey={newFieldPanelRefreshKey}
         onSubmit={onAddNewField}
       />
       <Grid
@@ -76,8 +98,10 @@ export function GridEditor({
 
 function CreateNewFieldPanel({
   onSubmit,
+  formResetKey = 0,
   ...props
 }: React.ComponentProps<typeof SidePanel> & {
+  formResetKey?: number;
   onSubmit?: (field: NewFieldInit) => void;
 }) {
   const [name, setName] = useState("");
@@ -111,7 +135,7 @@ function CreateNewFieldPanel({
     <SidePanel {...props}>
       <PanelHeader>New Field</PanelHeader>
       <PanelContent>
-        <form>
+        <form key={formResetKey}>
           <PanelPropertySection>
             <PanelPropertySectionTitle>Preview</PanelPropertySectionTitle>
             <PanelPropertyFields>

@@ -60,7 +60,7 @@ export default async function FormResponsesPage({
   return (
     <div className="h-full flex flex-col flex-1 w-full overflow-x-hidden">
       <div className="flex flex-col h-full w-full">
-        <GridEditor columns={columns} rows={rows} />
+        <GridEditor columns={columns} rows={rows} form_id={form_id} />
       </div>
       <footer className="flex min-h-9 overflow-hidden items-center px-2 w-full border-t">
         <div>{form?.responses?.length ?? 0} response(s)</div>
