@@ -76,12 +76,14 @@ export function PanelPropertyField({
   );
 }
 
-export function PropertyTextInput({ placeholder }: { placeholder?: string }) {
+export function PropertyTextInput(
+  props: React.InputHTMLAttributes<HTMLInputElement>
+) {
   return (
     <input
       className="peer/input block box-border w-full rounded-md shadow-sm transition-all focus-visible:shadow-md outline-none focus:ring-current focus:ring-2 focus-visible:border-foreground-muted focus-visible:ring-background-control placeholder-foreground-muted bg-foreground/[.026] border border-control text-sm px-4 py-2"
       type="text"
-      placeholder={placeholder}
+      {...props}
     />
   );
 }
