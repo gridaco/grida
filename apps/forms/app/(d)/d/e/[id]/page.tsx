@@ -1,6 +1,7 @@
 import { GridaLogo } from "@/components/grida-logo";
 import { createServerClient } from "@/lib/supabase/server";
 import { cookies } from "next/headers";
+import Link from "next/link";
 import { notFound } from "next/navigation";
 
 export default async function FormPage({ params }: { params: { id: string } }) {
@@ -67,7 +68,9 @@ export default async function FormPage({ params }: { params: { id: string } }) {
         </button>
       </form>
       <footer className="py-10 w-max mx-auto">
-        <PoweredByWaterMark />
+        <Link href={"/"} target="_blank">
+          <PoweredByWaterMark />
+        </Link>
       </footer>
     </main>
   );
