@@ -53,7 +53,7 @@ export default function DeveloperPage({
 
   return (
     <main>
-      <Panel />
+      {/* <CreateNewFieldPanel /> */}
       <button className="rounded p-2 bg-neutral-100">
         <PlusIcon width={24} height={24} />
       </button>
@@ -81,56 +81,6 @@ export default function DeveloperPage({
         />
       </section>
     </main>
-  );
-}
-
-function Panel() {
-  return (
-    <SidePanel trigger={<button>Create New Field</button>}>
-      <PanelHeader>New Field</PanelHeader>
-      <PanelContent>
-        <PanelPropertySection>
-          <PanelPropertySectionTitle>Preview</PanelPropertySectionTitle>
-          <PanelPropertyFields>
-            <div className="w-full min-h-40 bg-neutral-200 rounded p-10 border border-black/20">
-              <FormFieldPreview />
-            </div>
-          </PanelPropertyFields>
-        </PanelPropertySection>
-        <PanelPropertySection>
-          <PanelPropertySectionTitle>General</PanelPropertySectionTitle>
-          <PanelPropertyFields>
-            <PanelPropertyField
-              label={"Name"}
-              description="Recommended to use lowercase and use an underscore to separate words e.g. column_name"
-            >
-              <PropertyTextInput placeholder={"field_name"} />
-            </PanelPropertyField>
-            <PanelPropertyField label={"Type"}>
-              <select>
-                <option value="text">Text</option>
-                <option value="textarea">Textarea</option>
-                <option value="email">Email</option>
-                <option value="number">Number</option>
-              </select>
-            </PanelPropertyField>
-            <PanelPropertyField label={"Required"}>
-              <input type="checkbox" />
-            </PanelPropertyField>
-
-            {/* <PropertyTextField
-                label={"Name"}
-                placeholder={"field_name"}
-                description="Recommended to use lowercase and use an underscore to separate words e.g. column_name"
-              /> */}
-          </PanelPropertyFields>
-        </PanelPropertySection>
-      </PanelContent>
-      <PanelFooter>
-        <button className="rounded p-2 bg-neutral-100">Cancel</button>
-        <button className="rounded p-2 bg-neutral-100">Save</button>
-      </PanelFooter>
-    </SidePanel>
   );
 }
 

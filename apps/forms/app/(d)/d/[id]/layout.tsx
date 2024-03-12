@@ -42,7 +42,7 @@ export default async function Layout({
           <EditableFormTitle form_id={id} defaultValue={data.title} />
         </div>
         <div className="w-1/3 flex items-center justify-center gap-4">
-          <Link href={`/d/${id}/edit`}>
+          <Link href={`/d/${id}/design`}>
             <button className="px-4 py-2 border-b-2 border-transparent hover:border-black">
               Design
             </button>
@@ -52,9 +52,9 @@ export default async function Layout({
               Share
             </button>
           </Link>
-          <Link href={`/d/${id}/responses`}>
+          <Link href={`/d/${id}/table`}>
             <button className="px-4 py-2 border-b-2 border-transparent hover:border-black">
-              Results
+              Table
             </button>
           </Link>
           <Link href={`/d/${id}/developer`}>
