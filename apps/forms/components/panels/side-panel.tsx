@@ -4,11 +4,13 @@ import React from "react";
 export function SidePanel({
   children,
   trigger,
+  ...props
 }: React.PropsWithChildren<{
   trigger?: React.ReactNode;
-}>) {
+}> &
+  React.ComponentProps<typeof Dialog.Root>) {
   return (
-    <Dialog.Root>
+    <Dialog.Root {...props}>
       {trigger && <Dialog.Trigger asChild>{trigger}</Dialog.Trigger>}
       <Dialog.Portal>
         <Dialog.Overlay className="z-40 fixed bg-neutral-500/50 h-full w-full left-0 top-0 opacity-75 data-closed:animate-fade-out-overlay-bg data-open:animate-fade-in-overlay-bg " />

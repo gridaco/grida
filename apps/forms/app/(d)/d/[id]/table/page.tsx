@@ -3,6 +3,8 @@ import { Grid } from "@/scaffolds/grid";
 import { DownloadIcon } from "@radix-ui/react-icons";
 import { cookies } from "next/headers";
 
+import { GridEditor } from "@/scaffolds/grid-editor";
+
 export default async function FormResponsesPage({
   params,
 }: {
@@ -58,7 +60,7 @@ export default async function FormResponsesPage({
   return (
     <div className="h-full flex flex-col flex-1 w-full overflow-x-hidden">
       <div className="flex flex-col h-full w-full">
-        <Grid columns={columns} rows={rows} />
+        <GridEditor columns={columns} rows={rows} />
       </div>
       <footer className="flex min-h-9 overflow-hidden items-center px-2 w-full border-t">
         <div>{form?.responses?.length ?? 0} response(s)</div>

@@ -21,6 +21,7 @@ import {
 export function Grid({
   columns,
   rows,
+  onAddNewFieldClick,
 }: {
   columns: {
     key: string;
@@ -28,6 +29,7 @@ export function Grid({
     type?: string;
   }[];
   rows: { __id: string; [key: string]: string | number | boolean }[];
+  onAddNewFieldClick?: () => void;
 }) {
   const __leading_column: Column<any> = {
     key: "__",
@@ -62,7 +64,9 @@ export function Grid({
     resizable: false,
     draggable: true,
     width: 100,
-    renderHeaderCell: NewFieldHeaderCell,
+    renderHeaderCell: (props) => (
+      <NewFieldHeaderCell {...props} onClick={onAddNewFieldClick} />
+    ),
   };
 
   const formattedColumns = [__leading_column, __id_column, __created_at_column]
@@ -144,9 +148,16 @@ function FieldHeaderCell({ column }: RenderHeaderCellProps<any>) {
   );
 }
 
-function NewFieldHeaderCell({}: RenderHeaderCellProps<any>) {
+function NewFieldHeaderCell({
+  onClick,
+}: RenderHeaderCellProps<any> & {
+  onClick?: () => void;
+}) {
   return (
-    <button className="rounded p-2 bg-neutral-100 w-full flex items-center justify-center">
+    <button
+      onClick={onClick}
+      className="rounded p-2 bg-neutral-100 w-full flex items-center justify-center"
+    >
       <PlusIcon />
     </button>
   );

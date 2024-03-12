@@ -2,17 +2,7 @@
 import { Cross1Icon, PlusIcon } from "@radix-ui/react-icons";
 import React, { useEffect, useState } from "react";
 import { createClientClient } from "@/lib/supabase/client";
-import {
-  PanelContent,
-  PanelFooter,
-  PanelHeader,
-  PanelPropertyField,
-  PanelPropertyFields,
-  PanelPropertySection,
-  PanelPropertySectionTitle,
-  PropertyTextInput,
-  SidePanel,
-} from "@/components/panels/side-panel";
+import { FormFieldPreview } from "@/components/formfield";
 
 interface FormFieldDefinition {
   name: string;
@@ -147,15 +137,6 @@ function FormFeildEdit({
         <FormFieldPreview />
       </tbody>
     </table>
-  );
-}
-
-function FormFieldPreview() {
-  return (
-    <div className="flex flex-col">
-      <label>Field Label</label>
-      <input type="text" placeholder="Placeholder" />
-    </div>
   );
 }
 
