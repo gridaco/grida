@@ -27,18 +27,25 @@ export default async function FormPage({ params }: { params: { id: string } }) {
 
   const { title, fields } = data;
 
-  console.log(fields);
   return (
     <main className="p-4 container mx-auto min-h-screen">
       <header>
-        <h1 className="text-4xl font-bold">{title}</h1>
+        <h1 className="py-10 text-4xl font-bold">{title}</h1>
       </header>
-      <form className="grid grid-cols-1 gap-4 my-4 h-full">
+      <form className="flex flex-col gap-4 py-4 h-full overflow-auto flex-1">
         {fields.map((field: any) => {
           return (
-            <label key={field.id} className="flex flex-col">
+            <label
+              data-has-label={!!field.label}
+              key={field.id}
+              className="flex flex-col data-[has-label='false']:capitalize"
+            >
               {field.label || field.name}
+              {field.help_text && (
+                <span className="text-sm text-gray-500">{field.help_text}</span>
+              )}
               <input
+                className="shadow appearance-none border rounded py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
                 min={field.min}
                 max={field.max}
                 pattern={field.pattern}
@@ -55,7 +62,7 @@ export default async function FormPage({ params }: { params: { id: string } }) {
           Submit
         </button>
       </form>
-      <footer className="w-max mx-auto">
+      <footer className="py-10 w-max mx-auto">
         <PoweredByWaterMark />
       </footer>
     </main>
