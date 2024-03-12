@@ -1,6 +1,6 @@
 "use client";
 import { Cross1Icon, PlusIcon } from "@radix-ui/react-icons";
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 
 interface FormFieldDefinition {
   name: string;
@@ -10,10 +10,34 @@ interface FormFieldDefinition {
   required: boolean;
 }
 
-export default function DeveloperPage() {
+export default function DeveloperPage({
+  params,
+}: {
+  params: {
+    id: string;
+  };
+}) {
+  const form_id = params.id;
   const [fields, setFields] = useState<FormFieldDefinition[]>([]);
 
   const is_empty = fields.length === 0;
+
+  const supabase = createClientClient();
+
+  useEffect(() => {
+    supabase
+      .from("form_field")
+      .select()
+      .eq("form_id", form_id)
+      .then(({ data, error }) => {
+        if (error) {
+          console.error(error);
+        } else {
+          console.log("fields", data);
+          setFields(data as FormFieldDefinition[]);
+        }
+      });
+  }, [supabase, form_id]);
 
   return (
     <main>
@@ -25,7 +49,7 @@ export default function DeveloperPage() {
       <section className="mx-auto max-w-screen-lg">
         <div className="flex flex-col gap-2">
           {fields.map((field, i) => (
-            <FormFeildEdit key={i} />
+            <FormFeildEdit key={i} {...field} />
           ))}
         </div>
         <NewFieldButton
@@ -48,13 +72,19 @@ export default function DeveloperPage() {
   );
 }
 
-function FormFeildEdit() {
+function FormFeildEdit({
+  name,
+  label,
+  type,
+  placeholder,
+  required,
+}: FormFieldDefinition) {
   return (
     <table className="rounded border p-4 flex flex-col gap-4">
       <thead>
         <tr className="flex">
           <th>
-            <select>
+            <select value={type}>
               <option value="text">Text</option>
               <option value="textarea">Textarea</option>
               <option value="email">Email</option>
@@ -66,6 +96,7 @@ function FormFeildEdit() {
               className="shadow appearance-none border rounded py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
               type="text"
               placeholder="Field Name"
+              defaultValue={name}
             />
           </th>
           <div className="flex-1" />
@@ -74,20 +105,32 @@ function FormFeildEdit() {
       </thead>
       <tbody className="flex justify-between">
         <div className="flex flex-col gap-2">
-          <input
-            className="shadow appearance-none border rounded py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
-            type="text"
-            placeholder="Label"
-          />
-          <input
-            className="shadow appearance-none border rounded py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
-            type="text"
-            placeholder="Placeholder"
-          />
-          <input
-            // className="shadow appearance-none border rounded py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
-            type="checkbox"
-          />
+          <label>
+            Label
+            <input
+              className="shadow appearance-none border rounded py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+              type="text"
+              placeholder="Label"
+              defaultValue={label}
+            />
+          </label>
+          <label>
+            Placeholder
+            <input
+              className="shadow appearance-none border rounded py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+              type="text"
+              placeholder="Placeholder"
+              defaultValue={placeholder}
+            />
+          </label>
+          <label>
+            Required
+            <input
+              // className="shadow appearance-none border rounded py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+              type="checkbox"
+              defaultChecked={required}
+            />
+          </label>
         </div>
         <FormFieldPreview />
       </tbody>
@@ -123,6 +166,7 @@ function NewFieldButton({
 }
 
 import * as Dialog from "@radix-ui/react-dialog";
+import { createClientClient } from "@/lib/supabase/client";
 
 function SidePanel() {
   return (

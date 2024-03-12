@@ -162,6 +162,9 @@ importers:
       react:
         specifier: ^18.2.0
         version: 18.2.0
+      react-data-grid:
+        specifier: 7.0.0-beta.42
+        version: 7.0.0-beta.42(react-dom@18.2.0)(react@18.2.0)
       react-dom:
         specifier: ^18.2.0
         version: 18.2.0(react@18.2.0)
@@ -32804,6 +32807,17 @@ packages:
       hoist-non-react-statics: 3.3.2
       react: 18.2.0
       universal-cookie: 4.0.4
+    dev: false
+
+  /react-data-grid@7.0.0-beta.42(react-dom@18.2.0)(react@18.2.0):
+    resolution: {integrity: sha512-N5ToEOxMlQGkRYhed3ahFz34fgJTccrCA9PZqIGVoO1vsZADNISXk6ywODJOdCz/1yB78MLu+T7q6cnJd2024A==}
+    peerDependencies:
+      react: ^18.2.0
+      react-dom: ^18.2.0
+    dependencies:
+      clsx: 2.1.0
+      react: 18.2.0
+      react-dom: 18.2.0(react@18.2.0)
     dev: false
 
   /react-datepicker@4.25.0(react-dom@18.2.0)(react@18.2.0):
