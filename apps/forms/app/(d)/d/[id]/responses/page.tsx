@@ -2,6 +2,7 @@ import { createServerClient } from "@/lib/supabase/server";
 import { Grid } from "@/scaffolds/grid";
 import { DownloadIcon } from "@radix-ui/react-icons";
 import { cookies } from "next/headers";
+import { Column } from "react-data-grid";
 export default async function FormResponsesPage({
   params,
 }: {
@@ -30,25 +31,21 @@ export default async function FormResponsesPage({
     console.error(error);
   }
 
-  const columns = [
-    {
-      key: "id",
-      name: "id",
-      frozen: true,
-    },
-  ].concat(
+  const columns =
     form?.fields?.map((field) => ({
       key: field.id,
       name: field.label ?? field.name,
       frozen: false,
       // You can add more properties here as needed by react-data-grid
-    })) ?? []
-  );
+    })) ?? [];
 
   // Transforming the responses into the format expected by react-data-grid
   const rows =
     form?.responses?.map((response, index) => {
-      const row: any = { id: response.id }; // react-data-grid expects each row to have a unique 'id' property
+      const row: any = {
+        __id: response.id,
+        __created_at: response.created_at,
+      }; // react-data-grid expects each row to have a unique 'id' property
       response.fields.forEach((field) => {
         row[field.form_field_id] = field.value?.toString(); // Matching the field's ID with its value
       });
