@@ -13,6 +13,9 @@ import {
   EnvelopeClosedIcon,
   TextIcon,
   ImageIcon,
+  EnterFullScreenIcon,
+  CalendarIcon,
+  Link2Icon,
 } from "@radix-ui/react-icons";
 
 export function Grid({
@@ -32,6 +35,7 @@ export function Grid({
     frozen: true,
     width: 50,
     renderHeaderCell: LeadingHeaderCell,
+    renderCell: LeadingCell,
   };
 
   const __id_column: Column<any> = {
@@ -93,13 +97,35 @@ function LeadingHeaderCell({ column }: RenderHeaderCellProps<any>) {
   return <div></div>;
 }
 
-function LeadingCell({ column }: RenderHeaderCellProps<any>) {
-  return <div></div>;
+function LeadingCell({ column }: RenderCellProps<any>) {
+  return (
+    <div className="flex group items-center justify-between h-full w-full">
+      <input type="checkbox" />
+      <button className="opacity-0 group-hover:opacity-100">
+        <EnterFullScreenIcon />
+      </button>
+    </div>
+  );
 }
 
 function DefaultPropertyHeaderCell({ column }: RenderHeaderCellProps<any>) {
-  const { name } = column;
-  return <div>{name}</div>;
+  const { name, key } = column;
+
+  return (
+    <div className="flex items-center gap-2">
+      <DefaultPropertyIcon __key={key} />
+      <span>{name}</span>
+    </div>
+  );
+}
+
+function DefaultPropertyIcon({ __key: key }: { __key: string }) {
+  switch (key) {
+    case "__gf_id":
+      return <Link2Icon />;
+    case "__gf_created_at":
+      return <CalendarIcon />;
+  }
 }
 
 function FieldHeaderCell({ column }: RenderHeaderCellProps<any>) {

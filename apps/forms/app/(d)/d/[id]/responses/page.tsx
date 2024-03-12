@@ -56,13 +56,17 @@ export default async function FormResponsesPage({
     }) ?? [];
 
   return (
-    <div>
-      <h1>Form Responses {form?.responses?.length}</h1>
-      <button>
-        <DownloadIcon />
-      </button>
-
-      <Grid columns={columns} rows={rows} />
+    <div className="h-full flex flex-col flex-1 w-full overflow-x-hidden">
+      <div className="flex flex-col h-full w-full">
+        <Grid columns={columns} rows={rows} />
+      </div>
+      <footer className="flex min-h-9 overflow-hidden items-center px-2 w-full border-t">
+        <div>{form?.responses?.length ?? 0} response(s)</div>
+        <button className="flex items-center gap-1 p-2 bg-neutral-100 rounded">
+          Export to CSV
+          <DownloadIcon />
+        </button>
+      </footer>
     </div>
   );
 }

@@ -29,16 +29,16 @@ export default async function Layout({
   }
 
   return (
-    <main className="p-4">
+    <main className="p-4 min-h-screen h-full">
       <header className="flex w-full gap-4">
-        <div className="w-1/3 flex gap-4 items-center justify-start">
+        <div className="w-1/3 flex gap-2 items-center justify-start">
           <Link href="/dashboard">
             <span className="flex items-center gap-2 text-2xl font-black select-none">
               <GridaLogo />
               Forms
             </span>
           </Link>
-          <SlashIcon />
+          <SlashIcon className="min-w-[20px]" width={20} height={20} />
           <EditableFormTitle form_id={id} defaultValue={data.title} />
         </div>
         <div className="w-1/3 flex items-center justify-center gap-4">
