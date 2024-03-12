@@ -13,48 +13,177 @@ export type Database = {
         Row: {
           cover_image: string | null
           created_at: string
+          custom_preview_url_path: string | null
+          custom_publish_url_path: string | null
           description: string | null
           id: string
+          is_draft: boolean
           is_edit_after_submission_allowed: boolean
+          is_master: boolean
           is_multiple_response_allowed: boolean
           is_unknown_field_allowed: boolean
-          posted_at: string | null
+          master_id: string | null
           project_id: number
+          published_at: string | null
+          response_redirect_uri: string | null
           thumbnail_image: string | null
           title: string
+          updated_at: string
         }
         Insert: {
           cover_image?: string | null
           created_at?: string
+          custom_preview_url_path?: string | null
+          custom_publish_url_path?: string | null
           description?: string | null
           id?: string
+          is_draft?: boolean
           is_edit_after_submission_allowed?: boolean
+          is_master?: boolean
           is_multiple_response_allowed?: boolean
           is_unknown_field_allowed?: boolean
-          posted_at?: string | null
+          master_id?: string | null
           project_id: number
+          published_at?: string | null
+          response_redirect_uri?: string | null
           thumbnail_image?: string | null
           title?: string
+          updated_at?: string
         }
         Update: {
           cover_image?: string | null
           created_at?: string
+          custom_preview_url_path?: string | null
+          custom_publish_url_path?: string | null
           description?: string | null
           id?: string
+          is_draft?: boolean
           is_edit_after_submission_allowed?: boolean
+          is_master?: boolean
           is_multiple_response_allowed?: boolean
           is_unknown_field_allowed?: boolean
-          posted_at?: string | null
+          master_id?: string | null
           project_id?: number
+          published_at?: string | null
+          response_redirect_uri?: string | null
           thumbnail_image?: string | null
           title?: string
+          updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "grida_forms_form_master_id_fkey"
+            columns: ["master_id"]
+            isOneToOne: false
+            referencedRelation: "form"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "grida_forms_form_project_id_fkey"
             columns: ["project_id"]
             isOneToOne: false
             referencedRelation: "project"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
+      form_block: {
+        Row: {
+          created_at: string
+          data: Json
+          form_field_id: string | null
+          form_id: string
+          id: string
+          local_index: number
+          parent_id: string | null
+          type: Database["grida_forms"]["Enums"]["form_block_type"]
+        }
+        Insert: {
+          created_at?: string
+          data: Json
+          form_field_id?: string | null
+          form_id: string
+          id?: string
+          local_index?: number
+          parent_id?: string | null
+          type: Database["grida_forms"]["Enums"]["form_block_type"]
+        }
+        Update: {
+          created_at?: string
+          data?: Json
+          form_field_id?: string | null
+          form_id?: string
+          id?: string
+          local_index?: number
+          parent_id?: string | null
+          type?: Database["grida_forms"]["Enums"]["form_block_type"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "grida_forms_form_block_form_field_id_fkey"
+            columns: ["form_field_id"]
+            isOneToOne: false
+            referencedRelation: "form_field"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "grida_forms_form_block_form_id_fkey"
+            columns: ["form_id"]
+            isOneToOne: false
+            referencedRelation: "form"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "grida_forms_form_block_parent_id_fkey"
+            columns: ["parent_id"]
+            isOneToOne: false
+            referencedRelation: "form_block"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
+      form_editor_metadata: {
+        Row: {
+          form_id: string | null
+          id: number
+          project_id: number | null
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          form_id?: string | null
+          id?: number
+          project_id?: number | null
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          form_id?: string | null
+          id?: number
+          project_id?: number | null
+          updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "grida_forms_editor_metadata_last_active_form_form_id_fkey"
+            columns: ["form_id"]
+            isOneToOne: false
+            referencedRelation: "form"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "grida_forms_editor_metadata_last_active_form_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "project"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "grida_forms_editor_metadata_last_active_form_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
             referencedColumns: ["id"]
           }
         ]
@@ -236,6 +365,7 @@ export type Database = {
       [_ in never]: never
     }
     Enums: {
+      form_block_type: "text" | "image" | "input"
       form_field_type:
         | "text"
         | "textarea"
@@ -254,6 +384,8 @@ export type Database = {
         | "password"
         | "color"
         | "radio"
+        | "country"
+        | "payment"
       response_platform_powered_by: "api" | "grida_forms" | "web_client"
     }
     CompositeTypes: {

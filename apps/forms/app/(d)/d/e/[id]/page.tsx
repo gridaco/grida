@@ -32,7 +32,10 @@ export default async function FormPage({ params }: { params: { id: string } }) {
       <header>
         <h1 className="py-10 text-4xl font-bold">{title}</h1>
       </header>
-      <form className="flex flex-col gap-4 py-4 h-full overflow-auto flex-1">
+      <form
+        action={"/submit/" + id}
+        className="flex flex-col gap-4 py-4 h-full overflow-auto flex-1"
+      >
         {fields.map((field: any) => {
           return (
             <label
@@ -45,6 +48,7 @@ export default async function FormPage({ params }: { params: { id: string } }) {
                 <span className="text-sm text-gray-500">{field.help_text}</span>
               )}
               <input
+                name={field.name}
                 className="shadow appearance-none border rounded py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
                 min={field.min}
                 max={field.max}

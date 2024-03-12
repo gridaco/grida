@@ -77,7 +77,7 @@ async function submit({
   // check if form exists
   const { data: form_reference } = await client
     .from("form")
-    .select("id, is_unknown_field_allowed")
+    .select("*")
     .eq("id", form_id)
     .single();
 
@@ -85,7 +85,7 @@ async function submit({
     return NextResponse.json({ error: "Form not found" }, { status: 404 });
   }
 
-  const { is_unknown_field_allowed } = form_reference;
+  const { is_unknown_field_allowed, response_redirect_uri } = form_reference;
 
   const entries = data.entries();
   const keys = Array.from(data.keys());
@@ -189,7 +189,7 @@ async function submit({
   let info: any = {};
 
   // if there are new fields
-  if (needs_to_be_created) {
+  if (needs_to_be_created?.length) {
     info.new_keys = {
       message:
         "There were new unknown fields in the request and the definitions are created automatically. To disable them, set is_unknown_field_allowed to false in the form settings.",
@@ -212,6 +212,12 @@ async function submit({
         "There were unknown fields in the request. To allow them, set is_unknown_field_allowed to true in the form settings.",
       data: { keys: ignored_names },
     };
+  }
+
+  if (response_redirect_uri) {
+    return NextResponse.redirect(response_redirect_uri, {
+      status: 301,
+    });
   }
 
   return NextResponse.json({
