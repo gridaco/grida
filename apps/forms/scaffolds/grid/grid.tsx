@@ -1,6 +1,12 @@
 "use client";
+
 import "react-data-grid/lib/styles.css";
-import DataGrid, { Column, RenderHeaderCellProps } from "react-data-grid";
+import DataGrid, {
+  Column,
+  RenderCellProps,
+  RenderEditCellProps,
+  RenderHeaderCellProps,
+} from "react-data-grid";
 import {
   PlusIcon,
   ChevronDownIcon,
@@ -29,7 +35,7 @@ export function Grid({
   };
 
   const __id_column: Column<any> = {
-    key: "__id",
+    key: "__gf_id",
     name: "id",
     frozen: true,
     resizable: true,
@@ -38,7 +44,7 @@ export function Grid({
   };
 
   const __created_at_column: Column<any> = {
-    key: "__created_at",
+    key: "__gf_created_at",
     name: "time",
     frozen: true,
     resizable: true,
@@ -47,7 +53,7 @@ export function Grid({
   };
 
   const __new_column: Column<any> = {
-    key: "__new",
+    key: "__gf_new",
     name: "+",
     resizable: false,
     draggable: true,
@@ -57,14 +63,20 @@ export function Grid({
 
   const formattedColumns = [__leading_column, __id_column, __created_at_column]
     .concat(
-      columns.map((col) => ({
-        key: col.key,
-        name: col.name,
-        resizable: true,
-        draggable: true,
-        width: undefined,
-        renderHeaderCell: FieldHeaderCell,
-      }))
+      columns.map(
+        (col) =>
+          ({
+            key: col.key,
+            name: col.name,
+            resizable: true,
+            draggable: true,
+            editable: true,
+            width: undefined,
+            renderHeaderCell: FieldHeaderCell,
+            renderCell: FieldCell,
+            renderEditCell: FieldEditCell,
+          }) as Column<any>
+      )
     )
     .concat(__new_column);
 
@@ -112,4 +124,44 @@ function NewFieldHeaderCell({}: RenderHeaderCellProps<any>) {
       <PlusIcon />
     </button>
   );
+}
+
+function FieldCell({ column, row }: RenderCellProps<any>) {
+  const data = row[column.key];
+
+  if (!data) {
+    return <></>;
+  }
+
+  const { type, value } = data;
+
+  const unwrapped = JSON.parse(value);
+
+  let display = "";
+  switch (type) {
+    case "text":
+      display = unwrapped;
+      break;
+  }
+
+  return <div>{unwrapped}</div>;
+}
+
+function FieldEditCell({ column, row }: RenderEditCellProps<any>) {
+  const data = row[column.key];
+
+  if (!data) {
+    return <></>;
+  }
+
+  const { type, value } = data;
+
+  const unwrapped = JSON.parse(value);
+
+  switch (type) {
+    case "text":
+      return <input type="text" defaultValue={unwrapped} />;
+    case "select":
+      return <select></select>;
+  }
 }
