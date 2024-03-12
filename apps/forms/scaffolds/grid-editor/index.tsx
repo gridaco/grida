@@ -18,6 +18,15 @@ import { FormFieldPreview } from "@/components/formfield";
 import { FormFieldType } from "@/types";
 import { capitalCase, snakeCase } from "change-case";
 import { createClientClient } from "@/lib/supabase/client";
+import {
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogTitle,
+  AlertDialogDescription,
+  AlertDialogCancel,
+  AlertDialogAction,
+  AlertDialogOverlay,
+} from "@editor-ui/alert-dialog";
 import toast from "react-hot-toast";
 
 type NewFieldInit = {
@@ -37,12 +46,27 @@ export function GridEditor({
 }) {
   const [newFieldPanelOpen, setNewFieldPanelOpen] = useState(false);
   const [newFieldPanelRefreshKey, setNewFieldPanelRefreshKey] = useState(0);
+  const [deleteFieldConfirmOpen, setDeleteFieldConfirmOpen] = useState(false);
+  const [focusedField, setFocusedField] = useState<string | null>(null);
+
+  const openNewFieldPanel = () => {
+    setNewFieldPanelRefreshKey((k) => k + 1);
+    setNewFieldPanelOpen(true);
+  };
 
   const closeNewFieldPanel = (options: { refresh: boolean }) => {
     setNewFieldPanelOpen(false);
     if (options.refresh) {
       setNewFieldPanelRefreshKey((k) => k + 1);
     }
+  };
+
+  const openDeleteFieldConfirm = () => {
+    setDeleteFieldConfirmOpen(true);
+  };
+
+  const closeDeleteFieldConfirm = () => {
+    setDeleteFieldConfirmOpen(false);
   };
 
   const supabase = createClientClient();
@@ -79,7 +103,16 @@ export function GridEditor({
 
   return (
     <>
-      <CreateNewFieldPanel
+      <DeleteFieldConfirmDialog
+        open={deleteFieldConfirmOpen}
+        onOpenChange={setDeleteFieldConfirmOpen}
+        onCancel={closeDeleteFieldConfirm}
+        onDeleteConfirm={() => {
+          console.log("delete confirm");
+        }}
+      />
+      <FieldEditPanel
+        title={focusedField ? "Edit Field" : "Add New Field"}
         open={newFieldPanelOpen}
         onOpenChange={setNewFieldPanelOpen}
         formResetKey={newFieldPanelRefreshKey}
@@ -88,19 +121,52 @@ export function GridEditor({
       <Grid
         columns={props.columns}
         rows={props.rows}
-        onAddNewFieldClick={() => {
-          setNewFieldPanelOpen(true);
+        onAddNewFieldClick={openNewFieldPanel}
+        onEditFieldClick={(field_id) => {
+          setFocusedField(field_id);
+          openNewFieldPanel();
         }}
+        onDeleteFieldClick={openDeleteFieldConfirm}
       />
     </>
   );
 }
 
-function CreateNewFieldPanel({
+function DeleteFieldConfirmDialog({
+  onCancel,
+  onDeleteConfirm,
+  ...props
+}: React.ComponentProps<typeof AlertDialog> & {
+  onCancel: () => void;
+  onDeleteConfirm: () => void;
+}) {
+  return (
+    <AlertDialog {...props}>
+      {/* <AlertDialogOverlay /> */}
+      <AlertDialogContent>
+        <AlertDialogTitle>Delete Field</AlertDialogTitle>
+        <AlertDialogDescription>
+          Deleting this field will remove all data associated with it. Are you
+          sure you want to delete this field?
+        </AlertDialogDescription>
+        <div className="flex justify-end gap-2 p-2">
+          <AlertDialogCancel onClick={onCancel}>Cancel</AlertDialogCancel>
+          <AlertDialogAction onClick={onDeleteConfirm}>
+            Delete
+          </AlertDialogAction>
+        </div>
+      </AlertDialogContent>
+    </AlertDialog>
+  );
+}
+
+function FieldEditPanel({
+  title,
   onSubmit,
   formResetKey = 0,
   ...props
 }: React.ComponentProps<typeof SidePanel> & {
+  title?: string;
   formResetKey?: number;
   onSubmit?: (field: NewFieldInit) => void;
 }) {
@@ -133,7 +199,7 @@ function CreateNewFieldPanel({
 
   return (
     <SidePanel {...props}>
-      <PanelHeader>New Field</PanelHeader>
+      <PanelHeader>{title}</PanelHeader>
       <PanelContent>
         <form key={formResetKey}>
           <PanelPropertySection>

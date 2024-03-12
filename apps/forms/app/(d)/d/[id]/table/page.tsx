@@ -1,5 +1,4 @@
 import { createServerClient } from "@/lib/supabase/server";
-import { Grid } from "@/scaffolds/grid";
 import { DownloadIcon } from "@radix-ui/react-icons";
 import { cookies } from "next/headers";
 

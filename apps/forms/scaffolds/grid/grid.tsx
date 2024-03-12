@@ -16,12 +16,24 @@ import {
   EnterFullScreenIcon,
   CalendarIcon,
   Link2Icon,
+  Pencil1Icon,
+  TrashIcon,
 } from "@radix-ui/react-icons";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuPortal,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@editor-ui/dropdown-menu";
 
 export function Grid({
   columns,
   rows,
   onAddNewFieldClick,
+  onEditFieldClick,
+  onDeleteFieldClick,
 }: {
   columns: {
     key: string;
@@ -30,6 +42,8 @@ export function Grid({
   }[];
   rows: { __id: string; [key: string]: string | number | boolean }[];
   onAddNewFieldClick?: () => void;
+  onEditFieldClick?: (id: string) => void;
+  onDeleteFieldClick?: (id: string) => void;
 }) {
   const __leading_column: Column<any> = {
     key: "__",
@@ -80,7 +94,17 @@ export function Grid({
             draggable: true,
             editable: true,
             width: undefined,
-            renderHeaderCell: FieldHeaderCell,
+            renderHeaderCell: (props) => (
+              <FieldHeaderCell
+                {...props}
+                onEditClick={() => {
+                  onEditFieldClick?.(col.key);
+                }}
+                onDeleteClick={() => {
+                  onDeleteFieldClick?.(col.key);
+                }}
+              />
+            ),
             renderCell: FieldCell,
             renderEditCell: FieldEditCell,
           }) as Column<any>
@@ -132,7 +156,14 @@ function DefaultPropertyIcon({ __key: key }: { __key: string }) {
   }
 }
 
-function FieldHeaderCell({ column }: RenderHeaderCellProps<any>) {
+function FieldHeaderCell({
+  column,
+  onEditClick,
+  onDeleteClick,
+}: RenderHeaderCellProps<any> & {
+  onEditClick?: () => void;
+  onDeleteClick?: () => void;
+}) {
   const { name } = column;
 
   return (
@@ -141,9 +172,25 @@ function FieldHeaderCell({ column }: RenderHeaderCellProps<any>) {
         <TextIcon />
         {name}
       </span>
-      <button>
-        <ChevronDownIcon />
-      </button>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <button>
+            <ChevronDownIcon />
+          </button>
+        </DropdownMenuTrigger>
+        <DropdownMenuPortal>
+          <DropdownMenuContent className="z-50">
+            <DropdownMenuItem onClick={onEditClick}>
+              <Pencil1Icon />
+              Edit Field
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={onDeleteClick}>
+              <TrashIcon />
+              Delete Field
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenuPortal>
+      </DropdownMenu>
     </div>
   );
 }
