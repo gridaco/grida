@@ -35,7 +35,7 @@ export default async function FormResponsesPage({
   const columns =
     form?.fields?.map((field) => ({
       key: field.id,
-      name: field.label ?? field.name,
+      name: field.name,
       frozen: false,
       // You can add more properties here as needed by react-data-grid
     })) ?? [];

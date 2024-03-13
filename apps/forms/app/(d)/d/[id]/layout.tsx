@@ -31,17 +31,17 @@ export default async function Layout({
   }
 
   return (
-    <main className="px-4 min-h-screen h-full">
+    <main className="min-h-screen h-screen flex flex-col">
       <Toaster position="bottom-center" />
-      <header className="flex w-full gap-4 border-b">
-        <div className="w-1/3 flex gap-2 items-center justify-start">
+      <header className="px-4 flex w-full gap-4 border-b">
+        <div className="w-1/3 flex items-center justify-start">
           <Link href="/dashboard">
-            <span className="flex items-center gap-2 text-xl font-black select-none">
-              <GridaLogo size={20} />
+            <span className="flex items-center gap-2 text-md font-black select-none">
+              <GridaLogo size={15} />
               Forms
             </span>
           </Link>
-          <SlashIcon className="min-w-[20px]" width={20} height={20} />
+          <SlashIcon className="min-w-[20px] ml-2" width={15} height={15} />
           <EditableFormTitle form_id={id} defaultValue={data.title} />
         </div>
         <div className="w-1/3 flex items-center justify-center gap-4">
@@ -49,12 +49,15 @@ export default async function Layout({
         </div>
         <div className="w-1/3 flex gap-4 items-center justify-end">
           <Link href={"preview"} target="_blank">
-            <button className="p-3 rounded bg-neutral-200" title="Preview">
-              <EyeOpenIcon width={20} height={20} />
+            <button
+              className="p-2 h-10 w-10 rounded bg-neutral-200"
+              title="Preview"
+            >
+              <EyeOpenIcon className="mx-auto" width={20} height={20} />
             </button>
           </Link>
           <button
-            className="px-4 py-2 self-stretch rounded bg-neutral-200"
+            className="px-4 py-2 h-10 rounded bg-neutral-200"
             title="Publish"
           >
             Publish

@@ -6,9 +6,10 @@ import React from "react";
 
 export function Tabs({ form_id: id }: { form_id: string }) {
   const router = useRouter();
-  const selectedId = usePathname();
+  const pathname = usePathname();
 
-  const tab = selectedId.split("/").pop();
+  // path is /d/:id/:tab/~
+  const tab = pathname.split("/")[3];
 
   return (
     <>

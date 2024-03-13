@@ -142,7 +142,7 @@ function DefaultPropertyHeaderCell({ column }: RenderHeaderCellProps<any>) {
   return (
     <div className="flex items-center gap-2">
       <DefaultPropertyIcon __key={key} />
-      <span>{name}</span>
+      <span className="font-normal">{name}</span>
     </div>
   );
 }
@@ -170,7 +170,7 @@ function FieldHeaderCell({
     <div className="flex items-center justify-between">
       <span className="flex items-center gap-2">
         <TextIcon />
-        {name}
+        <span className="font-normal">{name}</span>
       </span>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
