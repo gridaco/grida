@@ -67,7 +67,6 @@ const withTM = require("next-transpile-modules")(
     "@app/scene-view",
     "@app/blocks",
     "@app/cms-posts",
-    "@app/cms-forms",
     "@app/fp-customer-support",
     "@core/state",
     "@core/app-state",
