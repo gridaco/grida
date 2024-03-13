@@ -9,6 +9,7 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@dnd-kit/core": "^6.1.0",
     "@editor-ui/alert-dialog": "workspace:^",
     "@editor-ui/dropdown-menu": "workspace:^",
     "@radix-ui/react-dialog": "^1.0.5",

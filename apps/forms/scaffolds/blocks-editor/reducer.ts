@@ -11,7 +11,7 @@ export function reducer(
       return produce(state, (draft) => {
         draft.blocks.push({
           type: "text",
-          content: "",
+          data: {},
         });
       });
     default:

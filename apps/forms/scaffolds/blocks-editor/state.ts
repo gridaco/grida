@@ -1,3 +1,8 @@
 export interface BlocksEditorState {
-  blocks: any[];
+  blocks: FormBlock[];
+}
+
+export interface FormBlock {
+  type: string;
+  data: any;
 }

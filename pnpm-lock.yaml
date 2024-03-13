@@ -187,6 +187,9 @@ importers:
 
   apps/forms:
     dependencies:
+      '@dnd-kit/core':
+        specifier: ^6.1.0
+        version: 6.1.0(react-dom@18.2.0)(react@18.2.0)
       '@editor-ui/alert-dialog':
         specifier: workspace:^
         version: link:../../ui/editor-ui/packages/editor-ui-alert-dialog
