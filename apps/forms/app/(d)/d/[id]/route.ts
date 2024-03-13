@@ -9,7 +9,7 @@ export function GET(
   }
 ) {
   const origin = req.nextUrl.origin;
-  return NextResponse.redirect(origin + "/d/" + context.params.id + "/design", {
+  return NextResponse.redirect(origin + "/d/" + context.params.id + "/data", {
     status: 301,
   });
 }
