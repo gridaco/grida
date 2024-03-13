@@ -173,7 +173,7 @@ function FieldHeaderCell({
         <TextIcon />
         <span className="font-normal">{name}</span>
       </span>
-      <DropdownMenu>
+      <DropdownMenu modal={false}>
         <DropdownMenuTrigger asChild>
           <button>
             <ChevronDownIcon />
