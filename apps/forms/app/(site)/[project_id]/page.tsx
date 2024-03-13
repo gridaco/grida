@@ -24,7 +24,7 @@ export default async function FormsDashboardPage({
   const { data: auth } = await supabase.auth.getSession();
 
   if (!auth.session) {
-    return redirect("/login");
+    return redirect("/sign-in");
   }
 
   const { data: forms, error } = await supabase
