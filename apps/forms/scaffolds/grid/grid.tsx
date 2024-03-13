@@ -1,5 +1,6 @@
 "use client";
 
+import React, { useEffect, useRef } from "react";
 import "react-data-grid/lib/styles.css";
 import DataGrid, {
   Column,
@@ -128,7 +129,7 @@ function LeadingHeaderCell({ column }: RenderHeaderCellProps<any>) {
 function LeadingCell({ column }: RenderCellProps<any>) {
   return (
     <div className="flex group items-center justify-between h-full w-full">
-      <input type="checkbox" />
+      {/* <input type="checkbox" /> */}
       <button className="opacity-0 group-hover:opacity-100">
         <EnterFullScreenIcon />
       </button>
@@ -233,6 +234,15 @@ function FieldCell({ column, row }: RenderCellProps<any>) {
 
 function FieldEditCell({ column, row }: RenderEditCellProps<any>) {
   const data = row[column.key];
+  const ref = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (ref.current) {
+      // focus & select all
+      ref.current.focus();
+      ref.current.select();
+    }
+  }, [ref]);
 
   if (!data) {
     return <></>;
@@ -244,7 +254,15 @@ function FieldEditCell({ column, row }: RenderEditCellProps<any>) {
 
   switch (type) {
     case "text":
-      return <input type="text" defaultValue={unwrapped} />;
+      return (
+        <input
+          ref={ref}
+          readOnly
+          className="w-full px-2 appearance-none outline-none border-none"
+          type="text"
+          defaultValue={unwrapped}
+        />
+      );
     case "select":
       return <select></select>;
   }

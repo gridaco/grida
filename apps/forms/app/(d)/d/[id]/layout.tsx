@@ -8,6 +8,8 @@ import { EyeOpenIcon, SlashIcon } from "@radix-ui/react-icons";
 import { Toaster } from "react-hot-toast";
 import { Tabs } from "@/scaffolds/d/tabs";
 
+export const revalidate = 0;
+
 export default async function Layout({
   params,
   children,

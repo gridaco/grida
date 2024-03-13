@@ -19,6 +19,9 @@ export function Tabs({ form_id: id }: { form_id: string }) {
       <Link href={`/d/${id}/data`}>
         <Tab selected={tab === "data"}>Data</Tab>
       </Link>
+      <Link href={`/d/${id}/connect`}>
+        <Tab selected={tab === "connect"}>Connect</Tab>
+      </Link>
       <Link href={`/d/${id}/share`}>
         <Tab selected={tab === "share"}>Share</Tab>
       </Link>

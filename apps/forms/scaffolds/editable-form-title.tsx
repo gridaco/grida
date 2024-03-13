@@ -50,7 +50,6 @@ export function EditableFormTitle({
     <>
       <input
         className="
-          text-lg
           hover:shadow focus:shadow
         hover:border-black/10 focus:border-black/10
           focus:outline-none focus:shadow-outline

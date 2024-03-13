@@ -10,41 +10,41 @@ export default function Layout({
   const id = params.id;
 
   return (
-    <main className="grid grid-cols-1 gap-4 mt-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+    <main className="flex gap-4 h-screen">
       {/* side */}
-      <nav className="col-span-1 md:col-span-2 lg:col-span-1 xl:col-span-1 max-w-xs min-w-60 w-min">
-        <ul className="flex flex-col gap-2">
+      <nav className="col-span-1 max-w-xs min-w-60 w-min border-r h-full">
+        <ul className="flex flex-col">
           <li>
             <Link href={`/d/${id}/share/link`}>
-              <button className="w-full text-left px-4 py-2 rounded bg-transparent hover:bg-neutral-500/10">
+              <button className="w-full text-left px-4 py-4 bg-transparent hover:bg-neutral-500/10">
                 Share the link
               </button>
             </Link>
           </li>
           <li>
             <Link href={`/d/${id}/share/embed`}>
-              <button className="w-full text-left px-4 py-2 rounded bg-transparent hover:bg-neutral-500/10">
+              <button className="w-full text-left px-4 py-4 bg-transparent hover:bg-neutral-500/10">
                 Embed in a webpage
               </button>
             </Link>
           </li>
           <li>
             <Link href={`/d/${id}/share/custom`}>
-              <button className="w-full text-left px-4 py-2 rounded bg-transparent hover:bg-neutral-500/10">
+              <button className="w-full text-left px-4 py-4 bg-transparent hover:bg-neutral-500/10">
                 Use custom renderer
               </button>
             </Link>
           </li>
           <li>
             <Link href={`/d/${id}/share/api`}>
-              <button className="w-full text-left px-4 py-2 rounded bg-transparent hover:bg-neutral-500/10">
+              <button className="w-full text-left px-4 py-4 bg-transparent hover:bg-neutral-500/10">
                 Use API
               </button>
             </Link>
           </li>
         </ul>
       </nav>
-      {children}
+      <div className="w-full h-full overflow-scroll pt-4">{children}</div>
     </main>
   );
 }

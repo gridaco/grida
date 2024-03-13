@@ -40,11 +40,15 @@ async function Header() {
           </Link>
         </span>
       </div>
-      <div className="flex gap-10">
-        <button>Sign in</button>
-        <button className="px-4 py-2 rounded bg-black text-white dark:bg-white dark:text-black">
-          Get Started
-        </button>
+      <div className="flex gap-10 items-center">
+        <Link href="/sign-in">
+          <button>Sign in</button>
+        </Link>
+        <Link href="/sign-in">
+          <button className="px-4 py-2 rounded bg-black text-white dark:bg-white dark:text-black">
+            Get Started
+          </button>
+        </Link>
       </div>
     </header>
   );
