@@ -6,7 +6,7 @@ import { StateProvider, useEditorState } from "./provider";
 import { reducer } from "./reducer";
 import { PlusIcon } from "@radix-ui/react-icons";
 import { DndContext } from "@dnd-kit/core";
-import { Block } from "./blocks";
+import { Block, BlocksCanvas } from "./blocks";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -66,15 +66,14 @@ function BlocksEditor() {
         </DropdownMenuPortal>
       </DropdownMenu>
 
-      <div className="mt-10">
-        {state.blocks.map((block, index) => {
-          return (
-            <div key={index}>
-              <Block {...block} />
-            </div>
-          );
-        })}
-      </div>
+      <BlocksCanvas className="mt-10"></BlocksCanvas>
+      {state.blocks.map((block, index) => {
+        return (
+          <div key={index}>
+            <Block {...block} />
+          </div>
+        );
+      })}
     </div>
   );
 }

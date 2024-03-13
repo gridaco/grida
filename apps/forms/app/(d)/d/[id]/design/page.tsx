@@ -23,7 +23,7 @@ export default async function EditFormPage({
   }
 
   return (
-    <main className="p-4">
+    <main className="p-4 container mx-auto">
       <BlocksEditor
         initial={{
           form_id: id,

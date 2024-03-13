@@ -12,10 +12,11 @@ export function reducer(
 ): BlocksEditorState {
   switch (action.type) {
     case "blocks/new": {
+      // TODO: if adding new section, if there is a present non-section-blocks on root, it should automatically be nested under new section.
       const { block } = <CreateNewBlockAction>action;
       return produce(state, (draft) => {
         draft.blocks.push({
-          id: "[draft]",
+          id: "[draft]" + Math.random().toString(36).substring(7),
           form_id: state.form_id,
           type: block,
           data: {},
