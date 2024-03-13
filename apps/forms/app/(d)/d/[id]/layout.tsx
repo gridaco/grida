@@ -1,4 +1,3 @@
-import { Inter } from "next/font/google";
 import Link from "next/link";
 import { EditableFormTitle } from "@/scaffolds/editable-form-title";
 import { notFound } from "next/navigation";
@@ -7,6 +6,7 @@ import { createServerClient } from "@/lib/supabase/server";
 import { GridaLogo } from "@/components/grida-logo";
 import { EyeOpenIcon, SlashIcon } from "@radix-ui/react-icons";
 import { Toaster } from "react-hot-toast";
+
 export default async function Layout({
   params,
   children,

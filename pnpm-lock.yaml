@@ -211,6 +211,9 @@ importers:
       change-case:
         specifier: ^5.4.3
         version: 5.4.3
+      immer:
+        specifier: ^9.0.3
+        version: 9.0.21
       next:
         specifier: 14.1.1
         version: 14.1.1(react-dom@18.2.0)(react@18.2.0)
@@ -226,9 +229,6 @@ importers:
       react-hot-toast:
         specifier: ^2.4.0
         version: 2.4.1(csstype@3.1.0)(react-dom@18.2.0)(react@18.2.0)
-      zustand:
-        specifier: ^4.5.2
-        version: 4.5.2(@types/react@18.2.58)(react@18.2.0)
     devDependencies:
       '@types/node':
         specifier: ^20
