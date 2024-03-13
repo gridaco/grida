@@ -1,11 +1,19 @@
 "use client";
 
-import React from "react";
+import React, { useCallback } from "react";
 import type { BlocksEditorState, FormBlock } from "./state";
 import { StateProvider, useEditorState } from "./provider";
 import { reducer } from "./reducer";
 import { PlusIcon } from "@radix-ui/react-icons";
 import { DndContext } from "@dnd-kit/core";
+import { Block } from "./blocks";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuPortal,
+  DropdownMenuTrigger,
+} from "@editor-ui/dropdown-menu";
 
 export default function BlocksEditorRoot({
   initial,
@@ -24,28 +32,49 @@ export default function BlocksEditorRoot({
 }
 
 function BlocksEditor() {
-  const [state] = useEditorState();
-  return (
-    <div>
-      <button className="rounded border p-2">
-        <PlusIcon />
-      </button>
-      {state.blocks.map((block, index) => {
-        return (
-          <div key={index}>
-            <Block {...block} />
-          </div>
-        );
-      })}
-    </div>
-  );
-}
+  const [state, dispatch] = useEditorState();
 
-function Block(props: FormBlock) {
+  const addSectionBlock = useCallback(() => {
+    dispatch({
+      type: "blocks/new",
+      block: "section",
+    });
+  }, [dispatch]);
+
+  const addFieldBlock = useCallback(() => {
+    dispatch({
+      type: "blocks/new",
+      block: "field",
+    });
+  }, [dispatch]);
+
   return (
     <div>
-      <div>{props.type}</div>
-      <div>{JSON.stringify(props.data)}</div>
+      <DropdownMenu modal={false}>
+        <DropdownMenuTrigger asChild>
+          <button className="rounded border p-2">
+            <PlusIcon />
+          </button>
+        </DropdownMenuTrigger>
+        <DropdownMenuPortal>
+          <DropdownMenuContent className="z-50">
+            <DropdownMenuItem onClick={addSectionBlock}>
+              Section
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={addFieldBlock}>Field</DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenuPortal>
+      </DropdownMenu>
+
+      <div className="mt-10">
+        {state.blocks.map((block, index) => {
+          return (
+            <div key={index}>
+              <Block {...block} />
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }

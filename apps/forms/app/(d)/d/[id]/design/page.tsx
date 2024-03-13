@@ -12,12 +12,13 @@ export default async function EditFormPage({
   const cookieStore = cookies();
   const supabase = createServerClient(cookieStore);
 
-  const { data: blocks } = await supabase
-    .from("form_block")
-    .select()
-    .eq("form_id", id);
+  const { data } = await supabase
+    .from("form")
+    .select(`*, blocks:form_block(*), fields:form_field(*)`)
+    .eq("id", id)
+    .single();
 
-  if (!blocks) {
+  if (!data) {
     return notFound();
   }
 
@@ -25,7 +26,9 @@ export default async function EditFormPage({
     <main className="p-4">
       <BlocksEditor
         initial={{
-          blocks: blocks,
+          form_id: id,
+          fields: data.fields,
+          blocks: data.blocks,
         }}
       />
     </main>

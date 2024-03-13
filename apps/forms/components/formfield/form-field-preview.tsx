@@ -9,14 +9,18 @@ export function FormFieldPreview({
   placeholder,
   required,
   helpText,
+  readonly,
+  disabled,
 }: {
   name: string;
-  label: string;
+  label?: string;
   labelCapitalize?: boolean;
   type: FormFieldType;
   placeholder?: string;
   helpText?: string;
   required: boolean;
+  readonly?: boolean;
+  disabled?: boolean;
 }) {
   return (
     <label className="flex flex-col">
@@ -27,7 +31,8 @@ export function FormFieldPreview({
         {label || name}
       </span>
       <input
-        disabled={!name}
+        readOnly={readonly}
+        disabled={disabled || !name}
         autoFocus={false}
         className="shadow appearance-none border rounded py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
         type={type}
