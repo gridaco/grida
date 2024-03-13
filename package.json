@@ -2,26 +2,9 @@
   "name": "grida",
   "private": true,
   "license": "Apache 2.0",
-  "workspaces": [
-    "app",
-    "web",
-    "editor",
-    "editor-packages/*",
-    "packages/app-*",
-    "packages/core-*",
-    "packages/lib/*",
-    "externals/code/packages/*",
-    "externals/code/code",
-    "externals/boring/packages/*",
-    "ui/editor-ui/packages/*",
-    "ui/*"
-  ],
   "scripts": {
-    "web": "yarn workspace web run dev",
-    "desktop": "yarn workspace @grida.co/desktop run start",
-    "site": "yarn workspace grida.site run dev",
-    "clean": "rimraf node_modules yarn.lock",
-    "clean:install": "yarn clean && yarn"
+    "clean": "rimraf node_modules pnpm-lock.yaml",
+    "clean:install": "pnpm run clean && pnpm install"
   },
   "resolutions": {
     "@design-sdk/figma-node": "0.0.25",

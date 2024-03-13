@@ -3,7 +3,7 @@ const path = require("path");
 
 const setup_docs = require("./setup-docs");
 
-const watch_dir = path.join(__dirname, "../../docs");
+const watch_dir = path.join(__dirname, "../../../../docs");
 
 // watch `watch_dir` for changes
 console.log(`Watching ${watch_dir} for changes...`);

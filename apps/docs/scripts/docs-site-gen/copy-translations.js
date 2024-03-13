@@ -5,7 +5,7 @@ const marked = require("marked");
 const path = require("path");
 
 const docs_site_root = path.join(__dirname, "../../");
-const docs_site_docs_root = path.join(__dirname, "../../docs");
+const docs_site_docs_root = path.join(__dirname, "../../../docs");
 
 /**
  * Loop through the docs directory.
@@ -36,7 +36,7 @@ const docs_site_docs_root = path.join(__dirname, "../../docs");
  *      - intro.md
  *
  *
- * final directory, under docs-site root:
+ * final directory, under docs site root:
  * - docs/
  *  - @package1/
  *    - intro.md
@@ -117,8 +117,9 @@ function handle_dir(dir_path) {
 }
 
 function handle_translations_dir(dir_path) {
-  const translations = fse.readJsonSync(path.join(dir_path, "meta.json"))
-    .translations;
+  const translations = fse.readJsonSync(
+    path.join(dir_path, "meta.json")
+  ).translations;
 
   for (const locale of translations) {
     handle_translation_dir(dir_path, locale);
@@ -143,23 +144,23 @@ function handle_translation_dir(dir_path, locale) {
     for (const translation_dir_file of translation_dir_files) {
       const translation_dir_file_path = path.join(
         translation_dir_path,
-        translation_dir_file,
+        translation_dir_file
       );
       const translation_dir_file_stat = fse.statSync(translation_dir_file_path);
 
       if (translation_dir_file_stat.isFile()) {
         const translation_dir_file_ext = path.extname(
-          translation_dir_file_path,
+          translation_dir_file_path
         );
 
         if (is_valid_document_related_file_ext(translation_dir_file_ext)) {
           const origin_root_path_witout_translations_dir = path.join(
             dir_path,
-            "..",
+            ".."
           );
           const rel = path.relative(
             docs_site_docs_root,
-            origin_root_path_witout_translations_dir,
+            origin_root_path_witout_translations_dir
           );
 
           const translation_dir_file_content_translated_path = path.join(
@@ -169,7 +170,7 @@ function handle_translation_dir(dir_path, locale) {
             "docusaurus-plugin-content-docs",
             "current",
             rel,
-            translation_dir_file,
+            translation_dir_file
           );
 
           // before copying the file, check if asset is being used, we need to support them.
@@ -190,18 +191,18 @@ function handle_translation_dir(dir_path, locale) {
           // copy origin file to targetted locale directory
           fse.copySync(
             translation_dir_file_path,
-            translation_dir_file_content_translated_path,
+            translation_dir_file_content_translated_path
           );
 
           // log
           console.log(
             `[copy-translations] ${locale}: ${path.relative(
               docs_site_docs_root,
-              translation_dir_file_path,
+              translation_dir_file_path
             )} -> ${path.relative(
               docs_site_docs_root,
-              translation_dir_file_content_translated_path,
-            )}`,
+              translation_dir_file_content_translated_path
+            )}`
           );
         }
       }
@@ -226,16 +227,16 @@ function handle_translation_dir(dir_path, locale) {
 function transform_relative_asset_path(
   origin_rel_asset_path,
   origin_path,
-  target_path,
+  target_path
 ) {
   const abs_path_to_asset = path.join(
     path.dirname(origin_path),
-    origin_rel_asset_path,
+    origin_rel_asset_path
   );
   const rel_doc_to_root = path.relative(origin_path, docs_site_docs_root);
   const rel_root_to_asset = path.relative(
     docs_site_docs_root,
-    abs_path_to_asset,
+    abs_path_to_asset
   );
   // console.log("rel", rel_doc_to_root);
   // console.log("rel2", rel_root_to_asset);
@@ -246,16 +247,16 @@ function transform_relative_asset_path(
 function transform_translated_doc_content_with_asset_path(
   content,
   origin_path,
-  target_path,
+  target_path
 ) {
   // parse markdown content with marked.
   const _parsed = marked.lexer(content);
 
-  const _is_remote_url = url => {
+  const _is_remote_url = (url) => {
     return url.startsWith("http://") || url.startsWith("https://");
   };
 
-  const mapper = item => {
+  const mapper = (item) => {
     const { type, tokens, items, raw, href } = item;
     const children = items || tokens;
 
@@ -272,7 +273,7 @@ function transform_translated_doc_content_with_asset_path(
         console.log("image", item, raw, href);
         console.log(
           "new path",
-          `"${transform_relative_asset_path(href, origin_path, target_path)}"`,
+          `"${transform_relative_asset_path(href, origin_path, target_path)}"`
         );
         break;
     }

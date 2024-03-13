@@ -1,8 +1,8 @@
 const fse = require("fs-extra");
 const path = require("path");
 
-const origin = path.join(__dirname, "../../../docs");
-const dest = path.join(__dirname, "../../../docs-site/docs");
+const origin = path.join(__dirname, "../../../../docs");
+const dest = path.join(__dirname, "../../../docs/docs");
 
 /**
  * copy all directory & containing files from origin to dest.
@@ -11,7 +11,7 @@ const dest = path.join(__dirname, "../../../docs-site/docs");
  * use fse.copySync() to copy files.
  */
 function copyAll() {
-  fse.copySync(origin, dest, { overwrite: true }, function(err) {
+  fse.copySync(origin, dest, { overwrite: true }, function (err) {
     if (err) {
       console.error(err);
     } else {

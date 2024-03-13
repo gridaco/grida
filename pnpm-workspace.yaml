@@ -3,7 +3,6 @@ packages:
   - "web"
   - "www"
   - "editor"
-  - "docs-site"
   - "editor-packages/*"
   - "apps/*"
   - "packages/app-*"
