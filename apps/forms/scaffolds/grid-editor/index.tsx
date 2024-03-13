@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useCallback, useState } from "react";
 import { Grid } from "../grid";
 import {
   PanelClose,
@@ -25,7 +25,6 @@ import {
   AlertDialogDescription,
   AlertDialogCancel,
   AlertDialogAction,
-  AlertDialogOverlay,
 } from "@editor-ui/alert-dialog";
 import toast from "react-hot-toast";
 
@@ -101,15 +100,34 @@ export function GridEditor({
       });
   };
 
+  const onDeleteField = useCallback(() => {
+    supabase
+      .from("form_field")
+      .delete({
+        count: "exact",
+      })
+      .eq("id", focusedField!)
+      .then(({ error, count }) => {
+        if (count === 0) {
+          toast.error("Failed to delete field");
+          return;
+        }
+        if (error) {
+          toast.error("Failed to delete field");
+          console.error(error);
+          return;
+        }
+        toast.success("Field deleted");
+      });
+  }, [supabase, focusedField]);
+
   return (
     <>
       <DeleteFieldConfirmDialog
         open={deleteFieldConfirmOpen}
         onOpenChange={setDeleteFieldConfirmOpen}
         onCancel={closeDeleteFieldConfirm}
-        onDeleteConfirm={() => {
-          console.log("delete confirm");
-        }}
+        onDeleteConfirm={onDeleteField}
       />
       <FieldEditPanel
         title={focusedField ? "Edit Field" : "Add New Field"}
@@ -126,7 +144,10 @@ export function GridEditor({
           setFocusedField(field_id);
           openNewFieldPanel();
         }}
-        onDeleteFieldClick={openDeleteFieldConfirm}
+        onDeleteFieldClick={(field_id) => {
+          setFocusedField(field_id);
+          openDeleteFieldConfirm();
+        }}
       />
     </>
   );
@@ -142,7 +163,6 @@ function DeleteFieldConfirmDialog({
 }) {
   return (
     <AlertDialog {...props}>
-      {/* <AlertDialogOverlay /> */}
       <AlertDialogContent>
         <AlertDialogTitle>Delete Field</AlertDialogTitle>
         <AlertDialogDescription>
