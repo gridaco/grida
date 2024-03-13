@@ -22,14 +22,16 @@ export default async function WithLink({ params }: { params: { id: string } }) {
   const { url } = data;
 
   return (
-    <main>
+    <main className="w-full">
       <h1 className="text-xl font-bold">Use Link</h1>
       <p>
         Share this link with your users to let them fill out the form.
         <br />
-        <a href={url} target="_blank" rel="noreferrer">
-          {url}
-        </a>
+        <pre className="overflow-x-auto p-2 bg-neutral-100 rounded">
+          <a className="underline" href={url} target="_blank" rel="noreferrer">
+            {url}
+          </a>
+        </pre>
       </p>
     </main>
   );
