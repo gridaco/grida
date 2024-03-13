@@ -2,7 +2,12 @@ import { FormFieldPreview } from "@/components/formfield";
 import type { FormBlock } from "../state";
 import { useEditorState } from "../provider";
 import { FormFieldDefinition } from "@/types";
-import { InputIcon, SectionIcon } from "@radix-ui/react-icons";
+import {
+  DragHandleHorizontalIcon,
+  DragHandleVerticalIcon,
+  InputIcon,
+  SectionIcon,
+} from "@radix-ui/react-icons";
 import React, { useCallback } from "react";
 import { useDraggable, useDroppable } from "@dnd-kit/core";
 import { CSS } from "@dnd-kit/utilities";
@@ -23,12 +28,14 @@ export function BlocksCanvas({
 }
 
 export function Block(props: React.PropsWithChildren<FormBlock>) {
-  const { attributes, listeners, setNodeRef, transform } = useDraggable({
-    id: props.id,
-  });
+  const { attributes, listeners, setNodeRef, transform, isDragging } =
+    useDraggable({
+      id: props.id,
+    });
 
   const style = {
     transform: CSS.Translate.toString(transform),
+    zIndex: isDragging ? 1 : 0,
   };
 
   function renderBlock() {
@@ -42,7 +49,19 @@ export function Block(props: React.PropsWithChildren<FormBlock>) {
 
   return (
     <>
-      <div ref={setNodeRef} style={style} {...attributes} {...listeners}>
+      <div
+        data-folder={props.type === "section"}
+        ref={setNodeRef}
+        style={style}
+        className="relative data-[folder='true']:mt-16 data-[folder='true']:mb-4"
+      >
+        <button
+          className="absolute -left-4 -top-4 bg-white rounded border shadow p-1"
+          {...attributes}
+          {...listeners}
+        >
+          <DragHandleHorizontalIcon />
+        </button>
         {renderBlock()}
       </div>
     </>
@@ -68,7 +87,7 @@ export function FieldBlock({ id, type, form_field_id, data }: FormBlock) {
   );
 
   return (
-    <div className="rounded-md flex flex-col gap-4 border w-full p-4">
+    <div className="rounded-md flex flex-col gap-4 border w-full p-4 bg-white shadow-md">
       <div className="flex flex-row items-center gap-8">
         <span className="flex flex-row gap-2 items-center">
           <InputIcon />
@@ -112,7 +131,7 @@ export function SectionBlock({
   });
 
   return (
-    <div ref={setNodeRef} className="mt-10 p-4 rounded-md border">
+    <div ref={setNodeRef} className="p-4 rounded-md border bg-white shadow-md">
       <span className="flex flex-row gap-2 items-center">
         <SectionIcon />
         <span>Section</span>

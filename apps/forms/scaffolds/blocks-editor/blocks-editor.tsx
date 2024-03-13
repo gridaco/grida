@@ -14,6 +14,7 @@ import {
   DropdownMenuPortal,
   DropdownMenuTrigger,
 } from "@editor-ui/dropdown-menu";
+import { restrictToVerticalAxis } from "@dnd-kit/modifiers";
 
 export default function BlocksEditorRoot({
   initial,
@@ -24,7 +25,7 @@ export default function BlocksEditorRoot({
 
   return (
     <StateProvider state={state} dispatch={dispatch}>
-      <DndContext>
+      <DndContext modifiers={[restrictToVerticalAxis]}>
         <BlocksEditor />
       </DndContext>
     </StateProvider>
@@ -65,15 +66,15 @@ function BlocksEditor() {
           </DropdownMenuContent>
         </DropdownMenuPortal>
       </DropdownMenu>
-
-      <BlocksCanvas className="mt-10"></BlocksCanvas>
-      {state.blocks.map((block, index) => {
-        return (
-          <div key={index}>
-            <Block {...block} />
-          </div>
-        );
-      })}
+      <BlocksCanvas className="flex flex-col gap-4 mt-10">
+        {state.blocks.map((block, index) => {
+          return (
+            <div key={index}>
+              <Block {...block} />
+            </div>
+          );
+        })}
+      </BlocksCanvas>
     </div>
   );
 }
