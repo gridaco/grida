@@ -51,14 +51,14 @@ scripting built in with js/ts sdk and add-on plugin
 
 - **nothing** - nothing but drawing. everything drawable graphics engine.
   - [github](https://github.com/gridaco/nothing)
-  - [website](https://nothing.app/)
+  - [website](https://nothing.graphics/)
   - **@nothing.app/react** - React SDK - Fully built, all-in-one graphics tools for drawing, editing and sharing
 
 **UI LIBRARY**
 
 - **reflect-ui**
-  - **reflect-editor-ui** - Editor UI Framework for React - used by enterprise level applications - such as Bridged, Nothing, Design to code, Code.surf
-    - [gitHub](https://github.com/reflect-ui/reflect-editor-ui)
+  - **editor-ui** - Editor UI Framework
+    - [gitHub](https://github.com/gridaco/editor-ui)
   - **reflect-ui-react** - 🌊 reflect components for react
     - [github](github.com/reflect-ui/reflect-ui-react)
   - [github](https://github.com/reflect-ui)
@@ -73,18 +73,18 @@ scripting built in with js/ts sdk and add-on plugin
 - **design-file-converter** - ➡️🎨➡️🎨 Convert your design from sketch figma xd Grida - to - sketch figma xd Grida.
   - [github](https://github.com/gridaco/design-file-converter)
   - [website](https://grida.co/convert-design)
-- **.grida** - .bridged configuration specs for Grida App and Code extensions
+- **.grida** - .grida configuration specs for Grida App and Code extensions
   - [github](https://github.com/gridaco/.grida)
 
 **BACKEND - LIVE COLLABORATION / DATA MANAGEMENT**
 
 - **design-server** - Structure & SDK for building realtime collaboration backend service
   - [github](https://github.com/gridaco/design-server)
-- **BASE - bridged-app-services** - BASE: Bridged App SErvices
-  - [github](https://github.com/bridgedxyz/base)
+- **BASE - Grida App Services** - BASE
+  - [github](https://github.com/gridaco/base)
   - [website](https://bridged.cc)
-  - **base-sdk-ts** - Bridged App SErvices SDK for nodejs / browser
-    - [github](https://github.com/bridgedxyz/base-sdk-ts)
+  - **base-sdk-ts** - BASE SDK for nodejs / browser
+    - [github](https://github.com/gridaco/base-sdk-ts)
 
 **WYSIWYG**
 
@@ -97,14 +97,6 @@ scripting built in with js/ts sdk and add-on plugin
 - **design-to-code** - Design to code engine. A design ✌️ code standard.
   - [github](https://github.com/gridaco/design-to-code/)
   - [website](https://designto.codes/)
-
-**BUILT-IN SERVICES**
-
-- **accounts.bridged.xyz** - (PRIVATE) accounts & payments web / server
-  - [website](https://accounts.bridged.xyz) (source is closed due to security reasons)
-- **console.bridged.xyz** - Bridged console for managing your designs, asset, translations with collaboration.
-  - [github](https://github.com/bridgedxyz/console.bridged.xyz)
-  - [website](https://console.bridged.xyz)
 
 ## The design
 
@@ -150,7 +142,7 @@ Here are some concepts that do not exist on current design tools, but only at im
 We'de love to have you change the industry together. _Read below documentations before submitting a PR._
 
 - [contributing.md](./CONTRIBUTING.md)
-- [working with submodule packages](https://github.com/bridgedxyz/.github/blob/main/contributing/working-with-submodules.md)
+- [working with submodule packages](https://github.com/gridaco/.github/blob/main/contributing/working-with-submodules.md)
 - [how Grida repo `/packages` are structured](./packages)
 
 ### Building
@@ -159,11 +151,7 @@ We'de love to have you change the industry together. _Read below documentations 
 git clone --recurse-submodules https://github.com/gridaco/grida.git
 cd grida
 
-yarn
-yarn desktop # to run as electron desktop app
-# .. or ..
-yarn web # to run as web app
-
+pnpm install
 ```
 
 update pulling - `git submodule update --init --recursive`
