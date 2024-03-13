@@ -1,1 +1,1 @@
-export { Inspector as Inspector } from "./inspector";
+export { Inspector as Inspector } from "./inspector-readonly";

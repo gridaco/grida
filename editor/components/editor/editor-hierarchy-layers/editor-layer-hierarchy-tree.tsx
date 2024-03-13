@@ -11,17 +11,13 @@ import {
   IconContainer,
   LayerIcon,
 } from "./editor-layer-hierarchy-item";
-import {
-  FigmaReflectRepository,
-  useEditorState,
-  useWorkspace,
-} from "core/states";
+import { DesignRepository, useEditorState, useWorkspace } from "core/states";
 import { useDispatch } from "core/dispatch";
 import {
   flattenNodeTree,
   FlattenedDisplayItemNode,
+  HierarchyTreeNode,
 } from "./editor-layer-heriarchy-controller";
-import type { ReflectSceneNode } from "@design-sdk/figma-node";
 import type { IVirtualizedList } from "@editor-ui/listview";
 import useMeasure from "react-use-measure";
 import { p } from "@tree-/q";
@@ -60,7 +56,7 @@ function useAutoFocus({
  * @returns
  */
 export function DesignLayerHierarchy({
-  rootNodeIDs = null,
+  rootNodeIDs,
   expandAll = false,
 }: {
   rootNodeIDs?: string[];
@@ -70,7 +66,7 @@ export function DesignLayerHierarchy({
     debounce: { scroll: 100, resize: 100 },
   });
   const [state] = useEditorState();
-  const { selectedNodes, selectedPage, design } = state;
+  const { selectedNodes, selectedPage } = state;
   const { highlightLayer, highlightedLayer } = useWorkspace();
   const dispatch = useDispatch();
 
@@ -79,16 +75,24 @@ export function DesignLayerHierarchy({
   const ref = React.useRef<IVirtualizedList>(null);
 
   // get the root nodes (if the rootNodeIDs is not specified, use the selected page's children)
-  let roots: ReflectSceneNode[] = [];
-  if (rootNodeIDs?.length > 0) {
-    roots = rootNodeIDs.reduce((acc, item) => {
-      acc.push(findUnder(item, design));
-      return acc;
-    }, []);
-  } else {
-    roots = selectedPage
-      ? design.pages.find((p) => p.id == selectedPage).children
-      : [design?.input?.entry];
+  let roots: HierarchyTreeNode[] = [];
+  switch (state.mode.value) {
+    case "design": {
+      if (rootNodeIDs && (rootNodeIDs?.length ?? 0 > 0)) {
+        roots = rootNodeIDs.reduce((acc, item) => {
+          acc.push(findUnder(item, state.design));
+          return acc;
+        }, []);
+      } else {
+        roots = selectedPage
+          ? state.design.pages.find((p) => p.id == selectedPage).children
+          : [];
+      }
+      break;
+    }
+    case "craft": {
+      roots = state.craft.children;
+    }
   }
 
   const layers: FlattenedDisplayItemNode[][] = useMemo(() => {
@@ -216,7 +220,7 @@ export function DesignLayerHierarchy({
  * @param design
  * @returns
  */
-function findUnder(node: string, design: FigmaReflectRepository) {
+function findUnder(node: string, design: DesignRepository) {
   for (const page of design.pages) {
     for (const frame of page.children.filter(Boolean)) {
       if (frame.id === node) {

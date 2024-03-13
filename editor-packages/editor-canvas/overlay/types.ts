@@ -8,3 +8,13 @@ interface XYWHRotation {
 export type OutlineProps = XYWHRotation & {
   width?: number;
 };
+
+export type ResizeHandleOrigin =
+  | "nw"
+  | "ne"
+  | "sw"
+  | "se"
+  | "n"
+  | "s"
+  | "w"
+  | "e";

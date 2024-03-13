@@ -4,6 +4,7 @@ import type { RGBA, WidgetKey } from "@reflect-ui/core";
 import type { ComponentNode } from "@design-sdk/figma-types";
 import type { DesignInput } from "@grida/builder-config/input";
 import type { File } from "@grida/builder-config/output/output-file";
+import type { CraftNode } from "@code-editor/craft";
 
 export type { File };
 
@@ -26,13 +27,13 @@ type TCanvasMode = "free" | "focus";
  * - code - with coding editor
  * - run - run app, full screen
  */
-type TEditorMode = "design" | "code" | "run";
+export type TEditorMode = "design" | "code" | "run" | "craft";
 type TDesignerMode = "inspect" | "comment"; // | "prototype";
 
 export type EditorPage = {
   id: string;
   name: string;
-  type: "home" | "code" | "figma-canvas";
+  type: "home" | "code" | "figma-canvas" | "craft";
 };
 
 export interface EditorState {
@@ -50,14 +51,23 @@ export interface EditorState {
    * > only set by the url pararm or other programatic cause, not caused by after-load user interaction.
    */
   selectedNodesInitial?: string[] | null;
-  design: FigmaReflectRepository;
+  design: DesignRepository;
   mode: LastKnown<TEditorMode>;
   designerMode: TDesignerMode;
   canvasMode: LastKnown<TCanvasMode>;
   currentPreview?: ScenePreviewData;
   code: CodeRepository;
   devtoolsConsole?: DevtoolsConsole;
+
+  // v2 (with craft mode)
+  craft: {
+    id: string;
+    type: "document";
+    children: EditorNode[];
+  };
 }
+
+type EditorNode = CraftNode;
 
 export interface EditorSnapshot {
   pages: EditorPage[];
@@ -65,11 +75,14 @@ export interface EditorSnapshot {
   selectedNodes: string[];
   selectedLayersOnPreview: string[];
   selectedNodesInitial?: string[] | null;
-  design: FigmaReflectRepository;
+  design: DesignRepository;
   isolation: NodeIsolationData;
   code: CodeRepository;
   canvasMode: EditorState["canvasMode"];
+  craft?: EditorState["craft"];
 }
+
+export type DesignRepository = FigmaReflectRepository; // | CraftDesignRepository;
 
 export interface FigmaReflectRepository {
   /**
@@ -98,6 +111,19 @@ export interface FigmaReflectRepository {
   // styles: { [key: string]: {} };
   input: DesignInput;
 }
+
+// export interface CraftDesignRepository {
+//   name: string;
+//   key: string;
+//   version: string;
+//   lastModified: Date;
+//   pages: {
+//     id: string;
+//     name: string;
+//     children: ReflectSceneNode[];
+//     backgroundColor: RGBA;
+//   }[];
+// }
 
 export type CanvasFocusData = {
   /**

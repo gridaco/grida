@@ -11,10 +11,10 @@ export default function CommunitySearchResultPage({
   return (
     <>
       <Head>
-        <title>Files matching "{q}" | Grida Code Community</title>
+        <title>Files matching &quot;{q}&quot; | Grida Code Community</title>
       </Head>
       <CommunityResultsLayout
-        heading={<h1>Files matching "{q}"</h1>}
+        heading={<h1>Files matching &quot;{q}&quot;</h1>}
         files={files}
       />
     </>

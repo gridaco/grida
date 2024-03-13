@@ -15,6 +15,7 @@ import {
 import { useEditorState } from "core/states";
 import { useOpenPreferences } from "@code-editor/preferences";
 import { openInFigma } from "@code-editor/external-links";
+import { EditorAppbarModeCraftAddButton } from "./editor-appbar-mode-craft-add-button";
 
 export function AppbarFragmentForSidebar() {
   const [state] = useEditorState();
@@ -27,7 +28,7 @@ export function AppbarFragmentForSidebar() {
   const openPreferences = useOpenPreferences();
 
   return (
-    <RootWrapperAppbarFragmentForSidebar>
+    <div className="flex justify-start items-center gap-2.5 self-stretch box-border p-3.5">
       <MenuButton
         onGoToHome={() => {
           router.push("/");
@@ -38,7 +39,12 @@ export function AppbarFragmentForSidebar() {
         onOpenInFigma={handleOpenFile}
         onOpenPreferences={openPreferences}
       />
-    </RootWrapperAppbarFragmentForSidebar>
+      {state.mode.value === "craft" && (
+        <div>
+          <EditorAppbarModeCraftAddButton />
+        </div>
+      )}
+    </div>
   );
 }
 

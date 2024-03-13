@@ -11,13 +11,15 @@ import { FrameTitle, FrameTitleProps } from "../frame-title";
 import type { Box, XY, XYWH } from "../types";
 import { Marquee } from "../marquee";
 import { boundingbox, box_to_xywh } from "../math";
+import type { ResizeHandleOrigin } from "../overlay/types";
+
 interface HudControls {
   onSelectNode: (node: string) => void;
   onHoverNode: (node: string | null) => void;
 }
 
-export interface HudCustomRenderers {
-  renderFrameTitle?: (props: FrameTitleProps) => React.ReactNode;
+export interface HudCustomRenderers<T> {
+  renderFrameTitle?: (props: Partial<T> & FrameTitleProps) => React.ReactNode;
 }
 
 /**
@@ -30,7 +32,7 @@ export interface DisplayNodeMeta {
   absoluteY: number;
   width: number;
   height: number;
-  rotation: number;
+  rotation?: number;
 }
 
 /**
@@ -41,10 +43,11 @@ interface PositionGuideMeta {
   b: Box;
 }
 
-export function HudSurface({
+export function HudSurface<T>({
   offset,
   zoom,
-  hide,
+  hidden: hide,
+  disabled,
   highlights = [],
   labelDisplayNodes = [],
   selectedNodes = [],
@@ -57,6 +60,9 @@ export function HudSurface({
   disableMarquee = false,
   //
   renderFrameTitle = frame_title_default_renderer,
+  onSelectionResize,
+  onResizeStart,
+  onResizeEnd,
 }: {
   offset: XY;
   zoom: number;
@@ -64,13 +70,21 @@ export function HudSurface({
   positionGuides?: PositionGuideMeta[];
   labelDisplayNodes?: DisplayNodeMeta[];
   selectedNodes?: DisplayNodeMeta[];
-  hide: boolean;
+  hidden: boolean;
+  disabled?: boolean;
   marquee?: XYWH | null;
   disableMarquee?: boolean;
   disableGrouping?: boolean;
   readonly: boolean;
+  onSelectionResize?: (
+    handle: ResizeHandleOrigin,
+    delta: [number, number],
+    meta: { altKey: boolean; shiftKey: boolean }
+  ) => void;
+  onResizeStart?: () => void;
+  onResizeEnd?: () => void;
 } & HudControls &
-  HudCustomRenderers) {
+  HudCustomRenderers<T>) {
   const [ox, oy] = offset;
   return (
     <div
@@ -89,7 +103,7 @@ export function HudSurface({
       id="hud-surface"
     >
       {!disableMarquee && marquee && <Marquee rect={marquee} />}
-      {!hide && (
+      {!disabled && (
         <>
           {/* position guide above all other generic overlays */}
           {positionGuides.length > 0 && (
@@ -104,6 +118,7 @@ export function HudSurface({
                   node.absoluteY * zoom,
                 ];
                 return renderFrameTitle({
+                  ...(node as T),
                   id: node.id,
                   name: node.name,
                   xy: absxy,
@@ -148,6 +163,9 @@ export function HudSurface({
               zoom={zoom}
               readonly={readonly}
               disableGrouping={disableGrouping}
+              onResize={onSelectionResize}
+              onResizeStart={onResizeStart}
+              onResizeEnd={onResizeEnd}
             />
           )}
         </>
@@ -184,12 +202,22 @@ function SelectionsHighlight({
   disableSizeDisplay = false,
   disableGrouping,
   readonly,
+  onResize,
+  onResizeStart,
+  onResizeEnd,
 }: {
   readonly: boolean;
   selections: DisplayNodeMeta[];
   zoom: number;
   disableGrouping?: boolean;
   disableSizeDisplay?: boolean;
+  onResize?: (
+    handle: ResizeHandleOrigin,
+    delta: [number, number],
+    meta: { altKey: boolean; shiftKey: boolean }
+  ) => void;
+  onResizeStart?: () => void;
+  onResizeEnd?: () => void;
 }) {
   if (disableGrouping) {
     return (
@@ -230,7 +258,7 @@ function SelectionsHighlight({
 
   const box = boundingbox(
     selections.map((d) => {
-      return [d.absoluteX, d.absoluteY, d.width, d.height, d.rotation];
+      return [d.absoluteX, d.absoluteY, d.width, d.height, d.rotation ?? 0];
     }),
     2
   );
@@ -282,6 +310,9 @@ function SelectionsHighlight({
           xywh={xywh}
           rotation={0}
           zoom={zoom}
+          onResizeStart={onResizeStart}
+          onResizeEnd={onResizeEnd}
+          onResize={onResize}
         />
       )}
     </>

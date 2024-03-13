@@ -1,13 +1,15 @@
 import { EditorSnapshot, HistoryState } from "core/states";
 import {
+  EditorStateSeed,
   createInitialEditorState,
   createPendingEditorState,
 } from "./editor-initial-state";
 
 export function createInitialHistoryState(
-  editor: EditorSnapshot
+  editor: EditorSnapshot,
+  seed?: EditorStateSeed
 ): HistoryState {
-  const applicationState = createInitialEditorState(editor);
+  const applicationState = createInitialEditorState(editor, seed);
   return {
     past: [],
     present: applicationState,
@@ -15,8 +17,10 @@ export function createInitialHistoryState(
   };
 }
 
-export function createPendingHistoryState(): HistoryState {
-  const applicationState = createPendingEditorState();
+export function createPendingHistoryState(
+  seed?: EditorStateSeed
+): HistoryState {
+  const applicationState = createPendingEditorState(seed);
   return {
     past: [],
     present: applicationState,

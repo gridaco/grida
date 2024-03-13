@@ -5,7 +5,6 @@ import {
   FigmaFileOrNodeIdType,
   FigmaTargetNodeConfig,
 } from "@design-sdk/figma-url/dist";
-import { event_cta__to_code } from "analytics";
 import { useTranslation } from "next-i18next";
 import React, { useCallback, useEffect, useState } from "react";
 import { Flex } from "theme-ui";
@@ -67,11 +66,11 @@ export function CtaArea({ mode }: { mode: CtaOrigin }) {
       setHasOngoingAuthProc(true);
 
       // log event
-      event_cta__to_code({
-        step: "authenticate-with-figma",
-        input: afterurl,
-        origin: mode,
-      });
+      // event_cta__to_code({
+      //   step: "authenticate-with-figma",
+      //   input: afterurl,
+      //   origin: mode,
+      // });
 
       addPopup({
         title: "",
@@ -131,11 +130,11 @@ export function CtaArea({ mode }: { mode: CtaOrigin }) {
       const parsed = parseFileAndNodeId(url);
       if (parsed) {
         // log event
-        event_cta__to_code({
-          step: "input-and-validate",
-          input: url,
-          origin: mode,
-        });
+        // event_cta__to_code({
+        //   step: "input-and-validate",
+        //   input: url,
+        //   origin: mode,
+        // });
 
         inputRef?.current?.blur();
         isAccessTokenValid().then(valid => {
@@ -164,11 +163,11 @@ export function CtaArea({ mode }: { mode: CtaOrigin }) {
     target: FigmaTargetNodeConfig;
   }) => {
     // log event
-    event_cta__to_code({
-      step: "submit-and-move",
-      input: target.url,
-      origin: mode,
-    });
+    // event_cta__to_code({
+    //   step: "submit-and-move",
+    //   input: target.url,
+    //   origin: mode,
+    // });
     const q = {
       fat: figmaAccessToken,
       figma: "1",

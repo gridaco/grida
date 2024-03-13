@@ -6,7 +6,7 @@ type Rect = {
   y: number;
   width: number;
   height: number;
-  rotation: number;
+  rotation?: number;
 };
 
 /**
@@ -30,7 +30,7 @@ export function centerOf(
   scale: number;
 } {
   const xywhrs = rects.map((r) => {
-    return [r.x, r.y, r.width, r.height, r.rotation] as XYWHR;
+    return [r.x, r.y, r.width, r.height, r.rotation ?? 0] as XYWHR;
   });
   if (!rects || rects.length === 0) {
     return {

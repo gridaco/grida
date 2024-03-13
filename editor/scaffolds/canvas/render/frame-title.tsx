@@ -69,7 +69,7 @@ export function FrameTitleRenderer({
   );
 }
 
-function SelectedStatePrimaryAction({ onClick }: { onClick: () => void }) {
+function SelectedStatePrimaryAction({ onClick }: { onClick?: () => void }) {
   return (
     <span
       onClick={onClick}

@@ -9,6 +9,7 @@
   },
   "dependencies": {
     "@emotion/babel-preset-css-prop": "^11.2.0",
+    "@engine/core": "workspace:^",
     "babel-plugin-module-resolver": "^4.1.0",
     "dayjs": "^1.11.2",
     "next": "^12.1.4",

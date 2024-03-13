@@ -5,8 +5,8 @@ import React, {
   createContext,
 } from "react";
 import { useRouter } from "next/router";
-import { EssentialWorkspaceInfo, StateProvider } from "core/states";
-import { SetupWorkspace } from "./setup";
+import { WorkspaceStateSeed, StateProvider } from "core/states";
+import { SetupFigmaWorkspace } from "./setup";
 import { WorkspaceDefaultProviders } from "./_providers";
 import * as warmup from "./warmup";
 import type { EditorSnapshot } from "core/states";
@@ -23,8 +23,12 @@ export function useWorkspaceInitializerContext() {
 
 export function Workspace({
   children,
-  ...seed
-}: React.PropsWithChildren<EssentialWorkspaceInfo>) {
+  initial,
+  designer,
+}: React.PropsWithChildren<{
+  initial?: WorkspaceStateSeed;
+  designer: "figma" | "builder";
+}>) {
   const router = useRouter();
 
   const handleDispatch = useCallback((action: WorkspaceAction) => {
@@ -40,6 +44,7 @@ export function Workspace({
       initialDispatcher({
         type: "setup-with-editor-snapshot",
         value: snapshot,
+        seed: initial,
       });
     },
     []
@@ -49,10 +54,7 @@ export function Workspace({
     type: "pending",
   });
 
-  const safe_value = warmup.safestate({
-    ...initialState,
-    ...seed,
-  });
+  const safe_value = warmup.safestate(initialState, initial);
 
   return (
     <>
@@ -63,9 +65,13 @@ export function Workspace({
       >
         <StateProvider state={safe_value} dispatch={handleDispatch}>
           <WorkspaceDefaultProviders>
-            <SetupWorkspace router={router} dispatch={handleWarmup}>
-              {children}
-            </SetupWorkspace>
+            {designer === "figma" ? (
+              <SetupFigmaWorkspace router={router} dispatch={handleWarmup}>
+                {children}
+              </SetupFigmaWorkspace>
+            ) : (
+              <>{children}</>
+            )}
           </WorkspaceDefaultProviders>
         </StateProvider>
       </WorkspaceInitializerContext.Provider>

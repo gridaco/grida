@@ -1,5 +1,4 @@
 import React from "react";
-import styled from "@emotion/styled";
 import { ReadonlyProperty } from "components/inspector";
 import {
   PropertyLine,
@@ -17,6 +16,7 @@ import {
 } from "@radix-ui/react-collapsible";
 
 import { ChevronUpIcon, ChevronDownIcon } from "@radix-ui/react-icons";
+import { useInspectorElement } from "hooks/use-inspector-element";
 
 export function LayoutSection() {
   const { target, root } = useTargetContainer();
@@ -36,7 +36,6 @@ export function LayoutSection() {
 
   let tr, tl, br, bl;
   if ("cornerRadius" in target) {
-    const numeric = (v: IRadius) => (typeof v === "number" ? rd(v) : null);
     const { bl: _bl, br: _br, tl: _tl, tr: _tr } = target.cornerRadius;
     tr = numeric(_tr);
     tl = numeric(_tl);
@@ -99,11 +98,5 @@ export function LayoutSection() {
   );
 }
 
-const Line = styled.div`
-  display: flex;
-  flex-direction: row;
-  gap: 4px;
-  width: 100%;
-`;
-
+const numeric = (v: IRadius) => (typeof v === "number" ? rd(v) : null);
 const rd = (v: number) => Math.round(v * 100) / 100;

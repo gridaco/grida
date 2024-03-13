@@ -3,6 +3,7 @@ import { SceneNodeIcon } from "@code-editor/node-icons";
 import { useTargetContainer } from "hooks/use-target-node";
 
 import React from "react";
+import { useInspectorElement } from "hooks/use-inspector-element";
 export function InfoSection() {
   const { target } = useTargetContainer();
 
@@ -12,21 +13,35 @@ export function InfoSection() {
 
   const { type, name } = target;
   return (
-    <Section>
+    <section className="flex flex-col p-3">
       <SceneTitle>
         <SceneNodeIcon color="white" type={type} />
         <input disabled value={name} />
       </SceneTitle>
       {/* <SceneDescription>{"No description"}</SceneDescription> */}
-    </Section>
+    </section>
   );
 }
 
-const Section = styled.section`
-  display: flex;
-  flex-direction: column;
-  padding: 14px;
-`;
+export function CrafInfoSection() {
+  const element = useInspectorElement();
+
+  const { id, type, name, tag } = element ?? {};
+  return (
+    <section className="flex flex-col p-3">
+      <SceneTitle>
+        {/* <SceneNodeIcon color="white" type={type} /> */}
+        <input disabled value={name} />
+        <pre className="text-xs">
+          {type} {type === "html" ? tag : ""}
+          <br />
+          {id}
+        </pre>
+      </SceneTitle>
+      {/* <SceneDescription>{"No description"}</SceneDescription> */}
+    </section>
+  );
+}
 
 const SceneTitle = styled.div`
   display: flex;
@@ -46,10 +61,4 @@ const SceneTitle = styled.div`
     border: none;
     color: rgba(255, 255, 255, 0.8);
   }
-`;
-
-const SceneDescription = styled.p`
-  margin: 0;
-  font-size: 14px;
-  color: rgba(255, 255, 255, 0.5);
 `;

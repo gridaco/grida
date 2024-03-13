@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { MonacoEditor, MonacoEditorProps as MonacoEditorProps } from "./monaco";
-import { Tabs, Tab } from "@mui/material";
+import * as Tabs from "@radix-ui/react-tabs";
 
 export interface CodeEditorProps
   extends Omit<MonacoEditorProps, "defaultValue" | "defaultLanguage"> {}
@@ -21,37 +21,37 @@ export function CodeEditor({
   files: Files;
 } & CodeEditorProps) {
   const keys = Object.keys(files);
-  const [filekey, setFilekey] = useState<string>(keys[0]);
-  const getfile = (key: string) => files[key];
-  const handleChange = (event, newValue) => {
-    setFilekey(newValue);
+  const [fileKey, setFileKey] = useState<string>(keys[0]);
+  const getFile = (key: string) => files[key];
+
+  const handleTabChange = (value: string) => {
+    setFileKey(value);
   };
 
-  const file = getfile(filekey);
+  const file = getFile(fileKey);
 
   return (
     <>
       {keys.length >= 2 && (
-        <Tabs
-          value={filekey}
-          onChange={handleChange}
-          indicatorColor="primary"
-          textColor="inherit"
-          variant="scrollable"
-          scrollButtons={false}
-          style={{ color: "white" }}
-          aria-label="scrollable prevent tabs example"
+        <Tabs.Root
+          value={fileKey}
+          onValueChange={handleTabChange}
+          aria-label="Files"
         >
-          {Object.keys(files).map((name) => {
-            return <Tab key={name} label={name} value={name} />;
-          })}
-        </Tabs>
+          <Tabs.List>
+            {Object.keys(files).map((name) => (
+              <Tabs.Trigger key={name} value={name} style={{ color: "white" }}>
+                {name}
+              </Tabs.Trigger>
+            ))}
+          </Tabs.List>
+        </Tabs.Root>
       )}
       <MonacoEditor
-        key={filekey}
+        key={fileKey}
         {...editor_props}
         onChange={(v: string, e) => {
-          onChange?.(filekey, v, e);
+          onChange?.(fileKey, v, e);
         }}
         language={file.language}
         value={file.raw}

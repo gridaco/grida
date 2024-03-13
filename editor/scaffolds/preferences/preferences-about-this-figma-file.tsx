@@ -10,7 +10,8 @@ import { useEditorState } from "core/states";
 function EditorPreferenceFigmaPage({}: PreferencePageProps) {
   const [state] = useEditorState();
   const { key: filekey, name, pages, lastModified, version } = state.design;
-  const frames = pages.reduce((acc, p) => acc + p.children.length, 0);
+  // @ts-ignore
+  const frames: number = pages.reduce((acc, p) => acc + p.children.length, 0);
 
   return (
     <PageContentLayout>

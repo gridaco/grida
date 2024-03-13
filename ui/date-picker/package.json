@@ -3,9 +3,12 @@
   "version": "0.0.0",
   "private": false,
   "dependencies": {
+    "@emotion/react": "^11.11.4",
+    "@emotion/styled": "^11.11.0",
     "react-datepicker": "^4.8.0"
   },
   "devDependencies": {
+    "@types/react": "18.2.58",
     "@types/react-datepicker": "^4.4.1"
   }
 }

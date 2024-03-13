@@ -45,17 +45,24 @@ export const flatten = <T extends ITreeNode>(
   return final;
 };
 
-export function flattenNodeTree(
-  root: ReflectSceneNode,
+export interface HierarchyTreeNode<T extends HierarchyTreeNode = any> {
+  id: string;
+  name: string;
+  children?: T[];
+  parent?: T;
+}
+
+export function flattenNodeTree<T extends HierarchyTreeNode>(
+  root: T,
   selections: string[],
   expands: string[]
-): FlattenedDisplayItemNode<ReflectSceneNode>[] {
-  const flattened: FlattenedDisplayItemNode<ReflectSceneNode>[] = [];
+): FlattenedDisplayItemNode<T>[] {
+  const flattened: FlattenedDisplayItemNode<T>[] = [];
 
-  visit<ReflectSceneNode>(root, {
-    getChildren: (layer) => {
+  visit<T>(root, {
+    getChildren: (layer): T[] => {
       if (expands.includes(layer.id)) {
-        return layer.children;
+        return layer.children ?? [];
       }
       return [];
     },
@@ -65,9 +72,9 @@ export function flattenNodeTree(
         id: layer.id,
         name: layer.name,
         parent: layer.parent?.id,
-        depth: indexPath.length - 1,
+        depth: indexPath ? indexPath.length - 1 : 0,
         expanded:
-          layer.children.length <= 0
+          (layer.children?.length ?? 0) <= 0
             ? undefined
             : expands.includes(layer.id)
             ? true

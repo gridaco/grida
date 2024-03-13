@@ -13,7 +13,7 @@ interface BitmapPreviewService {
   ) => Promise<string>;
 }
 
-const Context = React.createContext<BitmapPreviewService>(null);
+const Context = React.createContext<BitmapPreviewService | null>(null);
 
 const usefigmaBitmapPreviewService = () => {
   const context = React.useContext(Context);

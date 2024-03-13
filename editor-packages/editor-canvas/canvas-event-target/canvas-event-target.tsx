@@ -26,6 +26,8 @@ export type OnPointerDownHandler = (
   e: { event: React.MouseEvent<EventTarget, MouseEvent> } & SharedGestureState
 ) => void;
 
+export type OnPointerUpHandler = OnPointerDownHandler;
+
 const ZOOM_WITH_SCROLL_SENSITIVITY = 0.001;
 
 export function CanvasEventTarget({
@@ -40,6 +42,7 @@ export function CanvasEventTarget({
   onPointerMoveStart,
   onPointerMoveEnd,
   onPointerDown,
+  onPointerUp,
   onDrag,
   onDragStart,
   onDragEnd,
@@ -58,6 +61,7 @@ export function CanvasEventTarget({
     onPointerMoveStart: OnPointerMoveHandler;
     onPointerMoveEnd: OnPointerMoveHandler;
     onPointerDown: OnPointerDownHandler;
+    onPointerUp: OnPointerUpHandler;
     onDrag: OnDragHandler;
     onDragStart: OnDragHandler;
     onDragEnd: OnDragHandler;
@@ -241,6 +245,8 @@ export function CanvasEventTarget({
       },
       // @ts-ignore
       onMouseDown: onPointerDown,
+      // @ts-ignore
+      onPointerUp: onPointerUp,
       onMoveStart: onPointerMoveStart,
       onMoveEnd: onPointerMoveEnd,
     },

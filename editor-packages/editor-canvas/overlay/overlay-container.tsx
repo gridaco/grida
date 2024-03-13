@@ -10,7 +10,7 @@ export function OverlayContainer({
   children,
 }: {
   xywh: [number, number, number, number];
-  rotation: number;
+  rotation?: number;
   children: React.ReactNode;
 }) {
   // const [x, y, w, h] = xywh;

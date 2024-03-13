@@ -3,6 +3,7 @@
   "version": "0.0.0",
   "private": false,
   "dependencies": {
+    "@code-editor/estypes-resolver": "workspace:^",
     "esbuild-wasm": "0.14.34",
     "localforage": "^1.10.0"
   },

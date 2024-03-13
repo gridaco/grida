@@ -1,5 +1,4 @@
 import React, { useCallback } from "react";
-import styled from "@emotion/styled";
 import { DefaultEditorWorkspaceLayout } from "layouts/default-editor-workspace-layout";
 import {
   WorkspaceContentPanel,
@@ -7,7 +6,7 @@ import {
 } from "layouts/panel";
 import { EditorSidebar } from "components/editor";
 import { EditorState, useEditorState } from "core/states";
-import { Canvas } from "scaffolds/canvas";
+import { EditorCraftCanvas, EditorFigmaCanvas } from "scaffolds/canvas";
 import { Inspector } from "scaffolds/inspector";
 import { EditorHome } from "@code-editor/dashboard";
 import { EditorIsolatedInspection } from "@code-editor/isolated-inspection";
@@ -18,26 +17,20 @@ import { Dialog } from "@mui/material";
 import { FullScreenPreview } from "scaffolds/preview-full-screen";
 import { useDispatch } from "core/dispatch";
 import { Code } from "scaffolds/code";
+import { CraftInspector } from "scaffolds/inspector/inspector-craft";
 
 export function Editor() {
   const [state] = useEditorState();
-  const { loading } = useEditorSetupContext();
+  const { loading, progress } = useEditorSetupContext();
 
-  const _initially_loaded = state.design?.pages?.length > 0;
-  const _initial_load_progress =
-    [!!state.design?.input, state.design?.pages?.length > 0, !loading].filter(
-      Boolean
-    ).length /
-      3 +
-    0.2;
-
+  const initiallyLoaded = progress > 0;
   // this key is used for force re-rendering canvas after the whole file is fetched.
-  const _refreshkey = loading || !_initially_loaded ? "1" : "0";
+  const _refreshkey = loading || !initiallyLoaded ? "1" : "0";
 
   return (
     <>
-      {(loading || !_initially_loaded) && (
-        <EditorSkeleton percent={_initial_load_progress * 100} />
+      {(loading || !initiallyLoaded) && (
+        <EditorSkeleton percent={progress * 100} />
       )}
 
       <DefaultEditorWorkspaceLayout
@@ -63,7 +56,9 @@ export function Editor() {
             }}
             minWidth={300}
             zIndex={1}
-            hidden={state.mode.value !== "design"}
+            hidden={
+              state.mode.value !== "design" && state.mode.value !== "craft"
+            }
             backgroundColor={colors.color_editor_bg_on_dark}
           >
             <SideRightPanel />
@@ -77,6 +72,25 @@ export function Editor() {
                   type={root?.entry?.origin}
                   entry={root?.entry}
                   widget={result?.widget}
+                  controls={
+                    <>
+                     <ClearRemoteDesignSessionCache key={id} file={file} node={id} />
+                      <br />
+                      {(type === "INSTANCE" || type === "COMPONENT") && (
+                        <Link
+                          href={{
+                            pathname: "/figma/inspect-component",
+                            query: {
+                              // e.g. https://www.figma.com/file/iypAHagtcSp3Osfo2a7EDz/engine?node-id=3098%3A4097
+                              design: `https://www.figma.com/file/${file}/?node-id=${id}`,
+                            },
+                          }}
+                        >
+                          inspect component
+                        </Link>
+                      )}
+                    </>
+                  }
                 />
               </WorkspaceContentPanel>
             </WorkspaceBottomPanelDockLayout>
@@ -100,8 +114,14 @@ function ModeDesign() {
     case "home":
       return <EditorHome />;
     default:
-      return <Canvas />;
+      return <EditorFigmaCanvas />;
   }
+}
+
+function ModeCraft() {
+  const [state] = useEditorState();
+
+  return <EditorCraftCanvas />;
 }
 
 function ModeCode() {
@@ -120,6 +140,8 @@ function SideRightPanel() {
       return <></>;
     case "design":
       return <Inspector />;
+    case "craft":
+      return <CraftInspector />;
   }
 }
 
@@ -135,6 +157,9 @@ function PageView() {
         }
         case "design": {
           return <ModeDesign />;
+        }
+        case "craft": {
+          return <ModeCraft />;
         }
       }
     },

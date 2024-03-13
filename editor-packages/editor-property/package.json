@@ -1,13 +1,23 @@
 {
   "name": "@code-editor/property",
   "version": "0.0.0",
-  "dependencies": {
-    "@radix-ui/react-hover-card": "^1.0.2"
-  },
   "peerDependencies": {
+    "@design-sdk/figma-types": "^0.0.53",
+    "@emotion/styled": "^11.11.0",
+    "@radix-ui/colors": "^3.0.0",
+    "@radix-ui/react-hover-card": "^1.0.7",
+    "@reflect-ui/core": "^0.0.9",
+    "@stitches/react": "^1.2.8",
+    "@web-builder/styles": "*",
     "react": "^18.2.0"
   },
   "devDependencies": {
+    "@design-sdk/figma-types": "^0.0.53",
+    "@emotion/styled": "^11.11.0",
+    "@radix-ui/colors": "^3.0.0",
+    "@radix-ui/react-hover-card": "^1.0.7",
+    "@reflect-ui/core": "^0.0.9",
+    "@stitches/react": "^1.2.8",
     "@types/node": "^18.11.9",
     "@types/react": "^18.0.24",
     "@types/react-dom": "^18.0.8",

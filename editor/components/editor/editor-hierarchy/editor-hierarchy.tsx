@@ -19,6 +19,8 @@ export function EditorHierarchy() {
       return <DashboardHierarchy />;
     case "figma-canvas":
       return <DesignLayerHierarchy />;
+    case "craft":
+      return <DesignLayerHierarchy />;
     case "code":
       return <CodeFilesHierarchyTree />;
     default:

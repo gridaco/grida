@@ -20,6 +20,11 @@ export function workspaceReducer(
         draft.highlightedLayer = action.id;
       });
     }
+    case "highlight-node/remove": {
+      return produce(state, (draft) => {
+        draft.highlightedLayer = undefined;
+      });
+    }
     // todo: move to workspace state
     case "tasks/push": {
       const { task } = <BackgroundTaskPushAction>action;
@@ -73,6 +78,14 @@ export function workspaceReducer(
       return produce(state, (draft) => {
         draft.debugMode = enabled;
       });
+    }
+
+    case "copy": {
+      return produce(state, (draft) => {
+        // TODO:
+      });
+
+      return state;
     }
 
     // default fallback - use history reducer

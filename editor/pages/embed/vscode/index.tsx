@@ -4,7 +4,6 @@ import {
   VanillaFrameContextManuProvider,
 } from "@code-editor/preview-pip";
 import { CodeEditor } from "components/code-editor";
-import styled from "@emotion/styled";
 
 function Preview() {
   return (
@@ -44,7 +43,7 @@ export default function EmbedForVSCodeExtensionPage() {
       </ResizablePIP>
       <CodeEditor
         options={{
-          renderFinalNewline: true,
+          renderFinalNewline: "on",
         }}
         files={{
           "main.ts": {

@@ -15,9 +15,7 @@ import {
   PopupInfo,
   PopupProvider,
 } from "utils/context/PopupContext";
-import { analytics } from "utils/firebase";
 import { BodyCustomStyleInAbosulteSectionLayout } from "utils/styled/styles";
-import { MDXProvider } from "@mdx-js/react";
 import { _MDX_COMPONENTS } from "components/mdx";
 import { Box } from "theme-ui";
 import { env } from "process";
@@ -100,15 +98,6 @@ const App = ({ Component, pageProps }: AppPropsWithLayout) => {
       defaultLayout(page, Component.layoutConfig ?? ({} as any)));
   const getTheme = Component.getTheme ?? (() => undefined);
 
-  useEffect(() => {
-    if (process.env.NODE_ENV === "development") {
-      return;
-    }
-    // region set firebase analytics
-    analytics();
-    // endregion set firebase analytics
-  }, [router.events, router.pathname]);
-
   const renderPopups = () => {
     return (
       <PopupConsumer>
@@ -171,6 +160,7 @@ const App = ({ Component, pageProps }: AppPropsWithLayout) => {
         <Providers>
           <ThemeProvider fallback="light" override={getTheme() ?? "light"}>
             <PopupProvider>
+              {/* @ts-ignore */}
               {getLayout(<Component {...pageProps} />)}
               {renderPopups()}
             </PopupProvider>
@@ -185,9 +175,7 @@ const Providers = ({ children }: { children: React.ReactNode }) => {
   return (
     <>
       <CookiesProvider>
-        <MDXProvider components={_MDX_COMPONENTS}>
           <RecoilRoot>{children}</RecoilRoot>
-        </MDXProvider>
       </CookiesProvider>
     </>
   );

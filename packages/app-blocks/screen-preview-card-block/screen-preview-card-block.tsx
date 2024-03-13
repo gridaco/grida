@@ -1,5 +1,4 @@
 import React from "react";
-import styled from "@emotion/styled";
 import { ProviderFigmaEmbed } from "./provider-figma-embed";
 import { ProviderAnySnapshotView } from "./provider-any-snapshot-view";
 import { ProviderSketchEmbed } from "./provider-sketch-embed";

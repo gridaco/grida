@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import type { IScenePreviewDataFlutterPreview } from "core/states";
-import FlutterDaemonView from "@code-editor/flutter-daemon-view";
+// import FlutterDaemonView from "@code-editor/flutter-daemon-view";
 
 const dartservices_html_src = "https://dartpad.dev/scripts/frame_dark.html";
 

@@ -2,8 +2,7 @@ import React, { useState } from "react";
 import styled from "@emotion/styled";
 import TreeView from "@mui/lab/TreeView";
 import TreeItem from "@mui/lab/TreeItem";
-import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
-import ChevronRightIcon from "@mui/icons-material/ChevronRight";
+import { ChevronRightIcon, ChevronDownIcon } from "@radix-ui/react-icons";
 import { SideNavigation } from "components/side-navigation";
 
 interface LayerTree {
@@ -69,7 +68,7 @@ export function LayerHierarchy(props: {
         </div>
         <>
           <TreeView
-            defaultCollapseIcon={<ExpandMoreIcon />}
+            defaultCollapseIcon={<ChevronDownIcon />}
             defaultExpanded={[props.data?.id]}
             defaultExpandIcon={<ChevronRightIcon />}
             expanded={expanded}

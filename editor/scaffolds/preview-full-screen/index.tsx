@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { useEditorState } from "core/states";
 import styled from "@emotion/styled";
 import { useWindowSize } from "hooks";
-import Close from "@mui/icons-material/Close";
+import { CrossCircledIcon } from "@radix-ui/react-icons";
 import ClientOnly from "components/client-only";
 import { VanillaDedicatedPreviewRenderer } from "components/app-runner";
 
@@ -72,7 +72,7 @@ const CloseButton = ({ onClick }: { onClick: () => void }) => {
   return (
     <CloseButtonBase onClick={onClick}>
       <ClientOnly>
-        <Close style={{ color: "white" }} />
+        <CrossCircledIcon color="white" />
       </ClientOnly>
     </CloseButtonBase>
   );

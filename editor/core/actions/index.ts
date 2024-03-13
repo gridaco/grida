@@ -1,3 +1,4 @@
+import { CraftHistoryAction, CraftDraftAction } from "@code-editor/craft";
 import type { FrameworkConfig } from "@grida/builder-config";
 import type {
   ConsoleLog,
@@ -8,8 +9,10 @@ import type {
 } from "core/states";
 
 export type WorkspaceAction =
+  | { type: "copy" } // copy does not need to be handled by the history.
   | HistoryAction
   | HighlightNodeAction
+  | RemoveSelectedNodeFromHighlightAction
   | EditorModeAction;
 
 /**
@@ -18,10 +21,10 @@ export type WorkspaceAction =
 export type WorkspaceWarmupAction = SetFigmaAuthAction | SetFigmaUserAction;
 
 export type HistoryAction =
-  //
   | { type: "undo" }
-  //
   | { type: "redo" }
+  | { type: "cut" }
+  | { type: "paste" }
   | Action;
 
 export type Action =
@@ -33,7 +36,6 @@ export type Action =
   | DesignerModeSwitchActon
   | SelectNodeAction
   | CanvasFocusNodeAction
-  | HighlightNodeAction
   | EnterIsolatedInspectionAction
   | ExitIsolatedInspectionAction
   | CanvasEditAction
@@ -41,7 +43,11 @@ export type Action =
   | PreviewAction
   | CodingAction
   | DevtoolsAction
-  | BackgroundTaskAction;
+  | BackgroundTaskAction
+  // craft mode
+  | CraftHistoryAction
+  | CraftDraftAction;
+//
 
 export type ActionType = Action["type"];
 
@@ -78,20 +84,46 @@ export interface SelectNodeAction {
   node: string | string[];
 }
 
-/**
- * Select and move to the node.
- */
 export interface CanvasFocusNodeAction {
   type: "canvas/focus";
   node: string;
 }
 
-export type CanvasEditAction = TranslateNodeAction;
+export type CanvasEditAction =
+  | TranslateDeltaSelectedNodeAction
+  | PositionSelectedNodeAction
+  | ResizeSelectedNodeAction
+  | DeltaResizeNodeAction;
 
-export interface TranslateNodeAction {
+/**
+ * Select and move to the node.
+ */
+export interface TranslateDeltaSelectedNodeAction {
   type: "node-transform-translate";
-  translate: [number, number];
-  node: string[];
+  /**
+   * delta value
+   */
+  translate: [number | undefined, number | undefined];
+}
+
+export interface PositionSelectedNodeAction {
+  type: "node-transform-position";
+  x?: number;
+  y?: number;
+}
+
+export interface ResizeSelectedNodeAction {
+  type: "node-resize";
+  width?: number;
+  height?: number;
+}
+
+export interface DeltaResizeNodeAction {
+  type: "node-resize-delta";
+  origin: "nw" | "ne" | "sw" | "se" | "n" | "s" | "w" | "e";
+  delta: [number, number];
+  shiftKey?: boolean;
+  altKey?: boolean;
 }
 
 export interface EnterIsolatedInspectionAction {
@@ -113,6 +145,10 @@ export interface SelectPageAction {
 export interface HighlightNodeAction {
   type: "highlight-node";
   id: string;
+}
+
+export interface RemoveSelectedNodeFromHighlightAction {
+  type: "highlight-node/remove";
 }
 
 type CanvasModeAction = CanvasModeSwitchAction;

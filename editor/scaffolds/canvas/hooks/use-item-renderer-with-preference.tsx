@@ -4,14 +4,22 @@ import {
   D2CVanillaPreview,
   OptimizedPreviewCanvas,
 } from "scaffolds/preview-canvas";
+import { CraftRenderPipeline } from "@/renderers/pipeline";
 
 /**
  * Returns a dedicated funtion to render a node with preferred renderer component.
  * @returns
  */
-export function useRenderItemWithPreference() {
+export function useRenderItemWithPreference(props?: {
+  force_use_renderer?:
+    | "bitmap-renderer"
+    | "d2c-vanilla-iframe-renderer"
+    | "craft-renderer";
+}) {
   const { config: preferences } = usePreferences();
-  const { renderer } = preferences.canvas;
+  const { renderer: _preferred_renderer } = preferences.canvas;
+
+  const renderer = props?.force_use_renderer || _preferred_renderer;
 
   const renderItem = useCallback(
     (p) => {
@@ -21,11 +29,14 @@ export function useRenderItemWithPreference() {
             <OptimizedPreviewCanvas key={p.node.id} target={p.node} {...p} />
           );
         }
-        case "vanilla-renderer": {
+        case "d2c-vanilla-iframe-renderer": {
           return <D2CVanillaPreview key={p.node.id} target={p.node} {...p} />;
         }
+        case "craft-renderer": {
+          return <CraftRenderPipeline key={p.node.id} target={p.node} {...p} />;
+        }
         default:
-          throw new Error("Unknown renderer", renderer);
+          throw new Error("Unknown renderer", renderer as any);
       }
     },
     [renderer]

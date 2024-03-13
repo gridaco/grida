@@ -1,6 +1,6 @@
 import React from "react";
 import styled from "@emotion/styled";
-import { Send } from "@mui/icons-material";
+import { PaperPlaneIcon } from "@radix-ui/react-icons";
 import TextareaAutosize from "react-textarea-autosize";
 
 export function MessageInput({
@@ -38,11 +38,7 @@ export function MessageInput({
           setText("");
         }}
       >
-        <Send
-          style={{
-            fontSize: 14,
-          }}
-        />
+        <PaperPlaneIcon />
       </MessageInputButton>
     </MessageInputContainer>
   );

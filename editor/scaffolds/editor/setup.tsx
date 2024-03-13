@@ -1,6 +1,11 @@
 import React, { useEffect, useCallback, useState } from "react";
 import { NextRouter } from "next/router";
-import { EditorPage, EditorSnapshot, useEditorState } from "core/states";
+import {
+  useEditorState,
+  type EditorPage,
+  type EditorSnapshot,
+  type FigmaReflectRepository,
+} from "core/states";
 import { useFigmaCommunityFile, useFigmaFile } from "hooks";
 import { warmup } from "scaffolds/editor";
 import type { FileResponse } from "@design-sdk/figma-remote-types";
@@ -17,15 +22,104 @@ type EditorSetupState = {
    * explicitly set loading to block uesr interaction.
    */
   loading?: boolean;
+  /**
+   * 0 to 1
+   */
+  progress: number;
 };
 
-const EditorSetupContext = React.createContext<EditorSetupState>(null);
+const EditorSetupContext = React.createContext<EditorSetupState | null>(null);
 
 export function useEditorSetupContext() {
   return React.useContext(EditorSetupContext);
 }
 
-interface EssentialEditorSetupProps {
+export function SetupCraftCraftEditor({ children }: React.PropsWithChildren<{}>) {
+  const { provideEditorSnapshot: initialize } =
+    useWorkspaceInitializerContext();
+
+    const initial_frame_size = {
+      width: 1920,
+      height: 1080,
+    }
+
+  useEffect(() => {
+    initialize({
+      selectedPage: "component",
+      pages: [
+        {
+          id: "component",
+          name: "Component",
+          type: "craft",
+        },
+      ],
+      selectedNodes: [],
+      selectedLayersOnPreview: [],
+      // TODO: remove me
+      design: {
+        name: "Untitled",
+        components: {},
+        key: "untitled",
+        pages: [
+          {
+            id: "component",
+            name: "Component",
+            backgroundColor: { r: 1, g: 1, b: 1, a: 1 },
+            children: [],
+            flowStartingPoints: [],
+          },
+        ],
+        version: "",
+        lastModified: new Date(),
+        // @ts-ignore
+        input: undefined
+      },
+      craft: {
+        'id': '0',
+        'type': 'document',
+        children: [
+          {
+            'type': 'viewport',
+            x: - initial_frame_size.width / 2,
+            y: - initial_frame_size.height / 2,
+            width: initial_frame_size.width,
+            height: initial_frame_size.height,
+            'name': 'Viewport',
+            'absoluteX': - initial_frame_size.width / 2,
+            'absoluteY': - initial_frame_size.height / 2,
+            id: 'viewport',
+            'appearance': 'light',
+            'breakpoint': 'xl',
+            children: []
+          }
+        ]
+      },
+      isolation: {
+        isolated: false,
+        node: "component",
+      },
+      code: { files: {}, loading: true },
+      canvasMode: {
+        value: "free",
+        last: "free",
+        updated: undefined,
+      },
+    });
+  }, [initialize]);
+
+  return (
+    <EditorSetupContext.Provider
+      value={{
+        loading: false,
+        progress: 1,
+      }}
+    >
+      {children}
+    </EditorSetupContext.Provider>
+  );
+}
+
+interface EssentialFigmaEditorSetupProps {
   nodeid: string;
   filekey: string;
   router: NextRouter;
@@ -39,7 +133,7 @@ function FigmaEditorBaseSetup({
   children,
   loaded,
 }: React.PropsWithChildren<
-  EssentialEditorSetupProps & {
+  EssentialFigmaEditorSetupProps & {
     file: FileResponse;
     loaded?: boolean;
   }
@@ -61,6 +155,18 @@ function FigmaEditorBaseSetup({
   // }, [file]);
 
   const [state] = useEditorState();
+
+  // loading progress
+  const loading = !loaded;
+  const _initially_loaded = state.design?.pages?.length > 0;
+  const _initial_load_progress =
+    [
+      !!(state.design as FigmaReflectRepository)?.input,
+      state.design?.pages?.length > 0,
+      !loading,
+    ].filter(Boolean).length /
+      3 +
+    0.2;
 
   const initialCanvasMode = q_map_canvas_mode_from_query(
     router.query.mode as string
@@ -142,7 +248,9 @@ function FigmaEditorBaseSetup({
   }, [file]);
 
   return (
-    <EditorSetupContext.Provider value={{ loading: !loaded }}>
+    <EditorSetupContext.Provider
+      value={{ loading: loading, progress: _initial_load_progress }}
+    >
       {children}
     </EditorSetupContext.Provider>
   );
@@ -153,7 +261,7 @@ export function SetupFigmaCommunityFileEditor({
   nodeid,
   router,
   children,
-}: React.PropsWithChildren<EssentialEditorSetupProps>) {
+}: React.PropsWithChildren<EssentialFigmaEditorSetupProps>) {
   const fig = useFigmaCommunityFile({ id: filekey });
   const [file, setFile] = useState<FileResponse>(null);
   const [loaded, setLoaded] = useState<boolean>(false);
@@ -187,7 +295,10 @@ export function SetupFigmaCommunityFileEditor({
     >
       <FigmaImageServiceProvider
         filekey={filekey}
-        resolveApiClient={() => FigmaCommunityImageClient()}
+        resolveApiClient={() =>
+          // @ts-ignore
+          FigmaCommunityImageClient()
+        }
       >
         {children}
       </FigmaImageServiceProvider>
@@ -200,7 +311,7 @@ export function SetupFigmaFileEditor({
   nodeid,
   router,
   children,
-}: React.PropsWithChildren<EssentialEditorSetupProps>) {
+}: React.PropsWithChildren<EssentialFigmaEditorSetupProps>) {
   const [file, setFile] = useState<FileResponse>(null);
   const [loaded, setLoaded] = useState<boolean>(false);
 
@@ -228,7 +339,7 @@ export function SetupFigmaFileEditor({
     if (fig.__type === "error") {
       // handle error by reason
       switch (fig.reason) {
-        case "token-expired":{
+        case "token-expired": {
           alert("The token is expired. Please re-authenticate.");
           openFpatConfigurationPreference();
           break;

@@ -1,7 +1,6 @@
 import React, { useRef, useState } from "react";
 import { VanillaFlutterRunner } from "./flutter-app-runner";
 import { features, types, hosting } from "@base-sdk/base";
-import { nanoid } from "nanoid";
 import { ReactAppRunner } from "./react-app-runner";
 import { VanillaRunner } from "./vanilla-app-runner";
 import { NumberSize, Resizable } from "re-resizable";
@@ -23,11 +22,10 @@ export function AppRunner(props: {
   src: string;
   componentName: string;
 }) {
-  const [viewportsize, setViewportsize] =
-    useState<{
-      height: number;
-      width: number;
-    }>(DEFAULT_SIZE);
+  const [viewportsize, setViewportsize] = useState<{
+    height: number;
+    width: number;
+  }>(DEFAULT_SIZE);
   const { platform, sceneSize, src, componentName } = props;
 
   return (

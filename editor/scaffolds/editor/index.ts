@@ -1,9 +1,10 @@
 export {
   SetupFigmaFileEditor,
   SetupFigmaCommunityFileEditor,
+  SetupCraftCraftEditor as SetupNoopEditor,
   useEditorSetupContext,
 } from "./setup";
 export { Editor } from "./editor";
-export { EditorDefaultProviders } from "./_providers";
 export { useFigmaImageService } from "./editor-figma-image-service-provider";
 export * as warmup from "./warmup";
+export * from "./providers";

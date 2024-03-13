@@ -3,6 +3,32 @@
   "version": "0.0.0",
   "private": false,
   "dependencies": {
-    "@code-editor/console-feed": "^3.3.1"
+    "@code-editor/console-feed": "^3.3.1",
+    "@radix-ui/react-icons": "^1.0.3",
+    "@visx/gradient": "^1.7.0",
+    "@visx/group": "^1.7.0",
+    "@visx/hierarchy": "^1.7.0",
+    "@visx/shape": "^1.8.0",
+    "d3-shape": "^3.2.0",
+    "react-base16-styling": "^0.9.1",
+    "react-json-tree": "^0.15.0"
+  },
+  "peerDependencies": {
+    "@code-editor/ui": "*",
+    "@design-sdk/figma": "^0.0.53",
+    "@design-sdk/figma-node": "^0.0.53",
+    "@emotion/styled": "^11.11.0",
+    "@reflect-ui/core": "^0.0.9",
+    "@web-builder/core": "*",
+    "react": "^18"
+  },
+  "devDependencies": {
+    "@design-sdk/figma": "^0.0.53",
+    "@design-sdk/figma-node": "^0.0.53",
+    "@emotion/styled": "^11.11.0",
+    "@reflect-ui/core": "^0.0.9",
+    "@types/node": "^20.11.20",
+    "@types/react": "18.2.58",
+    "react": "^18"
   }
 }

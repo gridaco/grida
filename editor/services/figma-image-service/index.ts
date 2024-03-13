@@ -222,6 +222,7 @@ export class FigmaImageService {
             clearTimeout(this.timeout);
             handle_queue();
           } else {
+            // @ts-ignore
             this.timeout = setTimeout(handle_queue, DEBOUNCE);
           }
 

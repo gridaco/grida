@@ -1,5 +1,4 @@
 import React from "react";
-import { event_click_footer_menu } from "analytics";
 import Link from "next/link";
 import { LinkWithDocsFallback } from "components/fixme";
 import { Flex, Text } from "theme-ui";
@@ -56,7 +55,7 @@ export default function SitemapList({ sitemap }: {
             className="text-sm"
             onClick={() => {
               // log footer menu item click
-              event_click_footer_menu({ menu: i.label });
+              // event_click_footer_menu({ menu: i.label });
             }}
             color={theme.footer.menu.color}
           >

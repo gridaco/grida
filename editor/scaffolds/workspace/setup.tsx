@@ -3,7 +3,7 @@ import { WorkspaceWarmupAction } from "core/actions";
 import { NextRouter } from "next/router";
 import { WorkspaceFigmaAuthProvider } from "./figma-auth";
 
-export function SetupWorkspace({
+export function SetupFigmaWorkspace({
   router,
   children,
   dispatch,

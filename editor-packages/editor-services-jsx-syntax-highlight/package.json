@@ -2,8 +2,14 @@
   "name": "@code-editor/jsx-syntax-highlight-services",
   "version": "0.0.0",
   "private": false,
-  "dependencies": {},
+  "dependencies": {
+    "@code-editor/webworker-services-core": "workspace:^"
+  },
   "peerDependencies": {
-    "@monaco-editor/react": "^4.4.1"
+    "@monaco-editor/react": "^4.4.1",
+    "monaco-editor": "^0.46.0"
+  },
+  "devDependencies": {
+    "monaco-editor": "^0.46.0"
   }
 }

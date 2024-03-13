@@ -5,7 +5,7 @@ import type {
   SelectPageAction,
   CodingUpdateFileAction,
   CanvasModeSwitchAction,
-  TranslateNodeAction,
+  TranslateDeltaSelectedNodeAction,
   PreviewBuildingStateUpdateAction,
   PreviewSetAction,
   DevtoolsConsoleAction,
@@ -20,8 +20,11 @@ import type {
   CodingNewTemplateSessionAction,
   EnterIsolatedInspectionAction,
   ExitIsolatedInspectionAction,
+  ResizeSelectedNodeAction,
+  PositionSelectedNodeAction,
+  DeltaResizeNodeAction,
 } from "core/actions";
-import { EditorState, EssentialWorkspaceInfo } from "core/states";
+import { EditorState, WorkspaceStateSeed } from "core/states";
 import { NextRouter, useRouter } from "next/router";
 import { CanvasStateStore } from "@code-editor/canvas/stores";
 import q from "@design-sdk/query";
@@ -30,6 +33,18 @@ import { getPageNode } from "utils/get-target-node";
 import { nanoid } from "nanoid";
 import { last_page_by_mode } from "core/stores";
 import { track } from "@code-editor/analytics";
+import {
+  CraftHistoryAction,
+  craftHistoryReducer,
+  craftDraftReducer,
+  CraftDraftAction,
+  CraftHtmlElement,
+  CraftViewportNode,
+} from "@code-editor/craft";
+import {
+  cvt_delta_by_resize_handle_origin,
+  resize,
+} from "@code-editor/canvas/math";
 
 const _DEV_CLEAR_LOG = false;
 
@@ -41,11 +56,21 @@ const clearlog = (by: string) => {
 };
 
 export function editorReducer(
-  state: EditorState & EssentialWorkspaceInfo,
+  state: EditorState & WorkspaceStateSeed,
   action: Action
 ): EditorState {
-  const router = useRouter();
+  // const router = useRouter();
+  const router = { push: () => {} } as any;
   const filekey = state.design.key;
+
+  // craft mode
+  if (action.type.startsWith("(craft)")) {
+    return craftHistoryReducer(state, action as CraftHistoryAction);
+  }
+
+  if (action.type.startsWith("(draft)")) {
+    return craftDraftReducer(state, action as CraftDraftAction);
+  }
 
   switch (action.type) {
     case "mode": {
@@ -128,30 +153,34 @@ export function editorReducer(
       // 2. select page containing the node
       // 3. move canvas to the node (if page is canvas)
 
-      return produce(state, (draft) => {
-        const page = getPageNode(node, state);
-        const _1_select_node = reducers["select-node"](draft, {
-          node: node,
-        });
-        const _2_select_page = reducers["select-page"](_1_select_node, {
-          page: page.id,
-        });
+      return produce(
+        state,
+        // @ts-ignore
+        (draft) => {
+          const page = getPageNode(node, state);
+          const _1_select_node = reducers["select-node"](state, {
+            node: node,
+          });
+          const _2_select_page = reducers["select-page"](_1_select_node, {
+            page: page.id,
+          });
 
-        const final = _2_select_page;
+          const final = _2_select_page;
 
-        return <EditorState>{
-          ...final,
-          canvas: {
-            // refresh canvas focus to the target.
-            focus: {
-              refreshkey: nanoid(4),
-              nodes: [node],
+          return <EditorState>{
+            ...final,
+            canvas: {
+              // refresh canvas focus to the target.
+              focus: {
+                refreshkey: nanoid(4),
+                nodes: [node],
+              },
+              // update selection
+              selectedNodes: [node],
             },
-            // update selection
-            selectedNodes: [node],
-          },
-        };
-      });
+          };
+        }
+      );
     }
 
     case "design/enter-isolation": {
@@ -197,20 +226,129 @@ export function editorReducer(
     }
 
     case "node-transform-translate": {
-      const { translate, node } = <TranslateNodeAction>action;
-
+      const { translate } = <TranslateDeltaSelectedNodeAction>action;
+      const [dx, dy] = translate;
       return produce(state, (draft) => {
-        const page = draft.design.pages.find(
-          (p) => p.id === state.selectedPage
-        );
+        const nodes =
+          state.mode.value === "craft"
+            ? draft.craft.children
+            : draft.design.pages.find((p) => p.id === state.selectedPage)
+                .children;
 
-        node
-          .map((n) => q.getNodeByIdFrom(n, page.children))
+        state.selectedNodes
+          .map((n) => q.getNodeByIdFrom(n, nodes as any))
           .map((n) => {
-            n.x += translate[0];
-            n.y += translate[1];
+            n.x += dx;
+            n.y += dy;
+            n.absoluteX += dx;
+            n.absoluteY += dy;
           });
       });
+    }
+    case "node-transform-position": {
+      const { x, y } = <PositionSelectedNodeAction>action;
+
+      return produce(state, (draft) => {
+        const nodes =
+          state.mode.value === "craft"
+            ? draft.craft.children
+            : draft.design.pages.find((p) => p.id === state.selectedPage)
+                .children;
+
+        state.selectedNodes
+          .map((n) => q.getNodeByIdFrom(n, nodes as any))
+          .map((n) => {
+            if (x) {
+              const dx = x - n.x;
+              n.x += dx;
+              n.absoluteX += dx;
+            }
+            if (y) {
+              const dy = y - n.y;
+              n.y += dy;
+              n.absoluteY += dy;
+            }
+          });
+      });
+    }
+    case "node-resize": {
+      const { width, height } = <ResizeSelectedNodeAction>action;
+
+      switch (state.mode.value) {
+        case "design": {
+          throw new Error(
+            `node-resize: mode not supported: ${state.mode.value}`
+          );
+        }
+        case "craft": {
+          return produce(state, (draft) => {
+            state.selectedNodes
+              .map((n) => q.getNodeByIdFrom(n, draft.craft.children))
+              .map((n: CraftHtmlElement) => {
+                if (n && width) n.width = width;
+                if (n && width) n.style!.width = width;
+                if (n && height) n.height = height;
+                if (n && height) n.style!.height = height;
+              });
+          });
+        }
+        default: {
+          throw new Error(
+            `node-transform-translate: mode not supported: ${state.mode.value}`
+          );
+        }
+      }
+    }
+    case "node-resize-delta": {
+      const { origin, delta, shiftKey, altKey } = <DeltaResizeNodeAction>action;
+      switch (state.mode.value) {
+        case "design": {
+          throw new Error(
+            `node-resize: mode not supported: ${state.mode.value}`
+          );
+        }
+        case "craft": {
+          return produce(state, (draft) => {
+            state.selectedNodes
+              .map((n) => q.getNodeByIdFrom(n, draft.craft.children))
+              .filter((n) => !!n && n.type !== "viewport")
+              .map((n: CraftHtmlElement) => {
+                if (!n) return;
+                const { origin: transform_origin, delta: transform_delta } =
+                  cvt_delta_by_resize_handle_origin(origin, delta, {
+                    shiftKey,
+                    altKey,
+                  });
+
+                const {
+                  value: [x, y, w, h],
+                  diff: [dx, dy],
+                } = resize(
+                  [n.x, n.y, n.width, n.height],
+                  transform_delta,
+                  transform_origin
+                );
+
+                // xy
+                n.x += dx;
+                n.y += dy;
+                n.absoluteX = x;
+                n.absoluteY = y;
+
+                // wh
+                n.width = w;
+                n.height = h;
+                n.style!.width = w;
+                n.style!.height = h;
+              });
+          });
+        }
+        default: {
+          throw new Error(
+            `node-transform-translate: mode not supported: ${state.mode.value}`
+          );
+        }
+      }
     }
 
     case "coding/new-template-session": {
@@ -422,26 +560,24 @@ const reducers = {
     state: EditorState,
     action: Omit<SelectNodeAction, "type">
   ) => {
+    const { node } = <SelectNodeAction>action;
+    const ids = Array.isArray(node) ? node : [node];
+
+    const changed = !value_identical(state.selectedNodes, ids);
+
+    if (!changed) {
+      // console.log("no change in selection");
+      return produce(state, (draft) => {});
+    }
+
     return produce(state, (draft) => {
       const filekey = state.design.key;
 
-      const { node } = <SelectNodeAction>action;
-      const ids = Array.isArray(node) ? node : [node];
-
       const current_node = state.selectedNodes;
-
-      if (
-        ids.length <= 1 &&
-        current_node.length <= 1 &&
-        ids[0] === current_node[0]
-      ) {
-        // same selection (no selection or same 1 selection)
-        return produce(state, (draft) => {});
-      }
 
       if (ids.length > 1 && ids.length === current_node.length) {
         // the selection event is always triggered by user, which means selecting same amount of nodes (greater thatn 1, and having a different node array is impossible.)
-        return produce(state, (draft) => {});
+        return;
       }
 
       const _canvas_state_store = new CanvasStateStore(
@@ -504,4 +640,15 @@ const reducers = {
       };
     });
   },
+};
+
+/**
+ * compare items in two arrays and return the difference.
+ * order does not matter.
+ * @param a
+ * @param b
+ * @returns `boolean`
+ */
+const value_identical = (a: string[], b: string[]) => {
+  return a.length === b.length && a.every((v) => b.includes(v));
 };

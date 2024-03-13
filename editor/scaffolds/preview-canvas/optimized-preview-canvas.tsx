@@ -1,7 +1,7 @@
 import { ReflectSceneNode, ReflectSceneNodeType } from "@design-sdk/figma-node";
 import type { FrameOptimizationFactors } from "@code-editor/canvas/frame";
 import { FigmaNodeBitmapView } from "@code-editor/canvas-renderer-bitmap";
-import { D2CVanillaPreview } from "./vanilla-preview-async";
+import { D2CVanillaPreview } from "./d2c-vanilla-preview-async";
 
 function _check_by_type(type: ReflectSceneNodeType) {
   switch (type) {
@@ -34,7 +34,7 @@ function optimized_preview_strategy(
     }
   }
 
-  if (children.length === 0) {
+  if (children?.length ?? 0 === 0) {
     const hasimagefill = scene.fills
       ?.filter(Boolean)
       ?.filter((f) => f.visible)

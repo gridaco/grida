@@ -36,6 +36,11 @@ export function historyReducer(state: HistoryState, action: HistoryAction) {
           }
         });
       }
+    case "cut":
+    case "paste": {
+      // TODO:
+      break;
+    }
     default:
       const nextState = editorReducer(currentState, action);
       const mergableEntry = getMergableHistoryEntry(state, action[0]);

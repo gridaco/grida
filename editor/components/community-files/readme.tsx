@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import styled from "@emotion/styled";
-import { Avatar } from "@mui/material";
+import * as Avatar from "@radix-ui/react-avatar";
 import {
   FigmaCommunityFileRelatedContentMeta,
   FigmaCommunityFileMeta,
@@ -82,7 +82,9 @@ export function Readme({
                       alignItems: "center",
                     }}
                   >
-                    <Avatar src={publisher.img_url} />
+                    <Avatar.Root>
+                      <Avatar.Image src={publisher.img_url} />
+                    </Avatar.Root>
                     <span>{publisher.name}</span>
                   </div>
                 </Link>
@@ -123,9 +125,7 @@ export function Readme({
           <div>
             <h3>Tags</h3>
             <div className="tags">
-              {tags?.map((tag) => (
-                <Tag key={tag}>{tag}</Tag>
-              ))}
+              {tags?.map((tag) => <Tag key={tag}>{tag}</Tag>)}
             </div>
           </div>
           <div style={{ height: 40 }} />

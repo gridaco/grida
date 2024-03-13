@@ -1,7 +1,7 @@
 import React, { forwardRef } from "react";
 import * as k from "./k";
 
-export const Handle = forwardRef(function (
+export const Handle = forwardRef(function Handle(
   {
     color,
     anchor,
@@ -12,7 +12,8 @@ export const Handle = forwardRef(function (
     borderRadius = 0,
     cursor,
     readonly,
-  }: {
+    ...props
+  }: Omit<React.HTMLAttributes<HTMLDivElement>, "style"> & {
     color: string;
     /**
      * the width of the outline
@@ -26,7 +27,7 @@ export const Handle = forwardRef(function (
     cursor?: React.CSSProperties["cursor"];
     readonly?: boolean;
   },
-  ref
+  ref: React.Ref<HTMLDivElement>
 ) {
   let dx = 0;
   let dy = 0;
@@ -54,6 +55,7 @@ export const Handle = forwardRef(function (
 
   return (
     <div
+      ref={ref}
       style={{
         position: "absolute",
         borderRadius: borderRadius,
@@ -67,6 +69,7 @@ export const Handle = forwardRef(function (
         zIndex: k.Z_INDEX_GUIDE_POSITION,
         pointerEvents: readonly ? "none" : "auto",
       }}
+      {...props}
     />
   );
 });

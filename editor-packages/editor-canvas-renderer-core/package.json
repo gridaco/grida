@@ -1,4 +1,8 @@
 {
   "name": "@code-editor/canvas-renderer-core",
-  "version": "0.0.0"
+  "version": "0.0.0",
+  "dependencies": {
+    "@design-sdk/core": "^0.0.53",
+    "@design-sdk/figma": "^0.0.53"
+  }
 }

@@ -1,0 +1,38 @@
+{
+  "name": "@app/cms-posts",
+  "version": "0.0.0",
+  "private": false,
+  "scripts": {
+    "dev": "next dev -p 3315",
+    "build": "next build",
+    "start": "next start -p 3315"
+  },
+  "dependencies": {
+    "@app/blocks": "workspace:0.0.0",
+    "@app/fp-customer-support": "workspace:^",
+    "@boring.so/document-model": "workspace:0.0.0",
+    "@boring.so/store": "workspace:^",
+    "@boringso/react-core": "workspace:0.0.0",
+    "@editor-ui/alert-dialog": "workspace:^",
+    "@editor-ui/dropdown-menu": "workspace:^",
+    "@editor-ui/theme": "workspace:^",
+    "@emotion/css": "^11.11.2",
+    "@emotion/react": "^11.11.4",
+    "@emotion/styled": "^11.11.0",
+    "@radix-ui/react-dialog": "^1.0.5",
+    "@ui/date-picker": "workspace:^",
+    "@ui/tags-input": "workspace:^",
+    "axios": "1.6.7",
+    "dayjs": "^1.11.10",
+    "eslint-config-next": "^14.1.3",
+    "next": "14.1.3",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "react-textarea-autosize": "^8.5.3",
+    "url-pattern": "^1.0.3"
+  },
+  "devDependencies": {
+    "@types/react": "18.0.9",
+    "typescript": "4.7.2"
+  }
+}

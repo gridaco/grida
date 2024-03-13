@@ -1,5 +1,11 @@
 {
   "name": "@code-editor/estypes-resolver",
   "version": "0.0.0",
-  "private": false
+  "private": false,
+  "devDependencies": {
+    "@monaco-editor/react": "^4.6.0"
+  },
+  "peerDependencies": {
+    "@monaco-editor/react": "^4.6.0"
+  }
 }

@@ -1,4 +1,4 @@
-import { FigmaReflectRepository } from "editor/core/states";
+import type { DesignRepository } from "editor/core/states";
 
 /**
  * This only supports root frame at the moment.
@@ -7,7 +7,7 @@ import { FigmaReflectRepository } from "editor/core/states";
  * @param design
  * @returns
  */
-export function findUnder(node: string, design: FigmaReflectRepository) {
+export function findUnder(node: string, design: DesignRepository) {
   for (const page of design.pages) {
     for (const frame of page.children.filter(Boolean)) {
       if (frame.id === node) {
@@ -17,11 +17,7 @@ export function findUnder(node: string, design: FigmaReflectRepository) {
   }
 }
 
-export function findShifted(
-  node: string,
-  design: FigmaReflectRepository,
-  shift = 0
-) {
+export function findShifted(node: string, design: DesignRepository, shift = 0) {
   for (const page of design.pages) {
     for (let i = 0; i < page.children.filter(Boolean).length; i++) {
       const frame = page.children[i];
