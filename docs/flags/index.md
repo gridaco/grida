@@ -32,7 +32,7 @@ Like in the example above, the `--artwork` flag is used to export the group as a
 
 Learn more about [--artwork](../@designto-code/flags/--artwork)
 
-<!-- this link is valid on docs-site -->
+<!-- this link is valid on docs site -->
 
 **Example case 2. - I want my text to be rendered as `<h1>`.**
 
