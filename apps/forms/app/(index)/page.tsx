@@ -1,5 +1,5 @@
 import { GridaLogo } from "@/components/grida-logo";
-import { SlashIcon } from "@radix-ui/react-icons";
+import { GitHubLogoIcon, SlashIcon } from "@radix-ui/react-icons";
 import Link from "next/link";
 
 export default function Home() {
@@ -41,6 +41,11 @@ async function Header() {
         </span>
       </div>
       <div className="flex gap-10 items-center">
+        <Link href="https://github.com/gridaco/grida/tree/main/apps/forms">
+          <button className="flex justify-center items-center">
+            <GitHubLogoIcon className="fill-black" width={24} height={24} />
+          </button>
+        </Link>
         <Link href="/sign-in">
           <button>Sign in</button>
         </Link>
