@@ -4,7 +4,9 @@ import {
   BlocksEditorAction,
   ChangeBlockFieldAction,
   CreateNewBlockAction,
+  SortBlockAction,
 } from "./action";
+import { arrayMove } from "@dnd-kit/sortable";
 
 export function reducer(
   state: BlocksEditorState,
@@ -30,6 +32,23 @@ export function reducer(
         if (block) {
           block.form_field_id = field_id;
         }
+      });
+    }
+    case "blocks/sort": {
+      const { block_id, over_id } = <SortBlockAction>action;
+      return produce(state, (draft) => {
+        if (over_id === "root") {
+          return;
+        }
+
+        const oldIndex = state.blocks.findIndex(
+          (block) => block.id === block_id
+        );
+        const newIndex = state.blocks.findIndex(
+          (block) => block.id === over_id
+        );
+
+        draft.blocks = arrayMove(state.blocks, oldIndex, newIndex);
       });
     }
     default:

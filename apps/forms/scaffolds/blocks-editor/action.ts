@@ -1,9 +1,18 @@
 import { FormBlockType } from "@/types";
 
-export type BlocksEditorAction = CreateNewBlockAction | ChangeBlockFieldAction;
+export type BlocksEditorAction =
+  | CreateNewBlockAction
+  | SortBlockAction
+  | ChangeBlockFieldAction;
 export interface CreateNewBlockAction {
   type: "blocks/new";
   block: FormBlockType;
+}
+
+export interface SortBlockAction {
+  type: "blocks/sort";
+  block_id: string;
+  over_id: string;
 }
 
 export interface ChangeBlockFieldAction {
