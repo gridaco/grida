@@ -13,11 +13,11 @@ export function Tabs({ form_id: id }: { form_id: string }) {
 
   return (
     <>
-      <Link href={`/d/${id}/blocks`}>
-        <Tab selected={tab === "blocks"}>Blocks</Tab>
-      </Link>
       <Link href={`/d/${id}/data`}>
         <Tab selected={tab === "data"}>Data</Tab>
+      </Link>
+      <Link href={`/d/${id}/blocks`}>
+        <Tab selected={tab === "blocks"}>Blocks</Tab>
       </Link>
       <Link href={`/d/${id}/connect`}>
         <Tab selected={tab === "connect"}>Connect</Tab>
