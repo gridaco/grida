@@ -193,6 +193,9 @@ importers:
       '@dnd-kit/modifiers':
         specifier: ^7.0.0
         version: 7.0.0(@dnd-kit/core@6.1.0)(react@18.2.0)
+      '@dnd-kit/utilities':
+        specifier: ^3.2.2
+        version: 3.2.2(react@18.2.0)
       '@editor-ui/alert-dialog':
         specifier: workspace:^
         version: link:../../ui/editor-ui/packages/editor-ui-alert-dialog
