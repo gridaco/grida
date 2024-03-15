@@ -4,6 +4,8 @@ import {
   BlocksEditorAction,
   ChangeBlockFieldAction,
   CreateNewBlockAction,
+  DeleteBlockAction,
+  OpenEditFieldAction,
   SortBlockAction,
 } from "./action";
 import { arrayMove } from "@dnd-kit/sortable";
@@ -23,6 +25,13 @@ export function reducer(
           type: block,
           data: {},
         });
+      });
+    }
+    case "blocks/delete": {
+      const { block_id } = <DeleteBlockAction>action;
+      console.log("delete block", block_id);
+      return produce(state, (draft) => {
+        draft.blocks = draft.blocks.filter((block) => block.id !== block_id);
       });
     }
     case "blocks/field/change": {
@@ -50,6 +59,13 @@ export function reducer(
         );
 
         draft.blocks = arrayMove(state.blocks, oldIndex, newIndex);
+      });
+    }
+    case "editor/field/edit": {
+      const { field_id, open } = <OpenEditFieldAction>action;
+      return produce(state, (draft) => {
+        draft.is_field_edit_panel_open = open ?? true;
+        draft.editing_field_id = field_id;
       });
     }
     default:

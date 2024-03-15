@@ -19,6 +19,15 @@ export type FormFieldType =
   | "country"
   | "payment";
 
+export type NewFormFieldInit = {
+  name: string;
+  label: string;
+  placeholder: string;
+  helpText: string;
+  type: FormFieldType;
+  required: boolean;
+};
+
 export interface FormFieldDefinition {
   id: string;
   name: string;

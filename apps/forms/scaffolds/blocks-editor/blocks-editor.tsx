@@ -25,6 +25,7 @@ import {
   SortableContext,
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
+import { FieldEditPanel } from "../panels/field-edit-panel";
 
 export default function BlocksEditorRoot({
   initial,
@@ -87,6 +88,12 @@ function BlocksEditor() {
 
   return (
     <div>
+      <FieldEditPanel
+        open={state.is_field_edit_panel_open}
+        onOpenChange={(open) => {
+          dispatch({ type: "editor/field/edit", open });
+        }}
+      />
       <DropdownMenu modal={false}>
         <DropdownMenuTrigger asChild>
           <button className="rounded border p-2">

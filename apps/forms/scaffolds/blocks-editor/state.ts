@@ -4,6 +4,8 @@ export interface BlocksEditorState {
   form_id: string;
   blocks: FormBlock[];
   fields: FormFieldDefinition[];
+  editing_field_id?: string;
+  is_field_edit_panel_open?: boolean;
 }
 
 export interface FormBlock {
