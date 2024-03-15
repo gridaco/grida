@@ -5,7 +5,13 @@ import type { BlocksEditorState, FormBlock } from "./state";
 import { StateProvider, useEditorState } from "./provider";
 import { reducer } from "./reducer";
 import { PlusIcon } from "@radix-ui/react-icons";
-import { DndContext } from "@dnd-kit/core";
+import {
+  DndContext,
+  PointerSensor,
+  closestCenter,
+  useSensor,
+  useSensors,
+} from "@dnd-kit/core";
 import { Block, BlocksCanvas } from "./blocks";
 import {
   DropdownMenu,
@@ -15,21 +21,48 @@ import {
   DropdownMenuTrigger,
 } from "@editor-ui/dropdown-menu";
 import { restrictToVerticalAxis } from "@dnd-kit/modifiers";
+import {
+  SortableContext,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
 
 export default function BlocksEditorRoot({
   initial,
 }: {
   initial: BlocksEditorState;
 }) {
+  const sensors = useSensors(useSensor(PointerSensor));
+
   const [state, dispatch] = React.useReducer(reducer, initial);
 
   return (
     <StateProvider state={state} dispatch={dispatch}>
-      <DndContext modifiers={[restrictToVerticalAxis]}>
+      <DndContext
+        sensors={sensors}
+        collisionDetection={closestCenter}
+        modifiers={[restrictToVerticalAxis]}
+        onDragEnd={handleDragEnd}
+      >
         <BlocksEditor />
       </DndContext>
     </StateProvider>
   );
+
+  function handleDragEnd(event: any) {
+    const { active, over } = event;
+
+    if (active.type === "section" && over?.type === "section") {
+      event.over = null; // Prevent section over section
+    }
+
+    if (over && active.id !== over.id) {
+      dispatch({
+        type: "blocks/sort",
+        block_id: active.id,
+        over_id: over.index,
+      });
+    }
+  }
 }
 
 function BlocksEditor() {
@@ -67,13 +100,18 @@ function BlocksEditor() {
         </DropdownMenuPortal>
       </DropdownMenu>
       <BlocksCanvas className="flex flex-col gap-4 mt-10">
-        {state.blocks.map((block, index) => {
-          return (
-            <div key={index}>
-              <Block {...block} />
-            </div>
-          );
-        })}
+        <SortableContext
+          items={state.blocks.map((block) => block.id)}
+          strategy={verticalListSortingStrategy}
+        >
+          {state.blocks.map((block, index) => {
+            return (
+              <div key={index}>
+                <Block {...block} />
+              </div>
+            );
+          })}
+        </SortableContext>
       </BlocksCanvas>
     </div>
   );
