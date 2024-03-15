@@ -44,6 +44,7 @@ export function reducer(
         const oldIndex = state.blocks.findIndex(
           (block) => block.id === block_id
         );
+
         const newIndex = state.blocks.findIndex(
           (block) => block.id === over_id
         );

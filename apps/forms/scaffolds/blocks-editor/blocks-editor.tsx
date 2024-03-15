@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useCallback } from "react";
+import React, { useCallback, useId } from "react";
 import type { BlocksEditorState, FormBlock } from "./state";
 import { StateProvider, useEditorState } from "./provider";
 import { reducer } from "./reducer";
@@ -8,7 +8,7 @@ import { PlusIcon } from "@radix-ui/react-icons";
 import {
   DndContext,
   PointerSensor,
-  closestCenter,
+  closestCorners,
   useSensor,
   useSensors,
 } from "@dnd-kit/core";
@@ -31,6 +31,8 @@ export default function BlocksEditorRoot({
 }: {
   initial: BlocksEditorState;
 }) {
+  const id = useId();
+
   const sensors = useSensors(useSensor(PointerSensor));
 
   const [state, dispatch] = React.useReducer(reducer, initial);
@@ -38,8 +40,9 @@ export default function BlocksEditorRoot({
   return (
     <StateProvider state={state} dispatch={dispatch}>
       <DndContext
+        id={id}
         sensors={sensors}
-        collisionDetection={closestCenter}
+        collisionDetection={closestCorners}
         modifiers={[restrictToVerticalAxis]}
         onDragEnd={handleDragEnd}
       >
@@ -59,7 +62,7 @@ export default function BlocksEditorRoot({
       dispatch({
         type: "blocks/sort",
         block_id: active.id,
-        over_id: over.index,
+        over_id: over.id,
       });
     }
   }
