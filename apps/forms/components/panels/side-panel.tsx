@@ -13,8 +13,8 @@ export function SidePanel({
     <Dialog.Root {...props}>
       {trigger && <Dialog.Trigger asChild>{trigger}</Dialog.Trigger>}
       <Dialog.Portal>
-        <Dialog.Overlay className="z-40 fixed bg-neutral-500/50 h-full w-full left-0 top-0 opacity-75 data-closed:animate-fade-out-overlay-bg data-open:animate-fade-in-overlay-bg " />
-        <Dialog.Content className="z-40 bg-neutral-100 flex flex-col fixed inset-y-0 lg:h-screen border-l border-overlay shadow-xl  w-screen max-w-3xl h-full  right-0 data-open:animate-panel-slide-right-out data-closed:animate-panel-slide-right-in">
+        <Dialog.Overlay className="z-40 fixed bg-neutral-500/50 h-full w-full left-0 top-0 opacity-75 data-[state='closed']:animate-fade-out-overlay-bg data-[staet='open']:animate-fade-in-overlay-bg " />
+        <Dialog.Content className="z-40 bg-neutral-100 flex flex-col fixed inset-y-0 lg:h-screen border-l border-overlay shadow-xl  w-screen max-w-3xl h-full  right-0 data-[state='open']:animate-panel-slide-right-out data-[state='closed']:animate-panel-slide-right-in">
           {children}
         </Dialog.Content>
       </Dialog.Portal>
