@@ -1,5 +1,5 @@
 import { produce } from "immer";
-import { BlocksEditorState } from "./state";
+import { FormEditorState } from "./state";
 import {
   BlocksEditorAction,
   ChangeBlockFieldAction,
@@ -11,9 +11,9 @@ import {
 import { arrayMove } from "@dnd-kit/sortable";
 
 export function reducer(
-  state: BlocksEditorState,
+  state: FormEditorState,
   action: BlocksEditorAction
-): BlocksEditorState {
+): FormEditorState {
   switch (action.type) {
     case "blocks/new": {
       // TODO: if adding new section, if there is a present non-section-blocks on root, it should automatically be nested under new section.

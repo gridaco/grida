@@ -14,6 +14,7 @@ import {
 } from "@editor-ui/alert-dialog";
 import toast from "react-hot-toast";
 import { FieldEditPanel } from "../panels/field-edit-panel";
+import { FormEditorProvider } from "../editor";
 
 export function GridEditor({
   form_id,
@@ -100,7 +101,13 @@ export function GridEditor({
   }, [supabase, focusedField]);
 
   return (
-    <>
+    <FormEditorProvider
+      initial={{
+        blocks: [], // TODO:
+        fields: [], // TODO:
+        form_id: form_id,
+      }}
+    >
       <DeleteFieldConfirmDialog
         open={deleteFieldConfirmOpen}
         onOpenChange={setDeleteFieldConfirmOpen}
@@ -127,7 +134,7 @@ export function GridEditor({
           openDeleteFieldConfirm();
         }}
       />
-    </>
+    </FormEditorProvider>
   );
 }
 

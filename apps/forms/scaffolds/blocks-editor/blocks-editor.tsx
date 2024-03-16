@@ -1,9 +1,8 @@
 "use client";
 
 import React, { useCallback, useId } from "react";
-import type { BlocksEditorState, FormBlock } from "../editor/state";
-import { StateProvider, useEditorState } from "../editor/";
-import { reducer } from "../editor/reducer";
+import type { FormEditorState, FormBlock } from "../editor/state";
+import { FormEditorProvider, useEditorState } from "../editor";
 import { PlusIcon } from "@radix-ui/react-icons";
 import {
   DndContext,
@@ -30,26 +29,34 @@ import { FieldEditPanel } from "../panels/field-edit-panel";
 export default function BlocksEditorRoot({
   initial,
 }: {
-  initial: BlocksEditorState;
+  initial: FormEditorState;
 }) {
+  return (
+    <FormEditorProvider initial={initial}>
+      <DndContextProvider>
+        <BlocksEditor />
+      </DndContextProvider>
+    </FormEditorProvider>
+  );
+}
+
+function DndContextProvider({ children }: React.PropsWithChildren<{}>) {
+  const [, dispatch] = useEditorState();
+
   const id = useId();
 
   const sensors = useSensors(useSensor(PointerSensor));
 
-  const [state, dispatch] = React.useReducer(reducer, initial);
-
   return (
-    <StateProvider state={state} dispatch={dispatch}>
-      <DndContext
-        id={id}
-        sensors={sensors}
-        collisionDetection={closestCorners}
-        modifiers={[restrictToVerticalAxis]}
-        onDragEnd={handleDragEnd}
-      >
-        <BlocksEditor />
-      </DndContext>
-    </StateProvider>
+    <DndContext
+      id={id}
+      sensors={sensors}
+      collisionDetection={closestCorners}
+      modifiers={[restrictToVerticalAxis]}
+      onDragEnd={handleDragEnd}
+    >
+      {children}
+    </DndContext>
   );
 
   function handleDragEnd(event: any) {

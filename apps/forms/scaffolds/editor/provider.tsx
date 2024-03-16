@@ -1,7 +1,7 @@
 "use client";
 
 import React, { memo, useMemo, useContext } from "react";
-import type { BlocksEditorState } from "./state";
+import type { FormEditorState } from "./state";
 import {
   DispatchContext,
   useDispatch,
@@ -9,14 +9,14 @@ import {
   type FlatDispatcher,
 } from "./dispatch";
 
-const Context = React.createContext<BlocksEditorState | undefined>(undefined);
+const Context = React.createContext<FormEditorState | undefined>(undefined);
 
 export const StateProvider = memo(function StateProvider({
   state,
   dispatch,
   children,
 }: {
-  state: BlocksEditorState;
+  state: FormEditorState;
   dispatch?: Dispatcher;
   children?: React.ReactNode;
 }) {
@@ -31,7 +31,7 @@ export const StateProvider = memo(function StateProvider({
 
 const __noop = () => {};
 
-export const useEditorState = (): [BlocksEditorState, FlatDispatcher] => {
+export const useEditorState = (): [FormEditorState, FlatDispatcher] => {
   const state = useContext(Context);
 
   if (!state) {

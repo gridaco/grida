@@ -1,6 +1,6 @@
 import type { FormBlockType, FormFieldDefinition } from "@/types";
 
-export interface BlocksEditorState {
+export interface FormEditorState {
   form_id: string;
   blocks: FormBlock[];
   fields: FormFieldDefinition[];
