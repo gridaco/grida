@@ -7,6 +7,7 @@ import { GridaLogo } from "@/components/grida-logo";
 import { EyeOpenIcon, SlashIcon } from "@radix-ui/react-icons";
 import { Toaster } from "react-hot-toast";
 import { Tabs } from "@/scaffolds/d/tabs";
+import { FormEditorProvider } from "@/scaffolds/editor";
 
 export const revalidate = 0;
 
@@ -23,7 +24,7 @@ export default async function Layout({
 
   const { data, error } = await supabase
     .from("form")
-    .select()
+    .select(`*, blocks:form_block(*), fields:form_field(*)`)
     .eq("id", id)
     .single();
 
@@ -66,7 +67,15 @@ export default async function Layout({
           </button>
         </div>
       </header>
-      {children}
+      <FormEditorProvider
+        initial={{
+          form_id: id,
+          fields: data.fields,
+          blocks: data.blocks,
+        }}
+      >
+        {children}
+      </FormEditorProvider>
     </main>
   );
 }

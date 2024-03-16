@@ -26,17 +26,11 @@ import {
 } from "@dnd-kit/sortable";
 import { FieldEditPanel } from "../panels/field-edit-panel";
 
-export default function BlocksEditorRoot({
-  initial,
-}: {
-  initial: FormEditorState;
-}) {
+export default function BlocksEditorRoot() {
   return (
-    <FormEditorProvider initial={initial}>
-      <DndContextProvider>
-        <BlocksEditor />
-      </DndContextProvider>
-    </FormEditorProvider>
+    <DndContextProvider>
+      <BlocksEditor />
+    </DndContextProvider>
   );
 }
 
