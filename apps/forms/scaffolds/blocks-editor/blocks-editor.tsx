@@ -1,9 +1,9 @@
 "use client";
 
 import React, { useCallback, useId } from "react";
-import type { BlocksEditorState, FormBlock } from "./state";
-import { StateProvider, useEditorState } from "./provider";
-import { reducer } from "./reducer";
+import type { BlocksEditorState, FormBlock } from "../editor/state";
+import { StateProvider, useEditorState } from "../editor/";
+import { reducer } from "../editor/reducer";
 import { PlusIcon } from "@radix-ui/react-icons";
 import {
   DndContext,

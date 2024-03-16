@@ -1,6 +1,6 @@
 import { FormFieldPreview } from "@/components/formfield";
-import type { FormBlock } from "../state";
-import { useEditorState } from "../provider";
+import type { FormBlock } from "../../editor/state";
+import { useEditorState } from "../../editor/provider";
 import { FormFieldDefinition } from "@/types";
 import {
   DotsHorizontalIcon,
