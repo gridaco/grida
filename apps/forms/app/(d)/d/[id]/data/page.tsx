@@ -3,6 +3,7 @@ import { DownloadIcon } from "@radix-ui/react-icons";
 import { cookies } from "next/headers";
 
 import { GridEditor } from "@/scaffolds/grid-editor";
+import Link from "next/link";
 
 export default async function FormResponsesPage({
   params,
@@ -63,10 +64,12 @@ export default async function FormResponsesPage({
       </div>
       <footer className="flex min-h-9 overflow-hidden items-center px-2 w-full border-t">
         <div>{form?.responses?.length ?? 0} response(s)</div>
-        <button className="flex items-center gap-1 p-2 bg-neutral-100 rounded">
-          Export to CSV
-          <DownloadIcon />
-        </button>
+        <Link href={`/v1/${form_id}/export/csv`} download target="_blank">
+          <button className="flex items-center gap-1 p-2 bg-neutral-100 rounded">
+            Export to CSV
+            <DownloadIcon />
+          </button>
+        </Link>
       </footer>
     </div>
   );
