@@ -62,10 +62,14 @@ export function reducer(
       });
     }
     case "editor/field/edit": {
-      const { field_id, open } = <OpenEditFieldAction>action;
+      const { field_id, open, refresh } = <OpenEditFieldAction>action;
       return produce(state, (draft) => {
         draft.is_field_edit_panel_open = open ?? true;
         draft.editing_field_id = field_id;
+        if (refresh) {
+          draft.field_edit_panel_refresh_key =
+            (draft.field_edit_panel_refresh_key ?? 0) + 1;
+        }
       });
     }
     default:

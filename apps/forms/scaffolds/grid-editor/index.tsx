@@ -32,13 +32,6 @@ export function GridEditor({
     setNewFieldPanelOpen(true);
   };
 
-  const closeNewFieldPanel = (options: { refresh: boolean }) => {
-    setNewFieldPanelOpen(false);
-    if (options.refresh) {
-      setNewFieldPanelRefreshKey((k) => k + 1);
-    }
-  };
-
   const openDeleteFieldConfirm = () => {
     setDeleteFieldConfirmOpen(true);
   };
@@ -48,36 +41,6 @@ export function GridEditor({
   };
 
   const supabase = createClientClient();
-
-  const onAddNewField = (init: NewFormFieldInit) => {
-    supabase
-      .from("form_field")
-      .insert({
-        form_id: form_id,
-        type: init.type,
-        name: init.name,
-        label: init.label,
-        placeholder: init.placeholder,
-        help_text: init.helpText,
-        required: init.required,
-      })
-      .select()
-      .single()
-      .then(({ data, error }) => {
-        if (data) {
-          toast.success("New field added");
-          closeNewFieldPanel({ refresh: true });
-        } else {
-          if (error.code === "23505") {
-            toast.error(`field with name "${init.name}" already exists`);
-            console.error(error);
-            return;
-          }
-          toast.error("Failed to add new field");
-          console.error(error);
-        }
-      });
-  };
 
   const onDeleteField = useCallback(() => {
     supabase
@@ -119,7 +82,6 @@ export function GridEditor({
         open={newFieldPanelOpen}
         onOpenChange={setNewFieldPanelOpen}
         formResetKey={newFieldPanelRefreshKey}
-        onSubmit={onAddNewField}
       />
       <Grid
         columns={props.columns}

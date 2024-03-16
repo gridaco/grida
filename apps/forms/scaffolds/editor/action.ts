@@ -33,4 +33,5 @@ export interface OpenEditFieldAction {
   field_id?: string;
   // true by default
   open?: boolean;
+  refresh?: boolean;
 }

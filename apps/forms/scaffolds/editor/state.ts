@@ -6,6 +6,7 @@ export interface FormEditorState {
   fields: FormFieldDefinition[];
   editing_field_id?: string;
   is_field_edit_panel_open?: boolean;
+  field_edit_panel_refresh_key?: number;
 }
 
 export interface FormBlock {

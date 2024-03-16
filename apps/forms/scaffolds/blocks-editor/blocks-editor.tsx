@@ -89,12 +89,6 @@ function BlocksEditor() {
 
   return (
     <div>
-      <FieldEditPanel
-        open={state.is_field_edit_panel_open}
-        onOpenChange={(open) => {
-          dispatch({ type: "editor/field/edit", open });
-        }}
-      />
       <DropdownMenu modal={false}>
         <DropdownMenuTrigger asChild>
           <button className="rounded border p-2">
