@@ -72,7 +72,7 @@ const default_field_init: {
       { label: "Option 3", value: "option3" },
     ],
   },
-  password: { type: "password" },
+  password: { type: "password", placeholder: "Password" },
   color: { type: "color" },
   radio: {
     type: "radio",
@@ -99,6 +99,7 @@ export function FieldEditPanel({
   formResetKey?: number;
   onSubmit?: (field: NewFormFieldInit) => void;
 }) {
+  const [effect_cause, set_effect_cause] = useState<"ai" | "human">("human");
   const [name, setName] = useState("");
   const [label, setLabel] = useState("");
   const [placeholder, setPlaceholder] = useState("");
@@ -135,18 +136,36 @@ export function FieldEditPanel({
     });
   };
 
+  const onSuggestion = (schema: NewFormFieldInit) => {
+    set_effect_cause("ai");
+
+    setName(schema.name);
+    setLabel(schema.label);
+    setPlaceholder(schema.placeholder);
+    setHelpText(schema.helpText);
+    setType(schema.type);
+    setRequired(schema.required);
+    setOptions(schema.options || []);
+    setPattern(schema.pattern);
+  };
+
   useEffect(() => {
-    if (type in default_field_init) {
-      const defaults = default_field_init[type];
-      setName(defaults.name || "");
-      setLabel(defaults.label || "");
-      setPlaceholder(defaults.placeholder || "");
-      setHelpText(defaults.helpText || "");
-      setRequired(defaults.required || false);
-      setOptions(defaults.options || []);
-      setPattern(defaults.pattern);
+    if (effect_cause === "human") {
+      if (type in default_field_init) {
+        const defaults = default_field_init[type];
+        setName(defaults.name || "");
+        setLabel(defaults.label || "");
+        setPlaceholder(defaults.placeholder || "");
+        setHelpText(defaults.helpText || "");
+        setRequired(defaults.required || false);
+        // reset options if there were no existing options
+        if (!options?.length) {
+          setOptions(defaults.options || []);
+        }
+        setPattern(defaults.pattern);
+      }
     }
-  }, [type]);
+  }, [type, effect_cause, options?.length]);
 
   return (
     <SidePanel {...props}>
@@ -188,6 +207,9 @@ export function FieldEditPanel({
             </div>
           </PanelPropertyFields>
         </PanelPropertySection>
+        <PanelPropertySection>
+          <FormFieldAssistant onSuggestion={onSuggestion} />
+        </PanelPropertySection>
         <form key={formResetKey}>
           <PanelPropertySection>
             <PanelPropertySectionTitle>Field</PanelPropertySectionTitle>
@@ -195,7 +217,10 @@ export function FieldEditPanel({
               <PanelPropertyField label={"Type"}>
                 <select
                   value={type}
-                  onChange={(e) => setType(e.target.value as FormFieldType)}
+                  onChange={(e) => {
+                    set_effect_cause("human");
+                    setType(e.target.value as FormFieldType);
+                  }}
                 >
                   {supported_field_types.map((type) => (
                     <option key={type} value={type}>
@@ -256,19 +281,15 @@ export function FieldEditPanel({
                   onChange={(e) => setHelpText(e.target.value)}
                 />
               </PanelPropertyField>
-              <PanelPropertyField label={"Required"}>
-                <input
-                  type="checkbox"
-                  checked={required}
-                  onChange={(e) => setRequired(e.target.checked)}
-                />
-              </PanelPropertyField>
-
-              {/* <PropertyTextField
-                label={"Name"}
-                placeholder={"field_name"}
-                description="Recommended to use lowercase and use an underscore to separate words e.g. column_name"
-              /> */}
+              {type !== "checkbox" && (
+                <PanelPropertyField label={"Required"}>
+                  <input
+                    type="checkbox"
+                    checked={required}
+                    onChange={(e) => setRequired(e.target.checked)}
+                  />
+                </PanelPropertyField>
+              )}
             </PanelPropertyFields>
           </PanelPropertySection>
           {has_options && (
@@ -299,6 +320,19 @@ export function FieldEditPanel({
                   />
                 </PanelPropertyField>
               )}
+              {type === "checkbox" && (
+                <PanelPropertyField label={"Required"}>
+                  <input
+                    type="checkbox"
+                    checked={required}
+                    onChange={(e) => setRequired(e.target.checked)}
+                  />
+                  <p>
+                    The checkbox will be required if it is checked. The user
+                    must check the checkbox to continue.
+                  </p>
+                </PanelPropertyField>
+              )}
             </PanelPropertyFields>
           </PanelPropertySection>
         </form>
@@ -312,6 +346,54 @@ export function FieldEditPanel({
         </button>
       </PanelFooter>
     </SidePanel>
+  );
+}
+
+function FormFieldAssistant({
+  onSuggestion,
+}: {
+  onSuggestion?: (schema: NewFormFieldInit) => void;
+}) {
+  const [description, setDescription] = useState("");
+  const [schema, setSchema] = useState<NewFormFieldInit | null>(null);
+
+  const assist = async () => {
+    const response = await fetch("/ai/schema", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ description }),
+    });
+
+    if (response.ok) {
+      const data = await response.json();
+      setSchema(data);
+      console.log(data);
+    } else {
+      const error = await response.json();
+      console.error(error);
+    }
+  };
+
+  useEffect(() => {
+    if (schema) {
+      onSuggestion?.(schema);
+    }
+  }, [schema]);
+
+  return (
+    <div>
+      <textarea
+        value={description}
+        onChange={(e) => setDescription(e.target.value)}
+      />
+      <button onClick={assist}>Assist</button>
+      <pre>
+        <code>{JSON.stringify(schema, null, 2)}</code>
+      </pre>
+      {/* {schema && <FormFieldPreview {...schema} />} */}
+    </div>
   );
 }
 
