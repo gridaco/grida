@@ -24,9 +24,15 @@ export function SidePanel({
 
 export function PanelPropertySection({
   children,
-}: React.PropsWithChildren<{}>) {
+  grid = true,
+}: React.PropsWithChildren<{
+  grid?: boolean;
+}>) {
   return (
-    <div className="grid grid-cols-12 gap-6 px-8 py-8 opacity-100">
+    <div
+      data-grid={grid}
+      className="grid grid-cols-12 data-[grid='false']:block gap-6 px-8 py-8 opacity-100"
+    >
       {children}
     </div>
   );

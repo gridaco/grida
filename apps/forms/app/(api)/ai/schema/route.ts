@@ -30,37 +30,18 @@ const formFieldTypes = [
 
 const interface_txt = `
 \`\`\`
-export type FormFieldType =
-  | "text"
-  | "textarea"
-  | "tel"
-  | "url"
-  | "checkbox"
-  | "number"
-  | "date"
-  | "month"
-  | "week"
-  | "email"
-  | "file"
-  | "image"
-  | "select"
-  | "latlng"
-  | "password"
-  | "color"
-  | "radio"
-  | "country"
-  | "payment";
-
 export type NewFormFieldInit = {
-  name: string; // snake_case
+  name: string; // The input's name, identifier. Recommended to use lowercase and use an underscore to separate words e.g. column_name
   label: string; // Human readable label
   placeholder: string; // Placeholder text
   helpText: string; // Help text, displayed below the field
   type: FormFieldType; // Type of field
   required: boolean; // Whether the field is required
-  options?: { label: string; value: string }[]; // Options for select, radio, checkbox, etc.
+  options?: { label: string; value: string }[]; // Options for [select, radio]
   pattern?: string; // Regular expression pattern for validation (for html input pattern attribute)
 };
+
+export type FormFieldType = | "text" | "textarea" | "tel" | "url" | "checkbox" | "number" | "date" | "month" | "week" | "email" | "file" | "image" | "select" | "latlng" | "password" | "color" | "radio" | "country" | "payment";
 \`\`\`
 `;
 
@@ -80,7 +61,7 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const prompt = `Based on the description: "${description}", create a form field schema with the \`NewFormFieldInit\` interface. The json should be acceptable by the following interface with JSON.parse()
+  const prompt = `Based on the user's field description: "${description}", create a form field schema with the \`NewFormFieldInit\` interface. The json should be acceptable by the following interface with JSON.parse()
 ${interface_txt}
 `;
 
@@ -91,7 +72,7 @@ ${interface_txt}
         {
           role: "system",
           content:
-            "Create a JSON schema for a form field based on a description, ensuring the type matches specific options.",
+            "Create a JSON schema for a form field based on a description, ensuring the type matches specific options. Users might not speak english, so be sure to localize the response based on their input.",
         },
         {
           role: "user",
