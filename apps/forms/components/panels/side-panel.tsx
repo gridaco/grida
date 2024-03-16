@@ -56,7 +56,7 @@ export function PanelPropertyField({
   optional,
   children,
 }: React.PropsWithChildren<{
-  label: string;
+  label: React.ReactNode;
   description?: string;
   optional?: boolean;
 }>) {

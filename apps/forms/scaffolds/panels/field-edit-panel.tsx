@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   PanelClose,
   PanelContent,
@@ -16,6 +16,78 @@ import {
 import { FormFieldPreview } from "@/components/formfield";
 import { FormFieldType, NewFormFieldInit } from "@/types";
 import { capitalCase, snakeCase } from "change-case";
+import { LockClosedIcon } from "@radix-ui/react-icons";
+import toast from "react-hot-toast";
+
+const supported_field_types: FormFieldType[] = [
+  "text",
+  "textarea",
+  "tel",
+  "url",
+  "checkbox",
+  "number",
+  "date",
+  "month",
+  "week",
+  "email",
+  "select",
+  "password",
+  "color",
+  "radio",
+];
+
+// @ts-ignore
+const default_field_init: {
+  [key in FormFieldType]: Partial<NewFormFieldInit>;
+} = {
+  text: {},
+  textarea: { type: "textarea" },
+  tel: {
+    type: "tel",
+    placeholder: "123-456-7890",
+    pattern: "[0-9]{3}-[0-9]{3}-[0-9]{4}",
+  },
+  url: {
+    type: "url",
+    placeholder: "https://example.com",
+    pattern: "https://.*",
+  },
+  checkbox: { type: "checkbox" },
+  number: { type: "number" },
+  date: { type: "date" },
+  month: { type: "month" },
+  week: { type: "week" },
+  email: {
+    type: "email",
+    name: "email",
+    label: "Email",
+    placeholder: "alice@example.com",
+    pattern: "[a-z0-9._%+-]+@[a-z0-9.-]+\\.[a-z]{2,}$",
+  },
+  select: {
+    type: "select",
+    options: [
+      { label: "Option 1", value: "option1" },
+      { label: "Option 2", value: "option2" },
+      { label: "Option 3", value: "option3" },
+    ],
+  },
+  password: { type: "password" },
+  color: { type: "color" },
+  radio: {
+    type: "radio",
+    options: [
+      { label: "Option 1", value: "option1" },
+      { label: "Option 2", value: "option2" },
+      { label: "Option 3", value: "option3" },
+    ],
+  },
+};
+
+const input_can_have_options: FormFieldType[] = ["select", "radio"];
+const input_can_have_pattern: FormFieldType[] = supported_field_types.filter(
+  (type) => !["checkbox", "color", "radio"].includes(type)
+);
 
 export function FieldEditPanel({
   title,
@@ -33,6 +105,10 @@ export function FieldEditPanel({
   const [helpText, setHelpText] = useState("");
   const [type, setType] = useState<FormFieldType>("text");
   const [required, setRequired] = useState(false);
+  const [pattern, setPattern] = useState<string | undefined>();
+  const [options, setOptions] = useState<{ label: string; value: string }[]>(
+    []
+  );
 
   const preview_label = buildPreviewLabel({
     name,
@@ -40,8 +116,13 @@ export function FieldEditPanel({
     required,
   });
 
+  const has_options = input_can_have_options.includes(type);
+  const has_pattern = input_can_have_pattern.includes(type);
+
   const preview_placeholder =
     placeholder || convertToPlainText(label) || convertToPlainText(name);
+
+  const preview_disabled = !name;
 
   const onSaveClick = () => {
     onSubmit?.({
@@ -54,15 +135,35 @@ export function FieldEditPanel({
     });
   };
 
+  useEffect(() => {
+    if (type in default_field_init) {
+      const defaults = default_field_init[type];
+      setName(defaults.name || "");
+      setLabel(defaults.label || "");
+      setPlaceholder(defaults.placeholder || "");
+      setHelpText(defaults.helpText || "");
+      setRequired(defaults.required || false);
+      setOptions(defaults.options || []);
+      setPattern(defaults.pattern);
+    }
+  }, [type]);
+
   return (
     <SidePanel {...props}>
       <PanelHeader>{title}</PanelHeader>
       <PanelContent>
-        <form key={formResetKey}>
-          <PanelPropertySection>
-            <PanelPropertySectionTitle>Preview</PanelPropertySectionTitle>
-            <PanelPropertyFields>
-              <div className="w-full min-h-40 bg-neutral-200 rounded p-10 border border-black/20">
+        <PanelPropertySection>
+          <PanelPropertySectionTitle>Preview</PanelPropertySectionTitle>
+          <PanelPropertyFields>
+            <div className="relative w-full min-h-40 bg-neutral-200 rounded p-10 border border-black/20">
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  toast.success("Test: Input is valid", {
+                    position: "top-right",
+                  });
+                }}
+              >
                 <FormFieldPreview
                   name={name}
                   type={type}
@@ -71,26 +172,45 @@ export function FieldEditPanel({
                   placeholder={preview_placeholder}
                   helpText={helpText}
                   required={required}
+                  disabled={preview_disabled}
+                  options={has_options ? options : undefined}
+                  pattern={pattern}
                 />
-              </div>
-            </PanelPropertyFields>
-          </PanelPropertySection>
+                <div className="absolute bottom-0 right-0 m-2">
+                  <button
+                    type="submit"
+                    className="rounded-full px-2 py-1 bg-neutral-100 text-xs font-mono"
+                  >
+                    Test
+                  </button>
+                </div>
+              </form>
+            </div>
+          </PanelPropertyFields>
+        </PanelPropertySection>
+        <form key={formResetKey}>
           <PanelPropertySection>
-            <PanelPropertySectionTitle>General</PanelPropertySectionTitle>
+            <PanelPropertySectionTitle>Field</PanelPropertySectionTitle>
             <PanelPropertyFields>
               <PanelPropertyField label={"Type"}>
                 <select
                   value={type}
                   onChange={(e) => setType(e.target.value as FormFieldType)}
                 >
-                  <option value="text">Text</option>
-                  <option value="textarea">Textarea</option>
-                  <option value="email">Email</option>
-                  <option value="number">Number</option>
+                  {supported_field_types.map((type) => (
+                    <option key={type} value={type}>
+                      {type}
+                    </option>
+                  ))}
                 </select>
               </PanelPropertyField>
               <PanelPropertyField
-                label={"Name"}
+                label={
+                  <div className="flex gap-2 items-center">
+                    <LockClosedIcon />
+                    Name *
+                  </div>
+                }
                 description="The input's name, identifier. Recommended to use lowercase and use an underscore to separate words e.g. column_name"
               >
                 <PropertyTextInput
@@ -101,6 +221,11 @@ export function FieldEditPanel({
                   onChange={(e) => setName(e.target.value)}
                 />
               </PanelPropertyField>
+            </PanelPropertyFields>
+          </PanelPropertySection>
+          <PanelPropertySection>
+            <PanelPropertySectionTitle>General</PanelPropertySectionTitle>
+            <PanelPropertyFields>
               <PanelPropertyField
                 label={"Label"}
                 description="The label that will be displayed to the user"
@@ -144,6 +269,36 @@ export function FieldEditPanel({
                 placeholder={"field_name"}
                 description="Recommended to use lowercase and use an underscore to separate words e.g. column_name"
               /> */}
+            </PanelPropertyFields>
+          </PanelPropertySection>
+          {has_options && (
+            <PanelPropertySection>
+              <PanelPropertySectionTitle>Options</PanelPropertySectionTitle>
+              <PanelPropertyFields>
+                {/*  */}
+                {options?.map((option, index) => (
+                  <p key={index}>
+                    {option.label} - {option.value}
+                  </p>
+                ))}
+              </PanelPropertyFields>
+            </PanelPropertySection>
+          )}
+          <PanelPropertySection>
+            <PanelPropertySectionTitle>Validation</PanelPropertySectionTitle>
+            <PanelPropertyFields>
+              {has_pattern && (
+                <PanelPropertyField
+                  label={"Pattern"}
+                  description="A regular expression that the input's value must match"
+                >
+                  <PropertyTextInput
+                    placeholder={".*"}
+                    value={pattern}
+                    onChange={(e) => setPattern(e.target.value)}
+                  />
+                </PanelPropertyField>
+              )}
             </PanelPropertyFields>
           </PanelPropertySection>
         </form>

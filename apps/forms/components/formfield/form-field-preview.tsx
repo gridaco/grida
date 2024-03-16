@@ -1,5 +1,5 @@
 import { FormFieldType } from "@/types";
-import { useEffect } from "react";
+import React, { useEffect } from "react";
 
 export function FormFieldPreview({
   name,
@@ -8,9 +8,11 @@ export function FormFieldPreview({
   type,
   placeholder,
   required,
+  options,
   helpText,
   readonly,
   disabled,
+  pattern,
 }: {
   name: string;
   label?: string;
@@ -19,9 +21,88 @@ export function FormFieldPreview({
   placeholder?: string;
   helpText?: string;
   required: boolean;
+  options?: { label: string; value: string }[];
   readonly?: boolean;
   disabled?: boolean;
+  pattern?: string;
 }) {
+  const sharedInputProps:
+    | React.ComponentProps<"input">
+    | React.ComponentProps<"textarea"> = {
+    readOnly: readonly,
+    disabled: disabled,
+    autoFocus: false,
+    placeholder: placeholder,
+    required: required,
+    pattern,
+  };
+
+  function renderInput() {
+    switch (type) {
+      case "textarea": {
+        return (
+          <HtmlTextarea
+            {...(sharedInputProps as React.ComponentProps<"textarea">)}
+          />
+        );
+      }
+      case "checkbox": {
+        return (
+          <input
+            className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"
+            type="checkbox"
+            {...(sharedInputProps as React.ComponentProps<"input">)}
+          />
+        );
+      }
+      case "select": {
+        return (
+          <select {...(sharedInputProps as React.ComponentProps<"select">)}>
+            {options?.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        );
+      }
+      case "color": {
+        return (
+          <input
+            type="color"
+            {...(sharedInputProps as React.ComponentProps<"input">)}
+          />
+        );
+      }
+      case "radio": {
+        return (
+          <>
+            {options?.map((option) => (
+              <div key={option.value}>
+                <input
+                  type="radio"
+                  name={name}
+                  id={option.value}
+                  value={option.value}
+                  {...(sharedInputProps as React.ComponentProps<"input">)}
+                />
+                <label>{option.label}</label>
+              </div>
+            ))}
+          </>
+        );
+      }
+      default: {
+        return (
+          <HtmlInput
+            type={type}
+            {...(sharedInputProps as React.ComponentProps<"input">)}
+          />
+        );
+      }
+    }
+  }
+
   return (
     <label className="flex flex-col">
       <span
@@ -30,16 +111,26 @@ export function FormFieldPreview({
       >
         {label || name}
       </span>
-      <input
-        readOnly={readonly}
-        disabled={disabled || !name}
-        autoFocus={false}
-        className="shadow appearance-none border rounded py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
-        type={type}
-        placeholder={placeholder}
-        required={required}
-      />
+      {renderInput()}
       {helpText && <span className="text-sm text-gray-600">{helpText}</span>}
     </label>
+  );
+}
+
+function HtmlTextarea({ ...props }: React.ComponentProps<"textarea">) {
+  return (
+    <textarea
+      className="shadow appearance-none border rounded py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+      {...props}
+    />
+  );
+}
+
+function HtmlInput({ ...props }: React.ComponentProps<"input">) {
+  return (
+    <input
+      className="shadow appearance-none border rounded py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+      {...props}
+    />
   );
 }
