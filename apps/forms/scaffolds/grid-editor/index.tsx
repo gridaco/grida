@@ -24,9 +24,16 @@ export function GridEditor({
   const [deleteFieldConfirmOpen, setDeleteFieldConfirmOpen] = useState(false);
 
   const { focus_field_id } = state;
-  const openNewFieldPanel = useCallback(
+  const openNewFieldPanel = useCallback(() => {
+    dispatch({
+      type: "editor/field/edit",
+      open: true,
+      refresh: true,
+    });
+  }, [dispatch]);
+
+  const openEditFieldPanel = useCallback(
     (field_id?: string) => {
-      console.log("open new field panel", field_id);
       dispatch({
         type: "editor/field/edit",
         field_id: field_id,
@@ -80,9 +87,7 @@ export function GridEditor({
         columns={props.columns}
         rows={props.rows}
         onAddNewFieldClick={openNewFieldPanel}
-        onEditFieldClick={(field_id) => {
-          openNewFieldPanel(field_id);
-        }}
+        onEditFieldClick={openEditFieldPanel}
         onDeleteFieldClick={(field_id) => {
           dispatch({
             type: "editor/field/focus",

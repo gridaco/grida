@@ -1,14 +1,9 @@
 import { createRouteHandlerClient } from "@/lib/supabase/server";
-import { NewFormFieldInit } from "@/types";
+import { FormFieldUpsert } from "@/types/private/api";
 import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
 
 export const revalidate = 0;
-
-type FormFieldUpsert = NewFormFieldInit & {
-  form_id: string;
-  id?: string;
-};
 
 export async function POST(req: NextRequest) {
   const cookieStore = cookies();
@@ -19,34 +14,19 @@ export async function POST(req: NextRequest) {
 
   const { data: upserted, error } = await supabase
     .from("form_field")
-    .update({
-      // id: data.id,
-      // form_id: data.form_id,
+    .upsert({
+      id: data.id,
+      form_id: data.form_id,
       type: data.type,
       name: data.name,
       label: data.label,
       placeholder: data.placeholder,
       help_text: data.helpText,
       required: data.required,
+      updated_at: new Date().toISOString(),
     })
-    .eq("id", data.id!)
     .select()
     .single();
-
-  // .then(({ data, error }) => {
-  //   if (data) {
-  //     toast.success("New field added");
-  //     closeNewFieldPanel({ refresh: true });
-  //   } else {
-  //     if (error.code === "23505") {
-  //       toast.error(`field with name "${init.name}" already exists`);
-  //       console.error(error);
-  //       return;
-  //     }
-  //     toast.error("Failed to add new field");
-  //     console.error(error);
-  //   }
-  // });
 
   console.log("upserted", upserted);
 

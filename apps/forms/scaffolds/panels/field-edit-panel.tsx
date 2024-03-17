@@ -139,6 +139,8 @@ export function FieldEditPanel({
       helpText,
       type,
       required,
+      options,
+      pattern,
     });
   };
 

@@ -8,6 +8,7 @@ import { FieldEditPanel } from "../panels/field-edit-panel";
 import { NewFormFieldInit } from "@/types";
 import { createClientClient } from "@/lib/supabase/client";
 import toast from "react-hot-toast";
+import { FormFieldUpsert } from "@/types/private/api";
 
 export function FormEditorProvider({
   initial,
@@ -50,13 +51,22 @@ function FieldEditPanelProvider({
 
   const onSaveField = useCallback(
     (init: NewFormFieldInit) => {
+      const data: FormFieldUpsert = {
+        ...init,
+        options: init.options?.length ? init.options : undefined,
+        //
+        id: state.focus_field_id,
+        form_id: form_id,
+      };
+
+      console.log("saving..", data);
+
       const promise = fetch("/private/editor/fields", {
-        body: JSON.stringify({
-          ...init,
-          id: state.focus_field_id,
-          form_id: form_id,
-        }),
+        body: JSON.stringify(data),
         method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
       })
         .then((res) => {
           if (!res.ok) {
