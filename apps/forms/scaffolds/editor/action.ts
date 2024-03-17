@@ -5,7 +5,9 @@ export type BlocksEditorAction =
   | DeleteBlockAction
   | OpenEditFieldAction
   | SortBlockAction
+  | FocusFieldAction
   | ChangeBlockFieldAction;
+
 export interface CreateNewBlockAction {
   type: "blocks/new";
   block: FormBlockType;
@@ -25,6 +27,11 @@ export interface SortBlockAction {
 export interface ChangeBlockFieldAction {
   type: "blocks/field/change";
   block_id: string;
+  field_id: string;
+}
+
+export interface FocusFieldAction {
+  type: "editor/field/focus";
   field_id: string;
 }
 

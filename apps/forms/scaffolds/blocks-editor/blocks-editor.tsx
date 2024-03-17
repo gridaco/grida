@@ -24,7 +24,6 @@ import {
   SortableContext,
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
-import { FieldEditPanel } from "../panels/field-edit-panel";
 
 export default function BlocksEditorRoot() {
   return (

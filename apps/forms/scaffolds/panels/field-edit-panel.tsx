@@ -93,22 +93,28 @@ export function FieldEditPanel({
   title,
   onSubmit,
   formResetKey = 0,
+  init,
+  disableAI,
   ...props
 }: React.ComponentProps<typeof SidePanel> & {
   title?: string;
   formResetKey?: number;
+  init?: Partial<NewFormFieldInit>;
+  disableAI?: boolean;
   onSubmit?: (field: NewFormFieldInit) => void;
 }) {
-  const [effect_cause, set_effect_cause] = useState<"ai" | "human">("human");
-  const [name, setName] = useState("");
-  const [label, setLabel] = useState("");
-  const [placeholder, setPlaceholder] = useState("");
-  const [helpText, setHelpText] = useState("");
-  const [type, setType] = useState<FormFieldType>("text");
-  const [required, setRequired] = useState(false);
-  const [pattern, setPattern] = useState<string | undefined>();
+  const [effect_cause, set_effect_cause] = useState<"ai" | "human" | "system">(
+    "system"
+  );
+  const [name, setName] = useState(init?.name || "");
+  const [label, setLabel] = useState(init?.label || "");
+  const [placeholder, setPlaceholder] = useState(init?.placeholder || "");
+  const [helpText, setHelpText] = useState(init?.helpText || "");
+  const [type, setType] = useState<FormFieldType>(init?.type || "text");
+  const [required, setRequired] = useState(init?.required || false);
+  const [pattern, setPattern] = useState<string | undefined>(init?.pattern);
   const [options, setOptions] = useState<{ label: string; value: string }[]>(
-    []
+    init?.options || []
   );
 
   const preview_label = buildPreviewLabel({
@@ -207,9 +213,11 @@ export function FieldEditPanel({
             </div>
           </PanelPropertyFields>
         </PanelPropertySection>
-        <PanelPropertySection grid={false}>
-          <FormFieldAssistant onSuggestion={onSuggestion} />
-        </PanelPropertySection>
+        {!disableAI && (
+          <PanelPropertySection grid={false}>
+            <FormFieldAssistant onSuggestion={onSuggestion} />
+          </PanelPropertySection>
+        )}
         <form key={formResetKey}>
           <PanelPropertySection>
             <PanelPropertySectionTitle>Field</PanelPropertySectionTitle>

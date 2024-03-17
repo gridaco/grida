@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useMemo } from "react";
 import { StateProvider, useEditorState } from "./provider";
 import { reducer } from "./reducer";
 import { FormEditorState } from "./state";
@@ -13,11 +13,11 @@ export function FormEditorProvider({
   initial,
   children,
 }: React.PropsWithChildren<{ initial: FormEditorState }>) {
-  const form_id = initial.form_id;
   const [state, dispatch] = React.useReducer(reducer, initial);
+
   return (
     <StateProvider state={state} dispatch={dispatch}>
-      <FieldEditPanelProvider form_id={form_id}>
+      <FieldEditPanelProvider form_id={state.form_id}>
         {/*  */}
         {children}
       </FieldEditPanelProvider>
@@ -32,6 +32,10 @@ function FieldEditPanelProvider({
   form_id: string;
 }>) {
   const [state, dispatch] = useEditorState();
+
+  const field = useMemo(() => {
+    return state.fields.find((f) => f.id === state.focus_field_id);
+  }, [state.focus_field_id, state.fields]);
 
   const supabase = createClientClient();
 
@@ -73,12 +77,29 @@ function FieldEditPanelProvider({
       });
   };
 
+  const is_existing_field = !!field;
+
   return (
     <>
       <FieldEditPanel
-        title={state.editing_field_id ? "Edit Field" : "New Field"}
+        key={field?.name}
         open={state.is_field_edit_panel_open}
+        title={is_existing_field ? "Edit Field" : "New Field"}
+        disableAI={is_existing_field}
         formResetKey={state.field_edit_panel_refresh_key}
+        init={
+          field
+            ? {
+                name: field.name,
+                type: field.type,
+                label: field.label ?? "",
+                helpText: field.help_text ?? "",
+                placeholder: field.placeholder ?? "",
+                // options: field.options,
+                required: field.required,
+              }
+            : undefined
+        }
         onOpenChange={(open) => {
           dispatch({ type: "editor/field/edit", open });
         }}

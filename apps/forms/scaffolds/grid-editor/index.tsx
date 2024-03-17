@@ -2,7 +2,6 @@
 
 import React, { useCallback, useState } from "react";
 import { Grid } from "../grid";
-import type { NewFormFieldInit } from "@/types";
 import { createClientClient } from "@/lib/supabase/client";
 import {
   AlertDialog,
@@ -13,8 +12,7 @@ import {
   AlertDialogAction,
 } from "@editor-ui/alert-dialog";
 import toast from "react-hot-toast";
-import { FieldEditPanel } from "../panels/field-edit-panel";
-import { FormEditorProvider } from "../editor";
+import { useEditorState } from "../editor";
 
 export function GridEditor({
   form_id,
@@ -22,15 +20,22 @@ export function GridEditor({
 }: React.ComponentProps<typeof Grid> & {
   form_id: string;
 }) {
-  const [newFieldPanelOpen, setNewFieldPanelOpen] = useState(false);
-  const [newFieldPanelRefreshKey, setNewFieldPanelRefreshKey] = useState(0);
+  const [state, dispatch] = useEditorState();
   const [deleteFieldConfirmOpen, setDeleteFieldConfirmOpen] = useState(false);
-  const [focusedField, setFocusedField] = useState<string | null>(null);
 
-  const openNewFieldPanel = () => {
-    setNewFieldPanelRefreshKey((k) => k + 1);
-    setNewFieldPanelOpen(true);
-  };
+  const { focus_field_id } = state;
+  const openNewFieldPanel = useCallback(
+    (field_id?: string) => {
+      console.log("open new field panel", field_id);
+      dispatch({
+        type: "editor/field/edit",
+        field_id: field_id,
+        open: true,
+        refresh: true,
+      });
+    },
+    [dispatch]
+  );
 
   const openDeleteFieldConfirm = () => {
     setDeleteFieldConfirmOpen(true);
@@ -48,7 +53,7 @@ export function GridEditor({
       .delete({
         count: "exact",
       })
-      .eq("id", focusedField!)
+      .eq("id", focus_field_id!)
       .then(({ error, count }) => {
         if (count === 0) {
           toast.error("Failed to delete field");
@@ -61,42 +66,32 @@ export function GridEditor({
         }
         toast.success("Field deleted");
       });
-  }, [supabase, focusedField]);
+  }, [supabase, focus_field_id]);
 
   return (
-    <FormEditorProvider
-      initial={{
-        blocks: [], // TODO:
-        fields: [], // TODO:
-        form_id: form_id,
-      }}
-    >
+    <>
       <DeleteFieldConfirmDialog
         open={deleteFieldConfirmOpen}
         onOpenChange={setDeleteFieldConfirmOpen}
         onCancel={closeDeleteFieldConfirm}
         onDeleteConfirm={onDeleteField}
       />
-      <FieldEditPanel
-        title={focusedField ? "Edit Field" : "Add New Field"}
-        open={newFieldPanelOpen}
-        onOpenChange={setNewFieldPanelOpen}
-        formResetKey={newFieldPanelRefreshKey}
-      />
       <Grid
         columns={props.columns}
         rows={props.rows}
         onAddNewFieldClick={openNewFieldPanel}
         onEditFieldClick={(field_id) => {
-          setFocusedField(field_id);
-          openNewFieldPanel();
+          openNewFieldPanel(field_id);
         }}
         onDeleteFieldClick={(field_id) => {
-          setFocusedField(field_id);
+          dispatch({
+            type: "editor/field/focus",
+            field_id,
+          });
           openDeleteFieldConfirm();
         }}
       />
-    </FormEditorProvider>
+    </>
   );
 }
 

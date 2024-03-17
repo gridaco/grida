@@ -4,7 +4,7 @@ export interface FormEditorState {
   form_id: string;
   blocks: FormBlock[];
   fields: FormFieldDefinition[];
-  editing_field_id?: string;
+  focus_field_id?: string;
   is_field_edit_panel_open?: boolean;
   field_edit_panel_refresh_key?: number;
 }
