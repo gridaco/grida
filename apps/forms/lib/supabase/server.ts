@@ -1,5 +1,6 @@
 import { Database } from "@/types/supabase";
-import { createServerComponentClient } from "@supabase/auth-helpers-nextjs";
+import { createServerComponentClient as _createServerComponentClient } from "@supabase/auth-helpers-nextjs";
+import { createRouteHandlerClient as _createRouteHandlerClient } from "@supabase/auth-helpers-nextjs";
 import { createClient } from "@supabase/supabase-js";
 import type { ReadonlyRequestCookies } from "next/dist/server/web/spec-extension/adapters/request-cookies";
 
@@ -13,8 +14,22 @@ export const client = createClient<Database, "grida_forms">(
   }
 );
 
-export const createServerClient = (cookieStore: ReadonlyRequestCookies) =>
-  createServerComponentClient<Database, "grida_forms">(
+export const createServerComponentClient = (
+  cookieStore: ReadonlyRequestCookies
+) =>
+  _createServerComponentClient<Database, "grida_forms">(
+    {
+      cookies: () => cookieStore,
+    },
+    {
+      options: {
+        db: { schema: "grida_forms" },
+      },
+    }
+  );
+
+export const createRouteHandlerClient = (cookieStore: ReadonlyRequestCookies) =>
+  _createRouteHandlerClient<Database, "grida_forms">(
     {
       cookies: () => cookieStore,
     },

@@ -1,4 +1,4 @@
-import { createServerClient } from "@/lib/supabase/server";
+import { createServerComponentClient } from "@/lib/supabase/server";
 import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
 import { NextRequest, NextResponse } from "next/server";
@@ -10,7 +10,7 @@ export async function GET(
 ) {
   const id = context.params.id;
   const cookieStore = cookies();
-  const supabase = createServerClient(cookieStore);
+  const supabase = createServerComponentClient(cookieStore);
   //
   const { data } = await supabase
     .from("form")

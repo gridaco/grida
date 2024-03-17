@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useMemo } from "react";
+import React, { useCallback, useMemo } from "react";
 import { StateProvider, useEditorState } from "./provider";
 import { reducer } from "./reducer";
 import { FormEditorState } from "./state";
@@ -37,51 +37,44 @@ function FieldEditPanelProvider({
     return state.fields.find((f) => f.id === state.focus_field_id);
   }, [state.focus_field_id, state.fields]);
 
-  const supabase = createClientClient();
-
-  const closeNewFieldPanel = (options: { refresh: boolean }) => {
-    dispatch({
-      type: "editor/field/edit",
-      open: false,
-      refresh: options.refresh,
-    });
-  };
-
-  const onSaveField = (
-    init: NewFormFieldInit,
-    reference?: {
-      id: string;
-    }
-  ) => {
-    supabase
-      .from("form_field")
-      .upsert({
-        id: reference?.id,
-        form_id: form_id,
-        type: init.type,
-        name: init.name,
-        label: init.label,
-        placeholder: init.placeholder,
-        help_text: init.helpText,
-        required: init.required,
-      })
-      .select()
-      .single()
-      .then(({ data, error }) => {
-        if (data) {
-          toast.success("New field added");
-          closeNewFieldPanel({ refresh: true });
-        } else {
-          if (error.code === "23505") {
-            toast.error(`field with name "${init.name}" already exists`);
-            console.error(error);
-            return;
-          }
-          toast.error("Failed to add new field");
-          console.error(error);
-        }
+  const closeFieldPanel = useCallback(
+    (options: { refresh: boolean }) => {
+      dispatch({
+        type: "editor/field/edit",
+        open: false,
+        refresh: options.refresh,
       });
-  };
+    },
+    [dispatch]
+  );
+
+  const onSaveField = useCallback(
+    (init: NewFormFieldInit) => {
+      const promise = fetch("/private/editor/fields", {
+        body: JSON.stringify({
+          ...init,
+          id: state.focus_field_id,
+          form_id: form_id,
+        }),
+        method: "POST",
+      })
+        .then((res) => {
+          if (!res.ok) {
+            throw new Error("Failed to save field");
+          }
+        })
+        .finally(() => {
+          closeFieldPanel({ refresh: true });
+        });
+
+      toast.promise(promise, {
+        loading: "Saving field...",
+        success: "Field saved",
+        error: "Failed to save field",
+      });
+    },
+    [closeFieldPanel, form_id, state.focus_field_id]
+  );
 
   const is_existing_field = !!field;
 

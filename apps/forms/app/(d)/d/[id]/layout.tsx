@@ -2,7 +2,7 @@ import Link from "next/link";
 import { EditableFormTitle } from "@/scaffolds/editable-form-title";
 import { notFound } from "next/navigation";
 import { cookies } from "next/headers";
-import { createServerClient } from "@/lib/supabase/server";
+import { createServerComponentClient } from "@/lib/supabase/server";
 import { GridaLogo } from "@/components/grida-logo";
 import { EyeOpenIcon, SlashIcon } from "@radix-ui/react-icons";
 import { Toaster } from "react-hot-toast";
@@ -19,7 +19,7 @@ export default async function Layout({
   params: { id: string };
 }>) {
   const cookieStore = cookies();
-  const supabase = createServerClient(cookieStore);
+  const supabase = createServerComponentClient(cookieStore);
   const id = params.id;
 
   const { data, error } = await supabase

@@ -1,4 +1,4 @@
-import { createServerClient } from "@/lib/supabase/server";
+import { createServerComponentClient } from "@/lib/supabase/server";
 import { DownloadIcon } from "@radix-ui/react-icons";
 import { cookies } from "next/headers";
 
@@ -15,7 +15,7 @@ export default async function FormResponsesPage({
   const { id: form_id } = params;
 
   const cookieStore = cookies();
-  const supabase = createServerClient(cookieStore);
+  const supabase = createServerComponentClient(cookieStore);
 
   const { data: form, error } = await supabase
     .from("form")
