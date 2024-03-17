@@ -52,9 +52,13 @@ export function EditableFormTitle({
         className="
           hover:shadow focus:shadow
         hover:border-black/10 focus:border-black/10
+        dark:hover:border-white/10 dark:focus:border-white/10
           focus:outline-none focus:shadow-outline
+        text-gray-700
+        dark:text-gray-300
+         dark:bg-black/10
           border border-transparent
-          box-border appearance-none rounded py-2 px-3 text-gray-700 leading-tight transition-all
+          box-border appearance-none rounded py-2 px-3 leading-tight transition-all
         "
         type="text"
         placeholder="Form title"

@@ -115,7 +115,7 @@ export function Grid({
 
   return (
     <DataGrid
-      className="border border-gray-200 h-max select-none"
+      className="border border-gray-200 dark:border-gray-900 h-max select-none"
       columns={formattedColumns}
       rows={rows}
     />

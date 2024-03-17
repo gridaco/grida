@@ -47,10 +47,16 @@ function FieldEditPanelProvider({
     });
   };
 
-  const onAddNewField = (init: NewFormFieldInit) => {
+  const onSaveField = (
+    init: NewFormFieldInit,
+    reference?: {
+      id: string;
+    }
+  ) => {
     supabase
       .from("form_field")
-      .insert({
+      .upsert({
+        id: reference?.id,
         form_id: form_id,
         type: init.type,
         name: init.name,
@@ -103,7 +109,7 @@ function FieldEditPanelProvider({
         onOpenChange={(open) => {
           dispatch({ type: "editor/field/edit", open });
         }}
-        onSubmit={onAddNewField}
+        onSave={onSaveField}
       />
 
       {children}

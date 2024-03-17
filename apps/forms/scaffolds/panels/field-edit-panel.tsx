@@ -91,7 +91,7 @@ const input_can_have_pattern: FormFieldType[] = supported_field_types.filter(
 
 export function FieldEditPanel({
   title,
-  onSubmit,
+  onSave,
   formResetKey = 0,
   init,
   disableAI,
@@ -101,7 +101,7 @@ export function FieldEditPanel({
   formResetKey?: number;
   init?: Partial<NewFormFieldInit>;
   disableAI?: boolean;
-  onSubmit?: (field: NewFormFieldInit) => void;
+  onSave?: (field: NewFormFieldInit) => void;
 }) {
   const [effect_cause, set_effect_cause] = useState<"ai" | "human" | "system">(
     "system"
@@ -132,7 +132,7 @@ export function FieldEditPanel({
   const preview_disabled = !name;
 
   const onSaveClick = () => {
-    onSubmit?.({
+    onSave?.({
       name,
       label,
       placeholder,
@@ -369,7 +369,7 @@ function FormFieldAssistant({
   const assist = async () => {
     setIsLoading(true);
     try {
-      const response = await fetch("/ai/schema", {
+      const response = await fetch("/private/editor/ai/schema", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

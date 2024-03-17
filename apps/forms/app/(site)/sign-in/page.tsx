@@ -74,7 +74,7 @@ export default function SigninPage() {
           </main>
           <aside className="flex-col items-center justify-center flex-1 flex-shrink hidden basis-1/4 xl:flex">
             <div
-              className="relative flex flex-col gap-6"
+              className="relative flex flex-col gap-6 h-full"
               style={{
                 height: "-webkit-fill-available",
               }}
