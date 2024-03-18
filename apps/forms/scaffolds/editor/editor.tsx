@@ -50,6 +50,28 @@ function FormResponsesProvider({ children }: React.PropsWithChildren<{}>) {
     return data;
   }, [supabase, state.responses_pagination_rows, state.form_id]);
 
+  const fetchResponse = useCallback(
+    async (id: string) => {
+      const { data, error } = await supabase
+        .from("response")
+        .select(
+          `
+            *,
+            fields:response_field(*)
+          `
+        )
+        .eq("id", id)
+        .single();
+
+      if (error) {
+        throw new Error();
+      }
+
+      return data;
+    },
+    [supabase]
+  );
+
   useEffect(() => {
     // fetch the responses
     const feed = fetchResponses().then((data) => {
@@ -65,6 +87,49 @@ function FormResponsesProvider({ children }: React.PropsWithChildren<{}>) {
       error: "Failed to fetch responses",
     });
   }, [dispatch, fetchResponses]);
+
+  useEffect(() => {
+    const changes = supabase
+      .channel("table-filter-changes")
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "grida_forms",
+          table: "response",
+          filter: `form_id=eq.${state.form_id}`,
+        },
+        (payload) => {
+          const { old, new: _new } = payload;
+
+          if (_new) {
+            // fetch the response in detail (delay is required for nested fields to be available)
+            setTimeout(() => {
+              const newresponse = fetchResponse(
+                (_new as { id: string }).id
+              ).then((data) => {
+                console.log("new response", data);
+                dispatch({
+                  type: "editor/response/feed",
+                  data: [data],
+                });
+              });
+
+              toast.promise(newresponse, {
+                loading: "Fetching new response...",
+                success: "New response fetched",
+                error: "Failed to fetch new response",
+              });
+            }, 1000);
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      changes.unsubscribe();
+    };
+  }, [dispatch, fetchResponse, state.form_id, supabase]);
 
   return <>{children}</>;
 }

@@ -116,7 +116,29 @@ export function reducer(
     case "editor/response/feed": {
       const { data } = <FeedResponseAction>action;
       return produce(state, (draft) => {
-        draft.responses = data;
+        // Initialize draft.responses if it's not already an array
+        if (!Array.isArray(draft.responses)) {
+          draft.responses = [];
+        }
+
+        // Map of ids to responses for the existing responses
+        const existingResponsesById = draft.responses.reduce(
+          (acc, response) => {
+            acc[response.id] = response;
+            return acc;
+          },
+          {}
+        );
+
+        data.forEach((newResponse) => {
+          if (existingResponsesById.hasOwnProperty(newResponse.id)) {
+            // Update existing response
+            Object.assign(existingResponsesById[newResponse.id], newResponse);
+          } else {
+            // Add new response if id does not exist
+            draft.responses!.push(newResponse);
+          }
+        });
       });
     }
     default:
