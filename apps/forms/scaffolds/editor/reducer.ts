@@ -8,6 +8,7 @@ import {
   FeedResponseAction,
   FocusFieldAction,
   OpenEditFieldAction,
+  ResponseFeedRowsAction,
   SaveFieldAction,
   SortBlockAction,
 } from "./action";
@@ -104,6 +105,12 @@ export function reducer(
           });
         }
         //
+      });
+    }
+    case "editor/responses/pagination/rows": {
+      const { max } = <ResponseFeedRowsAction>action;
+      return produce(state, (draft) => {
+        draft.responses_pagination_rows = max;
       });
     }
     case "editor/response/feed": {

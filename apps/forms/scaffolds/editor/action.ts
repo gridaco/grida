@@ -8,7 +8,8 @@ export type BlocksEditorAction =
   | FocusFieldAction
   | ChangeBlockFieldAction
   | SaveFieldAction
-  | FeedResponseAction;
+  | FeedResponseAction
+  | ResponseFeedRowsAction;
 
 export interface CreateNewBlockAction {
   type: "blocks/new";
@@ -54,4 +55,9 @@ export interface SaveFieldAction {
 export interface FeedResponseAction {
   type: "editor/response/feed";
   data: any[];
+}
+
+export interface ResponseFeedRowsAction {
+  type: "editor/responses/pagination/rows";
+  max: number;
 }

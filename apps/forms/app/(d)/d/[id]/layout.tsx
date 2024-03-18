@@ -78,6 +78,7 @@ export default async function Layout({
           form_id: id,
           fields: data.fields,
           blocks: data.blocks,
+          responses_pagination_rows: 100,
         }}
       >
         {children}

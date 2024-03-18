@@ -128,6 +128,7 @@ export function GridEditor() {
         />
       </div>
       <footer className="flex min-h-9 overflow-hidden items-center px-2 w-full border-t">
+        <MaxRowsSelect />
         <div>{state.responses?.length ?? 0} response(s)</div>
         <Link href={`/v1/${form_id}/export/csv`} download target="_blank">
           <button className="flex items-center gap-1 p-2 bg-neutral-100 rounded">
@@ -137,6 +138,28 @@ export function GridEditor() {
         </Link>
       </footer>
     </div>
+  );
+}
+
+function MaxRowsSelect() {
+  const [state, dispatch] = useEditorState();
+
+  return (
+    <select
+      className="p-2 bg-neutral-100 rounded"
+      value={state.responses_pagination_rows}
+      onChange={(e) => {
+        dispatch({
+          type: "editor/responses/pagination/rows",
+          max: parseInt(e.target.value),
+        });
+      }}
+    >
+      <option label="10 rows" value={10} />
+      <option label="100 rows" value={100} />
+      <option label="500 rows" value={500} />
+      <option label="1000 rows" value={1000} />
+    </select>
   );
 }
 
