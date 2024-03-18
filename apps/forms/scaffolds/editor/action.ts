@@ -7,7 +7,8 @@ export type BlocksEditorAction =
   | SortBlockAction
   | FocusFieldAction
   | ChangeBlockFieldAction
-  | SaveFieldAction;
+  | SaveFieldAction
+  | FeedResponseAction;
 
 export interface CreateNewBlockAction {
   type: "blocks/new";
@@ -48,4 +49,9 @@ export interface SaveFieldAction {
   type: "editor/field/save";
   field_id: string;
   data: FormFieldDefinition;
+}
+
+export interface FeedResponseAction {
+  type: "editor/response/feed";
+  data: any[];
 }

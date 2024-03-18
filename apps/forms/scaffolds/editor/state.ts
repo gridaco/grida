@@ -4,7 +4,8 @@ export interface FormEditorState {
   form_id: string;
   blocks: FormBlock[];
   fields: FormFieldDefinition[];
-  responses: any[];
+  responses?: any[];
+  responses_pagination_rows?: number;
   focus_field_id?: string;
   is_field_edit_panel_open?: boolean;
   field_edit_panel_refresh_key?: number;

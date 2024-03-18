@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useCallback, useMemo } from "react";
+import React, { useCallback, useEffect, useMemo } from "react";
 import { StateProvider, useEditorState } from "./provider";
 import { reducer } from "./reducer";
 import { FormEditorState } from "./state";
@@ -18,20 +18,58 @@ export function FormEditorProvider({
 
   return (
     <StateProvider state={state} dispatch={dispatch}>
-      <FieldEditPanelProvider form_id={state.form_id}>
-        {/*  */}
-        {children}
-      </FieldEditPanelProvider>
+      <FormResponsesProvider>
+        <FieldEditPanelProvider>{children}</FieldEditPanelProvider>
+      </FormResponsesProvider>
     </StateProvider>
   );
 }
 
-function FieldEditPanelProvider({
-  form_id,
-  children,
-}: React.PropsWithChildren<{
-  form_id: string;
-}>) {
+function FormResponsesProvider({ children }: React.PropsWithChildren<{}>) {
+  const [state, dispatch] = useEditorState();
+
+  const supabase = useMemo(() => createClientClient(), []);
+
+  const fetchResponses = useCallback(async () => {
+    // fetch the responses
+    const { data, error } = await supabase
+      .from("response")
+      .select(
+        `
+            *,
+            fields:response_field(*)
+        `
+      )
+      .eq("form_id", state.form_id)
+      .limit(state.responses_pagination_rows ?? 100);
+
+    if (error) {
+      throw new Error();
+    }
+
+    return data;
+  }, [supabase, state.responses_pagination_rows, state.form_id]);
+
+  useEffect(() => {
+    // fetch the responses
+    const feed = fetchResponses().then((data) => {
+      dispatch({
+        type: "editor/response/feed",
+        data: data,
+      });
+    });
+
+    toast.promise(feed, {
+      loading: "Fetching responses...",
+      success: "Responses fetched",
+      error: "Failed to fetch responses",
+    });
+  }, [dispatch, fetchResponses]);
+
+  return <>{children}</>;
+}
+
+function FieldEditPanelProvider({ children }: React.PropsWithChildren<{}>) {
   const [state, dispatch] = useEditorState();
 
   const field = useMemo(() => {
@@ -56,7 +94,7 @@ function FieldEditPanelProvider({
         options: init.options?.length ? init.options : undefined,
         //
         id: state.focus_field_id,
-        form_id: form_id,
+        form_id: state.form_id,
       };
 
       console.log("saving..", data);
@@ -93,7 +131,7 @@ function FieldEditPanelProvider({
         error: "Failed to save field",
       });
     },
-    [closeFieldPanel, form_id, state.focus_field_id, dispatch]
+    [closeFieldPanel, state.form_id, state.focus_field_id, dispatch]
   );
 
   const is_existing_field = !!field;

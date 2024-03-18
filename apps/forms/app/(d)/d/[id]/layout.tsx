@@ -28,8 +28,7 @@ export default async function Layout({
       `
         *,
         blocks:form_block(*),
-        fields:form_field(*),
-        responses: response(*, fields:response_field(*))
+        fields:form_field(*)
       `
     )
     .eq("id", id)
@@ -78,7 +77,6 @@ export default async function Layout({
         initial={{
           form_id: id,
           fields: data.fields,
-          responses: data.responses,
           blocks: data.blocks,
         }}
       >

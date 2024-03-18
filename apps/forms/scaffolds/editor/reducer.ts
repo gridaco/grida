@@ -5,6 +5,7 @@ import {
   ChangeBlockFieldAction,
   CreateNewBlockAction,
   DeleteBlockAction,
+  FeedResponseAction,
   FocusFieldAction,
   OpenEditFieldAction,
   SaveFieldAction,
@@ -103,6 +104,12 @@ export function reducer(
           });
         }
         //
+      });
+    }
+    case "editor/response/feed": {
+      const { data } = <FeedResponseAction>action;
+      return produce(state, (draft) => {
+        draft.responses = data;
       });
     }
     default:
