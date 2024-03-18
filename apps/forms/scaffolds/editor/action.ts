@@ -1,4 +1,4 @@
-import { FormBlockType } from "@/types";
+import { FormBlockType, FormFieldDefinition, NewFormFieldInit } from "@/types";
 
 export type BlocksEditorAction =
   | CreateNewBlockAction
@@ -6,7 +6,8 @@ export type BlocksEditorAction =
   | OpenEditFieldAction
   | SortBlockAction
   | FocusFieldAction
-  | ChangeBlockFieldAction;
+  | ChangeBlockFieldAction
+  | SaveFieldAction;
 
 export interface CreateNewBlockAction {
   type: "blocks/new";
@@ -41,4 +42,10 @@ export interface OpenEditFieldAction {
   // true by default
   open?: boolean;
   refresh?: boolean;
+}
+
+export interface SaveFieldAction {
+  type: "editor/field/save";
+  field_id: string;
+  data: FormFieldDefinition;
 }

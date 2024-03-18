@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useCallback, useState } from "react";
+import React, { useCallback, useMemo, useState } from "react";
 import { Grid } from "../grid";
 import { createClientClient } from "@/lib/supabase/client";
 import {
@@ -14,16 +14,43 @@ import {
 import toast from "react-hot-toast";
 import { useEditorState } from "../editor";
 
-export function GridEditor({
-  form_id,
-  ...props
-}: React.ComponentProps<typeof Grid> & {
-  form_id: string;
-}) {
+export function GridEditor() {
   const [state, dispatch] = useEditorState();
   const [deleteFieldConfirmOpen, setDeleteFieldConfirmOpen] = useState(false);
 
-  const { focus_field_id } = state;
+  const { form_id, focus_field_id, fields, responses } = state;
+
+  const columns = useMemo(
+    () =>
+      fields?.map((field) => ({
+        key: field.id,
+        name: field.name,
+        frozen: false,
+        // You can add more properties here as needed by react-data-grid
+      })) ?? [],
+    [fields]
+  );
+
+  // Transforming the responses into the format expected by react-data-grid
+  const rows = useMemo(() => {
+    return (
+      responses?.map((response, index) => {
+        const row: any = {
+          __gf_id: response.id,
+          __gf_created_at: response.created_at,
+        }; // react-data-grid expects each row to have a unique 'id' property
+        response.fields.forEach((field: any) => {
+          row[field.form_field_id] = {
+            type: field.type,
+            value: field.value,
+          };
+        });
+        return row;
+      }) ?? []
+    );
+    // TODO: need to update dpes with fields
+  }, [responses]);
+
   const openNewFieldPanel = useCallback(() => {
     dispatch({
       type: "editor/field/edit",
@@ -84,8 +111,8 @@ export function GridEditor({
         onDeleteConfirm={onDeleteField}
       />
       <Grid
-        columns={props.columns}
-        rows={props.rows}
+        columns={columns}
+        rows={rows}
         onAddNewFieldClick={openNewFieldPanel}
         onEditFieldClick={openEditFieldPanel}
         onDeleteFieldClick={(field_id) => {

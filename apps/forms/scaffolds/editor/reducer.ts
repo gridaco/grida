@@ -7,6 +7,7 @@ import {
   DeleteBlockAction,
   FocusFieldAction,
   OpenEditFieldAction,
+  SaveFieldAction,
   SortBlockAction,
 } from "./action";
 import { arrayMove } from "@dnd-kit/sortable";
@@ -78,6 +79,30 @@ export function reducer(
           draft.field_edit_panel_refresh_key =
             (draft.field_edit_panel_refresh_key ?? 0) + 1;
         }
+      });
+    }
+    case "editor/field/save": {
+      const { field_id, data } = <SaveFieldAction>action;
+      return produce(state, (draft) => {
+        const field = draft.fields.find((f) => f.id === field_id);
+        if (field) {
+          field.id = field_id;
+          field.name = data.name;
+          field.label = data.label;
+          field.placeholder = data.placeholder;
+          field.help_text = data.help_text;
+          field.type = data.type;
+          field.required = data.required;
+          // TODO: support options
+          // field.options = data.options;
+          field.pattern = data.pattern;
+        } else {
+          // create new field
+          draft.fields.push({
+            ...data,
+          });
+        }
+        //
       });
     }
     default:

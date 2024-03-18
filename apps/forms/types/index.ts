@@ -38,6 +38,7 @@ export interface FormFieldDefinition {
   placeholder?: string | null;
   required: boolean;
   help_text?: string | null;
+  pattern?: any | null;
 }
 
 export type FormBlockType =

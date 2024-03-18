@@ -5,10 +5,10 @@ import { StateProvider, useEditorState } from "./provider";
 import { reducer } from "./reducer";
 import { FormEditorState } from "./state";
 import { FieldEditPanel } from "../panels/field-edit-panel";
-import { NewFormFieldInit } from "@/types";
+import { FormFieldDefinition, NewFormFieldInit } from "@/types";
 import { createClientClient } from "@/lib/supabase/client";
 import toast from "react-hot-toast";
-import { FormFieldUpsert } from "@/types/private/api";
+import { FormFieldUpsert, EditorApiResponse } from "@/types/private/api";
 
 export function FormEditorProvider({
   initial,
@@ -68,10 +68,20 @@ function FieldEditPanelProvider({
           "Content-Type": "application/json",
         },
       })
-        .then((res) => {
+        .then(async (res) => {
           if (!res.ok) {
             throw new Error("Failed to save field");
           }
+
+          const { data } =
+            (await res.json()) as EditorApiResponse<FormFieldDefinition>;
+
+          // else save the field
+          dispatch({
+            type: "editor/field/save",
+            field_id: data.id,
+            data: data,
+          });
         })
         .finally(() => {
           closeFieldPanel({ refresh: true });
@@ -83,7 +93,7 @@ function FieldEditPanelProvider({
         error: "Failed to save field",
       });
     },
-    [closeFieldPanel, form_id, state.focus_field_id]
+    [closeFieldPanel, form_id, state.focus_field_id, dispatch]
   );
 
   const is_existing_field = !!field;

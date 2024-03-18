@@ -24,7 +24,14 @@ export default async function Layout({
 
   const { data, error } = await supabase
     .from("form")
-    .select(`*, blocks:form_block(*), fields:form_field(*)`)
+    .select(
+      `
+        *,
+        blocks:form_block(*),
+        fields:form_field(*),
+        responses: response(*, fields:response_field(*))
+      `
+    )
     .eq("id", id)
     .single();
 
@@ -71,6 +78,7 @@ export default async function Layout({
         initial={{
           form_id: id,
           fields: data.fields,
+          responses: data.responses,
           blocks: data.blocks,
         }}
       >
