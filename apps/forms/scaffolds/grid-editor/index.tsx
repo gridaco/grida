@@ -13,6 +13,8 @@ import {
 } from "@editor-ui/alert-dialog";
 import toast from "react-hot-toast";
 import { useEditorState } from "../editor";
+import Link from "next/link";
+import { DownloadIcon } from "@radix-ui/react-icons";
 
 export function GridEditor() {
   const [state, dispatch] = useEditorState();
@@ -103,27 +105,38 @@ export function GridEditor() {
   }, [supabase, focus_field_id]);
 
   return (
-    <>
-      <DeleteFieldConfirmDialog
-        open={deleteFieldConfirmOpen}
-        onOpenChange={setDeleteFieldConfirmOpen}
-        onCancel={closeDeleteFieldConfirm}
-        onDeleteConfirm={onDeleteField}
-      />
-      <Grid
-        columns={columns}
-        rows={rows}
-        onAddNewFieldClick={openNewFieldPanel}
-        onEditFieldClick={openEditFieldPanel}
-        onDeleteFieldClick={(field_id) => {
-          dispatch({
-            type: "editor/field/focus",
-            field_id,
-          });
-          openDeleteFieldConfirm();
-        }}
-      />
-    </>
+    <div className="h-full flex flex-col flex-1 w-full overflow-x-hidden">
+      <div className="flex flex-col h-full w-full">
+        <DeleteFieldConfirmDialog
+          open={deleteFieldConfirmOpen}
+          onOpenChange={setDeleteFieldConfirmOpen}
+          onCancel={closeDeleteFieldConfirm}
+          onDeleteConfirm={onDeleteField}
+        />
+        <Grid
+          columns={columns}
+          rows={rows}
+          onAddNewFieldClick={openNewFieldPanel}
+          onEditFieldClick={openEditFieldPanel}
+          onDeleteFieldClick={(field_id) => {
+            dispatch({
+              type: "editor/field/focus",
+              field_id,
+            });
+            openDeleteFieldConfirm();
+          }}
+        />
+      </div>
+      <footer className="flex min-h-9 overflow-hidden items-center px-2 w-full border-t">
+        <div>{state.responses?.length ?? 0} response(s)</div>
+        <Link href={`/v1/${form_id}/export/csv`} download target="_blank">
+          <button className="flex items-center gap-1 p-2 bg-neutral-100 rounded">
+            Export to CSV
+            <DownloadIcon />
+          </button>
+        </Link>
+      </footer>
+    </div>
   );
 }
 

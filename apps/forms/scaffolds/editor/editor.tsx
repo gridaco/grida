@@ -101,7 +101,7 @@ function FieldEditPanelProvider({
   return (
     <>
       <FieldEditPanel
-        key={field?.name}
+        key={field?.name || state.field_edit_panel_refresh_key}
         open={state.is_field_edit_panel_open}
         title={is_existing_field ? "Edit Field" : "New Field"}
         disableAI={is_existing_field}
