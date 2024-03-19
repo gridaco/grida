@@ -214,6 +214,12 @@ importers:
       '@radix-ui/react-icons':
         specifier: ^1.0.3
         version: 1.3.0(react@18.2.0)
+      '@react-three/drei':
+        specifier: ^9.83.9
+        version: 9.101.0(@react-three/fiber@8.15.19)(@types/react@18.2.58)(@types/three@0.149.0)(immer@9.0.21)(react-dom@18.2.0)(react@18.2.0)(three@0.150.1)
+      '@react-three/fiber':
+        specifier: ^8.12.0
+        version: 8.15.19(react-dom@18.2.0)(react-native@0.73.6)(react@18.2.0)(three@0.150.1)
       '@supabase/auth-helpers-nextjs':
         specifier: ^0.9.0
         version: 0.9.0(@supabase/supabase-js@2.39.7)
@@ -223,6 +229,9 @@ importers:
       '@supabase/supabase-js':
         specifier: ^2.39.7
         version: 2.39.7
+      '@types/three':
+        specifier: ^0.149.0
+        version: 0.149.0
       ai:
         specifier: ^3.0.12
         version: 3.0.12(react@18.2.0)(solid-js@1.8.15)(svelte@4.2.12)(vue@3.4.21)(zod@3.22.4)
@@ -253,6 +262,9 @@ importers:
       react-hot-toast:
         specifier: ^2.4.0
         version: 2.4.1(csstype@3.1.0)(react-dom@18.2.0)(react@18.2.0)
+      three:
+        specifier: ^0.150.1
+        version: 0.150.1
     devDependencies:
       '@types/node':
         specifier: ^20
@@ -3235,7 +3247,7 @@ importers:
         version: 1.3.0(react@18.2.0)
       '@react-three/drei':
         specifier: ^9.83.9
-        version: 9.101.0(@react-three/fiber@8.15.19)(@types/react@18.2.58)(@types/three@0.149.0)(react-dom@18.2.0)(react@18.2.0)(three@0.150.1)
+        version: 9.101.0(@react-three/fiber@8.15.19)(@types/react@18.2.58)(@types/three@0.149.0)(immer@9.0.21)(react-dom@18.2.0)(react@18.2.0)(three@0.150.1)
       '@react-three/fiber':
         specifier: ^8.12.0
         version: 8.15.19(react-dom@18.2.0)(react-native@0.73.6)(react@18.2.0)(three@0.150.1)
@@ -13305,7 +13317,7 @@ packages:
       zdog: 1.1.3
     dev: false
 
-  /@react-three/drei@9.101.0(@react-three/fiber@8.15.19)(@types/react@18.2.58)(@types/three@0.149.0)(react-dom@18.2.0)(react@18.2.0)(three@0.150.1):
+  /@react-three/drei@9.101.0(@react-three/fiber@8.15.19)(@types/react@18.2.58)(@types/three@0.149.0)(immer@9.0.21)(react-dom@18.2.0)(react@18.2.0)(three@0.150.1):
     resolution: {integrity: sha512-JuU8CKT0rbf7LP2XbDCqAEOdSSq5U3pk/BlxAlxZszRd7tByKhWZAEKY1QCZ/2pxBiIc0pWWR0rv8Me8BAQ6AQ==}
     peerDependencies:
       '@react-three/fiber': '>=8.0'
@@ -13337,7 +13349,7 @@ packages:
       three-mesh-bvh: 0.7.3(three@0.150.1)
       three-stdlib: 2.29.5(three@0.150.1)
       troika-three-text: 0.49.0(three@0.150.1)
-      tunnel-rat: 0.1.2(@types/react@18.2.58)(react@18.2.0)
+      tunnel-rat: 0.1.2(@types/react@18.2.58)(immer@9.0.21)(react@18.2.0)
       utility-types: 3.11.0
       uuid: 9.0.1
       zustand: 3.7.2(react@18.2.0)
@@ -37470,10 +37482,10 @@ packages:
     dependencies:
       safe-buffer: 5.2.1
 
-  /tunnel-rat@0.1.2(@types/react@18.2.58)(react@18.2.0):
+  /tunnel-rat@0.1.2(@types/react@18.2.58)(immer@9.0.21)(react@18.2.0):
     resolution: {integrity: sha512-lR5VHmkPhzdhrM092lI2nACsLO4QubF0/yoOhzX7c+wIpbN1GjHNzCc91QlpxBi+cnx8vVJ+Ur6vL5cEoQPFpQ==}
     dependencies:
-      zustand: 4.5.2(@types/react@18.2.58)(react@18.2.0)
+      zustand: 4.5.2(@types/react@18.2.58)(immer@9.0.21)(react@18.2.0)
     transitivePeerDependencies:
       - '@types/react'
       - immer
@@ -37948,7 +37960,7 @@ packages:
   /unload@2.2.0:
     resolution: {integrity: sha512-B60uB5TNBLtN6/LsgAf3udH9saB5p7gqJwcFfbOEZ8BcBHnGwCf6G/TGiEqkRAxX7zAFIUtzdrXQSdL3Q/wqNA==}
     dependencies:
-      '@babel/runtime': 7.16.3
+      '@babel/runtime': 7.24.0
       detect-node: 2.1.0
     dev: false
 
@@ -39394,7 +39406,7 @@ packages:
       react: 18.2.0
     dev: false
 
-  /zustand@4.5.2(@types/react@18.2.58)(react@18.2.0):
+  /zustand@4.5.2(@types/react@18.2.58)(immer@9.0.21)(react@18.2.0):
     resolution: {integrity: sha512-2cN1tPkDVkwCy5ickKrI7vijSjPksFRfqS6237NzT0vqSsztTNnQdHw9mmN7uBdk3gceVXU0a+21jFzFzAc9+g==}
     engines: {node: '>=12.7.0'}
     peerDependencies:
@@ -39410,6 +39422,7 @@ packages:
         optional: true
     dependencies:
       '@types/react': 18.2.58
+      immer: 9.0.21
       react: 18.2.0
       use-sync-external-store: 1.2.0(react@18.2.0)
     dev: false

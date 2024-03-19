@@ -18,9 +18,12 @@
     "@next/third-parties": "^14.1.3",
     "@radix-ui/react-dialog": "^1.0.5",
     "@radix-ui/react-icons": "^1.0.3",
+    "@react-three/drei": "^9.83.9",
+    "@react-three/fiber": "^8.12.0",
     "@supabase/auth-helpers-nextjs": "^0.9.0",
     "@supabase/ssr": "^0.1.0",
     "@supabase/supabase-js": "^2.39.7",
+    "@types/three": "^0.149.0",
     "ai": "^3.0.12",
     "change-case": "^5.4.3",
     "csv-stringify": "^6.4.6",
@@ -30,7 +33,8 @@
     "react": "^18",
     "react-data-grid": "7.0.0-beta.42",
     "react-dom": "^18",
-    "react-hot-toast": "^2.4.0"
+    "react-hot-toast": "^2.4.0",
+    "three": "^0.150.1"
   },
   "devDependencies": {
     "@types/node": "^20",
