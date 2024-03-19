@@ -1,5 +1,5 @@
 import { FormFieldPreview } from "@/components/formfield";
-import type { FormBlock } from "../../editor/state";
+import type { EditorFormBlock } from "../../editor/state";
 import { useEditorState } from "../../editor/provider";
 import { FormFieldDefinition } from "@/types";
 import {
@@ -20,6 +20,8 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@editor-ui/dropdown-menu";
+import { createClientClient } from "@/lib/supabase/client";
+import toast from "react-hot-toast";
 
 export function BlocksCanvas({
   children,
@@ -36,7 +38,7 @@ export function BlocksCanvas({
   );
 }
 
-export function Block(props: React.PropsWithChildren<FormBlock>) {
+export function Block(props: React.PropsWithChildren<EditorFormBlock>) {
   const {
     attributes,
     listeners,
@@ -88,11 +90,20 @@ export function Block(props: React.PropsWithChildren<FormBlock>) {
   );
 }
 
-export function FieldBlock({ id, type, form_field_id, data }: FormBlock) {
+export function FieldBlock({ id, type, form_field_id, data }: EditorFormBlock) {
   const [state, dispatch] = useEditorState();
 
   const form_field: FormFieldDefinition | undefined = state.fields.find(
     (f) => f.id === form_field_id
+  );
+
+  const supabase = createClientClient();
+
+  const deleteBlock = useCallback(
+    async (id: string) => {
+      await supabase.from("form_block").delete().eq("id", id);
+    },
+    [supabase]
   );
 
   const onFieldChange = useCallback(
@@ -108,11 +119,19 @@ export function FieldBlock({ id, type, form_field_id, data }: FormBlock) {
 
   const onDelete = useCallback(() => {
     console.log("delete block", id);
-    dispatch({
-      type: "blocks/delete",
-      block_id: id,
+    const deletion = deleteBlock(id).then(() => {
+      dispatch({
+        type: "blocks/delete",
+        block_id: id,
+      });
     });
-  }, [dispatch, id]);
+
+    toast.promise(deletion, {
+      loading: "Deleting block...",
+      success: "Block deleted",
+      error: "Failed to delete block",
+    });
+  }, [deleteBlock, dispatch, id]);
 
   const onEditClick = useCallback(() => {
     dispatch({
@@ -135,6 +154,7 @@ export function FieldBlock({ id, type, form_field_id, data }: FormBlock) {
               onFieldChange(e.target.value);
             }}
           >
+            <option value="">Select Field</option>
             {state.fields.map((f) => (
               <option key={f.id} value={f.id}>
                 {f.name}
@@ -183,7 +203,7 @@ export function FieldBlock({ id, type, form_field_id, data }: FormBlock) {
 export function SectionBlock({
   children,
   ...props
-}: React.PropsWithChildren<FormBlock>) {
+}: React.PropsWithChildren<EditorFormBlock>) {
   const { setNodeRef, isOver } = useDroppable({
     id: props.id,
   });

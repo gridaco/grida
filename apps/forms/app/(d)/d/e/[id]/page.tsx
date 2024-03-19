@@ -1,32 +1,24 @@
+import { FormClientFetchResponse } from "@/app/(api)/v1/[id]/route";
 import { GridaLogo } from "@/components/grida-logo";
-import { createServerComponentClient } from "@/lib/supabase/server";
-import { cookies } from "next/headers";
+import { EditorApiResponse } from "@/types/private/api";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+
+export const revalidate = 0;
+
+const HOST_NAME = process.env.NEXT_PUBLIC_HOST_NAME || "http://localhost:3000";
 
 export default async function FormPage({ params }: { params: { id: string } }) {
   const id = params.id;
 
-  const cookieStore = cookies();
-
-  const supabase = createServerComponentClient(cookieStore);
-
-  const { data, error } = await supabase
-    .from("form")
-    .select(
-      `
-        *,
-        fields:form_field(*)
-      `
-    )
-    .eq("id", id)
-    .single();
+  const res = await (await fetch(HOST_NAME + `/v1/${id}`)).json();
+  const { data } = res as EditorApiResponse<FormClientFetchResponse>;
 
   if (!data) {
     return notFound();
   }
 
-  const { title, fields } = data;
+  const { title, blocks } = data;
 
   return (
     <main className="p-4 container mx-auto min-h-screen">
@@ -37,7 +29,7 @@ export default async function FormPage({ params }: { params: { id: string } }) {
         action={"/submit/" + id}
         className="flex flex-col gap-4 py-4 h-full overflow-auto flex-1"
       >
-        {fields.map((field: any) => {
+        {blocks.map(({ field }) => {
           return (
             <label
               data-has-label={!!field.label}
@@ -67,12 +59,18 @@ export default async function FormPage({ params }: { params: { id: string } }) {
           Submit
         </button>
       </form>
-      <footer className="py-10 w-max mx-auto">
-        <Link href={"/"} target="_blank">
-          <PoweredByWaterMark />
-        </Link>
-      </footer>
+      <Footer />
     </main>
+  );
+}
+
+function Footer() {
+  return (
+    <footer className="py-10 w-max mx-auto">
+      <Link href={"/"} target="_blank">
+        <PoweredByWaterMark />
+      </Link>
+    </footer>
   );
 }
 

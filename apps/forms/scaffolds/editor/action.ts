@@ -1,7 +1,9 @@
 import { FormBlockType, FormFieldDefinition, NewFormFieldInit } from "@/types";
+import type { EditorFormBlock } from "./state";
 
 export type BlocksEditorAction =
-  | CreateNewBlockAction
+  | CreateNewPendingBlockAction
+  | ResolvePendingBlockAction
   | DeleteBlockAction
   | OpenEditFieldAction
   | SortBlockAction
@@ -11,9 +13,15 @@ export type BlocksEditorAction =
   | FeedResponseAction
   | ResponseFeedRowsAction;
 
-export interface CreateNewBlockAction {
+export interface CreateNewPendingBlockAction {
   type: "blocks/new";
   block: FormBlockType;
+}
+
+export interface ResolvePendingBlockAction {
+  type: "blocks/resolve";
+  block_id: string;
+  block: EditorFormBlock;
 }
 
 export interface DeleteBlockAction {

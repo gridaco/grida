@@ -3,11 +3,12 @@ import { FormEditorState } from "./state";
 import {
   BlocksEditorAction,
   ChangeBlockFieldAction,
-  CreateNewBlockAction,
+  CreateNewPendingBlockAction,
   DeleteBlockAction,
   FeedResponseAction,
   FocusFieldAction,
   OpenEditFieldAction,
+  ResolvePendingBlockAction,
   ResponseFeedRowsAction,
   SaveFieldAction,
   SortBlockAction,
@@ -21,14 +22,30 @@ export function reducer(
   switch (action.type) {
     case "blocks/new": {
       // TODO: if adding new section, if there is a present non-section-blocks on root, it should automatically be nested under new section.
-      const { block } = <CreateNewBlockAction>action;
+      const { block } = <CreateNewPendingBlockAction>action;
       return produce(state, (draft) => {
+        // find unused field id (if any)
+        const field_ids = draft.fields.map((f) => f.id);
+        const used_ids = draft.blocks.map((b) => b.form_field_id);
+        const unused_ids = field_ids.filter((id) => !used_ids.includes(id));
+        const field_id = unused_ids[0] ?? null;
+
         draft.blocks.push({
           id: "[draft]" + Math.random().toString(36).substring(7),
+          form_field_id: field_id,
           form_id: state.form_id,
           type: block,
           data: {},
         });
+      });
+    }
+    case "blocks/resolve": {
+      const { block_id, block } = <ResolvePendingBlockAction>action;
+      return produce(state, (draft) => {
+        const index = draft.blocks.findIndex((b) => b.id === block_id);
+        if (index !== -1) {
+          draft.blocks[index] = block;
+        }
       });
     }
     case "blocks/delete": {
