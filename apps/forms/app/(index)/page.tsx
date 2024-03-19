@@ -2,14 +2,15 @@ import { GridaLogo } from "@/components/grida-logo";
 import { GitHubLogoIcon, SlashIcon } from "@radix-ui/react-icons";
 import Link from "next/link";
 import { CheckIcon } from "@radix-ui/react-icons";
+import Image from "next/image";
 
 export default function Home() {
   return (
     <main>
       <Header />
+
       <div className="p-24">
-        <div className="h-64" />
-        <section>
+        <section className="relative">
           <div>
             <div className="flex flex-col">
               <h1 className="text-6xl font-bold py-10">
@@ -26,6 +27,15 @@ export default function Home() {
             <button className="mt-20 px-3 py-2 bg-neutral-800 rounded border border-neutral-800">
               Start your project
             </button>
+          </div>
+          <div className="hidden lg:block absolute -top-40 right-0 -z-10">
+            <Image
+              className="w-[50vw] object-contain"
+              src="/assets/landing/hero-main-artwork.png"
+              width={1080}
+              height={1080}
+              alt=""
+            />
           </div>
         </section>
         <div className="h-64" />
@@ -90,23 +100,32 @@ export default function Home() {
           <div className="columns-1 xl:columns-4 gap-10 w-full">
             <PricingCard
               plan={"Free"}
-              price={"$0"}
+              price={{
+                primary: "$0",
+                secondary: "/month",
+              }}
               excerpt="Try Grida forms for free"
             />
             <PricingCard
               plan={"Pro"}
-              price={"$20"}
+              price={{
+                primary: "$20",
+                secondary: "/month",
+              }}
               excerpt="Get start Grida forms for Pro"
               inverted
             />
             <PricingCard
               plan={"Business"}
-              price={"$60"}
+              price={{
+                primary: "$60",
+                secondary: "/month",
+              }}
               excerpt="Get start Grida forms for Business"
             />
             <PricingCard
               plan={"Enterprise"}
-              price={"Contact"}
+              price={{ primary: "Contact" }}
               excerpt="Get start Grida forms for Enterprise"
             />
           </div>
@@ -130,7 +149,7 @@ function FeatureCard({ title, excerpt }: { title: string; excerpt: string }) {
 
 async function Header() {
   return (
-    <header className="fixed top-0 left-0 right-0 p-24 flex justify-between items-center">
+    <header className="top-0 left-0 right-0 p-24 flex justify-between items-center">
       <div className="flex">
         <span className="flex items-center gap-2">
           <Link href="https://grida.co" target="_blank">
@@ -169,15 +188,21 @@ function PricingCard({
 }: {
   //
   plan: string;
-  price: string;
+  price: {
+    primary: string;
+    secondary?: string;
+  };
   excerpt: string;
   inverted?: boolean;
 }) {
   return (
     <div
       data-inverted={inverted}
-      className="flex-1 flex flex-col p-7 bg-neutral-900 border border-neutral-500/50 gap-8 rounded-lg
+      className="
+      flex-1 flex flex-col p-7 bg-neutral-900 border border-neutral-500/50 gap-8 rounded-lg
       data-[inverted='true']:invert
+      hover:scale-[1.02]
+      transition-all
       "
     >
       <div className="flex flex-col gap-1">
@@ -185,8 +210,12 @@ function PricingCard({
         <span className=" text-sm font-normal opacity-50">{excerpt}</span>
       </div>
       <div>
-        <span className="text-[48px] font-medium">{price}</span>
-        <span className="ml-2 text-sm font-normal opacity-50">/month</span>
+        <span className="text-[48px] font-medium">{price.primary}</span>
+        {price.secondary && (
+          <span className="ml-2 text-sm font-normal opacity-50">
+            {price.secondary}
+          </span>
+        )}
       </div>
       <hr className=" opacity-15" />
       <div className="flex flex-col gap-5">
@@ -196,7 +225,13 @@ function PricingCard({
         <PricingFeatureRow />
         <PricingFeatureRow />
       </div>
-      <button className=" text-lg font-medium px-5 py-3 rounded bg-neutral-800">
+      <button
+        className="
+        text-lg font-medium px-5 py-3 rounded bg-neutral-800
+        hover:invert
+        transition-all
+      "
+      >
         Start for free
       </button>
     </div>
