@@ -130,6 +130,28 @@ export default function Home() {
             />
           </div>
         </section>
+        <section>
+          <div className="py-20 flex flex-col gap-4">
+            <div>
+              <p className="text-lg font-semibold">Free</p>
+              <p className=" text-lg opacity-50">$0 / month</p>
+            </div>
+            <button className=" px-6 py-2 bg-neutral-800 rounded border border-neutral-700">
+              Start for free
+            </button>
+          </div>
+        </section>
+        <section>
+          <div className="py-20 flex flex-col items-center gap-7">
+            <GridaLogo />
+            <h2 className="text-4xl font-semibold">
+              Build in a weekend, scale to millions
+            </h2>
+            <button className="mt-10 px-3 py-2 bg-neutral-800 rounded border border-neutral-800">
+              Start your project
+            </button>
+          </div>
+        </section>
       </div>
     </main>
   );
