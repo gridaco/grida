@@ -271,6 +271,7 @@ export type Database = {
             | Database["grida_forms"]["Enums"]["response_platform_powered_by"]
             | null
           raw: Json
+          updated_at: string
           x_referer: string | null
           x_useragent: string | null
         }
@@ -285,6 +286,7 @@ export type Database = {
             | Database["grida_forms"]["Enums"]["response_platform_powered_by"]
             | null
           raw: Json
+          updated_at?: string
           x_referer?: string | null
           x_useragent?: string | null
         }
@@ -299,6 +301,7 @@ export type Database = {
             | Database["grida_forms"]["Enums"]["response_platform_powered_by"]
             | null
           raw?: Json
+          updated_at?: string
           x_referer?: string | null
           x_useragent?: string | null
         }
@@ -349,6 +352,13 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "grida_forms_response_field_form_field_id_fkey"
+            columns: ["form_field_id"]
+            isOneToOne: false
+            referencedRelation: "form_field"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "grida_forms_response_field_response_id_fkey"
             columns: ["response_id"]
             isOneToOne: false
@@ -365,7 +375,7 @@ export type Database = {
       [_ in never]: never
     }
     Enums: {
-      form_block_type: "text" | "image" | "input"
+      form_block_type: "section" | "group" | "field"
       form_field_type:
         | "text"
         | "textarea"

@@ -1,22 +1,7 @@
 "use client";
 
-import React, { useCallback, useState } from "react";
+import React, { useCallback, useMemo, useState } from "react";
 import { Grid } from "../grid";
-import {
-  PanelClose,
-  PanelContent,
-  PanelFooter,
-  PanelHeader,
-  PanelPropertyField,
-  PanelPropertyFields,
-  PanelPropertySection,
-  PanelPropertySectionTitle,
-  PropertyTextInput,
-  SidePanel,
-} from "@/components/panels/side-panel";
-import { FormFieldPreview } from "@/components/formfield";
-import { FormFieldType } from "@/types";
-import { capitalCase, snakeCase } from "change-case";
 import { createClientClient } from "@/lib/supabase/client";
 import {
   AlertDialog,
@@ -27,38 +12,66 @@ import {
   AlertDialogAction,
 } from "@editor-ui/alert-dialog";
 import toast from "react-hot-toast";
+import { useEditorState } from "../editor";
+import Link from "next/link";
+import { DownloadIcon } from "@radix-ui/react-icons";
 
-type NewFieldInit = {
-  name: string;
-  label: string;
-  placeholder: string;
-  helpText: string;
-  type: FormFieldType;
-  required: boolean;
-};
-
-export function GridEditor({
-  form_id,
-  ...props
-}: React.ComponentProps<typeof Grid> & {
-  form_id: string;
-}) {
-  const [newFieldPanelOpen, setNewFieldPanelOpen] = useState(false);
-  const [newFieldPanelRefreshKey, setNewFieldPanelRefreshKey] = useState(0);
+export function GridEditor() {
+  const [state, dispatch] = useEditorState();
   const [deleteFieldConfirmOpen, setDeleteFieldConfirmOpen] = useState(false);
-  const [focusedField, setFocusedField] = useState<string | null>(null);
 
-  const openNewFieldPanel = () => {
-    setNewFieldPanelRefreshKey((k) => k + 1);
-    setNewFieldPanelOpen(true);
-  };
+  const { form_id, focus_field_id, fields, responses } = state;
 
-  const closeNewFieldPanel = (options: { refresh: boolean }) => {
-    setNewFieldPanelOpen(false);
-    if (options.refresh) {
-      setNewFieldPanelRefreshKey((k) => k + 1);
-    }
-  };
+  const columns = useMemo(
+    () =>
+      fields?.map((field) => ({
+        key: field.id,
+        name: field.name,
+        frozen: false,
+        // You can add more properties here as needed by react-data-grid
+      })) ?? [],
+    [fields]
+  );
+
+  // Transforming the responses into the format expected by react-data-grid
+  const rows = useMemo(() => {
+    return (
+      responses?.map((response, index) => {
+        const row: any = {
+          __gf_id: response.id,
+          __gf_created_at: response.created_at,
+        }; // react-data-grid expects each row to have a unique 'id' property
+        response.fields.forEach((field: any) => {
+          row[field.form_field_id] = {
+            type: field.type,
+            value: field.value,
+          };
+        });
+        return row;
+      }) ?? []
+    );
+    // TODO: need to update dpes with fields
+  }, [responses]);
+
+  const openNewFieldPanel = useCallback(() => {
+    dispatch({
+      type: "editor/field/edit",
+      open: true,
+      refresh: true,
+    });
+  }, [dispatch]);
+
+  const openEditFieldPanel = useCallback(
+    (field_id?: string) => {
+      dispatch({
+        type: "editor/field/edit",
+        field_id: field_id,
+        open: true,
+        refresh: true,
+      });
+    },
+    [dispatch]
+  );
 
   const openDeleteFieldConfirm = () => {
     setDeleteFieldConfirmOpen(true);
@@ -70,43 +83,13 @@ export function GridEditor({
 
   const supabase = createClientClient();
 
-  const onAddNewField = (init: NewFieldInit) => {
-    supabase
-      .from("form_field")
-      .insert({
-        form_id: form_id,
-        type: init.type,
-        name: init.name,
-        label: init.label,
-        placeholder: init.placeholder,
-        help_text: init.helpText,
-        required: init.required,
-      })
-      .select()
-      .single()
-      .then(({ data, error }) => {
-        if (data) {
-          toast.success("New field added");
-          closeNewFieldPanel({ refresh: true });
-        } else {
-          if (error.code === "23505") {
-            toast.error(`field with name "${init.name}" already exists`);
-            console.error(error);
-            return;
-          }
-          toast.error("Failed to add new field");
-          console.error(error);
-        }
-      });
-  };
-
   const onDeleteField = useCallback(() => {
     supabase
       .from("form_field")
       .delete({
         count: "exact",
       })
-      .eq("id", focusedField!)
+      .eq("id", focus_field_id!)
       .then(({ error, count }) => {
         if (count === 0) {
           toast.error("Failed to delete field");
@@ -119,37 +102,64 @@ export function GridEditor({
         }
         toast.success("Field deleted");
       });
-  }, [supabase, focusedField]);
+  }, [supabase, focus_field_id]);
 
   return (
-    <>
-      <DeleteFieldConfirmDialog
-        open={deleteFieldConfirmOpen}
-        onOpenChange={setDeleteFieldConfirmOpen}
-        onCancel={closeDeleteFieldConfirm}
-        onDeleteConfirm={onDeleteField}
-      />
-      <FieldEditPanel
-        title={focusedField ? "Edit Field" : "Add New Field"}
-        open={newFieldPanelOpen}
-        onOpenChange={setNewFieldPanelOpen}
-        formResetKey={newFieldPanelRefreshKey}
-        onSubmit={onAddNewField}
-      />
-      <Grid
-        columns={props.columns}
-        rows={props.rows}
-        onAddNewFieldClick={openNewFieldPanel}
-        onEditFieldClick={(field_id) => {
-          setFocusedField(field_id);
-          openNewFieldPanel();
-        }}
-        onDeleteFieldClick={(field_id) => {
-          setFocusedField(field_id);
-          openDeleteFieldConfirm();
-        }}
-      />
-    </>
+    <div className="h-full flex flex-col flex-1 w-full overflow-x-hidden">
+      <div className="flex flex-col h-full w-full">
+        <DeleteFieldConfirmDialog
+          open={deleteFieldConfirmOpen}
+          onOpenChange={setDeleteFieldConfirmOpen}
+          onCancel={closeDeleteFieldConfirm}
+          onDeleteConfirm={onDeleteField}
+        />
+        <Grid
+          columns={columns}
+          rows={rows}
+          onAddNewFieldClick={openNewFieldPanel}
+          onEditFieldClick={openEditFieldPanel}
+          onDeleteFieldClick={(field_id) => {
+            dispatch({
+              type: "editor/field/focus",
+              field_id,
+            });
+            openDeleteFieldConfirm();
+          }}
+        />
+      </div>
+      <footer className="flex min-h-9 overflow-hidden items-center px-2 w-full border-t">
+        <MaxRowsSelect />
+        <div>{state.responses?.length ?? 0} response(s)</div>
+        <Link href={`/v1/${form_id}/export/csv`} download target="_blank">
+          <button className="flex items-center gap-1 p-2 bg-neutral-100 rounded">
+            Export to CSV
+            <DownloadIcon />
+          </button>
+        </Link>
+      </footer>
+    </div>
+  );
+}
+
+function MaxRowsSelect() {
+  const [state, dispatch] = useEditorState();
+
+  return (
+    <select
+      className="p-2 bg-neutral-100 rounded"
+      value={state.responses_pagination_rows}
+      onChange={(e) => {
+        dispatch({
+          type: "editor/responses/pagination/rows",
+          max: parseInt(e.target.value),
+        });
+      }}
+    >
+      <option label="10 rows" value={10} />
+      <option label="100 rows" value={100} />
+      <option label="500 rows" value={500} />
+      <option label="1000 rows" value={1000} />
+    </select>
   );
 }
 
@@ -178,168 +188,4 @@ function DeleteFieldConfirmDialog({
       </AlertDialogContent>
     </AlertDialog>
   );
-}
-
-function FieldEditPanel({
-  title,
-  onSubmit,
-  formResetKey = 0,
-  ...props
-}: React.ComponentProps<typeof SidePanel> & {
-  title?: string;
-  formResetKey?: number;
-  onSubmit?: (field: NewFieldInit) => void;
-}) {
-  const [name, setName] = useState("");
-  const [label, setLabel] = useState("");
-  const [placeholder, setPlaceholder] = useState("");
-  const [helpText, setHelpText] = useState("");
-  const [type, setType] = useState<FormFieldType>("text");
-  const [required, setRequired] = useState(false);
-
-  const preview_label = buildPreviewLabel({
-    name,
-    label,
-    required,
-  });
-
-  const preview_placeholder =
-    placeholder || convertToPlainText(label) || convertToPlainText(name);
-
-  const onSaveClick = () => {
-    onSubmit?.({
-      name,
-      label,
-      placeholder,
-      helpText,
-      type,
-      required,
-    });
-  };
-
-  return (
-    <SidePanel {...props}>
-      <PanelHeader>{title}</PanelHeader>
-      <PanelContent>
-        <form key={formResetKey}>
-          <PanelPropertySection>
-            <PanelPropertySectionTitle>Preview</PanelPropertySectionTitle>
-            <PanelPropertyFields>
-              <div className="w-full min-h-40 bg-neutral-200 rounded p-10 border border-black/20">
-                <FormFieldPreview
-                  name={name}
-                  type={type}
-                  label={preview_label}
-                  labelCapitalize={!!label}
-                  placeholder={preview_placeholder}
-                  helpText={helpText}
-                  required={required}
-                />
-              </div>
-            </PanelPropertyFields>
-          </PanelPropertySection>
-          <PanelPropertySection>
-            <PanelPropertySectionTitle>General</PanelPropertySectionTitle>
-            <PanelPropertyFields>
-              <PanelPropertyField label={"Type"}>
-                <select
-                  value={type}
-                  onChange={(e) => setType(e.target.value as FormFieldType)}
-                >
-                  <option value="text">Text</option>
-                  <option value="textarea">Textarea</option>
-                  <option value="email">Email</option>
-                  <option value="number">Number</option>
-                </select>
-              </PanelPropertyField>
-              <PanelPropertyField
-                label={"Name"}
-                description="The input's name, identifier. Recommended to use lowercase and use an underscore to separate words e.g. column_name"
-              >
-                <PropertyTextInput
-                  required
-                  autoFocus
-                  placeholder={"field_name"}
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                />
-              </PanelPropertyField>
-              <PanelPropertyField
-                label={"Label"}
-                description="The label that will be displayed to the user"
-              >
-                <PropertyTextInput
-                  placeholder={"Label Text"}
-                  value={label}
-                  onChange={(e) => setLabel(e.target.value)}
-                />
-              </PanelPropertyField>
-              <PanelPropertyField
-                label={"Placeholder"}
-                description="The placeholder text that will be displayed in the input when it's empty."
-              >
-                <PropertyTextInput
-                  placeholder={"Placeholder Text"}
-                  value={placeholder}
-                  onChange={(e) => setPlaceholder(e.target.value)}
-                />
-              </PanelPropertyField>
-              <PanelPropertyField
-                label={"Help Text"}
-                description="A small hint that will be displayed next to the input to help the user understand what to input."
-              >
-                <PropertyTextInput
-                  placeholder={"Help Text"}
-                  value={helpText}
-                  onChange={(e) => setHelpText(e.target.value)}
-                />
-              </PanelPropertyField>
-              <PanelPropertyField label={"Required"}>
-                <input
-                  type="checkbox"
-                  checked={required}
-                  onChange={(e) => setRequired(e.target.checked)}
-                />
-              </PanelPropertyField>
-
-              {/* <PropertyTextField
-                label={"Name"}
-                placeholder={"field_name"}
-                description="Recommended to use lowercase and use an underscore to separate words e.g. column_name"
-              /> */}
-            </PanelPropertyFields>
-          </PanelPropertySection>
-        </form>
-      </PanelContent>
-      <PanelFooter>
-        <PanelClose>
-          <button className="rounded p-2 bg-neutral-100">Cancel</button>
-        </PanelClose>
-        <button onClick={onSaveClick} className="rounded p-2 bg-neutral-100">
-          Save
-        </button>
-      </PanelFooter>
-    </SidePanel>
-  );
-}
-
-function buildPreviewLabel({
-  name,
-  label,
-  required,
-}: {
-  name: string;
-  label?: string;
-  required?: boolean;
-}) {
-  let txt = label || convertToPlainText(name);
-  if (required) {
-    txt += " *";
-  }
-  return txt;
-}
-
-function convertToPlainText(input: string) {
-  // Converts to snake_case then replaces underscores with spaces and capitalizes words
-  return capitalCase(snakeCase(input)).toLowerCase();
 }

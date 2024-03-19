@@ -27,12 +27,10 @@ export default async function WithLink({ params }: { params: { id: string } }) {
       <p>
         Share this link with your users to let them fill out the form.
         <br />
-        <pre className="overflow-x-auto p-2 bg-neutral-100 rounded">
-          <a className="underline" href={url} target="_blank" rel="noreferrer">
-            {url}
-          </a>
-        </pre>
       </p>
+      <pre className="overflow-x-scroll p-2 bg-neutral-100 rounded">
+        <span className="underline">{url}</span>
+      </pre>
     </main>
   );
 }

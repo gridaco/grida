@@ -1,5 +1,5 @@
 import { GridaLogo } from "@/components/grida-logo";
-import { createServerClient } from "@/lib/supabase/server";
+import { createServerComponentClient } from "@/lib/supabase/server";
 import { cookies } from "next/headers";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -9,7 +9,7 @@ export default async function FormPage({ params }: { params: { id: string } }) {
 
   const cookieStore = cookies();
 
-  const supabase = createServerClient(cookieStore);
+  const supabase = createServerComponentClient(cookieStore);
 
   const { data, error } = await supabase
     .from("form")

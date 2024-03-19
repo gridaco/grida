@@ -2,7 +2,7 @@ import React from "react";
 import Link from "next/link";
 import { cookies } from "next/headers";
 import { notFound, redirect } from "next/navigation";
-import { createServerClient } from "@/lib/supabase/server";
+import { createServerComponentClient } from "@/lib/supabase/server";
 import { DashboardFormCard } from "@/components/dashboard-form-card";
 import { GridaLogo } from "@/components/grida-logo";
 import { PlusIcon } from "@radix-ui/react-icons";
@@ -19,12 +19,12 @@ export default async function FormsDashboardPage({
   const project_id = Number(params.project_id);
 
   const cookieStore = cookies();
-  const supabase = createServerClient(cookieStore);
+  const supabase = createServerComponentClient(cookieStore);
 
   const { data: auth } = await supabase.auth.getSession();
 
   if (!auth.session) {
-    return redirect("/login");
+    return redirect("/sign-in");
   }
 
   const { data: forms, error } = await supabase
