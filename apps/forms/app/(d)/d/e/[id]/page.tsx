@@ -2,6 +2,7 @@ import {
   ClientRenderBlock,
   FormClientFetchResponse,
 } from "@/app/(api)/v1/[id]/route";
+import { FormFieldPreview } from "@/components/formfield";
 import { GridaLogo } from "@/components/grida-logo";
 import { EditorApiResponse } from "@/types/private/api";
 import Link from "next/link";
@@ -28,28 +29,39 @@ export default async function FormPage({ params }: { params: { id: string } }) {
       case "field": {
         const { field } = block;
         return (
-          <label
-            data-has-label={!!field.label}
+          <FormFieldPreview
             key={field.id}
-            className="flex flex-col data-[has-label='false']:capitalize"
-          >
-            {field.label || field.name}
-            {field.help_text && (
-              <span className="text-sm text-gray-500">{field.help_text}</span>
-            )}
-            <input
-              name={field.name}
-              className="shadow appearance-none border rounded py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
-              min={field.min}
-              max={field.max}
-              pattern={field.pattern}
-              required={field.required}
-              minLength={field.minlength}
-              maxLength={field.maxlength}
-              placeholder={field.placeholder || field.label || field.name}
-              type={field.type}
-            />
-          </label>
+            name={field.name}
+            label={field.label}
+            placeholder={field.placeholder}
+            type={field.type}
+            required={field.required}
+            helpText={field.help_text}
+            // options={field.options}
+            pattern={field.pattern}
+          />
+          // <label
+          //   data-has-label={!!field.label}
+          //   key={field.id}
+          //   className="flex flex-col gap-1 data-[has-label='false']:capitalize"
+          // >
+          //   <span>{field.label || field.name}</span>
+          //   <input
+          //     name={field.name}
+          //     className="shadow appearance-none border rounded py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+          //     min={field.min}
+          //     max={field.max}
+          //     pattern={field.pattern}
+          //     required={field.required}
+          //     minLength={field.minlength}
+          //     maxLength={field.maxlength}
+          //     placeholder={field.placeholder || field.label || field.name}
+          //     type={field.type}
+          //   />
+          //   {field.help_text && (
+          //     <span className="text-sm text-gray-500">{field.help_text}</span>
+          //   )}
+          // </label>
         );
       }
       case "section": {
@@ -65,7 +77,7 @@ export default async function FormPage({ params }: { params: { id: string } }) {
       </header>
       <form
         action={"/submit/" + id}
-        className="flex flex-col gap-4 py-4 h-full overflow-auto flex-1"
+        className="flex flex-col gap-8 py-4 h-full overflow-auto flex-1"
       >
         {blocks.map(renderBlock)}
         <button className="bg-blue-500 text-white rounded p-2" type="submit">

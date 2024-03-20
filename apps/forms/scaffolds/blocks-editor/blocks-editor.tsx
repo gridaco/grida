@@ -85,6 +85,7 @@ function PendingBlocksResolver() {
           data: {},
           form_id: state.form_id,
           type: block.type,
+          local_index: block.local_index,
           form_field_id: block.form_field_id,
         })
         .select()

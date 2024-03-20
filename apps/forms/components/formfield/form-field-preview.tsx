@@ -16,15 +16,15 @@ export function FormFieldPreview({
 }: {
   name: string;
   label?: string;
-  labelCapitalize?: boolean;
   type: FormFieldType;
   placeholder?: string;
   helpText?: string;
-  required: boolean;
+  required?: boolean;
   options?: { label: string; value: string }[];
+  pattern?: string;
   readonly?: boolean;
   disabled?: boolean;
-  pattern?: string;
+  labelCapitalize?: boolean;
 }) {
   const sharedInputProps:
     | React.ComponentProps<"input">

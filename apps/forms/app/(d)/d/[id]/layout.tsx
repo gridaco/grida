@@ -27,8 +27,11 @@ export default async function Layout({
     .select(
       `
         *,
-        blocks:form_block(*),
-        fields:form_field(*)
+        fields:form_field(
+          *,
+          options:form_field_option(*)
+        ),
+        blocks:form_block(*)
       `
     )
     .eq("id", id)

@@ -1,4 +1,5 @@
 import { client, createRouteHandlerClient } from "@/lib/supabase/server";
+import { FormFieldType } from "@/types";
 import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
 import { NextRequest, NextResponse } from "next/server";
@@ -26,7 +27,7 @@ interface ClientFieldRenderBlock {
   type: "field";
   field: {
     id: string;
-    type: string;
+    type: FormFieldType;
     name: string;
     label?: string;
     help_text?: string;
@@ -63,7 +64,10 @@ export async function GET(
     .select(
       `
         *,
-        fields:form_field(*),
+        fields:form_field(
+          *,
+          options:form_field_option(*)
+        ),
         blocks:form_block(*)
       `
     )
