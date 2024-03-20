@@ -10,14 +10,25 @@ export interface FormEditorInit {
 }
 
 export function initialFormEditorState(init: FormEditorInit): FormEditorState {
+  // ensure initial blocks are sorted by local_index
+  const sorted_blocks = Array.from(init.blocks).sort((a, b) => {
+    return a.local_index - b.local_index;
+  });
+
+  // prepare initial available_field_ids
+  const field_ids = init.fields.map((f) => f.id);
+  const block_referenced_field_ids = init.blocks
+    .map((b) => b.form_field_id)
+    .filter((id) => id !== null) as string[];
+  const block_available_field_ids = field_ids.filter(
+    (id) => !block_referenced_field_ids.includes(id)
+  );
+
   return {
     form_id: init.form_id,
-    // ensure initial blocks are sorted by local_index
-    blocks: Array.from(init.blocks).sort((a, b) => {
-      return a.local_index - b.local_index;
-    }),
+    blocks: sorted_blocks,
     fields: init.fields,
-    available_field_ids: init.fields.map((f) => f.id),
+    available_field_ids: block_available_field_ids,
     responses_pagination_rows: 100,
   };
 }
