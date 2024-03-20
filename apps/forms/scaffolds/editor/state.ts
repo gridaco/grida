@@ -12,7 +12,8 @@ export interface FormEditorInit {
 export function initialFormEditorState(init: FormEditorInit): FormEditorState {
   return {
     form_id: init.form_id,
-    blocks: init.blocks.sort((a, b) => {
+    // ensure initial blocks are sorted by local_index
+    blocks: Array.from(init.blocks).sort((a, b) => {
       return a.local_index - b.local_index;
     }),
     fields: init.fields,
