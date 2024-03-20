@@ -19,6 +19,11 @@ import {
   Link2Icon,
   Pencil1Icon,
   TrashIcon,
+  GlobeIcon,
+  DropdownMenuIcon,
+  CheckCircledIcon,
+  EyeClosedIcon,
+  ColorWheelIcon,
 } from "@radix-ui/react-icons";
 import {
   DropdownMenu,
@@ -28,6 +33,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@editor-ui/dropdown-menu";
+import { FormFieldType } from "@/types";
 
 export function Grid({
   columns,
@@ -98,6 +104,7 @@ export function Grid({
             renderHeaderCell: (props) => (
               <FieldHeaderCell
                 {...props}
+                type={col.type as FormFieldType}
                 onEditClick={() => {
                   onEditFieldClick?.(col.key);
                 }}
@@ -159,9 +166,11 @@ function DefaultPropertyIcon({ __key: key }: { __key: string }) {
 
 function FieldHeaderCell({
   column,
+  type,
   onEditClick,
   onDeleteClick,
 }: RenderHeaderCellProps<any> & {
+  type: FormFieldType;
   onEditClick?: () => void;
   onDeleteClick?: () => void;
 }) {
@@ -170,7 +179,7 @@ function FieldHeaderCell({
   return (
     <div className="flex items-center justify-between">
       <span className="flex items-center gap-2">
-        <TextIcon />
+        <FormFieldTypeIcon type={type} />
         <span className="font-normal">{name}</span>
       </span>
       <DropdownMenu modal={false}>
@@ -194,6 +203,35 @@ function FieldHeaderCell({
       </DropdownMenu>
     </div>
   );
+}
+
+function FormFieldTypeIcon({ type }: { type: FormFieldType }) {
+  switch (type) {
+    case "text":
+      return <TextIcon />;
+    case "tel":
+    case "email":
+      return <EnvelopeClosedIcon />;
+    case "radio":
+    case "select":
+      return <DropdownMenuIcon />;
+    case "url":
+      return <GlobeIcon />;
+    case "image":
+      return <ImageIcon />;
+    case "checkbox":
+      return <CheckCircledIcon />;
+    case "date":
+    case "month":
+    case "week":
+      return <CalendarIcon />;
+    case "password":
+      return <EyeClosedIcon />;
+    case "color":
+      return <ColorWheelIcon />;
+    default:
+      return <TextIcon />;
+  }
 }
 
 function NewFieldHeaderCell({
@@ -222,14 +260,20 @@ function FieldCell({ column, row }: RenderCellProps<any>) {
 
   const unwrapped = JSON.parse(value);
 
-  let display = "";
-  switch (type) {
+  let display = unwrapped;
+  switch (type as FormFieldType) {
     case "text":
       display = unwrapped;
       break;
+    case "password":
+      display = "●".repeat(display?.length ?? 0);
+      break;
+    case "checkbox": {
+      return <input type="checkbox" checked={unwrapped} disabled />;
+    }
   }
 
-  return <div>{unwrapped}</div>;
+  return <div>{display}</div>;
 }
 
 function FieldEditCell({ column, row }: RenderEditCellProps<any>) {
@@ -252,7 +296,12 @@ function FieldEditCell({ column, row }: RenderEditCellProps<any>) {
 
   const unwrapped = JSON.parse(value);
 
-  switch (type) {
+  switch (type as FormFieldType) {
+    case "email":
+    case "password":
+    case "tel":
+    case "textarea":
+    case "url":
     case "text":
       return (
         <input
@@ -265,5 +314,11 @@ function FieldEditCell({ column, row }: RenderEditCellProps<any>) {
       );
     case "select":
       return <select></select>;
+    case "color":
+      return <input readOnly disabled type="color" defaultValue={unwrapped} />;
+    case "checkbox":
+      return (
+        <input readOnly disabled type="checkbox" defaultChecked={unwrapped} />
+      );
   }
 }

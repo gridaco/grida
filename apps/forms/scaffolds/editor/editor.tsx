@@ -235,6 +235,7 @@ function FieldEditPanelProvider({ children }: React.PropsWithChildren<{}>) {
                 placeholder: field.placeholder ?? "",
                 options: field.options,
                 required: field.required,
+                pattern: field.pattern,
               }
             : undefined
         }

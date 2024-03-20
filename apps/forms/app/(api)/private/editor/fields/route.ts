@@ -25,6 +25,12 @@ export async function POST(req: NextRequest) {
       placeholder: init.placeholder,
       help_text: init.helpText,
       required: init.required,
+      pattern: init.pattern,
+      // 'autocomplete': init.autocomplete,
+      // 'description': init.description,
+      // 'max': init.max,
+      // 'min': init.min,
+      // 'step': init.step,
       updated_at: new Date().toISOString(),
     })
     .select()

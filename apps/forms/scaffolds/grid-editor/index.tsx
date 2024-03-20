@@ -28,6 +28,7 @@ export function GridEditor() {
         key: field.id,
         name: field.name,
         frozen: false,
+        type: field.type,
         // You can add more properties here as needed by react-data-grid
       })) ?? [],
     [fields]

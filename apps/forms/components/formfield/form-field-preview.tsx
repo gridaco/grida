@@ -29,6 +29,7 @@ export function FormFieldPreview({
   const sharedInputProps:
     | React.ComponentProps<"input">
     | React.ComponentProps<"textarea"> = {
+    name: name,
     readOnly: readonly,
     disabled: disabled,
     autoFocus: false,

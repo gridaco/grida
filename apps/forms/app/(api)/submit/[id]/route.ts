@@ -160,8 +160,10 @@ async function submit({
     .from("response_field")
     .insert(
       form_fields!.map((field) => ({
+        type: field.type,
         response_id: response_reference_obj!.id,
         form_field_id: field.id,
+        form_id: form_id,
         value: JSON.stringify(data.get(field.name)),
       }))
     )
