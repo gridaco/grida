@@ -113,7 +113,7 @@ export function FieldEditPanel({
   const [type, setType] = useState<FormFieldType>(init?.type || "text");
   const [required, setRequired] = useState(init?.required || false);
   const [pattern, setPattern] = useState<string | undefined>(init?.pattern);
-  const [options, setOptions] = useState<{ label: string; value: string }[]>(
+  const [options, setOptions] = useState<{ label?: string; value: string }[]>(
     init?.options || []
   );
 
@@ -161,15 +161,22 @@ export function FieldEditPanel({
     if (effect_cause === "human") {
       if (type in default_field_init) {
         const defaults = default_field_init[type];
-        setName(defaults.name || "");
-        setLabel(defaults.label || "");
-        setPlaceholder(defaults.placeholder || "");
-        setHelpText(defaults.helpText || "");
-        setRequired(defaults.required || false);
+
+        // optional reset
+        setName((_name) => _name || defaults.name || "");
+        setLabel((_label) => _label || defaults.label || "");
+        setPlaceholder(
+          (_placeholder) => _placeholder || defaults.placeholder || ""
+        );
+        setHelpText((_help) => _help || defaults.helpText || "");
+        setRequired((_required) => _required || defaults.required || false);
+
         // reset options if there were no existing options
         if (!options?.length) {
           setOptions(defaults.options || []);
         }
+
+        // always reset pattern
         setPattern(defaults.pattern);
       }
     }
@@ -400,6 +407,12 @@ function FormFieldAssistant({
     }
   }, [schema]);
 
+  const onKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === "Enter" && e.metaKey) {
+      assist();
+    }
+  };
+
   return (
     <div className="w-full border rounded-lg p-4 shadow-sm bg-white">
       <div className="flex items-center mb-4">
@@ -411,6 +424,7 @@ function FormFieldAssistant({
         value={description}
         placeholder="Describe the field..."
         onChange={(e) => setDescription(e.target.value)}
+        onKeyDown={onKeyDown}
         rows={4}
       />
       <button

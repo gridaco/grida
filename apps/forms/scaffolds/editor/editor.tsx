@@ -233,7 +233,7 @@ function FieldEditPanelProvider({ children }: React.PropsWithChildren<{}>) {
                 label: field.label ?? "",
                 helpText: field.help_text ?? "",
                 placeholder: field.placeholder ?? "",
-                // options: field.options,
+                options: field.options,
                 required: field.required,
               }
             : undefined

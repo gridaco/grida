@@ -60,16 +60,23 @@ export async function POST(req: NextRequest) {
           value: option.value,
           form_field_id: upserted.id,
           form_id: form_id,
-        }))
+        })),
+        {
+          onConflict: "value,form_field_id",
+        }
       )
       .select();
 
     field_options = upserted_options ?? undefined;
 
     if (error) {
-      // revert field upsert and throw
       console.error("error while upserting field options", error);
-      await supabase.from("form_field").delete().eq("id", upserted.id);
+      if (operation === "create") {
+        // revert field if options failed
+        await supabase.from("form_field").delete().eq("id", upserted.id);
+      } else {
+        // just let only the options fail, keep the updated field
+      }
       return NextResponse.error();
     }
   }

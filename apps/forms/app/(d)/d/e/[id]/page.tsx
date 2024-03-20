@@ -37,7 +37,7 @@ export default async function FormPage({ params }: { params: { id: string } }) {
             type={field.type}
             required={field.required}
             helpText={field.help_text}
-            // options={field.options}
+            options={field.options}
             pattern={field.pattern}
           />
           // <label

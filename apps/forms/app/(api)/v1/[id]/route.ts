@@ -38,6 +38,11 @@ interface ClientFieldRenderBlock {
     minlength?: number;
     maxlength?: number;
     placeholder?: string;
+    options?: {
+      id: string;
+      label?: string;
+      value: string;
+    }[];
   };
 }
 interface ClientSectionRenderBlock {

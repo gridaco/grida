@@ -178,7 +178,7 @@ export function FieldBlock({ id, type, form_field_id, data }: EditorFormBlock) {
             <DropdownMenuContent>
               <DropdownMenuItem onClick={onDelete}>
                 <TrashIcon />
-                Delete
+                Delete Block
               </DropdownMenuItem>
               {form_field_id && (
                 <DropdownMenuItem onClick={onEditClick}>
@@ -200,6 +200,7 @@ export function FieldBlock({ id, type, form_field_id, data }: EditorFormBlock) {
           required={form_field?.required ?? false}
           helpText={form_field?.help_text ?? ""}
           placeholder={form_field?.placeholder ?? ""}
+          options={form_field?.options}
         />
       </div>
     </div>

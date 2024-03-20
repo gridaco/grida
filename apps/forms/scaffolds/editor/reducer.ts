@@ -137,7 +137,6 @@ export function reducer(
       });
     }
     case "editor/field/edit": {
-      // TODO: I'm not being triggred inspect me.
       const { field_id, open, refresh } = <OpenEditFieldAction>action;
       return produce(state, (draft) => {
         draft.is_field_edit_panel_open = open ?? true;

@@ -39,6 +39,11 @@ export interface FormFieldDefinition {
   required: boolean;
   help_text?: string | null;
   pattern?: any | null;
+  options?: {
+    id: string;
+    label?: string;
+    value: string;
+  }[];
 }
 
 export type FormBlockType =
