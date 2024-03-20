@@ -101,6 +101,10 @@ export function GridEditor() {
           return;
         }
         toast.success("Field deleted");
+        dispatch({
+          type: "editor/field/delete",
+          field_id: focus_field_id!,
+        });
       });
   }, [supabase, focus_field_id]);
 

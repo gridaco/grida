@@ -5,6 +5,7 @@ import {
   ChangeBlockFieldAction,
   CreateNewPendingBlockAction,
   DeleteBlockAction,
+  DeleteFieldAction,
   FeedResponseAction,
   FocusFieldAction,
   OpenEditFieldAction,
@@ -24,6 +25,8 @@ export function reducer(
       // TODO: if adding new section, if there is a present non-section-blocks on root, it should automatically be nested under new section.
       const { block } = <CreateNewPendingBlockAction>action;
 
+      const new_index = state.blocks.length;
+
       switch (block) {
         case "field": {
           return produce(state, (draft) => {
@@ -37,6 +40,7 @@ export function reducer(
               form_field_id: field_id,
               form_id: state.form_id,
               type: block,
+              local_index: new_index,
               data: {},
             });
 
@@ -51,6 +55,7 @@ export function reducer(
             draft.blocks.push({
               id: "[draft]" + Math.random().toString(36).substring(7),
               form_id: state.form_id,
+              local_index: new_index,
               type: block,
               data: {},
             });
@@ -163,8 +168,31 @@ export function reducer(
           draft.fields.push({
             ...data,
           });
+
+          // add the field_id to available_field_ids
+          draft.available_field_ids.push(field_id);
         }
         //
+      });
+    }
+    case "editor/field/delete": {
+      const { field_id } = <DeleteFieldAction>action;
+      return produce(state, (draft) => {
+        // remove from fields
+        draft.fields = draft.fields.filter((f) => f.id !== field_id);
+
+        // remove from available_field_ids
+        draft.available_field_ids = draft.available_field_ids.filter(
+          (id) => id !== field_id
+        );
+
+        // set empty to referenced blocks
+        draft.blocks = draft.blocks.map((block) => {
+          if (block.form_field_id === field_id) {
+            block.form_field_id = null;
+          }
+          return block;
+        });
       });
     }
     case "editor/responses/pagination/rows": {

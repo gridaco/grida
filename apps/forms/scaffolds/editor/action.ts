@@ -10,6 +10,7 @@ export type BlocksEditorAction =
   | FocusFieldAction
   | ChangeBlockFieldAction
   | SaveFieldAction
+  | DeleteFieldAction
   | FeedResponseAction
   | ResponseFeedRowsAction;
 
@@ -58,6 +59,11 @@ export interface SaveFieldAction {
   type: "editor/field/save";
   field_id: string;
   data: FormFieldDefinition;
+}
+
+export interface DeleteFieldAction {
+  type: "editor/field/delete";
+  field_id: string;
 }
 
 export interface FeedResponseAction {
