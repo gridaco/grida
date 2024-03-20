@@ -113,9 +113,9 @@ export function FieldEditPanel({
   const [type, setType] = useState<FormFieldType>(init?.type || "text");
   const [required, setRequired] = useState(init?.required || false);
   const [pattern, setPattern] = useState<string | undefined>(init?.pattern);
-  const [options, setOptions] = useState<{ label?: string; value: string }[]>(
-    init?.options || []
-  );
+  const [options, setOptions] = useState<
+    { label?: string | null; value: string }[]
+  >(init?.options || []);
 
   const preview_label = buildPreviewLabel({
     name,

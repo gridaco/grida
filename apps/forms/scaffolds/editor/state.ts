@@ -12,7 +12,9 @@ export interface FormEditorInit {
 export function initialFormEditorState(init: FormEditorInit): FormEditorState {
   return {
     form_id: init.form_id,
-    blocks: init.blocks,
+    blocks: init.blocks.sort((a, b) => {
+      return a.local_index - b.local_index;
+    }),
     fields: init.fields,
     available_field_ids: init.fields.map((f) => f.id),
     responses_pagination_rows: 100,
@@ -38,5 +40,5 @@ export interface EditorFormBlock {
   type: FormBlockType;
   data: any;
   parent_id?: string | null;
-  local_index?: number;
+  local_index: number;
 }

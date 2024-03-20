@@ -20,7 +20,7 @@ export function FormFieldPreview({
   placeholder?: string;
   helpText?: string;
   required?: boolean;
-  options?: { label?: string; value: string }[];
+  options?: { label?: string | null; value: string }[];
   pattern?: string;
   readonly?: boolean;
   disabled?: boolean;

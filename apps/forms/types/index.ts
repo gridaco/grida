@@ -26,7 +26,7 @@ export type NewFormFieldInit = {
   helpText: string;
   type: FormFieldType;
   required: boolean;
-  options?: { label?: string; value: string }[];
+  options?: { label?: string | null; value: string }[];
   pattern?: string;
 };
 
@@ -41,7 +41,7 @@ export interface FormFieldDefinition {
   pattern?: any | null;
   options?: {
     id: string;
-    label?: string;
+    label?: string | null;
     value: string;
   }[];
 }
