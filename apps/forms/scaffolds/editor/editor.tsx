@@ -72,8 +72,17 @@ function FormResponsesProvider({ children }: React.PropsWithChildren<{}>) {
     [supabase]
   );
 
+  const initially_fetched_responses = React.useRef(false);
+
   useEffect(() => {
-    // fetch the responses
+    // initially fetch the responses
+    // this should be done only once
+    if (initially_fetched_responses.current) {
+      return;
+    }
+
+    initially_fetched_responses.current = true;
+
     const feed = fetchResponses().then((data) => {
       dispatch({
         type: "editor/response/feed",

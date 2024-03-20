@@ -10,7 +10,7 @@ interface DBBlock {
   parent_id?: string | null;
   created_at: string;
   local_index: number;
-  form_field_id: string;
+  form_field_id: string | null;
 }
 
 export interface FormClientFetchResponse {
@@ -78,6 +78,7 @@ export async function GET(
 
   // @ts-ignore
   let render_blocks: ClientRenderBlock[] = blocks
+    .sort((a: DBBlock, b: DBBlock) => a.local_index - b.local_index)
     ?.map((block: any) => {
       const is_field = block.type === "field";
       const field = is_field
@@ -100,7 +101,6 @@ export async function GET(
       };
     })
     .filter(Boolean);
-
   // if no blocks, render a simple form based on fields
   if (!render_blocks.length) {
     render_blocks = fields.map((field: any) => {

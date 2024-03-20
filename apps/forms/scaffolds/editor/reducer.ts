@@ -71,15 +71,22 @@ export function reducer(
           return;
         }
 
-        const oldIndex = state.blocks.findIndex(
+        const oldIndex = draft.blocks.findIndex(
           (block) => block.id === block_id
         );
 
-        const newIndex = state.blocks.findIndex(
+        const newIndex = draft.blocks.findIndex(
           (block) => block.id === over_id
         );
 
-        draft.blocks = arrayMove(state.blocks, oldIndex, newIndex);
+        // Ensure arrayMove returns a new array with objects that can be mutated
+        let movedBlocks = arrayMove(draft.blocks, oldIndex, newIndex);
+
+        // Re-assign draft.blocks to ensure the objects are treated as new if necessary
+        draft.blocks = movedBlocks.map((block, index) => ({
+          ...block,
+          local_index: index,
+        }));
       });
     }
     case "editor/field/focus": {

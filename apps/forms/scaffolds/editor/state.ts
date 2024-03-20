@@ -21,5 +21,5 @@ export interface EditorFormBlock {
   type: FormBlockType;
   data: any;
   parent_id?: string | null;
-  local_index?: number | null;
+  local_index?: number;
 }

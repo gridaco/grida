@@ -43,11 +43,12 @@ export interface FormFieldDefinition {
 
 export type FormBlockType =
   | "section"
+  // not supported yet
   | "group"
-  | "field"
-  // not supported yet
-  | "markdown"
-  // not supported yet
-  | "layout"
-  // not supported yet
-  | "divider";
+  | "field";
+// not supported yet
+// | "markdown"
+// not supported yet
+// | "layout"
+// not supported yet
+// | "divider";

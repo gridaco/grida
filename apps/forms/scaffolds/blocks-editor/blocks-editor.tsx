@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useCallback, useEffect, useId } from "react";
+import React, { useCallback, useEffect, useId, useRef } from "react";
 import { type EditorFormBlock, DRAFT_ID_START_WITH } from "../editor/state";
 import { useEditorState } from "../editor";
 import { PlusIcon } from "@radix-ui/react-icons";
@@ -75,9 +75,7 @@ function PendingBlocksResolver() {
   const [state, dispatch] = useEditorState();
 
   const supabase = createClientClient();
-  // TODO: move me to db sync handler
 
-  //
   const insertBlock = useCallback(
     async (block: EditorFormBlock) => {
       //
@@ -125,6 +123,64 @@ function PendingBlocksResolver() {
   return <></>;
 }
 
+function useSyncBlocks(blocks: EditorFormBlock[]) {
+  const supabase = createClientClient();
+  const prevBlocksRef = useRef(blocks);
+
+  useEffect(() => {
+    const prevBlocks = prevBlocksRef.current;
+    const updatedBlocks = blocks.filter((block) => {
+      const prevBlock = prevBlocks.find((prev) => prev.id === block.id);
+      return (
+        !prevBlock ||
+        block.type !== prevBlock.type ||
+        block.local_index !== prevBlock.local_index ||
+        block.form_field_id !== prevBlock.form_field_id
+      );
+    });
+
+    updatedBlocks.forEach(async (block) => {
+      try {
+        const { data, error } = await supabase
+          .from("form_block")
+          .update({
+            // Assuming these are the fields to update
+            type: block.type,
+            local_index: block.local_index,
+            form_field_id: block.form_field_id,
+          })
+          .eq("id", block.id)
+          .single();
+
+        if (error) throw new Error(error.message);
+        // Handle successful update (e.g., through a dispatch or local state update)
+      } catch (error) {
+        console.error("Failed to update block:", error);
+        // Handle error (e.g., rollback changes, show error message)
+      }
+    });
+
+    // Update the ref to the current blocks for the next render
+    prevBlocksRef.current = blocks;
+  }, [blocks, supabase]);
+}
+
+function OptimisticBlocksSyncProvider({
+  children,
+}: React.PropsWithChildren<{}>) {
+  // sync data to server, when blocks change. (use id as identifier)
+  // look for differences in..
+  // - type
+  // - local_index
+  // - form_field_id
+  const [state] = useEditorState();
+
+  // Use the custom hook to sync blocks
+  useSyncBlocks(state.blocks);
+
+  return <>{children}</>;
+}
+
 function BlocksEditor() {
   const [state, dispatch] = useEditorState();
 
@@ -145,6 +201,7 @@ function BlocksEditor() {
   return (
     <div>
       <PendingBlocksResolver />
+      <OptimisticBlocksSyncProvider />
       <DropdownMenu modal={false}>
         <DropdownMenuTrigger asChild>
           <button className="rounded border p-2">
