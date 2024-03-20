@@ -23,21 +23,40 @@ export function reducer(
     case "blocks/new": {
       // TODO: if adding new section, if there is a present non-section-blocks on root, it should automatically be nested under new section.
       const { block } = <CreateNewPendingBlockAction>action;
-      return produce(state, (draft) => {
-        // find unused field id (if any)
-        const field_ids = draft.fields.map((f) => f.id);
-        const used_ids = draft.blocks.map((b) => b.form_field_id);
-        const unused_ids = field_ids.filter((id) => !used_ids.includes(id));
-        const field_id = unused_ids[0] ?? null;
 
-        draft.blocks.push({
-          id: "[draft]" + Math.random().toString(36).substring(7),
-          form_field_id: field_id,
-          form_id: state.form_id,
-          type: block,
-          data: {},
-        });
-      });
+      switch (block) {
+        case "field": {
+          return produce(state, (draft) => {
+            const { available_field_ids } = state;
+
+            // find unused field id (if any)
+            const field_id = available_field_ids[0] ?? null;
+
+            draft.blocks.push({
+              id: "[draft]" + Math.random().toString(36).substring(7),
+              form_field_id: field_id,
+              form_id: state.form_id,
+              type: block,
+              data: {},
+            });
+
+            // remove the field id from available_field_ids
+            draft.available_field_ids = available_field_ids.filter(
+              (id) => id !== field_id
+            );
+          });
+        }
+        case "section": {
+          return produce(state, (draft) => {
+            draft.blocks.push({
+              id: "[draft]" + Math.random().toString(36).substring(7),
+              form_id: state.form_id,
+              type: block,
+              data: {},
+            });
+          });
+        }
+      }
     }
     case "blocks/resolve": {
       const { block_id, block } = <ResolvePendingBlockAction>action;
@@ -52,7 +71,17 @@ export function reducer(
       const { block_id } = <DeleteBlockAction>action;
       console.log("delete block", block_id);
       return produce(state, (draft) => {
+        // remove the field id from available_field_ids
         draft.blocks = draft.blocks.filter((block) => block.id !== block_id);
+
+        // find the field_id of the deleted block
+        const field_id = state.blocks.find(
+          (b) => b.id === block_id
+        )?.form_field_id;
+        // add the field_id to available_field_ids
+        if (field_id) {
+          draft.available_field_ids.push(field_id);
+        }
       });
     }
     case "blocks/field/change": {
@@ -60,7 +89,14 @@ export function reducer(
       return produce(state, (draft) => {
         const block = draft.blocks.find((b) => b.id === block_id);
         if (block) {
+          const previous_field_id = block.form_field_id;
           block.form_field_id = field_id;
+
+          // update the available_field_ids
+          draft.available_field_ids = [
+            ...draft.available_field_ids.filter((id) => id !== field_id),
+            previous_field_id,
+          ].filter(Boolean) as string[];
         }
       });
     }

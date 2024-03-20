@@ -3,7 +3,11 @@
 import React, { useCallback, useEffect, useMemo } from "react";
 import { StateProvider, useEditorState } from "./provider";
 import { reducer } from "./reducer";
-import { FormEditorState } from "./state";
+import {
+  FormEditorInit,
+  FormEditorState,
+  initialFormEditorState,
+} from "./state";
 import { FieldEditPanel } from "../panels/field-edit-panel";
 import { FormFieldDefinition, NewFormFieldInit } from "@/types";
 import { createClientClient } from "@/lib/supabase/client";
@@ -13,8 +17,11 @@ import { FormFieldUpsert, EditorApiResponse } from "@/types/private/api";
 export function FormEditorProvider({
   initial,
   children,
-}: React.PropsWithChildren<{ initial: FormEditorState }>) {
-  const [state, dispatch] = React.useReducer(reducer, initial);
+}: React.PropsWithChildren<{ initial: FormEditorInit }>) {
+  const [state, dispatch] = React.useReducer(
+    reducer,
+    initialFormEditorState(initial)
+  );
 
   return (
     <StateProvider state={state} dispatch={dispatch}>

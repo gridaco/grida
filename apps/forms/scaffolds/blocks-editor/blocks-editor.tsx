@@ -84,7 +84,7 @@ function PendingBlocksResolver() {
         .insert({
           data: {},
           form_id: state.form_id,
-          type: "field",
+          type: block.type,
           form_field_id: block.form_field_id,
         })
         .select()

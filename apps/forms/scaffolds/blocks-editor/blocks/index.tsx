@@ -97,6 +97,8 @@ export function FieldBlock({ id, type, form_field_id, data }: EditorFormBlock) {
     (f) => f.id === form_field_id
   );
 
+  const { available_field_ids } = state;
+
   const supabase = createClientClient();
 
   const deleteBlock = useCallback(
@@ -156,7 +158,11 @@ export function FieldBlock({ id, type, form_field_id, data }: EditorFormBlock) {
           >
             <option value="">Select Field</option>
             {state.fields.map((f) => (
-              <option key={f.id} value={f.id}>
+              <option
+                key={f.id}
+                value={f.id}
+                disabled={!available_field_ids.includes(f.id)}
+              >
                 {f.name}
               </option>
             ))}

@@ -19,7 +19,9 @@ export interface FormClientFetchResponse {
   //
 }
 
-type ClientRenderBlock = ClientFieldRenderBlock | ClientFieldRenderBlock;
+export type ClientRenderBlock =
+  | ClientFieldRenderBlock
+  | ClientSectionRenderBlock;
 interface ClientFieldRenderBlock {
   type: "field";
   field: {
