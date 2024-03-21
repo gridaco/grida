@@ -34,6 +34,7 @@ import {
   DropdownMenuTrigger,
 } from "@editor-ui/dropdown-menu";
 import { FormFieldType } from "@/types";
+import { JsonEditCell } from "./json-cell";
 
 export function Grid({
   columns,
@@ -276,7 +277,8 @@ function FieldCell({ column, row }: RenderCellProps<any>) {
   return <div>{display}</div>;
 }
 
-function FieldEditCell({ column, row }: RenderEditCellProps<any>) {
+function FieldEditCell(props: RenderEditCellProps<any>) {
+  const { column, row } = props;
   const data = row[column.key];
   const ref = useRef<HTMLInputElement>(null);
 
@@ -313,12 +315,14 @@ function FieldEditCell({ column, row }: RenderEditCellProps<any>) {
         />
       );
     case "select":
-      return <select></select>;
+      return <JsonEditCell {...props} />;
     case "color":
       return <input readOnly disabled type="color" defaultValue={unwrapped} />;
     case "checkbox":
-      return (
-        <input readOnly disabled type="checkbox" defaultChecked={unwrapped} />
-      );
+    // return (
+    //   <input readOnly disabled type="checkbox" defaultChecked={unwrapped} />
+    // );
+    default:
+      return <JsonEditCell {...props} />;
   }
 }
