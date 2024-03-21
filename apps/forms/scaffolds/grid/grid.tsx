@@ -1,7 +1,9 @@
 "use client";
 
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import "react-data-grid/lib/styles.css";
+import "./grid.css";
+
 import DataGrid, {
   Column,
   RenderCellProps,
@@ -35,6 +37,13 @@ import {
 } from "@editor-ui/dropdown-menu";
 import { FormFieldType } from "@/types";
 import { JsonEditCell } from "./json-cell";
+import { useEditorState } from "../editor";
+import { GFRow } from "./types";
+import { SelectColumn } from "./select-column";
+
+function rowKeyGetter(row: GFRow) {
+  return row.__gf_id;
+}
 
 export function Grid({
   columns,
@@ -48,18 +57,19 @@ export function Grid({
     name: string;
     type?: string;
   }[];
-  rows: { __id: string; [key: string]: string | number | boolean }[];
+  rows: GFRow[];
   onAddNewFieldClick?: () => void;
   onEditFieldClick?: (id: string) => void;
   onDeleteFieldClick?: (id: string) => void;
 }) {
-  const __leading_column: Column<any> = {
-    key: "__",
-    name: "",
-    frozen: true,
-    width: 50,
-    renderHeaderCell: LeadingHeaderCell,
-    renderCell: LeadingCell,
+  const [state, dispatch] = useEditorState();
+  const { selected_responses } = state;
+
+  const onSelectedRowsChange = (selectedRows: ReadonlySet<string>) => {
+    dispatch({
+      type: "editor/response/select",
+      selection: selectedRows,
+    });
   };
 
   const __id_column: Column<any> = {
@@ -91,7 +101,7 @@ export function Grid({
     ),
   };
 
-  const formattedColumns = [__leading_column, __id_column, __created_at_column]
+  const formattedColumns = [SelectColumn, __id_column, __created_at_column]
     .concat(
       columns.map(
         (col) =>
@@ -124,7 +134,10 @@ export function Grid({
   return (
     <DataGrid
       className="border border-gray-200 dark:border-gray-900 h-max select-none"
+      rowKeyGetter={rowKeyGetter}
       columns={formattedColumns}
+      selectedRows={selected_responses}
+      onSelectedRowsChange={onSelectedRowsChange}
       rows={rows}
     />
   );
@@ -137,7 +150,7 @@ function LeadingHeaderCell({ column }: RenderHeaderCellProps<any>) {
 function LeadingCell({ column }: RenderCellProps<any>) {
   return (
     <div className="flex group items-center justify-between h-full w-full">
-      {/* <input type="checkbox" /> */}
+      <input type="checkbox" />
       <button className="opacity-0 group-hover:opacity-100">
         <EnterFullScreenIcon />
       </button>

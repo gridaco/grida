@@ -28,6 +28,7 @@ export function initialFormEditorState(init: FormEditorInit): FormEditorState {
     form_id: init.form_id,
     blocks: sorted_blocks,
     fields: init.fields,
+    selected_responses: new Set(),
     available_field_ids: block_available_field_ids,
     responses_pagination_rows: 100,
   };
@@ -39,6 +40,7 @@ export interface FormEditorState {
   fields: FormFieldDefinition[];
   available_field_ids: string[];
   responses?: any[];
+  selected_responses: Set<string>;
   responses_pagination_rows: number;
   focus_field_id?: string;
   is_field_edit_panel_open?: boolean;

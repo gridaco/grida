@@ -6,12 +6,14 @@ import {
   CreateNewPendingBlockAction,
   DeleteBlockAction,
   DeleteFieldAction,
+  DeleteSelectedResponsesAction,
   FeedResponseAction,
   FocusFieldAction,
   OpenEditFieldAction,
   ResolvePendingBlockAction,
   ResponseFeedRowsAction,
   SaveFieldAction,
+  SelectResponse,
   SortBlockAction,
 } from "./action";
 import { arrayMove } from "@dnd-kit/sortable";
@@ -192,6 +194,29 @@ export function reducer(
           }
           return block;
         });
+      });
+    }
+    case "editor/response/select": {
+      const { selection } = <SelectResponse>action;
+      return produce(state, (draft) => {
+        draft.selected_responses = new Set(selection);
+      });
+    }
+    case "editor/response/delete/selected": {
+      return produce(state, (draft) => {
+        const ids = Array.from(state.selected_responses);
+
+        draft.responses = draft.responses?.filter(
+          (response) => !ids.includes(response.id)
+        );
+
+        // also remove from selected_responses
+        const new_selected_responses = new Set(state.selected_responses);
+        ids.forEach((id) => {
+          new_selected_responses.delete(id);
+        });
+
+        draft.selected_responses = new_selected_responses;
       });
     }
     case "editor/responses/pagination/rows": {

@@ -9,6 +9,8 @@ export type BlocksEditorAction =
   | SortBlockAction
   | FocusFieldAction
   | ChangeBlockFieldAction
+  | SelectResponse
+  | DeleteSelectedResponsesAction
   | SaveFieldAction
   | DeleteFieldAction
   | FeedResponseAction
@@ -69,6 +71,15 @@ export interface DeleteFieldAction {
 export interface FeedResponseAction {
   type: "editor/response/feed";
   data: any[];
+}
+
+export interface SelectResponse {
+  type: "editor/response/select";
+  selection: ReadonlySet<string>;
+}
+
+export interface DeleteSelectedResponsesAction {
+  type: "editor/response/delete/selected";
 }
 
 export interface ResponseFeedRowsAction {

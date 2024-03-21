@@ -13,6 +13,7 @@ import { FormFieldDefinition, NewFormFieldInit } from "@/types";
 import { createClientClient } from "@/lib/supabase/client";
 import toast from "react-hot-toast";
 import { FormFieldUpsert, EditorApiResponse } from "@/types/private/api";
+import { TooltipProvider } from "@radix-ui/react-tooltip";
 
 export function FormEditorProvider({
   initial,
@@ -25,9 +26,11 @@ export function FormEditorProvider({
 
   return (
     <StateProvider state={state} dispatch={dispatch}>
-      <FormResponsesProvider>
-        <FieldEditPanelProvider>{children}</FieldEditPanelProvider>
-      </FormResponsesProvider>
+      <TooltipProvider>
+        <FormResponsesProvider>
+          <FieldEditPanelProvider>{children}</FieldEditPanelProvider>
+        </FormResponsesProvider>
+      </TooltipProvider>
     </StateProvider>
   );
 }
@@ -118,7 +121,10 @@ function FormResponsesProvider({ children }: React.PropsWithChildren<{}>) {
         (payload) => {
           const { old, new: _new } = payload;
 
-          if (_new) {
+          // if deleted, the `new` is empty object `{}`
+          const new_id: string | undefined = (_new as { id: string }).id;
+
+          if (new_id) {
             // fetch the response in detail (delay is required for nested fields to be available)
             setTimeout(() => {
               const newresponse = fetchResponse(
