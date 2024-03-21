@@ -205,6 +205,9 @@ importers:
       '@editor-ui/dropdown-menu':
         specifier: workspace:^
         version: link:../../ui/editor-ui/packages/editor-ui-dropdown-menu
+      '@monaco-editor/react':
+        specifier: ^4.6.0
+        version: 4.6.0(monaco-editor@0.47.0)(react-dom@18.2.0)(react@18.2.0)
       '@next/third-parties':
         specifier: ^14.1.3
         version: 14.1.3(next@14.1.1)(react@18.2.0)
@@ -214,6 +217,9 @@ importers:
       '@radix-ui/react-icons':
         specifier: ^1.0.3
         version: 1.3.0(react@18.2.0)
+      '@radix-ui/react-popover':
+        specifier: ^1.0.7
+        version: 1.0.7(@types/react-dom@18.2.19)(@types/react@18.2.58)(react-dom@18.2.0)(react@18.2.0)
       '@react-three/drei':
         specifier: ^9.83.9
         version: 9.101.0(@react-three/fiber@8.15.19)(@types/react@18.2.58)(@types/three@0.149.0)(immer@9.0.21)(react-dom@18.2.0)(react@18.2.0)(three@0.150.1)
@@ -244,6 +250,9 @@ importers:
       immer:
         specifier: ^9.0.3
         version: 9.0.21
+      monaco-editor:
+        specifier: ^0.47.0
+        version: 0.47.0
       next:
         specifier: 14.1.1
         version: 14.1.1(react-dom@18.2.0)(react@18.2.0)
@@ -1399,7 +1408,7 @@ importers:
         version: link:../editor-services-estypes-resolver
       '@monaco-editor/react':
         specifier: ^4.4.1
-        version: 4.6.0(monaco-editor@0.46.0)(react-dom@18.2.0)(react@18.2.0)
+        version: 4.6.0(monaco-editor@0.47.0)(react-dom@18.2.0)(react@18.2.0)
       axios:
         specifier: 1.6.7
         version: 1.6.7(debug@4.3.1)
@@ -1417,7 +1426,7 @@ importers:
     devDependencies:
       '@monaco-editor/react':
         specifier: ^4.6.0
-        version: 4.6.0(monaco-editor@0.46.0)(react-dom@18.2.0)(react@18.2.0)
+        version: 4.6.0(monaco-editor@0.47.0)(react-dom@18.2.0)(react@18.2.0)
 
   editor-packages/editor-services-jsx-syntax-highlight:
     dependencies:
@@ -9157,6 +9166,15 @@ packages:
     dependencies:
       monaco-editor: 0.46.0
       state-local: 1.0.7
+    dev: false
+
+  /@monaco-editor/loader@1.4.0(monaco-editor@0.47.0):
+    resolution: {integrity: sha512-00ioBig0x642hytVspPl7DbQyaSWRaolYie/UFNjoTdvoKPzo6xrXLhTk9ixgIKcLH5b5vDOjVNiGyY+uDCUlg==}
+    peerDependencies:
+      monaco-editor: '>= 0.21.0 < 1'
+    dependencies:
+      monaco-editor: 0.47.0
+      state-local: 1.0.7
 
   /@monaco-editor/react@4.6.0(monaco-editor@0.26.1)(react-dom@18.2.0)(react@18.2.0):
     resolution: {integrity: sha512-RFkU9/i7cN2bsq/iTkurMWOEErmYcY6JiQI3Jn+WeR/FGISH8JbHERjpS9oRuSOPvDMJI0Z8nJeKkbOs9sBYQw==}
@@ -9180,6 +9198,19 @@ packages:
     dependencies:
       '@monaco-editor/loader': 1.4.0(monaco-editor@0.46.0)
       monaco-editor: 0.46.0
+      react: 18.2.0
+      react-dom: 18.2.0(react@18.2.0)
+    dev: false
+
+  /@monaco-editor/react@4.6.0(monaco-editor@0.47.0)(react-dom@18.2.0)(react@18.2.0):
+    resolution: {integrity: sha512-RFkU9/i7cN2bsq/iTkurMWOEErmYcY6JiQI3Jn+WeR/FGISH8JbHERjpS9oRuSOPvDMJI0Z8nJeKkbOs9sBYQw==}
+    peerDependencies:
+      monaco-editor: '>= 0.25.0 < 1'
+      react: ^18.2.0
+      react-dom: ^18.2.0
+    dependencies:
+      '@monaco-editor/loader': 1.4.0(monaco-editor@0.47.0)
+      monaco-editor: 0.47.0
       react: 18.2.0
       react-dom: 18.2.0(react@18.2.0)
 
@@ -29916,6 +29947,9 @@ packages:
   /monaco-editor@0.46.0:
     resolution: {integrity: sha512-ADwtLIIww+9FKybWscd7OCfm9odsFYHImBRI1v9AviGce55QY8raT+9ihH8jX/E/e6QVSGM+pKj4jSUSRmALNQ==}
 
+  /monaco-editor@0.47.0:
+    resolution: {integrity: sha512-VabVvHvQ9QmMwXu4du008ZDuyLnHs9j7ThVFsiJoXSOQk18+LF89N4ADzPbFenm0W4V2bGHnFBztIRQTgBfxzw==}
+
   /move-concurrently@1.0.1:
     resolution: {integrity: sha512-hdrFxZOycD/g6A6SoI2bB5NA/5NEqD0569+S47WZhPvm46sD50ZHdYaFmnua5lndde9rCHGjmfK7Z8BuCt/PcQ==}
     dependencies:
@@ -33832,6 +33866,7 @@ packages:
   /react-remove-scroll-bar@2.3.5(@types/react@18.2.58)(react@18.2.0):
     resolution: {integrity: sha512-3cqjOqg6s0XbOjWvmasmqHch+RLxIEk2r/70rzGXuz3iIGQsQheEQyqYCBb5EECoD01Vo2SIbDqW4paLeLTASw==}
     engines: {node: '>=10'}
+    deprecated: please update to the following version as this contains a bug (https://github.com/theKashey/react-remove-scroll-bar/issues/57)
     peerDependencies:
       '@types/react': 18.2.58
       react: ^18.2.0
