@@ -3,5 +3,5 @@ export default function Layout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  return <article className="prose">{children}</article>;
+  return <article className="prose pb-20">{children}</article>;
 }

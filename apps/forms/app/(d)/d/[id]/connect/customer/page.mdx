@@ -18,4 +18,32 @@ Add a hidden input field to your form with the name `__gf_customer_uuid` and the
 
 ## Method 2. Provide customer uuid via SDK
 
+```tsx
+import { Agent } from "@base-sdk/forms";
+
+const agent = new Agent({
+  apiKey: "YOUR_API_KEY",
+  formId: "YOUR_FORM_ID",
+  customer: {
+    uuid: "CUSTOMER_UUID",
+  },
+});
+
+const Form = () => {
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    await agent.submit({ e });
+  };
+
+  return (
+    <form onSubmit={handleSubmit}>
+      <input type="text" name="name" placeholder="Name" />
+      <input type="email" name="email" placeholder="Email" />
+      <input type="tel" name="phone" placeholder="Phone" />
+      <button type="submit">Submit</button>
+    </form>
+  );
+};
+```
+
 ## Method 3. Ensure identity with email / phone
