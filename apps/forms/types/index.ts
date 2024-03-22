@@ -19,6 +19,8 @@ export type FormFieldType =
   | "country"
   | "payment";
 
+export type PlatformPoweredBy = "api" | "grida_forms" | "web_client";
+
 export type NewFormFieldInit = {
   name: string;
   label: string;
@@ -57,3 +59,28 @@ export type FormBlockType =
 // | "layout"
 // not supported yet
 // | "divider";
+
+export interface FormResponse {
+  browser: string | null;
+  created_at: string;
+  customer_uuid: string | null;
+  form_id: string | null;
+  id: string;
+  ip: string | null;
+  platform_powered_by: PlatformPoweredBy | null;
+  raw: any;
+  updated_at: string;
+  x_referer: string | null;
+  x_useragent: string | null;
+  fields?: FormResponseField[];
+}
+
+export interface FormResponseField {
+  id: string;
+  created_at: string;
+  form_field_id: string;
+  response_id: string;
+  type: FormFieldType;
+  updated_at: string;
+  value: any;
+}

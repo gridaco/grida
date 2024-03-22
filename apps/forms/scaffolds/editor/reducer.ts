@@ -10,6 +10,7 @@ import {
   FeedResponseAction,
   FocusFieldAction,
   OpenEditFieldAction,
+  OpenResponseEditAction,
   ResolvePendingBlockAction,
   ResponseFeedRowsAction,
   SaveFieldAction,
@@ -235,7 +236,7 @@ export function reducer(
 
         // Map of ids to responses for the existing responses
         const existingResponsesById = draft.responses.reduce(
-          (acc, response) => {
+          (acc: any, response) => {
             acc[response.id] = response;
             return acc;
           },
@@ -245,12 +246,22 @@ export function reducer(
         data.forEach((newResponse) => {
           if (existingResponsesById.hasOwnProperty(newResponse.id)) {
             // Update existing response
-            Object.assign(existingResponsesById[newResponse.id], newResponse);
+            Object.assign(
+              (existingResponsesById as any)[newResponse.id],
+              newResponse
+            );
           } else {
             // Add new response if id does not exist
             draft.responses!.push(newResponse);
           }
         });
+      });
+    }
+    case "editor/responses/edit": {
+      const { response_id, open } = <OpenResponseEditAction>action;
+      return produce(state, (draft) => {
+        draft.is_response_edit_panel_open = open ?? true;
+        draft.focus_response_id = response_id;
       });
     }
     default:

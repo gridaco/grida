@@ -9,10 +9,16 @@ import {
   RenderHeaderCellProps,
   useRowSelection,
 } from "react-data-grid";
-import { ChangeEvent, InputHTMLAttributes, SyntheticEvent } from "react";
+import {
+  ChangeEvent,
+  InputHTMLAttributes,
+  SyntheticEvent,
+  useCallback,
+} from "react";
 import { GFRow } from "./types";
 import * as Tooltip from "@radix-ui/react-tooltip";
 import { EnterFullScreenIcon } from "@radix-ui/react-icons";
+import { useEditorState } from "../editor";
 
 function stopPropagation(event: SyntheticEvent) {
   event.stopPropagation();
@@ -114,9 +120,19 @@ function SelectCellFormatter({
   "aria-label": ariaLabel,
   "aria-labelledby": ariaLabelledBy,
 }: SelectCellFormatterProps) {
+  const id = row?.__gf_id;
+  const [state, dispatch] = useEditorState();
+
   function handleChange(e: ChangeEvent<HTMLInputElement>) {
     onChange(e.target.checked, (e.nativeEvent as MouseEvent).shiftKey);
   }
+
+  const onEnterFullScreenClick = useCallback(() => {
+    dispatch({
+      type: "editor/responses/edit",
+      response_id: id,
+    });
+  }, [dispatch, id]);
 
   return (
     <div className="group sb-grid-select-cell__formatter">
@@ -136,6 +152,7 @@ function SelectCellFormatter({
           <Tooltip.Trigger asChild>
             <button
               className="rdg-row__select-column__edit-action"
+              onClick={onEnterFullScreenClick}
               style={{
                 padding: 3,
               }}

@@ -45,7 +45,7 @@ export function GridEditor() {
           __gf_id: response.id,
           __gf_created_at: response.created_at,
         }; // react-data-grid expects each row to have a unique 'id' property
-        response.fields.forEach((field: any) => {
+        response?.fields?.forEach((field: any) => {
           row[field.form_field_id] = {
             type: field.type,
             value: field.value,

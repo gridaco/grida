@@ -14,6 +14,7 @@ export type BlocksEditorAction =
   | SaveFieldAction
   | DeleteFieldAction
   | FeedResponseAction
+  | OpenResponseEditAction
   | ResponseFeedRowsAction;
 
 export interface CreateNewPendingBlockAction {
@@ -85,4 +86,11 @@ export interface DeleteSelectedResponsesAction {
 export interface ResponseFeedRowsAction {
   type: "editor/responses/pagination/rows";
   max: number;
+}
+
+export interface OpenResponseEditAction {
+  type: "editor/responses/edit";
+  response_id?: string;
+  // true by default
+  open?: boolean;
 }

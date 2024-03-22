@@ -1,4 +1,4 @@
-import type { FormBlockType, FormFieldDefinition } from "@/types";
+import type { FormBlockType, FormFieldDefinition, FormResponse } from "@/types";
 
 export type DraftID = `[draft]${string}`;
 export const DRAFT_ID_START_WITH = "[draft]";
@@ -39,12 +39,14 @@ export interface FormEditorState {
   blocks: EditorFormBlock[];
   fields: FormFieldDefinition[];
   available_field_ids: string[];
-  responses?: any[];
+  responses?: FormResponse[];
   selected_responses: Set<string>;
   responses_pagination_rows: number;
   focus_field_id?: string;
   is_field_edit_panel_open?: boolean;
   field_edit_panel_refresh_key?: number;
+  is_response_edit_panel_open?: boolean;
+  focus_response_id?: string;
 }
 
 export interface EditorFormBlock {

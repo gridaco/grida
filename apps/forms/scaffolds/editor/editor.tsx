@@ -14,6 +14,7 @@ import { createClientClient } from "@/lib/supabase/client";
 import toast from "react-hot-toast";
 import { FormFieldUpsert, EditorApiResponse } from "@/types/private/api";
 import { TooltipProvider } from "@radix-ui/react-tooltip";
+import { ResponseEditPanel } from "../panels/response-edit-panel";
 
 export function FormEditorProvider({
   initial,
@@ -28,7 +29,9 @@ export function FormEditorProvider({
     <StateProvider state={state} dispatch={dispatch}>
       <TooltipProvider>
         <FormResponsesProvider>
-          <FieldEditPanelProvider>{children}</FieldEditPanelProvider>
+          <FieldEditPanelProvider>
+            <ResponseEditPanelProvider>{children}</ResponseEditPanelProvider>
+          </FieldEditPanelProvider>
         </FormResponsesProvider>
       </TooltipProvider>
     </StateProvider>
@@ -251,6 +254,29 @@ function FieldEditPanelProvider({ children }: React.PropsWithChildren<{}>) {
         onSave={onSaveField}
       />
 
+      {children}
+    </>
+  );
+}
+
+function ResponseEditPanelProvider({ children }: React.PropsWithChildren<{}>) {
+  const [state, dispatch] = useEditorState();
+
+  const response = useMemo(() => {
+    return state.responses?.find((r) => r.id === state.focus_response_id);
+  }, [state.responses, state.focus_response_id]);
+
+  return (
+    <>
+      <ResponseEditPanel
+        key={response?.id}
+        title="Edit Response"
+        open={state.is_response_edit_panel_open}
+        init={{ response, field_defs: state.fields }}
+        onOpenChange={(open) => {
+          dispatch({ type: "editor/responses/edit", open });
+        }}
+      />
       {children}
     </>
   );
