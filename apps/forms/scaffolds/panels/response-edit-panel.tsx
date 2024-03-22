@@ -86,14 +86,12 @@ export function ResponseEditPanel({
                 const txt = record?.value ? JSON.parse(record?.value) : "";
 
                 return (
-                  <>
-                    <PanelPropertyField key={def.id} label={def.name}>
-                      <PropertyTextInput
-                        placeholder={def.placeholder ?? ""}
-                        value={txt}
-                      />
-                    </PanelPropertyField>
-                  </>
+                  <PanelPropertyField key={def.id} label={def.name}>
+                    <PropertyTextInput
+                      placeholder={def.placeholder ?? ""}
+                      value={txt}
+                    />
+                  </PanelPropertyField>
                 );
               })}
             </PanelPropertyFields>

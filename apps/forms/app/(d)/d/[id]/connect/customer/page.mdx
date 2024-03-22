@@ -1,0 +1,21 @@
+# Connect Customer Identity
+
+Your Form, your Customers. Learn how to link response identity with your existing user records.
+
+## Method 1. Provide customer uuid via invisible form field
+
+Add a hidden input field to your form with the name `__gf_customer_uuid` and the value of the customer's unique identifier.
+
+```html
+<form>
+  <input type="hidden" name="__gf_customer_uuid" value="123456" />
+  <input type="text" name="name" placeholder="Name" />
+  <input type="email" name="email" placeholder="Email" />
+  <input type="tel" name="phone" placeholder="Phone" />
+  <button type="submit">Submit</button>
+</form>
+```
+
+## Method 2. Provide customer uuid via SDK
+
+## Method 3. Ensure identity with email / phone
