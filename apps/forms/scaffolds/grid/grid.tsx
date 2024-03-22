@@ -1,7 +1,9 @@
 "use client";
 
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import "react-data-grid/lib/styles.css";
+import "./grid.css";
+
 import DataGrid, {
   Column,
   RenderCellProps,
@@ -19,6 +21,12 @@ import {
   Link2Icon,
   Pencil1Icon,
   TrashIcon,
+  GlobeIcon,
+  DropdownMenuIcon,
+  CheckCircledIcon,
+  EyeClosedIcon,
+  ColorWheelIcon,
+  AvatarIcon,
 } from "@radix-ui/react-icons";
 import {
   DropdownMenu,
@@ -28,6 +36,15 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@editor-ui/dropdown-menu";
+import { FormFieldType } from "@/types";
+import { JsonEditCell } from "./json-cell";
+import { useEditorState } from "../editor";
+import { GFRow } from "./types";
+import { SelectColumn } from "./select-column";
+
+function rowKeyGetter(row: GFRow) {
+  return row.__gf_id;
+}
 
 export function Grid({
   columns,
@@ -41,18 +58,19 @@ export function Grid({
     name: string;
     type?: string;
   }[];
-  rows: { __id: string; [key: string]: string | number | boolean }[];
+  rows: GFRow[];
   onAddNewFieldClick?: () => void;
   onEditFieldClick?: (id: string) => void;
   onDeleteFieldClick?: (id: string) => void;
 }) {
-  const __leading_column: Column<any> = {
-    key: "__",
-    name: "",
-    frozen: true,
-    width: 50,
-    renderHeaderCell: LeadingHeaderCell,
-    renderCell: LeadingCell,
+  const [state, dispatch] = useEditorState();
+  const { selected_responses } = state;
+
+  const onSelectedRowsChange = (selectedRows: ReadonlySet<string>) => {
+    dispatch({
+      type: "editor/response/select",
+      selection: selectedRows,
+    });
   };
 
   const __id_column: Column<any> = {
@@ -73,6 +91,15 @@ export function Grid({
     renderHeaderCell: DefaultPropertyHeaderCell,
   };
 
+  const __customer_uuid_column: Column<any> = {
+    key: "__gf_customer_uuid",
+    name: "customer",
+    frozen: true,
+    resizable: true,
+    width: 100,
+    renderHeaderCell: DefaultPropertyHeaderCell,
+  };
+
   const __new_column: Column<any> = {
     key: "__gf_new",
     name: "+",
@@ -84,7 +111,12 @@ export function Grid({
     ),
   };
 
-  const formattedColumns = [__leading_column, __id_column, __created_at_column]
+  const formattedColumns = [
+    SelectColumn,
+    __id_column,
+    __created_at_column,
+    __customer_uuid_column,
+  ]
     .concat(
       columns.map(
         (col) =>
@@ -98,6 +130,7 @@ export function Grid({
             renderHeaderCell: (props) => (
               <FieldHeaderCell
                 {...props}
+                type={col.type as FormFieldType}
                 onEditClick={() => {
                   onEditFieldClick?.(col.key);
                 }}
@@ -116,7 +149,10 @@ export function Grid({
   return (
     <DataGrid
       className="border border-gray-200 dark:border-gray-900 h-max select-none"
+      rowKeyGetter={rowKeyGetter}
       columns={formattedColumns}
+      selectedRows={selected_responses}
+      onSelectedRowsChange={onSelectedRowsChange}
       rows={rows}
     />
   );
@@ -129,7 +165,7 @@ function LeadingHeaderCell({ column }: RenderHeaderCellProps<any>) {
 function LeadingCell({ column }: RenderCellProps<any>) {
   return (
     <div className="flex group items-center justify-between h-full w-full">
-      {/* <input type="checkbox" /> */}
+      <input type="checkbox" />
       <button className="opacity-0 group-hover:opacity-100">
         <EnterFullScreenIcon />
       </button>
@@ -151,17 +187,22 @@ function DefaultPropertyHeaderCell({ column }: RenderHeaderCellProps<any>) {
 function DefaultPropertyIcon({ __key: key }: { __key: string }) {
   switch (key) {
     case "__gf_id":
-      return <Link2Icon />;
+      return <Link2Icon className="min-w-4" />;
     case "__gf_created_at":
-      return <CalendarIcon />;
+      return <CalendarIcon className="min-w-4" />;
+    case "__gf_customer_uuid":
+    case "__gf_customer":
+      return <AvatarIcon className="min-w-4" />;
   }
 }
 
 function FieldHeaderCell({
   column,
+  type,
   onEditClick,
   onDeleteClick,
 }: RenderHeaderCellProps<any> & {
+  type: FormFieldType;
   onEditClick?: () => void;
   onDeleteClick?: () => void;
 }) {
@@ -170,7 +211,7 @@ function FieldHeaderCell({
   return (
     <div className="flex items-center justify-between">
       <span className="flex items-center gap-2">
-        <TextIcon />
+        <FormFieldTypeIcon type={type} />
         <span className="font-normal">{name}</span>
       </span>
       <DropdownMenu modal={false}>
@@ -194,6 +235,35 @@ function FieldHeaderCell({
       </DropdownMenu>
     </div>
   );
+}
+
+function FormFieldTypeIcon({ type }: { type: FormFieldType }) {
+  switch (type) {
+    case "text":
+      return <TextIcon />;
+    case "tel":
+    case "email":
+      return <EnvelopeClosedIcon />;
+    case "radio":
+    case "select":
+      return <DropdownMenuIcon />;
+    case "url":
+      return <GlobeIcon />;
+    case "image":
+      return <ImageIcon />;
+    case "checkbox":
+      return <CheckCircledIcon />;
+    case "date":
+    case "month":
+    case "week":
+      return <CalendarIcon />;
+    case "password":
+      return <EyeClosedIcon />;
+    case "color":
+      return <ColorWheelIcon />;
+    default:
+      return <TextIcon />;
+  }
 }
 
 function NewFieldHeaderCell({
@@ -222,17 +292,24 @@ function FieldCell({ column, row }: RenderCellProps<any>) {
 
   const unwrapped = JSON.parse(value);
 
-  let display = "";
-  switch (type) {
+  let display = unwrapped;
+  switch (type as FormFieldType) {
     case "text":
       display = unwrapped;
       break;
+    case "password":
+      display = "●".repeat(display?.length ?? 0);
+      break;
+    case "checkbox": {
+      return <input type="checkbox" checked={unwrapped} disabled />;
+    }
   }
 
-  return <div>{unwrapped}</div>;
+  return <div>{display}</div>;
 }
 
-function FieldEditCell({ column, row }: RenderEditCellProps<any>) {
+function FieldEditCell(props: RenderEditCellProps<any>) {
+  const { column, row } = props;
   const data = row[column.key];
   const ref = useRef<HTMLInputElement>(null);
 
@@ -252,7 +329,12 @@ function FieldEditCell({ column, row }: RenderEditCellProps<any>) {
 
   const unwrapped = JSON.parse(value);
 
-  switch (type) {
+  switch (type as FormFieldType) {
+    case "email":
+    case "password":
+    case "tel":
+    case "textarea":
+    case "url":
     case "text":
       return (
         <input
@@ -264,6 +346,14 @@ function FieldEditCell({ column, row }: RenderEditCellProps<any>) {
         />
       );
     case "select":
-      return <select></select>;
+      return <JsonEditCell {...props} />;
+    case "color":
+      return <input readOnly disabled type="color" defaultValue={unwrapped} />;
+    case "checkbox":
+    // return (
+    //   <input readOnly disabled type="checkbox" defaultChecked={unwrapped} />
+    // );
+    default:
+      return <JsonEditCell {...props} />;
   }
 }

@@ -14,6 +14,16 @@ export const client = createClient<Database, "grida_forms">(
   }
 );
 
+export const workspaceclient = createClient<Database, "public">(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_KEY!,
+  {
+    db: {
+      schema: "public",
+    },
+  }
+);
+
 export const createServerComponentClient = (
   cookieStore: ReadonlyRequestCookies
 ) =>

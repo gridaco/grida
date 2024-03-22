@@ -1,19 +1,31 @@
 import { FormBlockType, FormFieldDefinition, NewFormFieldInit } from "@/types";
+import type { EditorFormBlock } from "./state";
 
 export type BlocksEditorAction =
-  | CreateNewBlockAction
+  | CreateNewPendingBlockAction
+  | ResolvePendingBlockAction
   | DeleteBlockAction
   | OpenEditFieldAction
   | SortBlockAction
   | FocusFieldAction
   | ChangeBlockFieldAction
+  | SelectResponse
+  | DeleteSelectedResponsesAction
   | SaveFieldAction
+  | DeleteFieldAction
   | FeedResponseAction
+  | OpenResponseEditAction
   | ResponseFeedRowsAction;
 
-export interface CreateNewBlockAction {
+export interface CreateNewPendingBlockAction {
   type: "blocks/new";
   block: FormBlockType;
+}
+
+export interface ResolvePendingBlockAction {
+  type: "blocks/resolve";
+  block_id: string;
+  block: EditorFormBlock;
 }
 
 export interface DeleteBlockAction {
@@ -52,12 +64,33 @@ export interface SaveFieldAction {
   data: FormFieldDefinition;
 }
 
+export interface DeleteFieldAction {
+  type: "editor/field/delete";
+  field_id: string;
+}
+
 export interface FeedResponseAction {
   type: "editor/response/feed";
   data: any[];
 }
 
+export interface SelectResponse {
+  type: "editor/response/select";
+  selection: ReadonlySet<string>;
+}
+
+export interface DeleteSelectedResponsesAction {
+  type: "editor/response/delete/selected";
+}
+
 export interface ResponseFeedRowsAction {
   type: "editor/responses/pagination/rows";
   max: number;
+}
+
+export interface OpenResponseEditAction {
+  type: "editor/responses/edit";
+  response_id?: string;
+  // true by default
+  open?: boolean;
 }
