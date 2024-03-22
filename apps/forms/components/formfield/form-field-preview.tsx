@@ -16,19 +16,20 @@ export function FormFieldPreview({
 }: {
   name: string;
   label?: string;
-  labelCapitalize?: boolean;
   type: FormFieldType;
   placeholder?: string;
   helpText?: string;
-  required: boolean;
-  options?: { label: string; value: string }[];
+  required?: boolean;
+  options?: { label?: string | null; value: string }[];
+  pattern?: string;
   readonly?: boolean;
   disabled?: boolean;
-  pattern?: string;
+  labelCapitalize?: boolean;
 }) {
   const sharedInputProps:
     | React.ComponentProps<"input">
     | React.ComponentProps<"textarea"> = {
+    name: name,
     readOnly: readonly,
     disabled: disabled,
     autoFocus: false,
@@ -76,9 +77,9 @@ export function FormFieldPreview({
       }
       case "radio": {
         return (
-          <>
+          <fieldset>
             {options?.map((option) => (
-              <div key={option.value}>
+              <div className="flex items-center gap-2" key={option.value}>
                 <input
                   type="radio"
                   name={name}
@@ -86,10 +87,15 @@ export function FormFieldPreview({
                   value={option.value}
                   {...(sharedInputProps as React.ComponentProps<"input">)}
                 />
-                <label>{option.label}</label>
+                <label
+                  htmlFor={option.value}
+                  className="ms-2 text-sm font-medium text-gray-900 dark:text-gray-300"
+                >
+                  {option.label}
+                </label>
               </div>
             ))}
-          </>
+          </fieldset>
         );
       }
       default: {
@@ -104,7 +110,7 @@ export function FormFieldPreview({
   }
 
   return (
-    <label className="flex flex-col">
+    <label data-field-type={type} className="flex flex-col">
       <span
         data-capitalize={labelCapitalize}
         className="data-[capitalize]:capitalize"

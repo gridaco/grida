@@ -1,0 +1,11 @@
+/* edit button */
+.rdg-row__select-column__edit-action {
+  @apply opacity-0;
+}
+.rdg-row:hover .rdg-row__select-column__edit-action {
+  @apply opacity-100;
+}
+
+.rdg-row__select-column__edit-action:hover {
+  opacity: 1 !important;
+}
