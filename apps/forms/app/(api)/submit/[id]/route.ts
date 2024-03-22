@@ -1,5 +1,7 @@
-import { client } from "@/lib/supabase/server";
+import { client, workspaceclient } from "@/lib/supabase/server";
 import { NextRequest, NextResponse } from "next/server";
+
+const SYSTEM_GF_KEY_STARTS_WITH = "__gf_";
 
 export async function GET(
   req: NextRequest,
@@ -10,7 +12,12 @@ export async function GET(
   const form_id = context.params.id;
 
   // #region 1 prevalidate request form data (query)
-  const keys = Array.from(req.nextUrl.searchParams.keys());
+  const __keys = Array.from(req.nextUrl.searchParams.keys());
+  const system_gf_keys = __keys.filter((key) =>
+    key.startsWith(SYSTEM_GF_KEY_STARTS_WITH)
+  );
+  const keys = __keys.filter((key) => !system_gf_keys.includes(key));
+
   if (!keys.length) {
     return NextResponse.json(
       { error: "You must submit form with query params" },
@@ -88,7 +95,31 @@ async function submit({
   const { is_unknown_field_allowed, response_redirect_uri } = form_reference;
 
   const entries = data.entries();
-  const keys = Array.from(data.keys());
+  const __keys = Array.from(data.keys());
+  const system_gf_keys = __keys.filter((key) =>
+    key.startsWith(SYSTEM_GF_KEY_STARTS_WITH)
+  );
+  const keys = __keys.filter((key) => !system_gf_keys.includes(key));
+
+  // customer handling
+  const _fp_fingerprintjs_visitorid = String(
+    data.get("__gf_fp_fingerprintjs_visitorid")
+  );
+
+  const { data: customer } = await workspaceclient
+    .from("customer")
+    .upsert(
+      {
+        project_id: form_reference.project_id,
+        _fp_fingerprintjs_visitorid: _fp_fingerprintjs_visitorid,
+        last_seen_at: new Date().toISOString(),
+      },
+      {
+        onConflict: "project_id, _fp_fingerprintjs_visitorid",
+      }
+    )
+    .select()
+    .single();
 
   // create new form response
   const { data: response_reference_obj } = await client
@@ -98,6 +129,7 @@ async function submit({
       form_id: form_id,
       browser: meta.browser,
       ip: meta.ip,
+      customer_uuid: customer?.uuid,
       x_referer: meta.referer,
       x_useragent: meta.useragent,
       platform_powered_by: "web_client",

@@ -205,6 +205,9 @@ importers:
       '@editor-ui/dropdown-menu':
         specifier: workspace:^
         version: link:../../ui/editor-ui/packages/editor-ui-dropdown-menu
+      '@fingerprintjs/fingerprintjs':
+        specifier: ^4.2.2
+        version: 4.2.2
       '@monaco-editor/react':
         specifier: ^4.6.0
         version: 4.6.0(monaco-editor@0.47.0)(react-dom@18.2.0)(react@18.2.0)
@@ -8262,6 +8265,12 @@ packages:
     dependencies:
       axios: 1.6.7(debug@4.3.1)
       mime-types: 2.1.35
+    dev: false
+
+  /@fingerprintjs/fingerprintjs@4.2.2:
+    resolution: {integrity: sha512-scD+pDgNZW78LuFAr7ms2yxmDx2NWC4+K5iiOjPT2ZlTlHFbLsORUzLJI2rcKicxxLtHbvf3A7BU1drVr4iHGg==}
+    dependencies:
+      tslib: 2.6.2
     dev: false
 
   /@floating-ui/core@0.7.3:

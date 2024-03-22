@@ -368,6 +368,7 @@ export type Database = {
         Row: {
           created_at: string
           form_field_id: string
+          form_id: string | null
           id: string
           response_id: string
           type: Database["grida_forms"]["Enums"]["form_field_type"]
@@ -377,6 +378,7 @@ export type Database = {
         Insert: {
           created_at?: string
           form_field_id: string
+          form_id?: string | null
           id?: string
           response_id: string
           type?: Database["grida_forms"]["Enums"]["form_field_type"]
@@ -386,6 +388,7 @@ export type Database = {
         Update: {
           created_at?: string
           form_field_id?: string
+          form_id?: string | null
           id?: string
           response_id?: string
           type?: Database["grida_forms"]["Enums"]["form_field_type"]
@@ -398,6 +401,13 @@ export type Database = {
             columns: ["form_field_id"]
             isOneToOne: false
             referencedRelation: "form_field"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "grida_forms_response_field_form_id_fkey"
+            columns: ["form_id"]
+            isOneToOne: false
+            referencedRelation: "form"
             referencedColumns: ["id"]
           },
           {
@@ -448,23 +458,29 @@ export type Database = {
     Tables: {
       customer: {
         Row: {
+          _fp_fingerprintjs_visitorid: string | null
           created_at: string
           email: string | null
           id: number
+          last_seen_at: string
           project_id: number
           uuid: string
         }
         Insert: {
+          _fp_fingerprintjs_visitorid?: string | null
           created_at?: string
           email?: string | null
           id?: number
+          last_seen_at?: string
           project_id: number
           uuid?: string
         }
         Update: {
+          _fp_fingerprintjs_visitorid?: string | null
           created_at?: string
           email?: string | null
           id?: number
+          last_seen_at?: string
           project_id?: number
           uuid?: string
         }
