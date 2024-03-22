@@ -26,6 +26,7 @@ import {
   CheckCircledIcon,
   EyeClosedIcon,
   ColorWheelIcon,
+  AvatarIcon,
 } from "@radix-ui/react-icons";
 import {
   DropdownMenu,
@@ -90,6 +91,15 @@ export function Grid({
     renderHeaderCell: DefaultPropertyHeaderCell,
   };
 
+  const __customer_uuid_column: Column<any> = {
+    key: "__gf_customer_uuid",
+    name: "customer",
+    frozen: true,
+    resizable: true,
+    width: 100,
+    renderHeaderCell: DefaultPropertyHeaderCell,
+  };
+
   const __new_column: Column<any> = {
     key: "__gf_new",
     name: "+",
@@ -101,7 +111,12 @@ export function Grid({
     ),
   };
 
-  const formattedColumns = [SelectColumn, __id_column, __created_at_column]
+  const formattedColumns = [
+    SelectColumn,
+    __id_column,
+    __created_at_column,
+    __customer_uuid_column,
+  ]
     .concat(
       columns.map(
         (col) =>
@@ -172,9 +187,12 @@ function DefaultPropertyHeaderCell({ column }: RenderHeaderCellProps<any>) {
 function DefaultPropertyIcon({ __key: key }: { __key: string }) {
   switch (key) {
     case "__gf_id":
-      return <Link2Icon />;
+      return <Link2Icon className="min-w-4" />;
     case "__gf_created_at":
-      return <CalendarIcon />;
+      return <CalendarIcon className="min-w-4" />;
+    case "__gf_customer_uuid":
+    case "__gf_customer":
+      return <AvatarIcon className="min-w-4" />;
   }
 }
 
