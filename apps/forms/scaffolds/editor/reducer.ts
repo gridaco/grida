@@ -34,6 +34,7 @@ export function reducer(
         id: "[draft]" + Math.random().toString(36).substring(7),
         created_at: new Date().toISOString(),
         form_id: state.form_id,
+        form_page_id: state.page_id,
         type: block,
         local_index: new_index,
         data: {},
