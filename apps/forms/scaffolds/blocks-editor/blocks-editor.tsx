@@ -144,7 +144,9 @@ function useSyncBlocks(blocks: EditorFormBlock[]) {
       return (
         !prevBlock ||
         block.type !== prevBlock.type ||
-        block.parent_id !== prevBlock.parent_id ||
+        (block.parent_id !== prevBlock.parent_id &&
+          // exclude from sync if parent_id is a draft (this can happen when a new section is created and blocks are assigned to it)
+          !block.parent_id?.startsWith(DRAFT_ID_START_WITH)) ||
         block.local_index !== prevBlock.local_index ||
         block.form_field_id !== prevBlock.form_field_id ||
         block.title_html !== prevBlock.title_html ||
@@ -165,6 +167,7 @@ function useSyncBlocks(blocks: EditorFormBlock[]) {
             title_html: block.title_html,
             description_html: block.description_html,
             src: block.src,
+            updated_at: new Date().toISOString(),
           })
           .eq("id", block.id)
           .single();

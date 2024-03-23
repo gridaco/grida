@@ -61,6 +61,21 @@ export function reducer(
         }
         case "section": {
           return produce(state, (draft) => {
+            const id = __shared.id;
+
+            // section can be placed on root only.
+            // if there were no section on root, the existing blocks should be nested under the new section.
+            const section_blocks = draft.blocks.filter(
+              (block) => block.type === "section" && block.parent_id === null
+            );
+
+            if (section_blocks.length === 0) {
+              draft.blocks.forEach((block) => {
+                block.parent_id = id;
+              });
+            }
+
+            // we do not handle nested structur yet. (this is under consideration)
             draft.blocks.push({
               ...__shared,
             });
@@ -94,11 +109,25 @@ export function reducer(
     }
     case "blocks/resolve": {
       const { block_id, block } = <ResolvePendingBlockAction>action;
+
+      const old_id = block_id;
+      const new_id = block.id;
+
       return produce(state, (draft) => {
         const index = draft.blocks.findIndex((b) => b.id === block_id);
         if (index !== -1) {
+          // update the whole block with the resolved block
           draft.blocks[index] = block;
         }
+
+        // when resolved, the id is updated to the real id.
+        // other references to previous id should be updated as well.
+        // currently we have only parent_id to update.
+        draft.blocks.forEach((b) => {
+          if (b.parent_id === old_id) {
+            b.parent_id = new_id;
+          }
+        });
       });
     }
     case "blocks/delete": {

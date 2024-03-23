@@ -86,6 +86,7 @@ export type Database = {
           src: string | null
           title_html: string | null
           type: Database["grida_forms"]["Enums"]["form_block_type"]
+          updated_at: string
         }
         Insert: {
           created_at?: string
@@ -100,6 +101,7 @@ export type Database = {
           src?: string | null
           title_html?: string | null
           type: Database["grida_forms"]["Enums"]["form_block_type"]
+          updated_at?: string
         }
         Update: {
           created_at?: string
@@ -114,6 +116,7 @@ export type Database = {
           src?: string | null
           title_html?: string | null
           type?: Database["grida_forms"]["Enums"]["form_block_type"]
+          updated_at?: string
         }
         Relationships: [
           {
