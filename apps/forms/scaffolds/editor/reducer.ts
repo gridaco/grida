@@ -18,6 +18,7 @@ import {
   SortBlockAction,
 } from "./action";
 import { arrayMove } from "@dnd-kit/sortable";
+import { blockstreeflat } from "@/lib/forms/tree";
 
 export function reducer(
   state: FormEditorState,
@@ -82,10 +83,13 @@ export function reducer(
               });
             }
 
-            // we do not handle nested structur yet. (this is under consideration)
-            draft.blocks.push({
-              ...__shared,
-            });
+            const new_blocks = blockstreeflat(
+              draft.blocks.concat({
+                ...__shared,
+              })
+            );
+
+            draft.blocks = new_blocks;
           });
         }
         case "html": {
@@ -213,6 +217,18 @@ export function reducer(
             }
           }
 
+          if (!newParentId) {
+            // DO NOT ALLOW PARENT ID TO BE NULL IF THERE IS A SECTION PRESENT.
+            const section = draft.blocks.find(
+              (block) => block.type === "section"
+            );
+            if (section) {
+              // BLOCK THIS ACTION
+              // revert the move
+              draft.blocks = arrayMove(draft.blocks, newIndex, oldIndex);
+              return;
+            }
+          }
           movedBlock.parent_id = newParentId;
         }
       });
