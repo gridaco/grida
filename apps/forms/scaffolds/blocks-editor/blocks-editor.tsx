@@ -1,7 +1,12 @@
 "use client";
 
 import React, { useCallback, useEffect, useId, useRef } from "react";
-import { type EditorFormBlock, DRAFT_ID_START_WITH } from "../editor/state";
+import {
+  type EditorFlatFormBlock,
+  DRAFT_ID_START_WITH,
+  EditorBlockTree,
+  EditorBlockTreeFolderBlock,
+} from "../editor/state";
 import { useEditorState } from "../editor";
 import {
   ImageIcon,
@@ -85,7 +90,7 @@ function PendingBlocksResolver() {
   const supabase = createClientClient();
 
   const insertBlock = useCallback(
-    async (block: EditorFormBlock) => {
+    async (block: EditorFlatFormBlock) => {
       //
       const { data } = await supabase
         .from("form_block")
@@ -133,7 +138,7 @@ function PendingBlocksResolver() {
   return <></>;
 }
 
-function useSyncBlocks(blocks: EditorFormBlock[]) {
+function useSyncBlocks(blocks: EditorFlatFormBlock[]) {
   const supabase = createClientClient();
   const prevBlocksRef = useRef(blocks);
 
@@ -220,6 +225,8 @@ function BlocksEditor() {
   const addImageBlock = useCallback(() => addBlock("image"), [addBlock]);
   const addVideoBlock = useCallback(() => addBlock("video"), [addBlock]);
 
+  const tree = blockstree(state.blocks);
+
   return (
     <div>
       <PendingBlocksResolver />
@@ -255,12 +262,14 @@ function BlocksEditor() {
           </DropdownMenuContent>
         </DropdownMenuPortal>
       </DropdownMenu>
-      <BlocksCanvas className="flex flex-col gap-4 mt-10">
+      <BlocksCanvas id="root" className="flex flex-col gap-4 mt-10">
         <SortableContext
-          items={state.blocks.map((block) => block.id)}
+          // if depth > 0, sorting will be handled by each container.
+          disabled={tree.depth > 0}
+          items={tree.children.map((block) => block.id)}
           strategy={verticalListSortingStrategy}
         >
-          {state.blocks.map((block) => {
+          {tree.children.map((block) => {
             return (
               <div key={block.id}>
                 <Block {...block} />
@@ -271,4 +280,57 @@ function BlocksEditor() {
       </BlocksCanvas>
     </div>
   );
+}
+
+/**
+ * does not multi-level nesting only 1 level
+ */
+function blockstree(blocks: EditorFlatFormBlock[]): EditorBlockTree {
+  const folder_types = ["section", "group"];
+
+  const tree: EditorBlockTree = {
+    depth: 0,
+    children: [],
+  };
+
+  const folders: EditorBlockTreeFolderBlock[] = blocks
+    .filter((block) => folder_types.includes(block.type))
+    .sort((a, b) => a.local_index - b.local_index)
+    .map((block) => ({
+      ...block,
+      children: [],
+    })) as EditorBlockTreeFolderBlock[];
+
+  const items = blocks
+    .filter((block) => !folder_types.includes(block.type))
+    .sort((a, b) => a.local_index - b.local_index);
+
+  // assign folders to tree if any
+  if (folders.length > 0) {
+    tree.children = folders;
+    tree.depth = 1;
+  } else {
+    tree.children = items;
+    return tree;
+  }
+
+  // groupby parent_id, sort by local_index
+  const grouped = items.reduce(
+    (acc, block) => {
+      const parent_id = block.parent_id || "root";
+      if (!acc[parent_id]) {
+        acc[parent_id] = [];
+      }
+      acc[parent_id].push(block);
+      return acc;
+    },
+    {} as Record<string, EditorFlatFormBlock[]>
+  );
+
+  for (const folder of folders) {
+    const children = grouped[folder.id] || [];
+    folder.children = children;
+  }
+
+  return tree;
 }

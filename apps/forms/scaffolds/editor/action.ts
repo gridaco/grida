@@ -1,5 +1,5 @@
 import { FormBlockType, FormFieldDefinition, NewFormFieldInit } from "@/types";
-import type { EditorFormBlock } from "./state";
+import type { EditorFlatFormBlock } from "./state";
 
 export type BlocksEditorAction =
   | CreateNewPendingBlockAction
@@ -25,7 +25,7 @@ export interface CreateNewPendingBlockAction {
 export interface ResolvePendingBlockAction {
   type: "blocks/resolve";
   block_id: string;
-  block: EditorFormBlock;
+  block: EditorFlatFormBlock;
 }
 
 export interface DeleteBlockAction {

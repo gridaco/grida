@@ -7,7 +7,7 @@ export interface FormEditorInit {
   form_id: string;
   form_title: string;
   page_id: string | null;
-  blocks: EditorFormBlock[];
+  blocks: EditorFlatFormBlock[];
   fields: FormFieldDefinition[];
 }
 
@@ -42,7 +42,7 @@ export interface FormEditorState {
   form_id: string;
   form_title: string;
   page_id: string | null;
-  blocks: EditorFormBlock[];
+  blocks: EditorFlatFormBlock[];
   fields: FormFieldDefinition[];
   focus_field_id?: string;
   focus_response_id?: string;
@@ -56,6 +56,20 @@ export interface FormEditorState {
   field_edit_panel_refresh_key?: number;
 }
 
-export interface EditorFormBlock extends FormBlock {
+export interface EditorFlatFormBlock extends FormBlock {
   id: string | DraftID;
+}
+
+export interface EditorBlockTree {
+  depth: number;
+  children: EditorBlockTreeFolderBlock[] | EditorFlatFormBlock[];
+}
+
+export type EditorBlockTreeChild =
+  | EditorBlockTreeFolderBlock
+  | EditorFlatFormBlock;
+
+export interface EditorBlockTreeFolderBlock extends EditorFlatFormBlock {
+  type: "section" | "group";
+  children: EditorFlatFormBlock[];
 }

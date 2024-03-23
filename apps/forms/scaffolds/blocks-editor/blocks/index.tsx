@@ -1,5 +1,9 @@
 import { FormFieldPreview } from "@/components/formfield";
-import type { EditorFormBlock } from "../../editor/state";
+import type {
+  EditorBlockTreeChild,
+  EditorBlockTreeFolderBlock,
+  EditorFlatFormBlock,
+} from "../../editor/state";
 import { useEditorState } from "../../editor/provider";
 import { FormFieldDefinition } from "@/types";
 import {
@@ -13,7 +17,7 @@ import {
 import React, { useCallback } from "react";
 import { useDraggable, useDroppable } from "@dnd-kit/core";
 import { CSS } from "@dnd-kit/utilities";
-import { useSortable } from "@dnd-kit/sortable";
+import { SortableContext, useSortable } from "@dnd-kit/sortable";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -29,7 +33,7 @@ export function BlocksCanvas({
   ...props
 }: React.PropsWithChildren<React.HtmlHTMLAttributes<HTMLDivElement>>) {
   const { setNodeRef } = useDroppable({
-    id: "root",
+    id: props.id!,
   });
 
   return (
@@ -39,7 +43,7 @@ export function BlocksCanvas({
   );
 }
 
-export function Block(props: React.PropsWithChildren<EditorFormBlock>) {
+export function Block(props: EditorBlockTreeChild) {
   const {
     attributes,
     listeners,
@@ -63,7 +67,23 @@ export function Block(props: React.PropsWithChildren<EditorFormBlock>) {
   function renderBlock() {
     switch (props.type) {
       case "section":
-        return <SectionBlock {...props}>{props.children}</SectionBlock>;
+        return (
+          <SectionBlock {...props}>
+            <BlocksCanvas id={props.id} className="flex flex-col gap-4 mt-10">
+              <SortableContext
+                items={
+                  (props as EditorBlockTreeFolderBlock).children.map(
+                    (child) => child.id
+                  ) ?? []
+                }
+              >
+                {(props as EditorBlockTreeFolderBlock).children.map((child) => (
+                  <Block key={child.id} {...child} />
+                ))}
+              </SortableContext>
+            </BlocksCanvas>
+          </SectionBlock>
+        );
       case "field":
         return <FieldBlock {...props} />;
       case "html":
@@ -75,6 +95,13 @@ export function Block(props: React.PropsWithChildren<EditorFormBlock>) {
 
   return (
     <>
+      {/* <div className="text-xs border p-1">
+        <div className="flex flex-col gap-3">
+          <span>id: {props.id}</span>
+          <span>parent: {props.parent_id}</span>
+          <span>index: {props.local_index}</span>
+        </div>
+      </div> */}
       <div
         data-folder={props.type === "section"}
         ref={setNodeRef}
@@ -82,6 +109,9 @@ export function Block(props: React.PropsWithChildren<EditorFormBlock>) {
         className="relative data-[folder='true']:mt-16 data-[folder='true']:mb-4"
       >
         <button
+          style={{
+            display: props.type === "section" ? "none" : "block",
+          }}
           ref={setActivatorNodeRef}
           {...listeners}
           {...attributes}
@@ -95,7 +125,12 @@ export function Block(props: React.PropsWithChildren<EditorFormBlock>) {
   );
 }
 
-export function FieldBlock({ id, type, form_field_id, data }: EditorFormBlock) {
+export function FieldBlock({
+  id,
+  type,
+  form_field_id,
+  data,
+}: EditorFlatFormBlock) {
   const [state, dispatch] = useEditorState();
 
   const form_field: FormFieldDefinition | undefined = state.fields.find(
@@ -221,26 +256,33 @@ export function FieldBlock({ id, type, form_field_id, data }: EditorFormBlock) {
 export function SectionBlock({
   children,
   ...props
-}: React.PropsWithChildren<EditorFormBlock>) {
-  const { setNodeRef, isOver } = useDroppable({
-    id: props.id,
-  });
-
+}: React.PropsWithChildren<EditorFlatFormBlock>) {
   return (
     <div>
-      <div className="p-4 rounded-md border bg-white shadow-md">
-        <span className="flex flex-row gap-2 items-center">
-          <SectionIcon />
-          <span>Section</span>
-        </span>
+      <div className="p-4 rounded-md border-black border-2 bg-white shadow-md">
+        <div className="flex w-full justify-between items-center">
+          <span className="flex flex-row gap-2 items-center">
+            <SectionIcon />
+            <span>Section</span>
+          </span>
+          <div>
+            <DropdownMenu modal={false}>
+              <DropdownMenuTrigger asChild>
+                <button>
+                  <DotsHorizontalIcon />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent>
+                <DropdownMenuItem>
+                  <TrashIcon />
+                  Delete Section
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        </div>
       </div>
-      <div
-        data-over={isOver}
-        ref={setNodeRef}
-        className="min-h-64 m-4 rounded bg-neutral-500/5 data-[over='true']:bg-blue-500/10"
-      >
-        {children}
-      </div>
+      {children}
     </div>
   );
 }

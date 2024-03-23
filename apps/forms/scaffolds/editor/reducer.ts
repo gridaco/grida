@@ -1,5 +1,5 @@
 import { produce } from "immer";
-import { EditorFormBlock, FormEditorState } from "./state";
+import { EditorFlatFormBlock, FormEditorState } from "./state";
 import {
   BlocksEditorAction,
   ChangeBlockFieldAction,
@@ -30,11 +30,18 @@ export function reducer(
 
       const new_index = state.blocks.length;
 
-      const __shared: EditorFormBlock = {
+      // find the last parent section
+      const parent_section = state.blocks
+        .filter((block) => block.type === "section")
+        .sort((a, b) => b.local_index - a.local_index)[0];
+      const parent_id = parent_section?.id ?? null;
+
+      const __shared: EditorFlatFormBlock = {
         id: "[draft]" + Math.random().toString(36).substring(7),
         created_at: new Date().toISOString(),
         form_id: state.form_id,
         form_page_id: state.page_id,
+        parent_id: block === "section" ? null : parent_id,
         type: block,
         local_index: new_index,
         data: {},
