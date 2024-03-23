@@ -1,12 +1,7 @@
 "use client";
 
 import React, { useCallback, useEffect, useId, useRef } from "react";
-import {
-  type EditorFlatFormBlock,
-  DRAFT_ID_START_WITH,
-  EditorBlockTree,
-  EditorBlockTreeFolderBlock,
-} from "../editor/state";
+import { type EditorFlatFormBlock, DRAFT_ID_START_WITH } from "../editor/state";
 import { useEditorState } from "../editor";
 import {
   ImageIcon,
@@ -225,8 +220,6 @@ function BlocksEditor() {
   const addImageBlock = useCallback(() => addBlock("image"), [addBlock]);
   const addVideoBlock = useCallback(() => addBlock("video"), [addBlock]);
 
-  const tree = blockstree(state.blocks);
-
   return (
     <div>
       <PendingBlocksResolver />
@@ -264,12 +257,10 @@ function BlocksEditor() {
       </DropdownMenu>
       <BlocksCanvas id="root" className="flex flex-col gap-4 mt-10">
         <SortableContext
-          // if depth > 0, sorting will be handled by each container.
-          disabled={tree.depth > 0}
-          items={tree.children.map((block) => block.id)}
+          items={state.blocks.map((b) => b.id)}
           strategy={verticalListSortingStrategy}
         >
-          {tree.children.map((block) => {
+          {state.blocks.map((block) => {
             return (
               <div key={block.id}>
                 <Block {...block} />
@@ -280,57 +271,4 @@ function BlocksEditor() {
       </BlocksCanvas>
     </div>
   );
-}
-
-/**
- * does not multi-level nesting only 1 level
- */
-function blockstree(blocks: EditorFlatFormBlock[]): EditorBlockTree {
-  const folder_types = ["section", "group"];
-
-  const tree: EditorBlockTree = {
-    depth: 0,
-    children: [],
-  };
-
-  const folders: EditorBlockTreeFolderBlock[] = blocks
-    .filter((block) => folder_types.includes(block.type))
-    .sort((a, b) => a.local_index - b.local_index)
-    .map((block) => ({
-      ...block,
-      children: [],
-    })) as EditorBlockTreeFolderBlock[];
-
-  const items = blocks
-    .filter((block) => !folder_types.includes(block.type))
-    .sort((a, b) => a.local_index - b.local_index);
-
-  // assign folders to tree if any
-  if (folders.length > 0) {
-    tree.children = folders;
-    tree.depth = 1;
-  } else {
-    tree.children = items;
-    return tree;
-  }
-
-  // groupby parent_id, sort by local_index
-  const grouped = items.reduce(
-    (acc, block) => {
-      const parent_id = block.parent_id || "root";
-      if (!acc[parent_id]) {
-        acc[parent_id] = [];
-      }
-      acc[parent_id].push(block);
-      return acc;
-    },
-    {} as Record<string, EditorFlatFormBlock[]>
-  );
-
-  for (const folder of folders) {
-    const children = grouped[folder.id] || [];
-    folder.children = children;
-  }
-
-  return tree;
 }

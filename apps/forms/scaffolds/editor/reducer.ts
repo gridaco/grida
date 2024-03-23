@@ -174,13 +174,20 @@ export function reducer(
       const { block_id, over_id } = <SortBlockAction>action;
       return produce(state, (draft) => {
         if (over_id === "root") {
+          const blockIndex = draft.blocks.findIndex(
+            (block) => block.id === block_id
+          );
+          if (blockIndex > -1) {
+            // DO NOT ALLOW THIS ACTION. this is not hanlded yet. (item exiting section)
+            // Assign to root if moved above the first section
+            // draft.blocks[blockIndex].parent_id = null;
+          }
           return;
         }
 
         const oldIndex = draft.blocks.findIndex(
           (block) => block.id === block_id
         );
-
         const newIndex = draft.blocks.findIndex(
           (block) => block.id === over_id
         );
@@ -193,8 +200,24 @@ export function reducer(
           ...block,
           local_index: index,
         }));
+
+        // Update parent_id based on the new position
+        const movedBlock = draft.blocks.find((block) => block.id === block_id);
+        if (movedBlock) {
+          // Find the nearest section/group above the moved block
+          let newParentId: string | null = null;
+          for (let i = newIndex - 1; i >= 0; i--) {
+            if (["section", "group"].includes(draft.blocks[i].type)) {
+              newParentId = draft.blocks[i].id;
+              break;
+            }
+          }
+
+          movedBlock.parent_id = newParentId;
+        }
       });
     }
+
     case "editor/field/focus": {
       const { field_id } = <FocusFieldAction>action;
       return produce(state, (draft) => {

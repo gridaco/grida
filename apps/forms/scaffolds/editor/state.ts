@@ -1,3 +1,4 @@
+import { blockstreeflat } from "@/lib/forms/tree";
 import type { FormBlock, FormFieldDefinition, FormResponse } from "@/types";
 
 export type DraftID = `[draft]${string}`;
@@ -12,11 +13,6 @@ export interface FormEditorInit {
 }
 
 export function initialFormEditorState(init: FormEditorInit): FormEditorState {
-  // ensure initial blocks are sorted by local_index
-  const sorted_blocks = Array.from(init.blocks).sort((a, b) => {
-    return a.local_index - b.local_index;
-  });
-
   // prepare initial available_field_ids
   const field_ids = init.fields.map((f) => f.id);
   const block_referenced_field_ids = init.blocks
@@ -30,7 +26,7 @@ export function initialFormEditorState(init: FormEditorInit): FormEditorState {
     form_id: init.form_id,
     form_title: init.form_title,
     page_id: init.page_id,
-    blocks: sorted_blocks,
+    blocks: blockstreeflat(init.blocks),
     fields: init.fields,
     selected_responses: new Set(),
     available_field_ids: block_available_field_ids,
@@ -58,18 +54,4 @@ export interface FormEditorState {
 
 export interface EditorFlatFormBlock extends FormBlock {
   id: string | DraftID;
-}
-
-export interface EditorBlockTree {
-  depth: number;
-  children: EditorBlockTreeFolderBlock[] | EditorFlatFormBlock[];
-}
-
-export type EditorBlockTreeChild =
-  | EditorBlockTreeFolderBlock
-  | EditorFlatFormBlock;
-
-export interface EditorBlockTreeFolderBlock extends EditorFlatFormBlock {
-  type: "section" | "group";
-  children: EditorFlatFormBlock[];
 }

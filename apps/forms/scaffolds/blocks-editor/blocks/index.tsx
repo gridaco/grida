@@ -1,9 +1,5 @@
 import { FormFieldPreview } from "@/components/formfield";
-import type {
-  EditorBlockTreeChild,
-  EditorBlockTreeFolderBlock,
-  EditorFlatFormBlock,
-} from "../../editor/state";
+import type { EditorFlatFormBlock } from "../../editor/state";
 import { useEditorState } from "../../editor/provider";
 import { FormFieldDefinition } from "@/types";
 import {
@@ -17,7 +13,7 @@ import {
 import React, { useCallback } from "react";
 import { useDraggable, useDroppable } from "@dnd-kit/core";
 import { CSS } from "@dnd-kit/utilities";
-import { SortableContext, useSortable } from "@dnd-kit/sortable";
+import { useSortable } from "@dnd-kit/sortable";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -33,7 +29,7 @@ export function BlocksCanvas({
   ...props
 }: React.PropsWithChildren<React.HtmlHTMLAttributes<HTMLDivElement>>) {
   const { setNodeRef } = useDroppable({
-    id: props.id!,
+    id: "root",
   });
 
   return (
@@ -43,7 +39,7 @@ export function BlocksCanvas({
   );
 }
 
-export function Block(props: EditorBlockTreeChild) {
+export function Block(props: EditorFlatFormBlock) {
   const {
     attributes,
     listeners,
@@ -56,6 +52,7 @@ export function Block(props: EditorBlockTreeChild) {
     transition,
   } = useSortable({
     id: props.id,
+    disabled: props.type === "section",
   });
 
   const style = {
@@ -67,23 +64,7 @@ export function Block(props: EditorBlockTreeChild) {
   function renderBlock() {
     switch (props.type) {
       case "section":
-        return (
-          <SectionBlock {...props}>
-            <BlocksCanvas id={props.id} className="flex flex-col gap-4 mt-10">
-              <SortableContext
-                items={
-                  (props as EditorBlockTreeFolderBlock).children.map(
-                    (child) => child.id
-                  ) ?? []
-                }
-              >
-                {(props as EditorBlockTreeFolderBlock).children.map((child) => (
-                  <Block key={child.id} {...child} />
-                ))}
-              </SortableContext>
-            </BlocksCanvas>
-          </SectionBlock>
-        );
+        return <SectionBlock {...props} />;
       case "field":
         return <FieldBlock {...props} />;
       case "html":
@@ -95,6 +76,7 @@ export function Block(props: EditorBlockTreeChild) {
 
   return (
     <>
+      {/* debug display */}
       {/* <div className="text-xs border p-1">
         <div className="flex flex-col gap-3">
           <span>id: {props.id}</span>
@@ -125,6 +107,17 @@ export function Block(props: EditorBlockTreeChild) {
   );
 }
 
+function useDeleteBlock() {
+  const supabase = createClientClient();
+
+  return useCallback(
+    async (id: string) => {
+      return await supabase.from("form_block").delete().eq("id", id);
+    },
+    [supabase]
+  );
+}
+
 export function FieldBlock({
   id,
   type,
@@ -139,14 +132,7 @@ export function FieldBlock({
 
   const { available_field_ids } = state;
 
-  const supabase = createClientClient();
-
-  const deleteBlock = useCallback(
-    async (id: string) => {
-      await supabase.from("form_block").delete().eq("id", id);
-    },
-    [supabase]
-  );
+  const deleteBlock = useDeleteBlock();
 
   const onFieldChange = useCallback(
     (field_id: string) => {
@@ -253,10 +239,25 @@ export function FieldBlock({
   );
 }
 
-export function SectionBlock({
-  children,
-  ...props
-}: React.PropsWithChildren<EditorFlatFormBlock>) {
+export function SectionBlock({ id }: EditorFlatFormBlock) {
+  const [state, dispatch] = useEditorState();
+
+  const deleteBlock = useDeleteBlock();
+
+  const onDelete = useCallback(() => {
+    console.log("delete section block", id);
+    deleteBlock(id).then(({ error }) => {
+      if (error) {
+        toast.error("Failed to delete section block");
+        return;
+      }
+      dispatch({
+        type: "blocks/delete",
+        block_id: id,
+      });
+    });
+  }, [deleteBlock, dispatch, id]);
+
   return (
     <div>
       <div className="p-4 rounded-md border-black border-2 bg-white shadow-md">
@@ -273,7 +274,7 @@ export function SectionBlock({
                 </button>
               </DropdownMenuTrigger>
               <DropdownMenuContent>
-                <DropdownMenuItem>
+                <DropdownMenuItem onClick={onDelete}>
                   <TrashIcon />
                   Delete Section
                 </DropdownMenuItem>
@@ -282,7 +283,6 @@ export function SectionBlock({
           </div>
         </div>
       </div>
-      {children}
     </div>
   );
 }
