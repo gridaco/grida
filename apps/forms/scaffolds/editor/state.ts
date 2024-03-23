@@ -1,10 +1,11 @@
-import type { FormBlockType, FormFieldDefinition, FormResponse } from "@/types";
+import type { FormBlock, FormFieldDefinition, FormResponse } from "@/types";
 
 export type DraftID = `[draft]${string}`;
 export const DRAFT_ID_START_WITH = "[draft]";
 
 export interface FormEditorInit {
   form_id: string;
+  form_title: string;
   blocks: EditorFormBlock[];
   fields: FormFieldDefinition[];
 }
@@ -26,6 +27,7 @@ export function initialFormEditorState(init: FormEditorInit): FormEditorState {
 
   return {
     form_id: init.form_id,
+    form_title: init.form_title,
     blocks: sorted_blocks,
     fields: init.fields,
     selected_responses: new Set(),
@@ -36,25 +38,21 @@ export function initialFormEditorState(init: FormEditorInit): FormEditorState {
 
 export interface FormEditorState {
   form_id: string;
+  form_title: string;
   blocks: EditorFormBlock[];
   fields: FormFieldDefinition[];
+  focus_field_id?: string;
+  focus_response_id?: string;
+  focus_block_id?: string;
   available_field_ids: string[];
   responses?: FormResponse[];
   selected_responses: Set<string>;
   responses_pagination_rows: number;
-  focus_field_id?: string;
   is_field_edit_panel_open?: boolean;
-  field_edit_panel_refresh_key?: number;
   is_response_edit_panel_open?: boolean;
-  focus_response_id?: string;
+  field_edit_panel_refresh_key?: number;
 }
 
-export interface EditorFormBlock {
+export interface EditorFormBlock extends FormBlock {
   id: string | DraftID;
-  form_id: string;
-  form_field_id?: string | null;
-  type: FormBlockType;
-  data: any;
-  parent_id?: string | null;
-  local_index: number;
 }

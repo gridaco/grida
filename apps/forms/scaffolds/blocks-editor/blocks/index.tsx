@@ -22,6 +22,7 @@ import {
 } from "@editor-ui/dropdown-menu";
 import { createClientClient } from "@/lib/supabase/client";
 import toast from "react-hot-toast";
+import cs from "classnames";
 
 export function BlocksCanvas({
   children,
@@ -65,6 +66,10 @@ export function Block(props: React.PropsWithChildren<EditorFormBlock>) {
         return <SectionBlock {...props}>{props.children}</SectionBlock>;
       case "field":
         return <FieldBlock {...props} />;
+      case "html":
+        return <div>HTML Block</div>;
+      default:
+        return <div>Unsupported block type: {props.type}</div>;
     }
   }
 
@@ -143,30 +148,36 @@ export function FieldBlock({ id, type, form_field_id, data }: EditorFormBlock) {
   }, [dispatch, form_field_id]);
 
   return (
-    <div className="rounded-md flex flex-col gap-4 border w-full p-4 bg-white shadow-md">
+    <div
+      data-invalid={!form_field}
+      className={cs(
+        "rounded-md flex flex-col gap-4 border w-full p-4 bg-white shadow-md",
+        'data-[invalid="true"]:border-red-500/50 data-[invalid="true"]:bg-red-500/10'
+      )}
+    >
       <div className="flex w-full justify-between items-center">
         <div className="flex flex-row items-center gap-8">
           <span className="flex flex-row gap-2 items-center">
             <InputIcon />
-            <span className="capitalize">{type}</span>
+            <select
+              className="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500"
+              value={form_field_id ?? ""}
+              onChange={(e) => {
+                onFieldChange(e.target.value);
+              }}
+            >
+              <option value="">Select Field</option>
+              {state.fields.map((f) => (
+                <option
+                  key={f.id}
+                  value={f.id}
+                  disabled={!available_field_ids.includes(f.id)}
+                >
+                  {f.name}
+                </option>
+              ))}
+            </select>
           </span>
-          <select
-            value={form_field_id ?? ""}
-            onChange={(e) => {
-              onFieldChange(e.target.value);
-            }}
-          >
-            <option value="">Select Field</option>
-            {state.fields.map((f) => (
-              <option
-                key={f.id}
-                value={f.id}
-                disabled={!available_field_ids.includes(f.id)}
-              >
-                {f.name}
-              </option>
-            ))}
-          </select>
         </div>
         <div>
           <DropdownMenu modal={false}>
@@ -176,16 +187,16 @@ export function FieldBlock({ id, type, form_field_id, data }: EditorFormBlock) {
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent>
+              {form_field_id && (
+                <DropdownMenuItem onClick={onEditClick}>
+                  <Pencil1Icon />
+                  Edit Field Definition
+                </DropdownMenuItem>
+              )}
               <DropdownMenuItem onClick={onDelete}>
                 <TrashIcon />
                 Delete Block
               </DropdownMenuItem>
-              {form_field_id && (
-                <DropdownMenuItem onClick={onEditClick}>
-                  <Pencil1Icon />
-                  Edit Field
-                </DropdownMenuItem>
-              )}
             </DropdownMenuContent>
           </DropdownMenu>
         </div>

@@ -1,5 +1,5 @@
 import { produce } from "immer";
-import { FormEditorState } from "./state";
+import { EditorFormBlock, FormEditorState } from "./state";
 import {
   BlocksEditorAction,
   ChangeBlockFieldAction,
@@ -30,6 +30,15 @@ export function reducer(
 
       const new_index = state.blocks.length;
 
+      const __shared: EditorFormBlock = {
+        id: "[draft]" + Math.random().toString(36).substring(7),
+        created_at: new Date().toISOString(),
+        form_id: state.form_id,
+        type: block,
+        local_index: new_index,
+        data: {},
+      };
+
       switch (block) {
         case "field": {
           return produce(state, (draft) => {
@@ -39,12 +48,8 @@ export function reducer(
             const field_id = available_field_ids[0] ?? null;
 
             draft.blocks.push({
-              id: "[draft]" + Math.random().toString(36).substring(7),
+              ...__shared,
               form_field_id: field_id,
-              form_id: state.form_id,
-              type: block,
-              local_index: new_index,
-              data: {},
             });
 
             // remove the field id from available_field_ids
@@ -56,13 +61,33 @@ export function reducer(
         case "section": {
           return produce(state, (draft) => {
             draft.blocks.push({
-              id: "[draft]" + Math.random().toString(36).substring(7),
-              form_id: state.form_id,
-              local_index: new_index,
-              type: block,
-              data: {},
+              ...__shared,
             });
           });
+        }
+        case "html": {
+          return produce(state, (draft) => {
+            draft.blocks.push({
+              ...__shared,
+            });
+          });
+        }
+        case "image": {
+          return produce(state, (draft) => {
+            draft.blocks.push({
+              ...__shared,
+            });
+          });
+        }
+        case "video": {
+          return produce(state, (draft) => {
+            draft.blocks.push({
+              ...__shared,
+            });
+          });
+        }
+        default: {
+          throw new Error("Unsupported block type : " + block);
         }
       }
     }
@@ -204,6 +229,7 @@ export function reducer(
       });
     }
     case "editor/response/delete/selected": {
+      const {} = <DeleteSelectedResponsesAction>action;
       return produce(state, (draft) => {
         const ids = Array.from(state.selected_responses);
 

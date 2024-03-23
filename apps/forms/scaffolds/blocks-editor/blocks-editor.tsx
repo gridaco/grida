@@ -3,7 +3,14 @@
 import React, { useCallback, useEffect, useId, useRef } from "react";
 import { type EditorFormBlock, DRAFT_ID_START_WITH } from "../editor/state";
 import { useEditorState } from "../editor";
-import { PlusIcon } from "@radix-ui/react-icons";
+import {
+  ImageIcon,
+  PlusCircledIcon,
+  PlusIcon,
+  SectionIcon,
+  TextIcon,
+  VideoIcon,
+} from "@radix-ui/react-icons";
 import {
   DndContext,
   PointerSensor,
@@ -26,6 +33,7 @@ import {
 } from "@dnd-kit/sortable";
 import { createClientClient } from "@/lib/supabase/client";
 import toast from "react-hot-toast";
+import { FormBlockType } from "@/types";
 
 export default function BlocksEditorRoot() {
   return (
@@ -135,8 +143,11 @@ function useSyncBlocks(blocks: EditorFormBlock[]) {
       return (
         !prevBlock ||
         block.type !== prevBlock.type ||
+        block.parent_id !== prevBlock.parent_id ||
         block.local_index !== prevBlock.local_index ||
-        block.form_field_id !== prevBlock.form_field_id
+        block.form_field_id !== prevBlock.form_field_id ||
+        block.title_html !== prevBlock.title_html ||
+        block.description_html !== prevBlock.description_html
       );
     });
 
@@ -147,8 +158,12 @@ function useSyncBlocks(blocks: EditorFormBlock[]) {
           .update({
             // Assuming these are the fields to update
             type: block.type,
+            parent_id: block.parent_id,
             local_index: block.local_index,
             form_field_id: block.form_field_id,
+            title_html: block.title_html,
+            description_html: block.description_html,
+            src: block.src,
           })
           .eq("id", block.id)
           .single();
@@ -185,19 +200,21 @@ function OptimisticBlocksSyncProvider({
 function BlocksEditor() {
   const [state, dispatch] = useEditorState();
 
-  const addSectionBlock = useCallback(() => {
-    dispatch({
-      type: "blocks/new",
-      block: "section",
-    });
-  }, [dispatch]);
+  const addBlock = useCallback(
+    (block: FormBlockType) => {
+      dispatch({
+        type: "blocks/new",
+        block: block,
+      });
+    },
+    [dispatch]
+  );
 
-  const addFieldBlock = useCallback(() => {
-    dispatch({
-      type: "blocks/new",
-      block: "field",
-    });
-  }, [dispatch]);
+  const addSectionBlock = useCallback(() => addBlock("section"), [addBlock]);
+  const addFieldBlock = useCallback(() => addBlock("field"), [addBlock]);
+  const addHtmlBlock = useCallback(() => addBlock("html"), [addBlock]);
+  const addImageBlock = useCallback(() => addBlock("image"), [addBlock]);
+  const addVideoBlock = useCallback(() => addBlock("video"), [addBlock]);
 
   return (
     <div>
@@ -211,10 +228,26 @@ function BlocksEditor() {
         </DropdownMenuTrigger>
         <DropdownMenuPortal>
           <DropdownMenuContent className="z-50">
+            <DropdownMenuItem onClick={addFieldBlock}>
+              <PlusCircledIcon />
+              Field
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={addImageBlock}>
+              <ImageIcon />
+              Image
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={addVideoBlock}>
+              <VideoIcon />
+              Video
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={addHtmlBlock}>
+              <TextIcon />
+              Title and description
+            </DropdownMenuItem>
             <DropdownMenuItem onClick={addSectionBlock}>
+              <SectionIcon />
               Section
             </DropdownMenuItem>
-            <DropdownMenuItem onClick={addFieldBlock}>Field</DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenuPortal>
       </DropdownMenu>
