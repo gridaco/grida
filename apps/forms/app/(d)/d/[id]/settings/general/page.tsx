@@ -1,3 +1,4 @@
+import { Select } from "@/components/select";
 import { DeleteFormSection } from "@/scaffolds/settings/delete-form/delete-form-section";
 import Link from "next/link";
 
@@ -18,12 +19,12 @@ export default function FormGeneralSettingsPage() {
             </p>
             <div>
               <label>
-                <select>
+                <Select>
                   <option>Accept the form with ignoring unknown fields</option>
                   <option>
                     Reject forms when if any unknown field is present
                   </option>
-                </select>
+                </Select>
               </label>
             </div>
           </section>

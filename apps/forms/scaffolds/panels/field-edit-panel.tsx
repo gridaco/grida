@@ -19,6 +19,7 @@ import { capitalCase, snakeCase } from "change-case";
 import { LockClosedIcon } from "@radix-ui/react-icons";
 import { FormFieldAssistant } from "../ai/form-field-schema-assistant";
 import toast from "react-hot-toast";
+import { Select } from "@/components/select";
 
 const supported_field_types: FormFieldType[] = [
   "text",
@@ -235,7 +236,7 @@ export function FieldEditPanel({
             <PanelPropertySectionTitle>Field</PanelPropertySectionTitle>
             <PanelPropertyFields>
               <PanelPropertyField label={"Type"}>
-                <select
+                <Select
                   value={type}
                   onChange={(e) => {
                     set_effect_cause("human");
@@ -247,7 +248,7 @@ export function FieldEditPanel({
                       {type}
                     </option>
                   ))}
-                </select>
+                </Select>
               </PanelPropertyField>
               <PanelPropertyField
                 label={

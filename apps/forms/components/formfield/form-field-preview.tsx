@@ -1,5 +1,6 @@
 import { FormFieldType } from "@/types";
 import React, { useEffect } from "react";
+import { Select } from "../select";
 
 export function FormFieldPreview({
   name,
@@ -58,13 +59,13 @@ export function FormFieldPreview({
       }
       case "select": {
         return (
-          <select {...(sharedInputProps as React.ComponentProps<"select">)}>
+          <Select {...(sharedInputProps as React.ComponentProps<"select">)}>
             {options?.map((option) => (
               <option key={option.value} value={option.value}>
                 {option.label}
               </option>
             ))}
-          </select>
+          </Select>
         );
       }
       case "color": {

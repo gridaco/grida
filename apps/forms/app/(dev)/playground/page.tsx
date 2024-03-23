@@ -1,5 +1,6 @@
 "use client";
 
+import { Select } from "@/components/select";
 import { useState } from "react";
 
 export default function FormsPlayground() {
@@ -18,12 +19,12 @@ export default function FormsPlayground() {
               value={action}
               onChange={(e) => setAction(e.target.value)}
             />
-            <select value={method} onChange={(e) => setMethod(e.target.value)}>
+            <Select value={method} onChange={(e) => setMethod(e.target.value)}>
               <option>GET</option>
               <option>POST</option>
               <option>PUT</option>
               <option>DELETE</option>
-            </select>
+            </Select>
           </div>
         </header>
         <form action={action} method={method}>
