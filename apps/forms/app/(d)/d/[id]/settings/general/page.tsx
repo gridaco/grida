@@ -1,3 +1,6 @@
+import { DeleteFormSection } from "@/scaffolds/settings/delete-form/delete-form-section";
+import Link from "next/link";
+
 export default function FormGeneralSettingsPage() {
   return (
     <main>
@@ -23,6 +26,10 @@ export default function FormGeneralSettingsPage() {
             </div>
           </section>
         </div>
+      </section>
+      <section>
+        <h2 className="text-xl font-bold py-4">Delete Form</h2>
+        <DeleteFormSection />
       </section>
     </main>
   );

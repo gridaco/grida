@@ -10,7 +10,7 @@ export default function Layout({
   const id = params.id;
 
   return (
-    <main className="flex gap-4 h-screen">
+    <main className="flex h-screen">
       {/* side */}
       <nav className="col-span-1 max-w-xs min-w-60 w-min border-r h-full">
         <ul className="flex flex-col">
@@ -51,7 +51,7 @@ export default function Layout({
           </li>
         </ul>
       </nav>
-      <div className="w-full h-full overflow-scroll pt-4">{children}</div>
+      <div className="w-full h-full overflow-scroll p-4">{children}</div>
     </main>
   );
 }

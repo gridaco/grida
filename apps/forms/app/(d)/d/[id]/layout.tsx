@@ -95,6 +95,7 @@ export default async function Layout({
           <FormEditorProvider
             initial={{
               form_id: id,
+              form_title: data.title,
               fields: data.fields,
               blocks: data.blocks,
             }}
