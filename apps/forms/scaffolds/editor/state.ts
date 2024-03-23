@@ -6,6 +6,7 @@ export const DRAFT_ID_START_WITH = "[draft]";
 export interface FormEditorInit {
   form_id: string;
   form_title: string;
+  page_id: string | null;
   blocks: EditorFormBlock[];
   fields: FormFieldDefinition[];
 }
@@ -28,6 +29,7 @@ export function initialFormEditorState(init: FormEditorInit): FormEditorState {
   return {
     form_id: init.form_id,
     form_title: init.form_title,
+    page_id: init.page_id,
     blocks: sorted_blocks,
     fields: init.fields,
     selected_responses: new Set(),
@@ -39,6 +41,7 @@ export function initialFormEditorState(init: FormEditorInit): FormEditorState {
 export interface FormEditorState {
   form_id: string;
   form_title: string;
+  page_id: string | null;
   blocks: EditorFormBlock[];
   fields: FormFieldDefinition[];
   focus_field_id?: string;

@@ -93,6 +93,7 @@ function PendingBlocksResolver() {
           data: {},
           form_id: state.form_id,
           type: block.type,
+          form_page_id: state.page_id,
           local_index: block.local_index,
           form_field_id: block.form_field_id,
         })
@@ -101,7 +102,7 @@ function PendingBlocksResolver() {
 
       return data;
     },
-    [state.form_id, supabase]
+    [state.form_id, state.page_id, supabase]
   );
 
   useEffect(() => {

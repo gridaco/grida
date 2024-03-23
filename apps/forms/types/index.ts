@@ -48,10 +48,18 @@ export interface FormFieldDefinition {
   }[];
 }
 
+export interface FormPage {
+  id: string;
+  form_id: string;
+  name: string;
+  blocks: FormBlock[];
+}
+
 export interface FormBlock {
   id: string;
   form_id: string;
   form_field_id?: string | null;
+  form_page_id: string | null;
   type: FormBlockType;
   title_html?: string | null;
   description_html?: string | null;
