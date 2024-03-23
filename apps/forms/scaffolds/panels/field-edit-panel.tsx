@@ -95,13 +95,15 @@ export function FieldEditPanel({
   onSave,
   formResetKey = 0,
   init,
-  disableAI,
+  enableAI,
+  mode = "edit",
   ...props
 }: React.ComponentProps<typeof SidePanel> & {
   title?: string;
   formResetKey?: number;
   init?: Partial<NewFormFieldInit>;
-  disableAI?: boolean;
+  mode?: "edit" | "new";
+  enableAI?: boolean;
   onSave?: (field: NewFormFieldInit) => void;
 }) {
   const [effect_cause, set_effect_cause] = useState<"ai" | "human" | "system">(
@@ -223,7 +225,7 @@ export function FieldEditPanel({
             </div>
           </PanelPropertyFields>
         </PanelPropertySection>
-        {!disableAI && (
+        {enableAI && (
           <PanelPropertySection grid={false}>
             <FormFieldAssistant onSuggestion={onSuggestion} />
           </PanelPropertySection>
@@ -258,7 +260,7 @@ export function FieldEditPanel({
               >
                 <PropertyTextInput
                   required
-                  autoFocus
+                  autoFocus={mode === "edit"}
                   placeholder={"field_name"}
                   value={name}
                   onChange={(e) => setName(e.target.value)}
