@@ -48,13 +48,28 @@ export interface FormFieldDefinition {
   }[];
 }
 
+export interface FormBlock {
+  id: string;
+  form_id: string;
+  form_field_id?: string | null;
+  type: FormBlockType;
+  title_html?: string | null;
+  description_html?: string | null;
+  src?: string | null;
+  data: any;
+  created_at: string;
+  parent_id?: string | null;
+  local_index: number;
+}
+
 export type FormBlockType =
   | "section"
+  | "field"
+  | "image"
+  | "video"
+  | "html"
   // not supported yet
-  | "group"
-  | "field";
-// not supported yet
-// | "markdown"
+  | "group";
 // not supported yet
 // | "layout"
 // not supported yet
