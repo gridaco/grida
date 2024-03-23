@@ -17,7 +17,15 @@ export default async function FormPage({ params }: { params: { id: string } }) {
     return notFound();
   }
 
-  const { title, blocks } = data;
+  const { title, blocks, tree, fields } = data;
 
-  return <Form form_id={id} title={title} blocks={blocks} />;
+  return (
+    <Form
+      form_id={id}
+      title={title}
+      fields={fields}
+      blocks={blocks}
+      tree={tree}
+    />
+  );
 }

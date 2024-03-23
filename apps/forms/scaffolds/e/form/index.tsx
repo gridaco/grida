@@ -3,18 +3,24 @@
 import { ClientRenderBlock } from "@/app/(api)/v1/[id]/route";
 import { FormFieldPreview } from "@/components/formfield";
 import { Footer } from "./footer";
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
+import { FormBlockTree } from "@/lib/forms/types";
+import { FormFieldDefinition } from "@/types";
 
 export function Form({
   form_id,
   title,
   blocks,
+  fields,
+  tree,
 }: {
   form_id: string;
   title: string;
+  fields: FormFieldDefinition[];
   blocks: ClientRenderBlock[];
+  tree: FormBlockTree<ClientRenderBlock[]>;
 }) {
-  const renderBlock = (block: ClientRenderBlock) => {
+  const renderBlock = (block: ClientRenderBlock): any => {
     switch (block.type) {
       case "field": {
         const { field } = block;
@@ -30,33 +36,20 @@ export function Form({
             options={field.options}
             pattern={field.pattern}
           />
-          // <label
-          //   data-has-label={!!field.label}
-          //   key={field.id}
-          //   className="flex flex-col gap-1 data-[has-label='false']:capitalize"
-          // >
-          //   <span>{field.label || field.name}</span>
-          //   <input
-          //     name={field.name}
-          //     className="shadow appearance-none border rounded py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
-          //     min={field.min}
-          //     max={field.max}
-          //     pattern={field.pattern}
-          //     required={field.required}
-          //     minLength={field.minlength}
-          //     maxLength={field.maxlength}
-          //     placeholder={field.placeholder || field.label || field.name}
-          //     type={field.type}
-          //   />
-          //   {field.help_text && (
-          //     <span className="text-sm text-gray-500">{field.help_text}</span>
-          //   )}
-          // </label>
         );
       }
       case "section": {
-        return <>Section</>;
+        return (
+          <section
+            key={block.id}
+            className="border border-gray-300 p-4 rounded"
+          >
+            <>{block.children?.map(renderBlock)}</>
+          </section>
+        );
       }
+      default:
+        return <div key={block["id"]}></div>;
     }
   };
 
@@ -70,7 +63,7 @@ export function Form({
         className="flex flex-col gap-8 py-4 h-full overflow-auto flex-1"
       >
         <FingerprintField />
-        {blocks.map(renderBlock)}
+        {tree.children.map(renderBlock)}
         <button className="bg-blue-500 text-white rounded p-2" type="submit">
           Submit
         </button>

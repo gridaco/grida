@@ -1,29 +1,36 @@
+import { blockstree } from "@/lib/forms/tree";
+import { FormBlockTree } from "@/lib/forms/types";
 import { client, createRouteHandlerClient } from "@/lib/supabase/server";
-import { FormFieldType } from "@/types";
+import {
+  FormBlock,
+  FormBlockType,
+  FormFieldDefinition,
+  FormFieldType,
+  FormPage,
+} from "@/types";
 import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
 import { NextRequest, NextResponse } from "next/server";
 
-interface DBBlock {
-  id: string;
-  data: any;
-  form_id: string;
-  parent_id?: string | null;
-  created_at: string;
-  local_index: number;
-  form_field_id: string | null;
-}
-
 export interface FormClientFetchResponse {
   title: string;
+  tree: FormBlockTree<ClientRenderBlock[]>;
   blocks: ClientRenderBlock[];
-  //
+  fields: FormFieldDefinition[];
 }
 
 export type ClientRenderBlock =
   | ClientFieldRenderBlock
   | ClientSectionRenderBlock;
-interface ClientFieldRenderBlock {
+
+interface BaseRenderBlock {
+  id: string;
+  type: FormBlockType;
+  local_index: number;
+  parent_id: string | null;
+}
+
+interface ClientFieldRenderBlock extends BaseRenderBlock {
   type: "field";
   field: {
     id: string;
@@ -45,8 +52,9 @@ interface ClientFieldRenderBlock {
     }[];
   };
 }
-interface ClientSectionRenderBlock {
+interface ClientSectionRenderBlock extends BaseRenderBlock {
   type: "section";
+  children?: ClientRenderBlock[];
 }
 
 export async function GET(
@@ -73,7 +81,10 @@ export async function GET(
           *,
           options:form_field_option(*)
         ),
-        blocks:form_block(*)
+        default_page:form_page!default_form_page_id(
+          *,
+          blocks:form_block(*)
+        )
       `
     )
     .eq("id", id)
@@ -85,11 +96,12 @@ export async function GET(
     return notFound();
   }
 
-  const { title, blocks, fields } = data;
+  const { title, default_page, fields } = data;
+
+  const page_blocks = (data.default_page as unknown as FormPage).blocks;
 
   // @ts-ignore
-  let render_blocks: ClientRenderBlock[] = blocks
-    .sort((a: DBBlock, b: DBBlock) => a.local_index - b.local_index)
+  let render_blocks: ClientRenderBlock[] = page_blocks
     ?.map((block: any) => {
       const is_field = block.type === "field";
       const field = is_field
@@ -99,36 +111,50 @@ export async function GET(
       if (is_field) {
         // assert fiel to be not null
         if (!field) {
-          return null; // filter this out
+          return null; // this will be filtered out
         }
-        return {
+        return <ClientFieldRenderBlock>{
+          id: block.id,
           type: "field",
           field: field,
+          local_index: block.local_index,
+          parent_id: block.parent_id,
         };
       }
 
-      return {
-        type: "section",
+      return <BaseRenderBlock>{
+        id: block.id,
+        type: block.type,
+        local_index: block.local_index,
+        parent_id: block.parent_id,
       };
     })
     .filter(Boolean);
+
   // if no blocks, render a simple form based on fields
   if (!render_blocks.length) {
-    render_blocks = fields.map((field: any) => {
+    render_blocks = fields.map((field: any, i) => {
       return {
+        id: field.id,
         type: "field",
         field: {
           id: field.id,
           type: field.type,
           name: field.name,
         },
+        local_index: i,
+        parent_id: null,
       };
     });
   }
 
+  const tree = blockstree(render_blocks);
+
   const payload: FormClientFetchResponse = {
     title: title,
+    tree: tree,
     blocks: render_blocks,
+    fields: fields,
   };
 
   return NextResponse.json({

@@ -1,8 +1,10 @@
 import type { EditorFlatFormBlock } from "@/scaffolds/editor/state";
 
-export interface FormBlockTree {
+export interface FormBlockTree<
+  A = FormBlockTreeFolderBlock[] | EditorFlatFormBlock[],
+> {
   depth: number;
-  children: FormBlockTreeFolderBlock[] | EditorFlatFormBlock[];
+  children: A;
 }
 
 export type FormBlockTreeChild = FormBlockTreeFolderBlock | EditorFlatFormBlock;

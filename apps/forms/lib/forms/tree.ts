@@ -1,25 +1,35 @@
 import type { EditorFlatFormBlock } from "@/scaffolds/editor/state";
 import type { FormBlockTree, FormBlockTreeFolderBlock } from "./types";
+import { FormBlockType } from "@/types";
 
 const folder_types = ["section", "group"];
+
+type WithChildren<T> = T & { children: T[] };
 
 /**
  * does not multi-level nesting only 1 level
  * this is used on client side, where the actual rendering is done by nested components
  */
-export function blockstree(blocks: EditorFlatFormBlock[]): FormBlockTree {
-  const tree: FormBlockTree = {
+export function blockstree<
+  T extends {
+    id: string;
+    type: FormBlockType;
+    parent_id?: string | null;
+    local_index: number;
+  },
+>(blocks: T[]): FormBlockTree<T[]> {
+  const tree: FormBlockTree<T[]> = {
     depth: 0,
     children: [],
   };
 
-  const folders: FormBlockTreeFolderBlock[] = blocks
+  const folders: WithChildren<T>[] = blocks
     .filter((block) => folder_types.includes(block.type))
     .sort((a, b) => a.local_index - b.local_index)
     .map((block) => ({
       ...block,
       children: [],
-    })) as FormBlockTreeFolderBlock[];
+    }));
 
   const items = blocks
     .filter((block) => !folder_types.includes(block.type))
@@ -44,7 +54,7 @@ export function blockstree(blocks: EditorFlatFormBlock[]): FormBlockTree {
       acc[parent_id].push(block);
       return acc;
     },
-    {} as Record<string, EditorFlatFormBlock[]>
+    {} as Record<string, T[]>
   );
 
   for (const folder of folders) {
