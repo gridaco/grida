@@ -63,6 +63,7 @@ export interface FormBlock {
   type: FormBlockType;
   title_html?: string | null;
   description_html?: string | null;
+  body_html?: string | null;
   src?: string | null;
   data: any;
   created_at: string;
@@ -76,12 +77,11 @@ export type FormBlockType =
   | "image"
   | "video"
   | "html"
+  | "divider"
   // not supported yet
   | "group";
 // not supported yet
 // | "layout"
-// not supported yet
-// | "divider";
 
 export interface FormResponse {
   browser: string | null;

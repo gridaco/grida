@@ -9,6 +9,7 @@ export type BlocksEditorAction =
   | SortBlockAction
   | FocusFieldAction
   | ChangeBlockFieldAction
+  | HtmlBlockBodyAction
   | SelectResponse
   | DeleteSelectedResponsesAction
   | SaveFieldAction
@@ -43,6 +44,11 @@ export interface ChangeBlockFieldAction {
   type: "blocks/field/change";
   block_id: string;
   field_id: string;
+}
+export interface HtmlBlockBodyAction {
+  type: "blocks/html/body";
+  block_id: string;
+  html: string;
 }
 
 export interface FocusFieldAction {

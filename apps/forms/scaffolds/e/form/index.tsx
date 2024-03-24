@@ -48,6 +48,16 @@ export function Form({
           </section>
         );
       }
+      case "html": {
+        return (
+          <article
+            className="prose"
+            key={block["id"]}
+            dangerouslySetInnerHTML={{ __html: block["html"] }}
+          />
+        );
+      }
+
       default:
         return <div key={block["id"]}></div>;
     }

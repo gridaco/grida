@@ -4,6 +4,7 @@ import React, { useCallback, useEffect, useId, useRef } from "react";
 import { type EditorFlatFormBlock, DRAFT_ID_START_WITH } from "../editor/state";
 import { useEditorState } from "../editor";
 import {
+  CodeIcon,
   ImageIcon,
   PlusCircledIcon,
   PlusIcon,
@@ -96,6 +97,7 @@ function PendingBlocksResolver() {
           form_page_id: state.page_id,
           local_index: block.local_index,
           form_field_id: block.form_field_id,
+          body_html: block.body_html,
         })
         .select()
         .single();
@@ -134,6 +136,8 @@ function PendingBlocksResolver() {
 }
 
 function useSyncBlocks(blocks: EditorFlatFormBlock[]) {
+  // TODO: add debounce
+
   const supabase = createClientClient();
   const prevBlocksRef = useRef(blocks);
 
@@ -150,7 +154,9 @@ function useSyncBlocks(blocks: EditorFlatFormBlock[]) {
         block.local_index !== prevBlock.local_index ||
         block.form_field_id !== prevBlock.form_field_id ||
         block.title_html !== prevBlock.title_html ||
-        block.description_html !== prevBlock.description_html
+        block.description_html !== prevBlock.description_html ||
+        block.body_html !== prevBlock.body_html ||
+        block.src !== prevBlock.src
       );
     });
 
@@ -166,6 +172,7 @@ function useSyncBlocks(blocks: EditorFlatFormBlock[]) {
             form_field_id: block.form_field_id,
             title_html: block.title_html,
             description_html: block.description_html,
+            body_html: block.body_html,
             src: block.src,
             updated_at: new Date().toISOString(),
           })
@@ -245,8 +252,8 @@ function BlocksEditor() {
               Video
             </DropdownMenuItem>
             <DropdownMenuItem onClick={addHtmlBlock}>
-              <TextIcon />
-              Title and description
+              <CodeIcon />
+              HTML
             </DropdownMenuItem>
             <DropdownMenuItem onClick={addSectionBlock}>
               <SectionIcon />

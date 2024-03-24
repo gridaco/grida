@@ -21,7 +21,8 @@ export interface FormClientFetchResponse {
 
 export type ClientRenderBlock =
   | ClientFieldRenderBlock
-  | ClientSectionRenderBlock;
+  | ClientSectionRenderBlock
+  | ClientHtmlRenderBlock;
 
 interface BaseRenderBlock {
   id: string;
@@ -55,6 +56,11 @@ interface ClientFieldRenderBlock extends BaseRenderBlock {
 interface ClientSectionRenderBlock extends BaseRenderBlock {
   type: "section";
   children?: ClientRenderBlock[];
+}
+
+interface ClientHtmlRenderBlock extends BaseRenderBlock {
+  type: "html";
+  html: string;
 }
 
 export async function GET(
@@ -102,7 +108,7 @@ export async function GET(
 
   // @ts-ignore
   let render_blocks: ClientRenderBlock[] = page_blocks
-    ?.map((block: any) => {
+    ?.map((block: FormBlock) => {
       const is_field = block.type === "field";
       const field = is_field
         ? fields.find((f: any) => f.id === block.form_field_id) ?? null
@@ -122,12 +128,25 @@ export async function GET(
         };
       }
 
-      return <BaseRenderBlock>{
-        id: block.id,
-        type: block.type,
-        local_index: block.local_index,
-        parent_id: block.parent_id,
-      };
+      switch (block.type) {
+        case "html": {
+          return <ClientHtmlRenderBlock>{
+            id: block.id,
+            type: "html",
+            html: block.body_html,
+            local_index: block.local_index,
+            parent_id: block.parent_id,
+          };
+        }
+        default: {
+          return <BaseRenderBlock>{
+            id: block.id,
+            type: block.type,
+            local_index: block.local_index,
+            parent_id: block.parent_id,
+          };
+        }
+      }
     })
     .filter(Boolean);
 

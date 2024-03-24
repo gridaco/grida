@@ -9,6 +9,7 @@ import {
   DeleteSelectedResponsesAction,
   FeedResponseAction,
   FocusFieldAction,
+  HtmlBlockBodyAction,
   OpenEditFieldAction,
   OpenResponseEditAction,
   ResolvePendingBlockAction,
@@ -19,6 +20,7 @@ import {
 } from "./action";
 import { arrayMove } from "@dnd-kit/sortable";
 import { blockstreeflat } from "@/lib/forms/tree";
+import { HTML_BLOCK_BODY_HTML_DEFAULT_VALUE } from "@/k/html_block_defaults";
 
 export function reducer(
   state: FormEditorState,
@@ -96,6 +98,7 @@ export function reducer(
           return produce(state, (draft) => {
             draft.blocks.push({
               ...__shared,
+              body_html: HTML_BLOCK_BODY_HTML_DEFAULT_VALUE,
             });
           });
         }
@@ -171,6 +174,16 @@ export function reducer(
             ...draft.available_field_ids.filter((id) => id !== field_id),
             previous_field_id,
           ].filter(Boolean) as string[];
+        }
+      });
+    }
+    case "blocks/html/body": {
+      const { block_id, html } = <HtmlBlockBodyAction>action;
+      return produce(state, (draft) => {
+        const block = draft.blocks.find((b) => b.id === block_id);
+        console.log("html block body", block_id, html);
+        if (block && block.type === "html") {
+          block.body_html = html;
         }
       });
     }

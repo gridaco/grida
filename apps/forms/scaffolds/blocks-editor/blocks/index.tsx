@@ -30,6 +30,7 @@ import cs from "classnames";
 import dynamic from "next/dynamic";
 import { Editor } from "@monaco-editor/react";
 import Link from "next/link";
+import { Select } from "@/components/select";
 
 const ReactPlayer = dynamic(() => import("react-player/lazy"), { ssr: false });
 
@@ -194,8 +195,7 @@ export function FieldBlock({
         <div className="flex flex-row items-center gap-8">
           <span className="flex flex-row gap-2 items-center">
             <InputIcon />
-            <select
-              className="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500"
+            <Select
               value={form_field_id ?? ""}
               onChange={(e) => {
                 onFieldChange(e.target.value);
@@ -211,7 +211,7 @@ export function FieldBlock({
                   {f.name}
                 </option>
               ))}
-            </select>
+            </Select>
           </span>
         </div>
         <div>
@@ -418,13 +418,27 @@ export function VideoBlock({
   );
 }
 
-export function HtmlBlock({ id }: EditorFlatFormBlock) {
+export function HtmlBlock({ id, body_html }: EditorFlatFormBlock) {
   const [state, dispatch] = useEditorState();
+
+  const onEditBody = useCallback(
+    (html: string) => {
+      dispatch({
+        type: "blocks/html/body",
+        block_id: id,
+        html,
+      });
+    },
+    [dispatch, id]
+  );
 
   const deleteBlock = useDeleteBlock();
 
   return (
-    <FlatBlockBase invalid>
+    <FlatBlockBase
+      // TODO: add syntax validation
+      invalid={false}
+    >
       <BlockHeader>
         <div className="flex flex-row items-center gap-8">
           <div className="flex flex-col gap-1">
@@ -468,11 +482,8 @@ export function HtmlBlock({ id }: EditorFlatFormBlock) {
           <Editor
             height={400}
             defaultLanguage="html"
-            defaultValue={
-              //
-              `<h1>Title</h1>
-<p>Description</p>`
-            }
+            value={body_html ?? ""}
+            onChange={(value) => onEditBody(value ?? "")}
             options={{
               padding: { top: 10, bottom: 10 },
               minimap: { enabled: false },

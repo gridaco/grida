@@ -74,6 +74,7 @@ export type Database = {
       }
       form_block: {
         Row: {
+          body_html: string | null
           created_at: string
           data: Json
           description_html: string | null
@@ -89,6 +90,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          body_html?: string | null
           created_at?: string
           data: Json
           description_html?: string | null
@@ -104,6 +106,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          body_html?: string | null
           created_at?: string
           data?: Json
           description_html?: string | null
@@ -470,6 +473,7 @@ export type Database = {
         | "html"
         | "image"
         | "video"
+        | "divider"
       form_field_type:
         | "text"
         | "textarea"
