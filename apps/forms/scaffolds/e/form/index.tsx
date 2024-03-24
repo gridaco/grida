@@ -23,8 +23,71 @@ export function Form({
   blocks: ClientRenderBlock[];
   tree: FormBlockTree<ClientRenderBlock[]>;
 }) {
+  const sections = tree.children.filter((block) => block.type === "section");
+
+  const has_sections = sections.length > 0;
+
+  const last_section_id = has_sections
+    ? sections[sections.length - 1].id
+    : null;
+  const [current_section, set_current_section] = useState<string | null>(
+    has_sections ? sections[0].id : null
+  );
+
+  const submit_hidden = has_sections
+    ? last_section_id !== current_section
+    : false;
+
+  const previous_section_button_hidden = has_sections
+    ? current_section === sections[0].id
+    : true;
+
+  const next_section_button_hidden = has_sections
+    ? current_section === last_section_id
+    : true;
+
+  const onPrevious = (e: React.MouseEvent<HTMLButtonElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    if (current_section === sections[0].id) {
+      return;
+    }
+
+    const index = sections.findIndex(
+      (section) => section.id === current_section
+    );
+    set_current_section(sections[index - 1].id);
+  };
+
+  const onNext = (e: React.MouseEvent<HTMLButtonElement>) => {
+    // validate current section
+    e.preventDefault();
+    e.stopPropagation();
+
+    if (current_section === last_section_id) {
+      return;
+    }
+
+    const index = sections.findIndex(
+      (section) => section.id === current_section
+    );
+    set_current_section(sections[index + 1].id);
+  };
+
   const renderBlock = (block: ClientRenderBlock): any => {
     switch (block.type) {
+      case "section": {
+        return (
+          <section
+            key={block.id}
+            data-active-section={current_section === block.id}
+            className="rounded data-[active-section='false']:hidden"
+          >
+            <>{block.children?.map(renderBlock)}</>
+          </section>
+        );
+      }
       case "field": {
         const { field } = block;
         return (
@@ -39,16 +102,6 @@ export function Form({
             options={field.options}
             pattern={field.pattern}
           />
-        );
-      }
-      case "section": {
-        return (
-          <section
-            key={block.id}
-            className="border border-gray-300 p-4 rounded"
-          >
-            <>{block.children?.map(renderBlock)}</>
-          </section>
         );
       }
       case "html": {
@@ -93,9 +146,41 @@ export function Form({
       >
         <FingerprintField />
         {tree.children.map(renderBlock)}
-        <button className="bg-blue-500 text-white rounded p-2" type="submit">
-          Submit
-        </button>
+        <footer className="flex gap-4">
+          <button
+            data-previous-hidden={previous_section_button_hidden}
+            className="
+              bg-neutral-100 text-black shadow
+              rounded px-4 py-2
+              data-[previous-hidden='true']:hidden
+            "
+            onClick={onPrevious}
+          >
+            Back
+          </button>
+          <button
+            data-next-hidden={next_section_button_hidden}
+            className="
+            bg-neutral-100 text-black shadow
+              rounded px-4 py-2
+              data-[next-hidden='true']:hidden
+            "
+            onClick={onNext}
+          >
+            Next
+          </button>
+          <button
+            data-submit-hidden={submit_hidden}
+            className="
+            bg-blue-500 text-white shadow
+              rounded px-4 py-2
+              data-[submit-hidden='true']:hidden
+            "
+            type="submit"
+          >
+            Submit
+          </button>
+        </footer>
       </form>
       <Footer />
     </main>
