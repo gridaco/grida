@@ -17,7 +17,8 @@ export type FormFieldType =
   | "color"
   | "radio"
   | "country"
-  | "payment";
+  | "payment"
+  | "hidden";
 
 export type PlatformPoweredBy = "api" | "grida_forms" | "web_client";
 

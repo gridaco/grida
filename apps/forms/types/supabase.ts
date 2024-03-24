@@ -494,6 +494,7 @@ export type Database = {
         | "radio"
         | "country"
         | "payment"
+        | "hidden"
       response_platform_powered_by: "api" | "grida_forms" | "web_client"
     }
     CompositeTypes: {

@@ -36,6 +36,7 @@ const supported_field_types: FormFieldType[] = [
   "password",
   "color",
   "radio",
+  "hidden",
 ];
 
 // @ts-ignore
@@ -84,6 +85,7 @@ const default_field_init: {
       { label: "Option 3", value: "option3" },
     ],
   },
+  hidden: { type: "hidden" },
 };
 
 const input_can_have_options: FormFieldType[] = ["select", "radio"];

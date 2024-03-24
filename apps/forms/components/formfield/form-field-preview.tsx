@@ -110,6 +110,10 @@ export function FormFieldPreview({
     }
   }
 
+  if (type === "hidden") {
+    return <input type="hidden" name={name} />;
+  }
+
   return (
     <label data-field-type={type} className="flex flex-col gap-1">
       <span

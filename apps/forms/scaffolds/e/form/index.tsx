@@ -136,13 +136,13 @@ export function Form({
   };
 
   return (
-    <main className="p-4 container mx-auto min-h-screen prose">
-      <header>
+    <main className="container mx-auto min-h-screen prose p-4">
+      {/* <header>
         <h1 className="py-10 text-4xl font-bold">{title}</h1>
-      </header>
+      </header> */}
       <form
         action={"/submit/" + form_id}
-        className="flex flex-col gap-8 py-4 h-full overflow-auto flex-1"
+        className="flex flex-col gap-8 h-full overflow-auto flex-1"
       >
         <FingerprintField />
         {tree.children.map(renderBlock)}

@@ -31,6 +31,7 @@ import cs from "classnames";
 import dynamic from "next/dynamic";
 import { Editor } from "@monaco-editor/react";
 import { Select } from "@/components/select";
+import Link from "next/link";
 
 const ReactPlayer = dynamic(() => import("react-player/lazy"), { ssr: false });
 
@@ -169,6 +170,8 @@ export function FieldBlock({
     (f) => f.id === form_field_id
   );
 
+  const is_hidden_field = form_field?.type === "hidden";
+
   const { available_field_ids } = state;
 
   const deleteBlock = useDeleteBlock();
@@ -239,17 +242,31 @@ export function FieldBlock({
         </div>
       </BlockHeader>
       <div className="w-full min-h-40 bg-neutral-200 rounded p-10 border border-black/20">
-        <FormFieldPreview
-          readonly
-          disabled={!!!form_field}
-          name={form_field?.name ?? ""}
-          label={form_field?.label ?? ""}
-          type={form_field?.type ?? "text"}
-          required={form_field?.required ?? false}
-          helpText={form_field?.help_text ?? ""}
-          placeholder={form_field?.placeholder ?? ""}
-          options={form_field?.options}
-        />
+        {is_hidden_field ? (
+          <div>
+            <p className="text-xs opacity-50">
+              Hidden fields are not displayed in the form.
+              <br />
+              Configure how this field is populated in the form{" "}
+              <Link className="underline" href="./settings">
+                settings
+              </Link>
+              .
+            </p>
+          </div>
+        ) : (
+          <FormFieldPreview
+            readonly
+            disabled={!!!form_field}
+            name={form_field?.name ?? ""}
+            label={form_field?.label ?? ""}
+            type={form_field?.type ?? "text"}
+            required={form_field?.required ?? false}
+            helpText={form_field?.help_text ?? ""}
+            placeholder={form_field?.placeholder ?? ""}
+            options={form_field?.options}
+          />
+        )}
       </div>
     </FlatBlockBase>
   );

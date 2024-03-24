@@ -22,6 +22,13 @@ export default function Layout({
             </Link>
           </li>
           <li>
+            <Link href={`/d/${id}/connect/parameters`}>
+              <button className="w-full text-left px-4 py-4 bg-transparent hover:bg-neutral-500/10">
+                URL parameters
+              </button>
+            </Link>
+          </li>
+          <li>
             <Link href={`/d/${id}/connect/datasource/db`}>
               <button className="w-full text-left px-4 py-4 bg-transparent hover:bg-neutral-500/10">
                 Data Source

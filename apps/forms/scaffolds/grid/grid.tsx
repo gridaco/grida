@@ -261,6 +261,8 @@ function FormFieldTypeIcon({ type }: { type: FormFieldType }) {
       return <EyeClosedIcon />;
     case "color":
       return <ColorWheelIcon />;
+    case "hidden":
+      return <EyeClosedIcon />;
     default:
       return <TextIcon />;
   }
