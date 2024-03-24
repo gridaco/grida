@@ -3,6 +3,8 @@ import { NextRequest, NextResponse } from "next/server";
 
 const SYSTEM_GF_KEY_STARTS_WITH = "__gf_";
 
+export const revalidate = 0;
+
 export async function GET(
   req: NextRequest,
   context: {
