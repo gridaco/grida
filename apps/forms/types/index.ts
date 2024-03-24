@@ -79,6 +79,7 @@ export type FormBlockType =
   | "video"
   | "html"
   | "divider"
+  | "header"
   // not supported yet
   | "group";
 // not supported yet

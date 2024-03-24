@@ -6,6 +6,7 @@ import { useEditorState } from "../editor";
 import {
   CodeIcon,
   DividerHorizontalIcon,
+  HeadingIcon,
   ImageIcon,
   PlusCircledIcon,
   PlusIcon,
@@ -96,6 +97,9 @@ function PendingBlocksResolver() {
           form_id: state.form_id,
           type: block.type,
           form_page_id: state.page_id,
+          parent_id: block.parent_id?.startsWith(DRAFT_ID_START_WITH)
+            ? null
+            : block.parent_id,
           local_index: block.local_index,
           form_field_id: block.form_field_id,
           body_html: block.body_html,
@@ -227,6 +231,7 @@ function BlocksEditor() {
   const addFieldBlock = useCallback(() => addBlock("field"), [addBlock]);
   const addHtmlBlock = useCallback(() => addBlock("html"), [addBlock]);
   const addDividerBlock = useCallback(() => addBlock("divider"), [addBlock]);
+  const addHeaderBlock = useCallback(() => addBlock("header"), [addBlock]);
   const addImageBlock = useCallback(() => addBlock("image"), [addBlock]);
   const addVideoBlock = useCallback(() => addBlock("video"), [addBlock]);
 
@@ -265,6 +270,10 @@ function BlocksEditor() {
             <DropdownMenuItem onClick={addSectionBlock}>
               <SectionIcon />
               Section
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={addHeaderBlock}>
+              <HeadingIcon />
+              Header
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenuPortal>

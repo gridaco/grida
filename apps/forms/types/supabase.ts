@@ -474,6 +474,7 @@ export type Database = {
         | "image"
         | "video"
         | "divider"
+        | "header"
       form_field_type:
         | "text"
         | "textarea"

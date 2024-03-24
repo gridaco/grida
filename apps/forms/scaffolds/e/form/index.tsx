@@ -112,6 +112,26 @@ export function Form({
           />
         );
       }
+      case "header": {
+        return (
+          <header key={block.id}>
+            {block.title_html && (
+              <h1
+                dangerouslySetInnerHTML={{
+                  __html: block.title_html,
+                }}
+              />
+            )}
+            {block.description_html && (
+              <p
+                dangerouslySetInnerHTML={{
+                  __html: block.description_html,
+                }}
+              />
+            )}
+          </header>
+        );
+      }
       case "image": {
         return (
           // eslint-disable-next-line @next/next/no-img-element

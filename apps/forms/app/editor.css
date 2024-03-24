@@ -2,6 +2,9 @@
 @tailwind components;
 @tailwind utilities;
 
+/* https://github.com/adazzle/react-data-grid/issues/3460#issuecomment-2016837753 */
+@import "react-data-grid/lib/styles.css";
+
 :root {
   --foreground-rgb: 0, 0, 0;
   --background-start-rgb: 255, 255, 255;

@@ -25,7 +25,8 @@ export type ClientRenderBlock =
   | ClientHtmlRenderBlock
   | ClientImageRenderBlock
   | ClientVideoRenderBlock
-  | ClientDividerRenderBlock;
+  | ClientDividerRenderBlock
+  | ClientHeaderRenderBlock;
 
 interface BaseRenderBlock {
   id: string;
@@ -77,6 +78,12 @@ interface ClientVideoRenderBlock extends BaseRenderBlock {
 
 interface ClientDividerRenderBlock extends BaseRenderBlock {
   type: "divider";
+}
+
+interface ClientHeaderRenderBlock extends BaseRenderBlock {
+  type: "header";
+  title_html?: string | null;
+  description_html?: string | null;
 }
 
 export async function GET(
@@ -152,6 +159,16 @@ export async function GET(
             html: block.body_html,
             local_index: block.local_index,
             parent_id: block.parent_id,
+          };
+        }
+        case "header": {
+          return <ClientHeaderRenderBlock>{
+            id: block.id,
+            type: "header",
+            local_index: block.local_index,
+            parent_id: block.parent_id,
+            title_html: block.title_html,
+            description_html: block.description_html,
           };
         }
         case "image":

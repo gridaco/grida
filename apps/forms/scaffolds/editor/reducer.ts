@@ -1,6 +1,8 @@
 import { produce } from "immer";
 import { EditorFlatFormBlock, FormEditorState } from "./state";
 import {
+  BlockDescriptionAction,
+  BlockTitleAction,
   BlocksEditorAction,
   ChangeBlockFieldAction,
   CreateNewPendingBlockAction,
@@ -129,6 +131,15 @@ export function reducer(
             });
           });
         }
+        case "header": {
+          return produce(state, (draft) => {
+            draft.blocks.push({
+              ...__shared,
+              title_html: "Header",
+              description_html: "Description",
+            });
+          });
+        }
         default: {
           throw new Error("Unsupported block type : " + block);
         }
@@ -171,6 +182,24 @@ export function reducer(
         // add the field_id to available_field_ids
         if (field_id) {
           draft.available_field_ids.push(field_id);
+        }
+      });
+    }
+    case "blocks/title": {
+      const { block_id, title_html } = <BlockTitleAction>action;
+      return produce(state, (draft) => {
+        const block = draft.blocks.find((b) => b.id === block_id);
+        if (block) {
+          block.title_html = title_html;
+        }
+      });
+    }
+    case "blocks/description": {
+      const { block_id, description_html } = <BlockDescriptionAction>action;
+      return produce(state, (draft) => {
+        const block = draft.blocks.find((b) => b.id === block_id);
+        if (block) {
+          block.description_html = description_html;
         }
       });
     }
