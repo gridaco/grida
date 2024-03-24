@@ -1,8 +1,28 @@
 import { Select } from "@/components/select";
+import { createServerComponentClient } from "@/lib/supabase/server";
 import { DeleteFormSection } from "@/scaffolds/settings/delete-form/delete-form-section";
+import { cookies } from "next/headers";
 import Link from "next/link";
 
-export default function FormGeneralSettingsPage() {
+export default async function FormGeneralSettingsPage({
+  params,
+}: {
+  params: { id: string };
+}) {
+  const cookieStore = cookies();
+
+  const form_id = params.id;
+
+  const supabase = createServerComponentClient(cookieStore);
+
+  const { data } = await supabase
+    .from("form")
+    .select()
+    .eq("id", form_id)
+    .single();
+
+  const { redirect_after_response_uri } = data!;
+
   return (
     <main className="prose">
       <section>
@@ -59,6 +79,33 @@ export default function FormGeneralSettingsPage() {
             </label>
           </section>
         </div>
+      </section>
+      <section>
+        <form action="/private/editor/settings/redirect-uri" method="POST">
+          <header>
+            <h2>Redirect</h2>
+            <p>Customize redirection url after submission</p>
+          </header>
+          <div className="flex flex-col gap-8">
+            <label className="flex flex-col gap-2">
+              <input type="hidden" name="form_id" value={form_id} />
+              <input
+                name="redirect_uri"
+                type="text"
+                defaultValue={redirect_after_response_uri ?? ""}
+                placeholder="https://.."
+                pattern="https://.*"
+              />
+              <span>
+                Redirect to a custom URL after form submission. Leave empty for
+                default behavior.
+              </span>
+            </label>
+          </div>
+          <footer>
+            <button type="submit">Save</button>
+          </footer>
+        </form>
       </section>
       <section>
         <header>
