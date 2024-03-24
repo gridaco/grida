@@ -12,6 +12,8 @@ export type BlocksEditorAction =
   | HtmlBlockBodyAction
   | ImageBlockSrcAction
   | VideoBlockSrcAction
+  | BlockTitleAction
+  | BlockDescriptionAction
   | SelectResponse
   | DeleteSelectedResponsesAction
   | SaveFieldAction
@@ -63,6 +65,18 @@ export interface VideoBlockSrcAction {
   type: "blocks/video/src";
   block_id: string;
   src: string;
+}
+
+export interface BlockTitleAction {
+  type: "blocks/title";
+  block_id: string;
+  title_html: string;
+}
+
+export interface BlockDescriptionAction {
+  type: "blocks/description";
+  block_id: string;
+  description_html: string;
 }
 
 export interface FocusFieldAction {
