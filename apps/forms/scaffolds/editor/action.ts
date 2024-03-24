@@ -10,6 +10,8 @@ export type BlocksEditorAction =
   | FocusFieldAction
   | ChangeBlockFieldAction
   | HtmlBlockBodyAction
+  | ImageBlockSrcAction
+  | VideoBlockSrcAction
   | SelectResponse
   | DeleteSelectedResponsesAction
   | SaveFieldAction
@@ -49,6 +51,18 @@ export interface HtmlBlockBodyAction {
   type: "blocks/html/body";
   block_id: string;
   html: string;
+}
+
+export interface ImageBlockSrcAction {
+  type: "blocks/image/src";
+  block_id: string;
+  src: string;
+}
+
+export interface VideoBlockSrcAction {
+  type: "blocks/video/src";
+  block_id: string;
+  src: string;
 }
 
 export interface FocusFieldAction {

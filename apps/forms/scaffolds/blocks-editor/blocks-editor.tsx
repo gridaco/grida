@@ -98,6 +98,7 @@ function PendingBlocksResolver() {
           local_index: block.local_index,
           form_field_id: block.form_field_id,
           body_html: block.body_html,
+          src: block.src,
         })
         .select()
         .single();

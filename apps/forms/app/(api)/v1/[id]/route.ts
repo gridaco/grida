@@ -22,7 +22,10 @@ export interface FormClientFetchResponse {
 export type ClientRenderBlock =
   | ClientFieldRenderBlock
   | ClientSectionRenderBlock
-  | ClientHtmlRenderBlock;
+  | ClientHtmlRenderBlock
+  | ClientImageRenderBlock
+  | ClientVideoRenderBlock
+  | ClientDividerRenderBlock;
 
 interface BaseRenderBlock {
   id: string;
@@ -61,6 +64,19 @@ interface ClientSectionRenderBlock extends BaseRenderBlock {
 interface ClientHtmlRenderBlock extends BaseRenderBlock {
   type: "html";
   html: string;
+}
+interface ClientImageRenderBlock extends BaseRenderBlock {
+  type: "image";
+  src: string;
+}
+
+interface ClientVideoRenderBlock extends BaseRenderBlock {
+  type: "video";
+  src: string;
+}
+
+interface ClientDividerRenderBlock extends BaseRenderBlock {
+  type: "divider";
 }
 
 export async function GET(
@@ -134,6 +150,16 @@ export async function GET(
             id: block.id,
             type: "html",
             html: block.body_html,
+            local_index: block.local_index,
+            parent_id: block.parent_id,
+          };
+        }
+        case "image":
+        case "video": {
+          return <ClientImageRenderBlock>{
+            id: block.id,
+            type: block.type,
+            src: block.src,
             local_index: block.local_index,
             parent_id: block.parent_id,
           };

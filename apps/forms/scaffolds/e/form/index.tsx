@@ -6,6 +6,9 @@ import { Footer } from "./footer";
 import React, { useEffect, useState } from "react";
 import { FormBlockTree } from "@/lib/forms/types";
 import { FormFieldDefinition } from "@/types";
+import dynamic from "next/dynamic";
+
+const ReactPlayer = dynamic(() => import("react-player/lazy"), { ssr: false });
 
 export function Form({
   form_id,
@@ -52,14 +55,30 @@ export function Form({
         return (
           <article
             className="prose"
-            key={block["id"]}
-            dangerouslySetInnerHTML={{ __html: block["html"] }}
+            key={block.id}
+            dangerouslySetInnerHTML={{ __html: block.html }}
           />
+        );
+      }
+      case "image": {
+        return (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img key={block.id} src={block.src} alt="" />
+        );
+      }
+      case "video": {
+        return (
+          <div
+            key={block.id}
+            className="bg-neutral-200 rounded overflow-hidden border border-black/20 aspect-video"
+          >
+            <ReactPlayer width={"100%"} height={"100%"} url={block.src ?? ""} />
+          </div>
         );
       }
 
       default:
-        return <div key={block["id"]}></div>;
+        return <div key={block.id}></div>;
     }
   };
 

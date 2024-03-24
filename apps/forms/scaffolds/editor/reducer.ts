@@ -10,6 +10,7 @@ import {
   FeedResponseAction,
   FocusFieldAction,
   HtmlBlockBodyAction,
+  ImageBlockSrcAction,
   OpenEditFieldAction,
   OpenResponseEditAction,
   ResolvePendingBlockAction,
@@ -17,10 +18,13 @@ import {
   SaveFieldAction,
   SelectResponse,
   SortBlockAction,
+  VideoBlockSrcAction,
 } from "./action";
 import { arrayMove } from "@dnd-kit/sortable";
 import { blockstreeflat } from "@/lib/forms/tree";
 import { HTML_BLOCK_BODY_HTML_DEFAULT_VALUE } from "@/k/html_block_defaults";
+import { VIDEO_BLOCK_SRC_DEFAULT_VALUE } from "@/k/video_block_defaults";
+import { IMAGE_BLOCK_SRC_DEFAULT_VALUE } from "@/k/image_block_defaults";
 
 export function reducer(
   state: FormEditorState,
@@ -106,6 +110,7 @@ export function reducer(
           return produce(state, (draft) => {
             draft.blocks.push({
               ...__shared,
+              src: IMAGE_BLOCK_SRC_DEFAULT_VALUE,
             });
           });
         }
@@ -113,6 +118,7 @@ export function reducer(
           return produce(state, (draft) => {
             draft.blocks.push({
               ...__shared,
+              src: VIDEO_BLOCK_SRC_DEFAULT_VALUE,
             });
           });
         }
@@ -184,6 +190,24 @@ export function reducer(
         console.log("html block body", block_id, html);
         if (block && block.type === "html") {
           block.body_html = html;
+        }
+      });
+    }
+    case "blocks/image/src": {
+      const { block_id, src } = <ImageBlockSrcAction>action;
+      return produce(state, (draft) => {
+        const block = draft.blocks.find((b) => b.id === block_id);
+        if (block && block.type === "image") {
+          block.src = src;
+        }
+      });
+    }
+    case "blocks/video/src": {
+      const { block_id, src } = <VideoBlockSrcAction>action;
+      return produce(state, (draft) => {
+        const block = draft.blocks.find((b) => b.id === block_id);
+        if (block && block.type === "video") {
+          block.src = src;
         }
       });
     }

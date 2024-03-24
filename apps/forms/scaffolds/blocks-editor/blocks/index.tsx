@@ -15,7 +15,7 @@ import {
   VideoIcon,
 } from "@radix-ui/react-icons";
 import React, { useCallback } from "react";
-import { useDraggable, useDroppable } from "@dnd-kit/core";
+import { useDroppable } from "@dnd-kit/core";
 import { CSS } from "@dnd-kit/utilities";
 import { useSortable } from "@dnd-kit/sortable";
 import {
@@ -29,7 +29,6 @@ import toast from "react-hot-toast";
 import cs from "classnames";
 import dynamic from "next/dynamic";
 import { Editor } from "@monaco-editor/react";
-import Link from "next/link";
 import { Select } from "@/components/select";
 
 const ReactPlayer = dynamic(() => import("react-player/lazy"), { ssr: false });
@@ -326,7 +325,7 @@ export function ImageBlock({
   const deleteBlock = useDeleteBlock();
 
   return (
-    <FlatBlockBase invalid>
+    <FlatBlockBase>
       <BlockHeader>
         <div className="flex flex-row items-center gap-8">
           <span className="flex flex-row gap-2 items-center">
@@ -351,11 +350,11 @@ export function ImageBlock({
         </div>
       </BlockHeader>
       <div>
-        <div className="bg-neutral-200 rounded overflow-hidden border border-black/20 aspect-auto">
+        <div className="rounded p-4 overflow-hidden border border-black/20">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
-            width="100%"
-            height="100%"
+            // width="100%"
+            // height="100%"
             src={src || "/assets/placeholder-image.png"}
             alt={data?.alt}
           />
@@ -377,13 +376,26 @@ export function VideoBlock({
   const deleteBlock = useDeleteBlock();
 
   return (
-    <FlatBlockBase invalid>
+    <FlatBlockBase invalid={!src}>
       <BlockHeader>
-        <div className="flex flex-row items-center gap-8">
-          <span className="flex flex-row gap-2 items-center">
-            <VideoIcon />
-            Video
-          </span>
+        <div className="flex flex-col gap-2">
+          <div className="flex flex-row items-center gap-8">
+            <span className="flex flex-row gap-2 items-center">
+              <VideoIcon />
+              Video
+            </span>
+          </div>
+          <p className="text-xs opacity-50">
+            Embed video from URL. Supports YouTube, Vimeo, SoundCloud and{" "}
+            <a
+              className="underline"
+              href="https://www.npmjs.com/package/react-player#supported-media"
+              target="_blank"
+            >
+              Others
+            </a>
+            .
+          </p>
         </div>
         <div>
           <DropdownMenu modal={false}>
@@ -402,16 +414,23 @@ export function VideoBlock({
         </div>
       </BlockHeader>
       <div>
-        <div className="bg-neutral-200 rounded overflow-hidden border border-black/20 aspect-video">
-          <ReactPlayer
-            width={"100%"}
-            height={"100%"}
-            url={
-              src
-                ? src
-                : "https://www.youtube.com/watch?v=BFhp7Y0iLSA&ab_channel=AbstractMotion"
-            }
+        <div className="py-4">
+          <input
+            type="text"
+            value={src ?? ""}
+            onChange={(e) => {
+              dispatch({
+                type: "blocks/video/src",
+                block_id: id,
+                src: e.target.value,
+              });
+            }}
+            className="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500"
+            placeholder="Video URL"
           />
+        </div>
+        <div className="bg-neutral-200 rounded overflow-hidden border border-black/20 aspect-video">
+          <ReactPlayer width={"100%"} height={"100%"} url={src ?? ""} />
         </div>
       </div>
     </FlatBlockBase>
