@@ -17,7 +17,8 @@ export type FormFieldType =
   | "color"
   | "radio"
   | "country"
-  | "payment";
+  | "payment"
+  | "hidden";
 
 export type PlatformPoweredBy = "api" | "grida_forms" | "web_client";
 
@@ -48,17 +49,40 @@ export interface FormFieldDefinition {
   }[];
 }
 
+export interface FormPage {
+  id: string;
+  form_id: string;
+  name: string;
+  blocks: FormBlock[];
+}
+
+export interface FormBlock<T = FormBlockType> {
+  id: string;
+  form_id: string;
+  form_field_id?: string | null;
+  form_page_id: string | null;
+  type: T;
+  title_html?: string | null;
+  description_html?: string | null;
+  body_html?: string | null;
+  src?: string | null;
+  data: any;
+  created_at: string;
+  parent_id?: string | null;
+  local_index: number;
+}
+
 export type FormBlockType =
   | "section"
+  | "field"
+  | "image"
+  | "video"
+  | "html"
+  | "divider"
   // not supported yet
-  | "group"
-  | "field";
-// not supported yet
-// | "markdown"
+  | "group";
 // not supported yet
 // | "layout"
-// not supported yet
-// | "divider";
 
 export interface FormResponse {
   browser: string | null;

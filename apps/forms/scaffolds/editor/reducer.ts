@@ -1,5 +1,5 @@
 import { produce } from "immer";
-import { FormEditorState } from "./state";
+import { EditorFlatFormBlock, FormEditorState } from "./state";
 import {
   BlocksEditorAction,
   ChangeBlockFieldAction,
@@ -9,6 +9,8 @@ import {
   DeleteSelectedResponsesAction,
   FeedResponseAction,
   FocusFieldAction,
+  HtmlBlockBodyAction,
+  ImageBlockSrcAction,
   OpenEditFieldAction,
   OpenResponseEditAction,
   ResolvePendingBlockAction,
@@ -16,8 +18,13 @@ import {
   SaveFieldAction,
   SelectResponse,
   SortBlockAction,
+  VideoBlockSrcAction,
 } from "./action";
 import { arrayMove } from "@dnd-kit/sortable";
+import { blockstreeflat } from "@/lib/forms/tree";
+import { HTML_BLOCK_BODY_HTML_DEFAULT_VALUE } from "@/k/html_block_defaults";
+import { VIDEO_BLOCK_SRC_DEFAULT_VALUE } from "@/k/video_block_defaults";
+import { IMAGE_BLOCK_SRC_DEFAULT_VALUE } from "@/k/image_block_defaults";
 
 export function reducer(
   state: FormEditorState,
@@ -30,6 +37,23 @@ export function reducer(
 
       const new_index = state.blocks.length;
 
+      // find the last parent section
+      const parent_section = state.blocks
+        .filter((block) => block.type === "section")
+        .sort((a, b) => b.local_index - a.local_index)[0];
+      const parent_id = parent_section?.id ?? null;
+
+      const __shared: EditorFlatFormBlock = {
+        id: "[draft]" + Math.random().toString(36).substring(7),
+        created_at: new Date().toISOString(),
+        form_id: state.form_id,
+        form_page_id: state.page_id,
+        parent_id: block === "section" ? null : parent_id,
+        type: block,
+        local_index: new_index,
+        data: {},
+      };
+
       switch (block) {
         case "field": {
           return produce(state, (draft) => {
@@ -39,12 +63,8 @@ export function reducer(
             const field_id = available_field_ids[0] ?? null;
 
             draft.blocks.push({
-              id: "[draft]" + Math.random().toString(36).substring(7),
+              ...__shared,
               form_field_id: field_id,
-              form_id: state.form_id,
-              type: block,
-              local_index: new_index,
-              data: {},
             });
 
             // remove the field id from available_field_ids
@@ -55,24 +75,86 @@ export function reducer(
         }
         case "section": {
           return produce(state, (draft) => {
+            const id = __shared.id;
+
+            // section can be placed on root only.
+            // if there were no section on root, the existing blocks should be nested under the new section.
+            const section_blocks = draft.blocks.filter(
+              (block) => block.type === "section" && block.parent_id === null
+            );
+
+            if (section_blocks.length === 0) {
+              draft.blocks.forEach((block) => {
+                block.parent_id = id;
+              });
+            }
+
+            const new_blocks = blockstreeflat(
+              draft.blocks.concat({
+                ...__shared,
+              })
+            );
+
+            draft.blocks = new_blocks;
+          });
+        }
+        case "html": {
+          return produce(state, (draft) => {
             draft.blocks.push({
-              id: "[draft]" + Math.random().toString(36).substring(7),
-              form_id: state.form_id,
-              local_index: new_index,
-              type: block,
-              data: {},
+              ...__shared,
+              body_html: HTML_BLOCK_BODY_HTML_DEFAULT_VALUE,
             });
           });
+        }
+        case "image": {
+          return produce(state, (draft) => {
+            draft.blocks.push({
+              ...__shared,
+              src: IMAGE_BLOCK_SRC_DEFAULT_VALUE,
+            });
+          });
+        }
+        case "video": {
+          return produce(state, (draft) => {
+            draft.blocks.push({
+              ...__shared,
+              src: VIDEO_BLOCK_SRC_DEFAULT_VALUE,
+            });
+          });
+        }
+        case "divider": {
+          return produce(state, (draft) => {
+            draft.blocks.push({
+              ...__shared,
+            });
+          });
+        }
+        default: {
+          throw new Error("Unsupported block type : " + block);
         }
       }
     }
     case "blocks/resolve": {
       const { block_id, block } = <ResolvePendingBlockAction>action;
+
+      const old_id = block_id;
+      const new_id = block.id;
+
       return produce(state, (draft) => {
         const index = draft.blocks.findIndex((b) => b.id === block_id);
         if (index !== -1) {
+          // update the whole block with the resolved block
           draft.blocks[index] = block;
         }
+
+        // when resolved, the id is updated to the real id.
+        // other references to previous id should be updated as well.
+        // currently we have only parent_id to update.
+        draft.blocks.forEach((b) => {
+          if (b.parent_id === old_id) {
+            b.parent_id = new_id;
+          }
+        });
       });
     }
     case "blocks/delete": {
@@ -108,17 +190,52 @@ export function reducer(
         }
       });
     }
+    case "blocks/html/body": {
+      const { block_id, html } = <HtmlBlockBodyAction>action;
+      return produce(state, (draft) => {
+        const block = draft.blocks.find((b) => b.id === block_id);
+        console.log("html block body", block_id, html);
+        if (block && block.type === "html") {
+          block.body_html = html;
+        }
+      });
+    }
+    case "blocks/image/src": {
+      const { block_id, src } = <ImageBlockSrcAction>action;
+      return produce(state, (draft) => {
+        const block = draft.blocks.find((b) => b.id === block_id);
+        if (block && block.type === "image") {
+          block.src = src;
+        }
+      });
+    }
+    case "blocks/video/src": {
+      const { block_id, src } = <VideoBlockSrcAction>action;
+      return produce(state, (draft) => {
+        const block = draft.blocks.find((b) => b.id === block_id);
+        if (block && block.type === "video") {
+          block.src = src;
+        }
+      });
+    }
     case "blocks/sort": {
       const { block_id, over_id } = <SortBlockAction>action;
       return produce(state, (draft) => {
         if (over_id === "root") {
+          const blockIndex = draft.blocks.findIndex(
+            (block) => block.id === block_id
+          );
+          if (blockIndex > -1) {
+            // DO NOT ALLOW THIS ACTION. this is not hanlded yet. (item exiting section)
+            // Assign to root if moved above the first section
+            // draft.blocks[blockIndex].parent_id = null;
+          }
           return;
         }
 
         const oldIndex = draft.blocks.findIndex(
           (block) => block.id === block_id
         );
-
         const newIndex = draft.blocks.findIndex(
           (block) => block.id === over_id
         );
@@ -131,8 +248,36 @@ export function reducer(
           ...block,
           local_index: index,
         }));
+
+        // Update parent_id based on the new position
+        const movedBlock = draft.blocks.find((block) => block.id === block_id);
+        if (movedBlock) {
+          // Find the nearest section/group above the moved block
+          let newParentId: string | null = null;
+          for (let i = newIndex - 1; i >= 0; i--) {
+            if (["section", "group"].includes(draft.blocks[i].type)) {
+              newParentId = draft.blocks[i].id;
+              break;
+            }
+          }
+
+          if (!newParentId) {
+            // DO NOT ALLOW PARENT ID TO BE NULL IF THERE IS A SECTION PRESENT.
+            const section = draft.blocks.find(
+              (block) => block.type === "section"
+            );
+            if (section) {
+              // BLOCK THIS ACTION
+              // revert the move
+              draft.blocks = arrayMove(draft.blocks, newIndex, oldIndex);
+              return;
+            }
+          }
+          movedBlock.parent_id = newParentId;
+        }
       });
     }
+
     case "editor/field/focus": {
       const { field_id } = <FocusFieldAction>action;
       return produce(state, (draft) => {
@@ -204,6 +349,7 @@ export function reducer(
       });
     }
     case "editor/response/delete/selected": {
+      const {} = <DeleteSelectedResponsesAction>action;
       return produce(state, (draft) => {
         const ids = Array.from(state.selected_responses);
 

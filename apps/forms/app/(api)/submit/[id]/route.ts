@@ -3,6 +3,8 @@ import { NextRequest, NextResponse } from "next/server";
 
 const SYSTEM_GF_KEY_STARTS_WITH = "__gf_";
 
+export const revalidate = 0;
+
 export async function GET(
   req: NextRequest,
   context: {
@@ -92,7 +94,8 @@ async function submit({
     return NextResponse.json({ error: "Form not found" }, { status: 404 });
   }
 
-  const { is_unknown_field_allowed, response_redirect_uri } = form_reference;
+  const { is_unknown_field_allowed, redirect_after_response_uri } =
+    form_reference;
 
   const entries = data.entries();
   const __keys = Array.from(data.keys());
@@ -248,8 +251,8 @@ async function submit({
     };
   }
 
-  if (response_redirect_uri) {
-    return NextResponse.redirect(response_redirect_uri, {
+  if (redirect_after_response_uri) {
+    return NextResponse.redirect(redirect_after_response_uri, {
       status: 301,
     });
   }

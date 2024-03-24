@@ -1,5 +1,5 @@
 import { FormBlockType, FormFieldDefinition, NewFormFieldInit } from "@/types";
-import type { EditorFormBlock } from "./state";
+import type { EditorFlatFormBlock } from "./state";
 
 export type BlocksEditorAction =
   | CreateNewPendingBlockAction
@@ -9,6 +9,9 @@ export type BlocksEditorAction =
   | SortBlockAction
   | FocusFieldAction
   | ChangeBlockFieldAction
+  | HtmlBlockBodyAction
+  | ImageBlockSrcAction
+  | VideoBlockSrcAction
   | SelectResponse
   | DeleteSelectedResponsesAction
   | SaveFieldAction
@@ -25,7 +28,7 @@ export interface CreateNewPendingBlockAction {
 export interface ResolvePendingBlockAction {
   type: "blocks/resolve";
   block_id: string;
-  block: EditorFormBlock;
+  block: EditorFlatFormBlock;
 }
 
 export interface DeleteBlockAction {
@@ -43,6 +46,23 @@ export interface ChangeBlockFieldAction {
   type: "blocks/field/change";
   block_id: string;
   field_id: string;
+}
+export interface HtmlBlockBodyAction {
+  type: "blocks/html/body";
+  block_id: string;
+  html: string;
+}
+
+export interface ImageBlockSrcAction {
+  type: "blocks/image/src";
+  block_id: string;
+  src: string;
+}
+
+export interface VideoBlockSrcAction {
+  type: "blocks/video/src";
+  block_id: string;
+  src: string;
 }
 
 export interface FocusFieldAction {

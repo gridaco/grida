@@ -19,6 +19,7 @@ import { capitalCase, snakeCase } from "change-case";
 import { LockClosedIcon } from "@radix-ui/react-icons";
 import { FormFieldAssistant } from "../ai/form-field-schema-assistant";
 import toast from "react-hot-toast";
+import { Select } from "@/components/select";
 
 const supported_field_types: FormFieldType[] = [
   "text",
@@ -35,6 +36,7 @@ const supported_field_types: FormFieldType[] = [
   "password",
   "color",
   "radio",
+  "hidden",
 ];
 
 // @ts-ignore
@@ -83,6 +85,7 @@ const default_field_init: {
       { label: "Option 3", value: "option3" },
     ],
   },
+  hidden: { type: "hidden" },
 };
 
 const input_can_have_options: FormFieldType[] = ["select", "radio"];
@@ -95,13 +98,15 @@ export function FieldEditPanel({
   onSave,
   formResetKey = 0,
   init,
-  disableAI,
+  enableAI,
+  mode = "edit",
   ...props
 }: React.ComponentProps<typeof SidePanel> & {
   title?: string;
   formResetKey?: number;
   init?: Partial<NewFormFieldInit>;
-  disableAI?: boolean;
+  mode?: "edit" | "new";
+  enableAI?: boolean;
   onSave?: (field: NewFormFieldInit) => void;
 }) {
   const [effect_cause, set_effect_cause] = useState<"ai" | "human" | "system">(
@@ -223,7 +228,7 @@ export function FieldEditPanel({
             </div>
           </PanelPropertyFields>
         </PanelPropertySection>
-        {!disableAI && (
+        {enableAI && (
           <PanelPropertySection grid={false}>
             <FormFieldAssistant onSuggestion={onSuggestion} />
           </PanelPropertySection>
@@ -233,7 +238,7 @@ export function FieldEditPanel({
             <PanelPropertySectionTitle>Field</PanelPropertySectionTitle>
             <PanelPropertyFields>
               <PanelPropertyField label={"Type"}>
-                <select
+                <Select
                   value={type}
                   onChange={(e) => {
                     set_effect_cause("human");
@@ -245,7 +250,7 @@ export function FieldEditPanel({
                       {type}
                     </option>
                   ))}
-                </select>
+                </Select>
               </PanelPropertyField>
               <PanelPropertyField
                 label={
@@ -258,7 +263,7 @@ export function FieldEditPanel({
               >
                 <PropertyTextInput
                   required
-                  autoFocus
+                  autoFocus={mode === "edit"}
                   placeholder={"field_name"}
                   value={name}
                   onChange={(e) => setName(e.target.value)}

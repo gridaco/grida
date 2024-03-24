@@ -2,7 +2,7 @@ import BlocksEditor from "@/scaffolds/blocks-editor";
 
 export default async function EditFormPage() {
   return (
-    <main className="p-4 container mx-auto">
+    <main className="py-4 px-8 md:py-10 md:px-16 container mx-auto max-w-screen-lg">
       <BlocksEditor />
     </main>
   );
