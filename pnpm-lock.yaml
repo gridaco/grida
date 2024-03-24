@@ -262,6 +262,9 @@ importers:
       change-case:
         specifier: ^5.4.3
         version: 5.4.3
+      classnames:
+        specifier: ^2.5.1
+        version: 2.5.1
       csv-stringify:
         specifier: ^6.4.6
         version: 6.4.6
