@@ -92,18 +92,7 @@ const PricingComparisonTable = () => {
               priceDescription={"/month"}
               description={"Perfect for hobby projects and experiments"}
             />
-            <PricingTableRowMobile
-              category={pricing.database}
-              plan={"free"}
-              icon={<>icon</>}
-              sectionId="database"
-            />
-            <PricingTableRowMobile
-              category={pricing.auth}
-              plan={"free"}
-              icon={<>icon</>}
-              sectionId="auth"
-            />
+
             <PricingTableRowMobile
               category={pricing.storage}
               plan={"free"}
@@ -111,34 +100,28 @@ const PricingComparisonTable = () => {
               sectionId="storage"
             />
             <PricingTableRowMobile
-              category={pricing.realtime}
+              category={pricing.highlight}
               plan={"free"}
-              icon={<>icon</>}
-              sectionId="realtime"
+              icon={pricing.highlight.icon}
+              sectionId="highlight"
             />
             <PricingTableRowMobile
-              category={pricing["edge_functions"]}
+              category={pricing.integrations}
               plan={"free"}
-              icon={<>icon</>}
-              sectionId="edge-functions"
-            />
-            <PricingTableRowMobile
-              category={pricing.dashboard}
-              plan={"free"}
-              icon={pricing.dashboard.icon}
-              sectionId="dashboard"
-            />
-            <PricingTableRowMobile
-              category={pricing.security}
-              plan={"free"}
-              icon={pricing.security.icon}
-              sectionId="security"
+              icon={pricing.integrations.icon}
+              sectionId="integrations"
             />
             <PricingTableRowMobile
               category={pricing.support}
               plan={"free"}
               icon={pricing.support.icon}
               sectionId="support"
+            />
+            <PricingTableRowMobile
+              category={pricing.commingsoon}
+              plan={"free"}
+              icon={pricing.commingsoon.icon}
+              sectionId="commingsoon"
             />
           </>
         )}
@@ -154,45 +137,31 @@ const PricingComparisonTable = () => {
                 "Everything you need to scale your project into production"
               }
             />
-            <PricingTableRowMobile
-              category={pricing.database}
-              plan={"pro"}
-              icon={<>icon</>}
-            />
-            <PricingTableRowMobile
-              category={pricing.auth}
-              plan={"pro"}
-              icon={<>icon</>}
-            />
+
             <PricingTableRowMobile
               category={pricing.storage}
               plan={"pro"}
               icon={<>icon</>}
             />
             <PricingTableRowMobile
-              category={pricing.realtime}
+              category={pricing.highlight}
               plan={"pro"}
-              icon={<>icon</>}
+              icon={pricing.highlight.icon}
             />
             <PricingTableRowMobile
-              category={pricing["edge_functions"]}
+              category={pricing.integrations}
               plan={"pro"}
-              icon={<>icon</>}
-            />
-            <PricingTableRowMobile
-              category={pricing.dashboard}
-              plan={"pro"}
-              icon={pricing.dashboard.icon}
-            />
-            <PricingTableRowMobile
-              category={pricing.security}
-              plan={"pro"}
-              icon={pricing.security.icon}
+              icon={pricing.integrations.icon}
             />
             <PricingTableRowMobile
               category={pricing.support}
               plan={"pro"}
               icon={pricing.support.icon}
+            />
+            <PricingTableRowMobile
+              category={pricing.commingsoon}
+              plan={"pro"}
+              icon={pricing.commingsoon.icon}
             />
           </>
         )}
@@ -208,45 +177,31 @@ const PricingComparisonTable = () => {
                 "Collaborate with different permissions and access patterns"
               }
             />
-            <PricingTableRowMobile
-              category={pricing.database}
-              plan={"team"}
-              icon={<>icon</>}
-            />
-            <PricingTableRowMobile
-              category={pricing.auth}
-              plan={"team"}
-              icon={<>icon</>}
-            />
+
             <PricingTableRowMobile
               category={pricing.storage}
               plan={"team"}
               icon={<>icon</>}
             />
             <PricingTableRowMobile
-              category={pricing.realtime}
+              category={pricing.highlight}
               plan={"team"}
-              icon={<>icon</>}
+              icon={pricing.highlight.icon}
             />
             <PricingTableRowMobile
-              category={pricing["edge_functions"]}
+              category={pricing.integrations}
               plan={"team"}
-              icon={<>icon</>}
-            />
-            <PricingTableRowMobile
-              category={pricing.dashboard}
-              plan={"team"}
-              icon={pricing.dashboard.icon}
-            />
-            <PricingTableRowMobile
-              category={pricing.security}
-              plan={"team"}
-              icon={pricing.security.icon}
+              icon={pricing.integrations.icon}
             />
             <PricingTableRowMobile
               category={pricing.support}
               plan={"team"}
               icon={pricing.support.icon}
+            />
+            <PricingTableRowMobile
+              category={pricing.commingsoon}
+              plan={"team"}
+              icon={pricing.commingsoon.icon}
             />
           </>
         )}
@@ -262,45 +217,31 @@ const PricingComparisonTable = () => {
               }
               showDollarSign={false}
             />
-            <PricingTableRowMobile
-              category={pricing.database}
-              plan={"enterprise"}
-              icon={<>icon</>}
-            />
-            <PricingTableRowMobile
-              category={pricing.auth}
-              plan={"enterprise"}
-              icon={<>icon</>}
-            />
+
             <PricingTableRowMobile
               category={pricing.storage}
               plan={"enterprise"}
               icon={<>icon</>}
             />
             <PricingTableRowMobile
-              category={pricing.realtime}
+              category={pricing.highlight}
               plan={"enterprise"}
-              icon={<>icon</>}
+              icon={pricing.highlight.icon}
             />
             <PricingTableRowMobile
-              category={pricing["edge_functions"]}
+              category={pricing.integrations}
               plan={"enterprise"}
-              icon={<>icon</>}
-            />
-            <PricingTableRowMobile
-              category={pricing.dashboard}
-              plan={"enterprise"}
-              icon={pricing.dashboard.icon}
-            />
-            <PricingTableRowMobile
-              category={pricing.security}
-              plan={"enterprise"}
-              icon={pricing.security.icon}
+              icon={pricing.integrations.icon}
             />
             <PricingTableRowMobile
               category={pricing.support}
               plan={"enterprise"}
               icon={pricing.support.icon}
+            />
+            <PricingTableRowMobile
+              category={pricing.commingsoon}
+              plan={"enterprise"}
+              icon={pricing.commingsoon.icon}
             />
           </>
         )}
@@ -363,44 +304,29 @@ const PricingComparisonTable = () => {
           </thead>
           <tbody className="border-default divide-border divide-y first:divide-y-0">
             <PricingTableRowDesktop
-              category={pricing.database}
-              icon={<>icon</>}
-              sectionId="database"
-            />
-            <PricingTableRowDesktop
-              category={pricing.auth}
-              icon={<>icon</>}
-              sectionId="auth"
-            />
-            <PricingTableRowDesktop
               category={pricing.storage}
               icon={<>icon</>}
               sectionId="storage"
             />
             <PricingTableRowDesktop
-              category={pricing.realtime}
-              icon={<>icon</>}
-              sectionId="realtime"
+              category={pricing.highlight}
+              icon={pricing.highlight.icon}
+              sectionId="highlight"
             />
             <PricingTableRowDesktop
-              category={pricing["edge_functions"]}
-              icon={<>icon</>}
-              sectionId="edge-functions"
-            />
-            <PricingTableRowDesktop
-              category={pricing.dashboard}
-              icon={pricing.dashboard.icon}
-              sectionId="dashboard"
-            />
-            <PricingTableRowDesktop
-              category={pricing.security}
-              icon={pricing.security.icon}
-              sectionId="security"
+              category={pricing.integrations}
+              icon={pricing.integrations.icon}
+              sectionId="integrations"
             />
             <PricingTableRowDesktop
               category={pricing.support}
               icon={pricing.support.icon}
               sectionId="support"
+            />
+            <PricingTableRowDesktop
+              category={pricing.commingsoon}
+              icon={pricing.commingsoon.icon}
+              sectionId="commingsoon"
             />
           </tbody>
         </table>
