@@ -58,6 +58,7 @@ export function FormFieldAssistant({
         <span className="font-semibold text-gray-800">Ask AI</span>
       </div>
       <textarea
+        autoFocus
         className="w-full p-2 border-gray-300 focus:border-blue-500 focus:ring-blue-500 rounded-lg shadow-sm"
         value={description}
         placeholder="Describe the field..."

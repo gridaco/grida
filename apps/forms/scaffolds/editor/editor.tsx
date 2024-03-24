@@ -232,7 +232,8 @@ function FieldEditPanelProvider({ children }: React.PropsWithChildren<{}>) {
         key={field?.name || state.field_edit_panel_refresh_key}
         open={state.is_field_edit_panel_open}
         title={is_existing_field ? "Edit Field" : "New Field"}
-        disableAI={is_existing_field}
+        enableAI={!is_existing_field}
+        mode={is_existing_field ? "edit" : "new"}
         formResetKey={state.field_edit_panel_refresh_key}
         init={
           field

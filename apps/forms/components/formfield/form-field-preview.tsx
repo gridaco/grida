@@ -1,5 +1,6 @@
 import { FormFieldType } from "@/types";
 import React, { useEffect } from "react";
+import { Select } from "../select";
 
 export function FormFieldPreview({
   name,
@@ -58,13 +59,13 @@ export function FormFieldPreview({
       }
       case "select": {
         return (
-          <select {...(sharedInputProps as React.ComponentProps<"select">)}>
+          <Select {...(sharedInputProps as React.ComponentProps<"select">)}>
             {options?.map((option) => (
               <option key={option.value} value={option.value}>
                 {option.label}
               </option>
             ))}
-          </select>
+          </Select>
         );
       }
       case "color": {
@@ -109,8 +110,12 @@ export function FormFieldPreview({
     }
   }
 
+  if (type === "hidden") {
+    return <input type="hidden" name={name} />;
+  }
+
   return (
-    <label data-field-type={type} className="flex flex-col">
+    <label data-field-type={type} className="flex flex-col gap-1">
       <span
         data-capitalize={labelCapitalize}
         className="data-[capitalize]:capitalize"

@@ -295,6 +295,9 @@ importers:
       react-hot-toast:
         specifier: ^2.4.0
         version: 2.4.1(csstype@3.1.0)(react-dom@18.2.0)(react@18.2.0)
+      react-player:
+        specifier: ^2.14.1
+        version: 2.15.1(react@18.2.0)
       three:
         specifier: ^0.150.1
         version: 0.150.1

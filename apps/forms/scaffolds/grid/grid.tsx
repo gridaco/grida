@@ -1,9 +1,6 @@
 "use client";
 
 import React, { useEffect, useRef, useState } from "react";
-import "react-data-grid/lib/styles.css";
-import "./grid.css";
-
 import DataGrid, {
   Column,
   RenderCellProps,
@@ -41,6 +38,7 @@ import { JsonEditCell } from "./json-cell";
 import { useEditorState } from "../editor";
 import { GFRow } from "./types";
 import { SelectColumn } from "./select-column";
+import "./grid.css";
 
 function rowKeyGetter(row: GFRow) {
   return row.__gf_id;
@@ -261,6 +259,8 @@ function FormFieldTypeIcon({ type }: { type: FormFieldType }) {
       return <EyeClosedIcon />;
     case "color":
       return <ColorWheelIcon />;
+    case "hidden":
+      return <EyeClosedIcon />;
     default:
       return <TextIcon />;
   }

@@ -12,6 +12,7 @@ import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import { GoogleAnalytics } from "@next/third-parties/google";
 import "../../../editor.css";
+import { FormPage } from "@/types";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -41,7 +42,10 @@ export default async function Layout({
           *,
           options:form_field_option(*)
         ),
-        blocks:form_block(*)
+        default_page:form_page!default_form_page_id(
+          *,
+          blocks:form_block(*)
+        )
       `
     )
     .eq("id", id)
@@ -76,7 +80,7 @@ export default async function Layout({
               <Tabs form_id={id} />
             </div>
             <div className="w-1/3 flex gap-4 items-center justify-end">
-              <Link href={"preview"} target="_blank">
+              <Link href={`/d/${id}/preview`} target="_blank">
                 <button
                   className="p-2 h-10 w-10 rounded bg-neutral-200"
                   title="Preview"
@@ -95,8 +99,14 @@ export default async function Layout({
           <FormEditorProvider
             initial={{
               form_id: id,
+              form_title: data.title,
+              page_id: data.default_form_page_id,
               fields: data.fields,
-              blocks: data.blocks,
+              blocks: data.default_page
+                ? // there's a bug with supabase typegen, where the default_page will not be a array, but cast it to array.
+                  // it's safe to assume as non array.
+                  (data.default_page as unknown as FormPage).blocks || []
+                : [],
             }}
           >
             {children}

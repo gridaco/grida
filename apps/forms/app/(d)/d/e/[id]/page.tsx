@@ -17,7 +17,17 @@ export default async function FormPage({ params }: { params: { id: string } }) {
     return notFound();
   }
 
-  const { title, blocks } = data;
+  const { title, blocks, tree, fields } = data;
 
-  return <Form form_id={id} title={title} blocks={blocks} />;
+  return (
+    <div className="min-h-screen p-4">
+      <Form
+        form_id={id}
+        title={title}
+        fields={fields}
+        blocks={blocks}
+        tree={tree}
+      />
+    </div>
+  );
 }
