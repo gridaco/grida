@@ -136,7 +136,7 @@ export function Form({
   };
 
   return (
-    <main className="container mx-auto prose">
+    <main className="container mx-auto min-h-screen prose p-4 dark:prose-invert">
       {/* <header>
         <h1 className="py-10 text-4xl font-bold">{title}</h1>
       </header> */}
