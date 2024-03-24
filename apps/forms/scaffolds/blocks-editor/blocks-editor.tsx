@@ -1,9 +1,19 @@
 "use client";
 
 import React, { useCallback, useEffect, useId, useRef } from "react";
-import { type EditorFormBlock, DRAFT_ID_START_WITH } from "../editor/state";
+import { type EditorFlatFormBlock, DRAFT_ID_START_WITH } from "../editor/state";
 import { useEditorState } from "../editor";
-import { PlusIcon } from "@radix-ui/react-icons";
+import {
+  CodeIcon,
+  DividerHorizontalIcon,
+  HeadingIcon,
+  ImageIcon,
+  PlusCircledIcon,
+  PlusIcon,
+  SectionIcon,
+  TextIcon,
+  VideoIcon,
+} from "@radix-ui/react-icons";
 import {
   DndContext,
   PointerSensor,
@@ -26,6 +36,7 @@ import {
 } from "@dnd-kit/sortable";
 import { createClientClient } from "@/lib/supabase/client";
 import toast from "react-hot-toast";
+import { FormBlockType } from "@/types";
 
 export default function BlocksEditorRoot() {
   return (
@@ -77,7 +88,7 @@ function PendingBlocksResolver() {
   const supabase = createClientClient();
 
   const insertBlock = useCallback(
-    async (block: EditorFormBlock) => {
+    async (block: EditorFlatFormBlock) => {
       //
       const { data } = await supabase
         .from("form_block")
@@ -85,15 +96,21 @@ function PendingBlocksResolver() {
           data: {},
           form_id: state.form_id,
           type: block.type,
+          form_page_id: state.page_id,
+          parent_id: block.parent_id?.startsWith(DRAFT_ID_START_WITH)
+            ? null
+            : block.parent_id,
           local_index: block.local_index,
           form_field_id: block.form_field_id,
+          body_html: block.body_html,
+          src: block.src,
         })
         .select()
         .single();
 
       return data;
     },
-    [state.form_id, supabase]
+    [state.form_id, state.page_id, supabase]
   );
 
   useEffect(() => {
@@ -124,7 +141,9 @@ function PendingBlocksResolver() {
   return <></>;
 }
 
-function useSyncBlocks(blocks: EditorFormBlock[]) {
+function useSyncBlocks(blocks: EditorFlatFormBlock[]) {
+  // TODO: add debounce
+
   const supabase = createClientClient();
   const prevBlocksRef = useRef(blocks);
 
@@ -135,8 +154,15 @@ function useSyncBlocks(blocks: EditorFormBlock[]) {
       return (
         !prevBlock ||
         block.type !== prevBlock.type ||
+        (block.parent_id !== prevBlock.parent_id &&
+          // exclude from sync if parent_id is a draft (this can happen when a new section is created and blocks are assigned to it)
+          !block.parent_id?.startsWith(DRAFT_ID_START_WITH)) ||
         block.local_index !== prevBlock.local_index ||
-        block.form_field_id !== prevBlock.form_field_id
+        block.form_field_id !== prevBlock.form_field_id ||
+        block.title_html !== prevBlock.title_html ||
+        block.description_html !== prevBlock.description_html ||
+        block.body_html !== prevBlock.body_html ||
+        block.src !== prevBlock.src
       );
     });
 
@@ -147,8 +173,14 @@ function useSyncBlocks(blocks: EditorFormBlock[]) {
           .update({
             // Assuming these are the fields to update
             type: block.type,
+            parent_id: block.parent_id,
             local_index: block.local_index,
             form_field_id: block.form_field_id,
+            title_html: block.title_html,
+            description_html: block.description_html,
+            body_html: block.body_html,
+            src: block.src,
+            updated_at: new Date().toISOString(),
           })
           .eq("id", block.id)
           .single();
@@ -185,19 +217,23 @@ function OptimisticBlocksSyncProvider({
 function BlocksEditor() {
   const [state, dispatch] = useEditorState();
 
-  const addSectionBlock = useCallback(() => {
-    dispatch({
-      type: "blocks/new",
-      block: "section",
-    });
-  }, [dispatch]);
+  const addBlock = useCallback(
+    (block: FormBlockType) => {
+      dispatch({
+        type: "blocks/new",
+        block: block,
+      });
+    },
+    [dispatch]
+  );
 
-  const addFieldBlock = useCallback(() => {
-    dispatch({
-      type: "blocks/new",
-      block: "field",
-    });
-  }, [dispatch]);
+  const addSectionBlock = useCallback(() => addBlock("section"), [addBlock]);
+  const addFieldBlock = useCallback(() => addBlock("field"), [addBlock]);
+  const addHtmlBlock = useCallback(() => addBlock("html"), [addBlock]);
+  const addDividerBlock = useCallback(() => addBlock("divider"), [addBlock]);
+  const addHeaderBlock = useCallback(() => addBlock("header"), [addBlock]);
+  const addImageBlock = useCallback(() => addBlock("image"), [addBlock]);
+  const addVideoBlock = useCallback(() => addBlock("video"), [addBlock]);
 
   return (
     <div>
@@ -211,16 +247,40 @@ function BlocksEditor() {
         </DropdownMenuTrigger>
         <DropdownMenuPortal>
           <DropdownMenuContent className="z-50">
+            <DropdownMenuItem onClick={addFieldBlock}>
+              <PlusCircledIcon />
+              Field
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={addImageBlock}>
+              <ImageIcon />
+              Image
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={addVideoBlock}>
+              <VideoIcon />
+              Video
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={addHtmlBlock}>
+              <CodeIcon />
+              HTML
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={addDividerBlock}>
+              <DividerHorizontalIcon />
+              Divider
+            </DropdownMenuItem>
             <DropdownMenuItem onClick={addSectionBlock}>
+              <SectionIcon />
               Section
             </DropdownMenuItem>
-            <DropdownMenuItem onClick={addFieldBlock}>Field</DropdownMenuItem>
+            <DropdownMenuItem onClick={addHeaderBlock}>
+              <HeadingIcon />
+              Header
+            </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenuPortal>
       </DropdownMenu>
-      <BlocksCanvas className="flex flex-col gap-4 mt-10">
+      <BlocksCanvas id="root" className="flex flex-col gap-4 mt-10">
         <SortableContext
-          items={state.blocks.map((block) => block.id)}
+          items={state.blocks.map((b) => b.id)}
           strategy={verticalListSortingStrategy}
         >
           {state.blocks.map((block) => {

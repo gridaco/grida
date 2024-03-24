@@ -26,6 +26,7 @@ const formFieldTypes = [
   "radio",
   "country",
   "payment",
+  "hidden",
 ];
 
 const interface_txt = `
@@ -41,7 +42,7 @@ export type NewFormFieldInit = {
   pattern?: string; // Regular expression pattern for validation (for html input pattern attribute)
 };
 
-export type FormFieldType = | "text" | "textarea" | "tel" | "url" | "checkbox" | "number" | "date" | "month" | "week" | "email" | "file" | "image" | "select" | "latlng" | "password" | "color" | "radio" | "country" | "payment";
+export type FormFieldType = | "text" | "textarea" | "tel" | "url" | "checkbox" | "number" | "date" | "month" | "week" | "email" | "file" | "image" | "select" | "latlng" | "password" | "color" | "radio" | "country" | "payment" | "hidden";
 \`\`\`
 `;
 
