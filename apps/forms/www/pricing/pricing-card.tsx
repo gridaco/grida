@@ -19,10 +19,12 @@ export function PricingCard({
     <div
       data-inverted={inverted}
       className="
-        flex-1 flex flex-col p-7 bg-neutral-900 border border-neutral-500/50 gap-8 rounded-lg
+        bg-neutral-50
+        flex-1 flex flex-col p-7 dark:bg-neutral-900 border border-neutral-500/10 dark:border-neutral-500/50 gap-8 rounded-lg
         data-[inverted='true']:invert
         hover:scale-[1.02]
         transition-all
+
         "
     >
       <div className="flex flex-col gap-1">
