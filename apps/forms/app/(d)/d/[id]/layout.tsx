@@ -80,7 +80,7 @@ export default async function Layout({
               <Tabs form_id={id} />
             </div>
             <div className="w-1/3 flex gap-4 items-center justify-end">
-              <Link href={"preview"} target="_blank">
+              <Link href={`/d/${id}/preview`} target="_blank">
                 <button
                   className="p-2 h-10 w-10 rounded bg-neutral-200"
                   title="Preview"
