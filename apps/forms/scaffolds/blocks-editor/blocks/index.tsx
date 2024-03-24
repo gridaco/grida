@@ -4,6 +4,7 @@ import { useEditorState } from "../../editor/provider";
 import { FormFieldDefinition } from "@/types";
 import {
   CodeIcon,
+  DividerHorizontalIcon,
   DotsHorizontalIcon,
   DragHandleHorizontalIcon,
   ImageIcon,
@@ -82,6 +83,8 @@ export function Block(props: EditorFlatFormBlock) {
         return <ImageBlock {...props} />;
       case "video":
         return <VideoBlock {...props} />;
+      case "divider":
+        return <DividerBlock {...props} />;
       default:
         return <div>Unsupported block type: {props.type}</div>;
     }
@@ -506,8 +509,51 @@ export function HtmlBlock({ id, body_html }: EditorFlatFormBlock) {
             options={{
               padding: { top: 10, bottom: 10 },
               minimap: { enabled: false },
+              scrollBeyondLastLine: false,
             }}
           />
+        </div>
+      </div>
+    </FlatBlockBase>
+  );
+}
+
+export function DividerBlock({ id }: EditorFlatFormBlock) {
+  const deleteBlock = useDeleteBlock();
+
+  return (
+    <FlatBlockBase
+      // TODO: add syntax validation
+      invalid={false}
+    >
+      <BlockHeader>
+        <div className="flex flex-row items-center gap-8">
+          <div className="flex flex-col gap-1">
+            <span className="flex flex-row gap-2 items-center">
+              <DividerHorizontalIcon />
+              Divider
+            </span>
+          </div>
+        </div>
+        <div>
+          <DropdownMenu modal={false}>
+            <DropdownMenuTrigger asChild>
+              <button>
+                <DotsHorizontalIcon />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent>
+              <DropdownMenuItem onClick={() => deleteBlock(id)}>
+                <TrashIcon />
+                Delete Block
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+      </BlockHeader>
+      <div>
+        <div className="bg-neutral-200 rounded overflow-hidden border border-black/20 aspect-auto">
+          <hr />
         </div>
       </div>
     </FlatBlockBase>

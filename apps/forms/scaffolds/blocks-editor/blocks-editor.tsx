@@ -5,6 +5,7 @@ import { type EditorFlatFormBlock, DRAFT_ID_START_WITH } from "../editor/state";
 import { useEditorState } from "../editor";
 import {
   CodeIcon,
+  DividerHorizontalIcon,
   ImageIcon,
   PlusCircledIcon,
   PlusIcon,
@@ -225,6 +226,7 @@ function BlocksEditor() {
   const addSectionBlock = useCallback(() => addBlock("section"), [addBlock]);
   const addFieldBlock = useCallback(() => addBlock("field"), [addBlock]);
   const addHtmlBlock = useCallback(() => addBlock("html"), [addBlock]);
+  const addDividerBlock = useCallback(() => addBlock("divider"), [addBlock]);
   const addImageBlock = useCallback(() => addBlock("image"), [addBlock]);
   const addVideoBlock = useCallback(() => addBlock("video"), [addBlock]);
 
@@ -255,6 +257,10 @@ function BlocksEditor() {
             <DropdownMenuItem onClick={addHtmlBlock}>
               <CodeIcon />
               HTML
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={addDividerBlock}>
+              <DividerHorizontalIcon />
+              Divider
             </DropdownMenuItem>
             <DropdownMenuItem onClick={addSectionBlock}>
               <SectionIcon />

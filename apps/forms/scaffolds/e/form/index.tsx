@@ -54,7 +54,6 @@ export function Form({
       case "html": {
         return (
           <article
-            className="prose"
             key={block.id}
             dangerouslySetInnerHTML={{ __html: block.html }}
           />
@@ -76,14 +75,15 @@ export function Form({
           </div>
         );
       }
-
+      case "divider":
+        return <hr key={block.id} />;
       default:
-        return <div key={block.id}></div>;
+        return <div key={block["id"]}></div>;
     }
   };
 
   return (
-    <main className="p-4 container mx-auto min-h-screen">
+    <main className="p-4 container mx-auto min-h-screen prose">
       <header>
         <h1 className="py-10 text-4xl font-bold">{title}</h1>
       </header>

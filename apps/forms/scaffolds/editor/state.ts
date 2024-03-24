@@ -1,5 +1,10 @@
 import { blockstreeflat } from "@/lib/forms/tree";
-import type { FormBlock, FormFieldDefinition, FormResponse } from "@/types";
+import type {
+  FormBlock,
+  FormBlockType,
+  FormFieldDefinition,
+  FormResponse,
+} from "@/types";
 
 export type DraftID = `[draft]${string}`;
 export const DRAFT_ID_START_WITH = "[draft]";
@@ -52,6 +57,6 @@ export interface FormEditorState {
   field_edit_panel_refresh_key?: number;
 }
 
-export interface EditorFlatFormBlock extends FormBlock {
+export interface EditorFlatFormBlock<T = FormBlockType> extends FormBlock<T> {
   id: string | DraftID;
 }

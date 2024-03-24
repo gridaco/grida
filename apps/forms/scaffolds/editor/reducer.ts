@@ -122,6 +122,13 @@ export function reducer(
             });
           });
         }
+        case "divider": {
+          return produce(state, (draft) => {
+            draft.blocks.push({
+              ...__shared,
+            });
+          });
+        }
         default: {
           throw new Error("Unsupported block type : " + block);
         }

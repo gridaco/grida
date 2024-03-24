@@ -111,7 +111,7 @@ export function FormFieldPreview({
   }
 
   return (
-    <label data-field-type={type} className="flex flex-col">
+    <label data-field-type={type} className="flex flex-col gap-1">
       <span
         data-capitalize={labelCapitalize}
         className="data-[capitalize]:capitalize"

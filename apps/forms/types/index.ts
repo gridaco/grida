@@ -55,12 +55,12 @@ export interface FormPage {
   blocks: FormBlock[];
 }
 
-export interface FormBlock {
+export interface FormBlock<T = FormBlockType> {
   id: string;
   form_id: string;
   form_field_id?: string | null;
   form_page_id: string | null;
-  type: FormBlockType;
+  type: T;
   title_html?: string | null;
   description_html?: string | null;
   body_html?: string | null;

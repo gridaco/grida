@@ -164,6 +164,7 @@ export async function GET(
             parent_id: block.parent_id,
           };
         }
+        case "divider":
         default: {
           return <BaseRenderBlock>{
             id: block.id,
