@@ -11,6 +11,7 @@ import { ImageBlock } from "./image-block";
 import { VideoBlock } from "./video-block";
 import { DividerBlock } from "./divider-block";
 import { HeaderBlock } from "./header-block";
+import { PdfBlock } from "./pdf-block";
 
 export function BlocksCanvas({
   children,
@@ -61,6 +62,8 @@ export function Block(props: EditorFlatFormBlock) {
         return <ImageBlock {...props} />;
       case "video":
         return <VideoBlock {...props} />;
+      case "pdf":
+        return <PdfBlock {...props} />;
       case "divider":
         return <DividerBlock {...props} />;
       case "header":

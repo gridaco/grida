@@ -27,6 +27,7 @@ import { blockstreeflat } from "@/lib/forms/tree";
 import { HTML_BLOCK_BODY_HTML_DEFAULT_VALUE } from "@/k/html_block_defaults";
 import { VIDEO_BLOCK_SRC_DEFAULT_VALUE } from "@/k/video_block_defaults";
 import { IMAGE_BLOCK_SRC_DEFAULT_VALUE } from "@/k/image_block_defaults";
+import { PDF_BLOCK_SRC_DEFAULT_VALUE } from "@/k/pdf_block_defaults";
 
 export function reducer(
   state: FormEditorState,
@@ -132,6 +133,14 @@ export function reducer(
             draft.blocks.push({
               ...__shared,
               src: VIDEO_BLOCK_SRC_DEFAULT_VALUE,
+            });
+          });
+        }
+        case "pdf": {
+          return produce(state, (draft) => {
+            draft.blocks.push({
+              ...__shared,
+              src: PDF_BLOCK_SRC_DEFAULT_VALUE,
             });
           });
         }

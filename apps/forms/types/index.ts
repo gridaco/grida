@@ -81,6 +81,7 @@ export type FormBlockType =
   | "html"
   | "divider"
   | "header"
+  | "pdf"
   // not supported yet
   | "group";
 // not supported yet

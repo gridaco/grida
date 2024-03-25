@@ -10,6 +10,7 @@ import {
   ImageIcon,
   PlusCircledIcon,
   PlusIcon,
+  ReaderIcon,
   SectionIcon,
   TextIcon,
   VideoIcon,
@@ -235,6 +236,7 @@ function BlocksEditor() {
   const addHeaderBlock = useCallback(() => addBlock("header"), [addBlock]);
   const addImageBlock = useCallback(() => addBlock("image"), [addBlock]);
   const addVideoBlock = useCallback(() => addBlock("video"), [addBlock]);
+  const addPdfBlock = useCallback(() => addBlock("pdf"), [addBlock]);
 
   return (
     <div>
@@ -263,6 +265,10 @@ function BlocksEditor() {
             <DropdownMenuItem onClick={addHtmlBlock}>
               <CodeIcon />
               HTML
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={addPdfBlock}>
+              <ReaderIcon />
+              Pdf
             </DropdownMenuItem>
             <DropdownMenuItem onClick={addDividerBlock}>
               <DividerHorizontalIcon />
