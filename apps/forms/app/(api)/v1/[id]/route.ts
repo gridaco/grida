@@ -26,7 +26,8 @@ export type ClientRenderBlock =
   | ClientImageRenderBlock
   | ClientVideoRenderBlock
   | ClientDividerRenderBlock
-  | ClientHeaderRenderBlock;
+  | ClientHeaderRenderBlock
+  | ClientPdfRenderBlock;
 
 interface BaseRenderBlock {
   id: string;
@@ -74,6 +75,11 @@ interface ClientImageRenderBlock extends BaseRenderBlock {
 interface ClientVideoRenderBlock extends BaseRenderBlock {
   type: "video";
   src: string;
+}
+
+interface ClientPdfRenderBlock extends BaseRenderBlock {
+  type: "pdf";
+  data: string;
 }
 
 interface ClientDividerRenderBlock extends BaseRenderBlock {
@@ -177,6 +183,16 @@ export async function GET(
             id: block.id,
             type: block.type,
             src: block.src,
+            local_index: block.local_index,
+            parent_id: block.parent_id,
+          };
+        }
+        case "pdf": {
+          return <ClientPdfRenderBlock>{
+            id: block.id,
+            type: "pdf",
+            // for pdf, as the standard is <object> we use data instead of src
+            data: block.src,
             local_index: block.local_index,
             parent_id: block.parent_id,
           };
