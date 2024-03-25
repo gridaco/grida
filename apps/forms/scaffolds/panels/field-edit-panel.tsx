@@ -254,7 +254,7 @@ export function FieldEditPanel({
               </PanelPropertyField>
             </PanelPropertyFields>
           </PanelPropertySection>
-          <PanelPropertySection>
+          <PanelPropertySection hidden={type == "payment"}>
             <PanelPropertySectionTitle>General</PanelPropertySectionTitle>
             <PanelPropertyFields>
               <PanelPropertyField
@@ -298,20 +298,18 @@ export function FieldEditPanel({
               )}
             </PanelPropertyFields>
           </PanelPropertySection>
-          {has_options && (
-            <PanelPropertySection>
-              <PanelPropertySectionTitle>Options</PanelPropertySectionTitle>
-              <PanelPropertyFields>
-                {/*  */}
-                {options?.map((option, index) => (
-                  <p key={index}>
-                    {option.label} - {option.value}
-                  </p>
-                ))}
-              </PanelPropertyFields>
-            </PanelPropertySection>
-          )}
-          <PanelPropertySection>
+          <PanelPropertySection hidden={!has_options}>
+            <PanelPropertySectionTitle>Options</PanelPropertySectionTitle>
+            <PanelPropertyFields>
+              {/*  */}
+              {options?.map((option, index) => (
+                <p key={index}>
+                  {option.label} - {option.value}
+                </p>
+              ))}
+            </PanelPropertyFields>
+          </PanelPropertySection>
+          <PanelPropertySection hidden={type == "payment"}>
             <PanelPropertySectionTitle>Validation</PanelPropertySectionTitle>
             <PanelPropertyFields>
               {has_pattern && (

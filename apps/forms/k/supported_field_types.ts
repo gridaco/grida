@@ -17,4 +17,5 @@ export const supported_field_types: FormFieldType[] = [
   "radio",
   "hidden",
   "signature",
+  "payment",
 ];

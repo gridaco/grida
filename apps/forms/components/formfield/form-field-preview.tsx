@@ -2,6 +2,7 @@ import { FormFieldType } from "@/types";
 import React, { useEffect } from "react";
 import { Select } from "../select";
 import { SignatureCanvas } from "../signature-canvas";
+import { StripeCardForm } from "../stripe";
 
 export function FormFieldPreview({
   name,
@@ -107,6 +108,9 @@ export function FormFieldPreview({
             {...(sharedInputProps as React.ComponentProps<"input">)}
           />
         );
+      }
+      case "payment": {
+        return <StripeCardForm />;
       }
       default: {
         return (
