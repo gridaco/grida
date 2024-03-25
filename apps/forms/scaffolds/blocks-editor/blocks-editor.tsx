@@ -90,7 +90,7 @@ function PendingBlocksResolver() {
   const insertBlock = useCallback(
     async (block: EditorFlatFormBlock) => {
       //
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from("form_block")
         .insert({
           data: {},
@@ -108,6 +108,10 @@ function PendingBlocksResolver() {
         .select()
         .single();
 
+      if (error) {
+        throw new Error();
+      }
+
       return data;
     },
     [state.form_id, state.page_id, supabase]
@@ -121,20 +125,17 @@ function PendingBlocksResolver() {
     );
 
     for (const block of pending_blocks) {
-      insertBlock(block).then((data) => {
-        if (!data) {
+      insertBlock(block)
+        .then((data) => {
+          dispatch({
+            type: "blocks/resolve",
+            block_id: block.id,
+            block: data,
+          });
+        })
+        .catch(() => {
           toast.error("Failed to create block");
-          return;
-        }
-
-        dispatch({
-          type: "blocks/resolve",
-          block_id: block.id,
-          block: data,
         });
-
-        toast.success("Block created");
-      });
     }
   }, [dispatch, insertBlock, state.blocks]);
 

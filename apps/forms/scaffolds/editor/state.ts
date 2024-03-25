@@ -45,7 +45,7 @@ export interface FormEditorState {
   page_id: string | null;
   blocks: EditorFlatFormBlock[];
   fields: FormFieldDefinition[];
-  focus_field_id?: string;
+  focus_field_id?: string | null;
   focus_response_id?: string;
   focus_block_id?: string;
   available_field_ids: string[];
