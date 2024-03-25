@@ -127,6 +127,10 @@ export function FormFieldPreview({
     return <input type="hidden" name={name} />;
   }
 
+  if (type === "payment") {
+    return <StripeCardForm />;
+  }
+
   return (
     <label data-field-type={type} className="flex flex-col gap-1">
       <span
