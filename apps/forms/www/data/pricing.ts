@@ -31,17 +31,17 @@ type PricingFeature = {
 
 export const pricing: Pricing = {
   storage: {
-    title: "File Response & Storage",
+    title: "Features",
     icon: "M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4",
 
     features: [
       {
-        title: "Receive file uploads",
+        title: "Smart Customer Identity",
         // tooltips: {
         //   main: "The sum of all objects' size in your storage buckets.\nBilling is based on the average daily size in GB throughout your billing period.",
         // },
         plans: {
-          free: true,
+          free: false,
           pro: true,
           team: true,
           enterprise: true,
@@ -49,12 +49,132 @@ export const pricing: Pricing = {
         usage_based: true,
       },
       {
-        title: "File Storage Included",
+        title: "Connect Customer Identity",
         plans: {
-          free: "250mb",
-          pro: "25GB",
-          team: "50GB",
-          enterprise: "Custom",
+          free: false,
+          pro: true,
+          team: true,
+          enterprise: true,
+        },
+        usage_based: false,
+      },
+      {
+        title: "Visual Editor",
+        plans: {
+          free: true,
+          pro: true,
+          team: true,
+          enterprise: true,
+        },
+        usage_based: false,
+      },
+      {
+        title: "Advanced Analytics",
+        plans: {
+          free: false,
+          pro: false,
+          team: true,
+          enterprise: true,
+        },
+        usage_based: false,
+      },
+      {
+        title: "Custom branding & form page",
+        plans: {
+          free: true,
+          pro: true,
+          team: true,
+          enterprise: true,
+        },
+        usage_based: false,
+      },
+      {
+        title: "Remove branding on built-in form page",
+        plans: {
+          free: false,
+          pro: true,
+          team: true,
+          enterprise: true,
+        },
+        usage_based: false,
+      },
+      {
+        title: "API access",
+        plans: {
+          free: true,
+          pro: true,
+          team: true,
+          enterprise: true,
+        },
+        usage_based: false,
+      },
+      {
+        title: "JavaScript SDK",
+        plans: {
+          free: true,
+          pro: true,
+          team: true,
+          enterprise: true,
+        },
+        usage_based: false,
+      },
+      {
+        title: "React & React Native SDK",
+        plans: {
+          free: true,
+          pro: true,
+          team: true,
+          enterprise: true,
+        },
+        usage_based: false,
+      },
+      {
+        title: "Webhooks",
+        plans: {
+          free: false,
+          pro: true,
+          team: true,
+          enterprise: true,
+        },
+        usage_based: false,
+      },
+      {
+        title: "Redirect after submit",
+        plans: {
+          free: true,
+          pro: true,
+          team: true,
+          enterprise: true,
+        },
+        usage_based: false,
+      },
+      {
+        title: "Window postMessage interface",
+        plans: {
+          free: false,
+          pro: true,
+          team: true,
+          enterprise: true,
+        },
+        usage_based: false,
+      },
+      {
+        title: "Export to .csv .xlsx",
+        plans: {
+          free: true,
+          pro: true,
+          team: true,
+          enterprise: true,
+        },
+        usage_based: false,
+      },
+      {
+        title: "Limit number of responses",
+        plans: {
+          free: false,
+          pro: true,
+          team: true,
+          enterprise: true,
         },
         usage_based: false,
       },
@@ -75,57 +195,7 @@ export const pricing: Pricing = {
         usage_based: false,
       },
       {
-        title: "Email Support",
-        plans: {
-          free: false,
-          pro: true,
-          team: true,
-          enterprise: true,
-        },
-        usage_based: false,
-      },
-      {
-        title: "Email Support SLA",
-        plans: {
-          free: false,
-          pro: false,
-          team: true,
-          enterprise: true,
-        },
-        usage_based: false,
-      },
-      {
-        title: "Designated support",
-        plans: {
-          free: false,
-          pro: false,
-          team: false,
-          enterprise: true,
-        },
-        usage_based: false,
-      },
-      {
-        title: "On Boarding Support",
-        plans: {
-          free: false,
-          pro: false,
-          team: false,
-          enterprise: true,
-        },
-        usage_based: false,
-      },
-      {
-        title: "Designated Customer Success Team",
-        plans: {
-          free: false,
-          pro: false,
-          team: false,
-          enterprise: true,
-        },
-        usage_based: false,
-      },
-      {
-        title: "Security Questionnaire Help",
+        title: "Live chat support",
         plans: {
           free: false,
           pro: false,
@@ -141,7 +211,17 @@ export const pricing: Pricing = {
     icon: "",
     features: [
       {
-        title: "Smart Customer Identity",
+        title: "Receive file uploads",
+        plans: {
+          free: true,
+          pro: true,
+          team: true,
+          enterprise: true,
+        },
+        usage_based: false,
+      },
+      {
+        title: "File Storage Included",
         plans: {
           free: false,
           pro: true,
@@ -166,6 +246,16 @@ export const pricing: Pricing = {
         },
         usage_based: false,
       },
+      {
+        title: "Payments with Stripe",
+        plans: {
+          free: true,
+          pro: true,
+          team: true,
+          enterprise: true,
+        },
+        usage_based: false,
+      },
     ],
   },
   commingsoon: {
@@ -174,6 +264,16 @@ export const pricing: Pricing = {
     features: [
       {
         title: "Inventory Management",
+        plans: {
+          free: false,
+          pro: false,
+          team: true,
+          enterprise: true,
+        },
+        usage_based: false,
+      },
+      {
+        title: "Payments with Toss (For South Korea)",
         plans: {
           free: false,
           pro: false,
