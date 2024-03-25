@@ -1,6 +1,7 @@
 import { FormFieldType } from "@/types";
 import React, { useEffect } from "react";
 import { Select } from "../select";
+import { SignatureCanvas } from "../signature-canvas";
 
 export function FormFieldPreview({
   name,
@@ -97,6 +98,14 @@ export function FormFieldPreview({
               </div>
             ))}
           </fieldset>
+        );
+      }
+      case "signature": {
+        return (
+          // TODO: this is not accepted by form.
+          <SignatureCanvas
+            {...(sharedInputProps as React.ComponentProps<"input">)}
+          />
         );
       }
       default: {

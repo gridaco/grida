@@ -48,6 +48,7 @@
     "react-dom": "^18",
     "react-hot-toast": "^2.4.0",
     "react-player": "^2.14.1",
+    "signature_pad": "^4.2.0",
     "three": "^0.150.1",
     "use-file-picker": "^2.1.1"
   },

@@ -1,33 +1,12 @@
 import OpenAI from "openai";
 import { NextRequest, NextResponse } from "next/server";
+import { supported_field_types } from "@/k/supported_field_types";
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
-// Define the available form field types
-const formFieldTypes = [
-  "text",
-  "textarea",
-  "tel",
-  "url",
-  "checkbox",
-  "number",
-  "date",
-  "month",
-  "week",
-  "email",
-  "file",
-  "image",
-  "select",
-  "latlng",
-  "password",
-  "color",
-  "radio",
-  "country",
-  "payment",
-  "hidden",
-];
+const type_form_field_type = `export type FormFieldType = | ${supported_field_types.map((type) => `"${type}"`).join(" | ")};`;
 
 const interface_txt = `
 \`\`\`
@@ -42,7 +21,7 @@ export type NewFormFieldInit = {
   pattern?: string; // Regular expression pattern for validation (for html input pattern attribute)
 };
 
-export type FormFieldType = | "text" | "textarea" | "tel" | "url" | "checkbox" | "number" | "date" | "month" | "week" | "email" | "file" | "image" | "select" | "latlng" | "password" | "color" | "radio" | "country" | "payment" | "hidden";
+${type_form_field_type}
 \`\`\`
 `;
 
@@ -94,7 +73,7 @@ ${interface_txt}
     console.log(schema);
 
     // Validate the type field
-    if (!formFieldTypes.includes(schema.type)) {
+    if (!supported_field_types.includes(schema.type)) {
       // if the response is not a valid form field type, fallback to text
       schema.type = "text";
     }

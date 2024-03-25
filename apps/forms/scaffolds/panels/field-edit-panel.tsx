@@ -20,24 +20,7 @@ import { LockClosedIcon } from "@radix-ui/react-icons";
 import { FormFieldAssistant } from "../ai/form-field-schema-assistant";
 import toast from "react-hot-toast";
 import { Select } from "@/components/select";
-
-const supported_field_types: FormFieldType[] = [
-  "text",
-  "textarea",
-  "tel",
-  "url",
-  "checkbox",
-  "number",
-  "date",
-  "month",
-  "week",
-  "email",
-  "select",
-  "password",
-  "color",
-  "radio",
-  "hidden",
-];
+import { supported_field_types } from "@/k/supported_field_types";
 
 // @ts-ignore
 const default_field_init: {
