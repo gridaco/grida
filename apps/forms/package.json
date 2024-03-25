@@ -39,6 +39,7 @@
     "csv-stringify": "^6.4.6",
     "immer": "^9.0.3",
     "monaco-editor": "^0.47.0",
+    "nanoid": "^3.1.23",
     "next": "14.1.1",
     "openai": "^4.29.1",
     "prism-react-renderer": "^2.3.1",

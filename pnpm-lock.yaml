@@ -277,6 +277,9 @@ importers:
       monaco-editor:
         specifier: ^0.47.0
         version: 0.47.0
+      nanoid:
+        specifier: ^3.1.23
+        version: 3.3.7
       next:
         specifier: 14.1.1
         version: 14.1.1(react-dom@18.2.0)(react@18.2.0)

@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useCallback } from "react";
 import {
   DotsHorizontalIcon,
   ImageIcon,
@@ -25,9 +25,21 @@ export function ImageBlock({
   src,
   data,
 }: EditorFlatFormBlock) {
+  const [state, dispatch] = useEditorState();
   const [pickerOpen, setPickerOpen] = React.useState(false);
 
   const deleteBlock = useDeleteBlock();
+
+  const onChangeImage = useCallback(
+    (src: string) => {
+      dispatch({
+        type: "blocks/image/src",
+        block_id: id,
+        src: src,
+      });
+    },
+    [dispatch]
+  );
 
   return (
     <FlatBlockBase>
@@ -71,7 +83,11 @@ export function ImageBlock({
         </div>
       </BlockHeader>
       <div>
-        <MediaPicker open={pickerOpen} onOpenChange={setPickerOpen} />
+        <MediaPicker
+          open={pickerOpen}
+          onOpenChange={setPickerOpen}
+          onUseImage={onChangeImage}
+        />
         <div className="rounded p-4 overflow-hidden border border-black/20">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
