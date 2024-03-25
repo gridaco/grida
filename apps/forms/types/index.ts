@@ -18,7 +18,8 @@ export type FormFieldType =
   | "radio"
   | "country"
   | "payment"
-  | "hidden";
+  | "hidden"
+  | "signature";
 
 export type PlatformPoweredBy = "api" | "grida_forms" | "web_client";
 
@@ -80,6 +81,7 @@ export type FormBlockType =
   | "html"
   | "divider"
   | "header"
+  | "pdf"
   // not supported yet
   | "group";
 // not supported yet

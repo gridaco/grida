@@ -183,7 +183,7 @@ function FieldEditPanelProvider({ children }: React.PropsWithChildren<{}>) {
         ...init,
         options: init.options?.length ? init.options : undefined,
         //
-        id: state.focus_field_id,
+        id: state.focus_field_id ?? undefined,
         form_id: state.form_id,
       };
 

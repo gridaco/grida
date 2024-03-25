@@ -25,13 +25,16 @@ export function SidePanel({
 export function PanelPropertySection({
   children,
   grid = true,
+  hidden = false,
 }: React.PropsWithChildren<{
   grid?: boolean;
+  hidden?: boolean;
 }>) {
   return (
     <div
+      data-hidden={hidden}
       data-grid={grid}
-      className="grid grid-cols-12 data-[grid='false']:block gap-6 px-8 py-8 opacity-100"
+      className="grid grid-cols-12 data-[grid='false']:block gap-6 px-8 py-8 opacity-100 data-[hidden='true']:hidden"
     >
       {children}
     </div>

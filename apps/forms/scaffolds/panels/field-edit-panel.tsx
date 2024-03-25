@@ -20,24 +20,7 @@ import { LockClosedIcon } from "@radix-ui/react-icons";
 import { FormFieldAssistant } from "../ai/form-field-schema-assistant";
 import toast from "react-hot-toast";
 import { Select } from "@/components/select";
-
-const supported_field_types: FormFieldType[] = [
-  "text",
-  "textarea",
-  "tel",
-  "url",
-  "checkbox",
-  "number",
-  "date",
-  "month",
-  "week",
-  "email",
-  "select",
-  "password",
-  "color",
-  "radio",
-  "hidden",
-];
+import { supported_field_types } from "@/k/supported_field_types";
 
 // @ts-ignore
 const default_field_init: {
@@ -271,7 +254,7 @@ export function FieldEditPanel({
               </PanelPropertyField>
             </PanelPropertyFields>
           </PanelPropertySection>
-          <PanelPropertySection>
+          <PanelPropertySection hidden={type == "payment"}>
             <PanelPropertySectionTitle>General</PanelPropertySectionTitle>
             <PanelPropertyFields>
               <PanelPropertyField
@@ -315,20 +298,18 @@ export function FieldEditPanel({
               )}
             </PanelPropertyFields>
           </PanelPropertySection>
-          {has_options && (
-            <PanelPropertySection>
-              <PanelPropertySectionTitle>Options</PanelPropertySectionTitle>
-              <PanelPropertyFields>
-                {/*  */}
-                {options?.map((option, index) => (
-                  <p key={index}>
-                    {option.label} - {option.value}
-                  </p>
-                ))}
-              </PanelPropertyFields>
-            </PanelPropertySection>
-          )}
-          <PanelPropertySection>
+          <PanelPropertySection hidden={!has_options}>
+            <PanelPropertySectionTitle>Options</PanelPropertySectionTitle>
+            <PanelPropertyFields>
+              {/*  */}
+              {options?.map((option, index) => (
+                <p key={index}>
+                  {option.label} - {option.value}
+                </p>
+              ))}
+            </PanelPropertyFields>
+          </PanelPropertySection>
+          <PanelPropertySection hidden={type == "payment"}>
             <PanelPropertySectionTitle>Validation</PanelPropertySectionTitle>
             <PanelPropertyFields>
               {has_pattern && (

@@ -27,6 +27,7 @@ import { blockstreeflat } from "@/lib/forms/tree";
 import { HTML_BLOCK_BODY_HTML_DEFAULT_VALUE } from "@/k/html_block_defaults";
 import { VIDEO_BLOCK_SRC_DEFAULT_VALUE } from "@/k/video_block_defaults";
 import { IMAGE_BLOCK_SRC_DEFAULT_VALUE } from "@/k/image_block_defaults";
+import { PDF_BLOCK_SRC_DEFAULT_VALUE } from "@/k/pdf_block_defaults";
 
 export function reducer(
   state: FormEditorState,
@@ -45,8 +46,9 @@ export function reducer(
         .sort((a, b) => b.local_index - a.local_index)[0];
       const parent_id = parent_section?.id ?? null;
 
+      const id = "[draft]" + Math.random().toString(36).substring(7);
       const __shared: EditorFlatFormBlock = {
-        id: "[draft]" + Math.random().toString(36).substring(7),
+        id: id,
         created_at: new Date().toISOString(),
         form_id: state.form_id,
         form_page_id: state.page_id,
@@ -73,6 +75,16 @@ export function reducer(
             draft.available_field_ids = available_field_ids.filter(
               (id) => id !== field_id
             );
+
+            // update focus block id
+            draft.focus_block_id = id;
+
+            if (!field_id) {
+              // if no available field, but field block provided, open a field editor panel
+              draft.focus_field_id = null;
+              draft.is_field_edit_panel_open = true;
+              //
+            }
           });
         }
         case "section": {
@@ -124,6 +136,14 @@ export function reducer(
             });
           });
         }
+        case "pdf": {
+          return produce(state, (draft) => {
+            draft.blocks.push({
+              ...__shared,
+              src: PDF_BLOCK_SRC_DEFAULT_VALUE,
+            });
+          });
+        }
         case "divider": {
           return produce(state, (draft) => {
             draft.blocks.push({
@@ -156,6 +176,11 @@ export function reducer(
         if (index !== -1) {
           // update the whole block with the resolved block
           draft.blocks[index] = block;
+        }
+
+        // update focus block id if updated
+        if ((draft.focus_block_id = old_id)) {
+          draft.focus_block_id = new_id;
         }
 
         // when resolved, the id is updated to the real id.
@@ -336,8 +361,7 @@ export function reducer(
           field.help_text = data.help_text;
           field.type = data.type;
           field.required = data.required;
-          // TODO: support options
-          // field.options = data.options;
+          field.options = data.options;
           field.pattern = data.pattern;
         } else {
           // create new field
@@ -345,8 +369,22 @@ export function reducer(
             ...data,
           });
 
+          let unused_field_id: string | null = field_id;
+
+          // if new field, and focus block has no assigned field, use this.
+          if (draft.focus_block_id) {
+            const block = draft.blocks.find(
+              (d) => d.id == draft.focus_block_id
+            );
+
+            if (block && block.type === "field" && !block.form_field_id) {
+              block.form_field_id = unused_field_id;
+              unused_field_id = null;
+            }
+          }
+
           // add the field_id to available_field_ids
-          draft.available_field_ids.push(field_id);
+          if (unused_field_id) draft.available_field_ids.push(unused_field_id);
         }
         //
       });

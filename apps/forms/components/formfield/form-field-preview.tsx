@@ -1,6 +1,8 @@
 import { FormFieldType } from "@/types";
 import React, { useEffect } from "react";
 import { Select } from "../select";
+import { SignatureCanvas } from "../signature-canvas";
+import { StripeCardForm } from "../stripe";
 
 export function FormFieldPreview({
   name,
@@ -99,6 +101,17 @@ export function FormFieldPreview({
           </fieldset>
         );
       }
+      case "signature": {
+        return (
+          // TODO: this is not accepted by form.
+          <SignatureCanvas
+            {...(sharedInputProps as React.ComponentProps<"input">)}
+          />
+        );
+      }
+      case "payment": {
+        return <StripeCardForm />;
+      }
       default: {
         return (
           <HtmlInput
@@ -112,6 +125,10 @@ export function FormFieldPreview({
 
   if (type === "hidden") {
     return <input type="hidden" name={name} />;
+  }
+
+  if (type === "payment") {
+    return <StripeCardForm />;
   }
 
   return (

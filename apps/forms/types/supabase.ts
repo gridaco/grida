@@ -475,6 +475,7 @@ export type Database = {
         | "video"
         | "divider"
         | "header"
+        | "pdf"
       form_field_type:
         | "text"
         | "textarea"
@@ -496,6 +497,7 @@ export type Database = {
         | "country"
         | "payment"
         | "hidden"
+        | "signature"
       response_platform_powered_by: "api" | "grida_forms" | "web_client"
     }
     CompositeTypes: {
