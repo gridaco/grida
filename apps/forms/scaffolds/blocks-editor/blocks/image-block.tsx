@@ -15,6 +15,8 @@ import {
 import { EditorFlatFormBlock } from "@/scaffolds/editor/state";
 import { BlockHeader, FlatBlockBase, useDeleteBlock } from "./base-block";
 import { useEditorState } from "@/scaffolds/editor";
+import * as Tooltip from "@radix-ui/react-tooltip";
+import { MediaPicker } from "@/scaffolds/mediapicker";
 
 export function ImageBlock({
   id,
@@ -23,7 +25,7 @@ export function ImageBlock({
   src,
   data,
 }: EditorFlatFormBlock) {
-  const [state, dispatch] = useEditorState();
+  const [pickerOpen, setPickerOpen] = React.useState(false);
 
   const deleteBlock = useDeleteBlock();
 
@@ -36,7 +38,23 @@ export function ImageBlock({
             Image
           </span>
         </div>
-        <div>
+        <div className="flex gap-2">
+          <Tooltip.Root>
+            <Tooltip.Trigger asChild>
+              <button
+                onClick={() => {
+                  setPickerOpen(true);
+                }}
+              >
+                <ImageIcon />
+              </button>
+            </Tooltip.Trigger>
+            <Tooltip.Portal>
+              <Tooltip.Content>
+                <p className="text-xs opacity-50">Media Picker</p>
+              </Tooltip.Content>
+            </Tooltip.Portal>
+          </Tooltip.Root>
           <DropdownMenu modal={false}>
             <DropdownMenuTrigger asChild>
               <button>
@@ -53,6 +71,7 @@ export function ImageBlock({
         </div>
       </BlockHeader>
       <div>
+        <MediaPicker open={pickerOpen} onOpenChange={setPickerOpen} />
         <div className="rounded p-4 overflow-hidden border border-black/20">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
