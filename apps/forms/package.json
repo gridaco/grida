@@ -24,6 +24,7 @@
     "@radix-ui/react-dialog": "^1.0.5",
     "@radix-ui/react-icons": "^1.0.3",
     "@radix-ui/react-popover": "^1.0.7",
+    "@radix-ui/react-tabs": "^1.0.4",
     "@radix-ui/react-tooltip": "^1.0.7",
     "@react-three/drei": "^9.83.9",
     "@react-three/fiber": "^8.12.0",
@@ -46,7 +47,8 @@
     "react-dom": "^18",
     "react-hot-toast": "^2.4.0",
     "react-player": "^2.14.1",
-    "three": "^0.150.1"
+    "three": "^0.150.1",
+    "use-file-picker": "^2.1.1"
   },
   "devDependencies": {
     "@tailwindcss/typography": "^0.5.10",

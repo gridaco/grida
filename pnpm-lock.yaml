@@ -232,6 +232,9 @@ importers:
       '@radix-ui/react-popover':
         specifier: ^1.0.7
         version: 1.0.7(@types/react-dom@18.2.19)(@types/react@18.2.58)(react-dom@18.2.0)(react@18.2.0)
+      '@radix-ui/react-tabs':
+        specifier: ^1.0.4
+        version: 1.0.4(@types/react-dom@18.2.19)(@types/react@18.2.58)(react-dom@18.2.0)(react@18.2.0)
       '@radix-ui/react-tooltip':
         specifier: ^1.0.7
         version: 1.0.7(@types/react-dom@18.2.19)(@types/react@18.2.58)(react-dom@18.2.0)(react@18.2.0)
@@ -301,6 +304,9 @@ importers:
       three:
         specifier: ^0.150.1
         version: 0.150.1
+      use-file-picker:
+        specifier: ^2.1.1
+        version: 2.1.1(react@18.2.0)
     devDependencies:
       '@tailwindcss/typography':
         specifier: ^0.5.10
@@ -23886,6 +23892,13 @@ packages:
     resolution: {integrity: sha512-P9bmyZ3h/PRG+Nzga+rbdI4OEpNDzAVyy74uVO9ATgzLK6VtAsYybF/+TOCvrc0MO793d6+42lLyZTw7/ArVzA==}
     dev: false
 
+  /file-selector@0.2.4:
+    resolution: {integrity: sha512-ZDsQNbrv6qRi1YTDOEWzf5J2KjZ9KMI1Q2SGeTkCJmNNW25Jg4TW4UMcmoqcg4WrAyKRcpBXdbWRxkfrOzVRbA==}
+    engines: {node: '>= 10'}
+    dependencies:
+      tslib: 2.6.2
+    dev: false
+
   /file-system-cache@1.1.0:
     resolution: {integrity: sha512-IzF5MBq+5CR0jXx5RxPe4BICl/oEhBSXKaL9fLhAXrIfIUS77Hr4vzrYyqYMHN6uTt+BOqi3fDCTjjEBCjERKw==}
     dependencies:
@@ -38317,6 +38330,16 @@ packages:
     peerDependencies:
       react: ^18.2.0
     dependencies:
+      react: 18.2.0
+    dev: false
+
+  /use-file-picker@2.1.1(react@18.2.0):
+    resolution: {integrity: sha512-IhKUL7pVL5m0D/1zM5vgAyamkpiMfSQYg16+P7OpYEp1zTkhdX6jSsWr3kbbrfvPjSxkyaPy3lbCSyOslz9PNg==}
+    engines: {node: '>=12'}
+    peerDependencies:
+      react: ^18.2.0
+    dependencies:
+      file-selector: 0.2.4
       react: 18.2.0
     dev: false
 
