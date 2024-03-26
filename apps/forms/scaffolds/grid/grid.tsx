@@ -24,6 +24,7 @@ import {
   EyeClosedIcon,
   ColorWheelIcon,
   AvatarIcon,
+  RadiobuttonIcon,
 } from "@radix-ui/react-icons";
 import {
   DropdownMenu,
@@ -243,6 +244,7 @@ function FormFieldTypeIcon({ type }: { type: FormFieldType }) {
     case "email":
       return <EnvelopeClosedIcon />;
     case "radio":
+      return <RadiobuttonIcon />;
     case "select":
       return <DropdownMenuIcon />;
     case "url":
@@ -261,6 +263,12 @@ function FormFieldTypeIcon({ type }: { type: FormFieldType }) {
       return <ColorWheelIcon />;
     case "hidden":
       return <EyeClosedIcon />;
+    case "signature":
+      // TODO: replace icon
+      return <>✍️</>;
+    case "payment":
+      // TODO: replace icon
+      return <>💰</>;
     default:
       return <TextIcon />;
   }
