@@ -70,9 +70,9 @@ export function PanelPropertyField({
   optional?: boolean;
 }>) {
   return (
-    <div className="text-sm grid gap-2 md:grid md:grid-cols-12">
+    <label className="text-sm grid gap-2 md:grid md:grid-cols-12">
       <div className="flex flex-row space-x-2 justify-between col-span-12">
-        <label className="block text-sm">{label}</label>
+        <span className="block text-sm">{label}</span>
         {optional && <span className="text-sm">Optional</span>}
       </div>
       <div className="col-span-12">
@@ -81,7 +81,7 @@ export function PanelPropertyField({
           <span className="mt-2 leading-normal text-sm">{description}</span>
         )}
       </div>
-    </div>
+    </label>
   );
 }
 

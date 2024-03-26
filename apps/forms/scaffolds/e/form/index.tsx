@@ -153,7 +153,7 @@ export function Form({
           <object
             key={block.id}
             data={block.data + "#toolbar=0&navpanes=0&scrollbar=0"}
-            className="w-full h-full aspect-[1/1.2] max-h-screen rounded overflow-hidden"
+            className="w-full h-full aspect-[1/1.2] max-h-screen rounded overflow-hidden border shadow-sm box-content"
             type="application/pdf"
             width="100%"
             height="100%"

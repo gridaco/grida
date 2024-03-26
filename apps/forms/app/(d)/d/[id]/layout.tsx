@@ -11,15 +11,39 @@ import { FormEditorProvider } from "@/scaffolds/editor";
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import { GoogleAnalytics } from "@next/third-parties/google";
-import "../../../editor.css";
 import { FormPage } from "@/types";
 import { PreviewButton } from "@/components/preview-button";
+import "../../../editor.css";
 
 const inter = Inter({ subsets: ["latin"] });
 
-export const metadata: Metadata = {
-  title: "Grida Forms",
-};
+export async function generateMetadata({
+  params,
+}: {
+  params: { id: string };
+}): Promise<Metadata> {
+  const cookieStore = cookies();
+  const supabase = createServerComponentClient(cookieStore);
+  const id = params.id;
+
+  const { data, error } = await supabase
+    .from("form")
+    .select(
+      `
+        title
+      `
+    )
+    .eq("id", id)
+    .single();
+
+  if (!data) {
+    return notFound();
+  }
+
+  return {
+    title: `${data.title} | Grida Forms`,
+  };
+}
 
 export const revalidate = 0;
 
