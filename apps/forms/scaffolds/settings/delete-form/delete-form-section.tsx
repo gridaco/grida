@@ -25,7 +25,7 @@ export function DeleteFormSection() {
         </p>
         <AlertDialog>
           <AlertDialogTrigger asChild>
-            <button className="focus:outline-none text-red-700 bg-red-100 hover:bg-red-200 focus:ring-4 focus:ring-red-300 font-medium rounded-lg text-sm px-5 py-2.5 me-2 mb-2 dark:bg-red-600 dark:hover:bg-red-700 dark:focus:ring-red-900">
+            <button className="focus:outline-none text-red-700 bg-red-100 hover:bg-red-200 focus:ring-4 focus:ring-red-300 font-medium rounded-lg text-sm px-5 py-2.5 me-2 mb-2 dark:bg-red-600 dark:hover:bg-red-700 dark:focus:ring-red-900 w-fit">
               Delete Form
             </button>
           </AlertDialogTrigger>
