@@ -7,6 +7,7 @@ import {
   PreferenceBox,
   PreferenceBoxFooter,
   PreferenceBoxHeader,
+  cls_input,
 } from "@/components/preferences";
 
 export function RedirectPreferences({
@@ -42,6 +43,7 @@ export function RedirectPreferences({
                   defaultValue={defaultValue}
                   placeholder="https://.."
                   pattern="https://.*"
+                  className={cls_input}
                 />
                 <span>
                   Redirect to a custom URL after form submission. Leave empty

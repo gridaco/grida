@@ -2,7 +2,7 @@ import { createServerComponentClient } from "@/lib/supabase/server";
 import { UnknownFieldPreferences } from "@/scaffolds/settings/data-unknown-fields";
 import { DeleteFormSection } from "@/scaffolds/settings/delete-form/delete-form-section";
 import { RedirectPreferences } from "@/scaffolds/settings/redirect-section";
-import { TrustedOriginPreferences } from "@/scaffolds/settings/redirect-section copy";
+import { TrustedOriginPreferences } from "@/scaffolds/settings/trusted-origins";
 import { ResponsePreferences } from "@/scaffolds/settings/response-preference-section";
 import { cookies } from "next/headers";
 import React from "react";

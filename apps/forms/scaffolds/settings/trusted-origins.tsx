@@ -7,11 +7,12 @@ import {
   PreferenceBox,
   PreferenceBoxFooter,
   PreferenceBoxHeader,
+  cls_textarea,
 } from "@/components/preferences";
 
 export function TrustedOriginPreferences({}: {}) {
   return (
-    <PreferenceBox>
+    <PreferenceBox beta>
       <PreferenceBoxHeader heading={<>Trusted origins</>} />
       <PreferenceBody>
         <div className="flex flex-col gap-8">
@@ -23,7 +24,10 @@ export function TrustedOriginPreferences({}: {}) {
             </p>
             <div>
               <label>
-                <textarea />
+                <textarea
+                  name="allowed_origins_txt_csv"
+                  className={cls_textarea}
+                />
               </label>
             </div>
           </section>

@@ -12,12 +12,11 @@ import { Select } from "@/components/select";
 
 export function UnknownFieldPreferences({}: {}) {
   return (
-    <PreferenceBox>
+    <PreferenceBox beta>
       <PreferenceBoxHeader heading={<>Handling unknown fields</>} />
       <PreferenceBody>
         <div className="flex flex-col gap-8">
           <section>
-            <h3>Handling unknown fields</h3>
             <p className="opacity-80">
               When a form is submitted with fields that are not defined in the
               form schema, you can choose to ignore them or store them as

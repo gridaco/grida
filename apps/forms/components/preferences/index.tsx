@@ -1,5 +1,11 @@
 import clsx from "clsx";
 
+export const cls_input =
+  "bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500";
+
+export const cls_textarea =
+  "block p-2.5 w-full text-sm text-gray-900 bg-gray-50 rounded-lg border border-gray-300 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500";
+
 export function PreferenceBox({
   beta,
   children,
@@ -37,7 +43,7 @@ export function PreferenceBoxHeader({
     <header className="flex items-center px-6 py-4">
       <div className="w-full flex items-center justify-between">
         <div className="flex items-center gap-x-2">
-          <p>{heading}</p>
+          <h2 className="text-lg font-semibold">{heading}</h2>
           {headingBadge && (
             <div className="inline-flex items-center rounded-full bg-opacity-10 bg-surface-200 text-foreground-light border border-strong px-2.5 py-0.5 text-xs">
               {headingBadge}

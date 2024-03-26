@@ -1,12 +1,13 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Toggle } from "@/components/toggle";
 import {
   PreferenceBody,
   PreferenceBox,
   PreferenceBoxFooter,
   PreferenceBoxHeader,
+  cls_input,
 } from "@/components/preferences";
 
 export function ResponsePreferences() {
@@ -20,9 +21,10 @@ export function ResponsePreferences() {
 
 function MaxRespoonses() {
   const [enabled, setEnabled] = useState(false);
+  const [n, setN] = useState(10000);
 
   return (
-    <PreferenceBox>
+    <PreferenceBox beta>
       <PreferenceBoxHeader heading={<>Maximum responses</>} />
       <PreferenceBody>
         <div className="flex flex-col">
@@ -36,9 +38,16 @@ function MaxRespoonses() {
               <label className="flex flex-col gap-2 cursor-pointer">
                 <span>Maximum number of responses allowed</span>
                 <input
+                  name="max_responses_per_customer"
                   type="number"
                   placeholder="Leave empty for unlimited responses"
-                  min="1"
+                  min={1}
+                  defaultValue={1}
+                  value={n}
+                  onChange={(e) => {
+                    setN(parseInt(e.target.value));
+                  }}
+                  className={cls_input}
                 />
               </label>
             </div>
@@ -54,10 +63,17 @@ function MaxRespoonses() {
 
 function RestrictNumberOfResponseByCustomer() {
   const [enabled, setEnabled] = useState(false);
+  const [n, setN] = useState(0);
+
+  useEffect(() => {
+    setN(enabled ? 1 : 0);
+  }, [enabled]);
 
   return (
     <PreferenceBox beta>
-      <PreferenceBoxHeader heading={<>Limit number of responses</>} />
+      <PreferenceBoxHeader
+        heading={<>Limit number of responses by customer</>}
+      />
       <PreferenceBody>
         <div className="flex flex-col">
           <Toggle
@@ -65,11 +81,26 @@ function RestrictNumberOfResponseByCustomer() {
             label={enabled ? "Enabled" : "Disabled"}
             onChange={setEnabled}
           />
-          {enabled && (
+          {enabled ? (
             <div>
-              Limit to 1 response per user. Users won&apos;t be able to submit
-              multiple responses.
+              <input
+                name="max_responses_per_customer"
+                type="number"
+                min={1}
+                defaultValue={1}
+                value={n}
+                onChange={(e) => {
+                  setN(parseInt(e.target.value));
+                }}
+                className={cls_input}
+              />
+              <div>
+                Limit to {n} {txt_response_plural(n)} per user.
+                <>{n === 1 && <>{txt_no_multiple_response_description}</>}</>
+              </div>
             </div>
+          ) : (
+            <>{txt_no_multiple_response_description}</>
           )}
         </div>
       </PreferenceBody>
@@ -79,3 +110,10 @@ function RestrictNumberOfResponseByCustomer() {
     </PreferenceBox>
   );
 }
+
+const txt_no_multiple_response_description =
+  "Users won't be able to submit multiple responses.";
+
+const txt_response_plural = (n: number) => {
+  return n === 1 ? "response" : "responses";
+};
