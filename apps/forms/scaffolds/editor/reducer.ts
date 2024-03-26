@@ -361,8 +361,9 @@ export function reducer(
           field.help_text = data.help_text;
           field.type = data.type;
           field.required = data.required;
-          field.options = data.options;
           field.pattern = data.pattern;
+          field.options = data.options;
+          field.data = data.data;
         } else {
           // create new field
           draft.fields.push({

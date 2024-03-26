@@ -14,13 +14,22 @@ import {
   SidePanel,
 } from "@/components/panels/side-panel";
 import { FormFieldPreview } from "@/components/formfield";
-import { FormFieldType, NewFormFieldInit } from "@/types";
+import {
+  FormFieldDataSchema,
+  FormFieldType,
+  NewFormFieldInit,
+  PaymentFieldData,
+} from "@/types";
 import { capitalCase, snakeCase } from "change-case";
 import { LockClosedIcon } from "@radix-ui/react-icons";
 import { FormFieldAssistant } from "../ai/form-field-schema-assistant";
 import toast from "react-hot-toast";
 import { Select } from "@/components/select";
 import { supported_field_types } from "@/k/supported_field_types";
+import {
+  payments_service_providers,
+  payments_service_providers_display_map,
+} from "@/k/payments_service_providers";
 
 // @ts-ignore
 const default_field_init: {
@@ -69,6 +78,12 @@ const default_field_init: {
     ],
   },
   hidden: { type: "hidden" },
+  payment: {
+    type: "payment",
+    data: {
+      type: "payment",
+    } as PaymentFieldData,
+  },
 };
 
 const input_can_have_options: FormFieldType[] = ["select", "radio"];
@@ -105,6 +120,7 @@ export function FieldEditPanel({
   const [options, setOptions] = useState<
     { label?: string | null; value: string }[]
   >(init?.options || []);
+  const [data, setData] = useState<FormFieldDataSchema>(init?.data ?? {});
 
   const preview_label = buildPreviewLabel({
     name,
@@ -118,7 +134,10 @@ export function FieldEditPanel({
   const preview_placeholder =
     placeholder || convertToPlainText(label) || convertToPlainText(name);
 
-  const preview_disabled = !name;
+  const preview_disabled =
+    !name ||
+    (type == "payment" &&
+      (data as PaymentFieldData)?.service_provider === "tosspayments");
 
   const onSaveClick = () => {
     onSave?.({
@@ -128,8 +147,9 @@ export function FieldEditPanel({
       helpText,
       type,
       required,
-      options,
       pattern,
+      options,
+      data,
     });
   };
 
@@ -198,6 +218,7 @@ export function FieldEditPanel({
                   disabled={preview_disabled}
                   options={has_options ? options : undefined}
                   pattern={pattern}
+                  data={data}
                 />
                 <div className="absolute bottom-0 right-0 m-2">
                   <button
@@ -251,6 +272,29 @@ export function FieldEditPanel({
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                 />
+              </PanelPropertyField>
+            </PanelPropertyFields>
+          </PanelPropertySection>
+          <PanelPropertySection hidden={type !== "payment"}>
+            <PanelPropertySectionTitle>Payment</PanelPropertySectionTitle>
+            <PanelPropertyFields>
+              <PanelPropertyField label={"Service Provider"}>
+                <Select
+                  value={(data as PaymentFieldData)?.service_provider}
+                  onChange={(e) => {
+                    setData({
+                      ...data,
+                      type: "payment",
+                      service_provider: e.target.value,
+                    });
+                  }}
+                >
+                  {payments_service_providers.map((provider) => (
+                    <option key={provider} value={provider}>
+                      {payments_service_providers_display_map[provider].label}
+                    </option>
+                  ))}
+                </Select>
               </PanelPropertyField>
             </PanelPropertyFields>
           </PanelPropertySection>

@@ -203,6 +203,7 @@ export type Database = {
           alt: string | null
           autocomplete: boolean | null
           created_at: string
+          data: Json | null
           description: string | null
           form_id: string
           help_text: string | null
@@ -223,6 +224,7 @@ export type Database = {
           alt?: string | null
           autocomplete?: boolean | null
           created_at?: string
+          data?: Json | null
           description?: string | null
           form_id: string
           help_text?: string | null
@@ -243,6 +245,7 @@ export type Database = {
           alt?: string | null
           autocomplete?: boolean | null
           created_at?: string
+          data?: Json | null
           description?: string | null
           form_id?: string
           help_text?: string | null

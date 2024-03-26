@@ -195,6 +195,7 @@ function FieldEditPanelProvider({ children }: React.PropsWithChildren<{}>) {
         //
         id: state.focus_field_id ?? undefined,
         form_id: state.form_id,
+        data: init.data,
       };
 
       console.log("saving..", data);
@@ -256,6 +257,7 @@ function FieldEditPanelProvider({ children }: React.PropsWithChildren<{}>) {
                 options: field.options,
                 required: field.required,
                 pattern: field.pattern,
+                data: field.data,
               }
             : undefined
         }

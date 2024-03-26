@@ -128,6 +128,7 @@ export function FieldBlock({
             helpText={form_field?.help_text ?? ""}
             placeholder={form_field?.placeholder ?? ""}
             options={form_field?.options}
+            data={form_field?.data}
           />
         )}
       </div>

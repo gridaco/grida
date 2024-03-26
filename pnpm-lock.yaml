@@ -256,6 +256,9 @@ importers:
       '@supabase/supabase-js':
         specifier: ^2.39.7
         version: 2.39.7
+      '@tosspayments/payment-widget-sdk':
+        specifier: ^0.10.2
+        version: 0.10.2(typescript@5.4.2)
       '@types/mdx':
         specifier: ^2.0.11
         version: 2.0.11
@@ -17259,6 +17262,58 @@ packages:
     resolution: {integrity: sha512-RbzJvlNzmRq5c3O09UipeuXno4tA1FE6ikOjxZK0tuxVv3412l64l5t1W5pj4+rJq9vpkm/kwiR07aZXnsKPxw==}
     engines: {node: '>= 6'}
     dev: true
+
+  /@tosspayments/brandpay-types@0.2.6(typescript@5.4.2):
+    resolution: {integrity: sha512-FY8aOm/2rqtXjYux9ZdNTL6GC5+VNIw8eOQ7TP01dS2uGWSzAtR6uuw9HVsgkmJtSyJgmo97tjmbio5oyeyFlg==}
+    peerDependencies:
+      typescript: ^5
+    peerDependenciesMeta:
+      typescript:
+        optional: true
+    dependencies:
+      typescript: 5.4.2
+    dev: false
+
+  /@tosspayments/payment-widget-sdk@0.10.2(typescript@5.4.2):
+    resolution: {integrity: sha512-0dpkEbnDXmvIwpHYm+YODpMhh/gAtvJRYOU5uikFQpM/XCkyZDXAP9C6pc+GhiT6NsWIKKFILwaSgAeL/UT3ow==}
+    dependencies:
+      '@tosspayments/payment-widget__types': 1.0.1(typescript@5.4.2)
+    transitivePeerDependencies:
+      - typescript
+    dev: false
+
+  /@tosspayments/payment-widget-types@0.0.5(typescript@5.4.2):
+    resolution: {integrity: sha512-Daaui9u7aRPzJhw4omJIUAbYBSmNAFNjWWkuUnX9uHxzE3gtjcJHIpGrjlzmCFm+j3ZH4rgyrgv4pkazVYH3OQ==}
+    peerDependencies:
+      typescript: ^5
+    peerDependenciesMeta:
+      typescript:
+        optional: true
+    dependencies:
+      typescript: 5.4.2
+    dev: false
+
+  /@tosspayments/payment-widget__types@1.0.1(typescript@5.4.2):
+    resolution: {integrity: sha512-p2l6ni4ZAH0Jh7Yo4hwwDAECN0rz6Io9R19oBJ5ZkL0H1upMhGzT6xrdymIYQwcUSzIcwHwI2u03eeAX19hmug==}
+    dependencies:
+      '@tosspayments/brandpay-types': 0.2.6(typescript@5.4.2)
+      '@tosspayments/payment-widget-types': 0.0.5(typescript@5.4.2)
+      '@tosspayments/payment__types': 1.67.2
+    transitivePeerDependencies:
+      - typescript
+    dev: false
+
+  /@tosspayments/payment__types@1.67.2:
+    resolution: {integrity: sha512-GVXhGeKSruo4VTi8GNLISvhDeF4HfVLPN4UHjo2Dl3e7DPh40h6TKq5nCnt5hVbH7CcpyE5yfbWvI2RV0ABDcw==}
+    dependencies:
+      '@tosspayments/sdk-constants': 0.2.2
+    dev: false
+
+  /@tosspayments/sdk-constants@0.2.2:
+    resolution: {integrity: sha512-qTIcD9JnVtN65/yiW5sPAlvK5fpQtDluv4IEyslubncbQLQKE+ePSnGZU1fLNPxcchv6QTnwmgj9Ndm6EN/Ymg==}
+    dependencies:
+      type-fest: 2.19.0
+    dev: false
 
   /@tree-/q@0.0.1:
     resolution: {integrity: sha512-aQOo/1gOZZsExTFj85EA1O06fWyGSYNUbXyF04FMDROQf4oMFPaYhFU7l70lQx/hlVNmDZ2oZPt3hLyXXLq0mg==}

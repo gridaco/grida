@@ -1,8 +1,9 @@
-import { FormFieldType } from "@/types";
+import { FormFieldDataSchema, FormFieldType, PaymentFieldData } from "@/types";
 import React, { useEffect } from "react";
 import { Select } from "../select";
 import { SignatureCanvas } from "../signature-canvas";
-import { StripeCardForm } from "../stripe";
+import { StripePaymentFormFieldPreview } from "./form-field-preview-payment-stripe";
+import { TossPaymentsPaymentFormFieldPreview } from "./form-field-preview-payment-tosspayments";
 
 export function FormFieldPreview({
   name,
@@ -16,6 +17,7 @@ export function FormFieldPreview({
   readonly,
   disabled,
   pattern,
+  data,
 }: {
   name: string;
   label?: string;
@@ -28,6 +30,7 @@ export function FormFieldPreview({
   readonly?: boolean;
   disabled?: boolean;
   labelCapitalize?: boolean;
+  data?: FormFieldDataSchema | null;
 }) {
   const sharedInputProps:
     | React.ComponentProps<"input">
@@ -109,9 +112,6 @@ export function FormFieldPreview({
           />
         );
       }
-      case "payment": {
-        return <StripeCardForm />;
-      }
       default: {
         return (
           <HtmlInput
@@ -128,7 +128,7 @@ export function FormFieldPreview({
   }
 
   if (type === "payment") {
-    return <StripeCardForm />;
+    return <PaymentField data={data as PaymentFieldData} disabled={disabled} />;
   }
 
   return (
@@ -161,4 +161,21 @@ function HtmlInput({ ...props }: React.ComponentProps<"input">) {
       {...props}
     />
   );
+}
+
+function PaymentField({
+  data,
+  disabled,
+}: {
+  data?: PaymentFieldData;
+  disabled?: boolean;
+}) {
+  switch (data?.service_provider) {
+    case "stripe":
+      return <StripePaymentFormFieldPreview />;
+    case "tosspayments":
+      return <TossPaymentsPaymentFormFieldPreview disabled={disabled} />;
+    default:
+      return <StripePaymentFormFieldPreview />;
+  }
 }

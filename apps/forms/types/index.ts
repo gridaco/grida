@@ -32,6 +32,7 @@ export type NewFormFieldInit = {
   required: boolean;
   options?: { label?: string | null; value: string }[];
   pattern?: string;
+  data?: FormFieldDataSchema | null;
 };
 
 export interface FormFieldDefinition {
@@ -48,6 +49,7 @@ export interface FormFieldDefinition {
     label?: string | null;
     value: string;
   }[];
+  data?: FormFieldDataSchema | null;
 }
 
 export interface FormPage {
@@ -110,4 +112,13 @@ export interface FormResponseField {
   type: FormFieldType;
   updated_at: string;
   value: any;
+}
+
+export type FormFieldDataSchema = PaymentFieldData | {};
+
+export type PaymentsServiceProviders = "stripe" | "tosspayments";
+
+export interface PaymentFieldData {
+  type: "payment";
+  service_provider: PaymentsServiceProviders;
 }
