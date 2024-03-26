@@ -53,6 +53,13 @@ export function FormFieldPreview({
           />
         );
       }
+      case "file": {
+        return (
+          <HtmlFileInput
+            {...(sharedInputProps as React.ComponentProps<"input">)}
+          />
+        );
+      }
       case "checkbox": {
         return (
           <input
@@ -158,6 +165,24 @@ function HtmlInput({ ...props }: React.ComponentProps<"input">) {
   return (
     <input
       className="bg-neutral-50 border border-neutral-300 text-neutral-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-neutral-700 dark:border-neutral-600 dark:placeholder-neutral-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500"
+      {...props}
+    />
+  );
+}
+
+function HtmlFileInput({ ...props }: React.ComponentProps<"input">) {
+  return (
+    <input
+      type="file"
+      className="
+        text-sm text-stone-500
+        file:mr-5 file:py-1 file:px-3
+        file:rounded file:border-none
+        file:text-xs file:font-medium
+        file:bg-stone-50 file:text-stone-700
+        hover:file:cursor-pointer hover:file:bg-blue-50
+        hover:file:text-blue-700
+      "
       {...props}
     />
   );

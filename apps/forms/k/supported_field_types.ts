@@ -6,6 +6,7 @@ export const supported_field_types: FormFieldType[] = [
   "tel",
   "url",
   "checkbox",
+  // checkboxes
   "number",
   "date",
   "month",
@@ -13,6 +14,7 @@ export const supported_field_types: FormFieldType[] = [
   "email",
   "select",
   "password",
+  "file",
   "color",
   "radio",
   "hidden",
