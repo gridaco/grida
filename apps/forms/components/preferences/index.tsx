@@ -78,7 +78,7 @@ export function SectorHeader({ children }: React.PropsWithChildren<{}>) {
 }
 
 export function SectorHeading({ children }: React.PropsWithChildren<{}>) {
-  return <h1 className="text-2xl font-bold py-2">{children}</h1>;
+  return <h1 className="text-xl font-medium py-2">{children}</h1>;
 }
 
 export function SectorDescription({ children }: React.PropsWithChildren<{}>) {

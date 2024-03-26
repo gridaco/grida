@@ -15,13 +15,12 @@ export function TrustedOriginPreferences({}: {}) {
     <PreferenceBox beta>
       <PreferenceBoxHeader heading={<>Trusted origins</>} />
       <PreferenceBody>
-        <div className="flex flex-col gap-8">
+        <p className="opacity-80">
+          Add comma separated origins where the form can be embedded. Leave
+          empty to allow all origins.
+        </p>
+        <div className="flex flex-col gap-8 mt-2">
           <section>
-            <h3>Allowed origins</h3>
-            <p className="opacity-80">
-              Add origins where the form can be embedded. Leave empty to allow
-              all origins.
-            </p>
             <div>
               <label>
                 <textarea
