@@ -10,7 +10,7 @@ export default function Layout({
   const id = params.id;
 
   return (
-    <main className="flex">
+    <main className="flex flex-1">
       {/* side */}
       <nav className="col-span-1 max-w-xs min-w-60 w-min border-r dark:border-r-neutral-800 h-full">
         <ul className="flex flex-col">
