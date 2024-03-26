@@ -21,6 +21,65 @@ export type FormFieldType =
   | "hidden"
   | "signature";
 
+export type FormFieldAutocompleteType =
+  | "off"
+  | "on"
+  | "name"
+  | "honorific-prefix"
+  | "given-name"
+  | "additional-name"
+  | "family-name"
+  | "honorific-suffix"
+  | "nickname"
+  | "email"
+  | "username"
+  | "new-password"
+  | "current-password"
+  | "one-time-code"
+  | "organization-title"
+  | "organization"
+  | "street-address"
+  | "shipping"
+  | "billing"
+  | "address-line1"
+  | "address-line2"
+  | "address-line3"
+  | "address-level4"
+  | "address-level3"
+  | "address-level2"
+  | "address-level1"
+  | "country"
+  | "country-name"
+  | "postal-code"
+  | "cc-name"
+  | "cc-given-name"
+  | "cc-additional-name"
+  | "cc-family-name"
+  | "cc-number"
+  | "cc-exp"
+  | "cc-exp-month"
+  | "cc-exp-year"
+  | "cc-csc"
+  | "cc-type"
+  | "transaction-currency"
+  | "transaction-amount"
+  | "language"
+  | "bday"
+  | "bday-day"
+  | "bday-month"
+  | "bday-year"
+  | "sex"
+  | "tel"
+  | "tel-country-code"
+  | "tel-national"
+  | "tel-area-code"
+  | "tel-local"
+  | "tel-extension"
+  | "impp"
+  | "url"
+  | "photo"
+  | "webauthn";
+
 export type PlatformPoweredBy = "api" | "grida_forms" | "web_client";
 
 export type NewFormFieldInit = {
@@ -32,7 +91,10 @@ export type NewFormFieldInit = {
   required: boolean;
   options?: { label?: string | null; value: string }[];
   pattern?: string;
+  autocomplete?: FormFieldAutocompleteType[] | null;
   data?: FormFieldDataSchema | null;
+  accept?: string | null;
+  multiple?: boolean;
 };
 
 export interface FormFieldDefinition {
@@ -49,7 +111,10 @@ export interface FormFieldDefinition {
     label?: string | null;
     value: string;
   }[];
+  autocomplete?: FormFieldAutocompleteType[] | null;
   data?: FormFieldDataSchema | null;
+  accept?: string | null;
+  multiple?: boolean | null;
 }
 
 export interface FormPage {

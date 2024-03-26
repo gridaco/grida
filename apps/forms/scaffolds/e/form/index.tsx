@@ -102,6 +102,9 @@ export function Form({
             options={field.options}
             pattern={field.pattern}
             data={field.data}
+            autoComplete={field.autocomplete}
+            accept={field.accept}
+            multiple={field.multiple}
           />
         );
       }

@@ -15,6 +15,7 @@ import {
 } from "@/components/panels/side-panel";
 import { FormFieldPreview } from "@/components/formfield";
 import {
+  FormFieldAutocompleteType,
   FormFieldDataSchema,
   FormFieldType,
   NewFormFieldInit,
@@ -25,7 +26,11 @@ import { LockClosedIcon } from "@radix-ui/react-icons";
 import { FormFieldAssistant } from "../ai/form-field-schema-assistant";
 import toast from "react-hot-toast";
 import { Select } from "@/components/select";
-import { supported_field_types } from "@/k/supported_field_types";
+import {
+  html5_multiple_supported_field_types,
+  supported_field_autocomplete_types,
+  supported_field_types,
+} from "@/k/supported_field_types";
 import {
   payments_service_providers,
   payments_service_providers_display_map,
@@ -120,7 +125,14 @@ export function FieldEditPanel({
   const [options, setOptions] = useState<
     { label?: string | null; value: string }[]
   >(init?.options || []);
+  const [autocomplete, setAutocomplete] = useState<FormFieldAutocompleteType[]>(
+    init?.autocomplete || []
+  );
   const [data, setData] = useState<FormFieldDataSchema>(init?.data ?? {});
+  const [accept, setAccept] = useState<string | undefined>(
+    init?.accept ?? undefined
+  );
+  const [multiple, setMultiple] = useState(init?.multiple || false);
 
   const preview_label = buildPreviewLabel({
     name,
@@ -130,6 +142,7 @@ export function FieldEditPanel({
 
   const has_options = input_can_have_options.includes(type);
   const has_pattern = input_can_have_pattern.includes(type);
+  const has_accept = type === "file";
 
   const preview_placeholder =
     placeholder || convertToPlainText(label) || convertToPlainText(name);
@@ -149,7 +162,10 @@ export function FieldEditPanel({
       required,
       pattern,
       options,
+      autocomplete,
       data,
+      accept,
+      multiple,
     });
   };
 
@@ -218,7 +234,10 @@ export function FieldEditPanel({
                   disabled={preview_disabled}
                   options={has_options ? options : undefined}
                   pattern={pattern}
+                  autoComplete={autocomplete.join(" ")}
                   data={data}
+                  accept={accept}
+                  multiple={multiple}
                 />
                 <div className="absolute bottom-0 right-0 m-2">
                   <button
@@ -331,6 +350,31 @@ export function FieldEditPanel({
                   onChange={(e) => setHelpText(e.target.value)}
                 />
               </PanelPropertyField>
+              <PanelPropertyField label={"Auto Complete"}>
+                <Select
+                  value={autocomplete}
+                  onChange={(e) => {
+                    setAutocomplete([
+                      e.target.value as FormFieldAutocompleteType,
+                    ]);
+                  }}
+                >
+                  {supported_field_autocomplete_types.map((type) => (
+                    <option key={type} value={type}>
+                      {type}
+                    </option>
+                  ))}
+                </Select>
+              </PanelPropertyField>
+              {html5_multiple_supported_field_types.includes(type) && (
+                <PanelPropertyField label={"Multiple"}>
+                  <input
+                    type="checkbox"
+                    checked={multiple}
+                    onChange={(e) => setMultiple(e.target.checked)}
+                  />
+                </PanelPropertyField>
+              )}
               {type !== "checkbox" && (
                 <PanelPropertyField label={"Required"}>
                   <input
@@ -356,6 +400,18 @@ export function FieldEditPanel({
           <PanelPropertySection hidden={type == "payment"}>
             <PanelPropertySectionTitle>Validation</PanelPropertySectionTitle>
             <PanelPropertyFields>
+              {has_accept && (
+                <PanelPropertyField
+                  label={"Accept"}
+                  description="A comma-separated list of file types that the input should accept"
+                >
+                  <PropertyTextInput
+                    placeholder={"image/*"}
+                    value={accept}
+                    onChange={(e) => setAccept(e.target.value)}
+                  />
+                </PanelPropertyField>
+              )}
               {has_pattern && (
                 <PanelPropertyField
                   label={"Pattern"}

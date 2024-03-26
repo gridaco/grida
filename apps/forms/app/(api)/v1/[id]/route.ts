@@ -57,7 +57,10 @@ interface ClientFieldRenderBlock extends BaseRenderBlock {
       label?: string;
       value: string;
     }[];
+    autocomplete?: string;
     data?: FormFieldDataSchema | null;
+    accept?: string;
+    multiple?: boolean;
   };
 }
 interface ClientSectionRenderBlock extends BaseRenderBlock {
@@ -153,7 +156,12 @@ export async function GET(
         return <ClientFieldRenderBlock>{
           id: block.id,
           type: "field",
-          field: field,
+          field: {
+            ...field,
+            required: field.required ?? undefined,
+            multiple: field.multiple ?? undefined,
+            autocomplete: field.autocomplete?.join(" ") ?? null,
+          },
           local_index: block.local_index,
           parent_id: block.parent_id,
         };

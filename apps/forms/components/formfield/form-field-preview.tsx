@@ -16,6 +16,9 @@ export function FormFieldPreview({
   helpText,
   readonly,
   disabled,
+  autoComplete,
+  accept,
+  multiple,
   pattern,
   data,
 }: {
@@ -29,6 +32,9 @@ export function FormFieldPreview({
   pattern?: string;
   readonly?: boolean;
   disabled?: boolean;
+  autoComplete?: string;
+  accept?: string;
+  multiple?: boolean;
   labelCapitalize?: boolean;
   data?: FormFieldDataSchema | null;
 }) {
@@ -42,6 +48,9 @@ export function FormFieldPreview({
     placeholder: placeholder,
     required: required,
     pattern,
+    autoComplete,
+    accept,
+    multiple,
   };
 
   function renderInput() {

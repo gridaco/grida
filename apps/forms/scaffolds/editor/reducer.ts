@@ -363,7 +363,10 @@ export function reducer(
           field.required = data.required;
           field.pattern = data.pattern;
           field.options = data.options;
+          field.autocomplete = data.autocomplete;
           field.data = data.data;
+          field.accept = data.accept;
+          field.multiple = data.multiple;
         } else {
           // create new field
           draft.fields.push({

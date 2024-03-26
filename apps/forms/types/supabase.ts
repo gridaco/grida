@@ -200,8 +200,11 @@ export type Database = {
       }
       form_field: {
         Row: {
+          accept: string | null
           alt: string | null
-          autocomplete: boolean | null
+          autocomplete:
+            | Database["grida_forms"]["Enums"]["form_field_autocomplete_type"][]
+            | null
           created_at: string
           data: Json | null
           description: string | null
@@ -213,6 +216,7 @@ export type Database = {
           maxlength: number | null
           min: Json | null
           minlength: number | null
+          multiple: boolean | null
           name: string
           pattern: Json | null
           placeholder: string | null
@@ -221,8 +225,11 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          accept?: string | null
           alt?: string | null
-          autocomplete?: boolean | null
+          autocomplete?:
+            | Database["grida_forms"]["Enums"]["form_field_autocomplete_type"][]
+            | null
           created_at?: string
           data?: Json | null
           description?: string | null
@@ -234,6 +241,7 @@ export type Database = {
           maxlength?: number | null
           min?: Json | null
           minlength?: number | null
+          multiple?: boolean | null
           name: string
           pattern?: Json | null
           placeholder?: string | null
@@ -242,8 +250,11 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          accept?: string | null
           alt?: string | null
-          autocomplete?: boolean | null
+          autocomplete?:
+            | Database["grida_forms"]["Enums"]["form_field_autocomplete_type"][]
+            | null
           created_at?: string
           data?: Json | null
           description?: string | null
@@ -255,6 +266,7 @@ export type Database = {
           maxlength?: number | null
           min?: Json | null
           minlength?: number | null
+          multiple?: boolean | null
           name?: string
           pattern?: Json | null
           placeholder?: string | null
@@ -479,6 +491,64 @@ export type Database = {
         | "divider"
         | "header"
         | "pdf"
+      form_field_autocomplete_type:
+        | "off"
+        | "on"
+        | "name"
+        | "honorific-prefix"
+        | "given-name"
+        | "additional-name"
+        | "family-name"
+        | "honorific-suffix"
+        | "nickname"
+        | "email"
+        | "username"
+        | "new-password"
+        | "current-password"
+        | "one-time-code"
+        | "organization-title"
+        | "organization"
+        | "street-address"
+        | "shipping"
+        | "billing"
+        | "address-line1"
+        | "address-line2"
+        | "address-line3"
+        | "address-level4"
+        | "address-level3"
+        | "address-level2"
+        | "address-level1"
+        | "country"
+        | "country-name"
+        | "postal-code"
+        | "cc-name"
+        | "cc-given-name"
+        | "cc-additional-name"
+        | "cc-family-name"
+        | "cc-number"
+        | "cc-exp"
+        | "cc-exp-month"
+        | "cc-exp-year"
+        | "cc-csc"
+        | "cc-type"
+        | "transaction-currency"
+        | "transaction-amount"
+        | "language"
+        | "bday"
+        | "bday-day"
+        | "bday-month"
+        | "bday-year"
+        | "sex"
+        | "tel"
+        | "tel-country-code"
+        | "tel-national"
+        | "tel-area-code"
+        | "tel-local"
+        | "tel-extension"
+        | "impp"
+        | "url"
+        | "photo"
+        | "webauthn"
       form_field_type:
         | "text"
         | "textarea"

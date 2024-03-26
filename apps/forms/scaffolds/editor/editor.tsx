@@ -257,7 +257,10 @@ function FieldEditPanelProvider({ children }: React.PropsWithChildren<{}>) {
                 options: field.options,
                 required: field.required,
                 pattern: field.pattern,
+                autocomplete: field.autocomplete,
                 data: field.data,
+                accept: field.accept,
+                multiple: field.multiple ?? undefined,
               }
             : undefined
         }
