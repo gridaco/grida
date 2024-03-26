@@ -13,6 +13,7 @@ import { Inter } from "next/font/google";
 import { GoogleAnalytics } from "@next/third-parties/google";
 import "../../../editor.css";
 import { FormPage } from "@/types";
+import { PreviewButton } from "@/components/preview-button";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -80,20 +81,7 @@ export default async function Layout({
               <Tabs form_id={id} />
             </div>
             <div className="w-1/3 flex gap-4 items-center justify-end">
-              <Link href={`/d/${id}/preview`} target="_blank">
-                <button
-                  className="p-2 h-10 w-10 rounded bg-neutral-200"
-                  title="Preview"
-                >
-                  <EyeOpenIcon className="mx-auto" width={20} height={20} />
-                </button>
-              </Link>
-              <button
-                className="px-4 py-2 h-10 rounded bg-neutral-200"
-                title="Publish"
-              >
-                Publish
-              </button>
+              <PreviewButton form_id={id} />
             </div>
           </header>
           <FormEditorProvider
