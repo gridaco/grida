@@ -22,30 +22,16 @@ export default function Layout({
             </Link>
           </li>
           <li>
-            <Link href={`/d/${id}/settings/share/link`}>
+            <Link href={`/d/${id}/settings/share`}>
               <button className="w-full text-left px-4 py-4 bg-transparent hover:bg-neutral-500/10">
-                Share the link
+                Share
               </button>
             </Link>
           </li>
           <li>
-            <Link href={`/d/${id}/settings/share/embed`}>
+            <Link href={`/d/${id}/settings/api`}>
               <button className="w-full text-left px-4 py-4 bg-transparent hover:bg-neutral-500/10">
-                Embed in a webpage
-              </button>
-            </Link>
-          </li>
-          <li>
-            <Link href={`/d/${id}/settings/share/custom`}>
-              <button className="w-full text-left px-4 py-4 bg-transparent hover:bg-neutral-500/10">
-                Use custom renderer
-              </button>
-            </Link>
-          </li>
-          <li>
-            <Link href={`/d/${id}/settings/share/api`}>
-              <button className="w-full text-left px-4 py-4 bg-transparent hover:bg-neutral-500/10">
-                Use API
+                API Keys
               </button>
             </Link>
           </li>

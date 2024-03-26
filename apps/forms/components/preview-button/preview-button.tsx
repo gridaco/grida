@@ -1,6 +1,11 @@
 "use client";
 
-import { ChevronDownIcon, EyeOpenIcon } from "@radix-ui/react-icons";
+import {
+  ChevronDownIcon,
+  EyeOpenIcon,
+  OpenInNewWindowIcon,
+  GearIcon,
+} from "@radix-ui/react-icons";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import clsx from "clsx";
 import Link from "next/link";
@@ -9,6 +14,7 @@ import { useRouter } from "next/navigation";
 export function PreviewButton({ form_id }: { form_id: string }) {
   const router = useRouter();
   const built_in_agent_url = `/d/${form_id}/preview`;
+  const custom_agent_setting_url = `/d/${form_id}/connect`;
 
   return (
     <div role="group" className="inline-flex rounded-md shadow-sm">
@@ -41,15 +47,15 @@ export function PreviewButton({ form_id }: { form_id: string }) {
           >
             <Link href={built_in_agent_url} target="_blank">
               <DropdownMenu.Item className="flex gap-2 items-center p-1 cursor-pointer">
-                <EyeOpenIcon />
+                <OpenInNewWindowIcon />
                 Built in Agent
               </DropdownMenu.Item>
             </Link>
             <DropdownMenu.Item
               className="flex gap-2 items-center p-1 cursor-pointer"
-              onClick={() => router.push(`./settings`)}
+              onClick={() => router.push(custom_agent_setting_url)}
             >
-              <EyeOpenIcon />
+              <GearIcon />
               Configure Agent
             </DropdownMenu.Item>
           </DropdownMenu.Content>

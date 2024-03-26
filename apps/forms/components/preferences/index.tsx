@@ -68,3 +68,23 @@ export function PreferenceBoxFooter({ children }: React.PropsWithChildren<{}>) {
     </footer>
   );
 }
+
+export function Sector({ children }: React.PropsWithChildren<{}>) {
+  return <section className="py-5">{children}</section>;
+}
+
+export function SectorHeader({ children }: React.PropsWithChildren<{}>) {
+  return <header className="flex flex-col gap-1 mb-4">{children}</header>;
+}
+
+export function SectorHeading({ children }: React.PropsWithChildren<{}>) {
+  return <h1 className="text-2xl font-bold py-2">{children}</h1>;
+}
+
+export function SectorDescription({ children }: React.PropsWithChildren<{}>) {
+  return <span className="text-sm opacity-50">{children}</span>;
+}
+
+export function SectorBlocks({ children }: React.PropsWithChildren<{}>) {
+  return <div className="flex flex-col gap-8">{children}</div>;
+}

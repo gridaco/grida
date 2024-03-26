@@ -7,15 +7,16 @@ import {
   PreferenceBox,
   PreferenceBoxFooter,
   PreferenceBoxHeader,
+  SectorBlocks,
   cls_input,
 } from "@/components/preferences";
 
 export function ResponsePreferences() {
   return (
-    <div className="flex flex-col gap-8">
+    <SectorBlocks>
       <RestrictNumberOfResponseByCustomer />
       <MaxRespoonses />
-    </div>
+    </SectorBlocks>
   );
 }
 

@@ -6,6 +6,12 @@ import { TrustedOriginPreferences } from "@/scaffolds/settings/trusted-origins";
 import { ResponsePreferences } from "@/scaffolds/settings/response-preference-section";
 import { cookies } from "next/headers";
 import React from "react";
+import {
+  Sector,
+  SectorDescription,
+  SectorHeader,
+  SectorHeading,
+} from "@/components/preferences";
 
 export default async function FormGeneralSettingsPage({
   params,
@@ -72,20 +78,4 @@ export default async function FormGeneralSettingsPage({
       </Sector>
     </main>
   );
-}
-
-function Sector({ children }: React.PropsWithChildren<{}>) {
-  return <section className="py-5">{children}</section>;
-}
-
-function SectorHeader({ children }: React.PropsWithChildren<{}>) {
-  return <header className="flex flex-col gap-1 mb-4">{children}</header>;
-}
-
-function SectorHeading({ children }: React.PropsWithChildren<{}>) {
-  return <h1 className="text-2xl font-bold py-2">{children}</h1>;
-}
-
-function SectorDescription({ children }: React.PropsWithChildren<{}>) {
-  return <span className="text-sm opacity-50">{children}</span>;
 }
