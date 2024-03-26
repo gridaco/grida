@@ -56,7 +56,7 @@ export function FormFieldPreview({
       case "checkbox": {
         return (
           <input
-            className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"
+            className="w-4 h-4 text-blue-600 bg-neutral-100 border-neutral-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-neutral-800 focus:ring-2 dark:bg-neutral-700 dark:border-neutral-600"
             type="checkbox"
             {...(sharedInputProps as React.ComponentProps<"input">)}
           />
@@ -95,7 +95,7 @@ export function FormFieldPreview({
                 />
                 <label
                   htmlFor={option.value}
-                  className="ms-2 text-sm font-medium text-gray-900 dark:text-gray-300"
+                  className="ms-2 text-sm font-medium text-neutral-900 dark:text-neutral-300"
                 >
                   {option.label}
                 </label>
@@ -140,7 +140,7 @@ export function FormFieldPreview({
         {label || name}
       </span>
       {renderInput()}
-      {helpText && <span className="text-sm text-gray-600">{helpText}</span>}
+      {helpText && <span className="text-sm text-neutral-600">{helpText}</span>}
     </label>
   );
 }
@@ -148,7 +148,7 @@ export function FormFieldPreview({
 function HtmlTextarea({ ...props }: React.ComponentProps<"textarea">) {
   return (
     <textarea
-      className="shadow appearance-none border rounded py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+      className="block p-2.5 w-full text-sm text-neutral-900 bg-neutral-50 rounded-lg border border-neutral-300 focus:ring-blue-500 focus:border-blue-500 dark:bg-neutral-700 dark:border-neutral-600 dark:placeholder-neutral-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500"
       {...props}
     />
   );
@@ -157,7 +157,7 @@ function HtmlTextarea({ ...props }: React.ComponentProps<"textarea">) {
 function HtmlInput({ ...props }: React.ComponentProps<"input">) {
   return (
     <input
-      className="shadow appearance-none border rounded py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+      className="bg-neutral-50 border border-neutral-300 text-neutral-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-neutral-700 dark:border-neutral-600 dark:placeholder-neutral-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500"
       {...props}
     />
   );

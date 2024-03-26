@@ -12,7 +12,7 @@ export default function Layout({
   return (
     <main className="flex">
       {/* side */}
-      <nav className="col-span-1 max-w-xs min-w-60 w-min border-r h-full">
+      <nav className="col-span-1 max-w-xs min-w-60 w-min border-r dark:border-r-neutral-800 h-full">
         <ul className="flex flex-col">
           <li>
             <Link href={`/d/${id}/settings/general`}>

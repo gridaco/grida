@@ -30,7 +30,7 @@ export function SectionBlock({ id }: EditorFlatFormBlock) {
 
   return (
     <div>
-      <div className="p-4 rounded-md border-black border-2 bg-white shadow-md">
+      <div className="p-4 rounded-md border-black dark:border-white/50 border-2 bg-white dark:bg-neutral-900 shadow-md">
         <BlockHeader>
           <span className="flex flex-row gap-2 items-center">
             <SectionIcon />

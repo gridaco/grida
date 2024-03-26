@@ -173,7 +173,7 @@ export function Form({
   };
 
   return (
-    <main className="relative container mx-auto min-h-screen prose p-4 dark:prose-invert">
+    <main className="relative container mx-auto min-h-screen p-4 prose dark:prose-invert">
       {/* <header>
         <h1 className="py-10 text-4xl font-bold">{title}</h1>
       </header> */}

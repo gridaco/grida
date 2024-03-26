@@ -96,7 +96,7 @@ export function Block(props: EditorFlatFormBlock) {
           ref={setActivatorNodeRef}
           {...listeners}
           {...attributes}
-          className="absolute -left-8 top-1 bg-white rounded border shadow p-1"
+          className="absolute -left-8 top-1 rounded border dark:border-neutral-700 shadow p-1"
         >
           <DragHandleHorizontalIcon />
         </button>
