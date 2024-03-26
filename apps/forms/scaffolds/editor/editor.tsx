@@ -28,20 +28,22 @@ export function FormEditorProvider({
   return (
     <StateProvider state={state} dispatch={dispatch}>
       <TooltipProvider>
-        <FormResponsesProvider>
-          <FieldEditPanelProvider>
-            <ResponseEditPanelProvider>{children}</ResponseEditPanelProvider>
-          </FieldEditPanelProvider>
-        </FormResponsesProvider>
+        <FieldEditPanelProvider>
+          <ResponseEditPanelProvider>{children}</ResponseEditPanelProvider>
+        </FieldEditPanelProvider>
       </TooltipProvider>
     </StateProvider>
   );
 }
 
-function FormResponsesProvider({ children }: React.PropsWithChildren<{}>) {
+export function InitialResponsesProvider({
+  children,
+}: React.PropsWithChildren<{}>) {
   const [state, dispatch] = useEditorState();
 
   const supabase = useMemo(() => createClientClient(), []);
+
+  const initially_fetched_responses = React.useRef(false);
 
   const fetchResponses = useCallback(async () => {
     // fetch the responses
@@ -62,30 +64,6 @@ function FormResponsesProvider({ children }: React.PropsWithChildren<{}>) {
 
     return data;
   }, [supabase, state.responses_pagination_rows, state.form_id]);
-
-  const fetchResponse = useCallback(
-    async (id: string) => {
-      const { data, error } = await supabase
-        .from("response")
-        .select(
-          `
-            *,
-            fields:response_field(*)
-          `
-        )
-        .eq("id", id)
-        .single();
-
-      if (error) {
-        throw new Error();
-      }
-
-      return data;
-    },
-    [supabase]
-  );
-
-  const initially_fetched_responses = React.useRef(false);
 
   useEffect(() => {
     // initially fetch the responses
@@ -109,6 +87,38 @@ function FormResponsesProvider({ children }: React.PropsWithChildren<{}>) {
       error: "Failed to fetch responses",
     });
   }, [dispatch, fetchResponses]);
+
+  return <>{children}</>;
+}
+
+export function FormResponsesProvider({
+  children,
+}: React.PropsWithChildren<{}>) {
+  const [state, dispatch] = useEditorState();
+
+  const supabase = useMemo(() => createClientClient(), []);
+
+  const fetchResponse = useCallback(
+    async (id: string) => {
+      const { data, error } = await supabase
+        .from("response")
+        .select(
+          `
+            *,
+            fields:response_field(*)
+          `
+        )
+        .eq("id", id)
+        .single();
+
+      if (error) {
+        throw new Error();
+      }
+
+      return data;
+    },
+    [supabase]
+  );
 
   useEffect(() => {
     const changes = supabase
