@@ -101,6 +101,7 @@ export function Form({
             helpText={field.help_text}
             options={field.options}
             pattern={field.pattern}
+            data={field.data}
           />
         );
       }

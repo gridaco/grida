@@ -4,6 +4,7 @@ import { client, createRouteHandlerClient } from "@/lib/supabase/server";
 import {
   FormBlock,
   FormBlockType,
+  FormFieldDataSchema,
   FormFieldDefinition,
   FormFieldType,
   FormPage,
@@ -56,6 +57,7 @@ interface ClientFieldRenderBlock extends BaseRenderBlock {
       label?: string;
       value: string;
     }[];
+    data?: FormFieldDataSchema | null;
   };
 }
 interface ClientSectionRenderBlock extends BaseRenderBlock {
