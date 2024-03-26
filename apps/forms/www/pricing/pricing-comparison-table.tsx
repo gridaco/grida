@@ -62,7 +62,7 @@ const PricingComparisonTable = () => {
   return (
     <div
       id="compare-plans"
-      className="sm:pb-18 container relative mx-auto px-4 pb-16 md:pb-16 lg:px-16 xl:px-20"
+      className="sm:pb-18 container relative top-48 mx-auto px-4 pb-16 md:pb-16 lg:px-16 xl:px-20"
     >
       {/* <!-- xs to lg --> */}
       <div className="lg:hidden">
@@ -286,15 +286,15 @@ const PricingComparisonTable = () => {
                           {plan.priceMonthly}
                         </span>
                         {["Free", "Pro", "Team"].includes(plan.name) && (
-                          <span className="text-[13px] leading-4 mt-1">
+                          <span className="text-[13px] opacity-50 leading-4 mt-1">
                             {plan.costUnit}
                           </span>
                         )}
                       </p>
                     </span>
-                    <span className="flex flex-col justify-between h-full pb-2">
-                      <button>
-                        <Link href={plan.href}>{plan.cta}</Link>
+                    <span className="flex flex-col bg-neutral-800 rounded justify-between h-full py-2 mt-2 hover:invert transition-all">
+                      <button className="text-sm text-white">
+                        Start for free
                       </button>
                     </span>
                   </span>
@@ -302,7 +302,7 @@ const PricingComparisonTable = () => {
               ))}
             </tr>
           </thead>
-          <tbody className="border-default divide-border divide-y first:divide-y-0">
+          <tbody className="border-default divide-border dark:divide-white dark:divide-opacity-25 divide-y first:divide-y-0">
             <PricingTableRowDesktop
               category={pricing.storage}
               icon={<>icon</>}

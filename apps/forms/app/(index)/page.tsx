@@ -25,7 +25,7 @@ export default function Home() {
                 builder for developers
               </p>
             </div>
-            <button className="mt-20 px-3 py-2 bg-neutral-800 rounded border border-neutral-800 hover:invert transition-all">
+            <button className="mt-20 px-3 py-2 bg-neutral-800 text-white rounded border border-neutral-800 hover:invert transition-all">
               Start your project
             </button>
           </div>
@@ -61,25 +61,25 @@ export default function Home() {
                 }
               />
               <FeatureCard
-                title={"Smart Customer Identity"}
+                title={"Visual Editor"}
                 excerpt={
                   "Lorem ipsum dolor sit amet, consectetur adipiscing elit."
                 }
               />
               <FeatureCard
-                title={"Smart Customer Identity"}
+                title={"Advanced Analytics"}
                 excerpt={
                   "Lorem ipsum dolor sit amet, consectetur adipiscing elit."
                 }
               />
               <FeatureCard
-                title={"Smart Customer Identity"}
+                title={"Custom branding & form page"}
                 excerpt={
                   "Lorem ipsum dolor sit amet, consectetur adipiscing elit."
                 }
               />
               <FeatureCard
-                title={"Smart Customer Identity"}
+                title={"API access"}
                 excerpt={
                   "Lorem ipsum dolor sit amet, consectetur adipiscing elit."
                 }
@@ -141,67 +141,15 @@ export default function Home() {
             />
           </div>
         </section>
-        <section>
-          <div className="flex flex-row">
-            <div className="columns-1 py-20 pl-20 gap-4">
-              <div>
-                <p className="text-lg font-semibold">Free</p>
-                <p className=" text-lg opacity-50">$0 / month</p>
-              </div>
-              <button
-                className="mt-8 px-11 py-2 bg-neutral-800 rounded border border-neutral-700 hover:invert
-        transition-all"
-              >
-                Start for free
-              </button>
-            </div>
-            <div className="columns-1 py-20 pl-20 gap-4">
-              <div>
-                <p className="text-lg font-semibold">Pro</p>
-                <p className=" text-lg opacity-50">$0 / month</p>
-              </div>
-              <button
-                className="mt-8 px-11 py-2 bg-neutral-800 rounded border border-neutral-700 hover:invert
-        transition-all"
-              >
-                Start for free
-              </button>
-            </div>
-            <div className="columns-1 py-20 pl-20 gap-4">
-              <div>
-                <p className="text-lg font-semibold">Business</p>
-                <p className=" text-lg opacity-50">$0 / month</p>
-              </div>
-              <button
-                className="mt-8 px-11 py-2 bg-neutral-800 rounded border border-neutral-700 hover:invert
-        transition-all"
-              >
-                Start for free
-              </button>
-            </div>
-            <div className="columns-1 py-20 pl-20 gap-4">
-              <div>
-                <p className="text-lg font-semibold">Enterprise</p>
-                <p className=" text-lg opacity-50">$0 / month</p>
-              </div>
-              <button
-                className="mt-8 px-11 py-2 bg-neutral-800 rounded border border-neutral-700 hover:invert
-        transition-all"
-              >
-                Start for free
-              </button>
-            </div>
-          </div>
-        </section>
         <PricingComparisonTable />
         <section>
-          <div className="py-20 flex flex-col items-center gap-7">
+          <div className="py-80 flex flex-col items-center gap-7">
             <GridaLogo />
             <h2 className="text-4xl font-semibold">
               Build in a weekend, scale to millions
             </h2>
             <button
-              className="mt-10 px-3 py-2 bg-neutral-800 rounded border border-neutral-800 hover:invert
+              className="mt-10 px-3 py-2 text-white bg-neutral-800 rounded border border-neutral-800 hover:invert
         transition-all"
             >
               Start your project
@@ -279,7 +227,9 @@ async function Header() {
           </Link>
           <SlashIcon width={20} height={20} />
           <Link href="/">
-            <span className="text-2xl font-bold dark:text-white">Forms</span>
+            <span className="text-2xl font-bold dark:text-white">
+              Grida Forms
+            </span>
           </Link>
         </span>
       </div>

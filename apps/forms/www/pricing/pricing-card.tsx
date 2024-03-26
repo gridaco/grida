@@ -48,7 +48,7 @@ export function PricingCard({
       </div>
       <button
         className="
-          text-lg font-medium px-5 py-3 rounded bg-neutral-800
+          text-lg font-medium px-5 py-3 rounded text-white bg-neutral-800
           hover:invert
           transition-all
         "

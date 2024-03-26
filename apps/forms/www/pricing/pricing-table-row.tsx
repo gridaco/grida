@@ -20,7 +20,7 @@ export const Check = () => (
     fill="none"
   >
     <path
-      fill="#001eff"
+      fill="currentColor"
       fillRule="evenodd"
       d="M12 21.212a9 9 0 1 0 0-18 9 9 0 0 0 0 18Zm-.708-6.414 4.463-4.463-.707-.708-4.11 4.11-1.986-1.986-.707.707 2.34 2.34h.707Z"
       clipRule="evenodd"
@@ -49,6 +49,7 @@ export const IconPricingMinus = (props: any) => (
         fillRule="evenodd"
         d="M9 18A9 9 0 1 0 9 0a9 9 0 0 0 0 18ZM5.534 9.534h6.804v-1H5.534v1Z"
         clipRule="evenodd"
+        opacity="0.1"
       />
     </svg>
     <span className="sr-only">Not included in {props.plan}</span>
