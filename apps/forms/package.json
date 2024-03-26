@@ -35,7 +35,7 @@
     "@types/three": "^0.149.0",
     "ai": "^3.0.12",
     "change-case": "^5.4.3",
-    "classnames": "^2.5.1",
+    "clsx": "^1.1.1",
     "csv-stringify": "^6.4.6",
     "immer": "^9.0.3",
     "monaco-editor": "^0.47.0",
