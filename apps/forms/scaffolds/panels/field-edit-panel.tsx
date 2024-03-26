@@ -198,7 +198,7 @@ export function FieldEditPanel({
         <PanelPropertySection>
           <PanelPropertySectionTitle>Preview</PanelPropertySectionTitle>
           <PanelPropertyFields>
-            <div className="relative w-full min-h-40 bg-neutral-200 rounded p-10 border border-black/20">
+            <div className="relative w-full min-h-40 bg-neutral-200 dark:bg-neutral-800 rounded p-10 border border-black/20">
               <form
                 onSubmit={(e) => {
                   e.preventDefault();
@@ -223,7 +223,7 @@ export function FieldEditPanel({
                 <div className="absolute bottom-0 right-0 m-2">
                   <button
                     type="submit"
-                    className="rounded-full px-2 py-1 bg-neutral-100 text-xs font-mono"
+                    className="rounded-full px-2 py-1 bg-neutral-100 dark:bg-neutral-900 text-xs font-mono"
                   >
                     Test
                   </button>
@@ -387,9 +387,14 @@ export function FieldEditPanel({
       </PanelContent>
       <PanelFooter>
         <PanelClose>
-          <button className="rounded p-2 bg-neutral-100">Cancel</button>
+          <button className="rounded p-2 bg-neutral-100 dark:bg-neutral-900">
+            Cancel
+          </button>
         </PanelClose>
-        <button onClick={onSaveClick} className="rounded p-2 bg-neutral-100">
+        <button
+          onClick={onSaveClick}
+          className="rounded p-2 bg-neutral-100 dark:bg-neutral-900"
+        >
           Save
         </button>
       </PanelFooter>

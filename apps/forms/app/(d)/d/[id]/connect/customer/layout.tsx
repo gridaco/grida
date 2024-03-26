@@ -5,7 +5,7 @@ export default function Layout({
 }>) {
   return (
     <main className="max-w-2xl mx-auto">
-      <article className="prose dark:prose-invert pb-20">{children}</article>;
+      <article className="prose dark:prose-invert pb-20">{children}</article>
     </main>
   );
 }

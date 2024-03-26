@@ -51,12 +51,12 @@ export function EditableFormTitle({
       <input
         className="
           hover:shadow focus:shadow
-          hover:border-gray-300 focus:border-gray-300
-          dark:hover:border-gray-600 dark:focus:border-gray-600
+          hover:border-neutral-300 focus:border-neutral-300
+          dark:hover:border-neutral-600 dark:focus:border-neutral-600
           focus:outline-none focus:ring-2 focus:ring-opacity-50
-          text-gray-700 dark:text-gray-300
-          bg-white dark:bg-gray-800
-          border border-gray-300 dark:border-gray-700
+          text-neutral-700 dark:text-neutral-300
+          bg-white dark:bg-neutral-800
+          border border-neutral-300 dark:border-neutral-700
           box-border appearance-none rounded py-2 px-3 leading-tight transition-all
         "
         type="text"

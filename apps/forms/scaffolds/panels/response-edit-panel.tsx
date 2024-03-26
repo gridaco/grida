@@ -128,7 +128,9 @@ export function ResponseEditPanel({
       </PanelContent>
       <PanelFooter>
         <PanelClose>
-          <button className="rounded p-2 bg-neutral-100">Close</button>
+          <button className="rounded p-2 bg-neutral-100 dark:bg-neutral-900">
+            Close
+          </button>
         </PanelClose>
         {/* <button onClick={onSaveClick} className="rounded p-2 bg-neutral-100">
           Save
