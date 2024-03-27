@@ -94,8 +94,11 @@ async function submit({
     return NextResponse.json({ error: "Form not found" }, { status: 404 });
   }
 
-  const { is_unknown_field_allowed, redirect_after_response_uri } =
-    form_reference;
+  const {
+    is_unknown_field_allowed,
+    is_redirect_after_response_uri_enabled,
+    redirect_after_response_uri,
+  } = form_reference;
 
   const entries = data.entries();
   const __keys = Array.from(data.keys());
@@ -251,7 +254,7 @@ async function submit({
     };
   }
 
-  if (redirect_after_response_uri) {
+  if (is_redirect_after_response_uri_enabled && redirect_after_response_uri) {
     return NextResponse.redirect(redirect_after_response_uri, {
       status: 301,
     });

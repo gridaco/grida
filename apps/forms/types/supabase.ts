@@ -19,6 +19,7 @@ export type Database = {
           id: string
           is_edit_after_submission_allowed: boolean
           is_multiple_response_allowed: boolean
+          is_redirect_after_response_uri_enabled: boolean
           is_unknown_field_allowed: boolean
           project_id: number
           redirect_after_response_uri: string | null
@@ -34,6 +35,7 @@ export type Database = {
           id?: string
           is_edit_after_submission_allowed?: boolean
           is_multiple_response_allowed?: boolean
+          is_redirect_after_response_uri_enabled?: boolean
           is_unknown_field_allowed?: boolean
           project_id: number
           redirect_after_response_uri?: string | null
@@ -49,6 +51,7 @@ export type Database = {
           id?: string
           is_edit_after_submission_allowed?: boolean
           is_multiple_response_allowed?: boolean
+          is_redirect_after_response_uri_enabled?: boolean
           is_unknown_field_allowed?: boolean
           project_id?: number
           redirect_after_response_uri?: string | null

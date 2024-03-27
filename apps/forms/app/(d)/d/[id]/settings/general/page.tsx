@@ -12,6 +12,7 @@ import {
   SectorHeader,
   SectorHeading,
 } from "@/components/preferences";
+import { notFound } from "next/navigation";
 
 export default async function FormGeneralSettingsPage({
   params,
@@ -29,6 +30,10 @@ export default async function FormGeneralSettingsPage({
     .select()
     .eq("id", form_id)
     .single();
+
+  if (!data) {
+    return notFound();
+  }
 
   const { redirect_after_response_uri } = data!;
 
