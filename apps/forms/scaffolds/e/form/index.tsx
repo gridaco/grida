@@ -11,6 +11,8 @@ import clsx from "clsx";
 
 const ReactPlayer = dynamic(() => import("react-player/lazy"), { ssr: false });
 
+const cjk = ["ko", "ja"];
+
 const cls_button_submit =
   "text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:ring-blue-300 font-medium rounded-lg text-sm px-5 py-2.5 me-2 mb-2 dark:bg-blue-600 dark:hover:bg-blue-700 focus:outline-none dark:focus:ring-blue-800";
 const cls_button_nuetral =
@@ -24,6 +26,7 @@ export function Form({
   tree,
   translations,
   options,
+  lang,
 }: {
   form_id: string;
   title: string;
@@ -36,6 +39,7 @@ export function Form({
     submit: string;
     pay: string;
   };
+  lang: string;
   options: {
     is_powered_by_branding_enabled: boolean;
   };
@@ -195,7 +199,13 @@ export function Form({
   };
 
   return (
-    <main className="relative container mx-auto min-h-screen p-4 prose dark:prose-invert">
+    <main
+      data-cjk={cjk.includes(lang)}
+      className={clsx(
+        "relative container mx-auto min-h-screen p-4 prose dark:prose-invert",
+        "data-[cjk='true']:break-keep"
+      )}
+    >
       {/* <header>
         <h1 className="py-10 text-4xl font-bold">{title}</h1>
       </header> */}

@@ -18,6 +18,7 @@ export interface FormClientFetchResponse {
   tree: FormBlockTree<ClientRenderBlock[]>;
   blocks: ClientRenderBlock[];
   fields: FormFieldDefinition[];
+  lang: string;
   options: {
     is_powered_by_branding_enabled: boolean;
   };
@@ -139,7 +140,13 @@ export async function GET(
     return notFound();
   }
 
-  const { title, default_page, fields, is_powered_by_branding_enabled } = data;
+  const {
+    title,
+    default_page,
+    fields,
+    is_powered_by_branding_enabled,
+    default_form_page_language,
+  } = data;
 
   const page_blocks = (data.default_page as unknown as FormPage).blocks;
 
@@ -247,6 +254,7 @@ export async function GET(
     tree: tree,
     blocks: render_blocks,
     fields: fields,
+    lang: default_form_page_language,
     options: {
       is_powered_by_branding_enabled,
     },
