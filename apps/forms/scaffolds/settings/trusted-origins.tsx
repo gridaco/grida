@@ -7,12 +7,13 @@ import {
   PreferenceBox,
   PreferenceBoxFooter,
   PreferenceBoxHeader,
+  cls_save_button,
   cls_textarea,
 } from "@/components/preferences";
 
 export function TrustedOriginPreferences({}: {}) {
   return (
-    <PreferenceBox beta>
+    <PreferenceBox beta disabled>
       <PreferenceBoxHeader heading={<>Trusted origins</>} />
       <PreferenceBody>
         <p className="opacity-80">
@@ -33,7 +34,7 @@ export function TrustedOriginPreferences({}: {}) {
         </div>
       </PreferenceBody>
       <PreferenceBoxFooter>
-        <button form="redirect-uri" type="submit">
+        <button form="redirect-uri" type="submit" className={cls_save_button}>
           Save
         </button>
       </PreferenceBoxFooter>

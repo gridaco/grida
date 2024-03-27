@@ -7,6 +7,7 @@ import {
   PreferenceBox,
   PreferenceBoxFooter,
   PreferenceBoxHeader,
+  cls_save_button,
 } from "@/components/preferences";
 import { Select } from "@/components/select";
 import { FormResponseUnknownFieldHandlingStrategyType } from "@/types";
@@ -62,7 +63,11 @@ export function UnknownFieldPreferences({
         </form>
       </PreferenceBody>
       <PreferenceBoxFooter>
-        <button form="/private/editor/settings/unknown-fields" type="submit">
+        <button
+          form="/private/editor/settings/unknown-fields"
+          type="submit"
+          className={cls_save_button}
+        >
           Save
         </button>
       </PreferenceBoxFooter>

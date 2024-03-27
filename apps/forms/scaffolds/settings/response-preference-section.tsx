@@ -9,6 +9,7 @@ import {
   PreferenceBoxHeader,
   SectorBlocks,
   cls_input,
+  cls_save_button,
 } from "@/components/preferences";
 import clsx from "clsx";
 
@@ -73,6 +74,7 @@ export function RestrictNumberOfResponseByCustomer({
         <button
           form="/private/editor/settings/max-responses-by-customer"
           type="submit"
+          className={cls_save_button}
         >
           Save
         </button>
@@ -140,6 +142,7 @@ export function MaxRespoonses({
         <button
           form="/private/editor/settings/max-responses-in-total"
           type="submit"
+          className={cls_save_button}
         >
           Save
         </button>

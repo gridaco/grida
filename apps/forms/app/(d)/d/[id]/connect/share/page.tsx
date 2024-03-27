@@ -1,3 +1,4 @@
+import { CopyToClipboardInput } from "@/components/copy-to-clipboard-input";
 import {
   PreferenceBody,
   PreferenceBox,
@@ -45,21 +46,17 @@ export default async function WithLink({ params }: { params: { id: string } }) {
           <PreferenceBox>
             <PreferenceBoxHeader heading={<>Built-in Page URL</>} />
             <PreferenceBody>
-              <p>
+              <p className="mb-2 opacity-80">
                 Share this link with your users to let them fill out the form.
                 <br />
               </p>
-              <pre className="overflow-x-scroll p-2 bg-neutral-50 rounded">
-                <span className="underline opacity-70 text-sm">{url}</span>
-              </pre>
+              <CopyToClipboardInput value={url} />
             </PreferenceBody>
           </PreferenceBox>
           <PreferenceBox>
             <PreferenceBoxHeader heading={<>Embedding</>} />
             <PreferenceBody>
-              <pre className="overflow-x-scroll p-2 bg-neutral-100 rounded">
-                <span>{build_embed_code(embed)}</span>
-              </pre>
+              <CopyToClipboardInput value={build_embed_code(embed)} />
             </PreferenceBody>
           </PreferenceBox>
         </SectorBlocks>
@@ -76,13 +73,11 @@ export default async function WithLink({ params }: { params: { id: string } }) {
           <PreferenceBox>
             <PreferenceBoxHeader heading={<>Quick Submit API URL</>} />
             <PreferenceBody>
-              <p>
+              <p className="mb-2 opacity-80">
                 Use this URL to action on your html form to collect data
                 directly to the backend.
               </p>
-              <pre className="overflow-x-scroll p-2 bg-neutral-50 rounded">
-                <span className="underline opacity-70 text-sm">{submit}</span>
-              </pre>
+              <CopyToClipboardInput value={submit} />
             </PreferenceBody>
           </PreferenceBox>
         </SectorBlocks>

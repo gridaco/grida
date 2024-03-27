@@ -6,6 +6,7 @@ import {
   PreferenceBox,
   PreferenceBoxFooter,
   PreferenceBoxHeader,
+  cls_save_button,
 } from "@/components/preferences";
 import { Select } from "@/components/select";
 import type { FormsPageLanguage } from "@/types";
@@ -66,7 +67,11 @@ export function FormPageLanguagePreferences({
         </form>
       </PreferenceBody>
       <PreferenceBoxFooter>
-        <button form="/private/editor/settings/default-language" type="submit">
+        <button
+          form="/private/editor/settings/default-language"
+          type="submit"
+          className={cls_save_button}
+        >
           Save
         </button>
       </PreferenceBoxFooter>

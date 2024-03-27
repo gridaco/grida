@@ -40,9 +40,9 @@ export default async function FormGeneralSettingsPage({
   return (
     <main className="max-w-2xl mx-auto">
       <Sector>
-        <SectorHeader>
+        {/* <SectorHeader>
           <SectorHeading>General</SectorHeading>
-        </SectorHeader>
+        </SectorHeader> */}
         <AboutThisForm form_id={form_id} />
       </Sector>
       <Sector>

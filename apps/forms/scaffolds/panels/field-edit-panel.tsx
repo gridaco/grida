@@ -35,6 +35,7 @@ import {
   payments_service_providers,
   payments_service_providers_display_map,
 } from "@/k/payments_service_providers";
+import { cls_save_button } from "@/components/preferences";
 
 // @ts-ignore
 const default_field_init: {
@@ -447,10 +448,7 @@ export function FieldEditPanel({
             Cancel
           </button>
         </PanelClose>
-        <button
-          onClick={onSaveClick}
-          className="rounded p-2 bg-neutral-100 dark:bg-neutral-900"
-        >
+        <button onClick={onSaveClick} className={cls_save_button}>
           Save
         </button>
       </PanelFooter>

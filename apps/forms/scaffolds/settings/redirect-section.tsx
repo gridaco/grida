@@ -8,6 +8,7 @@ import {
   PreferenceBoxFooter,
   PreferenceBoxHeader,
   cls_input,
+  cls_save_button,
 } from "@/components/preferences";
 
 export function RedirectPreferences({
@@ -61,7 +62,11 @@ export function RedirectPreferences({
         </form>
       </PreferenceBody>
       <PreferenceBoxFooter>
-        <button form="/private/editor/settings/redirect-uri" type="submit">
+        <button
+          form="/private/editor/settings/redirect-uri"
+          type="submit"
+          className={cls_save_button}
+        >
           Save
         </button>
       </PreferenceBoxFooter>

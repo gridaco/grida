@@ -9,7 +9,7 @@ import { CopyToClipboardInput } from "@/components/copy-to-clipboard-input";
 export function AboutThisForm({ form_id }: { form_id: string }) {
   return (
     <PreferenceBox>
-      <PreferenceBoxHeader heading={<>Form Info</>} />
+      <PreferenceBoxHeader heading={<>About</>} />
       <PreferenceBody>
         <label>
           <span className="text-sm opacity-80 font-mono">form_id</span>

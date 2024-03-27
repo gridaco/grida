@@ -7,6 +7,7 @@ import {
   PreferenceBox,
   PreferenceBoxFooter,
   PreferenceBoxHeader,
+  cls_save_button,
 } from "@/components/preferences";
 import { PoweredByGridaWaterMark } from "@/components/powered-by-branding";
 
@@ -48,6 +49,7 @@ export function CustomizeBrandingPreferences({
         <button
           form="/private/editor/settings/powered-by-branding"
           type="submit"
+          className={cls_save_button}
         >
           Save
         </button>
