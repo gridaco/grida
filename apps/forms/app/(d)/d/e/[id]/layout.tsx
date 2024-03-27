@@ -22,7 +22,8 @@ export async function generateMetadata({
     .from("form")
     .select(
       `
-        title
+        title,
+        is_powered_by_branding_enabled
       `
     )
     .eq("id", id)
@@ -32,8 +33,10 @@ export async function generateMetadata({
     return notFound();
   }
 
+  const { title, is_powered_by_branding_enabled } = data;
+
   return {
-    title: `${data.title} | Grida Forms`,
+    title: is_powered_by_branding_enabled ? `${title} | Grida Forms` : title,
   };
 }
 
