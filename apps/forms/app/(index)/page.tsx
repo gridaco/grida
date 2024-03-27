@@ -43,7 +43,7 @@ export default function Home() {
         <section>
           <div>
             <h2 className="text-4xl font-semibold text-center py-10">
-              Deliver an optimized User Experience{" "}
+              Elevate User Experience with Tailored Interactivity{" "}
             </h2>
           </div>
           <div className="mt-20">
@@ -51,37 +51,37 @@ export default function Home() {
               <FeatureCard
                 title={"Smart Customer Identity"}
                 excerpt={
-                  "Lorem ipsum dolor sit amet, consectetur adipiscing elit."
+                  "Optimize user experience with customizable Smart Customer Identity in your forms."
                 }
               />
               <FeatureCard
                 title={"Connect Customer Identity"}
                 excerpt={
-                  "Lorem ipsum dolor sit amet, consectetur adipiscing elit."
+                  "Align your forms with your customers' identity, fostering a personalized and trustworthy interaction."
                 }
               />
               <FeatureCard
                 title={"Visual Editor"}
                 excerpt={
-                  "Lorem ipsum dolor sit amet, consectetur adipiscing elit."
+                  "Visual Editor allows users to intuitively customize visuals, ensuring their forms match their unique style."
                 }
               />
               <FeatureCard
                 title={"Advanced Analytics"}
                 excerpt={
-                  "Lorem ipsum dolor sit amet, consectetur adipiscing elit."
+                  "Advanced Analytics provides detailed insights to optimize your form strategy."
                 }
               />
               <FeatureCard
                 title={"Custom branding & form page"}
                 excerpt={
-                  "Lorem ipsum dolor sit amet, consectetur adipiscing elit."
+                  "Customize your form pages with branding elements to align seamlessly with your brand identity."
                 }
               />
               <FeatureCard
                 title={"API access"}
                 excerpt={
-                  "Lorem ipsum dolor sit amet, consectetur adipiscing elit."
+                  "API access allows for streamlined integration and enhanced form functionality."
                 }
               />
             </div>
@@ -91,11 +91,11 @@ export default function Home() {
         <section>
           <div className="py-20 flex flex-col items-center gap-7">
             <h2 className="text-4xl font-semibold text-center">
-              Predictable pricing, designed to scale
+              Discover Our Service: Engineered for Your Expansion
             </h2>
             <p className="opacity-50 text-center">
-              Start building for free, collaborate with a team, then scale to
-              millions of users.
+              Begin your creation at no cost, join forces with your team, and
+              then expand to reach millions.
             </p>
             <label className="inline-flex items-center cursor-pointer">
               <input type="checkbox" value="" className="sr-only peer" />
@@ -146,7 +146,7 @@ export default function Home() {
           <div className="py-80 flex flex-col items-center gap-7">
             <GridaLogo />
             <p className="text-4xl font-semibold text-center">
-              Build in a weekend, scale to millions
+              Create Effortlessly, Expand Boundlessly
             </p>
             <button
               className="mt-10 px-3 py-2 text-white bg-neutral-800 rounded border border-neutral-800 hover:invert
