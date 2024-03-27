@@ -19,7 +19,7 @@ import { TossPaymentsCheckoutSessionResponseData } from "@/types/integrations/ap
 
 interface TossPaymentsCheckoutSessionContext
   extends TossPaymentsCheckoutSessionResponseData {
-  paymentWidgetRef?: React.MutableRefObject<PaymentWidgetInstance | null>;
+  paymentWidgetRef: React.MutableRefObject<PaymentWidgetInstance | null>;
 }
 
 const TossPaymentsCheckoutSessionContext =
@@ -31,15 +31,22 @@ export function TossPaymentsCheckoutProvider({
 }: React.PropsWithChildren<{
   initial: TossPaymentsCheckoutSessionResponseData | null;
 }>) {
-  const [checkoutSession, setCheckoutSession] =
-    useState<TossPaymentsCheckoutSessionResponseData | null>(initial);
+  const [session, setSession] =
+    useState<TossPaymentsCheckoutSessionContext | null>(null);
+
+  const paymentWidgetRef = useRef<PaymentWidgetInstance>(null);
 
   useEffect(() => {
-    setCheckoutSession(initial);
+    if (!initial) {
+      return;
+    }
+
+    const updatedSession = { ...initial, paymentWidgetRef };
+    setSession(updatedSession);
   }, [initial]);
 
   return (
-    <TossPaymentsCheckoutSessionContext.Provider value={checkoutSession}>
+    <TossPaymentsCheckoutSessionContext.Provider value={session}>
       {children}
     </TossPaymentsCheckoutSessionContext.Provider>
   );
@@ -59,7 +66,6 @@ export function TossPaymentsCheckout({
 }: React.PropsWithChildren<TossPaymentsCheckoutSessionResponseData>) {
   const session = useTossPaymentsCheckoutSession();
 
-  const paymentWidgetRef = useRef<PaymentWidgetInstance>(null);
   const paymentMethodsWidgetRef = useRef<any>(null);
   const agreementWidgetRef = useRef<any>(null);
 
@@ -73,9 +79,8 @@ export function TossPaymentsCheckout({
     (async () => {
       const paymentWidget = await loadPaymentWidget(customerKey, ANONYMOUS); // 비회원 customerKey
 
-      if (paymentWidgetRef.current == null) {
-        // @ts-ignore
-        paymentWidgetRef.current = paymentWidget;
+      if (session.paymentWidgetRef.current == null) {
+        session.paymentWidgetRef.current = paymentWidget;
       }
 
       /**
@@ -83,7 +88,7 @@ export function TossPaymentsCheckout({
        * @docs https://docs.tosspayments.com/reference/widget-sdk#renderpaymentmethods%EC%84%A0%ED%83%9D%EC%9E%90-%EA%B2%B0%EC%A0%9C-%EA%B8%88%EC%95%A1
        */
       const paymentMethodsWidget =
-        paymentWidgetRef.current.renderPaymentMethods(
+        session.paymentWidgetRef.current?.renderPaymentMethods(
           "#payment-method",
           { value: price },
           { variantKey: "DEFAULT" }
@@ -93,10 +98,10 @@ export function TossPaymentsCheckout({
        * 약관을 렌더링합니다.
        * @docs https://docs.tosspayments.com/reference/widget-sdk#renderagreement%EC%84%A0%ED%83%9D%EC%9E%90-%EC%98%B5%EC%85%98
        */
-      agreementWidgetRef.current = paymentWidgetRef.current.renderAgreement(
-        "#agreement",
-        { variantKey: "DEFAULT" }
-      );
+      agreementWidgetRef.current =
+        session.paymentWidgetRef.current?.renderAgreement("#agreement", {
+          variantKey: "DEFAULT",
+        });
 
       paymentMethodsWidgetRef.current = paymentMethodsWidget;
     })();
@@ -113,6 +118,10 @@ export function TossPaymentsCheckout({
   );
 }
 
+/**
+ * This is a layout container if the pay button is used within a checkout widget.
+ * @returns
+ */
 export function TossPaymentsPayButtonContainerFooter({
   children,
 }: React.PropsWithChildren<{}>) {
@@ -121,9 +130,25 @@ export function TossPaymentsPayButtonContainerFooter({
 
 export function TossPaymentsPayButton({
   className,
+  children,
   ...props
 }: React.ButtonHTMLAttributes<HTMLButtonElement>) {
   const session = useTossPaymentsCheckoutSession();
+
+  const classname = clsx(
+    "w-full",
+    "text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:ring-blue-300 font-medium rounded-lg text-sm px-5 py-2.5 me-2 mb-2 dark:bg-blue-600 dark:hover:bg-blue-700 focus:outline-none dark:focus:ring-blue-800",
+    "disabled:opacity-50 disabled:cursor-not-allowed",
+    className
+  );
+
+  if (!session) {
+    return (
+      <button {...props} className={classname}>
+        {children || "결제하기"}
+      </button>
+    );
+  }
 
   const {
     orderId,
@@ -134,22 +159,17 @@ export function TossPaymentsPayButton({
     successUrl,
     failUrl,
     paymentWidgetRef,
-  } = session!;
+  } = session;
 
-  const disabled = !paymentWidgetRef;
+  const disabled = !paymentWidgetRef.current;
 
   return (
     <button
       {...props}
       disabled={disabled || props.disabled}
-      className={clsx(
-        "w-full",
-        "text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:ring-blue-300 font-medium rounded-lg text-sm px-5 py-2.5 me-2 mb-2 dark:bg-blue-600 dark:hover:bg-blue-700 focus:outline-none dark:focus:ring-blue-800",
-        "disabled:opacity-50 disabled:cursor-not-allowed",
-        className
-      )}
+      className={classname}
       onClick={async () => {
-        const paymentWidget = paymentWidgetRef!.current;
+        const paymentWidget = paymentWidgetRef.current;
 
         try {
           /**
@@ -170,7 +190,7 @@ export function TossPaymentsPayButton({
         }
       }}
     >
-      결제하기
+      {children || "결제하기"}
     </button>
   );
 }
