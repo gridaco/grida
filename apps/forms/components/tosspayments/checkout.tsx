@@ -63,7 +63,7 @@ export function useTossPaymentsCheckoutSession() {
 
 export function TossPaymentsCheckout({
   children,
-}: React.PropsWithChildren<TossPaymentsCheckoutSessionResponseData>) {
+}: React.PropsWithChildren<{}>) {
   const session = useTossPaymentsCheckoutSession();
 
   const paymentMethodsWidgetRef = useRef<any>(null);

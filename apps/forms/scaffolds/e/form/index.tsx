@@ -1,13 +1,24 @@
 "use client";
 
-import { ClientRenderBlock } from "@/app/(api)/v1/[id]/route";
+import {
+  ClientRenderBlock,
+  ClientSectionRenderBlock,
+} from "@/app/(api)/v1/[id]/route";
 import { FormFieldPreview } from "@/components/formfield";
 import { PoweredByGridaFooter } from "./powered-by-brand-footer";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { FormBlockTree } from "@/lib/forms/types";
-import { FormFieldDefinition } from "@/types";
+import { FormFieldDefinition, PaymentFieldData } from "@/types";
 import dynamic from "next/dynamic";
 import clsx from "clsx";
+import { TossPaymentsCheckoutSessionResponseData } from "@/types/integrations/api";
+import { request_toss_payments_checkout_session } from "@/lib/agent/integrations/payments/tosspayments/api";
+import {
+  TossPaymentsCheckout,
+  TossPaymentsCheckoutProvider,
+  TossPaymentsPayButton,
+} from "@/components/tosspayments";
+import { StripePaymentFormFieldPreview } from "@/components/formfield/form-field-preview-payment-stripe";
 
 const ReactPlayer = dynamic(() => import("react-player/lazy"), { ssr: false });
 
@@ -17,6 +28,8 @@ const cls_button_submit =
   "text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:ring-blue-300 font-medium rounded-lg text-sm px-5 py-2.5 me-2 mb-2 dark:bg-blue-600 dark:hover:bg-blue-700 focus:outline-none dark:focus:ring-blue-800";
 const cls_button_nuetral =
   "py-2.5 px-5 me-2 mb-2 text-sm font-medium text-neutral-900 focus:outline-none bg-white rounded-lg border border-neutral-200 hover:bg-neutral-100 hover:text-blue-700 focus:z-10 focus:ring-4 focus:ring-neutral-100 dark:focus:ring-neutral-700 dark:bg-neutral-800 dark:text-neutral-200 dark:border-neutral-700 dark:hover:text-white dark:hover:bg-neutral-800";
+
+type PaymentCheckoutSession = TossPaymentsCheckoutSessionResponseData | any;
 
 export function Form({
   form_id,
@@ -44,6 +57,9 @@ export function Form({
     is_powered_by_branding_enabled: boolean;
   };
 }) {
+  const [checkoutSession, setCheckoutSession] =
+    useState<PaymentCheckoutSession | null>(null);
+
   const sections = tree.children.filter((block) => block.type === "section");
 
   const has_sections = sections.length > 0;
@@ -51,34 +67,55 @@ export function Form({
   const last_section_id = has_sections
     ? sections[sections.length - 1].id
     : null;
-  const [current_section, set_current_section] = useState<string | null>(
+
+  const [current_section_id, set_current_section_id] = useState<string | null>(
     has_sections ? sections[0].id : null
   );
 
+  const current_section = useMemo(() => {
+    return sections.find((section) => section.id === current_section_id) as
+      | ClientSectionRenderBlock
+      | undefined;
+  }, [current_section_id]);
+
+  const primary_action_override_by_payment =
+    current_section?.attributes?.contains_payment;
+
   const submit_hidden = has_sections
-    ? last_section_id !== current_section
+    ? primary_action_override_by_payment ||
+      last_section_id !== current_section_id
     : false;
 
+  const pay_hidden = !primary_action_override_by_payment;
+
   const previous_section_button_hidden = has_sections
-    ? current_section === sections[0].id
+    ? current_section_id === sections[0].id
     : true;
 
   const next_section_button_hidden = has_sections
-    ? current_section === last_section_id
+    ? current_section_id === last_section_id
     : true;
+
+  useEffect(() => {
+    request_toss_payments_checkout_session({
+      form_id: form_id,
+      testmode: true,
+      redirect: true,
+    }).then(setCheckoutSession);
+  }, []);
 
   const onPrevious = (e: React.MouseEvent<HTMLButtonElement>) => {
     e.preventDefault();
     e.stopPropagation();
 
-    if (current_section === sections[0].id) {
+    if (current_section_id === sections[0].id) {
       return;
     }
 
     const index = sections.findIndex(
-      (section) => section.id === current_section
+      (section) => section.id === current_section_id
     );
-    set_current_section(sections[index - 1].id);
+    set_current_section_id(sections[index - 1].id);
   };
 
   const onNext = (e: React.MouseEvent<HTMLButtonElement>) => {
@@ -86,14 +123,14 @@ export function Form({
     e.preventDefault();
     e.stopPropagation();
 
-    if (current_section === last_section_id) {
+    if (current_section_id === last_section_id) {
       return;
     }
 
     const index = sections.findIndex(
-      (section) => section.id === current_section
+      (section) => section.id === current_section_id
     );
-    set_current_section(sections[index + 1].id);
+    set_current_section_id(sections[index + 1].id);
   };
 
   const renderBlock = (block: ClientRenderBlock): any => {
@@ -103,8 +140,11 @@ export function Form({
           <section
             id={block.id}
             data-gf-section-id={block.id}
+            data-gf-section-contains-payment={
+              block.attributes?.contains_payment
+            }
             key={block.id}
-            data-active-section={current_section === block.id}
+            data-active-section={current_section_id === block.id}
             className="rounded data-[active-section='false']:hidden"
           >
             <GroupLayout>{block.children?.map(renderBlock)}</GroupLayout>
@@ -113,23 +153,42 @@ export function Form({
       }
       case "field": {
         const { field } = block;
-        return (
-          <FormFieldPreview
-            key={field.id}
-            name={field.name}
-            label={field.label}
-            placeholder={field.placeholder}
-            type={field.type}
-            required={field.required}
-            helpText={field.help_text}
-            options={field.options}
-            pattern={field.pattern}
-            data={field.data}
-            autoComplete={field.autocomplete}
-            accept={field.accept}
-            multiple={field.multiple}
-          />
-        );
+        const { type } = field;
+
+        switch (type) {
+          case "payment": {
+            switch ((field.data as PaymentFieldData).service_provider) {
+              case "tosspayments": {
+                return <TossPaymentsCheckout {...checkoutSession} />;
+              }
+              case "stripe": {
+                return <StripePaymentFormFieldPreview />;
+              }
+              default: {
+                return <></>;
+              }
+            }
+          }
+          default: {
+            return (
+              <FormFieldPreview
+                key={field.id}
+                name={field.name}
+                label={field.label}
+                placeholder={field.placeholder}
+                type={field.type}
+                required={field.required}
+                helpText={field.help_text}
+                options={field.options}
+                pattern={field.pattern}
+                data={field.data}
+                autoComplete={field.autocomplete}
+                accept={field.accept}
+                multiple={field.multiple}
+              />
+            );
+          }
+        }
       }
       case "html": {
         return (
@@ -207,58 +266,70 @@ export function Form({
         "data-[cjk='true']:break-keep"
       )}
     >
-      {/* <header>
+      <TossPaymentsCheckoutProvider initial={checkoutSession}>
+        {/* <header>
         <h1 className="py-10 text-4xl font-bold">{title}</h1>
       </header> */}
-      <form
-        id="form"
-        action={"/submit/" + form_id}
-        className="p-4 pt-10 md:pt-4 h-full overflow-auto flex-1"
-      >
-        <FingerprintField />
-        <GroupLayout>{tree.children.map(renderBlock)}</GroupLayout>
-      </form>
-      <footer
-        className="
+        <form
+          id="form"
+          action={"/submit/" + form_id}
+          className="p-4 pt-10 md:pt-4 h-full overflow-auto flex-1"
+        >
+          <FingerprintField />
+          <GroupLayout>{tree.children.map(renderBlock)}</GroupLayout>
+        </form>
+        <footer
+          className="
           sticky md:static bottom-0
           flex gap-2 justify-between md:justify-start
           bg-white dark:bg-black
           p-4 mt-4 pt-4 border-t dark:border-t-neutral-900
         "
-      >
-        <button
-          data-previous-hidden={previous_section_button_hidden}
-          className={clsx(
-            cls_button_nuetral,
-            "data-[previous-hidden='true']:hidden"
-          )}
-          onClick={onPrevious}
         >
-          {translations.back}
-        </button>
-        <button
-          data-next-hidden={next_section_button_hidden}
-          className={clsx(
-            cls_button_nuetral,
-            "data-[next-hidden='true']:hidden"
-          )}
-          onClick={onNext}
-        >
-          {translations.next}
-        </button>
-        <button
-          data-submit-hidden={submit_hidden}
-          form="form"
-          className={clsx(
-            cls_button_submit,
-            "w-full md:w-auto",
-            "data-[submit-hidden='true']:hidden"
-          )}
-          type="submit"
-        >
-          {translations.submit}
-        </button>
-      </footer>
+          <button
+            data-previous-hidden={previous_section_button_hidden}
+            className={clsx(
+              cls_button_nuetral,
+              "data-[previous-hidden='true']:hidden"
+            )}
+            onClick={onPrevious}
+          >
+            {translations.back}
+          </button>
+          <button
+            data-next-hidden={next_section_button_hidden}
+            className={clsx(
+              cls_button_nuetral,
+              "data-[next-hidden='true']:hidden"
+            )}
+            onClick={onNext}
+          >
+            {translations.next}
+          </button>
+          <button
+            data-submit-hidden={submit_hidden}
+            form="form"
+            className={clsx(
+              cls_button_submit,
+              "w-full md:w-auto",
+              "data-[submit-hidden='true']:hidden"
+            )}
+            type="submit"
+          >
+            {translations.submit}
+          </button>
+          <TossPaymentsPayButton
+            data-pay-hidden={pay_hidden}
+            className={clsx(
+              cls_button_submit,
+              "w-full md:w-auto",
+              "data-[pay-hidden='true']:hidden"
+            )}
+          >
+            {translations.pay}
+          </TossPaymentsPayButton>
+        </footer>
+      </TossPaymentsCheckoutProvider>
       {options.is_powered_by_branding_enabled && <PoweredByGridaFooter />}
     </main>
   );

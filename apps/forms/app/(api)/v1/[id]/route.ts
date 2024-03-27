@@ -67,9 +67,12 @@ interface ClientFieldRenderBlock extends BaseRenderBlock {
     multiple?: boolean;
   };
 }
-interface ClientSectionRenderBlock extends BaseRenderBlock {
+export interface ClientSectionRenderBlock extends BaseRenderBlock {
   type: "section";
   children?: ClientRenderBlock[];
+  attributes?: {
+    contains_payment: boolean;
+  };
 }
 
 interface ClientHtmlRenderBlock extends BaseRenderBlock {
@@ -215,6 +218,26 @@ export async function GET(
             data: block.src,
             local_index: block.local_index,
             parent_id: block.parent_id,
+          };
+        }
+        case "section": {
+          const children_ids = page_blocks.filter(
+            (b) => b.parent_id === block.id
+          );
+
+          const contains_payment = children_ids.some(
+            (b) =>
+              b.type === "field" &&
+              fields.find((f) => f.id === b.form_field_id)?.type === "payment"
+          );
+
+          return <ClientSectionRenderBlock>{
+            id: block.id,
+            type: "section",
+            local_index: block.local_index,
+            attributes: {
+              contains_payment,
+            },
           };
         }
         case "divider":

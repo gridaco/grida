@@ -30,9 +30,9 @@ export function TossPaymentsPaymentFormFieldPreview({
     <>
       {session ? (
         <TossPaymentsCheckoutProvider initial={session}>
-          <TossPaymentsCheckout {...session}>
+          <TossPaymentsCheckout>
             <TossPaymentsPayButtonContainerFooter>
-              <TossPaymentsPayButton>Pay</TossPaymentsPayButton>
+              <TossPaymentsPayButton>결제하기</TossPaymentsPayButton>
             </TossPaymentsPayButtonContainerFooter>
           </TossPaymentsCheckout>
         </TossPaymentsCheckoutProvider>
