@@ -1,3 +1,8 @@
+export type FormResponseUnknownFieldHandlingStrategyType =
+  | "accept"
+  | "ignore"
+  | "reject";
+
 export type FormFieldType =
   | "text"
   | "textarea"

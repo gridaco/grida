@@ -35,7 +35,11 @@ export default async function FormGeneralSettingsPage({
     return notFound();
   }
 
-  const { redirect_after_response_uri } = data!;
+  const {
+    unknown_field_handling_strategy,
+    redirect_after_response_uri,
+    is_redirect_after_response_uri_enabled,
+  } = data!;
 
   return (
     <main className="max-w-2xl mx-auto">
@@ -43,7 +47,12 @@ export default async function FormGeneralSettingsPage({
         <SectorHeader>
           <SectorHeading>Data Integrity</SectorHeading>
         </SectorHeader>
-        <UnknownFieldPreferences />
+        <UnknownFieldPreferences
+          form_id={form_id}
+          init={{
+            unknown_field_handling_strategy,
+          }}
+        />
       </Sector>
       <Sector>
         <SectorHeader>
@@ -63,7 +72,11 @@ export default async function FormGeneralSettingsPage({
         </SectorHeader>
         <RedirectPreferences
           form_id={form_id}
-          defaultValue={redirect_after_response_uri ?? ""}
+          init={{
+            is_redirect_after_response_uri_enabled:
+              is_redirect_after_response_uri_enabled,
+            redirect_after_response_uri: redirect_after_response_uri ?? "",
+          }}
         />
       </Sector>
       <Sector>

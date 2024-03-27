@@ -95,7 +95,7 @@ async function submit({
   }
 
   const {
-    is_unknown_field_allowed,
+    unknown_field_handling_strategy,
     is_redirect_after_response_uri_enabled,
     redirect_after_response_uri,
   } = form_reference;
@@ -127,22 +127,6 @@ async function submit({
     .select()
     .single();
 
-  // create new form response
-  const { data: response_reference_obj } = await client
-    .from("response")
-    .insert({
-      raw: JSON.stringify(Object.fromEntries(entries)),
-      form_id: form_id,
-      browser: meta.browser,
-      ip: meta.ip,
-      customer_uuid: customer?.uuid,
-      x_referer: meta.referer,
-      x_useragent: meta.useragent,
-      platform_powered_by: "web_client",
-    })
-    .select("id")
-    .single();
-
   // get the fields ready
   const { data: form_fields } = await client
     .from("form_field")
@@ -162,21 +146,38 @@ async function submit({
   let needs_to_be_created: string[] | null = null;
 
   // create new fields by preference
-  if (!is_unknown_field_allowed && unknown_names.length > 0) {
+  if (
+    unknown_field_handling_strategy === "ignore" &&
+    unknown_names.length > 0
+  ) {
     // ignore new fields
     ignored_names.push(...unknown_names);
     // add only existing fields to mapping
     target_names.push(...known_names);
-  } else {
+  } else if (unknown_field_handling_strategy === "accept") {
     // add all fields to mapping
     target_names.push(...known_names);
     target_names.push(...unknown_names);
 
     needs_to_be_created = [...unknown_names];
+  } else if (unknown_field_handling_strategy === "reject") {
+    // reject all fields
+    return NextResponse.json(
+      {
+        error: "Unknown fields are not allowed",
+        info: {
+          message:
+            "To allow unknown fields, set 'unknown_field_handling_strategy' to 'ignore' or 'accept' in the form settings.",
+          data: { keys: unknown_names },
+        },
+      },
+      {
+        status: 400,
+      }
+    );
   }
-
-  // create new fields
   if (needs_to_be_created) {
+    // create new fields
     const { data: new_fields } = await client
       .from("form_field")
       .insert(
@@ -192,6 +193,22 @@ async function submit({
     // extend form_fields with new fields
     form_fields!.push(...new_fields!);
   }
+
+  // create new form response
+  const { data: response_reference_obj } = await client
+    .from("response")
+    .insert({
+      raw: JSON.stringify(Object.fromEntries(entries)),
+      form_id: form_id,
+      browser: meta.browser,
+      ip: meta.ip,
+      customer_uuid: customer?.uuid,
+      x_referer: meta.referer,
+      x_useragent: meta.useragent,
+      platform_powered_by: "web_client",
+    })
+    .select("id")
+    .single();
 
   // save each field value
   const { data: response_fields } = await client
@@ -232,7 +249,7 @@ async function submit({
   if (needs_to_be_created?.length) {
     info.new_keys = {
       message:
-        "There were new unknown fields in the request and the definitions are created automatically. To disable them, set is_unknown_field_allowed to false in the form settings.",
+        "There were new unknown fields in the request and the definitions are created automatically. To disable them, set 'unknown_field_handling_strategy' to 'ignore' or 'reject' in the form settings.",
       data: {
         keys: needs_to_be_created,
         fields: form_fields!.filter((field: any) =>
@@ -249,7 +266,7 @@ async function submit({
   if (ignored_names.length > 0) {
     warning.ignored_keys = {
       message:
-        "There were unknown fields in the request. To allow them, set is_unknown_field_allowed to true in the form settings.",
+        "There were unknown fields in the request. To allow them, set 'unknown_field_handling_strategy' to 'accept' in the form settings.",
       data: { keys: ignored_names },
     };
   }

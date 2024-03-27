@@ -12,12 +12,17 @@ import {
 
 export function RedirectPreferences({
   form_id,
-  defaultValue,
+  init,
 }: {
   form_id: string;
-  defaultValue: string;
+  init: {
+    redirect_after_response_uri: string;
+    is_redirect_after_response_uri_enabled: boolean;
+  };
 }) {
-  const [enabled, setEnabled] = useState(!!defaultValue);
+  const [enabled, setEnabled] = useState(
+    init.is_redirect_after_response_uri_enabled
+  );
 
   return (
     <PreferenceBox>
@@ -42,7 +47,7 @@ export function RedirectPreferences({
                 name="redirect_after_response_uri"
                 type="text"
                 disabled={!enabled}
-                defaultValue={defaultValue}
+                defaultValue={init.redirect_after_response_uri}
                 placeholder="https://.."
                 pattern="https://.*"
                 className={cls_input}

@@ -20,10 +20,10 @@ export type Database = {
           is_edit_after_submission_allowed: boolean
           is_multiple_response_allowed: boolean
           is_redirect_after_response_uri_enabled: boolean
-          is_unknown_field_allowed: boolean
           project_id: number
           redirect_after_response_uri: string | null
           title: string
+          unknown_field_handling_strategy: Database["grida_forms"]["Enums"]["form_response_unknown_field_handling_strategy_type"]
           updated_at: string
         }
         Insert: {
@@ -36,10 +36,10 @@ export type Database = {
           is_edit_after_submission_allowed?: boolean
           is_multiple_response_allowed?: boolean
           is_redirect_after_response_uri_enabled?: boolean
-          is_unknown_field_allowed?: boolean
           project_id: number
           redirect_after_response_uri?: string | null
           title?: string
+          unknown_field_handling_strategy?: Database["grida_forms"]["Enums"]["form_response_unknown_field_handling_strategy_type"]
           updated_at?: string
         }
         Update: {
@@ -52,10 +52,10 @@ export type Database = {
           is_edit_after_submission_allowed?: boolean
           is_multiple_response_allowed?: boolean
           is_redirect_after_response_uri_enabled?: boolean
-          is_unknown_field_allowed?: boolean
           project_id?: number
           redirect_after_response_uri?: string | null
           title?: string
+          unknown_field_handling_strategy?: Database["grida_forms"]["Enums"]["form_response_unknown_field_handling_strategy_type"]
           updated_at?: string
         }
         Relationships: [
@@ -574,6 +574,10 @@ export type Database = {
         | "payment"
         | "hidden"
         | "signature"
+      form_response_unknown_field_handling_strategy_type:
+        | "ignore"
+        | "accept"
+        | "reject"
       response_platform_powered_by: "api" | "grida_forms" | "web_client"
     }
     CompositeTypes: {
