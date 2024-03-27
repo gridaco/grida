@@ -18,7 +18,8 @@ export function Toggle({
       <input
         type="checkbox"
         name={name}
-        className="sr-only peer"
+        // className="sr-only peer" // the sr-only breaks the scroll layout.
+        className="hidden peer"
         disabled={disabled}
         checked={value}
         onChange={(e) => {
