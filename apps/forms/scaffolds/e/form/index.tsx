@@ -169,7 +169,7 @@ export function Form({
         return (
           <div
             key={block.id}
-            className="bg-neutral-200 rounded overflow-hidden border border-black/20 aspect-video"
+            className="rounded overflow-hidden border border-black/20 dark:bg-white/10 aspect-video"
           >
             <ReactPlayer width={"100%"} height={"100%"} url={block.src ?? ""} />
           </div>
@@ -202,7 +202,8 @@ export function Form({
     <main
       data-cjk={cjk.includes(lang)}
       className={clsx(
-        "relative container mx-auto min-h-screen p-4 prose dark:prose-invert",
+        "h-screen md:h-auto min-h-screen",
+        "relative container mx-auto prose dark:prose-invert",
         "data-[cjk='true']:break-keep"
       )}
     >
@@ -212,12 +213,19 @@ export function Form({
       <form
         id="form"
         action={"/submit/" + form_id}
-        className="h-full overflow-auto flex-1"
+        className="p-4 pt-10 md:pt-4 h-full overflow-auto flex-1"
       >
         <FingerprintField />
         <GroupLayout>{tree.children.map(renderBlock)}</GroupLayout>
       </form>
-      <footer className="mt-4 pt-4 flex gap-2 border-t dark:border-t-neutral-700">
+      <footer
+        className="
+          sticky md:static bottom-0
+          flex gap-2 justify-between md:justify-start
+          bg-white dark:bg-black
+          p-4 mt-4 pt-4 border-t dark:border-t-neutral-900
+        "
+      >
         <button
           data-previous-hidden={previous_section_button_hidden}
           className={clsx(
@@ -243,6 +251,7 @@ export function Form({
           form="form"
           className={clsx(
             cls_button_submit,
+            "w-full md:w-auto",
             "data-[submit-hidden='true']:hidden"
           )}
           type="submit"

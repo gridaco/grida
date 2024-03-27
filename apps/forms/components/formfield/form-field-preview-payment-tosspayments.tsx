@@ -1,6 +1,12 @@
 "use client";
+
 import { useEffect, useState } from "react";
-import { TossPaymentsCheckout } from "../tosspayments/checkout";
+import {
+  TossPaymentsCheckout,
+  TossPaymentsCheckoutProvider,
+  TossPaymentsPayButton,
+  TossPaymentsPayButtonContainerFooter,
+} from "../tosspayments/checkout";
 import { request_toss_payments_checkout_session } from "@/lib/agent/integrations/payments/tosspayments/api";
 import { TossPaymentsCheckoutSessionResponseData } from "@/types/integrations/api";
 
@@ -23,9 +29,13 @@ export function TossPaymentsPaymentFormFieldPreview({
   return (
     <>
       {session ? (
-        <>
-          <TossPaymentsCheckout {...session} />
-        </>
+        <TossPaymentsCheckoutProvider initial={session}>
+          <TossPaymentsCheckout {...session}>
+            <TossPaymentsPayButtonContainerFooter>
+              <TossPaymentsPayButton>Pay</TossPaymentsPayButton>
+            </TossPaymentsPayButtonContainerFooter>
+          </TossPaymentsCheckout>
+        </TossPaymentsCheckoutProvider>
       ) : (
         <></>
       )}

@@ -75,6 +75,7 @@ export interface TossPaymentsCheckoutSessionResponseData
     TossPaymentsIntegrationPublicKeys {
   successUrl: string;
   failUrl: string;
+  price: number;
 }
 
 export interface IntegrationsApiResponse<T> {

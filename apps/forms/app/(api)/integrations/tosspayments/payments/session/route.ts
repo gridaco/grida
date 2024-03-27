@@ -43,6 +43,8 @@ export async function POST(req: NextRequest) {
     orderName: orderName,
     successUrl: redirect ? build_toss_payments_success_url() : "#",
     failUrl: redirect ? build_toss_payments_fail_url() : "#",
+    // TODO:
+    price: 1000,
     //
     customerKey: customerKey,
   };
