@@ -15,6 +15,7 @@ function get_tosspayments_fail_url_search_params(
 }
 
 export function GET(req: NextRequest) {
+  const origin = req.nextUrl.origin;
   const searchParams = req.nextUrl.searchParams;
 
   const { code, message } =
