@@ -273,7 +273,7 @@ export function Form({
         <form
           id="form"
           action={"/submit/" + form_id}
-          className="p-4 pt-10 md:pt-4 h-full overflow-auto flex-1"
+          className="p-4 pt-10 md:pt-16 h-full overflow-auto flex-1"
         >
           <FingerprintField />
           <GroupLayout>{tree.children.map(renderBlock)}</GroupLayout>
