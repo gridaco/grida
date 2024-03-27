@@ -5,6 +5,7 @@ import {
   BlockTitleAction,
   BlocksEditorAction,
   ChangeBlockFieldAction,
+  CreateFielFromBlockdAction,
   CreateNewPendingBlockAction,
   DeleteBlockAction,
   DeleteFieldAction,
@@ -226,6 +227,18 @@ export function reducer(
         if (block) {
           block.description_html = description_html;
         }
+      });
+    }
+    case "blocks/field/new": {
+      const { block_id } = <CreateFielFromBlockdAction>action;
+      // trigger new field from empty field block
+      return produce(state, (draft) => {
+        // update focus block id
+        draft.focus_block_id = block_id;
+
+        // if no available field, but field block provided, open a field editor panel
+        draft.focus_field_id = null;
+        draft.is_field_edit_panel_open = true;
       });
     }
     case "blocks/field/change": {

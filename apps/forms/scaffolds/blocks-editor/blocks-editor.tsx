@@ -110,7 +110,7 @@ function PendingBlocksResolver() {
         .single();
 
       if (error) {
-        throw new Error();
+        throw error;
       }
 
       return data;
@@ -134,8 +134,13 @@ function PendingBlocksResolver() {
             block: data,
           });
         })
-        .catch(() => {
+        .catch((e) => {
+          console.error("Failed to create block", e);
           toast.error("Failed to create block");
+          dispatch({
+            type: "blocks/delete",
+            block_id: block.id,
+          });
         });
     }
   }, [dispatch, insertBlock, state.blocks]);
