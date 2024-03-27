@@ -90,10 +90,10 @@ export default function Home() {
         <div className="h-96" />
         <section>
           <div className="py-20 flex flex-col items-center gap-7">
-            <h2 className="text-4xl font-semibold">
+            <h2 className="text-4xl font-semibold text-center">
               Predictable pricing, designed to scale
             </h2>
-            <p className="opacity-50">
+            <p className="opacity-50 text-center">
               Start building for free, collaborate with a team, then scale to
               millions of users.
             </p>
@@ -145,9 +145,9 @@ export default function Home() {
         <section>
           <div className="py-80 flex flex-col items-center gap-7">
             <GridaLogo />
-            <h2 className="text-4xl font-semibold">
+            <p className="text-4xl font-semibold text-center">
               Build in a weekend, scale to millions
-            </h2>
+            </p>
             <button
               className="mt-10 px-3 py-2 text-white bg-neutral-800 rounded border border-neutral-800 hover:invert
         transition-all"
@@ -156,7 +156,7 @@ export default function Home() {
             </button>
           </div>
         </section>
-        <section>
+        {/* <section>
           <div id="accordion-collapse" data-accordion="collapse">
             <h2 id="accordion-collapse-heading-1">
               <button
@@ -199,8 +199,23 @@ export default function Home() {
               </p>
             </div>
           </div>
-        </section>
+        </section> */}
       </div>
+      <footer className="mx-auto mt-32 w-full max-w-container px-4 sm:px-6 lg:px-8">
+        <div className="border-t border-neutral-400 border-opacity-25 py-10">
+          <div className="pt-8 flex flex-col items-center gap-7">
+            <GridaLogo />
+          </div>
+        </div>
+        <p className="mt-1 text-center text-sm leading-6 text-current">
+          Grida Inc. All rights reserved.
+        </p>
+        <div className="mt-20 mb-16 flex items-center justify-center text-sm leading-6 text-neutral-500">
+          Privacy policy
+          <div className="h-4 w-px mx-4 bg-neutral-400 opacity-25"></div>
+          <p>Changelog</p>
+        </div>
+      </footer>
     </main>
   );
 }

@@ -49,11 +49,10 @@ const PricingComparisonTable = () => {
             <span className="text-foreground-light">{price}</span>
           )}
 
-          <p className="p">{priceDescription}</p>
+          <p className="p opacity-50">{priceDescription}</p>
         </div>
-        <p className="p">{description}</p>
-        <button>
-          <Link href={selectedPlan.href}>{selectedPlan.cta}</Link>
+        <button className=" text-white flex flex-col bg-neutral-800 rounded justify-between h-full py-2 px-6 mt-2 hover:invert transition-all">
+          Start for free
         </button>
       </div>
     );
@@ -68,13 +67,13 @@ const PricingComparisonTable = () => {
       <div className="lg:hidden">
         {/* Free - Mobile  */}
         <div className="bg-background p-2 sticky top-14 z-10 pt-4">
-          <div className="bg-surface-100 rounded-lg border py-2 px-4 flex justify-between items-center">
+          <div className="bg-surface-100 rounded-lg border dark:border-white dark:border-opacity-25 py-2 px-4 flex justify-between items-center">
             <label className="text-foreground-lighter">Change plan</label>
             <select
               id="change-plan"
               name="Change plan"
               value={activeMobilePlan}
-              className="min-w-[120px]"
+              className="bg-transparent min-w-[120px]"
               onChange={(e) => setActiveMobilePlan(e.target.value)}
             >
               <option value="Free">Free</option>
@@ -131,8 +130,8 @@ const PricingComparisonTable = () => {
             <MobileHeader
               plan="Pro"
               from={false}
-              price={"25"}
-              priceDescription={"/month + additional use"}
+              price={"20"}
+              priceDescription={"/month"}
               description={
                 "Everything you need to scale your project into production"
               }
@@ -171,8 +170,8 @@ const PricingComparisonTable = () => {
             <MobileHeader
               plan="Team"
               from={false}
-              price={"599"}
-              priceDescription={"/month + additional use"}
+              price={"60"}
+              priceDescription={"/month"}
               description={
                 "Collaborate with different permissions and access patterns"
               }
@@ -210,7 +209,7 @@ const PricingComparisonTable = () => {
           <>
             <MobileHeader
               plan="Enterprise"
-              price={"Contact us for a quote"}
+              price={"Contact us"}
               priceDescription={""}
               description={
                 "Designated support team, account manager and technical specialist"
