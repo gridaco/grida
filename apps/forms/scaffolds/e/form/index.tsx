@@ -7,8 +7,14 @@ import React, { useEffect, useState } from "react";
 import { FormBlockTree } from "@/lib/forms/types";
 import { FormFieldDefinition } from "@/types";
 import dynamic from "next/dynamic";
+import clsx from "clsx";
 
 const ReactPlayer = dynamic(() => import("react-player/lazy"), { ssr: false });
+
+const cls_button_submit =
+  "text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:ring-blue-300 font-medium rounded-lg text-sm px-5 py-2.5 me-2 mb-2 dark:bg-blue-600 dark:hover:bg-blue-700 focus:outline-none dark:focus:ring-blue-800";
+const cls_button_nuetral =
+  "py-2.5 px-5 me-2 mb-2 text-sm font-medium text-gray-900 focus:outline-none bg-white rounded-lg border border-gray-200 hover:bg-gray-100 hover:text-blue-700 focus:z-10 focus:ring-4 focus:ring-gray-100 dark:focus:ring-gray-700 dark:bg-gray-800 dark:text-gray-400 dark:border-gray-600 dark:hover:text-white dark:hover:bg-gray-700";
 
 export function Form({
   form_id,
@@ -16,12 +22,19 @@ export function Form({
   blocks,
   fields,
   tree,
+  translations,
 }: {
   form_id: string;
   title: string;
   fields: FormFieldDefinition[];
   blocks: ClientRenderBlock[];
   tree: FormBlockTree<ClientRenderBlock[]>;
+  translations: {
+    next: string;
+    back: string;
+    submit: string;
+    pay: string;
+  };
 }) {
   const sections = tree.children.filter((block) => block.type === "section");
 
@@ -188,40 +201,37 @@ export function Form({
         <FingerprintField />
         <GroupLayout>{tree.children.map(renderBlock)}</GroupLayout>
       </form>
-      <footer className="mt-4 flex gap-4">
+      <footer className="mt-4 pt-4 flex gap-2 border-t dark:border-t-neutral-700">
         <button
           data-previous-hidden={previous_section_button_hidden}
-          className="
-              bg-neutral-100 text-black shadow
-              rounded px-4 py-2
-              data-[previous-hidden='true']:hidden
-            "
+          className={clsx(
+            cls_button_nuetral,
+            "data-[previous-hidden='true']:hidden"
+          )}
           onClick={onPrevious}
         >
-          Back
+          {translations.back}
         </button>
         <button
           data-next-hidden={next_section_button_hidden}
-          className="
-            bg-neutral-100 text-black shadow
-              rounded px-4 py-2
-              data-[next-hidden='true']:hidden
-            "
+          className={clsx(
+            cls_button_nuetral,
+            "data-[next-hidden='true']:hidden"
+          )}
           onClick={onNext}
         >
-          Next
+          {translations.next}
         </button>
         <button
           data-submit-hidden={submit_hidden}
           form="form"
-          className="
-            bg-blue-500 text-white shadow
-              rounded px-4 py-2
-              data-[submit-hidden='true']:hidden
-            "
+          className={clsx(
+            cls_button_submit,
+            "data-[submit-hidden='true']:hidden"
+          )}
           type="submit"
         >
-          Submit
+          {translations.submit}
         </button>
       </footer>
       <Footer />

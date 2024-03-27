@@ -37,7 +37,7 @@ export async function POST(req: NextRequest) {
   const orderId = nanoid();
   const orderName = `#${nanoid(4)}`;
   const customerKey = await get_tosspayments_customer_key(form_id, testmode);
-  console.log("redirect", redirect);
+
   const session: TossPaymentsCheckoutSessionResponseData = {
     orderId,
     orderName: orderName,
