@@ -1,3 +1,4 @@
+import { SideNavBadge, SideNavItem } from "@/components/sidenav";
 import Link from "next/link";
 
 export default function Layout({
@@ -16,23 +17,20 @@ export default function Layout({
         <ul className="flex flex-col">
           <li>
             <Link href={`/d/${id}/settings/general`}>
-              <button className="w-full text-left px-4 py-4 bg-transparent hover:bg-neutral-500/10">
-                General
-              </button>
+              <SideNavItem>General</SideNavItem>
             </Link>
           </li>
           <li>
             <Link href={`/d/${id}/settings/share`}>
-              <button className="w-full text-left px-4 py-4 bg-transparent hover:bg-neutral-500/10">
-                Share
-              </button>
+              <SideNavItem>Share</SideNavItem>
             </Link>
           </li>
           <li>
             <Link href={`/d/${id}/settings/api`}>
-              <button className="w-full text-left px-4 py-4 bg-transparent hover:bg-neutral-500/10">
+              <SideNavItem>
                 API Keys
-              </button>
+                <SideNavBadge>soon</SideNavBadge>
+              </SideNavItem>
             </Link>
           </li>
         </ul>
