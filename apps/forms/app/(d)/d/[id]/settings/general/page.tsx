@@ -41,7 +41,6 @@ export default async function FormGeneralSettingsPage({
   }
 
   const {
-    default_form_page_language,
     unknown_field_handling_strategy,
     redirect_after_response_uri,
     is_redirect_after_response_uri_enabled,
@@ -53,17 +52,6 @@ export default async function FormGeneralSettingsPage({
 
   return (
     <main className="max-w-2xl mx-auto">
-      <Sector>
-        <SectorHeader>
-          <SectorHeading>Language</SectorHeading>
-        </SectorHeader>
-        <FormPageLanguagePreferences
-          form_id={form_id}
-          init={{
-            default_form_page_language,
-          }}
-        />
-      </Sector>
       <Sector>
         <SectorHeader>
           <SectorHeading>Responses</SectorHeading>

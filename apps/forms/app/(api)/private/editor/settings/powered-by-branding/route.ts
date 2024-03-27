@@ -1,5 +1,4 @@
 import { createRouteHandlerClient } from "@/lib/supabase/server";
-import { FormsPageLanguage } from "@/types";
 import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
 import { NextRequest, NextResponse } from "next/server";
@@ -14,12 +13,17 @@ export async function POST(req: NextRequest) {
 
   const form_id = String(formdata.get("form_id"));
 
-  const __raw_default_form_page_language = formdata.get(
-    "default_form_page_language"
+  const __raw_is_powered_by_branding_enabled = formdata.get(
+    "is_powered_by_branding_enabled"
   );
-  const default_form_page_language = __raw_default_form_page_language
-    ? (String(__raw_default_form_page_language) as FormsPageLanguage)
-    : undefined;
+  console.log(__raw_is_powered_by_branding_enabled);
+  const is_powered_by_branding_enabled =
+    String(__raw_is_powered_by_branding_enabled) === "on";
+
+  console.log("POST /private/editor/settings/powered-by-branding", {
+    form_id,
+    is_powered_by_branding_enabled: is_powered_by_branding_enabled,
+  });
 
   if (!form_id) {
     return notFound();
@@ -30,7 +34,7 @@ export async function POST(req: NextRequest) {
   await supabase
     .from("form")
     .update({
-      default_form_page_language: default_form_page_language,
+      is_powered_by_branding_enabled: is_powered_by_branding_enabled,
     })
     .eq("id", form_id)
     .single();

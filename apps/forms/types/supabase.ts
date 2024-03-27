@@ -22,6 +22,7 @@ export type Database = {
           is_max_form_responses_by_customer_enabled: boolean
           is_max_form_responses_in_total_enabled: boolean
           is_multiple_response_allowed: boolean
+          is_powered_by_branding_enabled: boolean
           is_redirect_after_response_uri_enabled: boolean
           max_form_responses_by_customer: number | null
           max_form_responses_in_total: number | null
@@ -43,6 +44,7 @@ export type Database = {
           is_max_form_responses_by_customer_enabled?: boolean
           is_max_form_responses_in_total_enabled?: boolean
           is_multiple_response_allowed?: boolean
+          is_powered_by_branding_enabled?: boolean
           is_redirect_after_response_uri_enabled?: boolean
           max_form_responses_by_customer?: number | null
           max_form_responses_in_total?: number | null
@@ -64,6 +66,7 @@ export type Database = {
           is_max_form_responses_by_customer_enabled?: boolean
           is_max_form_responses_in_total_enabled?: boolean
           is_multiple_response_allowed?: boolean
+          is_powered_by_branding_enabled?: boolean
           is_redirect_after_response_uri_enabled?: boolean
           max_form_responses_by_customer?: number | null
           max_form_responses_in_total?: number | null

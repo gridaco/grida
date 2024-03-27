@@ -18,6 +18,9 @@ export interface FormClientFetchResponse {
   tree: FormBlockTree<ClientRenderBlock[]>;
   blocks: ClientRenderBlock[];
   fields: FormFieldDefinition[];
+  options: {
+    is_powered_by_branding_enabled: boolean;
+  };
 }
 
 export type ClientRenderBlock =
@@ -136,7 +139,7 @@ export async function GET(
     return notFound();
   }
 
-  const { title, default_page, fields } = data;
+  const { title, default_page, fields, is_powered_by_branding_enabled } = data;
 
   const page_blocks = (data.default_page as unknown as FormPage).blocks;
 
@@ -244,6 +247,9 @@ export async function GET(
     tree: tree,
     blocks: render_blocks,
     fields: fields,
+    options: {
+      is_powered_by_branding_enabled,
+    },
   };
 
   return NextResponse.json({

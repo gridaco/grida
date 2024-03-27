@@ -21,6 +21,11 @@ export default function Layout({
             </Link>
           </li>
           <li>
+            <Link href={`/d/${id}/settings/customize`}>
+              <SideNavItem>Customize</SideNavItem>
+            </Link>
+          </li>
+          <li>
             <Link href={`/d/${id}/settings/share`}>
               <SideNavItem>Share</SideNavItem>
             </Link>

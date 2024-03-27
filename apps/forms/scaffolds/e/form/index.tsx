@@ -2,7 +2,7 @@
 
 import { ClientRenderBlock } from "@/app/(api)/v1/[id]/route";
 import { FormFieldPreview } from "@/components/formfield";
-import { Footer } from "./footer";
+import { PoweredByGridaFooter } from "./powered-by-brand-footer";
 import React, { useEffect, useState } from "react";
 import { FormBlockTree } from "@/lib/forms/types";
 import { FormFieldDefinition } from "@/types";
@@ -23,6 +23,7 @@ export function Form({
   fields,
   tree,
   translations,
+  options,
 }: {
   form_id: string;
   title: string;
@@ -34,6 +35,9 @@ export function Form({
     back: string;
     submit: string;
     pay: string;
+  };
+  options: {
+    is_powered_by_branding_enabled: boolean;
   };
 }) {
   const sections = tree.children.filter((block) => block.type === "section");
@@ -93,6 +97,8 @@ export function Form({
       case "section": {
         return (
           <section
+            id={block.id}
+            data-gf-section-id={block.id}
             key={block.id}
             data-active-section={current_section === block.id}
             className="rounded data-[active-section='false']:hidden"
@@ -234,7 +240,7 @@ export function Form({
           {translations.submit}
         </button>
       </footer>
-      <Footer />
+      {options.is_powered_by_branding_enabled && <PoweredByGridaFooter />}
     </main>
   );
 }

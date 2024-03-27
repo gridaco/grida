@@ -18,7 +18,7 @@ export default async function FormPage({ params }: { params: { id: string } }) {
     return notFound();
   }
 
-  const { title, blocks, tree, fields } = data;
+  const { title, blocks, tree, fields, options } = data;
 
   return (
     <div className="min-h-screen p-4">
@@ -34,6 +34,7 @@ export default async function FormPage({ params }: { params: { id: string } }) {
           submit: i18next.t("submit"),
           pay: i18next.t("pay"),
         }}
+        options={options}
       />
     </div>
   );
