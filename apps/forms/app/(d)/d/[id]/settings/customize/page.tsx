@@ -1,15 +1,12 @@
+import React from "react";
 import { createServerComponentClient } from "@/lib/supabase/server";
 import { FormPageLanguagePreferences } from "@/scaffolds/settings/form-page-language";
-import { UnknownFieldPreferences } from "@/scaffolds/settings/data-unknown-fields";
-import { DeleteFormSection } from "@/scaffolds/settings/delete-form/delete-form-section";
 import { RedirectPreferences } from "@/scaffolds/settings/redirect-section";
-import { TrustedOriginPreferences } from "@/scaffolds/settings/trusted-origins";
 import {
   MaxRespoonses,
   RestrictNumberOfResponseByCustomer,
 } from "@/scaffolds/settings/response-preference-section";
 import { cookies } from "next/headers";
-import React from "react";
 import {
   Sector,
   SectorBlocks,
@@ -42,9 +39,14 @@ export default async function FormsCustomizeSettingsPage({
   }
 
   const {
-    //
     default_form_page_language,
     is_powered_by_branding_enabled,
+    redirect_after_response_uri,
+    is_redirect_after_response_uri_enabled,
+    max_form_responses_by_customer,
+    is_max_form_responses_by_customer_enabled,
+    max_form_responses_in_total,
+    is_max_form_responses_in_total_enabled,
   } = data!;
 
   return (
@@ -57,6 +59,46 @@ export default async function FormsCustomizeSettingsPage({
           form_id={form_id}
           init={{
             default_form_page_language,
+          }}
+        />
+      </Sector>
+      <Sector>
+        <SectorHeader>
+          <SectorHeading>Responses</SectorHeading>
+          <SectorDescription>
+            Manage how responses are collected and protected
+          </SectorDescription>
+        </SectorHeader>
+        <SectorBlocks>
+          <RestrictNumberOfResponseByCustomer
+            form_id={form_id}
+            init={{
+              is_max_form_responses_by_customer_enabled,
+              max_form_responses_by_customer,
+            }}
+          />
+          <MaxRespoonses
+            form_id={form_id}
+            init={{
+              is_max_form_responses_in_total_enabled,
+              max_form_responses_in_total,
+            }}
+          />
+        </SectorBlocks>
+      </Sector>
+      <Sector>
+        <SectorHeader>
+          <SectorHeading>Redirection</SectorHeading>
+          <SectorDescription>
+            Customize redirection url after submission
+          </SectorDescription>
+        </SectorHeader>
+        <RedirectPreferences
+          form_id={form_id}
+          init={{
+            is_redirect_after_response_uri_enabled:
+              is_redirect_after_response_uri_enabled,
+            redirect_after_response_uri: redirect_after_response_uri ?? "",
           }}
         />
       </Sector>

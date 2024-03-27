@@ -26,17 +26,12 @@ export default function Layout({
             </Link>
           </li>
           <li>
-            <Link href={`/d/${id}/settings/share`}>
-              <SideNavItem>Share</SideNavItem>
-            </Link>
-          </li>
-          <li>
-            <Link href={`/d/${id}/settings/api`}>
-              <SideNavItem>
-                API Keys
-                <SideNavBadge>soon</SideNavBadge>
-              </SideNavItem>
-            </Link>
+            {/* <Link href={`/d/${id}/settings/api`}> */}
+            <SideNavItem disabled>
+              API Keys
+              <SideNavBadge>soon</SideNavBadge>
+            </SideNavItem>
+            {/* </Link> */}
           </li>
         </ul>
       </nav>

@@ -16,6 +16,11 @@ export default function Layout({
       <nav className="col-span-1 max-w-xs min-w-60 w-min border-r dark:border-r-neutral-800 h-full">
         <ul className="flex flex-col">
           <li>
+            <Link href={`/d/${id}/connect/share`}>
+              <SideNavItem>Share</SideNavItem>
+            </Link>
+          </li>
+          <li>
             <Link href={`/d/${id}/connect/customer`}>
               <SideNavItem>Customer Identity</SideNavItem>
             </Link>

@@ -37,13 +37,13 @@ export default async function WithLink({ params }: { params: { id: string } }) {
         <SectorHeader>
           <SectorHeading>Share the link</SectorHeading>
           <SectorDescription>
-            We provide built-in agent URL, although you can build your own
-            frontend agent.
+            We provide built-in page URL, although you can build your own
+            frontend page.
           </SectorDescription>
         </SectorHeader>
         <SectorBlocks>
           <PreferenceBox>
-            <PreferenceBoxHeader heading={<>Built-in Agent URL</>} />
+            <PreferenceBoxHeader heading={<>Built-in Page URL</>} />
             <PreferenceBody>
               <p>
                 Share this link with your users to let them fill out the form.
