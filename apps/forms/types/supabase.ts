@@ -15,6 +15,7 @@ export type Database = {
           custom_preview_url_path: string | null
           custom_publish_url_path: string | null
           default_form_page_id: string | null
+          default_form_page_language: Database["grida_forms"]["Enums"]["form_page_language"]
           description: string | null
           id: string
           is_edit_after_submission_allowed: boolean
@@ -35,6 +36,7 @@ export type Database = {
           custom_preview_url_path?: string | null
           custom_publish_url_path?: string | null
           default_form_page_id?: string | null
+          default_form_page_language?: Database["grida_forms"]["Enums"]["form_page_language"]
           description?: string | null
           id?: string
           is_edit_after_submission_allowed?: boolean
@@ -55,6 +57,7 @@ export type Database = {
           custom_preview_url_path?: string | null
           custom_publish_url_path?: string | null
           default_form_page_id?: string | null
+          default_form_page_language?: Database["grida_forms"]["Enums"]["form_page_language"]
           description?: string | null
           id?: string
           is_edit_after_submission_allowed?: boolean
@@ -586,6 +589,7 @@ export type Database = {
         | "payment"
         | "hidden"
         | "signature"
+      form_page_language: "en" | "ko"
       form_response_unknown_field_handling_strategy_type:
         | "ignore"
         | "accept"

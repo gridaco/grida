@@ -1,3 +1,8 @@
+/**
+ * user facing page language
+ */
+export type FormsPageLanguage = "en" | "ko";
+
 export type FormResponseUnknownFieldHandlingStrategyType =
   | "accept"
   | "ignore"

@@ -1,4 +1,5 @@
 import { createServerComponentClient } from "@/lib/supabase/server";
+import { FormPageLanguagePreferences } from "@/scaffolds/settings/form-page-language";
 import { UnknownFieldPreferences } from "@/scaffolds/settings/data-unknown-fields";
 import { DeleteFormSection } from "@/scaffolds/settings/delete-form/delete-form-section";
 import { RedirectPreferences } from "@/scaffolds/settings/redirect-section";
@@ -40,6 +41,7 @@ export default async function FormGeneralSettingsPage({
   }
 
   const {
+    default_form_page_language,
     unknown_field_handling_strategy,
     redirect_after_response_uri,
     is_redirect_after_response_uri_enabled,
@@ -53,12 +55,12 @@ export default async function FormGeneralSettingsPage({
     <main className="max-w-2xl mx-auto">
       <Sector>
         <SectorHeader>
-          <SectorHeading>Data Integrity</SectorHeading>
+          <SectorHeading>Language</SectorHeading>
         </SectorHeader>
-        <UnknownFieldPreferences
+        <FormPageLanguagePreferences
           form_id={form_id}
           init={{
-            unknown_field_handling_strategy,
+            default_form_page_language,
           }}
         />
       </Sector>
@@ -99,6 +101,17 @@ export default async function FormGeneralSettingsPage({
             is_redirect_after_response_uri_enabled:
               is_redirect_after_response_uri_enabled,
             redirect_after_response_uri: redirect_after_response_uri ?? "",
+          }}
+        />
+      </Sector>
+      <Sector>
+        <SectorHeader>
+          <SectorHeading>Data Integrity</SectorHeading>
+        </SectorHeader>
+        <UnknownFieldPreferences
+          form_id={form_id}
+          init={{
+            unknown_field_handling_strategy,
           }}
         />
       </Sector>
