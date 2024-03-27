@@ -5,6 +5,7 @@ import {
   BlockTitleAction,
   BlocksEditorAction,
   ChangeBlockFieldAction,
+  CreateFielFromBlockdAction,
   CreateNewPendingBlockAction,
   DeleteBlockAction,
   DeleteFieldAction,
@@ -228,6 +229,18 @@ export function reducer(
         }
       });
     }
+    case "blocks/field/new": {
+      const { block_id } = <CreateFielFromBlockdAction>action;
+      // trigger new field from empty field block
+      return produce(state, (draft) => {
+        // update focus block id
+        draft.focus_block_id = block_id;
+
+        // if no available field, but field block provided, open a field editor panel
+        draft.focus_field_id = null;
+        draft.is_field_edit_panel_open = true;
+      });
+    }
     case "blocks/field/change": {
       const { block_id, field_id } = <ChangeBlockFieldAction>action;
       return produce(state, (draft) => {
@@ -361,8 +374,12 @@ export function reducer(
           field.help_text = data.help_text;
           field.type = data.type;
           field.required = data.required;
-          field.options = data.options;
           field.pattern = data.pattern;
+          field.options = data.options;
+          field.autocomplete = data.autocomplete;
+          field.data = data.data;
+          field.accept = data.accept;
+          field.multiple = data.multiple;
         } else {
           // create new field
           draft.fields.push({

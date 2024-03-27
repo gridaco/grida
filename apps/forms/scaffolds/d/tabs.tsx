@@ -39,8 +39,9 @@ function Tab({
     <button
       data-selected={selected}
       className="
-        mx-2 px-2 py-4 border-b-2 border-transparent opacity-50 hover:border-black min-w-10
+        mx-2 px-2 py-4 border-b-2 border-transparent opacity-50 hover:border-black dark:hover:border-white min-w-10
         data-[selected='true']:border-black
+        dark:data-[selected='true']:border-white
         data-[selected='true']:opacity-100
         transition-all
         font-medium text-sm

@@ -4,7 +4,7 @@ import { createClientClient } from "@/lib/supabase/client";
 import { useEditorState } from "@/scaffolds/editor";
 import { useCallback } from "react";
 import toast from "react-hot-toast";
-import cs from "classnames";
+import clsx from "clsx";
 
 export function useDeleteBlock() {
   const [state, dispatch] = useEditorState();
@@ -57,8 +57,8 @@ export function FlatBlockBase({
   return (
     <div
       data-invalid={invalid}
-      className={cs(
-        "rounded-md flex flex-col gap-4 border w-full p-4 bg-white shadow-md",
+      className={clsx(
+        "rounded-md flex flex-col gap-4 border dark:border-neutral-700 w-full p-4 bg-white dark:bg-neutral-900 shadow-md",
         'data-[invalid="true"]:border-red-500/50 data-[invalid="true"]:bg-red-500/10'
       )}
     >

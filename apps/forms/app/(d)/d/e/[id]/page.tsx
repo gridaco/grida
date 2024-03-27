@@ -2,6 +2,7 @@ import { FormClientFetchResponse } from "@/app/(api)/v1/[id]/route";
 import { Form } from "@/scaffolds/e/form";
 import { EditorApiResponse } from "@/types/private/api";
 import { notFound } from "next/navigation";
+import i18next from "i18next";
 
 export const revalidate = 0;
 
@@ -17,17 +18,23 @@ export default async function FormPage({ params }: { params: { id: string } }) {
     return notFound();
   }
 
-  const { title, blocks, tree, fields } = data;
+  const { title, blocks, tree, fields, options, lang } = data;
 
   return (
-    <div className="min-h-screen p-4">
-      <Form
-        form_id={id}
-        title={title}
-        fields={fields}
-        blocks={blocks}
-        tree={tree}
-      />
-    </div>
+    <Form
+      form_id={id}
+      title={title}
+      fields={fields}
+      blocks={blocks}
+      tree={tree}
+      translations={{
+        next: i18next.t("next"),
+        back: i18next.t("back"),
+        submit: i18next.t("submit"),
+        pay: i18next.t("pay"),
+      }}
+      lang={lang}
+      options={options}
+    />
   );
 }

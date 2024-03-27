@@ -37,6 +37,11 @@ export function FieldBlock({
 
   const { available_field_ids } = state;
 
+  const no_available_fields = available_field_ids.length === 0;
+
+  const can_create_new_field_from_this_block =
+    no_available_fields && !form_field;
+
   const deleteBlock = useDeleteBlock();
 
   const onFieldChange = useCallback(
@@ -49,6 +54,13 @@ export function FieldBlock({
     },
     [dispatch, id]
   );
+
+  const onNewFieldClick = useCallback(() => {
+    dispatch({
+      type: "blocks/field/new",
+      block_id: id,
+    });
+  }, [dispatch, id]);
 
   const onEditClick = useCallback(() => {
     dispatch({
@@ -66,6 +78,10 @@ export function FieldBlock({
             <Select
               value={form_field_id ?? ""}
               onChange={(e) => {
+                if (e.target.value === "__gf_new") {
+                  onNewFieldClick();
+                  return;
+                }
                 onFieldChange(e.target.value);
               }}
             >
@@ -79,6 +95,9 @@ export function FieldBlock({
                   {f.name}
                 </option>
               ))}
+              {can_create_new_field_from_this_block && (
+                <option value="__gf_new">Create New Field</option>
+              )}
             </Select>
           </span>
         </div>
@@ -104,7 +123,7 @@ export function FieldBlock({
           </DropdownMenu>
         </div>
       </BlockHeader>
-      <div className="w-full min-h-40 bg-neutral-200 rounded p-10 border border-black/20">
+      <div className="w-full min-h-40 bg-neutral-200 dark:bg-neutral-800 rounded p-10 border border-black/20">
         {is_hidden_field ? (
           <div>
             <p className="text-xs opacity-50">
@@ -128,6 +147,7 @@ export function FieldBlock({
             helpText={form_field?.help_text ?? ""}
             placeholder={form_field?.placeholder ?? ""}
             options={form_field?.options}
+            data={form_field?.data}
           />
         )}
       </div>

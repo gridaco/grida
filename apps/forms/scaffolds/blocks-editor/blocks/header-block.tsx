@@ -74,17 +74,17 @@ export function HeaderBlock({
         </div>
       </BlockHeader>
       <div>
-        <div className="bg-neutral-200 rounded overflow-hidden border border-black/20 aspect-auto">
+        <div className="bg-neutral-200 dark:bg-neutral-800 rounded overflow-hidden border border-black/20 aspect-auto">
           <input
             type="text"
-            className="w-full p-4 text-2xl font-bold outline-none"
+            className="w-full p-4 text-2xl font-bold outline-none dark:text-white dark:bg-neutral-900"
             placeholder="Heading"
             value={title_html ?? ""}
             onChange={(e) => onEditTitle(e.target.value)}
           />
           <input
             type="text"
-            className="w-full p-4 text-lg outline-none"
+            className="w-full p-4 text-lg outline-none dark:text-white dark:bg-neutral-900"
             placeholder="Description"
             value={description_html ?? ""}
             onChange={(e) => onEditDescription(e.target.value)}

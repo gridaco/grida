@@ -167,13 +167,7 @@ export function GridEditor() {
             </AlertDialog>
           </>
         ) : (
-          <>
-            <div>
-              <button className="flex items-center gap-1 p-2 rounded-md border text-sm">
-                Insert
-              </button>
-            </div>
-          </>
+          <></>
         )}
       </header>
       <div className="flex flex-col h-full w-full">
@@ -201,7 +195,7 @@ export function GridEditor() {
         <MaxRowsSelect />
         <div>{txt_n_responses(state.responses?.length ?? 0)}</div>
         <Link href={`/v1/${form_id}/export/csv`} download target="_blank">
-          <button className="flex items-center gap-1 p-2 bg-neutral-100 rounded">
+          <button className="flex items-center gap-1 p-2 bg-neutral-100 dark:bg-neutral-900 rounded">
             Export to CSV
             <DownloadIcon />
           </button>
@@ -220,7 +214,7 @@ function MaxRowsSelect() {
 
   return (
     <select
-      className="p-2 bg-neutral-100 rounded"
+      className="p-2 bg-neutral-100 dark:bg-neutral-900 rounded"
       value={state.responses_pagination_rows}
       onChange={(e) => {
         dispatch({

@@ -28,7 +28,7 @@ export function PDFViewer({ file }: { file: string }) {
         <Page pageNumber={pageNumber} />
       </Document>
       <footer
-        className="absolute bottom-0 left-0 right-0 bg-white dark:bg-gray-800 p-2.5 text-sm text-gray-700 dark:text-gray-300"
+        className="absolute bottom-0 left-0 right-0 bg-white dark:bg-neutral-800 p-2.5 text-sm text-neutral-700 dark:text-neutral-300"
         style={{ zIndex: 999 }}
       >
         <div className="flex gap-2">

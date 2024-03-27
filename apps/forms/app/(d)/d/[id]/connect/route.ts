@@ -11,7 +11,7 @@ export function GET(
   const id = context.params.id;
   const origin = req.nextUrl.origin;
 
-  return NextResponse.redirect(origin + `/d/${id}/connect/customer`, {
+  return NextResponse.redirect(origin + `/d/${id}/connect/share`, {
     status: 301,
   });
 }

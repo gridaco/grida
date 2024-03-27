@@ -26,6 +26,10 @@ export async function POST(req: NextRequest) {
       help_text: init.helpText,
       required: init.required,
       pattern: init.pattern,
+      autocomplete: init.autocomplete,
+      data: init.data as any,
+      accept: init.accept,
+      multiple: init.multiple,
       // 'autocomplete': init.autocomplete,
       // 'description': init.description,
       // 'max': init.max,
@@ -36,7 +40,7 @@ export async function POST(req: NextRequest) {
     .select()
     .single();
 
-  console.log("upserted", upserted);
+  console.log("upserted", upserted, init.data);
 
   if (error) {
     console.error("error while upserting field", error);

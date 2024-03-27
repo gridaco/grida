@@ -6,6 +6,7 @@ import { createServerComponentClient } from "@/lib/supabase/server";
 import { DashboardFormCard } from "@/components/dashboard-form-card";
 import { GridaLogo } from "@/components/grida-logo";
 import { PlusIcon } from "@radix-ui/react-icons";
+import { CreateNewFormButton } from "@/components/create-form-button";
 
 export const revalidate = 0;
 
@@ -51,14 +52,9 @@ export default async function FormsDashboardPage({
         </h1>
       </header>
       <section className="flex justify-end py-4">
-        <form action={`/new?project_id=${project_id}`} method="POST">
-          <button className="flex justify-center items-center gap-2 px-4 py-2 bg-black text-white dark:invert rounded">
-            <PlusIcon />
-            Create new Form
-          </button>
-        </form>
+        <CreateNewFormButton project_id={project_id} />
       </section>
-      <hr className="my-10" />
+      <hr className="my-10 dark:border-neutral-700" />
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
         {forms?.map((form, i) => (
           <Link key={i} href={`/d/${form.id}`}>

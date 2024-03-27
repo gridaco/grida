@@ -23,13 +23,22 @@ export function SectionBlock({ id }: EditorFlatFormBlock) {
 
   const deleteBlock = useDeleteBlock();
 
+  const sections = state.blocks
+    .filter((block) => block.type === "section")
+    .sort((a, b) => a.local_index - b.local_index);
+  const index = sections.findIndex((section) => section.id === id);
+
   return (
     <div>
-      <div className="p-4 rounded-md border-black border-2 bg-white shadow-md">
+      <div className="p-4 rounded-md border-black dark:border-white/50 border-2 bg-white dark:bg-neutral-900 shadow-md">
         <BlockHeader>
           <span className="flex flex-row gap-2 items-center">
             <SectionIcon />
-            <span>Section</span>
+            <span>
+              Section {"("}
+              {index + 1} of {sections.length}
+              {")"}
+            </span>
           </span>
           <div>
             <DropdownMenu modal={false}>

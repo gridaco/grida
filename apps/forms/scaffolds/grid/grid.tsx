@@ -24,6 +24,7 @@ import {
   EyeClosedIcon,
   ColorWheelIcon,
   AvatarIcon,
+  RadiobuttonIcon,
 } from "@radix-ui/react-icons";
 import {
   DropdownMenu,
@@ -146,7 +147,7 @@ export function Grid({
 
   return (
     <DataGrid
-      className="border border-gray-200 dark:border-gray-900 h-max select-none"
+      className="border border-neutral-200 dark:border-neutral-900 h-max select-none"
       rowKeyGetter={rowKeyGetter}
       columns={formattedColumns}
       selectedRows={selected_responses}
@@ -243,6 +244,7 @@ function FormFieldTypeIcon({ type }: { type: FormFieldType }) {
     case "email":
       return <EnvelopeClosedIcon />;
     case "radio":
+      return <RadiobuttonIcon />;
     case "select":
       return <DropdownMenuIcon />;
     case "url":
@@ -261,6 +263,12 @@ function FormFieldTypeIcon({ type }: { type: FormFieldType }) {
       return <ColorWheelIcon />;
     case "hidden":
       return <EyeClosedIcon />;
+    case "signature":
+      // TODO: replace icon
+      return <>✍️</>;
+    case "payment":
+      // TODO: replace icon
+      return <>💰</>;
     default:
       return <TextIcon />;
   }
@@ -274,7 +282,7 @@ function NewFieldHeaderCell({
   return (
     <button
       onClick={onClick}
-      className="rounded p-2 bg-neutral-100 w-full flex items-center justify-center"
+      className="rounded p-2 bg-neutral-100 dark:bg-neutral-900 w-full flex items-center justify-center"
     >
       <PlusIcon />
     </button>

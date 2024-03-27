@@ -1,8 +1,9 @@
-import { FormFieldType } from "@/types";
+import { FormFieldDataSchema, FormFieldType, PaymentFieldData } from "@/types";
 import React, { useEffect } from "react";
 import { Select } from "../select";
 import { SignatureCanvas } from "../signature-canvas";
-import { StripeCardForm } from "../stripe";
+import { StripePaymentFormFieldPreview } from "./form-field-preview-payment-stripe";
+import { TossPaymentsPaymentFormFieldPreview } from "./form-field-preview-payment-tosspayments";
 
 export function FormFieldPreview({
   name,
@@ -15,7 +16,11 @@ export function FormFieldPreview({
   helpText,
   readonly,
   disabled,
+  autoComplete,
+  accept,
+  multiple,
   pattern,
+  data,
 }: {
   name: string;
   label?: string;
@@ -27,7 +32,11 @@ export function FormFieldPreview({
   pattern?: string;
   readonly?: boolean;
   disabled?: boolean;
+  autoComplete?: string;
+  accept?: string;
+  multiple?: boolean;
   labelCapitalize?: boolean;
+  data?: FormFieldDataSchema | null;
 }) {
   const sharedInputProps:
     | React.ComponentProps<"input">
@@ -39,6 +48,9 @@ export function FormFieldPreview({
     placeholder: placeholder,
     required: required,
     pattern,
+    autoComplete,
+    accept,
+    multiple,
   };
 
   function renderInput() {
@@ -50,10 +62,17 @@ export function FormFieldPreview({
           />
         );
       }
+      case "file": {
+        return (
+          <HtmlFileInput
+            {...(sharedInputProps as React.ComponentProps<"input">)}
+          />
+        );
+      }
       case "checkbox": {
         return (
           <input
-            className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"
+            className="w-4 h-4 text-blue-600 bg-neutral-100 border-neutral-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-neutral-800 focus:ring-2 dark:bg-neutral-700 dark:border-neutral-600"
             type="checkbox"
             {...(sharedInputProps as React.ComponentProps<"input">)}
           />
@@ -92,7 +111,7 @@ export function FormFieldPreview({
                 />
                 <label
                   htmlFor={option.value}
-                  className="ms-2 text-sm font-medium text-gray-900 dark:text-gray-300"
+                  className="ms-2 text-sm font-medium text-neutral-900 dark:text-neutral-300"
                 >
                   {option.label}
                 </label>
@@ -108,9 +127,6 @@ export function FormFieldPreview({
             {...(sharedInputProps as React.ComponentProps<"input">)}
           />
         );
-      }
-      case "payment": {
-        return <StripeCardForm />;
       }
       default: {
         return (
@@ -128,7 +144,7 @@ export function FormFieldPreview({
   }
 
   if (type === "payment") {
-    return <StripeCardForm />;
+    return <PaymentField data={data as PaymentFieldData} disabled={disabled} />;
   }
 
   return (
@@ -140,7 +156,7 @@ export function FormFieldPreview({
         {label || name}
       </span>
       {renderInput()}
-      {helpText && <span className="text-sm text-gray-600">{helpText}</span>}
+      {helpText && <span className="text-sm text-neutral-600">{helpText}</span>}
     </label>
   );
 }
@@ -148,7 +164,7 @@ export function FormFieldPreview({
 function HtmlTextarea({ ...props }: React.ComponentProps<"textarea">) {
   return (
     <textarea
-      className="shadow appearance-none border rounded py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+      className="block p-2.5 w-full text-sm text-neutral-900 bg-neutral-50 rounded-lg border border-neutral-300 focus:ring-blue-500 focus:border-blue-500 dark:bg-neutral-700 dark:border-neutral-600 dark:placeholder-neutral-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500"
       {...props}
     />
   );
@@ -157,8 +173,43 @@ function HtmlTextarea({ ...props }: React.ComponentProps<"textarea">) {
 function HtmlInput({ ...props }: React.ComponentProps<"input">) {
   return (
     <input
-      className="shadow appearance-none border rounded py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+      className="bg-neutral-50 border border-neutral-300 text-neutral-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-neutral-700 dark:border-neutral-600 dark:placeholder-neutral-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500"
       {...props}
     />
   );
+}
+
+function HtmlFileInput({ ...props }: React.ComponentProps<"input">) {
+  return (
+    <input
+      type="file"
+      className="
+        text-sm text-stone-500
+        file:mr-5 file:py-1 file:px-3
+        file:rounded file:border-none
+        file:text-xs file:font-medium
+        file:bg-stone-50 file:text-stone-700
+        hover:file:cursor-pointer hover:file:bg-blue-50
+        hover:file:text-blue-700
+      "
+      {...props}
+    />
+  );
+}
+
+function PaymentField({
+  data,
+  disabled,
+}: {
+  data?: PaymentFieldData;
+  disabled?: boolean;
+}) {
+  switch (data?.service_provider) {
+    case "stripe":
+      return <StripePaymentFormFieldPreview />;
+    case "tosspayments":
+      return <TossPaymentsPaymentFormFieldPreview disabled={disabled} />;
+    default:
+      return <StripePaymentFormFieldPreview />;
+  }
 }

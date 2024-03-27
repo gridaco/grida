@@ -88,6 +88,8 @@ export function ResponseEditPanel({
                 return (
                   <PanelPropertyField key={def.id} label={def.name}>
                     <PropertyTextInput
+                      autoFocus={false}
+                      readOnly
                       placeholder={def.placeholder ?? ""}
                       value={txt}
                     />
@@ -102,7 +104,7 @@ export function ResponseEditPanel({
           <PanelPropertyFields>
             <PanelPropertyField label={"JSON"}>
               <Editor
-                className="rounded overflow-hidden"
+                className="rounded overflow-hidden shadow-sm border"
                 height={400}
                 defaultLanguage="json"
                 defaultValue={JSON.stringify(response, null, 2)}
@@ -126,11 +128,13 @@ export function ResponseEditPanel({
       </PanelContent>
       <PanelFooter>
         <PanelClose>
-          <button className="rounded p-2 bg-neutral-100">Cancel</button>
+          <button className="rounded p-2 bg-neutral-100 dark:bg-neutral-900">
+            Close
+          </button>
         </PanelClose>
-        <button onClick={onSaveClick} className="rounded p-2 bg-neutral-100">
+        {/* <button onClick={onSaveClick} className="rounded p-2 bg-neutral-100">
           Save
-        </button>
+        </button> */}
       </PanelFooter>
     </SidePanel>
   );

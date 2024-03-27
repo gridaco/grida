@@ -14,13 +14,28 @@ import {
   SidePanel,
 } from "@/components/panels/side-panel";
 import { FormFieldPreview } from "@/components/formfield";
-import { FormFieldType, NewFormFieldInit } from "@/types";
+import {
+  FormFieldAutocompleteType,
+  FormFieldDataSchema,
+  FormFieldType,
+  NewFormFieldInit,
+  PaymentFieldData,
+} from "@/types";
 import { capitalCase, snakeCase } from "change-case";
 import { LockClosedIcon } from "@radix-ui/react-icons";
 import { FormFieldAssistant } from "../ai/form-field-schema-assistant";
 import toast from "react-hot-toast";
 import { Select } from "@/components/select";
-import { supported_field_types } from "@/k/supported_field_types";
+import {
+  html5_multiple_supported_field_types,
+  supported_field_autocomplete_types,
+  supported_field_types,
+} from "@/k/supported_field_types";
+import {
+  payments_service_providers,
+  payments_service_providers_display_map,
+} from "@/k/payments_service_providers";
+import { cls_save_button } from "@/components/preferences";
 
 // @ts-ignore
 const default_field_init: {
@@ -69,6 +84,12 @@ const default_field_init: {
     ],
   },
   hidden: { type: "hidden" },
+  payment: {
+    type: "payment",
+    data: {
+      type: "payment",
+    } as PaymentFieldData,
+  },
 };
 
 const input_can_have_options: FormFieldType[] = ["select", "radio"];
@@ -105,6 +126,14 @@ export function FieldEditPanel({
   const [options, setOptions] = useState<
     { label?: string | null; value: string }[]
   >(init?.options || []);
+  const [autocomplete, setAutocomplete] = useState<FormFieldAutocompleteType[]>(
+    init?.autocomplete || []
+  );
+  const [data, setData] = useState<FormFieldDataSchema>(init?.data ?? {});
+  const [accept, setAccept] = useState<string | undefined>(
+    init?.accept ?? undefined
+  );
+  const [multiple, setMultiple] = useState(init?.multiple || false);
 
   const preview_label = buildPreviewLabel({
     name,
@@ -114,11 +143,15 @@ export function FieldEditPanel({
 
   const has_options = input_can_have_options.includes(type);
   const has_pattern = input_can_have_pattern.includes(type);
+  const has_accept = type === "file";
 
   const preview_placeholder =
     placeholder || convertToPlainText(label) || convertToPlainText(name);
 
-  const preview_disabled = !name;
+  const preview_disabled =
+    !name ||
+    (type == "payment" &&
+      (data as PaymentFieldData)?.service_provider === "tosspayments");
 
   const onSaveClick = () => {
     onSave?.({
@@ -128,8 +161,12 @@ export function FieldEditPanel({
       helpText,
       type,
       required,
-      options,
       pattern,
+      options,
+      autocomplete,
+      data,
+      accept,
+      multiple,
     });
   };
 
@@ -178,7 +215,7 @@ export function FieldEditPanel({
         <PanelPropertySection>
           <PanelPropertySectionTitle>Preview</PanelPropertySectionTitle>
           <PanelPropertyFields>
-            <div className="relative w-full min-h-40 bg-neutral-200 rounded p-10 border border-black/20">
+            <div className="relative w-full min-h-40 bg-neutral-200 dark:bg-neutral-800 rounded p-10 border border-black/20">
               <form
                 onSubmit={(e) => {
                   e.preventDefault();
@@ -198,11 +235,15 @@ export function FieldEditPanel({
                   disabled={preview_disabled}
                   options={has_options ? options : undefined}
                   pattern={pattern}
+                  autoComplete={autocomplete.join(" ")}
+                  data={data}
+                  accept={accept}
+                  multiple={multiple}
                 />
                 <div className="absolute bottom-0 right-0 m-2">
                   <button
                     type="submit"
-                    className="rounded-full px-2 py-1 bg-neutral-100 text-xs font-mono"
+                    className="rounded-full px-2 py-1 bg-neutral-100 dark:bg-neutral-900 text-xs font-mono"
                   >
                     Test
                   </button>
@@ -254,6 +295,29 @@ export function FieldEditPanel({
               </PanelPropertyField>
             </PanelPropertyFields>
           </PanelPropertySection>
+          <PanelPropertySection hidden={type !== "payment"}>
+            <PanelPropertySectionTitle>Payment</PanelPropertySectionTitle>
+            <PanelPropertyFields>
+              <PanelPropertyField label={"Service Provider"}>
+                <Select
+                  value={(data as PaymentFieldData)?.service_provider}
+                  onChange={(e) => {
+                    setData({
+                      ...data,
+                      type: "payment",
+                      service_provider: e.target.value,
+                    });
+                  }}
+                >
+                  {payments_service_providers.map((provider) => (
+                    <option key={provider} value={provider}>
+                      {payments_service_providers_display_map[provider].label}
+                    </option>
+                  ))}
+                </Select>
+              </PanelPropertyField>
+            </PanelPropertyFields>
+          </PanelPropertySection>
           <PanelPropertySection hidden={type == "payment"}>
             <PanelPropertySectionTitle>General</PanelPropertySectionTitle>
             <PanelPropertyFields>
@@ -287,6 +351,31 @@ export function FieldEditPanel({
                   onChange={(e) => setHelpText(e.target.value)}
                 />
               </PanelPropertyField>
+              <PanelPropertyField label={"Auto Complete"}>
+                <Select
+                  value={autocomplete}
+                  onChange={(e) => {
+                    setAutocomplete([
+                      e.target.value as FormFieldAutocompleteType,
+                    ]);
+                  }}
+                >
+                  {supported_field_autocomplete_types.map((type) => (
+                    <option key={type} value={type}>
+                      {type}
+                    </option>
+                  ))}
+                </Select>
+              </PanelPropertyField>
+              {html5_multiple_supported_field_types.includes(type) && (
+                <PanelPropertyField label={"Multiple"}>
+                  <input
+                    type="checkbox"
+                    checked={multiple}
+                    onChange={(e) => setMultiple(e.target.checked)}
+                  />
+                </PanelPropertyField>
+              )}
               {type !== "checkbox" && (
                 <PanelPropertyField label={"Required"}>
                   <input
@@ -312,6 +401,18 @@ export function FieldEditPanel({
           <PanelPropertySection hidden={type == "payment"}>
             <PanelPropertySectionTitle>Validation</PanelPropertySectionTitle>
             <PanelPropertyFields>
+              {has_accept && (
+                <PanelPropertyField
+                  label={"Accept"}
+                  description="A comma-separated list of file types that the input should accept"
+                >
+                  <PropertyTextInput
+                    placeholder={"image/*"}
+                    value={accept}
+                    onChange={(e) => setAccept(e.target.value)}
+                  />
+                </PanelPropertyField>
+              )}
               {has_pattern && (
                 <PanelPropertyField
                   label={"Pattern"}
@@ -343,9 +444,11 @@ export function FieldEditPanel({
       </PanelContent>
       <PanelFooter>
         <PanelClose>
-          <button className="rounded p-2 bg-neutral-100">Cancel</button>
+          <button className="rounded p-2 bg-neutral-100 dark:bg-neutral-900">
+            Cancel
+          </button>
         </PanelClose>
-        <button onClick={onSaveClick} className="rounded p-2 bg-neutral-100">
+        <button onClick={onSaveClick} className={cls_save_button}>
           Save
         </button>
       </PanelFooter>
