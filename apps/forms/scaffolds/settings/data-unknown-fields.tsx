@@ -26,9 +26,13 @@ export function UnknownFieldPreferences({
     );
 
   return (
-    <PreferenceBox beta>
-      <PreferenceBoxHeader heading={<>Handling unknown fields</>} />
+    <PreferenceBox>
+      <PreferenceBoxHeader heading={<>Dynamic Fields</>} />
       <PreferenceBody>
+        <p className="opacity-80">
+          When a form is submitted with fields that are not defined in the form
+          schema, you can choose to ignore them or store them as metadata.
+        </p>
         <form
           id="/private/editor/settings/unknown-fields"
           action="/private/editor/settings/unknown-fields"
@@ -37,11 +41,6 @@ export function UnknownFieldPreferences({
           <input type="hidden" name="form_id" value={form_id} />
           <div className="flex flex-col gap-8">
             <section>
-              <p className="opacity-80">
-                When a form is submitted with fields that are not defined in the
-                form schema, you can choose to ignore them or store them as
-                metadata.
-              </p>
               <div className="mt-4 flex flex-col gap-1">
                 <Select
                   name="unknown_field_handling_strategy"
@@ -72,7 +71,8 @@ export function UnknownFieldPreferences({
 }
 
 const strategy_descriptions = {
-  accept: "This will create a new field in the form schema.",
-  ignore: "This will ignore the field and continue.",
-  reject: "This will reject the field and throw an error.",
+  accept: "Accept form with creating new fields in schema.",
+  ignore: "Accept form with ignoring unknown fields",
+  reject:
+    "Reject from. It will reject the request if unknown fields are found.",
 } as const;

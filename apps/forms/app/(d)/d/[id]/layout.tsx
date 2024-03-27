@@ -88,7 +88,7 @@ export default async function Layout({
           <GoogleAnalytics gaId={process.env.NEXT_PUBLIC_GAID} />
         )}
 
-        <main className="h-screen flex flex-col">
+        <div className="h-screen flex flex-col">
           <Toaster position="bottom-center" />
           <header className="px-4 flex w-full gap-4 border-b dark:border-neutral-900 bg-white dark:bg-neutral-900 z-10">
             <div className="w-1/3 flex items-center justify-start">
@@ -123,7 +123,7 @@ export default async function Layout({
           >
             <div className="flex flex-1 overflow-y-auto">{children}</div>
           </FormEditorProvider>
-        </main>
+        </div>
       </body>
     </html>
   );

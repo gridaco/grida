@@ -7,18 +7,19 @@ export const cls_textarea =
   "block p-2.5 w-full text-sm text-neutral-900 bg-neutral-50 rounded-lg border border-neutral-300 focus:ring-blue-500 focus:border-blue-500 dark:bg-neutral-700 dark:border-neutral-600 dark:placeholder-neutral-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500";
 
 export function PreferenceBox({
+  warning,
   beta,
   children,
 }: React.PropsWithChildren<{
   beta?: boolean;
+  warning?: boolean;
 }>) {
   return (
     <section
-      data-beta={beta}
+      data-warning={warning || beta}
       className={clsx(
         "rounded-md border border-overlay shadow-sm overflow-hidden mb-8 !m-0",
-        beta &&
-          "border-yellow-400 bg-yellow-50 text-yellow-900 dark:bg-yellow-700 dark:text-yellow-200 dark:border-yellow-600"
+        "data-[warning='true']:border-yellow-400 data-[warning='true']:bg-yellow-50 data-[warning='true']:text-yellow-900 data-[warning='true']:dark:bg-yellow-700 data-[warning='true']:dark:text-yellow-200 data-[warning='true']:dark:border-yellow-600"
       )}
     >
       {children}

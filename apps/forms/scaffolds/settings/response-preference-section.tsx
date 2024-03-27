@@ -26,8 +26,12 @@ function MaxRespoonses() {
 
   return (
     <PreferenceBox beta>
-      <PreferenceBoxHeader heading={<>Maximum responses</>} />
+      <PreferenceBoxHeader heading={<>Limit number of total responses</>} />
       <PreferenceBody>
+        <p>
+          Set maximum number of responses allowed. This is useful when you have
+          limited number of offers, inventory or tickets.
+        </p>
         <div className="flex flex-col">
           <Toggle
             value={enabled}
@@ -101,7 +105,7 @@ function RestrictNumberOfResponseByCustomer() {
               </div>
             </div>
           ) : (
-            <>{txt_no_multiple_response_description}</>
+            <>Users can submit an unlimited number of responses.</>
           )}
         </div>
       </PreferenceBody>
