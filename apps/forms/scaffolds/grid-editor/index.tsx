@@ -167,13 +167,7 @@ export function GridEditor() {
             </AlertDialog>
           </>
         ) : (
-          <>
-            <div>
-              <button className="flex items-center gap-1 p-2 rounded-md border text-sm">
-                Insert
-              </button>
-            </div>
-          </>
+          <></>
         )}
       </header>
       <div className="flex flex-col h-full w-full">
