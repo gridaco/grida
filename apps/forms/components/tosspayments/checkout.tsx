@@ -60,7 +60,7 @@ export function TossPaymentsCheckout({
   }, [customerKey, price]);
 
   return (
-    <div className="bg-white rounded-lg overflow-hidden shadow-sm">
+    <div className="bg-white rounded-lg overflow-hidden shadow-sm min-h-44">
       <div>
         <div id="payment-method" />
         <div id="agreement" />
