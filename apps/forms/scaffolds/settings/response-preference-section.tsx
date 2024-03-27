@@ -10,44 +10,121 @@ import {
   SectorBlocks,
   cls_input,
 } from "@/components/preferences";
+import clsx from "clsx";
 
-export function ResponsePreferences() {
+export function RestrictNumberOfResponseByCustomer({
+  form_id,
+  init,
+}: {
+  form_id: string;
+  init: {
+    is_max_form_responses_by_customer_enabled: boolean;
+    max_form_responses_by_customer?: number | null;
+  };
+}) {
+  const [enabled, setEnabled] = useState(
+    init.is_max_form_responses_by_customer_enabled
+  );
+  const [n, setN] = useState(init.max_form_responses_by_customer || 1);
+
   return (
-    <SectorBlocks>
-      <RestrictNumberOfResponseByCustomer />
-      <MaxRespoonses />
-    </SectorBlocks>
+    <PreferenceBox>
+      <PreferenceBoxHeader
+        heading={<>Limit number of responses by customer</>}
+      />
+      <PreferenceBody>
+        <form
+          id="/private/editor/settings/max-responses-by-customer"
+          action="/private/editor/settings/max-responses-by-customer"
+          method="POST"
+        >
+          <input type="hidden" name="form_id" value={form_id} />
+          <div className="flex flex-col">
+            <Toggle
+              name="is_max_form_responses_by_customer_enabled"
+              value={enabled}
+              label={enabled ? "Enabled" : "Disabled"}
+              onChange={setEnabled}
+            />
+            <div className={clsx(!enabled && "hidden")}>
+              <input
+                name="max_form_responses_by_customer"
+                type="number"
+                min={1}
+                value={n}
+                onChange={(e) => {
+                  setN(parseInt(e.target.value));
+                }}
+                className={cls_input}
+              />
+            </div>
+            {enabled && n ? (
+              <>
+                Limit to {n} {txt_response_plural(n)} per user.
+                <>{n === 1 && <>{txt_no_multiple_response_description}</>}</>
+              </>
+            ) : (
+              <>Users can submit an unlimited number of responses.</>
+            )}
+          </div>
+        </form>
+      </PreferenceBody>
+      <PreferenceBoxFooter>
+        <button
+          form="/private/editor/settings/max-responses-by-customer"
+          type="submit"
+        >
+          Save
+        </button>
+      </PreferenceBoxFooter>
+    </PreferenceBox>
   );
 }
 
-function MaxRespoonses() {
-  const [enabled, setEnabled] = useState(false);
-  const [n, setN] = useState(10000);
+export function MaxRespoonses({
+  form_id,
+  init,
+}: {
+  form_id: string;
+  init: {
+    is_max_form_responses_in_total_enabled: boolean;
+    max_form_responses_in_total: number | null;
+  };
+}) {
+  const [enabled, setEnabled] = useState(
+    init.is_max_form_responses_in_total_enabled
+  );
+  const [n, setN] = useState(init.max_form_responses_in_total || 100);
 
   return (
-    <PreferenceBox beta>
+    <PreferenceBox>
       <PreferenceBoxHeader heading={<>Limit number of total responses</>} />
       <PreferenceBody>
         <p>
           Set maximum number of responses allowed. This is useful when you have
           limited number of offers, inventory or tickets.
         </p>
-        <div className="flex flex-col">
-          <Toggle
-            value={enabled}
-            label={enabled ? "Enabled" : "Disabled"}
-            onChange={setEnabled}
-          />
-          {enabled && (
-            <div>
+        <form
+          id="/private/editor/settings/max-responses-in-total"
+          action="/private/editor/settings/max-responses-in-total"
+          method="POST"
+        >
+          <input type="hidden" name="form_id" value={form_id} />
+          <div className="flex flex-col">
+            <Toggle
+              name="is_max_form_responses_in_total_enabled"
+              value={enabled}
+              label={enabled ? "Enabled" : "Disabled"}
+              onChange={setEnabled}
+            />
+            <div className={clsx(!enabled && "hidden")}>
               <label className="flex flex-col gap-2 cursor-pointer">
                 <span>Maximum number of responses allowed</span>
                 <input
-                  name="max_responses_per_customer"
+                  name="max_form_responses_in_total"
                   type="number"
                   placeholder="Leave empty for unlimited responses"
                   min={1}
-                  defaultValue={1}
                   value={n}
                   onChange={(e) => {
                     setN(parseInt(e.target.value));
@@ -56,61 +133,16 @@ function MaxRespoonses() {
                 />
               </label>
             </div>
-          )}
-        </div>
+          </div>
+        </form>
       </PreferenceBody>
       <PreferenceBoxFooter>
-        <button>Save</button>
-      </PreferenceBoxFooter>
-    </PreferenceBox>
-  );
-}
-
-function RestrictNumberOfResponseByCustomer() {
-  const [enabled, setEnabled] = useState(false);
-  const [n, setN] = useState(0);
-
-  useEffect(() => {
-    setN(enabled ? 1 : 0);
-  }, [enabled]);
-
-  return (
-    <PreferenceBox beta>
-      <PreferenceBoxHeader
-        heading={<>Limit number of responses by customer</>}
-      />
-      <PreferenceBody>
-        <div className="flex flex-col">
-          <Toggle
-            value={enabled}
-            label={enabled ? "Enabled" : "Disabled"}
-            onChange={setEnabled}
-          />
-          {enabled ? (
-            <div>
-              <input
-                name="max_responses_per_customer"
-                type="number"
-                min={1}
-                defaultValue={1}
-                value={n}
-                onChange={(e) => {
-                  setN(parseInt(e.target.value));
-                }}
-                className={cls_input}
-              />
-              <div>
-                Limit to {n} {txt_response_plural(n)} per user.
-                <>{n === 1 && <>{txt_no_multiple_response_description}</>}</>
-              </div>
-            </div>
-          ) : (
-            <>Users can submit an unlimited number of responses.</>
-          )}
-        </div>
-      </PreferenceBody>
-      <PreferenceBoxFooter>
-        <button>Save</button>
+        <button
+          form="/private/editor/settings/max-responses-in-total"
+          type="submit"
+        >
+          Save
+        </button>
       </PreferenceBoxFooter>
     </PreferenceBox>
   );

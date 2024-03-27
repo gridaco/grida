@@ -3,11 +3,15 @@ import { UnknownFieldPreferences } from "@/scaffolds/settings/data-unknown-field
 import { DeleteFormSection } from "@/scaffolds/settings/delete-form/delete-form-section";
 import { RedirectPreferences } from "@/scaffolds/settings/redirect-section";
 import { TrustedOriginPreferences } from "@/scaffolds/settings/trusted-origins";
-import { ResponsePreferences } from "@/scaffolds/settings/response-preference-section";
+import {
+  MaxRespoonses,
+  RestrictNumberOfResponseByCustomer,
+} from "@/scaffolds/settings/response-preference-section";
 import { cookies } from "next/headers";
 import React from "react";
 import {
   Sector,
+  SectorBlocks,
   SectorDescription,
   SectorHeader,
   SectorHeading,
@@ -39,6 +43,10 @@ export default async function FormGeneralSettingsPage({
     unknown_field_handling_strategy,
     redirect_after_response_uri,
     is_redirect_after_response_uri_enabled,
+    max_form_responses_by_customer,
+    is_max_form_responses_by_customer_enabled,
+    max_form_responses_in_total,
+    is_max_form_responses_in_total_enabled,
   } = data!;
 
   return (
@@ -61,7 +69,22 @@ export default async function FormGeneralSettingsPage({
             Manage how responses are collected and protected
           </SectorDescription>
         </SectorHeader>
-        <ResponsePreferences />
+        <SectorBlocks>
+          <RestrictNumberOfResponseByCustomer
+            form_id={form_id}
+            init={{
+              is_max_form_responses_by_customer_enabled,
+              max_form_responses_by_customer,
+            }}
+          />
+          <MaxRespoonses
+            form_id={form_id}
+            init={{
+              is_max_form_responses_in_total_enabled,
+              max_form_responses_in_total,
+            }}
+          />
+        </SectorBlocks>
       </Sector>
       <Sector>
         <SectorHeader>
