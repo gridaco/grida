@@ -4,6 +4,13 @@ import { Select } from "../select";
 import { SignatureCanvas } from "../signature-canvas";
 import { StripePaymentFormFieldPreview } from "./form-field-preview-payment-stripe";
 import { TossPaymentsPaymentFormFieldPreview } from "./form-field-preview-payment-tosspayments";
+import clsx from "clsx";
+
+/**
+ * this disables the auto zoom in input text tag safari on iphone by setting font-size to 16px
+ * @see https://stackoverflow.com/questions/2989263/disable-auto-zoom-in-input-text-tag-safari-on-iphone
+ */
+const cls_input_ios_zoom_disable = "!text-base sm:!text-sm";
 
 export function FormFieldPreview({
   name,
@@ -164,16 +171,23 @@ export function FormFieldPreview({
 function HtmlTextarea({ ...props }: React.ComponentProps<"textarea">) {
   return (
     <textarea
-      className="block p-2.5 w-full text-sm text-neutral-900 bg-neutral-50 rounded-lg border border-neutral-300 focus:ring-blue-500 focus:border-blue-500 dark:bg-neutral-700 dark:border-neutral-600 dark:placeholder-neutral-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500"
+      className={clsx(
+        "block p-2.5 w-full text-sm text-neutral-900 bg-neutral-50 rounded-lg border border-neutral-300 focus:ring-blue-500 focus:border-blue-500 dark:bg-neutral-700 dark:border-neutral-600 dark:placeholder-neutral-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500",
+        cls_input_ios_zoom_disable
+      )}
       {...props}
     />
   );
 }
 
 function HtmlInput({ ...props }: React.ComponentProps<"input">) {
+  console.log(props.type);
   return (
     <input
-      className="bg-neutral-50 border border-neutral-300 text-neutral-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-neutral-700 dark:border-neutral-600 dark:placeholder-neutral-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500"
+      className={clsx(
+        "bg-neutral-50 border border-neutral-300 text-neutral-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-neutral-700 dark:border-neutral-600 dark:placeholder-neutral-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500",
+        cls_input_ios_zoom_disable
+      )}
       {...props}
     />
   );
