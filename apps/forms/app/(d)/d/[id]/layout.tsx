@@ -90,7 +90,7 @@ export default async function Layout({
 
         <div className="h-screen flex flex-col">
           <Toaster position="bottom-center" />
-          <header className="px-4 flex w-full gap-4 border-b dark:border-neutral-900 bg-white dark:bg-neutral-900 z-10">
+          <header className="px-4 flex w-full gap-4 border-b bg-white dark:bg-neutral-900 z-10">
             <div className="w-1/3 flex items-center justify-start">
               <Link href="/dashboard">
                 <span className="flex items-center gap-2 text-md font-black select-none">
