@@ -157,7 +157,7 @@ export function Form({
 
         switch (type) {
           case "payment": {
-            switch ((field.data as PaymentFieldData).service_provider) {
+            switch ((field.data as PaymentFieldData)?.service_provider) {
               case "tosspayments": {
                 return <TossPaymentsCheckout {...checkoutSession} />;
               }
