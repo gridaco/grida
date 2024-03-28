@@ -147,7 +147,7 @@ export function Grid({
 
   return (
     <DataGrid
-      className="border border-neutral-200 dark:border-neutral-900 h-max select-none"
+      className="flex-grow border border-neutral-200 dark:border-neutral-900 h-max select-none"
       rowKeyGetter={rowKeyGetter}
       columns={formattedColumns}
       selectedRows={selected_responses}

@@ -191,7 +191,7 @@ export function GridEditor() {
           }}
         />
       </div>
-      <footer className="flex gap-4 min-h-9 overflow-hidden items-center px-2 w-full border-t">
+      <footer className="flex gap-4 min-h-9 overflow-hidden items-center px-2 w-full border-t dark:border-t-neutral-700">
         <MaxRowsSelect />
         <div>{txt_n_responses(state.responses?.length ?? 0)}</div>
         <Link href={`/v1/${form_id}/export/csv`} download target="_blank">
