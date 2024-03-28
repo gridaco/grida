@@ -4,12 +4,12 @@ import Link from "next/link";
 import Image from "next/image";
 import PricingComparisonTable from "@/www/pricing/pricing-comparison-table";
 import { PricingCard } from "@/www/pricing/pricing-card";
+import { AccountTreeIcon, ApiIcon } from "@/www/icons";
 
 export default function Home() {
   return (
     <main>
       <Header />
-
       <div className="p-24">
         <section className="relative">
           <div>
@@ -49,36 +49,42 @@ export default function Home() {
           <div className="mt-20">
             <div className="columns-3 grid-rows-2 space-y-8">
               <FeatureCard
+                icon={<AccountTreeIcon />}
                 title={"Smart Customer Identity"}
                 excerpt={
                   "Optimize user experience with customizable Smart Customer Identity in your forms."
                 }
               />
               <FeatureCard
+                icon={<ApiIcon />}
                 title={"Connect Customer Identity"}
                 excerpt={
                   "Align your forms with your customers' identity, fostering a personalized and trustworthy interaction."
                 }
               />
               <FeatureCard
+                icon={<></>}
                 title={"Visual Editor"}
                 excerpt={
                   "Visual Editor allows users to intuitively customize visuals, ensuring their forms match their unique style."
                 }
               />
               <FeatureCard
+                icon={<></>}
                 title={"Advanced Analytics"}
                 excerpt={
                   "Advanced Analytics provides detailed insights to optimize your form strategy."
                 }
               />
               <FeatureCard
+                icon={<></>}
                 title={"Custom branding & form page"}
                 excerpt={
                   "Customize your form pages with branding elements to align seamlessly with your brand identity."
                 }
               />
               <FeatureCard
+                icon={<></>}
                 title={"API access"}
                 excerpt={
                   "API access allows for streamlined integration and enhanced form functionality."
@@ -220,10 +226,18 @@ export default function Home() {
   );
 }
 
-function FeatureCard({ title, excerpt }: { title: string; excerpt: string }) {
+function FeatureCard({
+  title,
+  excerpt,
+  icon,
+}: {
+  title: string;
+  excerpt: string;
+  icon: React.ReactNode;
+}) {
   return (
     <div className="flex flex-col gap-7">
-      <div className="w-7 h-7 bg-gray-200" />
+      {icon}
       <div className="flex flex-col gap-1 max-w-52">
         <span className="text-md font-medium">{title}</span>
         <p className=" text-sm font-normal opacity-50">{excerpt}</p>
