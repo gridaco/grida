@@ -1,6 +1,6 @@
 import { blockstree } from "@/lib/forms/tree";
 import { FormBlockTree } from "@/lib/forms/types";
-import { client, createRouteHandlerClient } from "@/lib/supabase/server";
+import { client } from "@/lib/supabase/server";
 import {
   FormBlock,
   FormBlockType,

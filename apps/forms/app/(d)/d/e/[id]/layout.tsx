@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import { cookies } from "next/headers";
-import { createServerComponentClient } from "@/lib/supabase/server";
+import { client, createServerComponentClient } from "@/lib/supabase/server";
 import { Metadata } from "next";
 import { Inter } from "next/font/google";
 import i18next from "i18next";
@@ -14,11 +14,9 @@ export async function generateMetadata({
 }: {
   params: { id: string };
 }): Promise<Metadata> {
-  const cookieStore = cookies();
-  const supabase = createServerComponentClient(cookieStore);
   const id = params.id;
 
-  const { data, error } = await supabase
+  const { data, error } = await client
     .from("form")
     .select(
       `
@@ -51,7 +49,7 @@ export default async function Layout({
   const cookieStore = cookies();
   const supabase = createServerComponentClient(cookieStore);
 
-  const { data, error } = await supabase
+  const { data, error } = await client
     .from("form")
     .select()
     .eq("id", id)

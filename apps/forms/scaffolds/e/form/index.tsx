@@ -157,7 +157,7 @@ export function Form({
 
         switch (type) {
           case "payment": {
-            switch ((field.data as PaymentFieldData).service_provider) {
+            switch ((field.data as PaymentFieldData)?.service_provider) {
               case "tosspayments": {
                 return <TossPaymentsCheckout {...checkoutSession} />;
               }
@@ -281,7 +281,7 @@ export function Form({
         <footer
           className="
           sticky md:static bottom-0
-          flex gap-2 justify-between md:justify-start
+          flex gap-2 justify-end md:justify-start
           bg-white dark:bg-black
           p-4 mt-4 pt-4 border-t dark:border-t-neutral-900
         "
@@ -300,6 +300,7 @@ export function Form({
             data-next-hidden={next_section_button_hidden}
             className={clsx(
               cls_button_nuetral,
+              "w-full md:w-auto",
               "data-[next-hidden='true']:hidden"
             )}
             onClick={onNext}
