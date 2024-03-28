@@ -28,6 +28,7 @@ export function FormFieldPreview({
   multiple,
   pattern,
   data,
+  novalidate,
 }: {
   name: string;
   label?: string;
@@ -44,6 +45,7 @@ export function FormFieldPreview({
   multiple?: boolean;
   labelCapitalize?: boolean;
   data?: FormFieldDataSchema | null;
+  novalidate?: boolean;
 }) {
   const sharedInputProps:
     | React.ComponentProps<"input">
@@ -53,11 +55,17 @@ export function FormFieldPreview({
     disabled: disabled,
     autoFocus: false,
     placeholder: placeholder,
-    required: required,
-    pattern,
     autoComplete,
     accept,
     multiple,
+    // form validation related
+    required: novalidate ? false : required,
+    pattern: novalidate ? undefined : pattern,
+    // minLength: novalidate ? undefined : data?.min_length,
+    // maxLength: novalidate ? undefined : data?.max_length,
+    // min: novalidate ? undefined : data?.min,
+    // max: novalidate ? undefined : data?.max,
+    // step: novalidate ? undefined : data?.step,
   };
 
   function renderInput() {

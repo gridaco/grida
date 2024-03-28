@@ -1,4 +1,5 @@
 import { createRouteHandlerClient } from "@/lib/supabase/server";
+import { FormFieldDataSchema, FormFieldType, PaymentFieldData } from "@/types";
 import { FormFieldUpsert } from "@/types/private/api";
 import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
@@ -27,7 +28,7 @@ export async function POST(req: NextRequest) {
       required: init.required,
       pattern: init.pattern,
       autocomplete: init.autocomplete,
-      data: init.data as any,
+      data: safe_data_field({ type: init.type, data: init.data as any }) as any,
       accept: init.accept,
       multiple: init.multiple,
       // 'autocomplete': init.autocomplete,
@@ -103,4 +104,31 @@ export async function POST(req: NextRequest) {
       status: operation === "create" ? 201 : 200,
     }
   );
+}
+
+/**
+ * this function ensures that dynamic json data is structured correctly by the field type
+ * @returns
+ */
+function safe_data_field({
+  type,
+  data,
+}: {
+  type: FormFieldType;
+  data?: FormFieldDataSchema;
+}): FormFieldDataSchema | undefined | null {
+  switch (type) {
+    case "payment": {
+      // TODO: enhance the schema validation with external libraries
+      if (!data || !(data as PaymentFieldData).type) {
+        return <PaymentFieldData>{
+          type: "payment",
+          service_provider: "stripe",
+        };
+      }
+      break;
+    }
+  }
+
+  return data;
 }

@@ -33,6 +33,7 @@ import {
 } from "@/k/supported_field_types";
 import {
   payments_service_providers,
+  payments_service_providers_default,
   payments_service_providers_display_map,
 } from "@/k/payments_service_providers";
 import { cls_save_button } from "@/components/preferences";
@@ -89,6 +90,7 @@ const default_field_init: {
     type: "payment",
     data: {
       type: "payment",
+      service_provider: payments_service_providers_default,
     } as PaymentFieldData,
   },
 };
@@ -130,7 +132,9 @@ export function FieldEditPanel({
   const [autocomplete, setAutocomplete] = useState<FormFieldAutocompleteType[]>(
     init?.autocomplete || []
   );
-  const [data, setData] = useState<FormFieldDataSchema>(init?.data ?? {});
+  const [data, setData] = useState<FormFieldDataSchema | null | undefined>(
+    init?.data
+  );
   const [accept, setAccept] = useState<string | undefined>(
     init?.accept ?? undefined
   );
@@ -152,6 +156,7 @@ export function FieldEditPanel({
   const preview_disabled =
     !name ||
     (type == "payment" &&
+      // disable preview if servive provider is tosspayments (it takes control over the window)
       (data as PaymentFieldData)?.service_provider === "tosspayments");
 
   const onSaveClick = () => {
@@ -197,7 +202,7 @@ export function FieldEditPanel({
         );
         setHelpText((_help) => _help || defaults.helpText || "");
         setRequired((_required) => _required || defaults.required || false);
-
+        setData((_data) => _data || defaults.data);
         // reset options if there were no existing options
         if (!options?.length) {
           setOptions(defaults.options || []);
@@ -311,7 +316,10 @@ export function FieldEditPanel({
                   }}
                 >
                   {payments_service_providers.map((provider) => (
-                    <option key={provider} value={provider}>
+                    <option
+                      key={provider}
+                      value={provider ?? payments_service_providers_default}
+                    >
                       {payments_service_providers_display_map[provider].label}
                     </option>
                   ))}
@@ -475,6 +483,9 @@ function buildPreviewLabel({
 }
 
 function convertToPlainText(input: string) {
+  if (!input) {
+    return "";
+  }
   // Converts to snake_case then replaces underscores with spaces and capitalizes words
   return capitalCase(snakeCase(input)).toLowerCase();
 }
