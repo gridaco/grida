@@ -154,28 +154,33 @@ async function submit({
     ignored_names.push(...unknown_names);
     // add only existing fields to mapping
     target_names.push(...known_names);
-  } else if (unknown_field_handling_strategy === "accept") {
+  } else {
     // add all fields to mapping
     target_names.push(...known_names);
     target_names.push(...unknown_names);
 
-    needs_to_be_created = [...unknown_names];
-  } else if (unknown_field_handling_strategy === "reject") {
-    // reject all fields
-    return NextResponse.json(
-      {
-        error: "Unknown fields are not allowed",
-        info: {
-          message:
-            "To allow unknown fields, set 'unknown_field_handling_strategy' to 'ignore' or 'accept' in the form settings.",
-          data: { keys: unknown_names },
-        },
-      },
-      {
-        status: 400,
+    if (unknown_field_handling_strategy === "accept") {
+      needs_to_be_created = [...unknown_names];
+    } else if (unknown_field_handling_strategy === "reject") {
+      if (unknown_names.length > 0) {
+        // reject all fields
+        return NextResponse.json(
+          {
+            error: "Unknown fields are not allowed",
+            info: {
+              message:
+                "To allow unknown fields, set 'unknown_field_handling_strategy' to 'ignore' or 'accept' in the form settings.",
+              data: { keys: unknown_names },
+            },
+          },
+          {
+            status: 400,
+          }
+        );
       }
-    );
+    }
   }
+
   if (needs_to_be_created) {
     // create new fields
     const { data: new_fields } = await client
