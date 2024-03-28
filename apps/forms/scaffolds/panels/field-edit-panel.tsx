@@ -36,6 +36,7 @@ import {
   payments_service_providers_display_map,
 } from "@/k/payments_service_providers";
 import { cls_save_button } from "@/components/preferences";
+import { Toggle } from "@/components/toggle";
 
 // @ts-ignore
 const default_field_init: {
@@ -378,11 +379,7 @@ export function FieldEditPanel({
               )}
               {type !== "checkbox" && (
                 <PanelPropertyField label={"Required"}>
-                  <input
-                    type="checkbox"
-                    checked={required}
-                    onChange={(e) => setRequired(e.target.checked)}
-                  />
+                  <Toggle value={required} onChange={setRequired} />
                 </PanelPropertyField>
               )}
             </PanelPropertyFields>
@@ -398,7 +395,12 @@ export function FieldEditPanel({
               ))}
             </PanelPropertyFields>
           </PanelPropertySection>
-          <PanelPropertySection hidden={type == "payment"}>
+          <PanelPropertySection
+            hidden={
+              type == "payment" ||
+              (!has_accept && !has_pattern && type !== "checkbox")
+            }
+          >
             <PanelPropertySectionTitle>Validation</PanelPropertySectionTitle>
             <PanelPropertyFields>
               {has_accept && (
@@ -426,16 +428,16 @@ export function FieldEditPanel({
                 </PanelPropertyField>
               )}
               {type === "checkbox" && (
-                <PanelPropertyField label={"Required"}>
-                  <input
-                    type="checkbox"
-                    checked={required}
-                    onChange={(e) => setRequired(e.target.checked)}
-                  />
-                  <p>
-                    The checkbox will be required if it is checked. The user
-                    must check the checkbox to continue.
-                  </p>
+                <PanelPropertyField
+                  label={"Required"}
+                  description={
+                    <>
+                      The checkbox will be required if it is checked. The user
+                      must check the checkbox to continue.
+                    </>
+                  }
+                >
+                  <Toggle value={required} onChange={setRequired} />
                 </PanelPropertyField>
               )}
             </PanelPropertyFields>

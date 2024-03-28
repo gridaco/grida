@@ -66,7 +66,7 @@ export function PanelPropertyField({
   children,
 }: React.PropsWithChildren<{
   label: React.ReactNode;
-  description?: string;
+  description?: React.ReactNode;
   optional?: boolean;
 }>) {
   return (
@@ -78,7 +78,9 @@ export function PanelPropertyField({
       <div className="col-span-12">
         <div className="relative">{children}</div>
         {description && (
-          <span className="mt-2 leading-normal text-sm">{description}</span>
+          <p className="mt-1 leading-normal text-xs opacity-50">
+            {description}
+          </p>
         )}
       </div>
     </label>
