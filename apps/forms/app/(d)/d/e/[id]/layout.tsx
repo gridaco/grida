@@ -63,7 +63,7 @@ export default async function Layout({
 
   i18next.init({
     lng: default_form_page_language,
-    debug: !IS_PRODUTION,
+    debug: false, //!IS_PRODUTION,
     resources: {
       en: {
         translation: {

@@ -189,7 +189,6 @@ function HtmlTextarea({ ...props }: React.ComponentProps<"textarea">) {
 }
 
 function HtmlInput({ ...props }: React.ComponentProps<"input">) {
-  console.log(props.type);
   return (
     <input
       className={clsx(
