@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useId, useState } from "react";
+import React, { useEffect, useId, useMemo, useState } from "react";
 import {
   PanelClose,
   PanelContent,
@@ -48,6 +48,7 @@ import { fmt_snake_case_to_human_text } from "@/utils/fmt";
 import clsx from "clsx";
 import {
   SortableContext,
+  arrayMove,
   useSortable,
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
@@ -60,6 +61,8 @@ import {
   useSensors,
 } from "@dnd-kit/core";
 import { restrictToVerticalAxis } from "@dnd-kit/modifiers";
+import { nanoid } from "nanoid";
+import { draftid } from "@/utils/id";
 
 // @ts-ignore
 const default_field_init: {
@@ -92,9 +95,9 @@ const default_field_init: {
   select: {
     type: "select",
     options: [
-      { label: "Option A", value: "option_a" },
-      { label: "Option B", value: "option_b" },
-      { label: "Option C", value: "option_c" },
+      { id: draftid(), label: "Option A", value: "option_a" },
+      { id: draftid(), label: "Option B", value: "option_b" },
+      { id: draftid(), label: "Option C", value: "option_c" },
     ],
   },
   password: { type: "password", placeholder: "Password" },
@@ -102,9 +105,9 @@ const default_field_init: {
   radio: {
     type: "radio",
     options: [
-      { label: "Option A", value: "option_a" },
-      { label: "Option B", value: "option_b" },
-      { label: "Option C", value: "option_c" },
+      { id: draftid(), label: "Option A", value: "option_a" },
+      { id: draftid(), label: "Option B", value: "option_b" },
+      { id: draftid(), label: "Option C", value: "option_c" },
     ],
   },
   hidden: { type: "hidden" },
@@ -122,7 +125,11 @@ const input_can_have_pattern: FormFieldType[] = supported_field_types.filter(
   (type) => !["checkbox", "color", "radio"].includes(type)
 );
 
-type Option = { id?: string; label?: string; value: string };
+type Option = {
+  id: string;
+  label?: string;
+  value: string;
+};
 
 export function FieldEditPanel({
   title,
@@ -150,7 +157,12 @@ export function FieldEditPanel({
   const [type, setType] = useState<FormFieldType>(init?.type || "text");
   const [required, setRequired] = useState(init?.required || false);
   const [pattern, setPattern] = useState<string | undefined>(init?.pattern);
-  const [options, setOptions] = useState<Option[]>(init?.options || []);
+  const [options, setOptions] = useState<Option[]>(
+    Array.from(init?.options ?? []).sort(
+      (a, b) => (a.index || 0) - (b.index || 0)
+    )
+  );
+
   const [autocomplete, setAutocomplete] = useState<FormFieldAutocompleteType[]>(
     init?.autocomplete || []
   );
@@ -182,7 +194,16 @@ export function FieldEditPanel({
     // disable preview if servive provider is tosspayments (it takes control over the window)
     (data as PaymentFieldData)?.service_provider === "tosspayments";
 
-  const onSaveClick = () => {
+  const onSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+
+    const indexed_options = options
+      .map((option, index) => ({
+        ...option,
+        index,
+      }))
+      .sort((a, b) => a.index - b.index);
+
     onSave?.({
       name,
       label,
@@ -191,7 +212,7 @@ export function FieldEditPanel({
       type,
       required,
       pattern,
-      options,
+      options: indexed_options,
       autocomplete,
       data,
       accept,
@@ -286,7 +307,7 @@ export function FieldEditPanel({
             <FormFieldAssistant onSuggestion={onSuggestion} />
           </PanelPropertySection>
         )}
-        <form key={formResetKey}>
+        <form key={formResetKey} id="field-edit-form" onSubmit={onSubmit}>
           <PanelPropertySection>
             <PanelPropertySectionTitle>Field</PanelPropertySectionTitle>
             <PanelPropertyFields>
@@ -399,7 +420,7 @@ export function FieldEditPanel({
               </PanelPropertyField>
               <PanelPropertyField label={"Auto Complete"}>
                 <Select
-                  value={autocomplete}
+                  value={autocomplete ? autocomplete[0] : ""}
                   onChange={(e) => {
                     setAutocomplete([
                       e.target.value as FormFieldAutocompleteType,
@@ -431,13 +452,23 @@ export function FieldEditPanel({
               <OptionsEdit
                 options={options}
                 onAdd={() => {
-                  setOptions([...options, { label: "", value: "" }]);
+                  setOptions([
+                    ...options,
+                    {
+                      id: draftid(),
+                      label: "",
+                      value: "",
+                    },
+                  ]);
                 }}
-                onChange={(index, option) => {
-                  setOptions(options.map((o, i) => (i === index ? option : o)));
+                onChange={(id, option) => {
+                  setOptions(options.map((_) => (_.id === id ? option : _)));
                 }}
-                onRemove={(index) => {
-                  setOptions(options.filter((_, i) => i !== index));
+                onRemove={(id) => {
+                  setOptions(options.filter((_) => _.id !== id));
+                }}
+                onSort={(from, to) => {
+                  setOptions(arrayMove(options, from, to));
                 }}
               />
             </PanelPropertyFields>
@@ -497,7 +528,11 @@ export function FieldEditPanel({
             Cancel
           </button>
         </PanelClose>
-        <button onClick={onSaveClick} className={cls_save_button}>
+        <button
+          type="submit"
+          form="field-edit-form"
+          className={cls_save_button}
+        >
           Save
         </button>
       </PanelFooter>
@@ -525,12 +560,14 @@ function OptionsEdit({
   options,
   onAdd,
   onChange,
+  onSort,
   onRemove,
 }: {
   options?: Option[];
   onAdd?: () => void;
-  onChange?: (index: number, option: Option) => void;
-  onRemove?: (index: number) => void;
+  onChange?: (id: string, option: Option) => void;
+  onSort?: (from: number, to: number) => void;
+  onRemove?: (id: string) => void;
 }) {
   const id = useId();
 
@@ -548,9 +585,10 @@ function OptionsEdit({
       sensors={sensors}
       collisionDetection={closestCorners}
       modifiers={[restrictToVerticalAxis]}
+      onDragEnd={handleDragEnd}
     >
       <SortableContext
-        items={options?.map((option) => option.value) || []}
+        items={options?.map((option) => option.id) || []}
         strategy={verticalListSortingStrategy}
       >
         <div className="flex flex-col gap-4">
@@ -570,17 +608,19 @@ function OptionsEdit({
                 <span className="w-full text-xs">Label</span>
               </div>
             )}
-            {options?.map((option, index) => (
+            {options?.map(({ id, ...option }, index) => (
               <OptionEditItem
-                key={index}
+                key={id}
+                id={id}
                 mode={mode}
                 label={option.label || ""}
                 value={option.value}
+                index={index}
                 onRemove={() => {
-                  onRemove?.(index);
+                  onRemove?.(id);
                 }}
                 onChange={(option) => {
-                  onChange?.(index, option);
+                  onChange?.(id, { id, ...option });
                 }}
               />
             ))}
@@ -597,6 +637,14 @@ function OptionsEdit({
       </SortableContext>
     </DndContext>
   );
+
+  function handleDragEnd(event: any) {
+    const { active, over } = event;
+
+    if (over && active.id !== over.id) {
+      onSort?.(active.data.current.index, over.data.current.index);
+    }
+  }
 }
 
 const does_fmt_match = (a: string, b: string) =>
@@ -605,14 +653,18 @@ const does_fmt_match = (a: string, b: string) =>
 const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
 function OptionEditItem({
+  id,
   label: _label,
   value: _value,
+  index,
   mode,
   onChange,
   onRemove,
 }: {
+  id: string;
   label: string;
   value: string;
+  index: number;
   mode: "simple" | "advanced";
   onChange?: (option: { label: string; value: string }) => void;
   onRemove?: () => void;
@@ -627,7 +679,7 @@ function OptionEditItem({
     isSorting,
     isOver,
     transition,
-  } = useSortable({ id: _value });
+  } = useSortable({ id: id, data: { index } });
 
   const [value, setValue] = useState(_value);
   const [label, setLabel] = useState(_label);
@@ -678,6 +730,7 @@ function OptionEditItem({
           type="text"
           placeholder="option_value"
           value={value}
+          required
           onChange={(e) => setValue(e.target.value)}
         />
       </label>

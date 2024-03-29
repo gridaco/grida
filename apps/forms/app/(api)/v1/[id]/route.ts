@@ -60,6 +60,7 @@ interface ClientFieldRenderBlock extends BaseRenderBlock {
       id: string;
       label?: string;
       value: string;
+      index: number;
     }[];
     autocomplete?: string;
     data?: FormFieldDataSchema | null;
@@ -171,6 +172,7 @@ export async function GET(
           type: "field",
           field: {
             ...field,
+            options: field.options.sort((a, b) => a.index - b.index),
             required: field.required ?? undefined,
             multiple: field.multiple ?? undefined,
             autocomplete: field.autocomplete?.join(" ") ?? null,

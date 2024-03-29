@@ -99,7 +99,12 @@ export type NewFormFieldInit = {
   helpText: string;
   type: FormFieldType;
   required: boolean;
-  options?: { id?: string; label?: string; value: string }[];
+  options?: {
+    id: string;
+    label?: string;
+    value: string;
+    index?: number;
+  }[];
   pattern?: string;
   autocomplete?: FormFieldAutocompleteType[] | null;
   data?: FormFieldDataSchema | null;

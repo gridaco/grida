@@ -311,6 +311,7 @@ export type Database = {
           form_field_id: string
           form_id: string
           id: string
+          index: number
           label: string
           value: string
         }
@@ -319,6 +320,7 @@ export type Database = {
           form_field_id: string
           form_id: string
           id?: string
+          index?: number
           label?: string
           value: string
         }
@@ -327,6 +329,7 @@ export type Database = {
           form_field_id?: string
           form_id?: string
           id?: string
+          index?: number
           label?: string
           value?: string
         }
@@ -443,6 +446,7 @@ export type Database = {
         Row: {
           created_at: string
           form_field_id: string
+          form_field_option_id: string | null
           form_id: string | null
           id: string
           response_id: string
@@ -453,6 +457,7 @@ export type Database = {
         Insert: {
           created_at?: string
           form_field_id: string
+          form_field_option_id?: string | null
           form_id?: string | null
           id?: string
           response_id: string
@@ -463,6 +468,7 @@ export type Database = {
         Update: {
           created_at?: string
           form_field_id?: string
+          form_field_option_id?: string | null
           form_id?: string | null
           id?: string
           response_id?: string
@@ -476,6 +482,13 @@ export type Database = {
             columns: ["form_field_id"]
             isOneToOne: false
             referencedRelation: "form_field"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "grida_forms_response_field_form_field_option_id_fkey"
+            columns: ["form_field_option_id"]
+            isOneToOne: false
+            referencedRelation: "form_field_option"
             referencedColumns: ["id"]
           },
           {

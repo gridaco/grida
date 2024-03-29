@@ -95,14 +95,20 @@ export function FormFieldPreview({
       }
       case "select": {
         return (
-          <Select {...(sharedInputProps as React.ComponentProps<"select">)}>
+          <Select
+            {...(sharedInputProps as React.ComponentProps<"select">)}
+            defaultValue=""
+          >
             {placeholder && (
-              <option value="" disabled={required} selected>
+              <option value="" disabled={required}>
                 {placeholder}
               </option>
             )}
             {options?.map((option) => (
-              <option key={option.id || option.value} value={option.value}>
+              <option
+                key={option.id || option.value}
+                value={option.id || option.value}
+              >
                 {option.label || option.value}
               </option>
             ))}

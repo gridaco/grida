@@ -29,6 +29,7 @@ import { HTML_BLOCK_BODY_HTML_DEFAULT_VALUE } from "@/k/html_block_defaults";
 import { VIDEO_BLOCK_SRC_DEFAULT_VALUE } from "@/k/video_block_defaults";
 import { IMAGE_BLOCK_SRC_DEFAULT_VALUE } from "@/k/image_block_defaults";
 import { PDF_BLOCK_SRC_DEFAULT_VALUE } from "@/k/pdf_block_defaults";
+import { draftid } from "@/utils/id";
 
 export function reducer(
   state: FormEditorState,
@@ -46,10 +47,10 @@ export function reducer(
         .filter((block) => block.type === "section")
         .sort((a, b) => b.local_index - a.local_index)[0];
       const parent_id = parent_section?.id ?? null;
+      const id = draftid();
 
-      const id = "[draft]" + Math.random().toString(36).substring(7);
       const __shared: EditorFlatFormBlock = {
-        id: id,
+        id,
         created_at: new Date().toISOString(),
         form_id: state.form_id,
         form_page_id: state.page_id,

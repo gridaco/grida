@@ -85,7 +85,9 @@ export function FieldBlock({
                 onFieldChange(e.target.value);
               }}
             >
-              <option value="">Select Field</option>
+              <option value="" disabled>
+                Select Field
+              </option>
               {state.fields.map((f) => (
                 <option
                   key={f.id}

@@ -69,6 +69,7 @@ export async function POST(req: NextRequest) {
         options.map((option) => ({
           label: option.label,
           value: option.value,
+          index: option.index ?? 0,
           form_field_id: upserted.id,
           form_id: form_id,
         })),
@@ -131,4 +132,13 @@ function safe_data_field({
   }
 
   return data;
+}
+
+function omit<T extends Record<string, any>>(
+  obj: T,
+  ...keys: string[]
+): Partial<T> {
+  return Object.fromEntries(
+    Object.entries(obj).filter(([key]) => !keys.includes(key))
+  ) as Partial<T>;
 }

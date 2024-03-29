@@ -1,5 +1,6 @@
 import { client, workspaceclient } from "@/lib/supabase/server";
 import { NextRequest, NextResponse } from "next/server";
+import { validate, version } from "uuid";
 
 const SYSTEM_GF_KEY_STARTS_WITH = "__gf_";
 
@@ -130,7 +131,7 @@ async function submit({
   // get the fields ready
   const { data: form_fields } = await client
     .from("form_field")
-    .select("*")
+    .select("*, options:form_field_option(*)")
     .eq("form_id", form_id);
 
   // group by existing and new fields
@@ -195,8 +196,8 @@ async function submit({
       )
       .select("*");
 
-    // extend form_fields with new fields
-    form_fields!.push(...new_fields!);
+    // extend form_fields with new fields (match the type)
+    form_fields!.push(...new_fields?.map((f) => ({ ...f, options: [] }))!);
   }
 
   // create new form response
@@ -219,13 +220,33 @@ async function submit({
   const { data: response_fields } = await client
     .from("response_field")
     .insert(
-      form_fields!.map((field) => ({
-        type: field.type,
-        response_id: response_reference_obj!.id,
-        form_field_id: field.id,
-        form_id: form_id,
-        value: JSON.stringify(data.get(field.name)),
-      }))
+      form_fields!.map((field) => {
+        const { name, options } = field;
+
+        // the field's value can be a input value or a reference to form_field_option
+        const value_or_reference = data.get(name);
+
+        // check if the value is a reference to form_field_option
+        const is_value_fkey_and_found =
+          is_uuid_v4(value_or_reference as string) &&
+          options?.find((o: any) => o.id === value_or_reference);
+
+        // locate the value
+        const value = is_value_fkey_and_found
+          ? is_value_fkey_and_found.value
+          : value_or_reference;
+
+        return {
+          type: field.type,
+          response_id: response_reference_obj!.id,
+          form_field_id: field.id,
+          form_id: form_id,
+          value: JSON.stringify(value),
+          form_field_option_id: is_value_fkey_and_found
+            ? is_value_fkey_and_found.id
+            : null,
+        };
+      })
     )
     .select();
 
@@ -289,4 +310,8 @@ async function submit({
     info: Object.keys(info).length > 0 ? info : null,
     error: null,
   });
+}
+
+function is_uuid_v4(value: string) {
+  return validate(value) && version(value) === 4;
 }
