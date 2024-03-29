@@ -1,3 +1,26 @@
+export interface Form {
+  created_at: string;
+  custom_preview_url_path: string | null;
+  custom_publish_url_path: string | null;
+  default_form_page_id: string | null;
+  default_form_page_language: FormsPageLanguage;
+  description: string | null;
+  id: string;
+  is_edit_after_submission_allowed: boolean;
+  is_max_form_responses_by_customer_enabled: boolean;
+  is_max_form_responses_in_total_enabled: boolean;
+  is_multiple_response_allowed: boolean;
+  is_powered_by_branding_enabled: boolean;
+  is_redirect_after_response_uri_enabled: boolean;
+  max_form_responses_by_customer: number | null;
+  max_form_responses_in_total: number | null;
+  project_id: number;
+  redirect_after_response_uri: string | null;
+  title: string;
+  unknown_field_handling_strategy: FormResponseUnknownFieldHandlingStrategyType;
+  updated_at: string;
+}
+
 /**
  * user facing page language
  */

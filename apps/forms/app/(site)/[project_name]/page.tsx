@@ -6,18 +6,31 @@ import {
   createServerComponentClient,
   workspaceclient,
 } from "@/lib/supabase/server";
-import { DashboardFormCard } from "@/components/dashboard-form-card";
 import { GridaLogo } from "@/components/grida-logo";
-import { PlusIcon } from "@radix-ui/react-icons";
+import {
+  PlusIcon,
+  ViewGridIcon,
+  ViewHorizontalIcon,
+} from "@radix-ui/react-icons";
 import { CreateNewFormButton } from "@/components/create-form-button";
+import { Form } from "@/types";
+import Image from "next/image";
 
 export const revalidate = 0;
 
+interface FormDashboardItem extends Form {
+  responses: { id: string }[];
+}
+
 export default async function FormsDashboardPage({
   params,
+  searchParams,
 }: {
   params: {
     project_name: string;
+  };
+  searchParams: {
+    layout?: "grid" | "list";
   };
 }) {
   const { project_name } = params;
@@ -26,6 +39,8 @@ export default async function FormsDashboardPage({
   const supabase = createServerComponentClient(cookieStore);
 
   const { data: auth } = await supabase.auth.getSession();
+
+  const layout = searchParams.layout ?? "list";
 
   if (!auth.session) {
     return redirect("/sign-in");
@@ -46,10 +61,14 @@ export default async function FormsDashboardPage({
 
   const { data: forms, error } = await supabase
     .from("form")
-    .select()
+    .select("*, responses:response(id)")
     .eq("project_id", project_id);
 
-  const count = forms?.length || 0;
+  if (!forms) {
+    return notFound();
+  }
+
+  const count = forms.length;
 
   return (
     <main className="container mx-auto px-4">
@@ -73,17 +92,105 @@ export default async function FormsDashboardPage({
       <section className="flex justify-end py-4">
         <CreateNewFormButton project_id={project_id} />
       </section>
-      <hr className="my-10 dark:border-neutral-700" />
+      <section className="w-full flex justify-end gap-2 mt-10">
+        <Link href="?layout=grid" replace>
+          <ViewGridIcon />
+        </Link>
+        <Link href="?layout=list" replace>
+          <ViewHorizontalIcon />
+        </Link>
+      </section>
+      <hr className="mb-10 mt-5 dark:border-neutral-700" />
+      <FormsGrid forms={forms} layout={layout} />
+      <footer className="h-44" />
+    </main>
+  );
+}
+
+function FormsGrid({
+  forms,
+  layout,
+}: {
+  forms: FormDashboardItem[];
+  layout: "grid" | "list";
+}) {
+  if (layout === "grid") {
+    return (
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
         {forms?.map((form, i) => (
           <Link key={i} href={`/d/${form.id}`}>
-            <DashboardFormCard
-              title={form.title}
-              thumbnail="/assets/placeholder-image.png"
-            />
+            <GridCard {...form} thumbnail="/assets/placeholder-image.png" />
           </Link>
         ))}
       </div>
-    </main>
+    );
+  }
+
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-1 lg:grid-cols-1 gap-4">
+      <header className="flex text-sm opacity-80">
+        <span className="flex-1">Form</span>
+        <span className="w-32">Responses</span>
+        <span className="w-44">Updated At</span>
+      </header>
+      {forms?.map((form, i) => (
+        <Link key={i} href={`/d/${form.id}`}>
+          <RowCard {...form} />
+        </Link>
+      ))}
+    </div>
+  );
+}
+
+function GridCard({
+  title,
+  responses,
+  thumbnail,
+}: FormDashboardItem & { thumbnail: string }) {
+  return (
+    <div className="rounded border border-neutral-500/10 bg-white dark:bg-neutral-900 shadow-md">
+      <Image
+        className="object-cover w-full h-full"
+        width={240}
+        height={300}
+        src={thumbnail}
+        alt="thumbnail"
+      />
+      <div className="px-4 py-2 flex flex-col gap-2">
+        <span>{title}</span>
+        <span className="text-xs opacity-50">{responses.length} responses</span>
+      </div>
+    </div>
+  );
+}
+
+function RowCard({
+  title,
+  responses,
+  created_at,
+  updated_at,
+}: FormDashboardItem) {
+  return (
+    <div className="flex items-center border rounded-xl overflow-hidden h-16 shadow-md bg-white dark:bg-neutral-900">
+      <Image
+        className="object-cover max-w-16 bg-neutral-500 aspect-square"
+        width={440}
+        height={440}
+        src={"/assets/placeholder-image.png"}
+        alt="thumbnail"
+      />
+      <div className="flex-1 px-6 font-medium text-gray-900 whitespace-nowrap dark:text-white">
+        <div className="flex flex-col">
+          <span>{title}</span>
+          <span className="text-xs font-normal opacity-50">
+            Created: {new Date(created_at).toLocaleDateString()}
+          </span>
+        </div>
+      </div>
+      <div className="opacity-80 w-32 text-sm">{responses.length}</div>
+      <div className="opacity-80 w-44 text-sm">
+        {new Date(updated_at).toLocaleDateString()}
+      </div>
+    </div>
   );
 }
