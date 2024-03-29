@@ -311,7 +311,7 @@ export type Database = {
           form_field_id: string
           form_id: string
           id: string
-          label: string | null
+          label: string
           value: string
         }
         Insert: {
@@ -319,7 +319,7 @@ export type Database = {
           form_field_id: string
           form_id: string
           id?: string
-          label?: string | null
+          label?: string
           value: string
         }
         Update: {
@@ -327,7 +327,7 @@ export type Database = {
           form_field_id?: string
           form_id?: string
           id?: string
-          label?: string | null
+          label?: string
           value?: string
         }
         Relationships: [
@@ -380,7 +380,7 @@ export type Database = {
         Row: {
           browser: string | null
           created_at: string
-          customer_uuid: string | null
+          customer_id: string | null
           form_id: string | null
           id: string
           ip: string | null
@@ -395,7 +395,7 @@ export type Database = {
         Insert: {
           browser?: string | null
           created_at?: string
-          customer_uuid?: string | null
+          customer_id?: string | null
           form_id?: string | null
           id?: string
           ip?: string | null
@@ -410,7 +410,7 @@ export type Database = {
         Update: {
           browser?: string | null
           created_at?: string
-          customer_uuid?: string | null
+          customer_id?: string | null
           form_id?: string | null
           id?: string
           ip?: string | null
@@ -425,10 +425,10 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "grida_forms_response_customer_uuid_fkey"
-            columns: ["customer_uuid"]
+            columns: ["customer_id"]
             isOneToOne: false
             referencedRelation: "customer"
-            referencedColumns: ["uuid"]
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "grida_forms_response_form_id_fkey"
@@ -610,28 +610,25 @@ export type Database = {
           _fp_fingerprintjs_visitorid: string | null
           created_at: string
           email: string | null
-          id: number
+          id: string
           last_seen_at: string
           project_id: number
-          uuid: string
         }
         Insert: {
           _fp_fingerprintjs_visitorid?: string | null
           created_at?: string
           email?: string | null
-          id?: number
+          id?: string
           last_seen_at?: string
           project_id: number
-          uuid?: string
         }
         Update: {
           _fp_fingerprintjs_visitorid?: string | null
           created_at?: string
           email?: string | null
-          id?: number
+          id?: string
           last_seen_at?: string
           project_id?: number
-          uuid?: string
         }
         Relationships: [
           {

@@ -207,7 +207,7 @@ async function submit({
       form_id: form_id,
       browser: meta.browser,
       ip: meta.ip,
-      customer_uuid: customer?.uuid,
+      customer_id: customer?.id,
       x_referer: meta.referer,
       x_useragent: meta.useragent,
       platform_powered_by: "web_client",
