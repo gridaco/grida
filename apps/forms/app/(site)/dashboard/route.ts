@@ -5,7 +5,7 @@ export const revalidate = 0;
 export function GET(req: NextRequest) {
   const origin = req.nextUrl.origin;
 
-  return NextResponse.redirect(origin + "/2", {
+  return NextResponse.redirect(origin + "/forms-playground", {
     status: 301,
   });
 }

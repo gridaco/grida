@@ -2,7 +2,10 @@ import React from "react";
 import Link from "next/link";
 import { cookies } from "next/headers";
 import { notFound, redirect } from "next/navigation";
-import { createServerComponentClient } from "@/lib/supabase/server";
+import {
+  createServerComponentClient,
+  workspaceclient,
+} from "@/lib/supabase/server";
 import { DashboardFormCard } from "@/components/dashboard-form-card";
 import { GridaLogo } from "@/components/grida-logo";
 import { PlusIcon } from "@radix-ui/react-icons";
@@ -14,10 +17,10 @@ export default async function FormsDashboardPage({
   params,
 }: {
   params: {
-    project_id: string;
+    project_name: string;
   };
 }) {
-  const project_id = Number(params.project_id);
+  const { project_name } = params;
 
   const cookieStore = cookies();
   const supabase = createServerComponentClient(cookieStore);
@@ -27,6 +30,19 @@ export default async function FormsDashboardPage({
   if (!auth.session) {
     return redirect("/sign-in");
   }
+
+  // TODO: this needs a RLS guard.
+  const { data: project_ref } = await workspaceclient
+    .from("project")
+    .select("id")
+    .eq("name", project_name)
+    .single();
+
+  if (!project_ref) {
+    return notFound();
+  }
+
+  const project_id = project_ref.id;
 
   const { data: forms, error } = await supabase
     .from("form")
@@ -38,12 +54,15 @@ export default async function FormsDashboardPage({
   return (
     <main className="container mx-auto px-4">
       <header className="py-10">
-        <Link href="/dashboard">
-          <span className="flex items-center gap-2 text-2xl font-black select-none">
-            <GridaLogo />
-            Forms
-          </span>
-        </Link>
+        <div>
+          <Link href="/dashboard">
+            <span className="flex items-center gap-2 text-2xl font-black select-none">
+              <GridaLogo />
+              Forms
+            </span>
+          </Link>
+          <span className="font-mono opacity-50">{project_name}</span>
+        </div>
         <h1 className="text-5xl font-mono font-black py-10 flex items-center gap-4">
           Dashboard
           <span className="text-2xl bg-neutral-500 text-white rounded-full py-2 px-3">
