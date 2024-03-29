@@ -60,6 +60,8 @@ export function Form({
   const [checkoutSession, setCheckoutSession] =
     useState<PaymentCheckoutSession | null>(null);
 
+  const submit_action = "/submit/" + form_id;
+
   const sections = tree.children.filter((block) => block.type === "section");
 
   const has_sections = sections.length > 0;
@@ -92,9 +94,9 @@ export function Form({
     ? current_section_id === sections[0].id
     : true;
 
-  const next_section_button_hidden = has_sections
-    ? current_section_id === last_section_id
-    : true;
+  const next_section_button_hidden =
+    (has_sections ? current_section_id === last_section_id : true) ||
+    primary_action_override_by_payment;
 
   useEffect(() => {
     request_toss_payments_checkout_session({
@@ -118,10 +120,10 @@ export function Form({
     set_current_section_id(sections[index - 1].id);
   };
 
-  const onNext = (e: React.MouseEvent<HTMLButtonElement>) => {
+  const onNext = (e?: React.MouseEvent<HTMLButtonElement>) => {
     // validate current section
-    e.preventDefault();
-    e.stopPropagation();
+    // e.preventDefault();
+    // e.stopPropagation();
 
     if (current_section_id === last_section_id) {
       return;
@@ -133,9 +135,15 @@ export function Form({
     set_current_section_id(sections[index + 1].id);
   };
 
-  const renderBlock = (block: ClientRenderBlock): any => {
+  const renderBlock = (
+    block: ClientRenderBlock,
+    context?: {
+      is_in_current_section: boolean;
+    }
+  ): any => {
     switch (block.type) {
       case "section": {
+        const is_current_section = current_section_id === block.id;
         return (
           <section
             id={block.id}
@@ -144,10 +152,16 @@ export function Form({
               block.attributes?.contains_payment
             }
             key={block.id}
-            data-active-section={current_section_id === block.id}
+            data-active-section={is_current_section}
             className="rounded data-[active-section='false']:hidden"
           >
-            <GroupLayout>{block.children?.map(renderBlock)}</GroupLayout>
+            <GroupLayout>
+              {block.children?.map((b) =>
+                renderBlock(b, {
+                  is_in_current_section: is_current_section,
+                })
+              )}
+            </GroupLayout>
           </section>
         );
       }
@@ -185,6 +199,7 @@ export function Form({
                 autoComplete={field.autocomplete}
                 accept={field.accept}
                 multiple={field.multiple}
+                novalidate={!context?.is_in_current_section}
               />
             );
           }
@@ -267,23 +282,33 @@ export function Form({
       )}
     >
       <TossPaymentsCheckoutProvider initial={checkoutSession}>
-        {/* <header>
-        <h1 className="py-10 text-4xl font-bold">{title}</h1>
-      </header> */}
         <form
           id="form"
-          action={"/submit/" + form_id}
+          action={submit_hidden ? undefined : submit_action}
+          onSubmit={(e) => {
+            if (submit_hidden) {
+              e.preventDefault();
+              e.stopPropagation();
+              const valid = (e.target as HTMLFormElement).checkValidity();
+              if (valid) {
+                onNext();
+              } else {
+                // show error
+                alert("Please fill out the form correctly.");
+              }
+            }
+          }}
           className="p-4 pt-10 md:pt-16 h-full overflow-auto flex-1"
         >
           <FingerprintField />
-          <GroupLayout>{tree.children.map(renderBlock)}</GroupLayout>
+          <GroupLayout>{tree.children.map((b) => renderBlock(b))}</GroupLayout>
         </form>
         <footer
           className="
           sticky md:static bottom-0
           flex gap-2 justify-end md:justify-start
-          bg-white dark:bg-black
-          p-4 mt-4 pt-4 border-t dark:border-t-neutral-900
+          bg-white dark:bg-neutral-900
+          p-4 mt-4 pt-4 border-t
         "
         >
           <button
@@ -298,24 +323,26 @@ export function Form({
           </button>
           <button
             data-next-hidden={next_section_button_hidden}
+            form="form"
+            type="submit"
             className={clsx(
               cls_button_nuetral,
               "w-full md:w-auto",
               "data-[next-hidden='true']:hidden"
             )}
-            onClick={onNext}
+            // onClick={onNext}
           >
             {translations.next}
           </button>
           <button
             data-submit-hidden={submit_hidden}
             form="form"
+            type="submit"
             className={clsx(
               cls_button_submit,
               "w-full md:w-auto",
               "data-[submit-hidden='true']:hidden"
             )}
-            type="submit"
           >
             {translations.submit}
           </button>

@@ -1,5 +1,6 @@
 import { client, workspaceclient } from "@/lib/supabase/server";
 import { NextRequest, NextResponse } from "next/server";
+import { validate, version } from "uuid";
 
 const SYSTEM_GF_KEY_STARTS_WITH = "__gf_";
 
@@ -130,7 +131,7 @@ async function submit({
   // get the fields ready
   const { data: form_fields } = await client
     .from("form_field")
-    .select("*")
+    .select("*, options:form_field_option(*)")
     .eq("form_id", form_id);
 
   // group by existing and new fields
@@ -154,28 +155,33 @@ async function submit({
     ignored_names.push(...unknown_names);
     // add only existing fields to mapping
     target_names.push(...known_names);
-  } else if (unknown_field_handling_strategy === "accept") {
+  } else {
     // add all fields to mapping
     target_names.push(...known_names);
     target_names.push(...unknown_names);
 
-    needs_to_be_created = [...unknown_names];
-  } else if (unknown_field_handling_strategy === "reject") {
-    // reject all fields
-    return NextResponse.json(
-      {
-        error: "Unknown fields are not allowed",
-        info: {
-          message:
-            "To allow unknown fields, set 'unknown_field_handling_strategy' to 'ignore' or 'accept' in the form settings.",
-          data: { keys: unknown_names },
-        },
-      },
-      {
-        status: 400,
+    if (unknown_field_handling_strategy === "accept") {
+      needs_to_be_created = [...unknown_names];
+    } else if (unknown_field_handling_strategy === "reject") {
+      if (unknown_names.length > 0) {
+        // reject all fields
+        return NextResponse.json(
+          {
+            error: "Unknown fields are not allowed",
+            info: {
+              message:
+                "To allow unknown fields, set 'unknown_field_handling_strategy' to 'ignore' or 'accept' in the form settings.",
+              data: { keys: unknown_names },
+            },
+          },
+          {
+            status: 400,
+          }
+        );
       }
-    );
+    }
   }
+
   if (needs_to_be_created) {
     // create new fields
     const { data: new_fields } = await client
@@ -190,8 +196,8 @@ async function submit({
       )
       .select("*");
 
-    // extend form_fields with new fields
-    form_fields!.push(...new_fields!);
+    // extend form_fields with new fields (match the type)
+    form_fields!.push(...new_fields?.map((f) => ({ ...f, options: [] }))!);
   }
 
   // create new form response
@@ -202,7 +208,7 @@ async function submit({
       form_id: form_id,
       browser: meta.browser,
       ip: meta.ip,
-      customer_uuid: customer?.uuid,
+      customer_id: customer?.id,
       x_referer: meta.referer,
       x_useragent: meta.useragent,
       platform_powered_by: "web_client",
@@ -214,13 +220,33 @@ async function submit({
   const { data: response_fields } = await client
     .from("response_field")
     .insert(
-      form_fields!.map((field) => ({
-        type: field.type,
-        response_id: response_reference_obj!.id,
-        form_field_id: field.id,
-        form_id: form_id,
-        value: JSON.stringify(data.get(field.name)),
-      }))
+      form_fields!.map((field) => {
+        const { name, options } = field;
+
+        // the field's value can be a input value or a reference to form_field_option
+        const value_or_reference = data.get(name);
+
+        // check if the value is a reference to form_field_option
+        const is_value_fkey_and_found =
+          is_uuid_v4(value_or_reference as string) &&
+          options?.find((o: any) => o.id === value_or_reference);
+
+        // locate the value
+        const value = is_value_fkey_and_found
+          ? is_value_fkey_and_found.value
+          : value_or_reference;
+
+        return {
+          type: field.type,
+          response_id: response_reference_obj!.id,
+          form_field_id: field.id,
+          form_id: form_id,
+          value: JSON.stringify(value),
+          form_field_option_id: is_value_fkey_and_found
+            ? is_value_fkey_and_found.id
+            : null,
+        };
+      })
     )
     .select();
 
@@ -284,4 +310,8 @@ async function submit({
     info: Object.keys(info).length > 0 ? info : null,
     error: null,
   });
+}
+
+function is_uuid_v4(value: string) {
+  return validate(value) && version(value) === 4;
 }

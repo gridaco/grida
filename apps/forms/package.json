@@ -16,6 +16,7 @@
     "@editor-ui/alert-dialog": "workspace:^",
     "@editor-ui/dropdown-menu": "workspace:^",
     "@fingerprintjs/fingerprintjs": "^4.2.2",
+    "@floating-ui/react": "^0.26.10",
     "@mdx-js/loader": "^3.0.1",
     "@mdx-js/react": "^3.0.1",
     "@monaco-editor/react": "^4.6.0",
@@ -54,13 +55,15 @@
     "react-player": "^2.14.1",
     "signature_pad": "^4.2.0",
     "three": "^0.150.1",
-    "use-file-picker": "^2.1.1"
+    "use-file-picker": "^2.1.1",
+    "uuid": "^9.0.1"
   },
   "devDependencies": {
     "@tailwindcss/typography": "^0.5.10",
     "@types/node": "^20",
     "@types/react": "^18",
     "@types/react-dom": "^18",
+    "@types/uuid": "^9.0.8",
     "autoprefixer": "^10.0.1",
     "eslint": "^8",
     "eslint-config-next": "14.1.1",

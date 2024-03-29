@@ -11,7 +11,7 @@ import {
 } from "@/components/preferences";
 import { PoweredByGridaWaterMark } from "@/components/powered-by-branding";
 
-export function CustomizeBrandingPreferences({
+export function CustomPoweredByBrandingPreferences({
   form_id,
   init,
 }: {

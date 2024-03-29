@@ -1,11 +1,11 @@
 import React from "react";
 import { createServerComponentClient } from "@/lib/supabase/server";
-import { FormPageLanguagePreferences } from "@/scaffolds/settings/form-page-language";
-import { RedirectPreferences } from "@/scaffolds/settings/redirect-section";
+import { FormPageLanguagePreferences } from "@/scaffolds/settings/form-page-language-preferences";
+import { RedirectPreferences } from "@/scaffolds/settings/redirect-preferences";
 import {
   MaxRespoonses,
   RestrictNumberOfResponseByCustomer,
-} from "@/scaffolds/settings/response-preference-section";
+} from "@/scaffolds/settings/response-preferences";
 import { cookies } from "next/headers";
 import {
   Sector,
@@ -15,7 +15,7 @@ import {
   SectorHeading,
 } from "@/components/preferences";
 import { notFound } from "next/navigation";
-import { CustomizeBrandingPreferences } from "@/scaffolds/settings/customize-branding-section";
+import { CustomPoweredByBrandingPreferences } from "@/scaffolds/settings/custom-powered-by-branding-preferences";
 
 export default async function FormsCustomizeSettingsPage({
   params,
@@ -105,8 +105,11 @@ export default async function FormsCustomizeSettingsPage({
       <Sector>
         <SectorHeader>
           <SectorHeading>Branding</SectorHeading>
+          <SectorDescription>
+            Opt-out from Grida branding on built-in pages
+          </SectorDescription>
         </SectorHeader>
-        <CustomizeBrandingPreferences
+        <CustomPoweredByBrandingPreferences
           form_id={form_id}
           init={{
             is_powered_by_branding_enabled,

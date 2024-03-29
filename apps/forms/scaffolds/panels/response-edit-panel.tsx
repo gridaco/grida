@@ -58,10 +58,7 @@ export function ResponseEditPanel({
           <PanelPropertySectionTitle>Customer</PanelPropertySectionTitle>
           <PanelPropertyFields>
             <PanelPropertyField label={"UUID"}>
-              <PropertyTextInput
-                value={response?.customer_uuid ?? ""}
-                disabled
-              />
+              <PropertyTextInput value={response?.customer_id ?? ""} disabled />
             </PanelPropertyField>
             <PanelPropertyField label={"Browser"}>
               <PropertyTextInput value={response?.browser ?? ""} disabled />

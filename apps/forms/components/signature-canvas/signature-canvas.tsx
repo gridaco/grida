@@ -28,7 +28,7 @@ export function SignatureCanvas({ name }: React.ComponentProps<"input">) {
       }}
     >
       <canvas
-        className="bg-transparent border rounded border-black shadow"
+        className="bg-transparent dark:bg-neutral-700 border rounded shadow"
         ref={ref}
         width="auto"
         height={180}

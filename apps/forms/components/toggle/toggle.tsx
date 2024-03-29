@@ -14,7 +14,7 @@ export function Toggle({
   onChange?: (value: boolean) => void;
 }) {
   return (
-    <label className="inline-flex items-center mb-5 cursor-pointer">
+    <label className="inline-flex items-center cursor-pointer">
       <input
         type="checkbox"
         name={name}

@@ -28,6 +28,7 @@ export function FormFieldPreview({
   multiple,
   pattern,
   data,
+  novalidate,
 }: {
   name: string;
   label?: string;
@@ -35,7 +36,7 @@ export function FormFieldPreview({
   placeholder?: string;
   helpText?: string;
   required?: boolean;
-  options?: { label?: string | null; value: string }[];
+  options?: { id?: string; label?: string | null; value: string }[];
   pattern?: string;
   readonly?: boolean;
   disabled?: boolean;
@@ -44,6 +45,7 @@ export function FormFieldPreview({
   multiple?: boolean;
   labelCapitalize?: boolean;
   data?: FormFieldDataSchema | null;
+  novalidate?: boolean;
 }) {
   const sharedInputProps:
     | React.ComponentProps<"input">
@@ -53,11 +55,17 @@ export function FormFieldPreview({
     disabled: disabled,
     autoFocus: false,
     placeholder: placeholder,
-    required: required,
-    pattern,
     autoComplete,
     accept,
     multiple,
+    // form validation related
+    required: novalidate ? false : required,
+    pattern: novalidate ? undefined : pattern,
+    // minLength: novalidate ? undefined : data?.min_length,
+    // maxLength: novalidate ? undefined : data?.max_length,
+    // min: novalidate ? undefined : data?.min,
+    // max: novalidate ? undefined : data?.max,
+    // step: novalidate ? undefined : data?.step,
   };
 
   function renderInput() {
@@ -76,32 +84,26 @@ export function FormFieldPreview({
           />
         );
       }
-      case "checkbox": {
-        return (
-          <input
-            className="w-4 h-4 text-blue-600 bg-neutral-100 border-neutral-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-neutral-800 focus:ring-2 dark:bg-neutral-700 dark:border-neutral-600"
-            type="checkbox"
-            {...(sharedInputProps as React.ComponentProps<"input">)}
-          />
-        );
-      }
       case "select": {
         return (
-          <Select {...(sharedInputProps as React.ComponentProps<"select">)}>
+          <Select
+            {...(sharedInputProps as React.ComponentProps<"select">)}
+            defaultValue=""
+          >
+            {placeholder && (
+              <option value="" disabled={required}>
+                {placeholder}
+              </option>
+            )}
             {options?.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
+              <option
+                key={option.id || option.value}
+                value={option.id || option.value}
+              >
+                {option.label || option.value}
               </option>
             ))}
           </Select>
-        );
-      }
-      case "color": {
-        return (
-          <input
-            type="color"
-            {...(sharedInputProps as React.ComponentProps<"input">)}
-          />
         );
       }
       case "radio": {
@@ -125,6 +127,46 @@ export function FormFieldPreview({
               </div>
             ))}
           </fieldset>
+        );
+      }
+      case "checkbox": {
+        return (
+          <input
+            className="w-4 h-4 text-blue-600 bg-neutral-100 border-neutral-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-neutral-800 focus:ring-2 dark:bg-neutral-700 dark:border-neutral-600"
+            type="checkbox"
+            {...(sharedInputProps as React.ComponentProps<"input">)}
+          />
+        );
+      }
+      case "checkboxes": {
+        return (
+          <fieldset>
+            {options?.map((option) => (
+              <div className="flex items-center gap-2" key={option.value}>
+                <input
+                  type="checkbox"
+                  name={name}
+                  id={option.value}
+                  value={option.value}
+                  {...(sharedInputProps as React.ComponentProps<"input">)}
+                />
+                <label
+                  htmlFor={option.value}
+                  className="ms-2 text-sm font-medium text-neutral-900 dark:text-neutral-300"
+                >
+                  {option.label}
+                </label>
+              </div>
+            ))}
+          </fieldset>
+        );
+      }
+      case "color": {
+        return (
+          <input
+            type="color"
+            {...(sharedInputProps as React.ComponentProps<"input">)}
+          />
         );
       }
       case "signature": {
@@ -181,7 +223,6 @@ function HtmlTextarea({ ...props }: React.ComponentProps<"textarea">) {
 }
 
 function HtmlInput({ ...props }: React.ComponentProps<"input">) {
-  console.log(props.type);
   return (
     <input
       className={clsx(

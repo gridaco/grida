@@ -223,7 +223,9 @@ function BlocksEditor() {
       <PendingBlocksResolver />
       <OptimisticBlocksSyncProvider />
       <div className="sticky top-20 z-50">
-        <AddBlockButton />
+        <div className="absolute -left-6">
+          <AddBlockButton />
+        </div>
       </div>
       <BlocksCanvas id="root" className="flex flex-col gap-4 mt-10">
         <SortableContext
@@ -268,7 +270,7 @@ function AddBlockButton() {
   return (
     <DropdownMenu.Root modal={false}>
       <DropdownMenu.Trigger asChild>
-        <button className="rounded border bg-white dark:bg-neutral-800 dark:border-neutral-700 p-2">
+        <button className="rounded-full w-12 h-12 flex items-center justify-center border bg-white dark:bg-neutral-800 dark:border-neutral-700 p-2">
           <PlusIcon />
         </button>
       </DropdownMenu.Trigger>

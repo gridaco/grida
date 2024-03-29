@@ -90,22 +90,31 @@ export default async function Layout({
 
         <div className="h-screen flex flex-col">
           <Toaster position="bottom-center" />
-          <header className="px-4 flex w-full gap-4 border-b dark:border-neutral-900 bg-white dark:bg-neutral-900 z-10">
-            <div className="w-1/3 flex items-center justify-start">
-              <Link href="/dashboard">
-                <span className="flex items-center gap-2 text-md font-black select-none">
-                  <GridaLogo size={15} />
-                  Forms
-                </span>
-              </Link>
-              <SlashIcon className="min-w-[20px] ml-2" width={15} height={15} />
-              <EditableFormTitle form_id={id} defaultValue={data.title} />
+          <header className="px-4 flex flex-col w-full gap-4 border-b bg-white dark:bg-neutral-900 z-10">
+            <div className="w-full flex gap-4">
+              <div className="w-1/3 flex items-center justify-start">
+                <Link href="/dashboard">
+                  <span className="flex items-center gap-2 text-md font-black select-none">
+                    <GridaLogo size={15} />
+                    Forms
+                  </span>
+                </Link>
+                <SlashIcon
+                  className="min-w-[20px] ml-2"
+                  width={15}
+                  height={15}
+                />
+                <EditableFormTitle form_id={id} defaultValue={data.title} />
+              </div>
+              <div className="invisible lg:visible w-1/3">
+                <Tabs form_id={id} />
+              </div>
+              <div className="w-1/3 flex gap-4 items-center justify-end">
+                <PreviewButton form_id={id} />
+              </div>
             </div>
-            <div className="w-1/3 flex items-center justify-center gap-4">
+            <div className="block lg:hidden">
               <Tabs form_id={id} />
-            </div>
-            <div className="w-1/3 flex gap-4 items-center justify-end">
-              <PreviewButton form_id={id} />
             </div>
           </header>
           <FormEditorProvider
