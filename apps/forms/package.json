@@ -16,6 +16,7 @@
     "@editor-ui/alert-dialog": "workspace:^",
     "@editor-ui/dropdown-menu": "workspace:^",
     "@fingerprintjs/fingerprintjs": "^4.2.2",
+    "@floating-ui/react": "^0.26.10",
     "@mdx-js/loader": "^3.0.1",
     "@mdx-js/react": "^3.0.1",
     "@monaco-editor/react": "^4.6.0",

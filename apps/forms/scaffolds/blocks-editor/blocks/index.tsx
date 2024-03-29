@@ -12,6 +12,7 @@ import { VideoBlock } from "./video-block";
 import { DividerBlock } from "./divider-block";
 import { HeaderBlock } from "./header-block";
 import { PdfBlock } from "./pdf-block";
+import clsx from "clsx";
 
 export function BlocksCanvas({
   children,
@@ -87,19 +88,27 @@ export function Block(props: EditorFlatFormBlock) {
         data-folder={props.type === "section"}
         ref={setNodeRef}
         style={style}
-        className="relative data-[folder='true']:mt-16 data-[folder='true']:mb-4"
+        className="group relative data-[folder='true']:mt-16 data-[folder='true']:mb-4"
       >
-        <button
+        <div
           style={{
             display: props.type === "section" ? "none" : "block",
           }}
           ref={setActivatorNodeRef}
           {...listeners}
           {...attributes}
-          className="absolute -left-8 top-1 rounded border dark:border-neutral-700 shadow p-1"
+          className={clsx(
+            "absolute left-0 right-0 top-3 flex items-center justify-center",
+            "cursor-move",
+            "opacity-0 p-1 group-hover:opacity-100"
+          )}
         >
-          <DragHandleDots2Icon />
-        </button>
+          <div className="w-full flex justify-center">
+            <div className="rotate-90">
+              <DragHandleDots2Icon width={20} height={20} />
+            </div>
+          </div>
+        </div>
         {renderBlock()}
       </div>
     </>
