@@ -64,26 +64,30 @@ export function PanelPropertyField({
   description,
   optional,
   children,
+  disabled,
 }: React.PropsWithChildren<{
   label: React.ReactNode;
   description?: React.ReactNode;
   optional?: boolean;
+  disabled?: boolean;
 }>) {
   return (
-    <label className="text-sm grid gap-2 md:grid md:grid-cols-12">
-      <div className="flex flex-row space-x-2 justify-between col-span-12">
-        <span className="block text-sm">{label}</span>
-        {optional && <span className="text-sm">Optional</span>}
-      </div>
-      <div className="col-span-12">
-        <div className="relative">{children}</div>
-        {description && (
-          <p className="mt-1 leading-normal text-xs opacity-50">
-            {description}
-          </p>
-        )}
-      </div>
-    </label>
+    <fieldset disabled={disabled} className="disabled:opacity-50">
+      <label className="text-sm grid gap-2 md:grid md:grid-cols-12">
+        <div className="flex flex-row space-x-2 justify-between col-span-12">
+          <span className="block text-sm">{label}</span>
+          {optional && <span className="text-sm">Optional</span>}
+        </div>
+        <div className="col-span-12">
+          <div className="relative">{children}</div>
+          {description && (
+            <p className="mt-1 leading-normal text-xs opacity-50">
+              {description}
+            </p>
+          )}
+        </div>
+      </label>
+    </fieldset>
   );
 }
 

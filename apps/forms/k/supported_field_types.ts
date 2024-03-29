@@ -5,7 +5,7 @@ export const supported_field_types: FormFieldType[] = [
   "textarea",
   "select",
   "checkbox",
-  // checkboxes
+  "checkboxes",
   "radio",
   "email",
   "tel",

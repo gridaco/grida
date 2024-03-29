@@ -26,6 +26,7 @@ body {
   *,
   ::before,
   ::after {
+    @apply border-neutral-300;
     @apply dark:border-neutral-700;
   }
 }

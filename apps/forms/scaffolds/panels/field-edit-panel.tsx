@@ -110,6 +110,18 @@ const default_field_init: {
       { id: draftid(), label: "Option C", value: "option_c" },
     ],
   },
+  checkboxes: {
+    type: "checkboxes",
+    options: [
+      { id: draftid(), label: "Choice A", value: "choice_a" },
+      { id: draftid(), label: "Choice B", value: "choice_b" },
+      { id: draftid(), label: "Choice C", value: "choice_c" },
+    ],
+    multiple: true,
+    // TODO: checkboxes is a non-standard HTML input type, we have no way to handle the required attribute with built-in HTML validation
+    // https://github.com/whatwg/html/issues/6868
+    required: false,
+  },
   hidden: { type: "hidden" },
   payment: {
     type: "payment",
@@ -120,9 +132,14 @@ const default_field_init: {
   },
 };
 
-const input_can_have_options: FormFieldType[] = ["select", "radio"];
+const input_can_have_options: FormFieldType[] = [
+  "select",
+  "radio",
+  "checkboxes",
+];
+
 const input_can_have_pattern: FormFieldType[] = supported_field_types.filter(
-  (type) => !["checkbox", "color", "radio"].includes(type)
+  (type) => !["checkbox", "checkboxes", "color", "radio"].includes(type)
 );
 
 type Option = {
@@ -246,6 +263,7 @@ export function FieldEditPanel({
         );
         setHelpText((_help) => _help || defaults.helpText || "");
         setRequired((_required) => _required || defaults.required || false);
+        setMultiple((_multiple) => _multiple || defaults.multiple || false);
         setData((_data) => _data || defaults.data);
         // reset options if there were no existing options
         if (!options?.length) {
@@ -467,7 +485,25 @@ export function FieldEditPanel({
                 </PanelPropertyField>
               )}
               {type !== "checkbox" && (
-                <PanelPropertyField label={"Required"}>
+                <PanelPropertyField
+                  label={"Required"}
+                  description={
+                    type === "checkboxes" ? (
+                      <>
+                        We follow html5 standards. Checkboxes cannot be
+                        required.{" "}
+                        <a
+                          className="underline"
+                          href="https://github.com/whatwg/html/issues/6868#issue-946624070"
+                          target="_blank"
+                        >
+                          Learn more
+                        </a>
+                      </>
+                    ) : undefined
+                  }
+                  disabled={type === "checkboxes"}
+                >
                   <Toggle value={required} onChange={setRequired} />
                 </PanelPropertyField>
               )}

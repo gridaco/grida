@@ -589,7 +589,7 @@ export type Database = {
         | "tel"
         | "url"
         | "checkbox"
-        | "number"
+        | "checkboxes"
         | "date"
         | "month"
         | "week"
@@ -605,6 +605,7 @@ export type Database = {
         | "payment"
         | "hidden"
         | "signature"
+        | "number"
       form_page_language: "en" | "ko"
       form_response_unknown_field_handling_strategy_type:
         | "ignore"
