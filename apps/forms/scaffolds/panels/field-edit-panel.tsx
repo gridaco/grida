@@ -371,6 +371,33 @@ export function FieldEditPanel({
               </PanelPropertyField>
             </PanelPropertyFields>
           </PanelPropertySection>
+          <PanelPropertySection hidden={!has_options}>
+            <PanelPropertySectionTitle>Options</PanelPropertySectionTitle>
+            <PanelPropertyFields>
+              <OptionsEdit
+                options={options}
+                onAdd={() => {
+                  setOptions([
+                    ...options,
+                    {
+                      id: draftid(),
+                      label: "",
+                      value: "",
+                    },
+                  ]);
+                }}
+                onChange={(id, option) => {
+                  setOptions(options.map((_) => (_.id === id ? option : _)));
+                }}
+                onRemove={(id) => {
+                  setOptions(options.filter((_) => _.id !== id));
+                }}
+                onSort={(from, to) => {
+                  setOptions(arrayMove(options, from, to));
+                }}
+              />
+            </PanelPropertyFields>
+          </PanelPropertySection>
           <PanelPropertySection hidden={type == "payment"}>
             <PanelPropertySectionTitle>General</PanelPropertySectionTitle>
             <PanelPropertyFields>
@@ -446,33 +473,7 @@ export function FieldEditPanel({
               )}
             </PanelPropertyFields>
           </PanelPropertySection>
-          <PanelPropertySection hidden={!has_options}>
-            <PanelPropertySectionTitle>Options</PanelPropertySectionTitle>
-            <PanelPropertyFields>
-              <OptionsEdit
-                options={options}
-                onAdd={() => {
-                  setOptions([
-                    ...options,
-                    {
-                      id: draftid(),
-                      label: "",
-                      value: "",
-                    },
-                  ]);
-                }}
-                onChange={(id, option) => {
-                  setOptions(options.map((_) => (_.id === id ? option : _)));
-                }}
-                onRemove={(id) => {
-                  setOptions(options.filter((_) => _.id !== id));
-                }}
-                onSort={(from, to) => {
-                  setOptions(arrayMove(options, from, to));
-                }}
-              />
-            </PanelPropertyFields>
-          </PanelPropertySection>
+
           <PanelPropertySection
             hidden={
               type == "payment" ||

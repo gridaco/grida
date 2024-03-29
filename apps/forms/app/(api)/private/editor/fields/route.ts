@@ -31,14 +31,13 @@ export async function POST(req: NextRequest) {
       data: safe_data_field({ type: init.type, data: init.data as any }) as any,
       accept: init.accept,
       multiple: init.multiple,
-      // 'autocomplete': init.autocomplete,
       // 'description': init.description,
       // 'max': init.max,
       // 'min': init.min,
       // 'step': init.step,
       updated_at: new Date().toISOString(),
     })
-    .select()
+    .select("*, existing_options:form_field_option(*)")
     .single();
 
   console.log("upserted", upserted, init.data);
@@ -59,9 +58,18 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // create options if any
+  const { existing_options } = upserted;
+
+  // upsert options if any
   const { options } = init;
+  const upserting_option_ids = options?.map((option) => option.id) ?? [];
+  // options to be deleted
+  const deleting_option_ids = existing_options
+    .map((option) => option.id)
+    .filter((id) => !upserting_option_ids.includes(id));
+
   let field_options: any[] | undefined = undefined;
+
   if (options) {
     const { data: upserted_options, error } = await supabase
       .from("form_field_option")
@@ -93,6 +101,14 @@ export async function POST(req: NextRequest) {
     }
   }
 
+  if (deleting_option_ids) {
+    console.log("removing_option_ids", deleting_option_ids);
+    await supabase
+      .from("form_field_option")
+      .delete()
+      .in("id", deleting_option_ids);
+  }
+
   return NextResponse.json(
     {
       data: {
@@ -100,6 +116,9 @@ export async function POST(req: NextRequest) {
         options: field_options,
       },
       message: `Field ${operation}d`,
+      info: {
+        deleted_options: deleting_option_ids,
+      },
     },
     {
       status: operation === "create" ? 201 : 200,
