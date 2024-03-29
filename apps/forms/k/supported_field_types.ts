@@ -3,23 +3,23 @@ import { FormFieldAutocompleteType, FormFieldType } from "@/types";
 export const supported_field_types: FormFieldType[] = [
   "text",
   "textarea",
-  "tel",
-  "url",
+  "select",
   "checkbox",
   // checkboxes
+  "radio",
+  "email",
+  "tel",
+  "url",
+  "password",
+  "signature",
+  "payment",
   "number",
   "date",
   "month",
   "week",
-  "email",
-  "select",
-  "password",
   "file",
   "color",
-  "radio",
   "hidden",
-  "signature",
-  "payment",
 ];
 
 export const supported_field_autocomplete_types: FormFieldAutocompleteType[] = [

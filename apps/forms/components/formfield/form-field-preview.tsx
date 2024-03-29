@@ -36,7 +36,7 @@ export function FormFieldPreview({
   placeholder?: string;
   helpText?: string;
   required?: boolean;
-  options?: { label?: string | null; value: string }[];
+  options?: { id?: string; label?: string | null; value: string }[];
   pattern?: string;
   readonly?: boolean;
   disabled?: boolean;
@@ -96,9 +96,14 @@ export function FormFieldPreview({
       case "select": {
         return (
           <Select {...(sharedInputProps as React.ComponentProps<"select">)}>
+            {placeholder && (
+              <option value="" disabled={required} selected>
+                {placeholder}
+              </option>
+            )}
             {options?.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
+              <option key={option.id || option.value} value={option.value}>
+                {option.label || option.value}
               </option>
             ))}
           </Select>

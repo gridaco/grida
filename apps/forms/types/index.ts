@@ -99,7 +99,7 @@ export type NewFormFieldInit = {
   helpText: string;
   type: FormFieldType;
   required: boolean;
-  options?: { label?: string | null; value: string }[];
+  options?: { id?: string; label?: string; value: string }[];
   pattern?: string;
   autocomplete?: FormFieldAutocompleteType[] | null;
   data?: FormFieldDataSchema | null;
@@ -118,7 +118,7 @@ export interface FormFieldDefinition {
   pattern?: any | null;
   options?: {
     id: string;
-    label?: string | null;
+    label?: string;
     value: string;
   }[];
   autocomplete?: FormFieldAutocompleteType[] | null;
@@ -167,7 +167,7 @@ export type FormBlockType =
 export interface FormResponse {
   browser: string | null;
   created_at: string;
-  customer_uuid: string | null;
+  customer_id: string | null;
   form_id: string | null;
   id: string;
   ip: string | null;

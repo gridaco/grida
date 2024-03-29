@@ -1,6 +1,6 @@
 import React from "react";
 import type { EditorFlatFormBlock } from "../../editor/state";
-import { DragHandleHorizontalIcon } from "@radix-ui/react-icons";
+import { DragHandleDots2Icon } from "@radix-ui/react-icons";
 import { useDroppable } from "@dnd-kit/core";
 import { CSS } from "@dnd-kit/utilities";
 import { useSortable } from "@dnd-kit/sortable";
@@ -98,7 +98,7 @@ export function Block(props: EditorFlatFormBlock) {
           {...attributes}
           className="absolute -left-8 top-1 rounded border dark:border-neutral-700 shadow p-1"
         >
-          <DragHandleHorizontalIcon />
+          <DragHandleDots2Icon />
         </button>
         {renderBlock()}
       </div>

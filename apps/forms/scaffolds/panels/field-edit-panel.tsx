@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useId, useState } from "react";
 import {
   PanelClose,
   PanelContent,
@@ -21,8 +21,14 @@ import {
   NewFormFieldInit,
   PaymentFieldData,
 } from "@/types";
-import { capitalCase, snakeCase } from "change-case";
-import { LockClosedIcon } from "@radix-ui/react-icons";
+import {
+  CrossCircledIcon,
+  DragHandleDots2Icon,
+  GearIcon,
+  LockClosedIcon,
+  PlusIcon,
+  TrashIcon,
+} from "@radix-ui/react-icons";
 import { FormFieldAssistant } from "../ai/form-field-schema-assistant";
 import toast from "react-hot-toast";
 import { Select } from "@/components/select";
@@ -38,6 +44,22 @@ import {
 } from "@/k/payments_service_providers";
 import { cls_save_button } from "@/components/preferences";
 import { Toggle } from "@/components/toggle";
+import { fmt_snake_case_to_human_text } from "@/utils/fmt";
+import clsx from "clsx";
+import {
+  SortableContext,
+  useSortable,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
+import {
+  DndContext,
+  PointerSensor,
+  closestCorners,
+  useSensor,
+  useSensors,
+} from "@dnd-kit/core";
+import { restrictToVerticalAxis } from "@dnd-kit/modifiers";
 
 // @ts-ignore
 const default_field_init: {
@@ -70,9 +92,9 @@ const default_field_init: {
   select: {
     type: "select",
     options: [
-      { label: "Option 1", value: "option1" },
-      { label: "Option 2", value: "option2" },
-      { label: "Option 3", value: "option3" },
+      { label: "Option A", value: "option_a" },
+      { label: "Option B", value: "option_b" },
+      { label: "Option C", value: "option_c" },
     ],
   },
   password: { type: "password", placeholder: "Password" },
@@ -80,9 +102,9 @@ const default_field_init: {
   radio: {
     type: "radio",
     options: [
-      { label: "Option 1", value: "option1" },
-      { label: "Option 2", value: "option2" },
-      { label: "Option 3", value: "option3" },
+      { label: "Option A", value: "option_a" },
+      { label: "Option B", value: "option_b" },
+      { label: "Option C", value: "option_c" },
     ],
   },
   hidden: { type: "hidden" },
@@ -99,6 +121,8 @@ const input_can_have_options: FormFieldType[] = ["select", "radio"];
 const input_can_have_pattern: FormFieldType[] = supported_field_types.filter(
   (type) => !["checkbox", "color", "radio"].includes(type)
 );
+
+type Option = { id?: string; label?: string; value: string };
 
 export function FieldEditPanel({
   title,
@@ -126,9 +150,7 @@ export function FieldEditPanel({
   const [type, setType] = useState<FormFieldType>(init?.type || "text");
   const [required, setRequired] = useState(init?.required || false);
   const [pattern, setPattern] = useState<string | undefined>(init?.pattern);
-  const [options, setOptions] = useState<
-    { label?: string | null; value: string }[]
-  >(init?.options || []);
+  const [options, setOptions] = useState<Option[]>(init?.options || []);
   const [autocomplete, setAutocomplete] = useState<FormFieldAutocompleteType[]>(
     init?.autocomplete || []
   );
@@ -151,13 +173,14 @@ export function FieldEditPanel({
   const has_accept = type === "file";
 
   const preview_placeholder =
-    placeholder || convertToPlainText(label) || convertToPlainText(name);
+    placeholder ||
+    fmt_snake_case_to_human_text(label) ||
+    fmt_snake_case_to_human_text(name);
 
   const preview_disabled =
-    !name ||
-    (type == "payment" &&
-      // disable preview if servive provider is tosspayments (it takes control over the window)
-      (data as PaymentFieldData)?.service_provider === "tosspayments");
+    type == "payment" &&
+    // disable preview if servive provider is tosspayments (it takes control over the window)
+    (data as PaymentFieldData)?.service_provider === "tosspayments";
 
   const onSaveClick = () => {
     onSave?.({
@@ -342,7 +365,21 @@ export function FieldEditPanel({
               </PanelPropertyField>
               <PanelPropertyField
                 label={"Placeholder"}
-                description="The placeholder text that will be displayed in the input when it's empty."
+                description={
+                  <>
+                    {type === "select" ? (
+                      <>
+                        The placeholder text that will be displayed in the input
+                        when no option is selected.
+                      </>
+                    ) : (
+                      <>
+                        The placeholder text that will be displayed in the input
+                        when it's empty.
+                      </>
+                    )}
+                  </>
+                }
               >
                 <PropertyTextInput
                   placeholder={"Placeholder Text"}
@@ -378,11 +415,7 @@ export function FieldEditPanel({
               </PanelPropertyField>
               {html5_multiple_supported_field_types.includes(type) && (
                 <PanelPropertyField label={"Multiple"}>
-                  <input
-                    type="checkbox"
-                    checked={multiple}
-                    onChange={(e) => setMultiple(e.target.checked)}
-                  />
+                  <Toggle value={multiple} onChange={setMultiple} />
                 </PanelPropertyField>
               )}
               {type !== "checkbox" && (
@@ -395,12 +428,18 @@ export function FieldEditPanel({
           <PanelPropertySection hidden={!has_options}>
             <PanelPropertySectionTitle>Options</PanelPropertySectionTitle>
             <PanelPropertyFields>
-              {/*  */}
-              {options?.map((option, index) => (
-                <p key={index}>
-                  {option.label} - {option.value}
-                </p>
-              ))}
+              <OptionsEdit
+                options={options}
+                onAdd={() => {
+                  setOptions([...options, { label: "", value: "" }]);
+                }}
+                onChange={(index, option) => {
+                  setOptions(options.map((o, i) => (i === index ? option : o)));
+                }}
+                onRemove={(index) => {
+                  setOptions(options.filter((_, i) => i !== index));
+                }}
+              />
             </PanelPropertyFields>
           </PanelPropertySection>
           <PanelPropertySection
@@ -475,17 +514,188 @@ function buildPreviewLabel({
   label?: string;
   required?: boolean;
 }) {
-  let txt = label || convertToPlainText(name);
+  let txt = label || fmt_snake_case_to_human_text(name);
   if (required) {
     txt += " *";
   }
   return txt;
 }
 
-function convertToPlainText(input: string) {
-  if (!input) {
-    return "";
-  }
-  // Converts to snake_case then replaces underscores with spaces and capitalizes words
-  return capitalCase(snakeCase(input)).toLowerCase();
+function OptionsEdit({
+  options,
+  onAdd,
+  onChange,
+  onRemove,
+}: {
+  options?: Option[];
+  onAdd?: () => void;
+  onChange?: (index: number, option: Option) => void;
+  onRemove?: (index: number) => void;
+}) {
+  const id = useId();
+
+  const sensors = useSensors(useSensor(PointerSensor));
+
+  const [mode, setMode] = useState<"simple" | "advanced">("simple");
+
+  const toggleMode = () => {
+    setMode(mode === "simple" ? "advanced" : "simple");
+  };
+
+  return (
+    <DndContext
+      id={id}
+      sensors={sensors}
+      collisionDetection={closestCorners}
+      modifiers={[restrictToVerticalAxis]}
+    >
+      <SortableContext
+        items={options?.map((option) => option.value) || []}
+        strategy={verticalListSortingStrategy}
+      >
+        <div className="flex flex-col gap-4">
+          <div className="flex gap-2 justify-between">
+            <span className="text-xs opacity-50">
+              Set the options for the select or radio input. you can set the
+              value and label individually in advanced mode.
+            </span>
+            <button type="button" onClick={toggleMode}>
+              {mode === "advanced" ? <CrossCircledIcon /> : <GearIcon />}
+            </button>
+          </div>
+          <div className="flex flex-col gap-2">
+            {mode === "advanced" && (
+              <div className="flex">
+                <span className="w-full text-xs">Value</span>
+                <span className="w-full text-xs">Label</span>
+              </div>
+            )}
+            {options?.map((option, index) => (
+              <OptionEditItem
+                key={index}
+                mode={mode}
+                label={option.label || ""}
+                value={option.value}
+                onRemove={() => {
+                  onRemove?.(index);
+                }}
+                onChange={(option) => {
+                  onChange?.(index, option);
+                }}
+              />
+            ))}
+            <button
+              type="button"
+              className="flex gap-2 items-center justify-center border rounded text-xs p-2 w-fit"
+              onClick={onAdd}
+            >
+              <PlusIcon />
+              Add Option
+            </button>
+          </div>
+        </div>
+      </SortableContext>
+    </DndContext>
+  );
+}
+
+const does_fmt_match = (a: string, b: string) =>
+  fmt_snake_case_to_human_text(a).toLowerCase() === b.toLowerCase();
+
+const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+
+function OptionEditItem({
+  label: _label,
+  value: _value,
+  mode,
+  onChange,
+  onRemove,
+}: {
+  label: string;
+  value: string;
+  mode: "simple" | "advanced";
+  onChange?: (option: { label: string; value: string }) => void;
+  onRemove?: () => void;
+}) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    setActivatorNodeRef,
+    transform,
+    isDragging,
+    isSorting,
+    isOver,
+    transition,
+  } = useSortable({ id: _value });
+
+  const [value, setValue] = useState(_value);
+  const [label, setLabel] = useState(_label);
+  const [fmt_matches, set_fmt_matches] = useState<boolean>(
+    does_fmt_match(value, label)
+  );
+
+  useEffect(() => {
+    if (fmt_matches) {
+      setLabel(capitalize(fmt_snake_case_to_human_text(value)));
+    }
+    set_fmt_matches(does_fmt_match(value, label));
+  }, [value]);
+
+  useEffect(() => {
+    set_fmt_matches(does_fmt_match(value, label));
+  }, [label]);
+
+  useEffect(() => {
+    onChange?.({ label, value });
+  }, [value, label]);
+
+  const style = {
+    transform: CSS.Translate.toString(transform),
+    zIndex: isDragging ? 1 : 0,
+    transition,
+  };
+
+  return (
+    <div
+      //
+      ref={setNodeRef}
+      style={style}
+      className="flex gap-1"
+    >
+      <button
+        //
+        type="button"
+        {...listeners}
+        {...attributes}
+        ref={setActivatorNodeRef}
+      >
+        <DragHandleDots2Icon className="opacity-50" />
+      </button>
+      <label className="w-full">
+        <input
+          className="block w-full p-2 text-gray-900 border border-gray-300 rounded-lg bg-gray-50 text-xs focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500"
+          type="text"
+          placeholder="option_value"
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+        />
+      </label>
+      <label className={clsx(mode === "simple" && "hidden", "w-full")}>
+        <input
+          className={
+            "block w-full p-2 text-gray-900 border border-gray-300 rounded-lg bg-gray-50 text-xs focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500"
+          }
+          type="text"
+          placeholder="Option Label"
+          value={label}
+          onChange={(e) => setLabel(e.target.value)}
+        />
+      </label>
+
+      <button type="button" onClick={onRemove}>
+        <TrashIcon />
+      </button>
+    </div>
+  );
 }

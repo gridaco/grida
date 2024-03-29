@@ -45,7 +45,7 @@ export function PanelPropertySectionTitle({
   children,
 }: React.PropsWithChildren<{}>) {
   return (
-    <span className="text-foreground col-span-12 text-sm lg:col-span-5 lg:!col-span-4">
+    <span className="col-span-12 text-sm lg:col-span-5 lg:!col-span-4">
       {children}
     </span>
   );
