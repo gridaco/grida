@@ -98,7 +98,7 @@ export function Block(props: EditorFlatFormBlock) {
           {...listeners}
           {...attributes}
           className={clsx(
-            "absolute left-0 right-0 top-3 flex items-center justify-center",
+            "absolute left-44 right-44 top-3 flex items-center justify-center",
             "cursor-move",
             "opacity-0 p-1 group-hover:opacity-100"
           )}
