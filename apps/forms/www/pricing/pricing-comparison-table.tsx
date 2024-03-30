@@ -1,11 +1,8 @@
 "use client";
 
 // The original code is from supabase/www (Licensed under Apache 2.0)
-
+import clsx from "clsx";
 import React, { useState } from "react";
-import Link from "next/link";
-
-import cn from "classnames";
 import { pricing } from "../data/pricing";
 import { plans } from "../data/plans";
 import {
@@ -275,7 +272,7 @@ const PricingComparisonTable = () => {
                         {plan.name}
                       </h3>
                       <p
-                        className={cn(
+                        className={clsx(
                           "text-foreground-lighter -my-1 xl:m-0",
                           plan.name === "Enterprise" && "xl:opacity-0"
                         )}
