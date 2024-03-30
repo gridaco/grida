@@ -5,6 +5,7 @@ import { SignatureCanvas } from "../signature-canvas";
 import { StripePaymentFormFieldPreview } from "./form-field-preview-payment-stripe";
 import { TossPaymentsPaymentFormFieldPreview } from "./form-field-preview-payment-tosspayments";
 import clsx from "clsx";
+import { ClockIcon } from "@radix-ui/react-icons";
 
 /**
  * this disables the auto zoom in input text tag safari on iphone by setting font-size to 16px
@@ -159,6 +160,20 @@ export function FormFieldPreview({
               </div>
             ))}
           </fieldset>
+        );
+      }
+      case "time": {
+        return (
+          <div className="relative">
+            <div className="absolute inset-y-0 end-0 top-0 flex items-center pe-3.5 pointer-events-none">
+              <ClockIcon />
+            </div>
+            <input
+              type="time"
+              className="bg-neutral-50 border leading-none border-neutral-300 text-neutral-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-neutral-700 dark:border-neutral-600 dark:placeholder-neutral-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500"
+              {...(sharedInputProps as React.ComponentProps<"input">)}
+            />
+          </div>
         );
       }
       case "color": {

@@ -606,6 +606,8 @@ export type Database = {
         | "hidden"
         | "signature"
         | "number"
+        | "time"
+        | "datetime-local"
       form_page_language: "en" | "ko"
       form_response_unknown_field_handling_strategy_type:
         | "ignore"
