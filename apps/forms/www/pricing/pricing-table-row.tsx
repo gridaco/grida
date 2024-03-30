@@ -87,7 +87,7 @@ export const PricingTableRowDesktop = (props: any) => {
         id={`${props.sectionId}-desktop`}
       >
         <th
-          className="bg-background text-foreground sticky top-[108px] xl:top-[84px] z-10 py-3 pl-6 text-left text-sm font-medium"
+          className="bg-white dark:bg-black text-foreground sticky top-[60px] xl:top-[40px] z-10 py-3 pl-6 text-left text-sm font-medium"
           scope="colgroup"
         >
           <div className="flex items-center gap-4">
@@ -203,7 +203,10 @@ export const PricingTableRowMobile = (props: any) => {
       <tbody className="border-default divide-border dark:divide-white dark:divide-opacity-25 divide-y first:divide-y-0">
         {category.features.map((feat: any, i: number) => {
           return (
-            <tr key={i} className="border-default border-t">
+            <tr
+              key={i}
+              className="border-default border-t border-neutral-500/10"
+            >
               <th
                 className="text-foreground-light px-4 py-3 text-left text-sm font-normal"
                 scope="row"

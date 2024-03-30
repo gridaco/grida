@@ -52,7 +52,7 @@ const PricingComparisonTable = () => {
           <p className="p opacity-50">{priceDescription}</p>
         </div>
         <button className=" text-white flex flex-col bg-neutral-800 rounded justify-between h-full py-2 px-6 mt-2 hover:invert transition-all">
-          Start for free
+          {selectedPlan.cta}
         </button>
       </div>
     );
@@ -250,7 +250,7 @@ const PricingComparisonTable = () => {
       <div className="hidden lg:block">
         <table className="h-px w-full table-fixed">
           <caption className="sr-only">Pricing plan comparison</caption>
-          <thead className="bg-background sticky top-[62px] z-10">
+          <thead className="bg-white dark:bg-black sticky top-0 z-10">
             <tr>
               <th
                 className="text-foreground w-1/3 px-6 pt-2 pb-2 text-left text-sm font-normal"
@@ -292,9 +292,11 @@ const PricingComparisonTable = () => {
                       </p>
                     </span>
                     <span className="flex flex-col bg-neutral-800 rounded justify-between h-full py-2 mt-2 hover:invert transition-all">
-                      <button className="text-sm text-white">
-                        Start for free
-                      </button>
+                      {
+                        <button className="text-sm text-white">
+                          {plan.cta}
+                        </button>
+                      }
                     </span>
                   </span>
                 </th>

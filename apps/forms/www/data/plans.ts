@@ -47,7 +47,7 @@ export const plans: PricingInformation[] = [
       "Free projects are paused after 1 week of inactivity. Limit of 2 active projects.",
     footerPartner:
       "Free projects are paused after 1 week of inactivity. Limit of 1 active project.",
-    cta: "Start for Free",
+    cta: "Start for free",
   },
   {
     id: "tier_pro",
@@ -134,6 +134,6 @@ export const plans: PricingInformation[] = [
     priceMonthly: "Custom",
     preface: "",
     footer: "",
-    cta: "Contact Us",
+    cta: "Contact Sales",
   },
 ];

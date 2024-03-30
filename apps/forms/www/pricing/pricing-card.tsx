@@ -1,10 +1,18 @@
 import { CheckIcon } from "@radix-ui/react-icons";
+import React from "react";
+
+interface PricingCardFeatureItem {
+  name: string;
+  trail?: string;
+}
 
 export function PricingCard({
   plan,
   price,
   excerpt,
   inverted,
+  features = [],
+  action,
 }: {
   //
   plan: string;
@@ -14,6 +22,8 @@ export function PricingCard({
   };
   excerpt: string;
   inverted?: boolean;
+  features?: PricingCardFeatureItem[];
+  action?: React.ReactNode;
 }) {
   return (
     <div
@@ -40,31 +50,38 @@ export function PricingCard({
       </div>
       <hr className=" opacity-15" />
       <div className="flex flex-col gap-5">
-        <PricingFeatureRow />
-        <PricingFeatureRow />
-        <PricingFeatureRow />
-        <PricingFeatureRow />
-        <PricingFeatureRow />
+        {features.map((feature, i) => (
+          <PricingFeatureRow key={i} {...feature} />
+        ))}
       </div>
-      <button
-        className="
-          text-lg font-medium px-5 py-3 rounded text-white bg-neutral-800
-          hover:invert
-          transition-all
-        "
-      >
-        Start for free
-      </button>
+      {action}
     </div>
   );
 }
 
-function PricingFeatureRow() {
+export function PricingCardButton({ children }: React.PropsWithChildren<{}>) {
+  return (
+    <button
+      className="
+          text-lg font-medium px-5 py-3 rounded text-white bg-neutral-800
+          hover:invert
+          transition-all
+        "
+    >
+      {children}
+    </button>
+  );
+}
+
+export function PricingFeatureRow({
+  name,
+  trail: number,
+}: PricingCardFeatureItem) {
   return (
     <div className="flex items-center w-full gap-2">
       <CheckIcon />
-      <span className="flex-1">Responses Included</span>
-      <span className=" opacity-50">50</span>
+      <span className="flex-1">{name}</span>
+      <span className=" opacity-50">{number}</span>
     </div>
   );
 }
