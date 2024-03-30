@@ -12,31 +12,38 @@ import {
   AnalysisIcon,
   VisualStudioIcon,
 } from "@/www/icons";
+import { AuroraBackground } from "@/www/aurora";
 
 export default function Home() {
   return (
-    <main>
+    <main className="relative">
       <Header />
-      <div className="p-24 mt-48">
-        <section className="relative">
-          <div>
-            <div className="flex flex-col items-center text-center">
-              <h1 className="text-6xl font-bold py-10 text-center">
-                Forms for developers
-              </h1>
-              <p className="text-lg opacity-80 max-w-md">
-                Grida Forms is a{" "}
-                <span>
-                  <code className="underline">headless & api-first</code> form
-                </span>
-                builder for developers
-              </p>
-              <button className="mt-16 px-3 py-2 bg-neutral-800 text-white rounded border border-neutral-800 hover:invert transition-all">
-                Start your project
-              </button>
-            </div>
+      <section className="relative flex flex-col  h-[100vh] items-center justify-center">
+        <div className="text-black dark:text-white">
+          <div className="flex flex-col items-center text-center">
+            <h1 className="text-6xl font-bold py-10 text-center">
+              Forms for developers
+            </h1>
+            <p className="text-lg opacity-80 max-w-md">
+              Grida Forms is a{" "}
+              <span>
+                <code className="underline">headless & api-first</code> form
+              </span>
+              builder for developers
+            </p>
+            <button className="mt-16 px-3 py-2 bg-neutral-800 text-white rounded border border-neutral-800 hover:invert transition-all">
+              Start your project
+            </button>
           </div>
-        </section>
+        </div>
+        <iframe
+          className="absolute inset-0 w-screen h-screen -z-10"
+          src="/wwwembeddings/aurora"
+          width="100vw"
+          height="100vh"
+        />
+      </section>
+      <div className="p-24">
         <div className="h-64" />
         <section>
           <div>
@@ -340,7 +347,7 @@ function FeatureCard({
 
 async function Header() {
   return (
-    <header className="top-0 left-0 right-0 py-14 px-24 flex justify-between items-center">
+    <header className="absolute top-0 left-0 right-0 py-14 px-24 flex justify-between items-center z-50">
       <div className="flex">
         <span className="flex items-center gap-2">
           <Link href="https://grida.co" target="_blank">

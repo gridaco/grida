@@ -1,5 +1,9 @@
 import type { Config } from "tailwindcss";
 
+const {
+  default: flattenColorPalette,
+} = require("tailwindcss/lib/util/flattenColorPalette");
+
 const config: Config = {
   content: [
     "./pages/**/*.{js,ts,jsx,tsx,mdx}",
@@ -16,6 +20,16 @@ const config: Config = {
           "conic-gradient(from 180deg at 50% 50%, var(--tw-gradient-stops))",
       },
       keyframes: {
+        // https://ui.aceternity.com/components/aurora-background
+        aurora: {
+          from: {
+            backgroundPosition: "50% 50%, 50% 50%",
+          },
+          to: {
+            backgroundPosition: "350% 50%, 350% 50%",
+          },
+        },
+        // 
         fadeIn: {
           "0%": { transform: "scale(0.95)", opacity: "0" },
           "100%": { transform: "scale(1)", opacity: "1" },
@@ -119,6 +133,9 @@ const config: Config = {
         },
       },
       animation: {
+        // https://ui.aceternity.com/components/aurora-background
+        aurora: "aurora 60s linear infinite",
+        // 
         "fade-in": "fadeIn 300ms both",
         "fade-out": "fadeOut 300ms both",
 
@@ -162,7 +179,26 @@ const config: Config = {
     },
     plugins: [require("tailwindcss-animate")],
   },
-  plugins: [require("@tailwindcss/typography")],
+  plugins: [
+    require("@tailwindcss/typography"),
+    addVariablesForColors
+
+  ],
 };
 
 export default config;
+
+
+/**
+ * @see https://ui.aceternity.com/components/aurora-background
+ */
+function addVariablesForColors({ addBase, theme }: any) {
+  let allColors = flattenColorPalette(theme("colors"));
+  let newVars = Object.fromEntries(
+    Object.entries(allColors).map(([key, val]) => [`--${key}`, val])
+  );
+ 
+  addBase({
+    ":root": newVars,
+  });
+}
