@@ -40,6 +40,7 @@
     "change-case": "^5.4.3",
     "clsx": "^1.1.1",
     "csv-stringify": "^6.4.6",
+    "framer-motion": "^11.0.24",
     "i18next": "^23.7.9",
     "immer": "^9.0.3",
     "monaco-editor": "^0.47.0",
@@ -53,8 +54,9 @@
     "react-hot-toast": "^2.4.0",
     "react-pdf": "^7.7.1",
     "react-player": "^2.14.1",
-    "signature_pad": "^4.2.0",
+    "tailwind-merge": "^2.2.2",
     "three": "^0.150.1",
+    "signature_pad": "^4.2.0",
     "use-file-picker": "^2.1.1",
     "uuid": "^9.0.1"
   },
