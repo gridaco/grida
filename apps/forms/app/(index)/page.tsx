@@ -13,6 +13,7 @@ import {
   VisualStudioIcon,
 } from "@/www/icons";
 import { AuroraBackground } from "@/www/aurora";
+import { plans } from "@/www/data/plans";
 
 export default function Home() {
   return (
@@ -120,130 +121,24 @@ export default function Home() {
             </label>
           </div>
           <div className="columns-1 lg:columns-2 2xl:columns-4 gap-10 space-y-10 w-full">
-            <PricingCard
-              plan={"Free"}
-              price={{
-                primary: "$0",
-                secondary: "/month",
-              }}
-              features={[
-                {
-                  name: "Responses Included",
-                  trail: "50",
-                },
-                {
-                  name: "Additional responses",
-                  trail: "X",
-                },
-                {
-                  name: "Number of forms",
-                  trail: "5",
-                },
-                {
-                  name: "Blocks per form",
-                  trail: "♾️",
-                },
-                {
-                  name: "Seats",
-                  trail: "1",
-                },
-              ]}
-              excerpt="Try Grida forms for free"
-              action={<PricingCardButton>Start for free</PricingCardButton>}
-            />
-            <PricingCard
-              plan={"Pro"}
-              price={{
-                primary: "$20",
-                secondary: "/month",
-              }}
-              features={[
-                {
-                  name: "Responses Included",
-                  trail: "1,000",
-                },
-                {
-                  name: "Additional responses",
-                  trail: "then $5 per 1K",
-                },
-                {
-                  name: "Number of forms",
-                  trail: "♾️",
-                },
-                {
-                  name: "Blocks per form",
-                  trail: "♾️",
-                },
-                {
-                  name: "Seats",
-                  trail: "♾️",
-                },
-              ]}
-              excerpt="Get start Grida forms for Pro"
-              highlight
-              action={
-                <PricingCardButton inverted>Get Started</PricingCardButton>
-              }
-            />
-            <PricingCard
-              plan={"Business"}
-              price={{
-                primary: "$60",
-                secondary: "/month",
-              }}
-              features={[
-                {
-                  name: "Responses Included",
-                  trail: "10,000",
-                },
-                {
-                  name: "Additional responses",
-                  trail: "then $1 per 1K",
-                },
-                {
-                  name: "Number of forms",
-                  trail: "♾️",
-                },
-                {
-                  name: "Blocks per form",
-                  trail: "♾️",
-                },
-                {
-                  name: "Seats",
-                  trail: "♾️",
-                },
-              ]}
-              excerpt="Get start Grida forms for Business"
-              action={<PricingCardButton>Get Started</PricingCardButton>}
-            />
-            <PricingCard
-              plan={"Enterprise"}
-              price={{ primary: "Contact" }}
-              features={[
-                {
-                  name: "Responses Included",
-                  trail: "♾️",
-                },
-                {
-                  name: "Additional responses",
-                  trail: "$1 per 1K",
-                },
-                {
-                  name: "Number of forms",
-                  trail: "♾️",
-                },
-                {
-                  name: "Blocks per form",
-                  trail: "♾️",
-                },
-                {
-                  name: "Seats",
-                  trail: "♾️",
-                },
-              ]}
-              excerpt="Get start Grida forms for Enterprise"
-              action={<PricingCardButton>Contact Sales</PricingCardButton>}
-            />
+            {plans.map((plan) => (
+              <PricingCard
+                key={plan.id}
+                plan={plan.name}
+                price={{
+                  primary: `$${plan.priceMonthly}`,
+                  secondary: plan.costUnit,
+                }}
+                features={plan.features}
+                excerpt={plan.description}
+                highlight={plan.highlight}
+                action={
+                  <Link href={plan.href} className="w-full">
+                    <PricingCardButton>{plan.cta}</PricingCardButton>
+                  </Link>
+                }
+              />
+            ))}
           </div>
         </section>
         <PricingComparisonTable />

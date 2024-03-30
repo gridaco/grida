@@ -70,7 +70,7 @@ export function PricingCardButton({
     <button
       className={clsx(
         `
-          text-lg font-medium px-5 py-3 rounded text-black dark:text-white bg-neutral-200 dark:bg-neutral-800
+          w-full text-lg font-medium px-5 py-3 rounded text-black dark:text-white bg-neutral-200 dark:bg-neutral-800
           hover:invert
           transition-all
         `,

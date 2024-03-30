@@ -3,8 +3,9 @@
 // The original code is from supabase/www (Licensed under Apache 2.0)
 import clsx from "clsx";
 import React, { useState } from "react";
+import { Component1Icon } from "@radix-ui/react-icons";
 import { pricing } from "../data/pricing";
-import { plans } from "../data/plans";
+import { PricingInformation, plans } from "../data/plans";
 import {
   PricingTableRowDesktop,
   PricingTableRowMobile,
@@ -88,35 +89,34 @@ const PricingComparisonTable = () => {
               priceDescription={"/month"}
               description={"Perfect for hobby projects and experiments"}
             />
-
             <PricingTableRowMobile
               category={pricing.storage}
               plan={"free"}
-              icon={<>icon</>}
+              icon={<Component1Icon />}
               sectionId="storage"
             />
             <PricingTableRowMobile
               category={pricing.highlight}
               plan={"free"}
-              icon={pricing.highlight.icon}
+              icon={<Component1Icon />}
               sectionId="highlight"
             />
             <PricingTableRowMobile
               category={pricing.integrations}
               plan={"free"}
-              icon={pricing.integrations.icon}
+              icon={<Component1Icon />}
               sectionId="integrations"
             />
             <PricingTableRowMobile
               category={pricing.support}
               plan={"free"}
-              icon={pricing.support.icon}
+              icon={<Component1Icon />}
               sectionId="support"
             />
             <PricingTableRowMobile
               category={pricing.commingsoon}
               plan={"free"}
-              icon={pricing.commingsoon.icon}
+              icon={<Component1Icon />}
               sectionId="commingsoon"
             />
           </>
@@ -142,22 +142,22 @@ const PricingComparisonTable = () => {
             <PricingTableRowMobile
               category={pricing.highlight}
               plan={"pro"}
-              icon={pricing.highlight.icon}
+              icon={<Component1Icon />}
             />
             <PricingTableRowMobile
               category={pricing.integrations}
               plan={"pro"}
-              icon={pricing.integrations.icon}
+              icon={<Component1Icon />}
             />
             <PricingTableRowMobile
               category={pricing.support}
               plan={"pro"}
-              icon={pricing.support.icon}
+              icon={<Component1Icon />}
             />
             <PricingTableRowMobile
               category={pricing.commingsoon}
               plan={"pro"}
-              icon={pricing.commingsoon.icon}
+              icon={<Component1Icon />}
             />
           </>
         )}
@@ -182,22 +182,22 @@ const PricingComparisonTable = () => {
             <PricingTableRowMobile
               category={pricing.highlight}
               plan={"team"}
-              icon={pricing.highlight.icon}
+              icon={<Component1Icon />}
             />
             <PricingTableRowMobile
               category={pricing.integrations}
               plan={"team"}
-              icon={pricing.integrations.icon}
+              icon={<Component1Icon />}
             />
             <PricingTableRowMobile
               category={pricing.support}
               plan={"team"}
-              icon={pricing.support.icon}
+              icon={<Component1Icon />}
             />
             <PricingTableRowMobile
               category={pricing.commingsoon}
               plan={"team"}
-              icon={pricing.commingsoon.icon}
+              icon={<Component1Icon />}
             />
           </>
         )}
@@ -222,22 +222,22 @@ const PricingComparisonTable = () => {
             <PricingTableRowMobile
               category={pricing.highlight}
               plan={"enterprise"}
-              icon={pricing.highlight.icon}
+              icon={<Component1Icon />}
             />
             <PricingTableRowMobile
               category={pricing.integrations}
               plan={"enterprise"}
-              icon={pricing.integrations.icon}
+              icon={<Component1Icon />}
             />
             <PricingTableRowMobile
               category={pricing.support}
               plan={"enterprise"}
-              icon={pricing.support.icon}
+              icon={<Component1Icon />}
             />
             <PricingTableRowMobile
               category={pricing.commingsoon}
               plan={"enterprise"}
-              icon={pricing.commingsoon.icon}
+              icon={<Component1Icon />}
             />
           </>
         )}
@@ -260,7 +260,7 @@ const PricingComparisonTable = () => {
                 />
               </th>
 
-              {plans.map((plan: any) => (
+              {plans.map((plan: PricingInformation) => (
                 <th
                   className="text-foreground w-1/4 px-0 text-left text-sm font-normal"
                   scope="col"
@@ -303,27 +303,27 @@ const PricingComparisonTable = () => {
           <tbody className="border-default divide-border dark:divide-white dark:divide-opacity-25 divide-y first:divide-y-0">
             <PricingTableRowDesktop
               category={pricing.storage}
-              icon={<>icon</>}
+              icon={<Component1Icon />}
               sectionId="storage"
             />
             <PricingTableRowDesktop
               category={pricing.highlight}
-              icon={pricing.highlight.icon}
+              icon={<Component1Icon />}
               sectionId="highlight"
             />
             <PricingTableRowDesktop
               category={pricing.integrations}
-              icon={pricing.integrations.icon}
+              icon={<Component1Icon />}
               sectionId="integrations"
             />
             <PricingTableRowDesktop
               category={pricing.support}
-              icon={pricing.support.icon}
+              icon={<Component1Icon />}
               sectionId="support"
             />
             <PricingTableRowDesktop
               category={pricing.commingsoon}
-              icon={pricing.commingsoon.icon}
+              icon={<Component1Icon />}
               sectionId="commingsoon"
             />
           </tbody>

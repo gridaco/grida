@@ -9,11 +9,11 @@ export interface PricingInformation {
   warning?: string;
   warningTooltip?: string;
   description: string;
-  preface: string;
-  features: (string | string[])[];
-  featuresPartner: (string | string[])[];
-  footer?: string;
-  footerPartner?: string;
+  highlight?: boolean;
+  features: {
+    name: string;
+    trail?: string;
+  }[];
   cta: string;
 }
 
@@ -23,59 +23,67 @@ export const plans: PricingInformation[] = [
     name: "Free",
     nameBadge: "",
     costUnit: "/ month",
-    href: "https://supabase.com/dashboard/new?plan=free",
+    href: "https://forms.grida.co/dashboard/new?plan=free",
     priceLabel: "",
     priceMonthly: 0,
-    description: "Perfect for passion projects & simple websites.",
-    preface: "Get started with:",
+    description: "Perfect for hobby projects.",
     features: [
-      "Unlimited API requests",
-      "50,000 monthly active users",
-      ["500 MB database space", "2 Core shared CPU • 1 GB RAM"],
-      "5 GB bandwidth",
-      "1 GB file storage",
-      "Community support",
+      {
+        name: "Responses Included",
+        trail: "50",
+      },
+      {
+        name: "Additional responses",
+        trail: "X",
+      },
+      {
+        name: "Number of forms",
+        trail: "5",
+      },
+      {
+        name: "Blocks per form",
+        trail: "♾️",
+      },
+      {
+        name: "Seats",
+        trail: "1",
+      },
     ],
-    featuresPartner: [
-      "Unlimited API requests",
-      "50,000 monthly active users",
-      ["500 MB database space", "2 Core shared CPU • 1 GB RAM"],
-      "5 GB bandwidth",
-      "Community support",
-    ],
-    footer:
-      "Free projects are paused after 1 week of inactivity. Limit of 2 active projects.",
-    footerPartner:
-      "Free projects are paused after 1 week of inactivity. Limit of 1 active project.",
     cta: "Start for free",
   },
   {
     id: "tier_pro",
     name: "Pro",
+    highlight: true,
     nameBadge: "Most Popular",
     costUnit: "/ month",
-    href: "https://supabase.com/dashboard/new?plan=pro",
+    href: "https://forms.grida.co/dashboard/new?plan=pro",
     priceLabel: "From",
     warning: "$10 in compute credits included",
     priceMonthly: 20,
-    description: "For production applications with the option to scale.",
+    description: "For teams with the option to scale.",
     features: [
-      ["100,000 monthly active users", "then $0.00325 per MAU"],
-      ["8 GB database space", "then $0.125 per GB"],
-      ["250 GB bandwidth", "then $0.09 per GB"],
-      ["100 GB file storage", "then $0.021 per GB"],
-      "Email support",
-      "Daily backups stored for 7 days",
-      "7-day log retention",
+      {
+        name: "Responses Included",
+        trail: "1,000",
+      },
+      {
+        name: "Additional responses",
+        trail: "then $5 per 1K",
+      },
+      {
+        name: "Number of forms",
+        trail: "♾️",
+      },
+      {
+        name: "Blocks per form",
+        trail: "♾️",
+      },
+      {
+        name: "Seats",
+        trail: "♾️",
+      },
     ],
-    featuresPartner: [
-      ["8 GB database space", "then $0.125 per GB"],
-      ["250 GB bandwidth", "then $0.09 per GB"],
-      "Email support",
-      "Daily backups stored for 7 days",
-      "7-day log retention",
-    ],
-    preface: "Everything in the Free plan, plus:",
     cta: "Get Started",
   },
   {
@@ -83,57 +91,65 @@ export const plans: PricingInformation[] = [
     name: "Team",
     nameBadge: "",
     costUnit: "/ month",
-    href: "https://supabase.com/dashboard/new?plan=team",
+    href: "https://forms.grida.co/dashboard/new?plan=team",
     priceLabel: "From",
     warning: "$10 in compute credits included",
     priceMonthly: 60,
-    description: "Collaborate with different permissions and access patterns.",
+    description: "Pro, plus commerce features and more responses.",
     features: [
-      "SOC2",
-      "HIPAA available as paid add-on",
-      "Read only and Billing member roles",
-      "SSO for Supabase Dashboard",
-      "Priority email support & SLAs",
-      "Daily backups stored for 14 days",
-      "28-day log retention",
+      {
+        name: "Responses Included",
+        trail: "10,000",
+      },
+      {
+        name: "Additional responses",
+        trail: "then $1 per 1K",
+      },
+      {
+        name: "Number of forms",
+        trail: "♾️",
+      },
+      {
+        name: "Blocks per form",
+        trail: "♾️",
+      },
+      {
+        name: "Seats",
+        trail: "♾️",
+      },
     ],
-    featuresPartner: [
-      "SOC2",
-      "HIPAA available as paid add-on",
-      "Read only and Billing member roles",
-      "SSO for Supabase Dashboard",
-      "Priority email support & SLAs",
-      "Daily backups stored for 14 days",
-      "28-day log retention",
-    ],
-    preface: "Everything in the Pro plan, plus:",
     cta: "Get Started",
   },
   {
     id: "tier_enterprise",
     name: "Enterprise",
-    href: "https://forms.supabase.com/enterprise",
-    description: "For large-scale applications managing serious workloads.",
+    href: "https://forms.grida.com/enterprise",
+    description:
+      "For large-scale and building custom solutions on top fo Grida Forms.",
     features: [
-      "Designated Support manager",
-      "Uptime SLAs",
-      "On-premise support",
-      "24×7×365 premium enterprise support",
-      "Private Slack channel",
-      "Custom Security Questionnaires",
-    ],
-    featuresPartner: [
-      "Designated Support manager",
-      "Uptime SLAs",
-      "On-premise support",
-      "24×7×365 premium enterprise support",
-      "Private Slack channel",
-      "Custom Security Questionnaires",
+      {
+        name: "Responses Included",
+        trail: "♾️",
+      },
+      {
+        name: "Additional responses",
+        trail: "$1 per 1K",
+      },
+      {
+        name: "Number of forms",
+        trail: "♾️",
+      },
+      {
+        name: "Blocks per form",
+        trail: "♾️",
+      },
+      {
+        name: "Seats",
+        trail: "♾️",
+      },
     ],
     priceLabel: "",
     priceMonthly: "Custom",
-    preface: "",
-    footer: "",
     cta: "Contact Sales",
   },
 ];

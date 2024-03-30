@@ -1,15 +1,5 @@
 import React, { Fragment } from "react";
-import { Component1Icon, InfoCircledIcon } from "@radix-ui/react-icons";
-
-function ProductIcon({
-  color,
-  icon,
-}: {
-  color?: React.CSSProperties["color"];
-  icon?: any;
-}) {
-  return <Component1Icon />;
-}
+import { InfoCircledIcon } from "@radix-ui/react-icons";
 
 export const Check = () => (
   <svg
@@ -91,7 +81,7 @@ export const PricingTableRowDesktop = (props: any) => {
           scope="colgroup"
         >
           <div className="flex items-center gap-4">
-            {props.icon && <ProductIcon icon={props.icon} color="green" />}
+            {props.icon && props.icon}
             <h4 className="m-0 text-base font-normal">{category.title}</h4>
           </div>
         </th>
@@ -186,7 +176,7 @@ export const PricingTableRowMobile = (props: any) => {
     >
       <caption className="bg-background border-default divide-border dark:divide-opacity-25 dark:border-white dark:border-opacity-25 border-t border-b px-4 py-3 text-left text-sm font-medium text-foreground">
         <span className="flex items-center gap-2">
-          {category.icon ? <ProductIcon icon={props.icon} /> : null}
+          {props.icon && props.icon}
           <span className="text-foreground font-normal">{category.title}</span>
         </span>
       </caption>
