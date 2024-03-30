@@ -12,17 +12,28 @@ export async function POST(req: NextRequest) {
   const cookieStore = cookies();
 
   const form_id = String(formdata.get("form_id"));
-  const redirect_uri = String(formdata.get("redirect_uri"));
+
+  const __raw_redirect_after_response_uri = formdata.get(
+    "redirect_after_response_uri"
+  );
+  const redirect_after_response_uri = __raw_redirect_after_response_uri
+    ? String(__raw_redirect_after_response_uri)
+    : undefined;
+
+  const __raw_is_redirect_after_response_uri_enabled = formdata.get(
+    "is_redirect_after_response_uri_enabled"
+  );
+  const is_redirect_after_response_uri_enabled =
+    String(__raw_is_redirect_after_response_uri_enabled) === "on";
+
+  console.log("POST /private/editor/settings/redirect-uri", {
+    form_id,
+    redirect_after_response_uri,
+    is_redirect_after_response_uri_enabled,
+  });
 
   if (!form_id) {
     return notFound();
-  }
-
-  if (redirect_uri == null) {
-    return NextResponse.json(
-      { error: "redirect_uri is required" },
-      { status: 400 }
-    );
   }
 
   const supabase = createRouteHandlerClient(cookieStore);
@@ -30,7 +41,9 @@ export async function POST(req: NextRequest) {
   await supabase
     .from("form")
     .update({
-      redirect_after_response_uri: redirect_uri || null,
+      redirect_after_response_uri: redirect_after_response_uri,
+      is_redirect_after_response_uri_enabled:
+        is_redirect_after_response_uri_enabled,
     })
     .eq("id", form_id)
     .single();

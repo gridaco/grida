@@ -6,6 +6,11 @@ const nextConfig = withMDX()({
   experimental: {
     mdxRs: true,
   },
+  webpack: (config) => {
+    // https://github.com/wojtekmaj/react-pdf?tab=readme-ov-file#nextjs
+    config.resolve.alias.canvas = false;
+    return config;
+  },
 });
 
 export default nextConfig;

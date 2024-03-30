@@ -1,4 +1,7 @@
-import { client } from "@/lib/supabase/server";
+import {
+  create_new_form_with_page,
+  seed_form_page_blocks,
+} from "@/services/new";
 import { NextRequest, NextResponse } from "next/server";
 
 export const revalidate = 0;
@@ -11,38 +14,27 @@ export async function POST(request: NextRequest) {
     return NextResponse.error();
   }
 
-  const { data, error } = await client
-    .from("form")
-    .insert({
-      project_id: project_id,
-    })
-    .select("*")
-    .single();
+  try {
+    const { form_id, form_page_id } = await create_new_form_with_page({
+      project_id,
+    });
 
-  if (!data) {
-    console.error("error while creating new form", error);
+    try {
+      await seed_form_page_blocks({
+        form_id,
+        form_page_id,
+      });
+    } catch (e) {
+      // this won't be happening
+      console.error("error while seeding form page blocks", e);
+      // ignore and continue since the form itself is created anyway.
+    }
+
+    return NextResponse.redirect(origin + `/d/${form_id}/blocks`, {
+      status: 301,
+    });
+  } catch (e) {
+    console.error("error while creating new form", e);
     return NextResponse.error();
   }
-
-  // create a default page
-  const { data: page } = await client
-    .from("form_page")
-    .insert({
-      form_id: data.id,
-      name: data.title,
-    })
-    .select("id")
-    .single();
-
-  // link the page to the form
-  await client
-    .from("form")
-    .update({
-      default_form_page_id: page!.id,
-    })
-    .eq("id", data.id);
-
-  return NextResponse.redirect(origin + `/d/${data.id}`, {
-    status: 301,
-  });
 }

@@ -1,0 +1,21 @@
+import clsx from "clsx";
+import React from "react";
+
+export function SideNavItem({
+  disabled,
+  children,
+}: React.PropsWithChildren<{
+  disabled?: boolean;
+}>) {
+  return (
+    <button
+      disabled={disabled}
+      className={clsx(
+        "flex items-center gap-2 w-full text-left px-4 py-4 bg-transparent hover:bg-neutral-500/10",
+        "disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent"
+      )}
+    >
+      {children}
+    </button>
+  );
+}

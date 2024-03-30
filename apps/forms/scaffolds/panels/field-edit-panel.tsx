@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useId, useMemo, useState } from "react";
 import {
   PanelClose,
   PanelContent,
@@ -14,30 +14,55 @@ import {
   SidePanel,
 } from "@/components/panels/side-panel";
 import { FormFieldPreview } from "@/components/formfield";
-import { FormFieldType, NewFormFieldInit } from "@/types";
-import { capitalCase, snakeCase } from "change-case";
-import { LockClosedIcon } from "@radix-ui/react-icons";
+import {
+  FormFieldAutocompleteType,
+  FormFieldDataSchema,
+  FormFieldType,
+  NewFormFieldInit,
+  PaymentFieldData,
+} from "@/types";
+import {
+  CrossCircledIcon,
+  DragHandleDots2Icon,
+  GearIcon,
+  LockClosedIcon,
+  PlusIcon,
+  TrashIcon,
+} from "@radix-ui/react-icons";
 import { FormFieldAssistant } from "../ai/form-field-schema-assistant";
 import toast from "react-hot-toast";
 import { Select } from "@/components/select";
-
-const supported_field_types: FormFieldType[] = [
-  "text",
-  "textarea",
-  "tel",
-  "url",
-  "checkbox",
-  "number",
-  "date",
-  "month",
-  "week",
-  "email",
-  "select",
-  "password",
-  "color",
-  "radio",
-  "hidden",
-];
+import {
+  html5_multiple_supported_field_types,
+  supported_field_autocomplete_types,
+  supported_field_types,
+} from "@/k/supported_field_types";
+import {
+  payments_service_providers,
+  payments_service_providers_default,
+  payments_service_providers_display_map,
+} from "@/k/payments_service_providers";
+import { cls_save_button } from "@/components/preferences";
+import { Toggle } from "@/components/toggle";
+import { fmt_snake_case_to_human_text } from "@/utils/fmt";
+import clsx from "clsx";
+import {
+  SortableContext,
+  arrayMove,
+  useSortable,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
+import {
+  DndContext,
+  PointerSensor,
+  closestCorners,
+  useSensor,
+  useSensors,
+} from "@dnd-kit/core";
+import { restrictToVerticalAxis } from "@dnd-kit/modifiers";
+import { nanoid } from "nanoid";
+import { draftid } from "@/utils/id";
 
 // @ts-ignore
 const default_field_init: {
@@ -70,9 +95,9 @@ const default_field_init: {
   select: {
     type: "select",
     options: [
-      { label: "Option 1", value: "option1" },
-      { label: "Option 2", value: "option2" },
-      { label: "Option 3", value: "option3" },
+      { id: draftid(), label: "Option A", value: "option_a" },
+      { id: draftid(), label: "Option B", value: "option_b" },
+      { id: draftid(), label: "Option C", value: "option_c" },
     ],
   },
   password: { type: "password", placeholder: "Password" },
@@ -80,18 +105,48 @@ const default_field_init: {
   radio: {
     type: "radio",
     options: [
-      { label: "Option 1", value: "option1" },
-      { label: "Option 2", value: "option2" },
-      { label: "Option 3", value: "option3" },
+      { id: draftid(), label: "Option A", value: "option_a" },
+      { id: draftid(), label: "Option B", value: "option_b" },
+      { id: draftid(), label: "Option C", value: "option_c" },
     ],
   },
+  checkboxes: {
+    type: "checkboxes",
+    options: [
+      { id: draftid(), label: "Choice A", value: "choice_a" },
+      { id: draftid(), label: "Choice B", value: "choice_b" },
+      { id: draftid(), label: "Choice C", value: "choice_c" },
+    ],
+    multiple: true,
+    // TODO: checkboxes is a non-standard HTML input type, we have no way to handle the required attribute with built-in HTML validation
+    // https://github.com/whatwg/html/issues/6868
+    required: false,
+  },
   hidden: { type: "hidden" },
+  payment: {
+    type: "payment",
+    data: {
+      type: "payment",
+      service_provider: payments_service_providers_default,
+    } as PaymentFieldData,
+  },
 };
 
-const input_can_have_options: FormFieldType[] = ["select", "radio"];
+const input_can_have_options: FormFieldType[] = [
+  "select",
+  "radio",
+  "checkboxes",
+];
+
 const input_can_have_pattern: FormFieldType[] = supported_field_types.filter(
-  (type) => !["checkbox", "color", "radio"].includes(type)
+  (type) => !["checkbox", "checkboxes", "color", "radio"].includes(type)
 );
+
+type Option = {
+  id: string;
+  label?: string;
+  value: string;
+};
 
 export function FieldEditPanel({
   title,
@@ -119,9 +174,22 @@ export function FieldEditPanel({
   const [type, setType] = useState<FormFieldType>(init?.type || "text");
   const [required, setRequired] = useState(init?.required || false);
   const [pattern, setPattern] = useState<string | undefined>(init?.pattern);
-  const [options, setOptions] = useState<
-    { label?: string | null; value: string }[]
-  >(init?.options || []);
+  const [options, setOptions] = useState<Option[]>(
+    Array.from(init?.options ?? []).sort(
+      (a, b) => (a.index || 0) - (b.index || 0)
+    )
+  );
+
+  const [autocomplete, setAutocomplete] = useState<FormFieldAutocompleteType[]>(
+    init?.autocomplete || []
+  );
+  const [data, setData] = useState<FormFieldDataSchema | null | undefined>(
+    init?.data
+  );
+  const [accept, setAccept] = useState<string | undefined>(
+    init?.accept ?? undefined
+  );
+  const [multiple, setMultiple] = useState(init?.multiple || false);
 
   const preview_label = buildPreviewLabel({
     name,
@@ -131,13 +199,28 @@ export function FieldEditPanel({
 
   const has_options = input_can_have_options.includes(type);
   const has_pattern = input_can_have_pattern.includes(type);
+  const has_accept = type === "file";
 
   const preview_placeholder =
-    placeholder || convertToPlainText(label) || convertToPlainText(name);
+    placeholder ||
+    fmt_snake_case_to_human_text(label) ||
+    fmt_snake_case_to_human_text(name);
 
-  const preview_disabled = !name;
+  const preview_disabled =
+    type == "payment" &&
+    // disable preview if servive provider is tosspayments (it takes control over the window)
+    (data as PaymentFieldData)?.service_provider === "tosspayments";
 
-  const onSaveClick = () => {
+  const onSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+
+    const indexed_options = options
+      .map((option, index) => ({
+        ...option,
+        index,
+      }))
+      .sort((a, b) => a.index - b.index);
+
     onSave?.({
       name,
       label,
@@ -145,8 +228,12 @@ export function FieldEditPanel({
       helpText,
       type,
       required,
-      options,
       pattern,
+      options: indexed_options,
+      autocomplete,
+      data,
+      accept,
+      multiple,
     });
   };
 
@@ -176,7 +263,8 @@ export function FieldEditPanel({
         );
         setHelpText((_help) => _help || defaults.helpText || "");
         setRequired((_required) => _required || defaults.required || false);
-
+        setMultiple((_multiple) => _multiple || defaults.multiple || false);
+        setData((_data) => _data || defaults.data);
         // reset options if there were no existing options
         if (!options?.length) {
           setOptions(defaults.options || []);
@@ -195,7 +283,7 @@ export function FieldEditPanel({
         <PanelPropertySection>
           <PanelPropertySectionTitle>Preview</PanelPropertySectionTitle>
           <PanelPropertyFields>
-            <div className="relative w-full min-h-40 bg-neutral-200 rounded p-10 border border-black/20">
+            <div className="relative w-full min-h-40 bg-neutral-200 dark:bg-neutral-800 rounded p-10 border border-black/20">
               <form
                 onSubmit={(e) => {
                   e.preventDefault();
@@ -215,11 +303,15 @@ export function FieldEditPanel({
                   disabled={preview_disabled}
                   options={has_options ? options : undefined}
                   pattern={pattern}
+                  autoComplete={autocomplete.join(" ")}
+                  data={data}
+                  accept={accept}
+                  multiple={multiple}
                 />
                 <div className="absolute bottom-0 right-0 m-2">
                   <button
                     type="submit"
-                    className="rounded-full px-2 py-1 bg-neutral-100 text-xs font-mono"
+                    className="rounded-full px-2 py-1 bg-neutral-100 dark:bg-neutral-900 text-xs font-mono"
                   >
                     Test
                   </button>
@@ -233,7 +325,7 @@ export function FieldEditPanel({
             <FormFieldAssistant onSuggestion={onSuggestion} />
           </PanelPropertySection>
         )}
-        <form key={formResetKey}>
+        <form key={formResetKey} id="field-edit-form" onSubmit={onSubmit}>
           <PanelPropertySection>
             <PanelPropertySectionTitle>Field</PanelPropertySectionTitle>
             <PanelPropertyFields>
@@ -271,7 +363,60 @@ export function FieldEditPanel({
               </PanelPropertyField>
             </PanelPropertyFields>
           </PanelPropertySection>
-          <PanelPropertySection>
+          <PanelPropertySection hidden={type !== "payment"}>
+            <PanelPropertySectionTitle>Payment</PanelPropertySectionTitle>
+            <PanelPropertyFields>
+              <PanelPropertyField label={"Service Provider"}>
+                <Select
+                  value={(data as PaymentFieldData)?.service_provider}
+                  onChange={(e) => {
+                    setData({
+                      ...data,
+                      type: "payment",
+                      service_provider: e.target.value,
+                    });
+                  }}
+                >
+                  {payments_service_providers.map((provider) => (
+                    <option
+                      key={provider}
+                      value={provider ?? payments_service_providers_default}
+                    >
+                      {payments_service_providers_display_map[provider].label}
+                    </option>
+                  ))}
+                </Select>
+              </PanelPropertyField>
+            </PanelPropertyFields>
+          </PanelPropertySection>
+          <PanelPropertySection hidden={!has_options}>
+            <PanelPropertySectionTitle>Options</PanelPropertySectionTitle>
+            <PanelPropertyFields>
+              <OptionsEdit
+                options={options}
+                onAdd={() => {
+                  setOptions([
+                    ...options,
+                    {
+                      id: draftid(),
+                      label: "",
+                      value: "",
+                    },
+                  ]);
+                }}
+                onChange={(id, option) => {
+                  setOptions(options.map((_) => (_.id === id ? option : _)));
+                }}
+                onRemove={(id) => {
+                  setOptions(options.filter((_) => _.id !== id));
+                }}
+                onSort={(from, to) => {
+                  setOptions(arrayMove(options, from, to));
+                }}
+              />
+            </PanelPropertyFields>
+          </PanelPropertySection>
+          <PanelPropertySection hidden={type == "payment"}>
             <PanelPropertySectionTitle>General</PanelPropertySectionTitle>
             <PanelPropertyFields>
               <PanelPropertyField
@@ -286,7 +431,21 @@ export function FieldEditPanel({
               </PanelPropertyField>
               <PanelPropertyField
                 label={"Placeholder"}
-                description="The placeholder text that will be displayed in the input when it's empty."
+                description={
+                  <>
+                    {type === "select" ? (
+                      <>
+                        The placeholder text that will be displayed in the input
+                        when no option is selected.
+                      </>
+                    ) : (
+                      <>
+                        The placeholder text that will be displayed in the input
+                        when it's empty.
+                      </>
+                    )}
+                  </>
+                }
               >
                 <PropertyTextInput
                   placeholder={"Placeholder Text"}
@@ -304,33 +463,73 @@ export function FieldEditPanel({
                   onChange={(e) => setHelpText(e.target.value)}
                 />
               </PanelPropertyField>
+              <PanelPropertyField label={"Auto Complete"}>
+                <Select
+                  value={autocomplete ? autocomplete[0] : ""}
+                  onChange={(e) => {
+                    setAutocomplete([
+                      e.target.value as FormFieldAutocompleteType,
+                    ]);
+                  }}
+                >
+                  {supported_field_autocomplete_types.map((type) => (
+                    <option key={type} value={type}>
+                      {type}
+                    </option>
+                  ))}
+                </Select>
+              </PanelPropertyField>
+              {html5_multiple_supported_field_types.includes(type) && (
+                <PanelPropertyField label={"Multiple"}>
+                  <Toggle value={multiple} onChange={setMultiple} />
+                </PanelPropertyField>
+              )}
               {type !== "checkbox" && (
-                <PanelPropertyField label={"Required"}>
-                  <input
-                    type="checkbox"
-                    checked={required}
-                    onChange={(e) => setRequired(e.target.checked)}
-                  />
+                <PanelPropertyField
+                  label={"Required"}
+                  description={
+                    type === "checkboxes" ? (
+                      <>
+                        We follow html5 standards. Checkboxes cannot be
+                        required.{" "}
+                        <a
+                          className="underline"
+                          href="https://github.com/whatwg/html/issues/6868#issue-946624070"
+                          target="_blank"
+                        >
+                          Learn more
+                        </a>
+                      </>
+                    ) : undefined
+                  }
+                  disabled={type === "checkboxes"}
+                >
+                  <Toggle value={required} onChange={setRequired} />
                 </PanelPropertyField>
               )}
             </PanelPropertyFields>
           </PanelPropertySection>
-          {has_options && (
-            <PanelPropertySection>
-              <PanelPropertySectionTitle>Options</PanelPropertySectionTitle>
-              <PanelPropertyFields>
-                {/*  */}
-                {options?.map((option, index) => (
-                  <p key={index}>
-                    {option.label} - {option.value}
-                  </p>
-                ))}
-              </PanelPropertyFields>
-            </PanelPropertySection>
-          )}
-          <PanelPropertySection>
+
+          <PanelPropertySection
+            hidden={
+              type == "payment" ||
+              (!has_accept && !has_pattern && type !== "checkbox")
+            }
+          >
             <PanelPropertySectionTitle>Validation</PanelPropertySectionTitle>
             <PanelPropertyFields>
+              {has_accept && (
+                <PanelPropertyField
+                  label={"Accept"}
+                  description="A comma-separated list of file types that the input should accept"
+                >
+                  <PropertyTextInput
+                    placeholder={"image/*"}
+                    value={accept}
+                    onChange={(e) => setAccept(e.target.value)}
+                  />
+                </PanelPropertyField>
+              )}
               {has_pattern && (
                 <PanelPropertyField
                   label={"Pattern"}
@@ -344,16 +543,16 @@ export function FieldEditPanel({
                 </PanelPropertyField>
               )}
               {type === "checkbox" && (
-                <PanelPropertyField label={"Required"}>
-                  <input
-                    type="checkbox"
-                    checked={required}
-                    onChange={(e) => setRequired(e.target.checked)}
-                  />
-                  <p>
-                    The checkbox will be required if it is checked. The user
-                    must check the checkbox to continue.
-                  </p>
+                <PanelPropertyField
+                  label={"Required"}
+                  description={
+                    <>
+                      The checkbox will be required if it is checked. The user
+                      must check the checkbox to continue.
+                    </>
+                  }
+                >
+                  <Toggle value={required} onChange={setRequired} />
                 </PanelPropertyField>
               )}
             </PanelPropertyFields>
@@ -362,9 +561,15 @@ export function FieldEditPanel({
       </PanelContent>
       <PanelFooter>
         <PanelClose>
-          <button className="rounded p-2 bg-neutral-100">Cancel</button>
+          <button className="rounded p-2 bg-neutral-100 dark:bg-neutral-900">
+            Cancel
+          </button>
         </PanelClose>
-        <button onClick={onSaveClick} className="rounded p-2 bg-neutral-100">
+        <button
+          type="submit"
+          form="field-edit-form"
+          className={cls_save_button}
+        >
           Save
         </button>
       </PanelFooter>
@@ -381,14 +586,206 @@ function buildPreviewLabel({
   label?: string;
   required?: boolean;
 }) {
-  let txt = label || convertToPlainText(name);
+  let txt = label || fmt_snake_case_to_human_text(name);
   if (required) {
     txt += " *";
   }
   return txt;
 }
 
-function convertToPlainText(input: string) {
-  // Converts to snake_case then replaces underscores with spaces and capitalizes words
-  return capitalCase(snakeCase(input)).toLowerCase();
+function OptionsEdit({
+  options,
+  onAdd,
+  onChange,
+  onSort,
+  onRemove,
+}: {
+  options?: Option[];
+  onAdd?: () => void;
+  onChange?: (id: string, option: Option) => void;
+  onSort?: (from: number, to: number) => void;
+  onRemove?: (id: string) => void;
+}) {
+  const id = useId();
+
+  const sensors = useSensors(useSensor(PointerSensor));
+
+  const [mode, setMode] = useState<"simple" | "advanced">("simple");
+
+  const toggleMode = () => {
+    setMode(mode === "simple" ? "advanced" : "simple");
+  };
+
+  return (
+    <DndContext
+      id={id}
+      sensors={sensors}
+      collisionDetection={closestCorners}
+      modifiers={[restrictToVerticalAxis]}
+      onDragEnd={handleDragEnd}
+    >
+      <SortableContext
+        items={options?.map((option) => option.id) || []}
+        strategy={verticalListSortingStrategy}
+      >
+        <div className="flex flex-col gap-4">
+          <div className="flex gap-2 justify-between">
+            <span className="text-xs opacity-50">
+              Set the options for the select or radio input. you can set the
+              value and label individually in advanced mode.
+            </span>
+            <button type="button" onClick={toggleMode}>
+              {mode === "advanced" ? <CrossCircledIcon /> : <GearIcon />}
+            </button>
+          </div>
+          <div className="flex flex-col gap-2">
+            {mode === "advanced" && (
+              <div className="flex">
+                <span className="w-full text-xs">Value</span>
+                <span className="w-full text-xs">Label</span>
+              </div>
+            )}
+            {options?.map(({ id, ...option }, index) => (
+              <OptionEditItem
+                key={id}
+                id={id}
+                mode={mode}
+                label={option.label || ""}
+                value={option.value}
+                index={index}
+                onRemove={() => {
+                  onRemove?.(id);
+                }}
+                onChange={(option) => {
+                  onChange?.(id, { id, ...option });
+                }}
+              />
+            ))}
+            <button
+              type="button"
+              className="flex gap-2 items-center justify-center border rounded text-xs p-2 w-fit"
+              onClick={onAdd}
+            >
+              <PlusIcon />
+              Add Option
+            </button>
+          </div>
+        </div>
+      </SortableContext>
+    </DndContext>
+  );
+
+  function handleDragEnd(event: any) {
+    const { active, over } = event;
+
+    if (over && active.id !== over.id) {
+      onSort?.(active.data.current.index, over.data.current.index);
+    }
+  }
+}
+
+const does_fmt_match = (a: string, b: string) =>
+  fmt_snake_case_to_human_text(a).toLowerCase() === b.toLowerCase();
+
+const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+
+function OptionEditItem({
+  id,
+  label: _label,
+  value: _value,
+  index,
+  mode,
+  onChange,
+  onRemove,
+}: {
+  id: string;
+  label: string;
+  value: string;
+  index: number;
+  mode: "simple" | "advanced";
+  onChange?: (option: { label: string; value: string }) => void;
+  onRemove?: () => void;
+}) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    setActivatorNodeRef,
+    transform,
+    isDragging,
+    isSorting,
+    isOver,
+    transition,
+  } = useSortable({ id: id, data: { index } });
+
+  const [value, setValue] = useState(_value);
+  const [label, setLabel] = useState(_label);
+  const [fmt_matches, set_fmt_matches] = useState<boolean>(
+    does_fmt_match(value, label)
+  );
+
+  useEffect(() => {
+    if (fmt_matches) {
+      setLabel(capitalize(fmt_snake_case_to_human_text(value)));
+    }
+    set_fmt_matches(does_fmt_match(value, label));
+  }, [value]);
+
+  useEffect(() => {
+    set_fmt_matches(does_fmt_match(value, label));
+  }, [label]);
+
+  useEffect(() => {
+    onChange?.({ label, value });
+  }, [value, label]);
+
+  const style = {
+    transform: CSS.Translate.toString(transform),
+    zIndex: isDragging ? 1 : 0,
+    transition,
+  };
+
+  return (
+    <div
+      //
+      ref={setNodeRef}
+      style={style}
+      className="flex gap-1"
+    >
+      <button
+        //
+        type="button"
+        {...listeners}
+        {...attributes}
+        ref={setActivatorNodeRef}
+      >
+        <DragHandleDots2Icon className="opacity-50" />
+      </button>
+      <label className="w-full">
+        <input
+          className="block w-full p-2 text-gray-900 border border-gray-300 rounded-lg bg-gray-50 text-xs focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500"
+          type="text"
+          placeholder="option_value"
+          value={value}
+          required
+          onChange={(e) => setValue(e.target.value)}
+        />
+      </label>
+      <label className={clsx(mode === "simple" && "hidden", "w-full")}>
+        <input
+          className={
+            "block w-full p-2 text-gray-900 border border-gray-300 rounded-lg bg-gray-50 text-xs focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500"
+          }
+          type="text"
+          placeholder="Option Label"
+          value={label}
+          onChange={(e) => setLabel(e.target.value)}
+        />
+      </label>
+
+      <button type="button" onClick={onRemove}>
+        <TrashIcon />
+      </button>
+    </div>
+  );
 }

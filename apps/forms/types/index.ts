@@ -1,9 +1,43 @@
+export interface Form {
+  created_at: string;
+  custom_preview_url_path: string | null;
+  custom_publish_url_path: string | null;
+  default_form_page_id: string | null;
+  default_form_page_language: FormsPageLanguage;
+  description: string | null;
+  id: string;
+  is_edit_after_submission_allowed: boolean;
+  is_max_form_responses_by_customer_enabled: boolean;
+  is_max_form_responses_in_total_enabled: boolean;
+  is_multiple_response_allowed: boolean;
+  is_powered_by_branding_enabled: boolean;
+  is_redirect_after_response_uri_enabled: boolean;
+  max_form_responses_by_customer: number | null;
+  max_form_responses_in_total: number | null;
+  project_id: number;
+  redirect_after_response_uri: string | null;
+  title: string;
+  unknown_field_handling_strategy: FormResponseUnknownFieldHandlingStrategyType;
+  updated_at: string;
+}
+
+/**
+ * user facing page language
+ */
+export type FormsPageLanguage = "en" | "ko";
+
+export type FormResponseUnknownFieldHandlingStrategyType =
+  | "accept"
+  | "ignore"
+  | "reject";
+
 export type FormFieldType =
   | "text"
   | "textarea"
   | "tel"
   | "url"
   | "checkbox"
+  | "checkboxes"
   | "number"
   | "date"
   | "month"
@@ -18,7 +52,67 @@ export type FormFieldType =
   | "radio"
   | "country"
   | "payment"
-  | "hidden";
+  | "hidden"
+  | "signature";
+
+export type FormFieldAutocompleteType =
+  | "off"
+  | "on"
+  | "name"
+  | "honorific-prefix"
+  | "given-name"
+  | "additional-name"
+  | "family-name"
+  | "honorific-suffix"
+  | "nickname"
+  | "email"
+  | "username"
+  | "new-password"
+  | "current-password"
+  | "one-time-code"
+  | "organization-title"
+  | "organization"
+  | "street-address"
+  | "shipping"
+  | "billing"
+  | "address-line1"
+  | "address-line2"
+  | "address-line3"
+  | "address-level4"
+  | "address-level3"
+  | "address-level2"
+  | "address-level1"
+  | "country"
+  | "country-name"
+  | "postal-code"
+  | "cc-name"
+  | "cc-given-name"
+  | "cc-additional-name"
+  | "cc-family-name"
+  | "cc-number"
+  | "cc-exp"
+  | "cc-exp-month"
+  | "cc-exp-year"
+  | "cc-csc"
+  | "cc-type"
+  | "transaction-currency"
+  | "transaction-amount"
+  | "language"
+  | "bday"
+  | "bday-day"
+  | "bday-month"
+  | "bday-year"
+  | "sex"
+  | "tel"
+  | "tel-country-code"
+  | "tel-national"
+  | "tel-area-code"
+  | "tel-local"
+  | "tel-extension"
+  | "impp"
+  | "url"
+  | "photo"
+  | "webauthn";
 
 export type PlatformPoweredBy = "api" | "grida_forms" | "web_client";
 
@@ -29,8 +123,17 @@ export type NewFormFieldInit = {
   helpText: string;
   type: FormFieldType;
   required: boolean;
-  options?: { label?: string | null; value: string }[];
+  options?: {
+    id: string;
+    label?: string;
+    value: string;
+    index?: number;
+  }[];
   pattern?: string;
+  autocomplete?: FormFieldAutocompleteType[] | null;
+  data?: FormFieldDataSchema | null;
+  accept?: string | null;
+  multiple?: boolean;
 };
 
 export interface FormFieldDefinition {
@@ -44,9 +147,13 @@ export interface FormFieldDefinition {
   pattern?: any | null;
   options?: {
     id: string;
-    label?: string | null;
+    label?: string;
     value: string;
   }[];
+  autocomplete?: FormFieldAutocompleteType[] | null;
+  data?: FormFieldDataSchema | null;
+  accept?: string | null;
+  multiple?: boolean | null;
 }
 
 export interface FormPage {
@@ -80,6 +187,7 @@ export type FormBlockType =
   | "html"
   | "divider"
   | "header"
+  | "pdf"
   // not supported yet
   | "group";
 // not supported yet
@@ -88,7 +196,7 @@ export type FormBlockType =
 export interface FormResponse {
   browser: string | null;
   created_at: string;
-  customer_uuid: string | null;
+  customer_id: string | null;
   form_id: string | null;
   id: string;
   ip: string | null;
@@ -108,4 +216,13 @@ export interface FormResponseField {
   type: FormFieldType;
   updated_at: string;
   value: any;
+}
+
+export type FormFieldDataSchema = PaymentFieldData | {};
+
+export type PaymentsServiceProviders = "stripe" | "tosspayments";
+
+export interface PaymentFieldData {
+  type: "payment";
+  service_provider: PaymentsServiceProviders;
 }

@@ -9,6 +9,7 @@ export type BlocksEditorAction =
   | SortBlockAction
   | FocusFieldAction
   | ChangeBlockFieldAction
+  | CreateFielFromBlockdAction
   | HtmlBlockBodyAction
   | ImageBlockSrcAction
   | VideoBlockSrcAction
@@ -49,6 +50,12 @@ export interface ChangeBlockFieldAction {
   block_id: string;
   field_id: string;
 }
+
+export interface CreateFielFromBlockdAction {
+  type: "blocks/field/new";
+  block_id: string;
+}
+
 export interface HtmlBlockBodyAction {
   type: "blocks/html/body";
   block_id: string;

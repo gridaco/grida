@@ -10,6 +10,7 @@ import {
   ImageIcon,
   PlusCircledIcon,
   PlusIcon,
+  ReaderIcon,
   SectionIcon,
   TextIcon,
   VideoIcon,
@@ -22,13 +23,7 @@ import {
   useSensors,
 } from "@dnd-kit/core";
 import { Block, BlocksCanvas } from "./blocks";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuPortal,
-  DropdownMenuTrigger,
-} from "@editor-ui/dropdown-menu";
+import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { restrictToVerticalAxis } from "@dnd-kit/modifiers";
 import {
   SortableContext,
@@ -90,7 +85,7 @@ function PendingBlocksResolver() {
   const insertBlock = useCallback(
     async (block: EditorFlatFormBlock) => {
       //
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from("form_block")
         .insert({
           data: {},
@@ -108,6 +103,10 @@ function PendingBlocksResolver() {
         .select()
         .single();
 
+      if (error) {
+        throw error;
+      }
+
       return data;
     },
     [state.form_id, state.page_id, supabase]
@@ -121,20 +120,22 @@ function PendingBlocksResolver() {
     );
 
     for (const block of pending_blocks) {
-      insertBlock(block).then((data) => {
-        if (!data) {
+      insertBlock(block)
+        .then((data) => {
+          dispatch({
+            type: "blocks/resolve",
+            block_id: block.id,
+            block: data,
+          });
+        })
+        .catch((e) => {
+          console.error("Failed to create block", e);
           toast.error("Failed to create block");
-          return;
-        }
-
-        dispatch({
-          type: "blocks/resolve",
-          block_id: block.id,
-          block: data,
+          dispatch({
+            type: "blocks/delete",
+            block_id: block.id,
+          });
         });
-
-        toast.success("Block created");
-      });
     }
   }, [dispatch, insertBlock, state.blocks]);
 
@@ -217,6 +218,36 @@ function OptimisticBlocksSyncProvider({
 function BlocksEditor() {
   const [state, dispatch] = useEditorState();
 
+  return (
+    <div>
+      <PendingBlocksResolver />
+      <OptimisticBlocksSyncProvider />
+      <div className="sticky top-20 z-50">
+        <div className="absolute -left-6">
+          <AddBlockButton />
+        </div>
+      </div>
+      <BlocksCanvas id="root" className="flex flex-col gap-4 mt-10">
+        <SortableContext
+          items={state.blocks.map((b) => b.id)}
+          strategy={verticalListSortingStrategy}
+        >
+          {state.blocks.map((block) => {
+            return (
+              <div key={block.id}>
+                <Block {...block} />
+              </div>
+            );
+          })}
+        </SortableContext>
+      </BlocksCanvas>
+    </div>
+  );
+}
+
+function AddBlockButton() {
+  const [state, dispatch] = useEditorState();
+
   const addBlock = useCallback(
     (block: FormBlockType) => {
       dispatch({
@@ -234,64 +265,68 @@ function BlocksEditor() {
   const addHeaderBlock = useCallback(() => addBlock("header"), [addBlock]);
   const addImageBlock = useCallback(() => addBlock("image"), [addBlock]);
   const addVideoBlock = useCallback(() => addBlock("video"), [addBlock]);
+  const addPdfBlock = useCallback(() => addBlock("pdf"), [addBlock]);
 
   return (
-    <div>
-      <PendingBlocksResolver />
-      <OptimisticBlocksSyncProvider />
-      <DropdownMenu modal={false}>
-        <DropdownMenuTrigger asChild>
-          <button className="rounded border p-2">
-            <PlusIcon />
-          </button>
-        </DropdownMenuTrigger>
-        <DropdownMenuPortal>
-          <DropdownMenuContent className="z-50">
-            <DropdownMenuItem onClick={addFieldBlock}>
-              <PlusCircledIcon />
-              Field
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={addImageBlock}>
-              <ImageIcon />
-              Image
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={addVideoBlock}>
-              <VideoIcon />
-              Video
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={addHtmlBlock}>
-              <CodeIcon />
-              HTML
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={addDividerBlock}>
-              <DividerHorizontalIcon />
-              Divider
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={addSectionBlock}>
-              <SectionIcon />
-              Section
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={addHeaderBlock}>
-              <HeadingIcon />
-              Header
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenuPortal>
-      </DropdownMenu>
-      <BlocksCanvas id="root" className="flex flex-col gap-4 mt-10">
-        <SortableContext
-          items={state.blocks.map((b) => b.id)}
-          strategy={verticalListSortingStrategy}
+    <DropdownMenu.Root modal={false}>
+      <DropdownMenu.Trigger asChild>
+        <button className="rounded-full w-12 h-12 flex items-center justify-center border bg-white dark:bg-neutral-800 dark:border-neutral-700 p-2">
+          <PlusIcon />
+        </button>
+      </DropdownMenu.Trigger>
+      <DropdownMenu.Portal>
+        <DropdownMenu.Content
+          className="z-50 flex flex-col rounded border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 shadow-lg p-4 gap-2"
+          align="start"
         >
-          {state.blocks.map((block) => {
-            return (
-              <div key={block.id}>
-                <Block {...block} />
-              </div>
-            );
-          })}
-        </SortableContext>
-      </BlocksCanvas>
-    </div>
+          <BlockItem onClick={addFieldBlock}>
+            <PlusCircledIcon />
+            Field
+          </BlockItem>
+          <BlockItem onClick={addImageBlock}>
+            <ImageIcon />
+            Image
+          </BlockItem>
+          <BlockItem onClick={addVideoBlock}>
+            <VideoIcon />
+            Video
+          </BlockItem>
+          <BlockItem onClick={addHtmlBlock}>
+            <CodeIcon />
+            HTML
+          </BlockItem>
+          <BlockItem onClick={addPdfBlock}>
+            <ReaderIcon />
+            Pdf
+          </BlockItem>
+          <BlockItem onClick={addDividerBlock}>
+            <DividerHorizontalIcon />
+            Divider
+          </BlockItem>
+          <BlockItem onClick={addSectionBlock}>
+            <SectionIcon />
+            Section
+          </BlockItem>
+          <BlockItem onClick={addHeaderBlock}>
+            <HeadingIcon />
+            Header
+          </BlockItem>
+        </DropdownMenu.Content>
+      </DropdownMenu.Portal>
+    </DropdownMenu.Root>
+  );
+}
+
+function BlockItem({
+  children,
+  ...props
+}: React.ComponentProps<typeof DropdownMenu.Item>) {
+  return (
+    <DropdownMenu.Item
+      {...props}
+      className="flex gap-2 items-center p-1 cursor-pointer"
+    >
+      {children}
+    </DropdownMenu.Item>
   );
 }

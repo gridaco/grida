@@ -11,14 +11,39 @@ import { FormEditorProvider } from "@/scaffolds/editor";
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import { GoogleAnalytics } from "@next/third-parties/google";
-import "../../../editor.css";
 import { FormPage } from "@/types";
+import { PreviewButton } from "@/components/preview-button";
+import "../../../editor.css";
 
 const inter = Inter({ subsets: ["latin"] });
 
-export const metadata: Metadata = {
-  title: "Grida Forms",
-};
+export async function generateMetadata({
+  params,
+}: {
+  params: { id: string };
+}): Promise<Metadata> {
+  const cookieStore = cookies();
+  const supabase = createServerComponentClient(cookieStore);
+  const id = params.id;
+
+  const { data, error } = await supabase
+    .from("form")
+    .select(
+      `
+        title
+      `
+    )
+    .eq("id", id)
+    .single();
+
+  if (!data) {
+    return notFound();
+  }
+
+  return {
+    title: `${data.title} | Grida Forms`,
+  };
+}
 
 export const revalidate = 0;
 
@@ -63,37 +88,33 @@ export default async function Layout({
           <GoogleAnalytics gaId={process.env.NEXT_PUBLIC_GAID} />
         )}
 
-        <main className="min-h-screen h-screen flex flex-col">
+        <div className="h-screen flex flex-col">
           <Toaster position="bottom-center" />
-          <header className="sticky top-0 px-4 flex w-full gap-4 border-b dark:border-neutral-900 bg-white z-10">
-            <div className="w-1/3 flex items-center justify-start">
-              <Link href="/dashboard">
-                <span className="flex items-center gap-2 text-md font-black select-none">
-                  <GridaLogo size={15} />
-                  Forms
-                </span>
-              </Link>
-              <SlashIcon className="min-w-[20px] ml-2" width={15} height={15} />
-              <EditableFormTitle form_id={id} defaultValue={data.title} />
+          <header className="px-4 flex flex-col w-full gap-4 border-b bg-white dark:bg-neutral-900 z-10">
+            <div className="w-full flex gap-4">
+              <div className="w-1/3 flex items-center justify-start">
+                <Link href="/dashboard">
+                  <span className="flex items-center gap-2 text-md font-black select-none">
+                    <GridaLogo size={15} />
+                    Forms
+                  </span>
+                </Link>
+                <SlashIcon
+                  className="min-w-[20px] ml-2"
+                  width={15}
+                  height={15}
+                />
+                <EditableFormTitle form_id={id} defaultValue={data.title} />
+              </div>
+              <div className="invisible lg:visible w-1/3">
+                <Tabs form_id={id} />
+              </div>
+              <div className="w-1/3 flex gap-4 items-center justify-end">
+                <PreviewButton form_id={id} />
+              </div>
             </div>
-            <div className="w-1/3 flex items-center justify-center gap-4">
+            <div className="block lg:hidden">
               <Tabs form_id={id} />
-            </div>
-            <div className="w-1/3 flex gap-4 items-center justify-end">
-              <Link href={`/d/${id}/preview`} target="_blank">
-                <button
-                  className="p-2 h-10 w-10 rounded bg-neutral-200"
-                  title="Preview"
-                >
-                  <EyeOpenIcon className="mx-auto" width={20} height={20} />
-                </button>
-              </Link>
-              <button
-                className="px-4 py-2 h-10 rounded bg-neutral-200"
-                title="Publish"
-              >
-                Publish
-              </button>
             </div>
           </header>
           <FormEditorProvider
@@ -109,9 +130,9 @@ export default async function Layout({
                 : [],
             }}
           >
-            {children}
+            <div className="flex flex-1 overflow-y-auto">{children}</div>
           </FormEditorProvider>
-        </main>
+        </div>
       </body>
     </html>
   );

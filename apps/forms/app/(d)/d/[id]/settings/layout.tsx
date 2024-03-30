@@ -1,3 +1,4 @@
+import { SideNavBadge, SideNavItem } from "@/components/sidenav";
 import Link from "next/link";
 
 export default function Layout({
@@ -10,44 +11,27 @@ export default function Layout({
   const id = params.id;
 
   return (
-    <main className="flex">
+    <main className="flex flex-1">
       {/* side */}
-      <nav className="col-span-1 max-w-xs min-w-60 w-min border-r h-full">
+      <nav className="col-span-1 max-w-xs min-w-60 w-min border-r dark:border-r-neutral-800">
         <ul className="flex flex-col">
           <li>
             <Link href={`/d/${id}/settings/general`}>
-              <button className="w-full text-left px-4 py-4 bg-transparent hover:bg-neutral-500/10">
-                General
-              </button>
+              <SideNavItem>General</SideNavItem>
             </Link>
           </li>
           <li>
-            <Link href={`/d/${id}/settings/share/link`}>
-              <button className="w-full text-left px-4 py-4 bg-transparent hover:bg-neutral-500/10">
-                Share the link
-              </button>
+            <Link href={`/d/${id}/settings/customize`}>
+              <SideNavItem>Customize</SideNavItem>
             </Link>
           </li>
           <li>
-            <Link href={`/d/${id}/settings/share/embed`}>
-              <button className="w-full text-left px-4 py-4 bg-transparent hover:bg-neutral-500/10">
-                Embed in a webpage
-              </button>
-            </Link>
-          </li>
-          <li>
-            <Link href={`/d/${id}/settings/share/custom`}>
-              <button className="w-full text-left px-4 py-4 bg-transparent hover:bg-neutral-500/10">
-                Use custom renderer
-              </button>
-            </Link>
-          </li>
-          <li>
-            <Link href={`/d/${id}/settings/share/api`}>
-              <button className="w-full text-left px-4 py-4 bg-transparent hover:bg-neutral-500/10">
-                Use API
-              </button>
-            </Link>
+            {/* <Link href={`/d/${id}/settings/api`}> */}
+            <SideNavItem disabled>
+              API Keys
+              <SideNavBadge>soon</SideNavBadge>
+            </SideNavItem>
+            {/* </Link> */}
           </li>
         </ul>
       </nav>

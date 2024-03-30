@@ -28,20 +28,22 @@ export function FormEditorProvider({
   return (
     <StateProvider state={state} dispatch={dispatch}>
       <TooltipProvider>
-        <FormResponsesProvider>
-          <FieldEditPanelProvider>
-            <ResponseEditPanelProvider>{children}</ResponseEditPanelProvider>
-          </FieldEditPanelProvider>
-        </FormResponsesProvider>
+        <FieldEditPanelProvider>
+          <ResponseEditPanelProvider>{children}</ResponseEditPanelProvider>
+        </FieldEditPanelProvider>
       </TooltipProvider>
     </StateProvider>
   );
 }
 
-function FormResponsesProvider({ children }: React.PropsWithChildren<{}>) {
+export function InitialResponsesProvider({
+  children,
+}: React.PropsWithChildren<{}>) {
   const [state, dispatch] = useEditorState();
 
   const supabase = useMemo(() => createClientClient(), []);
+
+  const initially_fetched_responses = React.useRef(false);
 
   const fetchResponses = useCallback(async () => {
     // fetch the responses
@@ -62,30 +64,6 @@ function FormResponsesProvider({ children }: React.PropsWithChildren<{}>) {
 
     return data;
   }, [supabase, state.responses_pagination_rows, state.form_id]);
-
-  const fetchResponse = useCallback(
-    async (id: string) => {
-      const { data, error } = await supabase
-        .from("response")
-        .select(
-          `
-            *,
-            fields:response_field(*)
-          `
-        )
-        .eq("id", id)
-        .single();
-
-      if (error) {
-        throw new Error();
-      }
-
-      return data;
-    },
-    [supabase]
-  );
-
-  const initially_fetched_responses = React.useRef(false);
 
   useEffect(() => {
     // initially fetch the responses
@@ -109,6 +87,38 @@ function FormResponsesProvider({ children }: React.PropsWithChildren<{}>) {
       error: "Failed to fetch responses",
     });
   }, [dispatch, fetchResponses]);
+
+  return <>{children}</>;
+}
+
+export function FormResponsesProvider({
+  children,
+}: React.PropsWithChildren<{}>) {
+  const [state, dispatch] = useEditorState();
+
+  const supabase = useMemo(() => createClientClient(), []);
+
+  const fetchResponse = useCallback(
+    async (id: string) => {
+      const { data, error } = await supabase
+        .from("response")
+        .select(
+          `
+            *,
+            fields:response_field(*)
+          `
+        )
+        .eq("id", id)
+        .single();
+
+      if (error) {
+        throw new Error();
+      }
+
+      return data;
+    },
+    [supabase]
+  );
 
   useEffect(() => {
     const changes = supabase
@@ -183,8 +193,9 @@ function FieldEditPanelProvider({ children }: React.PropsWithChildren<{}>) {
         ...init,
         options: init.options?.length ? init.options : undefined,
         //
-        id: state.focus_field_id,
+        id: state.focus_field_id ?? undefined,
         form_id: state.form_id,
+        data: init.data,
       };
 
       console.log("saving..", data);
@@ -246,6 +257,10 @@ function FieldEditPanelProvider({ children }: React.PropsWithChildren<{}>) {
                 options: field.options,
                 required: field.required,
                 pattern: field.pattern,
+                autocomplete: field.autocomplete,
+                data: field.data,
+                accept: field.accept,
+                multiple: field.multiple ?? undefined,
               }
             : undefined
         }

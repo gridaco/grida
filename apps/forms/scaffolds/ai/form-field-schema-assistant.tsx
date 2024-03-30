@@ -52,14 +52,16 @@ export function FormFieldAssistant({
   };
 
   return (
-    <div className="w-full border rounded-lg p-4 shadow-sm bg-white">
+    <div className="w-full border dark:border-neutral-700 rounded-lg p-4 shadow-sm bg-white dark:bg-black">
       <div className="flex items-center mb-4">
         <LightningBoltIcon className="w-4 h-4 mr-2" />
-        <span className="font-semibold text-gray-800">Ask AI</span>
+        <span className="font-semibold text-neutral-800 dark:text-neutral-200">
+          Ask AI
+        </span>
       </div>
       <textarea
         autoFocus
-        className="w-full p-2 border-gray-300 focus:border-blue-500 focus:ring-blue-500 rounded-lg shadow-sm"
+        className="block p-2.5 w-full text-sm text-neutral-900 bg-neutral-50 rounded-lg border border-neutral-300 focus:ring-blue-500 focus:border-blue-500 dark:bg-neutral-700 dark:border-neutral-600 dark:placeholder-neutral-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500"
         value={description}
         placeholder="Describe the field..."
         onChange={(e) => setDescription(e.target.value)}
@@ -68,7 +70,7 @@ export function FormFieldAssistant({
         disabled={isLoading}
       />
       <button
-        className={`mt-3 w-full inline-flex justify-center items-center gap-2 rounded-md p-2 text-white ${isLoading ? "bg-gray-400" : "bg-blue-600 hover:bg-blue-700"} focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2`}
+        className={`mt-3 w-full inline-flex justify-center items-center gap-2 rounded-md p-2 text-white ${isLoading ? "bg-neutral-400" : "bg-blue-600 hover:bg-blue-700"} focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2`}
         onClick={assist}
         disabled={isLoading}
       >

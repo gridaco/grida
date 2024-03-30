@@ -15,14 +15,21 @@ export type Database = {
           custom_preview_url_path: string | null
           custom_publish_url_path: string | null
           default_form_page_id: string | null
+          default_form_page_language: Database["grida_forms"]["Enums"]["form_page_language"]
           description: string | null
           id: string
           is_edit_after_submission_allowed: boolean
+          is_max_form_responses_by_customer_enabled: boolean
+          is_max_form_responses_in_total_enabled: boolean
           is_multiple_response_allowed: boolean
-          is_unknown_field_allowed: boolean
+          is_powered_by_branding_enabled: boolean
+          is_redirect_after_response_uri_enabled: boolean
+          max_form_responses_by_customer: number | null
+          max_form_responses_in_total: number | null
           project_id: number
           redirect_after_response_uri: string | null
           title: string
+          unknown_field_handling_strategy: Database["grida_forms"]["Enums"]["form_response_unknown_field_handling_strategy_type"]
           updated_at: string
         }
         Insert: {
@@ -30,14 +37,21 @@ export type Database = {
           custom_preview_url_path?: string | null
           custom_publish_url_path?: string | null
           default_form_page_id?: string | null
+          default_form_page_language?: Database["grida_forms"]["Enums"]["form_page_language"]
           description?: string | null
           id?: string
           is_edit_after_submission_allowed?: boolean
+          is_max_form_responses_by_customer_enabled?: boolean
+          is_max_form_responses_in_total_enabled?: boolean
           is_multiple_response_allowed?: boolean
-          is_unknown_field_allowed?: boolean
+          is_powered_by_branding_enabled?: boolean
+          is_redirect_after_response_uri_enabled?: boolean
+          max_form_responses_by_customer?: number | null
+          max_form_responses_in_total?: number | null
           project_id: number
           redirect_after_response_uri?: string | null
           title?: string
+          unknown_field_handling_strategy?: Database["grida_forms"]["Enums"]["form_response_unknown_field_handling_strategy_type"]
           updated_at?: string
         }
         Update: {
@@ -45,14 +59,21 @@ export type Database = {
           custom_preview_url_path?: string | null
           custom_publish_url_path?: string | null
           default_form_page_id?: string | null
+          default_form_page_language?: Database["grida_forms"]["Enums"]["form_page_language"]
           description?: string | null
           id?: string
           is_edit_after_submission_allowed?: boolean
+          is_max_form_responses_by_customer_enabled?: boolean
+          is_max_form_responses_in_total_enabled?: boolean
           is_multiple_response_allowed?: boolean
-          is_unknown_field_allowed?: boolean
+          is_powered_by_branding_enabled?: boolean
+          is_redirect_after_response_uri_enabled?: boolean
+          max_form_responses_by_customer?: number | null
+          max_form_responses_in_total?: number | null
           project_id?: number
           redirect_after_response_uri?: string | null
           title?: string
+          unknown_field_handling_strategy?: Database["grida_forms"]["Enums"]["form_response_unknown_field_handling_strategy_type"]
           updated_at?: string
         }
         Relationships: [
@@ -200,9 +221,13 @@ export type Database = {
       }
       form_field: {
         Row: {
+          accept: string | null
           alt: string | null
-          autocomplete: boolean | null
+          autocomplete:
+            | Database["grida_forms"]["Enums"]["form_field_autocomplete_type"][]
+            | null
           created_at: string
+          data: Json | null
           description: string | null
           form_id: string
           help_text: string | null
@@ -212,6 +237,7 @@ export type Database = {
           maxlength: number | null
           min: Json | null
           minlength: number | null
+          multiple: boolean | null
           name: string
           pattern: Json | null
           placeholder: string | null
@@ -220,9 +246,13 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          accept?: string | null
           alt?: string | null
-          autocomplete?: boolean | null
+          autocomplete?:
+            | Database["grida_forms"]["Enums"]["form_field_autocomplete_type"][]
+            | null
           created_at?: string
+          data?: Json | null
           description?: string | null
           form_id: string
           help_text?: string | null
@@ -232,6 +262,7 @@ export type Database = {
           maxlength?: number | null
           min?: Json | null
           minlength?: number | null
+          multiple?: boolean | null
           name: string
           pattern?: Json | null
           placeholder?: string | null
@@ -240,9 +271,13 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          accept?: string | null
           alt?: string | null
-          autocomplete?: boolean | null
+          autocomplete?:
+            | Database["grida_forms"]["Enums"]["form_field_autocomplete_type"][]
+            | null
           created_at?: string
+          data?: Json | null
           description?: string | null
           form_id?: string
           help_text?: string | null
@@ -252,6 +287,7 @@ export type Database = {
           maxlength?: number | null
           min?: Json | null
           minlength?: number | null
+          multiple?: boolean | null
           name?: string
           pattern?: Json | null
           placeholder?: string | null
@@ -275,7 +311,8 @@ export type Database = {
           form_field_id: string
           form_id: string
           id: string
-          label: string | null
+          index: number
+          label: string
           value: string
         }
         Insert: {
@@ -283,7 +320,8 @@ export type Database = {
           form_field_id: string
           form_id: string
           id?: string
-          label?: string | null
+          index?: number
+          label?: string
           value: string
         }
         Update: {
@@ -291,7 +329,8 @@ export type Database = {
           form_field_id?: string
           form_id?: string
           id?: string
-          label?: string | null
+          index?: number
+          label?: string
           value?: string
         }
         Relationships: [
@@ -344,7 +383,7 @@ export type Database = {
         Row: {
           browser: string | null
           created_at: string
-          customer_uuid: string | null
+          customer_id: string | null
           form_id: string | null
           id: string
           ip: string | null
@@ -359,7 +398,7 @@ export type Database = {
         Insert: {
           browser?: string | null
           created_at?: string
-          customer_uuid?: string | null
+          customer_id?: string | null
           form_id?: string | null
           id?: string
           ip?: string | null
@@ -374,7 +413,7 @@ export type Database = {
         Update: {
           browser?: string | null
           created_at?: string
-          customer_uuid?: string | null
+          customer_id?: string | null
           form_id?: string | null
           id?: string
           ip?: string | null
@@ -389,10 +428,10 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "grida_forms_response_customer_uuid_fkey"
-            columns: ["customer_uuid"]
+            columns: ["customer_id"]
             isOneToOne: false
             referencedRelation: "customer"
-            referencedColumns: ["uuid"]
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "grida_forms_response_form_id_fkey"
@@ -407,6 +446,7 @@ export type Database = {
         Row: {
           created_at: string
           form_field_id: string
+          form_field_option_id: string | null
           form_id: string | null
           id: string
           response_id: string
@@ -417,6 +457,7 @@ export type Database = {
         Insert: {
           created_at?: string
           form_field_id: string
+          form_field_option_id?: string | null
           form_id?: string | null
           id?: string
           response_id: string
@@ -427,6 +468,7 @@ export type Database = {
         Update: {
           created_at?: string
           form_field_id?: string
+          form_field_option_id?: string | null
           form_id?: string | null
           id?: string
           response_id?: string
@@ -440,6 +482,13 @@ export type Database = {
             columns: ["form_field_id"]
             isOneToOne: false
             referencedRelation: "form_field"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "grida_forms_response_field_form_field_option_id_fkey"
+            columns: ["form_field_option_id"]
+            isOneToOne: false
+            referencedRelation: "form_field_option"
             referencedColumns: ["id"]
           },
           {
@@ -475,13 +524,72 @@ export type Database = {
         | "video"
         | "divider"
         | "header"
+        | "pdf"
+      form_field_autocomplete_type:
+        | "off"
+        | "on"
+        | "name"
+        | "honorific-prefix"
+        | "given-name"
+        | "additional-name"
+        | "family-name"
+        | "honorific-suffix"
+        | "nickname"
+        | "email"
+        | "username"
+        | "new-password"
+        | "current-password"
+        | "one-time-code"
+        | "organization-title"
+        | "organization"
+        | "street-address"
+        | "shipping"
+        | "billing"
+        | "address-line1"
+        | "address-line2"
+        | "address-line3"
+        | "address-level4"
+        | "address-level3"
+        | "address-level2"
+        | "address-level1"
+        | "country"
+        | "country-name"
+        | "postal-code"
+        | "cc-name"
+        | "cc-given-name"
+        | "cc-additional-name"
+        | "cc-family-name"
+        | "cc-number"
+        | "cc-exp"
+        | "cc-exp-month"
+        | "cc-exp-year"
+        | "cc-csc"
+        | "cc-type"
+        | "transaction-currency"
+        | "transaction-amount"
+        | "language"
+        | "bday"
+        | "bday-day"
+        | "bday-month"
+        | "bday-year"
+        | "sex"
+        | "tel"
+        | "tel-country-code"
+        | "tel-national"
+        | "tel-area-code"
+        | "tel-local"
+        | "tel-extension"
+        | "impp"
+        | "url"
+        | "photo"
+        | "webauthn"
       form_field_type:
         | "text"
         | "textarea"
         | "tel"
         | "url"
         | "checkbox"
-        | "number"
+        | "checkboxes"
         | "date"
         | "month"
         | "week"
@@ -496,6 +604,13 @@ export type Database = {
         | "country"
         | "payment"
         | "hidden"
+        | "signature"
+        | "number"
+      form_page_language: "en" | "ko"
+      form_response_unknown_field_handling_strategy_type:
+        | "ignore"
+        | "accept"
+        | "reject"
       response_platform_powered_by: "api" | "grida_forms" | "web_client"
     }
     CompositeTypes: {
@@ -509,28 +624,25 @@ export type Database = {
           _fp_fingerprintjs_visitorid: string | null
           created_at: string
           email: string | null
-          id: number
+          id: string
           last_seen_at: string
           project_id: number
-          uuid: string
         }
         Insert: {
           _fp_fingerprintjs_visitorid?: string | null
           created_at?: string
           email?: string | null
-          id?: number
+          id?: string
           last_seen_at?: string
           project_id: number
-          uuid?: string
         }
         Update: {
           _fp_fingerprintjs_visitorid?: string | null
           created_at?: string
           email?: string | null
-          id?: number
+          id?: string
           last_seen_at?: string
           project_id?: number
-          uuid?: string
         }
         Relationships: [
           {

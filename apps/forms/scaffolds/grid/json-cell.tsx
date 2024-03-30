@@ -26,7 +26,7 @@ export function JsonEditCell({ column, row }: RenderEditCellProps<any>) {
       </Popover.Trigger>
       <Popover.PopoverPortal>
         <Popover.Content side="bottom" align="start" sideOffset={-35} asChild>
-          <div className="bg-white border border-gray-200 rounded shadow-lg overflow-hidden">
+          <div className="bg-white border border-neutral-200 rounded shadow-lg overflow-hidden">
             <BlockKeys
               value={value}
               onEscape={cancelChanges}
@@ -56,7 +56,7 @@ export function JsonEditCell({ column, row }: RenderEditCellProps<any>) {
                 }}
               />
             </BlockKeys>
-            <footer className="flex justify-between p-2 border-t border-gray-200">
+            <footer className="flex justify-between p-2 border-t border-neutral-200">
               <button onClick={cancelChanges}>Cancel</button>
               <button>Save</button>
             </footer>

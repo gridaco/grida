@@ -1,5 +1,6 @@
 import { client, workspaceclient } from "@/lib/supabase/server";
 import { NextRequest, NextResponse } from "next/server";
+import { validate, version } from "uuid";
 
 const SYSTEM_GF_KEY_STARTS_WITH = "__gf_";
 
@@ -94,8 +95,11 @@ async function submit({
     return NextResponse.json({ error: "Form not found" }, { status: 404 });
   }
 
-  const { is_unknown_field_allowed, redirect_after_response_uri } =
-    form_reference;
+  const {
+    unknown_field_handling_strategy,
+    is_redirect_after_response_uri_enabled,
+    redirect_after_response_uri,
+  } = form_reference;
 
   const entries = data.entries();
   const __keys = Array.from(data.keys());
@@ -124,26 +128,10 @@ async function submit({
     .select()
     .single();
 
-  // create new form response
-  const { data: response_reference_obj } = await client
-    .from("response")
-    .insert({
-      raw: JSON.stringify(Object.fromEntries(entries)),
-      form_id: form_id,
-      browser: meta.browser,
-      ip: meta.ip,
-      customer_uuid: customer?.uuid,
-      x_referer: meta.referer,
-      x_useragent: meta.useragent,
-      platform_powered_by: "web_client",
-    })
-    .select("id")
-    .single();
-
   // get the fields ready
   const { data: form_fields } = await client
     .from("form_field")
-    .select("*")
+    .select("*, options:form_field_option(*)")
     .eq("form_id", form_id);
 
   // group by existing and new fields
@@ -159,7 +147,10 @@ async function submit({
   let needs_to_be_created: string[] | null = null;
 
   // create new fields by preference
-  if (!is_unknown_field_allowed && unknown_names.length > 0) {
+  if (
+    unknown_field_handling_strategy === "ignore" &&
+    unknown_names.length > 0
+  ) {
     // ignore new fields
     ignored_names.push(...unknown_names);
     // add only existing fields to mapping
@@ -169,11 +160,30 @@ async function submit({
     target_names.push(...known_names);
     target_names.push(...unknown_names);
 
-    needs_to_be_created = [...unknown_names];
+    if (unknown_field_handling_strategy === "accept") {
+      needs_to_be_created = [...unknown_names];
+    } else if (unknown_field_handling_strategy === "reject") {
+      if (unknown_names.length > 0) {
+        // reject all fields
+        return NextResponse.json(
+          {
+            error: "Unknown fields are not allowed",
+            info: {
+              message:
+                "To allow unknown fields, set 'unknown_field_handling_strategy' to 'ignore' or 'accept' in the form settings.",
+              data: { keys: unknown_names },
+            },
+          },
+          {
+            status: 400,
+          }
+        );
+      }
+    }
   }
 
-  // create new fields
   if (needs_to_be_created) {
+    // create new fields
     const { data: new_fields } = await client
       .from("form_field")
       .insert(
@@ -186,21 +196,57 @@ async function submit({
       )
       .select("*");
 
-    // extend form_fields with new fields
-    form_fields!.push(...new_fields!);
+    // extend form_fields with new fields (match the type)
+    form_fields!.push(...new_fields?.map((f) => ({ ...f, options: [] }))!);
   }
+
+  // create new form response
+  const { data: response_reference_obj } = await client
+    .from("response")
+    .insert({
+      raw: JSON.stringify(Object.fromEntries(entries)),
+      form_id: form_id,
+      browser: meta.browser,
+      ip: meta.ip,
+      customer_id: customer?.id,
+      x_referer: meta.referer,
+      x_useragent: meta.useragent,
+      platform_powered_by: "web_client",
+    })
+    .select("id")
+    .single();
 
   // save each field value
   const { data: response_fields } = await client
     .from("response_field")
     .insert(
-      form_fields!.map((field) => ({
-        type: field.type,
-        response_id: response_reference_obj!.id,
-        form_field_id: field.id,
-        form_id: form_id,
-        value: JSON.stringify(data.get(field.name)),
-      }))
+      form_fields!.map((field) => {
+        const { name, options } = field;
+
+        // the field's value can be a input value or a reference to form_field_option
+        const value_or_reference = data.get(name);
+
+        // check if the value is a reference to form_field_option
+        const is_value_fkey_and_found =
+          is_uuid_v4(value_or_reference as string) &&
+          options?.find((o: any) => o.id === value_or_reference);
+
+        // locate the value
+        const value = is_value_fkey_and_found
+          ? is_value_fkey_and_found.value
+          : value_or_reference;
+
+        return {
+          type: field.type,
+          response_id: response_reference_obj!.id,
+          form_field_id: field.id,
+          form_id: form_id,
+          value: JSON.stringify(value),
+          form_field_option_id: is_value_fkey_and_found
+            ? is_value_fkey_and_found.id
+            : null,
+        };
+      })
     )
     .select();
 
@@ -229,7 +275,7 @@ async function submit({
   if (needs_to_be_created?.length) {
     info.new_keys = {
       message:
-        "There were new unknown fields in the request and the definitions are created automatically. To disable them, set is_unknown_field_allowed to false in the form settings.",
+        "There were new unknown fields in the request and the definitions are created automatically. To disable them, set 'unknown_field_handling_strategy' to 'ignore' or 'reject' in the form settings.",
       data: {
         keys: needs_to_be_created,
         fields: form_fields!.filter((field: any) =>
@@ -246,12 +292,12 @@ async function submit({
   if (ignored_names.length > 0) {
     warning.ignored_keys = {
       message:
-        "There were unknown fields in the request. To allow them, set is_unknown_field_allowed to true in the form settings.",
+        "There were unknown fields in the request. To allow them, set 'unknown_field_handling_strategy' to 'accept' in the form settings.",
       data: { keys: ignored_names },
     };
   }
 
-  if (redirect_after_response_uri) {
+  if (is_redirect_after_response_uri_enabled && redirect_after_response_uri) {
     return NextResponse.redirect(redirect_after_response_uri, {
       status: 301,
     });
@@ -264,4 +310,8 @@ async function submit({
     info: Object.keys(info).length > 0 ? info : null,
     error: null,
   });
+}
+
+function is_uuid_v4(value: string) {
+  return validate(value) && version(value) === 4;
 }

@@ -1,9 +1,10 @@
 import { blockstree } from "@/lib/forms/tree";
 import { FormBlockTree } from "@/lib/forms/types";
-import { client, createRouteHandlerClient } from "@/lib/supabase/server";
+import { client } from "@/lib/supabase/server";
 import {
   FormBlock,
   FormBlockType,
+  FormFieldDataSchema,
   FormFieldDefinition,
   FormFieldType,
   FormPage,
@@ -17,6 +18,10 @@ export interface FormClientFetchResponse {
   tree: FormBlockTree<ClientRenderBlock[]>;
   blocks: ClientRenderBlock[];
   fields: FormFieldDefinition[];
+  lang: string;
+  options: {
+    is_powered_by_branding_enabled: boolean;
+  };
 }
 
 export type ClientRenderBlock =
@@ -26,7 +31,8 @@ export type ClientRenderBlock =
   | ClientImageRenderBlock
   | ClientVideoRenderBlock
   | ClientDividerRenderBlock
-  | ClientHeaderRenderBlock;
+  | ClientHeaderRenderBlock
+  | ClientPdfRenderBlock;
 
 interface BaseRenderBlock {
   id: string;
@@ -54,12 +60,20 @@ interface ClientFieldRenderBlock extends BaseRenderBlock {
       id: string;
       label?: string;
       value: string;
+      index: number;
     }[];
+    autocomplete?: string;
+    data?: FormFieldDataSchema | null;
+    accept?: string;
+    multiple?: boolean;
   };
 }
-interface ClientSectionRenderBlock extends BaseRenderBlock {
+export interface ClientSectionRenderBlock extends BaseRenderBlock {
   type: "section";
   children?: ClientRenderBlock[];
+  attributes?: {
+    contains_payment: boolean;
+  };
 }
 
 interface ClientHtmlRenderBlock extends BaseRenderBlock {
@@ -74,6 +88,11 @@ interface ClientImageRenderBlock extends BaseRenderBlock {
 interface ClientVideoRenderBlock extends BaseRenderBlock {
   type: "video";
   src: string;
+}
+
+interface ClientPdfRenderBlock extends BaseRenderBlock {
+  type: "pdf";
+  data: string;
 }
 
 interface ClientDividerRenderBlock extends BaseRenderBlock {
@@ -125,7 +144,13 @@ export async function GET(
     return notFound();
   }
 
-  const { title, default_page, fields } = data;
+  const {
+    title,
+    default_page,
+    fields,
+    is_powered_by_branding_enabled,
+    default_form_page_language,
+  } = data;
 
   const page_blocks = (data.default_page as unknown as FormPage).blocks;
 
@@ -145,7 +170,13 @@ export async function GET(
         return <ClientFieldRenderBlock>{
           id: block.id,
           type: "field",
-          field: field,
+          field: {
+            ...field,
+            options: field.options.sort((a, b) => a.index - b.index),
+            required: field.required ?? undefined,
+            multiple: field.multiple ?? undefined,
+            autocomplete: field.autocomplete?.join(" ") ?? null,
+          },
           local_index: block.local_index,
           parent_id: block.parent_id,
         };
@@ -179,6 +210,36 @@ export async function GET(
             src: block.src,
             local_index: block.local_index,
             parent_id: block.parent_id,
+          };
+        }
+        case "pdf": {
+          return <ClientPdfRenderBlock>{
+            id: block.id,
+            type: "pdf",
+            // for pdf, as the standard is <object> we use data instead of src
+            data: block.src,
+            local_index: block.local_index,
+            parent_id: block.parent_id,
+          };
+        }
+        case "section": {
+          const children_ids = page_blocks.filter(
+            (b) => b.parent_id === block.id
+          );
+
+          const contains_payment = children_ids.some(
+            (b) =>
+              b.type === "field" &&
+              fields.find((f) => f.id === b.form_field_id)?.type === "payment"
+          );
+
+          return <ClientSectionRenderBlock>{
+            id: block.id,
+            type: "section",
+            local_index: block.local_index,
+            attributes: {
+              contains_payment,
+            },
           };
         }
         case "divider":
@@ -218,6 +279,10 @@ export async function GET(
     tree: tree,
     blocks: render_blocks,
     fields: fields,
+    lang: default_form_page_language,
+    options: {
+      is_powered_by_branding_enabled,
+    },
   };
 
   return NextResponse.json({

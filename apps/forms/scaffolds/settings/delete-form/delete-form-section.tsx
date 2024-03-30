@@ -25,7 +25,7 @@ export function DeleteFormSection() {
         </p>
         <AlertDialog>
           <AlertDialogTrigger asChild>
-            <button className="focus:outline-none text-red-700 bg-red-100 hover:bg-red-200 focus:ring-4 focus:ring-red-300 font-medium rounded-lg text-sm px-5 py-2.5 me-2 mb-2 dark:bg-red-600 dark:hover:bg-red-700 dark:focus:ring-red-900">
+            <button className="focus:outline-none text-red-700 bg-red-100 hover:bg-red-200 focus:ring-4 focus:ring-red-300 font-medium rounded-lg text-sm px-5 py-2.5 me-2 mb-2 dark:bg-red-600 dark:hover:bg-red-700 dark:focus:ring-red-900 w-fit">
               Delete Form
             </button>
           </AlertDialogTrigger>
@@ -47,13 +47,13 @@ export function DeleteFormSection() {
               <label className="flex flex-col gap-2">
                 <span className="opacity-80">
                   Type{" "}
-                  <code className="bg-gray-100 p-1 rounded-md text-sm font-mono">
+                  <code className="bg-neutral-100 p-1 rounded-md text-sm font-mono">
                     {confirmationText}
                   </code>{" "}
                   to delete this form
                 </span>
                 <input
-                  className="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500"
+                  className="bg-neutral-50 border border-neutral-300 text-neutral-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-neutral-700 dark:border-neutral-600 dark:placeholder-neutral-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500"
                   required
                   autoCorrect="off"
                   autoCapitalize="off"
