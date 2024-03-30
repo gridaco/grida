@@ -4,7 +4,14 @@ import Link from "next/link";
 import Image from "next/image";
 import PricingComparisonTable from "@/www/pricing/pricing-comparison-table";
 import { PricingCard } from "@/www/pricing/pricing-card";
-import { AccountTreeIcon, ApiIcon } from "@/www/icons";
+import {
+  AccountTreeIcon,
+  ApiIcon,
+  DashBoardCustomizeIcon,
+  SmartToyIcon,
+  AnalysisIcon,
+  VisualStudioIcon,
+} from "@/www/icons";
 
 export default function Home() {
   return (
@@ -49,42 +56,42 @@ export default function Home() {
           <div className="mt-20">
             <div className="columns-3 grid-rows-2 space-y-8">
               <FeatureCard
-                icon={<AccountTreeIcon />}
+                icon={<SmartToyIcon />}
                 title={"Smart Customer Identity"}
                 excerpt={
                   "Optimize user experience with customizable Smart Customer Identity in your forms."
                 }
               />
               <FeatureCard
-                icon={<ApiIcon />}
+                icon={<AccountTreeIcon />}
                 title={"Connect Customer Identity"}
                 excerpt={
                   "Align your forms with your customers' identity, fostering a personalized and trustworthy interaction."
                 }
               />
               <FeatureCard
-                icon={<></>}
+                icon={<VisualStudioIcon />}
                 title={"Visual Editor"}
                 excerpt={
                   "Visual Editor allows users to intuitively customize visuals, ensuring their forms match their unique style."
                 }
               />
               <FeatureCard
-                icon={<></>}
+                icon={<AnalysisIcon />}
                 title={"Advanced Analytics"}
                 excerpt={
                   "Advanced Analytics provides detailed insights to optimize your form strategy."
                 }
               />
               <FeatureCard
-                icon={<></>}
+                icon={<DashBoardCustomizeIcon />}
                 title={"Custom branding & form page"}
                 excerpt={
                   "Customize your form pages with branding elements to align seamlessly with your brand identity."
                 }
               />
               <FeatureCard
-                icon={<></>}
+                icon={<ApiIcon />}
                 title={"API access"}
                 excerpt={
                   "API access allows for streamlined integration and enhanced form functionality."
