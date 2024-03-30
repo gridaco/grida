@@ -1,4 +1,5 @@
 import { CheckIcon } from "@radix-ui/react-icons";
+import clsx from "clsx";
 import React from "react";
 
 interface PricingCardFeatureItem {
@@ -10,7 +11,7 @@ export function PricingCard({
   plan,
   price,
   excerpt,
-  inverted,
+  highlight: highlight,
   features = [],
   action,
 }: {
@@ -21,17 +22,17 @@ export function PricingCard({
     secondary?: string;
   };
   excerpt: string;
-  inverted?: boolean;
+  highlight?: boolean;
   features?: PricingCardFeatureItem[];
   action?: React.ReactNode;
 }) {
   return (
     <div
-      data-inverted={inverted}
+      data-highlight={highlight}
       className="
       bg-neutral-50 dark:bg-neutral-900
         flex-1 flex flex-col p-7 border border-neutral-500/10 dark:border-neutral-500/50 gap-8 rounded-lg
-        data-[inverted='true']:invert
+        data-[highlight='true']:bg-neutral-100 data-[highlight='true']:dark:bg-neutral-100 data-[highlight='true']:dark:text-black
         hover:scale-[1.02]
         transition-all
         "
@@ -59,14 +60,22 @@ export function PricingCard({
   );
 }
 
-export function PricingCardButton({ children }: React.PropsWithChildren<{}>) {
+export function PricingCardButton({
+  children,
+  inverted,
+}: React.PropsWithChildren<{
+  inverted?: boolean;
+}>) {
   return (
     <button
-      className="
-          text-lg font-medium px-5 py-3 rounded text-white bg-neutral-800
+      className={clsx(
+        `
+          text-lg font-medium px-5 py-3 rounded text-black dark:text-white bg-neutral-200 dark:bg-neutral-800
           hover:invert
           transition-all
-        "
+        `,
+        inverted && "invert"
+      )}
     >
       {children}
     </button>

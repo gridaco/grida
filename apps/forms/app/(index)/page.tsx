@@ -43,8 +43,8 @@ export default function Home() {
           height="100vh"
         />
       </section>
-      <div className="p-24">
-        <div className="h-64" />
+      <div className="container mx-auto px-4">
+        <div className="h-16 sm:h-32 lg:h-64" />
         <section>
           <div>
             <h2 className="text-4xl font-semibold text-center py-20">
@@ -180,8 +180,10 @@ export default function Home() {
                 },
               ]}
               excerpt="Get start Grida forms for Pro"
-              inverted
-              action={<PricingCardButton>Get Started</PricingCardButton>}
+              highlight
+              action={
+                <PricingCardButton inverted>Get Started</PricingCardButton>
+              }
             />
             <PricingCard
               plan={"Business"}
@@ -347,7 +349,7 @@ function FeatureCard({
 
 async function Header() {
   return (
-    <header className="absolute top-0 left-0 right-0 py-14 px-24 flex justify-between items-center z-50">
+    <header className="absolute top-0 left-0 right-0 py-4 px-4 md:py-14 md:px-24 flex justify-between items-center z-50">
       <div className="flex">
         <span className="flex items-center gap-2">
           <Link href="https://grida.co" target="_blank">
@@ -367,7 +369,7 @@ async function Header() {
             <GitHubLogoIcon className="fill-black" width={24} height={24} />
           </button>
         </Link>
-        <Link href="/sign-in">
+        <Link href="/sign-in" className="hidden md:block">
           <button>Sign in</button>
         </Link>
         <Link href="/sign-in">
