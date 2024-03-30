@@ -6,7 +6,7 @@ type Pricing = {
   commingsoon: PricingCategory;
 };
 
-type PricingCategory = {
+export type PricingCategory = {
   title: string;
   features: PricingFeature[];
 };
