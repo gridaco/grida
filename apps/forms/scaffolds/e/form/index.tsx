@@ -308,7 +308,8 @@ export function Form({
           sticky md:static bottom-0
           flex gap-2 justify-end md:justify-start
           bg-white dark:bg-neutral-900
-          p-4 mt-4 pt-4 border-t
+          p-4 mt-4 pt-4
+          border-t border-neutral-200 dark:border-neutral-800
         "
         >
           <button
@@ -364,7 +365,7 @@ export function Form({
 }
 
 function GroupLayout({ children }: React.PropsWithChildren<{}>) {
-  return <div className="flex flex-col gap-8">{children}</div>;
+  return <div className="flex flex-col gap-16">{children}</div>;
 }
 
 function FingerprintField() {

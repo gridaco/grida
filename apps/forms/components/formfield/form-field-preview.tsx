@@ -222,7 +222,7 @@ export function FormFieldPreview({
   const LabelText = () => (
     <span
       data-capitalize={labelCapitalize}
-      className="data-[capitalize]:capitalize"
+      className="data-[capitalize]:capitalize font-medium text-neutral-900 dark:text-neutral-300 text-sm"
     >
       {label || name}
     </span>
@@ -230,7 +230,9 @@ export function FormFieldPreview({
 
   const HelpText = () =>
     helpText ? (
-      <span className="text-sm text-neutral-600">{helpText}</span>
+      <span className="text-sm text-neutral-400 dark:text-neutral-600">
+        {helpText}
+      </span>
     ) : (
       <></>
     );
