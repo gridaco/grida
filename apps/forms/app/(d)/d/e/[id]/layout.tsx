@@ -5,6 +5,7 @@ import { Metadata } from "next";
 import { Inter } from "next/font/google";
 import i18next from "i18next";
 import resources from "@/k/i18n";
+import { FormPage, FormPageBackgroundSchema } from "@/types";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -52,7 +53,14 @@ export default async function Layout({
 
   const { data, error } = await client
     .from("form")
-    .select()
+    .select(
+      `
+        *,
+        default_page:form_page!default_form_page_id(
+          *
+        )
+      `
+    )
     .eq("id", id)
     .single();
 
@@ -60,7 +68,7 @@ export default async function Layout({
     return notFound();
   }
 
-  const { default_form_page_language } = data;
+  const { default_form_page_language, default_page } = data;
 
   i18next.init({
     lng: default_form_page_language,
@@ -68,25 +76,43 @@ export default async function Layout({
     resources: resources,
   });
 
+  const { background } = default_page as any as FormPage;
+
   return (
     <html lang={default_form_page_language}>
       <body className={inter.className}>
         {children}
-        <CustomBackground />
+        {background && (
+          <FormPageBackground {...(background as FormPageBackgroundSchema)} />
+        )}
       </body>
     </html>
   );
 }
 
-function CustomBackground() {
+function FormPageBackground({ element, src }: FormPageBackgroundSchema) {
+  const renderBackground = () => {
+    switch (element) {
+      case "iframe":
+        return <FormPageBackgroundIframe src={src!} />;
+      default:
+        return <></>;
+    }
+  };
+
   return (
-    <div className="fixed select-none inset-0 -z-10">
-      <iframe
-        className="absolute inset-0 w-screen h-screen -z-10"
-        src="https://forms.grida.co/wwwembeddings/aurora"
-        width="100vw"
-        height="100vh"
-      />
-    </div>
+    <div className="fixed select-none inset-0 -z-10">{renderBackground()}</div>
+  );
+}
+
+function FormPageBackgroundIframe({ src }: { src: string }) {
+  return (
+    <iframe
+      allowTransparency
+      className="absolute inset-0 w-screen h-screen -z-10 bg-transparent"
+      src={src}
+      width="100vw"
+      height="100vh"
+    />
   );
 }

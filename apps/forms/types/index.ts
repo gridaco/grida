@@ -176,6 +176,7 @@ export interface FormPage {
   form_id: string;
   name: string;
   blocks: FormBlock[];
+  background?: FormPageBackgroundSchema;
 }
 
 export interface FormBlock<T = FormBlockType> {
@@ -240,4 +241,19 @@ export type PaymentsServiceProviders = "stripe" | "tosspayments";
 export interface PaymentFieldData {
   type: "payment";
   service_provider: PaymentsServiceProviders;
+}
+
+export type FormPageBackgroundSchema = FormPageThemeEmbeddedBackgroundData;
+
+interface FormPageThemeEmbeddedBackgroundData {
+  type: "background";
+  element: "iframe" | "img" | "div";
+  /**
+   * allowed for iframe, img
+   */
+  src?: string;
+  /**
+   * allowed for all
+   */
+  "background-color"?: string;
 }

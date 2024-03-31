@@ -352,18 +352,21 @@ export type Database = {
       }
       form_page: {
         Row: {
+          background: Json | null
           created_at: string
           form_id: string
           id: string
           name: string
         }
         Insert: {
+          background?: Json | null
           created_at?: string
           form_id: string
           id?: string
           name?: string
         }
         Update: {
+          background?: Json | null
           created_at?: string
           form_id?: string
           id?: string
