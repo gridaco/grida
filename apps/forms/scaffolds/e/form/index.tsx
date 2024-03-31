@@ -278,7 +278,8 @@ export function Form({
       className={clsx(
         "h-screen md:h-auto min-h-screen",
         "relative container mx-auto prose dark:prose-invert",
-        "data-[cjk='true']:break-keep"
+        "data-[cjk='true']:break-keep",
+        "flex flex-col"
       )}
     >
       <TossPaymentsCheckoutProvider initial={checkoutSession}>
@@ -302,12 +303,18 @@ export function Form({
         >
           <FingerprintField />
           <GroupLayout>{tree.children.map((b) => renderBlock(b))}</GroupLayout>
+          {options.is_powered_by_branding_enabled && (
+            // desktop branding
+            <div className="block md:hidden">
+              <PoweredByGridaFooter />
+            </div>
+          )}
         </form>
         <footer
           className="
           sticky md:static bottom-0
           flex gap-2 justify-end md:justify-start
-          bg-white dark:bg-neutral-900
+          bg-white md:bg-transparent dark:bg-neutral-900
           p-4 mt-4 pt-4
           border-t border-neutral-200 dark:border-neutral-800
         "
@@ -359,13 +366,18 @@ export function Form({
           </TossPaymentsPayButton>
         </footer>
       </TossPaymentsCheckoutProvider>
-      {options.is_powered_by_branding_enabled && <PoweredByGridaFooter />}
+      {options.is_powered_by_branding_enabled && (
+        // desktop branding
+        <div className="hidden md:block">
+          <PoweredByGridaFooter />
+        </div>
+      )}
     </main>
   );
 }
 
 function GroupLayout({ children }: React.PropsWithChildren<{}>) {
-  return <div className="flex flex-col gap-16">{children}</div>;
+  return <div className="flex flex-col gap-8">{children}</div>;
 }
 
 function FingerprintField() {

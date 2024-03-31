@@ -70,7 +70,23 @@ export default async function Layout({
 
   return (
     <html lang={default_form_page_language}>
-      <body className={inter.className}>{children}</body>
+      <body className={inter.className}>
+        {children}
+        <CustomBackground />
+      </body>
     </html>
+  );
+}
+
+function CustomBackground() {
+  return (
+    <div className="fixed select-none inset-0 -z-10">
+      <iframe
+        className="absolute inset-0 w-screen h-screen -z-10"
+        src="https://forms.grida.co/wwwembeddings/aurora"
+        width="100vw"
+        height="100vh"
+      />
+    </div>
   );
 }
