@@ -22,12 +22,12 @@ const resources: Record<
       pay: "Pagar",
     },
   },
-  de: {
+  ko: {
     translation: {
-      next: "Weiter",
-      back: "Zurück",
-      submit: "Einreichen",
-      pay: "Bezahlen",
+      next: "다음",
+      back: "이전",
+      submit: "제출",
+      pay: "결제",
     },
   },
   ja: {
@@ -36,6 +36,14 @@ const resources: Record<
       back: "戻る",
       submit: "提出する",
       pay: "支払う",
+    },
+  },
+  zh: {
+    translation: {
+      next: "下一步",
+      back: "上一步",
+      submit: "提交",
+      pay: "支付",
     },
   },
   fr: {
@@ -62,12 +70,12 @@ const resources: Record<
       pay: "Paga",
     },
   },
-  ko: {
+  de: {
     translation: {
-      next: "다음",
-      back: "이전",
-      submit: "제출",
-      pay: "결제",
+      next: "Weiter",
+      back: "Zurück",
+      submit: "Einreichen",
+      pay: "Bezahlen",
     },
   },
   ru: {
@@ -76,14 +84,6 @@ const resources: Record<
       back: "Назад",
       submit: "Отправить",
       pay: "Оплатить",
-    },
-  },
-  zh: {
-    translation: {
-      next: "下一步",
-      back: "上一步",
-      submit: "提交",
-      pay: "支付",
     },
   },
   ar: {
