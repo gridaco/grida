@@ -326,7 +326,7 @@ export function Form({
           className="
           sticky md:static bottom-0
           flex gap-2 justify-end md:justify-start
-          bg-white md:bg-transparent dark:bg-neutral-900
+          bg-white md:bg-transparent dark:bg-neutral-900 md:dark:bg-transparent
           p-4 mt-4 pt-4
           border-t border-neutral-200 dark:border-neutral-800
         "
