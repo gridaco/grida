@@ -3,7 +3,7 @@ import React from "react";
 import dynamic from "next/dynamic";
 
 const World = dynamic(
-  () => import("../../../../theme/backgrounds/globe").then((m) => m.World),
+  () => import("../../../../../theme/backgrounds/globe").then((m) => m.World),
   {
     ssr: false,
   }
