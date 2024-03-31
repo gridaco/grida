@@ -13,6 +13,8 @@ export async function POST(req: NextRequest) {
 
   const { form_id } = init;
 
+  console.log("POST /private/editor/fields", init);
+
   const supabase = createRouteHandlerClient(cookieStore);
 
   const { data: upserted, error } = await supabase
@@ -91,6 +93,7 @@ export async function POST(req: NextRequest) {
 
     if (error) {
       console.error("error while upserting field options", error);
+      console.info("failed options payload", init.options);
       if (operation === "create") {
         // revert field if options failed
         await supabase.from("form_field").delete().eq("id", upserted.id);
@@ -101,7 +104,7 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  if (deleting_option_ids) {
+  if (deleting_option_ids?.length) {
     console.log("removing_option_ids", deleting_option_ids);
     await supabase
       .from("form_field_option")

@@ -405,7 +405,11 @@ export function FieldEditPanel({
                   ]);
                 }}
                 onChange={(id, option) => {
-                  setOptions(options.map((_) => (_.id === id ? option : _)));
+                  setOptions(
+                    options.map((_option: Option) =>
+                      _option.id && _option.id === id ? option : _option
+                    )
+                  );
                 }}
                 onRemove={(id) => {
                   setOptions(options.filter((_) => _.id !== id));
@@ -441,7 +445,7 @@ export function FieldEditPanel({
                     ) : (
                       <>
                         The placeholder text that will be displayed in the input
-                        when it's empty.
+                        when it&apos;s empty.
                       </>
                     )}
                   </>
