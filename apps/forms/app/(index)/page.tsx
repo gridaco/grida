@@ -12,7 +12,7 @@ import {
   AnalysisIcon,
   VisualStudioIcon,
 } from "@/www/icons";
-import { AuroraBackground } from "@/www/aurora";
+import { AuroraBackground } from "@/theme/backgrounds/aurora";
 import { plans } from "@/www/data/plans";
 
 export default function Home() {

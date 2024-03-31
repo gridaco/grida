@@ -5,6 +5,7 @@ import { Metadata } from "next";
 import { Inter } from "next/font/google";
 import i18next from "i18next";
 import resources from "@/k/i18n";
+import { FormPage } from "@/types";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -52,7 +53,14 @@ export default async function Layout({
 
   const { data, error } = await client
     .from("form")
-    .select()
+    .select(
+      `
+        *,
+        default_page:form_page!default_form_page_id(
+          *
+        )
+      `
+    )
     .eq("id", id)
     .single();
 
@@ -60,13 +68,15 @@ export default async function Layout({
     return notFound();
   }
 
-  const { default_form_page_language } = data;
+  const { default_form_page_language, default_page } = data;
 
   i18next.init({
     lng: default_form_page_language,
     debug: false, //!IS_PRODUTION,
     resources: resources,
   });
+
+  const { background } = default_page as any as FormPage;
 
   return (
     <html lang={default_form_page_language}>

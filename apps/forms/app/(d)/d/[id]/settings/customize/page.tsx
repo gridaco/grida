@@ -16,6 +16,9 @@ import {
 } from "@/components/preferences";
 import { notFound } from "next/navigation";
 import { CustomPoweredByBrandingPreferences } from "@/scaffolds/settings/custom-powered-by-branding-preferences";
+import { CustomSectionStylePreferences } from "@/scaffolds/settings/custom-section-style-preferences";
+import { CustomPageBackgroundPreferences } from "@/scaffolds/settings/custom-page-background-preferences";
+import { FormPage } from "@/types";
 
 export default async function FormsCustomizeSettingsPage({
   params,
@@ -28,9 +31,16 @@ export default async function FormsCustomizeSettingsPage({
 
   const supabase = createServerComponentClient(cookieStore);
 
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from("form")
-    .select()
+    .select(
+      `
+        *,
+        default_page:form_page!default_form_page_id(
+          *
+        )
+      `
+    )
     .eq("id", form_id)
     .single();
 
@@ -47,7 +57,10 @@ export default async function FormsCustomizeSettingsPage({
     is_max_form_responses_by_customer_enabled,
     max_form_responses_in_total,
     is_max_form_responses_in_total_enabled,
+    default_page,
   } = data!;
+
+  const { background, stylesheet } = default_page as any as FormPage;
 
   return (
     <main className="max-w-2xl mx-auto">
@@ -115,6 +128,29 @@ export default async function FormsCustomizeSettingsPage({
             is_powered_by_branding_enabled,
           }}
         />
+      </Sector>
+      <Sector>
+        <SectorHeader>
+          <SectorHeading>Theme</SectorHeading>
+          <SectorDescription>
+            Customize Page Themes (only available trhough built-in pages)
+          </SectorDescription>
+        </SectorHeader>
+        <SectorBlocks>
+          <CustomPageBackgroundPreferences
+            form_id={form_id}
+            init={{
+              background,
+            }}
+          />
+          <CustomSectionStylePreferences
+            form_id={form_id}
+            init={{
+              background,
+              stylesheet,
+            }}
+          />
+        </SectorBlocks>
       </Sector>
     </main>
   );

@@ -40,6 +40,7 @@ export function Form({
   translations,
   options,
   lang,
+  stylesheet,
 }: {
   form_id: string;
   title: string;
@@ -56,6 +57,7 @@ export function Form({
   options: {
     is_powered_by_branding_enabled: boolean;
   };
+  stylesheet?: any;
 }) {
   const [checkoutSession, setCheckoutSession] =
     useState<PaymentCheckoutSession | null>(null);
@@ -118,6 +120,9 @@ export function Form({
       (section) => section.id === current_section_id
     );
     set_current_section_id(sections[index - 1].id);
+
+    // scroll to top
+    window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
   const onNext = (e?: React.MouseEvent<HTMLButtonElement>) => {
@@ -133,6 +138,9 @@ export function Form({
       (section) => section.id === current_section_id
     );
     set_current_section_id(sections[index + 1].id);
+
+    // scroll to top
+    window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
   const renderBlock = (
@@ -153,7 +161,11 @@ export function Form({
             }
             key={block.id}
             data-active-section={is_current_section}
-            className="rounded data-[active-section='false']:hidden"
+            className={clsx(
+              "data-[active-section='false']:hidden",
+              "rounded",
+              stylesheet?.section
+            )}
           >
             <GroupLayout>
               {block.children?.map((b) =>
@@ -278,7 +290,8 @@ export function Form({
       className={clsx(
         "h-screen md:h-auto min-h-screen",
         "relative container mx-auto prose dark:prose-invert",
-        "data-[cjk='true']:break-keep"
+        "data-[cjk='true']:break-keep",
+        "flex flex-col"
       )}
     >
       <TossPaymentsCheckoutProvider initial={checkoutSession}>
@@ -302,12 +315,18 @@ export function Form({
         >
           <FingerprintField />
           <GroupLayout>{tree.children.map((b) => renderBlock(b))}</GroupLayout>
+          {options.is_powered_by_branding_enabled && (
+            // desktop branding
+            <div className="block md:hidden">
+              <PoweredByGridaFooter />
+            </div>
+          )}
         </form>
         <footer
           className="
           sticky md:static bottom-0
           flex gap-2 justify-end md:justify-start
-          bg-white dark:bg-neutral-900
+          bg-white md:bg-transparent dark:bg-neutral-900
           p-4 mt-4 pt-4
           border-t border-neutral-200 dark:border-neutral-800
         "
@@ -359,13 +378,18 @@ export function Form({
           </TossPaymentsPayButton>
         </footer>
       </TossPaymentsCheckoutProvider>
-      {options.is_powered_by_branding_enabled && <PoweredByGridaFooter />}
+      {options.is_powered_by_branding_enabled && (
+        // desktop branding
+        <div className="hidden md:block">
+          <PoweredByGridaFooter />
+        </div>
+      )}
     </main>
   );
 }
 
 function GroupLayout({ children }: React.PropsWithChildren<{}>) {
-  return <div className="flex flex-col gap-16">{children}</div>;
+  return <div className="flex flex-col gap-8">{children}</div>;
 }
 
 function FingerprintField() {
