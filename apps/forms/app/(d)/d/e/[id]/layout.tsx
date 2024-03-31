@@ -4,6 +4,7 @@ import { client, createServerComponentClient } from "@/lib/supabase/server";
 import { Metadata } from "next";
 import { Inter } from "next/font/google";
 import i18next from "i18next";
+import resources from "@/k/i18n";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -64,24 +65,7 @@ export default async function Layout({
   i18next.init({
     lng: default_form_page_language,
     debug: false, //!IS_PRODUTION,
-    resources: {
-      en: {
-        translation: {
-          next: "Next",
-          back: "Previous",
-          submit: "Submit",
-          pay: "Pay",
-        },
-      },
-      ko: {
-        translation: {
-          next: "다음",
-          back: "이전",
-          submit: "제출",
-          pay: "결제",
-        },
-      },
-    },
+    resources: resources,
   });
 
   return (

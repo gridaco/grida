@@ -24,7 +24,20 @@ export interface Form {
 /**
  * user facing page language
  */
-export type FormsPageLanguage = "en" | "ko";
+export type FormsPageLanguage =
+  | "en"
+  | "es"
+  | "de"
+  | "jp"
+  | "fr"
+  | "pt"
+  | "it"
+  | "ko"
+  | "ru"
+  | "zh"
+  | "ar"
+  | "hi"
+  | "nl";
 
 export type FormResponseUnknownFieldHandlingStrategyType =
   | "accept"
