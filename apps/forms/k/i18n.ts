@@ -30,7 +30,7 @@ const resources: Record<
       pay: "Bezahlen",
     },
   },
-  jp: {
+  ja: {
     translation: {
       next: "次へ",
       back: "戻る",

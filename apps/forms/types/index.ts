@@ -28,7 +28,7 @@ export type FormsPageLanguage =
   | "en"
   | "es"
   | "de"
-  | "jp"
+  | "ja"
   | "fr"
   | "pt"
   | "it"

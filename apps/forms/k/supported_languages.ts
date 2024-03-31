@@ -9,7 +9,7 @@ export const language_label_map: Record<FormsPageLanguage, string> = {
   en: "English",
   es: "Spanish / Español",
   de: "German / Deutsch",
-  jp: "Japanese / 日本語",
+  ja: "Japanese / 日本語",
   fr: "French / Français",
   pt: "Portuguese / Português",
   it: "Italian / Italiano",

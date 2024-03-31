@@ -613,7 +613,7 @@ export type Database = {
         | "ko"
         | "es"
         | "de"
-        | "jp"
+        | "ja"
         | "fr"
         | "pt"
         | "it"
