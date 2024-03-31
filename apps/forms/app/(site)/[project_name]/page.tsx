@@ -62,7 +62,8 @@ export default async function FormsDashboardPage({
   const { data: forms, error } = await supabase
     .from("form")
     .select("*, responses:response(id)")
-    .eq("project_id", project_id);
+    .eq("project_id", project_id)
+    .order("updated_at", { ascending: false });
 
   if (!forms) {
     return notFound();

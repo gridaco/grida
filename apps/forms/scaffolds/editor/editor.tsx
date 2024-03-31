@@ -198,7 +198,7 @@ function FieldEditPanelProvider({ children }: React.PropsWithChildren<{}>) {
         data: init.data,
       };
 
-      console.log("saving..", data);
+      console.log("[EDITOR] saving..", data);
 
       const promise = fetch("/private/editor/fields", {
         body: JSON.stringify(data),

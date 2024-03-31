@@ -24,7 +24,20 @@ export interface Form {
 /**
  * user facing page language
  */
-export type FormsPageLanguage = "en" | "ko";
+export type FormsPageLanguage =
+  | "en"
+  | "es"
+  | "de"
+  | "ja"
+  | "fr"
+  | "pt"
+  | "it"
+  | "ko"
+  | "ru"
+  | "zh"
+  | "ar"
+  | "hi"
+  | "nl";
 
 export type FormResponseUnknownFieldHandlingStrategyType =
   | "accept"
@@ -40,8 +53,10 @@ export type FormFieldType =
   | "checkboxes"
   | "number"
   | "date"
+  | "datetime-local"
   | "month"
   | "week"
+  | "time"
   | "email"
   | "file"
   | "image"

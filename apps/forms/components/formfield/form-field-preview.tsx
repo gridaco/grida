@@ -5,6 +5,7 @@ import { SignatureCanvas } from "../signature-canvas";
 import { StripePaymentFormFieldPreview } from "./form-field-preview-payment-stripe";
 import { TossPaymentsPaymentFormFieldPreview } from "./form-field-preview-payment-tosspayments";
 import clsx from "clsx";
+import { ClockIcon } from "@radix-ui/react-icons";
 
 /**
  * this disables the auto zoom in input text tag safari on iphone by setting font-size to 16px
@@ -140,25 +141,47 @@ export function FormFieldPreview({
       }
       case "checkboxes": {
         return (
-          <fieldset>
-            {options?.map((option) => (
-              <div className="flex items-center gap-2" key={option.value}>
-                <input
-                  type="checkbox"
-                  name={name}
-                  id={option.value}
-                  value={option.value}
-                  {...(sharedInputProps as React.ComponentProps<"input">)}
-                />
-                <label
-                  htmlFor={option.value}
-                  className="ms-2 text-sm font-medium text-neutral-900 dark:text-neutral-300"
+          <fieldset className="not-prose">
+            <ul className="text-sm font-medium text-neutral-900 bg-white border border-neutral-200 rounded-lg dark:bg-neutral-700 dark:border-neutral-600 dark:text-white">
+              {options?.map((option) => (
+                <li
+                  key={option.value}
+                  className="w-full border-b border-neutral-200 rounded-t-lg dark:border-neutral-600"
                 >
-                  {option.label}
-                </label>
-              </div>
-            ))}
+                  <div className="flex items-center ps-3">
+                    <input
+                      type="checkbox"
+                      name={name}
+                      id={option.value}
+                      value={option.value}
+                      {...(sharedInputProps as React.ComponentProps<"input">)}
+                      className="w-4 h-4 text-blue-600 bg-neutral-100 border-neutral-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-neutral-700 dark:focus:ring-offset-neutral-700 focus:ring-2 dark:bg-neutral-600 dark:border-neutral-500"
+                    />
+                    <label
+                      htmlFor={option.value}
+                      className="w-full py-3 ms-2 text-sm font-medium text-neutral-900 dark:text-neutral-300"
+                    >
+                      {option.label}
+                    </label>
+                  </div>
+                </li>
+              ))}
+            </ul>
           </fieldset>
+        );
+      }
+      case "time": {
+        return (
+          <div className="relative">
+            <div className="absolute inset-y-0 end-0 top-0 flex items-center pe-3.5 pointer-events-none">
+              <ClockIcon />
+            </div>
+            <input
+              type="time"
+              className="bg-neutral-50 border leading-none border-neutral-300 text-neutral-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-neutral-700 dark:border-neutral-600 dark:placeholder-neutral-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500"
+              {...(sharedInputProps as React.ComponentProps<"input">)}
+            />
+          </div>
         );
       }
       case "color": {
@@ -196,16 +219,45 @@ export function FormFieldPreview({
     return <PaymentField data={data as PaymentFieldData} disabled={disabled} />;
   }
 
+  const LabelText = () => (
+    <span
+      data-capitalize={labelCapitalize}
+      className="data-[capitalize]:capitalize font-medium text-neutral-900 dark:text-neutral-300 text-sm"
+    >
+      {label || name}
+    </span>
+  );
+
+  const HelpText = () =>
+    helpText ? (
+      <span className="text-sm text-neutral-400 dark:text-neutral-600">
+        {helpText}
+      </span>
+    ) : (
+      <></>
+    );
+
+  switch (type) {
+    case "checkboxes": {
+      return (
+        <label
+          htmlFor={"none"} // disable the focusing since checkboxes is not standard form input
+          data-field-type={type}
+          className="flex flex-col gap-1"
+        >
+          <LabelText />
+          <HelpText />
+          {renderInput()}
+        </label>
+      );
+    }
+  }
+
   return (
     <label data-field-type={type} className="flex flex-col gap-1">
-      <span
-        data-capitalize={labelCapitalize}
-        className="data-[capitalize]:capitalize"
-      >
-        {label || name}
-      </span>
+      <LabelText />
       {renderInput()}
-      {helpText && <span className="text-sm text-neutral-600">{helpText}</span>}
+      <HelpText />
     </label>
   );
 }

@@ -15,6 +15,7 @@ import {
 import { EditorFlatFormBlock } from "@/scaffolds/editor/state";
 import { useEditorState } from "@/scaffolds/editor";
 import { BlockHeader, FlatBlockBase, useDeleteBlock } from "./base-block";
+import TextareaAutosize from "react-textarea-autosize";
 
 export function HeaderBlock({
   id,
@@ -82,8 +83,8 @@ export function HeaderBlock({
             value={title_html ?? ""}
             onChange={(e) => onEditTitle(e.target.value)}
           />
-          <input
-            type="text"
+          <TextareaAutosize
+            minRows={1}
             className="w-full p-4 text-lg outline-none dark:text-white dark:bg-neutral-900"
             placeholder="Description"
             value={description_html ?? ""}

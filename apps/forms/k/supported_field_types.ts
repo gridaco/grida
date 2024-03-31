@@ -15,6 +15,8 @@ export const supported_field_types: FormFieldType[] = [
   "payment",
   "number",
   "date",
+  "datetime-local",
+  "time",
   "month",
   "week",
   "file",

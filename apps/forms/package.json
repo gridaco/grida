@@ -54,9 +54,10 @@
     "react-hot-toast": "^2.4.0",
     "react-pdf": "^7.7.1",
     "react-player": "^2.14.1",
+    "react-textarea-autosize": "^8.5.3",
+    "signature_pad": "^4.2.0",
     "tailwind-merge": "^2.2.2",
     "three": "^0.150.1",
-    "signature_pad": "^4.2.0",
     "use-file-picker": "^2.1.1",
     "uuid": "^9.0.1"
   },
