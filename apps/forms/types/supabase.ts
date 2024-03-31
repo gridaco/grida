@@ -357,6 +357,7 @@ export type Database = {
           form_id: string
           id: string
           name: string
+          stylesheet: Json | null
         }
         Insert: {
           background?: Json | null
@@ -364,6 +365,7 @@ export type Database = {
           form_id: string
           id?: string
           name?: string
+          stylesheet?: Json | null
         }
         Update: {
           background?: Json | null
@@ -371,6 +373,7 @@ export type Database = {
           form_id?: string
           id?: string
           name?: string
+          stylesheet?: Json | null
         }
         Relationships: [
           {

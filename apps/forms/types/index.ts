@@ -177,6 +177,7 @@ export interface FormPage {
   name: string;
   blocks: FormBlock[];
   background?: FormPageBackgroundSchema;
+  stylesheet?: any;
 }
 
 export interface FormBlock<T = FormBlockType> {

@@ -5,7 +5,7 @@ import { Metadata } from "next";
 import { Inter } from "next/font/google";
 import i18next from "i18next";
 import resources from "@/k/i18n";
-import { FormPage, FormPageBackgroundSchema } from "@/types";
+import { FormPage } from "@/types";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -80,39 +80,7 @@ export default async function Layout({
 
   return (
     <html lang={default_form_page_language}>
-      <body className={inter.className}>
-        {children}
-        {background && (
-          <FormPageBackground {...(background as FormPageBackgroundSchema)} />
-        )}
-      </body>
+      <body className={inter.className}>{children}</body>
     </html>
-  );
-}
-
-function FormPageBackground({ element, src }: FormPageBackgroundSchema) {
-  const renderBackground = () => {
-    switch (element) {
-      case "iframe":
-        return <FormPageBackgroundIframe src={src!} />;
-      default:
-        return <></>;
-    }
-  };
-
-  return (
-    <div className="fixed select-none inset-0 -z-10">{renderBackground()}</div>
-  );
-}
-
-function FormPageBackgroundIframe({ src }: { src: string }) {
-  return (
-    <iframe
-      allowTransparency
-      className="absolute inset-0 w-screen h-screen -z-10 bg-transparent"
-      src={src}
-      width="100vw"
-      height="100vh"
-    />
   );
 }

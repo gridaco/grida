@@ -22,6 +22,8 @@ export interface FormClientFetchResponse {
   options: {
     is_powered_by_branding_enabled: boolean;
   };
+  background?: FormPage["background"];
+  stylesheet?: FormPage["stylesheet"];
 }
 
 export type ClientRenderBlock =
@@ -283,6 +285,8 @@ export async function GET(
     options: {
       is_powered_by_branding_enabled,
     },
+    background: (data.default_page as unknown as FormPage).background,
+    stylesheet: (data.default_page as unknown as FormPage).stylesheet,
   };
 
   return NextResponse.json({

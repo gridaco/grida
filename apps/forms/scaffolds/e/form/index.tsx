@@ -40,6 +40,7 @@ export function Form({
   translations,
   options,
   lang,
+  stylesheet,
 }: {
   form_id: string;
   title: string;
@@ -56,6 +57,7 @@ export function Form({
   options: {
     is_powered_by_branding_enabled: boolean;
   };
+  stylesheet?: any;
 }) {
   const [checkoutSession, setCheckoutSession] =
     useState<PaymentCheckoutSession | null>(null);
@@ -118,6 +120,9 @@ export function Form({
       (section) => section.id === current_section_id
     );
     set_current_section_id(sections[index - 1].id);
+
+    // scroll to top
+    window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
   const onNext = (e?: React.MouseEvent<HTMLButtonElement>) => {
@@ -133,6 +138,9 @@ export function Form({
       (section) => section.id === current_section_id
     );
     set_current_section_id(sections[index + 1].id);
+
+    // scroll to top
+    window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
   const renderBlock = (
@@ -153,7 +161,11 @@ export function Form({
             }
             key={block.id}
             data-active-section={is_current_section}
-            className="rounded data-[active-section='false']:hidden"
+            className={clsx(
+              "data-[active-section='false']:hidden",
+              "rounded",
+              stylesheet?.section
+            )}
           >
             <GroupLayout>
               {block.children?.map((b) =>
