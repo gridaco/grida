@@ -1,4 +1,4 @@
-import { AuroraBackground } from "@/www/aurora";
+import { AuroraBackground } from "@/theme/backgrounds/aurora";
 
 export default function AuroraBgPage() {
   return <AuroraBackground />;
