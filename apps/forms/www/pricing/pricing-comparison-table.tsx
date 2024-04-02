@@ -5,13 +5,13 @@ import clsx from "clsx";
 import React, { useState } from "react";
 import { Component1Icon } from "@radix-ui/react-icons";
 import { pricing } from "../data/pricing";
-import { PricingInformation, plans } from "../data/plans";
+import { PricingInformation, plans, save_plans } from "../data/plans";
 import {
   PricingTableRowDesktop,
   PricingTableRowMobile,
 } from "./pricing-table-row";
 
-const PricingComparisonTable = () => {
+const PricingComparisonTable = ({ plans }: { plans: PricingInformation[] }) => {
   const [activeMobilePlan, setActiveMobilePlan] = useState("Free");
 
   const MobileHeader = ({
