@@ -28,9 +28,11 @@ export default function Home() {
               </span>
               builder for developers
             </p>
-            <button className="mt-16 px-3 py-2 bg-neutral-800 text-white rounded border border-neutral-800 hover:invert transition-all">
-              Start your project
-            </button>
+            <Link href="/dashboard/new?plan=free">
+              <button className="mt-16 px-3 py-2 bg-neutral-800 text-white rounded border border-neutral-800 hover:invert transition-all">
+                Start your project
+              </button>
+            </Link>
           </div>
         </div>
         <iframe
@@ -103,12 +105,14 @@ export default function Home() {
             <p className="text-4xl font-semibold text-center">
               Create Effortlessly, Expand Boundlessly
             </p>
-            <button
-              className="mt-10 px-3 py-2 text-white bg-neutral-800 rounded border border-neutral-800 hover:invert
+            <Link href="/dashboard/new?plan=free">
+              <button
+                className="mt-10 px-3 py-2 text-white bg-neutral-800 rounded border border-neutral-800 hover:invert
         transition-all"
-            >
-              Start your project
-            </button>
+              >
+                Start your project
+              </button>
+            </Link>
           </div>
         </section>
         {/* <section>
@@ -214,7 +218,10 @@ async function Header() {
         </span>
       </div>
       <div className="flex gap-10 items-center">
-        <Link href="https://github.com/gridaco/grida/tree/main/apps/forms">
+        <Link
+          href="https://github.com/gridaco/grida/tree/main/apps/forms"
+          target="_blank"
+        >
           <button className="flex justify-center items-center">
             <GitHubLogoIcon className="fill-black" width={24} height={24} />
           </button>
@@ -222,7 +229,7 @@ async function Header() {
         <Link href="/sign-in" className="hidden md:block">
           <button>Sign in</button>
         </Link>
-        <Link href="/sign-in">
+        <Link href="/dashboard/new?plan=free">
           <button className="px-4 py-2 rounded bg-black text-white dark:bg-white dark:text-black">
             Get Started
           </button>

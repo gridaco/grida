@@ -38,7 +38,7 @@ export const pricing: Pricing = {
         //   main: "The sum of all objects' size in your storage buckets.\nBilling is based on the average daily size in GB throughout your billing period.",
         // },
         plans: {
-          free: false,
+          free: true,
           pro: true,
           team: true,
           enterprise: true,
@@ -48,7 +48,7 @@ export const pricing: Pricing = {
       {
         title: "Connect Customer Identity",
         plans: {
-          free: false,
+          free: true,
           pro: true,
           team: true,
           enterprise: true,
@@ -128,7 +128,7 @@ export const pricing: Pricing = {
       {
         title: "Webhooks",
         plans: {
-          free: false,
+          free: true,
           pro: true,
           team: true,
           enterprise: true,
@@ -148,7 +148,7 @@ export const pricing: Pricing = {
       {
         title: "Window postMessage interface",
         plans: {
-          free: false,
+          free: true,
           pro: true,
           team: true,
           enterprise: true,
@@ -233,7 +233,7 @@ export const pricing: Pricing = {
       {
         title: "Connect to Google sheets",
         plans: {
-          free: false,
+          free: true,
           pro: true,
           team: true,
           enterprise: true,

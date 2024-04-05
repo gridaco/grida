@@ -23,7 +23,7 @@ export const plans: PricingInformation[] = [
     name: "Free",
     nameBadge: "",
     costUnit: "/ month",
-    href: "https://forms.grida.co/dashboard/new?plan=free",
+    href: "/dashboard/new?plan=free",
     priceLabel: "",
     priceMonthly: 0,
     description: "Perfect for hobby projects.",
@@ -57,7 +57,7 @@ export const plans: PricingInformation[] = [
     highlight: true,
     nameBadge: "Most Popular",
     costUnit: "/ month",
-    href: "https://forms.grida.co/dashboard/new?plan=pro",
+    href: "/dashboard/new?plan=pro",
     priceLabel: "From",
     warning: "$10 in compute credits included",
     priceMonthly: 20,
@@ -91,7 +91,7 @@ export const plans: PricingInformation[] = [
     name: "Team",
     nameBadge: "",
     costUnit: "/ month",
-    href: "https://forms.grida.co/dashboard/new?plan=team",
+    href: "/dashboard/new?plan=team",
     priceLabel: "From",
     warning: "$10 in compute credits included",
     priceMonthly: 60,
@@ -123,7 +123,7 @@ export const plans: PricingInformation[] = [
   {
     id: "tier_enterprise",
     name: "Enterprise",
-    href: "https://forms.grida.com/enterprise",
+    href: "/enterprise",
     description:
       "For large-scale and building custom solutions on top fo Grida Forms.",
     features: [
@@ -159,12 +159,12 @@ export const save_plans: PricingInformation[] = [
   {
     ...plans[1],
     priceMonthly: 10,
-    href: "https://forms.grida.co/dashboard/new?plan=pro&period=yearly",
+    href: "/dashboard/new?plan=pro&period=yearly",
   },
   {
     ...plans[2],
     priceMonthly: 48,
-    href: "https://forms.grida.co/dashboard/new?plan=team&period=yearly",
+    href: "/dashboard/new?plan=team&period=yearly",
   },
   plans[3],
 ];
