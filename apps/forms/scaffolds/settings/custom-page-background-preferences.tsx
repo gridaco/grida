@@ -63,7 +63,6 @@ export function CustomPageBackgroundPreferences({
           <div className="mt-4 flex items-center justify-center select-none">
             <iframe
               key={src}
-              allowTransparency
               src={src}
               className="w-full h-96"
               style={{ border: 0 }}

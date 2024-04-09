@@ -6,6 +6,7 @@ import { Inter } from "next/font/google";
 import i18next from "i18next";
 import resources from "@/k/i18n";
 import { FormPage } from "@/types";
+import { ThemeProvider } from "@/components/theme-provider";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -80,7 +81,16 @@ export default async function Layout({
 
   return (
     <html lang={default_form_page_language}>
-      <body className={inter.className}>{children}</body>
+      <body className={inter.className}>
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="system"
+          enableSystem
+          disableTransitionOnChange
+        >
+          {children}
+        </ThemeProvider>
+      </body>
     </html>
   );
 }
