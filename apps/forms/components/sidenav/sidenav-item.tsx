@@ -11,7 +11,7 @@ export function SideNavItem({
     <button
       disabled={disabled}
       className={clsx(
-        "flex items-center gap-2 w-full text-left px-4 py-4 bg-transparent hover:bg-neutral-500/10",
+        "flex items-center gap-2 w-full text-sm text-left font-medium px-4 py-2 bg-transparent hover:bg-neutral-500/10",
         "disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent"
       )}
     >
