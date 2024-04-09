@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 export default function StoreProductsPage() {
   return (
     <main className="h-full flex flex-col">
@@ -8,6 +10,9 @@ export default function StoreProductsPage() {
           <li>Orders</li>
         </ul>
       </nav>
+      <Link href="./products/new">
+        <button>Add product</button>
+      </Link>
     </main>
   );
 }
