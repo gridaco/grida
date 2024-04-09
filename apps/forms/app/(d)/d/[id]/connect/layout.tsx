@@ -30,18 +30,18 @@ export default function Layout({
             </Link>
           </li>
           <li>
-            <Link href={`/d/${id}/connect/customer`}>
-              <SideNavItem>
-                <AvatarIcon />
-                Customer Identity
-              </SideNavItem>
-            </Link>
-          </li>
-          <li>
             <Link href={`/d/${id}/connect/store`}>
               <SideNavItem>
                 <ArchiveIcon />
                 Store
+              </SideNavItem>
+            </Link>
+          </li>
+          <li>
+            <Link href={`/d/${id}/connect/customer`}>
+              <SideNavItem>
+                <AvatarIcon />
+                Customer Identity
               </SideNavItem>
             </Link>
           </li>
