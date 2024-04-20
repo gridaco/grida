@@ -63,6 +63,7 @@ import {
 import { restrictToVerticalAxis } from "@dnd-kit/modifiers";
 import { nanoid } from "nanoid";
 import { draftid } from "@/utils/id";
+import { SkuEditPanel } from "./sku-panel";
 
 // @ts-ignore
 const default_field_init: {
@@ -164,6 +165,8 @@ export function FieldEditPanel({
   enableAI?: boolean;
   onSave?: (field: NewFormFieldInit) => void;
 }) {
+  const [skuOpen, setSkuOpen] = useState(false);
+  const [skuEnabeld, setSkuEnabled] = useState(false);
   const [effect_cause, set_effect_cause] = useState<"ai" | "human" | "system">(
     "system"
   );
@@ -418,6 +421,21 @@ export function FieldEditPanel({
                   setOptions(arrayMove(options, from, to));
                 }}
               />
+            </PanelPropertyFields>
+          </PanelPropertySection>
+          <PanelPropertySection hidden={type !== "select"}>
+            <PanelPropertySectionTitle>Store</PanelPropertySectionTitle>
+            <PanelPropertyFields>
+              <PanelPropertyField label={"Track Inventory"}>
+                <Toggle
+                  value={skuEnabeld}
+                  onChange={(enabled) => {
+                    setSkuEnabled(enabled);
+                    setSkuOpen(enabled);
+                  }}
+                />
+                <SkuEditPanel open={skuOpen} />
+              </PanelPropertyField>
             </PanelPropertyFields>
           </PanelPropertySection>
           <PanelPropertySection hidden={type == "payment"}>
