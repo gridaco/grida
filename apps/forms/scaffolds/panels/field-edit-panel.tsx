@@ -433,30 +433,32 @@ export function FieldEditPanel({
                   onChange={(e) => setLabel(e.target.value)}
                 />
               </PanelPropertyField>
-              <PanelPropertyField
-                label={"Placeholder"}
-                description={
-                  <>
-                    {type === "select" ? (
-                      <>
-                        The placeholder text that will be displayed in the input
-                        when no option is selected.
-                      </>
-                    ) : (
-                      <>
-                        The placeholder text that will be displayed in the input
-                        when it&apos;s empty.
-                      </>
-                    )}
-                  </>
-                }
-              >
-                <PropertyTextInput
-                  placeholder={"Placeholder Text"}
-                  value={placeholder}
-                  onChange={(e) => setPlaceholder(e.target.value)}
-                />
-              </PanelPropertyField>
+              {type !== "checkbox" && (
+                <PanelPropertyField
+                  label={"Placeholder"}
+                  description={
+                    <>
+                      {type === "select" ? (
+                        <>
+                          The placeholder text that will be displayed in the
+                          input when no option is selected.
+                        </>
+                      ) : (
+                        <>
+                          The placeholder text that will be displayed in the
+                          input when it&apos;s empty.
+                        </>
+                      )}
+                    </>
+                  }
+                >
+                  <PropertyTextInput
+                    placeholder={"Placeholder Text"}
+                    value={placeholder}
+                    onChange={(e) => setPlaceholder(e.target.value)}
+                  />
+                </PanelPropertyField>
+              )}
               <PanelPropertyField
                 label={"Help Text"}
                 description="A small hint that will be displayed next to the input to help the user understand what to input."

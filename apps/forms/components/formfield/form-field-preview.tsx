@@ -6,6 +6,7 @@ import { StripePaymentFormFieldPreview } from "./form-field-preview-payment-stri
 import { TossPaymentsPaymentFormFieldPreview } from "./form-field-preview-payment-tosspayments";
 import clsx from "clsx";
 import { ClockIcon } from "@radix-ui/react-icons";
+import { Checkbox } from "@/components/ui/checkbox";
 
 /**
  * this disables the auto zoom in input text tag safari on iphone by setting font-size to 16px
@@ -51,6 +52,7 @@ export function FormFieldPreview({
   const sharedInputProps:
     | React.ComponentProps<"input">
     | React.ComponentProps<"textarea"> = {
+    id: name,
     name: name,
     readOnly: readonly,
     disabled: disabled,
@@ -132,11 +134,8 @@ export function FormFieldPreview({
       }
       case "checkbox": {
         return (
-          <input
-            className="w-4 h-4 text-blue-600 bg-neutral-100 border-neutral-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-neutral-800 focus:ring-2 dark:bg-neutral-700 dark:border-neutral-600"
-            type="checkbox"
-            {...(sharedInputProps as React.ComponentProps<"input">)}
-          />
+          // @ts-ignore
+          <Checkbox {...(sharedInputProps as React.ComponentProps<"input">)} />
         );
       }
       case "checkboxes": {
@@ -220,12 +219,13 @@ export function FormFieldPreview({
   }
 
   const LabelText = () => (
-    <span
+    <label
       data-capitalize={labelCapitalize}
+      htmlFor={name}
       className="data-[capitalize]:capitalize font-medium text-neutral-900 dark:text-neutral-300 text-sm"
     >
       {label || name}
-    </span>
+    </label>
   );
 
   const HelpText = () =>
@@ -238,6 +238,17 @@ export function FormFieldPreview({
     );
 
   switch (type) {
+    case "checkbox": {
+      return (
+        <div className="items-top flex space-x-2">
+          {renderInput()}
+          <div className="grid gap-1.5 leading-none">
+            <LabelText />
+            <HelpText />
+          </div>
+        </div>
+      );
+    }
     case "checkboxes": {
       return (
         <label
