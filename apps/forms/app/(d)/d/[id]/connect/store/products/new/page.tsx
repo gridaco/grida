@@ -42,7 +42,7 @@ export default function StoreProductsNewPage() {
   );
 }
 
-export function Info() {
+function Info() {
   return (
     <Card>
       <CardHeader>
