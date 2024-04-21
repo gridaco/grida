@@ -1,6 +1,13 @@
 import { FormFieldDataSchema, FormFieldType, PaymentFieldData } from "@/types";
 import React, { useEffect } from "react";
-import { Select } from "../select";
+import { Select as HtmlSelect } from "../select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { SignatureCanvas } from "../signature-canvas";
 import { StripePaymentFormFieldPreview } from "./form-field-preview-payment-stripe";
 import { TossPaymentsPaymentFormFieldPreview } from "./form-field-preview-payment-tosspayments";
@@ -31,6 +38,7 @@ export function FormFieldPreview({
   pattern,
   data,
   novalidate,
+  vanilla,
 }: {
   name: string;
   label?: string;
@@ -48,6 +56,7 @@ export function FormFieldPreview({
   labelCapitalize?: boolean;
   data?: FormFieldDataSchema | null;
   novalidate?: boolean;
+  vanilla?: boolean;
 }) {
   const sharedInputProps:
     | React.ComponentProps<"input">
@@ -88,24 +97,46 @@ export function FormFieldPreview({
         );
       }
       case "select": {
+        if (vanilla) {
+          // html5 vanilla select
+          return (
+            <HtmlSelect
+              {...(sharedInputProps as React.ComponentProps<"select">)}
+              value={sharedInputProps.value || undefined}
+              defaultValue=""
+            >
+              {placeholder && (
+                <option value="" disabled={required}>
+                  {placeholder}
+                </option>
+              )}
+              {options?.map((option) => (
+                <option
+                  key={option.id || option.value}
+                  value={option.id || option.value}
+                >
+                  {option.label || option.value}
+                </option>
+              ))}
+            </HtmlSelect>
+          );
+        }
         return (
-          <Select
-            {...(sharedInputProps as React.ComponentProps<"select">)}
-            defaultValue=""
-          >
-            {placeholder && (
-              <option value="" disabled={required}>
-                {placeholder}
-              </option>
-            )}
-            {options?.map((option) => (
-              <option
-                key={option.id || option.value}
-                value={option.id || option.value}
-              >
-                {option.label || option.value}
-              </option>
-            ))}
+          // shadcn select
+          <Select>
+            <SelectTrigger>
+              <SelectValue placeholder={placeholder} />
+            </SelectTrigger>
+            <SelectContent>
+              {options?.map((option) => (
+                <SelectItem
+                  key={option.id || option.value}
+                  value={option.id || option.value}
+                >
+                  {option.label || option.value}
+                </SelectItem>
+              ))}
+            </SelectContent>
           </Select>
         );
       }

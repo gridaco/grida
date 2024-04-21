@@ -12,6 +12,10 @@ const resources: Record<
       back: "Previous",
       submit: "Submit",
       pay: "Pay",
+      page_complete: {
+        title: "Complete",
+        description: "You have completed all the required fields on this page",
+      },
     },
   },
   es: {
@@ -28,6 +32,10 @@ const resources: Record<
       back: "이전",
       submit: "제출",
       pay: "결제",
+      page_complete: {
+        title: "완료",
+        description: "이 페이지의 필수 필드를 모두 작성했습니다",
+      },
     },
   },
   ja: {
