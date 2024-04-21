@@ -393,6 +393,7 @@ export type Database = {
           form_id: string | null
           id: string
           ip: string | null
+          local_id: number
           platform_powered_by:
             | Database["grida_forms"]["Enums"]["response_platform_powered_by"]
             | null
@@ -408,6 +409,7 @@ export type Database = {
           form_id?: string | null
           id?: string
           ip?: string | null
+          local_id?: number
           platform_powered_by?:
             | Database["grida_forms"]["Enums"]["response_platform_powered_by"]
             | null
@@ -423,6 +425,7 @@ export type Database = {
           form_id?: string | null
           id?: string
           ip?: string | null
+          local_id?: number
           platform_powered_by?:
             | Database["grida_forms"]["Enums"]["response_platform_powered_by"]
             | null
