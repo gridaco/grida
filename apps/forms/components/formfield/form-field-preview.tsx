@@ -28,6 +28,7 @@ export function FormFieldPreview({
   type,
   placeholder,
   required,
+  defaultValue,
   options,
   helpText,
   readonly,
@@ -39,6 +40,7 @@ export function FormFieldPreview({
   data,
   novalidate,
   vanilla,
+  preview,
 }: {
   name: string;
   label?: string;
@@ -46,6 +48,7 @@ export function FormFieldPreview({
   placeholder?: string;
   helpText?: string;
   required?: boolean;
+  defaultValue?: string;
   options?: { id?: string; label?: string | null; value: string }[];
   pattern?: string;
   readonly?: boolean;
@@ -56,7 +59,14 @@ export function FormFieldPreview({
   labelCapitalize?: boolean;
   data?: FormFieldDataSchema | null;
   novalidate?: boolean;
+  /**
+   * use vanilla html5 input element only
+   */
   vanilla?: boolean;
+  /**
+   * force render invisible field if true
+   */
+  preview?: boolean;
 }) {
   const sharedInputProps:
     | React.ComponentProps<"input">
@@ -70,6 +80,7 @@ export function FormFieldPreview({
     autoComplete,
     accept,
     multiple,
+    defaultValue: defaultValue,
     // form validation related
     required: novalidate ? false : required,
     pattern: novalidate ? undefined : pattern,
@@ -103,7 +114,7 @@ export function FormFieldPreview({
             <HtmlSelect
               {...(sharedInputProps as React.ComponentProps<"select">)}
               value={sharedInputProps.value || undefined}
-              defaultValue=""
+              defaultValue={sharedInputProps.defaultValue || ""}
             >
               {placeholder && (
                 <option value="" disabled={required}>
@@ -121,9 +132,21 @@ export function FormFieldPreview({
             </HtmlSelect>
           );
         }
+        if (multiple) {
+          // TODO:
+          return (
+            <>invalid - non vanilla select cannot have property multiple</>
+          );
+        }
+
         return (
           // shadcn select
-          <Select>
+          // @ts-ignore
+          <Select
+            {...(sharedInputProps as React.ComponentProps<"select">)}
+            value={(sharedInputProps.value as string) || undefined}
+            defaultValue={(sharedInputProps.defaultValue as string) || ""}
+          >
             <SelectTrigger>
               <SelectValue placeholder={placeholder} />
             </SelectTrigger>
@@ -242,7 +265,12 @@ export function FormFieldPreview({
   }
 
   if (type === "hidden") {
-    return <input type="hidden" name={name} />;
+    if (preview) {
+      // TODO: improve me
+      return <p>hidden field - {name}</p>;
+    }
+
+    return <input type="hidden" name={name} defaultValue={defaultValue} />;
   }
 
   if (type === "payment") {
