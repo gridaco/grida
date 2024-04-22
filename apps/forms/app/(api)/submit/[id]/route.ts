@@ -1,8 +1,13 @@
+import {
+  SYSTEM_GF_KEY_STARTS_WITH,
+  SYSTEM_GF_FINGERPRINT_VISITORID_KEY,
+  SYSTEM_GF_CUSTOMER_UUID_KEY,
+} from "@/k/system";
 import { client, workspaceclient } from "@/lib/supabase/server";
+import { upsert_customer_with } from "@/services/customer";
+import { is_uuid_v4 } from "@/utils/is";
 import { NextRequest, NextResponse } from "next/server";
-import { validate, version } from "uuid";
 
-const SYSTEM_GF_KEY_STARTS_WITH = "__gf_";
 const HOST = process.env.HOST;
 
 export const revalidate = 0;
@@ -112,24 +117,20 @@ async function submit({
   const keys = __keys.filter((key) => !system_gf_keys.includes(key));
 
   // customer handling
+  const _gf_customer_uuid = String(data.get(SYSTEM_GF_CUSTOMER_UUID_KEY));
   const _fp_fingerprintjs_visitorid = String(
-    data.get("__gf_fp_fingerprintjs_visitorid")
+    data.get(SYSTEM_GF_FINGERPRINT_VISITORID_KEY)
   );
 
-  const { data: customer } = await workspaceclient
-    .from("customer")
-    .upsert(
-      {
-        project_id: form_reference.project_id,
-        _fp_fingerprintjs_visitorid: _fp_fingerprintjs_visitorid,
-        last_seen_at: new Date().toISOString(),
-      },
-      {
-        onConflict: "project_id, _fp_fingerprintjs_visitorid",
-      }
-    )
-    .select()
-    .single();
+  const customer = await upsert_customer_with({
+    project_id: form_reference.project_id,
+    uuid: _gf_customer_uuid,
+    hints: {
+      _fp_fingerprintjs_visitorid,
+    },
+  });
+
+  console.log("submit: _gf_customer_uuid", _gf_customer_uuid, customer);
 
   // get the fields ready
   const { data: form_fields } = await client
@@ -211,7 +212,7 @@ async function submit({
       form_id: form_id,
       browser: meta.browser,
       ip: meta.ip,
-      customer_id: customer?.id,
+      customer_id: customer?.uid,
       x_referer: meta.referer,
       x_useragent: meta.useragent,
       platform_powered_by: "web_client",
@@ -322,8 +323,4 @@ async function submit({
     info: Object.keys(info).length > 0 ? info : null,
     error: null,
   });
-}
-
-function is_uuid_v4(value: string) {
-  return validate(value) && version(value) === 4;
 }
