@@ -24,11 +24,12 @@ export async function validate_max_access({
   // response number
   if (is_max_form_responses_in_total_enabled) {
     //
-    const { count } = await client
+    const { count, error } = await client
       .from("response")
       .select("id", { count: "exact" })
       .eq("form_id", form_id);
 
+    if (error) throw error;
     if (
       (count ?? 0) + count_diff >=
       (max_form_responses_in_total ?? Infinity)
@@ -41,11 +42,15 @@ export async function validate_max_access({
   if (is_max_form_responses_by_customer_enabled) {
     if (customer_id) {
       //
-      const { count, data } = await client
+      const { count, data, error } = await client
         .from("response")
         .select("id", { count: "exact" })
         .eq("form_id", form_id)
         .eq("customer_id", customer_id);
+
+      if (error) throw error;
+
+      console.log("count", count);
 
       if (
         (count ?? 0) + count_diff >=
@@ -61,6 +66,7 @@ export async function validate_max_access({
     } else {
       // TODO:
       // there is a limit to 'by-customer' but there was no way to identify this customer, which forcing it to close.
+      throw new Error("customer_id is required");
     }
   }
 

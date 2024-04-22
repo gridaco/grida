@@ -1,3 +1,5 @@
+"use client";
+
 import type { FormPageBackgroundSchema } from "@/types";
 import type {
   FormClientFetchResponseData,
@@ -9,34 +11,65 @@ import { notFound, redirect } from "next/navigation";
 import { FormLoading } from "@/scaffolds/e/form/loading";
 import { FormPageDeveloperErrorDialog } from "@/scaffolds/e/form/error";
 import i18next from "i18next";
-
-export const revalidate = 0;
+import useSWR from "swr";
+import { Progress } from "@/components/ui/progress";
+import { Skeleton } from "@/components/ui/skeleton";
+import clsx from "clsx";
+import { useFingerprint } from "@/scaffolds/fingerprint";
+import { SYSTEM_GF_FINGERPRINT_VISITORID_KEY } from "@/k/system";
 
 const HOST_NAME = process.env.NEXT_PUBLIC_HOST_NAME || "http://localhost:3000";
 
-// TODO: add fingerprint support after via client side handling
-export default async function FormPage({
+export default function FormPage({
   params,
   searchParams,
 }: {
   params: { id: string };
   searchParams: { [key: string]: string };
 }) {
-  const id = params.id;
+  const form_id = params.id;
 
-  const req_url =
-    HOST_NAME +
-    `/v1/${id}?${new URLSearchParams({
-      ...searchParams,
-    })}`;
-  console.log(req_url, searchParams);
-  const res = await (await fetch(req_url)).json();
-  const { data, error } = res as EditorApiResponse<
-    FormClientFetchResponseData,
-    FormClientFetchResponseError
-  >;
+  const { result: fingerprint } = useFingerprint();
 
-  if (!data) {
+  const req_url = fingerprint?.visitorId
+    ? HOST_NAME +
+      `/v1/${form_id}?${new URLSearchParams({
+        ...searchParams,
+        [SYSTEM_GF_FINGERPRINT_VISITORID_KEY]: fingerprint.visitorId,
+      })}`
+    : null;
+
+  const {
+    data: res,
+    error: servererror,
+    isLoading,
+  } = useSWR<
+    EditorApiResponse<FormClientFetchResponseData, FormClientFetchResponseError>
+  >(req_url, async (url: string) => {
+    const res = await fetch(url);
+    return res.json();
+  });
+
+  const { data, error } = res || {};
+
+  if (isLoading || !data) {
+    return (
+      <main
+        className={clsx(
+          "h-screen md:h-auto min-h-screen",
+          "relative mx-auto prose dark:prose-invert",
+          "data-[cjk='true']:break-keep",
+          "flex flex-col"
+        )}
+      >
+        <div className="mt-8">
+          <SkeletonCard />
+        </div>
+      </main>
+    );
+  }
+
+  if (servererror) {
     return notFound();
   }
 
@@ -57,14 +90,14 @@ export default async function FormPage({
     switch (error.code) {
       case "FORM_RESPONSE_LIMIT_BY_CUSTOMER_REACHED":
       case "FORM_RESPONSE_LIMIT_REACHED":
-        return redirect(`./${id}/alreadyresponded`);
+        return redirect(`./${form_id}/alreadyresponded`);
     }
   }
 
   return (
     <FormLoading>
       <Form
-        form_id={id}
+        form_id={form_id}
         title={title}
         fields={fields}
         defaultValues={default_values}
@@ -115,5 +148,17 @@ function FormPageBackgroundIframe({ src }: { src: string }) {
       width="100vw"
       height="100vh"
     />
+  );
+}
+
+function SkeletonCard() {
+  return (
+    <div className="flex flex-col space-y-3">
+      <Skeleton className="h-[125px] w-full rounded-xl" />
+      <div className="space-y-2">
+        <Skeleton className="h-4 w-full" />
+        <Skeleton className="h-4 w-full" />
+      </div>
+    </div>
   );
 }
