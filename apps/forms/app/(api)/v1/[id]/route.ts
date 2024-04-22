@@ -328,6 +328,14 @@ export async function GET(
     })
     .filter(Boolean);
 
+  const _field_blocks: ClientFieldRenderBlock[] = render_blocks.filter(
+    (b) => b.type === "field"
+  ) as ClientFieldRenderBlock[];
+  const _render_field_ids = _field_blocks.map(
+    (b: ClientFieldRenderBlock) => b.field.id
+  );
+  let render_fields = fields.filter((f) => _render_field_ids.includes(f.id));
+
   // if no blocks, render a simple form based on fields
   if (!render_blocks.length) {
     render_blocks = fields.map((field: any, i) => {
@@ -343,11 +351,13 @@ export async function GET(
         parent_id: null,
       };
     });
+
+    render_fields = fields;
   }
 
   const tree = blockstree(render_blocks);
 
-  const required_hidden_fields = fields.filter(
+  const required_hidden_fields = render_fields.filter(
     (f) => f.type === "hidden" && f.required
   );
 
