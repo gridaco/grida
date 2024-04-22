@@ -144,8 +144,8 @@ export function FormFieldPreview({
           // @ts-ignore
           <Select
             {...(sharedInputProps as React.ComponentProps<"select">)}
-            value={(sharedInputProps.value as string) || undefined}
-            defaultValue={(sharedInputProps.defaultValue as string) || ""}
+            value={sharedInputProps.value as string}
+            defaultValue={sharedInputProps.defaultValue as string}
           >
             <SelectTrigger>
               <SelectValue placeholder={placeholder} />
