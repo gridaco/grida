@@ -1,5 +1,16 @@
 "use client";
 
+import type { FormPageBackgroundSchema } from "@/types";
+import type {
+  FormClientFetchResponseData,
+  FormClientFetchResponseError,
+} from "@/app/(api)/v1/[id]/route";
+import { EditorApiResponse } from "@/types/private/api";
+import { notFound, redirect } from "next/navigation";
+import { FormPageDeveloperErrorDialog } from "@/scaffolds/e/form/error";
+import i18next from "i18next";
+import useSWR from "swr";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   ClientRenderBlock,
   ClientSectionRenderBlock,
@@ -33,14 +44,123 @@ const cls_button_nuetral =
 
 type PaymentCheckoutSession = TossPaymentsCheckoutSessionResponseData | any;
 
+const HOST_NAME = process.env.NEXT_PUBLIC_HOST_NAME || "http://localhost:3000";
+
 export function Form({
+  form_id,
+  params,
+  translation,
+}: {
+  form_id: string;
+  params: { [key: string]: string };
+  translation: FormTranslation;
+}) {
+  const { result: fingerprint } = useFingerprint();
+
+  const req_url = fingerprint?.visitorId
+    ? HOST_NAME +
+      `/v1/${form_id}?${new URLSearchParams({
+        ...params,
+        [SYSTEM_GF_FINGERPRINT_VISITORID_KEY]: fingerprint.visitorId,
+      })}`
+    : null;
+
+  const {
+    data: res,
+    error: servererror,
+    isLoading,
+  } = useSWR<
+    EditorApiResponse<FormClientFetchResponseData, FormClientFetchResponseError>
+  >(req_url, async (url: string) => {
+    const res = await fetch(url);
+    return res.json();
+  });
+
+  const { data, error } = res || {};
+
+  if (isLoading || !data) {
+    return (
+      <main
+        className={clsx(
+          "h-screen md:h-auto min-h-screen",
+          "relative mx-auto prose dark:prose-invert",
+          "data-[cjk='true']:break-keep",
+          "flex flex-col"
+        )}
+      >
+        <div className="mt-8">
+          <SkeletonCard />
+        </div>
+      </main>
+    );
+  }
+
+  if (servererror) {
+    return notFound();
+  }
+
+  const {
+    //
+    title,
+    blocks,
+    tree,
+    fields,
+    default_values,
+    options,
+    lang,
+    stylesheet,
+    background,
+  } = data;
+
+  if (error) {
+    switch (error.code) {
+      case "FORM_RESPONSE_LIMIT_BY_CUSTOMER_REACHED":
+      case "FORM_RESPONSE_LIMIT_REACHED":
+        return redirect(`./${form_id}/alreadyresponded`);
+    }
+  }
+
+  return (
+    <>
+      <FormView
+        form_id={form_id}
+        title={title}
+        fields={fields}
+        defaultValues={default_values}
+        blocks={blocks}
+        tree={tree}
+        translation={translation}
+        lang={lang}
+        options={options}
+        stylesheet={stylesheet}
+      />
+      {background && (
+        <FormPageBackground {...(background as FormPageBackgroundSchema)} />
+      )}
+      {error && (
+        <div className="absolute top-4 right-4">
+          <FormPageDeveloperErrorDialog {...error} />
+        </div>
+      )}
+    </>
+  );
+}
+
+interface FormTranslation {
+  next: string;
+  back: string;
+  submit: string;
+  pay: string;
+}
+
+function FormView({
   form_id,
   title,
   blocks,
   fields,
   defaultValues,
   tree,
-  translations,
+  translation,
   options,
   lang,
   stylesheet,
@@ -51,12 +171,7 @@ export function Form({
   fields: FormFieldDefinition[];
   blocks: ClientRenderBlock[];
   tree: FormBlockTree<ClientRenderBlock[]>;
-  translations: {
-    next: string;
-    back: string;
-    submit: string;
-    pay: string;
-  };
+  translation: FormTranslation;
   lang: string;
   options: {
     is_powered_by_branding_enabled: boolean;
@@ -345,7 +460,7 @@ export function Form({
             )}
             onClick={onPrevious}
           >
-            {translations.back}
+            {translation.back}
           </button>
           <button
             data-next-hidden={next_section_button_hidden}
@@ -358,7 +473,7 @@ export function Form({
             )}
             // onClick={onNext}
           >
-            {translations.next}
+            {translation.next}
           </button>
           <button
             data-submit-hidden={submit_hidden}
@@ -370,7 +485,7 @@ export function Form({
               "data-[submit-hidden='true']:hidden"
             )}
           >
-            {translations.submit}
+            {translation.submit}
           </button>
           <TossPaymentsPayButton
             data-pay-hidden={pay_hidden}
@@ -380,7 +495,7 @@ export function Form({
               "data-[pay-hidden='true']:hidden"
             )}
           >
-            {translations.pay}
+            {translation.pay}
           </TossPaymentsPayButton>
         </footer>
       </TossPaymentsCheckoutProvider>
@@ -408,5 +523,43 @@ function FingerprintField() {
       name={SYSTEM_GF_FINGERPRINT_VISITORID_KEY}
       value={result?.visitorId}
     />
+  );
+}
+
+function FormPageBackground({ element, src }: FormPageBackgroundSchema) {
+  const renderBackground = () => {
+    switch (element) {
+      case "iframe":
+        return <FormPageBackgroundIframe src={src!} />;
+      default:
+        return <></>;
+    }
+  };
+
+  return (
+    <div className="fixed select-none inset-0 -z-10">{renderBackground()}</div>
+  );
+}
+
+function FormPageBackgroundIframe({ src }: { src: string }) {
+  return (
+    <iframe
+      className="absolute inset-0 w-screen h-screen -z-10 bg-transparent"
+      src={src}
+      width="100vw"
+      height="100vh"
+    />
+  );
+}
+
+function SkeletonCard() {
+  return (
+    <div className="flex flex-col space-y-3">
+      <Skeleton className="h-[125px] w-full rounded-xl" />
+      <div className="space-y-2">
+        <Skeleton className="h-4 w-full" />
+        <Skeleton className="h-4 w-full" />
+      </div>
+    </div>
   );
 }
