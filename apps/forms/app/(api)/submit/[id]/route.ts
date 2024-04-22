@@ -5,6 +5,7 @@ import {
 } from "@/k/system";
 import { client, workspaceclient } from "@/lib/supabase/server";
 import { upsert_customer_with } from "@/services/customer";
+import { validate_max_access } from "@/services/form/validate-max-access";
 import { is_uuid_v4 } from "@/utils/is";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -107,6 +108,10 @@ async function submit({
     is_ending_page_enabled,
     ending_page_template_id,
     redirect_after_response_uri,
+    is_max_form_responses_in_total_enabled,
+    max_form_responses_in_total,
+    is_max_form_responses_by_customer_enabled,
+    max_form_responses_by_customer,
   } = form_reference;
 
   const entries = data.entries();
@@ -118,9 +123,9 @@ async function submit({
 
   // customer handling
 
-  const _gf_customer_uuid: string | null = data.get(
-    SYSTEM_GF_CUSTOMER_UUID_KEY
-  ) as string;
+  const _gf_customer_uuid: string | null = val(
+    data.get(SYSTEM_GF_CUSTOMER_UUID_KEY) as string
+  );
 
   const _fp_fingerprintjs_visitorid: string | null = data.get(
     SYSTEM_GF_FINGERPRINT_VISITORID_KEY
@@ -134,7 +139,27 @@ async function submit({
     },
   });
 
-  console.log("submit: _gf_customer_uuid", _gf_customer_uuid, customer);
+  // validation
+  const max_access_error = await validate_max_access({
+    form_id,
+    customer_id: customer?.uid,
+    is_max_form_responses_in_total_enabled,
+    max_form_responses_in_total,
+    is_max_form_responses_by_customer_enabled,
+    max_form_responses_by_customer,
+    count_diff: 1,
+  });
+
+  if (max_access_error) {
+    return NextResponse.json(
+      {
+        error: max_access_error,
+      },
+      {
+        status: 400,
+      }
+    );
+  }
 
   // get the fields ready
   const { data: form_fields } = await client
@@ -328,3 +353,8 @@ async function submit({
     error: null,
   });
 }
+
+const val = (v?: string | null) => {
+  if (v) return v;
+  else return null;
+};

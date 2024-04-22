@@ -7,7 +7,7 @@ export async function upsert_customer_with({
   hints,
 }: {
   project_id: number;
-  uuid?: string;
+  uuid?: string | null;
   hints?: {
     email?: string;
     _fp_fingerprintjs_visitorid?: string;

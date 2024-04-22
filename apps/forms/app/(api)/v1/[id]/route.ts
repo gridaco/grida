@@ -12,6 +12,7 @@ import { blockstree } from "@/lib/forms/tree";
 import { FormBlockTree } from "@/lib/forms/types";
 import { client } from "@/lib/supabase/server";
 import { upsert_customer_with } from "@/services/customer";
+import { validate_max_access } from "@/services/form/validate-max-access";
 import {
   FormBlock,
   FormBlockType,
@@ -381,42 +382,15 @@ export async function GET(
     });
   }
 
-  // response number
-  if (is_max_form_responses_in_total_enabled) {
-    //
-    const { count } = await client
-      .from("response")
-      .select("id", { count: "exact" })
-      .eq("form_id", id);
-
-    if ((count ?? 0) >= (max_form_responses_in_total ?? Infinity)) {
-      // reject: cause the form has reached the limit
-      response.error = FORM_RESPONSE_LIMIT_REACHED;
-    }
-  }
-  // response number by customer
-  if (is_max_form_responses_by_customer_enabled) {
-    if (customer) {
-      //
-      const { count, data } = await client
-        .from("response")
-        .select("id", { count: "exact" })
-        .eq("form_id", id)
-        .eq("customer_id", customer.uid);
-
-      if ((count ?? 0) >= (max_form_responses_by_customer ?? Infinity)) {
-        // reject: cause the customer has reached the limit
-        response.error = {
-          ...FORM_RESPONSE_LIMIT_BY_CUSTOMER_REACHED,
-          max: max_form_responses_by_customer ?? Infinity,
-          last_response_id: data?.[0]?.id as string,
-        };
-      }
-    } else {
-      // TODO:
-      // there is a limit to 'by-customer' but there was no way to identify this customer, which forcing it to close.
-    }
-  }
+  const max_access_error = await validate_max_access({
+    form_id: id,
+    customer_id: customer?.uid,
+    is_max_form_responses_in_total_enabled,
+    max_form_responses_in_total,
+    is_max_form_responses_by_customer_enabled,
+    max_form_responses_by_customer,
+  });
+  if (max_access_error) response.error = max_access_error;
 
   const payload: FormClientFetchResponseData = {
     title: title,
@@ -446,6 +420,8 @@ export async function GET(
   };
 
   response.data = payload;
+
+  console.log(response.error, missing_required_hidden_fields);
 
   return NextResponse.json(response);
 }
