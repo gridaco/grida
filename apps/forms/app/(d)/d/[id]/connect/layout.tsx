@@ -1,4 +1,10 @@
 import { SideNavBadge, SideNavItem } from "@/components/sidenav";
+import {
+  ArchiveIcon,
+  AvatarIcon,
+  CodeIcon,
+  Link2Icon,
+} from "@radix-ui/react-icons";
 import Link from "next/link";
 
 export default function Layout({
@@ -17,17 +23,32 @@ export default function Layout({
         <ul className="flex flex-col">
           <li>
             <Link href={`/d/${id}/connect/share`}>
-              <SideNavItem>Share</SideNavItem>
+              <SideNavItem>
+                <Link2Icon />
+                Share
+              </SideNavItem>
+            </Link>
+          </li>
+          <li>
+            <Link href={`/d/${id}/connect/store`}>
+              <SideNavItem>
+                <ArchiveIcon />
+                Store
+              </SideNavItem>
             </Link>
           </li>
           <li>
             <Link href={`/d/${id}/connect/customer`}>
-              <SideNavItem>Customer Identity</SideNavItem>
+              <SideNavItem>
+                <AvatarIcon />
+                Customer Identity
+              </SideNavItem>
             </Link>
           </li>
           <li>
             {/* <Link href={`/d/${id}/connect/parameters`}> */}
             <SideNavItem disabled>
+              <CodeIcon />
               URL parameters
               <SideNavBadge>soon</SideNavBadge>
             </SideNavItem>
@@ -36,6 +57,7 @@ export default function Layout({
           <li>
             {/* <Link href={`/d/${id}/connect/datasource/db`}> */}
             <SideNavItem disabled>
+              <CodeIcon />
               Data Source
               <SideNavBadge>soon</SideNavBadge>
             </SideNavItem>
@@ -44,6 +66,7 @@ export default function Layout({
           <li>
             {/* <Link href={`/d/${id}/connect/webhooks`}> */}
             <SideNavItem disabled>
+              <CodeIcon />
               Webhooks
               <SideNavBadge>soon</SideNavBadge>
             </SideNavItem>
@@ -52,6 +75,7 @@ export default function Layout({
           <li>
             {/* <Link href={`/d/${id}/connect/integrations`}> */}
             <SideNavItem disabled>
+              <CodeIcon />
               Integrations
               <SideNavBadge>soon</SideNavBadge>
             </SideNavItem>
@@ -60,6 +84,7 @@ export default function Layout({
           <li className="hidden">
             <Link href={`/d/${id}/connect/import`}>
               <SideNavItem>
+                <CodeIcon />
                 Import Data
                 <SideNavBadge>soon</SideNavBadge>
               </SideNavItem>

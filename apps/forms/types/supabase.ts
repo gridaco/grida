@@ -17,8 +17,10 @@ export type Database = {
           default_form_page_id: string | null
           default_form_page_language: Database["grida_forms"]["Enums"]["form_page_language"]
           description: string | null
+          ending_page_template_id: string | null
           id: string
           is_edit_after_submission_allowed: boolean
+          is_ending_page_enabled: boolean
           is_max_form_responses_by_customer_enabled: boolean
           is_max_form_responses_in_total_enabled: boolean
           is_multiple_response_allowed: boolean
@@ -39,8 +41,10 @@ export type Database = {
           default_form_page_id?: string | null
           default_form_page_language?: Database["grida_forms"]["Enums"]["form_page_language"]
           description?: string | null
+          ending_page_template_id?: string | null
           id?: string
           is_edit_after_submission_allowed?: boolean
+          is_ending_page_enabled?: boolean
           is_max_form_responses_by_customer_enabled?: boolean
           is_max_form_responses_in_total_enabled?: boolean
           is_multiple_response_allowed?: boolean
@@ -61,8 +65,10 @@ export type Database = {
           default_form_page_id?: string | null
           default_form_page_language?: Database["grida_forms"]["Enums"]["form_page_language"]
           description?: string | null
+          ending_page_template_id?: string | null
           id?: string
           is_edit_after_submission_allowed?: boolean
+          is_ending_page_enabled?: boolean
           is_max_form_responses_by_customer_enabled?: boolean
           is_max_form_responses_in_total_enabled?: boolean
           is_multiple_response_allowed?: boolean
@@ -393,6 +399,7 @@ export type Database = {
           form_id: string | null
           id: string
           ip: string | null
+          local_id: number
           platform_powered_by:
             | Database["grida_forms"]["Enums"]["response_platform_powered_by"]
             | null
@@ -408,6 +415,7 @@ export type Database = {
           form_id?: string | null
           id?: string
           ip?: string | null
+          local_id?: number
           platform_powered_by?:
             | Database["grida_forms"]["Enums"]["response_platform_powered_by"]
             | null
@@ -423,6 +431,7 @@ export type Database = {
           form_id?: string | null
           id?: string
           ip?: string | null
+          local_id?: number
           platform_powered_by?:
             | Database["grida_forms"]["Enums"]["response_platform_powered_by"]
             | null

@@ -211,11 +211,12 @@ export type FormBlockType =
 // | "layout"
 
 export interface FormResponse {
+  id: string;
+  local_id: number;
   browser: string | null;
   created_at: string;
   customer_id: string | null;
   form_id: string | null;
-  id: string;
   ip: string | null;
   platform_powered_by: PlatformPoweredBy | null;
   raw: any;

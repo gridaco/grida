@@ -15,6 +15,7 @@ import toast from "react-hot-toast";
 import { FormFieldUpsert, EditorApiResponse } from "@/types/private/api";
 import { TooltipProvider } from "@radix-ui/react-tooltip";
 import { ResponseEditPanel } from "../panels/response-edit-panel";
+import { fmt_hashed_local_id } from "@/utils/fmt";
 
 export function FormEditorProvider({
   initial,
@@ -286,7 +287,7 @@ function ResponseEditPanelProvider({ children }: React.PropsWithChildren<{}>) {
     <>
       <ResponseEditPanel
         key={response?.id}
-        title="Edit Response"
+        title={`Response ${response?.local_id ? fmt_hashed_local_id(response?.local_id) : ""}`}
         open={state.is_response_edit_panel_open}
         init={{ response, field_defs: state.fields }}
         onOpenChange={(open) => {

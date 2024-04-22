@@ -1,4 +1,5 @@
 import { SideNavBadge, SideNavItem } from "@/components/sidenav";
+import { CodeIcon, GearIcon, MagicWandIcon } from "@radix-ui/react-icons";
 import Link from "next/link";
 
 export default function Layout({
@@ -17,17 +18,24 @@ export default function Layout({
         <ul className="flex flex-col">
           <li>
             <Link href={`/d/${id}/settings/general`}>
-              <SideNavItem>General</SideNavItem>
+              <SideNavItem>
+                <GearIcon />
+                General
+              </SideNavItem>
             </Link>
           </li>
           <li>
             <Link href={`/d/${id}/settings/customize`}>
-              <SideNavItem>Customize</SideNavItem>
+              <SideNavItem>
+                <MagicWandIcon />
+                Customize
+              </SideNavItem>
             </Link>
           </li>
           <li>
             {/* <Link href={`/d/${id}/settings/api`}> */}
             <SideNavItem disabled>
+              <CodeIcon />
               API Keys
               <SideNavBadge>soon</SideNavBadge>
             </SideNavItem>
