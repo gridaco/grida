@@ -1,8 +1,14 @@
+import {
+  SYSTEM_GF_KEY_STARTS_WITH,
+  SYSTEM_GF_FINGERPRINT_VISITORID_KEY,
+  SYSTEM_GF_CUSTOMER_UUID_KEY,
+} from "@/k/system";
 import { client, workspaceclient } from "@/lib/supabase/server";
+import { upsert_customer_with } from "@/services/customer";
+import { validate_max_access } from "@/services/form/validate-max-access";
+import { is_uuid_v4 } from "@/utils/is";
 import { NextRequest, NextResponse } from "next/server";
-import { validate, version } from "uuid";
 
-const SYSTEM_GF_KEY_STARTS_WITH = "__gf_";
 const HOST = process.env.HOST;
 
 export const revalidate = 0;
@@ -102,6 +108,10 @@ async function submit({
     is_ending_page_enabled,
     ending_page_template_id,
     redirect_after_response_uri,
+    is_max_form_responses_in_total_enabled,
+    max_form_responses_in_total,
+    is_max_form_responses_by_customer_enabled,
+    max_form_responses_by_customer,
   } = form_reference;
 
   const entries = data.entries();
@@ -112,24 +122,44 @@ async function submit({
   const keys = __keys.filter((key) => !system_gf_keys.includes(key));
 
   // customer handling
-  const _fp_fingerprintjs_visitorid = String(
-    data.get("__gf_fp_fingerprintjs_visitorid")
+
+  const _gf_customer_uuid: string | null = val(
+    data.get(SYSTEM_GF_CUSTOMER_UUID_KEY) as string
   );
 
-  const { data: customer } = await workspaceclient
-    .from("customer")
-    .upsert(
+  const _fp_fingerprintjs_visitorid: string | null = data.get(
+    SYSTEM_GF_FINGERPRINT_VISITORID_KEY
+  ) as string;
+
+  const customer = await upsert_customer_with({
+    project_id: form_reference.project_id,
+    uuid: _gf_customer_uuid,
+    hints: {
+      _fp_fingerprintjs_visitorid,
+    },
+  });
+
+  // validation
+  const max_access_error = await validate_max_access({
+    form_id,
+    customer_id: customer?.uid,
+    is_max_form_responses_in_total_enabled,
+    max_form_responses_in_total,
+    is_max_form_responses_by_customer_enabled,
+    max_form_responses_by_customer,
+    count_diff: 1,
+  });
+
+  if (max_access_error) {
+    return NextResponse.json(
       {
-        project_id: form_reference.project_id,
-        _fp_fingerprintjs_visitorid: _fp_fingerprintjs_visitorid,
-        last_seen_at: new Date().toISOString(),
+        error: max_access_error,
       },
       {
-        onConflict: "project_id, _fp_fingerprintjs_visitorid",
+        status: 400,
       }
-    )
-    .select()
-    .single();
+    );
+  }
 
   // get the fields ready
   const { data: form_fields } = await client
@@ -211,7 +241,7 @@ async function submit({
       form_id: form_id,
       browser: meta.browser,
       ip: meta.ip,
-      customer_id: customer?.id,
+      customer_id: customer?.uid,
       x_referer: meta.referer,
       x_useragent: meta.useragent,
       platform_powered_by: "web_client",
@@ -324,6 +354,7 @@ async function submit({
   });
 }
 
-function is_uuid_v4(value: string) {
-  return validate(value) && version(value) === 4;
-}
+const val = (v?: string | null) => {
+  if (v) return v;
+  else return null;
+};

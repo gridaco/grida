@@ -296,6 +296,7 @@ export function FieldEditPanel({
                 }}
               >
                 <FormFieldPreview
+                  preview
                   name={name}
                   type={type}
                   label={preview_label}

@@ -19,6 +19,8 @@ import {
   TossPaymentsPayButton,
 } from "@/components/tosspayments";
 import { StripePaymentFormFieldPreview } from "@/components/formfield/form-field-preview-payment-stripe";
+import { useFingerprint } from "@/scaffolds/fingerprint";
+import { SYSTEM_GF_FINGERPRINT_VISITORID_KEY } from "@/k/system";
 
 const ReactPlayer = dynamic(() => import("react-player/lazy"), { ssr: false });
 
@@ -36,6 +38,7 @@ export function Form({
   title,
   blocks,
   fields,
+  defaultValues,
   tree,
   translations,
   options,
@@ -44,6 +47,7 @@ export function Form({
 }: {
   form_id: string;
   title: string;
+  defaultValues?: { [key: string]: string };
   fields: FormFieldDefinition[];
   blocks: ClientRenderBlock[];
   tree: FormBlockTree<ClientRenderBlock[]>;
@@ -196,6 +200,7 @@ export function Form({
             }
           }
           default: {
+            const defaultValue = defaultValues?.[field.name];
             return (
               <FormFieldPreview
                 key={field.id}
@@ -207,6 +212,7 @@ export function Form({
                 helpText={field.help_text}
                 options={field.options}
                 pattern={field.pattern}
+                defaultValue={defaultValue}
                 data={field.data}
                 autoComplete={field.autocomplete}
                 accept={field.accept}
@@ -289,7 +295,7 @@ export function Form({
       data-cjk={cjk.includes(lang)}
       className={clsx(
         "h-screen md:h-auto min-h-screen",
-        "relative container mx-auto prose dark:prose-invert",
+        "relative mx-auto prose dark:prose-invert",
         "data-[cjk='true']:break-keep",
         "flex flex-col"
       )}
@@ -393,22 +399,14 @@ function GroupLayout({ children }: React.PropsWithChildren<{}>) {
 }
 
 function FingerprintField() {
-  const [fingerprint, setFingerprint] = useState<string>("");
-
-  useEffect(() => {
-    setTimeout(() => {
-      window.fingerprint?.get().then((f) => {
-        setFingerprint(f.visitorId);
-      });
-    }, 1000);
-  }, []);
+  const { result } = useFingerprint();
 
   /* hidden client fingerprint field */
   return (
     <input
       type="hidden"
-      name="__gf_fp_fingerprintjs_visitorid"
-      value={fingerprint}
+      name={SYSTEM_GF_FINGERPRINT_VISITORID_KEY}
+      value={result?.visitorId}
     />
   );
 }

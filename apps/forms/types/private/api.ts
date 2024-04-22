@@ -5,7 +5,8 @@ export type FormFieldUpsert = NewFormFieldInit & {
   id?: string;
 };
 
-export interface EditorApiResponse<T> {
+export interface EditorApiResponse<T, E = any> {
   data: T;
-  message: string;
+  error?: E | null;
+  message?: string;
 }

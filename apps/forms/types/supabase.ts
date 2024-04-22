@@ -442,11 +442,11 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "grida_forms_response_customer_uuid_fkey"
+            foreignKeyName: "grida_forms_response_customer_id_fkey"
             columns: ["customer_id"]
             isOneToOne: false
             referencedRelation: "customer"
-            referencedColumns: ["id"]
+            referencedColumns: ["uid"]
           },
           {
             foreignKeyName: "grida_forms_response_form_id_fkey"
@@ -654,25 +654,28 @@ export type Database = {
           _fp_fingerprintjs_visitorid: string | null
           created_at: string
           email: string | null
-          id: string
           last_seen_at: string
           project_id: number
+          uid: string
+          uuid: string | null
         }
         Insert: {
           _fp_fingerprintjs_visitorid?: string | null
           created_at?: string
           email?: string | null
-          id?: string
           last_seen_at?: string
           project_id: number
+          uid?: string
+          uuid?: string | null
         }
         Update: {
           _fp_fingerprintjs_visitorid?: string | null
           created_at?: string
           email?: string | null
-          id?: string
           last_seen_at?: string
           project_id?: number
+          uid?: string
+          uuid?: string | null
         }
         Relationships: [
           {
