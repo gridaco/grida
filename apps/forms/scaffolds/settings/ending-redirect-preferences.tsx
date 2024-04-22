@@ -11,7 +11,7 @@ import {
   cls_save_button,
 } from "@/components/preferences";
 
-export function RedirectPreferences({
+export function EndingRedirectPreferences({
   form_id,
   init,
 }: {

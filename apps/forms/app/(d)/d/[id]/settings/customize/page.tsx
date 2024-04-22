@@ -1,7 +1,7 @@
 import React from "react";
 import { createServerComponentClient } from "@/lib/supabase/server";
 import { FormPageLanguagePreferences } from "@/scaffolds/settings/form-page-language-preferences";
-import { RedirectPreferences } from "@/scaffolds/settings/redirect-preferences";
+import { EndingRedirectPreferences } from "@/scaffolds/settings/ending-redirect-preferences";
 import {
   MaxRespoonses,
   RestrictNumberOfResponseByCustomer,
@@ -101,12 +101,12 @@ export default async function FormsCustomizeSettingsPage({
       </Sector>
       <Sector>
         <SectorHeader>
-          <SectorHeading>Redirection</SectorHeading>
+          <SectorHeading>Ending</SectorHeading>
           <SectorDescription>
-            Customize redirection url after submission
+            Redirect or show custom page after form submission
           </SectorDescription>
         </SectorHeader>
-        <RedirectPreferences
+        <EndingRedirectPreferences
           form_id={form_id}
           init={{
             is_redirect_after_response_uri_enabled:
