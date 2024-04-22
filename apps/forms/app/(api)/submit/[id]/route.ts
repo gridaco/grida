@@ -117,10 +117,14 @@ async function submit({
   const keys = __keys.filter((key) => !system_gf_keys.includes(key));
 
   // customer handling
-  const _gf_customer_uuid = String(data.get(SYSTEM_GF_CUSTOMER_UUID_KEY));
-  const _fp_fingerprintjs_visitorid = String(
-    data.get(SYSTEM_GF_FINGERPRINT_VISITORID_KEY)
-  );
+
+  const _gf_customer_uuid: string | null = data.get(
+    SYSTEM_GF_CUSTOMER_UUID_KEY
+  ) as string;
+
+  const _fp_fingerprintjs_visitorid: string | null = data.get(
+    SYSTEM_GF_FINGERPRINT_VISITORID_KEY
+  ) as string;
 
   const customer = await upsert_customer_with({
     project_id: form_reference.project_id,

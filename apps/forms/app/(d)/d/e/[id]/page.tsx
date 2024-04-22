@@ -1,18 +1,20 @@
+import type { FormPageBackgroundSchema } from "@/types";
 import type {
   FormClientFetchResponseData,
   FormClientFetchResponseError,
 } from "@/app/(api)/v1/[id]/route";
-import type { FormFieldDefinition, FormPageBackgroundSchema } from "@/types";
 import { Form } from "@/scaffolds/e/form";
 import { EditorApiResponse } from "@/types/private/api";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { FormLoading } from "@/scaffolds/e/form/loading";
+import { FormPageDeveloperErrorDialog } from "@/scaffolds/e/form/error";
 import i18next from "i18next";
 
 export const revalidate = 0;
 
 const HOST_NAME = process.env.NEXT_PUBLIC_HOST_NAME || "http://localhost:3000";
 
+// TODO: add fingerprint support after via client side handling
 export default async function FormPage({
   params,
   searchParams,
@@ -44,7 +46,6 @@ export default async function FormPage({
     blocks,
     tree,
     fields,
-    required_hidden_fields,
     default_values,
     options,
     lang,
@@ -53,7 +54,11 @@ export default async function FormPage({
   } = data;
 
   if (error) {
-    return <FormPageDeveloperError {...error} />;
+    switch (error.code) {
+      case "FORM_RESPONSE_LIMIT_BY_CUSTOMER_REACHED":
+      case "FORM_RESPONSE_LIMIT_REACHED":
+        return redirect(`./${id}/alreadyresponded`);
+    }
   }
 
   return (
@@ -77,6 +82,11 @@ export default async function FormPage({
       />
       {background && (
         <FormPageBackground {...(background as FormPageBackgroundSchema)} />
+      )}
+      {error && (
+        <div className="absolute top-4 right-4">
+          <FormPageDeveloperErrorDialog {...error} />
+        </div>
       )}
     </FormLoading>
   );
@@ -105,36 +115,5 @@ function FormPageBackgroundIframe({ src }: { src: string }) {
       width="100vw"
       height="100vh"
     />
-  );
-}
-
-function FormPageDeveloperError({
-  code,
-  message,
-  missing_required_hidden_fields,
-}: {
-  code: string;
-  message?: string;
-  missing_required_hidden_fields?: FormFieldDefinition[];
-}) {
-  return (
-    <main className="font-mono p-8 prose">
-      <header>
-        <h1 className="text-2xl font-bold">
-          Developer Error: <code>{code}</code>{" "}
-        </h1>
-      </header>
-      <p>{message}</p>
-      {missing_required_hidden_fields && (
-        <>
-          <p>Missing required hidden fields:</p>
-          <ul>
-            {missing_required_hidden_fields.map((m) => (
-              <li key={m.name}>{m.name}</li>
-            ))}
-          </ul>
-        </>
-      )}
-    </main>
   );
 }

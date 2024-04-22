@@ -55,7 +55,9 @@ export type FormClientFetchResponseError =
   | MissingRequiredHiddenFieldsError
   | MaxResponseByCustomerError
   | {
-      code: string;
+      code:
+        | typeof UUID_FORMAT_MISMATCH.code
+        | typeof FORM_RESPONSE_LIMIT_REACHED.code;
       message: string;
     };
 export interface MissingRequiredHiddenFieldsError {
@@ -407,7 +409,7 @@ export async function GET(
         response.error = {
           ...FORM_RESPONSE_LIMIT_BY_CUSTOMER_REACHED,
           max: max_form_responses_by_customer ?? Infinity,
-          last_response_id: data?.[0]?.id,
+          last_response_id: data?.[0]?.id as string,
         };
       }
     } else {
