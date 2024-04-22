@@ -1,9 +1,11 @@
 import type { FormsPageLanguage } from "@/types";
 
+type TVal = string | { [key: string]: TVal };
+
 const resources: Record<
   FormsPageLanguage,
   {
-    translation: { [key: string]: string | { [key: string]: string } };
+    translation: { [key: string]: TVal };
   }
 > = {
   en: {
@@ -12,9 +14,12 @@ const resources: Record<
       back: "Previous",
       submit: "Submit",
       pay: "Pay",
-      page_complete: {
-        title: "Complete",
-        description: "You have completed all the required fields on this page",
+      formcomplete: {
+        receipt01: {
+          title: "Receipt Confirmed",
+          description:
+            "Consider taking a screenshot of this page for your records.",
+        },
       },
     },
   },
@@ -24,6 +29,13 @@ const resources: Record<
       back: "Anterior",
       submit: "Enviar",
       pay: "Pagar",
+      formcomplete: {
+        receipt01: {
+          title: "Recibo Confirmado",
+          description:
+            "Considere tomar una captura de pantalla de esta página para sus registros.",
+        },
+      },
     },
   },
   ko: {
@@ -32,9 +44,11 @@ const resources: Record<
       back: "이전",
       submit: "제출",
       pay: "결제",
-      page_complete: {
-        title: "완료",
-        description: "이 페이지의 필수 필드를 모두 작성했습니다",
+      formcomplete: {
+        receipt01: {
+          title: "접수 완료",
+          description: "스크린샷을 찍어 접수 번호를 저장하세요.",
+        },
       },
     },
   },
@@ -44,6 +58,13 @@ const resources: Record<
       back: "戻る",
       submit: "提出する",
       pay: "支払う",
+      formcomplete: {
+        receipt01: {
+          title: "受領確認済み",
+          description:
+            "このページのスクリーンショットを取って記録しておくことを検討してください。",
+        },
+      },
     },
   },
   zh: {
@@ -52,6 +73,12 @@ const resources: Record<
       back: "上一步",
       submit: "提交",
       pay: "支付",
+      formcomplete: {
+        receipt01: {
+          title: "收据已确认",
+          description: "考虑截图此页面以备记录。",
+        },
+      },
     },
   },
   fr: {
@@ -60,6 +87,13 @@ const resources: Record<
       back: "Précédent",
       submit: "Soumettre",
       pay: "Payer",
+      formcomplete: {
+        receipt01: {
+          title: "Reçu Confirmé",
+          description:
+            "Envisagez de prendre une capture d'écran de cette page pour vos dossiers.",
+        },
+      },
     },
   },
   pt: {
@@ -68,6 +102,13 @@ const resources: Record<
       back: "Anterior",
       submit: "Enviar",
       pay: "Pagar",
+      formcomplete: {
+        receipt01: {
+          title: "Recebimento Confirmado",
+          description:
+            "Considere tirar uma captura de tela desta página para seus registros.",
+        },
+      },
     },
   },
   it: {
@@ -76,6 +117,13 @@ const resources: Record<
       back: "Indietro",
       submit: "Invia",
       pay: "Paga",
+      formcomplete: {
+        receipt01: {
+          title: "Ricevuta Confermata",
+          description:
+            "Considera di fare uno screenshot di questa pagina per i tuoi archivi.",
+        },
+      },
     },
   },
   de: {
@@ -84,6 +132,13 @@ const resources: Record<
       back: "Zurück",
       submit: "Einreichen",
       pay: "Bezahlen",
+      formcomplete: {
+        receipt01: {
+          title: "Empfang Bestätigt",
+          description:
+            "Erwägen Sie, einen Screenshot dieser Seite für Ihre Unterlagen zu machen.",
+        },
+      },
     },
   },
   ru: {
@@ -92,6 +147,13 @@ const resources: Record<
       back: "Назад",
       submit: "Отправить",
       pay: "Оплатить",
+      formcomplete: {
+        receipt01: {
+          title: "Квитанция Подтверждена",
+          description:
+            "Рассмотрите возможность сделать скриншот этой страницы для ваших записей.",
+        },
+      },
     },
   },
   ar: {
@@ -100,6 +162,12 @@ const resources: Record<
       back: "السابق",
       submit: "إرسال",
       pay: "دفع",
+      formcomplete: {
+        receipt01: {
+          title: "تأكيد الاستلام",
+          description: "فكر في التقاط لقطة شاشة لهذه الصفحة لسجلاتك.",
+        },
+      },
     },
   },
   hi: {
@@ -108,6 +176,13 @@ const resources: Record<
       back: "पिछला",
       submit: "जमा करें",
       pay: "भुगतान करें",
+      formcomplete: {
+        receipt01: {
+          title: "रसीद की पुष्टि",
+          description:
+            "अपने रिकॉर्ड के लिए इस पेज का स्क्रीनशॉट लेने पर विचार करें।",
+        },
+      },
     },
   },
   nl: {
@@ -116,6 +191,13 @@ const resources: Record<
       back: "Vorige",
       submit: "Indienen",
       pay: "Betalen",
+      formcomplete: {
+        receipt01: {
+          title: "Ontvangst Bevestigd",
+          description:
+            "Overweeg een screenshot van deze pagina te maken voor uw administratie.",
+        },
+      },
     },
   },
 } as const;
