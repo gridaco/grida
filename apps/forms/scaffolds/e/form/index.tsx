@@ -295,7 +295,7 @@ export function Form({
       data-cjk={cjk.includes(lang)}
       className={clsx(
         "h-screen md:h-auto min-h-screen",
-        "relative container mx-auto prose dark:prose-invert",
+        "relative mx-auto prose dark:prose-invert",
         "data-[cjk='true']:break-keep",
         "flex flex-col"
       )}
