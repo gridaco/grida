@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { validate, version } from "uuid";
 
 const SYSTEM_GF_KEY_STARTS_WITH = "__gf_";
+const HOST = process.env.HOST;
 
 export const revalidate = 0;
 
@@ -98,6 +99,8 @@ async function submit({
   const {
     unknown_field_handling_strategy,
     is_redirect_after_response_uri_enabled,
+    is_ending_page_enabled,
+    ending_page_template_id,
     redirect_after_response_uri,
   } = form_reference;
 
@@ -295,6 +298,15 @@ async function submit({
         "There were unknown fields in the request. To allow them, set 'unknown_field_handling_strategy' to 'accept' in the form settings.",
       data: { keys: ignored_names },
     };
+  }
+
+  if (is_ending_page_enabled && ending_page_template_id) {
+    return NextResponse.redirect(
+      `${HOST}/d/e/${form_id}/complete?rid=${response?.id}`,
+      {
+        status: 301,
+      }
+    );
   }
 
   if (is_redirect_after_response_uri_enabled && redirect_after_response_uri) {
