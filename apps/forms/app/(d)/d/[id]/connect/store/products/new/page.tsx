@@ -76,7 +76,7 @@ function Info() {
   );
 }
 
-export function Variants() {
+function Variants() {
   return (
     <Card>
       <CardHeader>
@@ -183,7 +183,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
-export function Category() {
+function Category() {
   return (
     <Card>
       <CardHeader>
