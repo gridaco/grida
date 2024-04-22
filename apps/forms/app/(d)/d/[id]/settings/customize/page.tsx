@@ -19,6 +19,7 @@ import { CustomPoweredByBrandingPreferences } from "@/scaffolds/settings/custom-
 import { CustomSectionStylePreferences } from "@/scaffolds/settings/custom-section-style-preferences";
 import { CustomPageBackgroundPreferences } from "@/scaffolds/settings/custom-page-background-preferences";
 import { FormPage } from "@/types";
+import { EndingPagePreferences } from "@/scaffolds/settings/ending-page-preferences";
 
 export default async function FormsCustomizeSettingsPage({
   params,
@@ -49,6 +50,7 @@ export default async function FormsCustomizeSettingsPage({
   }
 
   const {
+    title,
     default_form_page_language,
     is_powered_by_branding_enabled,
     redirect_after_response_uri,
@@ -58,6 +60,8 @@ export default async function FormsCustomizeSettingsPage({
     max_form_responses_in_total,
     is_max_form_responses_in_total_enabled,
     default_page,
+    is_ending_page_enabled,
+    ending_page_template_id,
   } = data!;
 
   const { background, stylesheet } = default_page as any as FormPage;
@@ -106,14 +110,25 @@ export default async function FormsCustomizeSettingsPage({
             Redirect or show custom page after form submission
           </SectorDescription>
         </SectorHeader>
-        <EndingRedirectPreferences
-          form_id={form_id}
-          init={{
-            is_redirect_after_response_uri_enabled:
-              is_redirect_after_response_uri_enabled,
-            redirect_after_response_uri: redirect_after_response_uri ?? "",
-          }}
-        />
+        <SectorBlocks>
+          <EndingRedirectPreferences
+            form_id={form_id}
+            init={{
+              is_redirect_after_response_uri_enabled:
+                is_redirect_after_response_uri_enabled,
+              redirect_after_response_uri: redirect_after_response_uri ?? "",
+            }}
+          />
+          <EndingPagePreferences
+            form_id={form_id}
+            lng={default_form_page_language}
+            title={title}
+            init={{
+              enabled: is_ending_page_enabled,
+              template_id: ending_page_template_id,
+            }}
+          />
+        </SectorBlocks>
       </Sector>
       <Sector>
         <SectorHeader>
