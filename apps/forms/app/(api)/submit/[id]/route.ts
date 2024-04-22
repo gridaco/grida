@@ -147,7 +147,6 @@ async function submit({
     max_form_responses_in_total,
     is_max_form_responses_by_customer_enabled,
     max_form_responses_by_customer,
-    count_diff: 1,
   });
 
   if (max_access_error) {

@@ -3,9 +3,12 @@ import {
   FORM_RESPONSE_LIMIT_REACHED,
   MISSING_REQUIRED_HIDDEN_FIELDS,
   UUID_FORMAT_MISMATCH,
+  VISITORID_FORMAT_MISMATCH,
 } from "@/k/error";
 import {
+  SYSTEM_GF_CUSTOMER_EMAIL_KEY,
   SYSTEM_GF_CUSTOMER_UUID_KEY,
+  SYSTEM_GF_FINGERPRINT_VISITORID_KEY,
   SYSTEM_GF_KEY_STARTS_WITH,
 } from "@/k/system";
 import { blockstree } from "@/lib/forms/tree";
@@ -170,18 +173,14 @@ export async function GET(
   const id = context.params.id;
   const searchParams = req.nextUrl.searchParams;
 
-  const __keys = Array.from(req.nextUrl.searchParams.keys());
-  const system_gf_keys: string[] = __keys.filter((key) =>
-    key.startsWith(SYSTEM_GF_KEY_STARTS_WITH)
-  );
-
-  // system keys validation
-  if (system_gf_keys.includes(SYSTEM_GF_CUSTOMER_UUID_KEY)) {
-    if (!is_uuid_v4(searchParams.get(SYSTEM_GF_CUSTOMER_UUID_KEY) as string)) {
-      response.error = UUID_FORMAT_MISMATCH;
-    }
+  let system_keys: SystemKeys = {};
+  try {
+    system_keys = parse_system_keys(searchParams);
+  } catch (e) {
+    console.error("error while parsing system keys:", e);
+    // @ts-ignore
+    response.error = e;
   }
-  //
 
   const cookieStore = cookies();
   // TODO: strict with permissions
@@ -379,15 +378,17 @@ export async function GET(
   // fetch customer
   let customer: { uid: string } | null = null;
   if (
-    system_gf_keys.includes(SYSTEM_GF_CUSTOMER_UUID_KEY)
-    // TODO: or fingerprint
+    system_keys[SYSTEM_GF_CUSTOMER_UUID_KEY] ||
+    system_keys[SYSTEM_GF_FINGERPRINT_VISITORID_KEY] ||
+    system_keys[SYSTEM_GF_CUSTOMER_EMAIL_KEY]
   ) {
     customer = await upsert_customer_with({
       project_id: __project_id,
-      uuid: searchParams.get(SYSTEM_GF_CUSTOMER_UUID_KEY) as string,
+      uuid: system_keys[SYSTEM_GF_CUSTOMER_UUID_KEY],
       hints: {
-        // TODO: add fingerprint support
-        _fp_fingerprintjs_visitorid: undefined,
+        email: system_keys[SYSTEM_GF_CUSTOMER_EMAIL_KEY],
+        _fp_fingerprintjs_visitorid:
+          system_keys[SYSTEM_GF_FINGERPRINT_VISITORID_KEY],
       },
     });
   }
@@ -400,7 +401,10 @@ export async function GET(
     is_max_form_responses_by_customer_enabled,
     max_form_responses_by_customer,
   });
-  if (max_access_error) response.error = max_access_error;
+  if (max_access_error) {
+    response.error = max_access_error;
+    console.error("max access error", max_access_error);
+  }
 
   const payload: FormClientFetchResponseData = {
     title: title,
@@ -431,8 +435,6 @@ export async function GET(
 
   response.data = payload;
 
-  console.log(response.error, missing_required_hidden_fields);
-
   return NextResponse.json(response);
 }
 
@@ -459,4 +461,53 @@ function parseSeedFromSearchParams({
   );
 
   return { seed, missing_required_hidden_fields };
+}
+
+interface SystemKeys {
+  [SYSTEM_GF_FINGERPRINT_VISITORID_KEY]?: string;
+  [SYSTEM_GF_CUSTOMER_UUID_KEY]?: string;
+  [SYSTEM_GF_CUSTOMER_EMAIL_KEY]?: string;
+}
+
+function parse_system_keys(
+  data: URLSearchParams | Map<string, string>
+): SystemKeys {
+  const map: SystemKeys = {};
+  const keys = Array.from(data.keys());
+  const system_gf_keys: string[] = keys.filter((key) =>
+    key.startsWith(SYSTEM_GF_KEY_STARTS_WITH)
+  );
+
+  for (const key of system_gf_keys) {
+    const value = data.get(key) as string;
+    switch (key) {
+      case SYSTEM_GF_FINGERPRINT_VISITORID_KEY: {
+        if (value.length === 32) {
+          map[key] = value;
+          break;
+        } else {
+          throw VISITORID_FORMAT_MISMATCH;
+        }
+      }
+      case SYSTEM_GF_CUSTOMER_UUID_KEY: {
+        if (is_uuid_v4(value)) {
+          map[key] = value;
+          break;
+        } else {
+          throw UUID_FORMAT_MISMATCH;
+        }
+      }
+      case SYSTEM_GF_CUSTOMER_EMAIL_KEY: {
+        if (!value.includes("@")) {
+          // TODO: more strict email validation
+          map[key] = value;
+          break;
+        }
+      }
+      default:
+        break;
+    }
+  }
+
+  return map;
 }

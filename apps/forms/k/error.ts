@@ -9,6 +9,11 @@ export const UUID_FORMAT_MISMATCH = {
   message: "UUID format mismatch",
 } as const;
 
+export const VISITORID_FORMAT_MISMATCH = {
+  code: "VISITORID_FORMAT_MISMATCH",
+  message: "visitor id format mismatch possible forge attempt",
+} as const;
+
 export const FORM_RESPONSE_LIMIT_REACHED = {
   code: "FORM_RESPONSE_LIMIT_REACHED",
   message: "Form response limit reached",

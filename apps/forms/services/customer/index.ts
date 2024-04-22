@@ -16,11 +16,12 @@ export async function upsert_customer_with({
   const pl = {
     uuid: uuid,
     project_id: project_id,
+    email: hints?.email,
     _fp_fingerprintjs_visitorid: hints?._fp_fingerprintjs_visitorid,
     last_seen_at: new Date().toISOString(),
   } as const;
 
-  console.log("c:", pl);
+  console.log("customer::payload:", pl);
   if (uuid && is_uuid_v4(uuid)) {
     const { data: customer, error } = await workspaceclient
       .from("customer")
@@ -31,7 +32,7 @@ export async function upsert_customer_with({
       .single();
 
     if (error) {
-      console.error("c:", error);
+      console.error("customer::error-1:", error);
       if (error.code === "23505") {
         // this means there is a existing customer with (porbably) fingerprintjs_visitorid.
         // in this case, it needs to be merged (if possible - if the existing one does not have uuid set)
@@ -62,7 +63,7 @@ export async function upsert_customer_with({
       .select()
       .single();
 
-    error && console.error("c:", error);
+    error && console.error("customer::error-1:", error);
     return customer;
   }
 }
