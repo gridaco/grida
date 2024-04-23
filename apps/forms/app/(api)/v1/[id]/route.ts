@@ -48,11 +48,24 @@ export interface FormClientFetchResponseData {
   stylesheet?: FormPage["stylesheet"];
   default_values: { [key: string]: string };
   // access
-  is_closed: boolean;
-  is_closed_for_customer: boolean;
-  customer_identity_status: "anonymous" | "inferred" | "identified" | "trusted";
-  customer_identity_checked_by: "fingerprint" | "developer" | "system";
-  last_customer_response_id: string | null;
+  is_open: boolean;
+  customer_access: {
+    customer: {
+      uid: string;
+    } | null;
+    is_open: boolean;
+    customer_identity_status:
+      | "anonymous"
+      | "inferred"
+      | "identified"
+      | "trusted";
+    customer_identity_checked_by:
+      | "nocheck"
+      | "fingerprint"
+      | "developer"
+      | "system";
+    last_customer_response_id: string | null;
+  };
 }
 
 export type FormClientFetchResponseError =
@@ -406,6 +419,7 @@ export async function GET(
     console.error("max access error", max_access_error);
   }
 
+  const is_open = response.error === null;
   const payload: FormClientFetchResponseData = {
     title: title,
     tree: tree,
@@ -423,14 +437,20 @@ export async function GET(
     default_values: seed,
 
     // access
-    is_closed: response.error !== null,
-    is_closed_for_customer:
-      response.error?.code === FORM_RESPONSE_LIMIT_BY_CUSTOMER_REACHED.code,
-    // TODO:
-    customer_identity_status: "anonymous",
-    // TODO:
-    customer_identity_checked_by: "fingerprint",
-    last_customer_response_id: null,
+    is_open: is_open,
+    customer_access: {
+      customer: customer,
+      is_open:
+        is_open === false
+          ? false
+          : response.error?.code !==
+            FORM_RESPONSE_LIMIT_BY_CUSTOMER_REACHED.code,
+      // TODO:
+      customer_identity_status: "anonymous",
+      // TODO:
+      customer_identity_checked_by: "nocheck",
+      last_customer_response_id: null,
+    },
   };
 
   response.data = payload;

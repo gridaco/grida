@@ -64,9 +64,9 @@ export async function validate_max_access({
         };
       }
     } else {
-      // TODO:
-      // there is a limit to 'by-customer' but there was no way to identify this customer, which forcing it to close.
-      throw new Error("customer_id is required");
+      // there is a limit to 'by-customer' but there was no way to identify this customer
+      // yet, we are allowing this since the api can be accessed by anyone for pinning
+      return null;
     }
   }
 
