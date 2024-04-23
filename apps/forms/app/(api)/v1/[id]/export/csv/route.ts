@@ -3,6 +3,8 @@ import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
 import { NextRequest, NextResponse } from "next/server";
 import { stringify } from "csv-stringify/sync";
+import { unwrapFeildValue } from "@/lib/forms/unwrap";
+import { fmt_hashed_local_id } from "@/utils/fmt";
 
 export async function GET(
   req: NextRequest,
@@ -32,8 +34,8 @@ export async function GET(
 
   // headers
   const headers = [
-    "id",
-    "idx",
+    "id", // id
+    "no", // local_id
     "created_at",
     ...fields.map((field) => field.name),
   ];
@@ -44,11 +46,13 @@ export async function GET(
       const responseField = response.fields.find(
         (f) => f.form_field_id === field.id
       );
-      return responseField ? responseField.value : "";
+      return responseField
+        ? unwrapFeildValue(responseField.value, responseField.type)
+        : "";
     });
     return [
       response.id,
-      response.local_id,
+      fmt_hashed_local_id(response.local_id),
       response.created_at,
       ...responseValues,
     ];

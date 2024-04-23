@@ -40,6 +40,7 @@ import { useEditorState } from "../editor";
 import { GFRow } from "./types";
 import { SelectColumn } from "./select-column";
 import "./grid.css";
+import { unwrapFeildValue } from "@/lib/forms/unwrap";
 
 function rowKeyGetter(row: GFRow) {
   return row.__gf_id;
@@ -299,22 +300,17 @@ function FieldCell({ column, row }: RenderCellProps<any>) {
 
   const { type, value } = data;
 
-  const unwrapped = JSON.parse(value);
+  const unwrapped = unwrapFeildValue(value, type as FormFieldType, {
+    obscure: true,
+  });
 
-  let display = unwrapped;
   switch (type as FormFieldType) {
-    case "text":
-      display = unwrapped;
-      break;
-    case "password":
-      display = "●".repeat(display?.length ?? 0);
-      break;
     case "checkbox": {
-      return <input type="checkbox" checked={unwrapped} disabled />;
+      return <input type="checkbox" checked={unwrapped as boolean} disabled />;
     }
+    default:
+      return <div>{unwrapped}</div>;
   }
-
-  return <div>{display}</div>;
 }
 
 function FieldEditCell(props: RenderEditCellProps<any>) {
