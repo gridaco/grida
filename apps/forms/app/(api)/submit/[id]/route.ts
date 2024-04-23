@@ -150,14 +150,28 @@ async function submit({
   });
 
   if (max_access_error) {
-    return NextResponse.json(
-      {
-        error: max_access_error,
-      },
-      {
-        status: 400,
-      }
-    );
+    switch (max_access_error.code) {
+      case "FORM_RESPONSE_LIMIT_BY_CUSTOMER_REACHED":
+        return NextResponse.redirect(
+          `${HOST}/d/e/${form_id}/alreadyresponded`,
+          {
+            status: 301,
+          }
+        );
+      case "FORM_RESPONSE_LIMIT_REACHED":
+        return NextResponse.redirect(`${HOST}/d/e/${form_id}/formclosed`, {
+          status: 301,
+        });
+      default:
+        return NextResponse.json(
+          {
+            error: max_access_error,
+          },
+          {
+            status: 400,
+          }
+        );
+    }
   }
 
   // get the fields ready
