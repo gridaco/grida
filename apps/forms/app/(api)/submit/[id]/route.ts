@@ -9,6 +9,7 @@ import { validate_max_access } from "@/services/form/validate-max-access";
 import { is_uuid_v4 } from "@/utils/is";
 import { NextRequest, NextResponse } from "next/server";
 import { formlink } from "@/lib/forms/url";
+import { FORM_CLOSED_WHILE_RESPONDING } from "@/k/error";
 
 const HOST = process.env.HOST || "http://localhost:3000";
 
@@ -160,9 +161,14 @@ async function submit({
           }
         );
       case "FORM_RESPONSE_LIMIT_REACHED":
-        return NextResponse.redirect(formlink(HOST, form_id, "formclosed"), {
-          status: 301,
-        });
+        return NextResponse.redirect(
+          formlink(HOST, form_id, "formclosed", {
+            oops: FORM_CLOSED_WHILE_RESPONDING.code,
+          }),
+          {
+            status: 301,
+          }
+        );
       default:
         return NextResponse.json(
           {

@@ -23,3 +23,8 @@ export const FORM_RESPONSE_LIMIT_BY_CUSTOMER_REACHED = {
   code: "FORM_RESPONSE_LIMIT_BY_CUSTOMER_REACHED",
   message: "Form response limit by customer reached",
 } as const;
+
+export const FORM_CLOSED_WHILE_RESPONDING = {
+  code: "FORM_CLOSED_WHILE_RESPONDING",
+  message: "Form closed while responding",
+} as const;
