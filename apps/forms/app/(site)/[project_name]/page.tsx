@@ -147,6 +147,7 @@ function GridCard({
   title,
   responses,
   thumbnail,
+  max_form_responses_in_total,
 }: FormDashboardItem & { thumbnail: string }) {
   return (
     <div className="rounded border border-neutral-500/10 bg-white dark:bg-neutral-900 shadow-md">
@@ -159,7 +160,15 @@ function GridCard({
       />
       <div className="px-4 py-2 flex flex-col gap-2">
         <span>{title}</span>
-        <span className="text-xs opacity-50">{responses.length} responses</span>
+        <span className="text-xs opacity-50">
+          {max_form_responses_in_total ? (
+            <>
+              {responses.length} / {max_form_responses_in_total} responses
+            </>
+          ) : (
+            <>{responses.length} responses</>
+          )}
+        </span>
       </div>
     </div>
   );
@@ -170,6 +179,7 @@ function RowCard({
   responses,
   created_at,
   updated_at,
+  max_form_responses_in_total,
 }: FormDashboardItem) {
   return (
     <div className="flex items-center border rounded-xl overflow-hidden h-16 shadow-md bg-white dark:bg-neutral-900">
@@ -188,7 +198,15 @@ function RowCard({
           </span>
         </div>
       </div>
-      <div className="opacity-80 w-32 text-sm">{responses.length}</div>
+      <div className="opacity-80 w-32 text-sm">
+        {max_form_responses_in_total ? (
+          <>
+            {responses.length} / {max_form_responses_in_total}
+          </>
+        ) : (
+          <>{responses.length}</>
+        )}
+      </div>
       <div className="opacity-80 w-44 text-sm">
         {new Date(updated_at).toLocaleDateString()}
       </div>
