@@ -21,6 +21,7 @@ export type Database = {
           id: string
           is_edit_after_submission_allowed: boolean
           is_ending_page_enabled: boolean
+          is_force_closed: boolean
           is_max_form_responses_by_customer_enabled: boolean
           is_max_form_responses_in_total_enabled: boolean
           is_multiple_response_allowed: boolean
@@ -45,6 +46,7 @@ export type Database = {
           id?: string
           is_edit_after_submission_allowed?: boolean
           is_ending_page_enabled?: boolean
+          is_force_closed?: boolean
           is_max_form_responses_by_customer_enabled?: boolean
           is_max_form_responses_in_total_enabled?: boolean
           is_multiple_response_allowed?: boolean
@@ -69,6 +71,7 @@ export type Database = {
           id?: string
           is_edit_after_submission_allowed?: boolean
           is_ending_page_enabled?: boolean
+          is_force_closed?: boolean
           is_max_form_responses_by_customer_enabled?: boolean
           is_max_form_responses_in_total_enabled?: boolean
           is_multiple_response_allowed?: boolean
@@ -654,7 +657,10 @@ export type Database = {
           _fp_fingerprintjs_visitorid: string | null
           created_at: string
           email: string | null
+          is_email_verified: boolean
+          is_phone_verified: boolean
           last_seen_at: string
+          phone: string | null
           project_id: number
           uid: string
           uuid: string | null
@@ -663,7 +669,10 @@ export type Database = {
           _fp_fingerprintjs_visitorid?: string | null
           created_at?: string
           email?: string | null
+          is_email_verified?: boolean
+          is_phone_verified?: boolean
           last_seen_at?: string
+          phone?: string | null
           project_id: number
           uid?: string
           uuid?: string | null
@@ -672,7 +681,10 @@ export type Database = {
           _fp_fingerprintjs_visitorid?: string | null
           created_at?: string
           email?: string | null
+          is_email_verified?: boolean
+          is_phone_verified?: boolean
           last_seen_at?: string
+          phone?: string | null
           project_id?: number
           uid?: string
           uuid?: string | null

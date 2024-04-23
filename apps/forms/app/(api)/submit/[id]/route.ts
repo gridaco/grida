@@ -114,6 +114,7 @@ async function submit({
     max_form_responses_in_total,
     is_max_form_responses_by_customer_enabled,
     max_form_responses_by_customer,
+    is_force_closed,
   } = form_reference;
 
   const entries = data.entries();
@@ -179,6 +180,17 @@ async function submit({
           }
         );
     }
+  }
+
+  if (is_force_closed) {
+    return NextResponse.redirect(
+      formlink(HOST, form_id, "formclosed", {
+        oops: FORM_CLOSED_WHILE_RESPONDING.code,
+      }),
+      {
+        status: 301,
+      }
+    );
   }
 
   // get the fields ready

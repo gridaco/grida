@@ -2,10 +2,6 @@ import React from "react";
 import { createServerComponentClient } from "@/lib/supabase/server";
 import { FormPageLanguagePreferences } from "@/scaffolds/settings/form-page-language-preferences";
 import { EndingRedirectPreferences } from "@/scaffolds/settings/ending-redirect-preferences";
-import {
-  MaxRespoonses,
-  RestrictNumberOfResponseByCustomer,
-} from "@/scaffolds/settings/response-preferences";
 import { cookies } from "next/headers";
 import {
   Sector,
@@ -55,10 +51,6 @@ export default async function FormsCustomizeSettingsPage({
     is_powered_by_branding_enabled,
     redirect_after_response_uri,
     is_redirect_after_response_uri_enabled,
-    max_form_responses_by_customer,
-    is_max_form_responses_by_customer_enabled,
-    max_form_responses_in_total,
-    is_max_form_responses_in_total_enabled,
     default_page,
     is_ending_page_enabled,
     ending_page_template_id,
@@ -78,30 +70,6 @@ export default async function FormsCustomizeSettingsPage({
             default_form_page_language,
           }}
         />
-      </Sector>
-      <Sector>
-        <SectorHeader>
-          <SectorHeading>Responses</SectorHeading>
-          <SectorDescription>
-            Manage how responses are collected and protected
-          </SectorDescription>
-        </SectorHeader>
-        <SectorBlocks>
-          <RestrictNumberOfResponseByCustomer
-            form_id={form_id}
-            init={{
-              is_max_form_responses_by_customer_enabled,
-              max_form_responses_by_customer,
-            }}
-          />
-          <MaxRespoonses
-            form_id={form_id}
-            init={{
-              is_max_form_responses_in_total_enabled,
-              max_form_responses_in_total,
-            }}
-          />
-        </SectorBlocks>
       </Sector>
       <Sector>
         <SectorHeader>

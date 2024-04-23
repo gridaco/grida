@@ -115,6 +115,7 @@ export function Form({
     switch (error.code) {
       case "FORM_RESPONSE_LIMIT_BY_CUSTOMER_REACHED":
         return redirect(`./${form_id}/alreadyresponded`);
+      case "FORM_FORCE_CLOSED":
       case "FORM_RESPONSE_LIMIT_REACHED":
         return redirect(`./${form_id}/formclosed`);
     }

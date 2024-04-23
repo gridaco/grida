@@ -67,6 +67,7 @@ export async function validate_max_access({
       // there is a limit to 'by-customer' but there was no way to identify this customer
       // yet, we are allowing this since the api can be accessed by anyone for pinning
       return null;
+      // TODO: revise me
     }
   }
 
