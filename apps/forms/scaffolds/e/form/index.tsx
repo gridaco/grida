@@ -8,7 +8,6 @@ import type {
 import { EditorApiResponse } from "@/types/private/api";
 import { notFound, redirect } from "next/navigation";
 import { FormPageDeveloperErrorDialog } from "@/scaffolds/e/form/error";
-import i18next from "i18next";
 import useSWR from "swr";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -115,8 +114,9 @@ export function Form({
   if (error) {
     switch (error.code) {
       case "FORM_RESPONSE_LIMIT_BY_CUSTOMER_REACHED":
-      case "FORM_RESPONSE_LIMIT_REACHED":
         return redirect(`./${form_id}/alreadyresponded`);
+      case "FORM_RESPONSE_LIMIT_REACHED":
+        return redirect(`./${form_id}/formclosed`);
     }
   }
 

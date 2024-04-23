@@ -8,7 +8,13 @@ import {
   PreferenceBoxHeader,
   cls_save_button,
 } from "@/components/preferences";
-import { Select } from "@/components/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 const HOST_NAME = process.env.NEXT_PUBLIC_HOST_NAME || "http://localhost:3000";
 
@@ -40,11 +46,15 @@ export function EndingPagePreferences({
           <input type="hidden" name="form_id" value={form_id} />
           <Select
             name="template_id"
-            value={template ?? ""}
-            onChange={(e) => setTemplate(e.target.value)}
+            value={template || undefined}
+            onValueChange={setTemplate}
           >
-            <option value="">None</option>
-            <option value="receipt01">Receipt 01</option>
+            <SelectTrigger>
+              <SelectValue placeholder="None" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="receipt01">Receipt 01</SelectItem>
+            </SelectContent>
           </Select>
           <p className="mt-1 opacity-80">
             Enabling ending page will disable redirection

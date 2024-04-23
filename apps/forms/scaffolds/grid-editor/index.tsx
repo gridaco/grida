@@ -17,6 +17,13 @@ import { useEditorState } from "../editor";
 import Link from "next/link";
 import { DownloadIcon, TrashIcon } from "@radix-ui/react-icons";
 import { fmt_hashed_local_id } from "@/utils/fmt";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 export function GridEditor() {
   const [state, dispatch] = useEditorState();
@@ -215,21 +222,28 @@ function MaxRowsSelect() {
   const [state, dispatch] = useEditorState();
 
   return (
-    <select
-      className="p-2 bg-neutral-100 dark:bg-neutral-900 rounded"
-      value={state.responses_pagination_rows}
-      onChange={(e) => {
-        dispatch({
-          type: "editor/responses/pagination/rows",
-          max: parseInt(e.target.value),
-        });
-      }}
-    >
-      <option label="10 rows" value={10} />
-      <option label="100 rows" value={100} />
-      <option label="500 rows" value={500} />
-      <option label="1000 rows" value={1000} />
-    </select>
+    <div>
+      <Select
+        value={state.responses_pagination_rows + ""}
+        onValueChange={(value) => {
+          dispatch({
+            type: "editor/responses/pagination/rows",
+            max: parseInt(value),
+          });
+        }}
+      >
+        <SelectTrigger>
+          <SelectValue placeholder="rows" />
+        </SelectTrigger>
+        <SelectContent>
+          <></>
+          <SelectItem value={10 + ""}>10 rows</SelectItem>
+          <SelectItem value={100 + ""}>100 rows</SelectItem>
+          <SelectItem value={500 + ""}>500 rows</SelectItem>
+          <SelectItem value={1000 + ""}>1000 rows</SelectItem>
+        </SelectContent>
+      </Select>
+    </div>
   );
 }
 

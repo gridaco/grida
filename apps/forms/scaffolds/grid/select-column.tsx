@@ -19,6 +19,8 @@ import { GFRow } from "./types";
 import * as Tooltip from "@radix-ui/react-tooltip";
 import { EnterFullScreenIcon } from "@radix-ui/react-icons";
 import { useEditorState } from "../editor";
+import { Checkbox } from "@/components/ui/checkbox";
+import { CheckedState } from "@radix-ui/react-checkbox";
 
 function stopPropagation(event: SyntheticEvent) {
   event.stopPropagation();
@@ -115,7 +117,6 @@ function SelectCellFormatter({
   value,
   tabIndex,
   disabled,
-  onClick,
   onChange,
   "aria-label": ariaLabel,
   "aria-labelledby": ariaLabelledBy,
@@ -123,8 +124,8 @@ function SelectCellFormatter({
   const id = row?.__gf_id;
   const [state, dispatch] = useEditorState();
 
-  function handleChange(e: ChangeEvent<HTMLInputElement>) {
-    onChange(e.target.checked, (e.nativeEvent as MouseEvent).shiftKey);
+  function handleChange(checked: CheckedState) {
+    onChange(checked === true, false);
   }
 
   const onEnterFullScreenClick = useCallback(() => {
@@ -136,16 +137,15 @@ function SelectCellFormatter({
 
   return (
     <div className="group sb-grid-select-cell__formatter">
-      <input
+      <Checkbox
         aria-label={ariaLabel}
         aria-labelledby={ariaLabelledBy}
         tabIndex={tabIndex}
-        type="checkbox"
         className="rdg-row__select-column__select-action"
         disabled={disabled}
         checked={value}
-        onChange={handleChange}
-        onClick={onClick}
+        onCheckedChange={handleChange}
+        onClick={stopPropagation}
       />
       {row && (
         <Tooltip.Root delayDuration={0}>
@@ -188,26 +188,24 @@ function SelectCellHeader({
   tabIndex,
   value,
   onChange,
-  onClick,
   "aria-label": ariaLabel,
   "aria-labelledby": ariaLabelledBy,
 }: SelectCellHeaderProps) {
-  function handleChange(e: ChangeEvent<HTMLInputElement>) {
-    onChange(e.target.checked, (e.nativeEvent as MouseEvent).shiftKey);
+  function handleChange(checked: CheckedState) {
+    onChange(checked === true, false);
   }
 
   return (
     <div className="sb-grid-select-cell__header">
-      <input
+      <Checkbox
         aria-label={ariaLabel}
         aria-labelledby={ariaLabelledBy}
         tabIndex={tabIndex}
-        type="checkbox"
-        className="sb-grid-select-cell__header__input"
+        className="rdg-row__select-column__select-action"
         disabled={disabled}
         checked={value}
-        onChange={handleChange}
-        onClick={onClick}
+        onCheckedChange={handleChange}
+        onClick={stopPropagation}
       />
     </div>
   );

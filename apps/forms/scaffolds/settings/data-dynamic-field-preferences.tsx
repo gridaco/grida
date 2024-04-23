@@ -9,7 +9,13 @@ import {
   PreferenceBoxHeader,
   cls_save_button,
 } from "@/components/preferences";
-import { Select } from "@/components/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { FormResponseUnknownFieldHandlingStrategyType } from "@/types";
 
 export function UnknownFieldPreferences({
@@ -46,13 +52,18 @@ export function UnknownFieldPreferences({
                 <Select
                   name="unknown_field_handling_strategy"
                   value={strategy}
-                  onChange={(e) => {
-                    setStrategy(e.target.value as any);
+                  onValueChange={(value) => {
+                    setStrategy(value as any);
                   }}
                 >
-                  <option value="accept">Accept</option>
-                  <option value="ignore">Ignore</option>
-                  <option value="reject">Reject</option>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="accept">Accept</SelectItem>
+                    <SelectItem value="ignore">Ignore</SelectItem>
+                    <SelectItem value="reject">Reject</SelectItem>
+                  </SelectContent>
                 </Select>
                 <div className="opacity-80">
                   {strategy_descriptions[strategy]}

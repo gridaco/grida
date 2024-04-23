@@ -1,6 +1,6 @@
 import { FormFieldDataSchema, FormFieldType, PaymentFieldData } from "@/types";
 import React, { useEffect } from "react";
-import { Select as HtmlSelect } from "../select";
+import { Select as HtmlSelect } from "../vanilla/select";
 import {
   Select,
   SelectContent,

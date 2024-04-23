@@ -46,26 +46,29 @@ export function InitialResponsesProvider({
 
   const initially_fetched_responses = React.useRef(false);
 
-  const fetchResponses = useCallback(async () => {
-    // fetch the responses
-    const { data, error } = await supabase
-      .from("response")
-      .select(
-        `
+  const fetchResponses = useCallback(
+    async (limit: number = 100) => {
+      // fetch the responses
+      const { data, error } = await supabase
+        .from("response")
+        .select(
+          `
             *,
             fields:response_field(*)
         `
-      )
-      .eq("form_id", state.form_id)
-      .order("local_id")
-      .limit(state.responses_pagination_rows ?? 100);
+        )
+        .eq("form_id", state.form_id)
+        .order("local_id")
+        .limit(limit);
 
-    if (error) {
-      throw new Error();
-    }
+      if (error) {
+        throw new Error();
+      }
 
-    return data;
-  }, [supabase, state.responses_pagination_rows, state.form_id]);
+      return data;
+    },
+    [supabase, state.form_id]
+  );
 
   useEffect(() => {
     // initially fetch the responses
@@ -76,19 +79,47 @@ export function InitialResponsesProvider({
 
     initially_fetched_responses.current = true;
 
-    const feed = fetchResponses().then((data) => {
-      dispatch({
-        type: "editor/response/feed",
-        data: data,
-      });
-    });
+    const feed = fetchResponses(state.responses_pagination_rows).then(
+      (data) => {
+        dispatch({
+          type: "editor/response/feed",
+          data: data,
+          reset: true,
+        });
+      }
+    );
 
     toast.promise(feed, {
       loading: "Fetching responses...",
       success: "Responses fetched",
       error: "Failed to fetch responses",
     });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dispatch, fetchResponses]);
+
+  // TODO: this gets called twice after the first hook, initially.
+  useEffect(() => {
+    // re-fetch when the pagination rows change, only if the initial fetch is done
+    if (!initially_fetched_responses.current) {
+      return;
+    }
+
+    const feed = fetchResponses(state.responses_pagination_rows).then(
+      (data) => {
+        dispatch({
+          type: "editor/response/feed",
+          data: data,
+          reset: true,
+        });
+      }
+    );
+
+    toast.promise(feed, {
+      loading: "Fetching responses...",
+      success: "Responses fetched",
+      error: "Failed to fetch responses",
+    });
+  }, [dispatch, fetchResponses, state.responses_pagination_rows]);
 
   return <>{children}</>;
 }

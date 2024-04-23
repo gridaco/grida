@@ -458,13 +458,19 @@ export function reducer(
       });
     }
     case "editor/response/feed": {
-      const { data } = <FeedResponseAction>action;
+      const { data, reset } = <FeedResponseAction>action;
       return produce(state, (draft) => {
         // Initialize draft.responses if it's not already an array
         if (!Array.isArray(draft.responses)) {
           draft.responses = [];
         }
 
+        if (reset) {
+          draft.responses = data;
+          return;
+        }
+
+        // Merge & Add new responses to the existing responses
         // Map of ids to responses for the existing responses
         const existingResponsesById = draft.responses.reduce(
           (acc: any, response) => {

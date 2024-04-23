@@ -17,9 +17,15 @@ import { EditorFlatFormBlock } from "@/scaffolds/editor/state";
 import { BlockHeader, FlatBlockBase, useDeleteBlock } from "./base-block";
 import { useEditorState } from "@/scaffolds/editor";
 import { FormFieldDefinition } from "@/types";
-import { Select } from "@/components/select";
 import Link from "next/link";
 import { FormFieldPreview } from "@/components/formfield";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 export function FieldBlock({
   id,
@@ -77,29 +83,31 @@ export function FieldBlock({
             <InputIcon />
             <Select
               value={form_field_id ?? ""}
-              onChange={(e) => {
-                if (e.target.value === "__gf_new") {
+              onValueChange={(value) => {
+                if (value === "__gf_new") {
                   onNewFieldClick();
                   return;
                 }
-                onFieldChange(e.target.value);
+                onFieldChange(value);
               }}
             >
-              <option value="" disabled>
-                Select Field
-              </option>
-              {state.fields.map((f) => (
-                <option
-                  key={f.id}
-                  value={f.id}
-                  disabled={!available_field_ids.includes(f.id)}
-                >
-                  {f.name}
-                </option>
-              ))}
-              {can_create_new_field_from_this_block && (
-                <option value="__gf_new">Create New Field</option>
-              )}
+              <SelectTrigger id="category" aria-label="Select category">
+                <SelectValue placeholder="Select Field" />
+              </SelectTrigger>
+              <SelectContent>
+                {state.fields.map((f) => (
+                  <SelectItem
+                    key={f.id}
+                    value={f.id}
+                    disabled={!available_field_ids.includes(f.id)}
+                  >
+                    {f.name}
+                  </SelectItem>
+                ))}
+                {can_create_new_field_from_this_block && (
+                  <SelectItem value="__gf_new">Create New Field</SelectItem>
+                )}
+              </SelectContent>
             </Select>
           </span>
         </div>

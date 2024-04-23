@@ -7,11 +7,7 @@ import {
   workspaceclient,
 } from "@/lib/supabase/server";
 import { GridaLogo } from "@/components/grida-logo";
-import {
-  PlusIcon,
-  ViewGridIcon,
-  ViewHorizontalIcon,
-} from "@radix-ui/react-icons";
+import { ViewGridIcon, ViewHorizontalIcon } from "@radix-ui/react-icons";
 import { CreateNewFormButton } from "@/components/create-form-button";
 import { Form } from "@/types";
 import Image from "next/image";
@@ -19,7 +15,7 @@ import Image from "next/image";
 export const revalidate = 0;
 
 interface FormDashboardItem extends Form {
-  responses: { id: string }[];
+  responses: number;
 }
 
 export default async function FormsDashboardPage({
@@ -59,15 +55,25 @@ export default async function FormsDashboardPage({
 
   const project_id = project_ref.id;
 
-  const { data: forms, error } = await supabase
+  // fetch forms with responses count
+  const { data: __forms, error } = await supabase
     .from("form")
-    .select("*, responses:response(id)")
+    .select("*, response(count) ")
     .eq("project_id", project_id)
     .order("updated_at", { ascending: false });
 
-  if (!forms) {
+  if (!__forms) {
     return notFound();
   }
+
+  const forms: FormDashboardItem[] = __forms.map(
+    (form) =>
+      ({
+        ...form,
+        responses: (form.response as any as { count: number }[])[0]?.count || 0, // Unwrap count or default to 0 if no responses
+      }) as FormDashboardItem
+  );
+  //
 
   const count = forms.length;
 
@@ -147,6 +153,7 @@ function GridCard({
   title,
   responses,
   thumbnail,
+  max_form_responses_in_total,
 }: FormDashboardItem & { thumbnail: string }) {
   return (
     <div className="rounded border border-neutral-500/10 bg-white dark:bg-neutral-900 shadow-md">
@@ -159,7 +166,15 @@ function GridCard({
       />
       <div className="px-4 py-2 flex flex-col gap-2">
         <span>{title}</span>
-        <span className="text-xs opacity-50">{responses.length} responses</span>
+        <span className="text-xs opacity-50">
+          {max_form_responses_in_total ? (
+            <>
+              {responses} / {max_form_responses_in_total} responses
+            </>
+          ) : (
+            <>{responses} responses</>
+          )}
+        </span>
       </div>
     </div>
   );
@@ -170,6 +185,7 @@ function RowCard({
   responses,
   created_at,
   updated_at,
+  max_form_responses_in_total,
 }: FormDashboardItem) {
   return (
     <div className="flex items-center border rounded-xl overflow-hidden h-16 shadow-md bg-white dark:bg-neutral-900">
@@ -188,7 +204,15 @@ function RowCard({
           </span>
         </div>
       </div>
-      <div className="opacity-80 w-32 text-sm">{responses.length}</div>
+      <div className="opacity-80 w-32 text-sm">
+        {max_form_responses_in_total ? (
+          <>
+            {responses} / {max_form_responses_in_total}
+          </>
+        ) : (
+          <>{responses}</>
+        )}
+      </div>
       <div className="opacity-80 w-44 text-sm">
         {new Date(updated_at).toLocaleDateString()}
       </div>
