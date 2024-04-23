@@ -113,6 +113,7 @@ export interface DeleteFieldAction {
 export interface FeedResponseAction {
   type: "editor/response/feed";
   data: any[];
+  reset?: boolean;
 }
 
 export interface SelectResponse {

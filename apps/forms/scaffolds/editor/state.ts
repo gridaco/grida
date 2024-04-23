@@ -35,7 +35,7 @@ export function initialFormEditorState(init: FormEditorInit): FormEditorState {
     fields: init.fields,
     selected_responses: new Set(),
     available_field_ids: block_available_field_ids,
-    responses_pagination_rows: 500,
+    responses_pagination_rows: 100,
   };
 }
 
