@@ -7,6 +7,7 @@ import {
 } from "@/components/ui/card";
 import { FORM_CLOSED_WHILE_RESPONDING } from "@/k/error";
 import Link from "next/link";
+import i18next from "i18next";
 
 export default function FormClosedPage({
   searchParams,
@@ -21,20 +22,19 @@ export default function FormClosedPage({
           {oops === FORM_CLOSED_WHILE_RESPONDING.code ? (
             <>
               <h2 className="text-lg font-bold tracking-tight">
-                Form Closed While Responding
+                {i18next.t("formclosed.while_responding.title")}
               </h2>
               <p className="text-sm text-center text-gray-500">
-                Thank you for your interest. Unfortunately, the form is closed
-                while responding. If you believe this is a mistake, please
-                contact support.
+                {i18next.t("formclosed.while_responding.description")}
               </p>
             </>
           ) : (
             <>
-              <h2 className="text-lg font-bold tracking-tight">Form Closed</h2>
+              <h2 className="text-lg font-bold tracking-tight">
+                {i18next.t("formclosed.default.title")}
+              </h2>
               <p className="text-sm text-center text-gray-500">
-                Form is closed. If you believe this is a mistake, please contact
-                support.
+                {i18next.t("formclosed.default.description")}
               </p>
             </>
           )}
