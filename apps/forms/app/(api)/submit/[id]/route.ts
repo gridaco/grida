@@ -8,8 +8,9 @@ import { upsert_customer_with } from "@/services/customer";
 import { validate_max_access } from "@/services/form/validate-max-access";
 import { is_uuid_v4 } from "@/utils/is";
 import { NextRequest, NextResponse } from "next/server";
+import { formlink } from "@/lib/forms/url";
 
-const HOST = process.env.HOST;
+const HOST = process.env.HOST || "http://localhost:3000";
 
 export const revalidate = 0;
 
@@ -153,13 +154,13 @@ async function submit({
     switch (max_access_error.code) {
       case "FORM_RESPONSE_LIMIT_BY_CUSTOMER_REACHED":
         return NextResponse.redirect(
-          `${HOST}/d/e/${form_id}/alreadyresponded`,
+          formlink(HOST, form_id, "alreadyresponded"),
           {
             status: 301,
           }
         );
       case "FORM_RESPONSE_LIMIT_REACHED":
-        return NextResponse.redirect(`${HOST}/d/e/${form_id}/formclosed`, {
+        return NextResponse.redirect(formlink(HOST, form_id, "formclosed"), {
           status: 301,
         });
       default:
@@ -345,7 +346,9 @@ async function submit({
 
   if (is_ending_page_enabled && ending_page_template_id) {
     return NextResponse.redirect(
-      `${HOST}/d/e/${form_id}/complete?rid=${response?.id}`,
+      formlink(HOST, form_id, "complete", {
+        rid: response?.id,
+      }),
       {
         status: 301,
       }
