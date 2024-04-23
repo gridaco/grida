@@ -8,7 +8,13 @@ import {
   PreferenceBoxHeader,
   cls_save_button,
 } from "@/components/preferences";
-import { Select } from "@/components/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { FormPageBackgroundSchema } from "@/types";
 import { section_style_glass_morphism } from "@/theme/section/css";
 
@@ -37,10 +43,16 @@ export function CustomSectionStylePreferences({
           <Select
             name="css"
             value={css}
-            onChange={(e) => setCss(e.target.value)}
+            onValueChange={(value) => setCss(value)}
           >
-            <option value="">None</option>
-            <option value={section_style_glass_morphism}>Glass Morphism</option>
+            <SelectTrigger>
+              <SelectValue placeholder="None" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={section_style_glass_morphism}>
+                Glass Morphism
+              </SelectItem>
+            </SelectContent>
           </Select>
         </form>
         {css && (

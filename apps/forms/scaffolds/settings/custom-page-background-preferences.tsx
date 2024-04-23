@@ -8,7 +8,13 @@ import {
   PreferenceBoxHeader,
   cls_save_button,
 } from "@/components/preferences";
-import { Select } from "@/components/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { FormPageBackgroundSchema } from "@/types";
 
 const HOST_NAME = process.env.NEXT_PUBLIC_HOST_NAME || "http://localhost:3000";
@@ -37,26 +43,30 @@ export function CustomPageBackgroundPreferences({
           <Select
             name="src"
             value={src}
-            onChange={(e) => setSrc(e.target.value)}
+            onValueChange={(value) => setSrc(value)}
           >
-            <option value="">None</option>
-            <option value={`${HOST_NAME}/theme/embed/backgrounds/aurora`}>
-              Aurora
-            </option>
-            <option value={`${HOST_NAME}/theme/embed/backgrounds/dots`}>
-              Dots
-            </option>
-            <option value={`${HOST_NAME}/theme/embed/backgrounds/grid`}>
-              Grid
-            </option>
-            <option
-              value={`${HOST_NAME}/theme/embed/backgrounds/grid?variant=sm`}
-            >
-              Grid (small)
-            </option>
-            <option value={`${HOST_NAME}/theme/embed/backgrounds/globe`}>
-              Globe
-            </option>
+            <SelectTrigger>
+              <SelectValue placeholder="None" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={`${HOST_NAME}/theme/embed/backgrounds/aurora`}>
+                Aurora
+              </SelectItem>
+              <SelectItem value={`${HOST_NAME}/theme/embed/backgrounds/dots`}>
+                Dots
+              </SelectItem>
+              <SelectItem value={`${HOST_NAME}/theme/embed/backgrounds/grid`}>
+                Grid
+              </SelectItem>
+              <SelectItem
+                value={`${HOST_NAME}/theme/embed/backgrounds/grid?variant=sm`}
+              >
+                Grid (small)
+              </SelectItem>
+              <SelectItem value={`${HOST_NAME}/theme/embed/backgrounds/globe`}>
+                Globe
+              </SelectItem>
+            </SelectContent>
           </Select>
         </form>
         {src && (

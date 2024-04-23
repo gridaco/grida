@@ -30,8 +30,13 @@ import {
   TrashIcon,
 } from "@radix-ui/react-icons";
 import { FormFieldAssistant } from "../ai/form-field-schema-assistant";
-import toast from "react-hot-toast";
-import { Select } from "@/components/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   html5_multiple_supported_field_types,
   supported_field_autocomplete_types,
@@ -46,6 +51,7 @@ import { cls_save_button } from "@/components/preferences";
 import { Toggle } from "@/components/toggle";
 import { fmt_snake_case_to_human_text } from "@/utils/fmt";
 import clsx from "clsx";
+import toast from "react-hot-toast";
 import {
   SortableContext,
   arrayMove,
@@ -61,7 +67,6 @@ import {
   useSensors,
 } from "@dnd-kit/core";
 import { restrictToVerticalAxis } from "@dnd-kit/modifiers";
-import { nanoid } from "nanoid";
 import { draftid } from "@/utils/id";
 import { SkuEditPanel } from "./sku-panel";
 
@@ -336,16 +341,21 @@ export function FieldEditPanel({
               <PanelPropertyField label={"Type"}>
                 <Select
                   value={type}
-                  onChange={(e) => {
+                  onValueChange={(value) => {
                     set_effect_cause("human");
-                    setType(e.target.value as FormFieldType);
+                    setType(value as FormFieldType);
                   }}
                 >
-                  {supported_field_types.map((type) => (
-                    <option key={type} value={type}>
-                      {type}
-                    </option>
-                  ))}
+                  <SelectTrigger id="category" aria-label="Select category">
+                    <SelectValue placeholder="Type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {supported_field_types.map((type) => (
+                      <SelectItem key={type} value={type}>
+                        {type}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
                 </Select>
               </PanelPropertyField>
               <PanelPropertyField
@@ -373,22 +383,27 @@ export function FieldEditPanel({
               <PanelPropertyField label={"Service Provider"}>
                 <Select
                   value={(data as PaymentFieldData)?.service_provider}
-                  onChange={(e) => {
+                  onValueChange={(value) => {
                     setData({
                       ...data,
                       type: "payment",
-                      service_provider: e.target.value,
+                      service_provider: value,
                     });
                   }}
                 >
-                  {payments_service_providers.map((provider) => (
-                    <option
-                      key={provider}
-                      value={provider ?? payments_service_providers_default}
-                    >
-                      {payments_service_providers_display_map[provider].label}
-                    </option>
-                  ))}
+                  <SelectTrigger>
+                    <SelectValue placeholder="service provider" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {payments_service_providers.map((provider) => (
+                      <SelectItem
+                        key={provider}
+                        value={provider ?? payments_service_providers_default}
+                      >
+                        {payments_service_providers_display_map[provider].label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
                 </Select>
               </PanelPropertyField>
             </PanelPropertyFields>
@@ -491,17 +506,20 @@ export function FieldEditPanel({
               <PanelPropertyField label={"Auto Complete"}>
                 <Select
                   value={autocomplete ? autocomplete[0] : ""}
-                  onChange={(e) => {
-                    setAutocomplete([
-                      e.target.value as FormFieldAutocompleteType,
-                    ]);
+                  onValueChange={(value) => {
+                    setAutocomplete([value as FormFieldAutocompleteType]);
                   }}
                 >
-                  {supported_field_autocomplete_types.map((type) => (
-                    <option key={type} value={type}>
-                      {type}
-                    </option>
-                  ))}
+                  <SelectTrigger>
+                    <SelectValue placeholder="autocomplete" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {supported_field_autocomplete_types.map((type) => (
+                      <SelectItem key={type} value={type}>
+                        {type}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
                 </Select>
               </PanelPropertyField>
               {html5_multiple_supported_field_types.includes(type) && (

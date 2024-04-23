@@ -97,6 +97,7 @@ export function InitialResponsesProvider({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dispatch, fetchResponses]);
 
+  // TODO: this gets called twice after the first hook, initially.
   useEffect(() => {
     // re-fetch when the pagination rows change, only if the initial fetch is done
     if (!initially_fetched_responses.current) {

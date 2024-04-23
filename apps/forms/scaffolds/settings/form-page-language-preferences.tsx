@@ -8,7 +8,13 @@ import {
   PreferenceBoxHeader,
   cls_save_button,
 } from "@/components/preferences";
-import { Select } from "@/components/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import type { FormsPageLanguage } from "@/types";
 import {
   language_label_map,
@@ -47,15 +53,20 @@ export function FormPageLanguagePreferences({
                 <Select
                   name="default_form_page_language"
                   value={language}
-                  onChange={(e) => {
-                    setLanguage(e.target.value as any);
+                  onValueChange={(value) => {
+                    setLanguage(value as any);
                   }}
                 >
-                  {supported_form_page_languages.map((lang) => (
-                    <option key={lang} value={lang}>
-                      {language_label_map[lang]}
-                    </option>
-                  ))}
+                  <SelectTrigger>
+                    <SelectValue placeholder="None" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {supported_form_page_languages.map((lang) => (
+                      <SelectItem key={lang} value={lang}>
+                        {language_label_map[lang]}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
                 </Select>
                 <div className="opacity-80">
                   The form page will be displayed in{" "}

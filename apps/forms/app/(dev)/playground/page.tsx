@@ -1,6 +1,6 @@
 "use client";
 
-import { Select } from "@/components/select";
+import { Select } from "@/components/vanilla/select";
 import { useState } from "react";
 
 export default function FormsPlayground() {
