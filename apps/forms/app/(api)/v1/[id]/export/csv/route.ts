@@ -31,7 +31,12 @@ export async function GET(
   const { title, fields, responses } = data;
 
   // headers
-  const headers = ["id", "created_at", ...fields.map((field) => field.name)];
+  const headers = [
+    "id",
+    "idx",
+    "created_at",
+    ...fields.map((field) => field.name),
+  ];
 
   // rows
   const rows = responses.map((response) => {
@@ -41,7 +46,12 @@ export async function GET(
       );
       return responseField ? responseField.value : "";
     });
-    return [response.id, response.created_at, ...responseValues];
+    return [
+      response.id,
+      response.local_id,
+      response.created_at,
+      ...responseValues,
+    ];
   });
 
   const csvContent = stringify([headers, ...rows], {
@@ -49,15 +59,15 @@ export async function GET(
     columns: headers,
   });
 
-  // Set up the headers to return a CSV file
-  const responseHeaders = new Headers({
-    "Content-Type": "text/csv",
-    "Content-Disposition": `attachment; filename="${title}-responses.csv"`,
-  });
+  const filename = `${id}-responses.csv`;
+  // `${title}-responses.csv` // this throws on non unicode characters
 
-  // Return the CSV file
   return new NextResponse(csvContent, {
     status: 200,
-    headers: responseHeaders,
+    headers: {
+      // Set up the headers to return a CSV file
+      "Content-Type": "text/csv",
+      "Content-Disposition": `attachment; filename="${filename}"`,
+    },
   });
 }
