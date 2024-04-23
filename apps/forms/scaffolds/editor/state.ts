@@ -51,6 +51,7 @@ export interface FormEditorState {
   available_field_ids: string[];
   responses?: FormResponse[];
   selected_responses: Set<string>;
+  // TODO: add effect on this value to update responses
   responses_pagination_rows: number;
   is_field_edit_panel_open?: boolean;
   is_response_edit_panel_open?: boolean;

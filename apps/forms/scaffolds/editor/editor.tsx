@@ -57,6 +57,7 @@ export function InitialResponsesProvider({
         `
       )
       .eq("form_id", state.form_id)
+      .order("local_id")
       .limit(state.responses_pagination_rows ?? 100);
 
     if (error) {
