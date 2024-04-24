@@ -131,6 +131,7 @@ interface ClientFieldRenderBlock extends BaseRenderBlock {
       id: string;
       label?: string;
       value: string;
+      disabled?: boolean;
       index: number;
     }[];
     autocomplete?: string;
@@ -263,7 +264,12 @@ export async function GET(
           type: "field",
           field: {
             ...field,
-            options: field.options.sort((a, b) => a.index - b.index),
+            options: field.options
+              .sort((a, b) => a.index - b.index)
+              .map((o) => ({
+                ...o,
+                disabled: o.disabled ?? undefined,
+              })),
             required: field.required ?? undefined,
             multiple: field.multiple ?? undefined,
             autocomplete: field.autocomplete?.join(" ") ?? null,

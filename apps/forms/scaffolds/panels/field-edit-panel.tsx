@@ -153,7 +153,7 @@ type Option = {
   id: string;
   label?: string;
   value: string;
-  disabled?: boolean;
+  disabled?: boolean | null;
 };
 
 export function FieldEditPanel({
