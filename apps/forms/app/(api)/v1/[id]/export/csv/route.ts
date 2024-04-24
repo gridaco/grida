@@ -70,7 +70,7 @@ export async function GET(
     status: 200,
     headers: {
       // Set up the headers to return a CSV file
-      "Content-Type": "text/csv",
+      "Content-Type": "text/csv; charset=utf-8",
       "Content-Disposition": `attachment; filename="${filename}"`,
     },
   });
