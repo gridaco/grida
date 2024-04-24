@@ -29,6 +29,8 @@ import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
 import { NextRequest, NextResponse } from "next/server";
 
+export const revalidate = 0;
+
 interface FormClientFetchResponse {
   data: FormClientFetchResponseData | null;
   error: FormClientFetchResponseError | null;

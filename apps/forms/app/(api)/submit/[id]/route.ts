@@ -133,6 +133,8 @@ async function submit({
     SYSTEM_GF_FINGERPRINT_VISITORID_KEY
   ) as string;
 
+  console.log("/submit::_gf_customer_uuid:", _gf_customer_uuid);
+
   const customer = await upsert_customer_with({
     project_id: form_reference.project_id,
     uuid: _gf_customer_uuid,
@@ -140,6 +142,8 @@ async function submit({
       _fp_fingerprintjs_visitorid,
     },
   });
+
+  console.log("/submit::customer:", customer);
 
   // validation
   const max_access_error = await validate_max_access({

@@ -5,6 +5,7 @@ import {
   CardHeader,
 } from "@/components/ui/card";
 import Link from "next/link";
+import i18next from "i18next";
 
 export default function AlreadyRespondedPage() {
   return (
@@ -12,11 +13,10 @@ export default function AlreadyRespondedPage() {
       <Card className="w-full max-w-md p-4">
         <CardHeader className="flex flex-col items-center">
           <h2 className="text-lg font-bold tracking-tight">
-            Already Responded
+            {i18next.t("alreadyresponded.default.title")}
           </h2>
           <p className="text-sm text-center text-gray-500">
-            You have already submitted this form. If you believe this is a
-            mistake, please contact support.
+            {i18next.t("alreadyresponded.default.description")}
           </p>
         </CardHeader>
         <CardContent className="p-0" />
@@ -25,7 +25,7 @@ export default function AlreadyRespondedPage() {
             className="flex items-center justify-center w-full p-4 text-sm font-medium text-white bg-blue-600 rounded-b"
             href="#"
           >
-            Home
+            {i18next.t("home")}
           </Link>
         </CardFooter>
       </Card>
