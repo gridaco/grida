@@ -516,6 +516,7 @@ function parse_system_keys(
           map[key] = value;
           break;
         } else {
+          console.error("uuid format mismatch", value);
           throw UUID_FORMAT_MISMATCH;
         }
       }
