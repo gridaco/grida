@@ -14,6 +14,7 @@ const resources: Record<
       back: "Previous",
       submit: "Submit",
       pay: "Pay",
+      home: "Home",
       formclosed: {
         default: {
           title: "Form Closed",
@@ -30,6 +31,13 @@ const resources: Record<
           title: "Receipt Confirmed",
           description:
             "Consider taking a screenshot of this page for your records.",
+        },
+      },
+      alreadyresponded: {
+        default: {
+          title: "Already Responded",
+          description:
+            "You have already submitted this form. If you believe this is a mistake, please contact support.",
         },
       },
     },
@@ -66,6 +74,7 @@ const resources: Record<
       back: "이전",
       submit: "제출",
       pay: "결제",
+      home: "홈",
       formclosed: {
         default: {
           title: "폼이 마감되었습니다",
@@ -82,6 +91,13 @@ const resources: Record<
         receipt01: {
           title: "접수 완료",
           description: "스크린샷을 찍어 접수 번호를 저장하세요.",
+        },
+      },
+      alreadyresponded: {
+        default: {
+          title: "이미 응답했습니다",
+          description:
+            "이미 이 폼을 제출했습니다. 이것이 실수라고 생각하신다면 지원팀에 문의해 주세요.",
         },
       },
     },

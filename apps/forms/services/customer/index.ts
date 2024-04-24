@@ -53,6 +53,7 @@ export async function upsert_customer_with({
         return customer;
       }
     }
+    console.log("customer::upserted:", customer);
     return customer;
   } else {
     const { data: customer, error } = await workspaceclient
@@ -64,6 +65,7 @@ export async function upsert_customer_with({
       .single();
 
     error && console.error("customer::error-1:", error);
+    console.log("customer::upserted:", customer);
     return customer;
   }
 }

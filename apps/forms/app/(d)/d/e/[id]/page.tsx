@@ -1,6 +1,8 @@
 import { Form } from "@/scaffolds/e/form";
 import i18next from "i18next";
 
+export const revalidate = 0;
+
 export default function FormPage({
   params,
   searchParams,

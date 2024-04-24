@@ -6,6 +6,8 @@ import { stringify } from "csv-stringify/sync";
 import { unwrapFeildValue } from "@/lib/forms/unwrap";
 import { fmt_hashed_local_id } from "@/utils/fmt";
 
+export const revalidate = 0;
+
 export async function GET(
   req: NextRequest,
   context: { params: { id: string } }
@@ -63,14 +65,19 @@ export async function GET(
     columns: headers,
   });
 
+  // BOM for CJK characters in file content
+  const BOM = "\uFEFF";
+
+  const csvContentWithBOM = BOM + csvContent;
+
   const filename = `${id}-responses.csv`;
   // `${title}-responses.csv` // this throws on non unicode characters
 
-  return new NextResponse(csvContent, {
+  return new NextResponse(csvContentWithBOM, {
     status: 200,
     headers: {
       // Set up the headers to return a CSV file
-      "Content-Type": "text/csv",
+      "Content-Type": "text/csv; charset=utf-8",
       "Content-Disposition": `attachment; filename="${filename}"`,
     },
   });

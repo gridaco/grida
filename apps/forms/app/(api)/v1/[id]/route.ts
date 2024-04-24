@@ -30,6 +30,8 @@ import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
 import { NextRequest, NextResponse } from "next/server";
 
+export const revalidate = 0;
+
 interface FormClientFetchResponse {
   data: FormClientFetchResponseData | null;
   error: FormClientFetchResponseError | null;
@@ -522,6 +524,7 @@ function parse_system_keys(
           map[key] = value;
           break;
         } else {
+          console.error("uuid format mismatch", value);
           throw UUID_FORMAT_MISMATCH;
         }
       }
