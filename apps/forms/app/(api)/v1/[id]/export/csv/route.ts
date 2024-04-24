@@ -63,10 +63,15 @@ export async function GET(
     columns: headers,
   });
 
+  // BOM for CJK characters in file content
+  const BOM = "\uFEFF";
+
+  const csvContentWithBOM = BOM + csvContent;
+
   const filename = `${id}-responses.csv`;
   // `${title}-responses.csv` // this throws on non unicode characters
 
-  return new NextResponse(csvContent, {
+  return new NextResponse(csvContentWithBOM, {
     status: 200,
     headers: {
       // Set up the headers to return a CSV file
