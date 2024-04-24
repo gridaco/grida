@@ -6,6 +6,8 @@ import { stringify } from "csv-stringify/sync";
 import { unwrapFeildValue } from "@/lib/forms/unwrap";
 import { fmt_hashed_local_id } from "@/utils/fmt";
 
+export const revalidate = 0;
+
 export async function GET(
   req: NextRequest,
   context: { params: { id: string } }
