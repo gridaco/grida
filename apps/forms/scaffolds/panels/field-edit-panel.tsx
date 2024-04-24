@@ -49,6 +49,7 @@ import {
 } from "@/k/payments_service_providers";
 import { cls_save_button } from "@/components/preferences";
 import { Toggle } from "@/components/toggle";
+import { Switch } from "@/components/ui/switch";
 import { fmt_snake_case_to_human_text } from "@/utils/fmt";
 import clsx from "clsx";
 import toast from "react-hot-toast";
@@ -152,6 +153,7 @@ type Option = {
   id: string;
   label?: string;
   value: string;
+  disabled?: boolean;
 };
 
 export function FieldEditPanel({
@@ -302,6 +304,7 @@ export function FieldEditPanel({
               >
                 <FormFieldPreview
                   preview
+                  vanilla
                   name={name}
                   type={type}
                   label={preview_label}
@@ -418,8 +421,8 @@ export function FieldEditPanel({
                     ...options,
                     {
                       id: draftid(),
-                      label: "",
-                      value: "",
+                      value: `option_${options.length + 1}`,
+                      label: `Option ${options.length + 1}`,
                     },
                   ]);
                 }}
@@ -683,9 +686,12 @@ function OptionsEdit({
           </div>
           <div className="flex flex-col gap-2">
             {mode === "advanced" && (
-              <div className="flex">
-                <span className="w-full text-xs">Value</span>
-                <span className="w-full text-xs">Label</span>
+              <div className="flex text-xs opacity-80">
+                <span className="w-5" />
+                <span className="flex-1">value</span>
+                <span className="flex-1">label</span>
+                <span className="min-w-16">disabled</span>
+                <span className="w-5" />
               </div>
             )}
             {options?.map(({ id, ...option }, index) => (
@@ -736,6 +742,7 @@ function OptionEditItem({
   id,
   label: _label,
   value: _value,
+  disabled: _disabled,
   index,
   mode,
   onChange,
@@ -744,9 +751,14 @@ function OptionEditItem({
   id: string;
   label: string;
   value: string;
+  disabled?: boolean | null;
   index: number;
   mode: "simple" | "advanced";
-  onChange?: (option: { label: string; value: string }) => void;
+  onChange?: (option: {
+    label: string;
+    value: string;
+    disabled: boolean;
+  }) => void;
   onRemove?: () => void;
 }) {
   const {
@@ -763,6 +775,7 @@ function OptionEditItem({
 
   const [value, setValue] = useState(_value);
   const [label, setLabel] = useState(_label);
+  const [disabled, setDisabled] = useState<boolean>(_disabled || false);
   const [fmt_matches, set_fmt_matches] = useState<boolean>(
     does_fmt_match(value, label)
   );
@@ -779,8 +792,8 @@ function OptionEditItem({
   }, [label]);
 
   useEffect(() => {
-    onChange?.({ label, value });
-  }, [value, label]);
+    onChange?.({ label, value, disabled });
+  }, [value, label, disabled]);
 
   const style = {
     transform: CSS.Translate.toString(transform),
@@ -793,7 +806,7 @@ function OptionEditItem({
       //
       ref={setNodeRef}
       style={style}
-      className="flex gap-1"
+      className="flex gap-1 items-center"
     >
       <button
         //
@@ -804,7 +817,7 @@ function OptionEditItem({
       >
         <DragHandleDots2Icon className="opacity-50" />
       </button>
-      <label className="w-full">
+      <label className="flex-1">
         <input
           className="block w-full p-2 text-gray-900 border border-gray-300 rounded-lg bg-gray-50 text-xs focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500"
           type="text"
@@ -814,7 +827,7 @@ function OptionEditItem({
           onChange={(e) => setValue(e.target.value)}
         />
       </label>
-      <label className={clsx(mode === "simple" && "hidden", "w-full")}>
+      <label className={clsx(mode === "simple" && "hidden", "flex-1")}>
         <input
           className={
             "block w-full p-2 text-gray-900 border border-gray-300 rounded-lg bg-gray-50 text-xs focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500"
@@ -824,6 +837,14 @@ function OptionEditItem({
           value={label}
           onChange={(e) => setLabel(e.target.value)}
         />
+      </label>
+      <label
+        className={clsx(
+          mode === "simple" && "hidden",
+          "flex items-center min-w-16"
+        )}
+      >
+        <Switch checked={disabled} onCheckedChange={setDisabled} />
       </label>
 
       <button type="button" onClick={onRemove}>

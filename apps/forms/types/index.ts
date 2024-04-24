@@ -142,6 +142,7 @@ export type NewFormFieldInit = {
     id: string;
     label?: string;
     value: string;
+    disabled?: boolean;
     index?: number;
   }[];
   pattern?: string;
@@ -164,6 +165,7 @@ export interface FormFieldDefinition {
     id: string;
     label?: string;
     value: string;
+    disabled?: boolean;
   }[];
   autocomplete?: FormFieldAutocompleteType[] | null;
   data?: FormFieldDataSchema | null;

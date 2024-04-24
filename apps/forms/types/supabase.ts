@@ -317,6 +317,7 @@ export type Database = {
       form_field_option: {
         Row: {
           created_at: string
+          disabled: boolean | null
           form_field_id: string
           form_id: string
           id: string
@@ -326,6 +327,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          disabled?: boolean | null
           form_field_id: string
           form_id: string
           id?: string
@@ -335,6 +337,7 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          disabled?: boolean | null
           form_field_id?: string
           form_id?: string
           id?: string
