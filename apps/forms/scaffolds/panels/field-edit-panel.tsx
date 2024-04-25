@@ -212,7 +212,7 @@ export function FieldEditPanel({
     // disable preview if servive provider is tosspayments (it takes control over the window)
     (data as PaymentFieldData)?.service_provider === "tosspayments";
 
-  const onSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+  const save = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
 
     const indexed_options = options
@@ -235,6 +235,7 @@ export function FieldEditPanel({
       data,
       accept,
       multiple,
+      options_inventory: inventoryEnabled ? stocksMap : undefined,
     });
   };
 
@@ -327,7 +328,7 @@ export function FieldEditPanel({
             <FormFieldAssistant onSuggestion={onSuggestion} />
           </PanelPropertySection>
         )}
-        <form key={formResetKey} id="field-edit-form" onSubmit={onSubmit}>
+        <form key={formResetKey} id="field-edit-form" onSubmit={save}>
           <PanelPropertySection>
             <PanelPropertySectionTitle>Field</PanelPropertySectionTitle>
             <PanelPropertyFields>

@@ -180,16 +180,23 @@ function AdjustStockCountButton({
     setVStock(stock);
   }, [stock]);
 
+  const save = () => {
+    if (isNaN(vstock) || vstock < 0) {
+      setVStock(0);
+      return;
+    }
+    onSave?.(vstock);
+    setOpen(false);
+  };
+
   const onKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter") {
-      onSave?.(vstock);
-      setOpen(false);
+      save();
     }
   };
 
   const onSaveClick = () => {
-    onSave?.(vstock);
-    setOpen(false);
+    save();
   };
 
   return (
@@ -221,7 +228,10 @@ function AdjustStockCountButton({
               autoFocus
               type="number"
               value={vstock}
-              onChange={(e) => setVStock(parseInt(e.target.value))}
+              onChange={(e) => {
+                const v = parseInt(e.target.value);
+                setVStock(isNaN(v) ? 0 : v);
+              }}
               onKeyDown={onKeyDown}
               min={0}
             />

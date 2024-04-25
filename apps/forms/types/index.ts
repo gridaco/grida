@@ -1,3 +1,5 @@
+import { MutableInventoryStock } from "./inventory";
+
 export interface Form {
   created_at: string;
   custom_preview_url_path: string | null;
@@ -139,6 +141,7 @@ export type NewFormFieldInit = {
   type: FormFieldType;
   required: boolean;
   options?: Option[];
+  options_inventory?: { [option_id: string]: MutableInventoryStock };
   pattern?: string;
   autocomplete?: FormFieldAutocompleteType[] | null;
   data?: FormFieldDataSchema | null;
