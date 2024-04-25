@@ -10,60 +10,172 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  HoverCard,
+  HoverCardContent,
+  HoverCardTrigger,
+} from "@/components/ui/hover-card";
+import { QuestionMarkCircledIcon } from "@radix-ui/react-icons";
 
 export function OptionsStockEdit({ options }: { options: Option[] }) {
   return (
     <div className="flex flex-col gap-2">
-      {options.map((option) => (
-        <SkuItem key={option.id} option={option} />
-      ))}
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead className="w-[100px]">
+              <HoverCard openDelay={100} closeDelay={0}>
+                <HoverCardTrigger>sku</HoverCardTrigger>
+                <HoverCardContent>
+                  <p className="text-sm font-medium">SKU</p>
+                  <p className="text-xs font-light opacity-80">
+                    Stock Keeping Unit
+                  </p>
+                </HoverCardContent>
+              </HoverCard>
+            </TableHead>
+            <TableHead>
+              <HoverCard openDelay={100} closeDelay={0}>
+                <HoverCardTrigger className="flex gap-1 items-center cursor-pointer">
+                  commited
+                  <QuestionMarkCircledIcon />
+                </HoverCardTrigger>
+                <HoverCardContent>
+                  <p className="text-sm font-medium">Committed</p>
+                  <p className="text-xs font-light opacity-80">
+                    Stock that has been reserved for orders
+                  </p>
+                </HoverCardContent>
+              </HoverCard>
+            </TableHead>
+            <TableHead>
+              <HoverCard openDelay={100} closeDelay={0}>
+                <HoverCardTrigger className="flex gap-1 items-center cursor-pointer">
+                  available
+                  <QuestionMarkCircledIcon />
+                </HoverCardTrigger>
+                <HoverCardContent>
+                  <p className="text-sm font-medium">Available</p>
+                  <p className="text-xs font-light opacity-80">
+                    Stock that is available for sale
+                  </p>
+                </HoverCardContent>
+              </HoverCard>
+            </TableHead>
+            <TableHead>
+              <HoverCard openDelay={100} closeDelay={0}>
+                <HoverCardTrigger className="flex gap-1 items-center cursor-pointer">
+                  on hand
+                  <QuestionMarkCircledIcon />
+                </HoverCardTrigger>
+                <HoverCardContent>
+                  <p className="text-sm font-medium">On Hand</p>
+                  <p className="text-xs font-light opacity-80">
+                    Stock that is physically (or virtually) on hand
+                  </p>
+                </HoverCardContent>
+              </HoverCard>
+            </TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {options.map((option) => (
+            <SkuItemRow key={option.id} option={option} />
+          ))}
+        </TableBody>
+      </Table>
     </div>
   );
 }
 
-function SkuItem({ option }: { option: Option }) {
+function SkuItemRow({ option }: { option: Option }) {
   const onSaveStock = (option_id: string, stock: number) => {};
 
   return (
-    <div className="flex items-center gap-2 border-b py-1" key={option.id}>
-      <div className="flex-1">
-        <span className="font-mono">{option.value}</span>
-      </div>
-      <AdjustInventoryButton
-        stock={0}
-        onSave={(n) => {
-          onSaveStock(option.id, n);
-        }}
-      />
-    </div>
+    <TableRow key={option.id} className="font-mono">
+      {/* sku */}
+      <TableCell className="font-medium">{option.value}</TableCell>
+      {/* comitted */}
+      <TableCell>0</TableCell>
+      {/* available */}
+      <TableCell>
+        <AdjustStockCountButton
+          stock={0}
+          onSave={(n) => {
+            onSaveStock(option.id, n);
+          }}
+        />
+      </TableCell>
+      {/* on hand */}
+      <TableCell>
+        <AdjustStockCountButton
+          stock={0}
+          onSave={(n) => {
+            onSaveStock(option.id, n);
+          }}
+        />
+      </TableCell>
+    </TableRow>
   );
 }
 
-function AdjustInventoryButton({
+function AdjustStockCountButton({
   stock,
   onSave,
 }: {
   stock: number;
   onSave?: (stock: number) => void;
 }) {
+  const [open, setOpen] = useState(false);
   const [vstock, setVStock] = useState(stock);
+
+  useEffect(() => {
+    setVStock(stock);
+  }, [stock]);
+
+  const onKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter") {
+      onSave?.(vstock);
+      setOpen(false);
+    }
+  };
+
+  const onSaveClick = () => {
+    onSave?.(vstock);
+    setOpen(false);
+  };
 
   return (
     <div>
-      <Popover>
+      <Popover open={open} onOpenChange={setOpen}>
         <PopoverTrigger>
-          <Button className="font-mono w-20" type="button" variant="outline">
+          <Button
+            className="font-mono text-xs w-20"
+            type="button"
+            variant="outline"
+          >
             {stock}
           </Button>
         </PopoverTrigger>
         <PopoverContent
           side="bottom"
           alignOffset={8}
-          className="flex flex-col gap-1 p-1"
+          className="flex flex-col gap-1 p-2"
         >
-          <p>
-            <span className="text-sm">Adjust Inventory</span>
-          </p>
+          <div className="py-1">
+            <span className="text-sm font-medium">Adjust Inventory</span>
+            <p className="text-xs font-light opacity-80">
+              Enter the new stock count
+            </p>
+          </div>
           <div className="flex gap-1">
             <Input
               className="flex-1 font-mono"
@@ -71,6 +183,7 @@ function AdjustInventoryButton({
               type="number"
               value={vstock}
               onChange={(e) => setVStock(parseInt(e.target.value))}
+              onKeyDown={onKeyDown}
               min={0}
             />
 
@@ -78,7 +191,7 @@ function AdjustInventoryButton({
               type="button"
               variant="default"
               className={cls_save_button}
-              onClick={() => onSave?.(vstock)}
+              onClick={onSaveClick}
             >
               Save
             </Button>

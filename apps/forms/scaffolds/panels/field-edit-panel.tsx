@@ -49,6 +49,7 @@ import { arrayMove } from "@dnd-kit/sortable";
 import { draftid } from "@/utils/id";
 import { OptionsEdit } from "../options/options-edit";
 import { OptionsStockEdit } from "../options/options-sku";
+import { Switch } from "@/components/ui/switch";
 
 // @ts-ignore
 const default_field_init: {
@@ -144,8 +145,7 @@ export function FieldEditPanel({
   enableAI?: boolean;
   onSave?: (field: NewFormFieldInit) => void;
 }) {
-  const [skuOpen, setSkuOpen] = useState(false);
-  const [skuEnabeld, setSkuEnabled] = useState(false);
+  const [inventoryEnabled, setInventoryEnabled] = useState(false);
   const [effect_cause, set_effect_cause] = useState<"ai" | "human" | "system">(
     "system"
   );
@@ -179,8 +179,23 @@ export function FieldEditPanel({
     required,
   });
 
-  const [stocksMap, setStocksMap] = useState<{ [key: string]: number }>(
-    Object.fromEntries(options.map((o) => [o.id, 0]))
+  const [stocksMap, setStocksMap] = useState<{
+    [key: string]: {
+      comitted: number;
+      available: number;
+      onhand: number;
+    };
+  }>(
+    Object.fromEntries(
+      options.map((o) => [
+        o.id,
+        {
+          comitted: 0,
+          available: 0,
+          onhand: 0,
+        },
+      ])
+    )
   );
 
   const has_options = input_can_have_options.includes(type);
@@ -420,16 +435,16 @@ export function FieldEditPanel({
           <PanelPropertySection hidden={type !== "select"}>
             <PanelPropertySectionTitle>Store</PanelPropertySectionTitle>
             <PanelPropertyFields>
-              <PanelPropertyField label={"Track Inventory"}>
-                <Toggle
-                  value={skuEnabeld}
-                  onChange={(enabled) => {
-                    setSkuEnabled(enabled);
-                    setSkuOpen(enabled);
-                  }}
+              <PanelPropertyField
+                label={"Track Inventory"}
+                description="Enabiling Inventory will allow you to track stock levels for each option."
+              >
+                <Switch
+                  checked={inventoryEnabled}
+                  onCheckedChange={setInventoryEnabled}
                 />
               </PanelPropertyField>
-              {skuEnabeld && (
+              {inventoryEnabled && (
                 <>
                   <PanelPropertySectionTitle>
                     Inventory

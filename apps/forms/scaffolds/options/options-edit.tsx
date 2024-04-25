@@ -91,6 +91,7 @@ export function OptionsEdit({
                 mode={mode}
                 label={option.label || ""}
                 value={option.value}
+                disabled={option.disabled}
                 index={index}
                 onRemove={() => {
                   onRemove?.(id);
