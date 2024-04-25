@@ -76,8 +76,17 @@ export function PreferenceBoxFooter({ children }: React.PropsWithChildren<{}>) {
   );
 }
 
-export function Sector({ children }: React.PropsWithChildren<{}>) {
-  return <section className="py-5">{children}</section>;
+export function Sector({
+  id,
+  children,
+}: React.PropsWithChildren<{
+  id?: string;
+}>) {
+  return (
+    <section className="py-5" id={id}>
+      {children}
+    </section>
+  );
 }
 
 export function SectorHeader({ children }: React.PropsWithChildren<{}>) {

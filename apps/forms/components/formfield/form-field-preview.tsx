@@ -49,7 +49,12 @@ export function FormFieldPreview({
   helpText?: string;
   required?: boolean;
   defaultValue?: string;
-  options?: { id?: string; label?: string | null; value: string }[];
+  options?: {
+    id?: string;
+    label?: string | null;
+    value: string;
+    disabled?: boolean | null;
+  }[];
   pattern?: string;
   readonly?: boolean;
   disabled?: boolean;
@@ -125,6 +130,7 @@ export function FormFieldPreview({
                 <option
                   key={option.id || option.value}
                   value={option.id || option.value}
+                  disabled={option.disabled || false}
                 >
                   {option.label || option.value}
                 </option>
@@ -155,6 +161,7 @@ export function FormFieldPreview({
                 <SelectItem
                   key={option.id || option.value}
                   value={option.id || option.value}
+                  disabled={option.disabled || false}
                 >
                   {option.label || option.value}
                 </SelectItem>

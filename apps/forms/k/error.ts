@@ -28,3 +28,8 @@ export const FORM_CLOSED_WHILE_RESPONDING = {
   code: "FORM_CLOSED_WHILE_RESPONDING",
   message: "Form closed while responding",
 } as const;
+
+export const FORM_FORCE_CLOSED = {
+  code: "FORM_FORCE_CLOSED",
+  message: "The form is force closed",
+} as const;

@@ -1,4 +1,5 @@
 import {
+  FORM_FORCE_CLOSED,
   FORM_RESPONSE_LIMIT_BY_CUSTOMER_REACHED,
   FORM_RESPONSE_LIMIT_REACHED,
   MISSING_REQUIRED_HIDDEN_FIELDS,
@@ -76,7 +77,9 @@ export type FormClientFetchResponseError =
   | {
       code:
         | typeof UUID_FORMAT_MISMATCH.code
-        | typeof FORM_RESPONSE_LIMIT_REACHED.code;
+        | typeof FORM_RESPONSE_LIMIT_REACHED.code
+        | typeof VISITORID_FORMAT_MISMATCH.code
+        | typeof FORM_FORCE_CLOSED.code;
       message: string;
     };
 export interface MissingRequiredHiddenFieldsError {
@@ -128,6 +131,7 @@ interface ClientFieldRenderBlock extends BaseRenderBlock {
       id: string;
       label?: string;
       value: string;
+      disabled?: boolean;
       index: number;
     }[];
     autocomplete?: string;
@@ -237,6 +241,7 @@ export async function GET(
     is_max_form_responses_by_customer_enabled,
     max_form_responses_by_customer,
     project_id: __project_id,
+    is_force_closed: __is_force_closed,
   } = data;
 
   const page_blocks = (data.default_page as unknown as FormPage).blocks;
@@ -259,7 +264,12 @@ export async function GET(
           type: "field",
           field: {
             ...field,
-            options: field.options.sort((a, b) => a.index - b.index),
+            options: field.options
+              .sort((a, b) => a.index - b.index)
+              .map((o) => ({
+                ...o,
+                disabled: o.disabled ?? undefined,
+              })),
             required: field.required ?? undefined,
             multiple: field.multiple ?? undefined,
             autocomplete: field.autocomplete?.join(" ") ?? null,
@@ -421,7 +431,11 @@ export async function GET(
     console.error("max access error", max_access_error);
   }
 
-  const is_open = response.error === null;
+  if (__is_force_closed) {
+    response.error = FORM_FORCE_CLOSED;
+  }
+
+  const is_open = !__is_force_closed && response.error === null;
   const payload: FormClientFetchResponseData = {
     title: title,
     tree: tree,
