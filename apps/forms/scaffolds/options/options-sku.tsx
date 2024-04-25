@@ -2,7 +2,7 @@
 
 import React, { useEffect, useId, useMemo, useState } from "react";
 import { cls_save_button } from "@/components/preferences";
-import { Option } from "@/types";
+import type { Option } from "@/types";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import {
@@ -24,8 +24,17 @@ import {
   HoverCardTrigger,
 } from "@/components/ui/hover-card";
 import { QuestionMarkCircledIcon } from "@radix-ui/react-icons";
+import type { InventoryStock, MutableInventoryStock } from "@/types/inventory";
 
-export function OptionsStockEdit({ options }: { options: Option[] }) {
+interface InventoryTrackableOption extends Option, InventoryStock {}
+
+export function OptionsStockEdit({
+  options,
+  onChange,
+}: {
+  options: InventoryTrackableOption[];
+  onChange?: (id: string, stock: MutableInventoryStock) => void;
+}) {
   return (
     <div className="flex flex-col gap-2">
       <Table>
@@ -88,7 +97,13 @@ export function OptionsStockEdit({ options }: { options: Option[] }) {
         </TableHeader>
         <TableBody>
           {options.map((option) => (
-            <SkuItemRow key={option.id} option={option} />
+            <SkuItemRow
+              key={option.id}
+              option={option}
+              onChange={(stock) => {
+                onChange?.(option.id, stock);
+              }}
+            />
           ))}
         </TableBody>
       </Table>
@@ -96,31 +111,55 @@ export function OptionsStockEdit({ options }: { options: Option[] }) {
   );
 }
 
-function SkuItemRow({ option }: { option: Option }) {
-  const onSaveStock = (option_id: string, stock: number) => {};
+function SkuItemRow({
+  option,
+  onChange,
+}: {
+  option: InventoryTrackableOption;
+  onChange?: (stock: MutableInventoryStock) => void;
+}) {
+  const [availabe, setAvailable] = useState(option.available);
+  const [onHand, setOnHand] = useState(option.on_hand);
+
+  useEffect(() => {
+    setAvailable(option.available);
+    setOnHand(option.on_hand);
+  }, [option.available, option.on_hand]);
+
+  const onChangeAvailable = (value: number) => {
+    const diff = value - option.available;
+    setAvailable((v) => v + diff);
+    setOnHand((v) => v + diff);
+  };
+
+  const onChangeOnHand = (value: number) => {
+    const diff = value - option.on_hand;
+    setOnHand((v) => v + diff);
+    setAvailable((v) => v + diff);
+  };
+
+  useEffect(() => {
+    onChange?.({ available: availabe, on_hand: onHand });
+  }, [availabe, onHand]);
 
   return (
     <TableRow key={option.id} className="font-mono">
       {/* sku */}
       <TableCell className="font-medium">{option.value}</TableCell>
       {/* comitted */}
-      <TableCell>0</TableCell>
+      <TableCell>{option.committed}</TableCell>
       {/* available */}
       <TableCell>
         <AdjustStockCountButton
-          stock={0}
-          onSave={(n) => {
-            onSaveStock(option.id, n);
-          }}
+          stock={option.available}
+          onSave={onChangeAvailable}
         />
       </TableCell>
       {/* on hand */}
       <TableCell>
         <AdjustStockCountButton
-          stock={0}
-          onSave={(n) => {
-            onSaveStock(option.id, n);
-          }}
+          stock={option.on_hand}
+          onSave={onChangeOnHand}
         />
       </TableCell>
     </TableRow>

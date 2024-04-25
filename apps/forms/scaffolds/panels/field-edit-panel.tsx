@@ -50,6 +50,8 @@ import { draftid } from "@/utils/id";
 import { OptionsEdit } from "../options/options-edit";
 import { OptionsStockEdit } from "../options/options-sku";
 import { Switch } from "@/components/ui/switch";
+import { InventoryStock } from "@/types/inventory";
+import { INITIAL_INVENTORY_STOCK } from "@/k/inventory_defaults";
 
 // @ts-ignore
 const default_field_init: {
@@ -180,19 +182,17 @@ export function FieldEditPanel({
   });
 
   const [stocksMap, setStocksMap] = useState<{
-    [key: string]: {
-      comitted: number;
-      available: number;
-      onhand: number;
-    };
+    [key: string]: InventoryStock;
   }>(
     Object.fromEntries(
       options.map((o) => [
         o.id,
         {
-          comitted: 0,
-          available: 0,
-          onhand: 0,
+          available: INITIAL_INVENTORY_STOCK,
+          on_hand: INITIAL_INVENTORY_STOCK,
+          committed: 0,
+          unavailable: 0,
+          incoming: 0,
         },
       ])
     )
@@ -450,7 +450,23 @@ export function FieldEditPanel({
                     Inventory
                   </PanelPropertySectionTitle>
                   <PanelPropertyFields>
-                    <OptionsStockEdit options={options} />
+                    <OptionsStockEdit
+                      options={options.map((option) => {
+                        return {
+                          ...option,
+                          ...stocksMap[option.id],
+                        };
+                      })}
+                      onChange={(id, stock) => {
+                        setStocksMap({
+                          ...stocksMap,
+                          [id]: {
+                            ...stocksMap[id],
+                            ...stock,
+                          },
+                        });
+                      }}
+                    />
                   </PanelPropertyFields>
                 </>
               )}
