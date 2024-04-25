@@ -138,13 +138,7 @@ export type NewFormFieldInit = {
   helpText: string;
   type: FormFieldType;
   required: boolean;
-  options?: {
-    id: string;
-    label?: string;
-    value: string;
-    disabled?: boolean | null;
-    index?: number;
-  }[];
+  options?: Option[];
   pattern?: string;
   autocomplete?: FormFieldAutocompleteType[] | null;
   data?: FormFieldDataSchema | null;
@@ -161,12 +155,7 @@ export interface FormFieldDefinition {
   required: boolean;
   help_text?: string | null;
   pattern?: any | null;
-  options?: {
-    id: string;
-    label?: string;
-    value: string;
-    disabled?: boolean | null;
-  }[];
+  options?: Option[];
   autocomplete?: FormFieldAutocompleteType[] | null;
   data?: FormFieldDataSchema | null;
   accept?: string | null;
@@ -197,6 +186,14 @@ export interface FormBlock<T = FormBlockType> {
   parent_id?: string | null;
   local_index: number;
 }
+
+export type Option = {
+  id: string;
+  label?: string;
+  value: string;
+  disabled?: boolean | null;
+  index?: number;
+};
 
 export type FormBlockType =
   | "section"
