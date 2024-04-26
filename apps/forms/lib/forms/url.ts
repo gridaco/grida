@@ -1,3 +1,33 @@
+export function editorlink(
+  origin: string,
+  form_id: string,
+  page:
+    | "blocks"
+    | "settings"
+    | "responses"
+    | "connect"
+    | "connect/store"
+    | "connect/store/get-started"
+    | "connect/store/products"
+) {
+  switch (page) {
+    case "blocks":
+      return `${origin}/d/${form_id}/blocks`;
+    case "settings":
+      return `${origin}/d/${form_id}/settings`;
+    case "responses":
+      return `${origin}/d/${form_id}/responses`;
+    case "connect":
+      return `${origin}/d/${form_id}/connect`;
+    case "connect/store":
+      return `${origin}/d/${form_id}/connect/store`;
+    case "connect/store/get-started":
+      return `${origin}/d/${form_id}/connect/store/get-started`;
+    case "connect/store/products":
+      return `${origin}/d/${form_id}/connect/store/products`;
+  }
+}
+
 export function formlink(
   host: string,
   form_id: string,

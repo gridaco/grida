@@ -3,7 +3,7 @@ import {
   SYSTEM_GF_FINGERPRINT_VISITORID_KEY,
   SYSTEM_GF_CUSTOMER_UUID_KEY,
 } from "@/k/system";
-import { client, workspaceclient } from "@/lib/supabase/server";
+import { client } from "@/lib/supabase/server";
 import { upsert_customer_with } from "@/services/customer";
 import { validate_max_access } from "@/services/form/validate-max-access";
 import { is_uuid_v4 } from "@/utils/is";
