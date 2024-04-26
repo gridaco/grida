@@ -25,6 +25,7 @@ import {
 } from "@/components/ui/hover-card";
 import { QuestionMarkCircledIcon } from "@radix-ui/react-icons";
 import type { InventoryStock, MutableInventoryStock } from "@/types/inventory";
+import { CopyToClipboardInput } from "@/components/copy-to-clipboard-input";
 
 interface InventoryTrackableOption extends Option, InventoryStock {}
 
@@ -40,11 +41,12 @@ export function OptionsStockEdit({
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead className="w-[100px]">
-              <HoverCard openDelay={100} closeDelay={0}>
+            <TableHead className="w-[100px]">option</TableHead>
+            <TableHead>
+              <HoverCard openDelay={100} closeDelay={100}>
                 <HoverCardTrigger>sku</HoverCardTrigger>
                 <HoverCardContent>
-                  <p className="text-sm font-medium">SKU</p>
+                  <p className="text-sm font-medium">SKU (Auto Generated)</p>
                   <p className="text-xs font-light opacity-80">
                     Stock Keeping Unit
                   </p>
@@ -52,7 +54,7 @@ export function OptionsStockEdit({
               </HoverCard>
             </TableHead>
             <TableHead>
-              <HoverCard openDelay={100} closeDelay={0}>
+              <HoverCard openDelay={100} closeDelay={100}>
                 <HoverCardTrigger className="flex gap-1 items-center cursor-pointer">
                   commited
                   <QuestionMarkCircledIcon />
@@ -66,7 +68,7 @@ export function OptionsStockEdit({
               </HoverCard>
             </TableHead>
             <TableHead>
-              <HoverCard openDelay={100} closeDelay={0}>
+              <HoverCard openDelay={100} closeDelay={100}>
                 <HoverCardTrigger className="flex gap-1 items-center cursor-pointer">
                   available
                   <QuestionMarkCircledIcon />
@@ -80,7 +82,7 @@ export function OptionsStockEdit({
               </HoverCard>
             </TableHead>
             <TableHead>
-              <HoverCard openDelay={100} closeDelay={0}>
+              <HoverCard openDelay={100} closeDelay={100}>
                 <HoverCardTrigger className="flex gap-1 items-center cursor-pointer">
                   on hand
                   <QuestionMarkCircledIcon />
@@ -121,6 +123,8 @@ function SkuItemRow({
   const [availabe, setAvailable] = useState(option.available);
   const [onHand, setOnHand] = useState(option.on_hand);
 
+  const sku_preview = option.id.slice(0, 8);
+
   useEffect(() => {
     setAvailable(option.available);
     setOnHand(option.on_hand);
@@ -144,8 +148,19 @@ function SkuItemRow({
 
   return (
     <TableRow key={option.id} className="font-mono">
-      {/* sku */}
+      {/* name (option) */}
       <TableCell className="font-medium">{option.value}</TableCell>
+      {/* sku - id for option */}
+      <TableCell>
+        <HoverCard openDelay={100} closeDelay={100}>
+          <HoverCardTrigger className="flex gap-1 items-center cursor-pointer">
+            <pre className="text-xs">{sku_preview}</pre>
+          </HoverCardTrigger>
+          <HoverCardContent>
+            <CopyToClipboardInput value={option.id} />
+          </HoverCardContent>
+        </HoverCard>
+      </TableCell>
       {/* comitted */}
       <TableCell>{option.committed}</TableCell>
       {/* available */}
