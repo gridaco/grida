@@ -17,7 +17,7 @@ import {
   FormFieldDefinition,
   FormFieldType,
   FormResponse,
-  NewFormFieldInit,
+  FormFieldInit,
 } from "@/types";
 import { LockClosedIcon } from "@radix-ui/react-icons";
 import toast from "react-hot-toast";
@@ -34,7 +34,7 @@ export function ResponseEditPanel({
   title?: string;
   init?: Partial<{ response: FormResponse; field_defs: FormFieldDefinition[] }>;
   disableAI?: boolean;
-  onSave?: (field: NewFormFieldInit) => void;
+  onSave?: (field: FormFieldInit) => void;
 }) {
   const { response, field_defs } = init ?? {};
 

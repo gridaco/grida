@@ -11,29 +11,55 @@ export type Database = {
     Tables: {
       inventory_item: {
         Row: {
+          available: number
+          cost: number | null
           created_at: string
           id: number
+          product_id: number | null
           sku: string
           store_id: number
+          variant_id: number | null
         }
         Insert: {
+          available?: number
+          cost?: number | null
           created_at?: string
           id?: number
+          product_id?: number | null
           sku: string
           store_id: number
+          variant_id?: number | null
         }
         Update: {
+          available?: number
+          cost?: number | null
           created_at?: string
           id?: number
+          product_id?: number | null
           sku?: string
           store_id?: number
+          variant_id?: number | null
         }
         Relationships: [
+          {
+            foreignKeyName: "inventory_item_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "product"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "inventory_item_store_id_fkey"
             columns: ["store_id"]
             isOneToOne: false
             referencedRelation: "store"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_item_variant_id_fkey"
+            columns: ["variant_id"]
+            isOneToOne: false
+            referencedRelation: "product_variant"
             referencedColumns: ["id"]
           },
         ]
@@ -70,19 +96,19 @@ export type Database = {
       inventory_level_commit: {
         Row: {
           created_at: string
-          diff: number
+          diff: number | null
           id: number
           inventory_level_id: number
         }
         Insert: {
           created_at?: string
-          diff: number
+          diff?: number | null
           id?: number
           inventory_level_id: number
         }
         Update: {
           created_at?: string
-          diff?: number
+          diff?: number | null
           id?: number
           inventory_level_id?: number
         }
@@ -102,6 +128,7 @@ export type Database = {
           created_at: string
           id: number
           name: string
+          sku: string | null
           store_id: number
         }
         Insert: {
@@ -109,6 +136,7 @@ export type Database = {
           created_at?: string
           id?: number
           name: string
+          sku?: string | null
           store_id: number
         }
         Update: {
@@ -116,6 +144,7 @@ export type Database = {
           created_at?: string
           id?: number
           name?: string
+          sku?: string | null
           store_id?: number
         }
         Relationships: [
@@ -330,6 +359,12 @@ export type Database = {
           compare_at_price: number | null
           created_at: string
           id: number
+          inventory_management:
+            | Database["grida_commerce"]["Enums"]["inventory_management"]
+            | null
+          inventory_policy:
+            | Database["grida_commerce"]["Enums"]["inventory_policy"]
+            | null
           price: number | null
           product_id: number
           product_option_combination_id: number | null
@@ -341,6 +376,12 @@ export type Database = {
           compare_at_price?: number | null
           created_at?: string
           id?: number
+          inventory_management?:
+            | Database["grida_commerce"]["Enums"]["inventory_management"]
+            | null
+          inventory_policy?:
+            | Database["grida_commerce"]["Enums"]["inventory_policy"]
+            | null
           price?: number | null
           product_id: number
           product_option_combination_id?: number | null
@@ -352,6 +393,12 @@ export type Database = {
           compare_at_price?: number | null
           created_at?: string
           id?: number
+          inventory_management?:
+            | Database["grida_commerce"]["Enums"]["inventory_management"]
+            | null
+          inventory_policy?:
+            | Database["grida_commerce"]["Enums"]["inventory_policy"]
+            | null
           price?: number | null
           product_id?: number
           product_option_combination_id?: number | null
@@ -613,6 +660,8 @@ export type Database = {
         | "ZAR"
         | "ZMW"
         | "ZWL"
+      inventory_management: "none" | "system"
+      inventory_policy: "continue" | "deny"
     }
     CompositeTypes: {
       [_ in never]: never

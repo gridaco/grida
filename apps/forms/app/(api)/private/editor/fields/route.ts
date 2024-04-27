@@ -1,7 +1,13 @@
-import { createRouteHandlerClient } from "@/lib/supabase/server";
+import {
+  commerceclient,
+  createRouteHandlerClient,
+} from "@/lib/supabase/server";
+import { GridaCommerceClient } from "@/services/commerce";
 import { FormFieldDataSchema, FormFieldType, PaymentFieldData } from "@/types";
 import { FormFieldUpsert } from "@/types/private/api";
+import assert from "assert";
 import { cookies } from "next/headers";
+import { notFound } from "next/navigation";
 import { NextRequest, NextResponse } from "next/server";
 
 export const revalidate = 0;
@@ -17,6 +23,16 @@ export async function POST(req: NextRequest) {
 
   const supabase = createRouteHandlerClient(cookieStore);
 
+  const { data: form_reference } = await supabase
+    .from("form")
+    .select(`project_id, store_connection:connection_commerce_store(*)`)
+    .eq("id", form_id)
+    .single();
+
+  if (!form_reference) {
+    return notFound();
+  }
+
   const { data: upserted, error } = await supabase
     .from("form_field")
     .upsert({
@@ -26,11 +42,14 @@ export async function POST(req: NextRequest) {
       name: init.name,
       label: init.label,
       placeholder: init.placeholder,
-      help_text: init.helpText,
+      help_text: init.help_text,
       required: init.required,
       pattern: init.pattern,
       autocomplete: init.autocomplete,
-      data: safe_data_field({ type: init.type, data: init.data as any }) as any,
+      data: safe_data_field({
+        type: init.type,
+        data: init.data as any,
+      }) as any,
       accept: init.accept,
       multiple: init.multiple,
       // 'description': init.description,
@@ -63,7 +82,7 @@ export async function POST(req: NextRequest) {
   const { existing_options } = upserted;
 
   // upsert options if any
-  const { options } = init;
+  const { options, options_inventory } = init;
   const upserting_option_ids = options?.map((option) => option.id) ?? [];
   // options to be deleted
   const deleting_option_ids = existing_options
@@ -103,6 +122,42 @@ export async function POST(req: NextRequest) {
       }
       return NextResponse.error();
     }
+  }
+
+  // handle inventory update if any
+  if (options_inventory) {
+    // At this moment, we only support single option for single product,
+    // as following we consider the field with options and options inventory enabled as a product.
+
+    assert(options, "options are required to update inventory");
+    assert(form_reference.store_connection, "store_connection is required");
+
+    const commerce = new GridaCommerceClient(
+      commerceclient,
+      form_reference.project_id,
+      form_reference.store_connection.store_id
+    );
+
+    for (const inventory_item of Object.entries(options_inventory)) {
+      const [sku, mut] = inventory_item;
+      const { diff } = mut;
+      await commerce.upsertInventoryItem({
+        sku,
+        diff,
+      });
+    }
+
+    // TODO: product is not supported at the moment (only inventory)
+    // const { data: product } = await commerce.upsertProduct({
+    //   name: init.name,
+    //   sku: upserted.id,
+    //   options: {
+    //     // updating the name will reset the options
+    //     [upserted.name]: options.map((option) => option.value),
+    //   },
+    // });
+
+    // assert(product, "failed to upsert product with options");
   }
 
   if (deleting_option_ids?.length) {

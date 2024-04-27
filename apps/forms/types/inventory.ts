@@ -1,3 +1,7 @@
+export type InventoryLevelCommit = {
+  diff: number;
+};
+
 export interface MutableInventoryStock {
   available: number;
   on_hand: number;

@@ -18,7 +18,7 @@ import {
   FormFieldAutocompleteType,
   FormFieldDataSchema,
   FormFieldType,
-  NewFormFieldInit,
+  FormFieldInit,
   PaymentFieldData,
   Option,
 } from "@/types";
@@ -52,10 +52,11 @@ import { OptionsStockEdit } from "../options/options-sku";
 import { Switch } from "@/components/ui/switch";
 import { InventoryStock } from "@/types/inventory";
 import { INITIAL_INVENTORY_STOCK } from "@/k/inventory_defaults";
+import { FormFieldUpsert } from "@/types/private/api";
 
 // @ts-ignore
 const default_field_init: {
-  [key in FormFieldType]: Partial<NewFormFieldInit>;
+  [key in FormFieldType]: Partial<FormFieldInit>;
 } = {
   text: {},
   textarea: { type: "textarea" },
@@ -131,6 +132,8 @@ const input_can_have_pattern: FormFieldType[] = supported_field_types.filter(
   (type) => !["checkbox", "checkboxes", "color", "radio"].includes(type)
 );
 
+export type FormFieldSave = Omit<FormFieldUpsert, "form_id">;
+
 export function FieldEditPanel({
   title,
   onSave,
@@ -142,10 +145,10 @@ export function FieldEditPanel({
 }: React.ComponentProps<typeof SidePanel> & {
   title?: string;
   formResetKey?: number;
-  init?: Partial<NewFormFieldInit>;
+  init?: Partial<FormFieldInit>;
   mode?: "edit" | "new";
   enableAI?: boolean;
-  onSave?: (field: NewFormFieldInit) => void;
+  onSave?: (field: FormFieldSave) => void;
 }) {
   const [inventoryEnabled, setInventoryEnabled] = useState(false);
   const [effect_cause, set_effect_cause] = useState<"ai" | "human" | "system">(
@@ -154,7 +157,7 @@ export function FieldEditPanel({
   const [name, setName] = useState(init?.name || "");
   const [label, setLabel] = useState(init?.label || "");
   const [placeholder, setPlaceholder] = useState(init?.placeholder || "");
-  const [helpText, setHelpText] = useState(init?.helpText || "");
+  const [helpText, setHelpText] = useState(init?.help_text || "");
   const [type, setType] = useState<FormFieldType>(init?.type || "text");
   const [required, setRequired] = useState(init?.required || false);
   const [pattern, setPattern] = useState<string | undefined>(init?.pattern);
@@ -193,6 +196,7 @@ export function FieldEditPanel({
           committed: 0,
           unavailable: 0,
           incoming: 0,
+          diff: 0,
         },
       ])
     )
@@ -222,11 +226,24 @@ export function FieldEditPanel({
       }))
       .sort((a, b) => a.index - b.index);
 
+    const options_inventory_upsert_diff = inventoryEnabled
+      ? Object.fromEntries(
+          Object.entries(stocksMap).map(([id, stock]) => [
+            id,
+            {
+              diff:
+                stock.available -
+                (init?.options_inventory?.[id]?.available || 0),
+            },
+          ])
+        )
+      : undefined;
+
     onSave?.({
       name,
       label,
       placeholder,
-      helpText,
+      help_text: helpText,
       type,
       required,
       pattern,
@@ -235,17 +252,17 @@ export function FieldEditPanel({
       data,
       accept,
       multiple,
-      options_inventory: inventoryEnabled ? stocksMap : undefined,
+      options_inventory: options_inventory_upsert_diff,
     });
   };
 
-  const onSuggestion = (schema: NewFormFieldInit) => {
+  const onSuggestion = (schema: FormFieldInit) => {
     set_effect_cause("ai");
 
     setName(schema.name);
     setLabel(schema.label);
     setPlaceholder(schema.placeholder);
-    setHelpText(schema.helpText);
+    setHelpText(schema.help_text);
     setType(schema.type);
     setRequired(schema.required);
     setOptions(schema.options || []);
@@ -263,7 +280,7 @@ export function FieldEditPanel({
         setPlaceholder(
           (_placeholder) => _placeholder || defaults.placeholder || ""
         );
-        setHelpText((_help) => _help || defaults.helpText || "");
+        setHelpText((_help) => _help || defaults.help_text || "");
         setRequired((_required) => _required || defaults.required || false);
         setMultiple((_multiple) => _multiple || defaults.multiple || false);
         setData((_data) => _data || defaults.data);

@@ -1,4 +1,4 @@
-import { FormBlockType, FormFieldDefinition, NewFormFieldInit } from "@/types";
+import { FormBlockType, FormFieldDefinition, FormFieldInit } from "@/types";
 import type { EditorFlatFormBlock } from "./state";
 
 export type BlocksEditorAction =

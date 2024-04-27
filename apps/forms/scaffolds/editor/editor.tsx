@@ -8,8 +8,8 @@ import {
   FormEditorState,
   initialFormEditorState,
 } from "./state";
-import { FieldEditPanel } from "../panels/field-edit-panel";
-import { FormFieldDefinition, NewFormFieldInit } from "@/types";
+import { FieldEditPanel, FormFieldSave } from "../panels/field-edit-panel";
+import { FormFieldDefinition, FormFieldInit } from "@/types";
 import { createClientClient } from "@/lib/supabase/client";
 import toast from "react-hot-toast";
 import { FormFieldUpsert, EditorApiResponse } from "@/types/private/api";
@@ -221,7 +221,7 @@ function FieldEditPanelProvider({ children }: React.PropsWithChildren<{}>) {
   );
 
   const onSaveField = useCallback(
-    (init: NewFormFieldInit) => {
+    (init: FormFieldSave) => {
       const data: FormFieldUpsert = {
         ...init,
         options: init.options?.length ? init.options : undefined,
@@ -285,7 +285,7 @@ function FieldEditPanelProvider({ children }: React.PropsWithChildren<{}>) {
                 name: field.name,
                 type: field.type,
                 label: field.label ?? "",
-                helpText: field.help_text ?? "",
+                help_text: field.help_text ?? "",
                 placeholder: field.placeholder ?? "",
                 options: field.options,
                 // TODO: add inventory support

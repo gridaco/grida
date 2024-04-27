@@ -1,16 +1,16 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { NewFormFieldInit } from "@/types";
+import { FormFieldInit } from "@/types";
 import { LightningBoltIcon } from "@radix-ui/react-icons";
 
 export function FormFieldAssistant({
   onSuggestion,
 }: {
-  onSuggestion?: (schema: NewFormFieldInit) => void;
+  onSuggestion?: (schema: FormFieldInit) => void;
 }) {
   const [description, setDescription] = useState("");
-  const [schema, setSchema] = useState<NewFormFieldInit | null>(null);
+  const [schema, setSchema] = useState<FormFieldInit | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
   const assist = async () => {
