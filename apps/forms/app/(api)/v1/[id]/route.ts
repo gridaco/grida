@@ -1,7 +1,9 @@
 import {
   FORM_FORCE_CLOSED,
+  FORM_OPTION_SOLDOUT,
   FORM_RESPONSE_LIMIT_BY_CUSTOMER_REACHED,
   FORM_RESPONSE_LIMIT_REACHED,
+  FORM_SOLD_OUT,
   MISSING_REQUIRED_HIDDEN_FIELDS,
   UUID_FORMAT_MISMATCH,
   VISITORID_FORMAT_MISMATCH,
@@ -14,9 +16,13 @@ import {
 } from "@/k/system";
 import { blockstree } from "@/lib/forms/tree";
 import { FormBlockTree } from "@/lib/forms/types";
-import { client, grida_commerce_client } from "@/lib/supabase/server";
-import { GridaCommerceClient } from "@/services/commerce";
+import { client } from "@/lib/supabase/server";
 import { upsert_customer_with } from "@/services/customer";
+import {
+  FormFieldOptionsInventoryMap,
+  form_field_options_inventory,
+  validate_options_inventory,
+} from "@/services/form/inventory";
 import { validate_max_access } from "@/services/form/validate-max-access";
 import {
   FormBlock,
@@ -82,7 +88,9 @@ export type FormClientFetchResponseError =
         | typeof UUID_FORMAT_MISMATCH.code
         | typeof FORM_RESPONSE_LIMIT_REACHED.code
         | typeof VISITORID_FORMAT_MISMATCH.code
-        | typeof FORM_FORCE_CLOSED.code;
+        | typeof FORM_FORCE_CLOSED.code
+        | typeof FORM_SOLD_OUT.code
+        | typeof FORM_OPTION_SOLDOUT.code;
       message: string;
     };
 export interface MissingRequiredHiddenFieldsError {
@@ -180,8 +188,6 @@ interface ClientHeaderRenderBlock extends BaseRenderBlock {
   description_html?: string | null;
 }
 
-type SimpleOptionInventoryMap = { [sku: string]: number };
-
 export async function GET(
   req: NextRequest,
   context: {
@@ -254,24 +260,12 @@ export async function GET(
   const page_blocks = (data.default_page as unknown as FormPage).blocks;
 
   // store connection - inventory data
-  let options_inventory: SimpleOptionInventoryMap | null = null;
+  let options_inventory: FormFieldOptionsInventoryMap | null = null;
   if (store_connection) {
-    const commerce = new GridaCommerceClient(
-      grida_commerce_client,
-      __project_id,
-      store_connection.store_id
-    );
-
-    const { data: inventory_items } = await commerce.fetchInventoryItems();
-    assert(inventory_items, "failed to fetch inventory items");
-
-    options_inventory = inventory_items.reduce(
-      (acc: { [sku: string]: number }, item) => {
-        acc[item.sku] = item.available;
-        return acc;
-      },
-      {}
-    );
+    options_inventory = await form_field_options_inventory({
+      project_id: __project_id,
+      store_id: store_connection.store_id,
+    });
   }
 
   // @ts-ignore
@@ -416,6 +410,22 @@ export async function GET(
     (b: ClientFieldRenderBlock) => b.field.id
   );
   let render_fields = fields.filter((f) => _render_field_ids.includes(f.id));
+
+  // validation
+
+  // validate inventory TODO: (this can be moved above with some refactoring)
+  if (options_inventory) {
+    // TODO: [might have been resolved] we need to pass inventory map witch only present in render_fields (for whole sold out validation)
+    const render_options = render_fields.map((f) => f.options).flat();
+    const inventory_access_error = await validate_options_inventory({
+      options: render_options,
+      inventory: options_inventory,
+    });
+
+    if (inventory_access_error) {
+      response.error = inventory_access_error;
+    }
+  }
 
   // if no blocks, render a simple form based on fields
   if (!render_blocks.length) {
