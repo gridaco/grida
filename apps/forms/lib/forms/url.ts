@@ -31,7 +31,12 @@ export function editorlink(
 export function formlink(
   host: string,
   form_id: string,
-  state?: "complete" | "alreadyresponded" | "formclosed",
+  state?:
+    | "complete"
+    | "alreadyresponded"
+    | "formclosed"
+    | "formsoldout"
+    | "formoptionsoldout",
   params?: { [key: string]: string | number | undefined }
 ) {
   const q = params ? new URLSearchParams(params as any).toString() : null;
@@ -43,7 +48,12 @@ export function formlink(
 function _form_state_link(
   host: string,
   form_id: string,
-  state?: "complete" | "alreadyresponded" | "formclosed"
+  state?:
+    | "complete"
+    | "alreadyresponded"
+    | "formclosed"
+    | "formsoldout"
+    | "formoptionsoldout"
 ) {
   if (state) return `${host}/d/e/${form_id}/${state}`;
   return `${host}/d/e/${form_id}`;
