@@ -29,7 +29,7 @@ import {
   SortableContext,
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
-import { createClientClient } from "@/lib/supabase/client";
+import { createClientFormsClient } from "@/lib/supabase/client";
 import toast from "react-hot-toast";
 import { FormBlockType } from "@/types";
 
@@ -80,7 +80,7 @@ function DndContextProvider({ children }: React.PropsWithChildren<{}>) {
 function PendingBlocksResolver() {
   const [state, dispatch] = useEditorState();
 
-  const supabase = createClientClient();
+  const supabase = createClientFormsClient();
 
   const insertBlock = useCallback(
     async (block: EditorFlatFormBlock) => {
@@ -145,7 +145,7 @@ function PendingBlocksResolver() {
 function useSyncBlocks(blocks: EditorFlatFormBlock[]) {
   // TODO: add debounce
 
-  const supabase = createClientClient();
+  const supabase = createClientFormsClient();
   const prevBlocksRef = useRef(blocks);
 
   useEffect(() => {

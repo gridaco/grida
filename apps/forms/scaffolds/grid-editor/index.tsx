@@ -2,7 +2,7 @@
 
 import React, { useCallback, useMemo, useState } from "react";
 import { Grid } from "../grid";
-import { createClientClient } from "@/lib/supabase/client";
+import { createClientFormsClient } from "@/lib/supabase/client";
 import {
   AlertDialog,
   AlertDialogContent,
@@ -31,7 +31,7 @@ export function GridEditor() {
 
   const { form_id, focus_field_id, fields, responses, selected_responses } =
     state;
-  const supabase = createClientClient();
+  const supabase = createClientFormsClient();
 
   const columns = useMemo(
     () =>

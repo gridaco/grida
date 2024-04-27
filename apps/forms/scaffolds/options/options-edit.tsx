@@ -35,12 +35,14 @@ export function OptionsEdit({
   onChange,
   onSort,
   onRemove,
+  disableNewOption,
 }: {
   options?: Option[];
   onAdd?: () => void;
   onChange?: (id: string, option: Option) => void;
   onSort?: (from: number, to: number) => void;
   onRemove?: (id: string) => void;
+  disableNewOption?: boolean;
 }) {
   const id = useId();
 
@@ -101,14 +103,16 @@ export function OptionsEdit({
                 }}
               />
             ))}
-            <button
-              type="button"
-              className="flex gap-2 items-center justify-center border rounded text-xs p-2 w-fit"
-              onClick={onAdd}
-            >
-              <PlusIcon />
-              Add Option
-            </button>
+            {!disableNewOption && (
+              <button
+                type="button"
+                className="flex gap-2 items-center justify-center border rounded text-xs p-2 w-fit"
+                onClick={onAdd}
+              >
+                <PlusIcon />
+                Add Option
+              </button>
+            )}
           </div>
         </div>
       </SortableContext>

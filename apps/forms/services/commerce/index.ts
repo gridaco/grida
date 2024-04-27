@@ -5,12 +5,12 @@ import assert from "assert";
 export class GridaCommerceClient {
   public readonly client: SupabaseClient<Database, "grida_commerce">;
   public readonly project_id: number;
-  public readonly store_id?: number;
+  public readonly store_id?: number | null;
 
   constructor(
     client: SupabaseClient<Database, "grida_commerce">,
     project_id: number,
-    store_id?: number
+    store_id?: number | null
   ) {
     this.client = client;
     this.project_id = project_id;
@@ -75,6 +75,24 @@ export class GridaCommerceClient {
       inventory_level_id,
       diff,
     });
+  }
+
+  async fetchInventoryItems() {
+    assert(this.store_id, "store_id is required");
+    return await this.client
+      .from("inventory_item")
+      .select(`*, levels:inventory_level(*)`)
+      .eq("store_id", this.store_id);
+  }
+
+  async fetchInventoryItem({ sku }: { sku: string }) {
+    assert(this.store_id, "store_id is required");
+    return await this.client
+      .from("inventory_item")
+      .select(`*, levels:inventory_level(*)`)
+      .eq("store_id", this.store_id)
+      .eq("sku", sku)
+      .single();
   }
 
   async upsertProduct({

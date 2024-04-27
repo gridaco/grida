@@ -136,6 +136,7 @@ export type FormFieldAutocompleteType =
 export type PlatformPoweredBy = "api" | "grida_forms" | "web_client";
 
 export type FormFieldInit = {
+  id?: string;
   name: string;
   label: string;
   type: FormFieldType;
@@ -148,7 +149,7 @@ export type FormFieldInit = {
   data?: FormFieldDataSchema | null;
   accept?: string | null;
   multiple?: boolean;
-  options_inventory?: { [option_id: string]: MutableInventoryStock };
+  // options_inventory?: { [option_id: string]: MutableInventoryStock };
 };
 
 export interface IFormField {

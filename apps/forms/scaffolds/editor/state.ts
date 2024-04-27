@@ -10,7 +10,11 @@ export type DraftID = `[draft]${string}`;
 export const DRAFT_ID_START_WITH = "[draft]";
 
 export interface FormEditorInit {
+  project_id: number;
   form_id: string;
+  connections?: {
+    store_id?: number | null;
+  };
   form_title: string;
   page_id: string | null;
   blocks: EditorFlatFormBlock[];
@@ -28,6 +32,10 @@ export function initialFormEditorState(init: FormEditorInit): FormEditorState {
   );
 
   return {
+    connections: {
+      project_id: init.project_id,
+      store_id: init.connections?.store_id,
+    },
     form_id: init.form_id,
     form_title: init.form_title,
     page_id: init.page_id,
@@ -40,6 +48,10 @@ export function initialFormEditorState(init: FormEditorInit): FormEditorState {
 }
 
 export interface FormEditorState {
+  connections: {
+    project_id: number;
+    store_id?: number | null;
+  };
   form_id: string;
   form_title: string;
   page_id: string | null;

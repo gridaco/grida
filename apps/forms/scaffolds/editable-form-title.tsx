@@ -1,6 +1,6 @@
 "use client";
 
-import { createClientClient } from "@/lib/supabase/client";
+import { createClientFormsClient } from "@/lib/supabase/client";
 import { Database } from "@/types/supabase";
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
 import React, { useState, useEffect, useCallback } from "react";
@@ -15,7 +15,7 @@ export function EditableFormTitle({
 }) {
   const [value, setValue] = useState<string>(defaultValue || "");
 
-  const supabase = createClientClient();
+  const supabase = createClientFormsClient();
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const updateTitle = useCallback(

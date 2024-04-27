@@ -10,7 +10,7 @@ import {
 } from "./state";
 import { FieldEditPanel, FormFieldSave } from "../panels/field-edit-panel";
 import { FormFieldDefinition, FormFieldInit } from "@/types";
-import { createClientClient } from "@/lib/supabase/client";
+import { createClientFormsClient } from "@/lib/supabase/client";
 import toast from "react-hot-toast";
 import { FormFieldUpsert, EditorApiResponse } from "@/types/private/api";
 import { TooltipProvider } from "@radix-ui/react-tooltip";
@@ -42,7 +42,7 @@ export function InitialResponsesProvider({
 }: React.PropsWithChildren<{}>) {
   const [state, dispatch] = useEditorState();
 
-  const supabase = useMemo(() => createClientClient(), []);
+  const supabase = useMemo(() => createClientFormsClient(), []);
 
   const initially_fetched_responses = React.useRef(false);
 
@@ -129,7 +129,7 @@ export function FormResponsesProvider({
 }: React.PropsWithChildren<{}>) {
   const [state, dispatch] = useEditorState();
 
-  const supabase = useMemo(() => createClientClient(), []);
+  const supabase = useMemo(() => createClientFormsClient(), []);
 
   const fetchResponse = useCallback(
     async (id: string) => {
@@ -282,6 +282,7 @@ function FieldEditPanelProvider({ children }: React.PropsWithChildren<{}>) {
         init={
           field
             ? {
+                id: field.id,
                 name: field.name,
                 type: field.type,
                 label: field.label ?? "",
@@ -295,7 +296,7 @@ function FieldEditPanelProvider({ children }: React.PropsWithChildren<{}>) {
                 multiple: field.multiple ?? undefined,
                 options: field.options,
                 // TODO: add inventory support
-                options_inventory: undefined,
+                // options_inventory: undefined,
               }
             : undefined
         }

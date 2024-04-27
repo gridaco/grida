@@ -71,7 +71,8 @@ export default async function Layout({
         default_page:form_page!default_form_page_id(
           *,
           blocks:form_block(*)
-        )
+        ),
+        store_connection:connection_commerce_store(*)
       `
     )
     .eq("id", id)
@@ -125,6 +126,10 @@ export default async function Layout({
             </header>
             <FormEditorProvider
               initial={{
+                project_id: data.project_id,
+                connections: {
+                  store_id: data.store_connection?.store_id,
+                },
                 form_id: id,
                 form_title: data.title,
                 page_id: data.default_form_page_id,

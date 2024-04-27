@@ -53,6 +53,12 @@ import { Switch } from "@/components/ui/switch";
 import { InventoryStock } from "@/types/inventory";
 import { INITIAL_INVENTORY_STOCK } from "@/k/inventory_defaults";
 import { FormFieldUpsert } from "@/types/private/api";
+import { GridaCommerceClient } from "@/services/commerce";
+import { useEditorState } from "../editor";
+import {
+  createClientFormsClient,
+  createClientCommerceClient,
+} from "@/lib/supabase/client";
 
 // @ts-ignore
 const default_field_init: {
@@ -134,6 +140,119 @@ const input_can_have_pattern: FormFieldType[] = supported_field_types.filter(
 
 export type FormFieldSave = Omit<FormFieldUpsert, "form_id">;
 
+function useCommerceClient() {
+  const [state] = useEditorState();
+
+  const supabase = useMemo(() => createClientCommerceClient(), []);
+
+  const commerce = useMemo(
+    () =>
+      new GridaCommerceClient(
+        supabase,
+        state.connections.project_id,
+        state.connections.store_id
+      ),
+    [supabase, state.connections.project_id, state.connections.store_id]
+  );
+
+  return commerce;
+}
+
+function useInventory(options: Option[]) {
+  const commerce = useCommerceClient();
+  const [loading, setLoading] = useState(true);
+  const [inventory, setInventory] = useState<{
+    [key: string]: InventoryStock;
+  } | null>(null);
+
+  useEffect(() => {
+    setLoading(true);
+    console.log("fetching inventory");
+    commerce
+      .fetchInventoryItems()
+      .then(({ data, error }) => {
+        if (error) console.error(error);
+        if (!data) return;
+        console.log("inventory data", data);
+
+        // filter out items that are not in the options list
+        const filtered_data = data.filter((item) =>
+          options.some((option) => option.id === item.sku)
+        );
+
+        if (filtered_data.length === 0) {
+          return;
+        }
+
+        const inventorymap = options.reduce(
+          (acc: { [sku: string]: InventoryStock }, option) => {
+            const item = filtered_data.find((_) => _.sku === option.id);
+            if (item) {
+              acc[item.sku] = {
+                available: item.available,
+                on_hand: item.available, // TODO:
+                committed: 0, // TODO:
+                unavailable: 0,
+                incoming: 0,
+              };
+            } else {
+              acc[option.id] = {
+                available: 0,
+                on_hand: 0,
+                committed: 0,
+                unavailable: 0,
+                incoming: 0,
+              };
+            }
+            return acc;
+          },
+          {}
+        );
+        setInventory(inventorymap);
+      })
+      .finally(() => {
+        setLoading(false);
+      });
+  }, [commerce, options]);
+
+  return { inventory, loading };
+}
+
+function useInventoryState(
+  options: Option[],
+  _inventory: { [key: string]: InventoryStock } | null,
+  enabled: boolean
+) {
+  const [inventory, setInventory] = useState<{
+    [key: string]: InventoryStock;
+  } | null>(_inventory);
+
+  useEffect(() => {
+    if (enabled) {
+      setInventory(_inventory);
+
+      if (!_inventory) {
+        const initialmap = options.reduce(
+          (acc: { [sku: string]: InventoryStock }, option) => {
+            acc[option.id] = {
+              available: INITIAL_INVENTORY_STOCK,
+              on_hand: INITIAL_INVENTORY_STOCK,
+              committed: 0,
+              unavailable: 0,
+              incoming: 0,
+            };
+            return acc;
+          },
+          {}
+        );
+        setInventory(initialmap);
+      }
+    }
+  }, [_inventory, options, enabled]);
+
+  return [inventory, setInventory] as const;
+}
+
 export function FieldEditPanel({
   title,
   onSave,
@@ -150,7 +269,7 @@ export function FieldEditPanel({
   enableAI?: boolean;
   onSave?: (field: FormFieldSave) => void;
 }) {
-  const [inventoryEnabled, setInventoryEnabled] = useState(false);
+  const is_edit_mode = !!init?.id;
   const [effect_cause, set_effect_cause] = useState<"ai" | "human" | "system">(
     "system"
   );
@@ -184,23 +303,24 @@ export function FieldEditPanel({
     required,
   });
 
-  const [stocksMap, setStocksMap] = useState<{
-    [key: string]: InventoryStock;
-  }>(
-    Object.fromEntries(
-      options.map((o) => [
-        o.id,
-        {
-          available: INITIAL_INVENTORY_STOCK,
-          on_hand: INITIAL_INVENTORY_STOCK,
-          committed: 0,
-          unavailable: 0,
-          incoming: 0,
-          diff: 0,
-        },
-      ])
-    )
+  const { inventory: initial_inventory, loading: inventory_loading } =
+    useInventory(options);
+  const [is_inventory_enabled, __set_inventory_enabled] = useState(false);
+  const [inventory, setInventory] = useInventoryState(
+    options,
+    initial_inventory,
+    is_inventory_enabled
   );
+
+  useEffect(() => {
+    if (!inventory_loading && initial_inventory) {
+      __set_inventory_enabled(true);
+    }
+  }, [initial_inventory, inventory_loading]);
+
+  const enable_inventory = (checked: boolean) => {
+    if (checked) __set_inventory_enabled(true);
+  };
 
   const has_options = input_can_have_options.includes(type);
   const has_pattern = input_can_have_pattern.includes(type);
@@ -226,14 +346,12 @@ export function FieldEditPanel({
       }))
       .sort((a, b) => a.index - b.index);
 
-    const options_inventory_upsert_diff = inventoryEnabled
+    const options_inventory_upsert_diff = is_inventory_enabled
       ? Object.fromEntries(
-          Object.entries(stocksMap).map(([id, stock]) => [
+          Object.entries(inventory ?? {}).map(([id, stock]) => [
             id,
             {
-              diff:
-                stock.available -
-                (init?.options_inventory?.[id]?.available || 0),
+              diff: stock.available - (initial_inventory?.[id]?.available || 0),
             },
           ])
         )
@@ -423,6 +541,7 @@ export function FieldEditPanel({
             <PanelPropertySectionTitle>Options</PanelPropertySectionTitle>
             <PanelPropertyFields>
               <OptionsEdit
+                disableNewOption={is_inventory_enabled}
                 options={options}
                 onAdd={() => {
                   setOptions([
@@ -450,42 +569,51 @@ export function FieldEditPanel({
               />
             </PanelPropertyFields>
           </PanelPropertySection>
-          <PanelPropertySection hidden={type !== "select"}>
+          <PanelPropertySection hidden={type !== "select" || !is_edit_mode}>
             <PanelPropertySectionTitle>Store</PanelPropertySectionTitle>
             <PanelPropertyFields>
-              <PanelPropertyField
-                label={"Track Inventory"}
-                description="Enabiling Inventory will allow you to track stock levels for each option."
-              >
-                <Switch
-                  checked={inventoryEnabled}
-                  onCheckedChange={setInventoryEnabled}
-                />
-              </PanelPropertyField>
-              {inventoryEnabled && (
+              {inventory_loading ? (
+                <>{/*  */}</>
+              ) : (
                 <>
-                  <PanelPropertySectionTitle>
-                    Inventory
-                  </PanelPropertySectionTitle>
-                  <PanelPropertyFields>
-                    <OptionsStockEdit
-                      options={options.map((option) => {
-                        return {
-                          ...option,
-                          ...stocksMap[option.id],
-                        };
-                      })}
-                      onChange={(id, stock) => {
-                        setStocksMap({
-                          ...stocksMap,
-                          [id]: {
-                            ...stocksMap[id],
-                            ...stock,
-                          },
-                        });
-                      }}
+                  <PanelPropertyField
+                    label={"Track Inventory"}
+                    description="Enabiling Inventory will allow you to track stock levels for each option. (This cannot be disabled once enabled)"
+                  >
+                    <Switch
+                      checked={is_inventory_enabled}
+                      disabled={is_inventory_enabled} // cannot disable once enabled
+                      onCheckedChange={enable_inventory}
                     />
-                  </PanelPropertyFields>
+                  </PanelPropertyField>
+                  {is_inventory_enabled && (
+                    <>
+                      <PanelPropertySectionTitle>
+                        Inventory
+                      </PanelPropertySectionTitle>
+                      <PanelPropertyFields>
+                        {inventory && (
+                          <OptionsStockEdit
+                            options={options.map((option) => {
+                              return {
+                                ...option,
+                                ...inventory[option.id],
+                              };
+                            })}
+                            onChange={(id, stock) => {
+                              setInventory({
+                                ...inventory,
+                                [id]: {
+                                  ...inventory[id],
+                                  ...stock,
+                                },
+                              });
+                            }}
+                          />
+                        )}
+                      </PanelPropertyFields>
+                    </>
+                  )}
                 </>
               )}
             </PanelPropertyFields>

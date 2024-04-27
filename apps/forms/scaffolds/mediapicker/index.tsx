@@ -4,7 +4,7 @@ import React, { useCallback, useEffect, useState } from "react";
 import { useFilePicker } from "use-file-picker";
 import * as Tabs from "@radix-ui/react-tabs";
 import * as Dialog from "@radix-ui/react-dialog";
-import { createClientClient } from "@/lib/supabase/client";
+import { createClientFormsClient } from "@/lib/supabase/client";
 import { useEditorState } from "../editor";
 import { nanoid } from "nanoid";
 
@@ -106,7 +106,7 @@ function FromUrl() {
 
 export function useUploadFile() {
   const [state] = useEditorState();
-  const supabase = createClientClient();
+  const supabase = createClientFormsClient();
 
   return useCallback(
     async (file: Blob | File) => {
