@@ -1,3 +1,7 @@
+import type { MutableInventoryStock } from "./inventory";
+
+type UUID = string;
+
 export interface Form {
   created_at: string;
   custom_preview_url_path: string | null;
@@ -131,29 +135,24 @@ export type FormFieldAutocompleteType =
 
 export type PlatformPoweredBy = "api" | "grida_forms" | "web_client";
 
-export type NewFormFieldInit = {
+export type FormFieldInit = {
+  id?: string;
   name: string;
   label: string;
-  placeholder: string;
-  helpText: string;
   type: FormFieldType;
+  placeholder: string;
   required: boolean;
-  options?: {
-    id: string;
-    label?: string;
-    value: string;
-    disabled?: boolean | null;
-    index?: number;
-  }[];
+  help_text: string;
   pattern?: string;
+  options?: Option[];
   autocomplete?: FormFieldAutocompleteType[] | null;
   data?: FormFieldDataSchema | null;
   accept?: string | null;
   multiple?: boolean;
+  // options_inventory?: { [option_id: string]: MutableInventoryStock };
 };
 
-export interface FormFieldDefinition {
-  id: string;
+export interface IFormField {
   name: string;
   label?: string | null;
   type: FormFieldType;
@@ -161,16 +160,15 @@ export interface FormFieldDefinition {
   required: boolean;
   help_text?: string | null;
   pattern?: any | null;
-  options?: {
-    id: string;
-    label?: string;
-    value: string;
-    disabled?: boolean | null;
-  }[];
+  options?: Option[];
   autocomplete?: FormFieldAutocompleteType[] | null;
   data?: FormFieldDataSchema | null;
   accept?: string | null;
   multiple?: boolean | null;
+}
+
+export interface FormFieldDefinition extends IFormField {
+  id: UUID;
 }
 
 export interface FormPage {
@@ -197,6 +195,14 @@ export interface FormBlock<T = FormBlockType> {
   parent_id?: string | null;
   local_index: number;
 }
+
+export type Option = {
+  id: string;
+  label?: string;
+  value: string;
+  disabled?: boolean | null;
+  index?: number;
+};
 
 export type FormBlockType =
   | "section"

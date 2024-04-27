@@ -27,6 +27,7 @@ export function CopyToClipboardInput({ value }: { value: string }) {
         onClick={onCopyClick}
         data-copy-to-clipboard-target="npm-install-copy-text"
         className="absolute end-2.5 top-1/2 -translate-y-1/2 text-neutral-900 dark:text-neutral-400 hover:bg-neutral-100 dark:bg-neutral-800 dark:border-neutral-600 dark:hover:bg-neutral-700 rounded-lg py-2 px-2.5 inline-flex items-center justify-center bg-white border-neutral-200 border"
+        type="button"
       >
         <span
           className="inline-flex items-center"

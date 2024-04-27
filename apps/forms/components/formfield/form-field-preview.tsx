@@ -88,7 +88,7 @@ export function FormFieldPreview({
     defaultValue: defaultValue,
     // form validation related
     required: novalidate ? false : required,
-    pattern: novalidate ? undefined : pattern,
+    pattern: novalidate ? undefined : pattern || undefined,
     // minLength: novalidate ? undefined : data?.min_length,
     // maxLength: novalidate ? undefined : data?.max_length,
     // min: novalidate ? undefined : data?.min,

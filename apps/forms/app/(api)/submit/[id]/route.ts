@@ -3,13 +3,20 @@ import {
   SYSTEM_GF_FINGERPRINT_VISITORID_KEY,
   SYSTEM_GF_CUSTOMER_UUID_KEY,
 } from "@/k/system";
-import { client, workspaceclient } from "@/lib/supabase/server";
+import { client, grida_commerce_client } from "@/lib/supabase/server";
 import { upsert_customer_with } from "@/services/customer";
 import { validate_max_access } from "@/services/form/validate-max-access";
 import { is_uuid_v4 } from "@/utils/is";
 import { NextRequest, NextResponse } from "next/server";
 import { formlink } from "@/lib/forms/url";
 import { FORM_CLOSED_WHILE_RESPONDING } from "@/k/error";
+import {
+  FormFieldOptionsInventoryMap,
+  form_field_options_inventory,
+  validate_options_inventory,
+} from "@/services/form/inventory";
+import assert from "assert";
+import { GridaCommerceClient } from "@/services/commerce";
 
 const HOST = process.env.HOST || "http://localhost:3000";
 
@@ -96,7 +103,16 @@ async function submit({
   // check if form exists
   const { data: form_reference } = await client
     .from("form")
-    .select("*")
+    .select(
+      `
+        *,
+        fields:form_field(
+          *,
+          options:form_field_option(*)
+        ),
+        store_connection:connection_commerce_store(*)
+      `
+    )
     .eq("id", form_id)
     .single();
 
@@ -105,6 +121,7 @@ async function submit({
   }
 
   const {
+    project_id,
     unknown_field_handling_strategy,
     is_redirect_after_response_uri_enabled,
     is_ending_page_enabled,
@@ -115,9 +132,12 @@ async function submit({
     is_max_form_responses_by_customer_enabled,
     max_form_responses_by_customer,
     is_force_closed,
+    store_connection,
+    fields,
   } = form_reference;
 
   const entries = data.entries();
+
   const __keys = Array.from(data.keys());
   const system_gf_keys = __keys.filter((key) =>
     key.startsWith(SYSTEM_GF_KEY_STARTS_WITH)
@@ -197,7 +217,84 @@ async function submit({
     );
   }
 
+  let options_inventory: FormFieldOptionsInventoryMap | null = null;
+  if (store_connection) {
+    const commerce = new GridaCommerceClient(
+      grida_commerce_client,
+      project_id,
+      store_connection.store_id
+    );
+
+    options_inventory = await form_field_options_inventory({
+      project_id: project_id,
+      store_id: store_connection.store_id,
+    });
+    const inventory_keys = Object.keys(options_inventory);
+
+    // TODO: this may conflict the validation policy since v1/load uses render fields.
+    const options = form_reference.fields.map((f) => f.options).flat();
+
+    // TODO: now we only support one inventory option selection per form
+    const data_present_option_fields = fields.filter((f) => {
+      return f.options.length > 0 && !!data.get(f.name);
+    });
+
+    // get the option id that is both present in inventory and form data
+    const possible_selection_option_ids = data_present_option_fields
+      .map((f) => String(data.get(f!.name)))
+      .filter((id) => inventory_keys.includes(id));
+
+    assert(
+      possible_selection_option_ids.length <= 1,
+      "Multiple inventory options is not supported yet."
+    );
+
+    const selection_id =
+      possible_selection_option_ids.length == 1
+        ? possible_selection_option_ids[0]
+        : null;
+
+    console.log("selection_id", selection_id);
+
+    // validate if inventory is present
+    const inventory_access_error = await validate_options_inventory({
+      inventory: options_inventory,
+      options: options,
+      selection: selection_id ? { id: selection_id } : undefined,
+    });
+    if (inventory_access_error) {
+      console.error(inventory_access_error);
+      switch (inventory_access_error.code) {
+        case "FORM_SOLD_OUT":
+          return NextResponse.redirect(formlink(HOST, form_id, "formsoldout"), {
+            status: 301,
+          });
+        case "FORM_OPTION_UNAVAILABLE": {
+          return NextResponse.redirect(
+            formlink(HOST, form_id, "formoptionsoldout"),
+            {
+              status: 301,
+            }
+          );
+        }
+      }
+    }
+
+    if (selection_id) {
+      // TODO: only supports single inventory option selection
+      // update the inventory as selected
+      await commerce.upsertInventoryItem({
+        sku: selection_id,
+        level: {
+          diff: -1,
+          reason: "order",
+        },
+      });
+    }
+  }
+
   // get the fields ready
+  // TODO: no need to fetch fields again
   const { data: form_fields } = await client
     .from("form_field")
     .select("*, options:form_field_option(*)")
@@ -385,7 +482,7 @@ async function submit({
 
   return NextResponse.json({
     data: response,
-    raw: JSON.stringify(Object.fromEntries(entries)),
+    raw: response?.raw,
     warning: Object.keys(warning).length > 0 ? warning : null,
     info: Object.keys(info).length > 0 ? info : null,
     error: null,

@@ -7,8 +7,715 @@ export type Json =
   | Json[]
 
 export type Database = {
+  grida_commerce: {
+    Tables: {
+      inventory_item: {
+        Row: {
+          available: number
+          cost: number | null
+          created_at: string
+          id: number
+          product_id: number | null
+          sku: string
+          store_id: number
+          variant_id: number | null
+        }
+        Insert: {
+          available?: number
+          cost?: number | null
+          created_at?: string
+          id?: number
+          product_id?: number | null
+          sku: string
+          store_id: number
+          variant_id?: number | null
+        }
+        Update: {
+          available?: number
+          cost?: number | null
+          created_at?: string
+          id?: number
+          product_id?: number | null
+          sku?: string
+          store_id?: number
+          variant_id?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inventory_item_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "product"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_item_store_id_fkey"
+            columns: ["store_id"]
+            isOneToOne: false
+            referencedRelation: "store"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_item_variant_id_fkey"
+            columns: ["variant_id"]
+            isOneToOne: false
+            referencedRelation: "product_variant"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      inventory_level: {
+        Row: {
+          available: number
+          created_at: string
+          id: number
+          inventory_item_id: number
+        }
+        Insert: {
+          available?: number
+          created_at?: string
+          id?: number
+          inventory_item_id: number
+        }
+        Update: {
+          available?: number
+          created_at?: string
+          id?: number
+          inventory_item_id?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inventory_level_inventory_item_id_fkey"
+            columns: ["inventory_item_id"]
+            isOneToOne: false
+            referencedRelation: "inventory_item"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      inventory_level_commit: {
+        Row: {
+          created_at: string
+          diff: number | null
+          id: number
+          inventory_level_id: number
+          reason: Database["grida_commerce"]["Enums"]["inventory_level_commit_reason"]
+        }
+        Insert: {
+          created_at?: string
+          diff?: number | null
+          id?: number
+          inventory_level_id: number
+          reason?: Database["grida_commerce"]["Enums"]["inventory_level_commit_reason"]
+        }
+        Update: {
+          created_at?: string
+          diff?: number | null
+          id?: number
+          inventory_level_id?: number
+          reason?: Database["grida_commerce"]["Enums"]["inventory_level_commit_reason"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inventory_level_commit_inventory_level_id_fkey"
+            columns: ["inventory_level_id"]
+            isOneToOne: false
+            referencedRelation: "inventory_level"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      product: {
+        Row: {
+          body_html: string | null
+          created_at: string
+          id: number
+          name: string
+          sku: string | null
+          store_id: number
+        }
+        Insert: {
+          body_html?: string | null
+          created_at?: string
+          id?: number
+          name: string
+          sku?: string | null
+          store_id: number
+        }
+        Update: {
+          body_html?: string | null
+          created_at?: string
+          id?: number
+          name?: string
+          sku?: string | null
+          store_id?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "product_store_id_fkey"
+            columns: ["store_id"]
+            isOneToOne: false
+            referencedRelation: "store"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      product_option: {
+        Row: {
+          created_at: string
+          id: number
+          name: string
+          product_id: number
+          store_id: number
+        }
+        Insert: {
+          created_at?: string
+          id?: number
+          name: string
+          product_id: number
+          store_id: number
+        }
+        Update: {
+          created_at?: string
+          id?: number
+          name?: string
+          product_id?: number
+          store_id?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "option_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "product"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "option_store_id_fkey"
+            columns: ["store_id"]
+            isOneToOne: false
+            referencedRelation: "store"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      product_option_combination: {
+        Row: {
+          created_at: string
+          id: number
+          name: string | null
+          product_id: number
+          store_id: number
+        }
+        Insert: {
+          created_at?: string
+          id?: number
+          name?: string | null
+          product_id: number
+          store_id: number
+        }
+        Update: {
+          created_at?: string
+          id?: number
+          name?: string | null
+          product_id?: number
+          store_id?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "product_option_map_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "product"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_option_map_store_id_fkey"
+            columns: ["store_id"]
+            isOneToOne: false
+            referencedRelation: "store"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      product_option_combination_value_item: {
+        Row: {
+          created_at: string
+          id: number
+          option_combination_id: number
+          option_id: number
+          option_value_id: number
+          product_id: number
+          store_id: number
+        }
+        Insert: {
+          created_at?: string
+          id?: number
+          option_combination_id: number
+          option_id: number
+          option_value_id: number
+          product_id: number
+          store_id: number
+        }
+        Update: {
+          created_at?: string
+          id?: number
+          option_combination_id?: number
+          option_id?: number
+          option_value_id?: number
+          product_id?: number
+          store_id?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "product_option_map_item_option_id_fkey"
+            columns: ["option_id"]
+            isOneToOne: false
+            referencedRelation: "product_option"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_option_map_item_option_map_id_fkey"
+            columns: ["option_combination_id"]
+            isOneToOne: false
+            referencedRelation: "product_option_combination"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_option_map_item_option_value_id_fkey"
+            columns: ["option_value_id"]
+            isOneToOne: false
+            referencedRelation: "product_option_value"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_option_map_item_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "product"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_option_map_item_store_id_fkey"
+            columns: ["store_id"]
+            isOneToOne: false
+            referencedRelation: "store"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      product_option_value: {
+        Row: {
+          created_at: string
+          id: number
+          label: string | null
+          option_id: number
+          product_id: number
+          store_id: number
+          value: string
+        }
+        Insert: {
+          created_at?: string
+          id?: number
+          label?: string | null
+          option_id: number
+          product_id: number
+          store_id: number
+          value: string
+        }
+        Update: {
+          created_at?: string
+          id?: number
+          label?: string | null
+          option_id?: number
+          product_id?: number
+          store_id?: number
+          value?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "option_value_option_id_fkey"
+            columns: ["option_id"]
+            isOneToOne: false
+            referencedRelation: "product_option"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "option_value_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "product"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "option_value_store_id_fkey"
+            columns: ["store_id"]
+            isOneToOne: false
+            referencedRelation: "store"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      product_variant: {
+        Row: {
+          compare_at_price: number | null
+          created_at: string
+          id: number
+          inventory_management:
+            | Database["grida_commerce"]["Enums"]["inventory_management"]
+            | null
+          inventory_policy:
+            | Database["grida_commerce"]["Enums"]["inventory_policy"]
+            | null
+          price: number | null
+          product_id: number
+          product_option_combination_id: number | null
+          sku: string
+          store_id: number
+        }
+        Insert: {
+          compare_at_price?: number | null
+          created_at?: string
+          id?: number
+          inventory_management?:
+            | Database["grida_commerce"]["Enums"]["inventory_management"]
+            | null
+          inventory_policy?:
+            | Database["grida_commerce"]["Enums"]["inventory_policy"]
+            | null
+          price?: number | null
+          product_id: number
+          product_option_combination_id?: number | null
+          sku: string
+          store_id: number
+        }
+        Update: {
+          compare_at_price?: number | null
+          created_at?: string
+          id?: number
+          inventory_management?:
+            | Database["grida_commerce"]["Enums"]["inventory_management"]
+            | null
+          inventory_policy?:
+            | Database["grida_commerce"]["Enums"]["inventory_policy"]
+            | null
+          price?: number | null
+          product_id?: number
+          product_option_combination_id?: number | null
+          sku?: string
+          store_id?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "product_variant_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "product"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_variant_product_option_combination_id_fkey"
+            columns: ["product_option_combination_id"]
+            isOneToOne: true
+            referencedRelation: "product_option_combination"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_variant_store_id_fkey"
+            columns: ["store_id"]
+            isOneToOne: false
+            referencedRelation: "store"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      store: {
+        Row: {
+          created_at: string
+          currency: Database["grida_commerce"]["Enums"]["currency"]
+          id: number
+          name: string
+          project_id: number
+        }
+        Insert: {
+          created_at?: string
+          currency?: Database["grida_commerce"]["Enums"]["currency"]
+          id?: number
+          name: string
+          project_id: number
+        }
+        Update: {
+          created_at?: string
+          currency?: Database["grida_commerce"]["Enums"]["currency"]
+          id?: number
+          name?: string
+          project_id?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "store_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "project"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      create_option_combinations:
+        | {
+            Args: {
+              p_store_id: number
+              p_product_id: number
+              p_option_values: string[]
+            }
+            Returns: undefined
+          }
+        | {
+            Args: {
+              p_store_id: number
+              p_product_id: number
+              p_option_values: Json
+            }
+            Returns: undefined
+          }
+      get_existing_option_values: {
+        Args: {
+          p_product_id: number
+          p_exclude_option_id: number
+        }
+        Returns: {
+          option_id: number
+          value: string
+        }[]
+      }
+    }
+    Enums: {
+      currency:
+        | "AED"
+        | "AFN"
+        | "ALL"
+        | "AMD"
+        | "ANG"
+        | "AOA"
+        | "ARS"
+        | "AUD"
+        | "AWG"
+        | "AZN"
+        | "BAM"
+        | "BBD"
+        | "BDT"
+        | "BGN"
+        | "BHD"
+        | "BIF"
+        | "BMD"
+        | "BND"
+        | "BOB"
+        | "BRL"
+        | "BSD"
+        | "BTC"
+        | "BTN"
+        | "BWP"
+        | "BYN"
+        | "BZD"
+        | "CAD"
+        | "CDF"
+        | "CHF"
+        | "CLF"
+        | "CLP"
+        | "CNH"
+        | "CNY"
+        | "COP"
+        | "CRC"
+        | "CUC"
+        | "CUP"
+        | "CVE"
+        | "CZK"
+        | "DJF"
+        | "DKK"
+        | "DOP"
+        | "DZD"
+        | "EGP"
+        | "ERN"
+        | "ETB"
+        | "EUR"
+        | "FJD"
+        | "FKP"
+        | "GBP"
+        | "GEL"
+        | "GGP"
+        | "GHS"
+        | "GIP"
+        | "GMD"
+        | "GNF"
+        | "GTQ"
+        | "GYD"
+        | "HKD"
+        | "HNL"
+        | "HRK"
+        | "HTG"
+        | "HUF"
+        | "IDR"
+        | "ILS"
+        | "IMP"
+        | "INR"
+        | "IQD"
+        | "IRR"
+        | "ISK"
+        | "JEP"
+        | "JMD"
+        | "JOD"
+        | "JPY"
+        | "KES"
+        | "KGS"
+        | "KHR"
+        | "KMF"
+        | "KPW"
+        | "KRW"
+        | "KWD"
+        | "KYD"
+        | "KZT"
+        | "LAK"
+        | "LBP"
+        | "LKR"
+        | "LRD"
+        | "LSL"
+        | "LYD"
+        | "MAD"
+        | "MDL"
+        | "MGA"
+        | "MKD"
+        | "MMK"
+        | "MNT"
+        | "MOP"
+        | "MRU"
+        | "MUR"
+        | "MVR"
+        | "MWK"
+        | "MXN"
+        | "MYR"
+        | "MZN"
+        | "NAD"
+        | "NGN"
+        | "NIO"
+        | "NOK"
+        | "NPR"
+        | "NZD"
+        | "OMR"
+        | "PAB"
+        | "PEN"
+        | "PGK"
+        | "PHP"
+        | "PKR"
+        | "PLN"
+        | "PYG"
+        | "QAR"
+        | "RON"
+        | "RSD"
+        | "RUB"
+        | "RWF"
+        | "SAR"
+        | "SBD"
+        | "SCR"
+        | "SDG"
+        | "SEK"
+        | "SGD"
+        | "SHP"
+        | "SLL"
+        | "SOS"
+        | "SRD"
+        | "SSP"
+        | "STN"
+        | "SVC"
+        | "SYP"
+        | "SZL"
+        | "THB"
+        | "TJS"
+        | "TMT"
+        | "TND"
+        | "TOP"
+        | "TRY"
+        | "TTD"
+        | "TWD"
+        | "TZS"
+        | "UAH"
+        | "UGX"
+        | "USD"
+        | "UYU"
+        | "UZS"
+        | "VES"
+        | "VND"
+        | "VUV"
+        | "WST"
+        | "XAF"
+        | "XCD"
+        | "XDR"
+        | "XOF"
+        | "XPF"
+        | "YER"
+        | "ZAR"
+        | "ZMW"
+        | "ZWL"
+      inventory_level_commit_reason: "admin" | "initialize" | "other" | "order"
+      inventory_management: "none" | "system"
+      inventory_policy: "continue" | "deny"
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
   grida_forms: {
     Tables: {
+      connection_commerce_store: {
+        Row: {
+          created_at: string
+          form_id: string
+          id: number
+          project_id: number
+          store_id: number
+        }
+        Insert: {
+          created_at?: string
+          form_id: string
+          id?: number
+          project_id: number
+          store_id: number
+        }
+        Update: {
+          created_at?: string
+          form_id?: string
+          id?: number
+          project_id?: number
+          store_id?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "form_connection_store_form_id_fkey"
+            columns: ["form_id"]
+            isOneToOne: true
+            referencedRelation: "form"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "form_connection_store_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "project"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "form_connection_store_store_id_fkey"
+            columns: ["store_id"]
+            isOneToOne: false
+            referencedRelation: "store"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       form: {
         Row: {
           created_at: string
@@ -804,6 +1511,46 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      create_new_combination_maps: {
+        Args: {
+          new_store_id: number
+          new_product_id: number
+          new_option_id: number
+          new_value_id: number
+          new_value_text: string
+        }
+        Returns: undefined
+      }
+      create_single_option_map: {
+        Args: {
+          new_store_id: number
+          new_product_id: number
+          new_option_id: number
+          new_option_value_id: number
+          value_name: string
+        }
+        Returns: number
+      }
+      extend_existing_map_with_new_value:
+        | {
+            Args: {
+              new_store_id: number
+              new_product_id: number
+              new_option_id: number
+              new_value_id: number
+              new_value_text: string
+            }
+            Returns: undefined
+          }
+        | {
+            Args: {
+              product_id: number
+              new_option_id: number
+              new_value_id: number
+              new_value_text: string
+            }
+            Returns: undefined
+          }
       get_organizations_for_user: {
         Args: {
           user_id: string

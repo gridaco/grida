@@ -33,3 +33,13 @@ export const FORM_FORCE_CLOSED = {
   code: "FORM_FORCE_CLOSED",
   message: "The form is force closed",
 } as const;
+
+export const FORM_SOLD_OUT = {
+  code: "FORM_SOLD_OUT",
+  message: "The form is sold out",
+} as const;
+
+export const FORM_OPTION_SOLDOUT = {
+  code: "FORM_OPTION_UNAVAILABLE",
+  message: "The form option is unavailable",
+} as const;

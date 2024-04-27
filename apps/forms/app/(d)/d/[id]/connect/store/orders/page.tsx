@@ -1,5 +1,5 @@
 "use client";
-import * as React from "react";
+
 import Image from "next/image";
 import Link from "next/link";
 import {
@@ -21,7 +21,6 @@ import {
   Truck,
   Users2,
 } from "lucide-react";
-
 import { Badge } from "@/components/ui/badge";
 import {
   Breadcrumb,
@@ -72,8 +71,29 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { cookies } from "next/headers";
+import { createServerComponentClient } from "@/lib/supabase/server";
+import { redirect } from "next/navigation";
 
-export default function Dashboard() {
+export default function Dashboard({
+  params,
+}: {
+  params: {
+    id: string;
+  };
+}) {
+  // const form_id = params.id;
+  // const cookieStore = cookies();
+  // const supabase = createServerComponentClient(cookieStore);
+  // const { data: connection } = await supabase
+  //   .from("connection_commerce_store")
+  //   .select()
+  //   .eq("form_id", form_id)
+  //   .single();
+  // if (!connection) {
+  //   return redirect("../get-started");
+  // }
+
   return (
     <div className="flex min-h-screen w-full flex-col">
       {/* <aside className="fixed inset-y-0 left-0 z-10 hidden w-14 flex-col border-r bg-background sm:flex">

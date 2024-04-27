@@ -1,7 +1,9 @@
 import {
   FORM_FORCE_CLOSED,
+  FORM_OPTION_SOLDOUT,
   FORM_RESPONSE_LIMIT_BY_CUSTOMER_REACHED,
   FORM_RESPONSE_LIMIT_REACHED,
+  FORM_SOLD_OUT,
   MISSING_REQUIRED_HIDDEN_FIELDS,
   UUID_FORMAT_MISMATCH,
   VISITORID_FORMAT_MISMATCH,
@@ -16,6 +18,11 @@ import { blockstree } from "@/lib/forms/tree";
 import { FormBlockTree } from "@/lib/forms/types";
 import { client } from "@/lib/supabase/server";
 import { upsert_customer_with } from "@/services/customer";
+import {
+  FormFieldOptionsInventoryMap,
+  form_field_options_inventory,
+  validate_options_inventory,
+} from "@/services/form/inventory";
 import { validate_max_access } from "@/services/form/validate-max-access";
 import {
   FormBlock,
@@ -24,8 +31,10 @@ import {
   FormFieldDefinition,
   FormFieldType,
   FormPage,
+  Option,
 } from "@/types";
 import { is_uuid_v4 } from "@/utils/is";
+import assert from "assert";
 import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
 import { NextRequest, NextResponse } from "next/server";
@@ -79,7 +88,9 @@ export type FormClientFetchResponseError =
         | typeof UUID_FORMAT_MISMATCH.code
         | typeof FORM_RESPONSE_LIMIT_REACHED.code
         | typeof VISITORID_FORMAT_MISMATCH.code
-        | typeof FORM_FORCE_CLOSED.code;
+        | typeof FORM_FORCE_CLOSED.code
+        | typeof FORM_SOLD_OUT.code
+        | typeof FORM_OPTION_SOLDOUT.code;
       message: string;
     };
 export interface MissingRequiredHiddenFieldsError {
@@ -218,7 +229,8 @@ export async function GET(
         default_page:form_page!default_form_page_id(
           *,
           blocks:form_block(*)
-        )
+        ),
+        store_connection:connection_commerce_store(*)
       `
     )
     .eq("id", id)
@@ -242,9 +254,19 @@ export async function GET(
     max_form_responses_by_customer,
     project_id: __project_id,
     is_force_closed: __is_force_closed,
+    store_connection,
   } = data;
 
   const page_blocks = (data.default_page as unknown as FormPage).blocks;
+
+  // store connection - inventory data
+  let options_inventory: FormFieldOptionsInventoryMap | null = null;
+  if (store_connection) {
+    options_inventory = await form_field_options_inventory({
+      project_id: __project_id,
+      store_id: store_connection.store_id,
+    });
+  }
 
   // @ts-ignore
   let render_blocks: ClientRenderBlock[] = page_blocks
@@ -259,6 +281,38 @@ export async function GET(
         if (!field) {
           return null; // this will be filtered out
         }
+
+        // @ts-ignore
+        function mkoption(option: Option) {
+          const sku = option.id;
+
+          if (options_inventory && option.id in options_inventory) {
+            return sku_option(option, options_inventory[sku]);
+          }
+
+          return {
+            ...option,
+            disabled: option.disabled ?? undefined,
+          };
+        }
+
+        // @ts-ignore
+        function sku_option(option: Option, available: number): Option {
+          const is_inventory_available = available > 0;
+          const alert_under = 10;
+          const is_alerting_inventory = available <= alert_under;
+
+          return {
+            ...option,
+            label: is_inventory_available
+              ? is_alerting_inventory
+                ? `${option.label} (${available} left)`
+                : option.label
+              : `${option.label} (out of stock)`,
+            disabled: !is_inventory_available || (option.disabled ?? undefined),
+          };
+        }
+
         return <ClientFieldRenderBlock>{
           id: block.id,
           type: "field",
@@ -266,10 +320,7 @@ export async function GET(
             ...field,
             options: field.options
               .sort((a, b) => a.index - b.index)
-              .map((o) => ({
-                ...o,
-                disabled: o.disabled ?? undefined,
-              })),
+              .map(mkoption),
             required: field.required ?? undefined,
             multiple: field.multiple ?? undefined,
             autocomplete: field.autocomplete?.join(" ") ?? null,
@@ -359,6 +410,22 @@ export async function GET(
     (b: ClientFieldRenderBlock) => b.field.id
   );
   let render_fields = fields.filter((f) => _render_field_ids.includes(f.id));
+
+  // validation
+
+  // validate inventory TODO: (this can be moved above with some refactoring)
+  if (options_inventory) {
+    // TODO: [might have been resolved] we need to pass inventory map witch only present in render_fields (for whole sold out validation)
+    const render_options = render_fields.map((f) => f.options).flat();
+    const inventory_access_error = await validate_options_inventory({
+      options: render_options,
+      inventory: options_inventory,
+    });
+
+    if (inventory_access_error) {
+      response.error = inventory_access_error;
+    }
+  }
 
   // if no blocks, render a simple form based on fields
   if (!render_blocks.length) {

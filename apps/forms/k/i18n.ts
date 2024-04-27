@@ -26,6 +26,18 @@ const resources: Record<
             "Thank you for your interest. Unfortunately, the form is closed while responding. If you believe this is a mistake, please contact support.",
         },
       },
+      formsoldout: {
+        default: {
+          title: "Sold Out",
+          description: "We are out of stock and no longer accepting orders.",
+        },
+      },
+      formoptionsoldout: {
+        default: {
+          title: "Option Sold Out",
+          description: "Out of stock - Selected option is no longer available.",
+        },
+      },
       formcomplete: {
         receipt01: {
           title: "Receipt Confirmed",
@@ -85,6 +97,18 @@ const resources: Record<
           title: "폼이 마감되었습니다",
           description:
             "관심을 가져주셔서 감사합니다. 안타깝게도 응답 중에 폼이 닫혔습니다. 이것이 실수라고 생각하신다면 지원팀에 문의해 주세요.",
+        },
+      },
+      formsoldout: {
+        default: {
+          title: "품절 되었습니다",
+          description: "재고가 소진되어 더 이상 주문을 받지 않습니다.",
+        },
+      },
+      formoptionsoldout: {
+        default: {
+          title: "Option Sold Out",
+          description: "Out of stock - Selected option is no longer available.",
         },
       },
       formcomplete: {

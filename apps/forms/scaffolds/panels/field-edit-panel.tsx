@@ -18,17 +18,11 @@ import {
   FormFieldAutocompleteType,
   FormFieldDataSchema,
   FormFieldType,
-  NewFormFieldInit,
+  FormFieldInit,
   PaymentFieldData,
+  Option,
 } from "@/types";
-import {
-  CrossCircledIcon,
-  DragHandleDots2Icon,
-  GearIcon,
-  LockClosedIcon,
-  PlusIcon,
-  TrashIcon,
-} from "@radix-ui/react-icons";
+import { LockClosedIcon } from "@radix-ui/react-icons";
 import { FormFieldAssistant } from "../ai/form-field-schema-assistant";
 import {
   Select,
@@ -49,31 +43,26 @@ import {
 } from "@/k/payments_service_providers";
 import { cls_save_button } from "@/components/preferences";
 import { Toggle } from "@/components/toggle";
-import { Switch } from "@/components/ui/switch";
 import { fmt_snake_case_to_human_text } from "@/utils/fmt";
-import clsx from "clsx";
 import toast from "react-hot-toast";
-import {
-  SortableContext,
-  arrayMove,
-  useSortable,
-  verticalListSortingStrategy,
-} from "@dnd-kit/sortable";
-import { CSS } from "@dnd-kit/utilities";
-import {
-  DndContext,
-  PointerSensor,
-  closestCorners,
-  useSensor,
-  useSensors,
-} from "@dnd-kit/core";
-import { restrictToVerticalAxis } from "@dnd-kit/modifiers";
+import { arrayMove } from "@dnd-kit/sortable";
 import { draftid } from "@/utils/id";
-import { SkuEditPanel } from "./sku-panel";
+import { OptionsEdit } from "../options/options-edit";
+import { OptionsStockEdit } from "../options/options-sku";
+import { Switch } from "@/components/ui/switch";
+import { InventoryStock } from "@/types/inventory";
+import { INITIAL_INVENTORY_STOCK } from "@/k/inventory_defaults";
+import { FormFieldUpsert } from "@/types/private/api";
+import { GridaCommerceClient } from "@/services/commerce";
+import { useEditorState } from "../editor";
+import {
+  createClientFormsClient,
+  createClientCommerceClient,
+} from "@/lib/supabase/client";
 
 // @ts-ignore
 const default_field_init: {
-  [key in FormFieldType]: Partial<NewFormFieldInit>;
+  [key in FormFieldType]: Partial<FormFieldInit>;
 } = {
   text: {},
   textarea: { type: "textarea" },
@@ -149,12 +138,119 @@ const input_can_have_pattern: FormFieldType[] = supported_field_types.filter(
   (type) => !["checkbox", "checkboxes", "color", "radio"].includes(type)
 );
 
-type Option = {
-  id: string;
-  label?: string;
-  value: string;
-  disabled?: boolean | null;
-};
+export type FormFieldSave = Omit<FormFieldUpsert, "form_id">;
+
+function useCommerceClient() {
+  const [state] = useEditorState();
+
+  const supabase = useMemo(() => createClientCommerceClient(), []);
+
+  const commerce = useMemo(
+    () =>
+      new GridaCommerceClient(
+        supabase,
+        state.connections.project_id,
+        state.connections.store_id
+      ),
+    [supabase, state.connections.project_id, state.connections.store_id]
+  );
+
+  return commerce;
+}
+
+function useInventory(options: Option[]) {
+  const commerce = useCommerceClient();
+  const [loading, setLoading] = useState(true);
+  const [inventory, setInventory] = useState<{
+    [key: string]: InventoryStock;
+  } | null>(null);
+
+  useEffect(() => {
+    setLoading(true);
+    console.log("fetching inventory");
+    commerce
+      .fetchInventoryItems()
+      .then(({ data, error }) => {
+        if (error) console.error(error);
+        if (!data) return;
+
+        // filter out items that are not in the options list
+        const filtered_data = data.filter((item) =>
+          options.some((option) => option.id === item.sku)
+        );
+
+        if (filtered_data.length === 0) {
+          return;
+        }
+
+        const inventorymap = options.reduce(
+          (acc: { [sku: string]: InventoryStock }, option) => {
+            const item = filtered_data.find((_) => _.sku === option.id);
+            if (item) {
+              acc[item.sku] = {
+                available: item.available,
+                on_hand: item.available, // TODO:
+                committed: 0, // TODO:
+                unavailable: 0,
+                incoming: 0,
+              };
+            } else {
+              acc[option.id] = {
+                available: 0,
+                on_hand: 0,
+                committed: 0,
+                unavailable: 0,
+                incoming: 0,
+              };
+            }
+            return acc;
+          },
+          {}
+        );
+        setInventory(inventorymap);
+      })
+      .finally(() => {
+        setLoading(false);
+      });
+  }, [commerce, options]);
+
+  return { inventory, loading };
+}
+
+function useInventoryState(
+  options: Option[],
+  _inventory: { [key: string]: InventoryStock } | null,
+  enabled: boolean
+) {
+  const [inventory, setInventory] = useState<{
+    [key: string]: InventoryStock;
+  } | null>(_inventory);
+
+  useEffect(() => {
+    if (enabled) {
+      setInventory(_inventory);
+
+      if (!_inventory) {
+        const initialmap = options.reduce(
+          (acc: { [sku: string]: InventoryStock }, option) => {
+            acc[option.id] = {
+              available: INITIAL_INVENTORY_STOCK,
+              on_hand: INITIAL_INVENTORY_STOCK,
+              committed: 0,
+              unavailable: 0,
+              incoming: 0,
+            };
+            return acc;
+          },
+          {}
+        );
+        setInventory(initialmap);
+      }
+    }
+  }, [_inventory, options, enabled]);
+
+  return [inventory, setInventory] as const;
+}
 
 export function FieldEditPanel({
   title,
@@ -167,20 +263,19 @@ export function FieldEditPanel({
 }: React.ComponentProps<typeof SidePanel> & {
   title?: string;
   formResetKey?: number;
-  init?: Partial<NewFormFieldInit>;
+  init?: Partial<FormFieldInit>;
   mode?: "edit" | "new";
   enableAI?: boolean;
-  onSave?: (field: NewFormFieldInit) => void;
+  onSave?: (field: FormFieldSave) => void;
 }) {
-  const [skuOpen, setSkuOpen] = useState(false);
-  const [skuEnabeld, setSkuEnabled] = useState(false);
+  const is_edit_mode = !!init?.id;
   const [effect_cause, set_effect_cause] = useState<"ai" | "human" | "system">(
     "system"
   );
   const [name, setName] = useState(init?.name || "");
   const [label, setLabel] = useState(init?.label || "");
   const [placeholder, setPlaceholder] = useState(init?.placeholder || "");
-  const [helpText, setHelpText] = useState(init?.helpText || "");
+  const [helpText, setHelpText] = useState(init?.help_text || "");
   const [type, setType] = useState<FormFieldType>(init?.type || "text");
   const [required, setRequired] = useState(init?.required || false);
   const [pattern, setPattern] = useState<string | undefined>(init?.pattern);
@@ -207,6 +302,25 @@ export function FieldEditPanel({
     required,
   });
 
+  const { inventory: initial_inventory, loading: inventory_loading } =
+    useInventory(options);
+  const [is_inventory_enabled, __set_inventory_enabled] = useState(false);
+  const [inventory, setInventory] = useInventoryState(
+    options,
+    initial_inventory,
+    is_inventory_enabled
+  );
+
+  useEffect(() => {
+    if (!inventory_loading && initial_inventory) {
+      __set_inventory_enabled(true);
+    }
+  }, [initial_inventory, inventory_loading]);
+
+  const enable_inventory = (checked: boolean) => {
+    if (checked) __set_inventory_enabled(true);
+  };
+
   const has_options = input_can_have_options.includes(type);
   const has_pattern = input_can_have_pattern.includes(type);
   const has_accept = type === "file";
@@ -221,7 +335,7 @@ export function FieldEditPanel({
     // disable preview if servive provider is tosspayments (it takes control over the window)
     (data as PaymentFieldData)?.service_provider === "tosspayments";
 
-  const onSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+  const save = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
 
     const indexed_options = options
@@ -231,11 +345,22 @@ export function FieldEditPanel({
       }))
       .sort((a, b) => a.index - b.index);
 
+    const options_inventory_upsert_diff = is_inventory_enabled
+      ? Object.fromEntries(
+          Object.entries(inventory ?? {}).map(([id, stock]) => [
+            id,
+            {
+              diff: stock.available - (initial_inventory?.[id]?.available || 0),
+            },
+          ])
+        )
+      : undefined;
+
     onSave?.({
       name,
       label,
       placeholder,
-      helpText,
+      help_text: helpText,
       type,
       required,
       pattern,
@@ -244,16 +369,17 @@ export function FieldEditPanel({
       data,
       accept,
       multiple,
+      options_inventory: options_inventory_upsert_diff,
     });
   };
 
-  const onSuggestion = (schema: NewFormFieldInit) => {
+  const onSuggestion = (schema: FormFieldInit) => {
     set_effect_cause("ai");
 
     setName(schema.name);
     setLabel(schema.label);
     setPlaceholder(schema.placeholder);
-    setHelpText(schema.helpText);
+    setHelpText(schema.help_text);
     setType(schema.type);
     setRequired(schema.required);
     setOptions(schema.options || []);
@@ -271,7 +397,7 @@ export function FieldEditPanel({
         setPlaceholder(
           (_placeholder) => _placeholder || defaults.placeholder || ""
         );
-        setHelpText((_help) => _help || defaults.helpText || "");
+        setHelpText((_help) => _help || defaults.help_text || "");
         setRequired((_required) => _required || defaults.required || false);
         setMultiple((_multiple) => _multiple || defaults.multiple || false);
         setData((_data) => _data || defaults.data);
@@ -336,7 +462,7 @@ export function FieldEditPanel({
             <FormFieldAssistant onSuggestion={onSuggestion} />
           </PanelPropertySection>
         )}
-        <form key={formResetKey} id="field-edit-form" onSubmit={onSubmit}>
+        <form key={formResetKey} id="field-edit-form" onSubmit={save}>
           <PanelPropertySection>
             <PanelPropertySectionTitle>Field</PanelPropertySectionTitle>
             <PanelPropertyFields>
@@ -414,6 +540,7 @@ export function FieldEditPanel({
             <PanelPropertySectionTitle>Options</PanelPropertySectionTitle>
             <PanelPropertyFields>
               <OptionsEdit
+                disableNewOption={is_inventory_enabled}
                 options={options}
                 onAdd={() => {
                   setOptions([
@@ -441,19 +568,53 @@ export function FieldEditPanel({
               />
             </PanelPropertyFields>
           </PanelPropertySection>
-          <PanelPropertySection hidden={type !== "select"}>
+          <PanelPropertySection hidden={type !== "select" || !is_edit_mode}>
             <PanelPropertySectionTitle>Store</PanelPropertySectionTitle>
             <PanelPropertyFields>
-              <PanelPropertyField label={"Track Inventory"}>
-                <Toggle
-                  value={skuEnabeld}
-                  onChange={(enabled) => {
-                    setSkuEnabled(enabled);
-                    setSkuOpen(enabled);
-                  }}
-                />
-                <SkuEditPanel open={skuOpen} />
-              </PanelPropertyField>
+              {inventory_loading ? (
+                <>{/*  */}</>
+              ) : (
+                <>
+                  <PanelPropertyField
+                    label={"Track Inventory"}
+                    description="Enabiling Inventory will allow you to track stock levels for each option. (This cannot be disabled once enabled)"
+                  >
+                    <Switch
+                      checked={is_inventory_enabled}
+                      disabled={is_inventory_enabled} // cannot disable once enabled
+                      onCheckedChange={enable_inventory}
+                    />
+                  </PanelPropertyField>
+                  {is_inventory_enabled && (
+                    <>
+                      <PanelPropertySectionTitle>
+                        Inventory
+                      </PanelPropertySectionTitle>
+                      <PanelPropertyFields>
+                        {inventory && (
+                          <OptionsStockEdit
+                            options={options.map((option) => {
+                              return {
+                                ...option,
+                                ...inventory[option.id],
+                              };
+                            })}
+                            onChange={(id, stock) => {
+                              setInventory({
+                                ...inventory,
+                                [id]: {
+                                  ...inventory[id],
+                                  ...stock,
+                                },
+                              });
+                            }}
+                          />
+                        )}
+                      </PanelPropertyFields>
+                    </>
+                  )}
+                </>
+              )}
             </PanelPropertyFields>
           </PanelPropertySection>
           <PanelPropertySection hidden={type == "payment"}>
@@ -636,219 +797,4 @@ function buildPreviewLabel({
     txt += " *";
   }
   return txt;
-}
-
-function OptionsEdit({
-  options,
-  onAdd,
-  onChange,
-  onSort,
-  onRemove,
-}: {
-  options?: Option[];
-  onAdd?: () => void;
-  onChange?: (id: string, option: Option) => void;
-  onSort?: (from: number, to: number) => void;
-  onRemove?: (id: string) => void;
-}) {
-  const id = useId();
-
-  const sensors = useSensors(useSensor(PointerSensor));
-
-  const [mode, setMode] = useState<"simple" | "advanced">("simple");
-
-  const toggleMode = () => {
-    setMode(mode === "simple" ? "advanced" : "simple");
-  };
-
-  return (
-    <DndContext
-      id={id}
-      sensors={sensors}
-      collisionDetection={closestCorners}
-      modifiers={[restrictToVerticalAxis]}
-      onDragEnd={handleDragEnd}
-    >
-      <SortableContext
-        items={options?.map((option) => option.id) || []}
-        strategy={verticalListSortingStrategy}
-      >
-        <div className="flex flex-col gap-4">
-          <div className="flex gap-2 justify-between">
-            <span className="text-xs opacity-50">
-              Set the options for the select or radio input. you can set the
-              value and label individually in advanced mode.
-            </span>
-            <button type="button" onClick={toggleMode}>
-              {mode === "advanced" ? <CrossCircledIcon /> : <GearIcon />}
-            </button>
-          </div>
-          <div className="flex flex-col gap-2">
-            {mode === "advanced" && (
-              <div className="flex text-xs opacity-80">
-                <span className="w-5" />
-                <span className="flex-1">value</span>
-                <span className="flex-1">label</span>
-                <span className="min-w-16">disabled</span>
-                <span className="w-5" />
-              </div>
-            )}
-            {options?.map(({ id, ...option }, index) => (
-              <OptionEditItem
-                key={id}
-                id={id}
-                mode={mode}
-                label={option.label || ""}
-                value={option.value}
-                index={index}
-                onRemove={() => {
-                  onRemove?.(id);
-                }}
-                onChange={(option) => {
-                  onChange?.(id, { id, ...option });
-                }}
-              />
-            ))}
-            <button
-              type="button"
-              className="flex gap-2 items-center justify-center border rounded text-xs p-2 w-fit"
-              onClick={onAdd}
-            >
-              <PlusIcon />
-              Add Option
-            </button>
-          </div>
-        </div>
-      </SortableContext>
-    </DndContext>
-  );
-
-  function handleDragEnd(event: any) {
-    const { active, over } = event;
-
-    if (over && active.id !== over.id) {
-      onSort?.(active.data.current.index, over.data.current.index);
-    }
-  }
-}
-
-const does_fmt_match = (a: string, b: string) =>
-  fmt_snake_case_to_human_text(a).toLowerCase() === b.toLowerCase();
-
-const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
-
-function OptionEditItem({
-  id,
-  label: _label,
-  value: _value,
-  disabled: _disabled,
-  index,
-  mode,
-  onChange,
-  onRemove,
-}: {
-  id: string;
-  label: string;
-  value: string;
-  disabled?: boolean | null;
-  index: number;
-  mode: "simple" | "advanced";
-  onChange?: (option: {
-    label: string;
-    value: string;
-    disabled: boolean;
-  }) => void;
-  onRemove?: () => void;
-}) {
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    setActivatorNodeRef,
-    transform,
-    isDragging,
-    isSorting,
-    isOver,
-    transition,
-  } = useSortable({ id: id, data: { index } });
-
-  const [value, setValue] = useState(_value);
-  const [label, setLabel] = useState(_label);
-  const [disabled, setDisabled] = useState<boolean>(_disabled || false);
-  const [fmt_matches, set_fmt_matches] = useState<boolean>(
-    does_fmt_match(value, label)
-  );
-
-  useEffect(() => {
-    if (fmt_matches) {
-      setLabel(capitalize(fmt_snake_case_to_human_text(value)));
-    }
-    set_fmt_matches(does_fmt_match(value, label));
-  }, [value]);
-
-  useEffect(() => {
-    set_fmt_matches(does_fmt_match(value, label));
-  }, [label]);
-
-  useEffect(() => {
-    onChange?.({ label, value, disabled });
-  }, [value, label, disabled]);
-
-  const style = {
-    transform: CSS.Translate.toString(transform),
-    zIndex: isDragging ? 1 : 0,
-    transition,
-  };
-
-  return (
-    <div
-      //
-      ref={setNodeRef}
-      style={style}
-      className="flex gap-1 items-center"
-    >
-      <button
-        //
-        type="button"
-        {...listeners}
-        {...attributes}
-        ref={setActivatorNodeRef}
-      >
-        <DragHandleDots2Icon className="opacity-50" />
-      </button>
-      <label className="flex-1">
-        <input
-          className="block w-full p-2 text-gray-900 border border-gray-300 rounded-lg bg-gray-50 text-xs focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500"
-          type="text"
-          placeholder="option_value"
-          value={value}
-          required
-          onChange={(e) => setValue(e.target.value)}
-        />
-      </label>
-      <label className={clsx(mode === "simple" && "hidden", "flex-1")}>
-        <input
-          className={
-            "block w-full p-2 text-gray-900 border border-gray-300 rounded-lg bg-gray-50 text-xs focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500"
-          }
-          type="text"
-          placeholder="Option Label"
-          value={label}
-          onChange={(e) => setLabel(e.target.value)}
-        />
-      </label>
-      <label
-        className={clsx(
-          mode === "simple" && "hidden",
-          "flex items-center min-w-16"
-        )}
-      >
-        <Switch checked={disabled} onCheckedChange={setDisabled} />
-      </label>
-
-      <button type="button" onClick={onRemove}>
-        <TrashIcon />
-      </button>
-    </div>
-  );
 }

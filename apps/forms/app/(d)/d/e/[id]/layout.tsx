@@ -8,6 +8,8 @@ import resources from "@/k/i18n";
 import { FormPage } from "@/types";
 import { ThemeProvider } from "@/components/theme-provider";
 
+export const revalidate = 0;
+
 const inter = Inter({ subsets: ["latin"] });
 
 const IS_PRODUTION = process.env.NODE_ENV === "production";
