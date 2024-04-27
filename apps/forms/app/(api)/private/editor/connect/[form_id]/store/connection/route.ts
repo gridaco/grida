@@ -3,6 +3,8 @@ import {
   commerceclient,
   createRouteHandlerClient,
 } from "@/lib/supabase/server";
+import { GridaCommerceClient } from "@/services/commerce";
+import { GridaFormsClient } from "@/services/form";
 import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
 import { NextRequest, NextResponse } from "next/server";
@@ -20,17 +22,28 @@ export async function POST(
   const { form_id } = context.params;
   const supabase = createRouteHandlerClient(cookieStore);
 
-  const { data: form } = await supabase
+  const { data: form_reference } = await supabase
     .from("form")
     .select("title, project_id, store_connection:connection_commerce_store(*)")
     .eq("id", form_id)
     .single();
 
-  if (!form) {
+  if (!form_reference) {
     return notFound();
   }
 
-  if (form.store_connection) {
+  const commerce = new GridaCommerceClient(
+    commerceclient, // TODO: use non admin client
+    form_reference.project_id
+  );
+
+  const forms = new GridaFormsClient(
+    supabase,
+    form_reference.project_id,
+    form_id
+  );
+
+  if (form_reference.store_connection) {
     return NextResponse.redirect(
       editorlink(origin, form_id, "connect/store/products"),
       {
@@ -39,14 +52,10 @@ export async function POST(
     );
   }
 
-  const { data: store, error: store_insertion_error } = await commerceclient
-    .from("store")
-    .insert({
-      name: generated_form_store_name(form.title),
-      project_id: form.project_id,
-    })
-    .select("id")
-    .single();
+  const { data: store, error: store_insertion_error } =
+    await commerce.createStore({
+      name: generated_form_store_name(form_reference.title),
+    });
 
   if (store_insertion_error)
     console.error("store::error:", store_insertion_error);
@@ -59,13 +68,9 @@ export async function POST(
   }
 
   // create new connection record
-  const { data: connection, error } = await supabase
-    .from("connection_commerce_store")
-    .insert({
-      form_id: form_id,
-      project_id: form.project_id,
-      store_id: store.id,
-    });
+  const { data: connection, error } = await forms.createStoreConnection(
+    store.id
+  );
 
   if (error) {
     console.error("connection::error:", error);
