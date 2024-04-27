@@ -1,5 +1,5 @@
 import {
-  commerceclient,
+  grida_commerce_client,
   createRouteHandlerClient,
 } from "@/lib/supabase/server";
 import { GridaCommerceClient } from "@/services/commerce";
@@ -133,7 +133,7 @@ export async function POST(req: NextRequest) {
     assert(form_reference.store_connection, "store_connection is required");
 
     const commerce = new GridaCommerceClient(
-      commerceclient,
+      grida_commerce_client,
       form_reference.project_id,
       form_reference.store_connection.store_id
     );

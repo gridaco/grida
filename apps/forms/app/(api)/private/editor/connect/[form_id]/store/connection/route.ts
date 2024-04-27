@@ -1,6 +1,6 @@
 import { editorlink } from "@/lib/forms/url";
 import {
-  commerceclient,
+  grida_commerce_client,
   createRouteHandlerClient,
 } from "@/lib/supabase/server";
 import { GridaCommerceClient } from "@/services/commerce";
@@ -33,7 +33,7 @@ export async function POST(
   }
 
   const commerce = new GridaCommerceClient(
-    commerceclient, // TODO: use non admin client
+    grida_commerce_client, // TODO: use non admin client
     form_reference.project_id
   );
 

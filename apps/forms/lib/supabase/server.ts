@@ -24,7 +24,7 @@ export const workspaceclient = createClient<Database, "public">(
   }
 );
 
-export const commerceclient = createClient<Database, "grida_commerce">(
+export const grida_commerce_client = createClient<Database, "grida_commerce">(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_KEY!,
   {
