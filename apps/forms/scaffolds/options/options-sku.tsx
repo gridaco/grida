@@ -81,7 +81,7 @@ export function OptionsStockEdit({
                 </HoverCardContent>
               </HoverCard>
             </TableHead>
-            <TableHead>
+            {/* <TableHead>
               <HoverCard openDelay={100} closeDelay={100}>
                 <HoverCardTrigger className="flex gap-1 items-center cursor-pointer">
                   on hand
@@ -94,7 +94,7 @@ export function OptionsStockEdit({
                   </p>
                 </HoverCardContent>
               </HoverCard>
-            </TableHead>
+            </TableHead> */}
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -171,12 +171,12 @@ function SkuItemRow({
         />
       </TableCell>
       {/* on hand */}
-      <TableCell>
+      {/* <TableCell>
         <AdjustStockCountButton
           stock={option.on_hand}
           onSave={onChangeOnHand}
         />
-      </TableCell>
+      </TableCell> */}
     </TableRow>
   );
 }

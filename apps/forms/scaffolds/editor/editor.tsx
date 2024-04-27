@@ -287,15 +287,15 @@ function FieldEditPanelProvider({ children }: React.PropsWithChildren<{}>) {
                 label: field.label ?? "",
                 help_text: field.help_text ?? "",
                 placeholder: field.placeholder ?? "",
-                options: field.options,
-                // TODO: add inventory support
-                options_inventory: undefined,
                 required: field.required,
                 pattern: field.pattern,
                 autocomplete: field.autocomplete,
                 data: field.data,
                 accept: field.accept,
                 multiple: field.multiple ?? undefined,
+                options: field.options,
+                // TODO: add inventory support
+                options_inventory: undefined,
               }
             : undefined
         }
