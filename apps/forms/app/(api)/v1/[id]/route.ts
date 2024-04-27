@@ -14,7 +14,8 @@ import {
 } from "@/k/system";
 import { blockstree } from "@/lib/forms/tree";
 import { FormBlockTree } from "@/lib/forms/types";
-import { client } from "@/lib/supabase/server";
+import { client, grida_commerce_client } from "@/lib/supabase/server";
+import { GridaCommerceClient } from "@/services/commerce";
 import { upsert_customer_with } from "@/services/customer";
 import { validate_max_access } from "@/services/form/validate-max-access";
 import {
@@ -24,8 +25,10 @@ import {
   FormFieldDefinition,
   FormFieldType,
   FormPage,
+  Option,
 } from "@/types";
 import { is_uuid_v4 } from "@/utils/is";
+import assert from "assert";
 import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
 import { NextRequest, NextResponse } from "next/server";
@@ -177,6 +180,8 @@ interface ClientHeaderRenderBlock extends BaseRenderBlock {
   description_html?: string | null;
 }
 
+type SimpleOptionInventoryMap = { [sku: string]: number };
+
 export async function GET(
   req: NextRequest,
   context: {
@@ -218,7 +223,8 @@ export async function GET(
         default_page:form_page!default_form_page_id(
           *,
           blocks:form_block(*)
-        )
+        ),
+        store_connection:connection_commerce_store(*)
       `
     )
     .eq("id", id)
@@ -242,9 +248,31 @@ export async function GET(
     max_form_responses_by_customer,
     project_id: __project_id,
     is_force_closed: __is_force_closed,
+    store_connection,
   } = data;
 
   const page_blocks = (data.default_page as unknown as FormPage).blocks;
+
+  // store connection - inventory data
+  let options_inventory: SimpleOptionInventoryMap | null = null;
+  if (store_connection) {
+    const commerce = new GridaCommerceClient(
+      grida_commerce_client,
+      __project_id,
+      store_connection.store_id
+    );
+
+    const { data: inventory_items } = await commerce.fetchInventoryItems();
+    assert(inventory_items, "failed to fetch inventory items");
+
+    options_inventory = inventory_items.reduce(
+      (acc: { [sku: string]: number }, item) => {
+        acc[item.sku] = item.available;
+        return acc;
+      },
+      {}
+    );
+  }
 
   // @ts-ignore
   let render_blocks: ClientRenderBlock[] = page_blocks
@@ -259,6 +287,38 @@ export async function GET(
         if (!field) {
           return null; // this will be filtered out
         }
+
+        // @ts-ignore
+        function mkoption(option: Option) {
+          const sku = option.id;
+
+          if (options_inventory && option.id in options_inventory) {
+            return sku_option(option, options_inventory[sku]);
+          }
+
+          return {
+            ...option,
+            disabled: option.disabled ?? undefined,
+          };
+        }
+
+        // @ts-ignore
+        function sku_option(option: Option, available: number): Option {
+          const is_inventory_available = available > 0;
+          const alert_under = 10;
+          const is_alerting_inventory = available <= alert_under;
+
+          return {
+            ...option,
+            label: is_inventory_available
+              ? is_alerting_inventory
+                ? `${option.label} (${available} left)`
+                : option.label
+              : `${option.label} (out of stock)`,
+            disabled: !is_inventory_available || (option.disabled ?? undefined),
+          };
+        }
+
         return <ClientFieldRenderBlock>{
           id: block.id,
           type: "field",
@@ -266,10 +326,7 @@ export async function GET(
             ...field,
             options: field.options
               .sort((a, b) => a.index - b.index)
-              .map((o) => ({
-                ...o,
-                disabled: o.disabled ?? undefined,
-              })),
+              .map(mkoption),
             required: field.required ?? undefined,
             multiple: field.multiple ?? undefined,
             autocomplete: field.autocomplete?.join(" ") ?? null,
