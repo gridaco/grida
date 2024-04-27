@@ -1,3 +1,5 @@
+"use client";
+
 import Image from "next/image";
 import Link from "next/link";
 import {
@@ -73,26 +75,24 @@ import { cookies } from "next/headers";
 import { createServerComponentClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 
-export default async function Dashboard({
+export default function Dashboard({
   params,
 }: {
   params: {
     id: string;
   };
 }) {
-  const form_id = params.id;
-  const cookieStore = cookies();
-  const supabase = createServerComponentClient(cookieStore);
-
-  const { data: connection } = await supabase
-    .from("connection_commerce_store")
-    .select()
-    .eq("form_id", form_id)
-    .single();
-
-  if (!connection) {
-    return redirect("../get-started");
-  }
+  // const form_id = params.id;
+  // const cookieStore = cookies();
+  // const supabase = createServerComponentClient(cookieStore);
+  // const { data: connection } = await supabase
+  //   .from("connection_commerce_store")
+  //   .select()
+  //   .eq("form_id", form_id)
+  //   .single();
+  // if (!connection) {
+  //   return redirect("../get-started");
+  // }
 
   return (
     <div className="flex min-h-screen w-full flex-col">
