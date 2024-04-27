@@ -3,7 +3,7 @@ import {
   SYSTEM_GF_FINGERPRINT_VISITORID_KEY,
   SYSTEM_GF_CUSTOMER_UUID_KEY,
 } from "@/k/system";
-import { client } from "@/lib/supabase/server";
+import { client, grida_commerce_client } from "@/lib/supabase/server";
 import { upsert_customer_with } from "@/services/customer";
 import { validate_max_access } from "@/services/form/validate-max-access";
 import { is_uuid_v4 } from "@/utils/is";
@@ -16,6 +16,7 @@ import {
   validate_options_inventory,
 } from "@/services/form/inventory";
 import assert from "assert";
+import { GridaCommerceClient } from "@/services/commerce";
 
 const HOST = process.env.HOST || "http://localhost:3000";
 
@@ -218,6 +219,12 @@ async function submit({
 
   let options_inventory: FormFieldOptionsInventoryMap | null = null;
   if (store_connection) {
+    const commerce = new GridaCommerceClient(
+      grida_commerce_client,
+      project_id,
+      store_connection.store_id
+    );
+
     options_inventory = await form_field_options_inventory({
       project_id: project_id,
       store_id: store_connection.store_id,
@@ -271,6 +278,18 @@ async function submit({
           );
         }
       }
+    }
+
+    if (selection_id) {
+      // TODO: only supports single inventory option selection
+      // update the inventory as selected
+      await commerce.upsertInventoryItem({
+        sku: selection_id,
+        level: {
+          diff: -1,
+          reason: "order",
+        },
+      });
     }
   }
 

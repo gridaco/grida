@@ -31,7 +31,16 @@ export class GridaCommerceClient {
   /**
    * updates the inventory item without a product reference
    */
-  async upsertInventoryItem({ sku, diff }: { sku: string; diff?: number }) {
+  async upsertInventoryItem({
+    sku,
+    level,
+  }: {
+    sku: string;
+    level?: {
+      diff: number;
+      reason?: "admin" | "order" | "other" | "initialize";
+    };
+  }) {
     assert(this.store_id, "store_id is required");
     //
 
@@ -43,7 +52,8 @@ export class GridaCommerceClient {
       { onConflict: "store_id, sku" }
     );
 
-    if (diff) {
+    if (level) {
+      const { diff, reason } = level;
       // we need to fetch the inventory item again to ensure the levels are updated.
       const ii_retrieval = await this.client
         .from("inventory_item")
@@ -64,16 +74,21 @@ export class GridaCommerceClient {
 
       const { id: lowest_level_id } = _sorted_levels[0];
 
-      await this.adjustInventoryLevel(lowest_level_id, diff);
+      await this.adjustInventoryLevel(lowest_level_id, diff, reason);
     }
 
     return upsert_result;
   }
 
-  async adjustInventoryLevel(inventory_level_id: number, diff: number) {
+  async adjustInventoryLevel(
+    inventory_level_id: number,
+    diff: number,
+    reason?: "admin" | "order" | "other" | "initialize"
+  ) {
     return await this.client.from("inventory_level_commit").insert({
       inventory_level_id,
       diff,
+      reason: reason,
     });
   }
 
@@ -83,6 +98,14 @@ export class GridaCommerceClient {
       .from("inventory_item")
       .select(`*, levels:inventory_level(*)`)
       .eq("store_id", this.store_id);
+  }
+
+  /**
+   * fetches inventory items using RPC for more detailed information
+   * this includes committed (order) count along with available count
+   */
+  async fetchInventoryItemsRPC() {
+    throw "not implemented yet";
   }
 
   async fetchInventoryItem({ sku }: { sku: string }) {

@@ -143,7 +143,7 @@ export async function POST(req: NextRequest) {
       const { diff } = mut;
       await commerce.upsertInventoryItem({
         sku,
-        diff,
+        level: { diff, reason: "admin" },
       });
     }
 

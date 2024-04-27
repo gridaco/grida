@@ -173,7 +173,6 @@ function useInventory(options: Option[]) {
       .then(({ data, error }) => {
         if (error) console.error(error);
         if (!data) return;
-        console.log("inventory data", data);
 
         // filter out items that are not in the options list
         const filtered_data = data.filter((item) =>

@@ -99,18 +99,21 @@ export type Database = {
           diff: number | null
           id: number
           inventory_level_id: number
+          reason: Database["grida_commerce"]["Enums"]["inventory_level_commit_reason"]
         }
         Insert: {
           created_at?: string
           diff?: number | null
           id?: number
           inventory_level_id: number
+          reason?: Database["grida_commerce"]["Enums"]["inventory_level_commit_reason"]
         }
         Update: {
           created_at?: string
           diff?: number | null
           id?: number
           inventory_level_id?: number
+          reason?: Database["grida_commerce"]["Enums"]["inventory_level_commit_reason"]
         }
         Relationships: [
           {
@@ -355,7 +358,6 @@ export type Database = {
       }
       product_variant: {
         Row: {
-          available: boolean
           compare_at_price: number | null
           created_at: string
           id: number
@@ -372,7 +374,6 @@ export type Database = {
           store_id: number
         }
         Insert: {
-          available: boolean
           compare_at_price?: number | null
           created_at?: string
           id?: number
@@ -389,7 +390,6 @@ export type Database = {
           store_id: number
         }
         Update: {
-          available?: boolean
           compare_at_price?: number | null
           created_at?: string
           id?: number
@@ -660,6 +660,7 @@ export type Database = {
         | "ZAR"
         | "ZMW"
         | "ZWL"
+      inventory_level_commit_reason: "admin" | "initialize" | "other" | "order"
       inventory_management: "none" | "system"
       inventory_policy: "continue" | "deny"
     }
