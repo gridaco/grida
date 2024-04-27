@@ -35,30 +35,39 @@ export class GridaCommerceClient {
     assert(this.store_id, "store_id is required");
     //
 
-    const ii_upsertion = await this.client
-      .from("inventory_item")
-      .upsert(
-        {
-          store_id: this.store_id,
-          sku: sku,
-        },
-        { onConflict: "store_id, sku" }
-      )
-      .select(`*, levels:inventory_level(*)`)
-      .single();
+    const upsert_result = await this.client.from("inventory_item").upsert(
+      {
+        store_id: this.store_id,
+        sku: sku,
+      },
+      { onConflict: "store_id, sku" }
+    );
 
     if (diff) {
-      const { data: ii } = ii_upsertion;
+      // we need to fetch the inventory item again to ensure the levels are updated.
+      const ii_retrieval = await this.client
+        .from("inventory_item")
+        .select(`*, levels:inventory_level(*)`)
+        .eq("store_id", this.store_id)
+        .eq("sku", sku)
+        .single();
+
+      const { data: ii } = ii_retrieval;
       assert(ii, "failed to upsert inventory item");
       const { levels } = ii;
 
+      assert(levels, "failed to fetch inventory levels");
       // get the lowest `available` inventory level
-      const { id: lowest_level_id } = levels.sort(
-        (a, b) => a.available - b.available
-      )[0];
+      const _sorted_levels = levels.sort((a, b) => a.available - b.available);
+
+      assert(_sorted_levels.length, "no inventory levels found");
+
+      const { id: lowest_level_id } = _sorted_levels[0];
 
       await this.adjustInventoryLevel(lowest_level_id, diff);
     }
+
+    return upsert_result;
   }
 
   async adjustInventoryLevel(inventory_level_id: number, diff: number) {
