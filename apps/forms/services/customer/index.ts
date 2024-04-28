@@ -21,7 +21,7 @@ export async function upsert_customer_with({
     last_seen_at: new Date().toISOString(),
   } as const;
 
-  console.log("customer::payload:", pl);
+  // console.log("customer::payload:", pl);
   if (uuid && is_uuid_v4(uuid)) {
     const { data: customer, error } = await workspaceclient
       .from("customer")
@@ -53,7 +53,7 @@ export async function upsert_customer_with({
         return customer;
       }
     }
-    console.log("customer::upserted:", customer);
+    // console.log("customer::upserted:", customer);
     return customer;
   } else {
     const { data: customer, error } = await workspaceclient
@@ -65,7 +65,7 @@ export async function upsert_customer_with({
       .single();
 
     error && console.error("customer::error-1:", error);
-    console.log("customer::upserted:", customer);
+    // console.log("customer::upserted:", customer);
     return customer;
   }
 }

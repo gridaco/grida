@@ -79,15 +79,8 @@ export function Form({
 
   if (isLoading || !data) {
     return (
-      <main
-        className={clsx(
-          "h-screen md:h-auto min-h-screen",
-          "relative mx-auto prose dark:prose-invert",
-          "data-[cjk='true']:break-keep",
-          "flex flex-col"
-        )}
-      >
-        <div className="mt-8">
+      <main className="h-screen min-h-screen">
+        <div className="prose mx-auto p-4 pt-10 md:pt-16 h-full overflow-auto flex-1">
           <SkeletonCard />
         </div>
       </main>
@@ -560,10 +553,22 @@ function FormPageBackgroundIframe({ src }: { src: string }) {
 function SkeletonCard() {
   return (
     <div className="flex flex-col space-y-3">
-      <Skeleton className="h-[125px] w-full rounded-xl" />
-      <div className="space-y-2">
-        <Skeleton className="h-4 w-full" />
-        <Skeleton className="h-4 w-full" />
+      <Skeleton className="h-[24px] w-3/4 rounded-xl" />
+      <Skeleton className="h-[100px] w-full rounded-xl" />
+      <div className="h-10" />
+      <div className="space-y-10">
+        <div className="space-y-2">
+          <Skeleton className="h-4 w-1/4" />
+          <Skeleton className="h-8 w-full" />
+        </div>
+        <div className="space-y-2">
+          <Skeleton className="h-4 w-1/4" />
+          <Skeleton className="h-8 w-full" />
+        </div>
+        <div className="space-y-2">
+          <Skeleton className="h-4 w-1/4" />
+          <Skeleton className="h-8 w-full" />
+        </div>
       </div>
     </div>
   );

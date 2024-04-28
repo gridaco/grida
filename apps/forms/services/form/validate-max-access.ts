@@ -50,7 +50,7 @@ export async function validate_max_access({
 
       if (error) throw error;
 
-      console.log("count", count);
+      // console.log("count", count);
 
       if (
         (count ?? 0) + count_diff >=
