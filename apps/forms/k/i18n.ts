@@ -39,6 +39,10 @@ const resources: Record<
         },
       },
       formcomplete: {
+        default: {
+          title: "Form Complete",
+          description: "Thank you for your response.",
+        },
         receipt01: {
           title: "Receipt Confirmed",
           description:
@@ -112,6 +116,10 @@ const resources: Record<
         },
       },
       formcomplete: {
+        default: {
+          title: "응답 완료",
+          description: "응답해 주셔서 감사합니다.",
+        },
         receipt01: {
           title: "접수 완료",
           description: "스크린샷을 찍어 접수 번호를 저장하세요.",

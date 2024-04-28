@@ -1,3 +1,5 @@
+import resources from "@/k/i18n";
+import i18next from "i18next";
 import FormCompletePageTemplate_receipt01 from "@/theme/templates/formcomplete/receipt01";
 
 const mock = {
@@ -5,13 +7,24 @@ const mock = {
   local_id: 123,
 } as const;
 
-export default function Component({
+export default async function Component({
+  params,
   searchParams,
 }: {
+  params: {
+    lng: string;
+  };
   searchParams: {
     title?: string;
   };
 }) {
+  await i18next.init({
+    lng: params.lng,
+    fallbackLng: "en",
+    debug: false,
+    resources: resources,
+  });
+
   const title = searchParams.title || mock.title;
   return (
     <FormCompletePageTemplate_receipt01
