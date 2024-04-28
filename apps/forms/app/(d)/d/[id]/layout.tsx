@@ -13,8 +13,8 @@ import { Inter } from "next/font/google";
 import { GoogleAnalytics } from "@next/third-parties/google";
 import { FormPage } from "@/types";
 import { PreviewButton } from "@/components/preview-button";
-import "../../../editor.css";
 import { ThemeProvider } from "@/components/theme-provider";
+import "../../../editor.css";
 
 const inter = Inter({ subsets: ["latin"] });
 

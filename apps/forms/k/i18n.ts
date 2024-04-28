@@ -15,6 +15,8 @@ const resources: Record<
       submit: "Submit",
       pay: "Pay",
       home: "Home",
+      left_in_stock: "{{available}} left",
+      sold_out: "Sold Out",
       formclosed: {
         default: {
           title: "Form Closed",
@@ -115,6 +117,8 @@ const resources: Record<
       submit: "제출",
       pay: "결제",
       home: "홈",
+      left_in_stock: "{{available}}개 남음",
+      sold_out: "매진됨",
       formclosed: {
         default: {
           title: "폼이 마감되었습니다",

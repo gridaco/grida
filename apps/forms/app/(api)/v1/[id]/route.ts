@@ -8,6 +8,7 @@ import {
   UUID_FORMAT_MISMATCH,
   VISITORID_FORMAT_MISMATCH,
 } from "@/k/error";
+import resources from "@/k/i18n";
 import {
   SYSTEM_GF_CUSTOMER_EMAIL_KEY,
   SYSTEM_GF_CUSTOMER_UUID_KEY,
@@ -34,7 +35,7 @@ import {
   Option,
 } from "@/types";
 import { is_uuid_v4 } from "@/utils/is";
-import assert from "assert";
+import i18next from "i18next";
 import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
 import { NextRequest, NextResponse } from "next/server";
@@ -257,6 +258,13 @@ export async function GET(
     store_connection,
   } = data;
 
+  await i18next.init({
+    lng: default_form_page_language,
+    debug: false, //!IS_PRODUTION,
+    resources: resources,
+    preload: [default_form_page_language],
+  });
+
   const page_blocks = (data.default_page as unknown as FormPage).blocks;
 
   // store connection - inventory data
@@ -306,9 +314,9 @@ export async function GET(
             ...option,
             label: is_inventory_available
               ? is_alerting_inventory
-                ? `${option.label} (${available} left)`
+                ? `${option.label} (${i18next.t("left_in_stock", { available })})`
                 : option.label
-              : `${option.label} (out of stock)`,
+              : `${option.label} (${i18next.t("sold_out")})`,
             disabled: !is_inventory_available || (option.disabled ?? undefined),
           };
         }
