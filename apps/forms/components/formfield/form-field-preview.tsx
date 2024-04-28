@@ -41,6 +41,7 @@ export function FormFieldPreview({
   data,
   novalidate,
   vanilla,
+  locked,
   preview,
 }: {
   name: string;
@@ -69,6 +70,11 @@ export function FormFieldPreview({
    * use vanilla html5 input element only
    */
   vanilla?: boolean;
+  /**
+   * disable auto mutation of value when locked.
+   * by default, the input values are only modified by user input, thus, there is a exception for select input for extra validation (e.g. useSafeSelectValue)
+   */
+  locked?: boolean;
   /**
    * force render invisible field if true
    */
@@ -120,6 +126,7 @@ export function FormFieldPreview({
             <HtmlSelectWithSafeValue
               {...(sharedInputProps as React.ComponentProps<"select">)}
               options={options}
+              locked={locked}
             />
           );
         } else {
@@ -134,6 +141,7 @@ export function FormFieldPreview({
             <SelectWithSafeValue
               {...(sharedInputProps as React.ComponentProps<"select">)}
               options={options}
+              locked={locked}
             />
           );
         }
@@ -311,8 +319,8 @@ export function FormFieldPreview({
  * This is for Select component to automatically de-select the selected item when the selected option is disabled.
  */
 function SelectWithSafeValue({
-  options,
-  vanilla,
+  options: _options,
+  locked,
   ...inputProps
 }: React.ComponentProps<"select"> & {
   placeholder?: string;
@@ -323,20 +331,20 @@ function SelectWithSafeValue({
     disabled?: boolean | null;
   }[];
 } & {
-  vanilla?: boolean;
+  locked?: boolean;
 }) {
   const {
     value: _value,
     defaultValue: _defaultValue,
     placeholder,
-    required,
   } = inputProps;
 
-  const { value, defaultValue, setValue } = useSafeSelectValue({
+  const { value, defaultValue, options, setValue } = useSafeSelectValue({
     value: _value as string,
-    options: options?.map((option) => ({
+    options: _options?.map((option) => ({
       // map value to id if id exists
       value: option.id || option.value,
+      label: option.label || option.value,
       disabled: option.disabled,
     })),
     // TODO: this should be true to display placeholder when changed to disabled, but this won't work for reason.
@@ -344,6 +352,7 @@ function SelectWithSafeValue({
     useUndefined: false,
     // TODO: also, for smae reason setting the default value to ''
     defaultValue: (_defaultValue || "") as string,
+    locked,
   });
 
   return (
@@ -364,8 +373,8 @@ function SelectWithSafeValue({
       <SelectContent>
         {options?.map((option) => (
           <SelectItem
-            key={option.id || option.value}
-            value={option.id || option.value}
+            key={option.value}
+            value={option.value}
             disabled={option.disabled || false}
           >
             {option.label || option.value}
@@ -380,8 +389,8 @@ function SelectWithSafeValue({
  * This is for Select component to automatically de-select the selected item when the selected option is disabled.
  */
 function HtmlSelectWithSafeValue({
-  options,
-  vanilla,
+  options: _options,
+  locked,
   ...inputProps
 }: React.ComponentProps<"select"> & {
   placeholder?: string;
@@ -392,24 +401,25 @@ function HtmlSelectWithSafeValue({
     disabled?: boolean | null;
   }[];
 } & {
-  vanilla?: boolean;
+  locked?: boolean;
 }) {
   const {
     value: _value,
     defaultValue: _defaultValue,
     placeholder,
     required,
-    multiple,
   } = inputProps;
 
-  const { value, defaultValue, setValue } = useSafeSelectValue({
+  const { value, defaultValue, setValue, options } = useSafeSelectValue({
     value: _value as string,
     defaultValue: _defaultValue as string,
-    options: options?.map((option) => ({
+    options: _options?.map((option) => ({
       // map value to id if id exists
       value: option.id || option.value,
+      label: option.label || option.value,
       disabled: option.disabled,
     })),
+    locked,
   });
 
   // html5 vanilla select
@@ -423,17 +433,17 @@ function HtmlSelectWithSafeValue({
       }}
     >
       {placeholder && (
-        <option value="" disabled={required}>
+        <option value="" disabled={!locked && required}>
           {placeholder}
         </option>
       )}
       {options?.map((option) => (
         <option
-          key={option.id || option.value}
-          value={option.id || option.value}
+          key={option.value}
+          value={option.value}
           disabled={option.disabled || false}
         >
-          {option.label || option.value}
+          {option.label}
         </option>
       ))}
     </HtmlSelect>

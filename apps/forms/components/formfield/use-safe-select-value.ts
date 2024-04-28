@@ -1,7 +1,8 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 
 interface Option {
   value: string;
+  label: string;
   disabled?: boolean | null;
 }
 
@@ -16,26 +17,41 @@ interface Option {
 function useSafeSelectValue<T extends string | undefined = string | undefined>({
   value: _value,
   defaultValue: _defaultValue,
-  options,
+  options: _options,
   onChange,
   useUndefined = false,
+  locked = false,
 }: {
   value: T;
   defaultValue: T;
   options?: Option[];
   onChange?: (value: T) => void;
   useUndefined?: boolean;
+  locked?: boolean;
 }): {
   value: string | undefined;
   defaultValue: string | undefined;
+  options: Option[] | undefined;
   setValue: (value: T) => void;
 } {
   const isControlled = _value !== undefined;
   const [value, setValue] = useState(_value);
 
+  console.log("value", value, locked);
+
+  const stableOptions = useMemo(() => {
+    return locked
+      ? _options?.map((option) => ({ ...option, disabled: false }))
+      : _options;
+  }, [_options, locked]);
+
   useEffect(() => {
+    if (locked) {
+      return;
+    }
+
     const currentValue = isControlled ? _value! : value; // Use non-null assertion for controlledValue since we check isControlled
-    const currentOption = options?.find(
+    const currentOption = _options?.find(
       (option) => option.value === currentValue
     );
 
@@ -57,11 +73,12 @@ function useSafeSelectValue<T extends string | undefined = string | undefined>({
   }, [
     _value,
     _defaultValue,
-    options,
+    _options,
     isControlled,
     value,
     onChange,
     useUndefined,
+    locked,
   ]);
 
   const setSafeValue = (newValue: T) => {
@@ -74,6 +91,7 @@ function useSafeSelectValue<T extends string | undefined = string | undefined>({
   return {
     value: isControlled ? _value! : value,
     defaultValue: _defaultValue, // Always return the initial defaultValue for reference
+    options: stableOptions,
     setValue: setSafeValue,
   };
 }
