@@ -1,5 +1,5 @@
 import { FormFieldDataSchema, FormFieldType, PaymentFieldData } from "@/types";
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { Select as HtmlSelect } from "../vanilla/select";
 import {
   Select,
@@ -14,6 +14,7 @@ import { TossPaymentsPaymentFormFieldPreview } from "./form-field-preview-paymen
 import clsx from "clsx";
 import { ClockIcon } from "@radix-ui/react-icons";
 import { Checkbox } from "@/components/ui/checkbox";
+import useSafeSelectValue from "./use-safe-select-value";
 
 /**
  * this disables the auto zoom in input text tag safari on iphone by setting font-size to 16px
@@ -116,59 +117,26 @@ export function FormFieldPreview({
         if (vanilla) {
           // html5 vanilla select
           return (
-            <HtmlSelect
+            <HtmlSelectWithSafeValue
               {...(sharedInputProps as React.ComponentProps<"select">)}
-              value={sharedInputProps.value || undefined}
-              defaultValue={sharedInputProps.defaultValue || ""}
-            >
-              {placeholder && (
-                <option value="" disabled={required}>
-                  {placeholder}
-                </option>
-              )}
-              {options?.map((option) => (
-                <option
-                  key={option.id || option.value}
-                  value={option.id || option.value}
-                  disabled={option.disabled || false}
-                >
-                  {option.label || option.value}
-                </option>
-              ))}
-            </HtmlSelect>
+              options={options}
+            />
           );
-        }
-        if (multiple) {
-          // TODO:
-          return (
-            <>invalid - non vanilla select cannot have property multiple</>
-          );
-        }
+        } else {
+          if (multiple) {
+            // TODO:
+            return (
+              <>invalid - non vanilla select cannot have property multiple</>
+            );
+          }
 
-        return (
-          // shadcn select
-          // @ts-ignore
-          <Select
-            {...(sharedInputProps as React.ComponentProps<"select">)}
-            value={sharedInputProps.value as string}
-            defaultValue={sharedInputProps.defaultValue as string}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder={placeholder} />
-            </SelectTrigger>
-            <SelectContent>
-              {options?.map((option) => (
-                <SelectItem
-                  key={option.id || option.value}
-                  value={option.id || option.value}
-                  disabled={option.disabled || false}
-                >
-                  {option.label || option.value}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        );
+          return (
+            <SelectWithSafeValue
+              {...(sharedInputProps as React.ComponentProps<"select">)}
+              options={options}
+            />
+          );
+        }
       }
       case "radio": {
         return (
@@ -336,6 +304,139 @@ export function FormFieldPreview({
       {renderInput()}
       <HelpText />
     </label>
+  );
+}
+
+/**
+ * This is for Select component to automatically de-select the selected item when the selected option is disabled.
+ */
+function SelectWithSafeValue({
+  options,
+  vanilla,
+  ...inputProps
+}: React.ComponentProps<"select"> & {
+  placeholder?: string;
+  options?: {
+    id?: string;
+    label?: string | null;
+    value: string;
+    disabled?: boolean | null;
+  }[];
+} & {
+  vanilla?: boolean;
+}) {
+  const {
+    value: _value,
+    defaultValue: _defaultValue,
+    placeholder,
+    required,
+  } = inputProps;
+
+  const { value, defaultValue, setValue } = useSafeSelectValue({
+    value: _value as string,
+    options: options?.map((option) => ({
+      // map value to id if id exists
+      value: option.id || option.value,
+      disabled: option.disabled,
+    })),
+    // TODO: this should be true to display placeholder when changed to disabled, but this won't work for reason.
+    // leaving it as false for now.
+    useUndefined: false,
+    // TODO: also, for smae reason setting the default value to ''
+    defaultValue: (_defaultValue || "") as string,
+  });
+
+  return (
+    // shadcn select
+    // @ts-ignore
+    <Select
+      {...(inputProps as React.ComponentProps<"select">)}
+      // this is required, unless, the real native select won't change and fail to validate accurately
+      key={value}
+      value={value || undefined}
+      // TODO: same reason, disabling defaultValue to display placeholder
+      defaultValue={(defaultValue || undefined) as string}
+      onValueChange={setValue}
+    >
+      <SelectTrigger>
+        <SelectValue placeholder={placeholder} />
+      </SelectTrigger>
+      <SelectContent>
+        {options?.map((option) => (
+          <SelectItem
+            key={option.id || option.value}
+            value={option.id || option.value}
+            disabled={option.disabled || false}
+          >
+            {option.label || option.value}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  );
+}
+
+/**
+ * This is for Select component to automatically de-select the selected item when the selected option is disabled.
+ */
+function HtmlSelectWithSafeValue({
+  options,
+  vanilla,
+  ...inputProps
+}: React.ComponentProps<"select"> & {
+  placeholder?: string;
+  options?: {
+    id?: string;
+    label?: string | null;
+    value: string;
+    disabled?: boolean | null;
+  }[];
+} & {
+  vanilla?: boolean;
+}) {
+  const {
+    value: _value,
+    defaultValue: _defaultValue,
+    placeholder,
+    required,
+    multiple,
+  } = inputProps;
+
+  const { value, defaultValue, setValue } = useSafeSelectValue({
+    value: _value as string,
+    defaultValue: _defaultValue as string,
+    options: options?.map((option) => ({
+      // map value to id if id exists
+      value: option.id || option.value,
+      disabled: option.disabled,
+    })),
+  });
+
+  // html5 vanilla select
+  return (
+    <HtmlSelect
+      {...(inputProps as React.ComponentProps<"select">)}
+      value={value || undefined}
+      defaultValue={defaultValue || ""}
+      onChange={(e) => {
+        setValue(e.target.value as string);
+      }}
+    >
+      {placeholder && (
+        <option value="" disabled={required}>
+          {placeholder}
+        </option>
+      )}
+      {options?.map((option) => (
+        <option
+          key={option.id || option.value}
+          value={option.id || option.value}
+          disabled={option.disabled || false}
+        >
+          {option.label || option.value}
+        </option>
+      ))}
+    </HtmlSelect>
   );
 }
 
