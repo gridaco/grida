@@ -56,7 +56,7 @@ export function OptionsStockEdit({
             <TableHead>
               <HoverCard openDelay={100} closeDelay={100}>
                 <HoverCardTrigger className="flex gap-1 items-center cursor-pointer">
-                  commited
+                  committed
                   <QuestionMarkCircledIcon />
                 </HoverCardTrigger>
                 <HoverCardContent>
