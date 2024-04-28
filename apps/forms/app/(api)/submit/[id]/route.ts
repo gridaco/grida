@@ -9,7 +9,10 @@ import { validate_max_access } from "@/services/form/validate-max-access";
 import { is_uuid_v4 } from "@/utils/is";
 import { NextRequest, NextResponse } from "next/server";
 import { formlink } from "@/lib/forms/url";
-import { FORM_CLOSED_WHILE_RESPONDING } from "@/k/error";
+import {
+  FORM_CLOSED_WHILE_RESPONDING,
+  MISSING_REQUIRED_HIDDEN_FIELDS,
+} from "@/k/error";
 import {
   FormFieldOptionsInventoryMap,
   form_field_options_inventory,
@@ -166,7 +169,28 @@ async function submit({
 
   console.log("/submit::customer:", customer);
 
-  // validation
+  const required_hidden_fields = fields.filter(
+    (f) => f.type === "hidden" && f.required
+  );
+
+  // validation - check if all value is present for required hidden fields
+  const missing_required_hidden_fields = required_hidden_fields.filter((f) => {
+    return !keys.includes(f.name);
+  });
+
+  if (missing_required_hidden_fields.length > 0) {
+    // TODO: return json instead on devmode
+    return NextResponse.redirect(
+      formlink(HOST, form_id, "badrequest", {
+        error: MISSING_REQUIRED_HIDDEN_FIELDS.code,
+      }),
+      {
+        status: 301,
+      }
+    );
+  }
+
+  // validation - check if new response is accepted for custoemer
   const max_access_error = await validate_max_access({
     form_id,
     customer_id: customer?.uid,
@@ -206,6 +230,7 @@ async function submit({
     }
   }
 
+  // validation - check if form is force closed
   if (is_force_closed) {
     return NextResponse.redirect(
       formlink(HOST, form_id, "formclosed", {
@@ -217,6 +242,7 @@ async function submit({
     );
   }
 
+  // validatopn - check if user selected option is connected to inventory and is available
   let options_inventory: FormFieldOptionsInventoryMap | null = null;
   if (store_connection) {
     const commerce = new GridaCommerceClient(

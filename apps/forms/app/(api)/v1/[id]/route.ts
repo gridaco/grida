@@ -5,6 +5,7 @@ import {
   FORM_RESPONSE_LIMIT_REACHED,
   FORM_SOLD_OUT,
   MISSING_REQUIRED_HIDDEN_FIELDS,
+  REQUIRED_HIDDEN_FIELD_NOT_USED,
   UUID_FORMAT_MISMATCH,
   VISITORID_FORMAT_MISMATCH,
 } from "@/k/error";
@@ -95,7 +96,9 @@ export type FormClientFetchResponseError =
       message: string;
     };
 export interface MissingRequiredHiddenFieldsError {
-  code: "MISSING_REQUIRED_HIDDEN_FIELDS";
+  code:
+    | typeof MISSING_REQUIRED_HIDDEN_FIELDS.code
+    | typeof REQUIRED_HIDDEN_FIELD_NOT_USED.code;
   message: string;
   missing_required_hidden_fields: FormFieldDefinition[];
 }
@@ -456,8 +459,12 @@ export async function GET(
 
   const tree = blockstree(render_blocks);
 
-  const required_hidden_fields = render_fields.filter(
+  const required_hidden_fields = fields.filter(
     (f) => f.type === "hidden" && f.required
+  );
+
+  const not_included_required_hidden_fields = required_hidden_fields.filter(
+    (f) => !render_fields.some((rf) => rf.id === f.id)
   );
 
   const { seed, missing_required_hidden_fields } = parseSeedFromSearchParams({
@@ -466,13 +473,21 @@ export async function GET(
     required_hidden_fields,
   });
 
-  // check if required hidden fields are provided.
-  // if not, raise developer error.
-  if (missing_required_hidden_fields.length) {
+  if (not_included_required_hidden_fields.length > 0) {
+    // check if required hidden fields are not used.
     response.error = {
-      ...MISSING_REQUIRED_HIDDEN_FIELDS,
-      missing_required_hidden_fields,
+      ...REQUIRED_HIDDEN_FIELD_NOT_USED,
+      missing_required_hidden_fields: not_included_required_hidden_fields,
     };
+  } else {
+    // check if required hidden fields are provided.
+    // if not, raise developer error.
+    if (missing_required_hidden_fields.length) {
+      response.error = {
+        ...MISSING_REQUIRED_HIDDEN_FIELDS,
+        missing_required_hidden_fields,
+      };
+    }
   }
 
   // fetch customer

@@ -60,6 +60,13 @@ const resources: Record<
             "You have already submitted this form. If you believe this is a mistake, please contact support.",
         },
       },
+      badrequest: {
+        default: {
+          title: "Something went wrong",
+          description:
+            "Your request could not be processed. This may have occurred because the form was altered during the submission process or you are using an outdated version of the app. If the issue persists, please contact our support team for assistance.",
+        },
+      },
     },
   },
   es: {
@@ -159,6 +166,13 @@ const resources: Record<
           title: "이미 응답한 상태입니다",
           description:
             "이 폼에 이미 응답하셨습니다. 오류로 생각되신다면 지원팀에 문의해 주세요.",
+        },
+      },
+      badrequest: {
+        default: {
+          title: "오류가 발생했습니다",
+          description:
+            "잘못된 요청이 발생했습니다. 응답 중에 폼이 변경되었거나 사용 중인 앱 버전이 최신이 아니거나 허용되지 않은 접근일 수 있습니다. 문제가 계속되면 지원팀에 문의해 주십시오.",
         },
       },
     },

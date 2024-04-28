@@ -34,6 +34,8 @@ export function formlink(
   state?:
     | "complete"
     | "alreadyresponded"
+    | "developererror"
+    | "badrequest"
     | "formclosed"
     | "formsoldout"
     | "formoptionsoldout",
@@ -51,6 +53,8 @@ function _form_state_link(
   state?:
     | "complete"
     | "alreadyresponded"
+    | "developererror"
+    | "badrequest"
     | "formclosed"
     | "formsoldout"
     | "formoptionsoldout"

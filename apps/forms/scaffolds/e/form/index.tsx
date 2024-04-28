@@ -112,6 +112,8 @@ export function Form({
   } = data;
 
   if (error) {
+    console.log("form preload error", error);
+
     switch (error.code) {
       case "FORM_RESPONSE_LIMIT_BY_CUSTOMER_REACHED":
         return redirect(`./${form_id}/alreadyresponded`);
