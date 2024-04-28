@@ -23,30 +23,32 @@ const resources: Record<
         while_responding: {
           title: "Form Closed",
           description:
-            "Thank you for your interest. Unfortunately, the form is closed while responding. If you believe this is a mistake, please contact support.",
+            "Thank you for your interest. Unfortunately, the form closed during your response. If you believe this is a mistake, please contact support.",
         },
       },
       formsoldout: {
         default: {
           title: "Sold Out",
-          description: "We are out of stock and no longer accepting orders.",
+          description:
+            "All stock has been depleted, and we are no longer accepting orders.",
         },
       },
       formoptionsoldout: {
         default: {
           title: "Option Sold Out",
-          description: "Out of stock - Selected option is no longer available.",
+          description:
+            "The selected option is sold out and no longer available.",
         },
       },
       formcomplete: {
         default: {
-          title: "Form Complete",
+          title: "Response Complete",
           description: "Thank you for your response.",
         },
         receipt01: {
           title: "Receipt Confirmed",
           description:
-            "Consider taking a screenshot of this page for your records.",
+            "Your receipt has been confirmed. Please consider taking a screenshot for your records.",
         },
       },
       alreadyresponded: {
@@ -64,6 +66,28 @@ const resources: Record<
       back: "Anterior",
       submit: "Enviar",
       pay: "Pagar",
+      home: "Inicio",
+      formsoldout: {
+        default: {
+          title: "Agotado",
+          description:
+            "El stock ha sido agotado y no estamos aceptando más pedidos.",
+        },
+      },
+      formoptionsoldout: {
+        default: {
+          title: "Opción Agotada",
+          description:
+            "La opción seleccionada está agotada y ya no está disponible.",
+        },
+      },
+      alreadyresponded: {
+        default: {
+          title: "Ya ha respondido",
+          description:
+            "Si considera que esto es un error, por favor contacte al soporte.",
+        },
+      },
       formclosed: {
         default: {
           title: "Formulario Cerrado",
@@ -95,24 +119,24 @@ const resources: Record<
         default: {
           title: "폼이 마감되었습니다",
           description:
-            "관심을 가져주셔서 감사합니다. 폼이 마감되어, 더 이상 응답을 받지 않습니다. 이것이 실수라고 생각하신다면 지원팀에 문의해 주세요.",
+            "관심 가져주셔서 감사합니다. 현재 폼 접수가 종료되었습니다. 오류로 생각되신다면 지원팀에 연락해 주세요.",
         },
         while_responding: {
           title: "폼이 마감되었습니다",
           description:
-            "관심을 가져주셔서 감사합니다. 안타깝게도 응답 중에 폼이 닫혔습니다. 이것이 실수라고 생각하신다면 지원팀에 문의해 주세요.",
+            "관심 가져주셔서 감사합니다. 안타깝게도 응답을 받는 도중에 폼이 마감되었습니다. 이것이 실수라고 생각되시면 지원팀에 문의해 주세요.",
         },
       },
       formsoldout: {
         default: {
-          title: "품절 되었습니다",
-          description: "재고가 소진되어 더 이상 주문을 받지 않습니다.",
+          title: "품절되었습니다",
+          description: "모든 재고가 소진되어 추가 주문을 받지 않습니다.",
         },
       },
       formoptionsoldout: {
         default: {
-          title: "Option Sold Out",
-          description: "Out of stock - Selected option is no longer available.",
+          title: "옵션 품절",
+          description: "선택하신 옵션이 품절되어 더 이상 제공되지 않습니다.",
         },
       },
       formcomplete: {
@@ -122,14 +146,15 @@ const resources: Record<
         },
         receipt01: {
           title: "접수 완료",
-          description: "스크린샷을 찍어 접수 번호를 저장하세요.",
+          description:
+            "접수가 완료되었습니다. 스크린샷을 찍어 접수 번호를 기록해 두세요.",
         },
       },
       alreadyresponded: {
         default: {
-          title: "이미 응답했습니다",
+          title: "이미 응답한 상태입니다",
           description:
-            "이미 이 폼을 제출했습니다. 이것이 실수라고 생각하신다면 지원팀에 문의해 주세요.",
+            "이 폼에 이미 응답하셨습니다. 오류로 생각되신다면 지원팀에 문의해 주세요.",
         },
       },
     },
@@ -140,6 +165,27 @@ const resources: Record<
       back: "戻る",
       submit: "提出する",
       pay: "支払う",
+      home: "ホーム",
+      formsoldout: {
+        default: {
+          title: "完売",
+          description:
+            "在庫がすべて無くなり、これ以上の注文は受け付けておりません。",
+        },
+      },
+      formoptionsoldout: {
+        default: {
+          title: "オプション完売",
+          description: "選択されたオプションは売り切れで、もう利用できません。",
+        },
+      },
+      alreadyresponded: {
+        default: {
+          title: "既に回答済み",
+          description:
+            "このフォームはすでに提出されています。これが間違いだと思われる場合は、サポートに連絡してください。",
+        },
+      },
       formclosed: {
         default: {
           title: "フォームは閉鎖されました",
@@ -166,6 +212,26 @@ const resources: Record<
       back: "上一步",
       submit: "提交",
       pay: "支付",
+      home: "首页",
+      formsoldout: {
+        default: {
+          title: "售罄",
+          description: "库存已全部售罄，我们不再接受新的订单。",
+        },
+      },
+      formoptionsoldout: {
+        default: {
+          title: "选项售罄",
+          description: "所选选项已售罄，不再提供。",
+        },
+      },
+      alreadyresponded: {
+        default: {
+          title: "已经回应",
+          description:
+            "您已经提交过此表格。如果您认为这是一个错误，请联系支持。",
+        },
+      },
       formclosed: {
         default: {
           title: "表格已关闭",
@@ -173,8 +239,7 @@ const resources: Record<
         },
         while_responding: {
           title: "表格已关闭",
-          description:
-            "感谢您的兴趣。不幸的是，表格在回应过程中被关闭。如果您认为这是一个错误，请联系支持。",
+          description: "如果您认为这是一个错误，请及时联系支持团队。",
         },
       },
       formcomplete: {
@@ -191,6 +256,28 @@ const resources: Record<
       back: "Précédent",
       submit: "Soumettre",
       pay: "Payer",
+      home: "Accueil",
+      formsoldout: {
+        default: {
+          title: "Épuisé",
+          description:
+            "Nous sommes en rupture de stock et n'acceptons plus de commandes.",
+        },
+      },
+      formoptionsoldout: {
+        default: {
+          title: "Option Épuisée",
+          description:
+            "L'option sélectionnée est épuisée et n'est plus disponible.",
+        },
+      },
+      alreadyresponded: {
+        default: {
+          title: "Déjà répondu",
+          description:
+            "Vous avez déjà soumis ce formulaire. Si vous pensez que c'est une erreur, veuillez contacter le support.",
+        },
+      },
       formclosed: {
         default: {
           title: "Formulaire Fermé",
@@ -217,6 +304,28 @@ const resources: Record<
       back: "Anterior",
       submit: "Enviar",
       pay: "Pagar",
+      home: "Início",
+      formsoldout: {
+        default: {
+          title: "Esgotado",
+          description:
+            "Todo o estoque foi esgotado e não estamos mais aceitando pedidos.",
+        },
+      },
+      formoptionsoldout: {
+        default: {
+          title: "Opção Esgotada",
+          description:
+            "A opção selecionada está esgotada e não está mais disponível.",
+        },
+      },
+      alreadyresponded: {
+        default: {
+          title: "Já Respondido",
+          description:
+            "Você já enviou este formulário. Se acredita que isso é um erro, por favor entre em contato com o suporte.",
+        },
+      },
       formclosed: {
         default: {
           title: "Formulário Fechado",
@@ -243,6 +352,28 @@ const resources: Record<
       back: "Indietro",
       submit: "Invia",
       pay: "Paga",
+      home: "Home",
+      formsoldout: {
+        default: {
+          title: "Esaurito",
+          description:
+            "Tutto il stock è esaurito e non stiamo più accettando ordini.",
+        },
+      },
+      formoptionsoldout: {
+        default: {
+          title: "Opzione Esaurita",
+          description:
+            "L'opzione selezionata è esaurita e non è più disponibile.",
+        },
+      },
+      alreadyresponded: {
+        default: {
+          title: "Già Risposto",
+          description:
+            "Hai già inviato questo modulo. Se pensi che sia un errore, contatta il supporto.",
+        },
+      },
       formclosed: {
         default: {
           title: "Modulo Chiuso",
@@ -269,6 +400,28 @@ const resources: Record<
       back: "Zurück",
       submit: "Einreichen",
       pay: "Bezahlen",
+      home: "Startseite",
+      formsoldout: {
+        default: {
+          title: "Ausverkauft",
+          description:
+            "Unser gesamter Vorrat ist erschöpft, und wir nehmen keine Bestellungen mehr an.",
+        },
+      },
+      formoptionsoldout: {
+        default: {
+          title: "Option Ausverkauft",
+          description:
+            "Die gewählte Option ist ausverkauft und nicht mehr verfügbar.",
+        },
+      },
+      alreadyresponded: {
+        default: {
+          title: "Schon geantwortet",
+          description:
+            "Sie haben dieses Formular bereits eingereicht. Wenn Sie glauben, dass dies ein Fehler ist, kontaktieren Sie bitte den Support.",
+        },
+      },
       formclosed: {
         default: {
           title: "Formular Geschlossen",
@@ -295,6 +448,26 @@ const resources: Record<
       back: "Назад",
       submit: "Отправить",
       pay: "Оплатить",
+      home: "Главная",
+      formsoldout: {
+        default: {
+          title: "Распродано",
+          description: "Весь запас исчерпан, и мы больше не принимаем заказы.",
+        },
+      },
+      formoptionsoldout: {
+        default: {
+          title: "Опция распродана",
+          description: "Выбранная опция распродана и больше не доступна.",
+        },
+      },
+      alreadyresponded: {
+        default: {
+          title: "Уже ответили",
+          description:
+            "Вы уже отправили эту форму. Если вы считаете, что это ошибка, пожалуйста, свяжитесь со службой поддержки.",
+        },
+      },
       formclosed: {
         default: {
           title: "Форма закрыта",
@@ -321,6 +494,26 @@ const resources: Record<
       back: "السابق",
       submit: "إرسال",
       pay: "دفع",
+      home: "الرئيسية",
+      formsoldout: {
+        default: {
+          title: "نفذت الكمية",
+          description: "لقد نفذ كل المخزون ولم نعد نقبل طلبات جديدة.",
+        },
+      },
+      formoptionsoldout: {
+        default: {
+          title: "الخيار نفذ",
+          description: "الخيار المختار نفذ ولم يعد متوفرًا.",
+        },
+      },
+      alreadyresponded: {
+        default: {
+          title: "تم الرد بالفعل",
+          description:
+            "لقد قدمت هذا النموذج بالفعل. إذا كنت تعتقد أن هذا خطأ، الرجاء التواصل مع الدعم.",
+        },
+      },
       formclosed: {
         default: {
           title: "النموذج مغلق",
@@ -346,6 +539,27 @@ const resources: Record<
       back: "पिछला",
       submit: "जमा करें",
       pay: "भुगतान करें",
+      home: "होम",
+      formsoldout: {
+        default: {
+          title: "बिक गया",
+          description:
+            "सभी स्टॉक समाप्त हो गया है और हम अब और आर्डर स्वीकार नहीं कर रहे हैं।",
+        },
+      },
+      formoptionsoldout: {
+        default: {
+          title: "विकल्प बिक गया",
+          description: "चुना गया विकल्प बिक गया है और अब उपलब्ध नहीं है।",
+        },
+      },
+      alreadyresponded: {
+        default: {
+          title: "पहले ही जवाब दे दिया गया है",
+          description:
+            "आप इस फॉर्म का जवाब पहले ही दे चुके हैं। अगर आपको लगता है कि यह गलती है, तो कृपया समर्थन से संपर्क करें।",
+        },
+      },
       formclosed: {
         default: {
           title: "फॉर्म बंद है",
@@ -372,6 +586,28 @@ const resources: Record<
       back: "Vorige",
       submit: "Indienen",
       pay: "Betalen",
+      home: "Home",
+      formsoldout: {
+        default: {
+          title: "Uitverkocht",
+          description:
+            "Al onze voorraad is opgebruikt, en we nemen geen bestellingen meer aan.",
+        },
+      },
+      formoptionsoldout: {
+        default: {
+          title: "Optie Uitverkocht",
+          description:
+            "De geselecteerde optie is uitverkocht en niet meer beschikbaar.",
+        },
+      },
+      alreadyresponded: {
+        default: {
+          title: "Al Gereageerd",
+          description:
+            "U heeft dit formulier al ingediend. Als u denkt dat dit een vergissing is, neem dan contact op met de ondersteuning.",
+        },
+      },
       formclosed: {
         default: {
           title: "Formulier Gesloten",
