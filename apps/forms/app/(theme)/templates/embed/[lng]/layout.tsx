@@ -1,7 +1,7 @@
 import resources from "@/k/i18n";
 import i18next from "i18next";
 
-export default function Layout({
+export default async function Layout({
   children,
   params,
 }: {
@@ -10,12 +10,12 @@ export default function Layout({
     lng: string;
   };
 }) {
-  i18next.init({
+  await i18next.init({
     lng: params.lng,
     fallbackLng: "en",
     debug: false,
     resources: resources,
   });
 
-  return children;
+  return <>{children}</>;
 }

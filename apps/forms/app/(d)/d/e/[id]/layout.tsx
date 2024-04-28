@@ -73,7 +73,7 @@ export default async function Layout({
 
   const { default_form_page_language, default_page } = data;
 
-  i18next.init({
+  await i18next.init({
     lng: default_form_page_language,
     debug: false, //!IS_PRODUTION,
     resources: resources,
