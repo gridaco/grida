@@ -58,10 +58,7 @@ export default async function Layout({
     .from("form")
     .select(
       `
-        *,
-        default_page:form_page!default_form_page_id(
-          *
-        )
+        default_form_page_language
       `
     )
     .eq("id", id)
@@ -71,15 +68,7 @@ export default async function Layout({
     return notFound();
   }
 
-  const { default_form_page_language, default_page } = data;
-
-  await i18next.init({
-    lng: default_form_page_language,
-    debug: false, //!IS_PRODUTION,
-    resources: resources,
-  });
-
-  const { background } = default_page as any as FormPage;
+  const { default_form_page_language } = data;
 
   return (
     <html lang={default_form_page_language}>

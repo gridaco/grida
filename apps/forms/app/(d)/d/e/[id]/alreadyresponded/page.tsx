@@ -6,8 +6,16 @@ import {
 } from "@/components/ui/card";
 import Link from "next/link";
 import i18next from "i18next";
+import { ssr_page_init_i18n } from "../../i18n";
 
-export default function AlreadyRespondedPage() {
+export default async function AlreadyRespondedPage({
+  params,
+}: {
+  params: { id: string };
+}) {
+  const form_id = params.id;
+  await ssr_page_init_i18n({ form_id });
+
   return (
     <main className="flex items-center justify-center w-screen h-screen">
       <Card className="w-full max-w-md p-4">

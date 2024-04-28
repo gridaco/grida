@@ -1,9 +1,10 @@
 import { Form } from "@/scaffolds/e/form";
 import i18next from "i18next";
+import { ssr_page_init_i18n } from "../i18n";
 
 export const revalidate = 0;
 
-export default function FormPage({
+export default async function FormPage({
   params,
   searchParams,
 }: {
@@ -11,6 +12,7 @@ export default function FormPage({
   searchParams: { [key: string]: string };
 }) {
   const form_id = params.id;
+  await ssr_page_init_i18n({ form_id });
 
   return (
     <Form

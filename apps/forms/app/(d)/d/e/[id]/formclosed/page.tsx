@@ -8,12 +8,18 @@ import {
 import { FORM_CLOSED_WHILE_RESPONDING } from "@/k/error";
 import Link from "next/link";
 import i18next from "i18next";
+import { ssr_page_init_i18n } from "../../i18n";
 
-export default function FormClosedPage({
+export default async function FormClosedPage({
+  params,
   searchParams,
 }: {
+  params: { id: string };
   searchParams: { oops?: typeof FORM_CLOSED_WHILE_RESPONDING.code };
 }) {
+  const form_id = params.id;
+  await ssr_page_init_i18n({ form_id });
+
   const oops = searchParams.oops;
   return (
     <main className="flex items-center justify-center w-screen h-screen">

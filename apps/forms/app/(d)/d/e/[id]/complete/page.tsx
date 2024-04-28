@@ -5,6 +5,7 @@ import { CheckIcon } from "@radix-ui/react-icons";
 import { client } from "@/lib/supabase/server";
 import { notFound } from "next/navigation";
 import { EndingPage } from "@/theme/templates/formcomplete";
+import { ssr_page_init_i18n } from "../../i18n";
 
 export default async function SubmitCompletePage({
   params,
@@ -16,7 +17,7 @@ export default async function SubmitCompletePage({
     rid: string;
   };
 }) {
-  const id = params.id;
+  const form_id = params.id;
   const response_id = searchParams.rid;
 
   const { data, error } = await client
@@ -29,7 +30,7 @@ export default async function SubmitCompletePage({
         )
       `
     )
-    .eq("id", id)
+    .eq("id", form_id)
     .single();
 
   const { data: response } = await client
@@ -41,6 +42,8 @@ export default async function SubmitCompletePage({
   if (!data || !response) {
     return notFound();
   }
+
+  await ssr_page_init_i18n({ lng: data.default_form_page_language });
 
   const { title, ending_page_template_id } = data;
   const { local_id } = response;
