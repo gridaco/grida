@@ -5,6 +5,7 @@ import {
 } from "@/lib/supabase/server";
 import { GridaCommerceClient } from "@/services/commerce";
 import { GridaFormsClient } from "@/services/form";
+import { generated_form_store_name } from "@/services/utils/generated-form-store-name";
 import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
 import { NextRequest, NextResponse } from "next/server";
@@ -85,8 +86,4 @@ export async function POST(
       status: 301,
     }
   );
-}
-
-function generated_form_store_name(name: string) {
-  return `[generated] ${name}`;
 }

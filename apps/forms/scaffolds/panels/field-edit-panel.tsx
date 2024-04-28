@@ -59,6 +59,8 @@ import {
   createClientFormsClient,
   createClientCommerceClient,
 } from "@/lib/supabase/client";
+import { useRouter } from "next/navigation";
+import { editorlink } from "@/lib/forms/url";
 
 // @ts-ignore
 const default_field_init: {
@@ -159,6 +161,7 @@ function useCommerceClient() {
 }
 
 function useInventory(options: Option[]) {
+  const [state] = useEditorState();
   const commerce = useCommerceClient();
   const [loading, setLoading] = useState(true);
   const [inventory, setInventory] = useState<{
@@ -167,6 +170,12 @@ function useInventory(options: Option[]) {
 
   useEffect(() => {
     setLoading(true);
+
+    if (!state.connections.store_id) {
+      setLoading(false);
+      return;
+    }
+
     console.log("fetching inventory");
     commerce
       .fetchInventoryItems()
@@ -212,7 +221,7 @@ function useInventory(options: Option[]) {
       .finally(() => {
         setLoading(false);
       });
-  }, [commerce, options]);
+  }, [commerce, options, state.connections.store_id]);
 
   return { inventory, loading };
 }
@@ -269,6 +278,8 @@ export function FieldEditPanel({
   onSave?: (field: FormFieldSave) => void;
 }) {
   const is_edit_mode = !!init?.id;
+  const [state] = useEditorState();
+  const router = useRouter();
   const [effect_cause, set_effect_cause] = useState<"ai" | "human" | "system">(
     "system"
   );
@@ -318,7 +329,24 @@ export function FieldEditPanel({
   }, [initial_inventory, inventory_loading]);
 
   const enable_inventory = (checked: boolean) => {
-    if (checked) __set_inventory_enabled(true);
+    // check if store is connected
+    if (state.connections.store_id) {
+      if (checked) __set_inventory_enabled(true);
+    } else {
+      const ok = confirm(
+        "You need to connect a store to enable inventory tracking"
+      );
+      if (ok) {
+        const connect_redirect_link = editorlink(
+          window.location.origin,
+          state.form_id,
+          "connect/store"
+        );
+        console.log("redirecting to", connect_redirect_link);
+        props.onOpenChange?.(false);
+        router.push(connect_redirect_link);
+      }
+    }
   };
 
   const has_options = input_can_have_options.includes(type);
