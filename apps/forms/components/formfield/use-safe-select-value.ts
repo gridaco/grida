@@ -37,8 +37,6 @@ function useSafeSelectValue<T extends string | undefined = string | undefined>({
   const isControlled = _value !== undefined;
   const [value, setValue] = useState(_value);
 
-  console.log("value", value, locked);
-
   const stableOptions = useMemo(() => {
     return locked
       ? _options?.map((option) => ({ ...option, disabled: false }))
