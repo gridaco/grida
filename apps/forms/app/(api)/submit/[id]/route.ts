@@ -141,11 +141,13 @@ async function submit({
 
   const entries = data.entries();
 
-  const __keys = Array.from(data.keys());
-  const system_gf_keys = __keys.filter((key) =>
+  const __keys_all = Array.from(data.keys());
+  const system_gf_keys = __keys_all.filter((key) =>
     key.startsWith(SYSTEM_GF_KEY_STARTS_WITH)
   );
-  const keys = __keys.filter((key) => !system_gf_keys.includes(key));
+  const nonsystem_keys = __keys_all.filter(
+    (key) => !system_gf_keys.includes(key)
+  );
 
   // customer handling
 
@@ -175,10 +177,12 @@ async function submit({
 
   // validation - check if all value is present for required hidden fields
   const missing_required_hidden_fields = required_hidden_fields.filter((f) => {
-    return !keys.includes(f.name);
+    return !__keys_all.includes(f.name);
   });
 
   if (missing_required_hidden_fields.length > 0) {
+    console.error("error", MISSING_REQUIRED_HIDDEN_FIELDS);
+
     // TODO: return json instead on devmode
     return NextResponse.redirect(
       formlink(HOST, form_id, "badrequest", {
@@ -327,11 +331,11 @@ async function submit({
     .eq("form_id", form_id);
 
   // group by existing and new fields
-  const known_names = keys.filter((key) => {
+  const known_names = nonsystem_keys.filter((key) => {
     return form_fields!.some((field: any) => field.name === key);
   });
 
-  const unknown_names = keys.filter((key) => {
+  const unknown_names = nonsystem_keys.filter((key) => {
     return !form_fields!.some((field: any) => field.name === key);
   });
   const ignored_names: string[] = [];
