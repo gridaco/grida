@@ -45,7 +45,7 @@ export const FORM_SOLD_OUT = {
   message: "The form is sold out",
 } as const;
 
-export const FORM_OPTION_SOLDOUT = {
+export const FORM_OPTION_SOLD_OUT = {
   code: "FORM_OPTION_UNAVAILABLE",
   message: "The form option is unavailable",
 } as const;

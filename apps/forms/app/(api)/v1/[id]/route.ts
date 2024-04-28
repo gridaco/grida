@@ -1,6 +1,6 @@
 import {
   FORM_FORCE_CLOSED,
-  FORM_OPTION_SOLDOUT,
+  FORM_OPTION_SOLD_OUT,
   FORM_RESPONSE_LIMIT_BY_CUSTOMER_REACHED,
   FORM_RESPONSE_LIMIT_REACHED,
   FORM_SOLD_OUT,
@@ -92,7 +92,7 @@ export type FormClientFetchResponseError =
         | typeof VISITORID_FORMAT_MISMATCH.code
         | typeof FORM_FORCE_CLOSED.code
         | typeof FORM_SOLD_OUT.code
-        | typeof FORM_OPTION_SOLDOUT.code;
+        | typeof FORM_OPTION_SOLD_OUT.code;
       message: string;
     };
 export interface MissingRequiredHiddenFieldsError {
@@ -422,22 +422,6 @@ export async function GET(
   );
   let render_fields = fields.filter((f) => _render_field_ids.includes(f.id));
 
-  // validation
-
-  // validate inventory TODO: (this can be moved above with some refactoring)
-  if (options_inventory) {
-    // TODO: [might have been resolved] we need to pass inventory map witch only present in render_fields (for whole sold out validation)
-    const render_options = render_fields.map((f) => f.options).flat();
-    const inventory_access_error = await validate_options_inventory({
-      options: render_options,
-      inventory: options_inventory,
-    });
-
-    if (inventory_access_error) {
-      response.error = inventory_access_error;
-    }
-  }
-
   // if no blocks, render a simple form based on fields
   if (!render_blocks.length) {
     render_blocks = fields.map((field: any, i) => {
@@ -473,6 +457,11 @@ export async function GET(
     required_hidden_fields,
   });
 
+  // ==== validations ====
+  // validation execution order matters (does not affect this logic, but logic on the client side, since only one error is shown at a time.
+  // to fix this we need to add support for multiple errors in the response, and client side should handle it.
+
+  // validation 1
   if (not_included_required_hidden_fields.length > 0) {
     // check if required hidden fields are not used.
     response.error = {
@@ -487,6 +476,23 @@ export async function GET(
         ...MISSING_REQUIRED_HIDDEN_FIELDS,
         missing_required_hidden_fields,
       };
+    }
+  }
+
+  // validation 2
+  // validate inventory TODO: (this can be moved above with some refactoring)
+  if (options_inventory) {
+    // TODO: [might have been resolved] we need to pass inventory map witch only present in render_fields (for whole sold out validation)
+    const render_options = render_fields.map((f) => f.options).flat();
+    const inventory_access_error = await validate_options_inventory({
+      options: render_options,
+      inventory: options_inventory,
+    });
+
+    console.log(render_options, inventory_access_error);
+
+    if (inventory_access_error) {
+      response.error = inventory_access_error;
     }
   }
 
@@ -508,6 +514,7 @@ export async function GET(
     });
   }
 
+  // validation 3
   const max_access_error = await validate_max_access({
     form_id: id,
     customer_id: customer?.uid,

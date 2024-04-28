@@ -2,7 +2,7 @@ import { grida_commerce_client } from "@/lib/supabase/server";
 import { GridaCommerceClient } from "../commerce";
 import assert from "assert";
 import { Option } from "@/types";
-import { FORM_OPTION_SOLDOUT, FORM_SOLD_OUT } from "@/k/error";
+import { FORM_OPTION_SOLD_OUT, FORM_SOLD_OUT } from "@/k/error";
 
 export type FormFieldOptionsInventoryMap = { [sku: string]: number };
 
@@ -37,7 +37,7 @@ export async function validate_options_inventory({
   // TODO: this needs to be a grouped options, so we can validate by each field (select).
   options: Option[];
   selection?: { id: string }; // TODO:
-}): Promise<null | typeof FORM_SOLD_OUT | typeof FORM_OPTION_SOLDOUT> {
+}): Promise<null | typeof FORM_SOLD_OUT | typeof FORM_OPTION_SOLD_OUT> {
   const used_inventory = options.reduce(
     (acc: FormFieldOptionsInventoryMap, option) => {
       if (option.id in inventory) acc[option.id] = inventory[option.id];
@@ -46,8 +46,12 @@ export async function validate_options_inventory({
     {}
   );
 
+  const available = options.reduce((acc: number, option) => {
+    return acc + used_inventory[option.id] || 0;
+  }, 0);
+
   // check if sold out - if all options are sold out, then its FORM_SOLD_OUT
-  const sold_out = options.every((option) => used_inventory[option.id] === 0);
+  const sold_out = available === 0;
 
   if (sold_out) {
     // TODO: add validation if its a required field.
@@ -59,7 +63,7 @@ export async function validate_options_inventory({
     // TODO: add validation if its a required field.
     // check if the selection is provided (used on submission)
     if (inventory[selection.id] === 0) {
-      return FORM_OPTION_SOLDOUT;
+      return FORM_OPTION_SOLD_OUT;
     }
   }
 
