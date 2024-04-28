@@ -70,10 +70,17 @@ export function Form({
     isLoading,
   } = useSWR<
     EditorApiResponse<FormClientFetchResponseData, FormClientFetchResponseError>
-  >(req_url, async (url: string) => {
-    const res = await fetch(url);
-    return res.json();
-  });
+  >(
+    req_url,
+    async (url: string) => {
+      const res = await fetch(url);
+      return res.json();
+    },
+    {
+      // TODO: this is expensive, consider removing with other real-time features
+      refreshInterval: 1000,
+    }
+  );
 
   const { data, error } = res || {};
 
@@ -314,6 +321,8 @@ function FormView({
           }
           default: {
             const defaultValue = defaultValues?.[field.name];
+            const is_not_in_current_section = !context?.is_in_current_section;
+
             return (
               <FormFieldPreview
                 key={field.id}
@@ -330,7 +339,8 @@ function FormView({
                 autoComplete={field.autocomplete}
                 accept={field.accept}
                 multiple={field.multiple}
-                novalidate={!context?.is_in_current_section}
+                novalidate={is_not_in_current_section}
+                locked={is_not_in_current_section}
               />
             );
           }
