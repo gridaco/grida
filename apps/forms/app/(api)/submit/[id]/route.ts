@@ -291,6 +291,9 @@ async function submit({
       inventory: options_inventory,
       options: options,
       selection: selection_id ? { id: selection_id } : undefined,
+      config: {
+        available_counting_strategy: "sum_positive",
+      },
     });
     if (inventory_access_error) {
       console.error(inventory_access_error);

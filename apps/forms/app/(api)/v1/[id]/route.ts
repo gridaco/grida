@@ -487,11 +487,17 @@ export async function GET(
     const inventory_access_error = await validate_options_inventory({
       options: render_options,
       inventory: options_inventory,
+      config: {
+        available_counting_strategy: "sum_positive",
+      },
     });
 
-    console.log(render_options, inventory_access_error);
-
     if (inventory_access_error) {
+      console.error(
+        "inventory_access_error",
+        render_options,
+        inventory_access_error
+      );
       response.error = inventory_access_error;
     }
   }

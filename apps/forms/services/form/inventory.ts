@@ -32,11 +32,20 @@ export async function validate_options_inventory({
   inventory,
   options,
   selection,
+  config,
 }: {
   inventory: FormFieldOptionsInventoryMap;
   // TODO: this needs to be a grouped options, so we can validate by each field (select).
   options: Option[];
   selection?: { id: string }; // TODO:
+  config: {
+    /**
+     * How to count the available inventory for multiple options
+     * - sum_all: sum all the inventory: -1 + 1 = 0
+     * - sum_positive: sum only the positive inventory: -1 + 1 = 1
+     */
+    available_counting_strategy: "sum_all" | "sum_positive";
+  };
 }): Promise<null | typeof FORM_SOLD_OUT | typeof FORM_OPTION_SOLD_OUT> {
   const used_inventory = options.reduce(
     (acc: FormFieldOptionsInventoryMap, option) => {
@@ -47,7 +56,14 @@ export async function validate_options_inventory({
   );
 
   const available = options.reduce((acc: number, option) => {
-    return acc + used_inventory[option.id] || 0;
+    switch (config.available_counting_strategy) {
+      case "sum_all": {
+        return acc + used_inventory[option.id] || 0;
+      }
+      case "sum_positive": {
+        return acc + Math.max(used_inventory[option.id] || 0, 0);
+      }
+    }
   }, 0);
 
   // check if sold out - if all options are sold out, then its FORM_SOLD_OUT
