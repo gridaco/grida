@@ -188,10 +188,16 @@ export function FormResponsesProvider({
 
               toast.promise(newresponse, {
                 loading: "Fetching new response...",
-                success: "New response fetched",
+                success: "New response",
                 error: "Failed to fetch new response",
               });
             }, 1000);
+          } else {
+            // deleted
+            dispatch({
+              type: "editor/response/delete",
+              id: (old as { id: string }).id,
+            });
           }
         }
       )
