@@ -177,7 +177,8 @@ async function submit({
 
   // validation - check if all value is present for required hidden fields
   const missing_required_hidden_fields = required_hidden_fields.filter((f) => {
-    return !__keys_all.includes(f.name);
+    // TODO: to be more clear, rather than checking if the value is present, check if the value matches the required format, e.g. uuidv4 for __gf_customer_uuid
+    return !(__keys_all.includes(f.name) && !!data.get(f.name));
   });
 
   if (missing_required_hidden_fields.length > 0) {
