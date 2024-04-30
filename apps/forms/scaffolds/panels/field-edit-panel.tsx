@@ -502,7 +502,7 @@ export function FieldEditPanel({
                     setType(value as FormFieldType);
                   }}
                 >
-                  <SelectTrigger id="category" aria-label="Select category">
+                  <SelectTrigger id="type" aria-label="Select Field Type">
                     <SelectValue placeholder="Type" />
                   </SelectTrigger>
                   <SelectContent>

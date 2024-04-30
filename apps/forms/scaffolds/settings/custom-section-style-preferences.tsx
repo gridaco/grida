@@ -46,9 +46,10 @@ export function CustomSectionStylePreferences({
             onValueChange={(value) => setCss(value)}
           >
             <SelectTrigger>
-              <SelectValue placeholder="None" />
+              <SelectValue placeholder="Select Section Style" />
             </SelectTrigger>
             <SelectContent>
+              <SelectItem value={""}>None</SelectItem>
               <SelectItem value={section_style_glass_morphism}>
                 Glass Morphism
               </SelectItem>
