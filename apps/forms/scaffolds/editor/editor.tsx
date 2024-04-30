@@ -186,11 +186,15 @@ export function FormResponsesProvider({
                 });
               });
 
-              toast.promise(newresponse, {
-                loading: "Fetching new response...",
-                success: "New response",
-                error: "Failed to fetch new response",
-              });
+              toast.promise(
+                newresponse,
+                {
+                  loading: "Fetching new response...",
+                  success: "New response",
+                  error: "Failed to fetch new response",
+                },
+                { id: new_id }
+              );
             }, 1000);
           } else {
             // deleted

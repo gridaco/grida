@@ -15,6 +15,7 @@ import { FormPage } from "@/types";
 import { PreviewButton } from "@/components/preview-button";
 import { ThemeProvider } from "@/components/theme-provider";
 import "../../../editor.css";
+import { ToasterWithMax } from "@/components/toaster";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -96,7 +97,7 @@ export default async function Layout({
           disableTransitionOnChange
         >
           <div className="h-screen flex flex-col">
-            <Toaster position="bottom-center" />
+            <ToasterWithMax position="bottom-center" max={5} />
             <header className="px-4 flex flex-col w-full gap-4 border-b bg-white dark:bg-neutral-900 z-10">
               <div className="w-full flex gap-4">
                 <div className="w-1/3 flex items-center justify-start">
