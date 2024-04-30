@@ -31,6 +31,21 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Check, ChevronsUpDown } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import {
   html5_multiple_supported_field_types,
   supported_field_autocomplete_types,
@@ -61,6 +76,7 @@ import {
 } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
 import { editorlink } from "@/lib/forms/url";
+import { cn } from "@/utils";
 
 // @ts-ignore
 const default_field_init: {
@@ -259,6 +275,78 @@ function useInventoryState(
   }, [_inventory, options, enabled]);
 
   return [inventory, setInventory] as const;
+}
+
+export function TypeSelect({
+  value,
+  onValueChange,
+}: {
+  value: FormFieldType;
+  onValueChange: (value: FormFieldType) => void;
+}) {
+  return (
+    <Select value={value} onValueChange={onValueChange}>
+      <SelectTrigger id="type" aria-label="Select Field Type">
+        <SelectValue placeholder="Type" />
+      </SelectTrigger>
+      <SelectContent>
+        {supported_field_types.map((type) => (
+          <SelectItem key={type} value={type}>
+            {type}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  );
+
+  // TODO: below won't display properly on panel
+  const [open, setOpen] = React.useState(false);
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button
+          variant="outline"
+          role="combobox"
+          aria-expanded={open}
+          className="w-[200px] justify-between"
+        >
+          {value
+            ? supported_field_types.find((t) => t === value)
+            : "Select input..."}
+          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-[200px] p-0">
+        <Command>
+          <CommandInput placeholder="Search framework..." />
+          <CommandEmpty>No input found.</CommandEmpty>
+          <CommandGroup>
+            <CommandList>
+              {supported_field_types.map((t) => (
+                <CommandItem
+                  key={t}
+                  value={t}
+                  onSelect={(currentValue) => {
+                    onValueChange(currentValue as FormFieldType);
+                    setOpen(false);
+                  }}
+                >
+                  <Check
+                    className={cn(
+                      "mr-2 h-4 w-4",
+                      value === t ? "opacity-100" : "opacity-0"
+                    )}
+                  />
+                  {t}
+                </CommandItem>
+              ))}
+            </CommandList>
+          </CommandGroup>
+        </Command>
+      </PopoverContent>
+    </Popover>
+  );
 }
 
 export function FieldEditPanel({
@@ -495,24 +583,13 @@ export function FieldEditPanel({
             <PanelPropertySectionTitle>Field</PanelPropertySectionTitle>
             <PanelPropertyFields>
               <PanelPropertyField label={"Type"}>
-                <Select
+                <TypeSelect
                   value={type}
                   onValueChange={(value) => {
                     set_effect_cause("human");
-                    setType(value as FormFieldType);
+                    setType(value);
                   }}
-                >
-                  <SelectTrigger id="type" aria-label="Select Field Type">
-                    <SelectValue placeholder="Type" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {supported_field_types.map((type) => (
-                      <SelectItem key={type} value={type}>
-                        {type}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                />
               </PanelPropertyField>
               <PanelPropertyField
                 label={
