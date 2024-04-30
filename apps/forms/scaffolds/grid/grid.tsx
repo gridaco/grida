@@ -25,6 +25,7 @@ import {
   ColorWheelIcon,
   AvatarIcon,
   RadiobuttonIcon,
+  ArrowRightIcon,
 } from "@radix-ui/react-icons";
 import {
   DropdownMenu,
@@ -41,6 +42,7 @@ import { GFRow } from "./types";
 import { SelectColumn } from "./select-column";
 import "./grid.css";
 import { unwrapFeildValue } from "@/lib/forms/unwrap";
+import { Button } from "@/components/ui/button";
 
 function rowKeyGetter(row: GFRow) {
   return row.__gf_id;
@@ -98,6 +100,7 @@ export function Grid({
     resizable: true,
     width: 100,
     renderHeaderCell: DefaultPropertyHeaderCell,
+    renderCell: CustomerCell,
   };
 
   const __new_column: Column<any> = {
@@ -154,6 +157,7 @@ export function Grid({
       selectedRows={selected_responses}
       onSelectedRowsChange={onSelectedRowsChange}
       rows={rows}
+      rowHeight={44}
     />
   );
 }
@@ -288,6 +292,41 @@ function NewFieldHeaderCell({
     >
       <PlusIcon />
     </button>
+  );
+}
+
+function CustomerCell({ column, row }: RenderCellProps<any>) {
+  const [state, dispatch] = useEditorState();
+
+  const data = row[column.key];
+
+  if (!data) {
+    return <></>;
+  }
+
+  return (
+    <div className="w-full flex justify-between">
+      <span className="font-mono text-ellipsis flex-1 overflow-hidden">
+        {data}
+      </span>
+      <FKButton
+        onClick={() => {
+          dispatch({
+            type: "editor/customers/edit",
+            open: true,
+            customer_id: data,
+          });
+        }}
+      />
+    </div>
+  );
+}
+
+function FKButton({ onClick }: { onClick?: () => void }) {
+  return (
+    <Button variant="outline" className="m-1 p-2" onClick={onClick}>
+      <ArrowRightIcon className="w-3 h-3" />
+    </Button>
   );
 }
 
