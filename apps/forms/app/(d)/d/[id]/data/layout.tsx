@@ -19,29 +19,31 @@ export default function Layout({
   const id = params.id;
 
   return (
-    <main className="flex flex-1">
+    <main className="h-full flex flex-col flex-1 w-full">
       {/* side */}
-      {/* <nav className="col-span-1 max-w-xs min-w-60 w-min border-r dark:border-r-neutral-800 h-full">
-        <ul className="flex flex-col">
-          <li>
-            <Link href={`/d/${id}/data/responses`}>
-              <SideNavItem>
-                <BoxModelIcon />
-                Responses
-              </SideNavItem>
-            </Link>
-          </li>
-          <li>
-            <Link href={`/d/${id}/data/orders`}>
-              <SideNavItem>
-                <ArchiveIcon />
-                Orders
-              </SideNavItem>
-            </Link>
-          </li>
-        </ul>
-      </nav> */}
-      <div className="flex flex-1 overflow-hidden">{children}</div>
+      {/* <div className="flex h-full">
+        <nav className="col-span-1 max-w-xs min-w-60 w-min border-r dark:border-r-neutral-800 h-full">
+          <ul className="flex flex-col">
+            <li>
+              <Link href={`/d/${id}/data/responses`}>
+                <SideNavItem>
+                  <BoxModelIcon />
+                  Responses
+                </SideNavItem>
+              </Link>
+            </li>
+            <li>
+              <Link href={`/d/${id}/data/orders`}>
+                <SideNavItem>
+                  <ArchiveIcon />
+                  Orders
+                </SideNavItem>
+              </Link>
+            </li>
+          </ul>
+        </nav>
+      </div> */}
+      <div className="h-full overflow-x-hidden">{children}</div>
     </main>
   );
 }
