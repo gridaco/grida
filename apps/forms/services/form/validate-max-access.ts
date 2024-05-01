@@ -26,7 +26,7 @@ export async function validate_max_access({
     //
     const { count, error } = await client
       .from("response")
-      .select("id", { count: "exact" })
+      .select("*", { count: "exact", head: true })
       .eq("form_id", form_id);
 
     if (error) throw error;
