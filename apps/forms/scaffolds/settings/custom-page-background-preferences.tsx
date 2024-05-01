@@ -49,6 +49,7 @@ export function CustomPageBackgroundPreferences({
               <SelectValue placeholder="None" />
             </SelectTrigger>
             <SelectContent>
+              <SelectItem value={""}>None</SelectItem>
               <SelectItem value={`${HOST_NAME}/theme/embed/backgrounds/aurora`}>
                 Aurora
               </SelectItem>

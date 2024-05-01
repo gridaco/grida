@@ -16,6 +16,7 @@ import { FormFieldUpsert, EditorApiResponse } from "@/types/private/api";
 import { TooltipProvider } from "@radix-ui/react-tooltip";
 import { ResponseEditPanel } from "../panels/response-edit-panel";
 import { fmt_hashed_local_id } from "@/utils/fmt";
+import { CustomerEditPanel } from "../panels/customer-panel";
 
 export function FormEditorProvider({
   initial,
@@ -30,7 +31,9 @@ export function FormEditorProvider({
     <StateProvider state={state} dispatch={dispatch}>
       <TooltipProvider>
         <FieldEditPanelProvider>
-          <ResponseEditPanelProvider>{children}</ResponseEditPanelProvider>
+          <ResponseEditPanelProvider>
+            <CustomerPanelProvider>{children}</CustomerPanelProvider>
+          </ResponseEditPanelProvider>
         </FieldEditPanelProvider>
       </TooltipProvider>
     </StateProvider>
@@ -183,12 +186,22 @@ export function FormResponsesProvider({
                 });
               });
 
-              toast.promise(newresponse, {
-                loading: "Fetching new response...",
-                success: "New response fetched",
-                error: "Failed to fetch new response",
-              });
+              toast.promise(
+                newresponse,
+                {
+                  loading: "Fetching new response...",
+                  success: "New response",
+                  error: "Failed to fetch new response",
+                },
+                { id: new_id }
+              );
             }, 1000);
+          } else {
+            // deleted
+            dispatch({
+              type: "editor/response/delete",
+              id: (old as { id: string }).id,
+            });
           }
         }
       )
@@ -327,6 +340,29 @@ function ResponseEditPanelProvider({ children }: React.PropsWithChildren<{}>) {
         init={{ response, field_defs: state.fields }}
         onOpenChange={(open) => {
           dispatch({ type: "editor/responses/edit", open });
+        }}
+      />
+      {children}
+    </>
+  );
+}
+
+function CustomerPanelProvider({ children }: React.PropsWithChildren<{}>) {
+  const [state, dispatch] = useEditorState();
+
+  const customer = useMemo(() => {
+    return state.responses?.find((r) => r.id === state.focus_customer_id);
+  }, [state.responses, state.focus_customer_id]);
+
+  return (
+    <>
+      <CustomerEditPanel
+        key={customer?.id}
+        title={`Response ${customer?.local_id ? fmt_hashed_local_id(customer?.local_id) : ""}`}
+        open={state.is_customer_edit_panel_open}
+        // init={{ response: customer, field_defs: state.fields }}
+        onOpenChange={(open) => {
+          dispatch({ type: "editor/customers/edit", open });
         }}
       />
       {children}

@@ -11,8 +11,21 @@ import { ViewGridIcon, ViewHorizontalIcon } from "@radix-ui/react-icons";
 import { CreateNewFormButton } from "@/components/create-form-button";
 import { Form } from "@/types";
 import Image from "next/image";
+import { Metadata } from "next";
 
 export const revalidate = 0;
+
+export async function generateMetadata({
+  params,
+}: {
+  params: { project_name: string };
+}): Promise<Metadata> {
+  const { project_name } = params;
+
+  return {
+    title: `${project_name} | Grida Forms`,
+  };
+}
 
 interface FormDashboardItem extends Form {
   responses: number;

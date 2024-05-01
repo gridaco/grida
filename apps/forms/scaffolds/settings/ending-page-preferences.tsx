@@ -46,13 +46,14 @@ export function EndingPagePreferences({
           <input type="hidden" name="form_id" value={form_id} />
           <Select
             name="template_id"
-            value={template || undefined}
+            value={template ?? undefined}
             onValueChange={setTemplate}
           >
             <SelectTrigger>
-              <SelectValue placeholder="None" />
+              <SelectValue placeholder="Select Ending Page Template" />
             </SelectTrigger>
             <SelectContent>
+              <SelectItem value={""}>None</SelectItem>
               <SelectItem value="receipt01">Receipt 01</SelectItem>
             </SelectContent>
           </Select>

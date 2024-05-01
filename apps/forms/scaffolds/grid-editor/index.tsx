@@ -141,51 +141,53 @@ export function GridEditor() {
   const has_selected_responses = selected_responses.size > 0;
 
   return (
-    <div className="h-full flex flex-col flex-1 w-full overflow-x-hidden">
-      <header className="flex h-12 px-2 py-1 items-center w-full gap-4">
-        {has_selected_responses && (
-          <span
-            className="text-sm font-normal text-neutral-500"
-            aria-label="selected responses"
-          >
-            {txt_n_responses(selected_responses.size)} selected
-          </span>
-        )}
-        {has_selected_responses ? (
-          <>
-            <AlertDialog>
-              <AlertDialogTrigger asChild>
-                <button className="flex items-center gap-1 p-2 rounded-md border text-sm">
-                  <TrashIcon />
-                  Delete {txt_n_responses(selected_responses.size)}
-                </button>
-              </AlertDialogTrigger>
-              <AlertDialogContent>
-                <AlertDialogTitle>Delete Response</AlertDialogTitle>
-                <AlertDialogDescription>
-                  Deleting this response will remove all data associated with
-                  it. Are you sure you want to delete this response?
-                </AlertDialogDescription>
-                <div className="flex justify-end gap-2 p-2">
-                  <AlertDialogCancel>Cancel</AlertDialogCancel>
-                  <AlertDialogAction onClick={onDeleteResponse}>
-                    Delete
-                  </AlertDialogAction>
-                </div>
-              </AlertDialogContent>
-            </AlertDialog>
-          </>
-        ) : (
-          <></>
-        )}
+    <div className="flex flex-col h-full">
+      <header className="h-12 w-full">
+        <div className="flex px-2 py-1 items-center gap-4">
+          {has_selected_responses && (
+            <span
+              className="text-sm font-normal text-neutral-500"
+              aria-label="selected responses"
+            >
+              {txt_n_responses(selected_responses.size)} selected
+            </span>
+          )}
+          {has_selected_responses ? (
+            <>
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <button className="flex items-center gap-1 p-2 rounded-md border text-sm">
+                    <TrashIcon />
+                    Delete {txt_n_responses(selected_responses.size)}
+                  </button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogTitle>Delete Response</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Deleting this response will remove all data associated with
+                    it. Are you sure you want to delete this response?
+                  </AlertDialogDescription>
+                  <div className="flex justify-end gap-2 p-2">
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogAction onClick={onDeleteResponse}>
+                      Delete
+                    </AlertDialogAction>
+                  </div>
+                </AlertDialogContent>
+              </AlertDialog>
+            </>
+          ) : (
+            <></>
+          )}
+        </div>
       </header>
-      <div className="flex flex-col h-full w-full">
-        <DeleteFieldConfirmDialog
-          open={deleteFieldConfirmOpen}
-          onOpenChange={setDeleteFieldConfirmOpen}
-          onCancel={closeDeleteFieldConfirm}
-          onDeleteConfirm={onDeleteField}
-        />
+      <DeleteFieldConfirmDialog
+        open={deleteFieldConfirmOpen}
+        onOpenChange={setDeleteFieldConfirmOpen}
+        onCancel={closeDeleteFieldConfirm}
+        onDeleteConfirm={onDeleteField}
+      />
+      <div className="flex flex-col w-full h-full">
         <Grid
           columns={columns}
           rows={rows}

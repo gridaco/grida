@@ -59,6 +59,7 @@ export interface FormEditorState {
   fields: FormFieldDefinition[];
   focus_field_id?: string | null;
   focus_response_id?: string;
+  focus_customer_id?: string;
   focus_block_id?: string;
   available_field_ids: string[];
   responses?: FormResponse[];
@@ -67,6 +68,7 @@ export interface FormEditorState {
   responses_pagination_rows: number;
   is_field_edit_panel_open?: boolean;
   is_response_edit_panel_open?: boolean;
+  is_customer_edit_panel_open?: boolean;
   field_edit_panel_refresh_key?: number;
 }
 

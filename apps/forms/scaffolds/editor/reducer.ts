@@ -9,11 +9,13 @@ import {
   CreateNewPendingBlockAction,
   DeleteBlockAction,
   DeleteFieldAction,
+  DeleteResponseAction,
   DeleteSelectedResponsesAction,
   FeedResponseAction,
   FocusFieldAction,
   HtmlBlockBodyAction,
   ImageBlockSrcAction,
+  OpenCustomerEditAction,
   OpenEditFieldAction,
   OpenResponseEditAction,
   ResolvePendingBlockAction,
@@ -451,6 +453,20 @@ export function reducer(
         draft.selected_responses = new_selected_responses;
       });
     }
+    case "editor/response/delete": {
+      const { id } = <DeleteResponseAction>action;
+      return produce(state, (draft) => {
+        draft.responses = draft.responses?.filter(
+          (response) => response.id !== id
+        );
+
+        // also remove from selected_responses
+        const new_selected_responses = new Set(state.selected_responses);
+        new_selected_responses.delete(id);
+
+        draft.selected_responses = new_selected_responses;
+      });
+    }
     case "editor/responses/pagination/rows": {
       const { max } = <ResponseFeedRowsAction>action;
       return produce(state, (draft) => {
@@ -499,6 +515,13 @@ export function reducer(
       return produce(state, (draft) => {
         draft.is_response_edit_panel_open = open ?? true;
         draft.focus_response_id = response_id;
+      });
+    }
+    case "editor/customers/edit": {
+      const { customer_id, open } = <OpenCustomerEditAction>action;
+      return produce(state, (draft) => {
+        draft.is_customer_edit_panel_open = open ?? true;
+        draft.focus_customer_id = customer_id;
       });
     }
     default:
