@@ -100,7 +100,8 @@ export function Grid({
     resizable: true,
     width: 100,
     renderHeaderCell: DefaultPropertyHeaderCell,
-    renderCell: CustomerCell,
+    // TODO: wip - next release
+    // renderCell: CustomerCell,
   };
 
   const __new_column: Column<any> = {
