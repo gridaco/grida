@@ -105,7 +105,10 @@ export class GridaCommerceClient {
    * this includes committed (order) count along with available count
    */
   async fetchInventoryItemsRPC() {
-    throw "not implemented yet";
+    assert(this.store_id, "store_id is required");
+    return await this.client.rpc("get_inventory_items_with_committed", {
+      p_store_id: this.store_id,
+    });
   }
 
   async fetchInventoryItem({ sku }: { sku: string }) {

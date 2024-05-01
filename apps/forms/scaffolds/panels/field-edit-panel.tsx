@@ -194,7 +194,7 @@ function useInventory(options: Option[]) {
 
     console.log("fetching inventory");
     commerce
-      .fetchInventoryItems()
+      .fetchInventoryItemsRPC()
       .then(({ data, error }) => {
         if (error) console.error(error);
         if (!data) return;
@@ -215,7 +215,7 @@ function useInventory(options: Option[]) {
               acc[item.sku] = {
                 available: item.available,
                 on_hand: item.available, // TODO:
-                committed: 0, // TODO:
+                committed: item.committed,
                 unavailable: 0,
                 incoming: 0,
               };
@@ -648,14 +648,7 @@ export function FieldEditPanel({
                 disableNewOption={is_inventory_enabled}
                 options={options}
                 onAdd={() => {
-                  setOptions([
-                    ...options,
-                    {
-                      id: draftid(),
-                      value: `option_${options.length + 1}`,
-                      label: `Option ${options.length + 1}`,
-                    },
-                  ]);
+                  setOptions([...options, next_option_default(options)]);
                 }}
                 onChange={(id, option) => {
                   setOptions(
@@ -886,6 +879,23 @@ export function FieldEditPanel({
       </PanelFooter>
     </SidePanel>
   );
+}
+
+function next_option_default(options: Option[]): Option {
+  const len = options.length;
+  const val = (n: number) => `option_${n}`;
+
+  let n = len + 1;
+  while (options.some((_) => _.value === val(n))) {
+    n++;
+  }
+
+  return {
+    id: draftid(),
+    value: val(n),
+    label: `Option ${n}`,
+    disabled: false,
+  };
 }
 
 function buildPreviewLabel({

@@ -493,6 +493,54 @@ export type Database = {
           value: string
         }[]
       }
+      get_inventory_items_with_committed: {
+        Args: {
+          p_store_id: number
+        }
+        Returns: {
+          id: number
+          created_at: string
+          sku: string
+          store_id: number
+          product_id: number
+          variant_id: number
+          cost: number
+          available: number
+          committed: number
+        }[]
+      }
+      get_inventory_with_committed:
+        | {
+            Args: Record<PropertyKey, never>
+            Returns: {
+              id: number
+              created_at: string
+              sku: string
+              store_id: number
+              product_id: number
+              variant_id: number
+              cost: number
+              available: number
+              committed: number
+            }[]
+          }
+        | {
+            Args: {
+              p_store_id: number
+              p_sku: string
+            }
+            Returns: {
+              id: number
+              created_at: string
+              sku: string
+              store_id: number
+              product_id: number
+              variant_id: number
+              cost: number
+              available: number
+              committed: number
+            }[]
+          }
     }
     Enums: {
       currency:
@@ -660,7 +708,12 @@ export type Database = {
         | "ZAR"
         | "ZMW"
         | "ZWL"
-      inventory_level_commit_reason: "admin" | "initialize" | "other" | "order"
+      inventory_level_commit_reason:
+        | "admin"
+        | "initialize"
+        | "other"
+        | "order"
+        | "initialize_by_system"
       inventory_management: "none" | "system"
       inventory_policy: "continue" | "deny"
     }
@@ -694,6 +747,13 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "connection_commerce_store_store_id_fkey"
+            columns: ["store_id"]
+            isOneToOne: false
+            referencedRelation: "store"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "form_connection_store_form_id_fkey"
             columns: ["form_id"]
             isOneToOne: true
@@ -705,13 +765,6 @@ export type Database = {
             columns: ["project_id"]
             isOneToOne: false
             referencedRelation: "project"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "form_connection_store_store_id_fkey"
-            columns: ["store_id"]
-            isOneToOne: false
-            referencedRelation: "store"
             referencedColumns: ["id"]
           },
         ]
