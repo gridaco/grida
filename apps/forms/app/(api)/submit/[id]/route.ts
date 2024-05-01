@@ -159,7 +159,7 @@ async function submit({
     SYSTEM_GF_FINGERPRINT_VISITORID_KEY
   ) as string;
 
-  console.log("/submit::_gf_customer_uuid:", _gf_customer_uuid);
+  // console.log("/submit::_gf_customer_uuid:", _gf_customer_uuid);
 
   const customer = await upsert_customer_with({
     project_id: form_reference.project_id,
@@ -169,7 +169,7 @@ async function submit({
     },
   });
 
-  console.log("/submit::customer:", customer);
+  // console.log("/submit::customer:", customer);
 
   const required_hidden_fields = fields.filter(
     (f) => f.type === "hidden" && f.required

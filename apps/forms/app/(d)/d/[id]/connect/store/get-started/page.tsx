@@ -1,5 +1,5 @@
+import { Badge } from "@/components/ui/badge";
 import { ArchiveIcon } from "@radix-ui/react-icons";
-import Link from "next/link";
 
 export default function StoreGetStartedPage({
   params,
@@ -12,6 +12,9 @@ export default function StoreGetStartedPage({
       <div className="h-hull flex-1 flex flex-col justify-center items-center gap-8">
         <ArchiveIcon className="opacity-80" width={80} height={80} />
         <div className="h-hull flex flex-col justify-center items-center">
+          <Badge className="mb-2" variant={"outline"}>
+            Alpha
+          </Badge>
           <h1 className="text-2xl font-bold">Add commerce to your forms</h1>
           <p className="text-sm opacity-80 text-center max-w-md mt-2">
             Create personalized store for your customers. Here you can manage

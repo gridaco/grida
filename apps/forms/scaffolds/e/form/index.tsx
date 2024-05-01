@@ -187,6 +187,7 @@ function FormView({
 }) {
   const [checkoutSession, setCheckoutSession] =
     useState<PaymentCheckoutSession | null>(null);
+  const [is_submitting, set_is_submitting] = useState(false);
 
   const submit_action = "/submit/" + form_id;
 
@@ -440,6 +441,10 @@ function FormView({
                 // show error
                 alert("Please fill out the form correctly.");
               }
+            } else {
+              // submit
+              // disable submit button
+              set_is_submitting(true);
             }
           }}
           className="p-4 pt-10 md:pt-16 h-full overflow-auto flex-1"
@@ -487,12 +492,14 @@ function FormView({
           </button>
           <button
             data-submit-hidden={submit_hidden}
+            disabled={submit_hidden || is_submitting}
             form="form"
             type="submit"
             className={clsx(
               cls_button_submit,
               "w-full md:w-auto",
-              "data-[submit-hidden='true']:hidden"
+              "data-[submit-hidden='true']:hidden",
+              "disabled:opacity-50 disabled:cursor-not-allowed"
             )}
           >
             {translation.submit}
