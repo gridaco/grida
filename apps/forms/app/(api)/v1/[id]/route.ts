@@ -107,7 +107,11 @@ export interface MaxResponseByCustomerError {
   code: "FORM_RESPONSE_LIMIT_BY_CUSTOMER_REACHED";
   message: string;
   max: number;
-  last_response_id: string;
+  last_response_id?: string;
+  customer_id?: string;
+  __gf_customer_uuid?: string;
+  __gf_fp_fingerprintjs_visitorid?: string;
+  __gf_customer_email?: string;
 }
 
 export type ClientRenderBlock =
@@ -502,20 +506,24 @@ export async function GET(
     }
   }
 
+  const __gf_fp_fingerprintjs_visitorid =
+    system_keys[SYSTEM_GF_FINGERPRINT_VISITORID_KEY];
+  const __gf_customer_uuid = system_keys[SYSTEM_GF_CUSTOMER_UUID_KEY];
+  const __gf_customer_email = system_keys[SYSTEM_GF_CUSTOMER_EMAIL_KEY];
+
   // fetch customer
   let customer: { uid: string } | null = null;
   if (
-    system_keys[SYSTEM_GF_CUSTOMER_UUID_KEY] ||
-    system_keys[SYSTEM_GF_FINGERPRINT_VISITORID_KEY] ||
-    system_keys[SYSTEM_GF_CUSTOMER_EMAIL_KEY]
+    __gf_customer_uuid ||
+    __gf_fp_fingerprintjs_visitorid ||
+    __gf_customer_email
   ) {
     customer = await upsert_customer_with({
       project_id: __project_id,
-      uuid: system_keys[SYSTEM_GF_CUSTOMER_UUID_KEY],
+      uuid: __gf_customer_uuid,
       hints: {
-        email: system_keys[SYSTEM_GF_CUSTOMER_EMAIL_KEY],
-        _fp_fingerprintjs_visitorid:
-          system_keys[SYSTEM_GF_FINGERPRINT_VISITORID_KEY],
+        email: __gf_customer_email,
+        _fp_fingerprintjs_visitorid: __gf_fp_fingerprintjs_visitorid,
       },
     });
   }
@@ -530,8 +538,24 @@ export async function GET(
     max_form_responses_by_customer,
   });
   if (max_access_error) {
-    response.error = max_access_error;
-    console.error("max access error", max_access_error);
+    switch (max_access_error.code) {
+      case "FORM_RESPONSE_LIMIT_BY_CUSTOMER_REACHED":
+        const error: MaxResponseByCustomerError = {
+          ...max_access_error,
+          customer_id: customer?.uid,
+          __gf_customer_email,
+          __gf_customer_uuid,
+          __gf_fp_fingerprintjs_visitorid,
+        };
+        console.error("max access error", error);
+        response.error = error;
+        break;
+      case "FORM_RESPONSE_LIMIT_REACHED": {
+        response.error = max_access_error;
+        console.error("max access error", max_access_error);
+        break;
+      }
+    }
   }
 
   if (__is_force_closed) {

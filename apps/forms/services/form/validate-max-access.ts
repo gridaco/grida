@@ -35,7 +35,10 @@ export async function validate_max_access({
       (max_form_responses_in_total ?? Infinity)
     ) {
       // reject: cause the form has reached the limit
-      return FORM_RESPONSE_LIMIT_REACHED;
+      return {
+        ...FORM_RESPONSE_LIMIT_REACHED,
+        max: max_form_responses_in_total ?? Infinity,
+      };
     }
   }
   // response number by customer

@@ -17,6 +17,7 @@ const resources: Record<
       home: "Home",
       left_in_stock: "{{available}} left",
       sold_out: "Sold Out",
+      your_customer_id_is: "Your Customer ID is <code>{{customer_id}}</code>",
       formclosed: {
         default: {
           title: "Form Closed",
@@ -126,6 +127,7 @@ const resources: Record<
       home: "홈",
       left_in_stock: "{{available}}개 남음",
       sold_out: "매진됨",
+      your_customer_id_is: "고객 ID는 <code>{{customer_id}}</code>입니다",
       formclosed: {
         default: {
           title: "폼이 마감되었습니다",
