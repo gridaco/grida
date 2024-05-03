@@ -8,13 +8,20 @@ import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import i18next from "i18next";
 import { ssr_page_init_i18n } from "../../i18n";
+import { InfoCircledIcon } from "@radix-ui/react-icons";
 
 export default async function AlreadyRespondedPage({
   params,
+  searchParams,
 }: {
   params: { id: string };
+  searchParams?: {
+    fingerprint?: string;
+    customer?: string;
+  };
 }) {
   const form_id = params.id;
+  const { customer: customer_id } = searchParams || {};
   await ssr_page_init_i18n({ form_id });
 
   return (
@@ -27,8 +34,24 @@ export default async function AlreadyRespondedPage({
           <p className="text-sm text-center text-gray-500">
             {i18next.t("alreadyresponded.default.description")}
           </p>
+          <details className="text-center text-gray-500">
+            <summary className="list-none flex items-center justify-center">
+              <InfoCircledIcon className="" />
+            </summary>
+            <div className="mt-2 border border-dashed rounded p-2">
+              <p className="prose prose-sm">
+                <span
+                  dangerouslySetInnerHTML={{
+                    __html: i18next.t("your_customer_id_is", {
+                      customer_id,
+                      interpolation: { escapeValue: false },
+                    }),
+                  }}
+                />
+              </p>
+            </div>
+          </details>
         </CardHeader>
-        <CardContent className="p-0" />
         <CardFooter className="flex w-full p-0">
           <Link className="w-full" href="#">
             <Button className="w-full">{i18next.t("home")}</Button>

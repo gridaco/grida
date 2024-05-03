@@ -31,6 +31,7 @@ import {
 import { StripePaymentFormFieldPreview } from "@/components/formfield/form-field-preview-payment-stripe";
 import { useFingerprint } from "@/scaffolds/fingerprint";
 import { SYSTEM_GF_FINGERPRINT_VISITORID_KEY } from "@/k/system";
+import { formlink } from "@/lib/forms/url";
 
 const ReactPlayer = dynamic(() => import("react-player/lazy"), { ssr: false });
 
@@ -116,7 +117,13 @@ export function Form({
 
     switch (error.code) {
       case "FORM_RESPONSE_LIMIT_BY_CUSTOMER_REACHED":
-        return redirect(`./${form_id}/alreadyresponded`);
+        const { __gf_fp_fingerprintjs_visitorid, customer_id } = error;
+        return redirect(
+          formlink(HOST_NAME, form_id, "alreadyresponded", {
+            fingerprint: __gf_fp_fingerprintjs_visitorid,
+            customer: customer_id,
+          })
+        );
       case "FORM_FORCE_CLOSED":
       case "FORM_RESPONSE_LIMIT_REACHED":
         return redirect(`./${form_id}/formclosed`);
