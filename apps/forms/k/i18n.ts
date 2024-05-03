@@ -77,6 +77,7 @@ const resources: Record<
       submit: "Enviar",
       pay: "Pagar",
       home: "Inicio",
+      your_customer_id_is: "Su ID de cliente es <code>{{customer_id}}</code>",
       formsoldout: {
         default: {
           title: "Agotado",
@@ -186,6 +187,7 @@ const resources: Record<
       submit: "提出する",
       pay: "支払う",
       home: "ホーム",
+      your_customer_id_is: "お客様の顧客IDは<code>{{customer_id}}</code>です",
       formsoldout: {
         default: {
           title: "完売",
@@ -233,6 +235,7 @@ const resources: Record<
       submit: "提交",
       pay: "支付",
       home: "首页",
+      your_customer_id_is: "您的客户ID是<code>{{customer_id}}</code>",
       formsoldout: {
         default: {
           title: "售罄",
@@ -277,6 +280,8 @@ const resources: Record<
       submit: "Soumettre",
       pay: "Payer",
       home: "Accueil",
+      your_customer_id_is:
+        "Votre identifiant client est <code>{{customer_id}}</code>",
       formsoldout: {
         default: {
           title: "Épuisé",
@@ -325,6 +330,7 @@ const resources: Record<
       submit: "Enviar",
       pay: "Pagar",
       home: "Início",
+      your_customer_id_is: "Seu ID de cliente é <code>{{customer_id}}</code>",
       formsoldout: {
         default: {
           title: "Esgotado",
@@ -373,6 +379,7 @@ const resources: Record<
       submit: "Invia",
       pay: "Paga",
       home: "Home",
+      your_customer_id_is: "Il tuo ID cliente è <code>{{customer_id}}</code>",
       formsoldout: {
         default: {
           title: "Esaurito",
@@ -421,6 +428,8 @@ const resources: Record<
       submit: "Einreichen",
       pay: "Bezahlen",
       home: "Startseite",
+      your_customer_id_is:
+        "Ihre Kundennummer lautet <code>{{customer_id}}</code>",
       formsoldout: {
         default: {
           title: "Ausverkauft",
@@ -469,6 +478,7 @@ const resources: Record<
       submit: "Отправить",
       pay: "Оплатить",
       home: "Главная",
+      your_customer_id_is: "Ваш ID клиента - <code>{{customer_id}}</code>",
       formsoldout: {
         default: {
           title: "Распродано",
@@ -515,6 +525,8 @@ const resources: Record<
       submit: "إرسال",
       pay: "دفع",
       home: "الرئيسية",
+      your_customer_id_is:
+        "رقم هوية العميل الخاص بك هو <code>{{customer_id}}</code>",
       formsoldout: {
         default: {
           title: "نفذت الكمية",
@@ -560,6 +572,7 @@ const resources: Record<
       submit: "जमा करें",
       pay: "भुगतान करें",
       home: "होम",
+      your_customer_id_is: "आपका ग्राहक आईडी है <code>{{customer_id}}</code>",
       formsoldout: {
         default: {
           title: "बिक गया",
@@ -607,6 +620,7 @@ const resources: Record<
       submit: "Indienen",
       pay: "Betalen",
       home: "Home",
+      your_customer_id_is: "Uw klant-ID is <code>{{customer_id}}</code>",
       formsoldout: {
         default: {
           title: "Uitverkocht",
