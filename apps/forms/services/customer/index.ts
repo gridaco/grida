@@ -13,13 +13,19 @@ export async function upsert_customer_with({
     _fp_fingerprintjs_visitorid?: string;
   };
 }) {
-  const pl = {
+  const pl: {
+    uuid?: string | null;
+    project_id: number;
+    email?: string;
+    _fp_fingerprintjs_visitorid?: string;
+    last_seen_at: string;
+  } = {
     uuid: uuid,
     project_id: project_id,
     email: hints?.email,
     _fp_fingerprintjs_visitorid: hints?._fp_fingerprintjs_visitorid,
     last_seen_at: new Date().toISOString(),
-  } as const;
+  };
 
   // console.log("customer::payload:", pl);
   if (uuid && is_uuid_v4(uuid)) {
@@ -32,7 +38,7 @@ export async function upsert_customer_with({
       .single();
 
     if (error) {
-      console.error("customer::error-1:", error);
+      console.error("customer::error#1:", error, pl);
       if (error.code === "23505") {
         // this means there is a existing customer with (porbably) fingerprintjs_visitorid.
         // in this case, it needs to be merged (if possible - if the existing one does not have uuid set)
@@ -46,7 +52,29 @@ export async function upsert_customer_with({
           })
           .select()
           .single();
-        if (error) throw error;
+        if (error) {
+          console.error("customer::error#2:", error, pl);
+          if (error.code === "23505") {
+            // even after trying to merge, if it fails, then do not merge and upsert customer using only uuid
+            delete pl._fp_fingerprintjs_visitorid;
+            const { data: customer, error } = await workspaceclient
+              .from("customer")
+              .upsert(pl, {
+                onConflict: "project_id, uuid",
+              })
+              .select()
+              .single();
+            if (error) {
+              console.error("customer::error#3:", error, pl);
+              throw error;
+            }
+
+            console.log(
+              "c: above error is resolved by merging without _fp_fingerprintjs_visitorid"
+            );
+            return customer;
+          }
+        }
         console.log(
           "c: above error is resolved by merging with _fp_fingerprintjs_visitorid"
         );

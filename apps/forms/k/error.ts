@@ -10,6 +10,11 @@ export const REQUIRED_HIDDEN_FIELD_NOT_USED = {
     "Hidden field is configured as required but not present in the form render blocks",
 } as const;
 
+export const POSSIBLE_CUSTOMER_IDENTITY_FORGE = {
+  code: "POSSIBLE_CUSTOMER_IDENTITY_FORGE",
+  message: "Are you a hacker? - Possible customer identity forge detected",
+} as const;
+
 export const UUID_FORMAT_MISMATCH = {
   code: "UUID_FORMAT_MISMATCH",
   message: "UUID format mismatch",

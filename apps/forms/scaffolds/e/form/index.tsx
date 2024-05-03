@@ -30,7 +30,10 @@ import {
 } from "@/components/tosspayments";
 import { StripePaymentFormFieldPreview } from "@/components/formfield/form-field-preview-payment-stripe";
 import { useFingerprint } from "@/scaffolds/fingerprint";
-import { SYSTEM_GF_FINGERPRINT_VISITORID_KEY } from "@/k/system";
+import {
+  SYSTEM_GF_CUSTOMER_UUID_KEY,
+  SYSTEM_GF_FINGERPRINT_VISITORID_KEY,
+} from "@/k/system";
 import { formlink } from "@/lib/forms/url";
 
 const ReactPlayer = dynamic(() => import("react-player/lazy"), { ssr: false });
@@ -57,12 +60,21 @@ export function Form({
 }) {
   const { result: fingerprint } = useFingerprint();
 
-  const req_url = fingerprint?.visitorId
+  const __fingerprint_ready = !!fingerprint?.visitorId;
+  const __gf_customer_uuid = params[SYSTEM_GF_CUSTOMER_UUID_KEY];
+  const can_make_initial_request = !!__gf_customer_uuid || __fingerprint_ready;
+
+  const req_url = can_make_initial_request
     ? HOST_NAME +
-      `/v1/${form_id}?${new URLSearchParams({
-        ...params,
-        [SYSTEM_GF_FINGERPRINT_VISITORID_KEY]: fingerprint.visitorId,
-      })}`
+      `/v1/${form_id}?${
+        // rather intended or not, this will fetch data again when fingerprint is ready (when and even when it's not required)
+        fingerprint?.visitorId
+          ? new URLSearchParams({
+              ...params,
+              [SYSTEM_GF_FINGERPRINT_VISITORID_KEY]: fingerprint?.visitorId,
+            })
+          : new URLSearchParams(params)
+      }`
     : null;
 
   const {
@@ -79,7 +91,7 @@ export function Form({
     },
     {
       // TODO: this is expensive, consider removing with other real-time features
-      refreshInterval: 1000,
+      // refreshInterval: 1000,
     }
   );
 

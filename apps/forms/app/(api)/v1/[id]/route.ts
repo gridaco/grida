@@ -5,6 +5,7 @@ import {
   FORM_RESPONSE_LIMIT_REACHED,
   FORM_SOLD_OUT,
   MISSING_REQUIRED_HIDDEN_FIELDS,
+  POSSIBLE_CUSTOMER_IDENTITY_FORGE,
   REQUIRED_HIDDEN_FIELD_NOT_USED,
   UUID_FORMAT_MISMATCH,
   VISITORID_FORMAT_MISMATCH,
@@ -88,8 +89,9 @@ export type FormClientFetchResponseError =
   | {
       code:
         | typeof UUID_FORMAT_MISMATCH.code
-        | typeof FORM_RESPONSE_LIMIT_REACHED.code
         | typeof VISITORID_FORMAT_MISMATCH.code
+        | typeof POSSIBLE_CUSTOMER_IDENTITY_FORGE.code
+        | typeof FORM_RESPONSE_LIMIT_REACHED.code
         | typeof FORM_FORCE_CLOSED.code
         | typeof FORM_SOLD_OUT.code
         | typeof FORM_OPTION_SOLD_OUT.code;
@@ -511,6 +513,10 @@ export async function GET(
   const __gf_customer_uuid = system_keys[SYSTEM_GF_CUSTOMER_UUID_KEY];
   const __gf_customer_email = system_keys[SYSTEM_GF_CUSTOMER_EMAIL_KEY];
 
+  console.log(
+    "__gf_fp_fingerprintjs_visitorid",
+    __gf_fp_fingerprintjs_visitorid
+  );
   // fetch customer
   let customer: { uid: string } | null = null;
   if (
@@ -518,14 +524,19 @@ export async function GET(
     __gf_fp_fingerprintjs_visitorid ||
     __gf_customer_email
   ) {
-    customer = await upsert_customer_with({
-      project_id: __project_id,
-      uuid: __gf_customer_uuid,
-      hints: {
-        email: __gf_customer_email,
-        _fp_fingerprintjs_visitorid: __gf_fp_fingerprintjs_visitorid,
-      },
-    });
+    try {
+      customer = await upsert_customer_with({
+        project_id: __project_id,
+        uuid: __gf_customer_uuid,
+        hints: {
+          email: __gf_customer_email,
+          _fp_fingerprintjs_visitorid: __gf_fp_fingerprintjs_visitorid,
+        },
+      });
+    } catch (e) {
+      response.error = POSSIBLE_CUSTOMER_IDENTITY_FORGE;
+      console.error("error while upserting customer:", e);
+    }
   }
 
   // validation 3
