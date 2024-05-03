@@ -513,10 +513,6 @@ export async function GET(
   const __gf_customer_uuid = system_keys[SYSTEM_GF_CUSTOMER_UUID_KEY];
   const __gf_customer_email = system_keys[SYSTEM_GF_CUSTOMER_EMAIL_KEY];
 
-  console.log(
-    "__gf_fp_fingerprintjs_visitorid",
-    __gf_fp_fingerprintjs_visitorid
-  );
   // fetch customer
   let customer: { uid: string } | null = null;
   if (
