@@ -16,6 +16,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Button } from "@/components/ui/button";
 
 const HOST_NAME = process.env.NEXT_PUBLIC_HOST_NAME || "http://localhost:3000";
 
@@ -77,13 +78,9 @@ export function EndingPagePreferences({
         )}
       </PreferenceBody>
       <PreferenceBoxFooter>
-        <button
-          form="/private/editor/settings/ending-page"
-          type="submit"
-          className={cls_save_button}
-        >
+        <Button form="/private/editor/settings/ending-page" type="submit">
           Save
-        </button>
+        </Button>
       </PreferenceBoxFooter>
     </PreferenceBox>
   );

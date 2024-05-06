@@ -21,6 +21,7 @@ import {
   language_label_map,
   supported_form_page_languages,
 } from "@/k/supported_languages";
+import { Button } from "@/components/ui/button";
 
 export function FormPageLanguagePreferences({
   form_id,
@@ -83,13 +84,9 @@ export function FormPageLanguagePreferences({
         </form>
       </PreferenceBody>
       <PreferenceBoxFooter>
-        <button
-          form="/private/editor/settings/default-language"
-          type="submit"
-          className={cls_save_button}
-        >
+        <Button form="/private/editor/settings/default-language" type="submit">
           Save
-        </button>
+        </Button>
       </PreferenceBoxFooter>
     </PreferenceBox>
   );

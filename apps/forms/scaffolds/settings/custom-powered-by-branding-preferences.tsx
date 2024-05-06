@@ -10,6 +10,7 @@ import {
   cls_save_button,
 } from "@/components/preferences";
 import { PoweredByGridaWaterMark } from "@/components/powered-by-branding";
+import { Button } from "@/components/ui/button";
 
 export function CustomPoweredByBrandingPreferences({
   form_id,
@@ -46,13 +47,12 @@ export function CustomPoweredByBrandingPreferences({
         )}
       </PreferenceBody>
       <PreferenceBoxFooter>
-        <button
+        <Button
           form="/private/editor/settings/powered-by-branding"
           type="submit"
-          className={cls_save_button}
         >
           Save
-        </button>
+        </Button>
       </PreferenceBoxFooter>
     </PreferenceBox>
   );

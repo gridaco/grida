@@ -12,6 +12,7 @@ import {
   cls_save_button,
 } from "@/components/preferences";
 import clsx from "clsx";
+import { Button } from "@/components/ui/button";
 
 export function ClosingFormPreferences({
   form_id,
@@ -48,13 +49,9 @@ export function ClosingFormPreferences({
         </form>
       </PreferenceBody>
       <PreferenceBoxFooter>
-        <button
-          form="/private/editor/settings/force-close-form"
-          type="submit"
-          className={cls_save_button}
-        >
+        <Button form="/private/editor/settings/force-close-form" type="submit">
           Save
-        </button>
+        </Button>
       </PreferenceBoxFooter>
     </PreferenceBox>
   );

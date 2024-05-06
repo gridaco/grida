@@ -35,8 +35,7 @@ export function CopyToClipboardInput({ value }: { value: string }) {
             display: isCopied ? "none" : "inline-flex",
           }}
         >
-          <CopyIcon className="w-3 h-3 me-1.5" />
-          <span className="text-xs font-semibold">Copy</span>
+          <CopyIcon className="w-3 h-3" />
         </span>
         <span
           className="inline-flex items-center"

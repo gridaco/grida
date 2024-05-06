@@ -16,6 +16,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { FormPageBackgroundSchema } from "@/types";
+import { Button } from "@/components/ui/button";
 
 const HOST_NAME = process.env.NEXT_PUBLIC_HOST_NAME || "http://localhost:3000";
 
@@ -29,6 +30,8 @@ export function CustomPageBackgroundPreferences({
   };
 }) {
   const [src, setSrc] = useState(init.background?.src);
+
+  console.log(src);
 
   return (
     <PreferenceBox>
@@ -82,13 +85,9 @@ export function CustomPageBackgroundPreferences({
         )}
       </PreferenceBody>
       <PreferenceBoxFooter>
-        <button
-          form="/private/editor/settings/page-background"
-          type="submit"
-          className={cls_save_button}
-        >
+        <Button form="/private/editor/settings/page-background" type="submit">
           Save
-        </button>
+        </Button>
       </PreferenceBoxFooter>
     </PreferenceBox>
   );

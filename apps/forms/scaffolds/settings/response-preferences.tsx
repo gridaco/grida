@@ -13,6 +13,7 @@ import {
   cls_save_button,
 } from "@/components/preferences";
 import clsx from "clsx";
+import { Button } from "@/components/ui/button";
 
 export function RestrictNumberOfResponseByCustomer({
   form_id,
@@ -74,13 +75,12 @@ export function RestrictNumberOfResponseByCustomer({
         </form>
       </PreferenceBody>
       <PreferenceBoxFooter>
-        <button
+        <Button
           form="/private/editor/settings/max-responses-by-customer"
           type="submit"
-          className={cls_save_button}
         >
           Save
-        </button>
+        </Button>
       </PreferenceBoxFooter>
     </PreferenceBox>
   );
@@ -148,13 +148,12 @@ export function MaxRespoonses({
         </form>
       </PreferenceBody>
       <PreferenceBoxFooter>
-        <button
+        <Button
           form="/private/editor/settings/max-responses-in-total"
           type="submit"
-          className={cls_save_button}
         >
           Save
-        </button>
+        </Button>
       </PreferenceBoxFooter>
     </PreferenceBox>
   );

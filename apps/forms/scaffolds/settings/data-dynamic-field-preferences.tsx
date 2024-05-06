@@ -18,6 +18,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { FormResponseUnknownFieldHandlingStrategyType } from "@/types";
+import { Button } from "@/components/ui/button";
 
 export function UnknownFieldPreferences({
   form_id,
@@ -80,13 +81,9 @@ export function UnknownFieldPreferences({
         </form>
       </PreferenceBody>
       <PreferenceBoxFooter>
-        <button
-          form="/private/editor/settings/unknown-fields"
-          type="submit"
-          className={cls_save_button}
-        >
+        <Button form="/private/editor/settings/unknown-fields" type="submit">
           Save
-        </button>
+        </Button>
       </PreferenceBoxFooter>
     </PreferenceBox>
   );

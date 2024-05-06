@@ -11,6 +11,7 @@ import {
   cls_input,
   cls_save_button,
 } from "@/components/preferences";
+import { Button } from "@/components/ui/button";
 
 export function EndingRedirectPreferences({
   form_id,
@@ -63,13 +64,9 @@ export function EndingRedirectPreferences({
         </form>
       </PreferenceBody>
       <PreferenceBoxFooter>
-        <button
-          form="/private/editor/settings/redirect-uri"
-          type="submit"
-          className={cls_save_button}
-        >
+        <Button form="/private/editor/settings/redirect-uri" type="submit">
           Save
-        </button>
+        </Button>
       </PreferenceBoxFooter>
     </PreferenceBox>
   );
