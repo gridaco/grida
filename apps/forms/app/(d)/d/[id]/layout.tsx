@@ -16,6 +16,7 @@ import { PreviewButton } from "@/components/preview-button";
 import { ThemeProvider } from "@/components/theme-provider";
 import "../../../editor.css";
 import { ToasterWithMax } from "@/components/toaster";
+import clsx from "clsx";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -86,7 +87,13 @@ export default async function RootLayout({
 
   return (
     <html lang="en">
-      <body className={inter.className}>
+      <body
+        className={clsx(
+          inter.className,
+          // to prevent the whole page from scrolling by sr-only or other hidden absolute elements
+          "h-screen overflow-hidden"
+        )}
+      >
         {process.env.NEXT_PUBLIC_GAID && (
           <GoogleAnalytics gaId={process.env.NEXT_PUBLIC_GAID} />
         )}
