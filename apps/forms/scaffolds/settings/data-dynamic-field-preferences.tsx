@@ -7,6 +7,7 @@ import {
   PreferenceBox,
   PreferenceBoxFooter,
   PreferenceBoxHeader,
+  PreferenceDescription,
   cls_save_button,
 } from "@/components/preferences";
 import {
@@ -34,12 +35,17 @@ export function UnknownFieldPreferences({
 
   return (
     <PreferenceBox>
-      <PreferenceBoxHeader heading={<>Dynamic Fields</>} />
+      <PreferenceBoxHeader
+        heading={<>Dynamic Fields</>}
+        description={
+          <>
+            When a form is submitted with fields that are not defined in the
+            form schema, you can choose to ignore them or store them as
+            metadata.
+          </>
+        }
+      />
       <PreferenceBody>
-        <p className="opacity-80">
-          When a form is submitted with fields that are not defined in the form
-          schema, you can choose to ignore them or store them as metadata.
-        </p>
         <form
           id="/private/editor/settings/unknown-fields"
           action="/private/editor/settings/unknown-fields"
@@ -65,9 +71,9 @@ export function UnknownFieldPreferences({
                     <SelectItem value="reject">Reject</SelectItem>
                   </SelectContent>
                 </Select>
-                <div className="opacity-80">
+                <PreferenceDescription>
                   {strategy_descriptions[strategy]}
-                </div>
+                </PreferenceDescription>
               </div>
             </section>
           </div>

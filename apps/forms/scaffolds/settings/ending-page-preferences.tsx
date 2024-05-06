@@ -6,6 +6,7 @@ import {
   PreferenceBox,
   PreferenceBoxFooter,
   PreferenceBoxHeader,
+  PreferenceDescription,
   cls_save_button,
 } from "@/components/preferences";
 import {
@@ -57,9 +58,9 @@ export function EndingPagePreferences({
               <SelectItem value="receipt01">Receipt 01</SelectItem>
             </SelectContent>
           </Select>
-          <p className="mt-1 opacity-80">
+          <PreferenceDescription>
             Enabling ending page will disable redirection
-          </p>
+          </PreferenceDescription>
         </form>
         {template && (
           <div className="mt-4 flex items-center justify-center select-none">

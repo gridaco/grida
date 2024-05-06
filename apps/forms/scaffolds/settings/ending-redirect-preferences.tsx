@@ -7,6 +7,7 @@ import {
   PreferenceBox,
   PreferenceBoxFooter,
   PreferenceBoxHeader,
+  PreferenceDescription,
   cls_input,
   cls_save_button,
 } from "@/components/preferences";
@@ -53,10 +54,10 @@ export function EndingRedirectPreferences({
                 pattern="https://.*"
                 className={cls_input}
               />
-              <span>
+              <PreferenceDescription>
                 Redirect to a custom URL after form submission. Leave empty for
                 default behavior.
-              </span>
+              </PreferenceDescription>
             </label>
           </div>
         </form>

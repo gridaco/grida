@@ -6,6 +6,7 @@ import {
   PreferenceBox,
   PreferenceBoxFooter,
   PreferenceBoxHeader,
+  PreferenceDescription,
   cls_save_button,
 } from "@/components/preferences";
 import {
@@ -36,11 +37,13 @@ export function FormPageLanguagePreferences({
 
   return (
     <PreferenceBox>
-      <PreferenceBoxHeader heading={<>Page Language</>} />
+      <PreferenceBoxHeader
+        heading={<>Page Language</>}
+        description={
+          <>Choose the language that your customers will be seeing.</>
+        }
+      />
       <PreferenceBody>
-        <p className="opacity-80">
-          Choose the language that your customers will be seeing.
-        </p>
         <form
           id="/private/editor/settings/default-language"
           action="/private/editor/settings/default-language"
@@ -68,10 +71,12 @@ export function FormPageLanguagePreferences({
                     ))}
                   </SelectContent>
                 </Select>
-                <div className="opacity-80">
+                <PreferenceDescription>
                   The form page will be displayed in{" "}
-                  {language_label_map[language]}
-                </div>
+                  <span className="font-bold font-mono">
+                    {language_label_map[language]}
+                  </span>
+                </PreferenceDescription>
               </div>
             </section>
           </div>

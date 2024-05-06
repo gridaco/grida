@@ -7,6 +7,7 @@ import {
   PreferenceBox,
   PreferenceBoxFooter,
   PreferenceBoxHeader,
+  PreferenceDescription,
   SectorBlocks,
   cls_input,
   cls_save_button,
@@ -60,12 +61,14 @@ export function RestrictNumberOfResponseByCustomer({
               />
             </div>
             {enabled && n ? (
-              <>
+              <PreferenceDescription>
                 Limit to {n} {txt_response_plural(n)} per user.
                 <>{n === 1 && <>{txt_no_multiple_response_description}</>}</>
-              </>
+              </PreferenceDescription>
             ) : (
-              <>Users can submit an unlimited number of responses.</>
+              <PreferenceDescription>
+                Users can submit an unlimited number of responses.
+              </PreferenceDescription>
             )}
           </div>
         </form>
@@ -100,12 +103,16 @@ export function MaxRespoonses({
 
   return (
     <PreferenceBox>
-      <PreferenceBoxHeader heading={<>Limit number of total responses</>} />
+      <PreferenceBoxHeader
+        heading={<>Limit number of total responses</>}
+        description={
+          <>
+            Set maximum number of responses allowed. This is useful when you
+            have limited number of offers, inventory or tickets.
+          </>
+        }
+      />
       <PreferenceBody>
-        <p>
-          Set maximum number of responses allowed. This is useful when you have
-          limited number of offers, inventory or tickets.
-        </p>
         <form
           id="/private/editor/settings/max-responses-in-total"
           action="/private/editor/settings/max-responses-in-total"
@@ -121,7 +128,9 @@ export function MaxRespoonses({
             />
             <div className={clsx(!enabled && "hidden")}>
               <label className="flex flex-col gap-2 cursor-pointer">
-                <span>Maximum number of responses allowed</span>
+                <PreferenceDescription>
+                  Maximum number of responses allowed
+                </PreferenceDescription>
                 <input
                   name="max_form_responses_in_total"
                   type="number"
