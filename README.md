@@ -1,4 +1,4 @@
-# Free & Open Canvas for Humans and Machines
+CANCEL MY SUBSCRIPTION, # Free & Open Canvas for Humans and Machines
 
 Grida is a Free & Open canvas for humans and machines. With grida you can
 
