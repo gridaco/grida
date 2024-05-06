@@ -1,25 +1,18 @@
 "use client";
 
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo } from "react";
 import { StateProvider, useEditorState } from "./provider";
 import { reducer } from "./reducer";
-import {
-  FormEditorInit,
-  FormEditorState,
-  initialFormEditorState,
-} from "./state";
+import { FormEditorInit, initialFormEditorState } from "./state";
 import { FieldEditPanel, FormFieldSave } from "../panels/field-edit-panel";
-import { Customer, FormFieldDefinition, FormFieldInit } from "@/types";
-import {
-  createClientFormsClient,
-  createClientWorkspaceClient,
-} from "@/lib/supabase/client";
-import toast from "react-hot-toast";
+import { FormFieldDefinition } from "@/types";
+import { createClientFormsClient } from "@/lib/supabase/client";
 import { FormFieldUpsert, EditorApiResponse } from "@/types/private/api";
 import { TooltipProvider } from "@radix-ui/react-tooltip";
 import { ResponseEditPanel } from "../panels/response-edit-panel";
 import { fmt_hashed_local_id } from "@/utils/fmt";
 import { CustomerEditPanel } from "../panels/customer-panel";
+import toast from "react-hot-toast";
 
 export function FormEditorProvider({
   initial,
@@ -350,38 +343,17 @@ function ResponseEditPanelProvider({ children }: React.PropsWithChildren<{}>) {
   );
 }
 
-function useCustomer(uid?: string) {
-  const supabase = useMemo(() => createClientWorkspaceClient(), []);
-  const [customer, setCustomer] = useState<Customer | undefined>();
-
-  useEffect(() => {
-    if (!uid) return;
-    supabase
-      .from("customer")
-      .select("*")
-      .eq("uid", uid)
-      .single()
-      .then(({ data, error }) => {
-        if (data) setCustomer(data);
-        if (error) console.error(error);
-      });
-  }, [supabase, uid]);
-
-  return customer;
-}
-
 function CustomerPanelProvider({ children }: React.PropsWithChildren<{}>) {
   const [state, dispatch] = useEditorState();
-  const customer = useCustomer(state.focus_customer_id);
 
   return (
     <>
-      {customer && (
+      {state.focus_customer_id && (
         <CustomerEditPanel
-          key={customer?.uid}
+          key={state.focus_customer_id}
           title={<>Customer</>}
+          customer_id={state.focus_customer_id}
           open={state.is_customer_edit_panel_open}
-          init={customer}
           onOpenChange={(open) => {
             dispatch({ type: "editor/customers/edit", open });
           }}

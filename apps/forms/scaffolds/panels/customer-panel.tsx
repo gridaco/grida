@@ -1,6 +1,6 @@
 "use client";
-import React from "react";
 
+import React, { useEffect, useMemo, useState } from "react";
 import {
   Sheet,
   SheetClose,
@@ -14,16 +14,29 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import type { Customer } from "@/types";
+import type { Customer, FormResponse } from "@/types";
+import useSWR from "swr";
+import { FormCustomerDetail } from "@/app/(api)/private/editor/customers/[uid]/route";
+import { fmt_hashed_local_id } from "@/utils/fmt";
+import Link from "next/link";
+import { Link1Icon, Link2Icon } from "@radix-ui/react-icons";
 
 export function CustomerEditPanel({
   title,
-  init,
+  customer_id,
   ...props
 }: React.ComponentProps<typeof Sheet> & {
   title: React.ReactNode;
-  init: Customer;
+  customer_id: string;
 }) {
+  const { data: customer } = useSWR<FormCustomerDetail>(
+    `/private/editor/customers/${customer_id}`,
+    async (url: string) => {
+      const res = await fetch(url);
+      return res.json();
+    }
+  );
+
   return (
     <Sheet {...props}>
       <SheetContent>
@@ -35,14 +48,21 @@ export function CustomerEditPanel({
           <div className="grid grid-cols-4 items-center gap-4">
             <Avatar className="w-24 h-24">
               {/* <AvatarImage src="https://github.com/shadcn.png" /> */}
-              <AvatarFallback>{avatar_txt(init)}</AvatarFallback>
+              <AvatarFallback>
+                {customer ? avatar_txt(customer) : ""}
+              </AvatarFallback>
             </Avatar>
           </div>
           <div className="grid grid-cols-4 items-center gap-4">
             <Label htmlFor="uid" className="text-right">
               UID
             </Label>
-            <Input id="uid" readOnly value={init.uid} className="col-span-3" />
+            <Input
+              id="uid"
+              readOnly
+              value={customer?.uid}
+              className="col-span-3"
+            />
           </div>
           <div className="grid grid-cols-4 items-center gap-4">
             <Label htmlFor="uuid" className="text-right">
@@ -51,7 +71,8 @@ export function CustomerEditPanel({
             <Input
               id="uuid"
               readOnly
-              value={init.uuid ?? undefined}
+              placeholder="Empty"
+              value={customer?.uuid ?? undefined}
               className="col-span-3"
             />
           </div>
@@ -62,7 +83,8 @@ export function CustomerEditPanel({
             <Input
               id="email"
               readOnly
-              value={init.email ?? undefined}
+              placeholder="Empty"
+              value={customer?.email ?? undefined}
               className="col-span-3"
             />
           </div>
@@ -73,10 +95,36 @@ export function CustomerEditPanel({
             <Input
               id="phone"
               readOnly
-              value={init.phone ?? undefined}
+              placeholder="Empty"
+              value={customer?.phone ?? undefined}
               className="col-span-3"
             />
           </div>
+          <hr />
+          <div className="grid grid-cols-4 items-start gap-4">
+            <Label htmlFor="responses" className="text-right">
+              Responses
+            </Label>
+            <div className="col-span-3">
+              <ul>
+                {customer?.responses.map((response) => (
+                  <li
+                    key={response.id}
+                    className="flex items-center group border-b border-dashed hover:border-black"
+                  >
+                    <Link2Icon className="mr-2" />
+                    <Link href={`/d/${response.form.id}`}>
+                      {response.form.title}
+                    </Link>
+                    <span className="font-mono">
+                      {fmt_hashed_local_id(response.local_id)}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+          <hr />
         </div>
         <SheetFooter>
           <SheetClose asChild>
@@ -93,5 +141,5 @@ function avatar_txt(customer: Customer) {
     return customer.email.split("@")[0];
   }
 
-  return customer.uid.split("").splice(0, 2).join("");
+  return customer.uid.split("").splice(0, 4).join("").toUpperCase();
 }
