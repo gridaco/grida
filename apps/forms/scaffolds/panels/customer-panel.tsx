@@ -48,24 +48,24 @@ export function CustomerEditPanel({
           <div className="grid grid-cols-4 items-center gap-4">
             <Avatar className="w-24 h-24">
               {/* <AvatarImage src="https://github.com/shadcn.png" /> */}
-              <AvatarFallback>
+              <AvatarFallback className="font-mono font-bold">
                 {customer ? avatar_txt(customer) : ""}
               </AvatarFallback>
             </Avatar>
           </div>
           <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="uid" className="text-right">
+            <Label htmlFor="uid" className="font-mono text-right">
               UID
             </Label>
             <Input
               id="uid"
               readOnly
               value={customer?.uid}
-              className="col-span-3"
+              className="font-mono col-span-3"
             />
           </div>
           <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="uuid" className="text-right">
+            <Label htmlFor="uuid" className="font-mono text-right">
               UUID
             </Label>
             <Input
@@ -73,7 +73,7 @@ export function CustomerEditPanel({
               readOnly
               placeholder="Empty"
               value={customer?.uuid ?? undefined}
-              className="col-span-3"
+              className="font-mono col-span-3"
             />
           </div>
           <div className="grid grid-cols-4 items-center gap-4">
@@ -127,9 +127,9 @@ export function CustomerEditPanel({
           <hr />
         </div>
         <SheetFooter>
-          <SheetClose asChild>
+          {/* <SheetClose asChild>
             <Button>Close</Button>
-          </SheetClose>
+          </SheetClose> */}
         </SheetFooter>
       </SheetContent>
     </Sheet>
@@ -141,5 +141,5 @@ function avatar_txt(customer: Customer) {
     return customer.email.split("@")[0];
   }
 
-  return customer.uid.split("").splice(0, 4).join("").toUpperCase();
+  return "#" + customer.uid.split("").splice(0, 4).join("").toUpperCase();
 }
