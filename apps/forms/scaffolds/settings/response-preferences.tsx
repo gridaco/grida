@@ -42,7 +42,7 @@ export function RestrictNumberOfResponseByCustomer({
           method="POST"
         >
           <input type="hidden" name="form_id" value={form_id} />
-          <div className="flex flex-col">
+          <div className="flex flex-col gap-2">
             <Toggle
               name="is_max_form_responses_by_customer_enabled"
               value={enabled}
@@ -64,7 +64,7 @@ export function RestrictNumberOfResponseByCustomer({
             {enabled && n ? (
               <PreferenceDescription>
                 Limit to {n} {txt_response_plural(n)} per user.
-                <>{n === 1 && <>{txt_no_multiple_response_description}</>}</>
+                <>{n === 1 && <> {txt_no_multiple_response_description}</>}</>
               </PreferenceDescription>
             ) : (
               <PreferenceDescription>
