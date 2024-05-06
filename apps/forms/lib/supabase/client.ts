@@ -19,3 +19,13 @@ export const createClientCommerceClient = () =>
     },
     isSingleton: false,
   });
+
+export const createClientWorkspaceClient = () =>
+  createClientComponentClient<Database, "public">({
+    options: {
+      db: {
+        schema: "public",
+      },
+    },
+    isSingleton: false,
+  });

@@ -25,6 +25,15 @@ export interface Form {
   updated_at: string;
 }
 
+export interface Customer {
+  uid: string;
+  created_at: string;
+  last_seen_at: string;
+  email: string | null;
+  uuid: string | null;
+  phone: string | null;
+}
+
 /**
  * user facing page language
  */
