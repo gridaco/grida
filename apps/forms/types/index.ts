@@ -178,6 +178,7 @@ export interface IFormField {
 
 export interface FormFieldDefinition extends IFormField {
   id: UUID;
+  local_index: number;
 }
 
 export interface FormPage {

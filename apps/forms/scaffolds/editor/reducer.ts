@@ -7,6 +7,7 @@ import {
   ChangeBlockFieldAction,
   CreateFielFromBlockdAction,
   CreateNewPendingBlockAction,
+  DataGridReorderColumnAction,
   DeleteBlockAction,
   DeleteFieldAction,
   DeleteResponseAction,
@@ -522,6 +523,17 @@ export function reducer(
       return produce(state, (draft) => {
         draft.is_customer_edit_panel_open = open ?? true;
         draft.focus_customer_id = customer_id;
+      });
+    }
+    case "editor/data-grid/column/reorder": {
+      const { a, b } = <DataGridReorderColumnAction>action;
+      return produce(state, (draft) => {
+        // update field local_index
+        const field_a = draft.fields.find((f) => f.id === a);
+        const field_b = draft.fields.find((f) => f.id === b);
+        // TODO:
+
+        console.error("reorder:: Not implemented yet");
       });
     }
     default:
