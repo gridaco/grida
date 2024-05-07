@@ -19,6 +19,7 @@ import {
   RadiobuttonIcon,
   ArrowRightIcon,
   SwitchIcon,
+  SliderIcon,
 } from "@radix-ui/react-icons";
 
 export function FormFieldTypeIcon({ type }: { type: FormFieldType }) {
@@ -39,6 +40,7 @@ export function FormFieldTypeIcon({ type }: { type: FormFieldType }) {
     case "checkbox":
       return <CheckCircledIcon />;
     case "date":
+    case "datetime-local":
     case "month":
     case "week":
       return <CalendarIcon />;
@@ -50,6 +52,9 @@ export function FormFieldTypeIcon({ type }: { type: FormFieldType }) {
       return <EyeClosedIcon />;
     case "switch":
       return <SwitchIcon />;
+    case "number":
+    case "range":
+      return <SliderIcon />;
     case "signature":
       // TODO: replace icon
       return <>✍️</>;

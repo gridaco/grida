@@ -77,6 +77,7 @@ import {
 import { useRouter } from "next/navigation";
 import { editorlink } from "@/lib/forms/url";
 import { cn } from "@/utils";
+import { FormFieldTypeIcon } from "@/components/form-field-type-icon";
 
 // @ts-ignore
 const default_field_init: {
@@ -322,7 +323,10 @@ export function TypeSelect({
       <SelectContent>
         {supported_field_types.map((type) => (
           <SelectItem key={type} value={type}>
-            {type}
+            <div className="flex items-center gap-2">
+              <FormFieldTypeIcon type={type} />{" "}
+              <span className="capitalize">{type}</span>
+            </div>
           </SelectItem>
         ))}
       </SelectContent>
