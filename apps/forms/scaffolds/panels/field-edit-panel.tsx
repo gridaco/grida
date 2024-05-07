@@ -428,7 +428,6 @@ export function FieldEditPanel({
   const preview_label = buildPreviewLabel({
     name,
     label,
-    required,
   });
 
   const { inventory: initial_inventory, loading: inventory_loading } =
@@ -583,6 +582,7 @@ export function FieldEditPanel({
                   placeholder={preview_placeholder}
                   helpText={helpText}
                   required={required}
+                  requiredAsterisk
                   disabled={preview_disabled}
                   options={has_options ? options : undefined}
                   pattern={pattern}
@@ -932,18 +932,7 @@ function next_option_default(options: Option[]): Option {
   };
 }
 
-function buildPreviewLabel({
-  name,
-  label,
-  required,
-}: {
-  name: string;
-  label?: string;
-  required?: boolean;
-}) {
+function buildPreviewLabel({ name, label }: { name: string; label?: string }) {
   let txt = label || fmt_snake_case_to_human_text(name);
-  if (required) {
-    txt += " *";
-  }
   return txt;
 }

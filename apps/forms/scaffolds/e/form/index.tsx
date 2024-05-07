@@ -353,6 +353,7 @@ function FormView({
                 placeholder={field.placeholder}
                 type={field.type}
                 required={field.required}
+                requiredAsterisk
                 helpText={field.help_text}
                 options={field.options}
                 pattern={field.pattern}

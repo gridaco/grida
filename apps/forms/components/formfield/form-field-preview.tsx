@@ -30,6 +30,7 @@ export function FormFieldPreview({
   type,
   placeholder,
   required,
+  requiredAsterisk,
   defaultValue,
   options,
   helpText,
@@ -51,6 +52,7 @@ export function FormFieldPreview({
   placeholder?: string;
   helpText?: string;
   required?: boolean;
+  requiredAsterisk?: boolean;
   defaultValue?: string;
   options?: {
     id?: string;
@@ -273,7 +275,8 @@ export function FormFieldPreview({
       htmlFor={name}
       className="data-[capitalize]:capitalize font-medium text-neutral-900 dark:text-neutral-300 text-sm"
     >
-      {label || name}
+      {label || name}{" "}
+      {required && requiredAsterisk && <span className="text-red-500">*</span>}
     </label>
   );
 
