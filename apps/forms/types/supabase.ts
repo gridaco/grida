@@ -1002,6 +1002,7 @@ export type Database = {
           help_text: string | null
           id: string
           label: string | null
+          local_index: number
           max: Json | null
           maxlength: number | null
           min: Json | null
@@ -1027,6 +1028,7 @@ export type Database = {
           help_text?: string | null
           id?: string
           label?: string | null
+          local_index?: number
           max?: Json | null
           maxlength?: number | null
           min?: Json | null
@@ -1052,6 +1054,7 @@ export type Database = {
           help_text?: string | null
           id?: string
           label?: string | null
+          local_index?: number
           max?: Json | null
           maxlength?: number | null
           min?: Json | null

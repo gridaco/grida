@@ -7,9 +7,11 @@ import {
   PreferenceBox,
   PreferenceBoxFooter,
   PreferenceBoxHeader,
+  PreferenceDescription,
   cls_input,
   cls_save_button,
 } from "@/components/preferences";
+import { Button } from "@/components/ui/button";
 
 export function EndingRedirectPreferences({
   form_id,
@@ -53,22 +55,18 @@ export function EndingRedirectPreferences({
                 pattern="https://.*"
                 className={cls_input}
               />
-              <span>
+              <PreferenceDescription>
                 Redirect to a custom URL after form submission. Leave empty for
                 default behavior.
-              </span>
+              </PreferenceDescription>
             </label>
           </div>
         </form>
       </PreferenceBody>
       <PreferenceBoxFooter>
-        <button
-          form="/private/editor/settings/redirect-uri"
-          type="submit"
-          className={cls_save_button}
-        >
+        <Button form="/private/editor/settings/redirect-uri" type="submit">
           Save
-        </button>
+        </Button>
       </PreferenceBoxFooter>
     </PreferenceBox>
   );

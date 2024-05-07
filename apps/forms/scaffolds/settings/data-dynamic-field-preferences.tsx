@@ -7,6 +7,7 @@ import {
   PreferenceBox,
   PreferenceBoxFooter,
   PreferenceBoxHeader,
+  PreferenceDescription,
   cls_save_button,
 } from "@/components/preferences";
 import {
@@ -17,6 +18,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { FormResponseUnknownFieldHandlingStrategyType } from "@/types";
+import { Button } from "@/components/ui/button";
 
 export function UnknownFieldPreferences({
   form_id,
@@ -34,12 +36,17 @@ export function UnknownFieldPreferences({
 
   return (
     <PreferenceBox>
-      <PreferenceBoxHeader heading={<>Dynamic Fields</>} />
+      <PreferenceBoxHeader
+        heading={<>Dynamic Fields</>}
+        description={
+          <>
+            When a form is submitted with fields that are not defined in the
+            form schema, you can choose to ignore them or store them as
+            metadata.
+          </>
+        }
+      />
       <PreferenceBody>
-        <p className="opacity-80">
-          When a form is submitted with fields that are not defined in the form
-          schema, you can choose to ignore them or store them as metadata.
-        </p>
         <form
           id="/private/editor/settings/unknown-fields"
           action="/private/editor/settings/unknown-fields"
@@ -65,22 +72,18 @@ export function UnknownFieldPreferences({
                     <SelectItem value="reject">Reject</SelectItem>
                   </SelectContent>
                 </Select>
-                <div className="opacity-80">
+                <PreferenceDescription>
                   {strategy_descriptions[strategy]}
-                </div>
+                </PreferenceDescription>
               </div>
             </section>
           </div>
         </form>
       </PreferenceBody>
       <PreferenceBoxFooter>
-        <button
-          form="/private/editor/settings/unknown-fields"
-          type="submit"
-          className={cls_save_button}
-        >
+        <Button form="/private/editor/settings/unknown-fields" type="submit">
           Save
-        </button>
+        </Button>
       </PreferenceBoxFooter>
     </PreferenceBox>
   );

@@ -6,6 +6,7 @@ import {
   PreferenceBox,
   PreferenceBoxFooter,
   PreferenceBoxHeader,
+  PreferenceDescription,
   cls_save_button,
 } from "@/components/preferences";
 import {
@@ -15,6 +16,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Button } from "@/components/ui/button";
 
 const HOST_NAME = process.env.NEXT_PUBLIC_HOST_NAME || "http://localhost:3000";
 
@@ -57,9 +59,9 @@ export function EndingPagePreferences({
               <SelectItem value="receipt01">Receipt 01</SelectItem>
             </SelectContent>
           </Select>
-          <p className="mt-1 opacity-80">
+          <PreferenceDescription>
             Enabling ending page will disable redirection
-          </p>
+          </PreferenceDescription>
         </form>
         {template && (
           <div className="mt-4 flex items-center justify-center select-none">
@@ -76,13 +78,9 @@ export function EndingPagePreferences({
         )}
       </PreferenceBody>
       <PreferenceBoxFooter>
-        <button
-          form="/private/editor/settings/ending-page"
-          type="submit"
-          className={cls_save_button}
-        >
+        <Button form="/private/editor/settings/ending-page" type="submit">
           Save
-        </button>
+        </Button>
       </PreferenceBoxFooter>
     </PreferenceBox>
   );

@@ -17,6 +17,7 @@ import {
 } from "@/components/ui/select";
 import { FormPageBackgroundSchema } from "@/types";
 import { section_style_glass_morphism } from "@/theme/section/css";
+import { Button } from "@/components/ui/button";
 
 export function CustomSectionStylePreferences({
   form_id,
@@ -67,13 +68,12 @@ export function CustomSectionStylePreferences({
         )}
       </PreferenceBody>
       <PreferenceBoxFooter>
-        <button
+        <Button
           form="/private/editor/settings/page-section-style"
           type="submit"
-          className={cls_save_button}
         >
           Save
-        </button>
+        </Button>
       </PreferenceBoxFooter>
     </PreferenceBox>
   );

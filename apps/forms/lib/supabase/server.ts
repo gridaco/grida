@@ -59,3 +59,17 @@ export const createRouteHandlerClient = (cookieStore: ReadonlyRequestCookies) =>
       },
     }
   );
+
+export const createRouteHandlerWorkspaceClient = (
+  cookieStore: ReadonlyRequestCookies
+) =>
+  _createRouteHandlerClient<Database, "public">(
+    {
+      cookies: () => cookieStore,
+    },
+    {
+      options: {
+        db: { schema: "public" },
+      },
+    }
+  );

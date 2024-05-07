@@ -6,6 +6,7 @@ import {
   PreferenceBox,
   PreferenceBoxFooter,
   PreferenceBoxHeader,
+  PreferenceDescription,
   cls_save_button,
 } from "@/components/preferences";
 import {
@@ -20,6 +21,7 @@ import {
   language_label_map,
   supported_form_page_languages,
 } from "@/k/supported_languages";
+import { Button } from "@/components/ui/button";
 
 export function FormPageLanguagePreferences({
   form_id,
@@ -36,11 +38,13 @@ export function FormPageLanguagePreferences({
 
   return (
     <PreferenceBox>
-      <PreferenceBoxHeader heading={<>Page Language</>} />
+      <PreferenceBoxHeader
+        heading={<>Page Language</>}
+        description={
+          <>Choose the language that your customers will be seeing.</>
+        }
+      />
       <PreferenceBody>
-        <p className="opacity-80">
-          Choose the language that your customers will be seeing.
-        </p>
         <form
           id="/private/editor/settings/default-language"
           action="/private/editor/settings/default-language"
@@ -68,23 +72,21 @@ export function FormPageLanguagePreferences({
                     ))}
                   </SelectContent>
                 </Select>
-                <div className="opacity-80">
+                <PreferenceDescription>
                   The form page will be displayed in{" "}
-                  {language_label_map[language]}
-                </div>
+                  <span className="font-bold font-mono">
+                    {language_label_map[language]}
+                  </span>
+                </PreferenceDescription>
               </div>
             </section>
           </div>
         </form>
       </PreferenceBody>
       <PreferenceBoxFooter>
-        <button
-          form="/private/editor/settings/default-language"
-          type="submit"
-          className={cls_save_button}
-        >
+        <Button form="/private/editor/settings/default-language" type="submit">
           Save
-        </button>
+        </Button>
       </PreferenceBoxFooter>
     </PreferenceBox>
   );

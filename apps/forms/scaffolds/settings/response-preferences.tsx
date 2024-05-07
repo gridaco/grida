@@ -7,11 +7,13 @@ import {
   PreferenceBox,
   PreferenceBoxFooter,
   PreferenceBoxHeader,
+  PreferenceDescription,
   SectorBlocks,
   cls_input,
   cls_save_button,
 } from "@/components/preferences";
 import clsx from "clsx";
+import { Button } from "@/components/ui/button";
 
 export function RestrictNumberOfResponseByCustomer({
   form_id,
@@ -40,7 +42,7 @@ export function RestrictNumberOfResponseByCustomer({
           method="POST"
         >
           <input type="hidden" name="form_id" value={form_id} />
-          <div className="flex flex-col">
+          <div className="flex flex-col gap-2">
             <Toggle
               name="is_max_form_responses_by_customer_enabled"
               value={enabled}
@@ -60,24 +62,25 @@ export function RestrictNumberOfResponseByCustomer({
               />
             </div>
             {enabled && n ? (
-              <>
+              <PreferenceDescription>
                 Limit to {n} {txt_response_plural(n)} per user.
-                <>{n === 1 && <>{txt_no_multiple_response_description}</>}</>
-              </>
+                <>{n === 1 && <> {txt_no_multiple_response_description}</>}</>
+              </PreferenceDescription>
             ) : (
-              <>Users can submit an unlimited number of responses.</>
+              <PreferenceDescription>
+                Users can submit an unlimited number of responses.
+              </PreferenceDescription>
             )}
           </div>
         </form>
       </PreferenceBody>
       <PreferenceBoxFooter>
-        <button
+        <Button
           form="/private/editor/settings/max-responses-by-customer"
           type="submit"
-          className={cls_save_button}
         >
           Save
-        </button>
+        </Button>
       </PreferenceBoxFooter>
     </PreferenceBox>
   );
@@ -100,12 +103,16 @@ export function MaxRespoonses({
 
   return (
     <PreferenceBox>
-      <PreferenceBoxHeader heading={<>Limit number of total responses</>} />
+      <PreferenceBoxHeader
+        heading={<>Limit number of total responses</>}
+        description={
+          <>
+            Set maximum number of responses allowed. This is useful when you
+            have limited number of offers, inventory or tickets.
+          </>
+        }
+      />
       <PreferenceBody>
-        <p>
-          Set maximum number of responses allowed. This is useful when you have
-          limited number of offers, inventory or tickets.
-        </p>
         <form
           id="/private/editor/settings/max-responses-in-total"
           action="/private/editor/settings/max-responses-in-total"
@@ -121,7 +128,9 @@ export function MaxRespoonses({
             />
             <div className={clsx(!enabled && "hidden")}>
               <label className="flex flex-col gap-2 cursor-pointer">
-                <span>Maximum number of responses allowed</span>
+                <PreferenceDescription>
+                  Maximum number of responses allowed
+                </PreferenceDescription>
                 <input
                   name="max_form_responses_in_total"
                   type="number"
@@ -139,13 +148,12 @@ export function MaxRespoonses({
         </form>
       </PreferenceBody>
       <PreferenceBoxFooter>
-        <button
+        <Button
           form="/private/editor/settings/max-responses-in-total"
           type="submit"
-          className={cls_save_button}
         >
           Save
-        </button>
+        </Button>
       </PreferenceBoxFooter>
     </PreferenceBox>
   );
