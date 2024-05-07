@@ -1,23 +1,15 @@
 import { FormFieldType } from "@/types";
 import {
-  PlusIcon,
-  ChevronDownIcon,
   EnvelopeClosedIcon,
   TextIcon,
   ImageIcon,
-  EnterFullScreenIcon,
   CalendarIcon,
-  Link2Icon,
-  Pencil1Icon,
-  TrashIcon,
   GlobeIcon,
   DropdownMenuIcon,
   CheckCircledIcon,
   EyeClosedIcon,
   ColorWheelIcon,
-  AvatarIcon,
   RadiobuttonIcon,
-  ArrowRightIcon,
   SwitchIcon,
   SliderIcon,
 } from "@radix-ui/react-icons";

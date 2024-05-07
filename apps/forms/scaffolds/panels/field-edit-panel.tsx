@@ -182,6 +182,7 @@ const input_can_have_autocomplete: FormFieldType[] =
         "checkboxes",
         "switch",
         "radio",
+        "range",
         "hidden",
         "payment",
       ].includes(type)
@@ -824,29 +825,30 @@ export function FieldEditPanel({
                   <Toggle value={multiple} onChange={setMultiple} />
                 </PanelPropertyField>
               )}
-              {!html5_input_like_checkbox_field_types.includes(type) && (
-                <PanelPropertyField
-                  label={"Required"}
-                  description={
-                    html5_input_like_checkbox_field_types.includes(type) ? (
-                      <>
-                        We follow html5 standards. Checkboxes cannot be
-                        required.{" "}
-                        <a
-                          className="underline"
-                          href="https://github.com/whatwg/html/issues/6868#issue-946624070"
-                          target="_blank"
-                        >
-                          Learn more
-                        </a>
-                      </>
-                    ) : undefined
-                  }
-                  disabled={type === "checkboxes"}
-                >
-                  <Toggle value={required} onChange={setRequired} />
-                </PanelPropertyField>
-              )}
+              {!html5_input_like_checkbox_field_types.includes(type) &&
+                type !== "range" && (
+                  <PanelPropertyField
+                    label={"Required"}
+                    description={
+                      html5_input_like_checkbox_field_types.includes(type) ? (
+                        <>
+                          We follow html5 standards. Checkboxes cannot be
+                          required.{" "}
+                          <a
+                            className="underline"
+                            href="https://github.com/whatwg/html/issues/6868#issue-946624070"
+                            target="_blank"
+                          >
+                            Learn more
+                          </a>
+                        </>
+                      ) : undefined
+                    }
+                    disabled={type === "checkboxes"}
+                  >
+                    <Toggle value={required} onChange={setRequired} />
+                  </PanelPropertyField>
+                )}
             </PanelPropertyFields>
           </PanelPropertySection>
 

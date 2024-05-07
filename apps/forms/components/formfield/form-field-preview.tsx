@@ -16,6 +16,7 @@ import { ClockIcon } from "@radix-ui/react-icons";
 import { Checkbox } from "@/components/ui/checkbox";
 import useSafeSelectValue from "./use-safe-select-value";
 import { Switch } from "../ui/switch";
+import { Slider } from "../ui/slider";
 
 /**
  * this disables the auto zoom in input text tag safari on iphone by setting font-size to 16px
@@ -237,6 +238,12 @@ export function FormFieldPreview({
           />
         );
       }
+      case "range": {
+        return (
+          // @ts-ignore
+          <Slider {...(sharedInputProps as React.ComponentProps<"input">)} />
+        );
+      }
       case "signature": {
         return (
           // TODO: this is not accepted by form.
@@ -276,7 +283,9 @@ export function FormFieldPreview({
       className="data-[capitalize]:capitalize font-medium text-neutral-900 dark:text-neutral-300 text-sm"
     >
       {label || name}{" "}
-      {required && requiredAsterisk && <span className="text-red-500">*</span>}
+      {required && requiredAsterisk && (
+        <span className="text-red-500/80">*</span>
+      )}
     </label>
   );
 
