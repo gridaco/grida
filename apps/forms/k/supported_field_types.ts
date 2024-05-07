@@ -6,6 +6,7 @@ export const supported_field_types: FormFieldType[] = [
   "select",
   "checkbox",
   "checkboxes",
+  "switch",
   "radio",
   "email",
   "tel",
@@ -22,6 +23,7 @@ export const supported_field_types: FormFieldType[] = [
   "file",
   "color",
   "hidden",
+  "range",
 ];
 
 export const supported_field_autocomplete_types: FormFieldAutocompleteType[] = [

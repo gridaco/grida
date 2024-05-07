@@ -1374,6 +1374,7 @@ export type Database = {
         | "url"
         | "checkbox"
         | "checkboxes"
+        | "switch"
         | "date"
         | "month"
         | "week"
@@ -1392,6 +1393,7 @@ export type Database = {
         | "number"
         | "time"
         | "datetime-local"
+        | "range"
       form_page_language:
         | "en"
         | "ko"

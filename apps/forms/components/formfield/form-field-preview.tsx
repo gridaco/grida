@@ -15,6 +15,7 @@ import clsx from "clsx";
 import { ClockIcon } from "@radix-ui/react-icons";
 import { Checkbox } from "@/components/ui/checkbox";
 import useSafeSelectValue from "./use-safe-select-value";
+import { Switch } from "../ui/switch";
 
 /**
  * this disables the auto zoom in input text tag safari on iphone by setting font-size to 16px
@@ -206,6 +207,12 @@ export function FormFieldPreview({
           </fieldset>
         );
       }
+      case "switch": {
+        return (
+          // @ts-ignore
+          <Switch {...(sharedInputProps as React.ComponentProps<"input">)} />
+        );
+      }
       case "time": {
         return (
           <div className="relative">
@@ -279,7 +286,22 @@ export function FormFieldPreview({
       <></>
     );
 
+  // custom layout
   switch (type) {
+    case "switch": {
+      return (
+        <label
+          data-field-type={type}
+          className="flex flex-row gap-1 justify-between items-center"
+        >
+          <div className="flex flex-col gap-2">
+            <LabelText />
+            <HelpText />
+          </div>
+          {renderInput()}
+        </label>
+      );
+    }
     case "checkbox": {
       return (
         <div className="items-top flex space-x-2">

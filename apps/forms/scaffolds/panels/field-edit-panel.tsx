@@ -152,9 +152,39 @@ const input_can_have_options: FormFieldType[] = [
   "checkboxes",
 ];
 
-const input_can_have_pattern: FormFieldType[] = supported_field_types.filter(
-  (type) => !["checkbox", "checkboxes", "color", "radio"].includes(type)
-);
+const html5_input_like_checkbox_field_types: FormFieldType[] = [
+  "checkbox",
+  "switch",
+];
+
+/**
+ * html5 pattern allowed input types
+ * @see https://developer.mozilla.org/en-US/docs/Web/HTML/Attributes/pattern
+ */
+const input_can_have_pattern: FormFieldType[] = [
+  "text",
+  "tel",
+  // `date` uses pattern on fallback - https://developer.mozilla.org/en-US/docs/Web/HTML/Element/input/date#handling_browser_support
+  "date",
+  "email",
+  "url",
+  "password",
+  // "search", // not supported
+];
+
+const input_can_have_autocomplete: FormFieldType[] =
+  supported_field_types.filter(
+    (type) =>
+      ![
+        "file",
+        "checkbox",
+        "checkboxes",
+        "switch",
+        "radio",
+        "hidden",
+        "payment",
+      ].includes(type)
+  );
 
 export type FormFieldSave = Omit<FormFieldUpsert, "form_id">;
 
@@ -764,35 +794,37 @@ export function FieldEditPanel({
                   onChange={(e) => setHelpText(e.target.value)}
                 />
               </PanelPropertyField>
-              <PanelPropertyField label={"Auto Complete"}>
-                <Select
-                  value={autocomplete ? autocomplete[0] : ""}
-                  onValueChange={(value) => {
-                    setAutocomplete([value as FormFieldAutocompleteType]);
-                  }}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="autocomplete" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {supported_field_autocomplete_types.map((type) => (
-                      <SelectItem key={type} value={type}>
-                        {type}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </PanelPropertyField>
+              {input_can_have_autocomplete.includes(type) && (
+                <PanelPropertyField label={"Auto Complete"}>
+                  <Select
+                    value={autocomplete ? autocomplete[0] : ""}
+                    onValueChange={(value) => {
+                      setAutocomplete([value as FormFieldAutocompleteType]);
+                    }}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="autocomplete" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {supported_field_autocomplete_types.map((type) => (
+                        <SelectItem key={type} value={type}>
+                          {type}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </PanelPropertyField>
+              )}
               {html5_multiple_supported_field_types.includes(type) && (
                 <PanelPropertyField label={"Multiple"}>
                   <Toggle value={multiple} onChange={setMultiple} />
                 </PanelPropertyField>
               )}
-              {type !== "checkbox" && (
+              {!html5_input_like_checkbox_field_types.includes(type) && (
                 <PanelPropertyField
                   label={"Required"}
                   description={
-                    type === "checkboxes" ? (
+                    html5_input_like_checkbox_field_types.includes(type) ? (
                       <>
                         We follow html5 standards. Checkboxes cannot be
                         required.{" "}
@@ -817,7 +849,9 @@ export function FieldEditPanel({
           <PanelPropertySection
             hidden={
               type == "payment" ||
-              (!has_accept && !has_pattern && type !== "checkbox")
+              (!has_accept &&
+                !has_pattern &&
+                !html5_input_like_checkbox_field_types.includes(type))
             }
           >
             <PanelPropertySectionTitle>Validation</PanelPropertySectionTitle>
@@ -846,13 +880,13 @@ export function FieldEditPanel({
                   />
                 </PanelPropertyField>
               )}
-              {type === "checkbox" && (
+              {html5_input_like_checkbox_field_types.includes(type) && (
                 <PanelPropertyField
                   label={"Required"}
                   description={
                     <>
-                      The checkbox will be required if it is checked. The user
-                      must check the checkbox to continue.
+                      The checkbox / switch will be required if it is checked.
+                      The user must check the checkbox / switch to continue.
                     </>
                   }
                 >
