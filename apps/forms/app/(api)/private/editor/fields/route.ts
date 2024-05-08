@@ -98,6 +98,7 @@ export async function POST(req: NextRequest) {
         options.map((option) => ({
           label: option.label,
           value: option.value,
+          src: option.src,
           disabled: option.disabled,
           index: option.index ?? 0,
           form_field_id: upserted.id,

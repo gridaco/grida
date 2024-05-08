@@ -285,7 +285,7 @@ function OptionEditItem({
           <TrashIcon />
         </button>
       </div>
-      <div className="flex gap-1">
+      <div className={clsx(mode === "simple" && "hidden", "flex gap-1")}>
         <span className="w-5" />
         <span className="flex-1" />
         <div className="flex-[2]">
