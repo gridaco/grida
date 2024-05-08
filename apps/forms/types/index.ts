@@ -212,6 +212,7 @@ export type Option = {
   id: string;
   label?: string;
   value: string;
+  src?: string | null;
   disabled?: boolean | null;
   index?: number;
 };

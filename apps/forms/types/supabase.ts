@@ -1086,6 +1086,7 @@ export type Database = {
           id: string
           index: number
           label: string
+          src: string | null
           value: string
         }
         Insert: {
@@ -1096,6 +1097,7 @@ export type Database = {
           id?: string
           index?: number
           label?: string
+          src?: string | null
           value: string
         }
         Update: {
@@ -1106,6 +1108,7 @@ export type Database = {
           id?: string
           index?: number
           label?: string
+          src?: string | null
           value?: string
         }
         Relationships: [
