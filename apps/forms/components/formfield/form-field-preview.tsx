@@ -124,7 +124,7 @@ export function FormFieldPreview({
         );
       }
       case "select": {
-        if (vanilla) {
+        if (vanilla || multiple) {
           // html5 vanilla select
           // does not support `src`
           return (
@@ -153,7 +153,7 @@ export function FormFieldPreview({
       }
       case "radio": {
         return (
-          <fieldset>
+          <fieldset className="flex flex-col gap-1">
             {options?.map((option) => (
               <div className="flex items-center gap-2" key={option.value}>
                 <input
@@ -167,7 +167,15 @@ export function FormFieldPreview({
                   htmlFor={option.value}
                   className="ms-2 text-sm font-medium text-neutral-900 dark:text-neutral-300"
                 >
-                  {option.label}
+                  <span>{option.label}</span>
+                  {option.src && (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={option.src}
+                      alt={option.label || option.value}
+                      className="mt-1 w-12 h-12 aspect-square rounded-sm"
+                    />
+                  )}
                 </label>
               </div>
             ))}
@@ -203,6 +211,14 @@ export function FormFieldPreview({
                       className="w-full py-3 ms-2 text-sm font-medium text-neutral-900 dark:text-neutral-300"
                     >
                       {option.label}
+                      {option.src && (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={option.src}
+                          alt={option.label || option.value}
+                          className="mt-1 w-12 h-12 aspect-square rounded-sm"
+                        />
+                      )}
                     </label>
                   </div>
                 </li>
@@ -415,7 +431,7 @@ function SelectWithSafeValue({
                 <img
                   src={option.src}
                   alt={option.label || option.value}
-                  className="max-w-6 max-h-6 aspect-square rounded-sm mr-2"
+                  className="w-6 h-6 aspect-square rounded-sm mr-2"
                 />
                 {option.label || option.value}
               </div>

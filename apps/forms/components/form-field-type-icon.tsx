@@ -30,6 +30,7 @@ export function FormFieldTypeIcon({ type }: { type: FormFieldType }) {
     case "image":
       return <ImageIcon />;
     case "checkbox":
+    case "checkboxes":
       return <CheckCircledIcon />;
     case "date":
     case "datetime-local":
