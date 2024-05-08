@@ -7,6 +7,9 @@ import * as Dialog from "@radix-ui/react-dialog";
 import { createClientFormsClient } from "@/lib/supabase/client";
 import { useEditorState } from "../editor";
 import { nanoid } from "nanoid";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 
 export function MediaPicker({
   open,
@@ -21,7 +24,7 @@ export function MediaPicker({
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
       <Dialog.Portal>
         <Dialog.Overlay>
-          <Dialog.Content className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-10">
+          <Dialog.Content className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-50">
             <div className="flex flex-col min-w-96 max-w-screen-sm bg-white rounded-lg shadow-lg">
               <Tabs.Root>
                 <Tabs.List className="flex gap-2 border-b px-4">
@@ -76,21 +79,14 @@ function FromUrl() {
 
   return (
     <div className="flex flex-col gap-2">
-      <input
-        className="
-        w-full
-        hover:shadow focus:shadow
-        hover:border-black/10 focus:border-black/10
-        dark:hover:border-white/10 dark:focus:border-white/10
-        focus:outline-none focus:shadow-outline
-        text-neutral-700
-        dark:text-neutral-300
-        dark:bg-black/10
-        border border-transparent
-        box-border appearance-none rounded py-2 px-3 leading-tight transition-all
-        "
+      <Label htmlFor="url">
+        URL to{" "}
+        <span className="font-mono opacity-80 text-sm">.png .jpeg .gif</span>
+      </Label>
+      <Input
+        id="url"
         type="text"
-        placeholder="Enter URL"
+        placeholder="https://example.com/image.png"
         value={url}
         onChange={(e) => setUrl(e.target.value)}
       />
@@ -201,15 +197,17 @@ function FromFilePicker({
         </button>
       )}
       <footer className="absolute bottom-0 right-0 left-0">
-        {src && (
-          <button
-            className="py-2 px-4 bg-blue-500 text-white rounded"
-            disabled={!ready}
-            onClick={() => onUseImage?.(src!)}
-          >
-            Use Image
-          </button>
-        )}
+        <div className="p-2">
+          {src && (
+            <Button
+              variant={"outline"}
+              disabled={!ready}
+              onClick={() => onUseImage?.(src!)}
+            >
+              Use Image
+            </Button>
+          )}
+        </div>
       </footer>
     </div>
   );

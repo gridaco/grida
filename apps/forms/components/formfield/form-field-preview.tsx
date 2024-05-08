@@ -1,4 +1,9 @@
-import { FormFieldDataSchema, FormFieldType, PaymentFieldData } from "@/types";
+import {
+  FormFieldDataSchema,
+  FormFieldType,
+  Option,
+  PaymentFieldData,
+} from "@/types";
 import React, { useEffect, useState } from "react";
 import { Select as HtmlSelect } from "../vanilla/select";
 import {
@@ -15,6 +20,8 @@ import clsx from "clsx";
 import { ClockIcon } from "@radix-ui/react-icons";
 import { Checkbox } from "@/components/ui/checkbox";
 import useSafeSelectValue from "./use-safe-select-value";
+import { Switch } from "../ui/switch";
+import { Slider } from "../ui/slider";
 
 /**
  * this disables the auto zoom in input text tag safari on iphone by setting font-size to 16px
@@ -29,6 +36,7 @@ export function FormFieldPreview({
   type,
   placeholder,
   required,
+  requiredAsterisk,
   defaultValue,
   options,
   helpText,
@@ -50,13 +58,9 @@ export function FormFieldPreview({
   placeholder?: string;
   helpText?: string;
   required?: boolean;
+  requiredAsterisk?: boolean;
   defaultValue?: string;
-  options?: {
-    id?: string;
-    label?: string | null;
-    value: string;
-    disabled?: boolean | null;
-  }[];
+  options?: Option[];
   pattern?: string;
   readonly?: boolean;
   disabled?: boolean;
@@ -120,8 +124,9 @@ export function FormFieldPreview({
         );
       }
       case "select": {
-        if (vanilla) {
+        if (vanilla || multiple) {
           // html5 vanilla select
+          // does not support `src`
           return (
             <HtmlSelectWithSafeValue
               {...(sharedInputProps as React.ComponentProps<"select">)}
@@ -148,7 +153,7 @@ export function FormFieldPreview({
       }
       case "radio": {
         return (
-          <fieldset>
+          <fieldset className="flex flex-col gap-1">
             {options?.map((option) => (
               <div className="flex items-center gap-2" key={option.value}>
                 <input
@@ -162,7 +167,15 @@ export function FormFieldPreview({
                   htmlFor={option.value}
                   className="ms-2 text-sm font-medium text-neutral-900 dark:text-neutral-300"
                 >
-                  {option.label}
+                  <span>{option.label}</span>
+                  {option.src && (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={option.src}
+                      alt={option.label || option.value}
+                      className="mt-1 w-12 h-12 aspect-square rounded-sm"
+                    />
+                  )}
                 </label>
               </div>
             ))}
@@ -198,12 +211,26 @@ export function FormFieldPreview({
                       className="w-full py-3 ms-2 text-sm font-medium text-neutral-900 dark:text-neutral-300"
                     >
                       {option.label}
+                      {option.src && (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={option.src}
+                          alt={option.label || option.value}
+                          className="mt-1 w-12 h-12 aspect-square rounded-sm"
+                        />
+                      )}
                     </label>
                   </div>
                 </li>
               ))}
             </ul>
           </fieldset>
+        );
+      }
+      case "switch": {
+        return (
+          // @ts-ignore
+          <Switch {...(sharedInputProps as React.ComponentProps<"input">)} />
         );
       }
       case "time": {
@@ -226,6 +253,12 @@ export function FormFieldPreview({
             type="color"
             {...(sharedInputProps as React.ComponentProps<"input">)}
           />
+        );
+      }
+      case "range": {
+        return (
+          // @ts-ignore
+          <Slider {...(sharedInputProps as React.ComponentProps<"input">)} />
         );
       }
       case "signature": {
@@ -266,7 +299,10 @@ export function FormFieldPreview({
       htmlFor={name}
       className="data-[capitalize]:capitalize font-medium text-neutral-900 dark:text-neutral-300 text-sm"
     >
-      {label || name}
+      {label || name}{" "}
+      {required && requiredAsterisk && (
+        <span className="text-red-500/80">*</span>
+      )}
     </label>
   );
 
@@ -279,7 +315,22 @@ export function FormFieldPreview({
       <></>
     );
 
+  // custom layout
   switch (type) {
+    case "switch": {
+      return (
+        <label
+          data-field-type={type}
+          className="flex flex-row gap-1 justify-between items-center"
+        >
+          <div className="flex flex-col gap-2">
+            <LabelText />
+            <HelpText />
+          </div>
+          {renderInput()}
+        </label>
+      );
+    }
     case "checkbox": {
       return (
         <div className="items-top flex space-x-2">
@@ -324,12 +375,7 @@ function SelectWithSafeValue({
   ...inputProps
 }: React.ComponentProps<"select"> & {
   placeholder?: string;
-  options?: {
-    id?: string;
-    label?: string | null;
-    value: string;
-    disabled?: boolean | null;
-  }[];
+  options?: Option[];
 } & {
   locked?: boolean;
 }) {
@@ -339,21 +385,23 @@ function SelectWithSafeValue({
     placeholder,
   } = inputProps;
 
-  const { value, defaultValue, options, setValue } = useSafeSelectValue({
-    value: _value as string,
-    options: _options?.map((option) => ({
-      // map value to id if id exists
-      value: option.id || option.value,
-      label: option.label || option.value,
-      disabled: option.disabled,
-    })),
-    // TODO: this should be true to display placeholder when changed to disabled, but this won't work for reason.
-    // leaving it as false for now.
-    useUndefined: false,
-    // TODO: also, for smae reason setting the default value to ''
-    defaultValue: (_defaultValue || "") as string,
-    locked,
-  });
+  const { value, defaultValue, options, setValue } = useSafeSelectValue<Option>(
+    {
+      value: _value as string,
+      options: _options?.map((option) => ({
+        ...option,
+        // map value to id if id exists
+        value: option.id || option.value,
+        label: option.label || option.value,
+      })),
+      // TODO: this should be true to display placeholder when changed to disabled, but this won't work for reason.
+      // leaving it as false for now.
+      useUndefined: false,
+      // TODO: also, for smae reason setting the default value to ''
+      defaultValue: (_defaultValue || "") as string,
+      locked,
+    }
+  );
 
   return (
     // shadcn select
@@ -377,7 +425,19 @@ function SelectWithSafeValue({
             value={option.value}
             disabled={option.disabled || false}
           >
-            {option.label || option.value}
+            {option.src ? (
+              <div className="flex items-center gap-2">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={option.src}
+                  alt={option.label || option.value}
+                  className="w-6 h-6 aspect-square rounded-sm mr-2"
+                />
+                {option.label || option.value}
+              </div>
+            ) : (
+              <>{option.label || option.value}</>
+            )}
           </SelectItem>
         ))}
       </SelectContent>

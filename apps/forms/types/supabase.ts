@@ -1086,6 +1086,7 @@ export type Database = {
           id: string
           index: number
           label: string
+          src: string | null
           value: string
         }
         Insert: {
@@ -1096,6 +1097,7 @@ export type Database = {
           id?: string
           index?: number
           label?: string
+          src?: string | null
           value: string
         }
         Update: {
@@ -1106,6 +1108,7 @@ export type Database = {
           id?: string
           index?: number
           label?: string
+          src?: string | null
           value?: string
         }
         Relationships: [
@@ -1374,6 +1377,7 @@ export type Database = {
         | "url"
         | "checkbox"
         | "checkboxes"
+        | "switch"
         | "date"
         | "month"
         | "week"
@@ -1392,6 +1396,7 @@ export type Database = {
         | "number"
         | "time"
         | "datetime-local"
+        | "range"
       form_page_language:
         | "en"
         | "ko"

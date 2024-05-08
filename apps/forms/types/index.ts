@@ -64,6 +64,7 @@ export type FormFieldType =
   | "url"
   | "checkbox"
   | "checkboxes"
+  | "switch"
   | "number"
   | "date"
   | "datetime-local"
@@ -81,7 +82,8 @@ export type FormFieldType =
   | "country"
   | "payment"
   | "hidden"
-  | "signature";
+  | "signature"
+  | "range";
 
 export type FormFieldAutocompleteType =
   | "off"
@@ -210,6 +212,7 @@ export type Option = {
   id: string;
   label?: string;
   value: string;
+  src?: string | null;
   disabled?: boolean | null;
   index?: number;
 };

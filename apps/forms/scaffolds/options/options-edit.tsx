@@ -2,9 +2,11 @@
 
 import React, { useEffect, useId, useMemo, useState } from "react";
 import {
+  Cross1Icon,
   CrossCircledIcon,
   DragHandleDots2Icon,
   GearIcon,
+  ImageIcon,
   LockClosedIcon,
   PlusIcon,
   TrashIcon,
@@ -28,6 +30,8 @@ import {
 import { fmt_snake_case_to_human_text } from "@/utils/fmt";
 import { restrictToVerticalAxis } from "@dnd-kit/modifiers";
 import type { Option } from "@/types";
+import { Button } from "@/components/ui/button";
+import { MediaPicker } from "../mediapicker";
 
 export function OptionsEdit({
   options,
@@ -81,11 +85,12 @@ export function OptionsEdit({
               <div className="flex text-xs opacity-80">
                 <span className="w-5" />
                 <span className="flex-1">value</span>
-                <span className="flex-1">label</span>
+                <span className="flex-[2]">label</span>
                 <span className="min-w-16">disabled</span>
                 <span className="w-5" />
               </div>
             )}
+            <hr />
             {options?.map(({ id, ...option }, index) => (
               <OptionEditItem
                 key={id}
@@ -93,6 +98,7 @@ export function OptionsEdit({
                 mode={mode}
                 label={option.label || ""}
                 value={option.value}
+                src={option.src}
                 disabled={option.disabled}
                 index={index}
                 onRemove={() => {
@@ -137,6 +143,7 @@ function OptionEditItem({
   id,
   label: _label,
   value: _value,
+  src: _src,
   disabled: _disabled,
   index,
   mode,
@@ -146,12 +153,14 @@ function OptionEditItem({
   id: string;
   label: string;
   value: string;
+  src?: string | null;
   disabled?: boolean | null;
   index: number;
   mode: "simple" | "advanced";
   onChange?: (option: {
     label: string;
     value: string;
+    src?: string | null;
     disabled: boolean;
   }) => void;
   onRemove?: () => void;
@@ -174,6 +183,10 @@ function OptionEditItem({
   const [fmt_matches, set_fmt_matches] = useState<boolean>(
     does_fmt_match(value, label)
   );
+  const [src, setSrc] = useState<string | null | undefined>(_src);
+  const [mediaPickerOpen, setMediaPickerOpen] = useState(false);
+
+  const clearSrc = () => setSrc(null);
 
   useEffect(() => {
     if (fmt_matches) {
@@ -187,8 +200,8 @@ function OptionEditItem({
   }, [label]);
 
   useEffect(() => {
-    onChange?.({ label, value, disabled });
-  }, [value, label, disabled]);
+    onChange?.({ label, value, disabled, src });
+  }, [value, label, disabled, src]);
 
   const style = {
     transform: CSS.Translate.toString(transform),
@@ -201,50 +214,105 @@ function OptionEditItem({
       //
       ref={setNodeRef}
       style={style}
-      className="flex gap-1 items-center"
+      className="flex flex-col gap-1"
     >
-      <button
-        //
-        type="button"
-        {...listeners}
-        {...attributes}
-        ref={setActivatorNodeRef}
-      >
-        <DragHandleDots2Icon className="opacity-50" />
-      </button>
-      <label className="flex-1">
-        <input
-          className="block w-full p-2 text-gray-900 border border-gray-300 rounded-lg bg-gray-50 text-xs focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500"
-          type="text"
-          placeholder="option_value"
-          value={value}
-          required
-          onChange={(e) => setValue(e.target.value)}
-        />
-      </label>
-      <label className={clsx(mode === "simple" && "hidden", "flex-1")}>
-        <input
-          className={
-            "block w-full p-2 text-gray-900 border border-gray-300 rounded-lg bg-gray-50 text-xs focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500"
-          }
-          type="text"
-          placeholder="Option Label"
-          value={label}
-          onChange={(e) => setLabel(e.target.value)}
-        />
-      </label>
-      <label
-        className={clsx(
-          mode === "simple" && "hidden",
-          "flex items-center min-w-16"
-        )}
-      >
-        <Switch checked={disabled} onCheckedChange={setDisabled} />
-      </label>
+      <div className="flex gap-1 items-center">
+        <button
+          //
+          type="button"
+          {...listeners}
+          {...attributes}
+          ref={setActivatorNodeRef}
+        >
+          <DragHandleDots2Icon className="opacity-50" />
+        </button>
+        <label className="flex-1">
+          <input
+            className="block w-full p-2 text-gray-900 border border-gray-300 rounded-lg bg-gray-50 text-xs focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500"
+            type="text"
+            placeholder="option_value"
+            value={value}
+            required
+            onChange={(e) => setValue(e.target.value)}
+          />
+        </label>
+        <div
+          className={clsx(
+            mode === "simple" && "hidden",
+            "relative gap-2 flex-[2]"
+          )}
+        >
+          <input
+            className={
+              "block w-full p-2 text-gray-900 border border-gray-300 rounded-lg bg-gray-50 text-xs focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500"
+            }
+            type="text"
+            placeholder="Option Label"
+            value={label}
+            onChange={(e) => setLabel(e.target.value)}
+          />
+          <div>
+            <MediaPicker
+              open={mediaPickerOpen}
+              onOpenChange={setMediaPickerOpen}
+              onUseImage={(src) => {
+                setSrc(src);
+                setMediaPickerOpen(false);
+              }}
+            />
+            {!src && (
+              <button
+                onClick={() => setMediaPickerOpen(true)}
+                type="button"
+                className="absolute right-0 top-0 bottom-0 p-2 z-10"
+              >
+                <ImageIcon />
+              </button>
+            )}
+          </div>
+        </div>
 
-      <button type="button" onClick={onRemove}>
-        <TrashIcon />
-      </button>
+        <label
+          className={clsx(
+            mode === "simple" && "hidden",
+            "flex items-center min-w-16"
+          )}
+        >
+          <Switch checked={disabled} onCheckedChange={setDisabled} />
+        </label>
+
+        <button type="button" onClick={onRemove}>
+          <TrashIcon />
+        </button>
+      </div>
+      <div className={clsx(mode === "simple" && "hidden", "flex gap-1")}>
+        <span className="w-5" />
+        <span className="flex-1" />
+        <div className="flex-[2]">
+          {src && (
+            <div className="relative">
+              <Button
+                onClick={clearSrc}
+                className="absolute z-10 top-0 right-0 w-6 h-6 p-0 m-1"
+                variant="ghost"
+                type="button"
+              >
+                <Cross1Icon />
+              </Button>
+              <div className="aspect-square bg-neutral-500/50">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={src}
+                  alt=""
+                  className="w-full h-full object-contain rounded-sm overflow-hidden pointer-events-none select-none"
+                />
+              </div>
+            </div>
+          )}
+        </div>
+        <span className="min-w-16" />
+        <span className="w-5" />
+      </div>
     </div>
   );
 }

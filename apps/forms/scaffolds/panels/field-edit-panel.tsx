@@ -77,6 +77,7 @@ import {
 import { useRouter } from "next/navigation";
 import { editorlink } from "@/lib/forms/url";
 import { cn } from "@/utils";
+import { FormFieldTypeIcon } from "@/components/form-field-type-icon";
 
 // @ts-ignore
 const default_field_init: {
@@ -152,9 +153,40 @@ const input_can_have_options: FormFieldType[] = [
   "checkboxes",
 ];
 
-const input_can_have_pattern: FormFieldType[] = supported_field_types.filter(
-  (type) => !["checkbox", "checkboxes", "color", "radio"].includes(type)
-);
+const html5_input_like_checkbox_field_types: FormFieldType[] = [
+  "checkbox",
+  "switch",
+];
+
+/**
+ * html5 pattern allowed input types
+ * @see https://developer.mozilla.org/en-US/docs/Web/HTML/Attributes/pattern
+ */
+const input_can_have_pattern: FormFieldType[] = [
+  "text",
+  "tel",
+  // `date` uses pattern on fallback - https://developer.mozilla.org/en-US/docs/Web/HTML/Element/input/date#handling_browser_support
+  "date",
+  "email",
+  "url",
+  "password",
+  // "search", // not supported
+];
+
+const input_can_have_autocomplete: FormFieldType[] =
+  supported_field_types.filter(
+    (type) =>
+      ![
+        "file",
+        "checkbox",
+        "checkboxes",
+        "switch",
+        "radio",
+        "range",
+        "hidden",
+        "payment",
+      ].includes(type)
+  );
 
 export type FormFieldSave = Omit<FormFieldUpsert, "form_id">;
 
@@ -292,7 +324,10 @@ export function TypeSelect({
       <SelectContent>
         {supported_field_types.map((type) => (
           <SelectItem key={type} value={type}>
-            {type}
+            <div className="flex items-center gap-2">
+              <FormFieldTypeIcon type={type} />{" "}
+              <span className="capitalize">{type}</span>
+            </div>
           </SelectItem>
         ))}
       </SelectContent>
@@ -398,7 +433,6 @@ export function FieldEditPanel({
   const preview_label = buildPreviewLabel({
     name,
     label,
-    required,
   });
 
   const { inventory: initial_inventory, loading: inventory_loading } =
@@ -553,6 +587,7 @@ export function FieldEditPanel({
                   placeholder={preview_placeholder}
                   helpText={helpText}
                   required={required}
+                  requiredAsterisk
                   disabled={preview_disabled}
                   options={has_options ? options : undefined}
                   pattern={pattern}
@@ -764,60 +799,65 @@ export function FieldEditPanel({
                   onChange={(e) => setHelpText(e.target.value)}
                 />
               </PanelPropertyField>
-              <PanelPropertyField label={"Auto Complete"}>
-                <Select
-                  value={autocomplete ? autocomplete[0] : ""}
-                  onValueChange={(value) => {
-                    setAutocomplete([value as FormFieldAutocompleteType]);
-                  }}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="autocomplete" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {supported_field_autocomplete_types.map((type) => (
-                      <SelectItem key={type} value={type}>
-                        {type}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </PanelPropertyField>
+              {input_can_have_autocomplete.includes(type) && (
+                <PanelPropertyField label={"Auto Complete"}>
+                  <Select
+                    value={autocomplete ? autocomplete[0] : ""}
+                    onValueChange={(value) => {
+                      setAutocomplete([value as FormFieldAutocompleteType]);
+                    }}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="autocomplete" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {supported_field_autocomplete_types.map((type) => (
+                        <SelectItem key={type} value={type}>
+                          {type}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </PanelPropertyField>
+              )}
               {html5_multiple_supported_field_types.includes(type) && (
                 <PanelPropertyField label={"Multiple"}>
                   <Toggle value={multiple} onChange={setMultiple} />
                 </PanelPropertyField>
               )}
-              {type !== "checkbox" && (
-                <PanelPropertyField
-                  label={"Required"}
-                  description={
-                    type === "checkboxes" ? (
-                      <>
-                        We follow html5 standards. Checkboxes cannot be
-                        required.{" "}
-                        <a
-                          className="underline"
-                          href="https://github.com/whatwg/html/issues/6868#issue-946624070"
-                          target="_blank"
-                        >
-                          Learn more
-                        </a>
-                      </>
-                    ) : undefined
-                  }
-                  disabled={type === "checkboxes"}
-                >
-                  <Toggle value={required} onChange={setRequired} />
-                </PanelPropertyField>
-              )}
+              {!html5_input_like_checkbox_field_types.includes(type) &&
+                type !== "range" && (
+                  <PanelPropertyField
+                    label={"Required"}
+                    description={
+                      html5_input_like_checkbox_field_types.includes(type) ? (
+                        <>
+                          We follow html5 standards. Checkboxes cannot be
+                          required.{" "}
+                          <a
+                            className="underline"
+                            href="https://github.com/whatwg/html/issues/6868#issue-946624070"
+                            target="_blank"
+                          >
+                            Learn more
+                          </a>
+                        </>
+                      ) : undefined
+                    }
+                    disabled={type === "checkboxes"}
+                  >
+                    <Toggle value={required} onChange={setRequired} />
+                  </PanelPropertyField>
+                )}
             </PanelPropertyFields>
           </PanelPropertySection>
 
           <PanelPropertySection
             hidden={
               type == "payment" ||
-              (!has_accept && !has_pattern && type !== "checkbox")
+              (!has_accept &&
+                !has_pattern &&
+                !html5_input_like_checkbox_field_types.includes(type))
             }
           >
             <PanelPropertySectionTitle>Validation</PanelPropertySectionTitle>
@@ -846,13 +886,13 @@ export function FieldEditPanel({
                   />
                 </PanelPropertyField>
               )}
-              {type === "checkbox" && (
+              {html5_input_like_checkbox_field_types.includes(type) && (
                 <PanelPropertyField
                   label={"Required"}
                   description={
                     <>
-                      The checkbox will be required if it is checked. The user
-                      must check the checkbox to continue.
+                      The checkbox / switch will be required if it is checked.
+                      The user must check the checkbox / switch to continue.
                     </>
                   }
                 >
@@ -898,18 +938,7 @@ function next_option_default(options: Option[]): Option {
   };
 }
 
-function buildPreviewLabel({
-  name,
-  label,
-  required,
-}: {
-  name: string;
-  label?: string;
-  required?: boolean;
-}) {
+function buildPreviewLabel({ name, label }: { name: string; label?: string }) {
   let txt = label || fmt_snake_case_to_human_text(name);
-  if (required) {
-    txt += " *";
-  }
   return txt;
 }

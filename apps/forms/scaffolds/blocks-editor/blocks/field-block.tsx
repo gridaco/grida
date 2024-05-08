@@ -155,6 +155,7 @@ export function FieldBlock({
             label={form_field?.label ?? ""}
             type={form_field?.type ?? "text"}
             required={form_field?.required ?? false}
+            requiredAsterisk
             helpText={form_field?.help_text ?? ""}
             placeholder={form_field?.placeholder ?? ""}
             options={form_field?.options}
