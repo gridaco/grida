@@ -12,6 +12,7 @@ export type BlocksEditorAction =
   | DeleteBlockAction
   | OpenEditFieldAction
   | SortBlockAction
+  | FocusBlockAction
   | FocusFieldAction
   | ChangeBlockFieldAction
   | CreateFielFromBlockdAction
@@ -92,6 +93,11 @@ export interface BlockDescriptionAction {
   type: "blocks/description";
   block_id: string;
   description_html: string;
+}
+
+export interface FocusBlockAction {
+  type: "blocks/focus";
+  block_id: string;
 }
 
 export interface FocusFieldAction {
