@@ -1,4 +1,9 @@
-import { FormFieldDataSchema, FormFieldType, PaymentFieldData } from "@/types";
+import {
+  FormFieldDataSchema,
+  FormFieldType,
+  Option,
+  PaymentFieldData,
+} from "@/types";
 import React, { useEffect, useState } from "react";
 import { Select as HtmlSelect } from "../vanilla/select";
 import {
@@ -55,12 +60,7 @@ export function FormFieldPreview({
   required?: boolean;
   requiredAsterisk?: boolean;
   defaultValue?: string;
-  options?: {
-    id?: string;
-    label?: string | null;
-    value: string;
-    disabled?: boolean | null;
-  }[];
+  options?: Option[];
   pattern?: string;
   readonly?: boolean;
   disabled?: boolean;
@@ -126,6 +126,7 @@ export function FormFieldPreview({
       case "select": {
         if (vanilla) {
           // html5 vanilla select
+          // does not support `src`
           return (
             <HtmlSelectWithSafeValue
               {...(sharedInputProps as React.ComponentProps<"select">)}
@@ -358,12 +359,7 @@ function SelectWithSafeValue({
   ...inputProps
 }: React.ComponentProps<"select"> & {
   placeholder?: string;
-  options?: {
-    id?: string;
-    label?: string | null;
-    value: string;
-    disabled?: boolean | null;
-  }[];
+  options?: Option[];
 } & {
   locked?: boolean;
 }) {
@@ -373,21 +369,23 @@ function SelectWithSafeValue({
     placeholder,
   } = inputProps;
 
-  const { value, defaultValue, options, setValue } = useSafeSelectValue({
-    value: _value as string,
-    options: _options?.map((option) => ({
-      // map value to id if id exists
-      value: option.id || option.value,
-      label: option.label || option.value,
-      disabled: option.disabled,
-    })),
-    // TODO: this should be true to display placeholder when changed to disabled, but this won't work for reason.
-    // leaving it as false for now.
-    useUndefined: false,
-    // TODO: also, for smae reason setting the default value to ''
-    defaultValue: (_defaultValue || "") as string,
-    locked,
-  });
+  const { value, defaultValue, options, setValue } = useSafeSelectValue<Option>(
+    {
+      value: _value as string,
+      options: _options?.map((option) => ({
+        ...option,
+        // map value to id if id exists
+        value: option.id || option.value,
+        label: option.label || option.value,
+      })),
+      // TODO: this should be true to display placeholder when changed to disabled, but this won't work for reason.
+      // leaving it as false for now.
+      useUndefined: false,
+      // TODO: also, for smae reason setting the default value to ''
+      defaultValue: (_defaultValue || "") as string,
+      locked,
+    }
+  );
 
   return (
     // shadcn select
@@ -411,7 +409,19 @@ function SelectWithSafeValue({
             value={option.value}
             disabled={option.disabled || false}
           >
-            {option.label || option.value}
+            {option.src ? (
+              <div className="flex items-center gap-2">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={option.src}
+                  alt={option.label || option.value}
+                  className="max-w-6 max-h-6 aspect-square rounded-sm mr-2"
+                />
+                {option.label || option.value}
+              </div>
+            ) : (
+              <>{option.label || option.value}</>
+            )}
           </SelectItem>
         ))}
       </SelectContent>

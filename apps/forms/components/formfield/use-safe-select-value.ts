@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from "react";
 
 interface Option {
   value: string;
-  label: string;
+  label?: string | null;
   disabled?: boolean | null;
 }
 
@@ -14,7 +14,10 @@ interface Option {
  * @param onChange - Optional callback to notify parent components of value changes.
  * @returns - The current value, defaultValue, and a setter for the value.
  */
-function useSafeSelectValue<T extends string | undefined = string | undefined>({
+function useSafeSelectValue<
+  OP extends Option = Option,
+  T extends string | undefined = string | undefined,
+>({
   value: _value,
   defaultValue: _defaultValue,
   options: _options,
@@ -24,14 +27,14 @@ function useSafeSelectValue<T extends string | undefined = string | undefined>({
 }: {
   value: T;
   defaultValue: T;
-  options?: Option[];
+  options?: OP[];
   onChange?: (value: T) => void;
   useUndefined?: boolean;
   locked?: boolean;
 }): {
   value: string | undefined;
   defaultValue: string | undefined;
-  options: Option[] | undefined;
+  options: OP[] | undefined;
   setValue: (value: T) => void;
 } {
   const isControlled = _value !== undefined;
