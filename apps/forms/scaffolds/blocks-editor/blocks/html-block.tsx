@@ -9,13 +9,18 @@ import {
   DropdownMenuTrigger,
 } from "@editor-ui/dropdown-menu";
 import { EditorFlatFormBlock } from "@/scaffolds/editor/state";
-import { BlockHeader, FlatBlockBase, useDeleteBlock } from "./base-block";
+import {
+  BlockHeader,
+  FlatBlockBase,
+  useBlockFocus,
+  useDeleteBlock,
+} from "./base-block";
 import { useEditorState } from "@/scaffolds/editor";
 import { Editor } from "@monaco-editor/react";
 
 export function HtmlBlock({ id, body_html }: EditorFlatFormBlock) {
   const [state, dispatch] = useEditorState();
-
+  const [focused, setFocus] = useBlockFocus(id);
   const onEditBody = useCallback(
     (html: string) => {
       dispatch({
@@ -33,6 +38,8 @@ export function HtmlBlock({ id, body_html }: EditorFlatFormBlock) {
     <FlatBlockBase
       // TODO: add syntax validation
       invalid={false}
+      focused={focused}
+      onPointerDown={setFocus}
     >
       <BlockHeader>
         <div className="flex flex-row items-center gap-8">

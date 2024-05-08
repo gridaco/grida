@@ -14,7 +14,12 @@ import {
   DropdownMenuTrigger,
 } from "@editor-ui/dropdown-menu";
 import { EditorFlatFormBlock } from "@/scaffolds/editor/state";
-import { BlockHeader, FlatBlockBase, useDeleteBlock } from "./base-block";
+import {
+  BlockHeader,
+  FlatBlockBase,
+  useBlockFocus,
+  useDeleteBlock,
+} from "./base-block";
 import { useEditorState } from "@/scaffolds/editor";
 import dynamic from "next/dynamic";
 
@@ -28,11 +33,11 @@ export function VideoBlock({
   data,
 }: EditorFlatFormBlock) {
   const [state, dispatch] = useEditorState();
-
+  const [focused, setFocus] = useBlockFocus(id);
   const deleteBlock = useDeleteBlock();
 
   return (
-    <FlatBlockBase invalid={!src}>
+    <FlatBlockBase focused={focused} onPointerDown={setFocus} invalid={!src}>
       <BlockHeader>
         <div className="flex flex-col gap-2">
           <div className="flex flex-row items-center gap-8">

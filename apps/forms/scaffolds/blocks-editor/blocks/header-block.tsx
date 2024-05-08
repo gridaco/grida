@@ -14,7 +14,12 @@ import {
 } from "@editor-ui/dropdown-menu";
 import { EditorFlatFormBlock } from "@/scaffolds/editor/state";
 import { useEditorState } from "@/scaffolds/editor";
-import { BlockHeader, FlatBlockBase, useDeleteBlock } from "./base-block";
+import {
+  BlockHeader,
+  FlatBlockBase,
+  useBlockFocus,
+  useDeleteBlock,
+} from "./base-block";
 import TextareaAutosize from "react-textarea-autosize";
 
 export function HeaderBlock({
@@ -24,6 +29,7 @@ export function HeaderBlock({
 }: EditorFlatFormBlock) {
   const [state, dispatch] = useEditorState();
   const deleteBlock = useDeleteBlock();
+  const [focused, setFocus] = useBlockFocus(id);
 
   const onEditTitle = useCallback(
     (title: string) => {
@@ -48,7 +54,7 @@ export function HeaderBlock({
   );
 
   return (
-    <FlatBlockBase invalid={false}>
+    <FlatBlockBase focused={focused} invalid={false} onPointerDown={setFocus}>
       <BlockHeader>
         <div className="flex flex-row items-center gap-8">
           <div className="flex flex-col gap-1">

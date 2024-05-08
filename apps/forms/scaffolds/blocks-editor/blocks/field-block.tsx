@@ -14,7 +14,12 @@ import {
   DropdownMenuTrigger,
 } from "@editor-ui/dropdown-menu";
 import { EditorFlatFormBlock } from "@/scaffolds/editor/state";
-import { BlockHeader, FlatBlockBase, useDeleteBlock } from "./base-block";
+import {
+  BlockHeader,
+  FlatBlockBase,
+  useBlockFocus,
+  useDeleteBlock,
+} from "./base-block";
 import { useEditorState } from "@/scaffolds/editor";
 import { FormFieldDefinition } from "@/types";
 import Link from "next/link";
@@ -34,6 +39,7 @@ export function FieldBlock({
   data,
 }: EditorFlatFormBlock) {
   const [state, dispatch] = useEditorState();
+  const [focused, setFocus] = useBlockFocus(id);
 
   const form_field: FormFieldDefinition | undefined = state.fields.find(
     (f) => f.id === form_field_id
@@ -76,7 +82,11 @@ export function FieldBlock({
   }, [dispatch, form_field_id]);
 
   return (
-    <FlatBlockBase invalid={!form_field}>
+    <FlatBlockBase
+      focused={focused}
+      invalid={!form_field}
+      onPointerDown={setFocus}
+    >
       <BlockHeader>
         <div className="flex flex-row items-center gap-8">
           <span className="flex flex-row gap-2 items-center">

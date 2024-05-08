@@ -13,6 +13,7 @@ import {
   DeleteResponseAction,
   DeleteSelectedResponsesAction,
   FeedResponseAction,
+  FocusBlockAction,
   FocusFieldAction,
   HtmlBlockBodyAction,
   ImageBlockSrcAction,
@@ -33,6 +34,7 @@ import { VIDEO_BLOCK_SRC_DEFAULT_VALUE } from "@/k/video_block_defaults";
 import { IMAGE_BLOCK_SRC_DEFAULT_VALUE } from "@/k/image_block_defaults";
 import { PDF_BLOCK_SRC_DEFAULT_VALUE } from "@/k/pdf_block_defaults";
 import { draftid } from "@/utils/id";
+import { FormBlockType } from "@/types";
 
 export function reducer(
   state: FormEditorState,
@@ -43,7 +45,12 @@ export function reducer(
       // TODO: if adding new section, if there is a present non-section-blocks on root, it should automatically be nested under new section.
       const { block } = <CreateNewPendingBlockAction>action;
 
-      const new_index = state.blocks.length;
+      const old_index = state.blocks.length;
+      const focus_block_index = state.blocks.findIndex(
+        (block) => block.id === state.focus_block_id
+      );
+      const focus_index =
+        focus_block_index >= 0 ? focus_block_index + 1 : old_index;
 
       // find the last parent section
       const parent_section = state.blocks
@@ -59,39 +66,13 @@ export function reducer(
         form_page_id: state.page_id,
         parent_id: block === "section" ? null : parent_id,
         type: block,
-        local_index: new_index,
+        local_index: old_index,
         data: {},
       };
 
+      let init: EditorFlatFormBlock = init_block(__shared, block);
+
       switch (block) {
-        case "field": {
-          return produce(state, (draft) => {
-            const { available_field_ids } = state;
-
-            // find unused field id (if any)
-            const field_id = available_field_ids[0] ?? null;
-
-            draft.blocks.push({
-              ...__shared,
-              form_field_id: field_id,
-            });
-
-            // remove the field id from available_field_ids
-            draft.available_field_ids = available_field_ids.filter(
-              (id) => id !== field_id
-            );
-
-            // update focus block id
-            draft.focus_block_id = id;
-
-            if (!field_id) {
-              // if no available field, but field block provided, open a field editor panel
-              draft.focus_field_id = null;
-              draft.is_field_edit_panel_open = true;
-              //
-            }
-          });
-        }
         case "section": {
           return produce(state, (draft) => {
             const id = __shared.id;
@@ -117,58 +98,81 @@ export function reducer(
             draft.blocks = new_blocks;
           });
         }
-        case "html": {
+        case "field": {
           return produce(state, (draft) => {
+            const { available_field_ids } = state;
+
+            // find unused field id (if any)
+            const field_id = available_field_ids[0] ?? null;
+
             draft.blocks.push({
               ...__shared,
-              body_html: HTML_BLOCK_BODY_HTML_DEFAULT_VALUE,
+              form_field_id: field_id,
             });
+
+            // move ==
+            draft.blocks = arrayMove(draft.blocks, old_index, focus_index).map(
+              (block, index) => ({
+                ...block,
+                local_index: index,
+              })
+            );
+            // ========
+
+            // remove the field id from available_field_ids
+            draft.available_field_ids = available_field_ids.filter(
+              (id) => id !== field_id
+            );
+
+            // update focus block id
+            draft.focus_block_id = id;
+
+            if (!field_id) {
+              // if no available field, but field block provided, open a field editor panel
+              draft.focus_field_id = null;
+              draft.is_field_edit_panel_open = true;
+              //
+            }
           });
         }
-        case "image": {
-          return produce(state, (draft) => {
-            draft.blocks.push({
-              ...__shared,
-              src: IMAGE_BLOCK_SRC_DEFAULT_VALUE,
-            });
-          });
-        }
-        case "video": {
-          return produce(state, (draft) => {
-            draft.blocks.push({
-              ...__shared,
-              src: VIDEO_BLOCK_SRC_DEFAULT_VALUE,
-            });
-          });
-        }
-        case "pdf": {
-          return produce(state, (draft) => {
-            draft.blocks.push({
-              ...__shared,
-              src: PDF_BLOCK_SRC_DEFAULT_VALUE,
-            });
-          });
-        }
-        case "divider": {
-          return produce(state, (draft) => {
-            draft.blocks.push({
-              ...__shared,
-            });
-          });
-        }
+        case "html":
+        case "image":
+        case "video":
+        case "pdf":
+        case "divider":
         case "header": {
           return produce(state, (draft) => {
-            draft.blocks.push({
-              ...__shared,
-              title_html: "Header",
-              description_html: "Description",
-            });
+            draft.blocks.push(init);
+
+            // update focus block id
+            draft.focus_block_id = id;
+
+            // move ==
+            draft.blocks = arrayMove(draft.blocks, old_index, focus_index).map(
+              (block, index) => ({
+                ...block,
+                local_index: index,
+              })
+            );
+            // ========
           });
         }
         default: {
           throw new Error("Unsupported block type : " + block);
         }
       }
+    }
+    case "blocks/field/new": {
+      const { block_id } = <CreateFielFromBlockdAction>action;
+      // trigger new field from empty field block
+      return produce(state, (draft) => {
+        // update focus block id
+        draft.focus_block_id = block_id;
+
+        // if no available field, but field block provided, open a field editor panel
+        draft.focus_field_id = null;
+        draft.is_field_edit_panel_open = true;
+      });
     }
     case "blocks/resolve": {
       const { block_id, block } = <ResolvePendingBlockAction>action;
@@ -231,18 +235,6 @@ export function reducer(
         if (block) {
           block.description_html = description_html;
         }
-      });
-    }
-    case "blocks/field/new": {
-      const { block_id } = <CreateFielFromBlockdAction>action;
-      // trigger new field from empty field block
-      return produce(state, (draft) => {
-        // update focus block id
-        draft.focus_block_id = block_id;
-
-        // if no available field, but field block provided, open a field editor panel
-        draft.focus_field_id = null;
-        draft.is_field_edit_panel_open = true;
       });
     }
     case "blocks/field/change": {
@@ -348,7 +340,12 @@ export function reducer(
         }
       });
     }
-
+    case "blocks/focus": {
+      const { block_id } = <FocusBlockAction>action;
+      return produce(state, (draft) => {
+        draft.focus_block_id = block_id;
+      });
+    }
     case "editor/field/focus": {
       const { field_id } = <FocusFieldAction>action;
       return produce(state, (draft) => {
@@ -538,5 +535,42 @@ export function reducer(
     }
     default:
       return state;
+  }
+}
+
+function init_block(
+  base: EditorFlatFormBlock,
+  type: FormBlockType
+): EditorFlatFormBlock {
+  switch (type) {
+    case "html":
+      return {
+        ...base,
+        body_html: HTML_BLOCK_BODY_HTML_DEFAULT_VALUE,
+      };
+    case "image":
+      return {
+        ...base,
+        src: IMAGE_BLOCK_SRC_DEFAULT_VALUE,
+      };
+    case "video":
+      return {
+        ...base,
+        src: VIDEO_BLOCK_SRC_DEFAULT_VALUE,
+      };
+    case "pdf":
+      return {
+        ...base,
+        src: PDF_BLOCK_SRC_DEFAULT_VALUE,
+      };
+    case "header":
+      return {
+        ...base,
+        title_html: "Header",
+        description_html: "Description",
+      };
+    case "divider":
+    default:
+      return base;
   }
 }

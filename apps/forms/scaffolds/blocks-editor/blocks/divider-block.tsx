@@ -12,13 +12,19 @@ import {
   DropdownMenuTrigger,
 } from "@editor-ui/dropdown-menu";
 import { EditorFlatFormBlock } from "@/scaffolds/editor/state";
-import { BlockHeader, FlatBlockBase, useDeleteBlock } from "./base-block";
+import {
+  BlockHeader,
+  FlatBlockBase,
+  useBlockFocus,
+  useDeleteBlock,
+} from "./base-block";
 
 export function DividerBlock({ id }: EditorFlatFormBlock) {
+  const [focused, setFocus] = useBlockFocus(id);
   const deleteBlock = useDeleteBlock();
 
   return (
-    <FlatBlockBase>
+    <FlatBlockBase focused={focused} onPointerDown={setFocus}>
       <BlockHeader>
         <div className="flex flex-row items-center gap-8">
           <div className="flex flex-col gap-1">
