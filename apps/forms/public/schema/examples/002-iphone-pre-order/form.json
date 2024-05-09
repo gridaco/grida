@@ -1,0 +1,86 @@
+{
+  "$schema": "https://forms.grida.co/schema/form.schema.json",
+  "title": "iPhone 15 - Pre-order",
+  "name": "iphone-15-pre-order",
+  "fields": [
+    {
+      "name": "name",
+      "label": "Full Name",
+      "required": true,
+      "type": "text",
+      "autocomplete": "name"
+    },
+    {
+      "name": "color",
+      "label": "Color",
+      "required": true,
+      "type": "select",
+      "placeholder": "Select color",
+      "options": [
+        {
+          "label": "Blue",
+          "value": "blue"
+        },
+        {
+          "label": "Pink",
+          "value": "pink"
+        },
+        {
+          "label": "Yellow",
+          "value": "yellow"
+        },
+        {
+          "label": "Green",
+          "value": "green"
+        },
+        {
+          "label": "Black",
+          "value": "black"
+        }
+      ]
+    },
+    {
+      "name": "storage",
+      "label": "Storage",
+      "required": true,
+      "type": "select",
+      "placeholder": "Select storage size",
+      "options": [
+        {
+          "label": "128GB",
+          "value": "128"
+        },
+        {
+          "label": "256GB",
+          "value": "256"
+        },
+        {
+          "label": "512GB",
+          "value": "512"
+        }
+      ]
+    },
+    {
+      "name": "appletradein",
+      "label": "Apple Trade In.",
+      "required": true,
+      "type": "radio",
+      "options": [
+        {
+          "label": "Select a smartphone",
+          "value": "yes"
+        },
+        {
+          "label": "No trade-in",
+          "value": "no"
+        }
+      ]
+    },
+    {
+      "name": "signhere",
+      "label": "Sign here",
+      "required": true,
+      "type": "signature"
+    }
+  ]
+}

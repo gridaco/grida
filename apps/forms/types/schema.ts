@@ -23,7 +23,7 @@ export interface JSONField {
   pattern?: string;
   type: FormFieldType;
   options?: JSONOption[];
-  autocomplete?: FormFieldAutocompleteType[];
+  autocomplete?: FormFieldAutocompleteType | FormFieldAutocompleteType[];
 }
 
 export interface JSONOption {

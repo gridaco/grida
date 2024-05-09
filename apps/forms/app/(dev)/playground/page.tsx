@@ -8,7 +8,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { FormView } from "@/scaffolds/e/form";
-import { Editor, useMonaco } from "@monaco-editor/react";
+import { Editor as MonacoEditor, useMonaco } from "@monaco-editor/react";
 import { useEffect, useMemo, useState } from "react";
 import { nanoid } from "nanoid";
 import { JSONForm } from "@/types/schema";
@@ -18,6 +18,39 @@ import { FormRenderer } from "@/lib/forms";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { GridaLogo } from "@/components/grida-logo";
+import { FormFieldAutocompleteType } from "@/types";
+
+const HOST = process.env.NEXT_PUBLIC_HOST_NAME || "http://localhost:3000";
+
+const examples = [
+  {
+    id: "001-hello-world",
+    name: "Hello World",
+    template: {
+      schema: {
+        src: `${HOST}/schema/examples/001-hello-world/form.json`,
+      },
+    },
+  },
+  {
+    id: "002-iphone-pre-order",
+    name: "iPhone Pre-Order",
+    template: {
+      schema: {
+        src: `${HOST}/schema/examples/002-iphone-pre-order/form.json`,
+      },
+    },
+  },
+] as const;
+
+type MaybeArray<T> = T | T[];
+
+function toArrayOf<T>(value: MaybeArray<T>, nofalsy = true): NonNullable<T>[] {
+  return (
+    Array.isArray(value) ? value : nofalsy && value ? [value] : []
+  ) as NonNullable<T>[];
+}
 
 function parse(txt?: string): JSONForm | null {
   try {
@@ -38,6 +71,9 @@ function compile(txt?: string) {
     schema.fields?.map((f, i) => ({
       ...f,
       id: f.name,
+      autocomplete: toArrayOf<FormFieldAutocompleteType | undefined>(
+        f.autocomplete
+      ),
       required: f.required || false,
       local_index: i,
       options:
@@ -55,6 +91,7 @@ function compile(txt?: string) {
 export default function FormsPlayground() {
   const [action, setAction] = useState<string>("");
   const [method, setMethod] = useState<string>("get");
+  const [exampleId, setExampleId] = useState<string>(examples[0].id);
   const [__schema_txt, __set_schema_txt] = useState<string | undefined>();
 
   const renderer: FormRenderer | undefined = useMemo(
@@ -62,73 +99,118 @@ export default function FormsPlayground() {
     [__schema_txt]
   );
 
+  useEffect(() => {
+    if (exampleId) {
+      fetch(examples.find((e) => e.id === exampleId)!.template.schema.src)
+        .then((res) => res.text())
+        .then((schema) => {
+          __set_schema_txt(schema);
+        });
+    }
+  }, [exampleId]);
+
   return (
-    <main className="w-screen h-screen flex overflow-hidden">
-      <section className="flex-1">
-        <header className="p-2">
-          <h1 className="text-xl font-bold">Grida Forms Playground</h1>
-        </header>
-        <FormJsonEditor onChange={__set_schema_txt} />
-        <details className="absolute bottom-0 left-0 max-h-96 overflow-scroll">
-          <summary>Renderer JSON</summary>
-          <pre>
-            <code>{JSON.stringify(renderer, null, 2)}</code>
-          </pre>
-        </details>
-      </section>
-      <section className="flex-1">
-        <div className="px-4">
-          <header className="py-4 flex flex-col">
-            <div className="flex items-end gap-2">
-              <Label>
-                Method
-                <Select
-                  value={method}
-                  onValueChange={(value) => setMethod(value)}
-                >
-                  <SelectTrigger id="method" aria-label="select method">
-                    <SelectValue placeholder="Select method" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="get">GET</SelectItem>
-                    <SelectItem value="post">POST</SelectItem>
-                    <SelectItem value="put">PUT</SelectItem>
-                    <SelectItem value="delete">DELETE</SelectItem>
-                  </SelectContent>
-                </Select>
-              </Label>
-              <Label>
-                Action
-                <Input
-                  type="text"
-                  placeholder="https://forms.grida.co/submit/..."
-                  value={action}
-                  onChange={(e) => setAction(e.target.value)}
-                />
-              </Label>
-              <Button>Submit</Button>
-            </div>
-          </header>
-          <div className="rounded-lg shadow-md border-dashed">
-            {renderer && (
-              <FormView
-                title={"Form"}
-                form_id={renderer.id}
-                fields={renderer.fields()}
-                blocks={renderer.blocks()}
-                tree={renderer.tree()}
-                translation={resources.en.translation as any}
-                options={{
-                  is_powered_by_branding_enabled: false,
-                }}
-              />
-            )}
+    <main className="w-screen h-screen flex flex-col overflow-hidden">
+      <header className="p-4 flex justify-between">
+        <div className="flex gap-4">
+          <h1 className="text-xl font-black flex items-center gap-2">
+            <GridaLogo />
+            Forms
+            <span className="font-mono text-sm px-3 py-1 rounded-md bg-black/45 text-white">
+              Playground
+            </span>
+          </h1>
+          <div className="ms-10">
+            <Select
+              value={exampleId}
+              onValueChange={(value) => setExampleId(value)}
+            >
+              <SelectTrigger id="method" aria-label="select method">
+                <SelectValue placeholder="Select method" />
+              </SelectTrigger>
+              <SelectContent>
+                {examples.map((example) => (
+                  <SelectItem key={example.id} value={example.id}>
+                    {example.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
-          <form action={action} method={method}>
-            {/*  */}
-          </form>
         </div>
-      </section>
+      </header>
+      <div className="flex-1 flex">
+        <section className="flex-1">
+          <div className="w-full h-full p-4">
+            <div className="w-full h-full rounded-md overflow-hidden shadow">
+              <Editor value={__schema_txt} onChange={__set_schema_txt} />
+            </div>
+            <details className="bg-white absolute bottom-0 left-0 max-h-96 overflow-scroll z-10">
+              <summary>Renderer JSON</summary>
+              <pre>
+                <code>{JSON.stringify(renderer, null, 2)}</code>
+              </pre>
+            </details>
+          </div>
+        </section>
+        <section className="flex-1">
+          <div className="px-4">
+            <header className="py-4 flex flex-col">
+              <div className="flex items-end gap-2">
+                <Label>
+                  Method
+                  <Select
+                    value={method}
+                    onValueChange={(value) => setMethod(value)}
+                  >
+                    <SelectTrigger id="method" aria-label="select method">
+                      <SelectValue placeholder="Select method" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="get">GET</SelectItem>
+                      <SelectItem value="post">POST</SelectItem>
+                      <SelectItem value="put">PUT</SelectItem>
+                      <SelectItem value="delete">DELETE</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </Label>
+                <Label>
+                  Action
+                  <Input
+                    type="text"
+                    placeholder="https://forms.grida.co/submit/..."
+                    value={action}
+                    onChange={(e) => setAction(e.target.value)}
+                  />
+                </Label>
+                <Button>Submit</Button>
+              </div>
+            </header>
+            <div className="w-full min-h-40 rounded-lg shadow-md border-dashed flex flex-col items-center">
+              {renderer ? (
+                <FormView
+                  title={"Form"}
+                  form_id={renderer.id}
+                  fields={renderer.fields()}
+                  blocks={renderer.blocks()}
+                  tree={renderer.tree()}
+                  translation={resources.en.translation as any}
+                  options={{
+                    is_powered_by_branding_enabled: false,
+                  }}
+                />
+              ) : (
+                <div className="grow flex items-center justify-center p-4 text-center text-gray-500">
+                  Invalid schema
+                </div>
+              )}
+            </div>
+            <form action={action} method={method}>
+              {/*  */}
+            </form>
+          </div>
+        </section>
+      </div>
     </main>
   );
 }
@@ -138,7 +220,13 @@ const schema = {
   fileMatch: ["*"], // Associate with all JSON files
 };
 
-function FormJsonEditor({ onChange }: { onChange?: (value?: string) => void }) {
+function Editor({
+  value,
+  onChange,
+}: {
+  value?: string;
+  onChange?: (value?: string) => void;
+}) {
   const monaco = useMonaco();
 
   useEffect(() => {
@@ -149,5 +237,25 @@ function FormJsonEditor({ onChange }: { onChange?: (value?: string) => void }) {
     });
   }, [monaco]);
 
-  return <Editor height={"100%"} defaultLanguage="json" onChange={onChange} />;
+  return (
+    <div className="font-mono flex-1 flex flex-col w-full h-full">
+      <header className="p-2">
+        <h2 className="">form.json</h2>
+      </header>
+      <MonacoEditor
+        height={"100%"}
+        defaultLanguage="json"
+        onChange={onChange}
+        value={value}
+        options={{
+          padding: {
+            top: 16,
+          },
+          minimap: {
+            enabled: false,
+          },
+        }}
+      />
+    </div>
+  );
 }

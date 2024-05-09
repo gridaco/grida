@@ -436,8 +436,8 @@ export function FormView({
     <main
       data-cjk={options.optimize_for_cjk}
       className={clsx(
-        "h-screen md:h-auto min-h-screen",
-        "relative mx-auto prose dark:prose-invert",
+        "w-full h-full md:h-auto grow md:grow-0",
+        "relative prose dark:prose-invert",
         "data-[cjk='true']:break-keep",
         "flex flex-col"
       )}

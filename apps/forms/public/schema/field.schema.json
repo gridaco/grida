@@ -60,7 +60,18 @@
       }
     },
     "autocomplete": {
-      "$ref": "#/definitions/autocomplete"
+      "anyOf": [
+        {
+          "$ref": "#/definitions/autocomplete"
+        },
+        {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/autocomplete"
+          },
+          "uniqueItems": true
+        }
+      ]
     }
   },
   "required": ["name", "type"],

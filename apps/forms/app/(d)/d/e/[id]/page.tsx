@@ -15,15 +15,17 @@ export default async function FormPage({
   await ssr_page_init_i18n({ form_id });
 
   return (
-    <Form
-      form_id={form_id}
-      params={searchParams}
-      translation={{
-        next: i18next.t("next"),
-        back: i18next.t("back"),
-        submit: i18next.t("submit"),
-        pay: i18next.t("pay"),
-      }}
-    />
+    <main className="min-h-screen flex flex-col items-center">
+      <Form
+        form_id={form_id}
+        params={searchParams}
+        translation={{
+          next: i18next.t("next"),
+          back: i18next.t("back"),
+          submit: i18next.t("submit"),
+          pay: i18next.t("pay"),
+        }}
+      />
+    </main>
   );
 }
