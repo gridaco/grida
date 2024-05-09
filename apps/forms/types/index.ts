@@ -1,5 +1,3 @@
-import type { MutableInventoryStock } from "./inventory";
-
 type UUID = string;
 
 export interface Form {
