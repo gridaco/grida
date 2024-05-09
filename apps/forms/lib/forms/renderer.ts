@@ -101,13 +101,12 @@ export class FormRenderer {
 
   constructor(
     readonly id: string,
-    readonly _m_fields: FormFieldDefinition[],
-    readonly _m_blocks?: FormBlock[],
+    private readonly _m_fields: FormFieldDefinition[],
+    private readonly _m_blocks?: FormBlock[],
     plugins?: {
       option_renderer: (option: Option) => Option;
     }
   ) {
-    // @ts-ignore
     this._m_render_blocks = _m_blocks
       ?.map((block: FormBlock) => {
         const is_field = block.type === "field";
@@ -214,7 +213,7 @@ export class FormRenderer {
           }
         }
       })
-      .filter(Boolean);
+      .filter(Boolean) as ClientRenderBlock[];
 
     const _field_blocks: ClientFieldRenderBlock[] =
       this._m_render_blocks.filter(
@@ -236,9 +235,17 @@ export class FormRenderer {
           id: field.id,
           type: "field",
           field: {
-            id: field.id,
-            type: field.type,
-            name: field.name,
+            ...field,
+            options: field.options
+              ?.sort((a: any, b: any) => (a?.index || 0) - (b?.index || 0))
+              .map(
+                plugins?.option_renderer
+                  ? plugins.option_renderer
+                  : (option: Option) => option
+              ),
+            required: field.required ?? undefined,
+            multiple: field.multiple ?? undefined,
+            autocomplete: field.autocomplete?.join(" ") ?? null,
           },
           local_index: i,
           parent_id: null,
