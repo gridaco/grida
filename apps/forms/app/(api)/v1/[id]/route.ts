@@ -1,3 +1,4 @@
+import { NextRequest, NextResponse } from "next/server";
 import {
   FORM_FORCE_CLOSED,
   FORM_OPTION_SOLD_OUT,
@@ -27,7 +28,22 @@ import {
   validate_options_inventory,
 } from "@/services/form/inventory";
 import { validate_max_access } from "@/services/form/validate-max-access";
+import { is_uuid_v4 } from "@/utils/is";
+import i18next from "i18next";
+import { cookies } from "next/headers";
+import { notFound } from "next/navigation";
 import {
+  FormRenderer,
+  type BaseRenderBlock,
+  type ClientFieldRenderBlock,
+  type ClientHeaderRenderBlock,
+  type ClientHtmlRenderBlock,
+  type ClientImageRenderBlock,
+  type ClientPdfRenderBlock,
+  type ClientRenderBlock,
+  type ClientSectionRenderBlock,
+} from "@/lib/forms";
+import type {
   FormBlock,
   FormBlockType,
   FormFieldDataSchema,
@@ -36,13 +52,10 @@ import {
   FormPage,
   Option,
 } from "@/types";
-import { is_uuid_v4 } from "@/utils/is";
-import i18next from "i18next";
-import { cookies } from "next/headers";
-import { notFound } from "next/navigation";
-import { NextRequest, NextResponse } from "next/server";
 
 export const revalidate = 0;
+
+const cjk = ["ko", "ja"];
 
 interface FormClientFetchResponse {
   data: FormClientFetchResponseData | null;
@@ -58,6 +71,7 @@ export interface FormClientFetchResponseData {
   lang: string;
   options: {
     is_powered_by_branding_enabled: boolean;
+    optimize_for_cjk: boolean;
   };
   background?: FormPage["background"];
   stylesheet?: FormPage["stylesheet"];
@@ -114,88 +128,6 @@ export interface MaxResponseByCustomerError {
   __gf_customer_uuid?: string;
   __gf_fp_fingerprintjs_visitorid?: string;
   __gf_customer_email?: string;
-}
-
-export type ClientRenderBlock =
-  | ClientFieldRenderBlock
-  | ClientSectionRenderBlock
-  | ClientHtmlRenderBlock
-  | ClientImageRenderBlock
-  | ClientVideoRenderBlock
-  | ClientDividerRenderBlock
-  | ClientHeaderRenderBlock
-  | ClientPdfRenderBlock;
-
-interface BaseRenderBlock {
-  id: string;
-  type: FormBlockType;
-  local_index: number;
-  parent_id: string | null;
-}
-
-interface ClientFieldRenderBlock extends BaseRenderBlock {
-  type: "field";
-  field: {
-    id: string;
-    type: FormFieldType;
-    name: string;
-    label?: string;
-    help_text?: string;
-    min?: number;
-    max?: number;
-    pattern?: string;
-    required?: boolean;
-    minlength?: number;
-    maxlength?: number;
-    placeholder?: string;
-    options?: {
-      id: string;
-      label?: string;
-      value: string;
-      disabled?: boolean;
-      index: number;
-    }[];
-    autocomplete?: string;
-    data?: FormFieldDataSchema | null;
-    accept?: string;
-    multiple?: boolean;
-  };
-}
-export interface ClientSectionRenderBlock extends BaseRenderBlock {
-  type: "section";
-  children?: ClientRenderBlock[];
-  attributes?: {
-    contains_payment: boolean;
-  };
-}
-
-interface ClientHtmlRenderBlock extends BaseRenderBlock {
-  type: "html";
-  html: string;
-}
-interface ClientImageRenderBlock extends BaseRenderBlock {
-  type: "image";
-  src: string;
-}
-
-interface ClientVideoRenderBlock extends BaseRenderBlock {
-  type: "video";
-  src: string;
-}
-
-interface ClientPdfRenderBlock extends BaseRenderBlock {
-  type: "pdf";
-  data: string;
-}
-
-interface ClientDividerRenderBlock extends BaseRenderBlock {
-  type: "divider";
-}
-
-interface ClientHeaderRenderBlock extends BaseRenderBlock {
-  type: "header";
-  title_html?: string | null;
-  description_html?: string | null;
 }
 
 export async function GET(
@@ -285,176 +217,45 @@ export async function GET(
     });
   }
 
-  // @ts-ignore
-  let render_blocks: ClientRenderBlock[] = page_blocks
-    ?.map((block: FormBlock) => {
-      const is_field = block.type === "field";
-      const field = is_field
-        ? fields.find((f: any) => f.id === block.form_field_id) ?? null
-        : null;
+  function mkoption(option: Option) {
+    const sku = option.id;
 
-      if (is_field) {
-        // assert fiel to be not null
-        if (!field) {
-          return null; // this will be filtered out
-        }
+    if (options_inventory && option.id in options_inventory) {
+      return sku_option(option, options_inventory[sku]);
+    }
 
-        // @ts-ignore
-        function mkoption(option: Option) {
-          const sku = option.id;
-
-          if (options_inventory && option.id in options_inventory) {
-            return sku_option(option, options_inventory[sku]);
-          }
-
-          return {
-            ...option,
-            disabled: option.disabled ?? undefined,
-          };
-        }
-
-        // @ts-ignore
-        function sku_option(option: Option, available: number): Option {
-          const is_inventory_available = available > 0;
-          const alert_under = 10;
-          const is_alerting_inventory = available <= alert_under;
-
-          return {
-            ...option,
-            label: is_inventory_available
-              ? is_alerting_inventory
-                ? `${option.label} (${i18next.t("left_in_stock", { available })})`
-                : option.label
-              : `${option.label} (${i18next.t("sold_out")})`,
-            disabled: !is_inventory_available || (option.disabled ?? undefined),
-          };
-        }
-
-        return <ClientFieldRenderBlock>{
-          id: block.id,
-          type: "field",
-          field: {
-            ...field,
-            options: field.options
-              .sort((a, b) => a.index - b.index)
-              .map(mkoption),
-            required: field.required ?? undefined,
-            multiple: field.multiple ?? undefined,
-            autocomplete: field.autocomplete?.join(" ") ?? null,
-          },
-          local_index: block.local_index,
-          parent_id: block.parent_id,
-        };
-      }
-
-      switch (block.type) {
-        case "html": {
-          return <ClientHtmlRenderBlock>{
-            id: block.id,
-            type: "html",
-            html: block.body_html,
-            local_index: block.local_index,
-            parent_id: block.parent_id,
-          };
-        }
-        case "header": {
-          return <ClientHeaderRenderBlock>{
-            id: block.id,
-            type: "header",
-            local_index: block.local_index,
-            parent_id: block.parent_id,
-            title_html: block.title_html,
-            description_html: block.description_html,
-          };
-        }
-        case "image":
-        case "video": {
-          return <ClientImageRenderBlock>{
-            id: block.id,
-            type: block.type,
-            src: block.src,
-            local_index: block.local_index,
-            parent_id: block.parent_id,
-          };
-        }
-        case "pdf": {
-          return <ClientPdfRenderBlock>{
-            id: block.id,
-            type: "pdf",
-            // for pdf, as the standard is <object> we use data instead of src
-            data: block.src,
-            local_index: block.local_index,
-            parent_id: block.parent_id,
-          };
-        }
-        case "section": {
-          const children_ids = page_blocks.filter(
-            (b) => b.parent_id === block.id
-          );
-
-          const contains_payment = children_ids.some(
-            (b) =>
-              b.type === "field" &&
-              fields.find((f) => f.id === b.form_field_id)?.type === "payment"
-          );
-
-          return <ClientSectionRenderBlock>{
-            id: block.id,
-            type: "section",
-            local_index: block.local_index,
-            attributes: {
-              contains_payment,
-            },
-          };
-        }
-        case "divider":
-        default: {
-          return <BaseRenderBlock>{
-            id: block.id,
-            type: block.type,
-            local_index: block.local_index,
-            parent_id: block.parent_id,
-          };
-        }
-      }
-    })
-    .filter(Boolean);
-
-  const _field_blocks: ClientFieldRenderBlock[] = render_blocks.filter(
-    (b) => b.type === "field"
-  ) as ClientFieldRenderBlock[];
-  const _render_field_ids = _field_blocks.map(
-    (b: ClientFieldRenderBlock) => b.field.id
-  );
-  let render_fields = fields.filter((f) => _render_field_ids.includes(f.id));
-
-  // if no blocks, render a simple form based on fields
-  if (!render_blocks.length) {
-    render_blocks = fields.map((field: any, i) => {
-      return {
-        id: field.id,
-        type: "field",
-        field: {
-          id: field.id,
-          type: field.type,
-          name: field.name,
-        },
-        local_index: i,
-        parent_id: null,
-      };
-    });
-
-    render_fields = fields;
+    return {
+      ...option,
+      disabled: option.disabled ?? undefined,
+    };
   }
 
-  const tree = blockstree(render_blocks);
+  function sku_option(option: Option, available: number): Option {
+    const is_inventory_available = available > 0;
+    const alert_under = 10;
+    const is_alerting_inventory = available <= alert_under;
+
+    return {
+      ...option,
+      label: is_inventory_available
+        ? is_alerting_inventory
+          ? `${option.label} (${i18next.t("left_in_stock", { available })})`
+          : option.label
+        : `${option.label} (${i18next.t("sold_out")})`,
+      disabled: !is_inventory_available || (option.disabled ?? undefined),
+    };
+  }
+
+  const renderer = new FormRenderer(id, fields, page_blocks, {
+    option_renderer: mkoption,
+  });
 
   const required_hidden_fields = fields.filter(
     (f) => f.type === "hidden" && f.required
   );
 
   const not_included_required_hidden_fields = required_hidden_fields.filter(
-    (f) => !render_fields.some((rf) => rf.id === f.id)
+    (f) => !renderer.fields({ render: true }).some((rf) => rf.id === f.id)
   );
 
   const { seed, missing_required_hidden_fields } = parseSeedFromSearchParams({
@@ -489,7 +290,10 @@ export async function GET(
   // validate inventory TODO: (this can be moved above with some refactoring)
   if (options_inventory) {
     // TODO: [might have been resolved] we need to pass inventory map witch only present in render_fields (for whole sold out validation)
-    const render_options = render_fields.map((f) => f.options).flat();
+    const render_options = renderer
+      .fields({ render: true })
+      .map((f) => f.options ?? [])
+      .flat();
     const inventory_access_error = await validate_options_inventory({
       options: render_options,
       inventory: options_inventory,
@@ -572,13 +376,14 @@ export async function GET(
   const is_open = !__is_force_closed && response.error === null;
   const payload: FormClientFetchResponseData = {
     title: title,
-    tree: tree,
-    blocks: render_blocks,
+    tree: renderer.tree(),
+    blocks: renderer.blocks(),
     fields: fields,
     required_hidden_fields: required_hidden_fields,
     lang: default_form_page_language,
     options: {
       is_powered_by_branding_enabled,
+      optimize_for_cjk: cjk.includes(default_form_page_language),
     },
     background: (data.default_page as unknown as FormPage).background,
     stylesheet: (data.default_page as unknown as FormPage).stylesheet,
