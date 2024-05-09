@@ -51,6 +51,7 @@
     "@types/mdx": "^2.0.11",
     "@types/three": "^0.149.0",
     "ai": "^3.0.12",
+    "ajv": "^8.13.0",
     "change-case": "^5.4.3",
     "class-variance-authority": "^0.7.0",
     "clsx": "^1.2.1",
