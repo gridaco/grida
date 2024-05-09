@@ -1,0 +1,14 @@
+{
+  "$schema": "https://forms.grida.co/schema/form.schema.json",
+  "title": "Form with a single field",
+  "description": "This form has a single field",
+  "fields": [
+    {
+      "type": "text",
+      "name": "name",
+      "label": "Name",
+      "placeholder": "Please enter your name",
+      "required": true
+    }
+  ]
+}
