@@ -10,10 +10,6 @@ import { notFound, redirect } from "next/navigation";
 import { FormPageDeveloperErrorDialog } from "@/scaffolds/e/form/error";
 import useSWR from "swr";
 import { Skeleton } from "@/components/ui/skeleton";
-import {
-  ClientRenderBlock,
-  ClientSectionRenderBlock,
-} from "@/app/(api)/v1/[id]/route";
 import { FormFieldPreview } from "@/components/formfield";
 import { PoweredByGridaFooter } from "./powered-by-brand-footer";
 import React, { useEffect, useMemo, useState } from "react";
@@ -35,10 +31,9 @@ import {
   SYSTEM_GF_FINGERPRINT_VISITORID_KEY,
 } from "@/k/system";
 import { formlink } from "@/lib/forms/url";
+import { ClientRenderBlock, ClientSectionRenderBlock } from "@/lib/forms";
 
 const ReactPlayer = dynamic(() => import("react-player/lazy"), { ssr: false });
-
-const cjk = ["ko", "ja"];
 
 const cls_button_submit =
   "text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:ring-blue-300 font-medium rounded-lg text-sm px-5 py-2.5 me-2 mb-2 dark:bg-blue-600 dark:hover:bg-blue-700 focus:outline-none dark:focus:ring-blue-800";
@@ -146,17 +141,19 @@ export function Form({
     }
   }
 
+  const submit_action = "/submit/" + form_id;
+
   return (
     <>
       <FormView
         form_id={form_id}
+        action={submit_action}
         title={title}
         fields={fields}
         defaultValues={default_values}
         blocks={blocks}
         tree={tree}
         translation={translation}
-        lang={lang}
         options={options}
         stylesheet={stylesheet}
       />
@@ -179,8 +176,9 @@ interface FormTranslation {
   pay: string;
 }
 
-function FormView({
+export function FormView({
   form_id,
+  action,
   title,
   blocks,
   fields,
@@ -188,27 +186,25 @@ function FormView({
   tree,
   translation,
   options,
-  lang,
   stylesheet,
 }: {
   form_id: string;
+  action?: string;
   title: string;
   defaultValues?: { [key: string]: string };
   fields: FormFieldDefinition[];
   blocks: ClientRenderBlock[];
   tree: FormBlockTree<ClientRenderBlock[]>;
   translation: FormTranslation;
-  lang: string;
   options: {
     is_powered_by_branding_enabled: boolean;
+    optimize_for_cjk?: boolean;
   };
   stylesheet?: any;
 }) {
   const [checkoutSession, setCheckoutSession] =
     useState<PaymentCheckoutSession | null>(null);
   const [is_submitting, set_is_submitting] = useState(false);
-
-  const submit_action = "/submit/" + form_id;
 
   const sections = tree.children.filter((block) => block.type === "section");
 
@@ -438,7 +434,7 @@ function FormView({
 
   return (
     <main
-      data-cjk={cjk.includes(lang)}
+      data-cjk={options.optimize_for_cjk}
       className={clsx(
         "h-screen md:h-auto min-h-screen",
         "relative mx-auto prose dark:prose-invert",
@@ -449,7 +445,7 @@ function FormView({
       <TossPaymentsCheckoutProvider initial={checkoutSession}>
         <form
           id="form"
-          action={submit_hidden ? undefined : submit_action}
+          action={submit_hidden ? undefined : action}
           onSubmit={(e) => {
             if (submit_hidden) {
               e.preventDefault();

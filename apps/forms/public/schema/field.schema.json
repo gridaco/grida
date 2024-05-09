@@ -8,7 +8,7 @@
     "name": {
       "type": "string"
     },
-    "lable": {
+    "label": {
       "type": "string"
     },
     "placeholder": {
@@ -24,7 +24,34 @@
     },
     "type": {
       "type": "string",
-      "enum": ["text", "textarea", "select", "checkbox", "radio"]
+      "enum": [
+        "text",
+        "textarea",
+        "tel",
+        "url",
+        "checkbox",
+        "checkboxes",
+        "switch",
+        "number",
+        "date",
+        "datetime-local",
+        "month",
+        "week",
+        "time",
+        "email",
+        "file",
+        "image",
+        "select",
+        "latlng",
+        "password",
+        "color",
+        "radio",
+        "country",
+        "payment",
+        "hidden",
+        "signature",
+        "range"
+      ]
     },
     "options": {
       "type": "array",
@@ -39,7 +66,7 @@
   "required": ["name", "type"],
   "definitions": {
     "autocomplete": {
-      "type": "string",
+      "type": "array",
       "enum": [
         "off",
         "on",
