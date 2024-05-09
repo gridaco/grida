@@ -18,7 +18,6 @@ import {
   SYSTEM_GF_FINGERPRINT_VISITORID_KEY,
   SYSTEM_GF_KEY_STARTS_WITH,
 } from "@/k/system";
-import { blockstree } from "@/lib/forms/tree";
 import { FormBlockTree } from "@/lib/forms/types";
 import { client } from "@/lib/supabase/server";
 import { upsert_customer_with } from "@/services/customer";
@@ -32,26 +31,8 @@ import { is_uuid_v4 } from "@/utils/is";
 import i18next from "i18next";
 import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
-import {
-  FormRenderer,
-  type BaseRenderBlock,
-  type ClientFieldRenderBlock,
-  type ClientHeaderRenderBlock,
-  type ClientHtmlRenderBlock,
-  type ClientImageRenderBlock,
-  type ClientPdfRenderBlock,
-  type ClientRenderBlock,
-  type ClientSectionRenderBlock,
-} from "@/lib/forms";
-import type {
-  FormBlock,
-  FormBlockType,
-  FormFieldDataSchema,
-  FormFieldDefinition,
-  FormFieldType,
-  FormPage,
-  Option,
-} from "@/types";
+import { FormRenderer, type ClientRenderBlock } from "@/lib/forms";
+import type { FormFieldDefinition, FormPage, Option } from "@/types";
 
 export const revalidate = 0;
 
