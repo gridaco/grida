@@ -144,6 +144,7 @@ function FormJsonEditor({ onChange }: { onChange?: (value?: string) => void }) {
   useEffect(() => {
     monaco?.languages.json.jsonDefaults.setDiagnosticsOptions({
       validate: true,
+      enableSchemaRequest: true,
       schemas: [schema],
     });
   }, [monaco]);
