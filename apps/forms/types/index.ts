@@ -1,5 +1,6 @@
-type UUID = string;
+export * from "./schema";
 
+type UUID = string;
 export interface Form {
   created_at: string;
   custom_preview_url_path: string | null;
