@@ -1,9 +1,18 @@
 import type { FormFieldAutocompleteType, FormFieldType } from ".";
 
 export interface JSONForm {
-  title: string;
-  description: string;
-  fields: JSONField[];
+  title?: string;
+  name: string;
+  description?: string;
+  action?: string;
+  enctype?:
+    | "application/x-www-form-urlencoded"
+    | "multipart/form-data"
+    | "text/plain";
+  method?: "get" | "post" | "dialog";
+  novalidate?: boolean;
+  target?: "_blank" | "_self" | "_parent" | "_top";
+  fields?: JSONField[];
 }
 
 export interface JSONField {

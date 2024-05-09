@@ -8,8 +8,44 @@
     "title": {
       "type": "string"
     },
+    "name": {
+      "type": "string",
+      "description": "https://developer.mozilla.org/en-US/docs/Web/HTML/Element/form#name"
+    },
     "description": {
       "type": "string"
+    },
+    "action": {
+      "type": "string",
+      "format": "uri",
+      "description": "https://developer.mozilla.org/en-US/docs/Web/HTML/Element/form#action"
+    },
+    "enctype": {
+      "type": "string",
+      "enum": [
+        "application/x-www-form-urlencoded",
+        "multipart/form-data",
+        "text/plain"
+      ],
+      "default": "application/x-www-form-urlencoded",
+      "description": "https://developer.mozilla.org/en-US/docs/Web/HTML/Element/form#enctype"
+    },
+    "method": {
+      "type": "string",
+      "enum": ["get", "post", "dialog"],
+      "default": "get",
+      "description": "https://developer.mozilla.org/en-US/docs/Web/HTML/Element/form#method"
+    },
+    "novalidate": {
+      "type": "boolean",
+      "default": false,
+      "description": "https://developer.mozilla.org/en-US/docs/Web/HTML/Element/form#novalidate"
+    },
+    "target": {
+      "type": "string",
+      "enum": ["_self", "_blank", "_parent", "_top"],
+      "default": "_self",
+      "description": "https://developer.mozilla.org/en-US/docs/Web/HTML/Element/form#target"
     },
     "fields": {
       "type": "array",
@@ -18,5 +54,5 @@
       }
     }
   },
-  "required": ["title, fields"]
+  "required": ["name"]
 }
