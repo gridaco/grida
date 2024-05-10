@@ -153,8 +153,8 @@ export default function FormsPlayground() {
             </details>
           </div>
         </section>
-        <section className="flex-1">
-          <div className="px-4">
+        <section className="flex-1 flex flex-col">
+          <div className="px-4 grow flex flex-col">
             <header className="py-4 flex flex-col">
               <div className="flex items-end gap-2">
                 <Label>
@@ -186,7 +186,7 @@ export default function FormsPlayground() {
                 <Button>Submit</Button>
               </div>
             </header>
-            <div className="w-full min-h-40 rounded-lg shadow-md border-dashed flex flex-col items-center">
+            <div className="w-full grow min-h-40 rounded-lg shadow-md border-dashed flex flex-col items-center">
               {renderer ? (
                 <FormView
                   title={"Form"}
@@ -205,9 +205,6 @@ export default function FormsPlayground() {
                 </div>
               )}
             </div>
-            <form action={action} method={method}>
-              {/*  */}
-            </form>
           </div>
         </section>
       </div>
