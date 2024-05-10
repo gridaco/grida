@@ -24,6 +24,9 @@ import { Switch } from "../ui/switch";
 import { Slider } from "../ui/slider";
 import { Toggle } from "../ui/toggle";
 import { ToggleGroup, ToggleGroupItem } from "../ui/toggle-group";
+import { RadioGroup, RadioGroupItem } from "../ui/radio-group";
+import { Textarea } from "../ui/textarea";
+import { Input } from "../ui/input";
 
 /**
  * this disables the auto zoom in input text tag safari on iphone by setting font-size to 16px
@@ -109,11 +112,67 @@ export function FormFieldPreview({
     // step: novalidate ? undefined : data?.step,
   };
 
+  function renderChildren({
+    name,
+    label,
+    src,
+  }: {
+    name: string;
+    label?: string;
+    src?: string | null;
+  }) {
+    return (
+      <>
+        <span>{label || name}</span>
+        {src && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={src}
+            alt={label || name}
+            className="mt-1 w-12 h-12 aspect-square rounded-sm"
+          />
+        )}
+      </>
+    );
+  }
+
   function renderInput() {
     switch (type) {
-      case "textarea": {
+      case "text":
+      case "tel":
+      case "email":
+      case "number":
+      case "url":
+      case "password": {
+        if (vanilla) {
+          return (
+            <HtmlInput
+              type={type}
+              {...(sharedInputProps as React.ComponentProps<"input">)}
+            />
+          );
+        }
+
         return (
-          <HtmlTextarea
+          // @ts-ignore
+          <Input
+            type={type}
+            {...(sharedInputProps as React.ComponentProps<"input">)}
+          />
+        );
+      }
+      case "textarea": {
+        if (vanilla) {
+          return (
+            <HtmlTextarea
+              {...(sharedInputProps as React.ComponentProps<"textarea">)}
+            />
+          );
+        }
+
+        return (
+          // @ts-ignore
+          <Textarea
             {...(sharedInputProps as React.ComponentProps<"textarea">)}
           />
         );
@@ -154,34 +213,51 @@ export function FormFieldPreview({
         }
       }
       case "radio": {
+        if (vanilla) {
+          return (
+            <fieldset className="flex flex-col gap-1">
+              {options?.map((option) => (
+                <div className="flex items-center gap-2" key={option.value}>
+                  <input
+                    type="radio"
+                    name={name}
+                    id={option.value}
+                    value={option.value}
+                    {...(sharedInputProps as React.ComponentProps<"input">)}
+                  />
+                  <label
+                    htmlFor={option.value}
+                    className="ms-2 text-sm font-medium text-neutral-900 dark:text-neutral-300"
+                  >
+                    {renderChildren({
+                      name: option.value,
+                      label: option.label,
+                      src: option.src,
+                    })}
+                  </label>
+                </div>
+              ))}
+            </fieldset>
+          );
+        }
+
+        console.log(options);
+
         return (
-          <fieldset className="flex flex-col gap-1">
+          <RadioGroup>
             {options?.map((option) => (
-              <div className="flex items-center gap-2" key={option.value}>
-                <input
-                  type="radio"
-                  name={name}
-                  id={option.value}
-                  value={option.value}
-                  {...(sharedInputProps as React.ComponentProps<"input">)}
-                />
-                <label
-                  htmlFor={option.value}
-                  className="ms-2 text-sm font-medium text-neutral-900 dark:text-neutral-300"
-                >
-                  <span>{option.label}</span>
-                  {option.src && (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={option.src}
-                      alt={option.label || option.value}
-                      className="mt-1 w-12 h-12 aspect-square rounded-sm"
-                    />
-                  )}
+              <div key={option.id} className="flex items-center space-x-2">
+                <RadioGroupItem value={option.id} id={option.id} />
+                <label htmlFor={option.id}>
+                  {renderChildren({
+                    name: option.value,
+                    label: option.label,
+                    src: option.src,
+                  })}
                 </label>
               </div>
             ))}
-          </fieldset>
+          </RadioGroup>
         );
       }
       case "checkbox": {

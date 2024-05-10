@@ -44,7 +44,7 @@
       "options": ["A", "B", "C", "D", "E"]
     },
     {
-      "name": "toggle",
+      "name": "✔",
       "type": "toggle"
     },
     {
