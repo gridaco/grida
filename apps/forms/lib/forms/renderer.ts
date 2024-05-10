@@ -27,6 +27,14 @@ export interface BaseRenderBlock {
   parent_id: string | null;
 }
 
+type ClientRenderOption = {
+  id: string;
+  value: string;
+  label?: string;
+  disabled?: boolean | null;
+  index?: number;
+};
+
 export interface ClientFieldRenderBlock extends BaseRenderBlock {
   type: "field";
   field: {
@@ -42,13 +50,7 @@ export interface ClientFieldRenderBlock extends BaseRenderBlock {
     minlength?: number;
     maxlength?: number;
     placeholder?: string;
-    options?: {
-      id: string;
-      label?: string;
-      value: string;
-      disabled?: boolean;
-      index: number;
-    }[];
+    options?: ClientRenderOption[];
     autocomplete?: string;
     data?: FormFieldDataSchema | null;
     accept?: string;
@@ -103,7 +105,7 @@ export class FormRenderer {
     readonly id: string,
     private readonly _m_fields: FormFieldDefinition[],
     private readonly _m_blocks?: FormBlock[],
-    plugins?: {
+    private readonly plugins?: {
       option_renderer: (option: Option) => Option;
     }
   ) {
@@ -123,19 +125,7 @@ export class FormRenderer {
           return <ClientFieldRenderBlock>{
             id: block.id,
             type: "field",
-            field: {
-              ...field,
-              options: field.options
-                ?.sort((a, b) => (a?.index || 0) - (b?.index || 0))
-                .map(
-                  plugins?.option_renderer
-                    ? plugins.option_renderer
-                    : (option) => option
-                ),
-              required: field.required ?? undefined,
-              multiple: field.multiple ?? undefined,
-              autocomplete: field.autocomplete?.join(" ") ?? null,
-            },
+            field: this._field_block_field_definition(field),
             local_index: block.local_index,
             parent_id: block.parent_id,
           };
@@ -234,19 +224,7 @@ export class FormRenderer {
         return {
           id: field.id,
           type: "field",
-          field: {
-            ...field,
-            options: field.options
-              ?.sort((a: any, b: any) => (a?.index || 0) - (b?.index || 0))
-              .map(
-                plugins?.option_renderer
-                  ? plugins.option_renderer
-                  : (option: Option) => option
-              ),
-            required: field.required ?? undefined,
-            multiple: field.multiple ?? undefined,
-            autocomplete: field.autocomplete?.join(" ") ?? null,
-          },
+          field: this._field_block_field_definition(field),
           local_index: i,
           parent_id: null,
         };
@@ -275,5 +253,31 @@ export class FormRenderer {
 
   public validate() {
     throw new Error("Not implemented");
+  }
+
+  private _field_block_field_definition(
+    field: FormFieldDefinition
+  ): ClientFieldRenderBlock["field"] {
+    const mkoption = (options?: Option[]) =>
+      options
+        ?.sort((a, b) => (a?.index || 0) - (b?.index || 0))
+        .map((o, i) => ({ ...o, index: i }))
+        .map(
+          this.plugins?.option_renderer
+            ? this.plugins.option_renderer
+            : (option) => option
+        );
+
+    return {
+      ...field,
+      options: mkoption(field.options),
+      label: field.label || undefined,
+      help_text: field.help_text || undefined,
+      placeholder: field.placeholder || undefined,
+      accept: field.accept || undefined,
+      required: field.required ?? undefined,
+      multiple: field.multiple ?? undefined,
+      autocomplete: field.autocomplete?.join(" ") ?? undefined,
+    };
   }
 }

@@ -63,6 +63,7 @@ export type FormInputType =
   | "checkboxes"
   | "switch"
   | "toggle"
+  | "toggle-group"
   | "radio"
   | "number"
   | "date"

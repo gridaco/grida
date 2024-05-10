@@ -23,6 +23,7 @@ import useSafeSelectValue from "./use-safe-select-value";
 import { Switch } from "../ui/switch";
 import { Slider } from "../ui/slider";
 import { Toggle } from "../ui/toggle";
+import { ToggleGroup, ToggleGroupItem } from "../ui/toggle-group";
 
 /**
  * this disables the auto zoom in input text tag safari on iphone by setting font-size to 16px
@@ -189,45 +190,6 @@ export function FormFieldPreview({
           <Checkbox {...(sharedInputProps as React.ComponentProps<"input">)} />
         );
       }
-      case "checkboxes": {
-        return (
-          <fieldset className="not-prose">
-            <ul className="text-sm font-medium text-neutral-900 bg-white border border-neutral-200 rounded-lg dark:bg-neutral-700 dark:border-neutral-600 dark:text-white">
-              {options?.map((option) => (
-                <li
-                  key={option.value}
-                  className="w-full border-b border-neutral-200 rounded-t-lg dark:border-neutral-600"
-                >
-                  <div className="flex items-center ps-3">
-                    <input
-                      type="checkbox"
-                      name={name}
-                      id={option.value}
-                      value={option.value}
-                      {...(sharedInputProps as React.ComponentProps<"input">)}
-                      className="w-4 h-4 text-blue-600 bg-neutral-100 border-neutral-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-neutral-700 dark:focus:ring-offset-neutral-700 focus:ring-2 dark:bg-neutral-600 dark:border-neutral-500"
-                    />
-                    <label
-                      htmlFor={option.value}
-                      className="w-full py-3 ms-2 text-sm font-medium text-neutral-900 dark:text-neutral-300"
-                    >
-                      {option.label}
-                      {option.src && (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img
-                          src={option.src}
-                          alt={option.label || option.value}
-                          className="mt-1 w-12 h-12 aspect-square rounded-sm"
-                        />
-                      )}
-                    </label>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          </fieldset>
-        );
-      }
       case "toggle": {
         return (
           <fieldset>
@@ -351,6 +313,35 @@ export function FormFieldPreview({
       );
     }
     case "checkboxes": {
+      const renderItem = (item: Option) => {
+        return (
+          <div className="flex items-center ps-3">
+            <input
+              type="checkbox"
+              name={name}
+              id={item.value}
+              value={item.value}
+              {...(sharedInputProps as React.ComponentProps<"input">)}
+              className="w-4 h-4 text-blue-600 bg-neutral-100 border-neutral-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-neutral-700 dark:focus:ring-offset-neutral-700 focus:ring-2 dark:bg-neutral-600 dark:border-neutral-500"
+            />
+            <label
+              htmlFor={item.value}
+              className="w-full py-3 ms-2 text-sm font-medium text-neutral-900 dark:text-neutral-300"
+            >
+              {item.label}
+              {item.src && (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={item.src}
+                  alt={item.label || item.value}
+                  className="mt-1 w-12 h-12 aspect-square rounded-sm"
+                />
+              )}
+            </label>
+          </div>
+        );
+      };
+
       return (
         <label
           htmlFor={"none"} // disable the focusing since checkboxes is not standard form input
@@ -359,9 +350,33 @@ export function FormFieldPreview({
         >
           <LabelText />
           <HelpText />
-          {renderInput()}
+          <fieldset className="not-prose">
+            <ul className="text-sm font-medium text-neutral-900 bg-white border border-neutral-200 rounded-lg dark:bg-neutral-700 dark:border-neutral-600 dark:text-white">
+              {options?.map((option) => (
+                <li
+                  key={option.value}
+                  className="w-full border-b border-neutral-200 rounded-t-lg dark:border-neutral-600"
+                >
+                  {renderItem(option)}
+                </li>
+              ))}
+            </ul>
+          </fieldset>
         </label>
       );
+    }
+    case "toggle-group": {
+      if (options) {
+        return (
+          <ToggleGroup type={multiple ? "multiple" : "single"}>
+            {options.map((option) => (
+              <ToggleGroupItem key={option.id} value={option.id}>
+                {option.label}
+              </ToggleGroupItem>
+            ))}
+          </ToggleGroup>
+        );
+      }
     }
   }
 

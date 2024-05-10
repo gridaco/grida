@@ -1379,6 +1379,7 @@ export type Database = {
         | "checkboxes"
         | "switch"
         | "toggle"
+        | "toggle-group"
         | "date"
         | "month"
         | "week"

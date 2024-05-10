@@ -39,16 +39,18 @@
       "type": "checkbox"
     },
     {
-      "name": "checkbox []",
-      "type": "array",
-      "items": {
-        "type": "checkbox",
-        "options": ["A", "B", "C", "D", "E"]
-      }
+      "name": "checkboxes",
+      "type": "checkboxes",
+      "options": ["A", "B", "C", "D", "E"]
     },
     {
       "name": "toggle",
       "type": "toggle"
+    },
+    {
+      "name": "toggle-group",
+      "type": "toggle-group",
+      "options": ["A", "B", "C", "D", "E"]
     },
     {
       "name": "date",

@@ -11,15 +11,12 @@ import { FormView } from "@/scaffolds/e/form";
 import { Editor as MonacoEditor, useMonaco } from "@monaco-editor/react";
 import { useEffect, useMemo, useState } from "react";
 import { nanoid } from "nanoid";
-import { JSONForm } from "@/types/schema";
+import { JSONField, JSONForm, JSONOptionLike } from "@/types/schema";
 import resources from "@/k/i18n";
-import Ajv from "ajv";
 import { FormRenderer } from "@/lib/forms";
-import { Label } from "@/components/ui/label";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
 import { GridaLogo } from "@/components/grida-logo";
-import { FormFieldAutocompleteType } from "@/types";
+import { FormFieldAutocompleteType, Option } from "@/types";
+import Ajv from "ajv";
 
 const HOST = process.env.NEXT_PUBLIC_HOST_NAME || "http://localhost:3000";
 
@@ -75,9 +72,28 @@ function compile(txt?: string) {
     return;
   }
 
+  const map_option = (o: JSONOptionLike): Option => {
+    switch (typeof o) {
+      case "string":
+      case "number": {
+        return {
+          id: String(o),
+          value: String(o),
+          label: String(o),
+        };
+      }
+      case "object": {
+        return {
+          ...o,
+          id: o.value,
+        };
+      }
+    }
+  };
+
   const renderer = new FormRenderer(
     nanoid(),
-    schema.fields?.map((f, i) => ({
+    schema.fields?.map((f: JSONField, i) => ({
       ...f,
       id: f.name,
       autocomplete: toArrayOf<FormFieldAutocompleteType | undefined>(
@@ -85,25 +101,7 @@ function compile(txt?: string) {
       ),
       required: f.required || false,
       local_index: i,
-      options:
-        f.options?.map((o) => {
-          switch (typeof o) {
-            case "string":
-            case "number": {
-              return {
-                id: String(o),
-                value: String(o),
-                label: String(o),
-              };
-            }
-            case "object": {
-              return {
-                ...o,
-                id: o.value,
-              };
-            }
-          }
-        }) || [],
+      options: f.options?.map(map_option) || [],
     })) || [],
     []
   );

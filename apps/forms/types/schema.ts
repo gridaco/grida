@@ -22,9 +22,12 @@ export interface JSONField {
   required?: boolean;
   pattern?: string;
   type: FormInputType;
-  options?: (JSONOption | string | number)[];
+  options?: JSONOptionLike[];
+  multiple?: boolean;
   autocomplete?: FormFieldAutocompleteType | FormFieldAutocompleteType[];
 }
+
+export type JSONOptionLike = JSONOption | string | number;
 
 export interface JSONOption {
   value: string;

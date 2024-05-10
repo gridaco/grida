@@ -22,6 +22,10 @@
       "type": "string",
       "format": "regex"
     },
+    "multiple": {
+      "type": "boolean",
+      "default": false
+    },
     "type": {
       "type": "string",
       "enum": [
@@ -31,6 +35,8 @@
         "url",
         "checkbox",
         "checkboxes",
+        "toggle",
+        "toggle-group",
         "switch",
         "number",
         "date",
