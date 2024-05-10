@@ -1378,6 +1378,7 @@ export type Database = {
         | "checkbox"
         | "checkboxes"
         | "switch"
+        | "toggle"
         | "date"
         | "month"
         | "week"
