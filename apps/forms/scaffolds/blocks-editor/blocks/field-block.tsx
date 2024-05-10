@@ -23,7 +23,7 @@ import {
 import { useEditorState } from "@/scaffolds/editor";
 import { FormFieldDefinition } from "@/types";
 import Link from "next/link";
-import { FormFieldPreview } from "@/components/formfield";
+import FormFieldPreview from "@/components/formfield";
 import {
   Select,
   SelectContent,

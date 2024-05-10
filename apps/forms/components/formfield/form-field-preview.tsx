@@ -17,7 +17,7 @@ import { SignatureCanvas } from "../signature-canvas";
 import { StripePaymentFormFieldPreview } from "./form-field-preview-payment-stripe";
 import { TossPaymentsPaymentFormFieldPreview } from "./form-field-preview-payment-tosspayments";
 import clsx from "clsx";
-import { ClockIcon } from "@radix-ui/react-icons";
+import { ClockIcon, PlusIcon } from "@radix-ui/react-icons";
 import { Checkbox } from "@/components/ui/checkbox";
 import useSafeSelectValue from "./use-safe-select-value";
 import { Switch } from "../ui/switch";
@@ -27,6 +27,7 @@ import { ToggleGroup, ToggleGroupItem } from "../ui/toggle-group";
 import { RadioGroup, RadioGroupItem } from "../ui/radio-group";
 import { Textarea } from "../ui/textarea";
 import { Input } from "../ui/input";
+import { Button } from "../ui/button";
 
 /**
  * this disables the auto zoom in input text tag safari on iphone by setting font-size to 16px
@@ -34,7 +35,82 @@ import { Input } from "../ui/input";
  */
 const cls_input_ios_zoom_disable = "!text-base sm:!text-sm";
 
-export function FormFieldPreview({
+interface IInputField {
+  name: string;
+  label?: string;
+  type: FormInputType;
+  placeholder?: string;
+  helpText?: string;
+  required?: boolean;
+  requiredAsterisk?: boolean;
+  defaultValue?: string;
+  options?: Option[];
+  pattern?: string;
+  readonly?: boolean;
+  disabled?: boolean;
+  autoComplete?: string;
+  accept?: string;
+  multiple?: boolean;
+  labelCapitalize?: boolean;
+  data?: FormFieldDataSchema | null;
+}
+
+interface IFormField extends IInputField {
+  novalidate?: boolean;
+  /**
+   * disable auto mutation of value when locked.
+   * by default, the input values are only modified by user input, thus, there is a exception for select input for extra validation (e.g. useSafeSelectValue)
+   */
+  locked?: boolean;
+}
+
+interface IMonoFormFieldRenderingProps extends IFormField {
+  /**
+   * use vanilla html5 input element only
+   */
+  vanilla?: boolean;
+  /**
+   * force render invisible field if true
+   */
+  preview?: boolean;
+}
+
+interface IFormFieldRenderingProps extends IMonoFormFieldRenderingProps {
+  is_array?: boolean;
+}
+
+/**
+ * @beta is_array=true is experimental and only works on playground
+ * @returns
+ */
+function FormField({ is_array, ...props }: IFormFieldRenderingProps) {
+  const [n, setN] = useState(1);
+  if (is_array) {
+    return (
+      <>
+        <div>
+          <label>
+            <Button
+              variant="outline"
+              type="button"
+              onClick={() => {
+                setN((n) => n + 1);
+              }}
+            >
+              <PlusIcon />
+            </Button>
+          </label>
+          {Array.from({ length: n }).map((_, i) => (
+            <MonoFormField key={i} {...props} />
+          ))}
+        </div>
+      </>
+    );
+  }
+  return <MonoFormField {...props} />;
+}
+
+function MonoFormField({
   name,
   label,
   labelCapitalize,
@@ -56,39 +132,7 @@ export function FormFieldPreview({
   vanilla,
   locked,
   preview,
-}: {
-  name: string;
-  label?: string;
-  type: FormInputType;
-  placeholder?: string;
-  helpText?: string;
-  required?: boolean;
-  requiredAsterisk?: boolean;
-  defaultValue?: string;
-  options?: Option[];
-  pattern?: string;
-  readonly?: boolean;
-  disabled?: boolean;
-  autoComplete?: string;
-  accept?: string;
-  multiple?: boolean;
-  labelCapitalize?: boolean;
-  data?: FormFieldDataSchema | null;
-  novalidate?: boolean;
-  /**
-   * use vanilla html5 input element only
-   */
-  vanilla?: boolean;
-  /**
-   * disable auto mutation of value when locked.
-   * by default, the input values are only modified by user input, thus, there is a exception for select input for extra validation (e.g. useSafeSelectValue)
-   */
-  locked?: boolean;
-  /**
-   * force render invisible field if true
-   */
-  preview?: boolean;
-}) {
+}: IMonoFormFieldRenderingProps) {
   const sharedInputProps:
     | React.ComponentProps<"input">
     | React.ComponentProps<"textarea"> = {
@@ -667,3 +711,5 @@ function PaymentField({
       return <StripePaymentFormFieldPreview />;
   }
 }
+
+export default FormField;

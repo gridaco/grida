@@ -16,7 +16,7 @@
       "type": "email"
     },
     {
-      "name": "email[]",
+      "name": "emails",
       "type": ["email"]
     },
     {

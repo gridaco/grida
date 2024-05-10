@@ -13,7 +13,7 @@ import {
   PropertyTextInput,
   SidePanel,
 } from "@/components/panels/side-panel";
-import { FormFieldPreview } from "@/components/formfield";
+import FormFieldPreview from "@/components/formfield";
 import {
   FormFieldAutocompleteType,
   FormFieldDataSchema,

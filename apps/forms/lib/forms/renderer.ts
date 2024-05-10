@@ -40,6 +40,7 @@ export interface ClientFieldRenderBlock extends BaseRenderBlock {
   field: {
     id: string;
     type: FormInputType;
+    is_array?: boolean;
     name: string;
     label?: string;
     help_text?: string;

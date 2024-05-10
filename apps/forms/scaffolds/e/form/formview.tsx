@@ -1,6 +1,6 @@
 "use client";
 
-import { FormFieldPreview } from "@/components/formfield";
+import FormField from "@/components/formfield";
 import { PoweredByGridaFooter } from "./powered-by-brand-footer";
 import React, { useEffect, useMemo, useState } from "react";
 import { FormBlockTree } from "@/lib/forms/types";
@@ -200,12 +200,13 @@ export function FormView({
             const is_not_in_current_section = !context?.is_in_current_section;
 
             return (
-              <FormFieldPreview
+              <FormField
                 key={field.id}
                 name={field.name}
                 label={field.label}
                 placeholder={field.placeholder}
                 type={field.type}
+                is_array={field.is_array}
                 required={field.required}
                 requiredAsterisk
                 helpText={field.help_text}
