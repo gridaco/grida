@@ -1,6 +1,6 @@
 import {
   FormFieldDataSchema,
-  FormFieldType,
+  FormInputType,
   Option,
   PaymentFieldData,
 } from "@/types";
@@ -22,6 +22,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import useSafeSelectValue from "./use-safe-select-value";
 import { Switch } from "../ui/switch";
 import { Slider } from "../ui/slider";
+import { Toggle } from "../ui/toggle";
 
 /**
  * this disables the auto zoom in input text tag safari on iphone by setting font-size to 16px
@@ -54,7 +55,7 @@ export function FormFieldPreview({
 }: {
   name: string;
   label?: string;
-  type: FormFieldType;
+  type: FormInputType;
   placeholder?: string;
   helpText?: string;
   required?: boolean;
@@ -224,6 +225,13 @@ export function FormFieldPreview({
                 </li>
               ))}
             </ul>
+          </fieldset>
+        );
+      }
+      case "toggle": {
+        return (
+          <fieldset>
+            <Toggle>{label || name}</Toggle>
           </fieldset>
         );
       }

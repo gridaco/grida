@@ -2,7 +2,7 @@ import type {
   JSONField,
   FormBlockType,
   FormFieldDataSchema,
-  FormFieldType,
+  FormInputType,
   FormFieldDefinition,
   FormBlock,
   Option,
@@ -31,7 +31,7 @@ export interface ClientFieldRenderBlock extends BaseRenderBlock {
   type: "field";
   field: {
     id: string;
-    type: FormFieldType;
+    type: FormInputType;
     name: string;
     label?: string;
     help_text?: string;

@@ -54,7 +54,7 @@ export type FormResponseUnknownFieldHandlingStrategyType =
   | "ignore"
   | "reject";
 
-export type FormFieldType =
+export type FormInputType =
   | "text"
   | "textarea"
   | "tel"
@@ -148,7 +148,7 @@ export type FormFieldInit = {
   id?: string;
   name: string;
   label: string;
-  type: FormFieldType;
+  type: FormInputType;
   placeholder: string;
   required: boolean;
   help_text: string;
@@ -164,7 +164,7 @@ export type FormFieldInit = {
 export interface IFormField {
   name: string;
   label?: string | null;
-  type: FormFieldType;
+  type: FormInputType;
   placeholder?: string | null;
   required: boolean;
   help_text?: string | null;
@@ -250,7 +250,7 @@ export interface FormResponseField {
   created_at: string;
   form_field_id: string;
   response_id: string;
-  type: FormFieldType;
+  type: FormInputType;
   updated_at: string;
   value: any;
 }

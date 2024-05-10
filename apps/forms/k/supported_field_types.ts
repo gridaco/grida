@@ -1,6 +1,6 @@
-import { FormFieldAutocompleteType, FormFieldType } from "@/types";
+import { FormFieldAutocompleteType, FormInputType } from "@/types";
 
-export const supported_field_types: FormFieldType[] = [
+export const supported_field_types: FormInputType[] = [
   "text",
   "textarea",
   "select",
@@ -86,7 +86,7 @@ export const supported_field_autocomplete_types: FormFieldAutocompleteType[] = [
   "webauthn",
 ];
 
-export const html5_multiple_supported_field_types: FormFieldType[] = [
+export const html5_multiple_supported_field_types: FormInputType[] = [
   "file",
   "email",
   "select",

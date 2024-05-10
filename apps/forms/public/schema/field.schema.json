@@ -56,7 +56,12 @@
     "options": {
       "type": "array",
       "items": {
-        "$ref": "https://forms.grida.co/schema/option.schema.json"
+        "anyOf": [
+          { "$ref": "https://forms.grida.co/schema/option.schema.json" },
+          { "type": "string" },
+          { "type": "number" }
+        ],
+        "uniqueItems": true
       }
     },
     "autocomplete": {

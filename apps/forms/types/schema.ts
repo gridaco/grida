@@ -1,4 +1,4 @@
-import type { FormFieldAutocompleteType, FormFieldType } from ".";
+import type { FormFieldAutocompleteType, FormInputType } from ".";
 
 export interface JSONForm {
   title?: string;
@@ -21,8 +21,8 @@ export interface JSONField {
   placeholder?: string;
   required?: boolean;
   pattern?: string;
-  type: FormFieldType;
-  options?: JSONOption[];
+  type: FormInputType;
+  options?: (JSONOption | string | number)[];
   autocomplete?: FormFieldAutocompleteType | FormFieldAutocompleteType[];
 }
 

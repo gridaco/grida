@@ -17,7 +17,7 @@ import { FormFieldPreview } from "@/components/formfield";
 import {
   FormFieldAutocompleteType,
   FormFieldDataSchema,
-  FormFieldType,
+  FormInputType,
   FormFieldInit,
   PaymentFieldData,
   Option,
@@ -81,7 +81,7 @@ import { FormFieldTypeIcon } from "@/components/form-field-type-icon";
 
 // @ts-ignore
 const default_field_init: {
-  [key in FormFieldType]: Partial<FormFieldInit>;
+  [key in FormInputType]: Partial<FormFieldInit>;
 } = {
   text: {},
   textarea: { type: "textarea" },
@@ -147,13 +147,13 @@ const default_field_init: {
   },
 };
 
-const input_can_have_options: FormFieldType[] = [
+const input_can_have_options: FormInputType[] = [
   "select",
   "radio",
   "checkboxes",
 ];
 
-const html5_input_like_checkbox_field_types: FormFieldType[] = [
+const html5_input_like_checkbox_field_types: FormInputType[] = [
   "checkbox",
   "switch",
 ];
@@ -162,7 +162,7 @@ const html5_input_like_checkbox_field_types: FormFieldType[] = [
  * html5 pattern allowed input types
  * @see https://developer.mozilla.org/en-US/docs/Web/HTML/Attributes/pattern
  */
-const input_can_have_pattern: FormFieldType[] = [
+const input_can_have_pattern: FormInputType[] = [
   "text",
   "tel",
   // `date` uses pattern on fallback - https://developer.mozilla.org/en-US/docs/Web/HTML/Element/input/date#handling_browser_support
@@ -173,7 +173,7 @@ const input_can_have_pattern: FormFieldType[] = [
   // "search", // not supported
 ];
 
-const input_can_have_autocomplete: FormFieldType[] =
+const input_can_have_autocomplete: FormInputType[] =
   supported_field_types.filter(
     (type) =>
       ![
@@ -313,8 +313,8 @@ export function TypeSelect({
   value,
   onValueChange,
 }: {
-  value: FormFieldType;
-  onValueChange: (value: FormFieldType) => void;
+  value: FormInputType;
+  onValueChange: (value: FormInputType) => void;
 }) {
   return (
     <Select value={value} onValueChange={onValueChange}>
@@ -363,7 +363,7 @@ export function TypeSelect({
                   key={t}
                   value={t}
                   onSelect={(currentValue) => {
-                    onValueChange(currentValue as FormFieldType);
+                    onValueChange(currentValue as FormInputType);
                     setOpen(false);
                   }}
                 >
@@ -410,7 +410,7 @@ export function FieldEditPanel({
   const [label, setLabel] = useState(init?.label || "");
   const [placeholder, setPlaceholder] = useState(init?.placeholder || "");
   const [helpText, setHelpText] = useState(init?.help_text || "");
-  const [type, setType] = useState<FormFieldType>(init?.type || "text");
+  const [type, setType] = useState<FormInputType>(init?.type || "text");
   const [required, setRequired] = useState(init?.required || false);
   const [pattern, setPattern] = useState<string | undefined>(init?.pattern);
   const [options, setOptions] = useState<Option[]>(

@@ -42,6 +42,15 @@ const examples = [
       },
     },
   },
+  {
+    id: "003-fields",
+    name: "Fields",
+    template: {
+      schema: {
+        src: `${HOST}/schema/examples/003-fields/form.json`,
+      },
+    },
+  },
 ] as const;
 
 type MaybeArray<T> = T | T[];
@@ -77,10 +86,24 @@ function compile(txt?: string) {
       required: f.required || false,
       local_index: i,
       options:
-        f.options?.map((o) => ({
-          ...o,
-          id: o.value,
-        })) || [],
+        f.options?.map((o) => {
+          switch (typeof o) {
+            case "string":
+            case "number": {
+              return {
+                id: String(o),
+                value: String(o),
+                label: String(o),
+              };
+            }
+            case "object": {
+              return {
+                ...o,
+                id: o.value,
+              };
+            }
+          }
+        }) || [],
     })) || [],
     []
   );
@@ -139,8 +162,8 @@ export default function FormsPlayground() {
           </div>
         </div>
       </header>
-      <div className="flex-1 flex">
-        <section className="flex-1">
+      <div className="flex-1 flex h-full">
+        <section className="flex-1 h-full">
           <div className="w-full h-full p-4">
             <div className="w-full h-full rounded-md overflow-hidden shadow">
               <Editor value={__schema_txt} onChange={__set_schema_txt} />
@@ -153,59 +176,24 @@ export default function FormsPlayground() {
             </details>
           </div>
         </section>
-        <section className="flex-1 flex flex-col">
-          <div className="px-4 grow flex flex-col">
-            <header className="py-4 flex flex-col">
-              <div className="flex items-end gap-2">
-                <Label>
-                  Method
-                  <Select
-                    value={method}
-                    onValueChange={(value) => setMethod(value)}
-                  >
-                    <SelectTrigger id="method" aria-label="select method">
-                      <SelectValue placeholder="Select method" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="get">GET</SelectItem>
-                      <SelectItem value="post">POST</SelectItem>
-                      <SelectItem value="put">PUT</SelectItem>
-                      <SelectItem value="delete">DELETE</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </Label>
-                <Label>
-                  Action
-                  <Input
-                    type="text"
-                    placeholder="https://forms.grida.co/submit/..."
-                    value={action}
-                    onChange={(e) => setAction(e.target.value)}
-                  />
-                </Label>
-                <Button>Submit</Button>
-              </div>
-            </header>
-            <div className="w-full grow min-h-40 rounded-lg shadow-md border-dashed flex flex-col items-center">
-              {renderer ? (
-                <FormView
-                  title={"Form"}
-                  form_id={renderer.id}
-                  fields={renderer.fields()}
-                  blocks={renderer.blocks()}
-                  tree={renderer.tree()}
-                  translation={resources.en.translation as any}
-                  options={{
-                    is_powered_by_branding_enabled: false,
-                  }}
-                />
-              ) : (
-                <div className="grow flex items-center justify-center p-4 text-center text-gray-500">
-                  Invalid schema
-                </div>
-              )}
+        <section className="flex-1 flex h-full overflow-y-scroll">
+          {renderer ? (
+            <FormView
+              title={"Form"}
+              form_id={renderer.id}
+              fields={renderer.fields()}
+              blocks={renderer.blocks()}
+              tree={renderer.tree()}
+              translation={resources.en.translation as any}
+              options={{
+                is_powered_by_branding_enabled: false,
+              }}
+            />
+          ) : (
+            <div className="grow flex items-center justify-center p-4 text-center text-gray-500">
+              Invalid schema
             </div>
-          </div>
+          )}
         </section>
       </div>
     </main>

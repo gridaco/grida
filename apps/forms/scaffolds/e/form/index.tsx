@@ -432,7 +432,8 @@ export function FormView({
   };
 
   return (
-    <main
+    <div
+      id="form-view"
       data-cjk={options.optimize_for_cjk}
       className={clsx(
         "w-full h-full md:h-auto grow md:grow-0",
@@ -463,7 +464,7 @@ export function FormView({
               set_is_submitting(true);
             }
           }}
-          className="p-4 pt-10 md:pt-16 h-full overflow-auto flex-1"
+          className="p-4 pt-10 md:pt-16 h-full overflow-scroll flex-1"
         >
           <FingerprintField />
           <GroupLayout>{tree.children.map((b) => renderBlock(b))}</GroupLayout>
@@ -538,7 +539,7 @@ export function FormView({
           <PoweredByGridaFooter />
         </div>
       )}
-    </main>
+    </div>
   );
 }
 

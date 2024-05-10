@@ -1,5 +1,8 @@
 "use client";
 
+/**
+ * @deprecated
+ */
 export function Toggle({
   label,
   disabled,
