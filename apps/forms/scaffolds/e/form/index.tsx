@@ -178,7 +178,6 @@ interface FormTranslation {
 
 export function FormView({
   form_id,
-  action,
   title,
   blocks,
   fields,
@@ -187,9 +186,9 @@ export function FormView({
   translation,
   options,
   stylesheet,
+  ...formattributes
 }: {
   form_id: string;
-  action?: string;
   title: string;
   defaultValues?: { [key: string]: string };
   fields: FormFieldDefinition[];
@@ -201,7 +200,7 @@ export function FormView({
     optimize_for_cjk?: boolean;
   };
   stylesheet?: any;
-}) {
+} & React.FormHTMLAttributes<HTMLFormElement>) {
   const [checkoutSession, setCheckoutSession] =
     useState<PaymentCheckoutSession | null>(null);
   const [is_submitting, set_is_submitting] = useState(false);
@@ -444,8 +443,9 @@ export function FormView({
     >
       <TossPaymentsCheckoutProvider initial={checkoutSession}>
         <form
+          {...formattributes}
           id="form"
-          action={submit_hidden ? undefined : action}
+          action={submit_hidden ? undefined : formattributes.action}
           onSubmit={(e) => {
             if (submit_hidden) {
               e.preventDefault();
