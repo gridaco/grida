@@ -11,7 +11,13 @@ import { FormView } from "@/scaffolds/e/form";
 import { Editor as MonacoEditor, useMonaco } from "@monaco-editor/react";
 import { useEffect, useMemo, useState } from "react";
 import { nanoid } from "nanoid";
-import { JSONField, JSONForm, JSONOptionLike } from "@/types/schema";
+import {
+  JSONField,
+  JSONForm,
+  JSONOptionLike,
+  parse,
+  parse_jsonfield_type,
+} from "@/types/schema";
 import resources from "@/k/i18n";
 import { FormRenderer } from "@/lib/forms";
 import { GridaLogo } from "@/components/grida-logo";
@@ -58,14 +64,6 @@ function toArrayOf<T>(value: MaybeArray<T>, nofalsy = true): NonNullable<T>[] {
   ) as NonNullable<T>[];
 }
 
-function parse(txt?: string): JSONForm | null {
-  try {
-    return txt ? JSON.parse(txt) : null;
-  } catch (error) {
-    return null;
-  }
-}
-
 function compile(txt?: string) {
   const schema = parse(txt);
   if (!schema) {
@@ -93,16 +91,21 @@ function compile(txt?: string) {
 
   const renderer = new FormRenderer(
     nanoid(),
-    schema.fields?.map((f: JSONField, i) => ({
-      ...f,
-      id: f.name,
-      autocomplete: toArrayOf<FormFieldAutocompleteType | undefined>(
-        f.autocomplete
-      ),
-      required: f.required || false,
-      local_index: i,
-      options: f.options?.map(map_option) || [],
-    })) || [],
+    schema.fields?.map((f: JSONField, i) => {
+      const { type, is_array } = parse_jsonfield_type(f.type);
+      return {
+        ...f,
+        id: f.name,
+        type: type,
+        is_array,
+        autocomplete: toArrayOf<FormFieldAutocompleteType | undefined>(
+          f.autocomplete
+        ),
+        required: f.required || false,
+        local_index: i,
+        options: f.options?.map(map_option) || [],
+      };
+    }) || [],
     []
   );
 

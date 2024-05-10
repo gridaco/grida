@@ -27,6 +27,60 @@
       "default": false
     },
     "type": {
+      "anyOf": [
+        { "$ref": "#/definitions/type" },
+        {
+          "type": "object",
+          "properties": {
+            "type": { "const": "array" },
+            "items": {
+              "type": "object",
+              "properties": {
+                "type": { "$ref": "#/definitions/type" }
+              }
+            }
+          },
+          "required": ["type"]
+        },
+        {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/type"
+          },
+          "minItems": 1,
+          "maxItems": 1
+        }
+      ]
+    },
+    "options": {
+      "type": "array",
+      "items": {
+        "anyOf": [
+          { "$ref": "https://forms.grida.co/schema/option.schema.json" },
+          { "type": "string" },
+          { "type": "number" }
+        ],
+        "uniqueItems": true
+      }
+    },
+    "autocomplete": {
+      "anyOf": [
+        {
+          "$ref": "#/definitions/autocomplete"
+        },
+        {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/autocomplete"
+          },
+          "uniqueItems": true
+        }
+      ]
+    }
+  },
+  "required": ["name", "type"],
+  "definitions": {
+    "type": {
       "type": "string",
       "enum": [
         "text",
@@ -59,34 +113,6 @@
         "range"
       ]
     },
-    "options": {
-      "type": "array",
-      "items": {
-        "anyOf": [
-          { "$ref": "https://forms.grida.co/schema/option.schema.json" },
-          { "type": "string" },
-          { "type": "number" }
-        ],
-        "uniqueItems": true
-      }
-    },
-    "autocomplete": {
-      "anyOf": [
-        {
-          "$ref": "#/definitions/autocomplete"
-        },
-        {
-          "type": "array",
-          "items": {
-            "$ref": "#/definitions/autocomplete"
-          },
-          "uniqueItems": true
-        }
-      ]
-    }
-  },
-  "required": ["name", "type"],
-  "definitions": {
     "autocomplete": {
       "type": "array",
       "enum": [

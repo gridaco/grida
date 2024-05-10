@@ -16,6 +16,10 @@
       "type": "email"
     },
     {
+      "name": "email[]",
+      "type": ["email"]
+    },
+    {
       "name": "password",
       "type": "password"
     },

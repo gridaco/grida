@@ -166,6 +166,7 @@ export interface IFormField {
   name: string;
   label?: string | null;
   type: FormInputType;
+  is_array?: boolean;
   placeholder?: string | null;
   required: boolean;
   help_text?: string | null;
