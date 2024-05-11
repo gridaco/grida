@@ -29,6 +29,7 @@
     "type": {
       "anyOf": [
         { "$ref": "#/definitions/type" },
+        { "const": "object" },
         {
           "type": "object",
           "properties": {
@@ -51,6 +52,9 @@
           "maxItems": 1
         }
       ]
+    },
+    "schema": {
+      "$ref": "https://json-schema.org/draft-07/schema#"
     },
     "options": {
       "type": "array",

@@ -23,6 +23,13 @@ import { FormRenderer } from "@/lib/forms";
 import { GridaLogo } from "@/components/grida-logo";
 import { FormFieldAutocompleteType, Option } from "@/types";
 import Ajv from "ajv";
+import { Button } from "@/components/ui/button";
+import {
+  Link1Icon,
+  Link2Icon,
+  RocketIcon,
+  SlashIcon,
+} from "@radix-ui/react-icons";
 
 const HOST = process.env.NEXT_PUBLIC_HOST_NAME || "http://localhost:3000";
 
@@ -135,8 +142,8 @@ export default function FormsPlayground() {
 
   return (
     <main className="w-screen h-screen flex flex-col overflow-hidden">
-      <header className="p-4 flex justify-between">
-        <div className="flex gap-4">
+      <header className="p-4 flex justify-between border-b">
+        <div className="flex gap-1 items-center">
           <h1 className="text-xl font-black flex items-center gap-2">
             <GridaLogo />
             Forms
@@ -144,7 +151,8 @@ export default function FormsPlayground() {
               Playground
             </span>
           </h1>
-          <div className="ms-10">
+          <SlashIcon className="h-6 w-6 opacity-20" />
+          <div className="ms-1">
             <Select
               value={exampleId}
               onValueChange={(value) => setExampleId(value)}
@@ -161,6 +169,16 @@ export default function FormsPlayground() {
               </SelectContent>
             </Select>
           </div>
+        </div>
+        <div className="flex gap-2 items-center">
+          <Button variant="secondary">
+            <Link2Icon className="mr-2" />
+            Share
+          </Button>
+          <Button>
+            <RocketIcon className="mr-2" />
+            Publlish
+          </Button>
         </div>
       </header>
       <div className="flex-1 flex h-full">

@@ -20,6 +20,21 @@
       "type": ["email"]
     },
     {
+      "name": "todos",
+      "type": "object",
+      "schema": {
+        "type": "object",
+        "properties": {
+          "text": {
+            "type": "string"
+          },
+          "done": {
+            "type": "boolean"
+          }
+        }
+      }
+    },
+    {
       "name": "password",
       "type": "password"
     },
