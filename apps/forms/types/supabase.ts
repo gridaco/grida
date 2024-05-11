@@ -1001,6 +1001,7 @@ export type Database = {
           form_id: string
           help_text: string | null
           id: string
+          is_array: boolean
           label: string | null
           local_index: number
           max: Json | null
@@ -1027,6 +1028,7 @@ export type Database = {
           form_id: string
           help_text?: string | null
           id?: string
+          is_array?: boolean
           label?: string | null
           local_index?: number
           max?: Json | null
@@ -1053,6 +1055,7 @@ export type Database = {
           form_id?: string
           help_text?: string | null
           id?: string
+          is_array?: boolean
           label?: string | null
           local_index?: number
           max?: Json | null
@@ -1162,6 +1165,27 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      playground_gist: {
+        Row: {
+          created_at: string
+          gist: Json
+          id: number
+          slug: string | null
+        }
+        Insert: {
+          created_at?: string
+          gist: Json
+          id?: number
+          slug?: string | null
+        }
+        Update: {
+          created_at?: string
+          gist?: Json
+          id?: number
+          slug?: string | null
+        }
+        Relationships: []
       }
       response: {
         Row: {
