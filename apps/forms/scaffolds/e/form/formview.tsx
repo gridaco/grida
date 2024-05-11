@@ -324,7 +324,7 @@ export function FormView({
               set_is_submitting(true);
             }
           }}
-          className="p-4 pt-10 md:pt-16 h-full overflow-scroll flex-1"
+          className="p-4 pt-10 md:pt-16 h-full overflow-y-scroll flex-1"
         >
           <FingerprintField />
           <GroupLayout>{tree.children.map((b) => renderBlock(b))}</GroupLayout>
@@ -340,7 +340,7 @@ export function FormView({
           sticky md:static bottom-0
           flex gap-2 justify-end md:justify-start
           bg-white md:bg-transparent dark:bg-neutral-900 md:dark:bg-transparent
-          p-4 mt-4 pt-4
+          p-4 pt-4
           border-t border-neutral-200 dark:border-neutral-800
         "
         >
