@@ -22,14 +22,9 @@ import resources from "@/k/i18n";
 import { FormRenderer } from "@/lib/forms";
 import { GridaLogo } from "@/components/grida-logo";
 import { FormFieldAutocompleteType, Option } from "@/types";
-import Ajv from "ajv";
 import { Button } from "@/components/ui/button";
-import {
-  Link1Icon,
-  Link2Icon,
-  RocketIcon,
-  SlashIcon,
-} from "@radix-ui/react-icons";
+import { Link2Icon, RocketIcon, SlashIcon } from "@radix-ui/react-icons";
+import Ajv from "ajv";
 
 const HOST = process.env.NEXT_PUBLIC_HOST_NAME || "http://localhost:3000";
 
@@ -120,8 +115,6 @@ function compile(txt?: string) {
 }
 
 export default function FormsPlayground() {
-  const [action, setAction] = useState<string>("");
-  const [method, setMethod] = useState<string>("get");
   const [exampleId, setExampleId] = useState<string>(examples[0].id);
   const [__schema_txt, __set_schema_txt] = useState<string | undefined>();
 
@@ -181,18 +174,31 @@ export default function FormsPlayground() {
           </Button>
         </div>
       </header>
-      <div className="flex-1 flex h-full">
+      <div className="flex-1 flex max-h-full overflow-hidden">
         <section className="flex-1 h-full">
-          <div className="w-full h-full p-4">
-            <div className="w-full h-full rounded-md overflow-hidden shadow">
+          <div className="w-full h-full flex flex-col">
+            <div className="flex-shrink flex flex-col h-full">
               <Editor value={__schema_txt} onChange={__set_schema_txt} />
             </div>
-            <details className="bg-white absolute bottom-0 left-0 max-h-96 overflow-scroll z-10">
-              <summary>Renderer JSON</summary>
-              <pre>
-                <code>{JSON.stringify(renderer, null, 2)}</code>
-              </pre>
-            </details>
+            <div className="flex-grow">
+              <details>
+                <summary>Data</summary>
+                <MonacoEditor
+                  height={200}
+                  defaultLanguage="json"
+                  value={JSON.stringify(renderer, null, 2)}
+                  options={{
+                    padding: {
+                      top: 16,
+                    },
+                    minimap: {
+                      enabled: false,
+                    },
+                    scrollBeyondLastLine: false,
+                  }}
+                />
+              </details>
+            </div>
           </div>
         </section>
         <section className="flex-1 flex h-full overflow-y-scroll">
@@ -252,12 +258,14 @@ function Editor({
         onChange={onChange}
         value={value}
         options={{
+          automaticLayout: true,
           padding: {
             top: 16,
           },
           minimap: {
             enabled: false,
           },
+          scrollBeyondLastLine: false,
         }}
       />
     </div>
