@@ -98,7 +98,8 @@ export function Playground({
 }) {
   const generating = useRef(false);
   const router = useRouter();
-  const [is_modified, set_is_modified] = useState(false);
+
+  // const [is_modified, set_is_modified] = useState(false);
   const [exampleId, setExampleId] = useState<string | undefined>(
     initial ? undefined : examples[0].id
   );
@@ -106,6 +107,9 @@ export function Playground({
   const [__schema_txt, __set_schema_txt] = useState<string | null>(
     initial?.src || null
   );
+
+  const is_modified = __schema_txt !== initial?.src;
+  const [busy, setBusy] = useState(false);
 
   const renderer: FormRenderTree | undefined = useMemo(
     () => (__schema_txt ? compile(__schema_txt) : undefined),
@@ -117,6 +121,8 @@ export function Playground({
       if (generating.current) {
         return;
       }
+
+      setBusy(true);
       generating.current = true;
       generate(initial.prompt).then(async ({ output }) => {
         for await (const delta of readStreamableValue(output)) {
@@ -124,6 +130,7 @@ export function Playground({
           __set_schema_txt(JSON.stringify(delta, null, 2));
         }
         generating.current = false;
+        setBusy(false);
         // TODO: update gist with new schema generated to prevent re-generation on refresh
       });
     }
@@ -153,7 +160,7 @@ export function Playground({
       .then((req) => req.json())
       .then(({ slug }) => {
         // update the route
-        router.replace(`/playground/${slug}`);
+        router.push(`/playground/${slug}`);
       })
       .catch((err) => {
         console.error(err);
@@ -195,11 +202,15 @@ export function Playground({
           )}
         </div>
         <div className="flex gap-2 items-center">
-          <Button onClick={onShare} disabled={!is_modified} variant="secondary">
+          <Button
+            onClick={onShare}
+            disabled={!is_modified || busy}
+            variant="secondary"
+          >
             <Link2Icon className="mr-2" />
             Share
           </Button>
-          <Button>
+          <Button disabled={busy}>
             <RocketIcon className="mr-2" />
             Publlish
           </Button>
@@ -213,7 +224,7 @@ export function Playground({
                 value={__schema_txt || ""}
                 onChange={(v?: string) => {
                   __set_schema_txt(v || "");
-                  set_is_modified(true);
+                  // set_is_modified(true);
                 }}
               />
             </div>

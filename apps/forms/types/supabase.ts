@@ -1174,6 +1174,7 @@ export type Database = {
           is_public: boolean
           prompt: string | null
           slug: string | null
+          title: string | null
           user_id: string | null
         }
         Insert: {
@@ -1183,6 +1184,7 @@ export type Database = {
           is_public?: boolean
           prompt?: string | null
           slug?: string | null
+          title?: string | null
           user_id?: string | null
         }
         Update: {
@@ -1192,6 +1194,7 @@ export type Database = {
           is_public?: boolean
           prompt?: string | null
           slug?: string | null
+          title?: string | null
           user_id?: string | null
         }
         Relationships: [

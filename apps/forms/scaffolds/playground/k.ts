@@ -28,6 +28,15 @@ export const examples = [
       },
     },
   },
+  {
+    id: "004-job-application",
+    name: "Job Application",
+    template: {
+      schema: {
+        src: `${HOST}/schema/examples/004-job-application/form.json`,
+      },
+    },
+  },
 ] as const;
 
 export const shortcuts: [string, string, string][] = [
