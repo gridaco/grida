@@ -66,12 +66,6 @@ export default function AIHome() {
 
   return (
     <main className="flex flex-col w-full min-h-screen items-center justify-center">
-      <iframe
-        className="absolute inset-0 w-screen h-screen -z-10"
-        src="/wwwembeddings/beams"
-        width="100vw"
-        height="100vh"
-      />
       <div className="text-center mb-5">
         <h2 className="text-5xl font-bold">Build Forms with AI</h2>
         <p className="mt-2 text-lg text-gray-500 dark:text-gray-400">
@@ -79,11 +73,12 @@ export default function AIHome() {
         </p>
       </div>
       <div className="w-full max-w-md mx-auto space-y-4 border rounded-lg shadow-lg p-4">
-        <form className="space-y-4" method="GET" action="/playground">
+        <form className="space-y-4" method="POST" action="/playground/with-ai">
           <div className="space-y-1">
             <Textarea
               autoFocus
               className="min-h-[100px]"
+              name="prompt"
               id="prompt"
               placeholder={placeholder}
             />

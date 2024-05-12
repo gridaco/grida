@@ -9,7 +9,7 @@ import {
 } from "@/components/ui/select";
 import { FormView } from "@/scaffolds/e/form";
 import { Editor as MonacoEditor, useMonaco } from "@monaco-editor/react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { nanoid } from "nanoid";
 import {
   JSONField,
@@ -28,6 +28,8 @@ import { createClientFormsClient } from "@/lib/supabase/client";
 import toast from "react-hot-toast";
 import { useRouter } from "next/navigation";
 import { examples } from "./examples";
+import { generate } from "@/app/actions";
+import { readStreamableValue } from "ai/rsc";
 
 type MaybeArray<T> = T | T[];
 
@@ -87,9 +89,11 @@ function compile(value?: string | object) {
 
 export function Playground({
   initial,
+  prompt,
   slug,
 }: {
-  initial?: string;
+  initial: string | null;
+  prompt?: string;
   slug?: string;
 }) {
   const router = useRouter();
@@ -97,14 +101,33 @@ export function Playground({
   const [exampleId, setExampleId] = useState<string | undefined>(
     initial ? undefined : examples[0].id
   );
-  const [__schema_txt, __set_schema_txt] = useState<string | undefined>(
-    initial
-  );
+  // const [data, setData] = useState<JSONForm | undefined>();
+  const [__schema_txt, __set_schema_txt] = useState<string | null>(initial);
 
   const renderer: FormRenderTree | undefined = useMemo(
-    () => compile(__schema_txt),
+    () => (__schema_txt ? compile(__schema_txt) : undefined),
     [__schema_txt]
   );
+
+  const generating = useRef(false);
+
+  useEffect(() => {
+    if (prompt) {
+      if (generating.current) {
+        return;
+      }
+      generating.current = true;
+      generate(prompt).then(async ({ output }) => {
+        for await (const delta of readStreamableValue(output)) {
+          // setData(delta as JSONForm);
+          __set_schema_txt(JSON.stringify(delta, null, 2));
+        }
+        generating.current = false;
+        // TODO: update gist with new schema generated to prevent re-generation on refresh
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     if (exampleId) {
@@ -181,9 +204,9 @@ export function Playground({
           <div className="w-full h-full flex flex-col">
             <div className="flex-shrink flex flex-col h-full">
               <Editor
-                value={__schema_txt}
-                onChange={(v) => {
-                  __set_schema_txt(v);
+                value={__schema_txt || ""}
+                onChange={(v?: string) => {
+                  __set_schema_txt(v || "");
                   set_is_modified(true);
                 }}
               />

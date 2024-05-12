@@ -24,11 +24,15 @@ export default async function SharedPlaygroundPage({
     return redirect("/playground");
   }
 
-  const { gist } = _gist;
+  const { gist, prompt } = _gist;
 
   return (
     <main>
-      <Playground initial={JSON.stringify(gist, null, 2)} slug={slug} />
+      <Playground
+        initial={(gist && JSON.stringify(gist, null, 2)) || null}
+        prompt={prompt || undefined}
+        slug={slug}
+      />
     </main>
   );
 }

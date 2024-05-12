@@ -1169,20 +1169,23 @@ export type Database = {
       playground_gist: {
         Row: {
           created_at: string
-          gist: Json
+          gist: Json | null
           id: number
+          prompt: string | null
           slug: string | null
         }
         Insert: {
           created_at?: string
-          gist: Json
+          gist?: Json | null
           id?: number
+          prompt?: string | null
           slug?: string | null
         }
         Update: {
           created_at?: string
-          gist?: Json
+          gist?: Json | null
           id?: number
+          prompt?: string | null
           slug?: string | null
         }
         Relationships: []
