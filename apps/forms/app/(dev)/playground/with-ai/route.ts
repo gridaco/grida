@@ -17,10 +17,10 @@ export async function POST(req: NextRequest) {
       data: null,
       prompt: prompt,
     })
-    .select("short_id")
+    .select("slug")
     .single();
 
-  return NextResponse.redirect(origin + `/playground/${data?.short_id}`, {
+  return NextResponse.redirect(origin + `/playground/${data?.slug}`, {
     status: 303,
   });
 }

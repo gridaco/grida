@@ -1173,7 +1173,7 @@ export type Database = {
           id: number
           is_public: boolean
           prompt: string | null
-          short_id: string | null
+          slug: string | null
           user_id: string | null
         }
         Insert: {
@@ -1182,7 +1182,7 @@ export type Database = {
           id?: number
           is_public?: boolean
           prompt?: string | null
-          short_id?: string | null
+          slug?: string | null
           user_id?: string | null
         }
         Update: {
@@ -1191,7 +1191,7 @@ export type Database = {
           id?: number
           is_public?: boolean
           prompt?: string | null
-          short_id?: string | null
+          slug?: string | null
           user_id?: string | null
         }
         Relationships: [

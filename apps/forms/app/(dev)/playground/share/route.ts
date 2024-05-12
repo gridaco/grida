@@ -8,15 +8,19 @@ export async function POST(req: NextRequest) {
   const cookieStore = cookies();
   const supabase = createRouteHandlerClient(cookieStore);
 
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from("gist")
     .insert({
-      data: body,
+      data: {
+        ["form.json"]: body.src,
+      },
     })
     .select()
     .single();
 
-  assert(data, "Failed to create a new playground gist");
-
+  if (error) {
+    console.error(error);
+    return NextResponse.error();
+  }
   return NextResponse.json(data);
 }

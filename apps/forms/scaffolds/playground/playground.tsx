@@ -89,12 +89,12 @@ function compile(value?: string | object) {
 
 export function Playground({
   initial,
-  prompt,
-  slug,
 }: {
-  initial: string | null;
-  prompt?: string;
-  slug?: string;
+  initial?: {
+    src?: string;
+    prompt?: string;
+    slug?: string;
+  };
 }) {
   const generating = useRef(false);
   const router = useRouter();
@@ -103,7 +103,9 @@ export function Playground({
     initial ? undefined : examples[0].id
   );
   // const [data, setData] = useState<JSONForm | undefined>();
-  const [__schema_txt, __set_schema_txt] = useState<string | null>(initial);
+  const [__schema_txt, __set_schema_txt] = useState<string | null>(
+    initial?.src || null
+  );
 
   const renderer: FormRenderTree | undefined = useMemo(
     () => (__schema_txt ? compile(__schema_txt) : undefined),
@@ -111,12 +113,12 @@ export function Playground({
   );
 
   useEffect(() => {
-    if (prompt) {
+    if (initial?.prompt) {
       if (generating.current) {
         return;
       }
       generating.current = true;
-      generate(prompt).then(async ({ output }) => {
+      generate(initial.prompt).then(async ({ output }) => {
         for await (const delta of readStreamableValue(output)) {
           // setData(delta as JSONForm);
           __set_schema_txt(JSON.stringify(delta, null, 2));
@@ -139,21 +141,24 @@ export function Playground({
   }, [exampleId]);
 
   const onShare = async () => {
-    const supabase = createClientFormsClient();
-    const { data, error } = await supabase
-      .from("gist")
-      .insert({
-        data: JSON.parse(__schema_txt!),
+    const req = fetch("/playground/share", {
+      method: "POST",
+      body: JSON.stringify({
+        src: __schema_txt,
+      }),
+      headers: {
+        "Content-Type": "application/json",
+      },
+    })
+      .then((req) => req.json())
+      .then(({ slug }) => {
+        // update the route
+        router.replace(`/playground/${slug}`);
       })
-      .select("short_id")
-      .single();
-
-    if (error) {
-      toast.error("Failed");
-    }
-
-    // update the route
-    router.replace(`/playground/${data!.short_id}`);
+      .catch((err) => {
+        console.error(err);
+        toast.error("Failed to share");
+      });
   };
 
   return (
@@ -185,7 +190,9 @@ export function Playground({
               </SelectContent>
             </Select>
           </div>
-          {slug && !is_modified && <Button variant="link">../{slug}</Button>}
+          {initial?.slug && !is_modified && (
+            <Button variant="link">../{initial.slug}</Button>
+          )}
         </div>
         <div className="flex gap-2 items-center">
           <Button onClick={onShare} disabled={!is_modified} variant="secondary">
