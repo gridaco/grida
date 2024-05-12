@@ -9,9 +9,9 @@ export async function POST(req: NextRequest) {
   const supabase = createRouteHandlerClient(cookieStore);
 
   const { data } = await supabase
-    .from("playground_gist")
+    .from("gist")
     .insert({
-      gist: body,
+      data: body,
     })
     .select()
     .single();

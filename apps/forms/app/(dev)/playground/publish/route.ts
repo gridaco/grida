@@ -3,24 +3,24 @@ import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
 
 export async function POST(req: NextRequest) {
-  const origin = req.nextUrl.origin;
-  const formdata = await req.formData();
-  const prompt = String(formdata.get("prompt"));
+  const body = await req.json();
   const cookieStore = cookies();
   const supabase = createRouteHandlerClient(cookieStore);
 
-  console.log("prompt", prompt);
+  // check if user is logged in
+  const { data: _user } = await supabase.auth.getUser();
+  if (!_user?.user) {
+    return NextResponse.redirect("/sign-in?next=/playground/publish");
+  }
 
   const { data } = await supabase
-    .from("gist")
+    .from("form")
     .insert({
-      data: null,
-      prompt: prompt,
+      title: "",
+      project_id: 0,
     })
-    .select("short_id")
+    .select()
     .single();
-
-  return NextResponse.redirect(origin + `/playground/${data?.short_id}`, {
-    status: 303,
-  });
+  //
+  // publish
 }

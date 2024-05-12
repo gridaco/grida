@@ -1166,29 +1166,43 @@ export type Database = {
           },
         ]
       }
-      playground_gist: {
+      gist: {
         Row: {
           created_at: string
-          gist: Json | null
+          data: Json | null
           id: number
+          is_public: boolean
           prompt: string | null
-          slug: string | null
+          short_id: string | null
+          user_id: string | null
         }
         Insert: {
           created_at?: string
-          gist?: Json | null
+          data?: Json | null
           id?: number
+          is_public?: boolean
           prompt?: string | null
-          slug?: string | null
+          short_id?: string | null
+          user_id?: string | null
         }
         Update: {
           created_at?: string
-          gist?: Json | null
+          data?: Json | null
           id?: number
+          is_public?: boolean
           prompt?: string | null
-          slug?: string | null
+          short_id?: string | null
+          user_id?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "playground_gist_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       response: {
         Row: {

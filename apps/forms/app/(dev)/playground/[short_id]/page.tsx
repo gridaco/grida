@@ -7,31 +7,31 @@ export default async function SharedPlaygroundPage({
   params,
 }: {
   params: {
-    slug: string;
+    short_id: string;
   };
 }) {
-  const { slug } = params;
+  const { short_id } = params;
   const cookieStore = cookies();
   const supabase = createServerComponentClient(cookieStore);
 
   const { data: _gist } = await supabase
-    .from("playground_gist")
+    .from("gist")
     .select()
-    .eq("slug", slug)
+    .eq("short_id", short_id)
     .single();
 
   if (!_gist) {
     return redirect("/playground");
   }
 
-  const { gist, prompt } = _gist;
+  const { data, prompt } = _gist;
 
   return (
     <main>
       <Playground
-        initial={(gist && JSON.stringify(gist, null, 2)) || null}
+        initial={(data && JSON.stringify(data, null, 2)) || null}
         prompt={prompt || undefined}
-        slug={slug}
+        slug={short_id}
       />
     </main>
   );

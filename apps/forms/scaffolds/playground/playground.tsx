@@ -96,6 +96,7 @@ export function Playground({
   prompt?: string;
   slug?: string;
 }) {
+  const generating = useRef(false);
   const router = useRouter();
   const [is_modified, set_is_modified] = useState(false);
   const [exampleId, setExampleId] = useState<string | undefined>(
@@ -108,8 +109,6 @@ export function Playground({
     () => (__schema_txt ? compile(__schema_txt) : undefined),
     [__schema_txt]
   );
-
-  const generating = useRef(false);
 
   useEffect(() => {
     if (prompt) {
@@ -142,11 +141,11 @@ export function Playground({
   const onShare = async () => {
     const supabase = createClientFormsClient();
     const { data, error } = await supabase
-      .from("playground_gist")
+      .from("gist")
       .insert({
-        gist: JSON.parse(__schema_txt!),
+        data: JSON.parse(__schema_txt!),
       })
-      .select("slug")
+      .select("short_id")
       .single();
 
     if (error) {
@@ -154,7 +153,7 @@ export function Playground({
     }
 
     // update the route
-    router.replace(`/playground/${data!.slug}`);
+    router.replace(`/playground/${data!.short_id}`);
   };
 
   return (
@@ -211,7 +210,7 @@ export function Playground({
                 }}
               />
             </div>
-            <div className="flex-grow">
+            {/* <div className="flex-grow">
               <details>
                 <summary>Data</summary>
                 <MonacoEditor
@@ -229,7 +228,7 @@ export function Playground({
                   }}
                 />
               </details>
-            </div>
+            </div> */}
           </div>
         </section>
         <section className="flex-1 flex h-full overflow-y-scroll">
