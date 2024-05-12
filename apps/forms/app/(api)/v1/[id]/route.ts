@@ -31,7 +31,7 @@ import { is_uuid_v4 } from "@/utils/is";
 import i18next from "i18next";
 import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
-import { FormRenderer, type ClientRenderBlock } from "@/lib/forms";
+import { FormRenderTree, type ClientRenderBlock } from "@/lib/forms";
 import type { FormFieldDefinition, FormPage, Option } from "@/types";
 
 export const revalidate = 0;
@@ -227,7 +227,7 @@ export async function GET(
     };
   }
 
-  const renderer = new FormRenderer(id, fields, page_blocks, {
+  const renderer = new FormRenderTree(id, fields, page_blocks, {
     option_renderer: mkoption,
   });
 

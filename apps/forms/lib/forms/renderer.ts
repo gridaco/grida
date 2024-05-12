@@ -97,7 +97,7 @@ export interface ClientHeaderRenderBlock extends BaseRenderBlock {
   description_html?: string | null;
 }
 
-export class FormRenderer {
+export class FormRenderTree {
   private readonly _m_render_blocks: ClientRenderBlock[];
   private readonly _m_render_fields: FormFieldDefinition[];
   private readonly _m_tree: FormBlockTree<ClientRenderBlock[]>;

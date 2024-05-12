@@ -19,7 +19,7 @@ import {
   parse_jsonfield_type,
 } from "@/types/schema";
 import resources from "@/k/i18n";
-import { FormRenderer } from "@/lib/forms";
+import { FormRenderTree } from "@/lib/forms";
 import { GridaLogo } from "@/components/grida-logo";
 import { FormFieldAutocompleteType, Option } from "@/types";
 import { Button } from "@/components/ui/button";
@@ -94,7 +94,7 @@ function compile(txt?: string) {
     }
   };
 
-  const renderer = new FormRenderer(
+  const renderer = new FormRenderTree(
     nanoid(),
     schema.fields?.map((f: JSONField, i) => {
       const { type, is_array } = parse_jsonfield_type(f.type);
@@ -133,7 +133,7 @@ export function Playground({
     initial
   );
 
-  const renderer: FormRenderer | undefined = useMemo(
+  const renderer: FormRenderTree | undefined = useMemo(
     () => compile(__schema_txt),
     [__schema_txt]
   );
