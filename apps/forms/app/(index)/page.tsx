@@ -12,7 +12,6 @@ import {
   AnalysisIcon,
   VisualStudioIcon,
 } from "@/www/icons";
-import { AuroraBackground } from "@/theme/backgrounds/aurora";
 import { plans } from "@/www/data/plans";
 
 export default function Home() {
@@ -263,6 +262,12 @@ async function Header() {
           <button className="flex justify-center items-center">
             <GitHubLogoIcon className="fill-black" width={24} height={24} />
           </button>
+        </Link>
+        <Link href="/ai" className="hidden md:block">
+          <button className="hover:underline">AI</button>
+        </Link>
+        <Link href="/playground" className="hidden md:block">
+          <button className="hover:underline">Playground</button>
         </Link>
         <Link href="/sign-in" className="hidden md:block">
           <button>Sign in</button>

@@ -3,7 +3,6 @@
 import { streamObject } from "ai";
 import { openai } from "@ai-sdk/openai";
 import { createStreamableValue } from "ai/rsc";
-import { z } from "zod";
 import { ZJSONForm } from "@/types/zod";
 
 export async function generate(input: string) {

@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { generate } from "../actions";
+import { generate } from "@/app/actions";
 import { readStreamableValue } from "ai/rsc";
 import { FormRenderTree } from "@/lib/forms";
 import { nanoid } from "nanoid";
@@ -17,9 +17,16 @@ import { FormView } from "@/scaffolds/e/form";
 import resources from "@/k/i18n";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
 import { Editor as MonacoEditor, useMonaco } from "@monaco-editor/react";
+import { Metadata } from "next";
 
 type MaybeArray<T> = T | T[];
+
+// export const metadata: Metadata = {
+//   title: "AI Forms Builder",
+//   description: "AI Forms Builder",
+// };
 
 function toArrayOf<T>(value: MaybeArray<T>, nofalsy = true): NonNullable<T>[] {
   return (
@@ -75,9 +82,8 @@ function compile(value?: string | object) {
   return renderer;
 }
 
-export default function Home() {
+export default function Playground() {
   const [data, setData] = useState<JSONForm | undefined>();
-  const [input, setInput] = useState<string>("");
 
   const renderer: FormRenderTree | undefined = useMemo(
     () => compile(data),
@@ -87,59 +93,74 @@ export default function Home() {
   return (
     <main className="flex w-screen h-screen p-10">
       <div className="h-full flex-1">
-        <div className="h-full">
-          {/* {conversation.map((val: any, i: number) => (
-          <div key={i}>{val}</div>
-        ))} */}
-          <MonacoEditor
-            height="100%"
-            language="json"
-            value={JSON.stringify(data, null, 2)}
-            options={{
-              minimap: {
-                enabled: false,
-              },
-            }}
-          />
-        </div>
+        <Prompt
+          onSubmit={async (input) => {
+            const { output } = await generate(input);
 
-        <div className="absolute bottom-0 left-0 right-0 flex gap-4 p-4 z-10 bg-white">
-          <Textarea
-            value={input}
-            onChange={(event) => {
-              setInput(event.target.value);
-            }}
-          />
-          <Button
-            onClick={async () => {
-              const { output } = await generate(input);
-
-              for await (const delta of readStreamableValue(output)) {
-                setData(delta as JSONForm);
-              }
-            }}
-          >
-            Generate
-          </Button>
-        </div>
-      </div>
-      {renderer ? (
-        <FormView
-          title={"Form"}
-          form_id={renderer.id}
-          fields={renderer.fields()}
-          blocks={renderer.blocks()}
-          tree={renderer.tree()}
-          translation={resources.en.translation as any}
-          options={{
-            is_powered_by_branding_enabled: false,
+            for await (const delta of readStreamableValue(output)) {
+              setData(delta as JSONForm);
+            }
           }}
         />
-      ) : (
-        <div className="grow flex items-center justify-center p-4 text-center text-gray-500">
-          Invalid schema
-        </div>
+      </div>
+      {data && (
+        <>
+          {renderer ? (
+            <FormView
+              title={"Form"}
+              form_id={renderer.id}
+              fields={renderer.fields()}
+              blocks={renderer.blocks()}
+              tree={renderer.tree()}
+              translation={resources.en.translation as any}
+              options={{
+                is_powered_by_branding_enabled: false,
+              }}
+            />
+          ) : (
+            <div className="grow flex items-center justify-center p-4 text-center text-gray-500">
+              Invalid schema
+            </div>
+          )}
+        </>
       )}
     </main>
+  );
+}
+
+export function Prompt({ onSubmit }: { onSubmit?: (input: string) => void }) {
+  const [input, setInput] = useState<string>("");
+
+  return (
+    <div className="w-full max-w-md mx-auto space-y-4">
+      <div className="text-center">
+        <h2 className="text-2xl font-bold">Build Forms with AI</h2>
+        <p className="text-gray-500 dark:text-gray-400">
+          Enter your AI prompt and let the magic happen.
+        </p>
+      </div>
+      <form className="space-y-4">
+        <div className="space-y-1">
+          <Label htmlFor="prompt">Your Prompt</Label>
+          <Textarea
+            className="min-h-[100px]"
+            id="prompt"
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            placeholder="Enter your AI prompt here..."
+          />
+        </div>
+        <Button
+          onClick={(e) => {
+            e.preventDefault();
+            onSubmit?.(input);
+          }}
+          className="w-full"
+          type="submit"
+        >
+          Generate
+        </Button>
+      </form>
+    </div>
   );
 }
