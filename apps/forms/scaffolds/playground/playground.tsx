@@ -27,7 +27,7 @@ import { Link2Icon, RocketIcon, SlashIcon } from "@radix-ui/react-icons";
 import { createClientFormsClient } from "@/lib/supabase/client";
 import toast from "react-hot-toast";
 import { useRouter } from "next/navigation";
-import { examples } from "./examples";
+import { examples } from "./k";
 import { generate } from "@/app/actions";
 import { readStreamableValue } from "ai/rsc";
 
