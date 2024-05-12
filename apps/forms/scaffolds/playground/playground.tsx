@@ -26,40 +26,8 @@ import { Button } from "@/components/ui/button";
 import { Link2Icon, RocketIcon, SlashIcon } from "@radix-ui/react-icons";
 import { createClientFormsClient } from "@/lib/supabase/client";
 import toast from "react-hot-toast";
-import Ajv from "ajv";
 import { useRouter } from "next/navigation";
-
-const HOST = process.env.NEXT_PUBLIC_HOST_NAME || "http://localhost:3000";
-
-const examples = [
-  {
-    id: "001-hello-world",
-    name: "Hello World",
-    template: {
-      schema: {
-        src: `${HOST}/schema/examples/001-hello-world/form.json`,
-      },
-    },
-  },
-  {
-    id: "002-iphone-pre-order",
-    name: "iPhone Pre-Order",
-    template: {
-      schema: {
-        src: `${HOST}/schema/examples/002-iphone-pre-order/form.json`,
-      },
-    },
-  },
-  {
-    id: "003-fields",
-    name: "Fields",
-    template: {
-      schema: {
-        src: `${HOST}/schema/examples/003-fields/form.json`,
-      },
-    },
-  },
-] as const;
+import { examples } from "./examples";
 
 type MaybeArray<T> = T | T[];
 
@@ -69,8 +37,8 @@ function toArrayOf<T>(value: MaybeArray<T>, nofalsy = true): NonNullable<T>[] {
   ) as NonNullable<T>[];
 }
 
-function compile(txt?: string) {
-  const schema = parse(txt);
+function compile(value?: string | object) {
+  const schema = parse(value);
   if (!schema) {
     return;
   }

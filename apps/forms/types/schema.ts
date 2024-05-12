@@ -96,9 +96,14 @@ export function parse_jsonfield(raw: JSONFieldRaw): JSONField {
   };
 }
 
-export function parse(txt?: string): JSONForm | null | undefined {
+export function parse(value?: string | object): JSONForm | null | undefined {
   try {
-    const shema_raw: JSONFormRaw = txt ? JSON.parse(txt) : null;
+    const shema_raw: JSONFormRaw =
+      typeof value === "string"
+        ? value
+          ? JSON.parse(value)
+          : null
+        : (value as JSONFormRaw);
     if (shema_raw) {
       return <JSONForm>{
         ...shema_raw,
