@@ -24,6 +24,7 @@ import { GridaLogo } from "@/components/grida-logo";
 import { FormFieldAutocompleteType, Option } from "@/types";
 import { Button } from "@/components/ui/button";
 import {
+  ExclamationTriangleIcon,
   Link2Icon,
   ReloadIcon,
   RocketIcon,
@@ -96,6 +97,26 @@ function compile(value?: string | object) {
   return renderer;
 }
 
+function useRenderer(raw?: string | object | null) {
+  // use last valid schema
+  const [valid, setValid] = useState<FormRenderTree>();
+  const [invalid, setInvalid] = useState<boolean>(false);
+
+  useEffect(() => {
+    if (raw) {
+      const o = compile(raw);
+      if (o) {
+        setValid(o);
+        setInvalid(false);
+      } else {
+        setInvalid(true);
+      }
+    }
+  }, [raw]);
+
+  return [valid, invalid] as const;
+}
+
 export function Playground({
   initial,
 }: {
@@ -120,10 +141,7 @@ export function Playground({
   const is_modified = __schema_txt !== initial?.src;
   const [busy, setBusy] = useState(false);
 
-  const renderer: FormRenderTree | undefined = useMemo(
-    () => (__schema_txt ? compile(__schema_txt) : undefined),
-    [__schema_txt]
-  );
+  const [renderer, invalid] = useRenderer(__schema_txt);
 
   const streamGeneration = (prompt: string) => {
     if (generating.current) {
@@ -303,7 +321,7 @@ export function Playground({
         <div className="h-full border-r" />
         <section className="flex-1 h-full overflow-y-scroll">
           {renderer ? (
-            <div className="flex flex-col items-center w-full">
+            <div className="relative flex flex-col items-center w-full">
               {(renderer.title || renderer.description) && (
                 <div className="mt-10 text-start w-full prose dark:prose-invert p-4">
                   <h1>{renderer.title}</h1>
@@ -322,6 +340,11 @@ export function Playground({
                   is_powered_by_branding_enabled: true,
                 }}
               />
+              {invalid && (
+                <div className="absolute top-2 right-2 bg-red-500 p-2 rounded shadow">
+                  <ExclamationTriangleIcon />
+                </div>
+              )}
             </div>
           ) : (
             <div className="grow flex items-center justify-center p-4 text-center text-gray-500">
