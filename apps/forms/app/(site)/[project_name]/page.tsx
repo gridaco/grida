@@ -4,7 +4,7 @@ import { cookies } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 import {
   createServerComponentClient,
-  workspaceclient,
+  createServerComponentWorkspaceClient,
 } from "@/lib/supabase/server";
 import { GridaLogo } from "@/components/grida-logo";
 import { ViewGridIcon, ViewHorizontalIcon } from "@radix-ui/react-icons";
@@ -46,6 +46,7 @@ export default async function FormsDashboardPage({
 
   const cookieStore = cookies();
   const supabase = createServerComponentClient(cookieStore);
+  const wsclient = createServerComponentWorkspaceClient(cookieStore);
 
   const { data: auth } = await supabase.auth.getSession();
 
@@ -55,13 +56,15 @@ export default async function FormsDashboardPage({
     return redirect("/sign-in");
   }
 
-  // TODO: this needs a RLS guard.
-  const { data: project_ref } = await workspaceclient
+  const { data: project_ref, error: _project_ref_err } = await wsclient
     .from("project")
     .select("id")
     .eq("name", project_name)
+    // TODO: in theory, there can be multiple projects with the same name in different organizations that the user is part of
+    .limit(1)
     .single();
 
+  if (_project_ref_err) console.error(_project_ref_err);
   if (!project_ref) {
     return notFound();
   }
