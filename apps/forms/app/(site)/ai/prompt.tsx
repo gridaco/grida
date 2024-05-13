@@ -8,15 +8,18 @@ import { useMemo, useState } from "react";
 
 export function Prompt() {
   const [input, setInput] = useState("");
-  const placeholder =
-    shortcuts[Math.floor(Math.random() * shortcuts.length)][1];
+  const [submitted, setSubmitted] = useState(false);
+  const placeholder = useMemo(
+    () => shortcuts[Math.floor(Math.random() * shortcuts.length)][1],
+    []
+  );
 
-  // shortcuts - pick 5 random shortcuts
-  const shortcuts5 = useMemo(
+  // shortcuts - pick 4 random shortcuts
+  const shortcuts4 = useMemo(
     () =>
       shortcuts
         .sort(() => Math.random() - 0.5)
-        .slice(0, 5)
+        .slice(0, 4)
         .map(([name, placeholder, content]) => ({
           name,
           placeholder,
@@ -27,7 +30,14 @@ export function Prompt() {
 
   return (
     <div className="w-full max-w-md mx-auto space-y-4 border rounded-lg shadow-lg p-4">
-      <form className="space-y-4" method="POST" action="/playground/with-ai">
+      <form
+        onSubmit={(e) => {
+          setSubmitted(true);
+        }}
+        className="space-y-4"
+        method="POST"
+        action="/playground/with-ai"
+      >
         <div className="space-y-1">
           <Textarea
             autoFocus
@@ -39,12 +49,12 @@ export function Prompt() {
             onChange={(e) => setInput(e.target.value)}
           />
         </div>
-        <Button className="w-full" type="submit">
+        <Button disabled={submitted} className="w-full" type="submit">
           Generate
         </Button>
       </form>
-      <div className="flex flex-wrap gap-1">
-        {shortcuts5.map(({ name, content }) => (
+      <div className="flex flex-wrap items-center justify-center gap-1">
+        {shortcuts4.map(({ name, content }) => (
           <button
             onClick={() => {
               setInput(content);

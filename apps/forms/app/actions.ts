@@ -3,7 +3,7 @@
 import { streamObject } from "ai";
 import { openai } from "@ai-sdk/openai";
 import { createStreamableValue } from "ai/rsc";
-import { ZJSONForm } from "@/types/zod";
+import { GENzJSONForm } from "@/types/zod";
 
 export async function generate(input: string) {
   const stream = createStreamableValue({});
@@ -12,7 +12,7 @@ export async function generate(input: string) {
     const { partialObjectStream } = await streamObject({
       model: openai("gpt-4-1106-preview"),
       prompt: input,
-      schema: ZJSONForm,
+      schema: GENzJSONForm,
     });
 
     for await (const partialObject of partialObjectStream) {

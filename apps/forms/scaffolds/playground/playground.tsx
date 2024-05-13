@@ -249,6 +249,7 @@ export function Playground({
             </div> */}
           </div>
         </section>
+        <div className="h-full border-r" />
         <section className="flex-1 flex justify-center h-full overflow-y-scroll">
           {renderer ? (
             <FormView

@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-export const ZFormInputType = z.enum([
+export const zFormInputType = z.enum([
   "text",
   "textarea",
   "tel",
@@ -31,7 +31,7 @@ export const ZFormInputType = z.enum([
   "range",
 ]);
 
-export const ZFormFieldAutocompleteType = z.enum([
+export const zFormFieldAutocompleteType = z.enum([
   "off",
   "on",
   "name",
@@ -91,41 +91,72 @@ export const ZFormFieldAutocompleteType = z.enum([
   "webauthn",
 ]);
 
-export const ZJSONOption = z.object({
+export const zJSONOption = z.object({
   value: z.string(),
   label: z.string().optional(),
   src: z.string().optional(),
   disabled: z.boolean().optional(),
 });
 
-export const ZJSONField = z.object({
-  name: z.string(),
-  label: z.string().optional(),
-  placeholder: z.string().optional(),
+export const zJSONField = z.object({
+  name: z.string().describe("HTML5 form `name` attribute"),
+  label: z.string().optional().describe("User facing label"),
+  placeholder: z
+    .string()
+    .optional()
+    .describe(
+      "HTML5 form `placeholder` attribute + also used for `select` input"
+    ),
   required: z.boolean().optional(),
   pattern: z.string().optional(),
-  type: ZFormInputType.or(ZFormInputType.array()), // Simplified for direct or array of `FormInputType`
-  options: z.array(ZJSONOption.or(z.string()).or(z.number())).optional(),
+  type: zFormInputType
+    .or(zFormInputType.array())
+    .describe("`FormInputType` HTML5 + extended input type"),
+  options: z.array(zJSONOption.or(z.string()).or(z.number())).optional(),
   multiple: z.boolean().optional(),
-  autocomplete: ZFormFieldAutocompleteType.or(
-    ZFormFieldAutocompleteType.array()
-  ).optional(),
+  autocomplete: zFormFieldAutocompleteType
+    .or(zFormFieldAutocompleteType.array())
+    .optional(),
 });
 
-export const ZJSONForm = z.object({
-  title: z.string().optional(),
-  name: z.string(),
-  description: z.string().optional(),
-  action: z.string().optional(),
+export const zJSONForm = z.object({
+  title: z.string().optional().describe("User facing form title"),
+  name: z.string().describe("HTML5 form `name` attribute"),
+  description: z.string().optional().describe("description for the editor"),
+  action: z.string().optional().describe("HTML5 form `action` attribute"),
   enctype: z
     .enum([
       "application/x-www-form-urlencoded",
       "multipart/form-data",
       "text/plain",
     ])
-    .optional(),
-  method: z.enum(["get", "post", "dialog"]).optional(),
-  novalidate: z.boolean().optional(),
-  target: z.enum(["_blank", "_self", "_parent", "_top"]).optional(),
-  fields: z.array(ZJSONField).optional(),
+    .optional()
+    .describe("HTML5 form `enctype` attribute"),
+  method: z
+    .enum(["get", "post", "dialog"])
+    .optional()
+    .describe("HTML5 form `method` attribute"),
+  novalidate: z
+    .boolean()
+    .optional()
+    .describe("HTML5 form `novalidate` attribute"),
+  target: z
+    .enum(["_blank", "_self", "_parent", "_top"])
+    .optional()
+    .describe("HTML5 form `target` attribute"),
+  fields: z
+    .array(zJSONField)
+    .optional()
+    .describe("form fields definition, array of fields of `FormInputType`"),
+});
+
+/**
+ * schema for ai generation - exclude redundant fields
+ */
+export const GENzJSONForm = zJSONForm.omit({
+  action: true,
+  enctype: true,
+  method: true,
+  novalidate: true,
+  target: true,
 });
