@@ -5,7 +5,6 @@ import { cookies } from "next/headers";
 import { createServerComponentClient } from "@/lib/supabase/server";
 import { GridaLogo } from "@/components/grida-logo";
 import { EyeOpenIcon, SlashIcon } from "@radix-ui/react-icons";
-import { Toaster } from "react-hot-toast";
 import { Tabs } from "@/scaffolds/d/tabs";
 import { FormEditorProvider } from "@/scaffolds/editor";
 import type { Metadata } from "next";

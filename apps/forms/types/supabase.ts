@@ -1001,6 +1001,7 @@ export type Database = {
           form_id: string
           help_text: string | null
           id: string
+          is_array: boolean
           label: string | null
           local_index: number
           max: Json | null
@@ -1027,6 +1028,7 @@ export type Database = {
           form_id: string
           help_text?: string | null
           id?: string
+          is_array?: boolean
           label?: string | null
           local_index?: number
           max?: Json | null
@@ -1053,6 +1055,7 @@ export type Database = {
           form_id?: string
           help_text?: string | null
           id?: string
+          is_array?: boolean
           label?: string | null
           local_index?: number
           max?: Json | null
@@ -1159,6 +1162,47 @@ export type Database = {
             columns: ["form_id"]
             isOneToOne: false
             referencedRelation: "form"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      gist: {
+        Row: {
+          created_at: string
+          data: Json | null
+          id: number
+          is_public: boolean
+          prompt: string | null
+          slug: string | null
+          title: string | null
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          data?: Json | null
+          id?: number
+          is_public?: boolean
+          prompt?: string | null
+          slug?: string | null
+          title?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          data?: Json | null
+          id?: number
+          is_public?: boolean
+          prompt?: string | null
+          slug?: string | null
+          title?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "playground_gist_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
             referencedColumns: ["id"]
           },
         ]
@@ -1378,6 +1422,8 @@ export type Database = {
         | "checkbox"
         | "checkboxes"
         | "switch"
+        | "toggle"
+        | "toggle-group"
         | "date"
         | "month"
         | "week"

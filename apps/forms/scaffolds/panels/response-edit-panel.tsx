@@ -15,7 +15,7 @@ import {
 } from "@/components/panels/side-panel";
 import {
   FormFieldDefinition,
-  FormFieldType,
+  FormInputType,
   FormResponse,
   FormFieldInit,
 } from "@/types";

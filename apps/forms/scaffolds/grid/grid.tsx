@@ -26,7 +26,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@editor-ui/dropdown-menu";
-import { FormFieldType } from "@/types";
+import { FormInputType } from "@/types";
 import { JsonEditCell } from "./json-cell";
 import { useEditorState } from "../editor";
 import { GFRow } from "./types";
@@ -125,7 +125,7 @@ export function Grid({
             renderHeaderCell: (props) => (
               <FieldHeaderCell
                 {...props}
-                type={col.type as FormFieldType}
+                type={col.type as FormInputType}
                 onEditClick={() => {
                   onEditFieldClick?.(col.key);
                 }}
@@ -199,7 +199,7 @@ function FieldHeaderCell({
   onEditClick,
   onDeleteClick,
 }: RenderHeaderCellProps<any> & {
-  type: FormFieldType;
+  type: FormInputType;
   onEditClick?: () => void;
   onDeleteClick?: () => void;
 }) {
@@ -293,11 +293,11 @@ function FieldCell({ column, row }: RenderCellProps<any>) {
 
   const { type, value } = data;
 
-  const unwrapped = unwrapFeildValue(value, type as FormFieldType, {
+  const unwrapped = unwrapFeildValue(value, type as FormInputType, {
     obscure: true,
   });
 
-  switch (type as FormFieldType) {
+  switch (type as FormInputType) {
     case "checkbox": {
       return <input type="checkbox" checked={unwrapped as boolean} disabled />;
     }
@@ -327,7 +327,7 @@ function FieldEditCell(props: RenderEditCellProps<any>) {
 
   const unwrapped = JSON.parse(value);
 
-  switch (type as FormFieldType) {
+  switch (type as FormInputType) {
     case "email":
     case "password":
     case "tel":

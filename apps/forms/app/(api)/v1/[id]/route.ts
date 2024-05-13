@@ -31,7 +31,7 @@ import { is_uuid_v4 } from "@/utils/is";
 import i18next from "i18next";
 import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
-import { FormRenderer, type ClientRenderBlock } from "@/lib/forms";
+import { FormRenderTree, type ClientRenderBlock } from "@/lib/forms";
 import type { FormFieldDefinition, FormPage, Option } from "@/types";
 
 export const revalidate = 0;
@@ -167,6 +167,7 @@ export async function GET(
 
   const {
     title,
+    description,
     default_page,
     fields,
     is_powered_by_branding_enabled,
@@ -227,9 +228,16 @@ export async function GET(
     };
   }
 
-  const renderer = new FormRenderer(id, fields, page_blocks, {
-    option_renderer: mkoption,
-  });
+  const renderer = new FormRenderTree(
+    id,
+    title,
+    description,
+    fields,
+    page_blocks,
+    {
+      option_renderer: mkoption,
+    }
+  );
 
   const required_hidden_fields = fields.filter(
     (f) => f.type === "hidden" && f.required

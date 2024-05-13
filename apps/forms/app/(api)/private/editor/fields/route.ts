@@ -3,7 +3,7 @@ import {
   createRouteHandlerClient,
 } from "@/lib/supabase/server";
 import { GridaCommerceClient } from "@/services/commerce";
-import { FormFieldDataSchema, FormFieldType, PaymentFieldData } from "@/types";
+import { FormFieldDataSchema, FormInputType, PaymentFieldData } from "@/types";
 import { FormFieldUpsert } from "@/types/private/api";
 import assert from "assert";
 import { cookies } from "next/headers";
@@ -194,7 +194,7 @@ function safe_data_field({
   type,
   data,
 }: {
-  type: FormFieldType;
+  type: FormInputType;
   data?: FormFieldDataSchema;
 }): FormFieldDataSchema | undefined | null {
   switch (type) {

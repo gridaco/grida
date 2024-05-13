@@ -1,6 +1,6 @@
 import {
   FormFieldDataSchema,
-  FormFieldType,
+  FormInputType,
   Option,
   PaymentFieldData,
 } from "@/types";
@@ -17,11 +17,18 @@ import { SignatureCanvas } from "../signature-canvas";
 import { StripePaymentFormFieldPreview } from "./form-field-preview-payment-stripe";
 import { TossPaymentsPaymentFormFieldPreview } from "./form-field-preview-payment-tosspayments";
 import clsx from "clsx";
-import { ClockIcon } from "@radix-ui/react-icons";
+import { ClockIcon, PlusIcon } from "@radix-ui/react-icons";
 import { Checkbox } from "@/components/ui/checkbox";
 import useSafeSelectValue from "./use-safe-select-value";
 import { Switch } from "../ui/switch";
 import { Slider } from "../ui/slider";
+import { Toggle } from "../ui/toggle";
+import { ToggleGroup, ToggleGroupItem } from "../ui/toggle-group";
+import { RadioGroup, RadioGroupItem } from "../ui/radio-group";
+import { Textarea } from "../ui/textarea";
+import { Input } from "../ui/input";
+import { Button } from "../ui/button";
+import { Card } from "../ui/card";
 
 /**
  * this disables the auto zoom in input text tag safari on iphone by setting font-size to 16px
@@ -29,7 +36,82 @@ import { Slider } from "../ui/slider";
  */
 const cls_input_ios_zoom_disable = "!text-base sm:!text-sm";
 
-export function FormFieldPreview({
+interface IInputField {
+  name: string;
+  label?: string;
+  type: FormInputType;
+  placeholder?: string;
+  helpText?: string;
+  required?: boolean;
+  requiredAsterisk?: boolean;
+  defaultValue?: string;
+  options?: Option[];
+  pattern?: string;
+  readonly?: boolean;
+  disabled?: boolean;
+  autoComplete?: string;
+  accept?: string;
+  multiple?: boolean;
+  labelCapitalize?: boolean;
+  data?: FormFieldDataSchema | null;
+}
+
+interface IFormField extends IInputField {
+  novalidate?: boolean;
+  /**
+   * disable auto mutation of value when locked.
+   * by default, the input values are only modified by user input, thus, there is a exception for select input for extra validation (e.g. useSafeSelectValue)
+   */
+  locked?: boolean;
+}
+
+interface IMonoFormFieldRenderingProps extends IFormField {
+  /**
+   * use vanilla html5 input element only
+   */
+  vanilla?: boolean;
+  /**
+   * force render invisible field if true
+   */
+  preview?: boolean;
+}
+
+interface IFormFieldRenderingProps extends IMonoFormFieldRenderingProps {
+  is_array?: boolean;
+}
+
+/**
+ * @beta is_array=true is experimental and only works on playground
+ * @returns
+ */
+function FormField({ is_array, ...props }: IFormFieldRenderingProps) {
+  const [n, setN] = useState(1);
+  if (is_array) {
+    return (
+      <>
+        <div>
+          <label>
+            <Button
+              variant="outline"
+              type="button"
+              onClick={() => {
+                setN((n) => n + 1);
+              }}
+            >
+              <PlusIcon />
+            </Button>
+          </label>
+          {Array.from({ length: n }).map((_, i) => (
+            <MonoFormField key={i} {...props} />
+          ))}
+        </div>
+      </>
+    );
+  }
+  return <MonoFormField {...props} />;
+}
+
+function MonoFormField({
   name,
   label,
   labelCapitalize,
@@ -51,39 +133,7 @@ export function FormFieldPreview({
   vanilla,
   locked,
   preview,
-}: {
-  name: string;
-  label?: string;
-  type: FormFieldType;
-  placeholder?: string;
-  helpText?: string;
-  required?: boolean;
-  requiredAsterisk?: boolean;
-  defaultValue?: string;
-  options?: Option[];
-  pattern?: string;
-  readonly?: boolean;
-  disabled?: boolean;
-  autoComplete?: string;
-  accept?: string;
-  multiple?: boolean;
-  labelCapitalize?: boolean;
-  data?: FormFieldDataSchema | null;
-  novalidate?: boolean;
-  /**
-   * use vanilla html5 input element only
-   */
-  vanilla?: boolean;
-  /**
-   * disable auto mutation of value when locked.
-   * by default, the input values are only modified by user input, thus, there is a exception for select input for extra validation (e.g. useSafeSelectValue)
-   */
-  locked?: boolean;
-  /**
-   * force render invisible field if true
-   */
-  preview?: boolean;
-}) {
+}: IMonoFormFieldRenderingProps) {
   const sharedInputProps:
     | React.ComponentProps<"input">
     | React.ComponentProps<"textarea"> = {
@@ -107,11 +157,67 @@ export function FormFieldPreview({
     // step: novalidate ? undefined : data?.step,
   };
 
+  function renderChildren({
+    name,
+    label,
+    src,
+  }: {
+    name: string;
+    label?: string;
+    src?: string | null;
+  }) {
+    return (
+      <>
+        <span>{label || name}</span>
+        {src && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={src}
+            alt={label || name}
+            className="mt-1 w-12 h-12 aspect-square rounded-sm"
+          />
+        )}
+      </>
+    );
+  }
+
   function renderInput() {
     switch (type) {
-      case "textarea": {
+      case "text":
+      case "tel":
+      case "email":
+      case "number":
+      case "url":
+      case "password": {
+        if (vanilla) {
+          return (
+            <HtmlInput
+              type={type}
+              {...(sharedInputProps as React.ComponentProps<"input">)}
+            />
+          );
+        }
+
         return (
-          <HtmlTextarea
+          // @ts-ignore
+          <Input
+            type={type}
+            {...(sharedInputProps as React.ComponentProps<"input">)}
+          />
+        );
+      }
+      case "textarea": {
+        if (vanilla) {
+          return (
+            <HtmlTextarea
+              {...(sharedInputProps as React.ComponentProps<"textarea">)}
+            />
+          );
+        }
+
+        return (
+          // @ts-ignore
+          <Textarea
             {...(sharedInputProps as React.ComponentProps<"textarea">)}
           />
         );
@@ -152,34 +258,49 @@ export function FormFieldPreview({
         }
       }
       case "radio": {
+        if (vanilla) {
+          return (
+            <fieldset className="flex flex-col gap-1">
+              {options?.map((option) => (
+                <div className="flex items-center gap-2" key={option.value}>
+                  <input
+                    type="radio"
+                    name={name}
+                    id={option.value}
+                    value={option.value}
+                    {...(sharedInputProps as React.ComponentProps<"input">)}
+                  />
+                  <label
+                    htmlFor={option.value}
+                    className="ms-2 text-sm font-medium text-neutral-900 dark:text-neutral-300"
+                  >
+                    {renderChildren({
+                      name: option.value,
+                      label: option.label,
+                      src: option.src,
+                    })}
+                  </label>
+                </div>
+              ))}
+            </fieldset>
+          );
+        }
+
         return (
-          <fieldset className="flex flex-col gap-1">
+          <RadioGroup>
             {options?.map((option) => (
-              <div className="flex items-center gap-2" key={option.value}>
-                <input
-                  type="radio"
-                  name={name}
-                  id={option.value}
-                  value={option.value}
-                  {...(sharedInputProps as React.ComponentProps<"input">)}
-                />
-                <label
-                  htmlFor={option.value}
-                  className="ms-2 text-sm font-medium text-neutral-900 dark:text-neutral-300"
-                >
-                  <span>{option.label}</span>
-                  {option.src && (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={option.src}
-                      alt={option.label || option.value}
-                      className="mt-1 w-12 h-12 aspect-square rounded-sm"
-                    />
-                  )}
+              <div key={option.id} className="flex items-center space-x-2">
+                <RadioGroupItem value={option.id} id={option.id} />
+                <label htmlFor={option.id}>
+                  {renderChildren({
+                    name: option.value,
+                    label: option.label,
+                    src: option.src,
+                  })}
                 </label>
               </div>
             ))}
-          </fieldset>
+          </RadioGroup>
         );
       }
       case "checkbox": {
@@ -188,42 +309,10 @@ export function FormFieldPreview({
           <Checkbox {...(sharedInputProps as React.ComponentProps<"input">)} />
         );
       }
-      case "checkboxes": {
+      case "toggle": {
         return (
-          <fieldset className="not-prose">
-            <ul className="text-sm font-medium text-neutral-900 bg-white border border-neutral-200 rounded-lg dark:bg-neutral-700 dark:border-neutral-600 dark:text-white">
-              {options?.map((option) => (
-                <li
-                  key={option.value}
-                  className="w-full border-b border-neutral-200 rounded-t-lg dark:border-neutral-600"
-                >
-                  <div className="flex items-center ps-3">
-                    <input
-                      type="checkbox"
-                      name={name}
-                      id={option.value}
-                      value={option.value}
-                      {...(sharedInputProps as React.ComponentProps<"input">)}
-                      className="w-4 h-4 text-blue-600 bg-neutral-100 border-neutral-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-neutral-700 dark:focus:ring-offset-neutral-700 focus:ring-2 dark:bg-neutral-600 dark:border-neutral-500"
-                    />
-                    <label
-                      htmlFor={option.value}
-                      className="w-full py-3 ms-2 text-sm font-medium text-neutral-900 dark:text-neutral-300"
-                    >
-                      {option.label}
-                      {option.src && (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img
-                          src={option.src}
-                          alt={option.label || option.value}
-                          className="mt-1 w-12 h-12 aspect-square rounded-sm"
-                        />
-                      )}
-                    </label>
-                  </div>
-                </li>
-              ))}
-            </ul>
+          <fieldset>
+            <Toggle>{label || name}</Toggle>
           </fieldset>
         );
       }
@@ -293,10 +382,10 @@ export function FormFieldPreview({
     return <PaymentField data={data as PaymentFieldData} disabled={disabled} />;
   }
 
-  const LabelText = () => (
+  const LabelText = ({ htmlFor = name }: { htmlFor?: string }) => (
     <label
       data-capitalize={labelCapitalize}
-      htmlFor={name}
+      htmlFor={htmlFor}
       className="data-[capitalize]:capitalize font-medium text-neutral-900 dark:text-neutral-300 text-sm"
     >
       {label || name}{" "}
@@ -317,6 +406,11 @@ export function FormFieldPreview({
 
   // custom layout
   switch (type) {
+    // this can only present on ai generated data.
+    // @ts-ignore
+    case "submit": {
+      return <></>;
+    }
     case "switch": {
       return (
         <label
@@ -343,17 +437,73 @@ export function FormFieldPreview({
       );
     }
     case "checkboxes": {
+      const renderItem = (item: Option) => {
+        return (
+          <label className="flex items-center ps-3">
+            {/* @ts-ignore */}
+            <Checkbox
+              name={name}
+              id={item.id}
+              value={item.value}
+              {...(sharedInputProps as React.ComponentProps<"input">)}
+            />
+            <span className="w-full py-3 ms-2 text-sm font-medium text-neutral-900 dark:text-neutral-300">
+              {item.label}
+              {item.src && (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={item.src}
+                  alt={item.label || item.value}
+                  className="mt-1 w-12 h-12 aspect-square rounded-sm"
+                />
+              )}
+            </span>
+          </label>
+        );
+      };
+
       return (
-        <label
-          htmlFor={"none"} // disable the focusing since checkboxes is not standard form input
-          data-field-type={type}
-          className="flex flex-col gap-1"
-        >
-          <LabelText />
+        <div data-field-type={type} className="flex flex-col gap-1">
+          <LabelText htmlFor="none" />
           <HelpText />
-          {renderInput()}
-        </label>
+          <Card>
+            <fieldset className="not-prose">
+              <ul>
+                {options?.map((option) => (
+                  <li
+                    key={option.value}
+                    className="w-full border-b rounded-t-lg"
+                  >
+                    {renderItem(option)}
+                  </li>
+                ))}
+              </ul>
+            </fieldset>
+          </Card>
+        </div>
       );
+    }
+    case "radio": {
+      return (
+        <div data-field-type={type} className="flex flex-col gap-1">
+          <LabelText htmlFor="none" />
+          {renderInput()}
+          <HelpText />
+        </div>
+      );
+    }
+    case "toggle-group": {
+      if (options) {
+        return (
+          <ToggleGroup type={multiple ? "multiple" : "single"}>
+            {options.map((option) => (
+              <ToggleGroupItem key={option.id} value={option.id}>
+                {option.label}
+              </ToggleGroupItem>
+            ))}
+          </ToggleGroup>
+        );
+      }
     }
   }
 
@@ -514,7 +664,7 @@ function HtmlTextarea({ ...props }: React.ComponentProps<"textarea">) {
   return (
     <textarea
       className={clsx(
-        "block p-2.5 w-full text-sm text-neutral-900 bg-neutral-50 rounded-lg border border-neutral-300 focus:ring-blue-500 focus:border-blue-500 dark:bg-neutral-700 dark:border-neutral-600 dark:placeholder-neutral-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500",
+        "flex min-h-[60px] w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50",
         cls_input_ios_zoom_disable
       )}
       {...props}
@@ -526,7 +676,7 @@ function HtmlInput({ ...props }: React.ComponentProps<"input">) {
   return (
     <input
       className={clsx(
-        "bg-neutral-50 border border-neutral-300 text-neutral-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-neutral-700 dark:border-neutral-600 dark:placeholder-neutral-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500",
+        "h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50",
         cls_input_ios_zoom_disable
       )}
       {...props}
@@ -568,3 +718,5 @@ function PaymentField({
       return <StripePaymentFormFieldPreview />;
   }
 }
+
+export default FormField;

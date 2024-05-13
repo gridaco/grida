@@ -1,4 +1,4 @@
-import { FormFieldType } from "@/types";
+import { FormInputType } from "@/types";
 import {
   EnvelopeClosedIcon,
   TextIcon,
@@ -14,7 +14,7 @@ import {
   SliderIcon,
 } from "@radix-ui/react-icons";
 
-export function FormFieldTypeIcon({ type }: { type: FormFieldType }) {
+export function FormFieldTypeIcon({ type }: { type: FormInputType }) {
   switch (type) {
     case "text":
       return <TextIcon />;

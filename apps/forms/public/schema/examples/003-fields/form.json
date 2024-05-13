@@ -1,0 +1,87 @@
+{
+  "$schema": "https://forms.grida.co/schema/form.schema.json",
+  "title": "iPhone 15 - Pre-order",
+  "name": "iphone-15-pre-order",
+  "fields": [
+    {
+      "name": "text",
+      "type": "text"
+    },
+    {
+      "name": "number",
+      "type": "number"
+    },
+    {
+      "name": "email",
+      "type": "email"
+    },
+    {
+      "name": "emails",
+      "type": ["email"]
+    },
+    {
+      "name": "todos",
+      "type": "object",
+      "schema": {
+        "type": "object",
+        "properties": {
+          "text": {
+            "type": "string"
+          },
+          "done": {
+            "type": "boolean"
+          }
+        }
+      }
+    },
+    {
+      "name": "password",
+      "type": "password"
+    },
+    {
+      "name": "textarea",
+      "type": "textarea"
+    },
+    {
+      "name": "select",
+      "type": "select",
+      "placeholder": "Select Option",
+      "options": ["A", "B", "C", "D", "E"]
+    },
+    {
+      "name": "radio",
+      "type": "radio",
+      "options": ["yes", "no"]
+    },
+    {
+      "name": "checkbox",
+      "type": "checkbox"
+    },
+    {
+      "name": "checkboxes",
+      "type": "checkboxes",
+      "options": ["A", "B", "C", "D", "E"]
+    },
+    {
+      "name": "✔",
+      "type": "toggle"
+    },
+    {
+      "name": "toggle-group",
+      "type": "toggle-group",
+      "options": ["A", "B", "C", "D", "E"]
+    },
+    {
+      "name": "date",
+      "type": "date"
+    },
+    {
+      "name": "color",
+      "type": "color"
+    },
+    {
+      "name": "signature",
+      "type": "signature"
+    }
+  ]
+}

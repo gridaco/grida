@@ -1,8 +1,8 @@
-import type { FormFieldType } from "@/types";
+import type { FormInputType } from "@/types";
 
 export function unwrapFeildValue(
   value: any,
-  type: FormFieldType,
+  type: FormInputType,
   options?: {
     obscure?: boolean;
   }

@@ -1,0 +1,97 @@
+{
+  "title": "Entry-Level Job Application Form",
+  "name": "job_application_form",
+  "description": "Please fill out this form to apply for the entry-level position.",
+  "action": "",
+  "enctype": "multipart/form-data",
+  "method": "post",
+  "novalidate": false,
+  "target": "_self",
+  "fields": [
+    {
+      "name": "full_name",
+      "label": "Full Name",
+      "placeholder": "Your full name",
+      "required": true,
+      "type": "text"
+    },
+    {
+      "name": "email_address",
+      "label": "Email Address",
+      "placeholder": "Your email address",
+      "required": true,
+      "type": "email"
+    },
+    {
+      "name": "phone_number",
+      "label": "Phone Number",
+      "placeholder": "Your phone number",
+      "required": true,
+      "type": "tel"
+    },
+    {
+      "name": "address",
+      "label": "Address",
+      "placeholder": "Your current address",
+      "required": true,
+      "type": "textarea"
+    },
+    {
+      "name": "highest_education_level",
+      "label": "Highest Education Level",
+      "placeholder": "Select your highest level of education",
+      "required": true,
+      "type": "select",
+      "options": [
+        "High School Diploma",
+        "Associate Degree",
+        "Bachelor's Degree",
+        "Master's Degree",
+        "Doctorate or Higher"
+      ]
+    },
+    {
+      "name": "field_of_study",
+      "label": "Field of Study",
+      "placeholder": "Your major or field of study",
+      "required": true,
+      "type": "text"
+    },
+    {
+      "name": "graduation_date",
+      "label": "Graduation Date",
+      "placeholder": "Estimated or actual graduation date",
+      "required": false,
+      "type": "date"
+    },
+    {
+      "name": "employment_status",
+      "label": "Current Employment Status",
+      "placeholder": "Select your current employment status",
+      "required": true,
+      "type": "select",
+      "options": ["Employed", "Unemployed", "Student", "Self-Employed", "Other"]
+    },
+    {
+      "name": "resume",
+      "label": "Resume",
+      "placeholder": "Upload your resume",
+      "required": true,
+      "type": "file"
+    },
+    {
+      "name": "cover_letter",
+      "label": "Cover Letter (optional)",
+      "placeholder": "Upload your cover letter",
+      "required": false,
+      "type": "file"
+    },
+    {
+      "name": "references",
+      "label": "References (optional)",
+      "placeholder": "Provide any professional references",
+      "required": false,
+      "type": "textarea"
+    }
+  ]
+}

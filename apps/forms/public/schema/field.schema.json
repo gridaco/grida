@@ -22,6 +22,68 @@
       "type": "string",
       "format": "regex"
     },
+    "multiple": {
+      "type": "boolean",
+      "default": false
+    },
+    "type": {
+      "anyOf": [
+        { "$ref": "#/definitions/type" },
+        { "const": "object" },
+        {
+          "type": "object",
+          "properties": {
+            "type": { "const": "array" },
+            "items": {
+              "type": "object",
+              "properties": {
+                "type": { "$ref": "#/definitions/type" }
+              }
+            }
+          },
+          "required": ["type"]
+        },
+        {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/type"
+          },
+          "minItems": 1,
+          "maxItems": 1
+        }
+      ]
+    },
+    "schema": {
+      "$ref": "https://json-schema.org/draft-07/schema#"
+    },
+    "options": {
+      "type": "array",
+      "items": {
+        "anyOf": [
+          { "$ref": "https://forms.grida.co/schema/option.schema.json" },
+          { "type": "string" },
+          { "type": "number" }
+        ],
+        "uniqueItems": true
+      }
+    },
+    "autocomplete": {
+      "anyOf": [
+        {
+          "$ref": "#/definitions/autocomplete"
+        },
+        {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/autocomplete"
+          },
+          "uniqueItems": true
+        }
+      ]
+    }
+  },
+  "required": ["name", "type"],
+  "definitions": {
     "type": {
       "type": "string",
       "enum": [
@@ -31,6 +93,8 @@
         "url",
         "checkbox",
         "checkboxes",
+        "toggle",
+        "toggle-group",
         "switch",
         "number",
         "date",
@@ -53,29 +117,6 @@
         "range"
       ]
     },
-    "options": {
-      "type": "array",
-      "items": {
-        "$ref": "https://forms.grida.co/schema/option.schema.json"
-      }
-    },
-    "autocomplete": {
-      "anyOf": [
-        {
-          "$ref": "#/definitions/autocomplete"
-        },
-        {
-          "type": "array",
-          "items": {
-            "$ref": "#/definitions/autocomplete"
-          },
-          "uniqueItems": true
-        }
-      ]
-    }
-  },
-  "required": ["name", "type"],
-  "definitions": {
     "autocomplete": {
       "type": "array",
       "enum": [
