@@ -122,7 +122,7 @@ export function Form({
   const submit_action = "/submit/" + form_id;
 
   return (
-    <div className="pt-10 md:pt-16">
+    <div className="pt-10 md:pt-16 w-full flex justify-center">
       <FormView
         form_id={form_id}
         action={submit_action}
