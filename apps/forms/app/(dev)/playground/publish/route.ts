@@ -129,7 +129,7 @@ export async function POST(req: NextRequest) {
 
   // redirect to form editor page
 
-  return NextResponse.redirect(editorlink(HOST, form_id, "data"), {
+  return NextResponse.redirect(editorlink(HOST, form_id, "blocks"), {
     status: 302,
   });
 }
