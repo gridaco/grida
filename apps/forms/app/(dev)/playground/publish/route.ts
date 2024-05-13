@@ -104,7 +104,7 @@ export async function POST(req: NextRequest) {
 
   if (!PROJECT_ID) {
     // 2. create project if not exists  - TODO: also bad
-    const { data: project } = await workspaceclient
+    const { data: project, error } = await workspaceclient
       .from("project")
       .insert({
         organization_id: ORG_ID,
@@ -113,6 +113,7 @@ export async function POST(req: NextRequest) {
       .select()
       .single();
 
+    if (error) console.error(error);
     assert(project, "failed to create project");
 
     PROJECT_ID = project.id;
