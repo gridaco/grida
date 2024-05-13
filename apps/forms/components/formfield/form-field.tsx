@@ -29,6 +29,7 @@ import { Textarea } from "../ui/textarea";
 import { Input } from "../ui/input";
 import { Button } from "../ui/button";
 import { Card } from "../ui/card";
+import { Label } from "../ui/label";
 
 /**
  * this disables the auto zoom in input text tag safari on iphone by setting font-size to 16px
@@ -383,16 +384,16 @@ function MonoFormField({
   }
 
   const LabelText = ({ htmlFor = name }: { htmlFor?: string }) => (
-    <label
-      data-capitalize={labelCapitalize}
+    <Label
       htmlFor={htmlFor}
-      className="data-[capitalize]:capitalize font-medium text-neutral-900 dark:text-neutral-300 text-sm"
+      data-capitalize={labelCapitalize}
+      className="data-[capitalize]:capitalize mb-2"
     >
       {label || name}{" "}
       {required && requiredAsterisk && (
         <span className="text-red-500/80">*</span>
       )}
-    </label>
+    </Label>
   );
 
   const HelpText = () =>

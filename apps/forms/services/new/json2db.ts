@@ -10,6 +10,8 @@ import assert from "assert";
 type ID = string;
 type FormFieldInsertion =
   Database["grida_forms"]["Tables"]["form_field"]["Insert"];
+type FormFieldOptionInsertion =
+  Database["grida_forms"]["Tables"]["form_field_option"]["Insert"];
 type FormBlockInsertion =
   Database["grida_forms"]["Tables"]["form_block"]["Insert"];
 
@@ -21,9 +23,9 @@ type FormBlockInsertion =
  * - 1. create a new form (grida_forms.form)
  * - 2. create a new form page (grida_forms.form_page)
  * - 3. create fields (grida_forms.form_field)
- *
+ * - 4. create options (grida_forms.form_field_option)
  * // TODO:
- * - 4. create blocks (grida_forms.form_block)
+ * - 5. create blocks (grida_forms.form_block)
  */
 export class JSONFrom2DB {
   private renderer: FormRenderTree;
@@ -145,7 +147,40 @@ export class JSONFrom2DB {
       this.fields_db_map[f.name] = f.id;
     });
 
+    this.fields_db_map_ready = true;
+
     return _;
+  }
+
+  private async insert_options() {
+    assert(!!this.form_id, "form not inserted");
+    assert(!!this.fields_db_map_ready, "fields not inserted");
+
+    const options = this.renderer
+      .fields()
+      .map((f) =>
+        f.options?.map((o, i) => ({
+          ...o,
+          index: o.index || i,
+          _field: f,
+        }))
+      )
+      .flat()
+      .filter((o) => !!o);
+
+    const rows: FormFieldOptionInsertion[] = options.map((o) => {
+      return {
+        form_id: this.form_id!,
+        form_field_id: this.fields_db_map[o!._field.name],
+        disabled: o!.disabled,
+        index: o!.index,
+        label: o!.label,
+        src: o!.src,
+        value: o!.value,
+      };
+    });
+
+    return this.client.from("form_field_option").insert(rows);
   }
 
   private async insert_blocks() {
@@ -194,6 +229,7 @@ export class JSONFrom2DB {
     await this.insert_form();
     await this.insert_page();
     await this.insert_fields();
+    await this.insert_options();
     await this.insert_blocks();
 
     return {
