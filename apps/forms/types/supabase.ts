@@ -1173,7 +1173,7 @@ export type Database = {
           id: number
           is_public: boolean
           prompt: string | null
-          slug: string | null
+          slug: string
           title: string | null
           user_id: string | null
         }
@@ -1183,7 +1183,7 @@ export type Database = {
           id?: number
           is_public?: boolean
           prompt?: string | null
-          slug?: string | null
+          slug: string
           title?: string | null
           user_id?: string | null
         }
@@ -1193,7 +1193,7 @@ export type Database = {
           id?: number
           is_public?: boolean
           prompt?: string | null
-          slug?: string | null
+          slug?: string
           title?: string | null
           user_id?: string | null
         }

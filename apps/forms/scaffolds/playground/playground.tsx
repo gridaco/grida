@@ -121,21 +121,20 @@ export function Playground({
   );
 
   useEffect(() => {
-    if (initial?.prompt) {
+    if (initial?.prompt && !initial?.src) {
       if (generating.current) {
         return;
       }
 
       setBusy(true);
       generating.current = true;
-      generate(initial.prompt).then(async ({ output }) => {
+      generate(initial.prompt, initial?.slug).then(async ({ output }) => {
         for await (const delta of readStreamableValue(output)) {
           // setData(delta as JSONForm);
           __set_schema_txt(JSON.stringify(delta, null, 2));
         }
         generating.current = false;
         setBusy(false);
-        // TODO: update gist with new schema generated to prevent re-generation on refresh
       });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -178,7 +177,15 @@ export function Playground({
 
   return (
     <main className="w-screen h-screen flex flex-col overflow-hidden">
-      <header className="p-4 flex justify-between border-b">
+      <header className="relative p-4 flex justify-between border-b">
+        {busy && (
+          <div className="absolute inset-0 bg-white bg-opacity-50 flex items-center justify-center">
+            <div className="flex items-center gap-2">
+              <div className="w-6 h-6 border-2 border-t-[#333] rounded-full animate-spin" />
+              <span className="text-sm opacity-80">Generating...</span>
+            </div>
+          </div>
+        )}
         <div className="flex gap-1 items-center">
           <Link href="/ai">
             <button className="text-md font-black text-start flex items-center gap-2">
