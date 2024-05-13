@@ -39,6 +39,8 @@ import { readStreamableValue } from "ai/rsc";
 import Link from "next/link";
 import { useDarkMode } from "usehooks-ts";
 
+const HOST_NAME = process.env.NEXT_PUBLIC_HOST_NAME || "http://localhost:3000";
+
 type MaybeArray<T> = T | T[];
 
 function toArrayOf<T>(value: MaybeArray<T>, nofalsy = true): NonNullable<T>[] {
@@ -242,7 +244,18 @@ export function Playground({
             </Select>
           </div>
           {initial?.slug && !is_modified && (
-            <Button variant="link">../{initial.slug}</Button>
+            <Button
+              onClick={() => {
+                // copy to clipboard
+                navigator.clipboard.writeText(
+                  `${HOST_NAME}/playground/${initial.slug}`
+                );
+                toast.success("Copied");
+              }}
+              variant="link"
+            >
+              ../{initial.slug}
+            </Button>
           )}
         </div>
         <div className="flex-1 flex justify-center">
