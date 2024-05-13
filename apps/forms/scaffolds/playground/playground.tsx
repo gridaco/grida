@@ -319,11 +319,17 @@ function Editor({
       enableSchemaRequest: true,
       schemas: [schema],
     });
+
+    import("monaco-themes/themes/Blackboard.json").then((data) => {
+      data.colors["editor.background"] = "#030711";
+      monaco?.editor.defineTheme("dark", data as any);
+      monaco?.editor.setTheme(isDarkMode ? "dark" : "light");
+    });
   }, [monaco]);
 
   return (
     <div className="font-mono flex-1 flex flex-col w-full h-full">
-      <header className="p-2">
+      <header className="p-2 border-b">
         <span className="text-sm opacity-80">form.json</span>
       </header>
       <MonacoEditor
@@ -331,7 +337,7 @@ function Editor({
         defaultLanguage="json"
         onChange={onChange}
         value={value}
-        theme={isDarkMode ? "vs-dark" : "light"}
+        theme={isDarkMode ? "dark" : "light"}
         options={{
           readOnly: readonly,
           automaticLayout: true,
