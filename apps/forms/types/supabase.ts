@@ -882,7 +882,7 @@ export type Database = {
         Insert: {
           body_html?: string | null
           created_at?: string
-          data: Json
+          data?: Json
           description_html?: string | null
           form_field_id?: string | null
           form_id: string
@@ -1590,18 +1590,21 @@ export type Database = {
           id: number
           name: string
           organization_id: number
+          ref_id: string | null
         }
         Insert: {
           created_at?: string
           id?: number
           name: string
           organization_id: number
+          ref_id?: string | null
         }
         Update: {
           created_at?: string
           id?: number
           name?: string
           organization_id?: number
+          ref_id?: string | null
         }
         Relationships: [
           {

@@ -88,7 +88,6 @@ function PendingBlocksResolver() {
       const { data, error } = await supabase
         .from("form_block")
         .insert({
-          data: {},
           form_id: state.form_id,
           type: block.type,
           form_page_id: state.page_id,
