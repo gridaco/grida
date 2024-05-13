@@ -5,9 +5,10 @@ import { Card } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { shortcuts } from "@/scaffolds/playground/k";
 import { ArrowTopRightIcon } from "@radix-ui/react-icons";
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 
 export function Prompt() {
+  const form = useRef<HTMLFormElement>(null);
   const [input, setInput] = useState("");
   const [submitted, setSubmitted] = useState(false);
   const placeholder = useMemo(
@@ -32,7 +33,8 @@ export function Prompt() {
   return (
     <Card className="w-full max-w-xl mx-auto space-y-4 border rounded-lg shadow-lg p-4">
       <form
-        onSubmit={(e) => {
+        ref={form}
+        onSubmit={() => {
           setSubmitted(true);
         }}
         className="space-y-4"
@@ -47,11 +49,16 @@ export function Prompt() {
             id="prompt"
             placeholder={placeholder}
             value={input}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && e.metaKey) {
+                form.current?.submit();
+              }
+            }}
             onChange={(e) => setInput(e.target.value)}
           />
         </div>
         <Button disabled={submitted} className="w-full" type="submit">
-          Generate
+          Generate <span className="ms-4 text-xs opacity-50">⌘ + ↵</span>
         </Button>
       </form>
       <div className="flex flex-wrap items-center justify-center gap-1">
