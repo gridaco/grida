@@ -44,8 +44,6 @@ const HOST_NAME = process.env.NEXT_PUBLIC_HOST_NAME || "http://localhost:3000";
 
 type MaybeArray<T> = T | T[];
 
-export const maxDuration = 60;
-
 function toArrayOf<T>(value: MaybeArray<T>, nofalsy = true): NonNullable<T>[] {
   return (
     Array.isArray(value) ? value : nofalsy && value ? [value] : []

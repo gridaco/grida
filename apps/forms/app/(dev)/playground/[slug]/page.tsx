@@ -3,6 +3,8 @@ import { cookies } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 import Playground from "@/scaffolds/playground";
 
+export const maxDuration = 60;
+
 export default async function SharedPlaygroundPage({
   params,
 }: {
