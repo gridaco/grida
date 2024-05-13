@@ -4,7 +4,8 @@ export function editorlink(
   page:
     | "blocks"
     | "settings"
-    | "responses"
+    | "data"
+    | "data/responses"
     | "connect"
     | "connect/store"
     | "connect/store/get-started"
@@ -15,8 +16,10 @@ export function editorlink(
       return `${origin}/d/${form_id}/blocks`;
     case "settings":
       return `${origin}/d/${form_id}/settings`;
-    case "responses":
-      return `${origin}/d/${form_id}/responses`;
+    case "data":
+      return `${origin}/d/${form_id}/data`;
+    case "data/responses":
+      return `${origin}/d/${form_id}/data/responses`;
     case "connect":
       return `${origin}/d/${form_id}/connect`;
     case "connect/store":
