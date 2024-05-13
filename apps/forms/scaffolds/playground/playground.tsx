@@ -384,7 +384,7 @@ function Editor({
     });
 
     import("monaco-themes/themes/Blackboard.json").then((data) => {
-      data.colors["editor.background"] = "#1A1A1A";
+      data.colors["editor.background"] = "#0D0D0D";
       monaco?.editor.defineTheme("dark", data as any);
       monaco?.editor.setTheme(isDarkMode ? "dark" : "light");
     });

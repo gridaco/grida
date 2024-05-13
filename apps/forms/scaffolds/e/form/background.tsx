@@ -1,4 +1,8 @@
+"use client";
+
+import { motion } from "framer-motion";
 import type { FormPageBackgroundSchema } from "@/types";
+import { useState } from "react";
 
 export function FormPageBackground({ element, src }: FormPageBackgroundSchema) {
   const renderBackground = () => {
@@ -16,10 +20,21 @@ export function FormPageBackground({ element, src }: FormPageBackgroundSchema) {
 }
 
 export function FormPageBackgroundIframe({ src }: { src: string }) {
+  const [isLoaded, setIsLoaded] = useState(false);
   return (
-    <iframe
-      allowTransparency
-      className="absolute inset-0 w-screen h-screen -z-10 bg-transparent"
+    // prevent flickering
+    <motion.iframe
+      suppressHydrationWarning
+      initial={{ opacity: 0, scale: 1 }}
+      animate={{
+        opacity: isLoaded ? 1 : 0,
+      }}
+      transition={{ delay: 0.1, duration: 0.25 }}
+      onLoad={() => setIsLoaded(true)}
+      // @ts-ignore
+      allowtransparency="true"
+      background="transparent"
+      className="absolute inset-0 w-screen h-screen -z-10"
       src={src}
       width="100vw"
       height="100vh"
