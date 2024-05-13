@@ -259,7 +259,7 @@ export function Playground({
               tree={renderer.tree()}
               translation={resources.en.translation as any}
               options={{
-                is_powered_by_branding_enabled: false,
+                is_powered_by_branding_enabled: true,
               }}
             />
           ) : (
