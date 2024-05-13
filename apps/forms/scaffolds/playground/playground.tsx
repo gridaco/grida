@@ -23,7 +23,12 @@ import { FormRenderTree } from "@/lib/forms";
 import { GridaLogo } from "@/components/grida-logo";
 import { FormFieldAutocompleteType, Option } from "@/types";
 import { Button } from "@/components/ui/button";
-import { Link2Icon, RocketIcon, SlashIcon } from "@radix-ui/react-icons";
+import {
+  Link2Icon,
+  ReloadIcon,
+  RocketIcon,
+  SlashIcon,
+} from "@radix-ui/react-icons";
 import { createClientFormsClient } from "@/lib/supabase/client";
 import toast from "react-hot-toast";
 import { useRouter } from "next/navigation";
@@ -120,22 +125,26 @@ export function Playground({
     [__schema_txt]
   );
 
+  const streamGeneration = (prompt: string) => {
+    if (generating.current) {
+      return;
+    }
+
+    setBusy(true);
+    generating.current = true;
+    generate(prompt, initial?.slug).then(async ({ output }) => {
+      for await (const delta of readStreamableValue(output)) {
+        // setData(delta as JSONForm);
+        __set_schema_txt(JSON.stringify(delta, null, 2));
+      }
+      generating.current = false;
+      setBusy(false);
+    });
+  };
+
   useEffect(() => {
     if (initial?.prompt && !initial?.src) {
-      if (generating.current) {
-        return;
-      }
-
-      setBusy(true);
-      generating.current = true;
-      generate(initial.prompt, initial?.slug).then(async ({ output }) => {
-        for await (const delta of readStreamableValue(output)) {
-          // setData(delta as JSONForm);
-          __set_schema_txt(JSON.stringify(delta, null, 2));
-        }
-        generating.current = false;
-        setBusy(false);
-      });
+      streamGeneration(initial.prompt);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -178,15 +187,12 @@ export function Playground({
   return (
     <main className="w-screen h-screen flex flex-col overflow-hidden">
       <header className="relative p-4 flex justify-between border-b">
-        {busy && (
-          <div className="absolute inset-0 bg-white bg-opacity-50 flex items-center justify-center">
-            <div className="flex items-center gap-2">
-              <div className="w-6 h-6 border-2 border-t-[#333] rounded-full animate-spin" />
-              <span className="text-sm opacity-80">Generating...</span>
-            </div>
+        {/* {busy && (
+          <div className="absolute inset-0 flex items-center justify-center">
+            
           </div>
-        )}
-        <div className="flex gap-1 items-center">
+        )} */}
+        <div className="flex-1  flex gap-1 items-center">
           <Link href="/ai">
             <button className="text-md font-black text-start flex items-center gap-2">
               <GridaLogo />
@@ -221,7 +227,32 @@ export function Playground({
             <Button variant="link">../{initial.slug}</Button>
           )}
         </div>
-        <div className="flex gap-2 items-center">
+        <div className="flex-1 flex justify-center">
+          {busy ? (
+            <div className="flex items-center gap-2">
+              <div className="w-6 h-6 border-2 border-t-[#333] rounded-full animate-spin" />
+              <span className="text-sm opacity-80">Generating...</span>
+            </div>
+          ) : (
+            <>
+              {initial?.prompt ? (
+                <>
+                  <Button
+                    variant="ghost"
+                    onClick={() => {
+                      streamGeneration(initial.prompt!);
+                    }}
+                  >
+                    <ReloadIcon />
+                  </Button>
+                </>
+              ) : (
+                <></>
+              )}
+            </>
+          )}
+        </div>
+        <div className="flex-1 flex gap-2 items-center justify-end">
           <Button
             onClick={onShare}
             disabled={!is_modified || busy}
