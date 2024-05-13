@@ -15,6 +15,7 @@ import {
   JSONField,
   JSONForm,
   JSONOptionLike,
+  json_form_field_to_form_field_definition,
   parse,
   parse_jsonfield_type,
 } from "@/types/schema";
@@ -55,44 +56,11 @@ function compile(value?: string | object) {
     return;
   }
 
-  const map_option = (o: JSONOptionLike): Option => {
-    switch (typeof o) {
-      case "string":
-      case "number": {
-        return {
-          id: String(o),
-          value: String(o),
-          label: String(o),
-        };
-      }
-      case "object": {
-        return {
-          ...o,
-          id: o.value,
-        };
-      }
-    }
-  };
-
   const renderer = new FormRenderTree(
     nanoid(),
     schema.title,
     schema.description,
-    schema.fields?.map((f: JSONField, i) => {
-      const { type, is_array } = parse_jsonfield_type(f.type);
-      return {
-        ...f,
-        id: f.name,
-        type: type,
-        is_array,
-        autocomplete: toArrayOf<FormFieldAutocompleteType | undefined>(
-          f.autocomplete
-        ),
-        required: f.required || false,
-        local_index: i,
-        options: f.options?.map(map_option) || [],
-      };
-    }) || [],
+    json_form_field_to_form_field_definition(schema.fields),
     []
   );
 
@@ -179,7 +147,7 @@ export function Playground({
     }
   }, [exampleId]);
 
-  const onShare = async () => {
+  const onShareClick = async () => {
     setBusy(true);
     fetch("/playground/share", {
       method: "POST",
@@ -202,6 +170,19 @@ export function Playground({
       .finally(() => {
         setBusy(false);
       });
+  };
+
+  const onPublishClick = async () => {
+    setBusy(true);
+    fetch("/playground/publish", {
+      method: "POST",
+      body: JSON.stringify({
+        src: __schema_txt,
+      }),
+      headers: {
+        "Content-Type": "application/json",
+      },
+    });
   };
 
   return (
@@ -285,17 +266,21 @@ export function Playground({
         </div>
         <div className="flex-1 flex gap-2 items-center justify-end">
           <Button
-            onClick={onShare}
+            onClick={onShareClick}
             disabled={!is_modified || busy}
             variant="secondary"
           >
             <Link2Icon className="mr-2" />
             Share
           </Button>
-          <Button disabled={busy}>
-            <RocketIcon className="mr-2" />
-            Publlish
-          </Button>
+          <form action={`/playground/publish`} method="POST">
+            <input type="hidden" name="src" value={__schema_txt || undefined} />
+            <input type="hidden" name="gist" value={initial?.slug} />
+            <Button disabled={busy}>
+              <RocketIcon className="mr-2" />
+              Publish
+            </Button>
+          </form>
         </div>
       </header>
       <div className="flex-1 flex max-h-full overflow-hidden">

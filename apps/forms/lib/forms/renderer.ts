@@ -1,5 +1,4 @@
 import type {
-  JSONField,
   FormBlockType,
   FormFieldDataSchema,
   FormInputType,

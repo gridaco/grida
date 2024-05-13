@@ -38,6 +38,7 @@ export async function GET(req: NextRequest) {
     .single();
 
   if (!membership) {
+    // TODO: WROKSPACE MANAGEMENT
     // TODO: redirect to a page that says the user is not part of any organization
     return NextResponse.json(
       {
