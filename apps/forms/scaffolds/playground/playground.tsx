@@ -30,6 +30,8 @@ import { useRouter } from "next/navigation";
 import { examples } from "./k";
 import { generate } from "@/app/actions";
 import { readStreamableValue } from "ai/rsc";
+import Link from "next/link";
+import { useDarkMode } from "usehooks-ts";
 
 type MaybeArray<T> = T | T[];
 
@@ -66,6 +68,8 @@ function compile(value?: string | object) {
 
   const renderer = new FormRenderTree(
     nanoid(),
+    schema.title,
+    schema.description,
     schema.fields?.map((f: JSONField, i) => {
       const { type, is_array } = parse_jsonfield_type(f.type);
       return {
@@ -148,7 +152,8 @@ export function Playground({
   }, [exampleId]);
 
   const onShare = async () => {
-    const req = fetch("/playground/share", {
+    setBusy(true);
+    fetch("/playground/share", {
       method: "POST",
       body: JSON.stringify({
         src: __schema_txt,
@@ -165,6 +170,9 @@ export function Playground({
       .catch((err) => {
         console.error(err);
         toast.error("Failed to share");
+      })
+      .finally(() => {
+        setBusy(false);
       });
   };
 
@@ -172,16 +180,21 @@ export function Playground({
     <main className="w-screen h-screen flex flex-col overflow-hidden">
       <header className="p-4 flex justify-between border-b">
         <div className="flex gap-1 items-center">
-          <h1 className="text-xl font-black flex items-center gap-2">
-            <GridaLogo />
-            Forms
-            <span className="font-mono text-sm px-3 py-1 rounded-md bg-black/45 text-white">
-              Playground
-            </span>
-          </h1>
+          <Link href="/ai">
+            <button className="text-md font-black text-start flex items-center gap-2">
+              <GridaLogo />
+              <span className="flex flex-col">
+                Forms
+                <span className="-mt-1 font-mono font-normal text-[10px]">
+                  Playground
+                </span>
+              </span>
+            </button>
+          </Link>
           <SlashIcon className="h-6 w-6 opacity-20" />
           <div className="ms-1">
             <Select
+              disabled={busy}
               value={exampleId}
               onValueChange={(value) => setExampleId(value)}
             >
@@ -221,10 +234,10 @@ export function Playground({
           <div className="w-full h-full flex flex-col">
             <div className="flex-shrink flex flex-col h-full">
               <Editor
+                readonly={busy}
                 value={__schema_txt || ""}
                 onChange={(v?: string) => {
                   __set_schema_txt(v || "");
-                  // set_is_modified(true);
                 }}
               />
             </div>
@@ -250,19 +263,28 @@ export function Playground({
           </div>
         </section>
         <div className="h-full border-r" />
-        <section className="flex-1 flex justify-center h-full overflow-y-scroll">
+        <section className="flex-1 h-full overflow-y-scroll">
           {renderer ? (
-            <FormView
-              title={"Form"}
-              form_id={renderer.id}
-              fields={renderer.fields()}
-              blocks={renderer.blocks()}
-              tree={renderer.tree()}
-              translation={resources.en.translation as any}
-              options={{
-                is_powered_by_branding_enabled: true,
-              }}
-            />
+            <div className="flex flex-col items-center w-full">
+              {(renderer.title || renderer.description) && (
+                <div className="mt-10 text-start w-full prose dark:prose-invert p-4">
+                  <h1>{renderer.title}</h1>
+                  <p>{renderer.description}</p>
+                  <hr />
+                </div>
+              )}
+              <FormView
+                title={"Form"}
+                form_id={renderer.id}
+                fields={renderer.fields()}
+                blocks={renderer.blocks()}
+                tree={renderer.tree()}
+                translation={resources.en.translation as any}
+                options={{
+                  is_powered_by_branding_enabled: true,
+                }}
+              />
+            </div>
           ) : (
             <div className="grow flex items-center justify-center p-4 text-center text-gray-500">
               Invalid schema
@@ -282,11 +304,14 @@ const schema = {
 function Editor({
   value,
   onChange,
+  readonly,
 }: {
   value?: string;
   onChange?: (value?: string) => void;
+  readonly?: boolean;
 }) {
   const monaco = useMonaco();
+  const { isDarkMode } = useDarkMode();
 
   useEffect(() => {
     monaco?.languages.json.jsonDefaults.setDiagnosticsOptions({
@@ -299,14 +324,16 @@ function Editor({
   return (
     <div className="font-mono flex-1 flex flex-col w-full h-full">
       <header className="p-2">
-        <h2 className="">form.json</h2>
+        <span className="text-sm opacity-80">form.json</span>
       </header>
       <MonacoEditor
         height={"100%"}
         defaultLanguage="json"
         onChange={onChange}
         value={value}
+        theme={isDarkMode ? "vs-dark" : "light"}
         options={{
+          readOnly: readonly,
           automaticLayout: true,
           padding: {
             top: 16,

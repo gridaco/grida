@@ -324,7 +324,7 @@ export function FormView({
               set_is_submitting(true);
             }
           }}
-          className="p-4 pt-10 md:pt-16 h-full md:h-auto flex-1"
+          className="p-4 h-full md:h-auto flex-1"
         >
           <FingerprintField />
           <GroupLayout>{tree.children.map((b) => renderBlock(b))}</GroupLayout>

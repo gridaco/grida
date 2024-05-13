@@ -28,6 +28,7 @@ import { RadioGroup, RadioGroupItem } from "../ui/radio-group";
 import { Textarea } from "../ui/textarea";
 import { Input } from "../ui/input";
 import { Button } from "../ui/button";
+import { Card } from "../ui/card";
 
 /**
  * this disables the auto zoom in input text tag safari on iphone by setting font-size to 16px
@@ -465,18 +466,29 @@ function MonoFormField({
         <div data-field-type={type} className="flex flex-col gap-1">
           <LabelText htmlFor="none" />
           <HelpText />
-          <fieldset className="not-prose">
-            <ul className="text-sm font-medium text-neutral-900 bg-white border border-neutral-200 rounded-lg dark:bg-neutral-700 dark:border-neutral-600 dark:text-white">
-              {options?.map((option) => (
-                <li
-                  key={option.value}
-                  className="w-full border-b border-neutral-200 rounded-t-lg dark:border-neutral-600"
-                >
-                  {renderItem(option)}
-                </li>
-              ))}
-            </ul>
-          </fieldset>
+          <Card>
+            <fieldset className="not-prose">
+              <ul>
+                {options?.map((option) => (
+                  <li
+                    key={option.value}
+                    className="w-full border-b rounded-t-lg"
+                  >
+                    {renderItem(option)}
+                  </li>
+                ))}
+              </ul>
+            </fieldset>
+          </Card>
+        </div>
+      );
+    }
+    case "radio": {
+      return (
+        <div data-field-type={type} className="flex flex-col gap-1">
+          <LabelText htmlFor="none" />
+          {renderInput()}
+          <HelpText />
         </div>
       );
     }

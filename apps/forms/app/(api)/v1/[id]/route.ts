@@ -167,6 +167,7 @@ export async function GET(
 
   const {
     title,
+    description,
     default_page,
     fields,
     is_powered_by_branding_enabled,
@@ -227,9 +228,16 @@ export async function GET(
     };
   }
 
-  const renderer = new FormRenderTree(id, fields, page_blocks, {
-    option_renderer: mkoption,
-  });
+  const renderer = new FormRenderTree(
+    id,
+    title,
+    description,
+    fields,
+    page_blocks,
+    {
+      option_renderer: mkoption,
+    }
+  );
 
   const required_hidden_fields = fields.filter(
     (f) => f.type === "hidden" && f.required

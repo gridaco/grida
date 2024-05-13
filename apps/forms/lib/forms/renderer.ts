@@ -104,6 +104,8 @@ export class FormRenderTree {
 
   constructor(
     readonly id: string,
+    readonly title: string | null | undefined,
+    readonly description: string | null | undefined,
     private readonly _m_fields: FormFieldDefinition[],
     private readonly _m_blocks?: FormBlock[],
     private readonly plugins?: {

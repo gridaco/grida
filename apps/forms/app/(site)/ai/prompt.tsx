@@ -1,6 +1,7 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { shortcuts } from "@/scaffolds/playground/k";
 import { ArrowTopRightIcon } from "@radix-ui/react-icons";
@@ -29,7 +30,7 @@ export function Prompt() {
   );
 
   return (
-    <div className="w-full max-w-md mx-auto space-y-4 border rounded-lg shadow-lg p-4">
+    <Card className="w-full max-w-xl mx-auto space-y-4 border rounded-lg shadow-lg p-4">
       <form
         onSubmit={(e) => {
           setSubmitted(true);
@@ -67,6 +68,6 @@ export function Prompt() {
           </button>
         ))}
       </div>
-    </div>
+    </Card>
   );
 }

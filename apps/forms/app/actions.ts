@@ -10,7 +10,7 @@ export async function generate(input: string) {
 
   (async () => {
     const { partialObjectStream } = await streamObject({
-      model: openai("gpt-4-1106-preview"),
+      model: openai("gpt-4-turbo-2024-04-09"),
       prompt: input,
       schema: GENzJSONForm,
     });

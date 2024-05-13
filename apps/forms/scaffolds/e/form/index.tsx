@@ -18,6 +18,7 @@ import type {
   FormClientFetchResponseData,
   FormClientFetchResponseError,
 } from "@/app/(api)/v1/[id]/route";
+import { FormPageBackground } from "./background";
 
 const HOST_NAME = process.env.NEXT_PUBLIC_HOST_NAME || "http://localhost:3000";
 
@@ -121,7 +122,7 @@ export function Form({
   const submit_action = "/submit/" + form_id;
 
   return (
-    <>
+    <div className="pt-10 md:pt-16">
       <FormView
         form_id={form_id}
         action={submit_action}
@@ -142,33 +143,7 @@ export function Form({
           <FormPageDeveloperErrorDialog {...error} />
         </div>
       )}
-    </>
-  );
-}
-
-function FormPageBackground({ element, src }: FormPageBackgroundSchema) {
-  const renderBackground = () => {
-    switch (element) {
-      case "iframe":
-        return <FormPageBackgroundIframe src={src!} />;
-      default:
-        return <></>;
-    }
-  };
-
-  return (
-    <div className="fixed select-none inset-0 -z-10">{renderBackground()}</div>
-  );
-}
-
-function FormPageBackgroundIframe({ src }: { src: string }) {
-  return (
-    <iframe
-      className="absolute inset-0 w-screen h-screen -z-10 bg-transparent"
-      src={src}
-      width="100vw"
-      height="100vh"
-    />
+    </div>
   );
 }
 
