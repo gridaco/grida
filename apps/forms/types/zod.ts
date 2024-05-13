@@ -120,6 +120,9 @@ export const zJSONField = z.object({
 });
 
 export const zJSONForm = z.object({
+  $schema: z
+    .literal("https://forms.grida.co/schema/form.schema.json")
+    .describe("https://forms.grida.co/schema/form.schema.json"),
   title: z.string().optional().describe("User facing form title"),
   name: z.string().describe("HTML5 form `name` attribute"),
   description: z.string().optional().describe("description for the editor"),
