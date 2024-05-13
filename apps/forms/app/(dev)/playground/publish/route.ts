@@ -5,9 +5,13 @@ import {
 } from "@/lib/supabase/server";
 import { JSONFrom2DB } from "@/services/new/json2db";
 import assert from "assert";
-import { nanoid } from "nanoid";
+import { customAlphabet } from "nanoid";
 import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
+
+const alphabet = "abcdefghijklmnopqrstuvwxyz0123456789";
+// custom nanoid to set to meet organization name pattern - '^[a-z\d](?:[a-z\d]|-(?=[a-z\d])){0,38}$'
+const nanoid = customAlphabet(alphabet, 39);
 
 const HOST = process.env.HOST || "http://localhost:3000";
 
@@ -52,9 +56,12 @@ export async function POST(req: NextRequest) {
   const { data: auth } = await supabase.auth.getUser();
   if (!auth?.user) {
     // redirect back to playground, atm, user need to click the publish button again.
-    return NextResponse.redirect(`/sign-in?next=/playground/${data.slug}`, {
-      status: 302,
-    });
+    return NextResponse.redirect(
+      HOST + `/sign-in?next=/playground/${data.slug}`,
+      {
+        status: 302,
+      }
+    );
   }
 
   let ORG_ID = null;
