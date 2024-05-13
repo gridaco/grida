@@ -43,7 +43,19 @@ export class JSONFrom2DB {
       json.title,
       json.description,
       json_form_field_to_form_field_definition(json.fields),
-      []
+      [],
+      // TODO: consider moving this outerside or upper class
+      {
+        blocks: {
+          when_empty: {
+            header: {
+              title_and_description: {
+                enabled: true,
+              },
+            },
+          },
+        },
+      }
     );
     //
   }
@@ -140,50 +152,49 @@ export class JSONFrom2DB {
     assert(!!this.form_id, "form not inserted");
     assert(!!this.page_id, "page not inserted");
 
-    // TODO: need tree handling
+    // FIXME: block mapping is not complete - only works for field blocks and header blocks
 
-    // const rows: FormBlockInsertion[] =
-    //   this.renderer.blocks().map((b, i) => {
-    //     const __shared: Partial<FormBlockInsertion> = {
-    //       // 'form_field_id': this.fields_db_map[b.name],
-    //       'form_id': this.form_id!,
-    //       'form_page_id': this.page_id!,
-    //       'local_index': b.local_index,
-    //       'parent_id':
-    //     };
-    //     switch (b.type) {
-    //       case 'field': {
-    //         return {
+    // @ts-ignore
+    const rows: FormBlockInsertion[] = this.renderer.blocks().map((b, i) => {
+      const __shared: Partial<FormBlockInsertion> = {
+        // data: b.data
+        form_id: this.form_id!,
+        form_page_id: this.page_id!,
+        local_index: b.local_index,
+        parent_id: null, // TODO: need tree handling
+        type: b.type,
+      };
+      switch (b.type) {
+        case "field": {
+          return {
+            ...__shared,
+            form_field_id: this.fields_db_map[b.field.id],
+          };
+        }
+        case "header": {
+          return {
+            ...__shared,
+            // TODO: needs rename
+            title_html: b.title_html,
+            description_html: b.description_html,
+          };
+        }
+        default: {
+          return __shared;
+        }
+      }
+    });
 
-    //         }
-    //       }
-    //       case 'header': {
-    //         return {
-    //           'body_html': b.description_html, // TODO: needs rename
-    //           'data': b.title_html as any,
+    console.log("json2db blocks", rows);
 
-    //         }
-
-    //        }
-    //       default: {
-
-    //       }
-    //     }
-    //   });
-
-    // return await this.client.from("form_block").insert(
-    //   // TODO:
-    //   []
-    // );
-
-    throw new Error("not implemented");
+    return await this.client.from("form_block").insert(rows);
   }
 
   async insert() {
     await this.insert_form();
     await this.insert_page();
     await this.insert_fields();
-    // await this.insert_blocks();
+    await this.insert_blocks();
 
     return {
       form_id: this.form_id!,

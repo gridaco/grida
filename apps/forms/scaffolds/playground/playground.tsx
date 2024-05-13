@@ -61,7 +61,18 @@ function compile(value?: string | object) {
     schema.title,
     schema.description,
     json_form_field_to_form_field_definition(schema.fields),
-    []
+    [],
+    {
+      blocks: {
+        when_empty: {
+          header: {
+            title_and_description: {
+              enabled: true,
+            },
+          },
+        },
+      },
+    }
   );
 
   return renderer;
@@ -320,13 +331,6 @@ export function Playground({
         <section className="flex-1 h-full overflow-y-scroll">
           {renderer ? (
             <div className="relative flex flex-col items-center w-full">
-              {(renderer.title || renderer.description) && (
-                <div className="mt-10 text-start w-full prose dark:prose-invert p-4">
-                  <h1>{renderer.title}</h1>
-                  <p>{renderer.description}</p>
-                  <hr />
-                </div>
-              )}
               <FormView
                 title={"Form"}
                 form_id={renderer.id}

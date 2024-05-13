@@ -96,6 +96,24 @@ export interface ClientHeaderRenderBlock extends BaseRenderBlock {
   description_html?: string | null;
 }
 
+interface RenderTreeConfig {
+  blocks: {
+    when_empty?: {
+      /**
+       * header block configuration when there are no blocks provided
+       */
+      header?: {
+        /**
+         * create a header block on top with title and description
+         */
+        title_and_description: {
+          enabled: boolean;
+        };
+      };
+    };
+  };
+}
+
 export class FormRenderTree {
   private readonly _m_render_blocks: ClientRenderBlock[];
   private readonly _m_render_fields: FormFieldDefinition[];
@@ -107,6 +125,7 @@ export class FormRenderTree {
     readonly description: string | null | undefined,
     private readonly _m_fields: FormFieldDefinition[],
     private readonly _m_blocks?: FormBlock[],
+    private readonly config?: RenderTreeConfig,
     private readonly plugins?: {
       option_renderer: (option: Option) => Option;
     }
@@ -221,17 +240,44 @@ export class FormRenderTree {
     );
 
     // if no blocks, render a simple form based on fields
-    if (!this._m_render_blocks?.length) {
-      this._m_render_blocks = _m_fields.map((field: any, i) => {
-        return {
-          id: field.id,
-          type: "field",
-          field: this._field_block_field_definition(field),
-          local_index: i,
-          parent_id: null,
-        };
-      });
+    const is_render_blocks_empty = !this._m_render_blocks?.length;
+    if (is_render_blocks_empty) {
+      type ClientRenderBlockWithoutIndex = Omit<
+        ClientRenderBlock,
+        "local_index"
+      >;
 
+      const blocks: ClientRenderBlockWithoutIndex[] = [];
+
+      const _fields_as_blocks: ClientRenderBlockWithoutIndex[] = _m_fields.map(
+        (field: any, i) => {
+          return <ClientRenderBlockWithoutIndex>{
+            id: field.id,
+            type: "field",
+            field: this._field_block_field_definition(field),
+            parent_id: null,
+          };
+        }
+      );
+
+      if (config?.blocks.when_empty) {
+        if (config.blocks.when_empty.header?.title_and_description?.enabled) {
+          blocks.push(<ClientRenderBlockWithoutIndex>{
+            id: "header",
+            type: "header",
+            parent_id: null,
+            title_html: title,
+            description_html: description,
+          });
+        }
+      }
+
+      blocks.push(..._fields_as_blocks);
+
+      this._m_render_blocks = blocks.map((b, i) => ({
+        ...b,
+        local_index: i,
+      })) as ClientRenderBlock[];
       this._m_render_fields = this._m_fields;
     }
 
