@@ -285,8 +285,6 @@ function MonoFormField({
           );
         }
 
-        console.log(options);
-
         return (
           <RadioGroup>
             {options?.map((option) => (
@@ -383,10 +381,10 @@ function MonoFormField({
     return <PaymentField data={data as PaymentFieldData} disabled={disabled} />;
   }
 
-  const LabelText = () => (
+  const LabelText = ({ htmlFor = name }: { htmlFor?: string }) => (
     <label
       data-capitalize={labelCapitalize}
-      htmlFor={name}
+      htmlFor={htmlFor}
       className="data-[capitalize]:capitalize font-medium text-neutral-900 dark:text-neutral-300 text-sm"
     >
       {label || name}{" "}
@@ -407,6 +405,11 @@ function MonoFormField({
 
   // custom layout
   switch (type) {
+    // this can only present on ai generated data.
+    // @ts-ignore
+    case "submit": {
+      return <></>;
+    }
     case "switch": {
       return (
         <label
@@ -435,19 +438,15 @@ function MonoFormField({
     case "checkboxes": {
       const renderItem = (item: Option) => {
         return (
-          <div className="flex items-center ps-3">
-            <input
-              type="checkbox"
+          <label className="flex items-center ps-3">
+            {/* @ts-ignore */}
+            <Checkbox
               name={name}
-              id={item.value}
+              id={item.id}
               value={item.value}
               {...(sharedInputProps as React.ComponentProps<"input">)}
-              className="w-4 h-4 text-blue-600 bg-neutral-100 border-neutral-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-neutral-700 dark:focus:ring-offset-neutral-700 focus:ring-2 dark:bg-neutral-600 dark:border-neutral-500"
             />
-            <label
-              htmlFor={item.value}
-              className="w-full py-3 ms-2 text-sm font-medium text-neutral-900 dark:text-neutral-300"
-            >
+            <span className="w-full py-3 ms-2 text-sm font-medium text-neutral-900 dark:text-neutral-300">
               {item.label}
               {item.src && (
                 // eslint-disable-next-line @next/next/no-img-element
@@ -457,18 +456,14 @@ function MonoFormField({
                   className="mt-1 w-12 h-12 aspect-square rounded-sm"
                 />
               )}
-            </label>
-          </div>
+            </span>
+          </label>
         );
       };
 
       return (
-        <label
-          htmlFor={"none"} // disable the focusing since checkboxes is not standard form input
-          data-field-type={type}
-          className="flex flex-col gap-1"
-        >
-          <LabelText />
+        <div data-field-type={type} className="flex flex-col gap-1">
+          <LabelText htmlFor="none" />
           <HelpText />
           <fieldset className="not-prose">
             <ul className="text-sm font-medium text-neutral-900 bg-white border border-neutral-200 rounded-lg dark:bg-neutral-700 dark:border-neutral-600 dark:text-white">
@@ -482,7 +477,7 @@ function MonoFormField({
               ))}
             </ul>
           </fieldset>
-        </label>
+        </div>
       );
     }
     case "toggle-group": {

@@ -249,7 +249,7 @@ export function Playground({
             </div> */}
           </div>
         </section>
-        <section className="flex-1 flex h-full overflow-y-scroll">
+        <section className="flex-1 flex justify-center h-full overflow-y-scroll">
           {renderer ? (
             <FormView
               title={"Form"}
