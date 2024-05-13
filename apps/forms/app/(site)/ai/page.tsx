@@ -17,7 +17,7 @@ export default function AIHome() {
         element="iframe"
         src="https://forms.grida.co/theme/embed/backgrounds/grid"
       />
-      <div className="absolute inset-0 bg-neutral-50/50 pointer-events-none select-none" />
+      <div className="absolute inset-0 bg-neutral-100/50 dark:bg-neutral-500/10 pointer-events-none select-none" />
       <Header />
       <div className="text-center mb-5 z-10">
         <h2 className="text-5xl font-bold drop-shadow-lg">
