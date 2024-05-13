@@ -108,7 +108,7 @@ export async function POST(req: NextRequest) {
       .from("project")
       .insert({
         organization_id: ORG_ID,
-        name: "formss",
+        name: "forms",
       })
       .select()
       .single();
