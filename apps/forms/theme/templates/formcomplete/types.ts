@@ -1,4 +1,7 @@
 export interface FormResponsePageTemplateProps {
   form_title: string;
-  response_local_id: number;
+  /**
+   * either formatted local_index or local_short_id
+   */
+  response_short_id: string;
 }

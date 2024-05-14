@@ -17,7 +17,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import type { Customer, FormResponse } from "@/types";
 import useSWR from "swr";
 import { FormCustomerDetail } from "@/app/(api)/private/editor/customers/[uid]/route";
-import { fmt_hashed_local_id } from "@/utils/fmt";
+import { fmt_local_index } from "@/utils/fmt";
 import Link from "next/link";
 import { Link1Icon, Link2Icon } from "@radix-ui/react-icons";
 
@@ -117,7 +117,7 @@ export function CustomerEditPanel({
                       {response.form.title}
                     </Link>
                     <span className="font-mono">
-                      {fmt_hashed_local_id(response.local_id)}
+                      {fmt_local_index(response.local_index)}
                     </span>
                   </li>
                 ))}

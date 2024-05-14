@@ -17,8 +17,8 @@ export function fmt_snake_case_to_human_text(input: string) {
  * - 123 -> #123
  * - 1234 -> #1234
  */
-export function fmt_hashed_local_id(local_id: number): string {
-  return "#" + pad_number(local_id, 3);
+export function fmt_local_index(local_index: number): string {
+  return "#" + pad_number(local_index, 3);
 }
 
 /**

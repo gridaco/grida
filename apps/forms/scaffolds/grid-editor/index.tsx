@@ -16,7 +16,7 @@ import toast from "react-hot-toast";
 import { useEditorState } from "../editor";
 import Link from "next/link";
 import { DownloadIcon, TrashIcon } from "@radix-ui/react-icons";
-import { fmt_hashed_local_id } from "@/utils/fmt";
+import { fmt_local_index } from "@/utils/fmt";
 import {
   Select,
   SelectContent,
@@ -51,7 +51,7 @@ export function GridEditor() {
       responses?.map((response, index) => {
         const row: any = {
           __gf_id: response.id,
-          __gf_local_id: fmt_hashed_local_id(response.local_id),
+          __gf_local_index: fmt_local_index(response.local_index),
           __gf_created_at: response.created_at,
           __gf_customer_uuid: response.customer_id,
         }; // react-data-grid expects each row to have a unique 'id' property

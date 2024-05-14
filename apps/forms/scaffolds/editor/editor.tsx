@@ -10,7 +10,7 @@ import { createClientFormsClient } from "@/lib/supabase/client";
 import { FormFieldUpsert, EditorApiResponse } from "@/types/private/api";
 import { TooltipProvider } from "@radix-ui/react-tooltip";
 import { ResponseEditPanel } from "../panels/response-edit-panel";
-import { fmt_hashed_local_id } from "@/utils/fmt";
+import { fmt_local_index } from "@/utils/fmt";
 import { CustomerEditPanel } from "../panels/customer-panel";
 import toast from "react-hot-toast";
 
@@ -57,7 +57,7 @@ export function InitialResponsesProvider({
         `
         )
         .eq("form_id", state.form_id)
-        .order("local_id")
+        .order("local_index")
         .limit(limit);
 
       if (error) {
@@ -331,7 +331,7 @@ function ResponseEditPanelProvider({ children }: React.PropsWithChildren<{}>) {
     <>
       <ResponseEditPanel
         key={response?.id}
-        title={`Response ${response?.local_id ? fmt_hashed_local_id(response?.local_id) : ""}`}
+        title={`Response ${response?.local_index ? fmt_local_index(response?.local_index) : ""}`}
         open={state.is_response_edit_panel_open}
         init={{ response, field_defs: state.fields }}
         onOpenChange={(open) => {

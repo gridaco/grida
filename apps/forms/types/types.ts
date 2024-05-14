@@ -233,7 +233,7 @@ export type FormBlockType =
 
 export interface FormResponse {
   id: string;
-  local_id: number;
+  local_index: number;
   browser: string | null;
   created_at: string;
   customer_id: string | null;

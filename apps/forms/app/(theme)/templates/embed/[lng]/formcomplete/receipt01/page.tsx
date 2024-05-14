@@ -4,7 +4,7 @@ import FormCompletePageTemplate_receipt01 from "@/theme/templates/formcomplete/r
 
 const mock = {
   title: "ACME Form Title",
-  local_id: 123,
+  response_short_id: "#123",
 } as const;
 
 export default async function Component({
@@ -29,7 +29,7 @@ export default async function Component({
   return (
     <FormCompletePageTemplate_receipt01
       form_title={title}
-      response_local_id={mock.local_id}
+      response_short_id={mock.response_short_id}
     />
   );
 }

@@ -13,6 +13,7 @@ import { client } from "@/lib/supabase/server";
 import { notFound } from "next/navigation";
 import { EndingPage } from "@/theme/templates/formcomplete";
 import { ssr_page_init_i18n } from "../../i18n";
+import { fmt_local_index } from "@/utils/fmt";
 
 export default async function SubmitCompletePage({
   params,
@@ -86,14 +87,14 @@ export default async function SubmitCompletePage({
     return notFound();
   }
 
-  const { local_id } = response;
+  const { local_index } = response;
 
   return (
     <EndingPage
       template_id={ending_page_template_id}
       data={{
         form_title: title,
-        response_local_id: local_id,
+        response_short_id: fmt_local_index(local_index),
       }}
     />
   );
