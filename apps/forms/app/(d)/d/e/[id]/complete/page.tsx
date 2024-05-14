@@ -87,14 +87,14 @@ export default async function SubmitCompletePage({
     return notFound();
   }
 
-  const { local_id } = response;
+  const { local_index } = response;
 
   return (
     <EndingPage
       template_id={ending_page_template_id}
       data={{
         form_title: title,
-        response_short_id: fmt_local_index(local_id),
+        response_short_id: fmt_local_index(local_index),
       }}
     />
   );

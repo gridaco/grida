@@ -117,7 +117,7 @@ export function CustomerEditPanel({
                       {response.form.title}
                     </Link>
                     <span className="font-mono">
-                      {fmt_local_index(response.local_id)}
+                      {fmt_local_index(response.local_index)}
                     </span>
                   </li>
                 ))}

@@ -1215,7 +1215,7 @@ export type Database = {
           form_id: string | null
           id: string
           ip: string | null
-          local_id: number
+          local_index: number
           platform_powered_by:
             | Database["grida_forms"]["Enums"]["response_platform_powered_by"]
             | null
@@ -1231,7 +1231,7 @@ export type Database = {
           form_id?: string | null
           id?: string
           ip?: string | null
-          local_id?: number
+          local_index?: number
           platform_powered_by?:
             | Database["grida_forms"]["Enums"]["response_platform_powered_by"]
             | null
@@ -1247,7 +1247,7 @@ export type Database = {
           form_id?: string | null
           id?: string
           ip?: string | null
-          local_id?: number
+          local_index?: number
           platform_powered_by?:
             | Database["grida_forms"]["Enums"]["response_platform_powered_by"]
             | null
@@ -1673,6 +1673,19 @@ export type Database = {
         }
         Returns: number[]
       }
+      is_organization_member:
+        | {
+            Args: {
+              project_id: number
+            }
+            Returns: boolean
+          }
+        | {
+            Args: {
+              project_id: number
+            }
+            Returns: boolean
+          }
     }
     Enums: {
       [_ in never]: never

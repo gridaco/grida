@@ -51,7 +51,7 @@ export function GridEditor() {
       responses?.map((response, index) => {
         const row: any = {
           __gf_id: response.id,
-          __gf_local_index: fmt_local_index(response.local_id),
+          __gf_local_index: fmt_local_index(response.local_index),
           __gf_created_at: response.created_at,
           __gf_customer_uuid: response.customer_id,
         }; // react-data-grid expects each row to have a unique 'id' property

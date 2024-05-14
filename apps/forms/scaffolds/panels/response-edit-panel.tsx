@@ -49,7 +49,7 @@ export function ResponseEditPanel({
           <PanelPropertyFields>
             <PanelPropertyField label={"ID"}>
               <PropertyTextInput
-                value={fmt_local_index(response?.local_id ?? NaN)}
+                value={fmt_local_index(response?.local_index ?? NaN)}
                 disabled
               />
             </PanelPropertyField>

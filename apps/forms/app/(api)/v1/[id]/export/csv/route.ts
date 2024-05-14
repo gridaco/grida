@@ -54,7 +54,7 @@ export async function GET(
     });
     return [
       response.id,
-      fmt_local_index(response.local_id),
+      fmt_local_index(response.local_index),
       response.created_at,
       ...responseValues,
     ];

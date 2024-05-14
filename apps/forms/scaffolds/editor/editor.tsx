@@ -57,7 +57,7 @@ export function InitialResponsesProvider({
         `
         )
         .eq("form_id", state.form_id)
-        .order("local_id")
+        .order("local_index")
         .limit(limit);
 
       if (error) {
@@ -331,7 +331,7 @@ function ResponseEditPanelProvider({ children }: React.PropsWithChildren<{}>) {
     <>
       <ResponseEditPanel
         key={response?.id}
-        title={`Response ${response?.local_id ? fmt_local_index(response?.local_id) : ""}`}
+        title={`Response ${response?.local_index ? fmt_local_index(response?.local_index) : ""}`}
         open={state.is_response_edit_panel_open}
         init={{ response, field_defs: state.fields }}
         onOpenChange={(open) => {
