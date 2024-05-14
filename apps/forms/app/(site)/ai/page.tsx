@@ -15,7 +15,7 @@ export default function AIHome() {
       <FormPageBackground
         type="background"
         element="iframe"
-        src="https://forms.grida.co/theme/embed/backgrounds/grid"
+        src="https://forms.grida.co/theme/embed/backgrounds/dots"
       />
       <div className="absolute inset-0 bg-neutral-100/50 dark:bg-neutral-500/10 pointer-events-none select-none" />
       <Header />
