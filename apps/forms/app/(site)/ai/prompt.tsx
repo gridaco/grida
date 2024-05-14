@@ -7,7 +7,7 @@ import { shortcuts } from "@/scaffolds/playground/k";
 import { ArrowTopRightIcon } from "@radix-ui/react-icons";
 import { useMemo, useRef, useState } from "react";
 
-export function Prompt() {
+export default function Prompt({ autoFocus }: { autoFocus?: boolean }) {
   const form = useRef<HTMLFormElement>(null);
   const [input, setInput] = useState("");
   const [submitted, setSubmitted] = useState(false);
@@ -43,7 +43,7 @@ export function Prompt() {
       >
         <div className="space-y-1">
           <Textarea
-            autoFocus
+            autoFocus={autoFocus}
             className="min-h-[100px]"
             name="prompt"
             id="prompt"

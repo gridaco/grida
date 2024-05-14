@@ -1,5 +1,5 @@
 import { Metadata } from "next";
-import { Prompt } from "./prompt";
+import Prompt from "./prompt";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { Header } from "@/app/(site)/header";
@@ -35,7 +35,7 @@ export default function AIHome() {
         </p>
       </div>
       <div className="p-4 z-10">
-        <Prompt />
+        <Prompt autoFocus />
       </div>
       <div className="mt-10 z-10">
         <Link href="/playground">

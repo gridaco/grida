@@ -197,7 +197,7 @@ export function Playground({
   };
 
   return (
-    <main className="w-screen h-screen flex flex-col overflow-hidden">
+    <main className="h-screen flex flex-col overflow-hidden">
       <header className="relative p-4 flex justify-between border-b">
         {/* {busy && (
           <div className="absolute inset-0 flex items-center justify-center">
