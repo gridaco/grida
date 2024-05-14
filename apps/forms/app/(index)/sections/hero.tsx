@@ -1,8 +1,9 @@
+import { FormPageBackground } from "@/scaffolds/e/form/background";
 import Link from "next/link";
 
 export default function Hero() {
   return (
-    <section className="relative flex flex-col w-screen h-screen overflow-hidden items-center justify-center">
+    <section className="relative flex flex-col h-screen overflow-hidden items-center justify-center">
       <div className="text-black dark:text-white">
         <div className="flex flex-col items-center text-center">
           <h1 className="text-6xl font-bold py-10 text-center">
@@ -22,11 +23,10 @@ export default function Hero() {
           </Link>
         </div>
       </div>
-      <iframe
-        className="absolute inset-0 w-screen h-screen -z-10"
-        src="/wwwembeddings/aurora"
-        width="100vw"
-        height="100vh"
+      <FormPageBackground
+        type="background"
+        element="iframe"
+        src="https://forms.grida.co/theme/embed/backgrounds/dots"
       />
     </section>
   );

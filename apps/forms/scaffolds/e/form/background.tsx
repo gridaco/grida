@@ -20,17 +20,17 @@ export function FormPageBackground({ element, src }: FormPageBackgroundSchema) {
 }
 
 export function FormPageBackgroundIframe({ src }: { src: string }) {
-  const [isLoaded, setIsLoaded] = useState(false);
+  // const [isLoaded, setIsLoaded] = useState(false);
   return (
     // prevent flickering
     <motion.iframe
       suppressHydrationWarning
       initial={{ opacity: 0, scale: 1 }}
       animate={{
-        opacity: isLoaded ? 1 : 0,
+        opacity: 1,
       }}
       transition={{ delay: 0.1, duration: 0.25 }}
-      onLoad={() => setIsLoaded(true)}
+      // onLoad={() => setIsLoaded(true)}
       // @ts-ignore
       allowtransparency="true"
       background="transparent"
