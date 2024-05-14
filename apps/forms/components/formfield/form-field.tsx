@@ -288,7 +288,7 @@ function MonoFormField({
         }
 
         return (
-          <RadioGroup>
+          <RadioGroup name={name}>
             {options?.map((option) => (
               <div key={option.id} className="flex items-center space-x-2">
                 <RadioGroupItem value={option.id} id={option.id} />
