@@ -22,7 +22,7 @@ export default function Home() {
     <main className="relative">
       <Header />
       <Hero />
-      {/* <Demo /> */}
+      <Demo />
       <div className="container mx-auto px-4">
         <div className="h-16 sm:h-32 lg:h-64" />
         <section>
