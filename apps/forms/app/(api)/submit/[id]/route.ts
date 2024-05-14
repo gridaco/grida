@@ -103,6 +103,8 @@ async function submit({
     browser: string | null;
   };
 }) {
+  console.log("form_id", form_id);
+
   // check if form exists
   const { data: form_reference } = await client
     .from("form")
@@ -169,7 +171,7 @@ async function submit({
     },
   });
 
-  // console.log("/submit::customer:", customer);
+  console.log("/submit::customer:", customer);
 
   const required_hidden_fields = fields.filter(
     (f) => f.type === "hidden" && f.required
@@ -401,20 +403,23 @@ async function submit({
   }
 
   // create new form response
-  const { data: response_reference_obj } = await client
-    .from("response")
-    .insert({
-      raw: JSON.stringify(Object.fromEntries(entries)),
-      form_id: form_id,
-      browser: meta.browser,
-      ip: meta.ip,
-      customer_id: customer?.uid,
-      x_referer: meta.referer,
-      x_useragent: meta.useragent,
-      platform_powered_by: "web_client",
-    })
-    .select("id")
-    .single();
+  const { data: response_reference_obj, error: response_ref_error } =
+    await client
+      .from("response")
+      .insert({
+        raw: JSON.stringify(Object.fromEntries(entries)),
+        form_id: form_id,
+        browser: meta.browser,
+        ip: meta.ip,
+        customer_id: customer?.uid,
+        x_referer: meta.referer,
+        x_useragent: meta.useragent,
+        platform_powered_by: "web_client",
+      })
+      .select("id")
+      .single();
+
+  if (response_ref_error) console.error(response_ref_error);
 
   // save each field value
   const { data: response_fields } = await client
