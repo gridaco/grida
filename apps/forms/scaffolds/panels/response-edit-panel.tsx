@@ -22,7 +22,7 @@ import {
 import { LockClosedIcon } from "@radix-ui/react-icons";
 import toast from "react-hot-toast";
 import { Editor } from "@monaco-editor/react";
-import { fmt_hashed_local_id } from "@/utils/fmt";
+import { fmt_local_index } from "@/utils/fmt";
 
 export function ResponseEditPanel({
   title,
@@ -49,7 +49,7 @@ export function ResponseEditPanel({
           <PanelPropertyFields>
             <PanelPropertyField label={"ID"}>
               <PropertyTextInput
-                value={fmt_hashed_local_id(response?.local_id ?? NaN)}
+                value={fmt_local_index(response?.local_id ?? NaN)}
                 disabled
               />
             </PanelPropertyField>

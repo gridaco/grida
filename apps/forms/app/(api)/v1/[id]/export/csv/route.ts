@@ -4,7 +4,7 @@ import { notFound } from "next/navigation";
 import { NextRequest, NextResponse } from "next/server";
 import { stringify } from "csv-stringify/sync";
 import { unwrapFeildValue } from "@/lib/forms/unwrap";
-import { fmt_hashed_local_id } from "@/utils/fmt";
+import { fmt_local_index } from "@/utils/fmt";
 
 export const revalidate = 0;
 
@@ -37,7 +37,7 @@ export async function GET(
   // headers
   const headers = [
     "id", // id
-    "no", // local_id
+    "index", // local_index
     "created_at",
     ...fields.map((field) => field.name),
   ];
@@ -54,7 +54,7 @@ export async function GET(
     });
     return [
       response.id,
-      fmt_hashed_local_id(response.local_id),
+      fmt_local_index(response.local_id),
       response.created_at,
       ...responseValues,
     ];
