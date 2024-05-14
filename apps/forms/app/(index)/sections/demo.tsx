@@ -17,9 +17,14 @@ export default function Demo() {
     <section className="container mx-auto px-4 min-h-96">
       <motion.div
         className="hidden md:block z-10 -mt-40 mb-32"
-        initial={{ opacity: 0, y: 50, scale: 0.95 }}
+        initial={{ opacity: 1, y: 100, scale: 1 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
-        transition={{ duration: 0.5 }}
+        transition={{
+          delay: 0.2,
+          duration: 0.3,
+          type: "spring",
+          damping: 20,
+        }}
       >
         <Card className="mx-auto max-w-screen-lg 2xl:max-w-screen-2xl aspect-video overflow-hidden">
           <Playground />
