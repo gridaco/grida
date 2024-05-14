@@ -1,9 +1,12 @@
 "use client";
 
+import { Button } from "@/components/ui/button";
+import Link from "next/link";
 import { Card } from "@/components/ui/card";
 import Playground from "@/scaffolds/playground";
 import dynamic from "next/dynamic";
 import { motion } from "framer-motion";
+import { ArrowRightIcon } from "@radix-ui/react-icons";
 
 const Prompt = dynamic(() => import("@/app/(site)/ai/prompt"), {
   ssr: false,
@@ -23,22 +26,34 @@ export default function Demo() {
         </Card>
       </motion.div>
       <div className="mt-20">
-        <div className="text-center mb-5 z-10">
-          <h2 className="text-2xl font-bold drop-shadow-lg">
-            Build Forms{" "}
-            <span
-              className="bg-clip-text
+        <div className="flex flex-col w-full items-center justify-center">
+          <div className="text-center mb-5 z-10">
+            <h2 className="text-2xl font-bold drop-shadow-lg">
+              Build Forms{" "}
+              <span
+                className="bg-clip-text
             text-transparent bg-gradient-to-r from-[#f47272] to-[#c91773] dark:from-[#f4ba72] dark:to-[#f0f472]
           "
-            >
-              with AI
-            </span>
-          </h2>
-          <p className="mt-2 text-lg text-gray-500 dark:text-gray-400">
-            Enter your prompt and try it out in the playground
-          </p>
+              >
+                with AI
+              </span>
+            </h2>
+            <p className="mt-2 text-lg text-gray-500 dark:text-gray-400">
+              Enter your prompt and try it out in the playground
+            </p>
+          </div>
+          <div className="p-4 z-10">
+            <Prompt />
+          </div>
+          <div className="mt-10 z-10">
+            <Link href="/playground">
+              <Button variant="link">
+                Jump to playground
+                <ArrowRightIcon className="ms-2" />
+              </Button>
+            </Link>
+          </div>
         </div>
-        <Prompt />
       </div>
     </section>
   );
