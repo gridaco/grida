@@ -24,7 +24,11 @@ export default function FormCompletePageDefault({
             {form_title}
           </h2>
           <p className="text-sm text-center text-gray-500">
-            {i18next.t("formcomplete.default.description")}
+            <span
+              dangerouslySetInnerHTML={{
+                __html: i18next.t("formcomplete.default.description"),
+              }}
+            />
           </p>
         </CardHeader>
         <CardContent className="p-0" />
