@@ -55,7 +55,7 @@ export function EndingPagePreferences({
               <SelectValue placeholder="Select Ending Page Template" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value={""}>None</SelectItem>
+              <SelectItem value={"default"}>Default</SelectItem>
               <SelectItem value="receipt01">Receipt 01</SelectItem>
             </SelectContent>
           </Select>
@@ -64,17 +64,7 @@ export function EndingPagePreferences({
           </PreferenceDescription>
         </form>
         {template && (
-          <div className="mt-4 flex items-center justify-center select-none">
-            <iframe
-              key={template}
-              src={
-                HOST_NAME +
-                `/templates/embed/${lng}/formcomplete/${template}?title=${encodeURIComponent(title)}`
-              }
-              className="w-full h-96"
-              style={{ border: 0 }}
-            />
-          </div>
+          <EndingPagePreview template={template} title={title} lng={lng} />
         )}
       </PreferenceBody>
       <PreferenceBoxFooter>
@@ -84,4 +74,43 @@ export function EndingPagePreferences({
       </PreferenceBoxFooter>
     </PreferenceBox>
   );
+}
+
+function EndingPagePreview({
+  template,
+  lng,
+  title,
+}: {
+  template: string;
+  lng: string;
+  title: string;
+}) {
+  switch (template) {
+    case "receipt01": {
+      return (
+        <iframe
+          key={template}
+          src={
+            HOST_NAME +
+            `/templates/embed/${lng}/formcomplete/${template}?title=${encodeURIComponent(title)}`
+          }
+          className="w-full h-96"
+          style={{ border: 0 }}
+        />
+      );
+    }
+    case "default": {
+      return (
+        <iframe
+          key={template}
+          src={
+            HOST_NAME +
+            `/templates/embed/${lng}/formcomplete/default?title=${encodeURIComponent(title)}`
+          }
+          className="w-full h-96"
+          style={{ border: 0 }}
+        />
+      );
+    }
+  }
 }
