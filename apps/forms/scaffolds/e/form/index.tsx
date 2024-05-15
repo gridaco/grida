@@ -122,7 +122,7 @@ export function Form({
   const submit_action = "/submit/" + form_id;
 
   return (
-    <div className="pt-10 md:pt-16 w-full flex justify-center">
+    <main className="min-h-screen flex flex-col items-center pt-10 md:pt-16">
       <FormView
         form_id={form_id}
         action={submit_action}
@@ -143,7 +143,7 @@ export function Form({
           <FormPageDeveloperErrorDialog {...error} />
         </div>
       )}
-    </div>
+    </main>
   );
 }
 
