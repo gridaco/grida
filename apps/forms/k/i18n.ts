@@ -156,10 +156,7 @@ const resources: Record<
       formcomplete: {
         default: {
           title: "응답 완료",
-          // description: "응답해 주셔서 감사합니다.",
-          //  TODO: remove this
-          description:
-            "응답해 주셔서 감사합니다. <br/> (참가 확정시 문자 발송)",
+          description: "응답해 주셔서 감사합니다.",
         },
         receipt01: {
           title: "접수 완료",
