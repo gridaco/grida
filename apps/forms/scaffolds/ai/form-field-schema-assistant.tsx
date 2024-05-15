@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from "react";
 import { FormFieldInit } from "@/types";
 import { LightningBoltIcon } from "@radix-ui/react-icons";
+import { draftid } from "@/utils/id";
 
 export function FormFieldAssistant({
   onSuggestion,
@@ -25,9 +26,20 @@ export function FormFieldAssistant({
       });
 
       if (response.ok) {
-        const data = await response.json();
+        let data: FormFieldInit = await response.json();
+
+        // process the response to match the schema
+        data = {
+          ...data,
+          options:
+            data.options?.map((option) => ({
+              ...option,
+              id: draftid(),
+            })) || [],
+        };
+
         setSchema(data);
-        console.log(data);
+        console.log("assist", data);
       } else {
         const error = await response.json();
         console.error(error);

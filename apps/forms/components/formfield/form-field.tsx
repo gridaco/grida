@@ -158,7 +158,7 @@ function MonoFormField({
     // step: novalidate ? undefined : data?.step,
   };
 
-  function renderChildren({
+  function renderContent({
     name,
     label,
     src,
@@ -275,7 +275,7 @@ function MonoFormField({
                     htmlFor={option.value}
                     className="ms-2 text-sm font-medium text-neutral-900 dark:text-neutral-300"
                   >
-                    {renderChildren({
+                    {renderContent({
                       name: option.value,
                       label: option.label,
                       src: option.src,
@@ -288,12 +288,12 @@ function MonoFormField({
         }
 
         return (
-          <RadioGroup name={name}>
+          <RadioGroup id={name} name={name}>
             {options?.map((option) => (
               <div key={option.id} className="flex items-center space-x-2">
-                <RadioGroupItem value={option.id} id={option.id} />
+                <RadioGroupItem id={option.id} value={option.id} />
                 <label htmlFor={option.id}>
-                  {renderChildren({
+                  {renderContent({
                     name: option.value,
                     label: option.label,
                     src: option.src,
