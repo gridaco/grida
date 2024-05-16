@@ -26,6 +26,11 @@ import Link from "next/link";
 import { useDarkMode } from "usehooks-ts";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import PlaygroundPreview from "./preview";
+import { ThemePalette } from "../theme-editor/palette-editor";
+import { z } from "zod";
+import { Theme } from "../theme-editor/types";
+import { defaultTheme } from "../theme-editor/k";
+import { stringfyThemeVariables } from "../theme-editor/serialize";
 
 const HOST_NAME = process.env.NEXT_PUBLIC_HOST_NAME || "http://localhost:3000";
 
@@ -53,28 +58,6 @@ const theme = {
   --ring: 0 0% 3.9%;
   --radius: 0.5rem;
 }
-
-.dark {
-  --background: 0 0% 3.9%;
-  --foreground: 0 0% 98%;
-  --card: 0 0% 3.9%;
-  --card-foreground: 0 0% 98%;
-  --popover: 0 0% 3.9%;
-  --popover-foreground: 0 0% 98%;
-  --primary: 0 0% 98%;
-  --primary-foreground: 0 0% 9%;
-  --secondary: 0 0% 14.9%;
-  --secondary-foreground: 0 0% 98%;
-  --muted: 0 0% 14.9%;
-  --muted-foreground: 0 0% 63.9%;
-  --accent: 0 0% 14.9%;
-  --accent-foreground: 0 0% 98%;
-  --destructive: 0 62.8% 30.6%;
-  --destructive-foreground: 0 0% 98%;
-  --border: 0 0% 14.9%;
-  --input: 0 0% 14.9%;
-  --ring: 0 0% 83.1%;
-}
 `,
 };
 
@@ -99,8 +82,8 @@ export function Playground({
     initial?.src || null
   );
 
-  const [variablescss, setVariablescss] = useState<string | null>(
-    theme["variables.css"]
+  const [__variablecss_txt, __set_variablecss_txt] = useState<string | null>(
+    stringfyThemeVariables(theme)
   );
 
   const is_modified = __schema_txt !== initial?.src;
@@ -278,7 +261,7 @@ export function Playground({
                   "variables.css": {
                     name: "variables.css",
                     language: "css",
-                    value: theme["variables.css"],
+                    value: __variablecss_txt || "",
                   },
                 }}
                 onChange={(f: EditorFileName, v?: string) => {
@@ -288,7 +271,7 @@ export function Playground({
                       return;
                     }
                     case "variables.css": {
-                      setVariablescss(v || "");
+                      __set_variablecss_txt(v || "");
                       return;
                     }
                   }
@@ -301,7 +284,7 @@ export function Playground({
         <section className="flex-1 h-full overflow-y-scroll">
           <PlaygroundPreview
             schema={__schema_txt || ""}
-            css={variablescss || ""}
+            css={__variablecss_txt || ""}
           />
         </section>
       </div>
@@ -373,28 +356,43 @@ function Editor({
           </TabsList>
         </Tabs>
       </header>
-      <MonacoEditor
-        height={"100%"}
-        onChange={(v) => {
-          onChange?.(fileName, v);
-        }}
-        path={fileName}
-        defaultLanguage={file.language}
-        defaultValue={file.value}
-        value={file.value}
-        theme={isDarkMode ? "dark" : "light"}
-        options={{
-          readOnly: readonly,
-          automaticLayout: true,
-          padding: {
-            top: 16,
-          },
-          minimap: {
-            enabled: false,
-          },
-          scrollBeyondLastLine: false,
-        }}
-      />
+      <div className="relative w-full h-full">
+        {fileName === "variables.css" && (
+          <div className="absolute z-10 top-0 right-0 max-w-lg">
+            <ThemePalette
+              initialTheme={defaultTheme}
+              onValueChange={(theme) => {
+                // create css from theme
+                const css = stringfyThemeVariables(theme);
+
+                onChange?.("variables.css", css);
+              }}
+            />
+          </div>
+        )}
+        <MonacoEditor
+          height={"100%"}
+          onChange={(v) => {
+            onChange?.(fileName, v);
+          }}
+          path={fileName}
+          defaultLanguage={file.language}
+          defaultValue={file.value}
+          value={file.value}
+          theme={isDarkMode ? "dark" : "light"}
+          options={{
+            readOnly: readonly || fileName === "variables.css",
+            automaticLayout: true,
+            padding: {
+              top: 16,
+            },
+            minimap: {
+              enabled: false,
+            },
+            scrollBeyondLastLine: false,
+          }}
+        />
+      </div>
     </div>
   );
 }
