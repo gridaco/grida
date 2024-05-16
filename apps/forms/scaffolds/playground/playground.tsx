@@ -39,16 +39,62 @@ import { generate } from "@/app/actions";
 import { readStreamableValue } from "ai/rsc";
 import Link from "next/link";
 import { useDarkMode } from "usehooks-ts";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import useVariablesCSS from "./use-variables-css";
+import PlaygroundPreview from "./preview";
 
 const HOST_NAME = process.env.NEXT_PUBLIC_HOST_NAME || "http://localhost:3000";
 
-type MaybeArray<T> = T | T[];
-
-function toArrayOf<T>(value: MaybeArray<T>, nofalsy = true): NonNullable<T>[] {
-  return (
-    Array.isArray(value) ? value : nofalsy && value ? [value] : []
-  ) as NonNullable<T>[];
+const theme = {
+  "variables.css": `
+:root {
+  --background: 0 0% 100%;
+  --foreground: 0 0% 3.9%;
+  --card: 0 0% 100%;
+  --card-foreground: 0 0% 3.9%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 0 0% 3.9%;
+  --primary: 0 0% 9%;
+  --primary-foreground: 0 0% 98%;
+  --secondary: 0 0% 96.1%;
+  --secondary-foreground: 0 0% 9%;
+  --muted: 0 0% 96.1%;
+  --muted-foreground: 0 0% 45.1%;
+  --accent: 0 0% 96.1%;
+  --accent-foreground: 0 0% 9%;
+  --destructive: 0 84.2% 60.2%;
+  --destructive-foreground: 0 0% 98%;
+  --border: 0 0% 89.8%;
+  --input: 0 0% 89.8%;
+  --ring: 0 0% 3.9%;
+  --radius: 0.5rem;
 }
+
+.dark {
+  --background: 0 0% 3.9%;
+  --foreground: 0 0% 98%;
+  --card: 0 0% 3.9%;
+  --card-foreground: 0 0% 98%;
+  --popover: 0 0% 3.9%;
+  --popover-foreground: 0 0% 98%;
+  --primary: 0 0% 98%;
+  --primary-foreground: 0 0% 9%;
+  --secondary: 0 0% 14.9%;
+  --secondary-foreground: 0 0% 98%;
+  --muted: 0 0% 14.9%;
+  --muted-foreground: 0 0% 63.9%;
+  --accent: 0 0% 14.9%;
+  --accent-foreground: 0 0% 98%;
+  --destructive: 0 62.8% 30.6%;
+  --destructive-foreground: 0 0% 98%;
+  --border: 0 0% 14.9%;
+  --input: 0 0% 14.9%;
+  --ring: 0 0% 83.1%;
+}
+`,
+};
+
+type MaybeArray<T> = T | T[];
 
 function compile(value?: string | object) {
   const schema = parse(value);
@@ -119,6 +165,10 @@ export function Playground({
     initial?.src || null
   );
 
+  const [variablescss, setVariablescss] = useState<string | null>(
+    theme["variables.css"]
+  );
+
   const is_modified = __schema_txt !== initial?.src;
   const [busy, setBusy] = useState(false);
 
@@ -181,19 +231,6 @@ export function Playground({
       .finally(() => {
         setBusy(false);
       });
-  };
-
-  const onPublishClick = async () => {
-    setBusy(true);
-    fetch("/playground/publish", {
-      method: "POST",
-      body: JSON.stringify({
-        src: __schema_txt,
-      }),
-      headers: {
-        "Content-Type": "application/json",
-      },
-    });
   };
 
   return (
@@ -300,59 +337,40 @@ export function Playground({
             <div className="flex-shrink flex flex-col h-full">
               <Editor
                 readonly={busy}
-                value={__schema_txt || ""}
-                onChange={(v?: string) => {
-                  __set_schema_txt(v || "");
+                files={{
+                  "form.json": {
+                    name: "form.json",
+                    language: "json",
+                    value: __schema_txt || "",
+                  },
+                  "variables.css": {
+                    name: "variables.css",
+                    language: "css",
+                    value: theme["variables.css"],
+                  },
+                }}
+                onChange={(f: EditorFileName, v?: string) => {
+                  switch (f) {
+                    case "form.json": {
+                      __set_schema_txt(v || "");
+                      return;
+                    }
+                    case "variables.css": {
+                      setVariablescss(v || "");
+                      return;
+                    }
+                  }
                 }}
               />
             </div>
-            {/* <div className="flex-grow">
-              <details>
-                <summary>Data</summary>
-                <MonacoEditor
-                  height={200}
-                  defaultLanguage="json"
-                  value={JSON.stringify(renderer, null, 2)}
-                  options={{
-                    padding: {
-                      top: 16,
-                    },
-                    minimap: {
-                      enabled: false,
-                    },
-                    scrollBeyondLastLine: false,
-                  }}
-                />
-              </details>
-            </div> */}
           </div>
         </section>
         <div className="h-full border-r" />
         <section className="flex-1 h-full overflow-y-scroll">
-          {renderer ? (
-            <div className="relative flex flex-col items-center w-full">
-              <FormView
-                title={"Form"}
-                form_id={renderer.id}
-                fields={renderer.fields()}
-                blocks={renderer.blocks()}
-                tree={renderer.tree()}
-                translation={resources.en.translation as any}
-                options={{
-                  is_powered_by_branding_enabled: true,
-                }}
-              />
-              {invalid && (
-                <div className="absolute top-2 right-2 bg-red-500 p-2 rounded shadow">
-                  <ExclamationTriangleIcon />
-                </div>
-              )}
-            </div>
-          ) : (
-            <div className="grow flex items-center justify-center p-4 text-center text-gray-500">
-              Invalid schema
-            </div>
-          )}
+          <PlaygroundPreview
+            schema={__schema_txt || ""}
+            css={variablescss || ""}
+          />
         </section>
       </div>
     </main>
@@ -364,17 +382,32 @@ const schema = {
   fileMatch: ["*"], // Associate with all JSON files
 };
 
+type EditorFileName = "form.json" | "variables.css";
+type EditorFile<T extends EditorFileName = any> = {
+  name: EditorFileName;
+  language: "json" | "css";
+  value?: string;
+};
+type EditorFiles = {
+  "form.json": EditorFile<"form.json">;
+  "variables.css": EditorFile<"variables.css">;
+};
+
 function Editor({
-  value,
+  files,
   onChange,
   readonly,
 }: {
-  value?: string;
-  onChange?: (value?: string) => void;
+  // value?: string;
+  files: EditorFiles;
+  onChange?: (fileName: EditorFileName, value?: string) => void;
   readonly?: boolean;
 }) {
   const monaco = useMonaco();
   const { isDarkMode } = useDarkMode();
+  const [fileName, setFileName] = useState<EditorFileName>("form.json");
+
+  const file = files[fileName];
 
   useEffect(() => {
     monaco?.languages.json.jsonDefaults.setDiagnosticsOptions({
@@ -392,14 +425,30 @@ function Editor({
 
   return (
     <div className="font-mono flex-1 flex flex-col w-full h-full">
-      <header className="p-2 border-b">
-        <span className="text-sm opacity-80">form.json</span>
-      </header>
+      <Tabs
+        value={fileName}
+        onValueChange={(file) => {
+          setFileName(file as EditorFileName);
+        }}
+      >
+        <TabsList>
+          {Object.keys(files).map((file) => (
+            <TabsTrigger key={file} value={file}>
+              {file}
+            </TabsTrigger>
+          ))}
+        </TabsList>
+      </Tabs>
+      <header className="p-2 border-b"></header>
       <MonacoEditor
         height={"100%"}
-        defaultLanguage="json"
-        onChange={onChange}
-        value={value}
+        onChange={(v) => {
+          onChange?.(fileName, v);
+        }}
+        path={fileName}
+        defaultLanguage={file.language}
+        defaultValue={file.value}
+        value={file.value}
         theme={isDarkMode ? "dark" : "light"}
         options={{
           readOnly: readonly,
