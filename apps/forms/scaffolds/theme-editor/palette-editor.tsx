@@ -12,6 +12,7 @@ import clsx from "clsx";
 import { MoonIcon, SunIcon } from "@radix-ui/react-icons";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 
 export function ThemePalette({
   initialTheme,
@@ -81,27 +82,64 @@ export function ThemePalette({
         </header>
       </CardHeader>
       <CardContent>
-        <ul className="flex flex-col gap-2">
-          {Object.entries(theme[mode]).map(([key, value]) => (
-            <li className="flex items-center gap-2" key={key}>
-              <ColorChip
-                id={key}
-                value={value as any}
-                onChange={(value) => {
-                  setTheme((prev) => ({
-                    ...prev,
-                    [mode]: {
-                      ...prev[mode],
-                      [key]: value,
-                    },
-                  }));
-                }}
-              />
-              <label htmlFor={key} className="font-mono text-sm opacity-50">
-                {key}
-              </label>
-            </li>
-          ))}
+        <ul className="flex flex-col gap-2 font-mono">
+          {Object.entries(theme[mode]).map(([key, value]) => {
+            const type = typeof value;
+
+            switch (type) {
+              // casted to hsl
+              case "object": {
+                return (
+                  <li className="flex items-center gap-2" key={key}>
+                    <ColorChip
+                      id={key}
+                      value={value as any}
+                      onChange={(value) => {
+                        setTheme((prev) => ({
+                          ...prev,
+                          [mode]: {
+                            ...prev[mode],
+                            [key]: value,
+                          },
+                        }));
+                      }}
+                    />
+                    <label
+                      htmlFor={key}
+                      className="font-mono text-sm opacity-50"
+                    >
+                      {key}
+                    </label>
+                  </li>
+                );
+              }
+              case "string": {
+                return (
+                  <li key={key}>
+                    <label
+                      className="font-mono text-sm opacity-50"
+                      htmlFor={key}
+                    >
+                      {key}
+                    </label>
+                    <Input
+                      id={key}
+                      value={value as string}
+                      onChange={(e) => {
+                        setTheme((prev) => ({
+                          ...prev,
+                          [mode]: {
+                            ...prev[mode],
+                            [key]: e.target.value,
+                          },
+                        }));
+                      }}
+                    />
+                  </li>
+                );
+              }
+            }
+          })}
         </ul>
       </CardContent>
     </Card>
