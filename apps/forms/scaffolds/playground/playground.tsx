@@ -7,31 +7,16 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { FormView } from "@/scaffolds/e/form";
 import { Editor as MonacoEditor, useMonaco } from "@monaco-editor/react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { nanoid } from "nanoid";
-import {
-  JSONField,
-  JSONForm,
-  JSONOptionLike,
-  json_form_field_to_form_field_definition,
-  parse,
-  parse_jsonfield_type,
-} from "@/types/schema";
-import resources from "@/k/i18n";
-import { FormRenderTree } from "@/lib/forms";
 import { GridaLogo } from "@/components/grida-logo";
-import { FormFieldAutocompleteType, Option } from "@/types";
 import { Button } from "@/components/ui/button";
 import {
-  ExclamationTriangleIcon,
   Link2Icon,
   ReloadIcon,
   RocketIcon,
   SlashIcon,
 } from "@radix-ui/react-icons";
-import { createClientFormsClient } from "@/lib/supabase/client";
 import toast from "react-hot-toast";
 import { useRouter } from "next/navigation";
 import { examples } from "./k";
@@ -40,7 +25,6 @@ import { readStreamableValue } from "ai/rsc";
 import Link from "next/link";
 import { useDarkMode } from "usehooks-ts";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import useVariablesCSS from "./use-variables-css";
 import PlaygroundPreview from "./preview";
 
 const HOST_NAME = process.env.NEXT_PUBLIC_HOST_NAME || "http://localhost:3000";
@@ -94,56 +78,6 @@ const theme = {
 `,
 };
 
-type MaybeArray<T> = T | T[];
-
-function compile(value?: string | object) {
-  const schema = parse(value);
-  if (!schema) {
-    return;
-  }
-
-  const renderer = new FormRenderTree(
-    nanoid(),
-    schema.title,
-    schema.description,
-    json_form_field_to_form_field_definition(schema.fields),
-    [],
-    {
-      blocks: {
-        when_empty: {
-          header: {
-            title_and_description: {
-              enabled: true,
-            },
-          },
-        },
-      },
-    }
-  );
-
-  return renderer;
-}
-
-function useRenderer(raw?: string | object | null) {
-  // use last valid schema
-  const [valid, setValid] = useState<FormRenderTree>();
-  const [invalid, setInvalid] = useState<boolean>(false);
-
-  useEffect(() => {
-    if (raw) {
-      const o = compile(raw);
-      if (o) {
-        setValid(o);
-        setInvalid(false);
-      } else {
-        setInvalid(true);
-      }
-    }
-  }, [raw]);
-
-  return [valid, invalid] as const;
-}
-
 export function Playground({
   initial,
 }: {
@@ -171,8 +105,6 @@ export function Playground({
 
   const is_modified = __schema_txt !== initial?.src;
   const [busy, setBusy] = useState(false);
-
-  const [renderer, invalid] = useRenderer(__schema_txt);
 
   const streamGeneration = (prompt: string) => {
     if (generating.current) {
@@ -425,21 +357,22 @@ function Editor({
 
   return (
     <div className="font-mono flex-1 flex flex-col w-full h-full">
-      <Tabs
-        value={fileName}
-        onValueChange={(file) => {
-          setFileName(file as EditorFileName);
-        }}
-      >
-        <TabsList>
-          {Object.keys(files).map((file) => (
-            <TabsTrigger key={file} value={file}>
-              {file}
-            </TabsTrigger>
-          ))}
-        </TabsList>
-      </Tabs>
-      <header className="p-2 border-b"></header>
+      <header className="p-2 border-b z-10">
+        <Tabs
+          value={fileName}
+          onValueChange={(file) => {
+            setFileName(file as EditorFileName);
+          }}
+        >
+          <TabsList>
+            {Object.keys(files).map((file) => (
+              <TabsTrigger key={file} value={file}>
+                {file}
+              </TabsTrigger>
+            ))}
+          </TabsList>
+        </Tabs>
+      </header>
       <MonacoEditor
         height={"100%"}
         onChange={(v) => {

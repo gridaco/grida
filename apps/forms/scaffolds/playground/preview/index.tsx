@@ -11,6 +11,7 @@ import resources from "@/k/i18n";
 import { nanoid } from "nanoid";
 import { ExclamationTriangleIcon } from "@radix-ui/react-icons";
 import useVariablesCSS from "../use-variables-css";
+import { FormsPageLanguage } from "@/types";
 
 export default function PlaygroundPreview({
   schema,
@@ -52,6 +53,7 @@ function compile(value?: string | object) {
     nanoid(),
     schema.title,
     schema.description,
+    schema.lang,
     json_form_field_to_form_field_definition(schema.fields),
     [],
     {
@@ -116,6 +118,7 @@ export function PlaygroundPreviSlave() {
   }, []);
 
   const [renderer, invalid] = useRenderer(schema);
+  const lang: FormsPageLanguage = (renderer?.lang ?? "en") as FormsPageLanguage;
 
   return (
     <>
@@ -132,7 +135,7 @@ export function PlaygroundPreviSlave() {
             fields={renderer.fields()}
             blocks={renderer.blocks()}
             tree={renderer.tree()}
-            translation={resources.en.translation as any}
+            translation={resources[lang].translation as any}
             options={{
               is_powered_by_branding_enabled: true,
             }}
