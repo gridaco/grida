@@ -27,39 +27,11 @@ import { useDarkMode } from "usehooks-ts";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import PlaygroundPreview from "./preview";
 import { ThemePalette } from "../theme-editor/palette-editor";
-import { z } from "zod";
-import { Theme } from "../theme-editor/types";
-import { defaultTheme } from "../theme-editor/k";
 import { stringfyThemeVariables } from "../theme-editor/serialize";
+import blue from "@/theme/palettes/blue";
+import { useTheme } from "next-themes";
 
 const HOST_NAME = process.env.NEXT_PUBLIC_HOST_NAME || "http://localhost:3000";
-
-const theme = {
-  "variables.css": `
-:root {
-  --background: 0 0% 100%;
-  --foreground: 0 0% 3.9%;
-  --card: 0 0% 100%;
-  --card-foreground: 0 0% 3.9%;
-  --popover: 0 0% 100%;
-  --popover-foreground: 0 0% 3.9%;
-  --primary: 0 0% 9%;
-  --primary-foreground: 0 0% 98%;
-  --secondary: 0 0% 96.1%;
-  --secondary-foreground: 0 0% 9%;
-  --muted: 0 0% 96.1%;
-  --muted-foreground: 0 0% 45.1%;
-  --accent: 0 0% 96.1%;
-  --accent-foreground: 0 0% 9%;
-  --destructive: 0 84.2% 60.2%;
-  --destructive-foreground: 0 0% 98%;
-  --border: 0 0% 89.8%;
-  --input: 0 0% 89.8%;
-  --ring: 0 0% 3.9%;
-  --radius: 0.5rem;
-}
-`,
-};
 
 export function Playground({
   initial,
@@ -73,6 +45,8 @@ export function Playground({
   const generating = useRef(false);
   const router = useRouter();
 
+  const [fileName, setFileName] = useState<EditorFileName>("form.json");
+
   // const [is_modified, set_is_modified] = useState(false);
   const [exampleId, setExampleId] = useState<string | undefined>(
     initial ? undefined : examples[0].id
@@ -83,8 +57,10 @@ export function Playground({
   );
 
   const [__variablecss_txt, __set_variablecss_txt] = useState<string | null>(
-    stringfyThemeVariables(theme)
+    stringfyThemeVariables(blue)
   );
+
+  const [dark, setDark] = useState(false);
 
   const is_modified = __schema_txt !== initial?.src;
   const [busy, setBusy] = useState(false);
@@ -249,9 +225,25 @@ export function Playground({
       <div className="flex-1 flex max-h-full overflow-hidden">
         <section className="flex-1 h-full">
           <div className="w-full h-full flex flex-col">
-            <div className="flex-shrink flex flex-col h-full">
+            <div className="relative flex-shrink flex flex-col h-full">
+              {fileName === "variables.css" && (
+                <div className="absolute z-20 top-4 right-4 max-w-lg">
+                  <ThemePalette
+                    initialTheme={blue}
+                    onValueChange={(theme) => {
+                      // create css from theme
+                      const css = stringfyThemeVariables(theme);
+
+                      __set_variablecss_txt(css);
+                    }}
+                    onDarkChange={setDark}
+                  />
+                </div>
+              )}
               <Editor
                 readonly={busy}
+                fileName={fileName}
+                onFileNameChange={setFileName}
                 files={{
                   "form.json": {
                     name: "form.json",
@@ -285,6 +277,7 @@ export function Playground({
           <PlaygroundPreview
             schema={__schema_txt || ""}
             css={__variablecss_txt || ""}
+            dark={dark}
           />
         </section>
       </div>
@@ -309,18 +302,24 @@ type EditorFiles = {
 };
 
 function Editor({
+  fileName,
+  onFileNameChange,
   files,
   onChange,
   readonly,
 }: {
   // value?: string;
+  fileName: EditorFileName;
+  onFileNameChange?: (fileName: EditorFileName) => void;
   files: EditorFiles;
   onChange?: (fileName: EditorFileName, value?: string) => void;
   readonly?: boolean;
 }) {
   const monaco = useMonaco();
-  const { isDarkMode } = useDarkMode();
-  const [fileName, setFileName] = useState<EditorFileName>("form.json");
+  // const { isDarkMode } = useDarkMode();
+  const { theme } = useTheme();
+
+  const isDarkMode = theme === "dark";
 
   const file = files[fileName];
 
@@ -344,7 +343,7 @@ function Editor({
         <Tabs
           value={fileName}
           onValueChange={(file) => {
-            setFileName(file as EditorFileName);
+            onFileNameChange?.(file as EditorFileName);
           }}
         >
           <TabsList>
@@ -357,19 +356,6 @@ function Editor({
         </Tabs>
       </header>
       <div className="relative w-full h-full">
-        {fileName === "variables.css" && (
-          <div className="absolute z-10 top-0 right-0 max-w-lg">
-            <ThemePalette
-              initialTheme={defaultTheme}
-              onValueChange={(theme) => {
-                // create css from theme
-                const css = stringfyThemeVariables(theme);
-
-                onChange?.("variables.css", css);
-              }}
-            />
-          </div>
-        )}
         <MonacoEditor
           height={"100%"}
           onChange={(v) => {

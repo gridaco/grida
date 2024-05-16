@@ -12,13 +12,16 @@ import { nanoid } from "nanoid";
 import { ExclamationTriangleIcon } from "@radix-ui/react-icons";
 import useVariablesCSS from "../use-variables-css";
 import { FormsPageLanguage } from "@/types";
+import { useTheme } from "next-themes";
 
 export default function PlaygroundPreview({
   schema,
   css,
+  dark,
 }: {
   schema: string;
   css: string;
+  dark?: boolean;
 }) {
   const ref = useRef<HTMLIFrameElement>(null);
 
@@ -39,6 +42,15 @@ export default function PlaygroundPreview({
       );
     }
   }, [css]);
+
+  useEffect(() => {
+    if (ref.current) {
+      ref.current.contentWindow?.postMessage(
+        { type: "set_dark_mode", dark },
+        "*"
+      );
+    }
+  }, [dark]);
 
   return <iframe ref={ref} width="100%" height="100%" src="/preview" />;
 }
@@ -93,6 +105,8 @@ function useRenderer(raw?: string | object | null) {
 }
 
 export function PlaygroundPreviSlave() {
+  const { theme, setTheme } = useTheme();
+
   const [schema, setSchema] = useState<string | null>(null);
   const [variablescss, setVariablescss] = useState<string | null>(null);
 
@@ -106,6 +120,9 @@ export function PlaygroundPreviSlave() {
           break;
         case "set_variablescss":
           setVariablescss(event.data.variablescss);
+          break;
+        case "set_dark_mode":
+          setTheme(event.data.dark ? "dark" : "light");
           break;
       }
     };

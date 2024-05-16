@@ -8,7 +8,7 @@ export const HSL = z.object({
 
 export const REM = z.string();
 
-export const Theme = z.object({
+export const Palette = z.object({
   "--background": HSL,
   "--foreground": HSL,
   "--card": HSL,
@@ -31,7 +31,7 @@ export const Theme = z.object({
   "--radius": REM,
 });
 
-export const ThemeSet = z.object({
-  light: Theme,
-  dark: Theme,
+export const Theme = z.object({
+  light: Palette,
+  dark: Palette,
 });

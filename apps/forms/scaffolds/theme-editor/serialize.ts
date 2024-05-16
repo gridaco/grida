@@ -1,15 +1,38 @@
+import { Palette, Theme } from "@/theme/palettes/types";
 import csstree from "css-tree";
+import { z } from "zod";
 
-export function stringfyThemeVariables(theme: Record<string, any>) {
+export function stringfyThemeVariables(theme: z.infer<typeof Theme>) {
   // Convert values
-  const stringifyHSL = (value: any) => {
-    return `${value.h} ${value.s}% ${value.l}%`;
-  };
 
-  const stringifyREM = (value: any) => value;
+  const { light, dark } = theme;
 
   // Construct the CSS
-  const css = Object.entries(theme)
+  const css_1 = stringfyPalette(light);
+  const css_2 = stringfyPalette(dark);
+  return `:root {
+${indent(css_1)}
+}
+
+.dark {
+${indent(css_2)}
+}`;
+}
+
+const indent = (str: string) =>
+  str
+    .split("\n")
+    .map((line) => `  ${line}`)
+    .join("\n");
+
+const stringifyHSL = (value: any) => {
+  return `${value.h} ${value.s}% ${value.l}%`;
+};
+
+const stringifyREM = (value: any) => value;
+
+export function stringfyPalette(palette: z.infer<typeof Palette>) {
+  return Object.entries(palette)
     .map(([key, value]) => {
       if (key === "--radius") {
         return `${key}: ${stringifyREM(value)};`;
@@ -17,13 +40,6 @@ export function stringfyThemeVariables(theme: Record<string, any>) {
       return `${key}: ${stringifyHSL(value)};`;
     })
     .join("\n");
-
-  return `:root {
-${css
-  .split("\n")
-  .map((line) => `  ${line}`)
-  .join("\n")}
-}`;
 }
 
 export function parseThemeVariables(css: string) {
