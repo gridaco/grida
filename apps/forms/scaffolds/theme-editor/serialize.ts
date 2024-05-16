@@ -19,8 +19,11 @@ export function stringfyThemeVariables(theme: Record<string, any>) {
     .join("\n");
 
   return `:root {
-${css}
-  }`;
+${css
+  .split("\n")
+  .map((line) => `  ${line}`)
+  .join("\n")}
+}`;
 }
 
 export function parseThemeVariables(css: string) {
