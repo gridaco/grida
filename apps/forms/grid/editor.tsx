@@ -1,6 +1,13 @@
 "use client";
 import { produce } from "immer";
-import { PlusIcon } from "@radix-ui/react-icons";
+import {
+  ButtonIcon,
+  ImageIcon,
+  Link2Icon,
+  PlusIcon,
+  TextIcon,
+  VideoIcon,
+} from "@radix-ui/react-icons";
 import React, {
   createContext,
   memo,
@@ -9,19 +16,58 @@ import React, {
   useMemo,
 } from "react";
 import { useGesture } from "@use-gesture/react";
-import { Dialog, DialogClose, DialogContent } from "@/components/ui/dialog";
+import {
+  Drawer,
+  DrawerClose,
+  DrawerContent,
+  DrawerDescription,
+  DrawerFooter,
+  DrawerHeader,
+  DrawerTitle,
+  DrawerTrigger,
+} from "@/components/ui/drawer";
 import { nanoid } from "nanoid";
 import { Button } from "@/components/ui/button";
 import dynamic from "next/dynamic";
+import { useDraggable } from "@dnd-kit/core";
 const ReactPlayer = dynamic(() => import("react-player/lazy"), { ssr: false });
 
 const blockpresets = [
-  { type: "button", label: "Button" },
-  { type: "text", label: "Text" },
-  { type: "link", label: "Link" },
-  { type: "image", label: "Image" },
-  { type: "video", label: "Video" },
-  { type: "youtue", label: "YouTube" },
+  {
+    type: "forms.grida.co/start-form-button",
+    label: "Start Button",
+    icon: <ButtonIcon />,
+  },
+  {
+    type: "button",
+    label: "Button",
+    icon: <ButtonIcon />,
+  },
+  {
+    type: "text",
+    label: "Text",
+    icon: <TextIcon />,
+  },
+  {
+    type: "link",
+    label: "Link",
+    icon: <Link2Icon />,
+  },
+  {
+    type: "image",
+    label: "Image",
+    icon: <ImageIcon />,
+  },
+  {
+    type: "video",
+    label: "Video",
+    icon: <VideoIcon />,
+  },
+  {
+    type: "youtue",
+    label: "YouTube",
+    icon: <VideoIcon />,
+  },
 ] as const;
 
 type GridaBlock =
@@ -68,19 +114,85 @@ type Block<T = any> = {
 };
 
 interface State {
+  /**
+   * scale factor for grid
+   * @default 1
+   */
+  scalefactor: number;
+
+  /**
+   * actual width - consider canvas width
+   * @default 375
+   */
+  width: number;
+
+  /**
+   * actual height - consider canvas height
+   * @default 750
+   */
+  height: number;
+
+  /**
+   * grid size
+   * @default [6, 12]
+   */
+  size: Size;
+  /**
+   * current pointer position in grid space
+   */
   pos: Position;
+
+  /**
+   * is dragging
+   */
   dragging: boolean;
+
+  /**
+   * start position of marquee in grid space
+   */
   start?: Position;
+
+  /**
+   * end position of marquee in grid space
+   */
   end?: Position;
+
+  /**
+   * marquee area in grid space
+   */
+  marquee?: Area;
+
   controls: {
     insert_panel_open: boolean;
   };
+
+  /**
+   * selected block id
+   */
   selected?: BlockId;
-  marquee?: Area;
+
   debug?: boolean;
-  size: Size;
+
+  /**
+   * grid content blocks
+   */
   blocks: Block[];
 }
+
+const initial: State = {
+  scalefactor: 1,
+  width: 375,
+  height: 750,
+  size: [6, 12],
+  pos: [0, 0],
+  dragging: false,
+  selected: undefined,
+  marquee: undefined,
+  controls: {
+    insert_panel_open: false,
+  },
+  blocks: [],
+};
 
 type Action =
   | CellPonterMoveAction
@@ -267,18 +379,6 @@ const useGrid = (): [State, FlatDispatcher] => {
   return useMemo(() => [state, dispatch], [state, dispatch]);
 };
 
-const initial: State = {
-  pos: [0, 0],
-  dragging: false,
-  selected: undefined,
-  marquee: undefined,
-  controls: {
-    insert_panel_open: false,
-  },
-  size: [6, 12],
-  blocks: [],
-};
-
 function Provider({ children }: React.PropsWithChildren<{}>) {
   const [state, dispatch] = React.useReducer(reducer, initial);
   return (
@@ -300,43 +400,64 @@ function GridEditor() {
   const [state, dispatch] = useGrid();
   return (
     <div className="relative w-full h-full">
-      <Dialog
+      <Drawer
         open={state.controls.insert_panel_open}
         onOpenChange={(open) => {
           dispatch({ type: "controls/insert_panel_open", open: open });
         }}
       >
-        <DialogContent>
-          {blockpresets.map((block) => (
-            <button
-              key={block.type}
-              onClick={() => {
-                switch (block.type) {
-                  case "text": {
-                    dispatch({
-                      type: "blocks/new",
-                      block: "typography",
-                    });
-                    return;
+        <DrawerContent>
+          <DrawerHeader>
+            <DrawerTitle>Insert Block</DrawerTitle>
+          </DrawerHeader>
+          <div className="p-4 flex flex-col gap-2 w-full">
+            {blockpresets.map((block) => (
+              <Button
+                variant="outline"
+                className="h-20"
+                key={block.type}
+                onClick={() => {
+                  switch (block.type) {
+                    case "text": {
+                      dispatch({
+                        type: "blocks/new",
+                        block: "typography",
+                      });
+                      return;
+                    }
                   }
-                }
-                dispatch({
-                  type: "blocks/new",
-                  // @ts-ignore TODO: handle presets
-                  block: block.type,
-                });
-              }}
-            >
-              {block.label}
-            </button>
-          ))}
-          <div className="bg-red-50 w-10 h-10" />
-        </DialogContent>
-      </Dialog>
+                  dispatch({
+                    type: "blocks/new",
+                    // @ts-ignore TODO: handle presets
+                    block: block.type,
+                  });
+                }}
+              >
+                {React.cloneElement(block.icon, {
+                  className: "w-6 h-6 mr-2",
+                })}
+                {block.label}
+              </Button>
+            ))}
+          </div>
+          <DrawerFooter>
+            <Button>OK</Button>
+            <DrawerClose>
+              <Button variant="outline">Cancel</Button>
+            </DrawerClose>
+          </DrawerFooter>
+        </DrawerContent>
+      </Drawer>
       <GridGuide col={6} row={12} />
       <Grid col={6} row={12}>
         {state.blocks.map((block) => (
-          <GridAreaBlock x={block.x} y={block.y} z={block.z} key={block.id}>
+          <GridAreaBlock
+            key={block.id}
+            id={block.id}
+            x={block.x}
+            y={block.y}
+            z={block.z}
+          >
             {GridaBlockRenderer(block.element)}
           </GridAreaBlock>
         ))}
@@ -364,7 +485,7 @@ function GridaBlockRenderer(block: GridaBlock) {
 const gridpos = (col: number, row: number, i: number): Position => {
   const x = i % col;
   const y = Math.floor(i / col);
-  return [x, y] as const;
+  return [x, y];
 };
 
 function GridGuide({
@@ -509,23 +630,42 @@ function Grid({
   );
 }
 
+function Dragable({
+  id,
+  children,
+}: React.PropsWithChildren<{
+  id: string;
+}>) {
+  return <div className="w-full h-full">{children}</div>;
+}
+
 function GridAreaBlock({
+  id,
   x,
   y,
   z,
   debug,
   children,
 }: React.PropsWithChildren<{
+  id: string;
   x: [number, number];
   y: [number, number];
   z?: number;
   debug?: boolean;
 }>) {
+  const { setNodeRef } = useDraggable({ id });
+
   return (
     <div
+      onPointerEnter={() => {
+        // here
+        console.log("enter");
+      }}
+      ref={setNodeRef}
       data-debug={debug}
-      className="data-[debug='true']:bg-pink-300/20"
+      className="bg-background data-[debug='true']:bg-pink-300/20 hover:bg-yellow-200"
       style={{
+        pointerEvents: "auto",
         gridArea: y[0] + " / " + x[0] + " / " + y[1] + " / " + x[1],
         zIndex: z,
         overflow: "hidden",
