@@ -15,28 +15,27 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 
 export function ThemePalette({
-  initialTheme,
+  dark: _dark,
+  value,
+  preset,
+  onPresetChange,
   onValueChange,
   onDarkChange,
 }: {
-  initialTheme?: z.infer<typeof Theme>;
+  dark?: boolean;
+  preset?: string;
+  value: z.infer<typeof Theme>;
+  onPresetChange?: (preset: string) => void;
   onValueChange?: (theme: z.infer<typeof Theme>) => void;
   onDarkChange?: (dark: boolean) => void;
 }) {
-  const [mode, setMode] = useState<"light" | "dark">("light");
+  const [isdark, setisdark] = useState<boolean>(_dark ?? false);
+  const colorscheme = isdark ? "dark" : "light";
   const [presetId, setPresetId] = useState<string>("blue");
-  const [theme, setTheme] = useState<z.infer<typeof Theme>>(
-    // @ts-ignore
-    palettes[presetId]
-  );
 
   useEffect(() => {
-    onValueChange?.(theme);
-  }, [onValueChange, theme]);
-
-  useEffect(() => {
-    onDarkChange?.(mode === "dark");
-  }, [onDarkChange, mode]);
+    onDarkChange?.(isdark);
+  }, [onDarkChange, isdark]);
 
   return (
     <Card className="w-full h-full">
@@ -46,14 +45,14 @@ export function ThemePalette({
             {Object.keys(palettes).map((key) => {
               // @ts-ignore
               const palette = palettes[key];
-              const primary = palette[mode]["--primary"];
+              const primary = palette[colorscheme]["--primary"];
               return (
                 <button
                   key={key}
                   data-selected={key === presetId}
                   onClick={() => {
                     setPresetId(key);
-                    setTheme(palette);
+                    onPresetChange?.(key);
                   }}
                   className={clsx(
                     "w-6 h-6 border-2 rounded-full",
@@ -68,9 +67,9 @@ export function ThemePalette({
           </div>
           <ToggleGroup
             type="single"
-            value={mode}
+            value={colorscheme}
             defaultValue="light"
-            onValueChange={(v) => v && setMode(v as any)}
+            onValueChange={(v) => v && setisdark(v === "dark")}
           >
             <ToggleGroupItem value="light">
               <SunIcon />
@@ -83,56 +82,50 @@ export function ThemePalette({
       </CardHeader>
       <CardContent>
         <ul className="flex flex-col gap-2 font-mono">
-          {Object.entries(theme[mode]).map(([key, value]) => {
-            const type = typeof value;
+          {Object.entries(value[colorscheme]).map(([k, v]) => {
+            const type = typeof v;
 
             switch (type) {
               // casted to hsl
               case "object": {
                 return (
-                  <li className="flex items-center gap-2" key={key}>
+                  <li className="flex items-center gap-2" key={k}>
                     <ColorChip
-                      id={key}
-                      value={value as any}
-                      onChange={(value) => {
-                        setTheme((prev) => ({
-                          ...prev,
-                          [mode]: {
-                            ...prev[mode],
-                            [key]: value,
+                      id={k}
+                      value={v as any}
+                      onChange={(v) => {
+                        onValueChange?.({
+                          ...value,
+                          [colorscheme]: {
+                            ...value[colorscheme],
+                            [k]: v,
                           },
-                        }));
+                        });
                       }}
                     />
-                    <label
-                      htmlFor={key}
-                      className="font-mono text-sm opacity-50"
-                    >
-                      {key}
+                    <label htmlFor={k} className="font-mono text-sm opacity-50">
+                      {k}
                     </label>
                   </li>
                 );
               }
               case "string": {
                 return (
-                  <li key={key}>
-                    <label
-                      className="font-mono text-sm opacity-50"
-                      htmlFor={key}
-                    >
-                      {key}
+                  <li key={k}>
+                    <label className="font-mono text-sm opacity-50" htmlFor={k}>
+                      {k}
                     </label>
                     <Input
-                      id={key}
-                      value={value as string}
+                      id={k}
+                      value={v as string}
                       onChange={(e) => {
-                        setTheme((prev) => ({
-                          ...prev,
-                          [mode]: {
-                            ...prev[mode],
-                            [key]: e.target.value,
+                        onValueChange?.({
+                          ...value,
+                          [colorscheme]: {
+                            ...value[colorscheme],
+                            [k]: e.target.value,
                           },
-                        }));
+                        });
                       }}
                     />
                   </li>

@@ -28,7 +28,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import PlaygroundPreview from "./preview";
 import { ThemePalette } from "../theme-editor/palette-editor";
 import { stringfyThemeVariables } from "../theme-editor/serialize";
-import blue from "@/theme/palettes/blue";
+import * as palettes from "@/theme/palettes";
 import { useTheme } from "next-themes";
 
 const HOST_NAME = process.env.NEXT_PUBLIC_HOST_NAME || "http://localhost:3000";
@@ -56,9 +56,27 @@ export function Playground({
     initial?.src || null
   );
 
-  const [__variablecss_txt, __set_variablecss_txt] = useState<string | null>(
-    stringfyThemeVariables(blue)
+  const [theme_preset, set_theme_preset] = useState<string>("blue");
+  const [theme, set_theme] = useState(
+    // @ts-ignore
+    palettes[theme_preset]
   );
+  const [__variablecss_txt, __set_variablecss_txt] = useState<string | null>(
+    stringfyThemeVariables(theme)
+  );
+
+  useEffect(() => {
+    set_theme(
+      // @ts-ignore
+      palettes[theme_preset]
+    );
+  }, [theme_preset]);
+
+  useEffect(() => {
+    __set_variablecss_txt(stringfyThemeVariables(theme));
+  }, [theme]);
+
+  const [__customcss_txt, __set_customcss_txt] = useState<string>("");
 
   const [dark, setDark] = useState(false);
 
@@ -227,15 +245,12 @@ export function Playground({
           <div className="w-full h-full flex flex-col">
             <div className="relative flex-shrink flex flex-col h-full">
               {fileName === "variables.css" && (
-                <div className="absolute z-20 top-4 right-4 max-w-lg">
+                <div className="absolute z-20 top-16 right-4 max-w-lg">
                   <ThemePalette
-                    initialTheme={blue}
-                    onValueChange={(theme) => {
-                      // create css from theme
-                      const css = stringfyThemeVariables(theme);
-
-                      __set_variablecss_txt(css);
-                    }}
+                    preset={theme_preset}
+                    onPresetChange={set_theme_preset}
+                    value={theme}
+                    onValueChange={set_theme}
                     onDarkChange={setDark}
                   />
                 </div>
@@ -255,6 +270,11 @@ export function Playground({
                     language: "css",
                     value: __variablecss_txt || "",
                   },
+                  "custom.css": {
+                    name: "custom.css",
+                    language: "css",
+                    value: __customcss_txt || "",
+                  },
                 }}
                 onChange={(f: EditorFileName, v?: string) => {
                   switch (f) {
@@ -266,6 +286,9 @@ export function Playground({
                       __set_variablecss_txt(v || "");
                       return;
                     }
+                    case "custom.css": {
+                      __set_customcss_txt(v || "");
+                    }
                   }
                 }}
               />
@@ -276,7 +299,7 @@ export function Playground({
         <section className="flex-1 h-full overflow-y-scroll">
           <PlaygroundPreview
             schema={__schema_txt || ""}
-            css={__variablecss_txt || ""}
+            css={(__variablecss_txt || "") + "\n" + (__customcss_txt || "")}
             dark={dark}
           />
         </section>
@@ -290,7 +313,11 @@ const schema = {
   fileMatch: ["*"], // Associate with all JSON files
 };
 
-type EditorFileName = "form.json" | "variables.css";
+type EditorFileName =
+  | "form.json"
+  // | "theme.json"
+  | "variables.css"
+  | "custom.css";
 type EditorFile<T extends EditorFileName = any> = {
   name: EditorFileName;
   language: "json" | "css";
@@ -299,6 +326,8 @@ type EditorFile<T extends EditorFileName = any> = {
 type EditorFiles = {
   "form.json": EditorFile<"form.json">;
   "variables.css": EditorFile<"variables.css">;
+  // "theme.json": EditorFile<"theme.json">;
+  "custom.css": EditorFile<"custom.css">;
 };
 
 function Editor({
@@ -358,7 +387,10 @@ function Editor({
       <div className="relative w-full h-full">
         <MonacoEditor
           height={"100%"}
-          onChange={(v) => {
+          onChange={(v, ev) => {
+            if (ev.isFlush) {
+              return;
+            }
             onChange?.(fileName, v);
           }}
           path={fileName}

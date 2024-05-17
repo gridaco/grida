@@ -297,8 +297,9 @@ export function FormView({
       id="form-view"
       data-cjk={options.optimize_for_cjk}
       className={clsx(
+        "prose dark:prose-invert prose-headings:text-foreground prose-p:text-foreground text-foreground",
         "w-full h-full md:h-auto grow md:grow-0",
-        "relative prose dark:prose-invert",
+        "relative",
         "data-[cjk='true']:break-keep",
         "flex flex-col"
       )}
@@ -339,8 +340,8 @@ export function FormView({
         <footer
           className={clsx(
             "sticky bottom-0",
-            "flex gap-2 p-4 pt-4 border-t border-neutral-200 dark:border-neutral-800",
-            "justify-end bg-white dark:bg-neutral-900",
+            "flex gap-2 p-4 pt-4 border-t",
+            "justify-end bg-background",
             "md:static md:justify-start md:bg-transparent md:dark:bg-transparent"
           )}
         >
