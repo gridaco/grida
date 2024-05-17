@@ -1,5 +1,5 @@
 import { Palette, Theme } from "@/theme/palettes/types";
-import csstree from "css-tree";
+import * as csstree from "css-tree";
 import { z } from "zod";
 
 export function stringfyThemeVariables(theme: z.infer<typeof Theme>) {
