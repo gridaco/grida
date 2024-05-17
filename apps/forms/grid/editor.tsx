@@ -107,6 +107,9 @@ type GridaGridVideoBlock = {
   src: string;
 };
 
+/**
+ * [x1 y1 x2 y2]
+ */
 type Area = [number, number, number, number];
 type Position = [number, number];
 type Size = [number, number];
@@ -207,6 +210,7 @@ const initial: State = {
   is_marquee: false,
   selected: undefined,
   marquee: undefined,
+  debug: false,
   controls: {
     insert_panel_open: false,
   },
@@ -243,8 +247,8 @@ interface BlcokDragStartAction {
 
 interface BlcokDragAction {
   type: "block/drag";
-  // Cumulative displacements
-  offset: [number, number];
+  // Displacement of the current gesture
+  movement: [number, number];
 }
 
 interface BlockDragEndAction {
@@ -282,6 +286,19 @@ const gridxypos = (cellsize: number, xy: [number, number]): Position => {
   ] as Position;
 };
 
+/**
+ * (rounded) calculate grid position based on mouse position
+ * @param cellsize cell size in px
+ * @param xy mouse position in px (relative to grid)
+ * @returns
+ */
+const gridxyposround = (cellsize: number, xy: [number, number]): Position => {
+  return [
+    Math.round(xy[0] / cellsize),
+    Math.round(xy[1] / cellsize),
+  ] as Position;
+};
+
 const gridindexpos = (col: number, i: number): Position => {
   const x = i % col;
   const y = Math.floor(i / col);
@@ -289,7 +306,7 @@ const gridindexpos = (col: number, i: number): Position => {
 };
 
 function reducer(state: State, action: Action): State {
-  console.log(action);
+  // console.log(action);
   switch (action.type) {
     case "pointerdown": {
       return produce(state, (draft) => {
@@ -344,8 +361,8 @@ function reducer(state: State, action: Action): State {
         const id = nanoid();
         const [_mx1, _my1, _mx2, _my2] = state.marquee ?? [0, 0, 1, 1];
 
-        const x: Position = [_mx1 + 1, _mx2 + 2]; // +1 to endX for exclusive end in grid-area
-        const y: Position = [_my1 + 1, _my2 + 2]; // +1 to endY for exclusive end in grid-area
+        const x: Position = [_mx1, _mx2];
+        const y: Position = [_my1, _my2];
 
         const el = create_initial_grida_block(action.block);
         draft.blocks.push({
@@ -369,11 +386,25 @@ function reducer(state: State, action: Action): State {
     }
     case "block/dragend": {
       return produce(state, (draft) => {
+        if (state.is_dragging) {
+          // place the block
+          const block = draft.blocks.find((b) => b.id === state.selected);
+          // silent assert
+          if (!block) return;
+          if (!state.marquee) return;
+
+          const [mx1, my1, mx2, my2] = state.marquee ?? [-1, -1, -1, -1];
+
+          block.x = [mx1, mx2];
+          block.y = [my1, my2];
+        }
+
         draft.is_dragging = false;
+        draft.marquee = undefined; // Clear marquee after drag ends
       });
     }
     case "block/drag": {
-      const { offset: delta } = action;
+      const { movement: delta } = action;
       return produce(state, (draft) => {
         // update the marquee area to let user know the drop area
         const [_client_dx, _client_dy] = delta;
@@ -381,15 +412,20 @@ function reducer(state: State, action: Action): State {
         // silent assert
         if (!block) return;
 
-        const [dx, dy] = gridxypos(state.cellsize, [_client_dx, _client_dy]);
+        const [dx, dy] = gridxyposround(state.cellsize, [
+          _client_dx,
+          _client_dy,
+        ]);
 
-        const [x1, y1] = block.x;
-        const [x2, y2] = block.y;
+        const [ax1, ax2] = block.x;
+        const [bx1, bx2] = [ax1 + dx, ax2 + dx];
 
-        const [x1_, y1_] = [x1 + dx, y1 + dy];
-        const [x2_, y2_] = [x2 + dx, y2 + dy];
+        const [ay1, ay2] = block.y;
+        const [by1, by2] = [ay1 + dy, ay2 + dy];
 
-        draft.marquee = [x1_, y1_, x2_, y2_];
+        console.log(ax1, ax2, "=> ", _client_dx, dx, " => ", bx1, bx2);
+
+        draft.marquee = [bx1, by1, bx2, by2];
       });
     }
   }
@@ -420,7 +456,8 @@ function create_initial_grida_block(block: GridaBlockType): GridaBlock {
     case "image": {
       return {
         type: "image",
-        src: "https://placehold.co/600x400",
+        // unsplash random image
+        src: "https://source.unsplash.com/random/375x375",
       };
     }
     case "video": {
@@ -565,7 +602,13 @@ function GridEditor() {
       // onDragEnd={handleDragEnd}
       >
         <Controls />
-        <div id="grid-editor" className="relative w-full h-full">
+        <div
+          id="grid-editor"
+          className="relative w-full h-full"
+          style={{
+            userSelect: "none",
+          }}
+        >
           <GridGuide col={col} row={row} />
           <Grid col={col} row={row}>
             {state.blocks.map((block) => (
@@ -797,9 +840,8 @@ function GridAreaBlock({
   const gestureRef = useRef<HTMLDivElement>(null);
   useGesture(
     {
-      onDrag: ({ xy: [x, y], offset }) => {
-        console.log(offset);
-        dispatch({ type: "block/drag", offset: offset });
+      onDrag: ({ movement }) => {
+        dispatch({ type: "block/drag", movement: movement });
       },
       onDragStart: () => {
         dispatch({ type: "block/dragstart", id });
@@ -847,17 +889,31 @@ function GridAreaBlock({
         console.log("enter");
       }}
       data-debug={debug}
-      className="bg-background data-[debug='true']:bg-pink-300/20 hover:bg-yellow-200"
+      className="data-[debug='true']:bg-pink-300/20"
       style={{
         ...style,
         pointerEvents: "auto",
-        gridArea: y[0] + " / " + x[0] + " / " + y[1] + " / " + x[1],
+        gridArea:
+          y[0] +
+          1 +
+          " / " +
+          (x[0] + 1) +
+          " / " +
+          (y[1] + 2) +
+          " / " +
+          (x[1] + 2),
         zIndex: z,
         overflow: "hidden",
         position: "relative",
         padding: "0px",
       }}
     >
+      {state.debug && (
+        <div className="absolute top-0 left-0 bg-black text-white font-mono text-xs">
+          {id}
+          <br />x{x.join(",")} y{y.join(",")} z{z}
+        </div>
+      )}
       <div>{children}</div>
     </div>
   );
