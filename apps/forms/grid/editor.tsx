@@ -11,10 +11,14 @@ import {
 import React, {
   createContext,
   memo,
+  useState,
+  useEffect,
+  useRef,
   useCallback,
   useContext,
   useMemo,
 } from "react";
+
 import { useGesture } from "@use-gesture/react";
 import {
   Drawer,
@@ -29,7 +33,10 @@ import {
 import { nanoid } from "nanoid";
 import { Button } from "@/components/ui/button";
 import dynamic from "next/dynamic";
-import { useDraggable } from "@dnd-kit/core";
+import { DndContext, useDraggable } from "@dnd-kit/core";
+import { CSS } from "@dnd-kit/utilities";
+import clsx from "clsx";
+import useMergedRef from "./use-merged-ref";
 const ReactPlayer = dynamic(() => import("react-player/lazy"), { ssr: false });
 
 const blockpresets = [
@@ -121,6 +128,11 @@ interface State {
   scalefactor: number;
 
   /**
+   * actual cell size in px
+   */
+  cellsize: number;
+
+  /**
    * actual width - consider canvas width
    * @default 375
    */
@@ -145,7 +157,12 @@ interface State {
   /**
    * is dragging
    */
-  dragging: boolean;
+  is_dragging: boolean;
+
+  /**
+   * is marquee selection
+   */
+  is_marquee: boolean;
 
   /**
    * start position of marquee in grid space
@@ -183,9 +200,11 @@ const initial: State = {
   scalefactor: 1,
   width: 375,
   height: 750,
+  cellsize: 62.5,
   size: [6, 12],
   pos: [0, 0],
-  dragging: false,
+  is_dragging: false,
+  is_marquee: false,
   selected: undefined,
   marquee: undefined,
   controls: {
@@ -195,23 +214,33 @@ const initial: State = {
 };
 
 type Action =
-  | CellPonterMoveAction
-  | CellPonterDownrAction
+  | PonterMoveAction
+  | PonterDownrAction
   | OpenChangeInsertBlockPanel
-  | CellPonterUpAction
-  | InsertBlock;
+  | PonterUpAction
+  | InsertBlock
+  | BlcokDragStartAction
+  | BlockDragEndAction;
 
-interface CellPonterMoveAction {
+interface PonterMoveAction {
   type: "pointermove";
-  pos: [number, number];
+  xy: [number, number];
 }
 
-interface CellPonterDownrAction {
+interface PonterDownrAction {
   type: "pointerdown";
 }
 
-interface CellPonterUpAction {
+interface PonterUpAction {
   type: "pointerup";
+}
+
+interface BlcokDragStartAction {
+  type: "block/dragstart";
+}
+
+interface BlockDragEndAction {
+  type: "block/dragend";
 }
 
 interface OpenChangeInsertBlockPanel {
@@ -232,18 +261,44 @@ const __noop = () => {};
 
 const DispatchContext = createContext<Dispatcher>(__noop);
 
+/**
+ * calculate grid position based on mouse position
+ * @param cellsize cell size in px
+ * @param xy mouse position in px (relative to grid)
+ * @returns
+ */
+const gridxypos = (cellsize: number, xy: [number, number]): Position => {
+  return [
+    Math.floor(xy[0] / cellsize),
+    Math.floor(xy[1] / cellsize),
+  ] as Position;
+};
+
+const gridindexpos = (col: number, i: number): Position => {
+  const x = i % col;
+  const y = Math.floor(i / col);
+  return [x, y];
+};
+
 function reducer(state: State, action: Action): State {
+  console.log(action);
   switch (action.type) {
     case "pointerdown": {
       return produce(state, (draft) => {
-        draft.dragging = true;
+        if (state.is_dragging) {
+          return;
+        }
+        draft.is_marquee = true;
         draft.start = state.pos;
         draft.marquee = [...state.pos, ...state.pos];
       });
     }
     case "pointerup": {
       return produce(state, (draft) => {
-        draft.dragging = false;
+        if (state.is_dragging) {
+          return;
+        }
+        draft.is_marquee = false;
         draft.end = state.pos;
 
         // open insert panel
@@ -251,11 +306,15 @@ function reducer(state: State, action: Action): State {
       });
     }
     case "pointermove": {
-      const { pos } = action;
+      const { xy } = action;
+      const { cellsize } = state;
+
+      const pos = gridxypos(cellsize, xy);
+
       return produce(state, (draft) => {
         draft.pos = pos;
 
-        if (state.dragging && state.start) {
+        if (state.is_marquee && state.start) {
           const [startX, startY] = state.start;
           const [endX, endY] = pos;
 
@@ -291,6 +350,16 @@ function reducer(state: State, action: Action): State {
 
         // close insert panel
         draft.controls.insert_panel_open = false;
+      });
+    }
+    case "block/dragstart": {
+      return produce(state, (draft) => {
+        draft.is_dragging = true;
+      });
+    }
+    case "block/dragend": {
+      return produce(state, (draft) => {
+        draft.is_dragging = false;
       });
     }
   }
@@ -396,10 +465,10 @@ export default function Editor() {
   );
 }
 
-function GridEditor() {
+function Controls() {
   const [state, dispatch] = useGrid();
   return (
-    <div className="relative w-full h-full">
+    <>
       <Drawer
         open={state.controls.insert_panel_open}
         onOpenChange={(open) => {
@@ -448,21 +517,42 @@ function GridEditor() {
           </DrawerFooter>
         </DrawerContent>
       </Drawer>
-      <GridGuide col={6} row={12} />
-      <Grid col={6} row={12}>
-        {state.blocks.map((block) => (
-          <GridAreaBlock
-            key={block.id}
-            id={block.id}
-            x={block.x}
-            y={block.y}
-            z={block.z}
-          >
-            {GridaBlockRenderer(block.element)}
-          </GridAreaBlock>
-        ))}
-      </Grid>
-    </div>
+    </>
+  );
+}
+
+function GridEditor() {
+  const [state, dispatch] = useGrid();
+
+  const [col, row] = state.size;
+
+  return (
+    <>
+      <DndContext
+      // sensors={sensors}
+      // collisionDetection={closestCorners}
+      // modifiers={[restrictToVerticalAxis]}
+      // onDragEnd={handleDragEnd}
+      >
+        <Controls />
+        <div id="grid-editor" className="relative w-full h-full">
+          <GridGuide col={col} row={row} />
+          <Grid col={col} row={row}>
+            {state.blocks.map((block) => (
+              <GridAreaBlock
+                key={block.id}
+                id={block.id}
+                x={block.x}
+                y={block.y}
+                z={block.z}
+              >
+                {GridaBlockRenderer(block.element)}
+              </GridAreaBlock>
+            ))}
+          </Grid>
+        </div>
+      </DndContext>
+    </>
   );
 }
 
@@ -481,12 +571,6 @@ function GridaBlockRenderer(block: GridaBlock) {
     // case 'video'
   }
 }
-
-const gridpos = (col: number, row: number, i: number): Position => {
-  const x = i % col;
-  const y = Math.floor(i / col);
-  return [x, y];
-};
 
 function GridGuide({
   col,
@@ -517,15 +601,21 @@ function GridGuide({
 
   const [state, dispatch] = useGrid();
 
+  const { width, height } = state;
+
   return (
     <>
       <div
+        id="grid-guide"
         className="w-full h-full z-10"
         style={{
           position: "absolute",
+          pointerEvents: "none",
           display: "grid",
           gridTemplateColumns: `repeat(${col}, 1fr)`,
           gridTemplateRows: `repeat(${row}, 1fr)`,
+          width: width,
+          height: height,
           // height: "calc(var(--scale-factor) * 750)",
           // width: "calc(var(--scale-factor) * 375)",
           margin: "0px auto",
@@ -533,7 +623,7 @@ function GridGuide({
         }}
       >
         {Array.from({ length: col * row }).map((_, i) => (
-          <Cell pos={gridpos(col, row, i)} key={i} index={i} />
+          <Cell pos={gridindexpos(col, i)} key={i} index={i} />
         ))}
       </div>
     </>
@@ -545,33 +635,19 @@ function Cell({ pos, index }: { pos: Position; index: number }) {
   const [col, row] = state.size;
   const [_mx1, _my1, _mx2, _my2] = state.marquee ?? [-1, -1, -1, -1];
 
-  const bind = useGesture(
-    {
-      onPointerDown: () => {
-        dispatch({ type: "pointerdown" });
-      },
-      onPointerUp: () => {
-        dispatch({ type: "pointerup" });
-      },
-      onPointerMove: () => {
-        dispatch({ type: "pointermove", pos: pos });
-      },
-    },
-    {
-      drag: {
-        enabled: false,
-      },
-    }
-  );
-
   const is_in_marquee =
     pos[0] >= _mx1 && pos[0] <= _mx2 && pos[1] >= _my1 && pos[1] <= _my2;
 
+  const is_hovered = state.pos[0] === pos[0] && state.pos[1] === pos[1];
+
   return (
     <div
-      {...bind()}
+      data-hover={is_hovered}
       data-marqueed={is_in_marquee}
-      className="hover:bg-pink-200/15 data-[marqueed='true']:bg-pink-200/15"
+      className={clsx(
+        "data-[hover='true']:bg-pink-200/15",
+        "data-[marqueed='true']:bg-pink-200/15"
+      )}
       style={{
         touchAction: "none",
         border: "0.1px solid rgba(0, 0, 0, 0.1)",
@@ -583,7 +659,7 @@ function Cell({ pos, index }: { pos: Position; index: number }) {
       {state.debug ? (
         <>
           <span className="text-xs font-mono opacity-20">
-            {gridpos(col, row, index).join(",")}
+            {gridindexpos(col, index).join(",")}
           </span>
         </>
       ) : (
@@ -612,14 +688,47 @@ function Grid({
   col: number;
   row: number;
 }>) {
+  const [state, dispatch] = useGrid();
+  const { width, height } = state;
+  const ref = useRef<HTMLDivElement>(null);
+
+  useGesture(
+    {
+      onMove: ({ xy: [x, y] }) => {
+        if (ref.current) {
+          const rect = ref.current.getBoundingClientRect();
+          const relx = x - rect.left;
+          const rely = y - rect.top;
+          dispatch({ type: "pointermove", xy: [relx, rely] });
+        }
+      },
+      onPointerDown: () => {
+        dispatch({ type: "pointerdown" });
+      },
+      onPointerUp: () => {
+        dispatch({ type: "pointerup" });
+      },
+    },
+    {
+      drag: {
+        enabled: false,
+      },
+      target: ref,
+    }
+  );
+
   return (
     <div
+      ref={ref}
       className="w-full h-full"
       style={{
-        position: "relative",
+        // position: "relative",
+        position: "absolute",
         display: "grid",
         gridTemplateColumns: `repeat(${col}, 1fr)`,
         gridTemplateRows: `repeat(${row}, 1fr)`,
+        width: width,
+        height: height,
         // height: "calc(var(--scale-factor) * 750)",
         // width: "calc(var(--scale-factor) * 375)",
         margin: "0px auto",
@@ -653,18 +762,57 @@ function GridAreaBlock({
   z?: number;
   debug?: boolean;
 }>) {
-  const { setNodeRef } = useDraggable({ id });
+  const [state, dispatch] = useGrid();
+
+  const gestureRef = useRef<HTMLDivElement>(null);
+  useGesture(
+    {
+      onDragStart: () => {
+        dispatch({ type: "block/dragstart" });
+      },
+      onDragEnd: ({ event }) => {
+        dispatch({ type: "block/dragend" });
+      },
+    },
+    {
+      drag: {
+        enabled: true,
+      },
+      target: gestureRef,
+    }
+  );
+
+  const { transform, listeners, attributes, setNodeRef, isDragging } =
+    useDraggable({
+      id,
+    });
+
+  const style = {
+    transform: CSS.Translate.toString(transform),
+    zIndex: isDragging ? 1 : 0,
+  };
+
+  useEffect(() => {
+    if (isDragging) {
+      // cancel the editor drag
+    }
+  }, [isDragging]);
+
+  const mergedRef = useMergedRef<HTMLDivElement>(gestureRef, setNodeRef);
 
   return (
     <div
+      {...listeners}
+      {...attributes}
+      ref={mergedRef}
       onPointerEnter={() => {
         // here
         console.log("enter");
       }}
-      ref={setNodeRef}
       data-debug={debug}
       className="bg-background data-[debug='true']:bg-pink-300/20 hover:bg-yellow-200"
       style={{
+        ...style,
         pointerEvents: "auto",
         gridArea: y[0] + " / " + x[0] + " / " + y[1] + " / " + x[1],
         zIndex: z,
@@ -673,7 +821,7 @@ function GridAreaBlock({
         padding: "0px",
       }}
     >
-      {children}
+      <div>{children}</div>
     </div>
   );
 }
