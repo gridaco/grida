@@ -220,6 +220,7 @@ type Action =
   | PonterUpAction
   | InsertBlock
   | BlcokDragStartAction
+  | BlcokDragAction
   | BlockDragEndAction;
 
 interface PonterMoveAction {
@@ -237,6 +238,13 @@ interface PonterUpAction {
 
 interface BlcokDragStartAction {
   type: "block/dragstart";
+  id: BlockId;
+}
+
+interface BlcokDragAction {
+  type: "block/drag";
+  // Cumulative displacements
+  offset: [number, number];
 }
 
 interface BlockDragEndAction {
@@ -353,13 +361,35 @@ function reducer(state: State, action: Action): State {
       });
     }
     case "block/dragstart": {
+      const { id } = action;
       return produce(state, (draft) => {
+        draft.selected = id;
         draft.is_dragging = true;
       });
     }
     case "block/dragend": {
       return produce(state, (draft) => {
         draft.is_dragging = false;
+      });
+    }
+    case "block/drag": {
+      const { offset: delta } = action;
+      return produce(state, (draft) => {
+        // update the marquee area to let user know the drop area
+        const [_client_dx, _client_dy] = delta;
+        const block = state.blocks.find((b) => b.id === state.selected);
+        // silent assert
+        if (!block) return;
+
+        const [dx, dy] = gridxypos(state.cellsize, [_client_dx, _client_dy]);
+
+        const [x1, y1] = block.x;
+        const [x2, y2] = block.y;
+
+        const [x1_, y1_] = [x1 + dx, y1 + dy];
+        const [x2_, y2_] = [x2 + dx, y2 + dy];
+
+        draft.marquee = [x1_, y1_, x2_, y2_];
       });
     }
   }
@@ -645,8 +675,8 @@ function Cell({ pos, index }: { pos: Position; index: number }) {
       data-hover={is_hovered}
       data-marqueed={is_in_marquee}
       className={clsx(
-        "data-[hover='true']:bg-pink-200/15",
-        "data-[marqueed='true']:bg-pink-200/15"
+        "data-[hover='true']:bg-gray-500/15",
+        "data-[marqueed='true']:bg-gray-500/15"
       )}
       style={{
         touchAction: "none",
@@ -767,11 +797,18 @@ function GridAreaBlock({
   const gestureRef = useRef<HTMLDivElement>(null);
   useGesture(
     {
-      onDragStart: () => {
-        dispatch({ type: "block/dragstart" });
+      onDrag: ({ xy: [x, y], offset }) => {
+        console.log(offset);
+        dispatch({ type: "block/drag", offset: offset });
       },
-      onDragEnd: ({ event }) => {
-        dispatch({ type: "block/dragend" });
+      onDragStart: () => {
+        dispatch({ type: "block/dragstart", id });
+      },
+      onDragEnd: () => {
+        // set timeout to ensure the dragend is called after pointerup
+        setTimeout(() => {
+          dispatch({ type: "block/dragend" });
+        }, 10);
       },
     },
     {
