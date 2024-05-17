@@ -232,6 +232,7 @@ export async function GET(
     id,
     title,
     description,
+    default_form_page_language,
     fields,
     page_blocks,
     undefined,

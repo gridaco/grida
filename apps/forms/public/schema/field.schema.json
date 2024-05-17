@@ -118,7 +118,7 @@
       ]
     },
     "autocomplete": {
-      "type": "array",
+      "type": "string",
       "enum": [
         "off",
         "on",

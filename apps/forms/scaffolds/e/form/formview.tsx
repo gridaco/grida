@@ -18,6 +18,7 @@ import { StripePaymentFormFieldPreview } from "@/components/formfield/form-field
 import { useFingerprint } from "@/scaffolds/fingerprint";
 import { SYSTEM_GF_FINGERPRINT_VISITORID_KEY } from "@/k/system";
 import { ClientRenderBlock, ClientSectionRenderBlock } from "@/lib/forms";
+import { Button } from "@/components/ui/button";
 
 const cls_button_submit =
   "text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:ring-blue-300 font-medium rounded-lg text-sm px-5 py-2.5 me-2 mb-2 dark:bg-blue-600 dark:hover:bg-blue-700 focus:outline-none dark:focus:ring-blue-800";
@@ -296,8 +297,9 @@ export function FormView({
       id="form-view"
       data-cjk={options.optimize_for_cjk}
       className={clsx(
+        "prose dark:prose-invert prose-headings:text-foreground prose-p:text-foreground text-foreground",
         "w-full h-full md:h-auto grow md:grow-0",
-        "relative prose dark:prose-invert",
+        "relative",
         "data-[cjk='true']:break-keep",
         "flex flex-col"
       )}
@@ -338,48 +340,50 @@ export function FormView({
         <footer
           className={clsx(
             "sticky bottom-0",
-            "flex gap-2 p-4 pt-4 border-t border-neutral-200 dark:border-neutral-800",
-            "justify-end bg-white dark:bg-neutral-900",
+            "flex gap-2 p-4 pt-4 border-t",
+            "justify-end bg-background",
             "md:static md:justify-start md:bg-transparent md:dark:bg-transparent"
           )}
         >
-          <button
+          <Button
+            variant="outline"
             data-previous-hidden={previous_section_button_hidden}
             className={clsx(
-              cls_button_nuetral,
+              // cls_button_nuetral,
               "data-[previous-hidden='true']:hidden"
             )}
             onClick={onPrevious}
           >
             {translation.back}
-          </button>
-          <button
+          </Button>
+          <Button
+            variant="outline"
             data-next-hidden={next_section_button_hidden}
             form="form"
             type="submit"
             className={clsx(
-              cls_button_nuetral,
+              // cls_button_nuetral,
               "w-full md:w-auto",
               "data-[next-hidden='true']:hidden"
             )}
             // onClick={onNext}
           >
             {translation.next}
-          </button>
-          <button
+          </Button>
+          <Button
             data-submit-hidden={submit_hidden}
             disabled={submit_hidden || is_submitting}
             form="form"
             type="submit"
             className={clsx(
-              cls_button_submit,
+              // cls_button_submit,
               "w-full md:w-auto",
               "data-[submit-hidden='true']:hidden",
               "disabled:opacity-50 disabled:cursor-not-allowed"
             )}
           >
             {translation.submit}
-          </button>
+          </Button>
           <TossPaymentsPayButton
             data-pay-hidden={pay_hidden}
             className={clsx(

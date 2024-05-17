@@ -44,6 +44,7 @@ export class JSONFrom2DB {
       "[draft]",
       json.title,
       json.description,
+      json.lang,
       json_form_field_to_form_field_definition(json.fields),
       [],
       // TODO: consider moving this outerside or upper class
@@ -70,6 +71,7 @@ export class JSONFrom2DB {
         project_id: this.project_id,
         title: this.renderer.title || undefined,
         description: this.renderer.description,
+        default_form_page_language: this.renderer.lang || undefined,
       })
       .select()
       .single();

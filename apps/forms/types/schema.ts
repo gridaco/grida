@@ -2,6 +2,7 @@ import type {
   FormFieldAutocompleteType,
   FormFieldDefinition,
   FormInputType,
+  FormsPageLanguage,
   Option,
 } from ".";
 
@@ -26,6 +27,7 @@ interface _JSONForm<T> {
   title?: string;
   name: string;
   description?: string;
+  lang?: FormsPageLanguage;
   action?: string;
   enctype?:
     | "application/x-www-form-urlencoded"

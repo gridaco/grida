@@ -7,31 +7,16 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { FormView } from "@/scaffolds/e/form";
 import { Editor as MonacoEditor, useMonaco } from "@monaco-editor/react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { nanoid } from "nanoid";
-import {
-  JSONField,
-  JSONForm,
-  JSONOptionLike,
-  json_form_field_to_form_field_definition,
-  parse,
-  parse_jsonfield_type,
-} from "@/types/schema";
-import resources from "@/k/i18n";
-import { FormRenderTree } from "@/lib/forms";
 import { GridaLogo } from "@/components/grida-logo";
-import { FormFieldAutocompleteType, Option } from "@/types";
 import { Button } from "@/components/ui/button";
 import {
-  ExclamationTriangleIcon,
   Link2Icon,
   ReloadIcon,
   RocketIcon,
   SlashIcon,
 } from "@radix-ui/react-icons";
-import { createClientFormsClient } from "@/lib/supabase/client";
 import toast from "react-hot-toast";
 import { useRouter } from "next/navigation";
 import { examples } from "./k";
@@ -39,64 +24,14 @@ import { generate } from "@/app/actions";
 import { readStreamableValue } from "ai/rsc";
 import Link from "next/link";
 import { useDarkMode } from "usehooks-ts";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import PlaygroundPreview from "./preview";
+import { ThemePalette } from "../theme-editor/palette-editor";
+import { stringfyThemeVariables } from "../theme-editor/serialize";
+import * as palettes from "@/theme/palettes";
+import { useTheme } from "next-themes";
 
 const HOST_NAME = process.env.NEXT_PUBLIC_HOST_NAME || "http://localhost:3000";
-
-type MaybeArray<T> = T | T[];
-
-function toArrayOf<T>(value: MaybeArray<T>, nofalsy = true): NonNullable<T>[] {
-  return (
-    Array.isArray(value) ? value : nofalsy && value ? [value] : []
-  ) as NonNullable<T>[];
-}
-
-function compile(value?: string | object) {
-  const schema = parse(value);
-  if (!schema) {
-    return;
-  }
-
-  const renderer = new FormRenderTree(
-    nanoid(),
-    schema.title,
-    schema.description,
-    json_form_field_to_form_field_definition(schema.fields),
-    [],
-    {
-      blocks: {
-        when_empty: {
-          header: {
-            title_and_description: {
-              enabled: true,
-            },
-          },
-        },
-      },
-    }
-  );
-
-  return renderer;
-}
-
-function useRenderer(raw?: string | object | null) {
-  // use last valid schema
-  const [valid, setValid] = useState<FormRenderTree>();
-  const [invalid, setInvalid] = useState<boolean>(false);
-
-  useEffect(() => {
-    if (raw) {
-      const o = compile(raw);
-      if (o) {
-        setValid(o);
-        setInvalid(false);
-      } else {
-        setInvalid(true);
-      }
-    }
-  }, [raw]);
-
-  return [valid, invalid] as const;
-}
 
 export function Playground({
   initial,
@@ -110,6 +45,8 @@ export function Playground({
   const generating = useRef(false);
   const router = useRouter();
 
+  const [fileName, setFileName] = useState<EditorFileName>("form.json");
+
   // const [is_modified, set_is_modified] = useState(false);
   const [exampleId, setExampleId] = useState<string | undefined>(
     initial ? undefined : examples[0].id
@@ -119,10 +56,32 @@ export function Playground({
     initial?.src || null
   );
 
+  const [theme_preset, set_theme_preset] = useState<string>("blue");
+  const [theme, set_theme] = useState(
+    // @ts-ignore
+    palettes[theme_preset]
+  );
+  const [__variablecss_txt, __set_variablecss_txt] = useState<string | null>(
+    stringfyThemeVariables(theme)
+  );
+
+  useEffect(() => {
+    set_theme(
+      // @ts-ignore
+      palettes[theme_preset]
+    );
+  }, [theme_preset]);
+
+  useEffect(() => {
+    __set_variablecss_txt(stringfyThemeVariables(theme));
+  }, [theme]);
+
+  const [__customcss_txt, __set_customcss_txt] = useState<string>("");
+
+  const [dark, setDark] = useState(false);
+
   const is_modified = __schema_txt !== initial?.src;
   const [busy, setBusy] = useState(false);
-
-  const [renderer, invalid] = useRenderer(__schema_txt);
 
   const streamGeneration = (prompt: string) => {
     if (generating.current) {
@@ -181,19 +140,6 @@ export function Playground({
       .finally(() => {
         setBusy(false);
       });
-  };
-
-  const onPublishClick = async () => {
-    setBusy(true);
-    fetch("/playground/publish", {
-      method: "POST",
-      body: JSON.stringify({
-        src: __schema_txt,
-      }),
-      headers: {
-        "Content-Type": "application/json",
-      },
-    });
   };
 
   return (
@@ -297,62 +243,65 @@ export function Playground({
       <div className="flex-1 flex max-h-full overflow-hidden">
         <section className="flex-1 h-full">
           <div className="w-full h-full flex flex-col">
-            <div className="flex-shrink flex flex-col h-full">
+            <div className="relative flex-shrink flex flex-col h-full">
+              {fileName === "variables.css" && (
+                <div className="absolute z-20 top-16 right-4 max-w-lg">
+                  <ThemePalette
+                    preset={theme_preset}
+                    onPresetChange={set_theme_preset}
+                    value={theme}
+                    onValueChange={set_theme}
+                    onDarkChange={setDark}
+                  />
+                </div>
+              )}
               <Editor
                 readonly={busy}
-                value={__schema_txt || ""}
-                onChange={(v?: string) => {
-                  __set_schema_txt(v || "");
+                fileName={fileName}
+                onFileNameChange={setFileName}
+                files={{
+                  "form.json": {
+                    name: "form.json",
+                    language: "json",
+                    value: __schema_txt || "",
+                  },
+                  "variables.css": {
+                    name: "variables.css",
+                    language: "css",
+                    value: __variablecss_txt || "",
+                  },
+                  "custom.css": {
+                    name: "custom.css",
+                    language: "css",
+                    value: __customcss_txt || "",
+                  },
+                }}
+                onChange={(f: EditorFileName, v?: string) => {
+                  switch (f) {
+                    case "form.json": {
+                      __set_schema_txt(v || "");
+                      return;
+                    }
+                    case "variables.css": {
+                      __set_variablecss_txt(v || "");
+                      return;
+                    }
+                    case "custom.css": {
+                      __set_customcss_txt(v || "");
+                    }
+                  }
                 }}
               />
             </div>
-            {/* <div className="flex-grow">
-              <details>
-                <summary>Data</summary>
-                <MonacoEditor
-                  height={200}
-                  defaultLanguage="json"
-                  value={JSON.stringify(renderer, null, 2)}
-                  options={{
-                    padding: {
-                      top: 16,
-                    },
-                    minimap: {
-                      enabled: false,
-                    },
-                    scrollBeyondLastLine: false,
-                  }}
-                />
-              </details>
-            </div> */}
           </div>
         </section>
         <div className="h-full border-r" />
         <section className="flex-1 h-full overflow-y-scroll">
-          {renderer ? (
-            <div className="relative flex flex-col items-center w-full">
-              <FormView
-                title={"Form"}
-                form_id={renderer.id}
-                fields={renderer.fields()}
-                blocks={renderer.blocks()}
-                tree={renderer.tree()}
-                translation={resources.en.translation as any}
-                options={{
-                  is_powered_by_branding_enabled: true,
-                }}
-              />
-              {invalid && (
-                <div className="absolute top-2 right-2 bg-red-500 p-2 rounded shadow">
-                  <ExclamationTriangleIcon />
-                </div>
-              )}
-            </div>
-          ) : (
-            <div className="grow flex items-center justify-center p-4 text-center text-gray-500">
-              Invalid schema
-            </div>
-          )}
+          <PlaygroundPreview
+            schema={__schema_txt || ""}
+            css={(__variablecss_txt || "") + "\n" + (__customcss_txt || "")}
+            dark={dark}
+          />
         </section>
       </div>
     </main>
@@ -364,17 +313,44 @@ const schema = {
   fileMatch: ["*"], // Associate with all JSON files
 };
 
+type EditorFileName =
+  | "form.json"
+  // | "theme.json"
+  | "variables.css"
+  | "custom.css";
+type EditorFile<T extends EditorFileName = any> = {
+  name: EditorFileName;
+  language: "json" | "css";
+  value?: string;
+};
+type EditorFiles = {
+  "form.json": EditorFile<"form.json">;
+  "variables.css": EditorFile<"variables.css">;
+  // "theme.json": EditorFile<"theme.json">;
+  "custom.css": EditorFile<"custom.css">;
+};
+
 function Editor({
-  value,
+  fileName,
+  onFileNameChange,
+  files,
   onChange,
   readonly,
 }: {
-  value?: string;
-  onChange?: (value?: string) => void;
+  // value?: string;
+  fileName: EditorFileName;
+  onFileNameChange?: (fileName: EditorFileName) => void;
+  files: EditorFiles;
+  onChange?: (fileName: EditorFileName, value?: string) => void;
   readonly?: boolean;
 }) {
   const monaco = useMonaco();
-  const { isDarkMode } = useDarkMode();
+  // const { isDarkMode } = useDarkMode();
+  const { theme } = useTheme();
+
+  const isDarkMode = theme === "dark";
+
+  const file = files[fileName];
 
   useEffect(() => {
     monaco?.languages.json.jsonDefaults.setDiagnosticsOptions({
@@ -392,27 +368,49 @@ function Editor({
 
   return (
     <div className="font-mono flex-1 flex flex-col w-full h-full">
-      <header className="p-2 border-b">
-        <span className="text-sm opacity-80">form.json</span>
+      <header className="p-2 border-b z-10">
+        <Tabs
+          value={fileName}
+          onValueChange={(file) => {
+            onFileNameChange?.(file as EditorFileName);
+          }}
+        >
+          <TabsList>
+            {Object.keys(files).map((file) => (
+              <TabsTrigger key={file} value={file}>
+                {file}
+              </TabsTrigger>
+            ))}
+          </TabsList>
+        </Tabs>
       </header>
-      <MonacoEditor
-        height={"100%"}
-        defaultLanguage="json"
-        onChange={onChange}
-        value={value}
-        theme={isDarkMode ? "dark" : "light"}
-        options={{
-          readOnly: readonly,
-          automaticLayout: true,
-          padding: {
-            top: 16,
-          },
-          minimap: {
-            enabled: false,
-          },
-          scrollBeyondLastLine: false,
-        }}
-      />
+      <div className="relative w-full h-full">
+        <MonacoEditor
+          height={"100%"}
+          onChange={(v, ev) => {
+            if (ev.isFlush) {
+              return;
+            }
+            onChange?.(fileName, v);
+          }}
+          path={fileName}
+          defaultLanguage={file.language}
+          defaultValue={file.value}
+          value={file.value}
+          theme={isDarkMode ? "dark" : "light"}
+          options={{
+            readOnly: readonly || fileName === "variables.css",
+            automaticLayout: true,
+            padding: {
+              top: 16,
+            },
+            minimap: {
+              enabled: false,
+            },
+            scrollBeyondLastLine: false,
+          }}
+        />
+      </div>
     </div>
   );
 }
