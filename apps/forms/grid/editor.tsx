@@ -127,9 +127,9 @@ interface State {
   scalefactor: number;
 
   /**
-   * actual cell size in px
+   * cell unit in px
    */
-  cellsize: number;
+  unit: number;
 
   /**
    * actual width - consider canvas width
@@ -199,7 +199,7 @@ const initial: State = {
   scalefactor: 1,
   width: 375,
   height: 750,
-  cellsize: 62.5,
+  unit: 62.5,
   size: [6, 12],
   pos: [0, 0],
   is_dragging: false,
@@ -326,6 +326,12 @@ function reducer(state: State, action: Action): State {
         if (state.is_dragging) {
           return;
         }
+
+        // this can happen when pointer is down from outside the grid and up
+        if (!state.is_marquee) {
+          return;
+        }
+
         draft.is_marquee = false;
         draft.end = state.pos;
 
@@ -335,7 +341,7 @@ function reducer(state: State, action: Action): State {
     }
     case "pointermove": {
       const { xy } = action;
-      const { cellsize } = state;
+      const { unit: cellsize } = state;
 
       const pos = gridxypos(cellsize, xy);
 
@@ -355,8 +361,13 @@ function reducer(state: State, action: Action): State {
       });
     }
     case "controls/insert_panel_open": {
+      const { open } = action;
       return produce(state, (draft) => {
-        draft.controls.insert_panel_open = action.open;
+        draft.controls.insert_panel_open = open;
+        if (!open) {
+          draft.is_marquee = false;
+          draft.marquee = undefined;
+        }
       });
     }
     case "blocks/new": {
@@ -424,10 +435,7 @@ function reducer(state: State, action: Action): State {
         // silent assert
         if (!block) return;
 
-        const [dx, dy] = gridxyposround(state.cellsize, [
-          _client_dx,
-          _client_dy,
-        ]);
+        const [dx, dy] = gridxyposround(state.unit, [_client_dx, _client_dy]);
 
         const [ax1, ax2] = block.x;
         const [bx1, bx2] = [ax1 + dx, ax2 + dx];
@@ -816,11 +824,12 @@ function Grid({
       onPointerUp: () => {
         dispatch({ type: "pointerup" });
       },
+      // ensure pointerup from outside the grid
+      onDragEnd: () => {
+        dispatch({ type: "pointerup" });
+      },
     },
     {
-      drag: {
-        enabled: false,
-      },
       target: ref,
     }
   );
