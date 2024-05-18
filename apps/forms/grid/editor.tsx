@@ -148,15 +148,31 @@ interface State {
    * @default [6, 12]
    */
   size: Size;
+
   /**
    * current pointer position in grid space
    */
-  pos: Position;
+  point: Position;
 
   /**
    * is dragging
    */
   is_dragging: boolean;
+
+  /**
+   * is resizing
+   */
+  is_resizing: boolean;
+
+  /**
+   * current delta of the grid block
+   */
+  delta: [number, number];
+
+  /**
+   * Displacement of the current gesture (clientXY)
+   */
+  movement: [number, number];
 
   /**
    * is marquee selection
@@ -185,7 +201,12 @@ interface State {
   /**
    * selected block id
    */
-  selected?: BlockId;
+  selection?: BlockId;
+
+  /**
+   * highlighted block id
+   */
+  highlight?: BlockId;
 
   debug?: boolean;
 
@@ -201,11 +222,15 @@ const initial: State = {
   height: 750,
   unit: 62.5,
   size: [6, 12],
-  pos: [0, 0],
+  point: [0, 0],
   is_dragging: false,
+  is_resizing: false,
   is_marquee: false,
-  selected: undefined,
   marquee: undefined,
+  delta: [0, 0],
+  movement: [0, 0],
+  selection: undefined,
+  highlight: undefined,
   debug: false,
   controls: {
     insert_panel_open: false,
@@ -219,10 +244,14 @@ type Action =
   | OpenChangeInsertBlockPanel
   | PonterUpAction
   | InsertBlock
+  | BlcokPointerEnterAction
   | BlcokPointerDownAction
   | BlcokDragStartAction
   | BlcokDragAction
-  | BlockDragEndAction;
+  | BlockDragEndAction
+  | HandleDragStartAction
+  | HandleDragAction
+  | HandleDragEndAction;
 
 interface PonterMoveAction {
   type: "pointermove";
@@ -235,6 +264,11 @@ interface PonterDownrAction {
 
 interface PonterUpAction {
   type: "pointerup";
+}
+
+interface BlcokPointerEnterAction {
+  type: "block/pointerenter";
+  id: BlockId;
 }
 
 interface BlcokPointerDownAction {
@@ -255,6 +289,20 @@ interface BlcokDragAction {
 
 interface BlockDragEndAction {
   type: "block/dragend";
+}
+
+interface HandleDragStartAction {
+  type: "handle/dragstart";
+}
+
+interface HandleDragAction {
+  type: "handle/drag";
+  // Displacement of the current gesture
+  movement: [number, number];
+}
+
+interface HandleDragEndAction {
+  type: "handle/dragend";
 }
 
 interface OpenChangeInsertBlockPanel {
@@ -315,10 +363,10 @@ function reducer(state: State, action: Action): State {
         if (state.is_dragging) {
           return;
         }
-        draft.selected = undefined;
+        draft.selection = undefined;
         draft.is_marquee = true;
-        draft.start = state.pos;
-        draft.marquee = [...state.pos, ...state.pos];
+        draft.start = state.point;
+        draft.marquee = [...state.point, ...state.point];
       });
     }
     case "pointerup": {
@@ -333,7 +381,7 @@ function reducer(state: State, action: Action): State {
         }
 
         draft.is_marquee = false;
-        draft.end = state.pos;
+        draft.end = state.point;
 
         // open insert panel
         draft.controls.insert_panel_open = true;
@@ -346,7 +394,7 @@ function reducer(state: State, action: Action): State {
       const pos = gridxypos(cellsize, xy);
 
       return produce(state, (draft) => {
-        draft.pos = pos;
+        draft.point = pos;
 
         if (state.is_marquee && state.start) {
           const [startX, startY] = state.start;
@@ -388,50 +436,39 @@ function reducer(state: State, action: Action): State {
         });
 
         // select the block
-        draft.selected = id;
+        draft.selection = id;
 
         // close insert panel
         draft.controls.insert_panel_open = false;
       });
     }
+    case "block/pointerenter": {
+      const { id } = action;
+      return produce(state, (draft) => {
+        draft.highlight = id;
+      });
+    }
     case "block/pointerdown": {
       const { id } = action;
       return produce(state, (draft) => {
-        draft.selected = id;
+        draft.selection = id;
       });
     }
     case "block/dragstart": {
       const { id } = action;
       return produce(state, (draft) => {
-        draft.selected = id;
+        draft.movement = [0, 0];
+        draft.selection = id;
         draft.is_dragging = true;
       });
     }
-    case "block/dragend": {
-      return produce(state, (draft) => {
-        if (state.is_dragging) {
-          // place the block
-          const block = draft.blocks.find((b) => b.id === state.selected);
-          // silent assert
-          if (!block) return;
-          if (!state.marquee) return;
-
-          const [mx1, my1, mx2, my2] = state.marquee ?? [-1, -1, -1, -1];
-
-          block.x = [mx1, mx2];
-          block.y = [my1, my2];
-        }
-
-        draft.is_dragging = false;
-        draft.marquee = undefined; // Clear marquee after drag ends
-      });
-    }
     case "block/drag": {
-      const { movement: delta } = action;
+      const { movement } = action;
       return produce(state, (draft) => {
+        draft.movement = movement;
         // update the marquee area to let user know the drop area
-        const [_client_dx, _client_dy] = delta;
-        const block = state.blocks.find((b) => b.id === state.selected);
+        const [_client_dx, _client_dy] = movement;
+        const block = state.blocks.find((b) => b.id === state.selection);
         // silent assert
         if (!block) return;
 
@@ -446,6 +483,44 @@ function reducer(state: State, action: Action): State {
         console.log(ax1, ax2, "=> ", _client_dx, dx, " => ", bx1, bx2);
 
         draft.marquee = [bx1, by1, bx2, by2];
+      });
+    }
+    case "block/dragend": {
+      return produce(state, (draft) => {
+        if (state.is_dragging) {
+          // place the block
+          const block = draft.blocks.find((b) => b.id === state.selection);
+          // silent assert
+          if (!block) return;
+          if (!state.marquee) return;
+
+          const [mx1, my1, mx2, my2] = state.marquee ?? [-1, -1, -1, -1];
+
+          block.x = [mx1, mx2];
+          block.y = [my1, my2];
+        }
+
+        draft.movement = [0, 0];
+        draft.is_dragging = false;
+        draft.marquee = undefined; // Clear marquee after drag ends
+      });
+    }
+    case "handle/dragstart": {
+      return produce(state, (draft) => {
+        draft.is_resizing = true;
+        draft.movement = [0, 0];
+      });
+    }
+    case "handle/drag": {
+      const { movement } = action;
+      return produce(state, (draft) => {
+        draft.movement = movement;
+      });
+    }
+    case "handle/dragend": {
+      return produce(state, (draft) => {
+        draft.movement = [0, 0];
+        draft.is_resizing = false;
       });
     }
   }
@@ -763,7 +838,7 @@ function Cell({ pos, index }: { pos: Position; index: number }) {
   const is_in_marquee =
     pos[0] >= _mx1 && pos[0] <= _mx2 && pos[1] >= _my1 && pos[1] <= _my2;
 
-  const is_hovered = state.pos[0] === pos[0] && state.pos[1] === pos[1];
+  const is_hovered = state.point[0] === pos[0] && state.point[1] === pos[1];
 
   return (
     <div
@@ -856,7 +931,7 @@ function Grid({
   );
 }
 
-function GridAreaBlockResizeOverlay() {
+function GridAreaBlockOverlay({ readonly }: { readonly?: boolean }) {
   return (
     <div
       style={{
@@ -865,23 +940,35 @@ function GridAreaBlockResizeOverlay() {
         border: "2px solid rgba(0, 0, 255, 1)",
       }}
     >
-      <div className="absolute top-0 left-0">
-        <ResizeHandle anchor="nw" />
-      </div>
-      <div className="absolute top-0 right-0">
-        <ResizeHandle anchor="ne" />
-      </div>
-      <div className="absolute bottom-0 left-0">
-        <ResizeHandle anchor="sw" />
-      </div>
-      <div className="absolute bottom-0 right-0">
-        <ResizeHandle anchor="se" />
-      </div>
+      {!readonly && (
+        <>
+          <div className="absolute top-0 left-0">
+            <ResizeHandle anchor="nw" />
+          </div>
+          <div className="absolute top-0 right-0">
+            <ResizeHandle anchor="ne" />
+          </div>
+          <div className="absolute bottom-0 left-0">
+            <ResizeHandle anchor="sw" />
+          </div>
+          <div className="absolute bottom-0 right-0">
+            <ResizeHandle anchor="se" />
+          </div>
+        </>
+      )}
     </div>
   );
 }
 
 function ResizeHandle({ anchor }: { anchor: "nw" | "ne" | "sw" | "se" }) {
+  const bind = useGesture({
+    onDragStart: () => {
+      console.log("drag start");
+    },
+    onDrag: () => {},
+    onDragEnd: () => {},
+  });
+
   return (
     <div
       style={{
@@ -891,6 +978,7 @@ function ResizeHandle({ anchor }: { anchor: "nw" | "ne" | "sw" | "se" }) {
       }}
     >
       <div
+        {...bind()}
         style={{
           position: "absolute",
           width: "8px",
@@ -936,6 +1024,9 @@ function GridAreaBlock({
   const gestureRef = useRef<HTMLDivElement>(null);
   useGesture(
     {
+      onPointerEnter: () => {
+        dispatch({ type: "block/pointerenter", id });
+      },
       onPointerDown: () => {
         dispatch({ type: "block/pointerdown", id });
       },
@@ -978,7 +1069,8 @@ function GridAreaBlock({
 
   const mergedRef = useMergedRef<HTMLDivElement>(gestureRef, setNodeRef);
 
-  const selected = state.selected === id;
+  const selected = state.selection === id;
+  const highlighted = state.highlight === id;
 
   return (
     <div
@@ -1006,7 +1098,7 @@ function GridAreaBlock({
     >
       <div
         style={{
-          visibility: selected ? "visible" : "hidden",
+          visibility: selected || highlighted ? "visible" : "hidden",
           position: "absolute",
           top: 0,
           right: 0,
@@ -1015,7 +1107,7 @@ function GridAreaBlock({
           zIndex: 1,
         }}
       >
-        <GridAreaBlockResizeOverlay />
+        <GridAreaBlockOverlay readonly={!selected} />
       </div>
       <div
         style={{
