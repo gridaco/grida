@@ -59,6 +59,16 @@ const blockpresets = [
     icon: <TextIcon />,
   },
   {
+    type: "h1",
+    label: "Heading",
+    icon: <TextIcon />,
+  },
+  {
+    type: "p",
+    label: "Paragraph",
+    icon: <TextIcon />,
+  },
+  {
     type: "link",
     label: "Link",
     icon: <Link2Icon />,
@@ -74,6 +84,58 @@ const blockpresets = [
     icon: <VideoIcon />,
   },
 ] as const;
+
+function create_initial_grida_block(block: any): GridaBlock | undefined {
+  switch (block) {
+    case "button": {
+      return {
+        type: "button",
+        label: "Button",
+      };
+    }
+    case "text":
+    case "typography": {
+      return {
+        type: "typography",
+        element: "h1",
+        data: "Hello World",
+      };
+    }
+    case "h1": {
+      return {
+        type: "typography",
+        element: "h1",
+        data: "Hello World",
+      };
+    }
+    case "p": {
+      return {
+        type: "typography",
+        element: "p",
+        data: "In hac habitasse platea dictumst. Duis egestas libero molestie elementum tempus. Aenean ante diam, tristique ac ligula eget, laoreet vulputate quam. Quisque molestie tortor ut nisi varius suscipit. Aliquam ut dignissim ante. Lorem ipsum dolor sit amet, consectetur adipiscing.",
+      };
+    }
+    // case 'link': {
+    //   return {
+    //     type: 'link',
+    //     label: 'Link'
+    //   }
+    // }
+    case "image": {
+      return {
+        type: "image",
+        // unsplash random image
+        src: "https://source.unsplash.com/random/375x375",
+      };
+    }
+    case "video": {
+      return {
+        type: "video",
+        src: VIDEO_BLOCK_SRC_DEFAULT_VALUE,
+      };
+    }
+  }
+}
 
 type TransformOrigin = [0 | 1, 0 | 1];
 
@@ -228,7 +290,7 @@ const initial: State = {
   height: 750,
   unit: 62.5,
   size: [6, 12],
-  point: [0, 0],
+  point: [-0, -0],
   resize_anchor: undefined,
   is_dragging: false,
   is_resizing: false,
@@ -247,11 +309,13 @@ const initial: State = {
 
 type Action =
   | PonterMoveAction
+  | PonterLeaveAction
   | PonterDownrAction
   | OpenChangeInsertBlockPanel
   | PonterUpAction
   | InsertBlock
   | BlcokPointerEnterAction
+  | BlcokPointerLeaveAction
   | BlcokPointerDownAction
   | BlcokDragStartAction
   | BlcokDragAction
@@ -265,6 +329,10 @@ interface PonterMoveAction {
   xy: [number, number];
 }
 
+interface PonterLeaveAction {
+  type: "pointerleave";
+}
+
 interface PonterDownrAction {
   type: "pointerdown";
 }
@@ -276,6 +344,10 @@ interface PonterUpAction {
 interface BlcokPointerEnterAction {
   type: "block/pointerenter";
   id: BlockId;
+}
+
+interface BlcokPointerLeaveAction {
+  type: "block/pointerleave";
 }
 
 interface BlcokPointerDownAction {
@@ -377,6 +449,11 @@ function reducer(state: State, action: Action): State {
         draft.area = [...state.point, ...state.point];
       });
     }
+    case "pointerleave": {
+      return produce(state, (draft) => {
+        draft.point = [-1, -1];
+      });
+    }
     case "pointerup": {
       return produce(state, (draft) => {
         if (state.is_dragging) {
@@ -455,6 +532,11 @@ function reducer(state: State, action: Action): State {
       const { id } = action;
       return produce(state, (draft) => {
         draft.highlight = id;
+      });
+    }
+    case "block/pointerleave": {
+      return produce(state, (draft) => {
+        draft.highlight = undefined;
       });
     }
     case "block/pointerdown": {
@@ -580,43 +662,6 @@ function reducer(state: State, action: Action): State {
   return produce(state, (draft) => {});
 }
 
-function create_initial_grida_block(block: GridaBlockType): GridaBlock {
-  switch (block) {
-    case "button": {
-      return {
-        type: "button",
-        label: "Button",
-      };
-    }
-    case "typography": {
-      return {
-        type: "typography",
-        element: "h1",
-        data: "Hello World",
-      };
-    }
-    // case 'link': {
-    //   return {
-    //     type: 'link',
-    //     label: 'Link'
-    //   }
-    // }
-    case "image": {
-      return {
-        type: "image",
-        // unsplash random image
-        src: "https://source.unsplash.com/random/375x375",
-      };
-    }
-    case "video": {
-      return {
-        type: "video",
-        src: VIDEO_BLOCK_SRC_DEFAULT_VALUE,
-      };
-    }
-  }
-}
-
 export const useDispatch = (): FlatDispatcher => {
   const dispatch = useContext(DispatchContext);
   return useCallback(
@@ -695,15 +740,6 @@ function Controls() {
                 className="h-20"
                 key={block.type}
                 onClick={() => {
-                  switch (block.type) {
-                    case "text": {
-                      dispatch({
-                        type: "blocks/new",
-                        block: "typography",
-                      });
-                      return;
-                    }
-                  }
                   dispatch({
                     type: "blocks/new",
                     // @ts-ignore TODO: handle presets
@@ -949,6 +985,9 @@ function Grid({
           dispatch({ type: "pointermove", xy: [relx, rely] });
         }
       },
+      onPointerLeave: () => {
+        dispatch({ type: "pointerleave" });
+      },
       onPointerDown: () => {
         dispatch({ type: "pointerdown" });
       },
@@ -1160,6 +1199,9 @@ function GridAreaBlock({
     {
       onPointerEnter: () => {
         dispatch({ type: "block/pointerenter", id });
+      },
+      onPointerLeave: () => {
+        dispatch({ type: "block/pointerleave" });
       },
       onPointerDown: () => {
         dispatch({ type: "block/pointerdown", id });
