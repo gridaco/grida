@@ -38,6 +38,7 @@ import { CSS } from "@dnd-kit/utilities";
 import clsx from "clsx";
 import useMergedRef from "./use-merged-ref";
 import { VIDEO_BLOCK_SRC_DEFAULT_VALUE } from "@/k/video_block_defaults";
+import { cvt_delta_by_resize_handle_origin, resize } from "./transform-resize";
 const ReactPlayer = dynamic(() => import("react-player/lazy"), { ssr: false });
 
 const blockpresets = [
@@ -72,6 +73,8 @@ const blockpresets = [
     icon: <VideoIcon />,
   },
 ] as const;
+
+type TransformOrigin = [0 | 1, 0 | 1];
 
 type GridaBlock =
   | GridaGridImageBlock
@@ -169,6 +172,8 @@ interface State {
    */
   delta: [number, number];
 
+  resize_anchor?: "nw" | "ne" | "sw" | "se";
+
   /**
    * Displacement of the current gesture (clientXY)
    */
@@ -223,6 +228,7 @@ const initial: State = {
   unit: 62.5,
   size: [6, 12],
   point: [0, 0],
+  resize_anchor: undefined,
   is_dragging: false,
   is_resizing: false,
   is_marquee: false,
@@ -293,6 +299,7 @@ interface BlockDragEndAction {
 
 interface HandleDragStartAction {
   type: "handle/dragstart";
+  anchor: "nw" | "ne" | "sw" | "se";
 }
 
 interface HandleDragAction {
@@ -356,7 +363,7 @@ const gridindexpos = (col: number, i: number): Position => {
 };
 
 function reducer(state: State, action: Action): State {
-  // console.log(action);
+  console.log(action);
   switch (action.type) {
     case "pointerdown": {
       return produce(state, (draft) => {
@@ -437,6 +444,7 @@ function reducer(state: State, action: Action): State {
 
         // select the block
         draft.selection = id;
+        draft.highlight = id;
 
         // close insert panel
         draft.controls.insert_panel_open = false;
@@ -452,6 +460,7 @@ function reducer(state: State, action: Action): State {
       const { id } = action;
       return produce(state, (draft) => {
         draft.selection = id;
+        draft.highlight = id;
       });
     }
     case "block/dragstart": {
@@ -459,12 +468,15 @@ function reducer(state: State, action: Action): State {
       return produce(state, (draft) => {
         draft.movement = [0, 0];
         draft.selection = id;
+        draft.highlight = id;
         draft.is_dragging = true;
       });
     }
     case "block/drag": {
       const { movement } = action;
       return produce(state, (draft) => {
+        if (!state.is_dragging) return;
+
         draft.movement = movement;
         // update the marquee area to let user know the drop area
         const [_client_dx, _client_dy] = movement;
@@ -480,25 +492,24 @@ function reducer(state: State, action: Action): State {
         const [ay1, ay2] = block.y;
         const [by1, by2] = [ay1 + dy, ay2 + dy];
 
-        console.log(ax1, ax2, "=> ", _client_dx, dx, " => ", bx1, bx2);
+        // console.log(ax1, ax2, "=> ", _client_dx, dx, " => ", bx1, bx2);
 
         draft.marquee = [bx1, by1, bx2, by2];
       });
     }
     case "block/dragend": {
       return produce(state, (draft) => {
-        if (state.is_dragging) {
-          // place the block
-          const block = draft.blocks.find((b) => b.id === state.selection);
-          // silent assert
-          if (!block) return;
-          if (!state.marquee) return;
+        if (!state.is_dragging) return;
+        // place the block
+        const block = draft.blocks.find((b) => b.id === state.selection);
+        // silent assert
+        if (!block) return;
+        if (!state.marquee) return;
 
-          const [mx1, my1, mx2, my2] = state.marquee ?? [-1, -1, -1, -1];
+        const [mx1, my1, mx2, my2] = state.marquee ?? [-1, -1, -1, -1];
 
-          block.x = [mx1, mx2];
-          block.y = [my1, my2];
-        }
+        block.x = [mx1, mx2];
+        block.y = [my1, my2];
 
         draft.movement = [0, 0];
         draft.is_dragging = false;
@@ -506,8 +517,10 @@ function reducer(state: State, action: Action): State {
       });
     }
     case "handle/dragstart": {
+      const { anchor } = action;
       return produce(state, (draft) => {
         draft.is_resizing = true;
+        draft.resize_anchor = anchor;
         draft.movement = [0, 0];
       });
     }
@@ -914,6 +927,7 @@ function Grid({
       ref={ref}
       className="w-full h-full"
       style={{
+        touchAction: "none",
         // position: "relative",
         position: "absolute",
         display: "grid",
@@ -932,27 +946,84 @@ function Grid({
 }
 
 function GridAreaBlockOverlay({ readonly }: { readonly?: boolean }) {
+  const [state, dispatch] = useGrid();
+
+  const { movement, resize_anchor, is_resizing } = state;
+
+  const onDragStart = (anchor: "nw" | "ne" | "sw" | "se") => {
+    dispatch({ type: "handle/dragstart", anchor });
+  };
+
+  const onDrag = ({ movement }: { movement: [number, number] }) => {
+    dispatch({ type: "handle/drag", movement: movement });
+  };
+
+  const onDragEnd = () => {
+    dispatch({ type: "handle/dragend" });
+  };
+
+  const { origin, delta } = is_resizing
+    ? cvt_delta_by_resize_handle_origin(
+        resize_anchor ?? "nw",
+        is_resizing ? movement : [0, 0]
+      )
+    : {
+        origin: [0, 0] as [number, number],
+        delta: [0, 0] as [number, number],
+      };
+
+  const {
+    diff: [dx, dy, dw, dh],
+  } = resize(
+    // box size doesn't matter since we are only interested in the delta
+    [0, 0, 0, 0],
+    delta,
+    origin
+  );
+
   return (
     <div
       style={{
-        width: "100%",
-        height: "100%",
+        position: "absolute",
+        width: `calc(100% + ${dw}px)`,
+        height: `calc(100% + ${dh}px)`,
+        transform: `translate(${dx}px, ${dy}px)`,
         border: "2px solid rgba(0, 0, 255, 1)",
       }}
     >
       {!readonly && (
         <>
           <div className="absolute top-0 left-0">
-            <ResizeHandle anchor="nw" />
+            <ResizeHandle
+              anchor="nw"
+              onDragStart={() => onDragStart("nw")}
+              onDrag={onDrag}
+              onDragEnd={onDragEnd}
+            />
           </div>
           <div className="absolute top-0 right-0">
-            <ResizeHandle anchor="ne" />
+            <ResizeHandle
+              anchor="ne"
+              onDragStart={() => onDragStart("ne")}
+              onDrag={onDrag}
+              onDragEnd={onDragEnd}
+            />
           </div>
           <div className="absolute bottom-0 left-0">
-            <ResizeHandle anchor="sw" />
+            <ResizeHandle
+              anchor="sw"
+              onDragStart={() => onDragStart("sw")}
+              onDrag={onDrag}
+              onDragEnd={onDragEnd}
+            />
           </div>
           <div className="absolute bottom-0 right-0">
-            <ResizeHandle anchor="se" />
+            <ResizeHandle
+              anchor="se"
+              onDragStart={() => onDragStart("se")}
+              onDrag={onDrag}
+              onDragEnd={onDragEnd}
+            />
           </div>
         </>
       )}
@@ -960,14 +1031,33 @@ function GridAreaBlockOverlay({ readonly }: { readonly?: boolean }) {
   );
 }
 
-function ResizeHandle({ anchor }: { anchor: "nw" | "ne" | "sw" | "se" }) {
-  const bind = useGesture({
-    onDragStart: () => {
-      console.log("drag start");
+function ResizeHandle({
+  onDragStart,
+  onDrag,
+  onDragEnd,
+  anchor,
+}: {
+  anchor: "nw" | "ne" | "sw" | "se";
+  onDragStart?: () => void;
+  onDrag?: ({ movement }: { movement: [number, number] }) => void;
+  onDragEnd?: () => void;
+}) {
+  const bind = useGesture(
+    {
+      onDragStart: ({ event }) => {
+        // stop propagation to prevent the block drag - this is only required on start
+        event.stopPropagation();
+        onDragStart?.();
+      },
+      onDrag: onDrag,
+      onDragEnd: onDragEnd,
     },
-    onDrag: () => {},
-    onDragEnd: () => {},
-  });
+    {
+      eventOptions: {
+        capture: true,
+      },
+    }
+  );
 
   return (
     <div
@@ -980,6 +1070,7 @@ function ResizeHandle({ anchor }: { anchor: "nw" | "ne" | "sw" | "se" }) {
       <div
         {...bind()}
         style={{
+          touchAction: "none",
           position: "absolute",
           width: "8px",
           height: "8px",
@@ -1081,6 +1172,7 @@ function GridAreaBlock({
       className="data-[debug='true']:bg-pink-300/20"
       style={{
         ...style,
+        touchAction: "none",
         pointerEvents: "auto",
         gridArea:
           y[0] +
