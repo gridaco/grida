@@ -24,23 +24,20 @@ import {
   Drawer,
   DrawerClose,
   DrawerContent,
-  DrawerDescription,
   DrawerFooter,
   DrawerHeader,
   DrawerTitle,
-  DrawerTrigger,
 } from "@/components/ui/drawer";
 import { nanoid } from "nanoid";
 import { Button } from "@/components/ui/button";
-import dynamic from "next/dynamic";
 import { DndContext, useDraggable } from "@dnd-kit/core";
 import { CSS } from "@dnd-kit/utilities";
 import clsx from "clsx";
 import useMergedRef from "./use-merged-ref";
-import { VIDEO_BLOCK_SRC_DEFAULT_VALUE } from "@/k/video_block_defaults";
 import { cvt_delta_by_resize_handle_origin, resize } from "./transform-resize";
 import { motion } from "framer-motion";
-const ReactPlayer = dynamic(() => import("react-player/lazy"), { ssr: false });
+import { GridaBlockRenderer } from "./blocks";
+import { create_initial_grida_block } from "./blocks/data";
 
 const blockpresets = [
   {
@@ -85,89 +82,7 @@ const blockpresets = [
   },
 ] as const;
 
-function create_initial_grida_block(block: any): GridaBlock | undefined {
-  switch (block) {
-    case "button": {
-      return {
-        type: "button",
-        label: "Button",
-      };
-    }
-    case "text":
-    case "typography": {
-      return {
-        type: "typography",
-        element: "h1",
-        data: "Hello World",
-      };
-    }
-    case "h1": {
-      return {
-        type: "typography",
-        element: "h1",
-        data: "Hello World",
-      };
-    }
-    case "p": {
-      return {
-        type: "typography",
-        element: "p",
-        data: "In hac habitasse platea dictumst. Duis egestas libero molestie elementum tempus. Aenean ante diam, tristique ac ligula eget, laoreet vulputate quam. Quisque molestie tortor ut nisi varius suscipit. Aliquam ut dignissim ante. Lorem ipsum dolor sit amet, consectetur adipiscing.",
-      };
-    }
-    // case 'link': {
-    //   return {
-    //     type: 'link',
-    //     label: 'Link'
-    //   }
-    // }
-    case "image": {
-      return {
-        type: "image",
-        // unsplash random image
-        src: "https://source.unsplash.com/random/375x375",
-      };
-    }
-    case "video": {
-      return {
-        type: "video",
-        src: VIDEO_BLOCK_SRC_DEFAULT_VALUE,
-      };
-    }
-  }
-}
-
 type TransformOrigin = [0 | 1, 0 | 1];
-
-type GridaBlock =
-  | GridaGridImageBlock
-  | GridaGridTypographyBlock
-  | GridaGridButtonBlock
-  | GridaGridVideoBlock;
-
-type GridaBlockType = GridaBlock["type"];
-
-type GridaGridImageBlock = {
-  type: "image";
-  src: string;
-};
-
-type GridaGridTypographyBlock = {
-  type: "typography";
-  element: "h1" | "h2" | "h3" | "h4" | "h5" | "h6" | "p" | "span";
-  data: string;
-};
-
-type GridaGridButtonBlock = {
-  type: "button";
-  label: string;
-  href?: string;
-};
-
-type GridaGridVideoBlock = {
-  type: "video";
-  src: string;
-};
 
 /**
  * [x1 y1 x2 y2]
@@ -805,60 +720,6 @@ function GridEditor() {
         </div>
       </DndContext>
     </>
-  );
-}
-
-function GridaBlockRenderer(block: GridaBlock) {
-  const { type } = block;
-  switch (type) {
-    case "image":
-      return <GridaGridImageImageBlock {...block} />;
-    case "typography":
-      return <GridaGridTypographyBlock {...block} />;
-    case "button":
-      return <GridaGridButtonBlock {...block} />;
-    case "video":
-      return <GridaGridVideoBlock {...block} />;
-  }
-}
-
-function GridaGridImageImageBlock({ src }: GridaGridImageBlock) {
-  return (
-    <picture className="w-full h-full not-prose">
-      {/* eslint-disable-next-line jsx-a11y/alt-text */}
-      <img className="object-cover w-full h-full" src={src} />
-    </picture>
-  );
-}
-
-function GridaGridVideoBlock({ src }: GridaGridVideoBlock) {
-  return (
-    <div className="w-full h-full">
-      <ReactPlayer
-        className="pointer-events-none"
-        url={src}
-        playing={true}
-        controls={true}
-        width="100%"
-        height="100%"
-      />
-    </div>
-  );
-}
-
-function GridaGridTypographyBlock({ element, data }: GridaGridTypographyBlock) {
-  return (
-    <div className="w-full h-full px-4">
-      {React.createElement(element, {}, data)}
-    </div>
-  );
-}
-
-function GridaGridButtonBlock({ label }: GridaGridButtonBlock) {
-  return (
-    <div className="flex w-full h-full items-center justify-center">
-      <Button>{label}</Button>
-    </div>
   );
 }
 
