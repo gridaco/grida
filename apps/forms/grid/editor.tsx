@@ -37,6 +37,7 @@ import { DndContext, useDraggable } from "@dnd-kit/core";
 import { CSS } from "@dnd-kit/utilities";
 import clsx from "clsx";
 import useMergedRef from "./use-merged-ref";
+import { VIDEO_BLOCK_SRC_DEFAULT_VALUE } from "@/k/video_block_defaults";
 const ReactPlayer = dynamic(() => import("react-player/lazy"), { ssr: false });
 
 const blockpresets = [
@@ -68,11 +69,6 @@ const blockpresets = [
   {
     type: "video",
     label: "Video",
-    icon: <VideoIcon />,
-  },
-  {
-    type: "youtue",
-    label: "YouTube",
     icon: <VideoIcon />,
   },
 ] as const;
@@ -223,6 +219,7 @@ type Action =
   | OpenChangeInsertBlockPanel
   | PonterUpAction
   | InsertBlock
+  | BlcokPointerDownAction
   | BlcokDragStartAction
   | BlcokDragAction
   | BlockDragEndAction;
@@ -238,6 +235,11 @@ interface PonterDownrAction {
 
 interface PonterUpAction {
   type: "pointerup";
+}
+
+interface BlcokPointerDownAction {
+  type: "block/pointerdown";
+  id: BlockId;
 }
 
 interface BlcokDragStartAction {
@@ -313,6 +315,7 @@ function reducer(state: State, action: Action): State {
         if (state.is_dragging) {
           return;
         }
+        draft.selected = undefined;
         draft.is_marquee = true;
         draft.start = state.pos;
         draft.marquee = [...state.pos, ...state.pos];
@@ -373,8 +376,17 @@ function reducer(state: State, action: Action): State {
           element: el,
         });
 
+        // select the block
+        draft.selected = id;
+
         // close insert panel
         draft.controls.insert_panel_open = false;
+      });
+    }
+    case "block/pointerdown": {
+      const { id } = action;
+      return produce(state, (draft) => {
+        draft.selected = id;
       });
     }
     case "block/dragstart": {
@@ -463,15 +475,9 @@ function create_initial_grida_block(block: GridaBlockType): GridaBlock {
     case "video": {
       return {
         type: "video",
-        src: "",
+        src: VIDEO_BLOCK_SRC_DEFAULT_VALUE,
       };
     }
-    // case 'youtube': {
-    //   return {
-    //     type: 'youtube',
-    //     src: ''
-    //   }
-    // }
   }
 }
 
@@ -633,16 +639,54 @@ function GridaBlockRenderer(block: GridaBlock) {
   const { type } = block;
   switch (type) {
     case "image":
-      const { src } = block as GridaGridImageBlock;
-      return <ImageBlock src={src} />;
+      return <GridaGridImageImageBlock {...block} />;
     case "typography":
-      const { element, data } = block as GridaGridTypographyBlock;
-      return React.createElement(element, {}, data);
+      return <GridaGridTypographyBlock {...block} />;
     case "button":
-      const { label } = block as GridaGridButtonBlock;
-      return <Button>{label}</Button>;
-    // case 'video'
+      return <GridaGridButtonBlock {...block} />;
+    case "video":
+      return <GridaGridVideoBlock {...block} />;
   }
+}
+
+function GridaGridImageImageBlock({ src }: GridaGridImageBlock) {
+  return (
+    <picture className="w-full h-full not-prose">
+      {/* eslint-disable-next-line jsx-a11y/alt-text */}
+      <img className="object-cover w-full h-full" src={src} />
+    </picture>
+  );
+}
+
+function GridaGridVideoBlock({ src }: GridaGridVideoBlock) {
+  return (
+    <div className="w-full h-full">
+      <ReactPlayer
+        className="pointer-events-none"
+        url={src}
+        playing={true}
+        controls={true}
+        width="100%"
+        height="100%"
+      />
+    </div>
+  );
+}
+
+function GridaGridTypographyBlock({ element, data }: GridaGridTypographyBlock) {
+  return (
+    <div className="w-full h-full px-4">
+      {React.createElement(element, {}, data)}
+    </div>
+  );
+}
+
+function GridaGridButtonBlock({ label }: GridaGridButtonBlock) {
+  return (
+    <div className="flex w-full h-full items-center justify-center">
+      <Button>{label}</Button>
+    </div>
+  );
 }
 
 function GridGuide({
@@ -744,15 +788,6 @@ function Cell({ pos, index }: { pos: Position; index: number }) {
   );
 }
 
-function ImageBlock({ src }: { src: string }) {
-  return (
-    <picture className="w-full h-full not-prose">
-      {/* eslint-disable-next-line jsx-a11y/alt-text */}
-      <img className="object-cover w-full h-full" src={src} />
-    </picture>
-  );
-}
-
 function Grid({
   col,
   row,
@@ -812,14 +847,66 @@ function Grid({
   );
 }
 
-function Dragable({
-  id,
-  children,
-}: React.PropsWithChildren<{
-  id: string;
-}>) {
-  return <div className="w-full h-full">{children}</div>;
+function GridAreaBlockResizeOverlay() {
+  return (
+    <div
+      style={{
+        width: "100%",
+        height: "100%",
+        border: "2px solid rgba(0, 0, 255, 1)",
+      }}
+    >
+      <div className="absolute top-0 left-0">
+        <ResizeHandle anchor="nw" />
+      </div>
+      <div className="absolute top-0 right-0">
+        <ResizeHandle anchor="ne" />
+      </div>
+      <div className="absolute bottom-0 left-0">
+        <ResizeHandle anchor="sw" />
+      </div>
+      <div className="absolute bottom-0 right-0">
+        <ResizeHandle anchor="se" />
+      </div>
+    </div>
+  );
 }
+
+function ResizeHandle({ anchor }: { anchor: "nw" | "ne" | "sw" | "se" }) {
+  return (
+    <div
+      style={{
+        position: "relative",
+        width: 0,
+        height: 0,
+      }}
+    >
+      <div
+        style={{
+          position: "absolute",
+          width: "8px",
+          height: "8px",
+          transform: "translate(-50%, -50%)",
+          boxSizing: "content-box",
+          backgroundColor: "rgba(255, 255, 255, 1)",
+          border: "2px solid rgba(0, 0, 255, 1)",
+          cursor: resize_cursor_map[anchor],
+        }}
+      />
+    </div>
+  );
+}
+
+const resize_cursor_map = {
+  nw: "nwse-resize",
+  ne: "nesw-resize",
+  sw: "nesw-resize",
+  se: "nwse-resize",
+  w: "ew-resize",
+  n: "ns-resize",
+  s: "ns-resize",
+  e: "ew-resize",
+};
 
 function GridAreaBlock({
   id,
@@ -840,6 +927,9 @@ function GridAreaBlock({
   const gestureRef = useRef<HTMLDivElement>(null);
   useGesture(
     {
+      onPointerDown: () => {
+        dispatch({ type: "block/pointerdown", id });
+      },
       onDrag: ({ movement }) => {
         dispatch({ type: "block/drag", movement: movement });
       },
@@ -879,15 +969,13 @@ function GridAreaBlock({
 
   const mergedRef = useMergedRef<HTMLDivElement>(gestureRef, setNodeRef);
 
+  const selected = state.selected === id;
+
   return (
     <div
       {...listeners}
       {...attributes}
       ref={mergedRef}
-      onPointerEnter={() => {
-        // here
-        console.log("enter");
-      }}
       data-debug={debug}
       className="data-[debug='true']:bg-pink-300/20"
       style={{
@@ -903,18 +991,41 @@ function GridAreaBlock({
           " / " +
           (x[1] + 2),
         zIndex: z,
-        overflow: "hidden",
         position: "relative",
         padding: "0px",
       }}
     >
-      {state.debug && (
-        <div className="absolute top-0 left-0 bg-black text-white font-mono text-xs">
-          {id}
-          <br />x{x.join(",")} y{y.join(",")} z{z}
-        </div>
-      )}
-      <div>{children}</div>
+      <div
+        style={{
+          visibility: selected ? "visible" : "hidden",
+          position: "absolute",
+          top: 0,
+          right: 0,
+          bottom: 0,
+          left: 0,
+          zIndex: 1,
+        }}
+      >
+        <GridAreaBlockResizeOverlay />
+      </div>
+      <div
+        style={{
+          position: "absolute",
+          top: 0,
+          right: 0,
+          bottom: 0,
+          left: 0,
+          overflow: "hidden",
+        }}
+      >
+        {state.debug && (
+          <div className="absolute top-0 left-0 bg-black text-white font-mono text-xs">
+            {id}
+            <br />x{x.join(",")} y{y.join(",")} z{z}
+          </div>
+        )}
+        {children}
+      </div>
     </div>
   );
 }
