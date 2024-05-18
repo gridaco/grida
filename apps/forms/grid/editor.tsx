@@ -39,6 +39,7 @@ import clsx from "clsx";
 import useMergedRef from "./use-merged-ref";
 import { VIDEO_BLOCK_SRC_DEFAULT_VALUE } from "@/k/video_block_defaults";
 import { cvt_delta_by_resize_handle_origin, resize } from "./transform-resize";
+import { motion } from "framer-motion";
 const ReactPlayer = dynamic(() => import("react-player/lazy"), { ssr: false });
 
 const blockpresets = [
@@ -195,9 +196,9 @@ interface State {
   end?: Position;
 
   /**
-   * marquee area in grid space
+   * marquee / dropzone area in grid space
    */
-  marquee?: Area;
+  area?: Area;
 
   controls: {
     insert_panel_open: boolean;
@@ -232,7 +233,7 @@ const initial: State = {
   is_dragging: false,
   is_resizing: false,
   is_marquee: false,
-  marquee: undefined,
+  area: undefined,
   delta: [0, 0],
   movement: [0, 0],
   selection: undefined,
@@ -373,7 +374,7 @@ function reducer(state: State, action: Action): State {
         draft.selection = undefined;
         draft.is_marquee = true;
         draft.start = state.point;
-        draft.marquee = [...state.point, ...state.point];
+        draft.area = [...state.point, ...state.point];
       });
     }
     case "pointerup": {
@@ -411,7 +412,7 @@ function reducer(state: State, action: Action): State {
           const [minY, maxY] = startY < endY ? [startY, endY] : [endY, startY];
 
           draft.end = pos;
-          draft.marquee = [minX, minY, maxX, maxY];
+          draft.area = [minX, minY, maxX, maxY];
         }
       });
     }
@@ -421,14 +422,14 @@ function reducer(state: State, action: Action): State {
         draft.controls.insert_panel_open = open;
         if (!open) {
           draft.is_marquee = false;
-          draft.marquee = undefined;
+          draft.area = undefined;
         }
       });
     }
     case "blocks/new": {
       return produce(state, (draft) => {
         const id = nanoid();
-        const [_mx1, _my1, _mx2, _my2] = state.marquee ?? [0, 0, 1, 1];
+        const [_mx1, _my1, _mx2, _my2] = state.area ?? [0, 0, 1, 1];
 
         const x: Position = [_mx1, _mx2];
         const y: Position = [_my1, _my2];
@@ -494,7 +495,7 @@ function reducer(state: State, action: Action): State {
 
         // console.log(ax1, ax2, "=> ", _client_dx, dx, " => ", bx1, bx2);
 
-        draft.marquee = [bx1, by1, bx2, by2];
+        draft.area = [bx1, by1, bx2, by2];
       });
     }
     case "block/dragend": {
@@ -504,16 +505,16 @@ function reducer(state: State, action: Action): State {
         const block = draft.blocks.find((b) => b.id === state.selection);
         // silent assert
         if (!block) return;
-        if (!state.marquee) return;
+        if (!state.area) return;
 
-        const [mx1, my1, mx2, my2] = state.marquee ?? [-1, -1, -1, -1];
+        const [mx1, my1, mx2, my2] = state.area ?? [-1, -1, -1, -1];
 
         block.x = [mx1, mx2];
         block.y = [my1, my2];
 
         draft.movement = [0, 0];
         draft.is_dragging = false;
-        draft.marquee = undefined; // Clear marquee after drag ends
+        draft.area = undefined; // Clear marquee after drag ends
       });
     }
     case "handle/dragstart": {
@@ -528,12 +529,51 @@ function reducer(state: State, action: Action): State {
       const { movement } = action;
       return produce(state, (draft) => {
         draft.movement = movement;
+
+        // update the marquee area to let user know the resized area
+        const [_client_dx, _client_dy] = movement;
+        const block = draft.blocks.find((b) => b.id === state.selection);
+        // silent assert
+        if (!block) return;
+
+        const [dx, dy] = gridxyposround(state.unit, [_client_dx, _client_dy]);
+
+        const [ax1, ax2] = block.x;
+        const [ay1, ay2] = block.y;
+
+        const [nx1_, nx2_] = [ax1, ax2];
+        const [ny1_, ny2_] = [ay1, ay2];
+
+        const [dx_, dy_] = [dx, dy];
+
+        // TODO: hanlde following the anchor
+        // const [nx1__, nx2__] = [nx1_ + dx_, nx2_ + dx_];
+        // const [ny1__, ny2__] = [ny1_ + dy_, ny2_ + dy_];
+        const [nx1__, nx2__] = [nx1_, nx2_ + dx_];
+        const [ny1__, ny2__] = [ny1_, ny2_ + dy_];
+
+        // update the area
+        draft.area = [nx1__, ny1__, nx2__, ny2__];
       });
     }
     case "handle/dragend": {
       return produce(state, (draft) => {
         draft.movement = [0, 0];
         draft.is_resizing = false;
+
+        const block = draft.blocks.find((b) => b.id === state.selection);
+        // silent assert
+        if (!block) return;
+
+        const [mx1, my1, mx2, my2] = draft.area ?? [
+          block.x[0],
+          block.y[0],
+          block.x[1],
+          block.y[1],
+        ];
+
+        block.x = [mx1, mx2];
+        block.y = [my1, my2];
       });
     }
   }
@@ -706,9 +746,10 @@ function GridEditor() {
         <Controls />
         <div
           id="grid-editor"
-          className="relative w-full h-full"
           style={{
             userSelect: "none",
+            width: state.width,
+            height: state.height,
           }}
         >
           <GridGuide col={col} row={row} />
@@ -846,16 +887,18 @@ function GridGuide({
 function Cell({ pos, index }: { pos: Position; index: number }) {
   const [state, dispatch] = useGrid();
   const [col, row] = state.size;
-  const [_mx1, _my1, _mx2, _my2] = state.marquee ?? [-1, -1, -1, -1];
+  const [_mx1, _my1, _mx2, _my2] = state.area ?? [-1, -1, -1, -1];
 
   const is_in_marquee =
     pos[0] >= _mx1 && pos[0] <= _mx2 && pos[1] >= _my1 && pos[1] <= _my2;
 
-  const is_hovered = state.point[0] === pos[0] && state.point[1] === pos[1];
+  const { is_dragging, is_resizing } = state;
+  const is_pointer = state.point[0] === pos[0] && state.point[1] === pos[1];
+  const is_hover = is_pointer && !is_dragging && !is_resizing;
 
   return (
     <div
-      data-hover={is_hovered}
+      data-hover={is_hover}
       data-marqueed={is_in_marquee}
       className={clsx(
         "data-[hover='true']:bg-gray-500/15",
@@ -993,7 +1036,7 @@ function GridAreaBlockOverlay({ readonly }: { readonly?: boolean }) {
     >
       {!readonly && (
         <>
-          <div className="absolute top-0 left-0">
+          {/* <div className="absolute top-0 left-0">
             <ResizeHandle
               anchor="nw"
               onDragStart={() => onDragStart("nw")}
@@ -1016,7 +1059,7 @@ function GridAreaBlockOverlay({ readonly }: { readonly?: boolean }) {
               onDrag={onDrag}
               onDragEnd={onDragEnd}
             />
-          </div>
+          </div> */}
           <div className="absolute bottom-0 right-0">
             <ResizeHandle
               anchor="se"
@@ -1128,15 +1171,15 @@ function GridAreaBlock({
         dispatch({ type: "block/dragstart", id });
       },
       onDragEnd: () => {
-        // set timeout to ensure the dragend is called after pointerup
-        setTimeout(() => {
-          dispatch({ type: "block/dragend" });
-        }, 10);
+        dispatch({ type: "block/dragend" });
       },
     },
     {
       drag: {
         enabled: true,
+      },
+      eventOptions: {
+        capture: true,
       },
       target: gestureRef,
     }
@@ -1188,37 +1231,50 @@ function GridAreaBlock({
         padding: "0px",
       }}
     >
-      <div
-        style={{
-          visibility: selected || highlighted ? "visible" : "hidden",
-          position: "absolute",
-          top: 0,
-          right: 0,
-          bottom: 0,
-          left: 0,
-          zIndex: 1,
-        }}
-      >
-        <GridAreaBlockOverlay readonly={!selected} />
-      </div>
-      <div
+      <motion.div
         style={{
           position: "absolute",
           top: 0,
           right: 0,
           bottom: 0,
           left: 0,
-          overflow: "hidden",
+        }}
+        animate={{
+          scale: isDragging ? 1.05 : 1,
         }}
       >
-        {state.debug && (
-          <div className="absolute top-0 left-0 bg-black text-white font-mono text-xs">
-            {id}
-            <br />x{x.join(",")} y{y.join(",")} z{z}
-          </div>
-        )}
-        {children}
-      </div>
+        <div
+          style={{
+            visibility: selected || highlighted ? "visible" : "hidden",
+            position: "absolute",
+            top: 0,
+            right: 0,
+            bottom: 0,
+            left: 0,
+            zIndex: 1,
+          }}
+        >
+          <GridAreaBlockOverlay readonly={!selected} />
+        </div>
+        <div
+          style={{
+            position: "absolute",
+            top: 0,
+            right: 0,
+            bottom: 0,
+            left: 0,
+            overflow: "hidden",
+          }}
+        >
+          {state.debug && (
+            <div className="absolute top-0 left-0 bg-black text-white font-mono text-xs">
+              {id}
+              <br />x{x.join(",")} y{y.join(",")} z{z}
+            </div>
+          )}
+          {children}
+        </div>
+      </motion.div>
     </div>
   );
 }
