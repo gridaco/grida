@@ -1,13 +1,6 @@
 "use client";
 import { produce } from "immer";
-import {
-  ButtonIcon,
-  ImageIcon,
-  Link2Icon,
-  PlusIcon,
-  TextIcon,
-  VideoIcon,
-} from "@radix-ui/react-icons";
+import { PlusIcon } from "@radix-ui/react-icons";
 import React, {
   createContext,
   memo,
@@ -22,65 +15,18 @@ import React, {
 import { useGesture } from "@use-gesture/react";
 import {
   Drawer,
-  DrawerClose,
   DrawerContent,
-  DrawerFooter,
   DrawerHeader,
   DrawerTitle,
 } from "@/components/ui/drawer";
 import { nanoid } from "nanoid";
-import { Button } from "@/components/ui/button";
 import { DndContext, useDraggable } from "@dnd-kit/core";
 import { CSS } from "@dnd-kit/utilities";
 import clsx from "clsx";
 import useMergedRef from "./use-merged-ref";
 import { cvt_delta_by_resize_handle_origin, resize } from "./transform-resize";
 import { motion } from "framer-motion";
-import { GridaBlockRenderer } from "./blocks";
 import { create_initial_grida_block } from "./blocks/data";
-
-const blockpresets = [
-  {
-    type: "forms.grida.co/start-form-button",
-    label: "Start Button",
-    icon: <ButtonIcon />,
-  },
-  {
-    type: "button",
-    label: "Button",
-    icon: <ButtonIcon />,
-  },
-  {
-    type: "text",
-    label: "Text",
-    icon: <TextIcon />,
-  },
-  {
-    type: "h1",
-    label: "Heading",
-    icon: <TextIcon />,
-  },
-  {
-    type: "p",
-    label: "Paragraph",
-    icon: <TextIcon />,
-  },
-  {
-    type: "link",
-    label: "Link",
-    icon: <Link2Icon />,
-  },
-  {
-    type: "image",
-    label: "Image",
-    icon: <ImageIcon />,
-  },
-  {
-    type: "video",
-    label: "Video",
-    icon: <VideoIcon />,
-  },
-] as const;
 
 type TransformOrigin = [0 | 1, 0 | 1];
 
@@ -617,6 +563,24 @@ const useGrid = (): [State, FlatDispatcher] => {
   return useMemo(() => [state, dispatch], [state, dispatch]);
 };
 
+interface EditorProps {
+  renderer: (block: Block["element"]) => React.ReactNode;
+  components: {
+    insert_panel?: (props: {
+      state: State;
+      dispatch: FlatDispatcher;
+    }) => React.ReactNode;
+  };
+}
+
+export default function Editor({ ...props }: EditorProps) {
+  return (
+    <Provider>
+      <GridEditor {...props} />
+    </Provider>
+  );
+}
+
 function Provider({ children }: React.PropsWithChildren<{}>) {
   const [state, dispatch] = React.useReducer(reducer, initial);
   return (
@@ -626,15 +590,16 @@ function Provider({ children }: React.PropsWithChildren<{}>) {
   );
 }
 
-export default function Editor() {
-  return (
-    <Provider>
-      <GridEditor />
-    </Provider>
-  );
-}
-
-function Controls() {
+function Controls({
+  components,
+}: {
+  components: {
+    insert_panel?: (props: {
+      state: State;
+      dispatch: FlatDispatcher;
+    }) => React.ReactNode;
+  };
+}) {
   const [state, dispatch] = useGrid();
   return (
     <>
@@ -648,40 +613,15 @@ function Controls() {
           <DrawerHeader>
             <DrawerTitle>Insert Block</DrawerTitle>
           </DrawerHeader>
-          <div className="p-4 flex flex-col gap-2 w-full">
-            {blockpresets.map((block) => (
-              <Button
-                variant="outline"
-                className="h-20"
-                key={block.type}
-                onClick={() => {
-                  dispatch({
-                    type: "blocks/new",
-                    // @ts-ignore TODO: handle presets
-                    block: block.type,
-                  });
-                }}
-              >
-                {React.cloneElement(block.icon, {
-                  className: "w-6 h-6 mr-2",
-                })}
-                {block.label}
-              </Button>
-            ))}
-          </div>
-          <DrawerFooter>
-            <Button>OK</Button>
-            <DrawerClose>
-              <Button variant="outline">Cancel</Button>
-            </DrawerClose>
-          </DrawerFooter>
+          {components.insert_panel &&
+            components.insert_panel({ state, dispatch })}
         </DrawerContent>
       </Drawer>
     </>
   );
 }
 
-function GridEditor() {
+function GridEditor({ renderer, components }: EditorProps) {
   const [state, dispatch] = useGrid();
 
   const [col, row] = state.size;
@@ -694,7 +634,7 @@ function GridEditor() {
       // modifiers={[restrictToVerticalAxis]}
       // onDragEnd={handleDragEnd}
       >
-        <Controls />
+        <Controls components={components} />
         <div
           id="grid-editor"
           style={{
@@ -713,7 +653,7 @@ function GridEditor() {
                 y={block.y}
                 z={block.z}
               >
-                {GridaBlockRenderer(block.element)}
+                {renderer(block.element)}
               </GridAreaBlock>
             ))}
           </Grid>
@@ -1097,12 +1037,6 @@ function GridAreaBlock({
     transform: CSS.Translate.toString(transform),
     zIndex: isDragging ? 1 : 0,
   };
-
-  useEffect(() => {
-    if (isDragging) {
-      // cancel the editor drag
-    }
-  }, [isDragging]);
 
   const mergedRef = useMergedRef<HTMLDivElement>(gestureRef, setNodeRef);
 
