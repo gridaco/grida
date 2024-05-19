@@ -26,15 +26,15 @@ type TransformOrigin = [0 | 1, 0 | 1];
 /**
  * [x1 y1 x2 y2]
  */
-type Area = [number, number, number, number];
-type Position = [number, number];
-type Size = [number, number];
-type BlockId = string;
+type GridArea = [number, number, number, number];
+type GridPosition = [number, number];
+type GridSize = [number, number];
+type GridBlockId = string;
 
-type Block<T = any> = {
-  id: BlockId;
-  x: Position;
-  y: Position;
+export type GridBlock<T = any> = {
+  id: GridBlockId;
+  x: GridPosition;
+  y: GridPosition;
   z?: number;
   data?: T;
 };
@@ -67,12 +67,12 @@ interface State {
    * grid size
    * @default [6, 12]
    */
-  size: Size;
+  size: GridSize;
 
   /**
    * current pointer position in grid space
    */
-  point: Position;
+  point: GridPosition;
 
   /**
    * is dragging
@@ -97,6 +97,11 @@ interface State {
   movement: [number, number];
 
   /**
+   * is pointerdown
+   */
+  is_pointerdown: boolean;
+
+  /**
    * is marquee selection
    */
   is_marquee: boolean;
@@ -104,36 +109,36 @@ interface State {
   /**
    * start position of marquee in grid space
    */
-  start?: Position;
+  start?: GridPosition;
 
   /**
    * end position of marquee in grid space
    */
-  end?: Position;
+  end?: GridPosition;
 
   /**
    * marquee / dropzone area in grid space
    */
-  area?: Area;
+  area?: GridArea;
 
   controls: {};
 
   /**
    * selected block id
    */
-  selection?: BlockId;
+  selection?: GridBlockId;
 
   /**
    * highlighted block id
    */
-  highlight?: BlockId;
+  highlight?: GridBlockId;
 
   debug?: boolean;
 
   /**
    * grid content blocks
    */
-  blocks: Block[];
+  blocks: GridBlock[];
 }
 
 const initial: State = {
@@ -146,6 +151,7 @@ const initial: State = {
   resize_anchor: undefined,
   is_dragging: false,
   is_resizing: false,
+  is_pointerdown: false,
   is_marquee: false,
   area: undefined,
   delta: [0, 0],
@@ -197,7 +203,7 @@ interface PonterUpAction {
 
 interface BlcokPointerEnterAction {
   type: "block/pointerenter";
-  id: BlockId;
+  id: GridBlockId;
 }
 
 interface BlcokPointerLeaveAction {
@@ -206,12 +212,12 @@ interface BlcokPointerLeaveAction {
 
 interface BlcokPointerDownAction {
   type: "block/pointerdown";
-  id: BlockId;
+  id: GridBlockId;
 }
 
 interface BlcokDragStartAction {
   type: "block/dragstart";
-  id: BlockId;
+  id: GridBlockId;
 }
 
 interface BlcokDragAction {
@@ -246,12 +252,12 @@ interface OpenChangeInsertBlockPanel {
 
 interface InsertBlock {
   type: "blocks/new";
-  block: Block;
+  block: GridBlock;
 }
 
 interface InsertBlockHere {
   type: "blocks/new/here";
-  data?: Block["data"];
+  data?: GridBlock["data"];
 }
 
 interface ClearAction {
@@ -272,11 +278,11 @@ const DispatchContext = createContext<Dispatcher>(__noop);
  * @param xy mouse position in px (relative to grid)
  * @returns
  */
-const gridxypos = (cellsize: number, xy: [number, number]): Position => {
+const gridxypos = (cellsize: number, xy: [number, number]): GridPosition => {
   return [
     Math.floor(xy[0] / cellsize),
     Math.floor(xy[1] / cellsize),
-  ] as Position;
+  ] as GridPosition;
 };
 
 /**
@@ -285,14 +291,17 @@ const gridxypos = (cellsize: number, xy: [number, number]): Position => {
  * @param xy mouse position in px (relative to grid)
  * @returns
  */
-const gridxyposround = (cellsize: number, xy: [number, number]): Position => {
+const gridxyposround = (
+  cellsize: number,
+  xy: [number, number]
+): GridPosition => {
   return [
     Math.round(xy[0] / cellsize),
     Math.round(xy[1] / cellsize),
-  ] as Position;
+  ] as GridPosition;
 };
 
-const gridindexpos = (col: number, i: number): Position => {
+const gridindexpos = (col: number, i: number): GridPosition => {
   const x = i % col;
   const y = Math.floor(i / col);
   return [x, y];
@@ -314,7 +323,7 @@ function reducer(state: State, action: Action): State {
           return;
         }
         draft.selection = undefined;
-        draft.is_marquee = true;
+        draft.is_pointerdown = true;
         draft.start = state.point;
         draft.area = [...state.point, ...state.point];
       });
@@ -331,10 +340,10 @@ function reducer(state: State, action: Action): State {
         }
 
         // this can happen when pointer is down from outside the grid and up
-        if (!state.is_marquee) {
+        if (!state.is_pointerdown) {
           return;
         }
-
+        draft.is_pointerdown = false;
         draft.is_marquee = false;
         draft.end = state.point;
       });
@@ -348,7 +357,16 @@ function reducer(state: State, action: Action): State {
       return produce(state, (draft) => {
         draft.point = pos;
 
-        if (state.is_marquee && state.start) {
+        if (state.is_pointerdown && state.start) {
+          // drag delta = 1
+          if (
+            !draft.is_marquee &&
+            (Math.abs(state.start[0] - pos[0]) > 0 ||
+              Math.abs(state.start[1] - pos[1]) > 0)
+          ) {
+            draft.is_marquee = true;
+          }
+
           const [startX, startY] = state.start;
           const [endX, endY] = pos;
 
@@ -386,8 +404,8 @@ function reducer(state: State, action: Action): State {
         const id = nanoid();
         const [_mx1, _my1, _mx2, _my2] = state.area ?? [0, 0, 1, 1];
 
-        const x: Position = [_mx1, _mx2];
-        const y: Position = [_my1, _my2];
+        const x: GridPosition = [_mx1, _mx2];
+        const y: GridPosition = [_my1, _my2];
 
         draft.blocks.push({
           id,
@@ -536,7 +554,7 @@ function reducer(state: State, action: Action): State {
   return produce(state, (draft) => {});
 }
 
-export const useDispatch = (): FlatDispatcher => {
+const useDispatch = (): FlatDispatcher => {
   const dispatch = useContext(DispatchContext);
   return useCallback(
     (action: Action) => {
@@ -546,7 +564,7 @@ export const useDispatch = (): FlatDispatcher => {
   );
 };
 
-export const StateProvider = memo(function StateProvider({
+const StateProvider = memo(function StateProvider({
   state,
   dispatch,
   children,
@@ -584,7 +602,7 @@ export const useGrid = () => {
     clear: () => {
       dispatch({ type: "clear" });
     },
-    insertBlockOnAera: (data?: Block["data"]) => {
+    insertBlockOnAera: (data?: GridBlock["data"]) => {
       dispatch({ type: "blocks/new/here", data });
     },
   };
@@ -593,9 +611,9 @@ export const useGrid = () => {
 };
 
 interface EditorProps {
-  renderer: (block: Block["data"]) => React.ReactNode;
-  onMarqueeEnd?: (area?: Area) => void;
-  onBlockDoubleClick?: (id: BlockId) => void;
+  renderer: (data: GridBlock["data"]) => React.ReactNode;
+  onMarqueeEnd?: (area?: GridArea) => void;
+  onBlockDoubleClick?: (id: GridBlockId) => void;
 }
 
 export function GridContext({ children }: React.PropsWithChildren<{}>) {
@@ -723,7 +741,7 @@ function GridGuide({
   );
 }
 
-function Cell({ pos, index }: { pos: Position; index: number }) {
+function Cell({ pos, index }: { pos: GridPosition; index: number }) {
   const [state, dispatch] = useGridState();
   const [col, row] = state.size;
   const [_mx1, _my1, _mx2, _my2] = state.area ?? [-1, -1, -1, -1];

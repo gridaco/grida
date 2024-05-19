@@ -24,6 +24,9 @@ export function GridaBlockRenderer(block: GridaBlock) {
       return <GridaGridButtonBlock {...block} />;
     case "video":
       return <GridaGridVideoBlock {...block} />;
+    default: {
+      return <pre>{JSON.stringify(block, null, 2)}</pre>;
+    }
   }
 }
 
