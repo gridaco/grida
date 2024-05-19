@@ -11,14 +11,8 @@ import React, {
   useContext,
   useMemo,
 } from "react";
-
 import { useGesture } from "@use-gesture/react";
-import {
-  Drawer,
-  DrawerContent,
-  DrawerHeader,
-  DrawerTitle,
-} from "@/components/ui/drawer";
+
 import { nanoid } from "nanoid";
 import { DndContext, useDraggable } from "@dnd-kit/core";
 import { CSS } from "@dnd-kit/utilities";
@@ -26,7 +20,6 @@ import clsx from "clsx";
 import useMergedRef from "./use-merged-ref";
 import { cvt_delta_by_resize_handle_origin, resize } from "./transform-resize";
 import { motion } from "framer-motion";
-import { create_initial_grida_block } from "./blocks/data";
 
 type TransformOrigin = [0 | 1, 0 | 1];
 
@@ -43,7 +36,7 @@ type Block<T = any> = {
   x: Position;
   y: Position;
   z?: number;
-  element?: T;
+  data?: T;
 };
 
 interface State {
@@ -123,9 +116,7 @@ interface State {
    */
   area?: Area;
 
-  controls: {
-    insert_panel_open: boolean;
-  };
+  controls: {};
 
   /**
    * selected block id
@@ -175,6 +166,7 @@ type Action =
   | OpenChangeInsertBlockPanel
   | PonterUpAction
   | InsertBlock
+  | InsertBlockHere
   | BlcokPointerEnterAction
   | BlcokPointerLeaveAction
   | BlcokPointerDownAction
@@ -183,7 +175,8 @@ type Action =
   | BlockDragEndAction
   | HandleDragStartAction
   | HandleDragAction
-  | HandleDragEndAction;
+  | HandleDragEndAction
+  | ClearAction;
 
 interface PonterMoveAction {
   type: "pointermove";
@@ -251,9 +244,18 @@ interface OpenChangeInsertBlockPanel {
   open: boolean;
 }
 
-interface InsertBlock<T = any> {
+interface InsertBlock {
   type: "blocks/new";
-  block: T;
+  block: Block;
+}
+
+interface InsertBlockHere {
+  type: "blocks/new/here";
+  data?: Block["data"];
+}
+
+interface ClearAction {
+  type: "clear";
 }
 
 const Context = React.createContext<State | undefined>(undefined);
@@ -299,6 +301,13 @@ const gridindexpos = (col: number, i: number): Position => {
 function reducer(state: State, action: Action): State {
   console.log(action);
   switch (action.type) {
+    case "clear": {
+      return produce(state, (draft) => {
+        draft.selection = undefined;
+        draft.is_marquee = false;
+        draft.area = undefined;
+      });
+    }
     case "pointerdown": {
       return produce(state, (draft) => {
         if (state.is_dragging) {
@@ -328,9 +337,6 @@ function reducer(state: State, action: Action): State {
 
         draft.is_marquee = false;
         draft.end = state.point;
-
-        // open insert panel
-        draft.controls.insert_panel_open = true;
       });
     }
     case "pointermove": {
@@ -357,7 +363,6 @@ function reducer(state: State, action: Action): State {
     case "controls/insert_panel_open": {
       const { open } = action;
       return produce(state, (draft) => {
-        draft.controls.insert_panel_open = open;
         if (!open) {
           draft.is_marquee = false;
           draft.area = undefined;
@@ -365,6 +370,18 @@ function reducer(state: State, action: Action): State {
       });
     }
     case "blocks/new": {
+      const { block } = action;
+      return produce(state, (draft) => {
+        const { id } = block;
+        draft.blocks.push(block);
+
+        // select the block
+        draft.selection = id;
+        draft.highlight = id;
+      });
+    }
+    case "blocks/new/here": {
+      const { data } = action;
       return produce(state, (draft) => {
         const id = nanoid();
         const [_mx1, _my1, _mx2, _my2] = state.area ?? [0, 0, 1, 1];
@@ -372,21 +389,17 @@ function reducer(state: State, action: Action): State {
         const x: Position = [_mx1, _mx2];
         const y: Position = [_my1, _my2];
 
-        const el = create_initial_grida_block(action.block);
         draft.blocks.push({
           id,
           x: x,
           y: y,
           z: 0,
-          element: el,
+          data: data,
         });
 
         // select the block
         draft.selection = id;
         draft.highlight = id;
-
-        // close insert panel
-        draft.controls.insert_panel_open = false;
       });
     }
     case "block/pointerenter": {
@@ -551,7 +564,7 @@ export const StateProvider = memo(function StateProvider({
   );
 });
 
-const useGrid = (): [State, FlatDispatcher] => {
+const useGridState = (): [State, FlatDispatcher] => {
   const state = useContext(Context);
 
   if (!state) {
@@ -563,22 +576,30 @@ const useGrid = (): [State, FlatDispatcher] => {
   return useMemo(() => [state, dispatch], [state, dispatch]);
 };
 
-interface EditorProps {
-  renderer: (block: Block["element"]) => React.ReactNode;
-  components: {
-    insert_panel?: (props: {
-      state: State;
-      dispatch: FlatDispatcher;
-    }) => React.ReactNode;
+export const useGrid = () => {
+  const [state, dispatch] = useGridState();
+
+  const grid = {
+    ...state,
+    clear: () => {
+      dispatch({ type: "clear" });
+    },
+    insertBlockOnAera: (data?: Block["data"]) => {
+      dispatch({ type: "blocks/new/here", data });
+    },
   };
+
+  return grid;
+};
+
+interface EditorProps {
+  renderer: (block: Block["data"]) => React.ReactNode;
+  onMarqueeEnd?: (area?: Area) => void;
+  onBlockDoubleClick?: (id: BlockId) => void;
 }
 
-export default function Editor({ ...props }: EditorProps) {
-  return (
-    <Provider>
-      <GridEditor {...props} />
-    </Provider>
-  );
+export function GridContext({ children }: React.PropsWithChildren<{}>) {
+  return <Provider>{children}</Provider>;
 }
 
 function Provider({ children }: React.PropsWithChildren<{}>) {
@@ -590,41 +611,20 @@ function Provider({ children }: React.PropsWithChildren<{}>) {
   );
 }
 
-function Controls({
-  components,
-}: {
-  components: {
-    insert_panel?: (props: {
-      state: State;
-      dispatch: FlatDispatcher;
-    }) => React.ReactNode;
-  };
-}) {
-  const [state, dispatch] = useGrid();
-  return (
-    <>
-      <Drawer
-        open={state.controls.insert_panel_open}
-        onOpenChange={(open) => {
-          dispatch({ type: "controls/insert_panel_open", open: open });
-        }}
-      >
-        <DrawerContent>
-          <DrawerHeader>
-            <DrawerTitle>Insert Block</DrawerTitle>
-          </DrawerHeader>
-          {components.insert_panel &&
-            components.insert_panel({ state, dispatch })}
-        </DrawerContent>
-      </Drawer>
-    </>
-  );
-}
-
-function GridEditor({ renderer, components }: EditorProps) {
-  const [state, dispatch] = useGrid();
+export function GridEditor({
+  onMarqueeEnd,
+  onBlockDoubleClick,
+  renderer,
+}: EditorProps) {
+  const [state, dispatch] = useGridState();
 
   const [col, row] = state.size;
+
+  useEffect(() => {
+    if (state.is_marquee === false) {
+      onMarqueeEnd?.(state.area);
+    }
+  }, [state.is_marquee]);
 
   return (
     <>
@@ -634,7 +634,6 @@ function GridEditor({ renderer, components }: EditorProps) {
       // modifiers={[restrictToVerticalAxis]}
       // onDragEnd={handleDragEnd}
       >
-        <Controls components={components} />
         <div
           id="grid-editor"
           style={{
@@ -652,8 +651,11 @@ function GridEditor({ renderer, components }: EditorProps) {
                 x={block.x}
                 y={block.y}
                 z={block.z}
+                onDoubleClick={() => {
+                  onBlockDoubleClick?.(block.id);
+                }}
               >
-                {renderer(block.element)}
+                {renderer(block.data)}
               </GridAreaBlock>
             ))}
           </Grid>
@@ -690,7 +692,7 @@ function GridGuide({
   //   }}
   // ></div>
 
-  const [state, dispatch] = useGrid();
+  const [state, dispatch] = useGridState();
 
   const { width, height } = state;
 
@@ -722,7 +724,7 @@ function GridGuide({
 }
 
 function Cell({ pos, index }: { pos: Position; index: number }) {
-  const [state, dispatch] = useGrid();
+  const [state, dispatch] = useGridState();
   const [col, row] = state.size;
   const [_mx1, _my1, _mx2, _my2] = state.area ?? [-1, -1, -1, -1];
 
@@ -772,7 +774,7 @@ function Grid({
   col: number;
   row: number;
 }>) {
-  const [state, dispatch] = useGrid();
+  const [state, dispatch] = useGridState();
   const { width, height } = state;
   const ref = useRef<HTMLDivElement>(null);
 
@@ -828,20 +830,30 @@ function Grid({
   );
 }
 
-function GridAreaBlockOverlay({ readonly }: { readonly?: boolean }) {
-  const [state, dispatch] = useGrid();
+function GridAreaBlockOverlay({
+  onDoubleClick,
+  readonly,
+}: {
+  onDoubleClick?: () => void;
+  readonly?: boolean;
+}) {
+  const [state, dispatch] = useGridState();
 
   const { movement, resize_anchor, is_resizing } = state;
 
-  const onDragStart = (anchor: "nw" | "ne" | "sw" | "se") => {
+  const bind = useGesture({
+    onDoubleClick: onDoubleClick,
+  });
+
+  const onHandleDragStart = (anchor: "nw" | "ne" | "sw" | "se") => {
     dispatch({ type: "handle/dragstart", anchor });
   };
 
-  const onDrag = ({ movement }: { movement: [number, number] }) => {
+  const onHandleDrag = ({ movement }: { movement: [number, number] }) => {
     dispatch({ type: "handle/drag", movement: movement });
   };
 
-  const onDragEnd = () => {
+  const onHandleDragEnd = () => {
     dispatch({ type: "handle/dragend" });
   };
 
@@ -866,6 +878,7 @@ function GridAreaBlockOverlay({ readonly }: { readonly?: boolean }) {
 
   return (
     <div
+      {...bind()}
       style={{
         position: "absolute",
         width: `calc(100% + ${dw}px)`,
@@ -903,9 +916,9 @@ function GridAreaBlockOverlay({ readonly }: { readonly?: boolean }) {
           <div className="absolute bottom-0 right-0">
             <ResizeHandle
               anchor="se"
-              onDragStart={() => onDragStart("se")}
-              onDrag={onDrag}
-              onDragEnd={onDragEnd}
+              onDragStart={() => onHandleDragStart("se")}
+              onDrag={onHandleDrag}
+              onDragEnd={onHandleDragEnd}
             />
           </div>
         </>
@@ -986,14 +999,16 @@ function GridAreaBlock({
   z,
   debug,
   children,
+  onDoubleClick,
 }: React.PropsWithChildren<{
   id: string;
   x: [number, number];
   y: [number, number];
   z?: number;
   debug?: boolean;
+  onDoubleClick?: () => void;
 }>) {
-  const [state, dispatch] = useGrid();
+  const [state, dispatch] = useGridState();
 
   const gestureRef = useRef<HTMLDivElement>(null);
   useGesture(
@@ -1091,7 +1106,10 @@ function GridAreaBlock({
             zIndex: 1,
           }}
         >
-          <GridAreaBlockOverlay readonly={!selected} />
+          <GridAreaBlockOverlay
+            onDoubleClick={onDoubleClick}
+            readonly={!selected}
+          />
         </div>
         <div
           style={{

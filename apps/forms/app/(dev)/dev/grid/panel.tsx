@@ -55,7 +55,11 @@ const blockpresets = [
   },
 ] as const;
 
-export function InsertPanel({ dispatch }: { dispatch: React.Dispatch<any> }) {
+export function InsertPanel({
+  onInsert,
+}: {
+  onInsert: (type: (typeof blockpresets)[number]["type"]) => void;
+}) {
   return (
     <div className="p-4 flex flex-col gap-2 w-full">
       {blockpresets.map((block) => (
@@ -64,11 +68,7 @@ export function InsertPanel({ dispatch }: { dispatch: React.Dispatch<any> }) {
           className="h-20"
           key={block.type}
           onClick={() => {
-            dispatch({
-              type: "blocks/new",
-              // @ts-ignore TODO: handle presets
-              block: block.type,
-            });
+            onInsert(block.type);
           }}
         >
           {React.cloneElement(block.icon, {
