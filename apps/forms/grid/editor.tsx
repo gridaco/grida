@@ -12,7 +12,6 @@ import React, {
   useMemo,
 } from "react";
 import { useGesture } from "@use-gesture/react";
-
 import { nanoid } from "nanoid";
 import { DndContext, useDraggable } from "@dnd-kit/core";
 import { CSS } from "@dnd-kit/utilities";
@@ -312,6 +311,60 @@ const gridindexpos = (col: number, i: number): GridPosition => {
   return [x, y];
 };
 
+/**
+ * Calculate new area within the grid boundaries based on current area, delta, grid size, and options.
+ * @param a - The current area as [x1, y1, x2, y2].
+ * @param delta - The delta movement as [dx, dy].
+ * @param grid - The grid size as [columns, rows].
+ * @param config - Additional options such as strict mode.
+ * @returns The new area within grid boundaries as [x1, y1, x2, y2].
+ */
+function translateGridArea(
+  a: GridArea,
+  delta: [number, number],
+  grid: GridSize,
+  config?: { allow_resize?: boolean }
+): GridArea {
+  const [dx, dy] = delta;
+  const [maxCols, maxRows] = grid;
+  const [x1, y1, x2, y2] = a;
+
+  let newX1 = x1 + dx;
+  let newY1 = y1 + dy;
+  let newX2 = x2 + dx;
+  let newY2 = y2 + dy;
+
+  if (config?.allow_resize) {
+    // Ensure the new positions are within grid boundaries
+    newX1 = Math.max(0, Math.min(newX1, maxCols - 1));
+    newY1 = Math.max(0, Math.min(newY1, maxRows - 1));
+    newX2 = Math.max(0, Math.min(newX2, maxCols - 1));
+    newY2 = Math.max(0, Math.min(newY2, maxRows - 1));
+  } else {
+    // Adjust the delta if strict mode is enabled
+    if (newX1 < 0) {
+      newX1 = 0;
+      newX2 = x2 - x1;
+    } else if (newX2 >= maxCols) {
+      newX2 = maxCols - 1;
+      newX1 = newX2 - (x2 - x1);
+    }
+    if (newY1 < 0) {
+      newY1 = 0;
+      newY2 = y2 - y1;
+    } else if (newY2 >= maxRows) {
+      newY2 = maxRows - 1;
+      newY1 = newY2 - (y2 - y1);
+    }
+  }
+
+  // Adjust if the area is invalid (x1 should be less than x2, y1 should be less than y2)
+  if (newX1 > newX2) [newX1, newX2] = [newX2, newX1];
+  if (newY1 > newY2) [newY1, newY2] = [newY2, newY1];
+
+  return [newX1, newY1, newX2, newY2];
+}
+
 function reducer(state: State, action: Action): State {
   console.log(action);
   switch (action.type) {
@@ -466,15 +519,11 @@ function reducer(state: State, action: Action): State {
 
         const [dx, dy] = gridxyposround(state.unit, [_client_dx, _client_dy]);
 
-        const [ax1, ax2] = block.x;
-        const [bx1, bx2] = [ax1 + dx, ax2 + dx];
-
-        const [ay1, ay2] = block.y;
-        const [by1, by2] = [ay1 + dy, ay2 + dy];
-
-        // console.log(ax1, ax2, "=> ", _client_dx, dx, " => ", bx1, bx2);
-
-        draft.area = [bx1, by1, bx2, by2];
+        draft.area = translateGridArea(
+          [block.x[0], block.y[0], block.x[1], block.y[1]],
+          [dx, dy],
+          state.size
+        );
       });
     }
     case "block/dragend": {
