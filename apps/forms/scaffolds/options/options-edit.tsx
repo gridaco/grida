@@ -32,6 +32,7 @@ import { restrictToVerticalAxis } from "@dnd-kit/modifiers";
 import type { Option } from "@/types";
 import { Button } from "@/components/ui/button";
 import { MediaPicker } from "../mediapicker";
+import { useFormMediaUploader } from "../mediapicker/form-media-uploader";
 
 export function OptionsEdit({
   options,
@@ -177,6 +178,8 @@ function OptionEditItem({
     transition,
   } = useSortable({ id: id, data: { index } });
 
+  const mediaUploader = useFormMediaUploader();
+
   const [value, setValue] = useState(_value);
   const [label, setLabel] = useState(_label);
   const [disabled, setDisabled] = useState<boolean>(_disabled || false);
@@ -253,6 +256,7 @@ function OptionEditItem({
           />
           <div>
             <MediaPicker
+              uploader={mediaUploader}
               open={mediaPickerOpen}
               onOpenChange={setMediaPickerOpen}
               onUseImage={(src) => {
