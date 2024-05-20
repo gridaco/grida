@@ -19,7 +19,7 @@ const DispatchContext = createContext<Dispatcher>(__noop);
 
 function reducer(state: State, action: Action): State {
   switch (action.type) {
-    case "ui/panels/insert/open": {
+    case "ui/insert-panel/open": {
       return produce(state, (draft) => {
         draft.is_insert_panel_open = action.open;
       });
@@ -28,6 +28,12 @@ function reducer(state: State, action: Action): State {
       const { id, data } = action;
       return produce(state, (draft) => {
         draft.blocks[id] = data;
+      });
+    }
+    case "block/media/src": {
+      const { id, src } = action;
+      return produce(state, (draft) => {
+        draft.blocks[id].src = src;
       });
     }
     case "block/text/data": {

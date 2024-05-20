@@ -2,11 +2,13 @@ import { GridaBlock } from "../blocks";
 
 export type Action =
   | UIInsertPanelOpenChangeAction
-  | TextDataAction
-  | InsertBlock;
+  | InsertBlock
+  //
+  | MediaSrcAction
+  | TextDataAction;
 
 export type UIInsertPanelOpenChangeAction = {
-  type: "ui/panels/insert/open";
+  type: "ui/insert-panel/open";
   open: boolean;
 };
 
@@ -14,6 +16,12 @@ export type TextDataAction = {
   type: "block/text/data";
   id: string;
   data: string;
+};
+
+export type MediaSrcAction = {
+  type: "block/media/src";
+  id: string;
+  src: string;
 };
 
 export type InsertBlock = {
