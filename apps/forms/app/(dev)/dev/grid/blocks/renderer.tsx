@@ -69,3 +69,15 @@ function GridaGridButtonBlock({ label }: GridaGridButtonBlock) {
     </div>
   );
 }
+
+function GridaFormsStartButtonBlock() {
+  <div className="flex w-full h-full items-center justify-center px-4">
+    <Button className="w-full">Start</Button>
+  </div>;
+}
+
+function GridaFormsTimerBlock() {
+  <div className="flex w-full h-full items-center justify-center px-4">
+    <Button className="w-full">Start</Button>
+  </div>;
+}

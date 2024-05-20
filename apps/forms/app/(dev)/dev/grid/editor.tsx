@@ -132,7 +132,11 @@ function useSelection() {
 
       setId(id);
       setSelection(block);
+      return;
     }
+
+    setId(undefined);
+    setSelection(undefined);
   }, [grid.selection, grid.blocks, state.blocks]);
 
   return [id, selection] as const;
@@ -142,7 +146,7 @@ function Properties() {
   const [id, selection] = useSelection();
   return (
     <aside className="grow max-w-md border-s p-4">
-      <h1 className="text-xl">{id}</h1>
+      <h1 className="text-md font-mono mb-4">{id}</h1>
       <PropertyBody />
     </aside>
   );
@@ -158,6 +162,7 @@ function PropertyBody() {
     case "typography": {
       return (
         <div>
+          <Label>Text</Label>
           <Textarea
             value={selection?.data}
             onChange={(e) => {

@@ -2,7 +2,9 @@ export type GridaBlock =
   | GridaGridImageBlock
   | GridaGridTypographyBlock
   | GridaGridButtonBlock
-  | GridaGridVideoBlock;
+  | GridaGridVideoBlock
+  | GridaFormsStartButtonBlock
+  | GridaFormsBlock;
 
 export type GridaBlockType = GridaBlock["type"];
 
@@ -26,4 +28,14 @@ export type GridaGridButtonBlock = {
 export type GridaGridVideoBlock = {
   type: "video";
   src: string;
+};
+
+export type GridaFormsBlock = GridaFormsTimerBlock | GridaFormsStartButtonBlock;
+
+export type GridaFormsTimerBlock = {
+  type: "https://forms.grida.co/blocks/timer.schema.json";
+};
+
+export type GridaFormsStartButtonBlock = {
+  type: "https://forms.grida.co/blocks/start-button.schema.json";
 };

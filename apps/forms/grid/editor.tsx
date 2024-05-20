@@ -36,6 +36,11 @@ export type GridBlock<T = any> = {
   x: GridPosition;
   y: GridPosition;
   z?: number;
+  position?: "sticky" | "absolute" | "relative";
+  top?: number;
+  left?: number;
+  right?: number;
+  bottom?: number;
   data?: T;
 };
 
@@ -669,6 +674,11 @@ export function GridEditor({
                 x={block.x}
                 y={block.y}
                 z={block.z}
+                position={block.position}
+                top={block.top}
+                left={block.left}
+                right={block.right}
+                bottom={block.bottom}
                 onDoubleClick={() => {
                   onBlockDoubleClick?.(block.id);
                 }}
@@ -831,8 +841,7 @@ function Grid({
       className="w-full h-full"
       style={{
         touchAction: "none",
-        // position: "relative",
-        position: "absolute",
+        position: "relative",
         display: "grid",
         gridTemplateColumns: `repeat(${col}, 1fr)`,
         gridTemplateRows: `repeat(${row}, 1fr)`,
@@ -1015,6 +1024,11 @@ function GridAreaBlock({
   x,
   y,
   z,
+  position,
+  top,
+  left,
+  right,
+  bottom,
   debug,
   children,
   onDoubleClick,
@@ -1023,6 +1037,11 @@ function GridAreaBlock({
   x: [number, number];
   y: [number, number];
   z?: number;
+  position?: "sticky" | "absolute" | "relative";
+  top?: number;
+  left?: number;
+  right?: number;
+  bottom?: number;
   debug?: boolean;
   onDoubleClick?: () => void;
 }>) {
@@ -1097,7 +1116,11 @@ function GridAreaBlock({
           " / " +
           (x[1] + 2),
         zIndex: z,
-        position: "relative",
+        position: position ?? "relative",
+        top: top,
+        left: left,
+        right: right,
+        bottom: bottom,
         padding: "0px",
       }}
     >
