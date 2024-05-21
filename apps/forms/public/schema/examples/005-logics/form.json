@@ -6,33 +6,45 @@
   "method": "post",
   "fields": [
     {
-      "name": "condition",
-      "label": "Condition",
+      "name": "what_you_like",
+      "label": "What you like?",
+      "placeholder": "🐈‍⬛ / 🦮",
       "required": true,
       "type": "select",
       "options": [
         {
-          "label": "Yes",
-          "value": "yes"
+          "label": "🐈‍⬛ Me like kitty",
+          "value": "kitty"
         },
         {
-          "label": "No",
-          "value": "no"
+          "label": "🦮 Me like puppy",
+          "value": "puppy"
         }
       ]
     },
     {
-      "name": "yes",
-      "label": "Show when yes",
-      "placeholder": "You damn are positive!",
+      "name": "you_sure_dog",
+      "label": "Eh.. You Sure Doug?",
+      "placeholder": "Huh?",
       "required": true,
+      "type": "select",
+      "options": [
+        {
+          "label": "🐈‍⬛ Me like kitty",
+          "value": "kitty"
+        }
+      ]
+    },
+    {
+      "name": "me_like_kitty",
+      "label": "Nicely done",
+      "placeholder": "That was correct",
       "type": "text"
     },
     {
-      "name": "no",
-      "label": "Show when no",
-      "placeholder": "You damn are negative!",
-      "required": true,
+      "name": "me_like_kitty_2",
+      "label": "There you go",
+      "placeholder": "That was correct",
       "type": "text"
     }
   ],
@@ -40,33 +52,46 @@
     {
       "type": "field",
       "field": {
-        "$ref": "#/fields/condition"
+        "$ref": "#/fields/what_you_like"
       }
     },
     {
       "type": "field",
       "field": {
-        "$ref": "#/fields/yes"
+        "$ref": "#/fields/you_sure_dog"
       },
       "hidden": [
         {
-          "$ref": "#/fields/condition/value"
+          "$ref": "#/fields/what_you_like/value"
         },
-        "==",
-        "no"
+        "!=",
+        "puppy"
       ]
     },
     {
       "type": "field",
       "field": {
-        "$ref": "#/fields/no"
+        "$ref": "#/fields/me_like_kitty"
       },
       "hidden": [
         {
-          "$ref": "#/fields/condition/value"
+          "$ref": "#/fields/what_you_like/value"
         },
-        "==",
-        "yes"
+        "!=",
+        "kitty"
+      ]
+    },
+    {
+      "type": "field",
+      "field": {
+        "$ref": "#/fields/me_like_kitty_2"
+      },
+      "hidden": [
+        {
+          "$ref": "#/fields/you_sure_dog/value"
+        },
+        "!=",
+        "kitty"
       ]
     }
   ]
