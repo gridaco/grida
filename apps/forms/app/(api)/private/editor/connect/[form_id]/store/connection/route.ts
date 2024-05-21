@@ -18,6 +18,8 @@ export async function POST(
     params: { form_id: string };
   }
 ) {
+  const formdata = await req.formData();
+
   const origin = req.nextUrl.origin;
   const cookieStore = cookies();
   const { form_id } = context.params;
@@ -53,9 +55,13 @@ export async function POST(
     );
   }
 
+  const name =
+    (formdata.get("name") as string) ||
+    generated_form_store_name(form_reference.title);
+
   const { data: store, error: store_insertion_error } =
     await commerce.createStore({
-      name: generated_form_store_name(form_reference.title),
+      name: name,
     });
 
   if (store_insertion_error)
