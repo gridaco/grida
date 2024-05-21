@@ -145,12 +145,14 @@ interface State {
   blocks: GridBlock[];
 }
 
+const __multiple = 1;
+
 const initial: State = {
   scalefactor: 1,
   width: 375,
   height: 750,
-  unit: 62.5,
-  size: [6, 12],
+  unit: 62.5 / __multiple,
+  size: [6 * __multiple, 12 * __multiple],
   point: [-0, -0],
   resize_anchor: undefined,
   is_dragging: false,
@@ -789,7 +791,7 @@ function GridGuide({
           // height: "calc(var(--scale-factor) * 750)",
           // width: "calc(var(--scale-factor) * 375)",
           margin: "0px auto",
-          border: "1px solid rgba(0, 0, 0, 0.1)",
+          border: "1px solid rgba(0, 0, 0, 0.05)",
         }}
       >
         {Array.from({ length: col * row }).map((_, i) => (
@@ -822,7 +824,7 @@ function Cell({ pos, index }: { pos: GridPosition; index: number }) {
       )}
       style={{
         touchAction: "none",
-        border: "0.1px solid rgba(0, 0, 0, 0.1)",
+        border: "0.1px solid rgba(0, 0, 0, 0.05)",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
@@ -835,9 +837,7 @@ function Cell({ pos, index }: { pos: GridPosition; index: number }) {
           </span>
         </>
       ) : (
-        <>
-          <PlusIcon className="opacity-20" />
-        </>
+        <>{/* <PlusIcon className="opacity-20" /> */}</>
       )}
     </div>
   );

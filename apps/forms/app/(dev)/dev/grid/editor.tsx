@@ -1,7 +1,11 @@
 "use client";
 
 import { GridBlock, GridContext, GridEditor, useGrid } from "@/grid";
-import { GridaBlock, GridaBlockRenderer } from "@/app/(dev)/dev/grid/blocks";
+import {
+  GridaBlock,
+  GridaBlockRenderer,
+  ObjectFit,
+} from "@/app/(dev)/dev/grid/blocks";
 import { InsertPanel } from "./panel";
 import React, { useEffect, useState } from "react";
 import {
@@ -9,7 +13,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { create_initial_grida_block } from "./blocks/data";
+import { block_from_preset } from "./blocks/data";
 import { Provider, useBuilderState } from "./core";
 import { Textarea } from "@/components/ui/textarea";
 import { nanoid } from "nanoid";
@@ -18,6 +22,26 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { MediaPicker } from "@/scaffolds/mediapicker";
 import { useFormPlaygroundMediaUploader } from "@/scaffolds/mediapicker/form-media-uploader";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Slider } from "@/components/ui/slider";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import {
+  TextAlignCenterIcon,
+  TextAlignJustifyIcon,
+  TextAlignLeftIcon,
+  TextAlignRightIcon,
+  TextAlignBottomIcon,
+  TextAlignMiddleIcon,
+  TextAlignTopIcon,
+  ImageIcon,
+} from "@radix-ui/react-icons";
+import { RgbaColorPicker } from "react-colorful";
 
 export function PageBuilder() {
   return (
@@ -80,10 +104,10 @@ function Controls() {
           alignOffset={100}
         >
           <InsertPanel
-            onInsert={(type) => {
+            onInsert={(preset) => {
               const id = nanoid();
 
-              const element = create_initial_grida_block(type);
+              const element = block_from_preset(preset);
               if (!element) return;
 
               dispatch({
@@ -161,19 +185,113 @@ function PropertyBody() {
   switch (selection?.type) {
     case "typography": {
       return (
-        <div>
-          <Label>Text</Label>
-          <Textarea
-            value={selection?.data}
-            onChange={(e) => {
-              dispatch({
-                type: "block/text/data",
-                id: id!,
-                data: e.target.value,
-              });
-            }}
-            placeholder="Type something"
-          />
+        <div className="flex flex-col gap-4">
+          <div>
+            <Label>Typography</Label>
+            <Select>
+              <SelectTrigger id="el" aria-label="Text Element">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="h1">
+                  <h1>Heading 1</h1>
+                </SelectItem>
+                <SelectItem value="h2">
+                  <h1>Heading 2</h1>
+                </SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <Label>Horizontal</Label>
+            <ToggleGroup type="single" id="horizontal">
+              <ToggleGroupItem value="left">
+                <TextAlignLeftIcon />
+              </ToggleGroupItem>
+              <ToggleGroupItem value="center">
+                <TextAlignCenterIcon />
+              </ToggleGroupItem>
+              <ToggleGroupItem value="right">
+                <TextAlignRightIcon />
+              </ToggleGroupItem>
+            </ToggleGroup>
+            <Label>Vertical</Label>
+            <ToggleGroup type="single" id="vertical">
+              <ToggleGroupItem value="top">
+                <TextAlignTopIcon />
+              </ToggleGroupItem>
+              <ToggleGroupItem value="middle">
+                <TextAlignMiddleIcon />
+              </ToggleGroupItem>
+              <ToggleGroupItem value="bottom">
+                <TextAlignBottomIcon />
+              </ToggleGroupItem>
+            </ToggleGroup>
+          </div>
+          <div>
+            <Label>Font</Label>
+            <Select>
+              <SelectTrigger id="font-family" aria-label="select font-family">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="h1">
+                  <h1>Inter</h1>
+                </SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <Label>Font Size</Label>
+            <Slider />
+          </div>
+          <div className="flex flex-col">
+            <Label>Color</Label>
+            <Popover>
+              <PopoverTrigger>
+                <div
+                  className="w-full h-10 rounded-md border"
+                  style={{
+                    background: "red",
+                  }}
+                ></div>
+              </PopoverTrigger>
+              <PopoverContent>
+                <RgbaColorPicker />
+              </PopoverContent>
+            </Popover>
+          </div>
+          <div className="flex flex-col">
+            <Label>Background</Label>
+            <Popover>
+              <PopoverTrigger>
+                <div
+                  className="w-full h-10 rounded-md border"
+                  style={{
+                    background: "blue",
+                  }}
+                ></div>
+              </PopoverTrigger>
+              <PopoverContent>
+                <RgbaColorPicker />
+              </PopoverContent>
+            </Popover>
+          </div>
+          <div>
+            <Label htmlFor="data">Text</Label>
+            <Textarea
+              id="data"
+              value={selection?.data}
+              onChange={(e) => {
+                dispatch({
+                  type: "block/text/data",
+                  id: id!,
+                  data: e.target.value,
+                });
+              }}
+              placeholder="Type something"
+            />
+          </div>
         </div>
       );
     }
@@ -181,11 +299,12 @@ function PropertyBody() {
       return (
         <div>
           <Button
+            variant="outline"
             onClick={() => {
               setMediaPickerOpen(true);
             }}
           >
-            Upload Image
+            <ImageIcon />
           </Button>
           <MediaPicker
             open={mediaPickerOpen}
@@ -201,6 +320,26 @@ function PropertyBody() {
               });
             }}
           />
+          <Select
+            value={selection?.style?.objectFit}
+            onValueChange={(objectFit) => {
+              dispatch({
+                type: "block/style",
+                id: id!,
+                style: {
+                  objectFit: objectFit as ObjectFit,
+                },
+              });
+            }}
+          >
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="cover">Fill</SelectItem>
+              <SelectItem value="contain">Fit</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
       );
     }

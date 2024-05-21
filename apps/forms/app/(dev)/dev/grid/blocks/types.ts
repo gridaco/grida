@@ -1,16 +1,20 @@
+import * as CSS from "csstype";
 export type GridaBlock =
   | GridaGridImageBlock
   | GridaGridTypographyBlock
   | GridaGridButtonBlock
   | GridaGridVideoBlock
-  | GridaFormsStartButtonBlock
   | GridaFormsBlock;
 
 export type GridaBlockType = GridaBlock["type"];
 
+export type ObjectFit = "cover" | "contain" | "fill" | "none" | "scale-down";
+
+export type CSSProperties = CSS.Properties<string | number>;
 export type GridaGridImageBlock = {
   type: "image";
   src: string;
+  style: CSSProperties;
 };
 
 export type GridaGridTypographyBlock = {
@@ -30,7 +34,10 @@ export type GridaGridVideoBlock = {
   src: string;
 };
 
-export type GridaFormsBlock = GridaFormsTimerBlock | GridaFormsStartButtonBlock;
+export type GridaFormsBlock =
+  | GridaFormsTimerBlock
+  | GridaFormsStartButtonBlock
+  | GridaFormsGalleryBlock;
 
 export type GridaFormsTimerBlock = {
   type: "https://forms.grida.co/blocks/timer.schema.json";
@@ -38,4 +45,20 @@ export type GridaFormsTimerBlock = {
 
 export type GridaFormsStartButtonBlock = {
   type: "https://forms.grida.co/blocks/start-button.schema.json";
+  status: {
+    ok: {
+      label: string;
+    };
+    alreadyresponded: {
+      label: string;
+    };
+    formclosed: {
+      label: string;
+    };
+  };
+};
+
+export type GridaFormsGalleryBlock = {
+  type: "https://forms.grida.co/blocks/gallery.schema.json";
+  pictures: { src: string }[];
 };

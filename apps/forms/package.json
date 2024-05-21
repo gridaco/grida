@@ -59,6 +59,7 @@
     "clsx": "^1.2.1",
     "cmdk": "^1.0.0",
     "css-tree": "^2.3.1",
+    "csstype": "3.1.0",
     "csv-stringify": "^6.4.6",
     "framer-motion": "^11.0.24",
     "i18next": "^23.7.9",

@@ -1,10 +1,17 @@
-import { GridaBlock } from "../blocks";
+import type {
+  CSSProperties,
+  GridaBlock,
+  GridaGridImageBlock,
+  ObjectFit,
+} from "../blocks";
 
 export type Action =
   | UIInsertPanelOpenChangeAction
   | InsertBlock
   //
+  | StyleAction
   | MediaSrcAction
+  | ObjectFitAction
   | TextDataAction;
 
 export type UIInsertPanelOpenChangeAction = {
@@ -22,6 +29,18 @@ export type MediaSrcAction = {
   type: "block/media/src";
   id: string;
   src: string;
+};
+
+export type ObjectFitAction = {
+  type: "block/media/object-fit";
+  id: string;
+  objectFit: ObjectFit;
+};
+
+export type StyleAction = {
+  type: "block/style";
+  id: string;
+  style: Partial<CSSProperties>;
 };
 
 export type InsertBlock = {

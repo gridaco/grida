@@ -30,10 +30,26 @@ function reducer(state: State, action: Action): State {
         draft.blocks[id] = data;
       });
     }
+    case "block/style": {
+      const { id, style } = action;
+      return produce(state, (draft) => {
+        const block = draft.blocks[id];
+        draft.blocks[id].style = {
+          ...block.style,
+          ...style,
+        };
+      });
+    }
     case "block/media/src": {
       const { id, src } = action;
       return produce(state, (draft) => {
         draft.blocks[id].src = src;
+      });
+    }
+    case "block/media/object-fit": {
+      const { id, objectFit } = action;
+      return produce(state, (draft) => {
+        draft.blocks[id].objectFit = objectFit;
       });
     }
     case "block/text/data": {

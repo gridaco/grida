@@ -337,6 +337,9 @@ importers:
       css-tree:
         specifier: ^2.3.1
         version: 2.3.1
+      csstype:
+        specifier: 3.1.0
+        version: 3.1.0
       csv-stringify:
         specifier: ^6.4.6
         version: 6.4.6
