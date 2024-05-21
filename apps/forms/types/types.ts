@@ -1,3 +1,5 @@
+import type { JSONBooleanValueDescriptor } from "./logic";
+
 type UUID = string;
 export interface Form {
   created_at: string;
@@ -202,6 +204,7 @@ export interface IFormBlock<T = FormBlockType> {
   data: any;
   parent_id?: string | null;
   local_index: number;
+  v_hidden?: JSONBooleanValueDescriptor | null;
 }
 
 export interface FormBlock<T = FormBlockType> extends IFormBlock<T> {

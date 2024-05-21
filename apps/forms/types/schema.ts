@@ -4,10 +4,9 @@ import type {
   FormFieldDefinition,
   FormInputType,
   FormsPageLanguage,
-  IFormBlock,
   Option,
 } from ".";
-
+import type { JSONBooleanValueDescriptor, JSONFieldReference } from "./logic";
 import { toArrayOf, MaybeArray } from "./utility";
 
 /**
@@ -26,26 +25,6 @@ type JSONSchemaOptionalDefineAsArrayDescriptor<T> =
     };
 
 type JSONOptionalDefineAsArrayAnnotation<T> = T | [T];
-
-type JSONFieldReference = {
-  $ref: `#/fields/${string}`;
-};
-
-type JSONLiteral = string | number | boolean;
-
-type JSONConditionLefthand = JSONFieldReference | JSONLiteral;
-
-type JSONConditionOperator = "==" | "!=" | ">" | "<" | ">=" | "<=";
-
-type JSONConditionRighthand = JSONFieldReference | JSONLiteral;
-
-type JSONCondition = [
-  JSONConditionLefthand,
-  JSONConditionOperator,
-  JSONConditionRighthand,
-];
-
-type JSONBooleanValueDescriptor = boolean | JSONCondition;
 
 interface JSONFieldBlock {
   type: "field";
@@ -172,25 +151,6 @@ export class JSONFormParser {
   }
 }
 
-function map_json_form_block_to_form_block(
-  block: JSONFieldBlock,
-  index: number
-): FormBlock {
-  // TODO: support other types - now only field
-  return {
-    id: `block-${index}`,
-    local_index: index,
-    type: block.type,
-    data: {},
-    // TODO: needs name:id mapping
-    form_field_id: block.field.$ref.split("/").pop() as string,
-    //
-    created_at: new Date().toISOString(),
-    form_id: "form",
-    form_page_id: "form",
-  };
-}
-
 function map_json_form_field_to_form_field_definition(
   field: JSONFieldRaw,
   index: number
@@ -229,4 +189,24 @@ function map_json_form_field_to_form_field_definition(
       options: field.options?.map(map_option) || [],
     };
   }
+}
+
+function map_json_form_block_to_form_block(
+  block: JSONFieldBlock,
+  index: number
+): FormBlock {
+  // TODO: support other types - now only field
+  return {
+    id: `block-${index}`,
+    local_index: index,
+    type: block.type,
+    data: {},
+    v_hidden: block.hidden,
+    // TODO: needs name:id mapping
+    form_field_id: block.field.$ref.split("/").pop() as string,
+    //
+    created_at: new Date().toISOString(),
+    form_id: "form",
+    form_page_id: "form",
+  };
 }
