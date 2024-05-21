@@ -1,4 +1,5 @@
 import type {
+  FormBlock,
   FormFieldAutocompleteType,
   FormFieldDefinition,
   FormInputType,
@@ -6,12 +7,14 @@ import type {
   Option,
 } from ".";
 
+import { toArrayOf, MaybeArray } from "./utility";
+
 /**
  * used when representing a type in json following the schema.
  *
  * `"enum" | ["enum"] | { type: "array", type: "enum" }`
  */
-type JSONSchemaOptionalArrayDescriptor<T> =
+type JSONSchemaOptionalDefineAsArrayDescriptor<T> =
   | T
   | [T]
   | {
@@ -21,7 +24,33 @@ type JSONSchemaOptionalArrayDescriptor<T> =
       };
     };
 
-type JSONOptionalArrayAnnotation<T> = T | [T];
+type JSONOptionalDefineAsArrayAnnotation<T> = T | [T];
+
+type JSONFieldReference = {
+  $ref: `#/fields/${string}`;
+};
+
+type JSONLiteral = string | number | boolean;
+
+type JSONConditionLefthand = JSONFieldReference | JSONLiteral;
+
+type JSONConditionOperator = "==" | "!=" | ">" | "<" | ">=" | "<=";
+
+type JSONConditionRighthand = JSONFieldReference | JSONLiteral;
+
+type JSONCondition = [
+  JSONConditionLefthand,
+  JSONConditionOperator,
+  JSONConditionRighthand,
+];
+
+type JSONBooleanValueDescriptor = boolean | JSONCondition;
+
+interface JSONFieldBlock {
+  type: "field";
+  field: JSONFieldReference;
+  hidden?: JSONBooleanValueDescriptor;
+}
 
 interface _JSONForm<T> {
   title?: string;
@@ -36,45 +65,44 @@ interface _JSONForm<T> {
   method?: "get" | "post" | "dialog";
   novalidate?: boolean;
   target?: "_blank" | "_self" | "_parent" | "_top";
-  fields?: _JSONField<T>[];
+  fields?: T[];
+  blocks?: JSONFieldBlock[];
 }
 
-export type JSONForm = _JSONForm<JSONOptionalArrayAnnotation<FormInputType>>;
+export type JSONForm = _JSONForm<FormFieldDefinition>;
 export type JSONFormRaw = _JSONForm<
-  JSONSchemaOptionalArrayDescriptor<FormInputType>
+  _JSONField<JSONSchemaOptionalDefineAsArrayDescriptor<FormInputType>>
 >;
 type _JSONField<T> = {
   name: string;
-  label?: string;
-  placeholder?: string;
+  label?: string | null;
+  placeholder?: string | null;
   required?: boolean;
   pattern?: string;
   type: T;
   options?: JSONOptionLike[];
-  multiple?: boolean;
-  autocomplete?: FormFieldAutocompleteType | FormFieldAutocompleteType[];
+  multiple?: boolean | null;
+  autocomplete?: FormFieldAutocompleteType | FormFieldAutocompleteType[] | null;
 };
 
 export type JSONFieldRaw = _JSONField<
-  JSONSchemaOptionalArrayDescriptor<FormInputType>
+  JSONSchemaOptionalDefineAsArrayDescriptor<FormInputType>
 >;
-
-export type JSONField = _JSONField<JSONOptionalArrayAnnotation<FormInputType>>;
 
 export type JSONOptionLike = JSONOption | string | number;
 
 export interface JSONOption {
   value: string;
   label?: string;
-  src?: string;
-  disabled?: boolean;
+  src?: string | null;
+  disabled?: boolean | null;
 }
 
-function json_optional_array_descriptor_to_annotation<
+function json_optional_define_as_array_descriptor_to_annotation<
   T extends string = string,
 >(
-  descriptor: JSONSchemaOptionalArrayDescriptor<T>
-): JSONOptionalArrayAnnotation<T> {
+  descriptor: JSONSchemaOptionalDefineAsArrayDescriptor<T>
+): JSONOptionalDefineAsArrayAnnotation<T> {
   switch (typeof descriptor) {
     case "string":
       return descriptor;
@@ -87,51 +115,57 @@ function json_optional_array_descriptor_to_annotation<
 }
 
 export function parse_jsonfield_type(
-  descriptor: JSONSchemaOptionalArrayDescriptor<FormInputType>
+  descriptor: JSONSchemaOptionalDefineAsArrayDescriptor<FormInputType>
 ): { type: FormInputType; is_array: boolean } {
-  const annotation = json_optional_array_descriptor_to_annotation(descriptor);
+  const annotation =
+    json_optional_define_as_array_descriptor_to_annotation(descriptor);
   if (Array.isArray(annotation)) {
     return { type: annotation[0], is_array: true };
   }
   return { type: annotation, is_array: false };
 }
 
-export function parse_jsonfield(raw: JSONFieldRaw): JSONField {
-  return {
-    ...raw,
-    type: json_optional_array_descriptor_to_annotation(raw.type),
-  };
+export function parse(
+  value?: string | JSONFormRaw
+): JSONForm | null | undefined {
+  return new JSONFormParser(value).parse();
 }
 
-export function parse(value?: string | object): JSONForm | null | undefined {
-  try {
-    const shema_raw: JSONFormRaw =
-      typeof value === "string"
-        ? value
-          ? JSON.parse(value)
-          : null
-        : (value as JSONFormRaw);
-    if (shema_raw) {
-      return <JSONForm>{
-        ...shema_raw,
-        fields: shema_raw.fields?.map(parse_jsonfield),
-      };
-    }
-  } catch (error) {
-    return null;
+export class JSONFormParser {
+  readonly schema: JSONFormRaw | null | undefined;
+  constructor(value?: string | JSONFormRaw) {
+    try {
+      this.schema =
+        typeof value === "string"
+          ? value
+            ? JSON.parse(value)
+            : null
+          : // needs validation
+            (value as JSONFormRaw);
+    } catch (error) {}
+  }
+
+  //
+
+  fields(): FormFieldDefinition[] {
+    return json_form_field_to_form_field_definition(this.schema?.fields);
+  }
+
+  blocks(): FormBlock[] {
+    return [];
+  }
+
+  parse(): JSONForm | null | undefined {
+    if (!this.schema) return null;
+    return {
+      ...this.schema,
+      fields: this.fields(),
+    };
   }
 }
 
-type MaybeArray<T> = T | T[];
-
-function toArrayOf<T>(value: MaybeArray<T>, nofalsy = true): NonNullable<T>[] {
-  return (
-    Array.isArray(value) ? value : nofalsy && value ? [value] : []
-  ) as NonNullable<T>[];
-}
-
 export function json_form_field_to_form_field_definition(
-  fields?: JSONForm["fields"]
+  fields?: JSONFieldRaw[]
 ): FormFieldDefinition[] {
   const map_option = (o: JSONOptionLike): Option => {
     switch (typeof o) {
@@ -153,14 +187,14 @@ export function json_form_field_to_form_field_definition(
   };
 
   return (
-    fields?.map((f: JSONField, i) => {
+    fields?.map((f: JSONFieldRaw, i) => {
       const { type, is_array } = parse_jsonfield_type(f.type);
       return {
         ...f,
         id: f.name,
         type: type,
         is_array,
-        autocomplete: toArrayOf<FormFieldAutocompleteType | undefined>(
+        autocomplete: toArrayOf<FormFieldAutocompleteType | null | undefined>(
           f.autocomplete
         ),
         required: f.required || false,

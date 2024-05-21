@@ -9,6 +9,7 @@ import type {
 } from "@/types";
 import { blockstree } from "./tree";
 import { FormBlockTree } from "./types";
+import { toArrayOf } from "@/types/utility";
 
 export type ClientRenderBlock =
   | ClientFieldRenderBlock
@@ -125,7 +126,7 @@ export class FormRenderTree {
     readonly title: string | null | undefined,
     readonly description: string | null | undefined,
     readonly lang: FormsPageLanguage | null | undefined,
-    private readonly _m_fields: FormFieldDefinition[],
+    private readonly _m_fields: FormFieldDefinition[] = [],
     private readonly _m_blocks?: FormBlock[],
     private readonly config?: RenderTreeConfig,
     private readonly plugins?: {
@@ -327,7 +328,7 @@ export class FormRenderTree {
       accept: field.accept || undefined,
       required: field.required ?? undefined,
       multiple: field.multiple ?? undefined,
-      autocomplete: field.autocomplete?.join(" ") ?? undefined,
+      autocomplete: toArrayOf(field.autocomplete)?.join(" ") ?? undefined,
     };
   }
 }
