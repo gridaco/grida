@@ -36,6 +36,32 @@ export interface FormViewTranslation {
   pay: string;
 }
 
+function Providers({
+  form_id,
+  children,
+}: React.PropsWithChildren<{
+  form_id: string;
+}>) {
+  const [checkoutSession, setCheckoutSession] =
+    useState<PaymentCheckoutSession | null>(null);
+
+  useEffect(() => {
+    request_toss_payments_checkout_session({
+      form_id: form_id,
+      testmode: true,
+      redirect: true,
+    }).then(setCheckoutSession);
+  }, []);
+
+  return (
+    <>
+      <TossPaymentsCheckoutProvider initial={checkoutSession}>
+        {children}
+      </TossPaymentsCheckoutProvider>
+    </>
+  );
+}
+
 export function FormView({
   form_id,
   title,
@@ -61,8 +87,6 @@ export function FormView({
   };
   stylesheet?: any;
 } & React.FormHTMLAttributes<HTMLFormElement>) {
-  const [checkoutSession, setCheckoutSession] =
-    useState<PaymentCheckoutSession | null>(null);
   const [is_submitting, set_is_submitting] = useState(false);
 
   const sections = tree.children.filter((block) => block.type === "section");
@@ -100,14 +124,6 @@ export function FormView({
   const next_section_button_hidden =
     (has_sections ? current_section_id === last_section_id : true) ||
     primary_action_override_by_payment;
-
-  useEffect(() => {
-    request_toss_payments_checkout_session({
-      form_id: form_id,
-      testmode: true,
-      redirect: true,
-    }).then(setCheckoutSession);
-  }, []);
 
   const onPrevious = (e: React.MouseEvent<HTMLButtonElement>) => {
     e.preventDefault();
@@ -150,6 +166,7 @@ export function FormView({
       is_in_current_section: boolean;
     }
   ): any => {
+    console.log(block.hidden);
     switch (block.type) {
       case "section": {
         const is_current_section = current_section_id === block.id;
@@ -186,7 +203,7 @@ export function FormView({
           case "payment": {
             switch ((field.data as PaymentFieldData)?.service_provider) {
               case "tosspayments": {
-                return <TossPaymentsCheckout {...checkoutSession} />;
+                return <TossPaymentsCheckout />;
               }
               case "stripe": {
                 return <StripePaymentFormFieldPreview />;
@@ -304,7 +321,7 @@ export function FormView({
         "flex flex-col"
       )}
     >
-      <TossPaymentsCheckoutProvider initial={checkoutSession}>
+      <Providers form_id={form_id}>
         <form
           {...formattributes}
           id="form"
@@ -395,7 +412,7 @@ export function FormView({
             {translation.pay}
           </TossPaymentsPayButton>
         </footer>
-      </TossPaymentsCheckoutProvider>
+      </Providers>
       {options.is_powered_by_branding_enabled && (
         // desktop branding
         <div className="hidden md:block">
