@@ -77,7 +77,7 @@ export function block_from_preset(block: PresetID): GridaBlock | undefined {
     case "h1": {
       return {
         type: "typography",
-        element: "h1",
+        tag: "h1",
         data: "Hello World",
         style: {},
       };
@@ -85,7 +85,7 @@ export function block_from_preset(block: PresetID): GridaBlock | undefined {
     case "p": {
       return {
         type: "typography",
-        element: "p",
+        tag: "p",
         data: "In hac habitasse platea dictumst. Duis egestas libero molestie elementum tempus. Aenean ante diam, tristique ac ligula eget, laoreet vulputate quam. Quisque molestie tortor ut nisi varius suscipit. Aliquam ut dignissim ante. Lorem ipsum dolor sit amet, consectetur adipiscing.",
         style: {},
       };

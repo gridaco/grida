@@ -17,11 +17,15 @@ export type GridaGridImageBlock = {
   style: CSSProperties;
 };
 
+export type TypographyCSSProperties = CSSProperties & {
+  textAlignVertical?: "top" | "middle" | "bottom";
+};
+
 export type GridaGridTypographyBlock = {
   type: "typography";
-  element: "h1" | "h2" | "h3" | "h4" | "h5" | "h6" | "p" | "span";
+  tag: "h1" | "h2" | "h3" | "h4" | "h5" | "h6" | "p" | "span";
   data: string;
-  style: CSSProperties;
+  style: TypographyCSSProperties;
 };
 
 export type GridaGridButtonBlock = {

@@ -74,19 +74,44 @@ function GridaGridVideoBlock({ src }: GridaGridVideoBlock) {
 }
 
 function GridaGridTypographyBlock({
-  element,
+  tag: element,
   data,
-  style,
+  style: _style,
 }: GridaGridTypographyBlock) {
+  const { textAlign, textAlignVertical, ...style } = _style;
+
+  const textAlignVerticalMap = {
+    top: "flex-start",
+    middle: "center",
+    bottom: "flex-end",
+  };
+
   return (
     <div
       className={clsx(
         "w-full h-full"
         // "px-4"
       )}
-      style={style}
+      style={{
+        display: "flex",
+        alignItems: textAlignVertical
+          ? textAlignVerticalMap[textAlignVertical]
+          : undefined,
+        ...style,
+      }}
     >
-      {React.createElement(element, {}, data)}
+      {React.createElement(
+        element,
+        {
+          style: {
+            flex: 1,
+            width: "100%",
+            margin: 0,
+            textAlign,
+          },
+        },
+        data
+      )}
     </div>
   );
 }

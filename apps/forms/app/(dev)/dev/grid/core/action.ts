@@ -3,6 +3,7 @@ import type {
   GridaBlock,
   GridaGridImageBlock,
   ObjectFit,
+  TypographyCSSProperties,
 } from "../blocks";
 
 export type Action =
@@ -10,6 +11,7 @@ export type Action =
   | InsertBlock
   | DeleteBlock
   //
+  | TagAction
   | StyleAction
   | MediaSrcAction
   | ObjectFitAction
@@ -38,10 +40,16 @@ export type ObjectFitAction = {
   objectFit: ObjectFit;
 };
 
+export type TagAction = {
+  type: "block/tag";
+  id: string;
+  tag: string;
+};
+
 export type StyleAction = {
   type: "block/style";
   id: string;
-  style: Partial<CSSProperties>;
+  style: Partial<CSSProperties | TypographyCSSProperties>;
 };
 
 export type InsertBlock = {

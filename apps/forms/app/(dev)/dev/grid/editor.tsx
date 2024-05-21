@@ -213,6 +213,8 @@ function Properties() {
   );
 }
 
+const typography = ["h1", "h2", "h3", "h4", "h5", "h6", "p", "small"];
+
 function PropertyBody() {
   const [state, dispatch] = useBuilderState();
   const [id, selection] = useSelection();
@@ -225,23 +227,52 @@ function PropertyBody() {
         <div className="flex flex-col gap-4">
           <div>
             <Label>Typography</Label>
-            <Select>
-              <SelectTrigger id="el" aria-label="Text Element">
+            <Select
+              value={selection?.tag}
+              onValueChange={(tag) => {
+                dispatch({
+                  type: "block/tag",
+                  id: id!,
+                  tag: tag as (typeof typography)[number],
+                });
+              }}
+            >
+              <SelectTrigger id="tag" aria-label="Text Element">
                 <SelectValue />
               </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="h1">
-                  <h1>Heading 1</h1>
-                </SelectItem>
-                <SelectItem value="h2">
-                  <h1>Heading 2</h1>
-                </SelectItem>
+              <SelectContent className="prose">
+                {typography.map((el) => (
+                  <SelectItem key={el} value={el}>
+                    {React.createElement(
+                      el,
+                      {
+                        style: {
+                          margin: 0,
+                        },
+                      },
+                      el
+                    )}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
           <div>
             <Label>Horizontal</Label>
-            <ToggleGroup type="single" id="horizontal">
+            <ToggleGroup
+              type="single"
+              id="horizontal"
+              value={selection?.style?.textAlign}
+              onValueChange={(textAlign) => {
+                dispatch({
+                  type: "block/style",
+                  id: id!,
+                  style: {
+                    textAlign: textAlign as "left" | "center" | "right",
+                  },
+                });
+              }}
+            >
               <ToggleGroupItem value="left">
                 <TextAlignLeftIcon />
               </ToggleGroupItem>
@@ -253,7 +284,23 @@ function PropertyBody() {
               </ToggleGroupItem>
             </ToggleGroup>
             <Label>Vertical</Label>
-            <ToggleGroup type="single" id="vertical">
+            <ToggleGroup
+              type="single"
+              id="vertical"
+              value={selection?.style?.textAlignVertical as string}
+              onValueChange={(textAlignVertical) => {
+                dispatch({
+                  type: "block/style",
+                  id: id!,
+                  style: {
+                    textAlignVertical: textAlignVertical as
+                      | "top"
+                      | "middle"
+                      | "bottom",
+                  },
+                });
+              }}
+            >
               <ToggleGroupItem value="top">
                 <TextAlignTopIcon />
               </ToggleGroupItem>

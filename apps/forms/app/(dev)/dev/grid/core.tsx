@@ -36,6 +36,12 @@ function reducer(state: State, action: Action): State {
         delete draft.blocks[id];
       });
     }
+    case "block/tag": {
+      const { id, tag } = action;
+      return produce(state, (draft) => {
+        draft.blocks[id].tag = tag;
+      });
+    }
     case "block/style": {
       const { id, style } = action;
       return produce(state, (draft) => {
