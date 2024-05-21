@@ -39,6 +39,29 @@ export interface FormViewTranslation {
   pay: string;
 }
 
+export function FormView(
+  props: {
+    form_id: string;
+    title: string;
+    defaultValues?: { [key: string]: string };
+    fields: FormFieldDefinition[];
+    blocks: ClientRenderBlock[];
+    tree: FormBlockTree<ClientRenderBlock[]>;
+    translation: FormViewTranslation;
+    options: {
+      is_powered_by_branding_enabled: boolean;
+      optimize_for_cjk?: boolean;
+    };
+    stylesheet?: any;
+  } & React.FormHTMLAttributes<HTMLFormElement>
+) {
+  return (
+    <Providers {...props}>
+      <Body {...props} />
+    </Providers>
+  );
+}
+
 function Providers({
   form_id,
   fields,
@@ -73,7 +96,7 @@ function Providers({
   );
 }
 
-export function FormView({
+function Body({
   form_id,
   title,
   blocks,
@@ -177,7 +200,7 @@ export function FormView({
         "flex flex-col"
       )}
     >
-      <Providers form_id={form_id} fields={fields} blocks={blocks} tree={tree}>
+      <>
         <form
           {...formattributes}
           id="form"
@@ -277,7 +300,7 @@ export function FormView({
             {translation.pay}
           </TossPaymentsPayButton>
         </footer>
-      </Providers>
+      </>
       {options.is_powered_by_branding_enabled && (
         // desktop branding
         <div className="hidden md:block">
