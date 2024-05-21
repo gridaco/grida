@@ -18,7 +18,7 @@ import {
   SlashIcon,
 } from "@radix-ui/react-icons";
 import toast from "react-hot-toast";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { examples } from "./k";
 import { generate } from "@/app/actions";
 import { readStreamableValue } from "ai/rsc";
@@ -35,12 +35,16 @@ const HOST_NAME = process.env.NEXT_PUBLIC_HOST_NAME || "http://localhost:3000";
 
 export function Playground({
   initial,
+  defaultExample,
+  onRouteChange,
 }: {
   initial?: {
     src?: string;
     prompt?: string;
     slug?: string;
   };
+  defaultExample?: string;
+  onRouteChange?: (route: string) => void;
 }) {
   const generating = useRef(false);
   const router = useRouter();
@@ -49,7 +53,7 @@ export function Playground({
 
   // const [is_modified, set_is_modified] = useState(false);
   const [exampleId, setExampleId] = useState<string | undefined>(
-    initial ? undefined : examples[0].id
+    initial ? undefined : defaultExample ?? examples[0].id
   );
   // const [data, setData] = useState<JSONForm | undefined>();
   const [__schema_txt, __set_schema_txt] = useState<string | null>(
@@ -109,6 +113,7 @@ export function Playground({
 
   useEffect(() => {
     if (exampleId) {
+      // fetch and set the example schema
       fetch(examples.find((e) => e.id === exampleId)!.template.schema.src)
         .then((res) => res.text())
         .then((schema) => {
@@ -116,6 +121,11 @@ export function Playground({
         });
     }
   }, [exampleId]);
+
+  useEffect(() => {
+    // update the url
+    onRouteChange?.(`/playground?example=${exampleId}`);
+  }, [exampleId, onRouteChange]);
 
   const onShareClick = async () => {
     setBusy(true);
