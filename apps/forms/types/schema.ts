@@ -4,6 +4,7 @@ import type {
   FormFieldDefinition,
   FormInputType,
   FormsPageLanguage,
+  IFormBlock,
   Option,
 } from ".";
 
@@ -69,7 +70,10 @@ interface _JSONForm<T> {
   blocks?: JSONFieldBlock[];
 }
 
-export type JSONForm = _JSONForm<FormFieldDefinition>;
+export type JSONForm = Omit<_JSONForm<FormFieldDefinition>, "blocks"> & {
+  blocks?: FormBlock[];
+};
+
 export type JSONFormRaw = _JSONForm<
   _JSONField<JSONSchemaOptionalDefineAsArrayDescriptor<FormInputType>>
 >;
@@ -148,11 +152,14 @@ export class JSONFormParser {
   //
 
   fields(): FormFieldDefinition[] {
-    return json_form_field_to_form_field_definition(this.schema?.fields);
+    return (
+      this.schema?.fields?.map(map_json_form_field_to_form_field_definition) ||
+      []
+    );
   }
 
   blocks(): FormBlock[] {
-    return [];
+    return this.schema?.blocks?.map(map_json_form_block_to_form_block) || [];
   }
 
   parse(): JSONForm | null | undefined {
@@ -160,13 +167,34 @@ export class JSONFormParser {
     return {
       ...this.schema,
       fields: this.fields(),
+      blocks: this.blocks(),
     };
   }
 }
 
-export function json_form_field_to_form_field_definition(
-  fields?: JSONFieldRaw[]
-): FormFieldDefinition[] {
+function map_json_form_block_to_form_block(
+  block: JSONFieldBlock,
+  index: number
+): FormBlock {
+  // TODO: support other types - now only field
+  return {
+    id: `block-${index}`,
+    local_index: index,
+    type: block.type,
+    data: {},
+    // TODO: needs name:id mapping
+    form_field_id: block.field.$ref.split("/").pop() as string,
+    //
+    created_at: new Date().toISOString(),
+    form_id: "form",
+    form_page_id: "form",
+  };
+}
+
+function map_json_form_field_to_form_field_definition(
+  field: JSONFieldRaw,
+  index: number
+): FormFieldDefinition {
   const map_option = (o: JSONOptionLike): Option => {
     switch (typeof o) {
       case "string":
@@ -186,21 +214,19 @@ export function json_form_field_to_form_field_definition(
     }
   };
 
-  return (
-    fields?.map((f: JSONFieldRaw, i) => {
-      const { type, is_array } = parse_jsonfield_type(f.type);
-      return {
-        ...f,
-        id: f.name,
-        type: type,
-        is_array,
-        autocomplete: toArrayOf<FormFieldAutocompleteType | null | undefined>(
-          f.autocomplete
-        ),
-        required: f.required || false,
-        local_index: i,
-        options: f.options?.map(map_option) || [],
-      };
-    }) || []
-  );
+  {
+    const { type, is_array } = parse_jsonfield_type(field.type);
+    return {
+      ...field,
+      id: field.name,
+      type: type,
+      is_array,
+      autocomplete: toArrayOf<FormFieldAutocompleteType | null | undefined>(
+        field.autocomplete
+      ),
+      required: field.required || false,
+      local_index: index,
+      options: field.options?.map(map_option) || [],
+    };
+  }
 }

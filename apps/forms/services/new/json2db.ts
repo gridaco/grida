@@ -1,8 +1,5 @@
 import { FormRenderTree } from "@/lib/forms";
-import {
-  json_form_field_to_form_field_definition,
-  type JSONForm,
-} from "@/types";
+import { type JSONForm } from "@/types";
 import { Database } from "@/types/supabase";
 import { toArrayOf } from "@/types/utility";
 import { SupabaseClient } from "@supabase/supabase-js";

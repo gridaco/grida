@@ -37,6 +37,15 @@ export const examples = [
       },
     },
   },
+  {
+    id: "005-logics",
+    name: "Logics",
+    template: {
+      schema: {
+        src: `${HOST}/schema/examples/005-logics/form.json`,
+      },
+    },
+  },
 ] as const;
 
 /**

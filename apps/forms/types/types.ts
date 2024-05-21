@@ -192,20 +192,23 @@ export interface FormPage {
   stylesheet?: any;
 }
 
-export interface FormBlock<T = FormBlockType> {
-  id: string;
-  form_id: string;
+export interface IFormBlock<T = FormBlockType> {
   form_field_id?: string | null;
-  form_page_id: string | null;
   type: T;
   title_html?: string | null;
   description_html?: string | null;
   body_html?: string | null;
   src?: string | null;
   data: any;
-  created_at: string;
   parent_id?: string | null;
   local_index: number;
+}
+
+export interface FormBlock<T = FormBlockType> extends IFormBlock<T> {
+  id: string;
+  form_id: string;
+  form_page_id: string | null;
+  created_at: string;
 }
 
 export type Option = {

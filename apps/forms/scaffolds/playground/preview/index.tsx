@@ -1,10 +1,6 @@
 "use client";
 
-import {
-  JSONFormRaw,
-  json_form_field_to_form_field_definition,
-  parse,
-} from "@/types/schema";
+import { JSONFormRaw, parse } from "@/types/schema";
 import { FormRenderTree } from "@/lib/forms";
 import { FormView } from "@/scaffolds/e/form";
 import { useEffect, useRef, useState } from "react";
@@ -68,7 +64,7 @@ function compile(value?: string | JSONFormRaw) {
     schema.description,
     schema.lang,
     schema.fields ?? [],
-    [],
+    schema.blocks ?? [],
     {
       blocks: {
         when_empty: {
