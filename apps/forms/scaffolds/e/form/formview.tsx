@@ -22,6 +22,7 @@ import { Button } from "@/components/ui/button";
 import { FormAgentProvider } from "./core/agent";
 import { init } from "./core/state";
 import { useFormAgentState } from "./core/provider";
+import { useLogical } from "./use-logical";
 
 const cls_button_submit =
   "text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:ring-blue-300 font-medium rounded-lg text-sm px-5 py-2.5 me-2 mb-2 dark:bg-blue-600 dark:hover:bg-blue-700 focus:outline-none dark:focus:ring-blue-800";
@@ -327,9 +328,12 @@ function BlockRenderer({
 }) {
   const [state] = useFormAgentState();
 
+  const hidden = useLogical(block.hidden);
+
   const { current_section_id } = state;
 
   const __shared_root_attr = {
+    hidden: hidden,
     id: block.id,
     key: block.id,
   };
@@ -388,26 +392,28 @@ function BlockRenderer({
           const is_not_in_current_section = !context?.is_in_current_section;
 
           return (
-            <FormField
-              key={field.id}
-              name={field.name}
-              label={field.label}
-              placeholder={field.placeholder}
-              type={field.type}
-              is_array={field.is_array}
-              required={field.required}
-              requiredAsterisk
-              helpText={field.help_text}
-              options={field.options}
-              pattern={field.pattern}
-              defaultValue={defaultValue}
-              data={field.data}
-              autoComplete={field.autocomplete}
-              accept={field.accept}
-              multiple={field.multiple}
-              novalidate={is_not_in_current_section}
-              locked={is_not_in_current_section}
-            />
+            <div {...__shared_root_attr}>
+              <FormField
+                key={field.id}
+                name={field.name}
+                label={field.label}
+                placeholder={field.placeholder}
+                type={field.type}
+                is_array={field.is_array}
+                required={field.required}
+                requiredAsterisk
+                helpText={field.help_text}
+                options={field.options}
+                pattern={field.pattern}
+                defaultValue={defaultValue}
+                data={field.data}
+                autoComplete={field.autocomplete}
+                accept={field.accept}
+                multiple={field.multiple}
+                novalidate={is_not_in_current_section}
+                locked={is_not_in_current_section}
+              />
+            </div>
           );
         }
       }

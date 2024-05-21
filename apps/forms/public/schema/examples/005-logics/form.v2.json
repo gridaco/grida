@@ -1,0 +1,58 @@
+{
+  "$schema": "https://forms.grida.co/schema/form.schema.json",
+  "title": "Logics Demo",
+  "name": "logics",
+  "description": "Control form behavior with conditional logic",
+  "method": "post",
+  "fields": [
+    {
+      "name": "condition",
+      "label": "Condition",
+      "required": true,
+      "type": "select",
+      "options": [
+        {
+          "label": "Yes",
+          "value": "yes"
+        },
+        {
+          "label": "No",
+          "value": "no"
+        }
+      ]
+    },
+    {
+      "name": "yes",
+      "label": "Show when yes",
+      "placeholder": "You damn are positive!",
+      "required": true,
+      "type": "text"
+    },
+    {
+      "name": "no",
+      "label": "Show when no",
+      "placeholder": "You damn are negative!",
+      "required": true,
+      "type": "text"
+    }
+  ],
+  "variables": {
+    "is_yes": {
+      "type": "boolean",
+      "value": ["field.condition.value", "is", "yes"]
+    }
+  },
+  "effects": [
+    {
+      "if": ["is_yes"],
+      "then": [
+        ["field.yes.hidden", false],
+        ["field.no.hidden", true]
+      ],
+      "else": [
+        ["field.yes.hidden", true],
+        ["field.no.hidden", false]
+      ]
+    }
+  ]
+}
