@@ -2,7 +2,7 @@
 
 import FormField from "@/components/formfield";
 import { PoweredByGridaFooter } from "./powered-by-brand-footer";
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { FormBlockTree } from "@/lib/forms/types";
 import { FormFieldDefinition, PaymentFieldData } from "@/types";
 import dynamic from "next/dynamic";
@@ -19,6 +19,9 @@ import { useFingerprint } from "@/scaffolds/fingerprint";
 import { SYSTEM_GF_FINGERPRINT_VISITORID_KEY } from "@/k/system";
 import { ClientRenderBlock, ClientSectionRenderBlock } from "@/lib/forms";
 import { Button } from "@/components/ui/button";
+import { FormAgentProvider } from "./core/agent";
+import { init } from "./core/state";
+import { useFormAgentState } from "./core/provider";
 
 const cls_button_submit =
   "text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:ring-blue-300 font-medium rounded-lg text-sm px-5 py-2.5 me-2 mb-2 dark:bg-blue-600 dark:hover:bg-blue-700 focus:outline-none dark:focus:ring-blue-800";
@@ -38,9 +41,15 @@ export interface FormViewTranslation {
 
 function Providers({
   form_id,
+  fields,
+  blocks,
   children,
+  tree,
 }: React.PropsWithChildren<{
   form_id: string;
+  fields: FormFieldDefinition[];
+  blocks: ClientRenderBlock[];
+  tree: FormBlockTree<ClientRenderBlock[]>;
 }>) {
   const [checkoutSession, setCheckoutSession] =
     useState<PaymentCheckoutSession | null>(null);
@@ -55,9 +64,11 @@ function Providers({
 
   return (
     <>
-      <TossPaymentsCheckoutProvider initial={checkoutSession}>
-        {children}
-      </TossPaymentsCheckoutProvider>
+      <FormAgentProvider initial={init({ fields, blocks, tree })}>
+        <TossPaymentsCheckoutProvider initial={checkoutSession}>
+          {children}
+        </TossPaymentsCheckoutProvider>
+      </FormAgentProvider>
     </>
   );
 }
@@ -87,25 +98,21 @@ export function FormView({
   };
   stylesheet?: any;
 } & React.FormHTMLAttributes<HTMLFormElement>) {
-  const [is_submitting, set_is_submitting] = useState(false);
+  const [state, dispatch] = useFormAgentState();
 
-  const sections = tree.children.filter((block) => block.type === "section");
-
-  const has_sections = sections.length > 0;
-
-  const last_section_id = has_sections
-    ? sections[sections.length - 1].id
-    : null;
-
-  const [current_section_id, set_current_section_id] = useState<string | null>(
-    has_sections ? sections[0].id : null
-  );
+  const {
+    is_submitting,
+    sections,
+    has_sections,
+    last_section_id,
+    current_section_id,
+  } = state;
 
   const current_section = useMemo(() => {
     return sections.find((section) => section.id === current_section_id) as
       | ClientSectionRenderBlock
       | undefined;
-  }, [current_section_id]);
+  }, [current_section_id, sections]);
 
   const primary_action_override_by_payment =
     current_section?.attributes?.contains_payment;
@@ -133,11 +140,7 @@ export function FormView({
       return;
     }
 
-    const index = sections.findIndex(
-      (section) => section.id === current_section_id
-    );
-    set_current_section_id(sections[index - 1].id);
-
+    dispatch({ type: "section/prev" });
     // scroll to top
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
@@ -151,163 +154,16 @@ export function FormView({
       return;
     }
 
-    const index = sections.findIndex(
-      (section) => section.id === current_section_id
-    );
-    set_current_section_id(sections[index + 1].id);
+    dispatch({ type: "section/next" });
 
     // scroll to top
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
-  const renderBlock = (
-    block: ClientRenderBlock,
-    context?: {
-      is_in_current_section: boolean;
-    }
-  ): any => {
-    console.log(block.hidden);
-    switch (block.type) {
-      case "section": {
-        const is_current_section = current_section_id === block.id;
-        return (
-          <section
-            id={block.id}
-            data-gf-section-id={block.id}
-            data-gf-section-contains-payment={
-              block.attributes?.contains_payment
-            }
-            key={block.id}
-            data-active-section={is_current_section}
-            className={clsx(
-              "data-[active-section='false']:hidden",
-              "rounded",
-              stylesheet?.section
-            )}
-          >
-            <GroupLayout>
-              {block.children?.map((b) =>
-                renderBlock(b, {
-                  is_in_current_section: is_current_section,
-                })
-              )}
-            </GroupLayout>
-          </section>
-        );
-      }
-      case "field": {
-        const { field } = block;
-        const { type } = field;
-
-        switch (type) {
-          case "payment": {
-            switch ((field.data as PaymentFieldData)?.service_provider) {
-              case "tosspayments": {
-                return <TossPaymentsCheckout />;
-              }
-              case "stripe": {
-                return <StripePaymentFormFieldPreview />;
-              }
-              default: {
-                return <></>;
-              }
-            }
-          }
-          default: {
-            const defaultValue = defaultValues?.[field.name];
-            const is_not_in_current_section = !context?.is_in_current_section;
-
-            return (
-              <FormField
-                key={field.id}
-                name={field.name}
-                label={field.label}
-                placeholder={field.placeholder}
-                type={field.type}
-                is_array={field.is_array}
-                required={field.required}
-                requiredAsterisk
-                helpText={field.help_text}
-                options={field.options}
-                pattern={field.pattern}
-                defaultValue={defaultValue}
-                data={field.data}
-                autoComplete={field.autocomplete}
-                accept={field.accept}
-                multiple={field.multiple}
-                novalidate={is_not_in_current_section}
-                locked={is_not_in_current_section}
-              />
-            );
-          }
-        }
-      }
-      case "html": {
-        return (
-          <article
-            key={block.id}
-            dangerouslySetInnerHTML={{ __html: block.html }}
-          />
-        );
-      }
-      case "header": {
-        return (
-          <header key={block.id}>
-            {block.title_html && (
-              <h1
-                dangerouslySetInnerHTML={{
-                  __html: block.title_html,
-                }}
-              />
-            )}
-            {block.description_html && (
-              <p
-                dangerouslySetInnerHTML={{
-                  __html: block.description_html,
-                }}
-              />
-            )}
-          </header>
-        );
-      }
-      case "image": {
-        return (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img key={block.id} src={block.src} alt="" />
-        );
-      }
-      case "video": {
-        return (
-          <div
-            key={block.id}
-            className="rounded overflow-hidden border border-black/20 dark:bg-white/10 aspect-video"
-          >
-            <ReactPlayer width={"100%"} height={"100%"} url={block.src ?? ""} />
-          </div>
-        );
-      }
-      case "pdf": {
-        return (
-          <object
-            key={block.id}
-            data={block.data + "#toolbar=0&navpanes=0&scrollbar=0"}
-            className="w-full h-full aspect-[1/1.2] max-h-screen rounded overflow-hidden border shadow-sm box-content"
-            type="application/pdf"
-            width="100%"
-            height="100%"
-          >
-            <a href={block.data} target="_blank">
-              {block.data}
-            </a>
-          </object>
-        );
-      }
-      case "divider":
-        return <hr key={block.id} />;
-      default:
-        return <div key={block["id"]}></div>;
-    }
-  };
+  const getDefaultValue = useCallback(
+    (key: string) => defaultValues?.[key],
+    [defaultValues]
+  );
 
   return (
     <div
@@ -321,7 +177,7 @@ export function FormView({
         "flex flex-col"
       )}
     >
-      <Providers form_id={form_id}>
+      <Providers form_id={form_id} fields={fields} blocks={blocks} tree={tree}>
         <form
           {...formattributes}
           id="form"
@@ -340,13 +196,22 @@ export function FormView({
             } else {
               // submit
               // disable submit button
-              set_is_submitting(true);
+              dispatch({ type: "form/submit" });
             }
           }}
           className="p-4 h-full md:h-auto flex-1"
         >
           <FingerprintField />
-          <GroupLayout>{tree.children.map((b) => renderBlock(b))}</GroupLayout>
+          <GroupLayout>
+            {tree.children.map((b) => (
+              <BlockRenderer
+                key={b.id}
+                block={b}
+                stylesheet={stylesheet}
+                getDefaultValue={getDefaultValue}
+              />
+            ))}
+          </GroupLayout>
           {options.is_powered_by_branding_enabled && (
             // desktop branding
             <div className="block md:hidden">
@@ -421,6 +286,174 @@ export function FormView({
       )}
     </div>
   );
+}
+
+function BlockRenderer({
+  block,
+  stylesheet,
+  getDefaultValue,
+  context,
+}: {
+  block: ClientRenderBlock;
+  stylesheet?: any;
+  // e.g. (key) => defaultValues?.[key]
+  getDefaultValue?: (key: string) => string | undefined;
+  context?: {
+    is_in_current_section: boolean;
+  };
+}) {
+  const [state] = useFormAgentState();
+
+  const { current_section_id } = state;
+
+  const __shared_root_attr = {
+    id: block.id,
+    key: block.id,
+  };
+
+  switch (block.type) {
+    case "section": {
+      const is_current_section = current_section_id === block.id;
+      return (
+        <section
+          {...__shared_root_attr}
+          data-gf-section-id={block.id}
+          data-gf-section-contains-payment={block.attributes?.contains_payment}
+          data-active-section={is_current_section}
+          className={clsx(
+            "data-[active-section='false']:hidden",
+            "rounded",
+            stylesheet?.section
+          )}
+        >
+          <GroupLayout>
+            {block.children?.map((b) => (
+              <BlockRenderer
+                key={b.id}
+                block={b}
+                stylesheet={stylesheet}
+                getDefaultValue={getDefaultValue}
+                context={{
+                  is_in_current_section: is_current_section,
+                }}
+              />
+            ))}
+          </GroupLayout>
+        </section>
+      );
+    }
+    case "field": {
+      const { field } = block;
+      const { type } = field;
+
+      switch (type) {
+        case "payment": {
+          switch ((field.data as PaymentFieldData)?.service_provider) {
+            case "tosspayments": {
+              return <TossPaymentsCheckout />;
+            }
+            case "stripe": {
+              return <StripePaymentFormFieldPreview />;
+            }
+            default: {
+              return <></>;
+            }
+          }
+        }
+        default: {
+          const defaultValue = getDefaultValue?.(field.name);
+          const is_not_in_current_section = !context?.is_in_current_section;
+
+          return (
+            <FormField
+              key={field.id}
+              name={field.name}
+              label={field.label}
+              placeholder={field.placeholder}
+              type={field.type}
+              is_array={field.is_array}
+              required={field.required}
+              requiredAsterisk
+              helpText={field.help_text}
+              options={field.options}
+              pattern={field.pattern}
+              defaultValue={defaultValue}
+              data={field.data}
+              autoComplete={field.autocomplete}
+              accept={field.accept}
+              multiple={field.multiple}
+              novalidate={is_not_in_current_section}
+              locked={is_not_in_current_section}
+            />
+          );
+        }
+      }
+    }
+    case "html": {
+      return (
+        <article
+          {...__shared_root_attr}
+          dangerouslySetInnerHTML={{ __html: block.html }}
+        />
+      );
+    }
+    case "header": {
+      return (
+        <header {...__shared_root_attr}>
+          {block.title_html && (
+            <h1
+              dangerouslySetInnerHTML={{
+                __html: block.title_html,
+              }}
+            />
+          )}
+          {block.description_html && (
+            <p
+              dangerouslySetInnerHTML={{
+                __html: block.description_html,
+              }}
+            />
+          )}
+        </header>
+      );
+    }
+    case "image": {
+      return (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img {...__shared_root_attr} src={block.src} alt="" />
+      );
+    }
+    case "video": {
+      return (
+        <div
+          {...__shared_root_attr}
+          className="rounded overflow-hidden border border-black/20 dark:bg-white/10 aspect-video"
+        >
+          <ReactPlayer width={"100%"} height={"100%"} url={block.src ?? ""} />
+        </div>
+      );
+    }
+    case "pdf": {
+      return (
+        <object
+          {...__shared_root_attr}
+          data={block.data + "#toolbar=0&navpanes=0&scrollbar=0"}
+          className="w-full h-full aspect-[1/1.2] max-h-screen rounded overflow-hidden border shadow-sm box-content"
+          type="application/pdf"
+          width="100%"
+          height="100%"
+        >
+          <a href={block.data} target="_blank">
+            {block.data}
+          </a>
+        </object>
+      );
+    }
+    case "divider":
+      return <hr {...__shared_root_attr} />;
+    default:
+      return <div {...__shared_root_attr}></div>;
+  }
 }
 
 function GroupLayout({ children }: React.PropsWithChildren<{}>) {
