@@ -93,21 +93,23 @@ function Info() {
               placeholder="Product Name"
             />
           </div>
-          {/* <div className="grid gap-3">
+          <div className="grid gap-3">
             <Label htmlFor="description">Description</Label>
             <Textarea
               id="description"
               className="min-h-32"
               placeholder="Product Description"
             />
-          </div> */}
+          </div>
         </div>
       </CardContent>
     </Card>
   );
 }
 
-function makeVariants(options: { name: string; values: string[] }[]) {
+function makeVariants(
+  options: { name: string; values: string[] }[]
+): Record<string, string>[] {
   const variants: Record<string, string>[] = [];
 
   function generateVariants(
@@ -152,7 +154,19 @@ function Variants() {
           {
             <div className="grid gap-6">
               {groups.map((option, i) => (
-                <OptionCard key={i} />
+                <OptionCard
+                  key={i}
+                  option={option}
+                  onUpdate={(updatedOption) => {
+                    const newGroups = [...groups];
+                    newGroups[i] = updatedOption;
+                    setGroups(newGroups);
+                  }}
+                  onDelete={() => {
+                    const newGroups = groups.filter((_, index) => index !== i);
+                    setGroups(newGroups);
+                  }}
+                />
               ))}
             </div>
           }
@@ -206,9 +220,7 @@ function Variants() {
               </TableBody>
             </Table>
           ) : (
-            <>
-              <p className="text-sm text-muted-foreground">No variants</p>
-            </>
+            <p className="text-sm text-muted-foreground">No variants</p>
           )}
         </CardContent>
       </Card>
@@ -218,16 +230,67 @@ function Variants() {
 
 type DraftableOptionValue = string | { __draft: true };
 
-function OptionCard({}: {}) {
-  const [name, setName] = useState<string>("");
+interface OptionCardProps {
+  option: OptionGroup;
+  onUpdate: (updatedOption: OptionGroup) => void;
+  onDelete: () => void;
+}
+
+function OptionCard({ option, onUpdate, onDelete }: OptionCardProps) {
+  const [name, setName] = useState<string>(option.name);
   const [values, setValues] = useState<DraftableOptionValue[]>([
+    ...option.values,
     { __draft: true },
   ]);
 
-  const can_delete_value = values.length > 1;
-  const has_draft_value = values.some(
+  const canDeleteValue = values.length > 1;
+  const hasDraftValue = values.some(
     (value) => typeof value === "object" && "__draft" in value
   );
+
+  const handleNameChange = (newName: string) => {
+    setName(newName);
+    onUpdate({
+      ...option,
+      name: newName,
+      values: values.filter(
+        (value): value is string => typeof value === "string"
+      ),
+    });
+  };
+
+  const handleValueChange = (index: number, newValue: string) => {
+    const newValues = [...values];
+    newValues[index] = newValue;
+    setValues(newValues);
+    onUpdate({
+      ...option,
+      values: newValues.filter(
+        (value): value is string => typeof value === "string"
+      ),
+    });
+  };
+
+  const handleValueDelete = (index: number) => {
+    const newValues = values.filter((_, i) => i !== index);
+    setValues(newValues);
+    onUpdate({
+      ...option,
+      values: newValues.filter(
+        (value): value is string => typeof value === "string"
+      ),
+    });
+  };
+
+  const handleKeyPress = (
+    e: React.KeyboardEvent<HTMLInputElement>,
+    index: number
+  ) => {
+    if (e.key === "Enter" && !hasDraftValue) {
+      const newValues = [...values, { __draft: true }];
+      setValues(newValues as any);
+    }
+  };
 
   return (
     <Card className="shadow-none">
@@ -239,7 +302,7 @@ function OptionCard({}: {}) {
             className="w-full"
             value={name}
             placeholder="Size, Color, etc."
-            onChange={(e) => setName(e.target.value)}
+            onChange={(e) => handleNameChange(e.target.value)}
           />
         </Label>
         <Label className="grid gap-3">
@@ -253,29 +316,13 @@ function OptionCard({}: {}) {
                     className="w-full"
                     placeholder="Small"
                     value={typeof value === "string" ? value : ""}
-                    onChange={(e) => {
-                      const newValues = [...values];
-                      newValues[i] = e.target.value;
-                      setValues(newValues);
-                    }}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") {
-                        if (has_draft_value) return;
-                        // create new draft value
-                        const newValues = [...values];
-                        newValues.push({ __draft: true });
-                        setValues(newValues);
-                      }
-                    }}
+                    onChange={(e) => handleValueChange(i, e.target.value)}
+                    onKeyDown={(e) => handleKeyPress(e, i)}
                   />
-                  {can_delete_value && (
+                  {canDeleteValue && (
                     <div
                       className="absolute top-0 right-2 bottom-0 flex items-center justify-center"
-                      onClick={() => {
-                        const newValues = [...values];
-                        newValues.splice(i, 1);
-                        setValues(newValues);
-                      }}
+                      onClick={() => handleValueDelete(i)}
                     >
                       <button className="w-4 h-4 ">
                         <TrashIcon />
@@ -288,6 +335,16 @@ function OptionCard({}: {}) {
           </fieldset>
         </Label>
       </CardContent>
+      <CardFooter>
+        <Button
+          className="hover:bg-destructive hover:text-destructive-foreground"
+          variant="ghost"
+          size="sm"
+          onClick={onDelete}
+        >
+          Delete Option
+        </Button>
+      </CardFooter>
     </Card>
   );
 }
