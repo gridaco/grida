@@ -26,7 +26,7 @@ import {
   PlusCircledIcon,
   TrashIcon,
 } from "@radix-ui/react-icons";
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -35,6 +35,7 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
+import { AdjustStockCountButton } from "@/scaffolds/options/adjust-stock-button";
 
 function Header() {
   // TODO: links
@@ -44,11 +45,11 @@ function Header() {
       <Breadcrumb>
         <BreadcrumbList>
           <BreadcrumbItem>
-            <BreadcrumbLink href="~/store">Store</BreadcrumbLink>
+            <BreadcrumbLink href="../">Store</BreadcrumbLink>
           </BreadcrumbItem>
           <BreadcrumbSeparator />
           <BreadcrumbItem>
-            <BreadcrumbLink href="~/store/products">Products</BreadcrumbLink>
+            <BreadcrumbLink href="./">Products</BreadcrumbLink>
           </BreadcrumbItem>
           <BreadcrumbSeparator />
           <BreadcrumbItem>
@@ -143,6 +144,12 @@ function Variants() {
 
   const variants = makeVariants(groups);
 
+  const addNewVariantGroup = () => {
+    const newVariants = [...groups];
+    newVariants.push({ name: "", values: [] });
+    setGroups(newVariants);
+  };
+
   return (
     <div>
       <Card>
@@ -151,36 +158,30 @@ function Variants() {
           <CardDescription>Add options like size or color</CardDescription>
         </CardHeader>
         <CardContent>
-          {
-            <div className="grid gap-6">
-              {groups.map((option, i) => (
-                <OptionCard
-                  key={i}
-                  option={option}
-                  onUpdate={(updatedOption) => {
-                    const newGroups = [...groups];
-                    newGroups[i] = updatedOption;
-                    setGroups(newGroups);
-                  }}
-                  onDelete={() => {
-                    const newGroups = groups.filter((_, index) => index !== i);
-                    setGroups(newGroups);
-                  }}
-                />
-              ))}
-            </div>
-          }
+          <div className="grid gap-6">
+            {groups.map((option, i) => (
+              <OptionCard
+                key={i}
+                option={option}
+                onUpdate={(updatedOption) => {
+                  const newGroups = [...groups];
+                  newGroups[i] = updatedOption;
+                  setGroups(newGroups);
+                }}
+                onDelete={() => {
+                  const newGroups = groups.filter((_, index) => index !== i);
+                  setGroups(newGroups);
+                }}
+              />
+            ))}
+          </div>
         </CardContent>
         <CardFooter className="justify-center border-t p-4">
           <Button
             size="sm"
             variant="ghost"
             className="gap-1"
-            onClick={() => {
-              const newVariants = [...groups];
-              newVariants.push({ name: "", values: [] });
-              setGroups(newVariants);
-            }}
+            onClick={addNewVariantGroup}
           >
             <PlusCircledIcon className="h-3.5 w-3.5" />
             Add Variant
@@ -214,7 +215,15 @@ function Variants() {
                     {groups.map((option, j) => (
                       <TableCell key={j}>{variant[option.name]}</TableCell>
                     ))}
-                    <TableCell>0</TableCell>
+                    <TableCell>
+                      <AdjustStockCountButton
+                        stock={0}
+                        onSave={(stock) => {
+                          // TODO:
+                          console.log(`Stock for variant ${i} is ${stock}`);
+                        }}
+                      />
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -242,11 +251,23 @@ function OptionCard({ option, onUpdate, onDelete }: OptionCardProps) {
     ...option.values,
     { __draft: true },
   ]);
+  const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
+  const [lastAddedDraft, setLastAddedDraft] = useState(false);
 
   const canDeleteValue = values.length > 1;
   const hasDraftValue = values.some(
     (value) => typeof value === "object" && "__draft" in value
   );
+
+  useEffect(() => {
+    if (lastAddedDraft && inputRefs.current.length > 0) {
+      const lastIndex = inputRefs.current.length - 1;
+      if (inputRefs.current[lastIndex]) {
+        inputRefs.current[lastIndex]!.focus();
+      }
+      setLastAddedDraft(false);
+    }
+  }, [values, lastAddedDraft]);
 
   const handleNameChange = (newName: string) => {
     setName(newName);
@@ -289,6 +310,7 @@ function OptionCard({ option, onUpdate, onDelete }: OptionCardProps) {
     if (e.key === "Enter" && !hasDraftValue) {
       const newValues = [...values, { __draft: true }];
       setValues(newValues as any);
+      setLastAddedDraft(true);
     }
   };
 
@@ -318,6 +340,7 @@ function OptionCard({ option, onUpdate, onDelete }: OptionCardProps) {
                     value={typeof value === "string" ? value : ""}
                     onChange={(e) => handleValueChange(i, e.target.value)}
                     onKeyDown={(e) => handleKeyPress(e, i)}
+                    ref={(el) => (inputRefs.current[i] = el)}
                   />
                   {canDeleteValue && (
                     <div
@@ -336,12 +359,7 @@ function OptionCard({ option, onUpdate, onDelete }: OptionCardProps) {
         </Label>
       </CardContent>
       <CardFooter>
-        <Button
-          className="hover:bg-destructive hover:text-destructive-foreground"
-          variant="ghost"
-          size="sm"
-          onClick={onDelete}
-        >
+        <Button variant="ghost" size="sm" onClick={onDelete}>
           Delete Option
         </Button>
       </CardFooter>
