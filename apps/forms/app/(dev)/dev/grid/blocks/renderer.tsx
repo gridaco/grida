@@ -73,13 +73,18 @@ function GridaGridVideoBlock({ src }: GridaGridVideoBlock) {
   );
 }
 
-function GridaGridTypographyBlock({ element, data }: GridaGridTypographyBlock) {
+function GridaGridTypographyBlock({
+  element,
+  data,
+  style,
+}: GridaGridTypographyBlock) {
   return (
     <div
       className={clsx(
         "w-full h-full"
         // "px-4"
       )}
+      style={style}
     >
       {React.createElement(element, {}, data)}
     </div>

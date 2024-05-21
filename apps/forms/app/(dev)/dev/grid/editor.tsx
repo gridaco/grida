@@ -40,6 +40,8 @@ import {
   TextAlignMiddleIcon,
   TextAlignTopIcon,
   ImageIcon,
+  ArrowUpIcon,
+  ArrowDownIcon,
 } from "@radix-ui/react-icons";
 import { RgbaColorPicker } from "react-colorful";
 
@@ -167,11 +169,46 @@ function useSelection() {
 }
 
 function Properties() {
+  const [state, dispatch] = useBuilderState();
+  const grid = useGrid();
   const [id, selection] = useSelection();
   return (
     <aside className="grow max-w-md border-s p-4">
-      <h1 className="text-md font-mono mb-4">{id}</h1>
-      <PropertyBody />
+      {id && (
+        <>
+          <h1 className="text-md font-mono mb-4">{id}</h1>
+          <PropertyBody />
+          <div>
+            <Button
+              onClick={() => {
+                dispatch({ type: "block/delete", id });
+                grid.deleteBlock(grid.selection!);
+              }}
+              variant="destructive"
+            >
+              Delete
+            </Button>
+            <div>
+              <Button
+                onClick={() => {
+                  grid.translateBlockZ(grid.selection!, 1);
+                }}
+                variant="outline"
+              >
+                <ArrowUpIcon />
+              </Button>
+              <Button
+                onClick={() => {
+                  grid.translateBlockZ(grid.selection!, -1);
+                }}
+                variant="outline"
+              >
+                <ArrowDownIcon />
+              </Button>
+            </div>
+          </div>
+        </>
+      )}
     </aside>
   );
 }
@@ -243,7 +280,19 @@ function PropertyBody() {
           </div>
           <div>
             <Label>Font Size</Label>
-            <Slider />
+            <Input
+              type="number"
+              value={selection?.style?.fontSize}
+              onChange={(e) => {
+                dispatch({
+                  type: "block/style",
+                  id: id!,
+                  style: {
+                    fontSize: Number(e.target.value),
+                  },
+                });
+              }}
+            />
           </div>
           <div className="flex flex-col">
             <Label>Color</Label>

@@ -8,6 +8,7 @@ import type {
 export type Action =
   | UIInsertPanelOpenChangeAction
   | InsertBlock
+  | DeleteBlock
   //
   | StyleAction
   | MediaSrcAction
@@ -47,4 +48,9 @@ export type InsertBlock = {
   type: "block/insert";
   id: string;
   data: GridaBlock;
+};
+
+export type DeleteBlock = {
+  type: "block/delete";
+  id: string;
 };

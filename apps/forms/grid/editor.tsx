@@ -178,6 +178,8 @@ type Action =
   | OpenChangeInsertBlockPanel
   | PonterUpAction
   | InsertBlock
+  | DeleteBlock
+  | BlockZIndexAction
   | InsertBlockHere
   | BlcokPointerEnterAction
   | BlcokPointerLeaveAction
@@ -259,6 +261,17 @@ interface OpenChangeInsertBlockPanel {
 interface InsertBlock {
   type: "blocks/new";
   block: GridBlock;
+}
+
+interface DeleteBlock {
+  type: "blocks/delete";
+  id: GridBlockId;
+}
+
+interface BlockZIndexAction {
+  type: "blocks/zindex";
+  id: GridBlockId;
+  delta: number | "top" | "bottom";
 }
 
 interface InsertBlockHere {
@@ -480,6 +493,38 @@ function reducer(state: State, action: Action): State {
         draft.highlight = id;
       });
     }
+    case "blocks/delete": {
+      const { id } = action;
+      return produce(state, (draft) => {
+        draft.blocks = draft.blocks.filter((b) => b.id !== id);
+        draft.selection = undefined;
+        draft.highlight = undefined;
+        draft.area = undefined;
+      });
+    }
+    case "blocks/zindex": {
+      const { id, delta } = action;
+      return produce(state, (draft) => {
+        const block = draft.blocks.find((b) => b.id === id);
+        if (!block) return;
+
+        const index = draft.blocks.indexOf(block);
+        if (delta === "top") {
+          draft.blocks.splice(index, 1);
+          draft.blocks.push(block);
+        } else if (delta === "bottom") {
+          draft.blocks.splice(index, 1);
+          draft.blocks.unshift(block);
+        } else {
+          const newIndex = Math.max(
+            0,
+            Math.min(index + delta, draft.blocks.length - 1)
+          );
+          draft.blocks.splice(index, 1);
+          draft.blocks.splice(newIndex, 0, block);
+        }
+      });
+    }
     case "block/pointerenter": {
       const { id } = action;
       return produce(state, (draft) => {
@@ -660,6 +705,12 @@ export const useGrid = () => {
     },
     insertBlockOnAera: (data?: GridBlock["data"]) => {
       dispatch({ type: "blocks/new/here", data });
+    },
+    deleteBlock: (id: GridBlockId) => {
+      dispatch({ type: "blocks/delete", id });
+    },
+    translateBlockZ: (id: GridBlockId, delta: number | "top" | "bottom") => {
+      dispatch({ type: "blocks/zindex", id, delta });
     },
   };
 
@@ -1136,7 +1187,7 @@ function GridAreaBlock({
 
   const style = {
     transform: CSS.Translate.toString(transform),
-    zIndex: isDragging ? 1 : 0,
+    zIndex: isDragging ? 999 : undefined,
   };
 
   const mergedRef = useMergedRef<HTMLDivElement>(gestureRef, setNodeRef);
@@ -1164,7 +1215,7 @@ function GridAreaBlock({
           (y[1] + 2) +
           " / " +
           (x[1] + 2),
-        zIndex: z,
+        zIndex: style.zIndex ?? z,
         position: position ?? "relative",
         top: top,
         left: left,

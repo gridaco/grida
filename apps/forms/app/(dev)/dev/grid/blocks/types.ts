@@ -21,6 +21,7 @@ export type GridaGridTypographyBlock = {
   type: "typography";
   element: "h1" | "h2" | "h3" | "h4" | "h5" | "h6" | "p" | "span";
   data: string;
+  style: CSSProperties;
 };
 
 export type GridaGridButtonBlock = {

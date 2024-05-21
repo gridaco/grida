@@ -79,6 +79,7 @@ export function block_from_preset(block: PresetID): GridaBlock | undefined {
         type: "typography",
         element: "h1",
         data: "Hello World",
+        style: {},
       };
     }
     case "p": {
@@ -86,6 +87,7 @@ export function block_from_preset(block: PresetID): GridaBlock | undefined {
         type: "typography",
         element: "p",
         data: "In hac habitasse platea dictumst. Duis egestas libero molestie elementum tempus. Aenean ante diam, tristique ac ligula eget, laoreet vulputate quam. Quisque molestie tortor ut nisi varius suscipit. Aliquam ut dignissim ante. Lorem ipsum dolor sit amet, consectetur adipiscing.",
+        style: {},
       };
     }
     // case 'link': {
