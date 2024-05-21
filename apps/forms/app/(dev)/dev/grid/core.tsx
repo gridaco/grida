@@ -43,6 +43,7 @@ function reducer(state: State, action: Action): State {
       });
     }
     case "block/style": {
+      console.log("block/style", action);
       const { id, style } = action;
       return produce(state, (draft) => {
         const block = draft.blocks[id];

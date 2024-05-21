@@ -14,6 +14,7 @@ import type {
 } from "./types";
 import { Button } from "@/components/ui/button";
 import clsx from "clsx";
+import * as CSS from "./css";
 
 const ReactPlayer = dynamic(() => import("react-player/lazy"), { ssr: false });
 
@@ -51,7 +52,7 @@ function GridaGridImageImageBlock({ src, style }: GridaGridImageBlock) {
         className="object-cover w-full h-full"
         src={src}
         style={{
-          ...style,
+          ...CSS.parse(style),
         }}
       />
     </picture>
@@ -78,7 +79,7 @@ function GridaGridTypographyBlock({
   data,
   style: _style,
 }: GridaGridTypographyBlock) {
-  const { textAlign, textAlignVertical, ...style } = _style;
+  const { color, textAlign, textAlignVertical, ...style } = _style;
 
   const textAlignVerticalMap = {
     top: "flex-start",
@@ -97,7 +98,7 @@ function GridaGridTypographyBlock({
         alignItems: textAlignVertical
           ? textAlignVerticalMap[textAlignVertical]
           : undefined,
-        ...style,
+        ...CSS.parse(style),
       }}
     >
       {React.createElement(
@@ -108,6 +109,7 @@ function GridaGridTypographyBlock({
             width: "100%",
             margin: 0,
             textAlign,
+            color: CSS.parseColor(color),
           },
         },
         data

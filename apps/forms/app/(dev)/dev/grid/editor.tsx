@@ -44,6 +44,7 @@ import {
   ArrowDownIcon,
 } from "@radix-ui/react-icons";
 import { RgbaColorPicker } from "react-colorful";
+import * as CSS from "./blocks/css";
 
 export function PageBuilder() {
   return (
@@ -150,6 +151,7 @@ function useSelection() {
     const _: GridBlock<BlockRef> | undefined = grid.blocks.find(
       (block) => block.id === grid.selection
     );
+
     if (_) {
       const id = _.data?.id;
       if (!id) return;
@@ -163,6 +165,7 @@ function useSelection() {
 
     setId(undefined);
     setSelection(undefined);
+    // TODO: expensive
   }, [grid.selection, grid.blocks, state.blocks]);
 
   return [id, selection] as const;
@@ -348,12 +351,23 @@ function PropertyBody() {
                 <div
                   className="w-full h-10 rounded-md border"
                   style={{
-                    background: "red",
+                    backgroundColor: CSS.parseColor(selection?.style?.color),
                   }}
                 ></div>
               </PopoverTrigger>
               <PopoverContent>
-                <RgbaColorPicker />
+                <RgbaColorPicker
+                  color={selection?.style?.color as CSS.DataType.RGBA}
+                  onChange={(rgba) => {
+                    dispatch({
+                      type: "block/style",
+                      id: id!,
+                      style: {
+                        color: rgba,
+                      },
+                    });
+                  }}
+                />
               </PopoverContent>
             </Popover>
           </div>
@@ -364,12 +378,25 @@ function PropertyBody() {
                 <div
                   className="w-full h-10 rounded-md border"
                   style={{
-                    background: "blue",
+                    backgroundColor: CSS.parseColor(
+                      selection?.style?.backgroundColor
+                    ),
                   }}
                 ></div>
               </PopoverTrigger>
               <PopoverContent>
-                <RgbaColorPicker />
+                <RgbaColorPicker
+                  color={selection?.style?.backgroundColor as CSS.DataType.RGBA}
+                  onChange={(rgba) => {
+                    dispatch({
+                      type: "block/style",
+                      id: id!,
+                      style: {
+                        backgroundColor: rgba,
+                      },
+                    });
+                  }}
+                />
               </PopoverContent>
             </Popover>
           </div>

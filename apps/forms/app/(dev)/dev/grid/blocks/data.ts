@@ -35,16 +35,16 @@ export const blockpresets = [
     label: "Text",
     icon: TextIcon,
   },
-  {
-    preset: "h1",
-    label: "Heading",
-    icon: TextIcon,
-  },
-  {
-    preset: "p",
-    label: "Paragraph",
-    icon: TextIcon,
-  },
+  // {
+  //   preset: "h1",
+  //   label: "Heading",
+  //   icon: TextIcon,
+  // },
+  // {
+  //   preset: "p",
+  //   label: "Paragraph",
+  //   icon: TextIcon,
+  // },
   {
     preset: "link",
     label: "Link",
@@ -74,22 +74,22 @@ export function block_from_preset(block: PresetID): GridaBlock | undefined {
       };
     }
     case "text":
-    case "h1": {
-      return {
-        type: "typography",
-        tag: "h1",
-        data: "Hello World",
-        style: {},
-      };
-    }
-    case "p": {
-      return {
-        type: "typography",
-        tag: "p",
-        data: "In hac habitasse platea dictumst. Duis egestas libero molestie elementum tempus. Aenean ante diam, tristique ac ligula eget, laoreet vulputate quam. Quisque molestie tortor ut nisi varius suscipit. Aliquam ut dignissim ante. Lorem ipsum dolor sit amet, consectetur adipiscing.",
-        style: {},
-      };
-    }
+    // case "h1": {
+    //   return {
+    //     type: "typography",
+    //     tag: "h1",
+    //     data: "Hello World",
+    //     style: {},
+    //   };
+    // }
+    // case "p": {
+    //   return {
+    //     type: "typography",
+    //     tag: "p",
+    //     data: "In hac habitasse platea dictumst. Duis egestas libero molestie elementum tempus. Aenean ante diam, tristique ac ligula eget, laoreet vulputate quam. Quisque molestie tortor ut nisi varius suscipit. Aliquam ut dignissim ante. Lorem ipsum dolor sit amet, consectetur adipiscing.",
+    //     style: {},
+    //   };
+    // }
     // case 'link': {
     //   return {
     //     type: 'link',

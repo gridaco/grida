@@ -11,11 +11,11 @@ export function InsertPanel({
   onInsert: (preset: PresetID) => void;
 }) {
   return (
-    <div className="p-4 flex flex-col gap-2 w-full">
+    <div className="p-4 grid grid-cols-2 gap-2 w-full">
       {blockpresets.map((block) => (
         <Button
           variant="outline"
-          className="h-20"
+          className="flex flex-col justify-center h-20"
           key={block.preset}
           onClick={() => {
             onInsert(block.preset);
@@ -24,7 +24,7 @@ export function InsertPanel({
           {React.createElement(block.icon, {
             className: "w-6 h-6 me-2",
           })}
-          {block.label}
+          <span className="text-sm">{block.label}</span>
         </Button>
       ))}
     </div>

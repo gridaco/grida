@@ -1,4 +1,4 @@
-import * as CSS from "csstype";
+import * as CSS from "./css";
 export type GridaBlock =
   | GridaGridImageBlock
   | GridaGridTypographyBlock
@@ -10,15 +10,16 @@ export type GridaBlockType = GridaBlock["type"];
 
 export type ObjectFit = "cover" | "contain" | "fill" | "none" | "scale-down";
 
-export type CSSProperties = CSS.Properties<string | number>;
+export type CSSProperties = CSS.Properties;
+
+export type TypographyCSSProperties = CSSProperties & {
+  textAlignVertical?: "top" | "middle" | "bottom";
+};
+
 export type GridaGridImageBlock = {
   type: "image";
   src: string;
   style: CSSProperties;
-};
-
-export type TypographyCSSProperties = CSSProperties & {
-  textAlignVertical?: "top" | "middle" | "bottom";
 };
 
 export type GridaGridTypographyBlock = {
