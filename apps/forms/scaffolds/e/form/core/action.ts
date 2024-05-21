@@ -8,7 +8,7 @@ export type FormAgentAction =
 type FieldValueCahngeAction = {
   type: "fields/value/change";
   id: string;
-  value: string;
+  value: string | boolean;
 };
 
 type SectionChangeAction = {

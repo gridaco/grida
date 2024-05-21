@@ -55,6 +55,8 @@ interface IInputField {
   multiple?: boolean;
   labelCapitalize?: boolean;
   data?: FormFieldDataSchema | null;
+  onValueChange?: (value: string) => void;
+  onCheckedChange?: (checked: boolean) => void;
 }
 
 interface IFormField extends IInputField {
@@ -80,6 +82,8 @@ interface IMonoFormFieldRenderingProps extends IFormField {
 interface IFormFieldRenderingProps extends IMonoFormFieldRenderingProps {
   is_array?: boolean;
 }
+
+const __noop = (_: any) => _;
 
 /**
  * @beta is_array=true is experimental and only works on playground
@@ -134,10 +138,20 @@ function MonoFormField({
   vanilla,
   locked,
   preview,
+  onValueChange,
+  onCheckedChange,
 }: IMonoFormFieldRenderingProps) {
-  const sharedInputProps:
+  const __onchange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
+  ) => {
+    onValueChange?.(e.target.value);
+  };
+
+  const sharedInputProps: (
     | React.ComponentProps<"input">
-    | React.ComponentProps<"textarea"> = {
+    | React.ComponentProps<"textarea">
+  ) &
+    OnValueChange = {
     id: name,
     name: name,
     readOnly: readonly,
@@ -156,6 +170,9 @@ function MonoFormField({
     // min: novalidate ? undefined : data?.min,
     // max: novalidate ? undefined : data?.max,
     // step: novalidate ? undefined : data?.step,
+
+    // extended
+    onChange: __onchange,
   };
 
   function renderContent({
@@ -239,6 +256,7 @@ function MonoFormField({
               {...(sharedInputProps as React.ComponentProps<"select">)}
               options={options}
               locked={locked}
+              onValueChange={onValueChange}
             />
           );
         } else {
@@ -254,6 +272,7 @@ function MonoFormField({
               {...(sharedInputProps as React.ComponentProps<"select">)}
               options={options}
               locked={locked}
+              onValueChange={onValueChange}
             />
           );
         }
@@ -288,7 +307,13 @@ function MonoFormField({
         }
 
         return (
-          <RadioGroup id={name} name={name}>
+          // @ts-ignore
+          <RadioGroup
+            {...(sharedInputProps as React.ComponentProps<"div">)}
+            onValueChange={onValueChange}
+            id={name}
+            name={name}
+          >
             {options?.map((option) => (
               <div key={option.id} className="flex items-center space-x-2">
                 <RadioGroupItem id={option.id} value={option.id} />
@@ -307,20 +332,32 @@ function MonoFormField({
       case "checkbox": {
         return (
           // @ts-ignore
-          <Checkbox {...(sharedInputProps as React.ComponentProps<"input">)} />
+          <Checkbox
+            {...(sharedInputProps as React.ComponentProps<"input">)}
+            onCheckedChange={onCheckedChange}
+          />
         );
       }
       case "toggle": {
         return (
           <fieldset>
-            <Toggle>{label || name}</Toggle>
+            {/* @ts-ignore */}
+            <Toggle
+              {...(sharedInputProps as React.ComponentProps<"input">)}
+              onPressedChange={onCheckedChange}
+            >
+              {label || name}
+            </Toggle>
           </fieldset>
         );
       }
       case "switch": {
         return (
           // @ts-ignore
-          <Switch {...(sharedInputProps as React.ComponentProps<"input">)} />
+          <Switch
+            {...(sharedInputProps as React.ComponentProps<"input">)}
+            onCheckedChange={onCheckedChange}
+          />
         );
       }
       case "time": {
@@ -348,7 +385,11 @@ function MonoFormField({
       case "range": {
         return (
           // @ts-ignore
-          <Slider {...(sharedInputProps as React.ComponentProps<"input">)} />
+          <Slider
+            {...(sharedInputProps as React.ComponentProps<"input">)}
+            // TODO:
+            // onValueChange={}
+          />
         );
       }
       case "signature": {
@@ -446,6 +487,8 @@ function MonoFormField({
               name={name}
               id={item.id}
               value={item.value}
+              // TODO: this is fine with formData, but has a problem with onChange / onValueChange
+              onCheckedChange={__noop}
               {...(sharedInputProps as React.ComponentProps<"input">)}
             />
             <span className="w-full py-3 ms-2 text-sm font-medium text-neutral-900 dark:text-neutral-300">
@@ -496,7 +539,12 @@ function MonoFormField({
     case "toggle-group": {
       if (options) {
         return (
-          <ToggleGroup type={multiple ? "multiple" : "single"}>
+          // @ts-ignore
+          <ToggleGroup
+            type={multiple ? "multiple" : "single"}
+            // TODO: this can be array
+            onValueChange={onValueChange}
+          >
             {options.map((option) => (
               <ToggleGroupItem key={option.id} value={option.id}>
                 {option.label}
@@ -517,19 +565,25 @@ function MonoFormField({
   );
 }
 
+interface OnValueChange {
+  onValueChange?: (value: string) => void;
+  onCheckedChange?: (checked: boolean) => void;
+}
+
 /**
  * This is for Select component to automatically de-select the selected item when the selected option is disabled.
  */
 function SelectWithSafeValue({
   options: _options,
   locked,
+  onValueChange: cb_onValueChange,
   ...inputProps
 }: React.ComponentProps<"select"> & {
   placeholder?: string;
   options?: Option[];
 } & {
   locked?: boolean;
-}) {
+} & OnValueChange) {
   const {
     value: _value,
     defaultValue: _defaultValue,
@@ -554,6 +608,11 @@ function SelectWithSafeValue({
     }
   );
 
+  const onValueChange = (value: string) => {
+    cb_onValueChange?.(value);
+    setValue(value);
+  };
+
   return (
     // shadcn select
     // @ts-ignore
@@ -564,7 +623,7 @@ function SelectWithSafeValue({
       value={value || undefined}
       // TODO: same reason, disabling defaultValue to display placeholder
       defaultValue={(defaultValue || undefined) as string}
-      onValueChange={setValue}
+      onValueChange={onValueChange}
     >
       <SelectTrigger>
         <SelectValue placeholder={placeholder} />
@@ -602,6 +661,7 @@ function SelectWithSafeValue({
 function HtmlSelectWithSafeValue({
   options: _options,
   locked,
+  onValueChange: cb_onValueChange,
   ...inputProps
 }: React.ComponentProps<"select"> & {
   placeholder?: string;
@@ -613,7 +673,7 @@ function HtmlSelectWithSafeValue({
   }[];
 } & {
   locked?: boolean;
-}) {
+} & OnValueChange) {
   const {
     value: _value,
     defaultValue: _defaultValue,
@@ -633,15 +693,18 @@ function HtmlSelectWithSafeValue({
     locked,
   });
 
+  const onChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    setValue(e.target.value);
+    cb_onValueChange?.(e.target.value);
+  };
+
   // html5 vanilla select
   return (
     <HtmlSelect
       {...(inputProps as React.ComponentProps<"select">)}
       value={value || undefined}
       defaultValue={defaultValue || ""}
-      onChange={(e) => {
-        setValue(e.target.value as string);
-      }}
+      onChange={onChange}
     >
       {placeholder && (
         <option value="" disabled={!locked && required}>
@@ -661,7 +724,15 @@ function HtmlSelectWithSafeValue({
   );
 }
 
-function HtmlTextarea({ ...props }: React.ComponentProps<"textarea">) {
+function HtmlTextarea({
+  onValueChange,
+  ...props
+}: React.ComponentProps<"textarea"> & OnValueChange) {
+  const onChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    onValueChange?.(e.target.value);
+    props.onChange?.(e);
+  };
+
   return (
     <textarea
       className={clsx(
@@ -669,11 +740,20 @@ function HtmlTextarea({ ...props }: React.ComponentProps<"textarea">) {
         cls_input_ios_zoom_disable
       )}
       {...props}
+      onChange={onChange}
     />
   );
 }
 
-function HtmlInput({ ...props }: React.ComponentProps<"input">) {
+function HtmlInput({
+  onValueChange,
+  ...props
+}: React.ComponentProps<"input"> & OnValueChange) {
+  const onChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    onValueChange?.(e.target.value);
+    props.onChange?.(e);
+  };
+
   return (
     <input
       className={clsx(
@@ -681,6 +761,7 @@ function HtmlInput({ ...props }: React.ComponentProps<"input">) {
         cls_input_ios_zoom_disable
       )}
       {...props}
+      onChange={onChange}
     />
   );
 }

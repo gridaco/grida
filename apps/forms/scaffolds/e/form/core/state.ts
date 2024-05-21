@@ -5,7 +5,7 @@ import type { FormFieldDefinition } from "@/types";
 export interface FormAgentState {
   fields: {
     [key: string]: {
-      value?: string;
+      value?: string | boolean | undefined;
     };
   };
   blocks: {

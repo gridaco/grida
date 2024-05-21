@@ -17,7 +17,11 @@ import {
 import { StripePaymentFormFieldPreview } from "@/components/formfield/form-field-preview-payment-stripe";
 import { useFingerprint } from "@/scaffolds/fingerprint";
 import { SYSTEM_GF_FINGERPRINT_VISITORID_KEY } from "@/k/system";
-import { ClientRenderBlock, ClientSectionRenderBlock } from "@/lib/forms";
+import {
+  ClientFieldRenderBlock,
+  ClientRenderBlock,
+  ClientSectionRenderBlock,
+} from "@/lib/forms";
 import { Button } from "@/components/ui/button";
 import { FormAgentProvider } from "./core/agent";
 import { init } from "./core/state";
@@ -123,6 +127,8 @@ function Body({
   stylesheet?: any;
 } & React.FormHTMLAttributes<HTMLFormElement>) {
   const [state, dispatch] = useFormAgentState();
+
+  console.log(state.fields);
 
   const {
     is_submitting,
@@ -326,7 +332,18 @@ function BlockRenderer({
     is_in_current_section: boolean;
   };
 }) {
-  const [state] = useFormAgentState();
+  const [state, dispatch] = useFormAgentState();
+
+  const onValueChange = useCallback(
+    (value: string | boolean) => {
+      dispatch({
+        type: "fields/value/change",
+        id: (block as ClientFieldRenderBlock).field.id,
+        value,
+      });
+    },
+    [block, dispatch]
+  );
 
   const hidden = useLogical(block.hidden);
 
@@ -335,7 +352,6 @@ function BlockRenderer({
   const __shared_root_attr = {
     hidden: hidden,
     id: block.id,
-    key: block.id,
   };
 
   switch (block.type) {
@@ -412,6 +428,8 @@ function BlockRenderer({
                 multiple={field.multiple}
                 novalidate={is_not_in_current_section}
                 locked={is_not_in_current_section}
+                onValueChange={onValueChange}
+                onCheckedChange={onValueChange}
               />
             </div>
           );
