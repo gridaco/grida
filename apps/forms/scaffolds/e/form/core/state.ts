@@ -3,6 +3,8 @@ import { FormBlockTree } from "@/lib/forms/types";
 import type { FormFieldDefinition } from "@/types";
 
 export interface FormAgentState {
+  // do not change the keys
+  // #/fields/${string}/value
   fields: {
     [key: string]: {
       value?: string | boolean | undefined;

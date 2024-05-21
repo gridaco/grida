@@ -65,7 +65,7 @@
         {
           "$ref": "#/fields/condition/value"
         },
-        "===",
+        "==",
         "yes"
       ]
     }
