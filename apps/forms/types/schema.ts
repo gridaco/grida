@@ -1,17 +1,20 @@
 import type {
+  FormBlock,
   FormFieldAutocompleteType,
   FormFieldDefinition,
   FormInputType,
   FormsPageLanguage,
   Option,
 } from ".";
+import type { JSONBooleanValueDescriptor, JSONFieldReference } from "./logic";
+import { toArrayOf, MaybeArray } from "./utility";
 
 /**
  * used when representing a type in json following the schema.
  *
  * `"enum" | ["enum"] | { type: "array", type: "enum" }`
  */
-type JSONSchemaOptionalArrayDescriptor<T> =
+type JSONSchemaOptionalDefineAsArrayDescriptor<T> =
   | T
   | [T]
   | {
@@ -21,7 +24,13 @@ type JSONSchemaOptionalArrayDescriptor<T> =
       };
     };
 
-type JSONOptionalArrayAnnotation<T> = T | [T];
+type JSONOptionalDefineAsArrayAnnotation<T> = T | [T];
+
+interface JSONFieldBlock {
+  type: "field";
+  field: JSONFieldReference;
+  hidden?: JSONBooleanValueDescriptor;
+}
 
 interface _JSONForm<T> {
   title?: string;
@@ -36,45 +45,47 @@ interface _JSONForm<T> {
   method?: "get" | "post" | "dialog";
   novalidate?: boolean;
   target?: "_blank" | "_self" | "_parent" | "_top";
-  fields?: _JSONField<T>[];
+  fields?: T[];
+  blocks?: JSONFieldBlock[];
 }
 
-export type JSONForm = _JSONForm<JSONOptionalArrayAnnotation<FormInputType>>;
+export type JSONForm = Omit<_JSONForm<FormFieldDefinition>, "blocks"> & {
+  blocks?: FormBlock[];
+};
+
 export type JSONFormRaw = _JSONForm<
-  JSONSchemaOptionalArrayDescriptor<FormInputType>
+  _JSONField<JSONSchemaOptionalDefineAsArrayDescriptor<FormInputType>>
 >;
 type _JSONField<T> = {
   name: string;
-  label?: string;
-  placeholder?: string;
+  label?: string | null;
+  placeholder?: string | null;
   required?: boolean;
   pattern?: string;
   type: T;
   options?: JSONOptionLike[];
-  multiple?: boolean;
-  autocomplete?: FormFieldAutocompleteType | FormFieldAutocompleteType[];
+  multiple?: boolean | null;
+  autocomplete?: FormFieldAutocompleteType | FormFieldAutocompleteType[] | null;
 };
 
 export type JSONFieldRaw = _JSONField<
-  JSONSchemaOptionalArrayDescriptor<FormInputType>
+  JSONSchemaOptionalDefineAsArrayDescriptor<FormInputType>
 >;
-
-export type JSONField = _JSONField<JSONOptionalArrayAnnotation<FormInputType>>;
 
 export type JSONOptionLike = JSONOption | string | number;
 
 export interface JSONOption {
   value: string;
   label?: string;
-  src?: string;
-  disabled?: boolean;
+  src?: string | null;
+  disabled?: boolean | null;
 }
 
-function json_optional_array_descriptor_to_annotation<
+function json_optional_define_as_array_descriptor_to_annotation<
   T extends string = string,
 >(
-  descriptor: JSONSchemaOptionalArrayDescriptor<T>
-): JSONOptionalArrayAnnotation<T> {
+  descriptor: JSONSchemaOptionalDefineAsArrayDescriptor<T>
+): JSONOptionalDefineAsArrayAnnotation<T> {
   switch (typeof descriptor) {
     case "string":
       return descriptor;
@@ -87,52 +98,63 @@ function json_optional_array_descriptor_to_annotation<
 }
 
 export function parse_jsonfield_type(
-  descriptor: JSONSchemaOptionalArrayDescriptor<FormInputType>
+  descriptor: JSONSchemaOptionalDefineAsArrayDescriptor<FormInputType>
 ): { type: FormInputType; is_array: boolean } {
-  const annotation = json_optional_array_descriptor_to_annotation(descriptor);
+  const annotation =
+    json_optional_define_as_array_descriptor_to_annotation(descriptor);
   if (Array.isArray(annotation)) {
     return { type: annotation[0], is_array: true };
   }
   return { type: annotation, is_array: false };
 }
 
-export function parse_jsonfield(raw: JSONFieldRaw): JSONField {
-  return {
-    ...raw,
-    type: json_optional_array_descriptor_to_annotation(raw.type),
-  };
+export function parse(
+  value?: string | JSONFormRaw
+): JSONForm | null | undefined {
+  return new JSONFormParser(value).parse();
 }
 
-export function parse(value?: string | object): JSONForm | null | undefined {
-  try {
-    const shema_raw: JSONFormRaw =
-      typeof value === "string"
-        ? value
-          ? JSON.parse(value)
-          : null
-        : (value as JSONFormRaw);
-    if (shema_raw) {
-      return <JSONForm>{
-        ...shema_raw,
-        fields: shema_raw.fields?.map(parse_jsonfield),
-      };
-    }
-  } catch (error) {
-    return null;
+export class JSONFormParser {
+  readonly schema: JSONFormRaw | null | undefined;
+  constructor(value?: string | JSONFormRaw) {
+    try {
+      this.schema =
+        typeof value === "string"
+          ? value
+            ? JSON.parse(value)
+            : null
+          : // needs validation
+            (value as JSONFormRaw);
+    } catch (error) {}
+  }
+
+  //
+
+  fields(): FormFieldDefinition[] {
+    return (
+      this.schema?.fields?.map(map_json_form_field_to_form_field_definition) ||
+      []
+    );
+  }
+
+  blocks(): FormBlock[] {
+    return this.schema?.blocks?.map(map_json_form_block_to_form_block) || [];
+  }
+
+  parse(): JSONForm | null | undefined {
+    if (!this.schema) return null;
+    return {
+      ...this.schema,
+      fields: this.fields(),
+      blocks: this.blocks(),
+    };
   }
 }
 
-type MaybeArray<T> = T | T[];
-
-function toArrayOf<T>(value: MaybeArray<T>, nofalsy = true): NonNullable<T>[] {
-  return (
-    Array.isArray(value) ? value : nofalsy && value ? [value] : []
-  ) as NonNullable<T>[];
-}
-
-export function json_form_field_to_form_field_definition(
-  fields?: JSONForm["fields"]
-): FormFieldDefinition[] {
+function map_json_form_field_to_form_field_definition(
+  field: JSONFieldRaw,
+  index: number
+): FormFieldDefinition {
   const map_option = (o: JSONOptionLike): Option => {
     switch (typeof o) {
       case "string":
@@ -152,21 +174,39 @@ export function json_form_field_to_form_field_definition(
     }
   };
 
-  return (
-    fields?.map((f: JSONField, i) => {
-      const { type, is_array } = parse_jsonfield_type(f.type);
-      return {
-        ...f,
-        id: f.name,
-        type: type,
-        is_array,
-        autocomplete: toArrayOf<FormFieldAutocompleteType | undefined>(
-          f.autocomplete
-        ),
-        required: f.required || false,
-        local_index: i,
-        options: f.options?.map(map_option) || [],
-      };
-    }) || []
-  );
+  {
+    const { type, is_array } = parse_jsonfield_type(field.type);
+    return {
+      ...field,
+      id: field.name,
+      type: type,
+      is_array,
+      autocomplete: toArrayOf<FormFieldAutocompleteType | null | undefined>(
+        field.autocomplete
+      ),
+      required: field.required || false,
+      local_index: index,
+      options: field.options?.map(map_option) || [],
+    };
+  }
+}
+
+function map_json_form_block_to_form_block(
+  block: JSONFieldBlock,
+  index: number
+): FormBlock {
+  // TODO: support other types - now only field
+  return {
+    id: `block-${index}`,
+    local_index: index,
+    type: block.type,
+    data: {},
+    v_hidden: block.hidden,
+    // TODO: needs name:id mapping
+    form_field_id: block.field.$ref.split("/").pop() as string,
+    //
+    created_at: new Date().toISOString(),
+    form_id: "form",
+    form_page_id: "form",
+  };
 }

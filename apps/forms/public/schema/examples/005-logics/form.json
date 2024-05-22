@@ -1,0 +1,98 @@
+{
+  "$schema": "https://forms.grida.co/schema/form.schema.json",
+  "title": "Logics Demo",
+  "name": "logics",
+  "description": "Control form behavior with conditional logic",
+  "method": "post",
+  "fields": [
+    {
+      "name": "what_you_like",
+      "label": "What you like?",
+      "placeholder": "🐈‍⬛ / 🦮",
+      "required": true,
+      "type": "select",
+      "options": [
+        {
+          "label": "🐈‍⬛ Me like kitty",
+          "value": "kitty"
+        },
+        {
+          "label": "🦮 Me like puppy",
+          "value": "puppy"
+        }
+      ]
+    },
+    {
+      "name": "you_sure_dog",
+      "label": "Eh.. You Sure Doug?",
+      "placeholder": "Huh?",
+      "required": true,
+      "type": "select",
+      "options": [
+        {
+          "label": "🐈‍⬛ Me like kitty",
+          "value": "kitty"
+        }
+      ]
+    },
+    {
+      "name": "me_like_kitty",
+      "label": "Nicely done",
+      "placeholder": "That was correct",
+      "type": "text"
+    },
+    {
+      "name": "me_like_kitty_2",
+      "label": "There you go",
+      "placeholder": "That was correct",
+      "type": "text"
+    }
+  ],
+  "blocks": [
+    {
+      "type": "field",
+      "field": {
+        "$ref": "#/fields/what_you_like"
+      }
+    },
+    {
+      "type": "field",
+      "field": {
+        "$ref": "#/fields/you_sure_dog"
+      },
+      "hidden": [
+        {
+          "$ref": "#/fields/what_you_like/value"
+        },
+        "!=",
+        "puppy"
+      ]
+    },
+    {
+      "type": "field",
+      "field": {
+        "$ref": "#/fields/me_like_kitty"
+      },
+      "hidden": [
+        {
+          "$ref": "#/fields/what_you_like/value"
+        },
+        "!=",
+        "kitty"
+      ]
+    },
+    {
+      "type": "field",
+      "field": {
+        "$ref": "#/fields/me_like_kitty_2"
+      },
+      "hidden": [
+        {
+          "$ref": "#/fields/you_sure_dog/value"
+        },
+        "!=",
+        "kitty"
+      ]
+    }
+  ]
+}

@@ -9,6 +9,7 @@ import type {
 } from "@/types";
 import { blockstree } from "./tree";
 import { FormBlockTree } from "./types";
+import { toArrayOf } from "@/types/utility";
 
 export type ClientRenderBlock =
   | ClientFieldRenderBlock
@@ -25,6 +26,7 @@ export interface BaseRenderBlock {
   type: FormBlockType;
   local_index: number;
   parent_id: string | null;
+  hidden?: FormBlock["v_hidden"] | null;
 }
 
 type ClientRenderOption = {
@@ -125,7 +127,7 @@ export class FormRenderTree {
     readonly title: string | null | undefined,
     readonly description: string | null | undefined,
     readonly lang: FormsPageLanguage | null | undefined,
-    private readonly _m_fields: FormFieldDefinition[],
+    private readonly _m_fields: FormFieldDefinition[] = [],
     private readonly _m_blocks?: FormBlock[],
     private readonly config?: RenderTreeConfig,
     private readonly plugins?: {
@@ -139,6 +141,13 @@ export class FormRenderTree {
           ? _m_fields.find((f: any) => f.id === block.form_field_id) ?? null
           : null;
 
+        const shared: Partial<BaseRenderBlock> = {
+          id: block.id,
+          local_index: block.local_index,
+          parent_id: block.parent_id,
+          hidden: block.v_hidden,
+        } as const;
+
         if (is_field) {
           // assert fiel to be not null
           if (!field) {
@@ -146,30 +155,24 @@ export class FormRenderTree {
           }
 
           return <ClientFieldRenderBlock>{
-            id: block.id,
+            ...shared,
             type: "field",
             field: this._field_block_field_definition(field),
-            local_index: block.local_index,
-            parent_id: block.parent_id,
           };
         }
 
         switch (block.type) {
           case "html": {
             return <ClientHtmlRenderBlock>{
-              id: block.id,
+              ...shared,
               type: "html",
               html: block.body_html,
-              local_index: block.local_index,
-              parent_id: block.parent_id,
             };
           }
           case "header": {
             return <ClientHeaderRenderBlock>{
-              id: block.id,
+              ...shared,
               type: "header",
-              local_index: block.local_index,
-              parent_id: block.parent_id,
               title_html: block.title_html,
               description_html: block.description_html,
             };
@@ -177,21 +180,17 @@ export class FormRenderTree {
           case "image":
           case "video": {
             return <ClientImageRenderBlock>{
-              id: block.id,
+              ...shared,
               type: block.type,
               src: block.src,
-              local_index: block.local_index,
-              parent_id: block.parent_id,
             };
           }
           case "pdf": {
             return <ClientPdfRenderBlock>{
-              id: block.id,
+              ...shared,
               type: "pdf",
               // for pdf, as the standard is <object> we use data instead of src
               data: block.src,
-              local_index: block.local_index,
-              parent_id: block.parent_id,
             };
           }
           case "section": {
@@ -207,9 +206,8 @@ export class FormRenderTree {
             );
 
             return <ClientSectionRenderBlock>{
-              id: block.id,
+              ...shared,
               type: "section",
-              local_index: block.local_index,
               attributes: {
                 contains_payment,
               },
@@ -218,10 +216,8 @@ export class FormRenderTree {
           case "divider":
           default: {
             return <BaseRenderBlock>{
-              id: block.id,
+              ...shared,
               type: block.type,
-              local_index: block.local_index,
-              parent_id: block.parent_id,
             };
           }
         }
@@ -327,7 +323,7 @@ export class FormRenderTree {
       accept: field.accept || undefined,
       required: field.required ?? undefined,
       multiple: field.multiple ?? undefined,
-      autocomplete: field.autocomplete?.join(" ") ?? undefined,
+      autocomplete: toArrayOf(field.autocomplete)?.join(" ") ?? undefined,
     };
   }
 }
