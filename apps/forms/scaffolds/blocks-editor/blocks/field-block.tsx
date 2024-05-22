@@ -1,11 +1,13 @@
 "use client";
 
-import React, { useCallback } from "react";
+import React, { useCallback, useState } from "react";
 import {
   DotsHorizontalIcon,
+  GearIcon,
   InputIcon,
   MixIcon,
   Pencil1Icon,
+  PlusIcon,
   TrashIcon,
 } from "@radix-ui/react-icons";
 import {
@@ -32,6 +34,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
 
 export function FieldBlock({
   id,
@@ -49,7 +60,7 @@ export function FieldBlock({
   const is_hidden_field = form_field?.type === "hidden";
 
   const { available_field_ids } = state;
-
+  const [advanced, setAdvanced] = useState(false);
   const no_available_fields = available_field_ids.length === 0;
 
   const can_create_new_field_from_this_block =
@@ -100,11 +111,63 @@ export function FieldBlock({
         <div className="flex flex-row items-center gap-8">
           <span className="flex flex-row gap-2 items-center">
             <InputIcon />
+            <Dialog
+              open={advanced}
+              onOpenChange={(open) => {
+                if (!open) {
+                  setAdvanced(false);
+                }
+              }}
+            >
+              <DialogContent>
+                <DialogHeader>Advanced Mode</DialogHeader>
+                <DialogDescription>
+                  In advanced mode, you can re-use already referenced field.
+                  This is useful when there are multiple blocks that should be
+                  visible optionally. (Use with caution, only one value will be
+                  accepted if there are multiple rendered blocks with the same
+                  field)
+                </DialogDescription>
+                <div>
+                  <Select
+                    value={form_field_id ?? ""}
+                    onValueChange={(value) => {
+                      onFieldChange(value);
+                    }}
+                  >
+                    <SelectTrigger id="category" aria-label="Select category">
+                      <SelectValue placeholder="Select Field" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {state.fields.map((f) => (
+                        <SelectItem key={f.id} value={f.id} disabled={false}>
+                          {f.name}{" "}
+                          {!available_field_ids.includes(f.id) &&
+                            "(already used)"}
+                          <small className="ms-1 font-mono opacity-50">
+                            {f.id}
+                          </small>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <DialogFooter>
+                  <DialogClose asChild>
+                    <Button>Save</Button>
+                  </DialogClose>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
             <Select
               value={form_field_id ?? ""}
               onValueChange={(value) => {
                 if (value === "__gf_new") {
                   onNewFieldClick();
+                  return;
+                }
+                if (value === "__gf_advanced") {
+                  setAdvanced(true);
                   return;
                 }
                 onFieldChange(value);
@@ -124,8 +187,21 @@ export function FieldBlock({
                   </SelectItem>
                 ))}
                 {can_create_new_field_from_this_block && (
-                  <SelectItem value="__gf_new">Create New Field</SelectItem>
+                  <SelectItem value="__gf_new">
+                    <div className="flex items-center">
+                      <PlusIcon className="me-2" />
+                      Create New Field
+                    </div>
+                  </SelectItem>
                 )}
+                <div>
+                  <SelectItem value="__gf_advanced">
+                    <div className="flex items-center">
+                      <GearIcon className="me-2" />
+                      Advanced
+                    </div>
+                  </SelectItem>
+                </div>
               </SelectContent>
             </Select>
           </span>
