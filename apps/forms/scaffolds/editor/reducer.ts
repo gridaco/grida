@@ -3,6 +3,7 @@ import { EditorFlatFormBlock, FormEditorState } from "./state";
 import {
   BlockDescriptionAction,
   BlockTitleAction,
+  BlockVHiddenAction,
   BlocksEditorAction,
   ChangeBlockFieldAction,
   CreateFielFromBlockdAction,
@@ -217,6 +218,15 @@ export function reducer(
         // add the field_id to available_field_ids
         if (field_id) {
           draft.available_field_ids.push(field_id);
+        }
+      });
+    }
+    case "blocks/hidden": {
+      const { block_id, v_hidden } = <BlockVHiddenAction>action;
+      return produce(state, (draft) => {
+        const block = draft.blocks.find((b) => b.id === block_id);
+        if (block) {
+          block.v_hidden = v_hidden;
         }
       });
     }

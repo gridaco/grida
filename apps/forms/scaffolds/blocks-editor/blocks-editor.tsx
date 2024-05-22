@@ -124,7 +124,7 @@ function PendingBlocksResolver() {
           dispatch({
             type: "blocks/resolve",
             block_id: block.id,
-            block: data,
+            block: { ...data, v_hidden: data.v_hidden as any },
           });
         })
         .catch((e) => {
@@ -159,6 +159,7 @@ function useSyncBlocks(blocks: EditorFlatFormBlock[]) {
           !block.parent_id?.startsWith(DRAFT_ID_START_WITH)) ||
         block.local_index !== prevBlock.local_index ||
         block.form_field_id !== prevBlock.form_field_id ||
+        !shallowEqual(block.v_hidden, prevBlock.v_hidden) ||
         block.title_html !== prevBlock.title_html ||
         block.description_html !== prevBlock.description_html ||
         block.body_html !== prevBlock.body_html ||
@@ -176,6 +177,7 @@ function useSyncBlocks(blocks: EditorFlatFormBlock[]) {
             parent_id: block.parent_id,
             local_index: block.local_index,
             form_field_id: block.form_field_id,
+            v_hidden: block.v_hidden,
             title_html: block.title_html,
             description_html: block.description_html,
             body_html: block.body_html,
@@ -328,4 +330,30 @@ function BlockItem({
       {children}
     </DropdownMenu.Item>
   );
+}
+
+function shallowEqual(obj1: any, obj2: any) {
+  if (obj1 === obj2) return true;
+
+  if (
+    typeof obj1 !== "object" ||
+    obj1 === null ||
+    typeof obj2 !== "object" ||
+    obj2 === null
+  ) {
+    return false;
+  }
+
+  let keys1 = Object.keys(obj1);
+  let keys2 = Object.keys(obj2);
+
+  if (keys1.length !== keys2.length) return false;
+
+  for (let key of keys1) {
+    if (obj1[key] !== obj2[key]) {
+      return false;
+    }
+  }
+
+  return true;
 }

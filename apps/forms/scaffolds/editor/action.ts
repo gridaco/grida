@@ -5,6 +5,7 @@ import {
   FormResponse,
 } from "@/types";
 import type { EditorFlatFormBlock } from "./state";
+import { JSONConditionExpression } from "@/types/logic";
 
 export type BlocksEditorAction =
   | CreateNewPendingBlockAction
@@ -16,6 +17,7 @@ export type BlocksEditorAction =
   | FocusFieldAction
   | ChangeBlockFieldAction
   | CreateFielFromBlockdAction
+  | BlockVHiddenAction
   | HtmlBlockBodyAction
   | ImageBlockSrcAction
   | VideoBlockSrcAction
@@ -64,6 +66,12 @@ export interface ChangeBlockFieldAction {
 export interface CreateFielFromBlockdAction {
   type: "blocks/field/new";
   block_id: string;
+}
+
+export interface BlockVHiddenAction {
+  type: "blocks/hidden";
+  block_id: string;
+  v_hidden: JSONConditionExpression;
 }
 
 export interface HtmlBlockBodyAction {
