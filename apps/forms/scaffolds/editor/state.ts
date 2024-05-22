@@ -69,6 +69,7 @@ export interface FormEditorState {
   is_field_edit_panel_open?: boolean;
   is_response_edit_panel_open?: boolean;
   is_customer_edit_panel_open?: boolean;
+  is_block_edit_panel_open?: boolean;
   field_edit_panel_refresh_key?: number;
 }
 

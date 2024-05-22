@@ -30,6 +30,7 @@ export type BlocksEditorAction =
   | OpenResponseEditAction
   | ResponseFeedRowsAction
   | OpenCustomerEditAction
+  | OpenBlockEditPanelAction
   | DataGridReorderColumnAction;
 
 export interface CreateNewPendingBlockAction {
@@ -159,6 +160,13 @@ export interface OpenResponseEditAction {
 export interface OpenCustomerEditAction {
   type: "editor/customers/edit";
   customer_id?: string;
+  // true by default
+  open?: boolean;
+}
+
+export interface OpenBlockEditPanelAction {
+  type: "editor/panels/block-edit";
+  block_id?: string;
   // true by default
   open?: boolean;
 }

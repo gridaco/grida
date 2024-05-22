@@ -17,6 +17,7 @@ import {
   FocusFieldAction,
   HtmlBlockBodyAction,
   ImageBlockSrcAction,
+  OpenBlockEditPanelAction,
   OpenCustomerEditAction,
   OpenEditFieldAction,
   OpenResponseEditAction,
@@ -520,6 +521,13 @@ export function reducer(
       return produce(state, (draft) => {
         draft.is_customer_edit_panel_open = open ?? true;
         draft.focus_customer_id = customer_id;
+      });
+    }
+    case "editor/panels/block-edit": {
+      const { block_id, open } = <OpenBlockEditPanelAction>action;
+      return produce(state, (draft) => {
+        draft.is_block_edit_panel_open = open ?? true;
+        draft.focus_block_id = block_id;
       });
     }
     case "editor/data-grid/column/reorder": {

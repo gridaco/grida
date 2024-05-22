@@ -15,7 +15,7 @@ type JSONConditionLefthand<T extends string = string> =
   | JSONFieldReference<T>
   | JSONLiteral;
 
-type JSONConditionOperator = "==" | "!=" | ">" | "<" | ">=" | "<=";
+export type JSONConditionOperator = "==" | "!=" | ">" | "<" | ">=" | "<=";
 
 type JSONConditionRighthand<T extends string = string> =
   | JSONFieldReference<T>

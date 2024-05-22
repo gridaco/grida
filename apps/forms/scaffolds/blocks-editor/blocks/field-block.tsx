@@ -4,6 +4,7 @@ import React, { useCallback } from "react";
 import {
   DotsHorizontalIcon,
   InputIcon,
+  MixIcon,
   Pencil1Icon,
   TrashIcon,
 } from "@radix-ui/react-icons";
@@ -74,12 +75,20 @@ export function FieldBlock({
     });
   }, [dispatch, id]);
 
-  const onEditClick = useCallback(() => {
+  const onFieldEditClick = useCallback(() => {
     dispatch({
       type: "editor/field/edit",
       field_id: form_field_id!,
     });
   }, [dispatch, form_field_id]);
+
+  const onLogicEditClick = useCallback(() => {
+    dispatch({
+      type: "editor/panels/block-edit",
+      block_id: id,
+      open: true,
+    });
+  }, [dispatch, id]);
 
   return (
     <FlatBlockBase
@@ -130,11 +139,15 @@ export function FieldBlock({
             </DropdownMenuTrigger>
             <DropdownMenuContent>
               {form_field_id && (
-                <DropdownMenuItem onClick={onEditClick}>
+                <DropdownMenuItem onClick={onFieldEditClick}>
                   <Pencil1Icon />
                   Edit Field Definition
                 </DropdownMenuItem>
               )}
+              <DropdownMenuItem onClick={onLogicEditClick}>
+                <MixIcon />
+                Logic
+              </DropdownMenuItem>
               <DropdownMenuItem onClick={() => deleteBlock(id)}>
                 <TrashIcon />
                 Delete Block
