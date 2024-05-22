@@ -409,28 +409,34 @@ function BlockRenderer({
 
           return (
             <div {...__shared_root_attr}>
-              <FormField
-                key={field.id}
-                name={field.name}
-                label={field.label}
-                placeholder={field.placeholder}
-                type={field.type}
-                is_array={field.is_array}
-                required={field.required}
-                requiredAsterisk
-                helpText={field.help_text}
-                options={field.options}
-                pattern={field.pattern}
-                defaultValue={defaultValue}
-                data={field.data}
-                autoComplete={field.autocomplete}
-                accept={field.accept}
-                multiple={field.multiple}
-                novalidate={is_not_in_current_section}
-                locked={is_not_in_current_section}
-                onValueChange={onValueChange}
-                onCheckedChange={onValueChange}
-              />
+              {/* we are unmounting the field on hidden to prevent the hidden block field value being submitted */}
+              {/* this is mainly for strict logic handling on inventory tracking, but there will be a case where user might still want to accpet the value even when hidden (since the hidden can change in runtime.) */}
+              {!hidden ? (
+                <FormField
+                  key={field.id}
+                  name={field.name}
+                  label={field.label}
+                  placeholder={field.placeholder}
+                  type={field.type}
+                  is_array={field.is_array}
+                  required={field.required}
+                  requiredAsterisk
+                  helpText={field.help_text}
+                  options={field.options}
+                  pattern={field.pattern}
+                  defaultValue={defaultValue}
+                  data={field.data}
+                  autoComplete={field.autocomplete}
+                  accept={field.accept}
+                  multiple={field.multiple}
+                  novalidate={is_not_in_current_section || hidden}
+                  locked={is_not_in_current_section || hidden}
+                  onValueChange={onValueChange}
+                  onCheckedChange={onValueChange}
+                />
+              ) : (
+                <></>
+              )}
             </div>
           );
         }
