@@ -43,6 +43,7 @@ import {
   DialogHeader,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import clsx from "clsx";
 
 export function FieldBlock({
   id,
@@ -232,7 +233,11 @@ export function FieldBlock({
           </DropdownMenu>
         </div>
       </BlockHeader>
-      <div className="w-full min-h-40 bg-neutral-200 dark:bg-neutral-800 rounded p-10 border border-black/20">
+      <div
+        className={clsx(
+          "w-full min-h-40 bg-neutral-200 dark:bg-neutral-800 rounded p-10 border border-black/20"
+        )}
+      >
         {is_hidden_field ? (
           <div>
             <p className="text-xs opacity-50">
