@@ -20,6 +20,7 @@ import {
 } from "@/services/form/inventory";
 import assert from "assert";
 import { GridaCommerceClient } from "@/services/commerce";
+import { SubmissionHooks } from "./hooks";
 
 const HOST = process.env.HOST || "http://localhost:3000";
 
@@ -473,6 +474,10 @@ async function submit({
     console.error(select_response_error);
   }
 
+  // ==================================================
+  // region response building
+  // ==================================================
+
   // build info
   let info: any = {};
 
@@ -502,6 +507,41 @@ async function submit({
     };
   }
 
+  // endregion
+
+  // ==================================================
+  // region complete hooks
+  // ==================================================
+
+  // [emails]
+
+  const business_profile = {
+    name: "Grida Forms",
+    email: "no-reply@cors.sh",
+  };
+
+  // FIXME: DEV MODE
+  const _email_enabled = false;
+  if (_email_enabled) {
+    await SubmissionHooks.send_email({
+      form_id: form_id,
+      type: "formcomplete",
+      from: {
+        name: business_profile.name,
+        email: business_profile.email,
+      },
+      to: "universe@grida.co",
+      lang: "en",
+    });
+    // send email
+  }
+
+  // endregion
+
+  // ==================================================
+  // region final response
+  // ==================================================
+
   if (is_ending_page_enabled && ending_page_template_id) {
     return NextResponse.redirect(
       formlink(HOST, form_id, "complete", {
@@ -526,6 +566,8 @@ async function submit({
     info: Object.keys(info).length > 0 ? info : null,
     error: null,
   });
+
+  // endregion
 }
 
 const val = (v?: string | null) => {

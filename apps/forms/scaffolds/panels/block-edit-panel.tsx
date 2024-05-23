@@ -128,11 +128,7 @@ export function BlockEditPanel({
               </PopoverContent>
             </Popover>
           </div>
-          <p>
-            <span className="text-xs font-mono">
-              if {condition_v_hidden?.join(" ")}
-            </span>
-          </p>
+          {/* Add logic testing tool */}
           <hr />
         </div>
         <SheetFooter>
