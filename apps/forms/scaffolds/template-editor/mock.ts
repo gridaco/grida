@@ -9,9 +9,9 @@ const fakerlocales = {
 };
 
 export function mockContext({
-  lang,
+  lang = "en",
   title,
-}: Partial<TemplateVariables.FormResponseContext> & { lang: string }) {
+}: Partial<TemplateVariables.FormResponseContext> & { lang?: string }) {
   const faker = new Faker({
     // @ts-ignore
     locale: fakerlocales[lang],
@@ -45,7 +45,7 @@ export function mockContext({
 export function useMockedContext(
   init: Partial<TemplateVariables.FormResponseContext>,
   config: {
-    lang: string;
+    lang?: string;
     refreshKey: string;
   }
 ) {

@@ -44,21 +44,49 @@ function getComponent(template_id: string) {
 }
 
 export default function TemplatingDevPage() {
-  const [templateId, setTemplateId] = useState("default" as string);
+  const lang = "en";
+  return (
+    <TemplateEditor
+      getComponent={getComponent}
+      getPropTypes={(template_id) => {
+        return getPropTypes(
+          resources[lang as keyof typeof resources].translation["formcomplete"][
+            template_id as keyof (typeof resources)["en"]["translation"]["formcomplete"]
+          ]
+        );
+      }}
+      onSave={(data) => {
+        console.log(data);
+      }}
+    />
+  );
+}
+
+function TemplateEditor({
+  defaultTemplateId,
+  defaultTexts,
+  getComponent,
+  getPropTypes,
+  lang,
+  onSave,
+}: {
+  defaultTemplateId?: string;
+  defaultTexts?: Record<string, string>;
+  getComponent: (template_id: string) => React.ComponentType<any>;
+  getPropTypes: (template_id: string) => z.ZodObject<any>;
+  lang?: string;
+  onSave?: (data: Record<string, string>) => void;
+}) {
+  const [templateId, setTemplateId] = useState(defaultTemplateId ?? "default");
   const [isModified, setIsModified] = useState(false);
   const [contextRefreshKey, setContextRefreshKey] = useState(0);
-  const [texts, setTexts] = useState<Record<string, string>>({});
-
-  const lang = "en";
+  const [texts, setTexts] = useState<Record<string, string>>(
+    defaultTexts ?? {}
+  );
 
   const propTypes = useMemo(
-    () =>
-      getPropTypes(
-        resources[lang].translation["formcomplete"][
-          templateId as keyof (typeof resources)["en"]["translation"]["formcomplete"]
-        ]
-      ),
-    [templateId]
+    () => getPropTypes(templateId),
+    [templateId, getPropTypes]
   );
 
   useEffect(() => {
@@ -96,6 +124,11 @@ export default function TemplatingDevPage() {
 
   const onReloadContextClick = () => {
     setContextRefreshKey((prev) => prev + 1);
+  };
+
+  const onSaveClick = () => {
+    onSave?.(texts);
+    setIsModified(false);
   };
 
   const out = useMemo(() => {
@@ -137,13 +170,7 @@ export default function TemplatingDevPage() {
           </div>
           <div className="flex-1 flex justify-end gap-2">
             <Button variant="secondary">Cancel</Button>
-            <Button
-              disabled={!isModified}
-              onClick={() => {
-                console.log("save");
-                setIsModified(false);
-              }}
-            >
+            <Button disabled={!isModified} onClick={onSaveClick}>
               Save
             </Button>
           </div>
@@ -224,6 +251,7 @@ export default function TemplatingDevPage() {
                 </section>
               </article>
             </header>
+            <hr />
             <div key={templateId}>
               {Object.keys(propTypes.shape).map((key) => {
                 const defaultValue =
@@ -248,6 +276,7 @@ export default function TemplatingDevPage() {
                   </div>
                 );
               })}
+              h
             </div>
           </div>
         </aside>
