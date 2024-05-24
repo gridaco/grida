@@ -310,6 +310,18 @@ importers:
       '@supabase/supabase-js':
         specifier: ^2.39.7
         version: 2.43.1
+      '@tiptap/extension-mention':
+        specifier: ^2.1.13
+        version: 2.3.2(@tiptap/core@2.3.2)(@tiptap/pm@2.3.2)(@tiptap/suggestion@2.3.2)
+      '@tiptap/pm':
+        specifier: ^2.1.13
+        version: 2.3.2
+      '@tiptap/react':
+        specifier: ^2.1.13
+        version: 2.3.2(@tiptap/core@2.3.2)(@tiptap/pm@2.3.2)(react-dom@18.3.1)(react@18.3.1)
+      '@tiptap/starter-kit':
+        specifier: ^2.1.13
+        version: 2.3.2(@tiptap/pm@2.3.2)
       '@tosspayments/payment-widget-sdk':
         specifier: ^0.10.2
         version: 0.10.2(typescript@5.4.5)

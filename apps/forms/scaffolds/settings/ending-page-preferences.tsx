@@ -17,6 +17,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
+import { MixIcon } from "@radix-ui/react-icons";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
 
 const HOST_NAME = process.env.NEXT_PUBLIC_HOST_NAME || "http://localhost:3000";
 
@@ -35,6 +37,7 @@ export function EndingPagePreferences({
   };
 }) {
   const [template, setTemplate] = useState(init.template_id);
+  const [customizeOpen, setCustomizeOpen] = useState(false);
 
   return (
     <PreferenceBox>
@@ -67,7 +70,21 @@ export function EndingPagePreferences({
           <EndingPagePreview template={template} title={title} lng={lng} />
         )}
       </PreferenceBody>
+      <CustomizeTemplate
+        open={customizeOpen}
+        onOpenChange={(open) => {
+          if (open === false) setCustomizeOpen(false);
+        }}
+      />
       <PreferenceBoxFooter>
+        <Button
+          variant="secondary"
+          type="button"
+          onClick={() => setCustomizeOpen(true)}
+        >
+          <MixIcon className="me-2" />
+          Customize
+        </Button>
         <Button form="/private/editor/settings/ending-page" type="submit">
           Save
         </Button>
@@ -113,4 +130,15 @@ function EndingPagePreview({
       );
     }
   }
+}
+
+function CustomizeTemplate({ ...props }: React.ComponentProps<typeof Dialog>) {
+  return (
+    <Dialog {...props}>
+      <DialogContent className="min-w-full h-screen">
+        {/*  */}
+        {/*  */}
+      </DialogContent>
+    </Dialog>
+  );
 }

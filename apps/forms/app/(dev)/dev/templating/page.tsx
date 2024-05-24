@@ -2,8 +2,8 @@
 import { TemplateVariables } from "@/lib/templating";
 import { Editor } from "@monaco-editor/react";
 import { useEffect, useMemo, useState } from "react";
-import { faker } from "@faker-js/faker";
 import { fmt_local_index } from "@/utils/fmt";
+import { en, ko, Faker } from "@faker-js/faker";
 import { template } from "@/lib/templating/template";
 import {
   Card,
@@ -12,7 +12,17 @@ import {
   CardHeader,
 } from "@/components/ui/card";
 
-function fake() {
+const fakerlocales = {
+  en: en,
+  ko: ko,
+};
+
+function fake(lang: string) {
+  const faker = new Faker({
+    // @ts-ignore
+    locale: fakerlocales[lang],
+  });
+
   const response_index = faker.number.int(50);
   const context: TemplateVariables.FormResponseContext = {
     customer: {
@@ -42,7 +52,7 @@ Your Message
 
 export default function TemplatingDevPage() {
   const [source, setSource] = useState<string>(init);
-  const context = useMemo(() => fake(), []);
+  const context = useMemo(() => fake("ko"), []);
 
   const out = useMemo(() => {
     try {
@@ -64,7 +74,8 @@ export default function TemplatingDevPage() {
     <main className="h-screen flex">
       {/*  */}
       <aside className="flex-1 h-full">
-        <Editor
+        <Tiptap />
+        {/* <Editor
           height="100%"
           defaultLanguage="handlebars"
           defaultValue={init}
@@ -75,7 +86,7 @@ export default function TemplatingDevPage() {
               top: 16,
             },
           }}
-        />
+        /> */}
       </aside>
       {/*  */}
       <aside className="flex-1 h-full p-4 overflow-scroll">
@@ -118,3 +129,30 @@ function Example({ h1, h2, p }: { h1: string; h2: string; p: string }) {
     </Card>
   );
 }
+
+import { useEditor, EditorContent } from "@tiptap/react";
+import StarterKit from "@tiptap/starter-kit";
+import Mention from "@tiptap/extension-mention";
+import suggestion from "./suggestion.js";
+import "./styles.module.css";
+const Tiptap = () => {
+  const editor = useEditor({
+    extensions: [
+      StarterKit,
+      Mention.configure({
+        HTMLAttributes: {
+          class: "mention",
+        },
+        suggestion,
+      }),
+    ],
+    content: "<p>Hello World! 🌎️</p>",
+  });
+
+  return (
+    <EditorContent
+      className="prose h-full w-full p-4 outline-none border-none"
+      editor={editor}
+    />
+  );
+};
