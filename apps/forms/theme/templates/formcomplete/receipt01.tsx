@@ -6,24 +6,23 @@ import {
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import i18next from "i18next";
-import type { FormResponsePageTemplateProps } from "./types";
+import { TemplateVariables } from "@/lib/templating";
 
-export default function FormCompletePageTemplate_receipt01({
-  form_title,
-  response_short_id,
-}: FormResponsePageTemplateProps) {
+export default function FormCompletePageTemplate_receipt01(
+  context: TemplateVariables.FormResponseContext
+) {
   return (
     <main className="container mx-auto flex items-center justify-center w-screen h-screen">
       <Card className="w-full max-w-md p-4">
         <CardHeader className="flex flex-col items-center">
-          <div className="text-5xl font-black text-blue-700 mb-4">
-            {response_short_id}
+          <div className="text-5xl font-black text-accent-foreground mb-4">
+            {i18next.t("formcomplete.receipt01.h1", { ...context })}
           </div>
           <h2 className="text-lg text-center font-bold tracking-tight">
-            {i18next.t("formcomplete.receipt01.title")} - {form_title}
+            {i18next.t("formcomplete.receipt01.h2", { ...context })}
           </h2>
           <p className="text-sm text-center text-gray-500">
-            {i18next.t("formcomplete.receipt01.description")}
+            {i18next.t("formcomplete.receipt01.p", { ...context })}
           </p>
         </CardHeader>
         <CardContent className="p-0" />

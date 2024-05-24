@@ -59,7 +59,7 @@ export namespace TemplateVariables {
      * @readonly
      */
     response: {
-      short_id: string;
+      short_id: string | null;
       /**
        * a.k.a local_index
        */

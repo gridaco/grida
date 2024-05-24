@@ -62,14 +62,27 @@ export default async function SubmitCompletePage({
     return notFound();
   }
 
-  const { local_index } = response;
+  const { local_index, local_id } = response;
 
   return (
     <EndingPage
       template_id={ending_page_template_id}
       data={{
+        title: title,
+        language: data.default_form_page_language,
         form_title: title,
-        response_short_id: fmt_local_index(local_index),
+        response: {
+          index: local_index,
+          idx: fmt_local_index(local_index),
+          short_id: local_id,
+        },
+
+        // FIXME:
+        fields: {},
+        session: {},
+        customer: {
+          short_id: "",
+        },
       }}
     />
   );

@@ -220,12 +220,10 @@ const ExamplePropsZ = z.object({
   h1: z.string().default("{{response.idx}}"),
   h2: z
     .string()
-    .default(resources.en.translation["formcomplete"]["receipt01"]["title"]),
+    .default(resources.en.translation["formcomplete"]["receipt01"]["h2"]),
   p: z
     .string()
-    .default(
-      resources.en.translation["formcomplete"]["receipt01"]["description"]
-    ),
+    .default(resources.en.translation["formcomplete"]["receipt01"]["p"]),
 });
 
 function Example({ h1, h2, p }: { h1: string; h2: string; p: string }) {
@@ -234,7 +232,7 @@ function Example({ h1, h2, p }: { h1: string; h2: string; p: string }) {
       <CardHeader className="flex flex-col items-center">
         <div
           id="h1"
-          className="text-5xl font-black text-blue-700 mb-4"
+          className="text-5xl font-black text-accent-foreground mb-4"
           dangerouslySetInnerHTML={{ __html: h1 }}
         />
         <h2

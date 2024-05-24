@@ -1,4 +1,21 @@
+import { TemplateVariables } from "@/lib/templating";
+import type { HandlebarsPath } from "@/lib/templating/@types";
 import type { FormsPageLanguage } from "@/types";
+
+type T = HandlebarsPath<
+  TemplateVariables.FormResponseContext & {
+    available: number;
+  }
+>;
+
+/**
+ * @example 'c.d' => '{{c.d}}'
+ * @param key
+ * @returns
+ */
+function use(key: T) {
+  return `{{${key}}}`;
+}
 
 export interface Translation {
   next: string;
@@ -37,8 +54,9 @@ export interface Translation {
       description: string;
     };
     receipt01: {
-      title: string;
-      description: string;
+      h1: string;
+      h2: string;
+      p: string;
     };
   };
   alreadyresponded: {
@@ -68,9 +86,9 @@ const resources: Record<
       submit: "Submit",
       pay: "Pay",
       home: "Home",
-      left_in_stock: "{{available}} left",
+      left_in_stock: `${use("available")} left`,
       sold_out: "Sold Out",
-      your_customer_id_is: "Your Customer ID is <code>{{customer_id}}</code>",
+      your_customer_id_is: `Your Customer ID is <code>${use("customer.short_id")}</code>`,
       formclosed: {
         default: {
           title: "Form Closed",
@@ -102,9 +120,9 @@ const resources: Record<
           description: "Thank you for your response.",
         },
         receipt01: {
-          title: "Receipt Confirmed",
-          description:
-            "Your receipt has been confirmed. Please consider taking a screenshot for your records.",
+          h1: `${use("response.idx")}`,
+          h2: `Receipt Confirmed - ${use("form_title")}`,
+          p: "Your receipt has been confirmed. Please consider taking a screenshot for your records.",
         },
       },
       alreadyresponded: {
@@ -130,9 +148,9 @@ const resources: Record<
       submit: "Enviar",
       pay: "Pagar",
       home: "Inicio",
-      left_in_stock: "{{available}} restantes",
+      left_in_stock: `${use("available")} restantes`,
       sold_out: "Agotado",
-      your_customer_id_is: "Su ID de cliente es <code>{{customer_id}}</code>",
+      your_customer_id_is: `Su ID de cliente es <code>${use("customer.short_id")}</code>`,
       formclosed: {
         default: {
           title: "Formulario Cerrado",
@@ -164,9 +182,9 @@ const resources: Record<
           description: "Gracias por su respuesta.",
         },
         receipt01: {
-          title: "Recibo Confirmado",
-          description:
-            "Considere tomar una captura de pantalla de esta página para sus registros.",
+          h1: `${use("response.idx")}`,
+          h2: `Recibo Confirmado - ${use("form_title")}`,
+          p: "Considere tomar una captura de pantalla de esta página para sus registros.",
         },
       },
       alreadyresponded: {
@@ -192,9 +210,9 @@ const resources: Record<
       submit: "제출",
       pay: "결제",
       home: "홈",
-      left_in_stock: "{{available}}개 남음",
+      left_in_stock: `${use("available")}개 남음`,
       sold_out: "매진됨",
-      your_customer_id_is: "고객 ID는 <code>{{customer_id}}</code>입니다",
+      your_customer_id_is: `고객 ID는 <code>${use("customer.short_id")}</code>입니다`,
       formclosed: {
         default: {
           title: "폼이 마감되었습니다",
@@ -225,9 +243,9 @@ const resources: Record<
           description: "응답해 주셔서 감사합니다.",
         },
         receipt01: {
-          title: "접수 완료",
-          description:
-            "접수가 완료되었습니다. 스크린샷을 찍어 접수 번호를 기록해 두세요.",
+          h1: `${use("response.idx")}`,
+          h2: `접수 완료 - ${use("form_title")}`,
+          p: "접수가 완료되었습니다. 스크린샷을 찍어 접수 번호를 기록해 두세요.",
         },
       },
       alreadyresponded: {
@@ -253,9 +271,9 @@ const resources: Record<
       submit: "提出する",
       pay: "支払う",
       home: "ホーム",
-      left_in_stock: "残り{{available}}個",
+      left_in_stock: `残り${use("available")}個`,
       sold_out: "完売",
-      your_customer_id_is: "お客様の顧客IDは<code>{{customer_id}}</code>です",
+      your_customer_id_is: `お客様の顧客IDは<code>${use("customer.short_id")}</code>です`,
       formclosed: {
         default: {
           title: "フォームは閉鎖されました",
@@ -286,9 +304,9 @@ const resources: Record<
           description: "回答いただきありがとうございます。",
         },
         receipt01: {
-          title: "受領確認済み",
-          description:
-            "このページのスクリーンショットを取って記録しておくことを検討してください。",
+          h1: `${use("response.idx")}`,
+          h2: `受領確認済み - ${use("form_title")}`,
+          p: "このページのスクリーンショットを取って記録しておくことを検討してください。",
         },
       },
       alreadyresponded: {
@@ -314,9 +332,9 @@ const resources: Record<
       submit: "提交",
       pay: "支付",
       home: "首页",
-      left_in_stock: "剩余{{available}}件",
+      left_in_stock: `剩余${use("available")}件`,
       sold_out: "售罄",
-      your_customer_id_is: "您的客户ID是<code>{{customer_id}}</code>",
+      your_customer_id_is: `您的客户ID是<code>${use("customer.short_id")}</code>`,
       formclosed: {
         default: {
           title: "表格已关闭",
@@ -345,8 +363,9 @@ const resources: Record<
           description: "感谢您的回应。",
         },
         receipt01: {
-          title: "收据已确认",
-          description: "考虑截图此页面以备记录。",
+          h1: `${use("response.idx")}`,
+          h2: `收据已确认 - ${use("form_title")}`,
+          p: "考虑截图此页面以备记录。",
         },
       },
       alreadyresponded: {
@@ -372,10 +391,9 @@ const resources: Record<
       submit: "Soumettre",
       pay: "Payer",
       home: "Accueil",
-      left_in_stock: "{{available}} restants",
+      left_in_stock: `${use("available")} restants`,
       sold_out: "Épuisé",
-      your_customer_id_is:
-        "Votre identifiant client est <code>{{customer_id}}</code>",
+      your_customer_id_is: `Votre identifiant client est <code>${use("customer.short_id")}</code>`,
       formclosed: {
         default: {
           title: "Formulaire Fermé",
@@ -407,9 +425,9 @@ const resources: Record<
           description: "Merci pour votre réponse.",
         },
         receipt01: {
-          title: "Reçu Confirmé",
-          description:
-            "Envisagez de prendre une capture d'écran de cette page pour vos dossiers.",
+          h1: `${use("response.idx")}`,
+          h2: `Reçu Confirmé - ${use("form_title")}`,
+          p: "Envisagez de prendre une capture d'écran de cette page pour vos dossiers.",
         },
       },
       alreadyresponded: {
@@ -435,9 +453,9 @@ const resources: Record<
       submit: "Enviar",
       pay: "Pagar",
       home: "Início",
-      left_in_stock: "{{available}} restantes",
+      left_in_stock: `${use("available")} restantes`,
       sold_out: "Esgotado",
-      your_customer_id_is: "Seu ID de cliente é <code>{{customer_id}}</code>",
+      your_customer_id_is: `Seu ID de cliente é <code>${use("customer.short_id")}</code>`,
       formclosed: {
         default: {
           title: "Formulário Fechado",
@@ -469,9 +487,9 @@ const resources: Record<
           description: "Obrigado pela sua resposta.",
         },
         receipt01: {
-          title: "Recebimento Confirmado",
-          description:
-            "Considere tirar uma captura de tela desta página para seus registros.",
+          h1: `${use("response.idx")}`,
+          h2: `Recebimento Confirmado - ${use("form_title")}`,
+          p: "Considere tirar uma captura de tela desta página para seus registros.",
         },
       },
       alreadyresponded: {
@@ -497,9 +515,9 @@ const resources: Record<
       submit: "Invia",
       pay: "Paga",
       home: "Home",
-      left_in_stock: "{{available}} rimasti",
+      left_in_stock: `${use("available")} rimasti`,
       sold_out: "Esaurito",
-      your_customer_id_is: "Il tuo ID cliente è <code>{{customer_id}}</code>",
+      your_customer_id_is: `Il tuo ID cliente è <code>${use("customer.short_id")}</code>`,
       formclosed: {
         default: {
           title: "Modulo Chiuso",
@@ -531,9 +549,9 @@ const resources: Record<
           description: "Grazie per la tua risposta.",
         },
         receipt01: {
-          title: "Ricevuta Confermata",
-          description:
-            "Considera di fare uno screenshot di questa pagina per i tuoi archivi.",
+          h1: `${use("response.idx")}`,
+          h2: `Ricevuta Confermata - ${use("form_title")}`,
+          p: "Considera di fare uno screenshot di questa pagina per i tuoi archivi.",
         },
       },
       alreadyresponded: {
@@ -559,10 +577,9 @@ const resources: Record<
       submit: "Einreichen",
       pay: "Bezahlen",
       home: "Startseite",
-      left_in_stock: "{{available}} übrig",
+      left_in_stock: `${use("available")} übrig`,
       sold_out: "Ausverkauft",
-      your_customer_id_is:
-        "Ihre Kundennummer lautet <code>{{customer_id}}</code>",
+      your_customer_id_is: `Ihre Kundennummer lautet <code>${use("customer.short_id")}</code>`,
       formclosed: {
         default: {
           title: "Formular Geschlossen",
@@ -594,9 +611,9 @@ const resources: Record<
           description: "Vielen Dank für Ihre Antwort.",
         },
         receipt01: {
-          title: "Empfang Bestätigt",
-          description:
-            "Erwägen Sie, einen Screenshot dieser Seite für Ihre Unterlagen zu machen.",
+          h1: `${use("response.idx")}`,
+          h2: `Empfang Bestätigt - ${use("form_title")}`,
+          p: "Erwägen Sie, einen Screenshot dieser Seite für Ihre Unterlagen zu machen.",
         },
       },
       alreadyresponded: {
@@ -622,9 +639,9 @@ const resources: Record<
       submit: "Отправить",
       pay: "Оплатить",
       home: "Главная",
-      left_in_stock: "Осталось {{available}} шт.",
+      left_in_stock: `Осталось ${use("available")} шт.`,
       sold_out: "Распродано",
-      your_customer_id_is: "Ваш ID клиента - <code>{{customer_id}}</code>",
+      your_customer_id_is: `Ваш ID клиента - <code>${use("customer.short_id")}</code>`,
       formclosed: {
         default: {
           title: "Форма закрыта",
@@ -654,9 +671,9 @@ const resources: Record<
           description: "Спасибо за ваш ответ.",
         },
         receipt01: {
-          title: "Квитанция Подтверждена",
-          description:
-            "Рассмотрите возможность сделать скриншот этой страницы для ваших записей.",
+          h1: `${use("response.idx")}`,
+          h2: `Квитанция Подтверждена - ${use("form_title")}`,
+          p: "Рассмотрите возможность сделать скриншот этой страницы для ваших записей.",
         },
       },
       alreadyresponded: {
@@ -682,10 +699,9 @@ const resources: Record<
       submit: "إرسال",
       pay: "دفع",
       home: "الرئيسية",
-      left_in_stock: "{{available}} متبقية",
+      left_in_stock: `${use("available")} متبقية`,
       sold_out: "نفذت الكمية",
-      your_customer_id_is:
-        "رقم هوية العميل الخاص بك هو <code>{{customer_id}}</code>",
+      your_customer_id_is: `رقم هوية العميل الخاص بك هو <code>${use("customer.short_id")}</code>`,
       formclosed: {
         default: {
           title: "النموذج مغلق",
@@ -715,8 +731,9 @@ const resources: Record<
           description: "شكراً لردك.",
         },
         receipt01: {
-          title: "تأكيد الاستلام",
-          description: "فكر في التقاط لقطة شاشة لهذه الصفحة لسجلاتك.",
+          h1: `${use("response.idx")}`,
+          h2: `${use("form_title")} - تأكيد الاستلام`,
+          p: "فكر في التقاط لقطة شاشة لهذه الصفحة لسجلاتك.",
         },
       },
       alreadyresponded: {
@@ -742,9 +759,9 @@ const resources: Record<
       submit: "जमा करें",
       pay: "भुगतान करें",
       home: "होम",
-      left_in_stock: "{{available}} बचे हैं",
+      left_in_stock: `${use("available")} बचे हैं`,
       sold_out: "बिक गया",
-      your_customer_id_is: "आपका ग्राहक आईडी है <code>{{customer_id}}</code>",
+      your_customer_id_is: `आपका ग्राहक आईडी है <code>${use("customer.short_id")}</code>`,
       formclosed: {
         default: {
           title: "फॉर्म बंद है",
@@ -775,9 +792,9 @@ const resources: Record<
           description: "आपके जवाब के लिए धन्यवाद।",
         },
         receipt01: {
-          title: "रसीद की पुष्टि",
-          description:
-            "अपने रिकॉर्ड के लिए इस पेज का स्क्रीनशॉट लेने पर विचार करें।",
+          h1: `${use("response.idx")}`,
+          h2: `रसीद की पुष्टि - ${use("form_title")}`,
+          p: "अपने रिकॉर्ड के लिए इस पेज का स्क्रीनशॉट लेने पर विचार करें।",
         },
       },
       alreadyresponded: {
@@ -803,9 +820,9 @@ const resources: Record<
       submit: "Indienen",
       pay: "Betalen",
       home: "Home",
-      left_in_stock: "Nog {{available}} beschikbaar",
+      left_in_stock: `Nog ${use("available")} beschikbaar`,
       sold_out: "Uitverkocht",
-      your_customer_id_is: "Uw klant-ID is <code>{{customer_id}}</code>",
+      your_customer_id_is: `Uw klant-ID is <code>${use("customer.short_id")}</code>`,
       formclosed: {
         default: {
           title: "Formulier Gesloten",
@@ -837,9 +854,9 @@ const resources: Record<
           description: "Bedankt voor uw reactie.",
         },
         receipt01: {
-          title: "Ontvangst Bevestigd",
-          description:
-            "Overweeg een screenshot van deze pagina te maken voor uw administratie.",
+          h1: `${use("response.idx")}`,
+          h2: `Ontvangst Bevestigd - ${use("form_title")}`,
+          p: "Overweeg een screenshot van deze pagina te maken voor uw administratie.",
         },
       },
       alreadyresponded: {

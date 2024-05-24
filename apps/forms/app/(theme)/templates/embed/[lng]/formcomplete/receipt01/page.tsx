@@ -28,8 +28,19 @@ export default async function Component({
   const title = searchParams.title || mock.title;
   return (
     <FormCompletePageTemplate_receipt01
+      title={title}
       form_title={title}
-      response_short_id={mock.response_short_id}
+      language={params.lng}
+      response={{
+        idx: "#123",
+        index: 123,
+        short_id: "R12",
+      }}
+      session={{}}
+      fields={{}}
+      customer={{
+        short_id: "C34",
+      }}
     />
   );
 }
