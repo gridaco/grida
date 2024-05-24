@@ -1,4 +1,4 @@
-import resources from "@/k/i18n";
+import resources from "@/i18n";
 import i18next from "i18next";
 import FormCompletePageDefault from "@/theme/templates/formcomplete/default";
 

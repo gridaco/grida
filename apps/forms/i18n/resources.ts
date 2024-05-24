@@ -1,11 +1,64 @@
 import type { FormsPageLanguage } from "@/types";
 
-type TVal = string | { [key: string]: TVal };
+interface Translation {
+  next: string;
+  back: string;
+  submit: string;
+  pay: string;
+  home: string;
+  left_in_stock: string;
+  sold_out: string;
+  your_customer_id_is: string;
+  formclosed: {
+    default: {
+      title: string;
+      description: string;
+    };
+    while_responding: {
+      title: string;
+      description: string;
+    };
+  };
+  formsoldout: {
+    default: {
+      title: string;
+      description: string;
+    };
+  };
+  formoptionsoldout: {
+    default: {
+      title: string;
+      description: string;
+    };
+  };
+  formcomplete: {
+    default: {
+      title: string;
+      description: string;
+    };
+    receipt01: {
+      title: string;
+      description: string;
+    };
+  };
+  alreadyresponded: {
+    default: {
+      title: string;
+      description: string;
+    };
+  };
+  badrequest: {
+    default: {
+      title: string;
+      description: string;
+    };
+  };
+}
 
 const resources: Record<
   FormsPageLanguage,
   {
-    translation: { [key: string]: TVal };
+    translation: Translation;
   }
 > = {
   en: {

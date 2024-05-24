@@ -30,7 +30,7 @@ import {
   HoverCardContent,
 } from "@/components/ui/hover-card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import resources from "@/k/i18n";
+import resources from "@/i18n";
 import { useMockedContext } from "@/scaffolds/template-editor/mock";
 import { TemplateTextEditor } from "@/scaffolds/template-editor/text-editor";
 import { ContextVariablesTable } from "@/scaffolds/template-editor/about-variable-table";

@@ -11,7 +11,7 @@ import {
   UUID_FORMAT_MISMATCH,
   VISITORID_FORMAT_MISMATCH,
 } from "@/k/error";
-import resources from "@/k/i18n";
+import resources from "@/i18n";
 import {
   SYSTEM_GF_CUSTOMER_EMAIL_KEY,
   SYSTEM_GF_CUSTOMER_UUID_KEY,
