@@ -50,8 +50,8 @@ export interface Translation {
   };
   formcomplete: {
     default: {
-      title: string;
-      description: string;
+      h1: string;
+      p: string;
     };
     receipt01: {
       h1: string;
@@ -116,8 +116,8 @@ const resources: Record<
       },
       formcomplete: {
         default: {
-          title: "Response Complete",
-          description: "Thank you for your response.",
+          h1: `${use("form_title")}`,
+          p: "Thank you for your response.",
         },
         receipt01: {
           h1: `${use("response.idx")}`,
@@ -178,8 +178,8 @@ const resources: Record<
       },
       formcomplete: {
         default: {
-          title: "Respuesta Completa",
-          description: "Gracias por su respuesta.",
+          h1: `${use("form_title")}`,
+          p: "Gracias por su respuesta.",
         },
         receipt01: {
           h1: `${use("response.idx")}`,
@@ -239,8 +239,8 @@ const resources: Record<
       },
       formcomplete: {
         default: {
-          title: "응답 완료",
-          description: "응답해 주셔서 감사합니다.",
+          h1: `${use("form_title")}`,
+          p: "응답해 주셔서 감사합니다.",
         },
         receipt01: {
           h1: `${use("response.idx")}`,
@@ -300,8 +300,8 @@ const resources: Record<
       },
       formcomplete: {
         default: {
-          title: "回答完了",
-          description: "回答いただきありがとうございます。",
+          h1: `${use("form_title")}`,
+          p: "回答いただきありがとうございます。",
         },
         receipt01: {
           h1: `${use("response.idx")}`,
@@ -359,8 +359,8 @@ const resources: Record<
       },
       formcomplete: {
         default: {
-          title: "回应完成",
-          description: "感谢您的回应。",
+          h1: `${use("form_title")}`,
+          p: "感谢您的回应。",
         },
         receipt01: {
           h1: `${use("response.idx")}`,
@@ -421,8 +421,8 @@ const resources: Record<
       },
       formcomplete: {
         default: {
-          title: "Réponse Complète",
-          description: "Merci pour votre réponse.",
+          h1: `${use("form_title")}`,
+          p: "Merci pour votre réponse.",
         },
         receipt01: {
           h1: `${use("response.idx")}`,
@@ -483,8 +483,8 @@ const resources: Record<
       },
       formcomplete: {
         default: {
-          title: "Resposta Completa",
-          description: "Obrigado pela sua resposta.",
+          h1: `${use("form_title")}`,
+          p: "Obrigado pela sua resposta.",
         },
         receipt01: {
           h1: `${use("response.idx")}`,
@@ -545,8 +545,8 @@ const resources: Record<
       },
       formcomplete: {
         default: {
-          title: "Risposta Completata",
-          description: "Grazie per la tua risposta.",
+          h1: `${use("form_title")}`,
+          p: "Grazie per la tua risposta.",
         },
         receipt01: {
           h1: `${use("response.idx")}`,
@@ -607,8 +607,8 @@ const resources: Record<
       },
       formcomplete: {
         default: {
-          title: "Antwort Abgeschlossen",
-          description: "Vielen Dank für Ihre Antwort.",
+          h1: `${use("form_title")}`,
+          p: "Vielen Dank für Ihre Antwort.",
         },
         receipt01: {
           h1: `${use("response.idx")}`,
@@ -667,8 +667,8 @@ const resources: Record<
       },
       formcomplete: {
         default: {
-          title: "Ответ завершен",
-          description: "Спасибо за ваш ответ.",
+          h1: `${use("form_title")}`,
+          p: "Спасибо за ваш ответ.",
         },
         receipt01: {
           h1: `${use("response.idx")}`,
@@ -727,8 +727,8 @@ const resources: Record<
       },
       formcomplete: {
         default: {
-          title: "اكتمل الرد",
-          description: "شكراً لردك.",
+          h1: `${use("form_title")}`,
+          p: "شكراً لردك.",
         },
         receipt01: {
           h1: `${use("response.idx")}`,
@@ -788,8 +788,8 @@ const resources: Record<
       },
       formcomplete: {
         default: {
-          title: "प्रतिक्रिया पूर्ण",
-          description: "आपके जवाब के लिए धन्यवाद।",
+          h1: `${use("form_title")}`,
+          p: "आपके जवाब के लिए धन्यवाद।",
         },
         receipt01: {
           h1: `${use("response.idx")}`,
@@ -850,8 +850,8 @@ const resources: Record<
       },
       formcomplete: {
         default: {
-          title: "Reactie Voltooid",
-          description: "Bedankt voor uw reactie.",
+          h1: `${use("form_title")}`,
+          p: "Bedankt voor uw reactie.",
         },
         receipt01: {
           h1: `${use("response.idx")}`,

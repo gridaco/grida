@@ -26,5 +26,10 @@ export default async function Component({
   });
 
   const title = searchParams.title || mock.title;
-  return <FormCompletePageDefault form_title={title} />;
+  return (
+    <main className="flex items-center justify-center min-h-screen">
+      {/* @ts-ignore */}
+      <FormCompletePageDefault form_title={title} />
+    </main>
+  );
 }

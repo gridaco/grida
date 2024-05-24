@@ -4,7 +4,6 @@ import { notFound } from "next/navigation";
 import { EndingPage } from "@/theme/templates/formcomplete";
 import { ssr_page_init_i18n } from "../../i18n";
 import { fmt_local_index } from "@/utils/fmt";
-import FormCompletePageDefault from "@/theme/templates/formcomplete/default";
 
 export default async function SubmitCompletePage({
   params,
@@ -40,14 +39,6 @@ export default async function SubmitCompletePage({
 
   const { title, ending_page_template_id } = data;
 
-  switch (ending_page_template_id) {
-    case undefined:
-    case null:
-    case "default": {
-      return <FormCompletePageDefault form_title={title} />;
-    }
-  }
-
   if (!response_id) {
     return notFound();
   }
@@ -65,25 +56,27 @@ export default async function SubmitCompletePage({
   const { local_index, local_id } = response;
 
   return (
-    <EndingPage
-      template_id={ending_page_template_id}
-      data={{
-        title: title,
-        language: data.default_form_page_language,
-        form_title: title,
-        response: {
-          index: local_index,
-          idx: fmt_local_index(local_index),
-          short_id: local_id,
-        },
+    <main className="flex items-center justify-center min-h-screen">
+      <EndingPage
+        template_id={ending_page_template_id}
+        data={{
+          title: title,
+          language: data.default_form_page_language,
+          form_title: title,
+          response: {
+            index: local_index,
+            idx: fmt_local_index(local_index),
+            short_id: local_id,
+          },
 
-        // FIXME:
-        fields: {},
-        session: {},
-        customer: {
-          short_id: "",
-        },
-      }}
-    />
+          // FIXME:
+          fields: {},
+          session: {},
+          customer: {
+            short_id: "",
+          },
+        }}
+      />
+    </main>
   );
 }
