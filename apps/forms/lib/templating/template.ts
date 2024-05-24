@@ -1,7 +1,7 @@
 import Handlebars from "handlebars";
 import type { TemplateVariables } from ".";
 
-export function template(
+export function render(
   source: string,
   context: TemplateVariables.FormResponseContext
 ) {
