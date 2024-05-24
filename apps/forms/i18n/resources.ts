@@ -1,6 +1,6 @@
 import type { FormsPageLanguage } from "@/types";
 
-interface Translation {
+export interface Translation {
   next: string;
   back: string;
   submit: string;
@@ -130,7 +130,20 @@ const resources: Record<
       submit: "Enviar",
       pay: "Pagar",
       home: "Inicio",
+      left_in_stock: "{{available}} restantes",
+      sold_out: "Agotado",
       your_customer_id_is: "Su ID de cliente es <code>{{customer_id}}</code>",
+      formclosed: {
+        default: {
+          title: "Formulario Cerrado",
+          description: "Este formulario ya no acepta respuestas.",
+        },
+        while_responding: {
+          title: "Formulario Cerrado",
+          description:
+            "Gracias por su interés. Desafortunadamente, el formulario se cerró durante la respuesta. Si cree que esto es un error, por favor contacte al soporte.",
+        },
+      },
       formsoldout: {
         default: {
           title: "Agotado",
@@ -145,6 +158,17 @@ const resources: Record<
             "La opción seleccionada está agotada y ya no está disponible.",
         },
       },
+      formcomplete: {
+        default: {
+          title: "Respuesta Completa",
+          description: "Gracias por su respuesta.",
+        },
+        receipt01: {
+          title: "Recibo Confirmado",
+          description:
+            "Considere tomar una captura de pantalla de esta página para sus registros.",
+        },
+      },
       alreadyresponded: {
         default: {
           title: "Ya ha respondido",
@@ -152,22 +176,11 @@ const resources: Record<
             "Si considera que esto es un error, por favor contacte al soporte.",
         },
       },
-      formclosed: {
+      badrequest: {
         default: {
-          title: "Formulario Cerrado",
-          description: "Este formulario ya no acepta respuestas.",
-        },
-        while_responding: {
-          title: "Formulario Cerrado",
+          title: "Algo salió mal",
           description:
-            "Gracias por su interés. Desafortunadamente, el formulario se cerró durante la respuesta. Si cree que esto es un error, por favor contacte al soporte.",
-        },
-      },
-      formcomplete: {
-        receipt01: {
-          title: "Recibo Confirmado",
-          description:
-            "Considere tomar una captura de pantalla de esta página para sus registros.",
+            "Su solicitud no pudo ser procesada. Esto puede haber ocurrido porque el formulario fue alterado durante el proceso de envío o está utilizando una versión desactualizada de la aplicación. Si el problema persiste, por favor contacte a nuestro equipo de soporte para obtener ayuda.",
         },
       },
     },
@@ -240,7 +253,20 @@ const resources: Record<
       submit: "提出する",
       pay: "支払う",
       home: "ホーム",
+      left_in_stock: "残り{{available}}個",
+      sold_out: "完売",
       your_customer_id_is: "お客様の顧客IDは<code>{{customer_id}}</code>です",
+      formclosed: {
+        default: {
+          title: "フォームは閉鎖されました",
+          description: "このフォームはもう回答を受け付けていません。",
+        },
+        while_responding: {
+          title: "フォームは閉鎖されました",
+          description:
+            "ご関心をお寄せいただきありがとうございます。残念ながら、回答中にフォームが閉鎖されました。これが誤りであると思われる場合は、サポートに連絡してください。",
+        },
+      },
       formsoldout: {
         default: {
           title: "完売",
@@ -254,6 +280,17 @@ const resources: Record<
           description: "選択されたオプションは売り切れで、もう利用できません。",
         },
       },
+      formcomplete: {
+        default: {
+          title: "回答完了",
+          description: "回答いただきありがとうございます。",
+        },
+        receipt01: {
+          title: "受領確認済み",
+          description:
+            "このページのスクリーンショットを取って記録しておくことを検討してください。",
+        },
+      },
       alreadyresponded: {
         default: {
           title: "既に回答済み",
@@ -261,22 +298,11 @@ const resources: Record<
             "このフォームはすでに提出されています。これが間違いだと思われる場合は、サポートに連絡してください。",
         },
       },
-      formclosed: {
+      badrequest: {
         default: {
-          title: "フォームは閉鎖されました",
-          description: "このフォームはもう回答を受け付けていません。",
-        },
-        while_responding: {
-          title: "フォームは閉鎖されました",
+          title: "エラーが発生しました",
           description:
-            "ご関心をお寄せいただきありがとうございます。残念ながら、回答中にフォームが閉鎖されました。これが誤りであると思われる場合は、サポートに連絡してください。",
-        },
-      },
-      formcomplete: {
-        receipt01: {
-          title: "受領確認済み",
-          description:
-            "このページのスクリーンショットを取って記録しておくことを検討してください。",
+            "リクエストを処理できませんでした。送信プロセス中にフォームが変更されたか、アプリの古いバージョンを使用している可能性があります。問題が解決しない場合は、サポートチームにお問い合わせください。",
         },
       },
     },
@@ -288,7 +314,19 @@ const resources: Record<
       submit: "提交",
       pay: "支付",
       home: "首页",
+      left_in_stock: "剩余{{available}}件",
+      sold_out: "售罄",
       your_customer_id_is: "您的客户ID是<code>{{customer_id}}</code>",
+      formclosed: {
+        default: {
+          title: "表格已关闭",
+          description: "此表格不再接受回应。",
+        },
+        while_responding: {
+          title: "表格已关闭",
+          description: "如果您认为这是一个错误，请及时联系支持团队。",
+        },
+      },
       formsoldout: {
         default: {
           title: "售罄",
@@ -301,6 +339,16 @@ const resources: Record<
           description: "所选选项已售罄，不再提供。",
         },
       },
+      formcomplete: {
+        default: {
+          title: "回应完成",
+          description: "感谢您的回应。",
+        },
+        receipt01: {
+          title: "收据已确认",
+          description: "考虑截图此页面以备记录。",
+        },
+      },
       alreadyresponded: {
         default: {
           title: "已经回应",
@@ -308,20 +356,11 @@ const resources: Record<
             "您已经提交过此表格。如果您认为这是一个错误，请联系支持。",
         },
       },
-      formclosed: {
+      badrequest: {
         default: {
-          title: "表格已关闭",
-          description: "此表格不再接受回应。",
-        },
-        while_responding: {
-          title: "表格已关闭",
-          description: "如果您认为这是一个错误，请及时联系支持团队。",
-        },
-      },
-      formcomplete: {
-        receipt01: {
-          title: "收据已确认",
-          description: "考虑截图此页面以备记录。",
+          title: "发生错误",
+          description:
+            "您的请求无法处理。可能是因为在提交过程中表格被修改了或者您使用的是旧版本的应用程序。如果问题仍然存在，请联系支持团队寻求帮助。",
         },
       },
     },
@@ -333,8 +372,21 @@ const resources: Record<
       submit: "Soumettre",
       pay: "Payer",
       home: "Accueil",
+      left_in_stock: "{{available}} restants",
+      sold_out: "Épuisé",
       your_customer_id_is:
         "Votre identifiant client est <code>{{customer_id}}</code>",
+      formclosed: {
+        default: {
+          title: "Formulaire Fermé",
+          description: "Ce formulaire n'accepte plus de réponses.",
+        },
+        while_responding: {
+          title: "Formulaire Fermé",
+          description:
+            "Merci de votre intérêt. Malheureusement, le formulaire a été fermé pendant que vous répondiez. Si vous pensez que c'est une erreur, veuillez contacter le support.",
+        },
+      },
       formsoldout: {
         default: {
           title: "Épuisé",
@@ -349,6 +401,17 @@ const resources: Record<
             "L'option sélectionnée est épuisée et n'est plus disponible.",
         },
       },
+      formcomplete: {
+        default: {
+          title: "Réponse Complète",
+          description: "Merci pour votre réponse.",
+        },
+        receipt01: {
+          title: "Reçu Confirmé",
+          description:
+            "Envisagez de prendre une capture d'écran de cette page pour vos dossiers.",
+        },
+      },
       alreadyresponded: {
         default: {
           title: "Déjà répondu",
@@ -356,22 +419,11 @@ const resources: Record<
             "Vous avez déjà soumis ce formulaire. Si vous pensez que c'est une erreur, veuillez contacter le support.",
         },
       },
-      formclosed: {
+      badrequest: {
         default: {
-          title: "Formulaire Fermé",
-          description: "Ce formulaire n'accepte plus de réponses.",
-        },
-        while_responding: {
-          title: "Formulaire Fermé",
+          title: "Quelque chose s'est mal passé",
           description:
-            "Merci de votre intérêt. Malheureusement, le formulaire a été fermé pendant que vous répondiez. Si vous pensez que c'est une erreur, veuillez contacter le support.",
-        },
-      },
-      formcomplete: {
-        receipt01: {
-          title: "Reçu Confirmé",
-          description:
-            "Envisagez de prendre une capture d'écran de cette page pour vos dossiers.",
+            "Votre demande n'a pas pu être traitée. Cela peut être dû au fait que le formulaire a été modifié pendant le processus de soumission ou que vous utilisez une version obsolète de l'application. Si le problème persiste, veuillez contacter notre équipe de support pour obtenir de l'aide.",
         },
       },
     },
@@ -383,7 +435,20 @@ const resources: Record<
       submit: "Enviar",
       pay: "Pagar",
       home: "Início",
+      left_in_stock: "{{available}} restantes",
+      sold_out: "Esgotado",
       your_customer_id_is: "Seu ID de cliente é <code>{{customer_id}}</code>",
+      formclosed: {
+        default: {
+          title: "Formulário Fechado",
+          description: "Este formulário não está mais aceitando respostas.",
+        },
+        while_responding: {
+          title: "Formulário Fechado",
+          description:
+            "Obrigado pelo seu interesse. Infelizmente, o formulário foi fechado enquanto você respondia. Se você acredita que isso é um erro, por favor entre em contato com o suporte.",
+        },
+      },
       formsoldout: {
         default: {
           title: "Esgotado",
@@ -398,6 +463,17 @@ const resources: Record<
             "A opção selecionada está esgotada e não está mais disponível.",
         },
       },
+      formcomplete: {
+        default: {
+          title: "Resposta Completa",
+          description: "Obrigado pela sua resposta.",
+        },
+        receipt01: {
+          title: "Recebimento Confirmado",
+          description:
+            "Considere tirar uma captura de tela desta página para seus registros.",
+        },
+      },
       alreadyresponded: {
         default: {
           title: "Já Respondido",
@@ -405,22 +481,11 @@ const resources: Record<
             "Você já enviou este formulário. Se acredita que isso é um erro, por favor entre em contato com o suporte.",
         },
       },
-      formclosed: {
+      badrequest: {
         default: {
-          title: "Formulário Fechado",
-          description: "Este formulário não está mais aceitando respostas.",
-        },
-        while_responding: {
-          title: "Formulário Fechado",
+          title: "Algo deu errado",
           description:
-            "Obrigado pelo seu interesse. Infelizmente, o formulário foi fechado enquanto você respondia. Se você acredita que isso é um erro, por favor entre em contato com o suporte.",
-        },
-      },
-      formcomplete: {
-        receipt01: {
-          title: "Recebimento Confirmado",
-          description:
-            "Considere tirar uma captura de tela desta página para seus registros.",
+            "Sua solicitação não pôde ser processada. Isso pode ter ocorrido porque o formulário foi alterado durante o processo de envio ou você está usando uma versão desatualizada do aplicativo. Se o problema persistir, entre em contato com nossa equipe de suporte para obter assistência.",
         },
       },
     },
@@ -432,7 +497,20 @@ const resources: Record<
       submit: "Invia",
       pay: "Paga",
       home: "Home",
+      left_in_stock: "{{available}} rimasti",
+      sold_out: "Esaurito",
       your_customer_id_is: "Il tuo ID cliente è <code>{{customer_id}}</code>",
+      formclosed: {
+        default: {
+          title: "Modulo Chiuso",
+          description: "Questo modulo non accetta più risposte.",
+        },
+        while_responding: {
+          title: "Modulo Chiuso",
+          description:
+            "Grazie per il tuo interesse. Sfortunatamente, il modulo è stato chiuso durante la compilazione. Se credi che sia un errore, contatta l'assistenza.",
+        },
+      },
       formsoldout: {
         default: {
           title: "Esaurito",
@@ -447,6 +525,17 @@ const resources: Record<
             "L'opzione selezionata è esaurita e non è più disponibile.",
         },
       },
+      formcomplete: {
+        default: {
+          title: "Risposta Completata",
+          description: "Grazie per la tua risposta.",
+        },
+        receipt01: {
+          title: "Ricevuta Confermata",
+          description:
+            "Considera di fare uno screenshot di questa pagina per i tuoi archivi.",
+        },
+      },
       alreadyresponded: {
         default: {
           title: "Già Risposto",
@@ -454,22 +543,11 @@ const resources: Record<
             "Hai già inviato questo modulo. Se pensi che sia un errore, contatta il supporto.",
         },
       },
-      formclosed: {
+      badrequest: {
         default: {
-          title: "Modulo Chiuso",
-          description: "Questo modulo non accetta più risposte.",
-        },
-        while_responding: {
-          title: "Modulo Chiuso",
+          title: "Qualcosa è andato storto",
           description:
-            "Grazie per il tuo interesse. Sfortunatamente, il modulo è stato chiuso durante la compilazione. Se credi che sia un errore, contatta l'assistenza.",
-        },
-      },
-      formcomplete: {
-        receipt01: {
-          title: "Ricevuta Confermata",
-          description:
-            "Considera di fare uno screenshot di questa pagina per i tuoi archivi.",
+            "La tua richiesta non può essere elaborata. Ciò può essere accaduto perché il modulo è stato modificato durante il processo di invio o stai utilizzando una versione obsoleta dell'app. Se il problema persiste, contatta il nostro team di supporto per assistenza.",
         },
       },
     },
@@ -481,8 +559,21 @@ const resources: Record<
       submit: "Einreichen",
       pay: "Bezahlen",
       home: "Startseite",
+      left_in_stock: "{{available}} übrig",
+      sold_out: "Ausverkauft",
       your_customer_id_is:
         "Ihre Kundennummer lautet <code>{{customer_id}}</code>",
+      formclosed: {
+        default: {
+          title: "Formular Geschlossen",
+          description: "Dieses Formular akzeptiert keine Antworten mehr.",
+        },
+        while_responding: {
+          title: "Formular Geschlossen",
+          description:
+            "Vielen Dank für Ihr Interesse. Leider wurde das Formular während der Beantwortung geschlossen. Wenn Sie glauben, dass dies ein Fehler ist, kontaktieren Sie bitte den Support.",
+        },
+      },
       formsoldout: {
         default: {
           title: "Ausverkauft",
@@ -497,6 +588,17 @@ const resources: Record<
             "Die gewählte Option ist ausverkauft und nicht mehr verfügbar.",
         },
       },
+      formcomplete: {
+        default: {
+          title: "Antwort Abgeschlossen",
+          description: "Vielen Dank für Ihre Antwort.",
+        },
+        receipt01: {
+          title: "Empfang Bestätigt",
+          description:
+            "Erwägen Sie, einen Screenshot dieser Seite für Ihre Unterlagen zu machen.",
+        },
+      },
       alreadyresponded: {
         default: {
           title: "Schon geantwortet",
@@ -504,22 +606,11 @@ const resources: Record<
             "Sie haben dieses Formular bereits eingereicht. Wenn Sie glauben, dass dies ein Fehler ist, kontaktieren Sie bitte den Support.",
         },
       },
-      formclosed: {
+      badrequest: {
         default: {
-          title: "Formular Geschlossen",
-          description: "Dieses Formular akzeptiert keine Antworten mehr.",
-        },
-        while_responding: {
-          title: "Formular Geschlossen",
+          title: "Etwas ist schief gelaufen",
           description:
-            "Vielen Dank für Ihr Interesse. Leider wurde das Formular während der Beantwortung geschlossen. Wenn Sie glauben, dass dies ein Fehler ist, kontaktieren Sie bitte den Support.",
-        },
-      },
-      formcomplete: {
-        receipt01: {
-          title: "Empfang Bestätigt",
-          description:
-            "Erwägen Sie, einen Screenshot dieser Seite für Ihre Unterlagen zu machen.",
+            "Ihre Anfrage konnte nicht bearbeitet werden. Dies kann passiert sein, weil das Formular während des Einreichungsprozesses geändert wurde oder Sie eine veraltete Version der App verwenden. Wenn das Problem weiterhin besteht, kontaktieren Sie bitte unser Support-Team für Unterstützung.",
         },
       },
     },
@@ -531,7 +622,20 @@ const resources: Record<
       submit: "Отправить",
       pay: "Оплатить",
       home: "Главная",
+      left_in_stock: "Осталось {{available}} шт.",
+      sold_out: "Распродано",
       your_customer_id_is: "Ваш ID клиента - <code>{{customer_id}}</code>",
+      formclosed: {
+        default: {
+          title: "Форма закрыта",
+          description: "Эта форма больше не принимает ответы.",
+        },
+        while_responding: {
+          title: "Форма закрыта",
+          description:
+            "Спасибо за ваш интерес. К сожалению, форма была закрыта во время ответа. Если вы считаете, что это ошибка, пожалуйста, свяжитесь со службой поддержки.",
+        },
+      },
       formsoldout: {
         default: {
           title: "Распродано",
@@ -544,6 +648,17 @@ const resources: Record<
           description: "Выбранная опция распродана и больше не доступна.",
         },
       },
+      formcomplete: {
+        default: {
+          title: "Ответ завершен",
+          description: "Спасибо за ваш ответ.",
+        },
+        receipt01: {
+          title: "Квитанция Подтверждена",
+          description:
+            "Рассмотрите возможность сделать скриншот этой страницы для ваших записей.",
+        },
+      },
       alreadyresponded: {
         default: {
           title: "Уже ответили",
@@ -551,22 +666,11 @@ const resources: Record<
             "Вы уже отправили эту форму. Если вы считаете, что это ошибка, пожалуйста, свяжитесь со службой поддержки.",
         },
       },
-      formclosed: {
+      badrequest: {
         default: {
-          title: "Форма закрыта",
-          description: "Эта форма больше не принимает ответы.",
-        },
-        while_responding: {
-          title: "Форма закрыта",
+          title: "Что-то пошло не так",
           description:
-            "Спасибо за ваш интерес. К сожалению, форма была закрыта во время ответа. Если вы считаете, что это ошибка, пожалуйста, свяжитесь со службой поддержки.",
-        },
-      },
-      formcomplete: {
-        receipt01: {
-          title: "Квитанция Подтверждена",
-          description:
-            "Рассмотрите возможность сделать скриншот этой страницы для ваших записей.",
+            "Ваш запрос не может быть обработан. Это могло произойти, потому что форма была изменена во время процесса отправки или вы используете устаревшую версию приложения. Если проблема сохраняется, пожалуйста, свяжитесь с нашей службой поддержки для получения помощи.",
         },
       },
     },
@@ -578,8 +682,21 @@ const resources: Record<
       submit: "إرسال",
       pay: "دفع",
       home: "الرئيسية",
+      left_in_stock: "{{available}} متبقية",
+      sold_out: "نفذت الكمية",
       your_customer_id_is:
         "رقم هوية العميل الخاص بك هو <code>{{customer_id}}</code>",
+      formclosed: {
+        default: {
+          title: "النموذج مغلق",
+          description: "هذا النموذج لم يعد يقبل الردود.",
+        },
+        while_responding: {
+          title: "النموذج مغلق",
+          description:
+            "شكراً لاهتمامك. للأسف تم إغلاق النموذج أثناء الرد. إذا كنت تعتقد أن هذا خطأ، الرجاء التواصل مع الدعم.",
+        },
+      },
       formsoldout: {
         default: {
           title: "نفذت الكمية",
@@ -592,6 +709,16 @@ const resources: Record<
           description: "الخيار المختار نفذ ولم يعد متوفرًا.",
         },
       },
+      formcomplete: {
+        default: {
+          title: "اكتمل الرد",
+          description: "شكراً لردك.",
+        },
+        receipt01: {
+          title: "تأكيد الاستلام",
+          description: "فكر في التقاط لقطة شاشة لهذه الصفحة لسجلاتك.",
+        },
+      },
       alreadyresponded: {
         default: {
           title: "تم الرد بالفعل",
@@ -599,21 +726,11 @@ const resources: Record<
             "لقد قدمت هذا النموذج بالفعل. إذا كنت تعتقد أن هذا خطأ، الرجاء التواصل مع الدعم.",
         },
       },
-      formclosed: {
+      badrequest: {
         default: {
-          title: "النموذج مغلق",
-          description: "هذا النموذج لم يعد يقبل الردود.",
-        },
-        while_responding: {
-          title: "النموذج مغلق",
+          title: "حدث خطأ ما",
           description:
-            "شكراً لاهتمامك. للأسف تم إغلاق النموذج أثناء الرد. إذا كنت تعتقد أن هذا خطأ، الرجاء التواصل مع الدعم.",
-        },
-      },
-      formcomplete: {
-        receipt01: {
-          title: "تأكيد الاستلام",
-          description: "فكر في التقاط لقطة شاشة لهذه الصفحة لسجلاتك.",
+            "تعذر معالجة طلبك. قد يكون هذا بسبب تغيير النموذج أثناء عملية الإرسال أو أنك تستخدم إصدارًا قديمًا من التطبيق. إذا استمرت المشكلة، يرجى الاتصال بفريق الدعم لدينا للحصول على المساعدة.",
         },
       },
     },
@@ -625,7 +742,20 @@ const resources: Record<
       submit: "जमा करें",
       pay: "भुगतान करें",
       home: "होम",
+      left_in_stock: "{{available}} बचे हैं",
+      sold_out: "बिक गया",
       your_customer_id_is: "आपका ग्राहक आईडी है <code>{{customer_id}}</code>",
+      formclosed: {
+        default: {
+          title: "फॉर्म बंद है",
+          description: "यह फॉर्म अब प्रतिक्रिया स्वीकार नहीं कर रहा है।",
+        },
+        while_responding: {
+          title: "फॉर्म बंद है",
+          description:
+            "आपकी दिलचस्पी के लिए धन्यवाद। दुर्भाग्यवश, प्रतिक्रिया देते समय फॉर्म बंद हो गया है। अगर आपको लगता है कि यह गलती है, तो कृपया समर्थन से संपर्क करें।",
+        },
+      },
       formsoldout: {
         default: {
           title: "बिक गया",
@@ -639,6 +769,17 @@ const resources: Record<
           description: "चुना गया विकल्प बिक गया है और अब उपलब्ध नहीं है।",
         },
       },
+      formcomplete: {
+        default: {
+          title: "प्रतिक्रिया पूर्ण",
+          description: "आपके जवाब के लिए धन्यवाद।",
+        },
+        receipt01: {
+          title: "रसीद की पुष्टि",
+          description:
+            "अपने रिकॉर्ड के लिए इस पेज का स्क्रीनशॉट लेने पर विचार करें।",
+        },
+      },
       alreadyresponded: {
         default: {
           title: "पहले ही जवाब दे दिया गया है",
@@ -646,22 +787,11 @@ const resources: Record<
             "आप इस फॉर्म का जवाब पहले ही दे चुके हैं। अगर आपको लगता है कि यह गलती है, तो कृपया समर्थन से संपर्क करें।",
         },
       },
-      formclosed: {
+      badrequest: {
         default: {
-          title: "फॉर्म बंद है",
-          description: "यह फॉर्म अब प्रतिक्रिया स्वीकार नहीं कर रहा है।",
-        },
-        while_responding: {
-          title: "फॉर्म बंद है",
+          title: "कुछ गलत हो गया",
           description:
-            "आपकी दिलचस्पी के लिए धन्यवाद। दुर्भाग्यवश, प्रतिक्रिया देते समय फॉर्म बंद हो गया है। अगर आपको लगता है कि यह गलती है, तो कृपया समर्थन से संपर्क करें।",
-        },
-      },
-      formcomplete: {
-        receipt01: {
-          title: "रसीद की पुष्टि",
-          description:
-            "अपने रिकॉर्ड के लिए इस पेज का स्क्रीनशॉट लेने पर विचार करें।",
+            "आपका अनुरोध संसाधित नहीं हो सका। यह इसलिए हो सकता है क्योंकि सबमिशन प्रक्रिया के दौरान फॉर्म में बदलाव किया गया या आप ऐप का पुराना संस्करण उपयोग कर रहे हैं। अगर समस्या बनी रहती है, तो कृपया सहायता के लिए हमारे समर्थन टीम से संपर्क करें।",
         },
       },
     },
@@ -673,7 +803,20 @@ const resources: Record<
       submit: "Indienen",
       pay: "Betalen",
       home: "Home",
+      left_in_stock: "Nog {{available}} beschikbaar",
+      sold_out: "Uitverkocht",
       your_customer_id_is: "Uw klant-ID is <code>{{customer_id}}</code>",
+      formclosed: {
+        default: {
+          title: "Formulier Gesloten",
+          description: "Dit formulier accepteert geen reacties meer.",
+        },
+        while_responding: {
+          title: "Formulier Gesloten",
+          description:
+            "Dank u voor uw interesse. Helaas is het formulier gesloten terwijl u reageerde. Als u denkt dat dit een vergissing is, neem dan contact op met de ondersteuning.",
+        },
+      },
       formsoldout: {
         default: {
           title: "Uitverkocht",
@@ -688,6 +831,17 @@ const resources: Record<
             "De geselecteerde optie is uitverkocht en niet meer beschikbaar.",
         },
       },
+      formcomplete: {
+        default: {
+          title: "Reactie Voltooid",
+          description: "Bedankt voor uw reactie.",
+        },
+        receipt01: {
+          title: "Ontvangst Bevestigd",
+          description:
+            "Overweeg een screenshot van deze pagina te maken voor uw administratie.",
+        },
+      },
       alreadyresponded: {
         default: {
           title: "Al Gereageerd",
@@ -695,22 +849,11 @@ const resources: Record<
             "U heeft dit formulier al ingediend. Als u denkt dat dit een vergissing is, neem dan contact op met de ondersteuning.",
         },
       },
-      formclosed: {
+      badrequest: {
         default: {
-          title: "Formulier Gesloten",
-          description: "Dit formulier accepteert geen reacties meer.",
-        },
-        while_responding: {
-          title: "Formulier Gesloten",
+          title: "Er is iets misgegaan",
           description:
-            "Dank u voor uw interesse. Helaas is het formulier gesloten terwijl u reageerde. Als u denkt dat dit een vergissing is, neem dan contact op met de ondersteuning.",
-        },
-      },
-      formcomplete: {
-        receipt01: {
-          title: "Ontvangst Bevestigd",
-          description:
-            "Overweeg een screenshot van deze pagina te maken voor uw administratie.",
+            "Uw verzoek kon niet worden verwerkt. Dit kan zijn gebeurd omdat het formulier tijdens het indienen is gewijzigd of omdat u een verouderde versie van de app gebruikt. Als het probleem aanhoudt, neem dan contact op met ons ondersteuningsteam voor hulp.",
         },
       },
     },
