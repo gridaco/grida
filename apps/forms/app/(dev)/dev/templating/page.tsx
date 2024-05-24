@@ -1,12 +1,7 @@
 "use client";
-import { useEffect, useMemo, useState } from "react";
+
+import React, { useEffect, useMemo, useState } from "react";
 import { render } from "@/lib/templating/template";
-import {
-  Card,
-  CardContent,
-  CardFooter,
-  CardHeader,
-} from "@/components/ui/card";
 import { z } from "zod";
 import {
   Select,
@@ -34,15 +29,55 @@ import resources from "@/i18n";
 import { useMockedContext } from "@/scaffolds/template-editor/mock";
 import { TemplateTextEditor } from "@/scaffolds/template-editor/text-editor";
 import { ContextVariablesTable } from "@/scaffolds/template-editor/about-variable-table";
+import { Component as FormCompleteDefault } from "@/theme/templates/formcomplete/default";
+import { Component as FormCompleteReceipt01 } from "@/theme/templates/formcomplete/receipt01";
+
+function getComponent(template_id: string) {
+  switch (template_id) {
+    case "default":
+      return FormCompleteDefault;
+    case "receipt01":
+      return FormCompleteReceipt01;
+    default:
+      return FormCompleteDefault;
+  }
+}
 
 export default function TemplatingDevPage() {
+  const [templateId, setTemplateId] = useState("default" as string);
   const [isModified, setIsModified] = useState(false);
   const [contextRefreshKey, setContextRefreshKey] = useState(0);
-  const [texts, setTexts] = useState<Record<string, string>>({
-    h1: ExamplePropsZ.shape.h1._def.defaultValue(),
-    h2: ExamplePropsZ.shape.h2._def.defaultValue(),
-    p: ExamplePropsZ.shape.p._def.defaultValue(),
-  });
+  const [texts, setTexts] = useState<Record<string, string>>({});
+
+  const lang = "en";
+
+  const propTypes = useMemo(
+    () =>
+      getPropTypes(
+        resources[lang].translation["formcomplete"][
+          templateId as keyof (typeof resources)["en"]["translation"]["formcomplete"]
+        ]
+      ),
+    [templateId]
+  );
+
+  useEffect(() => {
+    const defaults = Object.keys(propTypes.shape).reduce(
+      (acc: typeof propTypes.shape, key) => {
+        return {
+          ...acc,
+          [key]:
+            propTypes.shape[
+              key as keyof typeof propTypes.shape
+              // @ts-ignore
+            ]._def.defaultValue(),
+        };
+      },
+      {}
+    );
+
+    setTexts(defaults);
+  }, [propTypes]);
 
   const onTextChange = (key: string, value: string) => {
     setTexts((prev) => ({ ...prev, [key]: value }));
@@ -51,11 +86,11 @@ export default function TemplatingDevPage() {
 
   const context = useMockedContext(
     {
-      title: "Form Title",
+      title: undefined,
     },
     {
       refreshKey: String(contextRefreshKey),
-      lang: "en",
+      lang: lang,
     }
   );
 
@@ -87,12 +122,13 @@ export default function TemplatingDevPage() {
             <Button size="icon" variant="outline">
               <CaretLeftIcon />
             </Button>
-            <Select>
+            <Select value={templateId} onValueChange={setTemplateId}>
               <SelectTrigger className="w-auto">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="example 1">Example 1</SelectItem>
+                <SelectItem value="default">default</SelectItem>
+                <SelectItem value="receipt01">receipt01</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -119,8 +155,11 @@ export default function TemplatingDevPage() {
         {/*  */}
         <div className="flex-1 h-full p-4">
           <div className="h-full flex items-center justify-center">
-            {/* @ts-ignore */}
-            <Example {...out} />
+            {React.createElement(
+              // @ts-ignore
+              getComponent(templateId),
+              { ...out }
+            )}
           </div>
         </div>
         <aside className="border-s flex-1 h-full max-w-md overflow-y-scroll">
@@ -185,11 +224,12 @@ export default function TemplatingDevPage() {
                 </section>
               </article>
             </header>
-            <div>
-              {Object.keys(ExamplePropsZ.shape).map((key) => {
+            <div key={templateId}>
+              {Object.keys(propTypes.shape).map((key) => {
                 const defaultValue =
-                  ExamplePropsZ.shape[
-                    key as keyof typeof ExamplePropsZ.shape
+                  propTypes.shape[
+                    key as keyof typeof propTypes.shape
+                    // @ts-ignore
                   ]._def.defaultValue();
                 return (
                   <div key={key} className="grid mb-10">
@@ -216,39 +256,13 @@ export default function TemplatingDevPage() {
   );
 }
 
-const ExamplePropsZ = z.object({
-  h1: z.string().default("{{response.idx}}"),
-  h2: z
-    .string()
-    .default(resources.en.translation["formcomplete"]["receipt01"]["h2"]),
-  p: z
-    .string()
-    .default(resources.en.translation["formcomplete"]["receipt01"]["p"]),
-});
-
-function Example({ h1, h2, p }: { h1: string; h2: string; p: string }) {
-  return (
-    <Card className="w-full max-w-md p-4">
-      <CardHeader className="flex flex-col items-center">
-        <div
-          id="h1"
-          className="text-5xl font-black text-accent-foreground mb-4"
-          dangerouslySetInnerHTML={{ __html: h1 }}
-        />
-        <h2
-          id="h2"
-          className="text-lg text-center font-bold tracking-tight"
-          dangerouslySetInnerHTML={{ __html: h2 }}
-        />
-      </CardHeader>
-      <CardContent className="p-0">
-        <p
-          id="p"
-          className="text-sm text-center text-gray-500"
-          dangerouslySetInnerHTML={{ __html: p }}
-        />
-      </CardContent>
-      {/* <CardFooter className="flex w-full p-0"></CardFooter> */}
-    </Card>
+function getPropTypes(t: Record<string, string>) {
+  return z.object(
+    Object.keys(t).reduce((acc, key) => {
+      return {
+        ...acc,
+        [key]: z.string().default(t[key]),
+      };
+    }, {})
   );
 }

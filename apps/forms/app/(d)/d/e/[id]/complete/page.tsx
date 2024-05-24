@@ -1,7 +1,7 @@
 import React from "react";
 import { client } from "@/lib/supabase/server";
 import { notFound } from "next/navigation";
-import { EndingPage } from "@/theme/templates/formcomplete";
+import { EndingPageWithContext } from "@/theme/templates/formcomplete";
 import { ssr_page_init_i18n } from "../../i18n";
 import { fmt_local_index } from "@/utils/fmt";
 
@@ -57,9 +57,9 @@ export default async function SubmitCompletePage({
 
   return (
     <main className="flex items-center justify-center min-h-screen">
-      <EndingPage
-        template_id={ending_page_template_id}
-        data={{
+      <EndingPageWithContext
+        template={ending_page_template_id}
+        context={{
           title: title,
           language: data.default_form_page_language,
           form_title: title,

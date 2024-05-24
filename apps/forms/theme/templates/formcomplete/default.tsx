@@ -15,26 +15,44 @@ export default function FormCompletePageDefault(
   context: TemplateVariables.FormResponseContext
 ) {
   return (
+    <Component
+      h1={i18next.t("formcomplete.default.h1", { ...context })}
+      p={i18next.t("formcomplete.default.p", { ...context })}
+      button={i18next.t("home")}
+    />
+  );
+}
+
+export function Component({
+  h1,
+  p,
+  button = "Home",
+}: {
+  h1: string;
+  p: string;
+  button?: string;
+}) {
+  return (
     <Card className="w-full max-w-md p-4">
       <CardHeader className="flex flex-col items-center">
         <CheckIcon className="w-12 h-12 my-4" />
         <h1
           className="text-lg text-center font-bold tracking-tight"
           dangerouslySetInnerHTML={{
-            __html: i18next.t("formcomplete.default.h1", { ...context }),
+            __html: h1,
           }}
         />
         <p
           className="text-sm text-center text-muted-foreground"
           dangerouslySetInnerHTML={{
-            __html: i18next.t("formcomplete.default.p", { ...context }),
+            __html: p,
           }}
         />
       </CardHeader>
       <CardContent className="p-0" />
       <CardFooter className="flex w-full p-0">
         <Link className="w-full" href="#">
-          <Button className="w-full">{i18next.t("home")}</Button>
+          <Button className="w-full">{button}</Button>
         </Link>
       </CardFooter>
     </Card>

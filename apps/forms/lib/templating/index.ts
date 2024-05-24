@@ -100,6 +100,10 @@ export namespace TemplateVariables {
       email: z.string().optional().describe("email of the customer"),
     }),
     response: z.object({
+      short_id: z
+        .string()
+        .nullable()
+        .describe("short_id of the response, a.k.a support id"),
       index: z
         .number()
         .describe("a.k.a local index of the response 1, 2, 3..."),

@@ -1,21 +1,21 @@
 import { TemplateVariables } from "@/lib/templating";
-import FormCompletePageTemplate_receipt01 from "./receipt01";
+import FormCompletePageTemplate_receipt01 from "@/theme/templates/formcomplete/receipt01";
 import FormCompletePageDefault from "@/theme/templates/formcomplete/default";
 
-export function EndingPage({
-  template_id,
-  data,
+export function EndingPageWithContext({
+  template,
+  context,
 }: {
-  template_id: string | null;
-  data: TemplateVariables.FormResponseContext;
+  template: string | null;
+  context: TemplateVariables.FormResponseContext;
 }) {
-  switch (template_id) {
+  switch (template) {
     case "receipt01":
-      return <FormCompletePageTemplate_receipt01 {...data} />;
+      return <FormCompletePageTemplate_receipt01 {...context} />;
     case "default":
     case undefined:
     case null:
     default:
-      return <FormCompletePageDefault {...data} />;
+      return <FormCompletePageDefault {...context} />;
   }
 }
