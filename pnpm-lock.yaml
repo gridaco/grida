@@ -412,6 +412,9 @@ importers:
       react-hot-toast:
         specifier: ^2.4.0
         version: 2.4.1(csstype@3.1.0)(react-dom@18.3.1)(react@18.3.1)
+      react-i18next:
+        specifier: ^13.5.0
+        version: 13.5.0(i18next@23.11.4)(react-dom@18.3.1)(react@18.3.1)
       react-pdf:
         specifier: ^7.7.1
         version: 7.7.3(@types/react@18.2.58)(react-dom@18.3.1)(react@18.3.1)
@@ -39469,7 +39472,7 @@ packages:
   /unload@2.2.0:
     resolution: {integrity: sha512-B60uB5TNBLtN6/LsgAf3udH9saB5p7gqJwcFfbOEZ8BcBHnGwCf6G/TGiEqkRAxX7zAFIUtzdrXQSdL3Q/wqNA==}
     dependencies:
-      '@babel/runtime': 7.16.3
+      '@babel/runtime': 7.24.5
       detect-node: 2.1.0
     dev: false
 
