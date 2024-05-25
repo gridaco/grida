@@ -52,6 +52,8 @@ export interface Translation {
     default: {
       h1: string;
       p: string;
+      button: string;
+      href: string;
     };
     receipt01: {
       h1: string;
@@ -118,6 +120,8 @@ const resources: Record<
         default: {
           h1: `${use("form_title")}`,
           p: "Thank you for your response.",
+          button: "Home",
+          href: "/",
         },
         receipt01: {
           h1: `${use("response.idx")}`,
@@ -180,6 +184,8 @@ const resources: Record<
         default: {
           h1: `${use("form_title")}`,
           p: "Gracias por su respuesta.",
+          button: "Inicio",
+          href: "/",
         },
         receipt01: {
           h1: `${use("response.idx")}`,
@@ -241,6 +247,8 @@ const resources: Record<
         default: {
           h1: `${use("form_title")}`,
           p: "응답해 주셔서 감사합니다.",
+          button: "홈",
+          href: "/",
         },
         receipt01: {
           h1: `${use("response.idx")}`,
@@ -302,6 +310,8 @@ const resources: Record<
         default: {
           h1: `${use("form_title")}`,
           p: "回答いただきありがとうございます。",
+          button: "ホーム",
+          href: "/",
         },
         receipt01: {
           h1: `${use("response.idx")}`,
@@ -361,6 +371,8 @@ const resources: Record<
         default: {
           h1: `${use("form_title")}`,
           p: "感谢您的回应。",
+          button: "首页",
+          href: "/",
         },
         receipt01: {
           h1: `${use("response.idx")}`,
@@ -423,6 +435,8 @@ const resources: Record<
         default: {
           h1: `${use("form_title")}`,
           p: "Merci pour votre réponse.",
+          button: "Accueil",
+          href: "/",
         },
         receipt01: {
           h1: `${use("response.idx")}`,
@@ -485,6 +499,8 @@ const resources: Record<
         default: {
           h1: `${use("form_title")}`,
           p: "Obrigado pela sua resposta.",
+          button: "Início",
+          href: "/",
         },
         receipt01: {
           h1: `${use("response.idx")}`,
@@ -547,6 +563,8 @@ const resources: Record<
         default: {
           h1: `${use("form_title")}`,
           p: "Grazie per la tua risposta.",
+          button: "Home",
+          href: "/",
         },
         receipt01: {
           h1: `${use("response.idx")}`,
@@ -609,6 +627,8 @@ const resources: Record<
         default: {
           h1: `${use("form_title")}`,
           p: "Vielen Dank für Ihre Antwort.",
+          button: "Startseite",
+          href: "/",
         },
         receipt01: {
           h1: `${use("response.idx")}`,
@@ -669,6 +689,8 @@ const resources: Record<
         default: {
           h1: `${use("form_title")}`,
           p: "Спасибо за ваш ответ.",
+          button: "Главная",
+          href: "/",
         },
         receipt01: {
           h1: `${use("response.idx")}`,
@@ -729,6 +751,8 @@ const resources: Record<
         default: {
           h1: `${use("form_title")}`,
           p: "شكراً لردك.",
+          button: "الرئيسية",
+          href: "/",
         },
         receipt01: {
           h1: `${use("response.idx")}`,
@@ -790,6 +814,8 @@ const resources: Record<
         default: {
           h1: `${use("form_title")}`,
           p: "आपके जवाब के लिए धन्यवाद।",
+          button: "होम",
+          href: "/",
         },
         receipt01: {
           h1: `${use("response.idx")}`,
@@ -852,6 +878,8 @@ const resources: Record<
         default: {
           h1: `${use("form_title")}`,
           p: "Bedankt voor uw reactie.",
+          button: "Home",
+          href: "/",
         },
         receipt01: {
           h1: `${use("response.idx")}`,
