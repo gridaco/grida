@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import {
   PreferenceBody,
   PreferenceBox,
@@ -9,6 +9,15 @@ import {
   PreferenceDescription,
   cls_save_button,
 } from "@/components/preferences";
+import resources from "@/i18n";
+import {
+  TemplateEditor,
+  getPropTypes,
+  getRenderedTexts,
+  useMockedContext,
+} from "@/scaffolds/template-editor";
+import { Component as FormCompleteDefault } from "@/theme/templates/formcomplete/default";
+import { Component as FormCompleteReceipt01 } from "@/theme/templates/formcomplete/receipt01";
 import {
   Select,
   SelectContent,
@@ -19,8 +28,11 @@ import {
 import { Button } from "@/components/ui/button";
 import { MixIcon } from "@radix-ui/react-icons";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
-
-const HOST_NAME = process.env.NEXT_PUBLIC_HOST_NAME || "http://localhost:3000";
+import { csr_init_i18n } from "@/i18n/csr";
+import { useTranslation } from "react-i18next";
+import { createClientFormsClient } from "@/lib/supabase/client";
+import toast from "react-hot-toast";
+import type { EndingPageI18nOverrides } from "@/types";
 
 export function EndingPagePreferences({
   form_id,
@@ -34,10 +46,53 @@ export function EndingPagePreferences({
   init: {
     enabled: boolean;
     template_id: string | null;
+    i18n_overrides: EndingPageI18nOverrides | null;
   };
 }) {
-  const [template, setTemplate] = useState(init.template_id);
+  useEffect(() => {
+    csr_init_i18n({
+      lng,
+    });
+  }, [lng]);
+
+  const [template, setTemplate] = useState(init.template_id ?? undefined);
   const [customizeOpen, setCustomizeOpen] = useState(false);
+  const [overrides, setOverrides] = useState(init.i18n_overrides?.overrides);
+
+  const context = useMockedContext(
+    {
+      title,
+      form_title: title,
+    },
+    {
+      lang: lng,
+    }
+  );
+
+  const texts = useMemo(() => {
+    return getRenderedTexts(overrides ?? {}, context);
+  }, [overrides, context]);
+
+  const supabase = createClientFormsClient();
+
+  const save = async (template_id: string, texts: Record<string, string>) => {
+    const _: EndingPageI18nOverrides = {
+      $schema: "https://forms.grida.co/schemas/v1/endingpage.json",
+      template_id,
+      overrides: texts,
+    };
+
+    const { error } = await supabase
+      .from("form")
+      .update({
+        is_ending_page_enabled: true,
+        ending_page_template_id: template_id,
+        ending_page_i18n_overrides: _ as {},
+      })
+      .eq("id", form_id);
+
+    if (error) throw error;
+  };
 
   return (
     <PreferenceBox>
@@ -53,6 +108,7 @@ export function EndingPagePreferences({
             name="template_id"
             value={template ?? undefined}
             onValueChange={setTemplate}
+            disabled={!!init.i18n_overrides}
           >
             <SelectTrigger>
               <SelectValue placeholder="Select Ending Page Template" />
@@ -66,14 +122,43 @@ export function EndingPagePreferences({
             Enabling ending page will disable redirection
           </PreferenceDescription>
         </form>
-        {template && (
-          <EndingPagePreview template={template} title={title} lng={lng} />
-        )}
+        <div className="flex justify-center items-center min-h-96">
+          {template &&
+            // TODO: need renderer component
+            React.createElement(
+              // @ts-ignore
+              getComponent(template),
+              {
+                ...texts,
+              }
+            )}
+        </div>
       </PreferenceBody>
       <CustomizeTemplate
+        key={template}
+        form_id={form_id}
+        title={title}
+        lang={lng}
+        init={{
+          template_id: template,
+          i18n_overrides: init.i18n_overrides?.overrides ?? {},
+        }}
         open={customizeOpen}
         onOpenChange={(open) => {
           if (open === false) setCustomizeOpen(false);
+        }}
+        onSave={(template, data) => {
+          const saving = save(template, data).then(() => {
+            setTemplate(template);
+            setCustomizeOpen(false);
+            setOverrides(data);
+          });
+
+          toast.promise(saving, {
+            loading: "Saving...",
+            success: "Saved",
+            error: "Failed to save",
+          });
         }}
       />
       <PreferenceBoxFooter>
@@ -85,59 +170,76 @@ export function EndingPagePreferences({
           <MixIcon className="me-2" />
           Customize
         </Button>
-        <Button form="/private/editor/settings/ending-page" type="submit">
-          Save
-        </Button>
+        {!overrides && (
+          <Button form="/private/editor/settings/ending-page" type="submit">
+            Save
+          </Button>
+        )}
       </PreferenceBoxFooter>
     </PreferenceBox>
   );
 }
 
-function EndingPagePreview({
-  template,
-  lng,
-  title,
-}: {
-  template: string;
-  lng: string;
-  title: string;
-}) {
-  switch (template) {
-    case "receipt01": {
-      return (
-        <iframe
-          key={template}
-          src={
-            HOST_NAME +
-            `/templates/embed/${lng}/formcomplete/${template}?title=${encodeURIComponent(title)}`
-          }
-          className="w-full h-96"
-          style={{ border: 0 }}
-        />
-      );
-    }
-    case "default": {
-      return (
-        <iframe
-          key={template}
-          src={
-            HOST_NAME +
-            `/templates/embed/${lng}/formcomplete/default?title=${encodeURIComponent(title)}`
-          }
-          className="w-full h-96"
-          style={{ border: 0 }}
-        />
-      );
-    }
+function getComponent(template_id: string) {
+  switch (template_id) {
+    case "receipt01":
+      return FormCompleteReceipt01;
+    case "default":
+    default:
+      return FormCompleteDefault;
   }
 }
 
-function CustomizeTemplate({ ...props }: React.ComponentProps<typeof Dialog>) {
+function CustomizeTemplate({
+  lang,
+  title,
+  form_id,
+  init,
+  onSave,
+  ...props
+}: React.ComponentProps<typeof Dialog> & {
+  init: {
+    template_id?: string;
+    i18n_overrides?: Record<string, string>;
+  };
+  lang: string;
+  title: string;
+  form_id: string;
+  onSave?: (template_id: string, data: Record<string, string>) => void;
+}) {
+  const { t } = useTranslation();
+
+  const onClose = () => {
+    props.onOpenChange?.(false);
+  };
   return (
     <Dialog {...props}>
-      <DialogContent className="min-w-full h-screen">
-        {/*  */}
-        {/*  */}
+      <DialogContent className="min-w-full h-screen p-0" hideCloseButton>
+        <TemplateEditor
+          context={{
+            title,
+            language: lang,
+          }}
+          lang={lang}
+          defaultTemplateId={init.template_id}
+          defaultTexts={init.i18n_overrides}
+          t={t}
+          getComponent={getComponent}
+          getPropTypes={(template_id) => {
+            return getPropTypes(
+              resources[lang as keyof typeof resources].translation[
+                "formcomplete"
+              ][
+                template_id as keyof (typeof resources)["en"]["translation"]["formcomplete"]
+              ]
+            );
+          }}
+          onSave={onSave}
+          onCancel={() => {
+            onClose();
+            //
+          }}
+        />
       </DialogContent>
     </Dialog>
   );

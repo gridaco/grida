@@ -18,7 +18,8 @@ export default function FormCompletePageDefault(
     <Component
       h1={i18next.t("formcomplete.default.h1", { ...context })}
       p={i18next.t("formcomplete.default.p", { ...context })}
-      button={i18next.t("home")}
+      button={i18next.t("formcomplete.default.button", { ...context })}
+      href={i18next.t("formcomplete.default.href", { ...context })}
     />
   );
 }
@@ -26,11 +27,13 @@ export default function FormCompletePageDefault(
 export function Component({
   h1,
   p,
-  button = "Home",
+  button,
+  href,
 }: {
   h1: string;
   p: string;
-  button?: string;
+  button: string;
+  href: string;
 }) {
   return (
     <Card className="w-full max-w-md p-4">
@@ -51,9 +54,16 @@ export function Component({
       </CardHeader>
       <CardContent className="p-0" />
       <CardFooter className="flex w-full p-0">
-        <Link className="w-full" href="#">
-          <Button className="w-full">{button}</Button>
-        </Link>
+        {href && (
+          <Link className="w-full" href={href}>
+            <Button
+              className="w-full"
+              dangerouslySetInnerHTML={{
+                __html: button,
+              }}
+            />
+          </Link>
+        )}
       </CardFooter>
     </Card>
   );

@@ -17,22 +17,25 @@ export function mockContext({
     locale: fakerlocales[lang],
   });
 
+  const short_id = () =>
+    faker.string.hexadecimal({
+      length: {
+        min: 1,
+        max: 5,
+      },
+    });
+
   const response_index = faker.number.int(50);
   const context: TemplateVariables.FormResponseContext = {
     customer: {
-      short_id: faker.string.uuid(),
+      short_id: short_id(),
     },
     form_title: title || faker.lorem.words(3),
     title: title || faker.lorem.words(3),
     fields: {},
     language: "en",
     response: {
-      short_id: faker.string.hexadecimal({
-        length: {
-          min: 1,
-          max: 5,
-        },
-      }),
+      short_id: short_id(),
       index: response_index,
       idx: fmt_local_index(response_index),
     },
@@ -46,7 +49,7 @@ export function useMockedContext(
   init: Partial<TemplateVariables.FormResponseContext>,
   config: {
     lang?: string;
-    refreshKey: string;
+    refreshKey?: string;
   }
 ) {
   const context = useMemo(

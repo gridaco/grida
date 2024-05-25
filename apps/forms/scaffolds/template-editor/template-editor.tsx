@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { render } from "@/lib/templating/template";
 import { z } from "zod";
 import {
@@ -28,30 +28,69 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useMockedContext } from "@/scaffolds/template-editor/mock";
 import { TemplateTextEditor } from "@/scaffolds/template-editor/text-editor";
 import { ContextVariablesTable } from "@/scaffolds/template-editor/about-variable-table";
+import { TemplateVariables } from "@/lib/templating";
+import type { i18n } from "i18next";
+
+export function getRenderedTexts(
+  texts: Record<string, string>,
+  context: TemplateVariables.FormResponseContext
+) {
+  return Object.keys(texts).reduce((acc, key) => {
+    try {
+      const text = texts[key];
+      return {
+        ...acc,
+        [key]: render(text, context),
+      };
+    } catch (e) {
+      return acc;
+    }
+  }, {});
+}
+
+function getDefaultTexts(
+  shape: z.ZodObject<any>,
+  defaultTexts?: Record<string, string>
+) {
+  const defaults = Object.keys(shape).reduce((acc: any, key) => {
+    return {
+      ...acc,
+      [key]:
+        defaultTexts?.[key] ??
+        shape[key as keyof typeof shape]._def.defaultValue(),
+    };
+  }, {});
+
+  return defaults;
+}
 
 export function TemplateEditor({
+  context: _context_init,
   defaultTemplateId,
   defaultTexts,
   getComponent,
   getPropTypes,
   lang,
+  t,
   onSave,
   onCancel,
 }: {
+  context?: Partial<TemplateVariables.FormResponseContext>;
   defaultTemplateId?: string;
   defaultTexts?: Record<string, string>;
   getComponent: (template_id: string) => React.ComponentType<any>;
   getPropTypes: (template_id: string) => z.ZodObject<any>;
   lang?: string;
-  onSave?: (data: Record<string, string>) => void;
+  t?: i18n["t"];
+  onSave?: (template_id: string, data: Record<string, string>) => void;
   onCancel?: () => void;
 }) {
   const [templateId, setTemplateId] = useState(defaultTemplateId ?? "default");
   const [isModified, setIsModified] = useState(false);
   const [contextRefreshKey, setContextRefreshKey] = useState(0);
-  const [texts, setTexts] = useState<Record<string, string>>(
-    defaultTexts ?? {}
-  );
+  const [contentRefreshKey, setContentRefreshKey] = useState(0);
+  const [props, setProps] = useState<Record<string, string>>({});
+  const [discardAlertOpen, setDiscardAlertOpen] = useState(false);
 
   const propTypes = useMemo(
     () => getPropTypes(templateId),
@@ -59,55 +98,49 @@ export function TemplateEditor({
   );
 
   useEffect(() => {
-    const defaults = Object.keys(propTypes.shape).reduce(
-      (acc: typeof propTypes.shape, key) => {
-        return {
-          ...acc,
-          [key]:
-            propTypes.shape[
-              key as keyof typeof propTypes.shape
-              // @ts-ignore
-            ]._def.defaultValue(),
-        };
-      },
-      {}
+    const defaultTextsForTemplate = getDefaultTexts(
+      propTypes.shape,
+      templateId === defaultTemplateId ? defaultTexts : undefined
     );
+    setProps(defaultTextsForTemplate);
+  }, [propTypes, defaultTexts, templateId, defaultTemplateId]);
 
-    setTexts(defaults);
-  }, [propTypes]);
+  useEffect(() => {
+    // tell the text editor to refresh when defaultTexts or templateId changes
+    setContentRefreshKey((prev) => prev + 1);
+  }, [defaultTexts, templateId]);
 
   const onTextChange = (key: string, value: string) => {
-    setTexts((prev) => ({ ...prev, [key]: value }));
+    setProps((prev) => ({ ...prev, [key]: value }));
     setIsModified(true);
   };
 
-  const context = useMockedContext(
-    {
-      title: undefined,
-    },
-    {
-      refreshKey: String(contextRefreshKey),
-      lang: lang,
-    }
-  );
+  const context = useMockedContext(_context_init || {}, {
+    refreshKey: String(contextRefreshKey),
+    lang: lang,
+  });
 
   const onReloadContextClick = () => {
     setContextRefreshKey((prev) => prev + 1);
   };
 
   const onSaveClick = () => {
-    onSave?.(texts);
+    onSave?.(templateId, props);
     setIsModified(false);
   };
 
   const onCancelClick = () => {
+    if (isModified) {
+      setDiscardAlertOpen(true);
+      return;
+    }
     onCancel?.();
   };
 
-  const out = useMemo(() => {
-    const out = Object.keys(texts).reduce((acc, key) => {
+  const texts = useMemo(() => {
+    const out = Object.keys(props).reduce((acc, key) => {
       try {
-        const text = texts[key];
+        const text = props[key];
         return {
           ...acc,
           [key]: render(text, context),
@@ -118,10 +151,15 @@ export function TemplateEditor({
     }, {});
 
     return out;
-  }, [texts, context]);
+  }, [props, context]);
 
   return (
     <main className="h-screen flex flex-col">
+      <DiscardChangesAlert
+        open={discardAlertOpen}
+        onOpenChange={setDiscardAlertOpen}
+        onDiscard={onCancel}
+      />
       <header className="border-b p-4">
         <div className="flex w-full justify-between">
           <div className="flex-1 flex gap-4">
@@ -152,16 +190,9 @@ export function TemplateEditor({
         </div>
       </header>
       <div className="h-full flex overflow-hidden">
-        {/*  */}
-
-        {/*  */}
         <div className="flex-1 h-full p-4">
           <div className="h-full flex items-center justify-center">
-            {React.createElement(
-              // @ts-ignore
-              getComponent(templateId),
-              { ...out }
-            )}
+            {React.createElement(getComponent(templateId), { ...texts })}
           </div>
         </div>
         <aside className="border-s flex-1 h-full max-w-md overflow-y-scroll">
@@ -227,12 +258,11 @@ export function TemplateEditor({
               </article>
             </header>
             <hr />
-            <div key={templateId}>
+            <div>
               {Object.keys(propTypes.shape).map((key) => {
                 const defaultValue =
                   propTypes.shape[
                     key as keyof typeof propTypes.shape
-                    // @ts-ignore
                   ]._def.defaultValue();
                 return (
                   <div key={key} className="grid mb-10">
@@ -242,12 +272,23 @@ export function TemplateEditor({
                     <div className="border rounded overflow-hidden">
                       <TemplateTextEditor
                         id={key}
-                        defaultValue={defaultValue}
+                        value={props[key] || defaultValue}
+                        refreshKey={String(contentRefreshKey)}
+                        plaintext={
+                          common_translation_attributes[
+                            key as keyof typeof common_translation_attributes
+                          ]?.plaintext ?? false
+                        }
                         onValueChange={(html) => {
                           onTextChange(key, html);
                         }}
                       />
                     </div>
+                    <small className="text-muted-foreground mt-2">
+                      {common_translation_attributes[
+                        key as keyof typeof common_translation_attributes
+                      ]?.help ?? ""}
+                    </small>
                   </div>
                 );
               })}
@@ -256,6 +297,82 @@ export function TemplateEditor({
         </aside>
       </div>
     </main>
+  );
+}
+
+// TODO: need a smarter way
+const common_translation_attributes = {
+  h1: {
+    plaintext: false,
+    help: "heading 1",
+  },
+  h2: {
+    plaintext: false,
+    help: "heading 2",
+  },
+  h3: {
+    plaintext: false,
+    help: "heading 3",
+  },
+  h4: {
+    plaintext: false,
+    help: "heading 4",
+  },
+  h5: {
+    plaintext: false,
+    help: "heading 5",
+  },
+  h6: {
+    plaintext: false,
+    help: "heading 6",
+  },
+  p: {
+    plaintext: false,
+    help: "paragraph",
+  },
+  button: {
+    plaintext: false,
+    help: "Button text",
+  },
+  href: {
+    plaintext: true,
+    help: "Link url",
+  },
+} as const;
+
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+
+function DiscardChangesAlert({
+  onDiscard,
+  ...props
+}: React.ComponentProps<typeof AlertDialog> & {
+  onDiscard?: () => void;
+}) {
+  return (
+    <AlertDialog {...props}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Discard Changes</AlertDialogTitle>
+          <AlertDialogDescription>
+            You have unsaved changes. Do you really want to close this panel?
+            Any changes you made will be lost.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Cancel</AlertDialogCancel>
+          <AlertDialogAction onClick={onDiscard}>Discard</AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
   );
 }
 

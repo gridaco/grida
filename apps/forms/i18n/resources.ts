@@ -52,13 +52,15 @@ export interface Translation {
     default: {
       h1: string;
       p: string;
-      button: string;
-      href: string;
+      button?: string;
+      href?: string;
     };
     receipt01: {
       h1: string;
       h2: string;
       p: string;
+      button?: string;
+      href?: string;
     };
   };
   alreadyresponded: {

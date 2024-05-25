@@ -286,3 +286,9 @@ interface FormPageThemeEmbeddedBackgroundData {
    */
   "background-color"?: string;
 }
+
+export interface EndingPageI18nOverrides {
+  $schema: "https://forms.grida.co/schemas/v1/endingpage.json";
+  template_id: string;
+  overrides: Record<string, string>;
+}
