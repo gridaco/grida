@@ -58,6 +58,7 @@
     "@tosspayments/payment-widget-sdk": "^0.10.2",
     "@types/mdx": "^2.0.11",
     "@types/three": "^0.149.0",
+    "@use-gesture/react": "^10.2.11",
     "ai": "3.1.8",
     "ajv": "^8.13.0",
     "change-case": "^5.4.3",
@@ -65,6 +66,7 @@
     "clsx": "^1.2.1",
     "cmdk": "^1.0.0",
     "css-tree": "^2.3.1",
+    "csstype": "3.1.0",
     "csv-stringify": "^6.4.6",
     "framer-motion": "^11.0.24",
     "handlebars": "^4.7.7",
@@ -98,6 +100,7 @@
     "use-file-picker": "^2.1.1",
     "usehooks-ts": "^3.1.0",
     "uuid": "^9.0.1",
+    "vaul": "^0.9.1",
     "zod": "^3.23.8"
   },
   "devDependencies": {

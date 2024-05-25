@@ -4,21 +4,22 @@ import React, { useCallback, useEffect, useState } from "react";
 import { useFilePicker } from "use-file-picker";
 import * as Tabs from "@radix-ui/react-tabs";
 import * as Dialog from "@radix-ui/react-dialog";
-import { createClientFormsClient } from "@/lib/supabase/client";
-import { useEditorState } from "../editor";
-import { nanoid } from "nanoid";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+
+type FileUploader = (file: Blob | File) => Promise<string>;
 
 export function MediaPicker({
   open,
   onOpenChange,
   onUseImage,
+  uploader,
 }: {
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
   onUseImage?: (url: string) => void;
+  uploader: FileUploader;
 }) {
   return (
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
@@ -37,7 +38,10 @@ export function MediaPicker({
                     <FromUrl />
                   </Tabs.Content>
                   <Tabs.Content value="upload" className="h-full">
-                    <FromFilePicker onUseImage={onUseImage} />
+                    <FromFilePicker
+                      uploader={uploader}
+                      onUseImage={onUseImage}
+                    />
                   </Tabs.Content>
                   <Tabs.Content value="search" className="h-full">
                     <div>Search content</div>
@@ -100,34 +104,12 @@ function FromUrl() {
   );
 }
 
-export function useUploadFile() {
-  const [state] = useEditorState();
-  const supabase = createClientFormsClient();
-
-  return useCallback(
-    async (file: Blob | File) => {
-      const fileKey = `${state.form_id}/${nanoid()}`;
-      return await supabase.storage
-        .from("grida-forms")
-        .upload(fileKey, file, {
-          contentType: file.type,
-        })
-        .then(({ data, error }) => {
-          if (error) {
-            throw new Error("Failed to upload file");
-          }
-          return supabase.storage.from("grida-forms").getPublicUrl(fileKey).data
-            .publicUrl;
-        });
-    },
-    [supabase.storage, state.form_id]
-  );
-}
-
 function FromFilePicker({
+  uploader,
   onUseImage,
 }: {
   onUseImage?: (url: string) => void;
+  uploader: FileUploader;
 }) {
   const [uploading, setUploading] = useState(false);
   const [src, setSrc] = useState<string | null>(null);
@@ -142,8 +124,6 @@ function FromFilePicker({
   const plainfile = plainFiles[0];
   const file = filesContent[0];
 
-  const uploadFile = useUploadFile();
-
   useEffect(() => {
     if (file) {
       const blob = new Blob([file.content], { type: file.type });
@@ -154,7 +134,7 @@ function FromFilePicker({
   useEffect(() => {
     if (plainfile) {
       setUploading(true);
-      uploadFile(plainfile)
+      uploader(plainfile)
         .then(setSrc)
         .finally(() => setUploading(false));
     }
