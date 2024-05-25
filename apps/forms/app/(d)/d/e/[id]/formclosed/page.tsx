@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { FORM_CLOSED_WHILE_RESPONDING } from "@/k/error";
 import Link from "next/link";
 import i18next from "i18next";
-import { ssr_page_init_i18n } from "../../i18n";
+import { ssr_page_init_i18n } from "@/i18n/ssr";
 
 export default async function FormClosedPage({
   params,

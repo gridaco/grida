@@ -1,6 +1,6 @@
 import { Form } from "@/scaffolds/e/form";
 import i18next from "i18next";
-import { ssr_page_init_i18n } from "../i18n";
+import { ssr_page_init_i18n } from "@/i18n/ssr";
 
 export const revalidate = 0;
 

@@ -2,7 +2,7 @@ import React from "react";
 import { client } from "@/lib/supabase/server";
 import { notFound } from "next/navigation";
 import { EndingPageWithContext } from "@/theme/templates/formcomplete";
-import { ssr_page_init_i18n } from "../../i18n";
+import { ssr_page_init_i18n } from "@/i18n/ssr";
 import { fmt_local_index } from "@/utils/fmt";
 
 export default async function SubmitCompletePage({
