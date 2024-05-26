@@ -745,7 +745,7 @@ export function FieldEditPanel({
               )}
             </PanelPropertyFields>
           </PanelPropertySection>
-          <PanelPropertySection hidden={type == "payment"}>
+          <PanelPropertySection hidden={type == "payment" || type == "hidden"}>
             <PanelPropertySectionTitle>General</PanelPropertySectionTitle>
             <PanelPropertyFields>
               <PanelPropertyField
@@ -894,6 +894,22 @@ export function FieldEditPanel({
                   <Toggle value={required} onChange={setRequired} />
                 </PanelPropertyField>
               )}
+            </PanelPropertyFields>
+          </PanelPropertySection>
+          <PanelPropertySection hidden={type !== "hidden"}>
+            <PanelPropertySectionTitle>Hidden Field</PanelPropertySectionTitle>
+            <PanelPropertyFields>
+              <PanelPropertyField
+                label={"Required"}
+                description={
+                  <>
+                    When checked, the field will be required. Developer must set
+                    a value for this field before via SDK or URL Params.
+                  </>
+                }
+              >
+                <Toggle value={required} onChange={setRequired} />
+              </PanelPropertyField>
             </PanelPropertyFields>
           </PanelPropertySection>
         </form>
