@@ -28,7 +28,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { MixIcon } from "@radix-ui/react-icons";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
-import { csr_init_i18n } from "@/i18n/csr";
+import { I18nProvider } from "@/i18n/csr";
 import { useTranslation } from "react-i18next";
 import { createClientFormsClient } from "@/lib/supabase/client";
 import toast from "react-hot-toast";
@@ -54,12 +54,6 @@ export function EndingPagePreferences({
     i18n_overrides: EndingPageI18nOverrides | null;
   };
 }) {
-  useEffect(() => {
-    csr_init_i18n({
-      lng: lang,
-    });
-  }, [lang]);
-
   const [template, setTemplate] = useState(init.template_id ?? undefined);
   const [customizeOpen, setCustomizeOpen] = useState(false);
   const [overrides, setOverrides] = useState(init.i18n_overrides?.overrides);
@@ -118,16 +112,18 @@ export function EndingPagePreferences({
             Enabling ending page will disable redirection
           </PreferenceDescription>
         </form>
-        {template && (
-          <div className="flex justify-center items-center min-h-96">
-            <Preview
-              title={title}
-              lang={lang}
-              template={template}
-              overrides={overrides}
-            />
-          </div>
-        )}
+        <I18nProvider lng={lang}>
+          {template && (
+            <div className="flex justify-center items-center min-h-96">
+              <Preview
+                title={title}
+                lang={lang}
+                template={template}
+                overrides={overrides}
+              />
+            </div>
+          )}
+        </I18nProvider>
       </PreferenceBody>
       <CustomizeTemplate
         key={template}
