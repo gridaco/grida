@@ -167,6 +167,12 @@ export function TemplateEditor({
     lang: lang,
   });
 
+  const getDefaultValue = (key: string) => {
+    return propTypes.shape[
+      key as keyof typeof propTypes.shape
+    ]._def.defaultValue();
+  };
+
   const onReloadContextClick = () => {
     setContextRefreshKey((prev) => prev + 1);
   };
@@ -307,10 +313,8 @@ export function TemplateEditor({
             <hr />
             <div>
               {Object.keys(propTypes.shape).map((key) => {
-                const defaultValue =
-                  propTypes.shape[
-                    key as keyof typeof propTypes.shape
-                  ]._def.defaultValue();
+                const value =
+                  props[key] !== undefined ? props[key] : getDefaultValue(key);
                 return (
                   <div key={key} className="grid mb-10">
                     <Label htmlFor={key} className="mb-2">
@@ -319,15 +323,16 @@ export function TemplateEditor({
                     <div className="border rounded overflow-hidden">
                       <TemplateTextEditor
                         id={key}
-                        value={props[key] || defaultValue}
+                        value={value}
                         refreshKey={String(contentRefreshKey)}
                         plaintext={
                           common_translation_attributes[
                             key as keyof typeof common_translation_attributes
                           ]?.plaintext ?? false
                         }
-                        onValueChange={(html) => {
-                          onTextChange(key, html);
+                        onValueChange={(value) => {
+                          console.log("onValueChange", key, value);
+                          onTextChange(key, value);
                         }}
                       />
                     </div>

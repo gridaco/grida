@@ -8,13 +8,17 @@ const fakerlocales = {
   ko: ko,
 };
 
+function lngFallback(lng: "en" | "ko" | (string | {})) {
+  return fakerlocales[lng as "en" | "ko"] || en;
+}
+
 export function mockContext({
   lang = "en",
   title,
 }: Partial<TemplateVariables.FormResponseContext> & { lang?: string }) {
   const faker = new Faker({
     // @ts-ignore
-    locale: fakerlocales[lang],
+    locale: lngFallback(lang),
   });
 
   const short_id = () =>

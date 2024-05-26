@@ -11,16 +11,18 @@ export function TemplateTextEditor({
   value,
   refreshKey,
   plaintext,
+  autofocus,
   onValueChange,
 }: {
   id?: string;
   value?: string;
   refreshKey?: string;
   plaintext?: boolean;
+  autofocus?: boolean;
   onValueChange?: (value: string) => void;
 }) {
   const editor = useEditor({
-    autofocus: true,
+    autofocus: autofocus,
     extensions: [
       StarterKit.configure({
         heading: undefined,
