@@ -52,7 +52,7 @@ async function toss_payments_request_confirm_payment(
     }
   );
   const data = await response.json();
-  console.log(data);
+  console.log("toss_payments_request_confirm_payment", data);
 
   return data;
 }

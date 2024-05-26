@@ -57,7 +57,7 @@ export function BlockEditPanel({
   const [condition_v_hidden, set_condition_v_hidden] =
     useState<ConditionExpression>();
 
-  console.log("block?.v_hidden", block?.v_hidden);
+  // console.log("block?.v_hidden", block?.v_hidden);
 
   const onSave = (e: any) => {
     const [l, op, r] = condition_v_hidden || [];

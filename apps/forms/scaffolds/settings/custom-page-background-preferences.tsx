@@ -31,8 +31,6 @@ export function CustomPageBackgroundPreferences({
 }) {
   const [src, setSrc] = useState(init.background?.src);
 
-  console.log(src);
-
   return (
     <PreferenceBox>
       <PreferenceBoxHeader heading={<>Dynamic Backgrounds</>} />
