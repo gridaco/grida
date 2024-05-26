@@ -11,7 +11,7 @@ import {
   AlertDialogCancel,
   AlertDialogAction,
   AlertDialogTrigger,
-} from "@editor-ui/alert-dialog";
+} from "@/components/ui/alert-dialog";
 import toast from "react-hot-toast";
 import { useEditorState } from "../editor";
 import Link from "next/link";
@@ -96,28 +96,27 @@ export function GridEditor() {
   };
 
   const onDeleteField = useCallback(() => {
-    supabase
+    const deleting = supabase
       .from("form_field")
       .delete({
         count: "exact",
       })
       .eq("id", focus_field_id!)
       .then(({ error, count }) => {
-        if (!count) {
-          toast.error("Failed to delete field");
-          return;
+        if (!count || error) {
+          throw error;
         }
-        if (error) {
-          toast.error("Failed to delete field");
-          console.error(error);
-          return;
-        }
-        toast.success("Field deleted");
         dispatch({
           type: "editor/field/delete",
           field_id: focus_field_id!,
         });
       });
+
+    toast.promise(deleting as Promise<any>, {
+      loading: "Deleting...",
+      success: "Field deleted",
+      error: "Failed to delete field",
+    });
   }, [supabase, focus_field_id, dispatch]);
 
   const onDeleteResponse = useCallback(() => {
