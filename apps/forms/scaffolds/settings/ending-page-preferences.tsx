@@ -32,50 +32,44 @@ import { csr_init_i18n } from "@/i18n/csr";
 import { useTranslation } from "react-i18next";
 import { createClientFormsClient } from "@/lib/supabase/client";
 import toast from "react-hot-toast";
-import type { EndingPageI18nOverrides } from "@/types";
+import type {
+  EndingPageI18nOverrides,
+  EndingPageTemplateID,
+  FormsPageLanguage,
+} from "@/types";
+import { render } from "@/lib/templating/template";
 
 export function EndingPagePreferences({
   form_id,
-  lng = "en",
+  lang = "en",
   title,
   init,
 }: {
   form_id: string;
-  lng?: string;
+  lang?: FormsPageLanguage;
   title: string;
   init: {
     enabled: boolean;
-    template_id: string | null;
+    template_id: EndingPageTemplateID | null;
     i18n_overrides: EndingPageI18nOverrides | null;
   };
 }) {
   useEffect(() => {
     csr_init_i18n({
-      lng,
+      lng: lang,
     });
-  }, [lng]);
+  }, [lang]);
 
   const [template, setTemplate] = useState(init.template_id ?? undefined);
   const [customizeOpen, setCustomizeOpen] = useState(false);
   const [overrides, setOverrides] = useState(init.i18n_overrides?.overrides);
 
-  const context = useMockedContext(
-    {
-      title,
-      form_title: title,
-    },
-    {
-      lang: lng,
-    }
-  );
-
-  const texts = useMemo(() => {
-    return getRenderedTexts(overrides ?? {}, context);
-  }, [overrides, context]);
-
   const supabase = createClientFormsClient();
 
-  const save = async (template_id: string, texts: Record<string, string>) => {
+  const save = async (
+    template_id: EndingPageTemplateID,
+    texts: Record<string, string>
+  ) => {
     const _: EndingPageI18nOverrides = {
       $schema: "https://forms.grida.co/schemas/v1/endingpage.json",
       template_id,
@@ -107,8 +101,10 @@ export function EndingPagePreferences({
           <Select
             name="template_id"
             value={template ?? undefined}
-            onValueChange={setTemplate}
-            disabled={!!init.i18n_overrides}
+            onValueChange={(template) =>
+              setTemplate(template as EndingPageTemplateID)
+            }
+            disabled={!!overrides}
           >
             <SelectTrigger>
               <SelectValue placeholder="Select Ending Page Template" />
@@ -122,37 +118,38 @@ export function EndingPagePreferences({
             Enabling ending page will disable redirection
           </PreferenceDescription>
         </form>
-        <div className="flex justify-center items-center min-h-96">
-          {template &&
-            // TODO: need renderer component
-            React.createElement(
-              // @ts-ignore
-              getComponent(template),
-              {
-                ...texts,
-              }
-            )}
-        </div>
+        {template && (
+          <div className="flex justify-center items-center min-h-96">
+            <Preview
+              title={title}
+              lang={lang}
+              template={template}
+              overrides={overrides}
+            />
+          </div>
+        )}
       </PreferenceBody>
       <CustomizeTemplate
         key={template}
         form_id={form_id}
         title={title}
-        lang={lng}
+        lang={lang}
         init={{
           template_id: template,
-          i18n_overrides: init.i18n_overrides?.overrides ?? {},
+          i18n_overrides: overrides,
         }}
         open={customizeOpen}
         onOpenChange={(open) => {
           if (open === false) setCustomizeOpen(false);
         }}
         onSave={(template, data) => {
-          const saving = save(template, data).then(() => {
-            setTemplate(template);
-            setCustomizeOpen(false);
-            setOverrides(data);
-          });
+          const saving = save(template as EndingPageTemplateID, data).then(
+            () => {
+              setTemplate(template as EndingPageTemplateID);
+              setCustomizeOpen(false);
+              setOverrides(data);
+            }
+          );
 
           toast.promise(saving, {
             loading: "Saving...",
@@ -180,6 +177,60 @@ export function EndingPagePreferences({
   );
 }
 
+function Preview({
+  template,
+  title,
+  lang,
+  overrides,
+}: {
+  template: EndingPageTemplateID;
+  title: string;
+  lang: FormsPageLanguage;
+  overrides?: Record<string, string>;
+}) {
+  const { t } = useTranslation();
+
+  const context = useMockedContext(
+    {
+      title,
+      form_title: title,
+    },
+    {
+      lang: lang,
+    }
+  );
+
+  const texts = useMemo(() => {
+    return getRenderedTexts({
+      shape: getPropTypes(resources.en.translation.formcomplete[template])
+        .shape,
+      overrides,
+      config: {
+        context,
+        i18n: {
+          t,
+          basePath: `formcomplete.${template}`,
+        },
+        renderer: render,
+        merge: false,
+      },
+    });
+  }, [template, overrides, context, t]);
+
+  return (
+    <>
+      {template &&
+        React.createElement(
+          // @ts-ignore
+          getComponent(template),
+          {
+            ...texts,
+          }
+        )}
+    </>
+  );
+}
+
 function getComponent(template_id: string) {
   switch (template_id) {
     case "receipt01":
@@ -202,7 +253,7 @@ function CustomizeTemplate({
     template_id?: string;
     i18n_overrides?: Record<string, string>;
   };
-  lang: string;
+  lang: FormsPageLanguage;
   title: string;
   form_id: string;
   onSave?: (template_id: string, data: Record<string, string>) => void;
@@ -227,10 +278,8 @@ function CustomizeTemplate({
           getComponent={getComponent}
           getPropTypes={(template_id) => {
             return getPropTypes(
-              resources[lang as keyof typeof resources].translation[
-                "formcomplete"
-              ][
-                template_id as keyof (typeof resources)["en"]["translation"]["formcomplete"]
+              resources[lang].translation["formcomplete"][
+                template_id as EndingPageTemplateID
               ]
             );
           }}

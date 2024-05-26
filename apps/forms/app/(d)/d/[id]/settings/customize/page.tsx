@@ -90,11 +90,11 @@ export default async function FormsCustomizeSettingsPage({
           />
           <EndingPagePreferences
             form_id={form_id}
-            lng={default_form_page_language}
+            lang={default_form_page_language}
             title={title}
             init={{
               enabled: is_ending_page_enabled,
-              template_id: ending_page_template_id,
+              template_id: ending_page_template_id as any,
               i18n_overrides:
                 ending_page_i18n_overrides as {} as EndingPageI18nOverrides,
             }}

@@ -1,8 +1,8 @@
 import { TemplateVariables } from "@/lib/templating";
-import type { HandlebarsPath } from "@/lib/templating/@types";
+import type { ObjectPath } from "@/lib/templating/@types";
 import type { FormsPageLanguage } from "@/types";
 
-type T = HandlebarsPath<
+type T = ObjectPath<
   TemplateVariables.FormResponseContext & {
     available: number;
   }

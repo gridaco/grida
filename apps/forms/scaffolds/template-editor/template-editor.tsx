@@ -30,26 +30,73 @@ import { TemplateTextEditor } from "@/scaffolds/template-editor/text-editor";
 import { ContextVariablesTable } from "@/scaffolds/template-editor/about-variable-table";
 import { TemplateVariables } from "@/lib/templating";
 import type { i18n } from "i18next";
+import type { ObjectPath } from "@/lib/templating/@types";
 
-export function getRenderedTexts(
-  texts: Record<string, string>,
-  context: TemplateVariables.FormResponseContext
-) {
-  return Object.keys(texts).reduce((acc, key) => {
-    try {
-      const text = texts[key];
+export function getRenderedTexts({
+  shape,
+  overrides,
+  config,
+}: {
+  shape: z.ZodObject<any>["shape"];
+  overrides: Record<string, string> | null | undefined;
+  config: {
+    context: TemplateVariables.FormResponseContext;
+    i18n: {
+      t: i18n["t"];
+      basePath?: ObjectPath<Translation> | (() => ObjectPath<Translation>);
+    };
+    renderer: (source: string, context: any) => string;
+    merge?: boolean;
+  };
+}): Record<string, string> {
+  const translate = (key: string) => {
+    if (config.i18n.basePath) {
+      const path =
+        typeof config.i18n.basePath === "function"
+          ? config.i18n.basePath()
+          : config.i18n.basePath;
+
+      return config.i18n.t(`${path}.${key}`, config.context as any);
+    }
+    return config.i18n.t(key, config.context as any);
+  };
+
+  if (overrides) {
+    return Object.keys(shape).reduce(
+      (acc: Record<string, string>, key: string) => {
+        const source = overrides[key];
+        if (!source) {
+          if (config.merge) {
+            return {
+              ...acc,
+              [key]: translate(key),
+            };
+          }
+          return acc;
+        }
+
+        return {
+          ...acc,
+          [key]: config.renderer(source, config.context),
+        };
+      },
+      {}
+    );
+  }
+
+  return Object.keys(shape).reduce(
+    (acc: Record<string, string>, key: string) => {
       return {
         ...acc,
-        [key]: render(text, context),
+        [key]: translate(key),
       };
-    } catch (e) {
-      return acc;
-    }
-  }, {});
+    },
+    {}
+  );
 }
 
 function getDefaultTexts(
-  shape: z.ZodObject<any>,
+  shape: z.ZodObject<any>["shape"],
   defaultTexts?: Record<string, string>
 ) {
   const defaults = Object.keys(shape).reduce((acc: any, key) => {
@@ -350,6 +397,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Translation } from "@/i18n/resources";
 
 function DiscardChangesAlert({
   onDiscard,

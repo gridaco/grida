@@ -34,4 +34,4 @@ type ValidPaths<T, D extends number = 10> = [D] extends [never]
 
 // Exclude invalid paths with trailing dots
 type ExcludeTrailingDot<T> = T extends `${infer _}.` ? never : T;
-export type HandlebarsPath<T> = ExcludeTrailingDot<ValidPaths<T>>;
+export type ObjectPath<T> = ExcludeTrailingDot<ValidPaths<T>>;
