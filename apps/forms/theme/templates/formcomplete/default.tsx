@@ -10,16 +10,37 @@ import {
 import { Button } from "@/components/ui/button";
 import { CheckIcon } from "@radix-ui/react-icons";
 import { TemplateVariables } from "@/lib/templating";
+import { getPropTypes, getRenderedTexts } from "@/lib/templating/template";
+import resources from "@/i18n";
+import { render } from "@/lib/templating/template";
 
-export default function FormCompletePageDefault(
-  context: TemplateVariables.FormResponseContext
-) {
+export default function FormCompletePageDefault({
+  overrides,
+  context,
+}: {
+  overrides?: Record<string, string>;
+  context: TemplateVariables.FormResponseContext;
+}) {
+  const texts = getRenderedTexts({
+    shape: getPropTypes(resources.en.translation.formcomplete.receipt01).shape,
+    overrides,
+    config: {
+      context,
+      i18n: {
+        t: i18next.t,
+        basePath: `formcomplete.default`,
+      },
+      renderer: render,
+      merge: false,
+    },
+  });
+
   return (
     <Component
-      h1={i18next.t("formcomplete.default.h1", { ...context })}
-      p={i18next.t("formcomplete.default.p", { ...context })}
-      button={i18next.t("formcomplete.default.button", { ...context })}
-      href={i18next.t("formcomplete.default.href", { ...context })}
+      h1={texts.h1}
+      p={texts.p}
+      button={texts.button}
+      href={texts.href}
     />
   );
 }
@@ -45,7 +66,7 @@ export function Component({
             __html: h1,
           }}
         />
-        <p
+        <span // p
           className="text-sm text-center text-muted-foreground"
           dangerouslySetInnerHTML={{
             __html: p,

@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { render } from "@/lib/templating/template";
+import { getDefaultTexts, render } from "@/lib/templating/template";
 import { z } from "zod";
 import {
   Select,
@@ -30,86 +30,6 @@ import { TemplateTextEditor } from "@/scaffolds/template-editor/text-editor";
 import { ContextVariablesTable } from "@/scaffolds/template-editor/about-variable-table";
 import { TemplateVariables } from "@/lib/templating";
 import type { i18n } from "i18next";
-import type { ObjectPath } from "@/lib/templating/@types";
-
-export function getRenderedTexts({
-  shape,
-  overrides,
-  config,
-}: {
-  shape: z.ZodObject<any>["shape"];
-  overrides: Record<string, string> | null | undefined;
-  config: {
-    context: TemplateVariables.FormResponseContext;
-    i18n: {
-      t: i18n["t"];
-      basePath?: ObjectPath<Translation> | (() => ObjectPath<Translation>);
-    };
-    renderer: (source: string, context: any) => string;
-    merge?: boolean;
-  };
-}): Record<string, string> {
-  const translate = (key: string) => {
-    if (config.i18n.basePath) {
-      const path =
-        typeof config.i18n.basePath === "function"
-          ? config.i18n.basePath()
-          : config.i18n.basePath;
-
-      return config.i18n.t(`${path}.${key}`, config.context as any);
-    }
-    return config.i18n.t(key, config.context as any);
-  };
-
-  if (overrides) {
-    return Object.keys(shape).reduce(
-      (acc: Record<string, string>, key: string) => {
-        const source = overrides[key];
-        if (!source) {
-          if (config.merge) {
-            return {
-              ...acc,
-              [key]: translate(key),
-            };
-          }
-          return acc;
-        }
-
-        return {
-          ...acc,
-          [key]: config.renderer(source, config.context),
-        };
-      },
-      {}
-    );
-  }
-
-  return Object.keys(shape).reduce(
-    (acc: Record<string, string>, key: string) => {
-      return {
-        ...acc,
-        [key]: translate(key),
-      };
-    },
-    {}
-  );
-}
-
-function getDefaultTexts(
-  shape: z.ZodObject<any>["shape"],
-  defaultTexts?: Record<string, string>
-) {
-  const defaults = Object.keys(shape).reduce((acc: any, key) => {
-    return {
-      ...acc,
-      [key]:
-        defaultTexts?.[key] ??
-        shape[key as keyof typeof shape]._def.defaultValue(),
-    };
-  }, {});
-
-  return defaults;
-}
 
 export function TemplateEditor({
   context: _context_init,
@@ -138,11 +58,18 @@ export function TemplateEditor({
   const [contentRefreshKey, setContentRefreshKey] = useState(0);
   const [props, setProps] = useState<Record<string, string>>({});
   const [discardAlertOpen, setDiscardAlertOpen] = useState(false);
+  const __initial_template_id = useRef(templateId);
 
   const propTypes = useMemo(
     () => getPropTypes(templateId),
     [templateId, getPropTypes]
   );
+
+  useEffect(() => {
+    if (__initial_template_id.current !== templateId) {
+      setIsModified(true);
+    }
+  }, [templateId]);
 
   useEffect(() => {
     const defaultTextsForTemplate = getDefaultTexts(
@@ -224,8 +151,11 @@ export function TemplateEditor({
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="default">default</SelectItem>
-                <SelectItem value="receipt01">receipt01</SelectItem>
+                {ending_page_templates.map((id) => (
+                  <SelectItem key={id} value={id}>
+                    {ending_page_template_config[id].label}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
@@ -403,6 +333,10 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Translation } from "@/i18n/resources";
+import {
+  ending_page_template_config,
+  ending_page_templates,
+} from "@/k/templates";
 
 function DiscardChangesAlert({
   onDiscard,
@@ -426,16 +360,5 @@ function DiscardChangesAlert({
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
-  );
-}
-
-export function getPropTypes(t: Record<string, string>) {
-  return z.object(
-    Object.keys(t).reduce((acc, key) => {
-      return {
-        ...acc,
-        [key]: z.string().default(t[key]),
-      };
-    }, {})
   );
 }

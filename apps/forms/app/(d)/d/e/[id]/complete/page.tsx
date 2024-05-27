@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { EndingPageWithContext } from "@/theme/templates/formcomplete";
 import { ssr_page_init_i18n } from "@/i18n/ssr";
 import { fmt_local_index } from "@/utils/fmt";
+import { EndingPageI18nOverrides } from "@/types";
 
 export default async function SubmitCompletePage({
   params,
@@ -37,7 +38,7 @@ export default async function SubmitCompletePage({
 
   await ssr_page_init_i18n({ lng: data.default_form_page_language });
 
-  const { title, ending_page_template_id } = data;
+  const { title, ending_page_template_id, ending_page_i18n_overrides } = data;
 
   if (!response_id) {
     return notFound();
@@ -58,7 +59,8 @@ export default async function SubmitCompletePage({
   return (
     <main className="flex items-center justify-center min-h-screen">
       <EndingPageWithContext
-        template={ending_page_template_id}
+        template_id={ending_page_template_id}
+        overrides={ending_page_i18n_overrides as {} as EndingPageI18nOverrides}
         context={{
           title: title,
           language: data.default_form_page_language,

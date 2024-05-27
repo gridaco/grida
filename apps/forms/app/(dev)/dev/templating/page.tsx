@@ -2,9 +2,10 @@
 
 import React from "react";
 import resources from "@/i18n";
-import { TemplateEditor, getPropTypes } from "@/scaffolds/template-editor";
+import { TemplateEditor } from "@/scaffolds/template-editor";
 import { Component as FormCompleteDefault } from "@/theme/templates/formcomplete/default";
 import { Component as FormCompleteReceipt01 } from "@/theme/templates/formcomplete/receipt01";
+import { getPropTypes } from "@/lib/templating/template";
 
 function getComponent(template_id: string) {
   switch (template_id) {

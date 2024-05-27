@@ -76,29 +76,29 @@ export namespace TemplateVariables {
     form_title: z.string().describe("Form title"),
     title: z.string().describe("Page / Campaign title"),
     language: z.string().describe("Language of the form"),
-    fields: z.record(z.string()).describe("Form fields (dynamic)"),
-    session: z.object({}),
-    customer: z.object({
-      short_id: z
-        .string()
-        .describe("short_id of the customer, a.k.a support id"),
-      first_name: z
-        .string()
-        .optional()
-        .describe("first name of the customer if linked"),
-      last_name: z
-        .string()
-        .optional()
-        .describe("last name of the customer if linked"),
-      display_name: z
-        .string()
-        .optional()
-        .describe(
-          "display name / full name / nickname of the customer if linked"
-        ),
-      phone: z.string().optional().describe("phone number of the customer"),
-      email: z.string().optional().describe("email of the customer"),
-    }),
+    // fields: z.record(z.string()).describe("Form fields (dynamic)"),
+    // session: z.object({}),
+    // customer: z.object({
+    //   short_id: z
+    //     .string()
+    //     .describe("short_id of the customer, a.k.a support id"),
+    //   first_name: z
+    //     .string()
+    //     .optional()
+    //     .describe("first name of the customer if linked"),
+    //   last_name: z
+    //     .string()
+    //     .optional()
+    //     .describe("last name of the customer if linked"),
+    //   display_name: z
+    //     .string()
+    //     .optional()
+    //     .describe(
+    //       "display name / full name / nickname of the customer if linked"
+    //     ),
+    //   phone: z.string().optional().describe("phone number of the customer"),
+    //   email: z.string().optional().describe("email of the customer"),
+    // }),
     response: z.object({
       short_id: z
         .string()

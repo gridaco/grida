@@ -29,18 +29,20 @@ export default async function Component({
   return (
     <main className="flex items-center justify-center min-h-screen">
       <FormCompletePageTemplate_receipt01
-        title={title}
-        form_title={title}
-        language={params.lng}
-        response={{
-          idx: "#123",
-          index: 123,
-          short_id: "R12",
-        }}
-        session={{}}
-        fields={{}}
-        customer={{
-          short_id: "C34",
+        context={{
+          title: title,
+          form_title: title,
+          language: params.lng,
+          response: {
+            idx: "#123",
+            index: 123,
+            short_id: "R12",
+          },
+          session: {},
+          fields: {},
+          customer: {
+            short_id: "C34",
+          },
         }}
       />
     </main>

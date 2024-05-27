@@ -7,15 +7,9 @@ import {
   PreferenceBoxFooter,
   PreferenceBoxHeader,
   PreferenceDescription,
-  cls_save_button,
 } from "@/components/preferences";
 import resources from "@/i18n";
-import {
-  TemplateEditor,
-  getPropTypes,
-  getRenderedTexts,
-  useMockedContext,
-} from "@/scaffolds/template-editor";
+import { TemplateEditor, useMockedContext } from "@/scaffolds/template-editor";
 import { Component as FormCompleteDefault } from "@/theme/templates/formcomplete/default";
 import { Component as FormCompleteReceipt01 } from "@/theme/templates/formcomplete/receipt01";
 import {
@@ -37,7 +31,15 @@ import type {
   EndingPageTemplateID,
   FormsPageLanguage,
 } from "@/types";
-import { render } from "@/lib/templating/template";
+import {
+  render,
+  getPropTypes,
+  getRenderedTexts,
+} from "@/lib/templating/template";
+import {
+  ending_page_template_config,
+  ending_page_templates,
+} from "@/k/templates";
 
 export function EndingPagePreferences({
   form_id,
@@ -104,8 +106,11 @@ export function EndingPagePreferences({
               <SelectValue placeholder="Select Ending Page Template" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value={"default"}>Default</SelectItem>
-              <SelectItem value="receipt01">Receipt 01</SelectItem>
+              {ending_page_templates.map((id) => (
+                <SelectItem key={id} value={id}>
+                  {ending_page_template_config[id].label}
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
           <PreferenceDescription>
