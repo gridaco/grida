@@ -57,7 +57,7 @@ export function BlockEditPanel({
   const [condition_v_hidden, set_condition_v_hidden] =
     useState<ConditionExpression>();
 
-  console.log("block?.v_hidden", block?.v_hidden);
+  // console.log("block?.v_hidden", block?.v_hidden);
 
   const onSave = (e: any) => {
     const [l, op, r] = condition_v_hidden || [];
@@ -128,11 +128,7 @@ export function BlockEditPanel({
               </PopoverContent>
             </Popover>
           </div>
-          <p>
-            <span className="text-xs font-mono">
-              if {condition_v_hidden?.join(" ")}
-            </span>
-          </p>
+          {/* Add logic testing tool */}
           <hr />
         </div>
         <SheetFooter>

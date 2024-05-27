@@ -1,4 +1,4 @@
-import resources from "@/k/i18n";
+import resources from "./resources";
 import { client } from "@/lib/supabase/server";
 import i18next from "i18next";
 

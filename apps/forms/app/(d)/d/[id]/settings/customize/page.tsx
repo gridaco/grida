@@ -14,7 +14,7 @@ import { notFound } from "next/navigation";
 import { CustomPoweredByBrandingPreferences } from "@/scaffolds/settings/custom-powered-by-branding-preferences";
 import { CustomSectionStylePreferences } from "@/scaffolds/settings/custom-section-style-preferences";
 import { CustomPageBackgroundPreferences } from "@/scaffolds/settings/custom-page-background-preferences";
-import { FormPage } from "@/types";
+import { EndingPageI18nOverrides, FormPage } from "@/types";
 import { EndingPagePreferences } from "@/scaffolds/settings/ending-page-preferences";
 
 export default async function FormsCustomizeSettingsPage({
@@ -54,6 +54,7 @@ export default async function FormsCustomizeSettingsPage({
     default_page,
     is_ending_page_enabled,
     ending_page_template_id,
+    ending_page_i18n_overrides,
   } = data!;
 
   const { background, stylesheet } = default_page as any as FormPage;
@@ -89,11 +90,13 @@ export default async function FormsCustomizeSettingsPage({
           />
           <EndingPagePreferences
             form_id={form_id}
-            lng={default_form_page_language}
+            lang={default_form_page_language}
             title={title}
             init={{
               enabled: is_ending_page_enabled,
-              template_id: ending_page_template_id,
+              template_id: ending_page_template_id as any,
+              i18n_overrides:
+                ending_page_i18n_overrides as {} as EndingPageI18nOverrides,
             }}
           />
         </SectorBlocks>

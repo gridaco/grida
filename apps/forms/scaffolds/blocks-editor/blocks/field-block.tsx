@@ -43,6 +43,7 @@ import {
   DialogHeader,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import clsx from "clsx";
 
 export function FieldBlock({
   id,
@@ -59,12 +60,14 @@ export function FieldBlock({
 
   const is_hidden_field = form_field?.type === "hidden";
 
-  const { available_field_ids } = state;
+  const { available_field_ids, fields } = state;
   const [advanced, setAdvanced] = useState(false);
   const no_available_fields = available_field_ids.length === 0;
 
   const can_create_new_field_from_this_block =
     no_available_fields && !form_field;
+
+  const can_advanced_mode = fields.length > 0;
 
   const deleteBlock = useDeleteBlock();
 
@@ -142,8 +145,17 @@ export function FieldBlock({
                       {state.fields.map((f) => (
                         <SelectItem key={f.id} value={f.id} disabled={false}>
                           {f.name}{" "}
-                          {!available_field_ids.includes(f.id) &&
-                            "(already used)"}
+                          <small>
+                            {!available_field_ids.includes(f.id) &&
+                              `${(() => {
+                                const t = state.blocks.filter(
+                                  (b) => b.form_field_id === f.id
+                                ).length;
+
+                                return `(${t} ${t <= 1 ? "usage" : "usages"})`;
+                              })()} 
+                            `}
+                          </small>
                           <small className="ms-1 font-mono opacity-50">
                             {f.id}
                           </small>
@@ -159,51 +171,62 @@ export function FieldBlock({
                 </DialogFooter>
               </DialogContent>
             </Dialog>
-            <Select
-              value={form_field_id ?? ""}
-              onValueChange={(value) => {
-                if (value === "__gf_new") {
-                  onNewFieldClick();
-                  return;
-                }
-                if (value === "__gf_advanced") {
-                  setAdvanced(true);
-                  return;
-                }
-                onFieldChange(value);
-              }}
-            >
-              <SelectTrigger id="category" aria-label="Select category">
-                <SelectValue placeholder="Select Field" />
-              </SelectTrigger>
-              <SelectContent>
-                {state.fields.map((f) => (
-                  <SelectItem
-                    key={f.id}
-                    value={f.id}
-                    disabled={!available_field_ids.includes(f.id)}
-                  >
-                    {f.name}
-                  </SelectItem>
-                ))}
-                {can_create_new_field_from_this_block && (
-                  <SelectItem value="__gf_new">
-                    <div className="flex items-center">
-                      <PlusIcon className="me-2" />
-                      Create New Field
-                    </div>
-                  </SelectItem>
-                )}
-                <div>
-                  <SelectItem value="__gf_advanced">
-                    <div className="flex items-center">
-                      <GearIcon className="me-2" />
-                      Advanced
-                    </div>
-                  </SelectItem>
-                </div>
-              </SelectContent>
-            </Select>
+            {fields.length === 0 ? (
+              <>
+                <Button variant="outline" size="sm" onClick={onNewFieldClick}>
+                  <PlusIcon className="me-2" />
+                  Create Field
+                </Button>
+              </>
+            ) : (
+              <>
+                <Select
+                  value={form_field_id ?? ""}
+                  onValueChange={(value) => {
+                    if (value === "__gf_new") {
+                      onNewFieldClick();
+                      return;
+                    }
+                    if (value === "__gf_advanced") {
+                      setAdvanced(true);
+                      return;
+                    }
+                    onFieldChange(value);
+                  }}
+                >
+                  <SelectTrigger id="category" aria-label="Select category">
+                    <SelectValue placeholder="Select Field" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {state.fields.map((f) => (
+                      <SelectItem
+                        key={f.id}
+                        value={f.id}
+                        disabled={!available_field_ids.includes(f.id)}
+                      >
+                        {f.name}
+                      </SelectItem>
+                    ))}
+                    {can_create_new_field_from_this_block && (
+                      <SelectItem value="__gf_new">
+                        <div className="flex items-center">
+                          <PlusIcon className="me-2" />
+                          Create New Field
+                        </div>
+                      </SelectItem>
+                    )}
+                    {can_advanced_mode && (
+                      <SelectItem value="__gf_advanced">
+                        <div className="flex items-center">
+                          <GearIcon className="me-2" />
+                          Advanced
+                        </div>
+                      </SelectItem>
+                    )}
+                  </SelectContent>
+                </Select>
+              </>
+            )}
           </span>
         </div>
         <div>
@@ -232,7 +255,11 @@ export function FieldBlock({
           </DropdownMenu>
         </div>
       </BlockHeader>
-      <div className="w-full min-h-40 bg-neutral-200 dark:bg-neutral-800 rounded p-10 border border-black/20">
+      <div
+        className={clsx(
+          "w-full min-h-40 bg-neutral-200 dark:bg-neutral-800 rounded p-10 border border-black/20"
+        )}
+      >
         {is_hidden_field ? (
           <div>
             <p className="text-xs opacity-50">

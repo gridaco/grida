@@ -1,4 +1,4 @@
-import resources from "@/k/i18n";
+import resources from "@/i18n";
 import i18next from "i18next";
 import FormCompletePageDefault from "@/theme/templates/formcomplete/default";
 
@@ -26,5 +26,14 @@ export default async function Component({
   });
 
   const title = searchParams.title || mock.title;
-  return <FormCompletePageDefault form_title={title} />;
+  return (
+    <main className="flex items-center justify-center min-h-screen">
+      <FormCompletePageDefault
+        // @ts-ignore
+        context={{
+          form_title: title,
+        }}
+      />
+    </main>
+  );
 }

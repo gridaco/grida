@@ -4,7 +4,7 @@ import { JSONFormRaw, parse } from "@/types/schema";
 import { FormRenderTree } from "@/lib/forms";
 import { FormView } from "@/scaffolds/e/form";
 import { useEffect, useRef, useState } from "react";
-import resources from "@/k/i18n";
+import resources from "@/i18n";
 import { nanoid } from "nanoid";
 import { ExclamationTriangleIcon } from "@radix-ui/react-icons";
 import useVariablesCSS from "../use-variables-css";

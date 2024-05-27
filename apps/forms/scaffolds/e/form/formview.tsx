@@ -128,8 +128,6 @@ function Body({
 } & React.FormHTMLAttributes<HTMLFormElement>) {
   const [state, dispatch] = useFormAgentState();
 
-  console.log(state.fields);
-
   const {
     is_submitting,
     sections,

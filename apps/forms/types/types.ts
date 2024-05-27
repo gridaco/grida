@@ -286,3 +286,11 @@ interface FormPageThemeEmbeddedBackgroundData {
    */
   "background-color"?: string;
 }
+
+export type EndingPageTemplateID = "default" | "receipt01";
+
+export interface EndingPageI18nOverrides {
+  $schema: "https://forms.grida.co/schemas/v1/endingpage.json";
+  template_id: EndingPageTemplateID;
+  overrides: Record<string, string>;
+}

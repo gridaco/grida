@@ -1,10 +1,10 @@
 import React from "react";
 import { client } from "@/lib/supabase/server";
 import { notFound } from "next/navigation";
-import { EndingPage } from "@/theme/templates/formcomplete";
-import { ssr_page_init_i18n } from "../../i18n";
+import { EndingPageWithContext } from "@/theme/templates/formcomplete";
+import { ssr_page_init_i18n } from "@/i18n/ssr";
 import { fmt_local_index } from "@/utils/fmt";
-import FormCompletePageDefault from "@/theme/templates/formcomplete/default";
+import { EndingPageI18nOverrides } from "@/types";
 
 export default async function SubmitCompletePage({
   params,
@@ -38,15 +38,7 @@ export default async function SubmitCompletePage({
 
   await ssr_page_init_i18n({ lng: data.default_form_page_language });
 
-  const { title, ending_page_template_id } = data;
-
-  switch (ending_page_template_id) {
-    case undefined:
-    case null:
-    case "default": {
-      return <FormCompletePageDefault form_title={title} />;
-    }
-  }
+  const { title, ending_page_template_id, ending_page_i18n_overrides } = data;
 
   if (!response_id) {
     return notFound();
@@ -62,15 +54,31 @@ export default async function SubmitCompletePage({
     return notFound();
   }
 
-  const { local_index } = response;
+  const { local_index, local_id } = response;
 
   return (
-    <EndingPage
-      template_id={ending_page_template_id}
-      data={{
-        form_title: title,
-        response_short_id: fmt_local_index(local_index),
-      }}
-    />
+    <main className="flex items-center justify-center min-h-screen">
+      <EndingPageWithContext
+        template_id={ending_page_template_id}
+        overrides={ending_page_i18n_overrides as {} as EndingPageI18nOverrides}
+        context={{
+          title: title,
+          language: data.default_form_page_language,
+          form_title: title,
+          response: {
+            index: local_index,
+            idx: fmt_local_index(local_index),
+            short_id: local_id,
+          },
+
+          // FIXME:
+          fields: {},
+          session: {},
+          customer: {
+            short_id: "",
+          },
+        }}
+      />
+    </main>
   );
 }

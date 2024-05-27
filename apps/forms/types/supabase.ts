@@ -806,6 +806,7 @@ export type Database = {
           default_form_page_id: string | null
           default_form_page_language: Database["grida_forms"]["Enums"]["form_page_language"]
           description: string | null
+          ending_page_i18n_overrides: Json | null
           ending_page_template_id: string | null
           id: string
           is_edit_after_submission_allowed: boolean
@@ -831,6 +832,7 @@ export type Database = {
           default_form_page_id?: string | null
           default_form_page_language?: Database["grida_forms"]["Enums"]["form_page_language"]
           description?: string | null
+          ending_page_i18n_overrides?: Json | null
           ending_page_template_id?: string | null
           id?: string
           is_edit_after_submission_allowed?: boolean
@@ -856,6 +858,7 @@ export type Database = {
           default_form_page_id?: string | null
           default_form_page_language?: Database["grida_forms"]["Enums"]["form_page_language"]
           description?: string | null
+          ending_page_i18n_overrides?: Json | null
           ending_page_template_id?: string | null
           id?: string
           is_edit_after_submission_allowed?: boolean

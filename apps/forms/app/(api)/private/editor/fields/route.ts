@@ -1,3 +1,4 @@
+import { FielSupports } from "@/k/supported_field_types";
 import {
   grida_commerce_client,
   createRouteHandlerClient,
@@ -14,14 +15,19 @@ export const revalidate = 0;
 
 export async function POST(req: NextRequest) {
   const cookieStore = cookies();
+  const supabase = createRouteHandlerClient(cookieStore);
   const init = (await req.json()) as FormFieldUpsert;
   const operation = init.id ? "update" : "create";
 
   const { form_id } = init;
-
   console.log("POST /private/editor/fields", init);
 
-  const supabase = createRouteHandlerClient(cookieStore);
+  const is_options_allowed_for_this_field = FielSupports.options(init.type);
+
+  // validate options - remove if not allowed
+  if (!is_options_allowed_for_this_field) {
+    delete init.options;
+  }
 
   const { data: form_reference } = await supabase
     .from("form")
