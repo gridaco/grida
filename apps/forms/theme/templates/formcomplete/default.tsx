@@ -22,7 +22,7 @@ export default function FormCompletePageDefault({
   context: TemplateVariables.FormResponseContext;
 }) {
   const texts = getRenderedTexts({
-    shape: getPropTypes(resources.en.translation.formcomplete.receipt01).shape,
+    shape: getPropTypes(resources.en.translation.formcomplete.default).shape,
     overrides,
     config: {
       context,
