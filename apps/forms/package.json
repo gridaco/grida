@@ -71,6 +71,7 @@
     "i18next": "^23.7.9",
     "immer": "^9.0.3",
     "lucide-react": "^0.367.0",
+    "mapbox-gl": "^3.4.0",
     "messagebird": "^4.0.1",
     "mini-svg-data-uri": "^1.4.4",
     "monaco-editor": "^0.47.0",
@@ -86,6 +87,7 @@
     "react-dom": "^18",
     "react-hot-toast": "^2.4.0",
     "react-i18next": "^13.5.0",
+    "react-map-gl": "^7.1.7",
     "react-pdf": "^7.7.1",
     "react-player": "^2.14.1",
     "react-textarea-autosize": "^8.5.3",
@@ -103,6 +105,7 @@
   "devDependencies": {
     "@tailwindcss/typography": "^0.5.10",
     "@types/css-tree": "^2.3.1",
+    "@types/mapbox-gl": "^3.1.0",
     "@types/node": "^20",
     "@types/react": "^18",
     "@types/react-dom": "^18",
