@@ -16,7 +16,7 @@ export default function MessageAppFrame({
     phone: string;
   };
   messages: {
-    message: string;
+    message: string | React.ReactNode;
     role: "incoming" | "outgoing";
   }[];
   hideInput?: boolean;

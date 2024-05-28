@@ -43,25 +43,48 @@ export namespace SubmissionHooks {
   }
 
   export async function send_sms({
-    type,
     form_id,
     to,
-  }: {
-    type: "formcomplete";
+    lang,
+    ...rest
+  }: (
+    | { type: "formcomplete" }
+    | {
+        type: "custom";
+        text: string;
+      }
+  ) & {
     form_id: string;
     to: string | string[];
     lang: string;
   }) {
-    console.log("send_sms", type, form_id, to);
-    bird
-      .sendsms({
-        text: "hey",
-        contacts: toArrayOf(to).map((tel) => ({
-          identifierKey: "phonenumber",
-          identifierValue: tel,
-        })),
-      })
-      .then(console.log)
-      .catch(console.error);
+    const { type } = rest;
+
+    switch (type) {
+      case "formcomplete": {
+        return bird
+          .sendsms({
+            text: "Form complete",
+            contacts: toArrayOf(to).map((tel) => ({
+              identifierKey: "phonenumber",
+              identifierValue: tel,
+            })),
+          })
+          .then(console.log)
+          .catch(console.error);
+      }
+      case "custom": {
+        return bird
+          .sendsms({
+            text: rest.text,
+            contacts: toArrayOf(to).map((tel) => ({
+              identifierKey: "phonenumber",
+              identifierValue: tel,
+            })),
+          })
+          .then(console.log)
+          .catch(console.error);
+      }
+    }
   }
 }
