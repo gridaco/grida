@@ -536,6 +536,19 @@ async function submit({
     // send email
   }
 
+  // [sms]
+
+  const _sms_enabled = false;
+  if (_sms_enabled) {
+    await SubmissionHooks.send_sms({
+      form_id: form_id,
+      type: "formcomplete",
+      to: "...",
+      lang: "en",
+    });
+    // send sms
+  }
+
   // endregion
 
   // ==================================================
