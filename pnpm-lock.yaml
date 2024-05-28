@@ -376,9 +376,6 @@ importers:
       mapbox-gl:
         specifier: ^3.4.0
         version: 3.4.0
-      messagebird:
-        specifier: ^4.0.1
-        version: 4.0.1
       mini-svg-data-uri:
         specifier: ^1.4.4
         version: 1.4.4
@@ -30264,15 +30261,6 @@ packages:
     resolution: {integrity: sha512-ZhoIoL7TNV4s5B6+rx5mC//fw8/POGyNxS/DZyCJeiZ12ScLfVwRE/GfsxwiTkMYYD5DmK2/JXnEVXqL4rF+Sw==}
     dev: false
 
-  /messagebird@4.0.1:
-    resolution: {integrity: sha512-Abn0aoH1Dzsq5KMeI3LNanVETwu4+HvNXZrhWRGzRIJ9ea88sefsVfy98Qj4NDmxGuXLFmT8Lhgw1kStzu7F0g==}
-    engines: {node: '>=10.0.0'}
-    dependencies:
-      jose: 4.15.5
-      safe-buffer: 5.2.1
-      scmp: 2.1.0
-    dev: false
-
   /methods@1.1.2:
     resolution: {integrity: sha512-iclAHeNqNm68zFtnZ0e+1L2yUIdvzNoauKU4WBA3VvH/vPFieF7qfRlwUZU+DA9P9bPXIS90ulxoUoCH23sV2w==}
     engines: {node: '>= 0.6'}
@@ -36849,10 +36837,6 @@ packages:
       ajv: 8.13.0
       ajv-formats: 2.1.1(ajv@8.13.0)
       ajv-keywords: 5.1.0(ajv@8.13.0)
-    dev: false
-
-  /scmp@2.1.0:
-    resolution: {integrity: sha512-o/mRQGk9Rcer/jEEw/yw4mwo3EU/NvYvp577/Btqrym9Qy5/MdWGBqipbALgd2lrdWTJ5/gqDusxfnQBxOxT2Q==}
     dev: false
 
   /screen-size-specs@0.0.1:
