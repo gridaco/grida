@@ -351,18 +351,14 @@ function CustomerPanelProvider({ children }: React.PropsWithChildren<{}>) {
 
   return (
     <>
-      {state.focus_customer_id && (
-        <CustomerEditPanel
-          key={state.focus_customer_id}
-          title={<>Customer</>}
-          customer_id={state.focus_customer_id}
-          open={state.is_customer_edit_panel_open}
-          onOpenChange={(open) => {
-            dispatch({ type: "editor/customers/edit", open });
-          }}
-        />
-      )}
-
+      <CustomerEditPanel
+        key={state.focus_customer_id}
+        customer_id={state.focus_customer_id}
+        open={state.is_customer_edit_panel_open}
+        onOpenChange={(open) => {
+          dispatch({ type: "editor/customers/edit", open });
+        }}
+      />
       {children}
     </>
   );
