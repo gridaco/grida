@@ -3,6 +3,7 @@ import {
   ArchiveIcon,
   AvatarIcon,
   CodeIcon,
+  EnvelopeClosedIcon,
   Link2Icon,
 } from "@radix-ui/react-icons";
 import Link from "next/link";
@@ -22,7 +23,7 @@ export default function Layout({
       <nav className="col-span-1 max-w-xs min-w-60 w-min border-r dark:border-r-neutral-800 h-full">
         <ul className="flex flex-col">
           <li>
-            <Link href={`/d/${id}/connect/share`}>
+            <Link href={`./share`}>
               <SideNavItem>
                 <Link2Icon />
                 Share
@@ -30,7 +31,15 @@ export default function Layout({
             </Link>
           </li>
           <li>
-            <Link href={`/d/${id}/connect/store`}>
+            <Link href={`./channels`}>
+              <SideNavItem>
+                <EnvelopeClosedIcon />
+                Channels
+              </SideNavItem>
+            </Link>
+          </li>
+          <li>
+            <Link href={`./store`}>
               <SideNavItem>
                 <ArchiveIcon />
                 Store
@@ -38,7 +47,7 @@ export default function Layout({
             </Link>
           </li>
           <li>
-            <Link href={`/d/${id}/connect/customer`}>
+            <Link href={`./customer`}>
               <SideNavItem>
                 <AvatarIcon />
                 Customer Identity
