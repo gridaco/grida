@@ -23,7 +23,7 @@ export default function Layout({
       <nav className="col-span-1 max-w-xs min-w-60 w-min border-r dark:border-r-neutral-800 h-full">
         <ul className="flex flex-col">
           <li>
-            <Link href={`./share`}>
+            <Link href={`/d/${id}/connect/share`}>
               <SideNavItem>
                 <Link2Icon />
                 Share
@@ -31,7 +31,7 @@ export default function Layout({
             </Link>
           </li>
           <li>
-            <Link href={`./channels`}>
+            <Link href={`/d/${id}/connect/channels`}>
               <SideNavItem>
                 <EnvelopeClosedIcon />
                 Channels
@@ -39,7 +39,7 @@ export default function Layout({
             </Link>
           </li>
           <li>
-            <Link href={`./store`}>
+            <Link href={`/d/${id}/connect/store`}>
               <SideNavItem>
                 <ArchiveIcon />
                 Store
@@ -47,7 +47,7 @@ export default function Layout({
             </Link>
           </li>
           <li>
-            <Link href={`./customer`}>
+            <Link href={`/d/${id}/connect/customer`}>
               <SideNavItem>
                 <AvatarIcon />
                 Customer Identity

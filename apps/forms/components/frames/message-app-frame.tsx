@@ -5,7 +5,7 @@ import { ArrowLeftIcon } from "@radix-ui/react-icons";
 import React from "react";
 import clsx from "clsx";
 
-export default function MessageDemo({
+export default function MessageAppFrame({
   sender,
   messages,
   hideInput,

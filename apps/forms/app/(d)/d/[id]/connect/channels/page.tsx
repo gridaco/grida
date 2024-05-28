@@ -44,7 +44,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import MessageDemo from "@/components/chat/message-demo";
+import MessageAppFrame from "@/components/frames/message-app-frame";
+import { bird_sms_fees } from "@/k/sms_fees";
+import MailAppFrame from "@/components/frames/mail-app-frame";
 
 const SMS_DEFAULT_ORIGINATOR = process.env
   .NEXT_PUBLIC_BIRD_SMS_DEFAULT_ORIGINATOR as string;
@@ -64,10 +66,19 @@ export default function ConnectChannels() {
         </SectorHeader>
         <SectorBlocks>
           <PreferenceBox>
-            <PreferenceBoxHeader heading={<>SMS Notifications</>} />
+            <PreferenceBoxHeader
+              heading={
+                <>
+                  SMS Notifications
+                  <Badge variant="outline" className="ms-2 align-middle">
+                    Add-on
+                  </Badge>
+                </>
+              }
+            />
             <PreferenceBody>
               <div className="max-w-sm max-h-96 rounded-3xl border-4 overflow-hidden">
-                <MessageDemo
+                <MessageAppFrame
                   hideInput
                   sender={{
                     name: "Grida Forms",
@@ -86,100 +97,165 @@ export default function ConnectChannels() {
                   ]}
                 />
               </div>
-              <Collapsible>
-                <CollapsibleTrigger>
-                  <Badge variant={"outline"}>$ View Pricing</Badge>
-                </CollapsibleTrigger>
-                <CollapsibleContent>
-                  <label>
-                    SMS{" "}
-                    <span>
-                      <Link href="https://bird.com/" target="_blank">
-                        by <BirdLogo size={20} className="inline" />
-                      </Link>
-                    </span>
-                  </label>
-                  <p>
-                    When exceeding the included messages, the following rates
-                    apply
-                  </p>
-                  <Table className="mt-4">
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>
-                          Type
-                          <HoverCard>
-                            <HoverCardTrigger>
-                              <QuestionMarkCircledIcon className="ms-2 inline align-middle" />
-                            </HoverCardTrigger>
-                            <HoverCardContent>
-                              <Link
-                                href="https://en.wikipedia.org/wiki/List_of_country_calling_codes"
-                                target="_blank"
-                              >
-                                Learn more about country calling codes
-                                <OpenInNewWindowIcon className="ms-2 inline align-middle" />
-                              </Link>
-                            </HoverCardContent>
-                          </HoverCard>
-                        </TableHead>
-                        <TableHead>Price</TableHead>
-                        <TableHead>SMS</TableHead>
-                        <TableHead>MMS</TableHead>
-                        <TableHead>Two-way</TableHead>
-                        <TableHead>Country</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      <TableRow>
-                        <TableCell>Zone 1</TableCell>
-                        <TableCell>$0.0077</TableCell>
-                        <TableCell>Yes</TableCell>
-                        <TableCell>No</TableCell>
-                        <TableCell>Yes</TableCell>
-                        <TableCell>🇺🇸 🇨🇦</TableCell>
-                      </TableRow>
-                      <TableRow>
-                        <TableCell>Zone 2 ~ 9</TableCell>
-                        <TableCell>$0.008</TableCell>
-                        <TableCell>Yes</TableCell>
-                        <TableCell>No</TableCell>
-                        <TableCell>Vary</TableCell>
-                        <TableCell>
-                          <Link
-                            href="https://docs.bird.com/applications/channels/channels/supported-channels/sms/concepts/choosing-the-right-sender-availability-and-restrictions-by-country#countries-and-restrictions"
-                            target="_blank"
-                          >
-                            🇪🇺 🇬🇧 🇲🇽 🇰🇷 🇯🇵 +50
-                          </Link>
-                        </TableCell>
-                      </TableRow>
-                    </TableBody>
-                  </Table>
-                </CollapsibleContent>
-              </Collapsible>
-
               <section className="py-5">
-                <Label>Originator</Label>
-                <Select defaultValue="default">
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="default">
-                      {SMS_DEFAULT_ORIGINATOR} (default)
-                    </SelectItem>
-                  </SelectContent>
-                </Select>
+                <div className="grid gap-2">
+                  <Label htmlFor="originator">Originator</Label>
+                  <Select name="originator" defaultValue="default">
+                    <SelectTrigger id="originator">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="default">
+                        {SMS_DEFAULT_ORIGINATOR} (default)
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </section>
+              <AboutSMSFees />
+            </PreferenceBody>
+          </PreferenceBox>
+          <PreferenceBox>
+            <PreferenceBoxHeader heading={<>Email Notifications</>} />
+            <PreferenceBody>
+              <div className="max-h-96 rounded-3xl border-4 overflow-hidden">
+                <MailAppFrame
+                  sidebarHidden
+                  message={{
+                    at: "Just now",
+                    from: {
+                      name: "Grida Forms",
+                      email: "notifications@forms.grida.co",
+                      avatar: "GR",
+                    },
+                    title: "Your Ticket is Ready",
+                  }}
+                  messages={[
+                    {
+                      from: "Grida Forms",
+                      title: "Your Ticket is Ready",
+                      at: "Just now",
+                    },
+                    {
+                      from: "Grida Forms",
+                      title: "Your submission has been received",
+                      at: "20 Minutes ago",
+                    },
+                    {
+                      from: "Grida Forms",
+                      title: "Registration is now open",
+                      at: "28 Minutes ago",
+                    },
+                  ]}
+                >
+                  <p>Dear team,</p>
+                  <p>
+                    Im excited to announce the release of our latest feature
+                    update. This release includes several new capabilities that
+                    will help you work more efficiently and effectively.
+                  </p>
+                  <p>Some of the key highlights include:</p>
+                  <ul>
+                    <li>Improved email search and filtering</li>
+                    <li>Enhanced email templates and signatures</li>
+                    <li>
+                      Seamless integration with our project management tools
+                    </li>
+                  </ul>
+                  <p>
+                    Weve been working hard to deliver these improvements, and
+                    were confident they will have a positive impact on your
+                    daily workflow. Please let me know if you have any questions
+                    or feedback.
+                  </p>
+                  <p>
+                    Best regards,
+                    <br />
+                    Jared
+                  </p>
+                </MailAppFrame>
+              </div>
+              <section className="py-5">
+                <div className="grid gap-2">
+                  <Label htmlFor="emailfrom">From</Label>
+                  <Select name="emailfrom" defaultValue="default">
+                    <SelectTrigger id="emailfrom">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="default">
+                        notifications@forms.grida.co
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               </section>
             </PreferenceBody>
           </PreferenceBox>
         </SectorBlocks>
       </Sector>
-
-      <section>
-        <h2>Email</h2>
-      </section>
     </main>
+  );
+}
+
+function AboutSMSFees() {
+  return (
+    <section className="my-10">
+      <Collapsible>
+        <CollapsibleTrigger>
+          <Badge variant={"outline"}>
+            <QuestionMarkCircledIcon className="w-3 h-3 inline align-middle me-2" />
+            Learn more about SMS Fees
+          </Badge>
+        </CollapsibleTrigger>
+        <CollapsibleContent>
+          <article className="my-4 prose dark:prose-invert">
+            <strong>For Pro Users,</strong> please refer to our{" "}
+            <Link href="/pricing" target="_blank">
+              standard pricing
+            </Link>
+            <br />
+            <br />
+            <strong>For Enterprise Users</strong>
+            <h6>Large-scale SMS messaging for enterprise customers</h6>
+            <p>
+              For enterprise customers, we offer dedicated pricing for SMS,{" "}
+              <Link href="https://bird.com/" target="_blank">
+                by <BirdLogo size={20} className="inline" />.
+              </Link>
+              <br />
+              <i>We take 0 margin on the SMS fees,</i> and you pay exactly what
+              you would pay to the carrier.
+            </p>
+          </article>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                {[
+                  "Unit",
+                  "Destination Country",
+                  "Originator Type",
+                  "Unit price",
+                ].map((th) => (
+                  <TableHead key={th}>{th}</TableHead>
+                ))}
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {bird_sms_fees.map(([a, b, c, d], i) => (
+                <TableRow key={i}>
+                  <TableCell>
+                    <small>{a}</small>
+                  </TableCell>
+                  <TableCell>{b}</TableCell>
+                  <TableCell>{c}</TableCell>
+                  <TableCell>{d}</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </CollapsibleContent>
+      </Collapsible>
+    </section>
   );
 }
