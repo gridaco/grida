@@ -817,10 +817,13 @@ export type Database = {
           is_multiple_response_allowed: boolean
           is_powered_by_branding_enabled: boolean
           is_redirect_after_response_uri_enabled: boolean
+          is_scheduling_enabled: boolean
           max_form_responses_by_customer: number | null
           max_form_responses_in_total: number | null
           project_id: number
           redirect_after_response_uri: string | null
+          scheduling_close_at: string | null
+          scheduling_open_at: string | null
           title: string
           unknown_field_handling_strategy: Database["grida_forms"]["Enums"]["form_response_unknown_field_handling_strategy_type"]
           updated_at: string
@@ -843,10 +846,13 @@ export type Database = {
           is_multiple_response_allowed?: boolean
           is_powered_by_branding_enabled?: boolean
           is_redirect_after_response_uri_enabled?: boolean
+          is_scheduling_enabled?: boolean
           max_form_responses_by_customer?: number | null
           max_form_responses_in_total?: number | null
           project_id: number
           redirect_after_response_uri?: string | null
+          scheduling_close_at?: string | null
+          scheduling_open_at?: string | null
           title?: string
           unknown_field_handling_strategy?: Database["grida_forms"]["Enums"]["form_response_unknown_field_handling_strategy_type"]
           updated_at?: string
@@ -869,10 +875,13 @@ export type Database = {
           is_multiple_response_allowed?: boolean
           is_powered_by_branding_enabled?: boolean
           is_redirect_after_response_uri_enabled?: boolean
+          is_scheduling_enabled?: boolean
           max_form_responses_by_customer?: number | null
           max_form_responses_in_total?: number | null
           project_id?: number
           redirect_after_response_uri?: string | null
+          scheduling_close_at?: string | null
+          scheduling_open_at?: string | null
           title?: string
           unknown_field_handling_strategy?: Database["grida_forms"]["Enums"]["form_response_unknown_field_handling_strategy_type"]
           updated_at?: string

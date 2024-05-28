@@ -42,7 +42,7 @@ export function ClosingFormPreferences({
             <Toggle
               name="is_force_closed"
               value={is_force_close_on}
-              label={is_force_close_on ? "Open Form" : "Force Close Form"}
+              label={"Force-Close this Form"}
               onChange={set_is_force_close_on}
             />
           </div>
