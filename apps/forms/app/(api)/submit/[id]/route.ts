@@ -21,6 +21,7 @@ import {
 import assert from "assert";
 import { GridaCommerceClient } from "@/services/commerce";
 import { SubmissionHooks } from "./hooks";
+import { Features } from "@/lib/features/scheduling";
 
 const HOST = process.env.HOST || "http://localhost:3000";
 
@@ -138,6 +139,9 @@ async function submit({
     is_max_form_responses_by_customer_enabled,
     max_form_responses_by_customer,
     is_force_closed,
+    is_scheduling_enabled,
+    scheduling_open_at,
+    scheduling_close_at,
     store_connection,
     fields,
   } = form_reference;
@@ -248,6 +252,25 @@ async function submit({
         status: 301,
       }
     );
+  }
+
+  // validation - check if form is open by schedule
+  if (is_scheduling_enabled) {
+    const isopen = Features.isopen({
+      open: scheduling_open_at,
+      close: scheduling_close_at,
+    });
+
+    if (!isopen) {
+      return NextResponse.redirect(
+        formlink(HOST, form_id, "formclosed", {
+          oops: FORM_CLOSED_WHILE_RESPONDING.code,
+        }),
+        {
+          status: 301,
+        }
+      );
+    }
   }
 
   // validatopn - check if user selected option is connected to inventory and is available

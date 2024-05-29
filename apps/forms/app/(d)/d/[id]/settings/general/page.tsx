@@ -18,6 +18,7 @@ import {
   RestrictNumberOfResponseByCustomer,
 } from "@/scaffolds/settings/response-preferences";
 import { ClosingFormPreferences } from "@/scaffolds/settings/closing-preference";
+import { SchedulingPreferences } from "@/scaffolds/settings/scheduling-preference";
 
 export default async function FormGeneralSettingsPage({
   params,
@@ -47,6 +48,10 @@ export default async function FormGeneralSettingsPage({
     max_form_responses_in_total,
     is_max_form_responses_in_total_enabled,
     is_force_closed,
+    is_scheduling_enabled,
+    scheduling_open_at,
+    scheduling_close_at,
+    scheduling_tz,
   } = data!;
 
   return (
@@ -69,6 +74,15 @@ export default async function FormGeneralSettingsPage({
             form_id={form_id}
             init={{
               is_force_closed,
+            }}
+          />
+          <SchedulingPreferences
+            form_id={form_id}
+            init={{
+              is_scheduling_enabled,
+              scheduling_open_at,
+              scheduling_close_at,
+              scheduling_tz,
             }}
           />
           <RestrictNumberOfResponseByCustomer
