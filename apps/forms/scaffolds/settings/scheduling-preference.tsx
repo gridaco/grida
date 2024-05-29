@@ -39,7 +39,7 @@ import {
 import { useTimestampTZ } from "@/hooks/use-timestamptz";
 import toast from "react-hot-toast";
 import { createClientFormsClient } from "@/lib/supabase/client";
-import { fromZonedTime } from "date-fns-tz";
+import { fromZonedTime, toZonedTime, format as tzFormat } from "date-fns-tz";
 
 export function SchedulingPreferences({
   form_id,
@@ -229,6 +229,11 @@ export function SchedulingPreferences({
               </TableBody>
             </Table>
           </div>
+          <OnYourLocalTime
+            open_at={scheduling_open_at}
+            close_at={scheduling_close_at}
+            tz={openTz}
+          />
         </form>
       </PreferenceBody>
       <PreferenceBoxFooter>
@@ -237,6 +242,61 @@ export function SchedulingPreferences({
         </Button>
       </PreferenceBoxFooter>
     </PreferenceBox>
+  );
+}
+
+function OnYourLocalTime({
+  open_at,
+  close_at,
+  tz,
+}: {
+  open_at: Date | undefined;
+  close_at: Date | undefined;
+  tz: string;
+}) {
+  const browserTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+
+  const openAtLocal = useMemo(
+    () =>
+      open_at ? toZonedTime(fromZonedTime(open_at, tz), browserTz) : undefined,
+    [browserTz, open_at, tz]
+  );
+
+  const closeAtLocal = useMemo(
+    () =>
+      close_at
+        ? toZonedTime(fromZonedTime(close_at, tz), browserTz)
+        : undefined,
+    [browserTz, close_at, tz]
+  );
+
+  return (
+    <article className="prose prose-sm dark:prose-invert">
+      {tz !== browserTz && (
+        <div className="text-muted-foreground">
+          <small>
+            The times are shown in {tz}. In your local time zone ({browserTz}),
+            they are:
+          </small>
+          <ul>
+            {openAtLocal && (
+              <li>
+                Open At:{" "}
+                {tzFormat(openAtLocal, "PPP HH:mm:ss", { timeZone: browserTz })}
+              </li>
+            )}
+            {closeAtLocal && (
+              <li>
+                Close At:{" "}
+                {tzFormat(closeAtLocal, "PPP HH:mm:ss", {
+                  timeZone: browserTz,
+                })}
+              </li>
+            )}
+          </ul>
+        </div>
+      )}
+    </article>
   );
 }
 
