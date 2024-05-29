@@ -1,12 +1,11 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useCallback, useMemo, useState } from "react";
 import {
   PreferenceBody,
   PreferenceBox,
   PreferenceBoxFooter,
   PreferenceBoxHeader,
-  PreferenceDescription,
 } from "@/components/preferences";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
@@ -37,6 +36,10 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { useTimestampTZ } from "@/hooks/use-timestamptz";
+import toast from "react-hot-toast";
+import { createClientFormsClient } from "@/lib/supabase/client";
+import { fromZonedTime } from "date-fns-tz";
 
 export function SchedulingPreferences({
   form_id,
@@ -47,19 +50,104 @@ export function SchedulingPreferences({
     is_scheduling_enabled: boolean;
     scheduling_open_at: string | null;
     scheduling_close_at: string | null;
+    scheduling_tz: string | null;
   };
 }) {
+  const supabase = createClientFormsClient();
+
   const [is_scheduling_enabled, set_is_scheduling_enabled] = useState(
     init.is_scheduling_enabled
   );
 
-  const [scheduling_open_at, set_scheduling_open_at] = React.useState<
-    Date | undefined
-  >(init.scheduling_open_at ? new Date(init.scheduling_open_at) : undefined);
+  const initialTZ =
+    init.scheduling_tz || Intl.DateTimeFormat().resolvedOptions().timeZone;
 
-  const [scheduling_close_at, set_scheduling_close_at] = React.useState<
-    Date | undefined
-  >(init.scheduling_close_at ? new Date(init.scheduling_close_at) : undefined);
+  const {
+    date: scheduling_open_at,
+    time: openTime,
+    tz: openTz,
+    setDate: set_scheduling_open_at,
+    setTime: setOpenTime,
+    setTimezone: setOpenTimezone,
+  } = useTimestampTZ(init.scheduling_open_at || undefined, initialTZ);
+
+  const {
+    date: scheduling_close_at,
+    time: closeTime,
+    tz: closeTz,
+    setDate: set_scheduling_close_at,
+    setTime: setCloseTime,
+    setTimezone: setCloseTimezone,
+  } = useTimestampTZ(init.scheduling_close_at || undefined, initialTZ);
+
+  // Function to synchronize timezones
+  const synchronizeTimezones = (newTz: string) => {
+    setOpenTimezone(newTz);
+    setCloseTimezone(newTz);
+  };
+
+  const update = useCallback(
+    async (data: {
+      is_scheduling_enabled: boolean;
+      scheduling_open_at?: string | null;
+      scheduling_close_at?: string | null;
+      scheduling_tz: string;
+    }) => {
+      const { error } = await supabase
+        .from("form")
+        .update({
+          ...data,
+        })
+        .eq("id", form_id);
+      if (error) {
+        throw error;
+      }
+    },
+    [form_id, supabase]
+  );
+
+  const handleSave = () => {
+    // Check if closing time is after opening time
+    if (
+      scheduling_open_at &&
+      scheduling_close_at &&
+      scheduling_open_at >= scheduling_close_at
+    ) {
+      toast.error("Closing time must be after opening time");
+      return;
+    }
+
+    // Check if either time is set (it's ok to have only one time set)
+    if (!scheduling_open_at && !scheduling_close_at) {
+      toast.error("You must either set the opening or closing time");
+      return;
+    }
+
+    const updating = update({
+      is_scheduling_enabled,
+      scheduling_open_at: scheduling_open_at
+        ? fromZonedTime(scheduling_open_at, openTz).toISOString()
+        : null,
+      scheduling_close_at: scheduling_close_at
+        ? fromZonedTime(scheduling_close_at, closeTz).toISOString()
+        : null,
+      scheduling_tz: openTz, // Save the timezone used
+    });
+
+    toast.promise(updating, {
+      loading: "Saving...",
+      success: "Saved!",
+      error: "Failed to save",
+    });
+
+    console.log({
+      form_id,
+      is_scheduling_enabled,
+      scheduling_open_at: scheduling_open_at?.toISOString(),
+      scheduling_close_at: scheduling_close_at?.toISOString(),
+      scheduling_tz: openTz, // Save the timezone used
+    });
+  };
 
   return (
     <PreferenceBox>
@@ -69,6 +157,10 @@ export function SchedulingPreferences({
           id="/private/editor/settings/..."
           action="/private/editor/settings/..."
           method="POST"
+          onSubmit={(e) => {
+            e.preventDefault();
+            handleSave();
+          }}
         >
           <input type="hidden" name="form_id" value={form_id} />
           <div className="flex gap-2 items-center">
@@ -97,16 +189,19 @@ export function SchedulingPreferences({
                   <TableCell>Open At</TableCell>
                   <TableCell>
                     <DatePicker
-                      placeholder="Openning Date"
+                      placeholder="Opening Date"
                       date={scheduling_open_at}
                       onValueChange={set_scheduling_open_at}
                     />
                   </TableCell>
                   <TableCell>
-                    <TimePicker />
+                    <TimePicker value={openTime} onValueChange={setOpenTime} />
                   </TableCell>
                   <TableCell>
-                    <TZPicker />
+                    <TZPicker
+                      value={openTz}
+                      onValueChange={synchronizeTimezones}
+                    />
                   </TableCell>
                 </TableRow>
                 <TableRow>
@@ -119,10 +214,16 @@ export function SchedulingPreferences({
                     />
                   </TableCell>
                   <TableCell>
-                    <TimePicker />
+                    <TimePicker
+                      value={closeTime}
+                      onValueChange={setCloseTime}
+                    />
                   </TableCell>
                   <TableCell>
-                    <TZPicker />
+                    <TZPicker
+                      value={closeTz}
+                      onValueChange={synchronizeTimezones}
+                    />
                   </TableCell>
                 </TableRow>
               </TableBody>
@@ -139,9 +240,21 @@ export function SchedulingPreferences({
   );
 }
 
-function TZPicker() {
+function TZPicker({
+  defaultValue,
+  value,
+  onValueChange,
+}: {
+  defaultValue?: string;
+  value?: string;
+  onValueChange?: (tzCode: string) => void;
+}) {
   return (
-    <Select defaultValue={Intl.DateTimeFormat().resolvedOptions().timeZone}>
+    <Select
+      defaultValue={defaultValue}
+      value={value}
+      onValueChange={onValueChange}
+    >
       <SelectTrigger className="max-w-40 text-xs">
         <SelectValue placeholder="Choose Time Zone" />
       </SelectTrigger>
@@ -191,6 +304,20 @@ function DatePicker({
   );
 }
 
-function TimePicker() {
-  return <Input type="time" />;
+function TimePicker({
+  value,
+  onValueChange,
+}: {
+  value?: string;
+  onValueChange?: (time: string) => void;
+}) {
+  return (
+    <Input
+      type="time"
+      value={value}
+      onChange={(e) => {
+        onValueChange?.(e.target.value);
+      }}
+    />
+  );
 }

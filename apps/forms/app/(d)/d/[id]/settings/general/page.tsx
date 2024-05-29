@@ -51,6 +51,7 @@ export default async function FormGeneralSettingsPage({
     is_scheduling_enabled,
     scheduling_open_at,
     scheduling_close_at,
+    scheduling_tz,
   } = data!;
 
   return (
@@ -81,6 +82,7 @@ export default async function FormGeneralSettingsPage({
               is_scheduling_enabled,
               scheduling_open_at,
               scheduling_close_at,
+              scheduling_tz,
             }}
           />
           <RestrictNumberOfResponseByCustomer

@@ -824,6 +824,7 @@ export type Database = {
           redirect_after_response_uri: string | null
           scheduling_close_at: string | null
           scheduling_open_at: string | null
+          scheduling_tz: string | null
           title: string
           unknown_field_handling_strategy: Database["grida_forms"]["Enums"]["form_response_unknown_field_handling_strategy_type"]
           updated_at: string
@@ -853,6 +854,7 @@ export type Database = {
           redirect_after_response_uri?: string | null
           scheduling_close_at?: string | null
           scheduling_open_at?: string | null
+          scheduling_tz?: string | null
           title?: string
           unknown_field_handling_strategy?: Database["grida_forms"]["Enums"]["form_response_unknown_field_handling_strategy_type"]
           updated_at?: string
@@ -882,6 +884,7 @@ export type Database = {
           redirect_after_response_uri?: string | null
           scheduling_close_at?: string | null
           scheduling_open_at?: string | null
+          scheduling_tz?: string | null
           title?: string
           unknown_field_handling_strategy?: Database["grida_forms"]["Enums"]["form_response_unknown_field_handling_strategy_type"]
           updated_at?: string
