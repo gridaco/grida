@@ -22,7 +22,7 @@ export default function StoreProductsPage() {
                   You have no products
                 </h3>
                 <p className="text-sm text-muted-foreground">
-                  You can start selling as soon as you add a product.
+                  Let&apos;s start by adding your first product
                 </p>
                 <Link href="./products/new">
                   <Button className="mt-4">Add Product</Button>

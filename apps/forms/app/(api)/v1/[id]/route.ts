@@ -11,7 +11,7 @@ import {
   UUID_FORMAT_MISMATCH,
   VISITORID_FORMAT_MISMATCH,
 } from "@/k/error";
-import resources from "@/k/i18n";
+import resources from "@/i18n";
 import {
   SYSTEM_GF_CUSTOMER_EMAIL_KEY,
   SYSTEM_GF_CUSTOMER_UUID_KEY,
@@ -33,6 +33,7 @@ import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
 import { FormRenderTree, type ClientRenderBlock } from "@/lib/forms";
 import type { FormFieldDefinition, FormPage, Option } from "@/types";
+import { Features } from "@/lib/features/scheduling";
 
 export const revalidate = 0;
 
@@ -178,6 +179,9 @@ export async function GET(
     max_form_responses_by_customer,
     project_id: __project_id,
     is_force_closed: __is_force_closed,
+    is_scheduling_enabled,
+    scheduling_open_at,
+    scheduling_close_at,
     store_connection,
   } = data;
 
@@ -360,8 +364,22 @@ export async function GET(
     }
   }
 
+  // validation - check if form is force closed
   if (__is_force_closed) {
     response.error = FORM_FORCE_CLOSED;
+  }
+
+  // validation - check if form is open by schedule
+  if (is_scheduling_enabled) {
+    const isopen = Features.isopen({
+      open: scheduling_open_at,
+      close: scheduling_close_at,
+    });
+
+    if (!isopen) {
+      // TODO: need a better error message
+      response.error = FORM_FORCE_CLOSED;
+    }
   }
 
   const is_open = !__is_force_closed && response.error === null;

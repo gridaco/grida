@@ -20,6 +20,8 @@ import {
 } from "@/services/form/inventory";
 import assert from "assert";
 import { GridaCommerceClient } from "@/services/commerce";
+import { SubmissionHooks } from "./hooks";
+import { Features } from "@/lib/features/scheduling";
 
 const HOST = process.env.HOST || "http://localhost:3000";
 
@@ -137,6 +139,9 @@ async function submit({
     is_max_form_responses_by_customer_enabled,
     max_form_responses_by_customer,
     is_force_closed,
+    is_scheduling_enabled,
+    scheduling_open_at,
+    scheduling_close_at,
     store_connection,
     fields,
   } = form_reference;
@@ -247,6 +252,25 @@ async function submit({
         status: 301,
       }
     );
+  }
+
+  // validation - check if form is open by schedule
+  if (is_scheduling_enabled) {
+    const isopen = Features.isopen({
+      open: scheduling_open_at,
+      close: scheduling_close_at,
+    });
+
+    if (!isopen) {
+      return NextResponse.redirect(
+        formlink(HOST, form_id, "formclosed", {
+          oops: FORM_CLOSED_WHILE_RESPONDING.code,
+        }),
+        {
+          status: 301,
+        }
+      );
+    }
   }
 
   // validatopn - check if user selected option is connected to inventory and is available
@@ -473,6 +497,10 @@ async function submit({
     console.error(select_response_error);
   }
 
+  // ==================================================
+  // region response building
+  // ==================================================
+
   // build info
   let info: any = {};
 
@@ -502,6 +530,54 @@ async function submit({
     };
   }
 
+  // endregion
+
+  // ==================================================
+  // region complete hooks
+  // ==================================================
+
+  // [emails]
+
+  const business_profile = {
+    name: "Grida Forms",
+    email: "no-reply@cors.sh",
+  };
+
+  // FIXME: DEV MODE
+  const _email_enabled = false;
+  if (_email_enabled) {
+    await SubmissionHooks.send_email({
+      form_id: form_id,
+      type: "formcomplete",
+      from: {
+        name: business_profile.name,
+        email: business_profile.email,
+      },
+      to: "universe@grida.co",
+      lang: "en",
+    });
+    // send email
+  }
+
+  // [sms]
+
+  const _sms_enabled = false;
+  if (_sms_enabled) {
+    await SubmissionHooks.send_sms({
+      form_id: form_id,
+      type: "formcomplete",
+      to: "...",
+      lang: "en",
+    });
+    // send sms
+  }
+
+  // endregion
+
+  // ==================================================
+  // region final response
+  // ==================================================
+
   if (is_ending_page_enabled && ending_page_template_id) {
     return NextResponse.redirect(
       formlink(HOST, form_id, "complete", {
@@ -526,6 +602,8 @@ async function submit({
     info: Object.keys(info).length > 0 ? info : null,
     error: null,
   });
+
+  // endregion
 }
 
 const val = (v?: string | null) => {

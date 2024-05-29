@@ -1,9 +1,7 @@
 import { FormRenderTree } from "@/lib/forms";
-import {
-  json_form_field_to_form_field_definition,
-  type JSONForm,
-} from "@/types";
+import { type JSONForm } from "@/types";
 import { Database } from "@/types/supabase";
+import { toArrayOf } from "@/types/utility";
 import { SupabaseClient } from "@supabase/supabase-js";
 import assert from "assert";
 
@@ -45,7 +43,7 @@ export class JSONFrom2DB {
       json.title,
       json.description,
       json.lang,
-      json_form_field_to_form_field_definition(json.fields),
+      json.fields,
       [],
       // TODO: consider moving this outerside or upper class
       {
@@ -118,12 +116,12 @@ export class JSONFrom2DB {
       return {
         accept: f.accept,
         // 'alt': f.alt,
-        autocomplete: f.autocomplete,
+        autocomplete: toArrayOf(f.autocomplete),
         data: f.data as any,
         // 'description': f.description,
         form_id: this.form_id!,
         help_text: f.help_text,
-        is_array: f.is_array,
+        is_array: f.is_array || false,
         label: f.label,
         local_index: i,
         // 'max': f.max,
@@ -151,6 +149,13 @@ export class JSONFrom2DB {
 
     this.fields_db_map_ready = true;
 
+    console.log(
+      "json2db fields",
+      this.renderer.fields(),
+      _,
+      this.fields_db_map
+    );
+
     return _;
   }
 
@@ -171,9 +176,10 @@ export class JSONFrom2DB {
       .filter((o) => !!o);
 
     const rows: FormFieldOptionInsertion[] = options.map((o) => {
+      const form_field_id = this.fields_db_map[o!._field.name];
       return {
         form_id: this.form_id!,
-        form_field_id: this.fields_db_map[o!._field.name],
+        form_field_id: form_field_id,
         disabled: o!.disabled,
         index: o!.index,
         label: o!.label,
@@ -203,9 +209,11 @@ export class JSONFrom2DB {
       };
       switch (b.type) {
         case "field": {
+          const form_field_id = this.fields_db_map[b.field.id];
+          console.log("json2db field", b.field.id, form_field_id);
           return {
             ...__shared,
-            form_field_id: this.fields_db_map[b.field.id],
+            form_field_id: form_field_id,
           };
         }
         case "header": {

@@ -23,6 +23,7 @@ export function SignatureCanvas({ name }: React.ComponentProps<"input">) {
     return () => {
       pad.current?.off();
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ref]);
 
   // change pen color

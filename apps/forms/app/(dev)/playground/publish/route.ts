@@ -4,6 +4,7 @@ import {
   workspaceclient,
 } from "@/lib/supabase/server";
 import { JSONFrom2DB } from "@/services/new/json2db";
+import { JSONFormParser } from "@/types";
 import assert from "assert";
 import { customAlphabet } from "nanoid";
 import { cookies } from "next/headers";
@@ -119,12 +120,14 @@ export async function POST(req: NextRequest) {
     PROJECT_ID = project.id;
   }
 
+  const jsonform = new JSONFormParser(src).parse();
+
   // create new form
-  const service = new JSONFrom2DB(
-    supabase,
-    PROJECT_ID,
-    JSON.parse(String(src))
-  );
+  if (!jsonform) {
+    return NextResponse.error();
+  }
+
+  const service = new JSONFrom2DB(supabase, PROJECT_ID, jsonform);
 
   const { form_id } = await service.insert();
 

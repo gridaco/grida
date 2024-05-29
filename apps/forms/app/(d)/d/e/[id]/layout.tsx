@@ -4,7 +4,7 @@ import { client, createServerComponentClient } from "@/lib/supabase/server";
 import { Metadata } from "next";
 import { Inter } from "next/font/google";
 import i18next from "i18next";
-import resources from "@/k/i18n";
+import resources from "@/i18n";
 import { FormPage } from "@/types";
 import { ThemeProvider } from "@/components/theme-provider";
 

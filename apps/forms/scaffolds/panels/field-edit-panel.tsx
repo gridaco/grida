@@ -47,6 +47,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import {
+  FielSupports,
   html5_multiple_supported_field_types,
   supported_field_autocomplete_types,
   supported_field_types,
@@ -146,12 +147,6 @@ const default_field_init: {
     } as PaymentFieldData,
   },
 };
-
-const input_can_have_options: FormInputType[] = [
-  "select",
-  "radio",
-  "checkboxes",
-];
 
 const html5_input_like_checkbox_field_types: FormInputType[] = [
   "checkbox",
@@ -471,9 +466,9 @@ export function FieldEditPanel({
     }
   };
 
-  const has_options = input_can_have_options.includes(type);
-  const has_pattern = input_can_have_pattern.includes(type);
-  const has_accept = type === "file";
+  const supports_options = FielSupports.options(type);
+  const supports_pattern = input_can_have_pattern.includes(type);
+  const supports_accept = type === "file";
 
   const preview_placeholder =
     placeholder ||
@@ -514,7 +509,7 @@ export function FieldEditPanel({
       type,
       required,
       pattern,
-      options: indexed_options,
+      options: supports_options ? indexed_options : undefined,
       autocomplete,
       data,
       accept,
@@ -589,7 +584,7 @@ export function FieldEditPanel({
                   required={required}
                   requiredAsterisk
                   disabled={preview_disabled}
-                  options={has_options ? options : undefined}
+                  options={supports_options ? options : undefined}
                   pattern={pattern}
                   autoComplete={autocomplete.join(" ")}
                   data={data}
@@ -676,7 +671,7 @@ export function FieldEditPanel({
               </PanelPropertyField>
             </PanelPropertyFields>
           </PanelPropertySection>
-          <PanelPropertySection hidden={!has_options}>
+          <PanelPropertySection hidden={!supports_options}>
             <PanelPropertySectionTitle>Options</PanelPropertySectionTitle>
             <PanelPropertyFields>
               <OptionsEdit
@@ -750,7 +745,7 @@ export function FieldEditPanel({
               )}
             </PanelPropertyFields>
           </PanelPropertySection>
-          <PanelPropertySection hidden={type == "payment"}>
+          <PanelPropertySection hidden={type == "payment" || type == "hidden"}>
             <PanelPropertySectionTitle>General</PanelPropertySectionTitle>
             <PanelPropertyFields>
               <PanelPropertyField
@@ -855,14 +850,14 @@ export function FieldEditPanel({
           <PanelPropertySection
             hidden={
               type == "payment" ||
-              (!has_accept &&
-                !has_pattern &&
+              (!supports_accept &&
+                !supports_pattern &&
                 !html5_input_like_checkbox_field_types.includes(type))
             }
           >
             <PanelPropertySectionTitle>Validation</PanelPropertySectionTitle>
             <PanelPropertyFields>
-              {has_accept && (
+              {supports_accept && (
                 <PanelPropertyField
                   label={"Accept"}
                   description="A comma-separated list of file types that the input should accept"
@@ -874,7 +869,7 @@ export function FieldEditPanel({
                   />
                 </PanelPropertyField>
               )}
-              {has_pattern && (
+              {supports_pattern && (
                 <PanelPropertyField
                   label={"Pattern"}
                   description="A regular expression that the input's value must match"
@@ -899,6 +894,22 @@ export function FieldEditPanel({
                   <Toggle value={required} onChange={setRequired} />
                 </PanelPropertyField>
               )}
+            </PanelPropertyFields>
+          </PanelPropertySection>
+          <PanelPropertySection hidden={type !== "hidden"}>
+            <PanelPropertySectionTitle>Hidden Field</PanelPropertySectionTitle>
+            <PanelPropertyFields>
+              <PanelPropertyField
+                label={"Required"}
+                description={
+                  <>
+                    When checked, the field will be required. Developer must set
+                    a value for this field before via SDK or URL Params.
+                  </>
+                }
+              >
+                <Toggle value={required} onChange={setRequired} />
+              </PanelPropertyField>
             </PanelPropertyFields>
           </PanelPropertySection>
         </form>

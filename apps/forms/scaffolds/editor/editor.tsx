@@ -13,6 +13,7 @@ import { ResponseEditPanel } from "../panels/response-edit-panel";
 import { fmt_local_index } from "@/utils/fmt";
 import { CustomerEditPanel } from "../panels/customer-panel";
 import toast from "react-hot-toast";
+import { BlockEditPanel } from "../panels/block-edit-panel";
 
 export function FormEditorProvider({
   initial,
@@ -26,11 +27,13 @@ export function FormEditorProvider({
   return (
     <StateProvider state={state} dispatch={dispatch}>
       <TooltipProvider>
-        <FieldEditPanelProvider>
-          <ResponseEditPanelProvider>
-            <CustomerPanelProvider>{children}</CustomerPanelProvider>
-          </ResponseEditPanelProvider>
-        </FieldEditPanelProvider>
+        <BlockPanelProvider>
+          <FieldEditPanelProvider>
+            <ResponseEditPanelProvider>
+              <CustomerPanelProvider>{children}</CustomerPanelProvider>
+            </ResponseEditPanelProvider>
+          </FieldEditPanelProvider>
+        </BlockPanelProvider>
       </TooltipProvider>
     </StateProvider>
   );
@@ -348,18 +351,23 @@ function CustomerPanelProvider({ children }: React.PropsWithChildren<{}>) {
 
   return (
     <>
-      {state.focus_customer_id && (
-        <CustomerEditPanel
-          key={state.focus_customer_id}
-          title={<>Customer</>}
-          customer_id={state.focus_customer_id}
-          open={state.is_customer_edit_panel_open}
-          onOpenChange={(open) => {
-            dispatch({ type: "editor/customers/edit", open });
-          }}
-        />
-      )}
+      <CustomerEditPanel
+        key={state.focus_customer_id}
+        customer_id={state.focus_customer_id}
+        open={state.is_customer_edit_panel_open}
+        onOpenChange={(open) => {
+          dispatch({ type: "editor/customers/edit", open });
+        }}
+      />
+      {children}
+    </>
+  );
+}
 
+function BlockPanelProvider({ children }: React.PropsWithChildren<{}>) {
+  return (
+    <>
+      <BlockEditPanel />
       {children}
     </>
   );

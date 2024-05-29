@@ -1,5 +1,33 @@
+"use client";
+
 import { Badge } from "@/components/ui/badge";
-import { ArchiveIcon } from "@radix-ui/react-icons";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { useEditorState } from "@/scaffolds/editor";
+import { generated_form_store_name } from "@/services/utils/generated-form-store-name";
+import { ArchiveIcon, InfoCircledIcon } from "@radix-ui/react-icons";
+import { useState } from "react";
 
 export default function StoreGetStartedPage({
   params,
@@ -22,19 +50,95 @@ export default function StoreGetStartedPage({
           </p>
         </div>
         <footer>
-          <form
-            action={`/private/editor/connect/${form_id}/store/connection`}
-            method="POST"
-          >
-            <button
-              className="text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:ring-blue-300 font-medium rounded-lg text-sm px-5 py-2.5 me-2 mb-2 dark:bg-blue-600 dark:hover:bg-blue-700 focus:outline-none dark:focus:ring-blue-800"
-              type="submit"
-            >
-              <span>Get started</span>
-            </button>
-          </form>
+          <Dialog>
+            <DialogTrigger asChild>
+              <Button>
+                <span>Get started</span>
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogTitle>
+                <h2 className="text-2xl font-bold">Create or Connect Store</h2>
+              </DialogTitle>
+              <DialogDescription>
+                Connect Store to track inventory, sell products (physical /
+                virtyal / tickets), and manage orders.
+                <Tooltip defaultOpen={false}>
+                  <TooltipTrigger asChild>
+                    <InfoCircledIcon className=" inline" />
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    For none physical products, it is a good practice to create
+                    each store per form.
+                  </TooltipContent>
+                </Tooltip>
+              </DialogDescription>
+              <hr />
+              <ConnectStoreForm />
+              <hr />
+              <DialogFooter>
+                <Button variant="ghost">Cancel</Button>
+                <Button form="connect-store-form" type="submit">
+                  Connect
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
         </footer>
       </div>
     </main>
+  );
+}
+
+function ConnectStoreForm() {
+  const [store_id, setStoreId] = useState<string>();
+
+  const is_create = store_id === "__new__";
+
+  const [state] = useEditorState();
+
+  return (
+    <form
+      id="connect-store-form"
+      action={`/private/editor/connect/${state.form_id}/store/connection`}
+      method="POST"
+      className="prose"
+    >
+      <Select
+        value={store_id}
+        onValueChange={(id) => setStoreId(id)}
+        name="store_id"
+      >
+        <SelectTrigger>
+          <SelectValue
+            placeholder="Select your Store"
+            aria-label="Select Store"
+          />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="__new__">Create New Store</SelectItem>
+          {/*  TODO: existing store listing */}
+        </SelectContent>
+      </Select>
+      {is_create && (
+        <>
+          <h4>
+            <span>Create New Store for this Form</span>
+          </h4>
+          <div>
+            <Label htmlFor="name">
+              <span>Name</span>
+            </Label>
+            <Input
+              id="name"
+              name="name"
+              autoFocus
+              defaultValue={generated_form_store_name(state.form_title)}
+              placeholder="Store Name"
+            />
+          </div>
+        </>
+      )}
+    </form>
   );
 }

@@ -3,6 +3,7 @@ import { EditorFlatFormBlock, FormEditorState } from "./state";
 import {
   BlockDescriptionAction,
   BlockTitleAction,
+  BlockVHiddenAction,
   BlocksEditorAction,
   ChangeBlockFieldAction,
   CreateFielFromBlockdAction,
@@ -17,6 +18,7 @@ import {
   FocusFieldAction,
   HtmlBlockBodyAction,
   ImageBlockSrcAction,
+  OpenBlockEditPanelAction,
   OpenCustomerEditAction,
   OpenEditFieldAction,
   OpenResponseEditAction,
@@ -216,6 +218,15 @@ export function reducer(
         // add the field_id to available_field_ids
         if (field_id) {
           draft.available_field_ids.push(field_id);
+        }
+      });
+    }
+    case "blocks/hidden": {
+      const { block_id, v_hidden } = <BlockVHiddenAction>action;
+      return produce(state, (draft) => {
+        const block = draft.blocks.find((b) => b.id === block_id);
+        if (block) {
+          block.v_hidden = v_hidden;
         }
       });
     }
@@ -520,6 +531,13 @@ export function reducer(
       return produce(state, (draft) => {
         draft.is_customer_edit_panel_open = open ?? true;
         draft.focus_customer_id = customer_id;
+      });
+    }
+    case "editor/panels/block-edit": {
+      const { block_id, open } = <OpenBlockEditPanelAction>action;
+      return produce(state, (draft) => {
+        draft.is_block_edit_panel_open = open ?? true;
+        draft.focus_block_id = block_id;
       });
     }
     case "editor/data-grid/column/reorder": {

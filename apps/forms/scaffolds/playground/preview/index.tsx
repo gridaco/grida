@@ -1,13 +1,10 @@
 "use client";
 
-import {
-  json_form_field_to_form_field_definition,
-  parse,
-} from "@/types/schema";
+import { JSONFormRaw, parse } from "@/types/schema";
 import { FormRenderTree } from "@/lib/forms";
 import { FormView } from "@/scaffolds/e/form";
 import { useEffect, useRef, useState } from "react";
-import resources from "@/k/i18n";
+import resources from "@/i18n";
 import { nanoid } from "nanoid";
 import { ExclamationTriangleIcon } from "@radix-ui/react-icons";
 import useVariablesCSS from "../use-variables-css";
@@ -55,7 +52,7 @@ export default function PlaygroundPreview({
   return <iframe ref={ref} width="100%" height="100%" src="/preview" />;
 }
 
-function compile(value?: string | object) {
+function compile(value?: string | JSONFormRaw) {
   const schema = parse(value);
   if (!schema) {
     return;
@@ -66,8 +63,8 @@ function compile(value?: string | object) {
     schema.title,
     schema.description,
     schema.lang,
-    json_form_field_to_form_field_definition(schema.fields),
-    [],
+    schema.fields ?? [],
+    schema.blocks ?? [],
     {
       blocks: {
         when_empty: {
@@ -84,7 +81,7 @@ function compile(value?: string | object) {
   return renderer;
 }
 
-function useRenderer(raw?: string | object | null) {
+function useRenderer(raw?: string | JSONFormRaw | null) {
   // use last valid schema
   const [valid, setValid] = useState<FormRenderTree>();
   const [invalid, setInvalid] = useState<boolean>(false);

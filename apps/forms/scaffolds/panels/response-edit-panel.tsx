@@ -47,13 +47,19 @@ export function ResponseEditPanel({
         <PanelPropertySection>
           <PanelPropertySectionTitle>General</PanelPropertySectionTitle>
           <PanelPropertyFields>
-            <PanelPropertyField label={"ID"}>
+            <PanelPropertyField label={"Local Index"}>
+              <PropertyTextInput value={response?.local_index} disabled />
+            </PanelPropertyField>
+            <PanelPropertyField label={"IDX"}>
               <PropertyTextInput
                 value={fmt_local_index(response?.local_index ?? NaN)}
                 disabled
               />
             </PanelPropertyField>
-            <PanelPropertyField label={"Instance ID"}>
+            <PanelPropertyField label={"Local ID"}>
+              <PropertyTextInput value={response?.local_id ?? ""} disabled />
+            </PanelPropertyField>
+            <PanelPropertyField label={"UUID"}>
               <PropertyTextInput value={response?.id} disabled />
             </PanelPropertyField>
             <PanelPropertyField label={"Created At"}>

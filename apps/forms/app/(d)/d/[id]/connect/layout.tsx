@@ -3,6 +3,7 @@ import {
   ArchiveIcon,
   AvatarIcon,
   CodeIcon,
+  EnvelopeClosedIcon,
   Link2Icon,
 } from "@radix-ui/react-icons";
 import Link from "next/link";
@@ -26,6 +27,14 @@ export default function Layout({
               <SideNavItem>
                 <Link2Icon />
                 Share
+              </SideNavItem>
+            </Link>
+          </li>
+          <li>
+            <Link href={`/d/${id}/connect/channels`}>
+              <SideNavItem>
+                <EnvelopeClosedIcon />
+                Channels
               </SideNavItem>
             </Link>
           </li>

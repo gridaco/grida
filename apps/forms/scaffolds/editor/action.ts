@@ -5,6 +5,7 @@ import {
   FormResponse,
 } from "@/types";
 import type { EditorFlatFormBlock } from "./state";
+import { JSONConditionExpression } from "@/types/logic";
 
 export type BlocksEditorAction =
   | CreateNewPendingBlockAction
@@ -16,6 +17,7 @@ export type BlocksEditorAction =
   | FocusFieldAction
   | ChangeBlockFieldAction
   | CreateFielFromBlockdAction
+  | BlockVHiddenAction
   | HtmlBlockBodyAction
   | ImageBlockSrcAction
   | VideoBlockSrcAction
@@ -30,6 +32,7 @@ export type BlocksEditorAction =
   | OpenResponseEditAction
   | ResponseFeedRowsAction
   | OpenCustomerEditAction
+  | OpenBlockEditPanelAction
   | DataGridReorderColumnAction;
 
 export interface CreateNewPendingBlockAction {
@@ -63,6 +66,12 @@ export interface ChangeBlockFieldAction {
 export interface CreateFielFromBlockdAction {
   type: "blocks/field/new";
   block_id: string;
+}
+
+export interface BlockVHiddenAction {
+  type: "blocks/hidden";
+  block_id: string;
+  v_hidden: JSONConditionExpression;
 }
 
 export interface HtmlBlockBodyAction {
@@ -159,6 +168,13 @@ export interface OpenResponseEditAction {
 export interface OpenCustomerEditAction {
   type: "editor/customers/edit";
   customer_id?: string;
+  // true by default
+  open?: boolean;
+}
+
+export interface OpenBlockEditPanelAction {
+  type: "editor/panels/block-edit";
+  block_id?: string;
   // true by default
   open?: boolean;
 }

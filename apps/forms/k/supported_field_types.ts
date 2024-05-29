@@ -91,3 +91,16 @@ export const html5_multiple_supported_field_types: FormInputType[] = [
   "email",
   "select",
 ];
+
+export const options_supported_field_types: FormInputType[] = [
+  "select",
+  "radio",
+  "checkboxes",
+  "toggle-group",
+];
+
+export namespace FielSupports {
+  export function options(type: FormInputType) {
+    return options_supported_field_types.includes(type);
+  }
+}

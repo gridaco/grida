@@ -68,9 +68,9 @@ ${interface_txt}
     });
 
     const content = response.choices[0].message.content!;
-    console.log(content);
+    console.log("ai", content);
     let schema = JSON.parse(content);
-    console.log(schema);
+    console.log("ai", schema);
 
     // Validate the type field
     if (!supported_field_types.includes(schema.type)) {

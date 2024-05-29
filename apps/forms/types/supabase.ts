@@ -204,6 +204,7 @@ export type Database = {
           created_at: string
           id: number
           name: string | null
+          option_value_ids: number[]
           product_id: number
           store_id: number
         }
@@ -211,6 +212,7 @@ export type Database = {
           created_at?: string
           id?: number
           name?: string | null
+          option_value_ids?: number[]
           product_id: number
           store_id: number
         }
@@ -218,6 +220,7 @@ export type Database = {
           created_at?: string
           id?: number
           name?: string | null
+          option_value_ids?: number[]
           product_id?: number
           store_id?: number
         }
@@ -483,6 +486,32 @@ export type Database = {
             }
             Returns: undefined
           }
+      generate_combinations:
+        | {
+            Args: {
+              option_ids: number[]
+              product_id: number
+              store_id: number
+            }
+            Returns: undefined
+          }
+        | {
+            Args: {
+              options: Json
+              index: number
+              current: Json
+            }
+            Returns: Json
+          }
+      generate_combinations_recursive: {
+        Args: {
+          option_values_list: number[]
+          current_combination: number[]
+          product_id: number
+          store_id: number
+        }
+        Returns: undefined
+      }
       get_existing_option_values: {
         Args: {
           p_product_id: number
@@ -777,6 +806,7 @@ export type Database = {
           default_form_page_id: string | null
           default_form_page_language: Database["grida_forms"]["Enums"]["form_page_language"]
           description: string | null
+          ending_page_i18n_overrides: Json | null
           ending_page_template_id: string | null
           id: string
           is_edit_after_submission_allowed: boolean
@@ -787,10 +817,14 @@ export type Database = {
           is_multiple_response_allowed: boolean
           is_powered_by_branding_enabled: boolean
           is_redirect_after_response_uri_enabled: boolean
+          is_scheduling_enabled: boolean
           max_form_responses_by_customer: number | null
           max_form_responses_in_total: number | null
           project_id: number
           redirect_after_response_uri: string | null
+          scheduling_close_at: string | null
+          scheduling_open_at: string | null
+          scheduling_tz: string | null
           title: string
           unknown_field_handling_strategy: Database["grida_forms"]["Enums"]["form_response_unknown_field_handling_strategy_type"]
           updated_at: string
@@ -802,6 +836,7 @@ export type Database = {
           default_form_page_id?: string | null
           default_form_page_language?: Database["grida_forms"]["Enums"]["form_page_language"]
           description?: string | null
+          ending_page_i18n_overrides?: Json | null
           ending_page_template_id?: string | null
           id?: string
           is_edit_after_submission_allowed?: boolean
@@ -812,10 +847,14 @@ export type Database = {
           is_multiple_response_allowed?: boolean
           is_powered_by_branding_enabled?: boolean
           is_redirect_after_response_uri_enabled?: boolean
+          is_scheduling_enabled?: boolean
           max_form_responses_by_customer?: number | null
           max_form_responses_in_total?: number | null
           project_id: number
           redirect_after_response_uri?: string | null
+          scheduling_close_at?: string | null
+          scheduling_open_at?: string | null
+          scheduling_tz?: string | null
           title?: string
           unknown_field_handling_strategy?: Database["grida_forms"]["Enums"]["form_response_unknown_field_handling_strategy_type"]
           updated_at?: string
@@ -827,6 +866,7 @@ export type Database = {
           default_form_page_id?: string | null
           default_form_page_language?: Database["grida_forms"]["Enums"]["form_page_language"]
           description?: string | null
+          ending_page_i18n_overrides?: Json | null
           ending_page_template_id?: string | null
           id?: string
           is_edit_after_submission_allowed?: boolean
@@ -837,10 +877,14 @@ export type Database = {
           is_multiple_response_allowed?: boolean
           is_powered_by_branding_enabled?: boolean
           is_redirect_after_response_uri_enabled?: boolean
+          is_scheduling_enabled?: boolean
           max_form_responses_by_customer?: number | null
           max_form_responses_in_total?: number | null
           project_id?: number
           redirect_after_response_uri?: string | null
+          scheduling_close_at?: string | null
+          scheduling_open_at?: string | null
+          scheduling_tz?: string | null
           title?: string
           unknown_field_handling_strategy?: Database["grida_forms"]["Enums"]["form_response_unknown_field_handling_strategy_type"]
           updated_at?: string
@@ -878,6 +922,7 @@ export type Database = {
           title_html: string | null
           type: Database["grida_forms"]["Enums"]["form_block_type"]
           updated_at: string
+          v_hidden: Json | null
         }
         Insert: {
           body_html?: string | null
@@ -894,6 +939,7 @@ export type Database = {
           title_html?: string | null
           type: Database["grida_forms"]["Enums"]["form_block_type"]
           updated_at?: string
+          v_hidden?: Json | null
         }
         Update: {
           body_html?: string | null
@@ -910,6 +956,7 @@ export type Database = {
           title_html?: string | null
           type?: Database["grida_forms"]["Enums"]["form_block_type"]
           updated_at?: string
+          v_hidden?: Json | null
         }
         Relationships: [
           {
@@ -1133,6 +1180,7 @@ export type Database = {
       }
       form_page: {
         Row: {
+          _id: number
           background: Json | null
           created_at: string
           form_id: string
@@ -1141,6 +1189,7 @@ export type Database = {
           stylesheet: Json | null
         }
         Insert: {
+          _id?: number
           background?: Json | null
           created_at?: string
           form_id: string
@@ -1149,6 +1198,7 @@ export type Database = {
           stylesheet?: Json | null
         }
         Update: {
+          _id?: number
           background?: Json | null
           created_at?: string
           form_id?: string
@@ -1215,6 +1265,7 @@ export type Database = {
           form_id: string | null
           id: string
           ip: string | null
+          local_id: string | null
           local_index: number
           platform_powered_by:
             | Database["grida_forms"]["Enums"]["response_platform_powered_by"]
@@ -1231,6 +1282,7 @@ export type Database = {
           form_id?: string | null
           id?: string
           ip?: string | null
+          local_id?: string | null
           local_index?: number
           platform_powered_by?:
             | Database["grida_forms"]["Enums"]["response_platform_powered_by"]
@@ -1247,6 +1299,7 @@ export type Database = {
           form_id?: string | null
           id?: string
           ip?: string | null
+          local_id?: string | null
           local_index?: number
           platform_powered_by?:
             | Database["grida_forms"]["Enums"]["response_platform_powered_by"]
@@ -1661,6 +1714,40 @@ export type Database = {
             }
             Returns: undefined
           }
+      generate_combination_recursive: {
+        Args: {
+          product_id: number
+          option_value_combinations: number[]
+          combination: number[]
+          level: number
+        }
+        Returns: undefined
+      }
+      generate_combinations:
+        | {
+            Args: {
+              option_ids: number[]
+              product_id: number
+              store_id: number
+            }
+            Returns: undefined
+          }
+        | {
+            Args: {
+              product_id: number
+              option_value_combinations: number[]
+            }
+            Returns: undefined
+          }
+      generate_combinations_recursive: {
+        Args: {
+          option_values_list: number[]
+          current_combination: number[]
+          product_id: number
+          store_id: number
+        }
+        Returns: undefined
+      }
       get_organizations_for_user: {
         Args: {
           user_id: string
@@ -1685,6 +1772,35 @@ export type Database = {
               project_id: number
             }
             Returns: boolean
+          }
+      recursive_option_combinations:
+        | {
+            Args: {
+              option_values: Json[]
+              combination: Json[]
+              level: number
+              option_count: number
+            }
+            Returns: undefined
+          }
+        | {
+            Args: {
+              option_values: Json
+              combination: Json
+              option_count: number
+            }
+            Returns: Json[]
+          }
+        | {
+            Args: {
+              product_id: number
+              store_id: number
+              option_values: Json[]
+              combination: Json[]
+              level: number
+              option_count: number
+            }
+            Returns: undefined
           }
     }
     Enums: {
