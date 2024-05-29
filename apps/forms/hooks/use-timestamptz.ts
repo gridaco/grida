@@ -21,7 +21,7 @@ export function useTimestampTZ(
       setTz(fallbackTimezone);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [initialDate, tz]);
+  }, [initialDate]);
 
   const setDateWithTZ = (newDate?: Date) => {
     if (newDate) {
@@ -39,9 +39,7 @@ export function useTimestampTZ(
       const [hours, minutes] = newTime.split(":").map(Number);
       const updatedDate = new Date(date);
       updatedDate.setHours(hours, minutes);
-      const utcDate = fromZonedTime(updatedDate, tz);
-      const zonedDate = toZonedTime(utcDate, tz);
-      setDate(zonedDate);
+      setDate(updatedDate);
     }
     setTime(newTime);
   };

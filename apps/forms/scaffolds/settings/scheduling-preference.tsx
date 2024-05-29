@@ -18,7 +18,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { CalendarIcon } from "@radix-ui/react-icons";
+import { CalendarIcon, InfoCircledIcon } from "@radix-ui/react-icons";
 import timezones from "timezones-list";
 import {
   Select,
@@ -39,7 +39,7 @@ import {
 import { useTimestampTZ } from "@/hooks/use-timestamptz";
 import toast from "react-hot-toast";
 import { createClientFormsClient } from "@/lib/supabase/client";
-import { fromZonedTime, toZonedTime, format as tzFormat } from "date-fns-tz";
+import { toZonedTime, format as tzFormat, fromZonedTime } from "date-fns-tz";
 
 export function SchedulingPreferences({
   form_id,
@@ -228,12 +228,12 @@ export function SchedulingPreferences({
                 </TableRow>
               </TableBody>
             </Table>
+            <OnYourLocalTime
+              open_at={scheduling_open_at}
+              close_at={scheduling_close_at}
+              tz={openTz}
+            />
           </div>
-          <OnYourLocalTime
-            open_at={scheduling_open_at}
-            close_at={scheduling_close_at}
-            tz={openTz}
-          />
         </form>
       </PreferenceBody>
       <PreferenceBoxFooter>
@@ -274,26 +274,33 @@ function OnYourLocalTime({
     <article className="prose prose-sm dark:prose-invert">
       {tz !== browserTz && (
         <div className="text-muted-foreground">
+          <hr />
           <small>
-            The times are shown in {tz}. In your local time zone ({browserTz}),
-            they are:
+            <InfoCircledIcon className="inline me-2 align-middle" />
+            The times are shown in <u>{tz}</u>. In your local time zone{" "}
+            <u>{browserTz}</u>, they are:
           </small>
-          <ul>
-            {openAtLocal && (
-              <li>
-                Open At:{" "}
-                {tzFormat(openAtLocal, "PPP HH:mm:ss", { timeZone: browserTz })}
-              </li>
-            )}
-            {closeAtLocal && (
-              <li>
-                Close At:{" "}
-                {tzFormat(closeAtLocal, "PPP HH:mm:ss", {
-                  timeZone: browserTz,
-                })}
-              </li>
-            )}
-          </ul>
+          <small>
+            <ul>
+              {openAtLocal && (
+                <li>
+                  Open At: <CalendarIcon className="inline me-2 align-middle" />
+                  {tzFormat(openAtLocal, "PPP HH:mm:ss", {
+                    timeZone: browserTz,
+                  })}
+                </li>
+              )}
+              {closeAtLocal && (
+                <li>
+                  Close At:{" "}
+                  <CalendarIcon className="inline me-2 align-middle" />
+                  {tzFormat(closeAtLocal, "PPP HH:mm:ss", {
+                    timeZone: browserTz,
+                  })}
+                </li>
+              )}
+            </ul>
+          </small>
         </div>
       )}
     </article>
