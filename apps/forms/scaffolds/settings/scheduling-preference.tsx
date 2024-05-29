@@ -276,7 +276,7 @@ function OnYourLocalTime({
         <div className="text-muted-foreground">
           <hr />
           <small>
-            <InfoCircledIcon className="inline me-2 align-middle" />
+            <InfoCircledIcon className="inline me-1 mb-1 align-middle" />
             The times are shown in <u>{tz}</u>. In your local time zone{" "}
             <u>{browserTz}</u>, they are:
           </small>
@@ -284,19 +284,24 @@ function OnYourLocalTime({
             <ul>
               {openAtLocal && (
                 <li>
-                  Open At: <CalendarIcon className="inline me-2 align-middle" />
-                  {tzFormat(openAtLocal, "PPP HH:mm:ss", {
-                    timeZone: browserTz,
-                  })}
+                  Open At:{" "}
+                  <span className="border rounded px-2 py-1">
+                    <CalendarIcon className="inline me-2 align-middle" />
+                    {tzFormat(openAtLocal, "PPP HH:mm:ss", {
+                      timeZone: browserTz,
+                    })}
+                  </span>
                 </li>
               )}
               {closeAtLocal && (
                 <li>
                   Close At:{" "}
-                  <CalendarIcon className="inline me-2 align-middle" />
-                  {tzFormat(closeAtLocal, "PPP HH:mm:ss", {
-                    timeZone: browserTz,
-                  })}
+                  <span className="border rounded px-2 py-1">
+                    <CalendarIcon className="inline me-2 align-middle" />
+                    {tzFormat(closeAtLocal, "PPP HH:mm:ss", {
+                      timeZone: browserTz,
+                    })}
+                  </span>
                 </li>
               )}
             </ul>
