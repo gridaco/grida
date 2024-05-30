@@ -148,12 +148,12 @@ export function GridEditor() {
     <div className="flex flex-col h-full">
       <header className="h-14 w-full">
         <div className="flex px-2 py-1 h-full items-center gap-4">
-          <Link href={`./analytics`}>
+          {/* <Link href={`./analytics`}>
             <Badge variant={"outline"} className="cursor-pointer">
               Analytics
               <OpenInNewWindowIcon className="align-middle ms-2" />
             </Badge>
-          </Link>
+          </Link> */}
           {has_selected_responses && (
             <span
               className="text-sm font-normal text-neutral-500"

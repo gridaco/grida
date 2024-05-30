@@ -1263,6 +1263,7 @@ export type Database = {
           created_at: string
           customer_id: string | null
           form_id: string | null
+          geo: Json | null
           id: string
           ip: string | null
           local_id: string | null
@@ -1272,6 +1273,7 @@ export type Database = {
             | null
           raw: Json
           updated_at: string
+          x_ipinfo: Json | null
           x_referer: string | null
           x_useragent: string | null
         }
@@ -1280,6 +1282,7 @@ export type Database = {
           created_at?: string
           customer_id?: string | null
           form_id?: string | null
+          geo?: Json | null
           id?: string
           ip?: string | null
           local_id?: string | null
@@ -1289,6 +1292,7 @@ export type Database = {
             | null
           raw: Json
           updated_at?: string
+          x_ipinfo?: Json | null
           x_referer?: string | null
           x_useragent?: string | null
         }
@@ -1297,6 +1301,7 @@ export type Database = {
           created_at?: string
           customer_id?: string | null
           form_id?: string | null
+          geo?: Json | null
           id?: string
           ip?: string | null
           local_id?: string | null
@@ -1306,6 +1311,7 @@ export type Database = {
             | null
           raw?: Json
           updated_at?: string
+          x_ipinfo?: Json | null
           x_referer?: string | null
           x_useragent?: string | null
         }

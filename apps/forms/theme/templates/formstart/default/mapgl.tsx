@@ -1,7 +1,8 @@
 "use client";
 
 import clsx from "clsx";
-import Map from "react-map-gl";
+import React from "react";
+import Map, { ViewState } from "react-map-gl";
 
 const MAPBOX_ACCESS_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN;
 
@@ -17,38 +18,36 @@ type MapStyle =
   | (string & {});
 
 export function MapGL({
+  id,
   className,
   mapStyle = "mapbox://styles/mapbox/light-v11",
-  latitude,
-  longitude,
-  zoom = 2,
+  initialViewState,
   interactive,
-}: {
-  zoom?: number;
+  children,
+}: React.PropsWithChildren<{
+  id?: string;
   className?: string;
-  longitude: number;
   mapStyle?: MapStyle;
-  latitude: number;
   interactive?: boolean;
-}) {
+  initialViewState?: Partial<ViewState>;
+}>) {
   return (
     <div className={clsx("flex flex-col overflow-hidden h-full", className)}>
       <Map
+        id={id}
         mapboxAccessToken={MAPBOX_ACCESS_TOKEN}
         interactive={interactive}
         mapLib={import("mapbox-gl")}
         attributionControl={false}
-        initialViewState={{
-          longitude: longitude,
-          latitude: latitude,
-          zoom: zoom,
-        }}
+        initialViewState={initialViewState}
         style={{
           width: "100%",
           flex: 1,
         }}
         mapStyle={mapStyle}
-      />
+      >
+        {children}
+      </Map>
     </div>
   );
 }

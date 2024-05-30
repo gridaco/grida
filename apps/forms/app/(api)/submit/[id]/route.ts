@@ -22,6 +22,7 @@ import assert from "assert";
 import { GridaCommerceClient } from "@/services/commerce";
 import { SubmissionHooks } from "./hooks";
 import { Features } from "@/lib/features/scheduling";
+import { ipinfo } from "@/lib/ipinfo";
 
 const HOST = process.env.HOST || "http://localhost:3000";
 
@@ -52,7 +53,11 @@ export async function GET(
 
   const meta = {
     useragent: req.headers.get("user-agent"),
-    ip: req.headers.get("x-real-ip") || req.headers.get("x-forwarded-for"),
+    ip:
+      req.ip ||
+      req.headers.get("x-real-ip") ||
+      req.headers.get("x-forwarded-for"),
+    geo: req.geo,
     referer: req.headers.get("referer"),
     browser: req.headers.get("sec-ch-ua"),
   };
@@ -83,7 +88,11 @@ export async function POST(
 
   const meta = {
     useragent: req.headers.get("user-agent"),
-    ip: req.headers.get("x-real-ip") || req.headers.get("x-forwarded-for"),
+    ip:
+      req.ip ||
+      req.headers.get("x-real-ip") ||
+      req.headers.get("x-forwarded-for"),
+    geo: req.geo,
     referer: req.headers.get("referer"),
     browser: req.headers.get("sec-ch-ua"),
   };
@@ -101,6 +110,7 @@ async function submit({
   meta: {
     useragent: string | null;
     ip: string | null;
+    geo: any;
     referer: string | null;
     browser: string | null;
   };
@@ -155,6 +165,21 @@ async function submit({
   const nonsystem_keys = __keys_all.filter(
     (key) => !system_gf_keys.includes(key)
   );
+
+  console.log("submit", meta);
+
+  // pre meta processing
+  let ipinfo_data: any = null;
+  if (meta.ip && isObjectEmpty(meta.geo)) {
+    try {
+      ipinfo_data = await ipinfo(meta.ip, process.env.IPINFO_ACCESS_TOKEN);
+      console.log("ipinfo", ipinfo_data);
+    } catch (e) {
+      console.error(e);
+    }
+  } else {
+    console.error("ip not found");
+  }
 
   // customer handling
 
@@ -438,6 +463,8 @@ async function submit({
         customer_id: customer?.uid,
         x_referer: meta.referer,
         x_useragent: meta.useragent,
+        x_ipinfo: ipinfo_data,
+        geo: isObjectEmpty(meta.geo) ? undefined : meta.geo,
         platform_powered_by: "web_client",
       })
       .select("id")
@@ -610,3 +637,11 @@ const val = (v?: string | null) => {
   if (v) return v;
   else return null;
 };
+
+function isObjectEmpty(obj: object) {
+  try {
+    return Object.keys(obj).length === 0;
+  } catch (e) {
+    return true;
+  }
+}

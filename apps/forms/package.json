@@ -58,6 +58,7 @@
     "@tosspayments/payment-widget-sdk": "^0.10.2",
     "@types/mdx": "^2.0.11",
     "@types/three": "^0.149.0",
+    "@uidotdev/usehooks": "^2.4.1",
     "@visx/responsive": "^3.10.2",
     "@visx/tooltip": "^3.3.0",
     "@visx/visx": "^3.11.0",
@@ -73,6 +74,7 @@
     "date-fns": "^3.6.0",
     "date-fns-tz": "^3.1.3",
     "framer-motion": "^11.0.24",
+    "geojson": "^0.5.0",
     "handlebars": "^4.7.7",
     "i18next": "^23.7.9",
     "immer": "^9.0.3",
@@ -112,6 +114,7 @@
   "devDependencies": {
     "@tailwindcss/typography": "^0.5.10",
     "@types/css-tree": "^2.3.1",
+    "@types/geojson": "^7946.0.14",
     "@types/mapbox-gl": "^3.1.0",
     "@types/node": "^20",
     "@types/react": "^18",
