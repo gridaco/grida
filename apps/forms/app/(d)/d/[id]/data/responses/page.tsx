@@ -4,7 +4,7 @@ import {
 } from "@/scaffolds/editor";
 import { GridEditor } from "@/scaffolds/grid-editor";
 
-export default async function FormResponsesPage() {
+export default function FormResponsesPage() {
   return (
     <>
       <InitialResponsesProvider>

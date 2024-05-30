@@ -110,8 +110,10 @@ export default function FormStartPage() {
             <SectionHeader>Location</SectionHeader>
             <MapGL
               className="rounded shadow-sm min-h-96"
-              longitude={-95.652901}
-              latitude={35.645233}
+              initialViewState={{
+                longitude: -95.652901,
+                latitude: 35.645233,
+              }}
             />
           </section>
           <section className="p-4">

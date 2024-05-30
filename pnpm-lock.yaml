@@ -334,22 +334,19 @@ importers:
       '@types/three':
         specifier: ^0.149.0
         version: 0.149.0
-      '@visx/axis':
-        specifier: ^3.10.1
-        version: 3.10.1(react@18.3.1)
-      '@visx/group':
-        specifier: ^1.7.0
-        version: 1.17.1(react@18.3.1)
+      '@uidotdev/usehooks':
+        specifier: ^2.4.1
+        version: 2.4.1(react-dom@18.3.1)(react@18.3.1)
       '@visx/responsive':
         specifier: ^3.10.2
         version: 3.10.2(react@18.3.1)
-      '@visx/scale':
-        specifier: ^3.5.0
-        version: 3.5.0
-      '@visx/shape':
-        specifier: ^1.8.0
-        version: 1.17.1(react@18.3.1)
+      '@visx/tooltip':
+        specifier: ^3.3.0
+        version: 3.3.0(react-dom@18.3.1)(react@18.3.1)
       '@visx/visx':
+        specifier: ^3.11.0
+        version: 3.11.0(@react-spring/web@9.7.3)(react-dom@18.3.1)(react@18.3.1)
+      '@visx/xychart':
         specifier: ^3.11.0
         version: 3.11.0(@react-spring/web@9.7.3)(react-dom@18.3.1)(react@18.3.1)
       ai:
@@ -376,9 +373,6 @@ importers:
       csv-stringify:
         specifier: ^6.4.6
         version: 6.4.6
-      d3-shape:
-        specifier: ^3.2.0
-        version: 3.2.0
       date-fns:
         specifier: ^3.6.0
         version: 3.6.0
@@ -388,6 +382,9 @@ importers:
       framer-motion:
         specifier: ^11.0.24
         version: 11.1.9(react-dom@18.3.1)(react@18.3.1)
+      geojson:
+        specifier: ^0.5.0
+        version: 0.5.0
       handlebars:
         specifier: ^4.7.7
         version: 4.7.8
@@ -500,9 +497,9 @@ importers:
       '@types/css-tree':
         specifier: ^2.3.1
         version: 2.3.7
-      '@types/d3-shape':
-        specifier: ^3.1.6
-        version: 3.1.6
+      '@types/geojson':
+        specifier: ^7946.0.14
+        version: 7946.0.14
       '@types/mapbox-gl':
         specifier: ^3.1.0
         version: 3.1.0
@@ -18129,6 +18126,7 @@ packages:
 
   /@types/d3-path@1.0.11:
     resolution: {integrity: sha512-4pQMp8ldf7UaB/gR8Fvvy69psNHkTpD/pVw3vmEi8iZAB9EPMBruB1JvHO4BIq9QkUUd2lV1F5YXpMNj7JPBpw==}
+    dev: false
 
   /@types/d3-random@2.2.3:
     resolution: {integrity: sha512-Ghs4R3CcgJ3o6svszRzIH4b8PPYex/COo+rhhZjDAs+bVducXwjmVSi27WcDOaLLCBV2t3tfVH9bYXAL76IvQA==}
@@ -18151,12 +18149,6 @@ packages:
     dependencies:
       '@types/d3-path': 1.0.11
     dev: false
-
-  /@types/d3-shape@3.1.6:
-    resolution: {integrity: sha512-5KKk5aKGu2I+O6SONMYSNflgiP0WfZIQvVUMan50wHsLG1G94JlxEVnCpQARfTtzytuY0p/9PXXZb3I7giofIA==}
-    dependencies:
-      '@types/d3-path': 1.0.11
-    dev: true
 
   /@types/d3-time-format@2.1.0:
     resolution: {integrity: sha512-/myT3I7EwlukNOX2xVdMzb8FRgNzRMpsZddwst9Ld/VFe6LyJyRp0s32l/V9XoUzk+Gqu56F/oGk6507+8BxrA==}
@@ -18962,6 +18954,17 @@ packages:
     dependencies:
       '@typescript-eslint/types': 5.62.0
       eslint-visitor-keys: 3.4.3
+
+  /@uidotdev/usehooks@2.4.1(react-dom@18.3.1)(react@18.3.1):
+    resolution: {integrity: sha512-1I+RwWyS+kdv3Mv0Vmc+p0dPYH0DTRAo04HLyXReYBL9AeseDWUJyi4THuksBJcu9F0Pih69Ak150VDnqbVnXg==}
+    engines: {node: '>=16'}
+    peerDependencies:
+      react: ^18.2.0
+      react-dom: ^18.2.0
+    dependencies:
+      react: 18.3.1
+      react-dom: 18.3.1(react@18.3.1)
+    dev: false
 
   /@ungap/structured-clone@1.2.0:
     resolution: {integrity: sha512-zuVdFrMJiuCDQUMCzQaD6KL28MjnqqN8XnAqiEq9PNm/hCPTSGfrXCOfwj1ow4LFb/tNymJPwsNbVePc1xFqrQ==}
@@ -26219,6 +26222,11 @@ packages:
 
   /geojson-vt@3.2.1:
     resolution: {integrity: sha512-EvGQQi/zPrDA6zr6BnJD/YhwAkBP8nnJ9emh3EnHQKVMfg/MRVtPbMYdgVy/IaEmn4UfagD2a6fafPDL5hbtwg==}
+    dev: false
+
+  /geojson@0.5.0:
+    resolution: {integrity: sha512-/Bx5lEn+qRF4TfQ5aLu6NH+UKtvIv7Lhc487y/c8BdludrCTpiWf9wyI0RTyqg49MFefIAvFDuEi5Dfd/zgNxQ==}
+    engines: {node: '>= 0.10'}
     dev: false
 
   /gesto@1.19.4:
