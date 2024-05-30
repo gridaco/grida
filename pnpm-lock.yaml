@@ -334,22 +334,16 @@ importers:
       '@types/three':
         specifier: ^0.149.0
         version: 0.149.0
-      '@visx/axis':
-        specifier: ^3.10.1
-        version: 3.10.1(react@18.3.1)
-      '@visx/group':
-        specifier: ^1.7.0
-        version: 1.17.1(react@18.3.1)
       '@visx/responsive':
         specifier: ^3.10.2
         version: 3.10.2(react@18.3.1)
-      '@visx/scale':
-        specifier: ^3.5.0
-        version: 3.5.0
-      '@visx/shape':
-        specifier: ^1.8.0
-        version: 1.17.1(react@18.3.1)
+      '@visx/tooltip':
+        specifier: ^3.3.0
+        version: 3.3.0(react-dom@18.3.1)(react@18.3.1)
       '@visx/visx':
+        specifier: ^3.11.0
+        version: 3.11.0(@react-spring/web@9.7.3)(react-dom@18.3.1)(react@18.3.1)
+      '@visx/xychart':
         specifier: ^3.11.0
         version: 3.11.0(@react-spring/web@9.7.3)(react-dom@18.3.1)(react@18.3.1)
       ai:
@@ -376,9 +370,6 @@ importers:
       csv-stringify:
         specifier: ^6.4.6
         version: 6.4.6
-      d3-shape:
-        specifier: ^3.2.0
-        version: 3.2.0
       date-fns:
         specifier: ^3.6.0
         version: 3.6.0
@@ -500,9 +491,6 @@ importers:
       '@types/css-tree':
         specifier: ^2.3.1
         version: 2.3.7
-      '@types/d3-shape':
-        specifier: ^3.1.6
-        version: 3.1.6
       '@types/mapbox-gl':
         specifier: ^3.1.0
         version: 3.1.0
@@ -18129,6 +18117,7 @@ packages:
 
   /@types/d3-path@1.0.11:
     resolution: {integrity: sha512-4pQMp8ldf7UaB/gR8Fvvy69psNHkTpD/pVw3vmEi8iZAB9EPMBruB1JvHO4BIq9QkUUd2lV1F5YXpMNj7JPBpw==}
+    dev: false
 
   /@types/d3-random@2.2.3:
     resolution: {integrity: sha512-Ghs4R3CcgJ3o6svszRzIH4b8PPYex/COo+rhhZjDAs+bVducXwjmVSi27WcDOaLLCBV2t3tfVH9bYXAL76IvQA==}
@@ -18151,12 +18140,6 @@ packages:
     dependencies:
       '@types/d3-path': 1.0.11
     dev: false
-
-  /@types/d3-shape@3.1.6:
-    resolution: {integrity: sha512-5KKk5aKGu2I+O6SONMYSNflgiP0WfZIQvVUMan50wHsLG1G94JlxEVnCpQARfTtzytuY0p/9PXXZb3I7giofIA==}
-    dependencies:
-      '@types/d3-path': 1.0.11
-    dev: true
 
   /@types/d3-time-format@2.1.0:
     resolution: {integrity: sha512-/myT3I7EwlukNOX2xVdMzb8FRgNzRMpsZddwst9Ld/VFe6LyJyRp0s32l/V9XoUzk+Gqu56F/oGk6507+8BxrA==}

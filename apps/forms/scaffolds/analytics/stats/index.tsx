@@ -5,7 +5,6 @@ import {
   createClientFormsClient,
   createClientWorkspaceClient,
 } from "@/lib/supabase/client";
-import { Skeleton } from "@/components/ui/skeleton";
 import LineChart from "../charts/basic-line-chart";
 import { GraphSkeleton, NumberSkeleton } from "../charts/skeleton";
 import { SupabaseClient } from "@supabase/supabase-js";
@@ -146,31 +145,40 @@ function RangeSelect({
     </Select>
   );
 }
-
 function serialize<T extends Record<string, any>>(
   data: Array<T>,
   {
+    from,
+    to,
     dateKey,
   }: {
+    from: Date;
+    to: Date;
     dateKey: keyof T;
   }
 ) {
-  const newData = data.reduce(
-    (acc: Record<string, number>, curr) => {
-      const dateValue = curr[dateKey];
+  // Step 1: Create a map for the new data with the provided dates range
+  const dateMap: Record<string, number> = {};
+  let currentDate = new Date(from);
+  while (currentDate <= to) {
+    const dateString = currentDate.toLocaleDateString();
+    dateMap[dateString] = 0;
+    currentDate.setDate(currentDate.getDate() + 1); // Move to the next day
+  }
 
-      if (typeof dateValue === "string" || (dateValue as any) instanceof Date) {
-        const date = new Date(dateValue).toLocaleDateString();
-        if (!acc[date]) acc[date] = 0;
-        acc[date]++;
+  // Step 2: Populate the map with actual data
+  data.forEach((item) => {
+    const dateValue = item[dateKey];
+    if (typeof dateValue === "string" || (dateValue as any) instanceof Date) {
+      const date = new Date(dateValue).toLocaleDateString();
+      if (dateMap[date] !== undefined) {
+        dateMap[date]++;
       }
+    }
+  });
 
-      return acc;
-    },
-    {} as Record<string, number>
-  );
-
-  const formattedData = Object.entries(newData).map(([date, count]) => ({
+  // Step 3: Format the data for output
+  const formattedData = Object.entries(dateMap).map(([date, count]) => ({
     date: new Date(date),
     count,
   }));
@@ -212,7 +220,13 @@ export function Customers({
         console.error(error);
       } else {
         // Process data to count new customers per day
-        setData(serialize(data || [], { dateKey: "created_at" }));
+        setData(
+          serialize(data || [], {
+            from,
+            to,
+            dateKey: "created_at",
+          })
+        );
       }
       setLoading(false);
     };
@@ -277,7 +291,13 @@ export function Responses({
         console.error(error);
       } else {
         // Process data to count new responses per day
-        setData(serialize(data || [], { dateKey: "created_at" }));
+        setData(
+          serialize(data || [], {
+            from,
+            to,
+            dateKey: "created_at",
+          })
+        );
       }
       setLoading(false);
     };
