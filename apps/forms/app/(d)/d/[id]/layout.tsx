@@ -133,7 +133,7 @@ export default async function RootLayout({
 
 function Header({ form_id, title }: { form_id: string; title: string }) {
   return (
-    <header className="px-4 flex flex-col w-full gap-4 border-b bg-white dark:bg-neutral-900 z-10">
+    <header className="px-4 flex flex-col w-full gap-4 border-b z-10">
       <div className="w-full flex gap-4">
         <div className="w-1/3 flex items-center justify-start">
           <Link href="/dashboard">
