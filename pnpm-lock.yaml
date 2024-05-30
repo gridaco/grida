@@ -334,6 +334,24 @@ importers:
       '@types/three':
         specifier: ^0.149.0
         version: 0.149.0
+      '@visx/axis':
+        specifier: ^3.10.1
+        version: 3.10.1(react@18.3.1)
+      '@visx/group':
+        specifier: ^1.7.0
+        version: 1.17.1(react@18.3.1)
+      '@visx/responsive':
+        specifier: ^3.10.2
+        version: 3.10.2(react@18.3.1)
+      '@visx/scale':
+        specifier: ^3.5.0
+        version: 3.5.0
+      '@visx/shape':
+        specifier: ^1.8.0
+        version: 1.17.1(react@18.3.1)
+      '@visx/visx':
+        specifier: ^3.11.0
+        version: 3.11.0(@react-spring/web@9.7.3)(react-dom@18.3.1)(react@18.3.1)
       ai:
         specifier: 3.1.8
         version: 3.1.8(openai@4.45.0)(react@18.3.1)(solid-js@1.8.17)(svelte@4.2.16)(vue@3.4.27)(zod@3.23.8)
@@ -358,6 +376,9 @@ importers:
       csv-stringify:
         specifier: ^6.4.6
         version: 6.4.6
+      d3-shape:
+        specifier: ^3.2.0
+        version: 3.2.0
       date-fns:
         specifier: ^3.6.0
         version: 3.6.0
@@ -479,6 +500,9 @@ importers:
       '@types/css-tree':
         specifier: ^2.3.1
         version: 2.3.7
+      '@types/d3-shape':
+        specifier: ^3.1.6
+        version: 3.1.6
       '@types/mapbox-gl':
         specifier: ^3.1.0
         version: 3.1.0
@@ -18055,8 +18079,36 @@ packages:
     resolution: {integrity: sha512-LUlutQBpR2TgqZJdvXCPOx9EME7a4PHSEo2Y2c8POFpj1E9a6V94PUZNwjVdfHWyb8RQZoNHTYOKs980+sOi+g==}
     dev: true
 
+  /@types/d3-array@3.0.3:
+    resolution: {integrity: sha512-Reoy+pKnvsksN0lQUlcH6dOGjRZ/3WRwXR//m+/8lt1BXeI4xyaUZoqULNjyXXRuh0Mj4LNpkCvhUpQlY3X5xQ==}
+    dev: false
+
+  /@types/d3-cloud@1.2.5:
+    resolution: {integrity: sha512-vEIER9DsEBUOdpRiwCh3n1qE+cV6h4e1LhxhY2sLt+m8LPNAIkOOhTlqk0JDiBwD+ZPM8ynFAOU3AuPuVYBFBA==}
+    dependencies:
+      '@types/d3': 3.5.53
+    dev: false
+
   /@types/d3-color@1.4.5:
     resolution: {integrity: sha512-5sNP3DmtSnSozxcjqmzQKsDOuVJXZkceo1KJScDc1982kk/TS9mTPc6lpli1gTu1MIBF1YWutpHpjucNWcIj5g==}
+    dev: false
+
+  /@types/d3-color@3.1.0:
+    resolution: {integrity: sha512-HKuicPHJuvPgCD+np6Se9MQvS6OCbJmOjGvylzMJRlDwUXjKTTXs6Pwgk79O09Vj/ho3u1ofXnhFOaEWWPrlwA==}
+    dev: false
+
+  /@types/d3-delaunay@6.0.1:
+    resolution: {integrity: sha512-tLxQ2sfT0p6sxdG75c6f/ekqxjyYR0+LwPrsO1mbC9YDBzPJhs2HbJJRrn8Ez1DBoHRo2yx7YEATI+8V1nGMnQ==}
+    dev: false
+
+  /@types/d3-format@3.0.1:
+    resolution: {integrity: sha512-5KY70ifCCzorkLuIkDe0Z9YTf9RR2CjBX1iaJG+rgM/cPP+sO+q9YdQ9WdhQcgPj1EQiJ2/0+yUkkziTG6Lubg==}
+    dev: false
+
+  /@types/d3-geo@3.1.0:
+    resolution: {integrity: sha512-856sckF0oP/diXtS4jNsiQw/UuK5fQG8l/a9VVLeSouf1/PPbBE1i1W852zVwKwYCBkFJJB7nCFTbk6UMEXBOQ==}
+    dependencies:
+      '@types/geojson': 7946.0.14
     dev: false
 
   /@types/d3-hierarchy@1.1.11:
@@ -18069,8 +18121,17 @@ packages:
       '@types/d3-color': 1.4.5
     dev: false
 
+  /@types/d3-interpolate@3.0.1:
+    resolution: {integrity: sha512-jx5leotSeac3jr0RePOH1KdR9rISG91QIE4Q2PYTu4OymLTZfA3SrnURSLzKH48HmXVUru50b8nje4E79oQSQw==}
+    dependencies:
+      '@types/d3-color': 3.1.0
+    dev: false
+
   /@types/d3-path@1.0.11:
     resolution: {integrity: sha512-4pQMp8ldf7UaB/gR8Fvvy69psNHkTpD/pVw3vmEi8iZAB9EPMBruB1JvHO4BIq9QkUUd2lV1F5YXpMNj7JPBpw==}
+
+  /@types/d3-random@2.2.3:
+    resolution: {integrity: sha512-Ghs4R3CcgJ3o6svszRzIH4b8PPYex/COo+rhhZjDAs+bVducXwjmVSi27WcDOaLLCBV2t3tfVH9bYXAL76IvQA==}
     dev: false
 
   /@types/d3-scale@3.3.5:
@@ -18079,14 +18140,42 @@ packages:
       '@types/d3-time': 2.1.4
     dev: false
 
+  /@types/d3-scale@4.0.2:
+    resolution: {integrity: sha512-Yk4htunhPAwN0XGlIwArRomOjdoBFXC3+kCxK2Ubg7I9shQlVSJy/pG/Ht5ASN+gdMIalpk8TJ5xV74jFsetLA==}
+    dependencies:
+      '@types/d3-time': 3.0.0
+    dev: false
+
   /@types/d3-shape@1.3.12:
     resolution: {integrity: sha512-8oMzcd4+poSLGgV0R1Q1rOlx/xdmozS4Xab7np0eamFFUYq71AU9pOCJEFnkXW2aI/oXdVYJzw6pssbSut7Z9Q==}
     dependencies:
       '@types/d3-path': 1.0.11
     dev: false
 
+  /@types/d3-shape@3.1.6:
+    resolution: {integrity: sha512-5KKk5aKGu2I+O6SONMYSNflgiP0WfZIQvVUMan50wHsLG1G94JlxEVnCpQARfTtzytuY0p/9PXXZb3I7giofIA==}
+    dependencies:
+      '@types/d3-path': 1.0.11
+    dev: true
+
+  /@types/d3-time-format@2.1.0:
+    resolution: {integrity: sha512-/myT3I7EwlukNOX2xVdMzb8FRgNzRMpsZddwst9Ld/VFe6LyJyRp0s32l/V9XoUzk+Gqu56F/oGk6507+8BxrA==}
+    dev: false
+
   /@types/d3-time@2.1.4:
     resolution: {integrity: sha512-BTfLsxTeo7yFxI/haOOf1ZwJ6xKgQLT9dCp+EcmQv87Gox6X+oKl4mLKfO6fnWm3P22+A6DknMNEZany8ql2Rw==}
+    dev: false
+
+  /@types/d3-time@3.0.0:
+    resolution: {integrity: sha512-sZLCdHvBUcNby1cB6Fd3ZBrABbjz3v1Vm90nysCQ6Vt7vd6e/h9Lt7SiJUoEX0l4Dzc7P5llKyhqSi1ycSf1Hg==}
+    dev: false
+
+  /@types/d3-voronoi@1.1.12:
+    resolution: {integrity: sha512-DauBl25PKZZ0WVJr42a6CNvI6efsdzofl9sajqZr2Gf5Gu733WkDdUGiPkUHXiUvYGzNNlFQde2wdZdfQPG+yw==}
+    dev: false
+
+  /@types/d3@3.5.53:
+    resolution: {integrity: sha512-8yKQA9cAS6+wGsJpBysmnhlaaxlN42Qizqkw+h2nILSlS+MAG2z4JdO6p+PJrJ+ACvimkmLJL281h157e52psQ==}
     dev: false
 
   /@types/debug@4.1.12:
@@ -18890,11 +18979,148 @@ packages:
       react: 18.3.1
     dev: false
 
+  /@visx/annotation@3.3.0(react-dom@18.3.1)(react@18.3.1):
+    resolution: {integrity: sha512-v0htpd/sT1kdU1N7frqmj078UByJXUwPQJT9LENv0ypssjGyRgvZERjkgSUuMKMjZquOBs/f6XOzxF4mLV57sA==}
+    peerDependencies:
+      react: ^18.2.0
+    dependencies:
+      '@types/react': 18.2.58
+      '@visx/drag': 3.3.0(react@18.3.1)
+      '@visx/group': 3.3.0(react@18.3.1)
+      '@visx/text': 3.3.0(react@18.3.1)
+      classnames: 2.5.1
+      prop-types: 15.8.1
+      react: 18.3.1
+      react-use-measure: 2.1.1(react-dom@18.3.1)(react@18.3.1)
+    transitivePeerDependencies:
+      - react-dom
+    dev: false
+
+  /@visx/axis@3.10.1(react@18.3.1):
+    resolution: {integrity: sha512-HBEDLcpZoJ16hFbkYu3S6mN5mbwlFmUWY5yN967X06RdIL4LmAG3gnZ7u4F9buA3LQo+trJXW78moN005odD4Q==}
+    peerDependencies:
+      react: ^18.2.0
+    dependencies:
+      '@types/react': 18.2.58
+      '@visx/group': 3.3.0(react@18.3.1)
+      '@visx/point': 3.3.0
+      '@visx/scale': 3.5.0
+      '@visx/shape': 3.5.0(react@18.3.1)
+      '@visx/text': 3.3.0(react@18.3.1)
+      classnames: 2.5.1
+      prop-types: 15.8.1
+      react: 18.3.1
+    dev: false
+
+  /@visx/bounds@3.3.0(react-dom@18.3.1)(react@18.3.1):
+    resolution: {integrity: sha512-gESmN+4N2NkeUzqQEDZaS63umkGfMp9XjQcKBqtOR64mjjQtamh3lNVRWvKjJ2Zb421RbYHWq22Wv9nay6ZUOg==}
+    peerDependencies:
+      react: ^18.2.0
+      react-dom: ^18.2.0
+    dependencies:
+      '@types/react': 18.2.58
+      '@types/react-dom': 18.2.19
+      prop-types: 15.8.1
+      react: 18.3.1
+      react-dom: 18.3.1(react@18.3.1)
+    dev: false
+
+  /@visx/brush@3.10.4(react@18.3.1):
+    resolution: {integrity: sha512-V1vmthRuODSOxt4V/aSVQF9/2V+t/DDQZHFj+M8ueiv9OVznBXVydkMDnaAG5jRAEboX8JlKSmTFB6YrrPc+Ow==}
+    peerDependencies:
+      react: ^18.2.0
+    dependencies:
+      '@visx/drag': 3.3.0(react@18.3.1)
+      '@visx/event': 3.3.0
+      '@visx/group': 3.3.0(react@18.3.1)
+      '@visx/scale': 3.5.0
+      '@visx/shape': 3.5.0(react@18.3.1)
+      classnames: 2.5.1
+      prop-types: 15.8.1
+      react: 18.3.1
+    dev: false
+
+  /@visx/clip-path@3.3.0(react@18.3.1):
+    resolution: {integrity: sha512-uMuI2M05qZTgUdTSHJGg4VDr2gytGmGyuaC89iByHqNaeMHkrJqQi/cOFAZi4D0dn75p7lVirJijEgDgSpcrMQ==}
+    peerDependencies:
+      react: ^18.2.0
+    dependencies:
+      '@types/react': 18.2.58
+      prop-types: 15.8.1
+      react: 18.3.1
+    dev: false
+
   /@visx/curve@1.7.0:
     resolution: {integrity: sha512-n0/SHM4YXjke+aEinhHFZPLMxWu3jbqtvqzfGJyibX8OmbDjavk9P+MHfGokUcw0xHy6Ch3YTuwbYuvVw5ny9A==}
     dependencies:
       '@types/d3-shape': 1.3.12
       d3-shape: 1.3.7
+    dev: false
+
+  /@visx/curve@3.3.0:
+    resolution: {integrity: sha512-G1l1rzGWwIs8ka3mBhO/gj8uYK6XdU/3bwRSoiZ+MockMahQFPog0bUkuVgPwwzPSJfsA/E5u53Y/DNesnHQxg==}
+    dependencies:
+      '@types/d3-shape': 1.3.12
+      d3-shape: 1.3.7
+    dev: false
+
+  /@visx/delaunay@3.5.0(react@18.3.1):
+    resolution: {integrity: sha512-M5X50FBEw3EZcnrT8qnjmm80CzSRZnwZA9DXbtgjOVdMJcuBZXsE0QKYisuTkH0bMLV765WKZWaQy8dwWb1snw==}
+    peerDependencies:
+      react: ^18.2.0
+    dependencies:
+      '@types/react': 18.2.58
+      '@visx/vendor': 3.5.0
+      classnames: 2.5.1
+      prop-types: 15.8.1
+      react: 18.3.1
+    dev: false
+
+  /@visx/drag@3.3.0(react@18.3.1):
+    resolution: {integrity: sha512-fLNsorq6GyANCqAE/dToG0q7YoGVxihGC9FZQUp0MCV1wMJIJ45ximhrl5NDng2ytbpWnBmXu8M8hdsdFuvIXw==}
+    peerDependencies:
+      react: ^18.2.0
+    dependencies:
+      '@types/react': 18.2.58
+      '@visx/event': 3.3.0
+      '@visx/point': 3.3.0
+      prop-types: 15.8.1
+      react: 18.3.1
+    dev: false
+
+  /@visx/event@3.3.0:
+    resolution: {integrity: sha512-fKalbNgNz2ooVOTXhvcOx5IlEQDgVfX66rI7bgZhBxI2/scy+5rWcXJXpwkheRF68SMx9R93SjKW6tmiD0h+jA==}
+    dependencies:
+      '@types/react': 18.2.58
+      '@visx/point': 3.3.0
+    dev: false
+
+  /@visx/geo@3.5.0(react@18.3.1):
+    resolution: {integrity: sha512-TpfMrLL5zHkrxKaasN9G2EQnCBmbhTgLa+o9/6lEFrBp8l4+j3zFaH/U6I6mqlhfMdZqgTj+9ryM4K7AfBuKDA==}
+    peerDependencies:
+      react: ^18.2.0
+    dependencies:
+      '@types/geojson': 7946.0.14
+      '@types/react': 18.2.58
+      '@visx/group': 3.3.0(react@18.3.1)
+      '@visx/vendor': 3.5.0
+      classnames: 2.5.1
+      prop-types: 15.8.1
+      react: 18.3.1
+    dev: false
+
+  /@visx/glyph@3.3.0(react@18.3.1):
+    resolution: {integrity: sha512-U2r1rFLpim3afKuuAmrbxXGSDCaLwXHmjXxWN8PiIQPMxpS7eaa/V5g2TRd/+x0KCkaf3Ismk4VKMl8ZlrmxIQ==}
+    peerDependencies:
+      react: ^18.2.0
+    dependencies:
+      '@types/d3-shape': 1.3.12
+      '@types/react': 18.2.58
+      '@visx/group': 3.3.0(react@18.3.1)
+      classnames: 2.5.1
+      d3-shape: 1.3.7
+      prop-types: 15.8.1
+      react: 18.3.1
     dev: false
 
   /@visx/gradient@1.7.0(react@18.3.1):
@@ -18907,12 +19133,61 @@ packages:
       react: 18.3.1
     dev: false
 
+  /@visx/gradient@3.3.0(react@18.3.1):
+    resolution: {integrity: sha512-t3vqukahDQsJ64/fcm85woFm2XPpSPMBz92gFvaY4J8EJY3e6rFOg382v5Dm17fgNsLRKJA0Vqo7mUtDe2pWOw==}
+    peerDependencies:
+      react: ^18.2.0
+    dependencies:
+      '@types/react': 18.2.58
+      prop-types: 15.8.1
+      react: 18.3.1
+    dev: false
+
+  /@visx/grid@3.5.0(react@18.3.1):
+    resolution: {integrity: sha512-i1pdobTE223ItMiER3q4ojIaZWja3vg46TkS6FotnBZ4c0VRDHSrALQPdi0na+YEgppASWCQ2WrI/vD6mIkhSg==}
+    peerDependencies:
+      react: ^18.2.0
+    dependencies:
+      '@types/react': 18.2.58
+      '@visx/curve': 3.3.0
+      '@visx/group': 3.3.0(react@18.3.1)
+      '@visx/point': 3.3.0
+      '@visx/scale': 3.5.0
+      '@visx/shape': 3.5.0(react@18.3.1)
+      classnames: 2.5.1
+      prop-types: 15.8.1
+      react: 18.3.1
+    dev: false
+
   /@visx/group@1.17.1(react@18.3.1):
     resolution: {integrity: sha512-g8pSqy8TXAisiOzypnVycDynEGlBhfxtVlwDmsbYB+XSFGEjnOheQSDohDI+ia7ek54Mw9uYe05tx5kP1hRMYw==}
     peerDependencies:
       react: ^18.2.0
     dependencies:
       '@types/react': 18.2.58
+      classnames: 2.5.1
+      prop-types: 15.8.1
+      react: 18.3.1
+    dev: false
+
+  /@visx/group@3.3.0(react@18.3.1):
+    resolution: {integrity: sha512-yKepDKwJqlzvnvPS0yDuW13XNrYJE4xzT6xM7J++441nu6IybWWwextyap8ey+kU651cYDb+q1Oi6aHvQwyEyw==}
+    peerDependencies:
+      react: ^18.2.0
+    dependencies:
+      '@types/react': 18.2.58
+      classnames: 2.5.1
+      prop-types: 15.8.1
+      react: 18.3.1
+    dev: false
+
+  /@visx/heatmap@3.3.0(react@18.3.1):
+    resolution: {integrity: sha512-FekGeV9hKS8c1G3hiKua1X3ccmCfY+QNPT6FV8XYfU3Mrlk2xi6WjSwqG1YaqYp+JsJ0mQXt/kW82RzFSqERwg==}
+    peerDependencies:
+      react: ^18.2.0
+    dependencies:
+      '@types/react': 18.2.58
+      '@visx/group': 3.3.0(react@18.3.1)
       classnames: 2.5.1
       prop-types: 15.8.1
       react: 18.3.1
@@ -18932,6 +19207,109 @@ packages:
       react: 18.3.1
     dev: false
 
+  /@visx/hierarchy@3.3.0(react@18.3.1):
+    resolution: {integrity: sha512-nPOZDsSst95+eZOQjZQbq1cuVywriiNAOQp2yXDkZov/32b7Qj0aakXvwU1Yd2DhriuSxlNzMecwVX7L6azrIg==}
+    peerDependencies:
+      react: ^18.2.0
+    dependencies:
+      '@types/d3-hierarchy': 1.1.11
+      '@types/react': 18.2.58
+      '@visx/group': 3.3.0(react@18.3.1)
+      classnames: 2.5.1
+      d3-hierarchy: 1.1.9
+      prop-types: 15.8.1
+      react: 18.3.1
+    dev: false
+
+  /@visx/legend@3.10.3(react@18.3.1):
+    resolution: {integrity: sha512-jEEK/zdp8gslc3egb3tqNi7dz79riuWR032lCHnULge/h+TtbrC8MnwhbdCbcCn7Fnu3SvY/5DnPpZImFE/Ojg==}
+    peerDependencies:
+      react: ^18.2.0
+    dependencies:
+      '@types/react': 18.2.58
+      '@visx/group': 3.3.0(react@18.3.1)
+      '@visx/scale': 3.5.0
+      classnames: 2.5.1
+      prop-types: 15.8.1
+      react: 18.3.1
+    dev: false
+
+  /@visx/marker@3.5.0(react@18.3.1):
+    resolution: {integrity: sha512-gpB+YkhNqaRLRQLLkDnwP1oFevbdOeAMRZJVB1e/XaDG/mL5maVPN6sYDoEPME276LOcW9MMfQeKM8JrRH8nFw==}
+    peerDependencies:
+      react: ^18.2.0
+    dependencies:
+      '@types/react': 18.2.58
+      '@visx/group': 3.3.0(react@18.3.1)
+      '@visx/shape': 3.5.0(react@18.3.1)
+      classnames: 2.5.1
+      prop-types: 15.8.1
+      react: 18.3.1
+    dev: false
+
+  /@visx/mock-data@3.3.0:
+    resolution: {integrity: sha512-yb5R/tAU8fjwRSc5VL1UPYbkD+BoYjXUorblE3/oDcSfFrOvpRMZzSaYCBbZ6jtllge3Ks6QVzwyUUj1/xweqQ==}
+    dependencies:
+      '@types/d3-random': 2.2.3
+      d3-random: 2.2.2
+    dev: false
+
+  /@visx/network@3.3.0(react@18.3.1):
+    resolution: {integrity: sha512-D4uRFQ+QKSyiDQ6YpjuC082yMllCKtv+KwDcNpyv8XNBkFm3LJuDKpIY4CDCrLeLhOiOTAfyEH7GV/cOcKiw5A==}
+    peerDependencies:
+      react: ^18.2.0
+    dependencies:
+      '@types/react': 18.2.58
+      '@visx/group': 3.3.0(react@18.3.1)
+      classnames: 2.5.1
+      prop-types: 15.8.1
+      react: 18.3.1
+    dev: false
+
+  /@visx/pattern@3.3.0(react@18.3.1):
+    resolution: {integrity: sha512-x/a8sG8a+yj+yMjecL+UunRBGPf2Jm6L/X5AbRHEYddHZxxZa6FwxFuJe4R6S19+/vmFaXm8Md1ZAzT/cu6Icw==}
+    peerDependencies:
+      react: ^18.2.0
+    dependencies:
+      '@types/react': 18.2.58
+      classnames: 2.5.1
+      prop-types: 15.8.1
+      react: 18.3.1
+    dev: false
+
+  /@visx/point@3.3.0:
+    resolution: {integrity: sha512-03eBBIJarkmX79WbeEGTUZwmS5/MUuabbiM9KfkGS9pETBTWkp1DZtEHZdp5z34x5TDQVLSi0rk1Plg3/8RtDg==}
+    dev: false
+
+  /@visx/react-spring@3.10.1(@react-spring/web@9.7.3)(react@18.3.1):
+    resolution: {integrity: sha512-OB64l98nGF0pBFXUmAgzQVJNhQvLXTw3RpyP11LpljJh4NRtpcnuHAYCruVQJjRrN7MIrqPdhhG0xvibLib2rg==}
+    peerDependencies:
+      '@react-spring/web': ^9.4.5
+      react: ^18.2.0
+    dependencies:
+      '@react-spring/web': 9.7.3(react-dom@18.3.1)(react@18.3.1)
+      '@types/react': 18.2.58
+      '@visx/axis': 3.10.1(react@18.3.1)
+      '@visx/grid': 3.5.0(react@18.3.1)
+      '@visx/scale': 3.5.0
+      '@visx/text': 3.3.0(react@18.3.1)
+      classnames: 2.5.1
+      prop-types: 15.8.1
+      react: 18.3.1
+    dev: false
+
+  /@visx/responsive@3.10.2(react@18.3.1):
+    resolution: {integrity: sha512-oDzFnLLpGpvTcFDoixVJX6iKOVzNJJW4dlAnsfgtxa/ibgMFZGoN4QL3NIzVlgg9s0fTDFCgQ+0FSMv1VvgKlQ==}
+    peerDependencies:
+      react: ^18.2.0
+    dependencies:
+      '@types/lodash': 4.17.1
+      '@types/react': 18.2.58
+      lodash: 4.17.21
+      prop-types: 15.8.1
+      react: 18.3.1
+    dev: false
+
   /@visx/scale@1.14.0:
     resolution: {integrity: sha512-ovbtEOF/d76uGMJ5UZlxdS3t2T8I6md+aIwOXBaq0HdjaCLbe7HLlMyHJKjak/sqBxLAiCGVnechTUpSkfgSQw==}
     dependencies:
@@ -18941,6 +19319,12 @@ packages:
       d3-interpolate: 1.4.0
       d3-scale: 3.3.0
       d3-time: 2.1.1
+    dev: false
+
+  /@visx/scale@3.5.0:
+    resolution: {integrity: sha512-xo3zrXV2IZxrMq9Y9RUVJUpd93h3NO/r/y3GVi5F9AsbOzOhsLIbsPkunhO9mpUSR8LZ9TiumLEBrY+3frRBSg==}
+    dependencies:
+      '@visx/vendor': 3.5.0
     dev: false
 
   /@visx/shape@1.17.1(react@18.3.1):
@@ -18959,6 +19343,204 @@ packages:
       d3-path: 1.0.9
       d3-shape: 1.3.7
       lodash: 4.17.21
+      prop-types: 15.8.1
+      react: 18.3.1
+    dev: false
+
+  /@visx/shape@3.5.0(react@18.3.1):
+    resolution: {integrity: sha512-DP3t9jBQ7dSE3e6ptA1xO4QAIGxO55GrY/6P+S6YREuQGjZgq20TLYLAsiaoPEzFSS4tp0m12ZTPivWhU2VBTw==}
+    peerDependencies:
+      react: ^18.2.0
+    dependencies:
+      '@types/d3-path': 1.0.11
+      '@types/d3-shape': 1.3.12
+      '@types/lodash': 4.17.1
+      '@types/react': 18.2.58
+      '@visx/curve': 3.3.0
+      '@visx/group': 3.3.0(react@18.3.1)
+      '@visx/scale': 3.5.0
+      classnames: 2.5.1
+      d3-path: 1.0.9
+      d3-shape: 1.3.7
+      lodash: 4.17.21
+      prop-types: 15.8.1
+      react: 18.3.1
+    dev: false
+
+  /@visx/text@3.3.0(react@18.3.1):
+    resolution: {integrity: sha512-fOimcsf0GtQE9whM5MdA/xIkHMaV29z7qNqNXysUDE8znSMKsN+ott7kSg2ljAEE89CQo3WKHkPNettoVsa84w==}
+    peerDependencies:
+      react: ^18.2.0
+    dependencies:
+      '@types/lodash': 4.17.1
+      '@types/react': 18.2.58
+      classnames: 2.5.1
+      lodash: 4.17.21
+      prop-types: 15.8.1
+      react: 18.3.1
+      reduce-css-calc: 1.3.0
+    dev: false
+
+  /@visx/threshold@3.5.0(react@18.3.1):
+    resolution: {integrity: sha512-Vq6yq2QIVuIOs8GfIhj+ifsAN3mglw9jWGPaLLHm72Hzr13NdQDFeWSZ8a6yQAcpA3oz7N/2StqLzb0FPYZRbA==}
+    peerDependencies:
+      react: ^18.2.0
+    dependencies:
+      '@types/react': 18.2.58
+      '@visx/clip-path': 3.3.0(react@18.3.1)
+      '@visx/shape': 3.5.0(react@18.3.1)
+      classnames: 2.5.1
+      prop-types: 15.8.1
+      react: 18.3.1
+    dev: false
+
+  /@visx/tooltip@3.3.0(react-dom@18.3.1)(react@18.3.1):
+    resolution: {integrity: sha512-0ovbxnvAphEU/RVJprWHdOJT7p3YfBDpwXclXRuhIY2EkH59g8sDHatDcYwiNPeqk61jBh1KACRZxqToMuutlg==}
+    peerDependencies:
+      react: ^18.2.0
+      react-dom: ^18.2.0
+    dependencies:
+      '@types/react': 18.2.58
+      '@visx/bounds': 3.3.0(react-dom@18.3.1)(react@18.3.1)
+      classnames: 2.5.1
+      prop-types: 15.8.1
+      react: 18.3.1
+      react-dom: 18.3.1(react@18.3.1)
+      react-use-measure: 2.1.1(react-dom@18.3.1)(react@18.3.1)
+    dev: false
+
+  /@visx/vendor@3.5.0:
+    resolution: {integrity: sha512-yt3SEZRVmt36+APsCISSO9eSOtzQkBjt+QRxNRzcTWuzwMAaF3PHCCSe31++kkpgY9yFoF+Gfes1TBe5NlETiQ==}
+    dependencies:
+      '@types/d3-array': 3.0.3
+      '@types/d3-color': 3.1.0
+      '@types/d3-delaunay': 6.0.1
+      '@types/d3-format': 3.0.1
+      '@types/d3-geo': 3.1.0
+      '@types/d3-interpolate': 3.0.1
+      '@types/d3-scale': 4.0.2
+      '@types/d3-time': 3.0.0
+      '@types/d3-time-format': 2.1.0
+      d3-array: 3.2.1
+      d3-color: 3.1.0
+      d3-delaunay: 6.0.2
+      d3-format: 3.1.0
+      d3-geo: 3.1.0
+      d3-interpolate: 3.0.1
+      d3-scale: 4.0.2
+      d3-time: 3.1.0
+      d3-time-format: 4.1.0
+      internmap: 2.0.3
+    dev: false
+
+  /@visx/visx@3.11.0(@react-spring/web@9.7.3)(react-dom@18.3.1)(react@18.3.1):
+    resolution: {integrity: sha512-KtWpwAMymm2oxF0bjfECoIlIoiZu71d4YmhJR/fAt7puKttKk+Syy0X1KqLXxsapan6DkV9dgCTc2mVCjKKoKw==}
+    peerDependencies:
+      react: ^18.2.0
+    dependencies:
+      '@visx/annotation': 3.3.0(react-dom@18.3.1)(react@18.3.1)
+      '@visx/axis': 3.10.1(react@18.3.1)
+      '@visx/bounds': 3.3.0(react-dom@18.3.1)(react@18.3.1)
+      '@visx/brush': 3.10.4(react@18.3.1)
+      '@visx/clip-path': 3.3.0(react@18.3.1)
+      '@visx/curve': 3.3.0
+      '@visx/delaunay': 3.5.0(react@18.3.1)
+      '@visx/drag': 3.3.0(react@18.3.1)
+      '@visx/event': 3.3.0
+      '@visx/geo': 3.5.0(react@18.3.1)
+      '@visx/glyph': 3.3.0(react@18.3.1)
+      '@visx/gradient': 3.3.0(react@18.3.1)
+      '@visx/grid': 3.5.0(react@18.3.1)
+      '@visx/group': 3.3.0(react@18.3.1)
+      '@visx/heatmap': 3.3.0(react@18.3.1)
+      '@visx/hierarchy': 3.3.0(react@18.3.1)
+      '@visx/legend': 3.10.3(react@18.3.1)
+      '@visx/marker': 3.5.0(react@18.3.1)
+      '@visx/mock-data': 3.3.0
+      '@visx/network': 3.3.0(react@18.3.1)
+      '@visx/pattern': 3.3.0(react@18.3.1)
+      '@visx/point': 3.3.0
+      '@visx/responsive': 3.10.2(react@18.3.1)
+      '@visx/scale': 3.5.0
+      '@visx/shape': 3.5.0(react@18.3.1)
+      '@visx/text': 3.3.0(react@18.3.1)
+      '@visx/threshold': 3.5.0(react@18.3.1)
+      '@visx/tooltip': 3.3.0(react-dom@18.3.1)(react@18.3.1)
+      '@visx/voronoi': 3.3.0(react@18.3.1)
+      '@visx/wordcloud': 3.3.0(react@18.3.1)
+      '@visx/xychart': 3.11.0(@react-spring/web@9.7.3)(react-dom@18.3.1)(react@18.3.1)
+      '@visx/zoom': 3.3.0(react@18.3.1)
+      react: 18.3.1
+    transitivePeerDependencies:
+      - '@react-spring/web'
+      - react-dom
+    dev: false
+
+  /@visx/voronoi@3.3.0(react@18.3.1):
+    resolution: {integrity: sha512-twVovwdcEZZRkFV+x6yXGcyohf7gYHz0y/dFoS0SfGtEwT+CMEQgfO3ZDNQjU8X/m8je/wu9qtd35Zur+0RYOQ==}
+    peerDependencies:
+      react: ^18.2.0
+    dependencies:
+      '@types/d3-voronoi': 1.1.12
+      '@types/react': 18.2.58
+      classnames: 2.5.1
+      d3-voronoi: 1.1.4
+      prop-types: 15.8.1
+      react: 18.3.1
+    dev: false
+
+  /@visx/wordcloud@3.3.0(react@18.3.1):
+    resolution: {integrity: sha512-nopA4+qoBo3xDlHPNqq7cQx/8u1pfsNk6a+RNJwQFM4Nql7AgD9X9rcThqxXzGxJK3oODH9qgEhs4q+m4Jn46A==}
+    peerDependencies:
+      react: ^18.2.0
+    dependencies:
+      '@types/d3-cloud': 1.2.5
+      '@visx/group': 3.3.0(react@18.3.1)
+      d3-cloud: 1.2.7
+      react: 18.3.1
+    dev: false
+
+  /@visx/xychart@3.11.0(@react-spring/web@9.7.3)(react-dom@18.3.1)(react@18.3.1):
+    resolution: {integrity: sha512-phs/q0eeVNJDaHkKLQ+/0UYVt1fiVTaDZPtOVgcFRpEghpRWFgyApGuZ+BWWnTcGzpLEVv1HBcVA6H555IpvJQ==}
+    peerDependencies:
+      '@react-spring/web': ^9.4.5
+      react: ^18.2.0
+    dependencies:
+      '@react-spring/web': 9.7.3(react-dom@18.3.1)(react@18.3.1)
+      '@types/lodash': 4.17.1
+      '@types/react': 18.2.58
+      '@visx/annotation': 3.3.0(react-dom@18.3.1)(react@18.3.1)
+      '@visx/axis': 3.10.1(react@18.3.1)
+      '@visx/event': 3.3.0
+      '@visx/glyph': 3.3.0(react@18.3.1)
+      '@visx/grid': 3.5.0(react@18.3.1)
+      '@visx/react-spring': 3.10.1(@react-spring/web@9.7.3)(react@18.3.1)
+      '@visx/responsive': 3.10.2(react@18.3.1)
+      '@visx/scale': 3.5.0
+      '@visx/shape': 3.5.0(react@18.3.1)
+      '@visx/text': 3.3.0(react@18.3.1)
+      '@visx/tooltip': 3.3.0(react-dom@18.3.1)(react@18.3.1)
+      '@visx/vendor': 3.5.0
+      '@visx/voronoi': 3.3.0(react@18.3.1)
+      classnames: 2.5.1
+      d3-interpolate-path: 2.2.1
+      d3-shape: 2.1.0
+      lodash: 4.17.21
+      mitt: 2.1.0
+      prop-types: 15.8.1
+      react: 18.3.1
+    transitivePeerDependencies:
+      - react-dom
+    dev: false
+
+  /@visx/zoom@3.3.0(react@18.3.1):
+    resolution: {integrity: sha512-ijSitmJWbhupAe1F0LTsusg/WWEvYBcxV9iOHmTbGHhgpdKuhmZCXYg2zGAF4oT3lTuhofUA678jQt5+U9FlWA==}
+    peerDependencies:
+      react: ^18.2.0
+    dependencies:
+      '@types/react': 18.2.58
+      '@use-gesture/react': 10.3.1(react@18.3.1)
+      '@visx/event': 3.3.0
       prop-types: 15.8.1
       react: 18.3.1
     dev: false
@@ -20370,6 +20952,10 @@ packages:
 
   /bail@2.0.2:
     resolution: {integrity: sha512-0xO6mYd7JB2YesxDKplafRpsiOzPt9V02ddPCLbY1xYGPOX24NTyN50qnUxgCPcSoYMhKpAuBTjQoRZCAkUDRw==}
+    dev: false
+
+  /balanced-match@0.4.2:
+    resolution: {integrity: sha512-STw03mQKnGUYtoNjmowo4F2cRmIIxYEGiMsjjwla/u5P1lxadj/05WkNaFjNiKTgJkj8KiXbgAiRTmcQRwQNtg==}
     dev: false
 
   /balanced-match@1.0.2:
@@ -22581,11 +23167,24 @@ packages:
       internmap: 1.0.1
     dev: false
 
+  /d3-array@3.2.1:
+    resolution: {integrity: sha512-gUY/qeHq/yNqqoCKNq4vtpFLdoCdvyNpWoC/KNjhGbhDuQpAM9sIQQKkXSNpXa9h5KySs/gzm7R88WkUutgwWQ==}
+    engines: {node: '>=12'}
+    dependencies:
+      internmap: 2.0.3
+    dev: false
+
   /d3-array@3.2.4:
     resolution: {integrity: sha512-tdQAmyA18i4J7wprpYq8ClcxZy3SC31QMeByyCFyRt7BVHdREQZ5lpzoe5mFEYZUWe+oq8HBvk9JjpibyEV4Jg==}
     engines: {node: '>=12'}
     dependencies:
       internmap: 2.0.3
+    dev: false
+
+  /d3-cloud@1.2.7:
+    resolution: {integrity: sha512-8TrgcgwRIpoZYQp7s3fGB7tATWfhckRb8KcVd1bOgqkNdkJRDGWfdSf4HkHHzZxSczwQJdSxvfPudwir5IAJ3w==}
+    dependencies:
+      d3-dispatch: 1.0.6
     dev: false
 
   /d3-color@1.4.1:
@@ -22597,11 +23196,22 @@ packages:
     engines: {node: '>=12'}
     dev: false
 
+  /d3-delaunay@6.0.2:
+    resolution: {integrity: sha512-IMLNldruDQScrcfT+MWnazhHbDJhcRJyOEBAJfwQnHle1RPh6WDuLvxNArUju2VSMSUuKlY5BGHRJ2cYyoFLQQ==}
+    engines: {node: '>=12'}
+    dependencies:
+      delaunator: 5.0.1
+    dev: false
+
   /d3-delaunay@6.0.4:
     resolution: {integrity: sha512-mdjtIZ1XLAM8bm/hx3WwjfHt6Sggek7qH043O8KEjDXN40xi3vx/6pYSVTwLjEgiXQTbvaouWKynLBiUZ6SK6A==}
     engines: {node: '>=12'}
     dependencies:
       delaunator: 5.0.1
+    dev: false
+
+  /d3-dispatch@1.0.6:
+    resolution: {integrity: sha512-fVjoElzjhCEy+Hbn8KygnmMS7Or0a9sI2UzGwoB7cCtvI1XpVN9GpoYlnb3xt2YV66oXYb1fLJ8GMvP4hdU1RA==}
     dev: false
 
   /d3-format@2.0.0:
@@ -22623,6 +23233,13 @@ packages:
       d3-tricontour: 1.0.2
     dev: false
 
+  /d3-geo@3.1.0:
+    resolution: {integrity: sha512-JEo5HxXDdDYXCaWdwLRt79y7giK8SbhZJbFWXqbRTolCHFI5jRqteLzCsq51NKbUoX0PjBVSohxrx+NoOUujYA==}
+    engines: {node: '>=12'}
+    dependencies:
+      d3-array: 3.2.4
+    dev: false
+
   /d3-geo@3.1.1:
     resolution: {integrity: sha512-637ln3gXKXOwhalDzinUgY83KzNWZRKbYubaG+fGVuc/dxO64RRljtCTnf5ecMyE1RIdtqpkVcq0IbtU2S8j2Q==}
     engines: {node: '>=12'}
@@ -22632,6 +23249,10 @@ packages:
 
   /d3-hierarchy@1.1.9:
     resolution: {integrity: sha512-j8tPxlqh1srJHAtxfvOUwKNYJkQuBFdM1+JAUfq6xqH5eAqf93L7oG1NVqDa4CpFZNvnNKtCYEUC8KY9yEn9lQ==}
+    dev: false
+
+  /d3-interpolate-path@2.2.1:
+    resolution: {integrity: sha512-6qLLh/KJVzls0XtMsMpcxhqMhgVEN7VIbR/6YGZe2qlS8KDgyyVB20XcmGnDyB051HcefQXM/Tppa9vcANEA4Q==}
     dev: false
 
   /d3-interpolate@1.4.0:
@@ -22654,6 +23275,10 @@ packages:
   /d3-path@3.1.0:
     resolution: {integrity: sha512-p3KP5HCf/bvjBSSKuXid6Zqijx7wIfNW+J/maPs+iwR35at5JCbLUT0LzF1cnjbCHWhqzQTIN2Jpe8pRebIEFQ==}
     engines: {node: '>=12'}
+    dev: false
+
+  /d3-random@2.2.2:
+    resolution: {integrity: sha512-0D9P8TRj6qDAtHhRQn6EfdOtHMfsUWanl3yb/84C4DqpZ+VsgfI5iTVRNRbELCfNvRfpMr8OrqqUTQ6ANGCijw==}
     dev: false
 
   /d3-scale-chromatic@3.1.0:
@@ -22687,6 +23312,12 @@ packages:
 
   /d3-shape@1.3.7:
     resolution: {integrity: sha512-EUkvKjqPFUAZyOlhY5gzCxCeI0Aep04LwIRpsZ/mLFelJiUfnK56jo5JMDSE7yyP2kLSb6LtF+S5chMk7uqPqw==}
+    dependencies:
+      d3-path: 1.0.9
+    dev: false
+
+  /d3-shape@2.1.0:
+    resolution: {integrity: sha512-PnjUqfM2PpskbSLTJvAzp2Wv4CZsnAgTfcVRTwW03QR3MkXF8Uo7B1y/lWkAsmbKwuecto++4NlsYcvYpXpTHA==}
     dependencies:
       d3-path: 1.0.9
     dev: false
@@ -22730,6 +23361,10 @@ packages:
     dependencies:
       d3-delaunay: 6.0.4
       d3-scale: 4.0.2
+    dev: false
+
+  /d3-voronoi@1.1.4:
+    resolution: {integrity: sha512-dArJ32hchFsrQ8uMiTBLq256MpnZjeuBtdHpaDlYuQyjU0CVzCJl/BVW+SkszaAeH95D/8gxqAhgx0ouAWAfRg==}
     dev: false
 
   /damerau-levenshtein@1.0.8:
@@ -29820,6 +30455,10 @@ packages:
       css-mediaquery: 0.1.2
     dev: false
 
+  /math-expression-evaluator@1.4.0:
+    resolution: {integrity: sha512-4vRUvPyxdO8cWULGTh9dZWL2tZK6LDBvj+OGHBER7poH9Qdt7kXEoj20wiz4lQUbUXQZFjPbe5mVDo9nutizCw==}
+    dev: false
+
   /mathml-tag-names@2.1.3:
     resolution: {integrity: sha512-APMBEanjybaPzUrfqU0IMU5I0AswKMH7k8OTLs0vvV4KZpExkTkY87nR/zpbuTPj+gARop7aGUbl11pnDfW6xg==}
     dev: true
@@ -31283,6 +31922,10 @@ packages:
       stream-each: 1.2.3
       through2: 2.0.5
     dev: true
+
+  /mitt@2.1.0:
+    resolution: {integrity: sha512-ILj2TpLiysu2wkBbWjAmww7TkZb65aiQO+DkVdUTBpBXq+MHYiETENkKFMtsJZX1Lf4pe4QOrTSjIfUwN5lRdg==}
+    dev: false
 
   /mixin-deep@1.3.2:
     resolution: {integrity: sha512-WRoDn//mXBiJ1H40rqa3vH0toePwSsGb45iInWlTySa+Uu4k3tYUSxa2v1KqAiLtvlrSzaExqS1gtk96A9zvEA==}
@@ -36017,6 +36660,20 @@ packages:
       indent-string: 4.0.0
       strip-indent: 3.0.0
     dev: true
+
+  /reduce-css-calc@1.3.0:
+    resolution: {integrity: sha512-0dVfwYVOlf/LBA2ec4OwQ6p3X9mYxn/wOl2xTcLwjnPYrkgEfPx3VI4eGCH3rQLlPISG5v9I9bkZosKsNRTRKA==}
+    dependencies:
+      balanced-match: 0.4.2
+      math-expression-evaluator: 1.4.0
+      reduce-function-call: 1.0.3
+    dev: false
+
+  /reduce-function-call@1.0.3:
+    resolution: {integrity: sha512-Hl/tuV2VDgWgCSEeWMLwxLZqX7OK59eU1guxXsRKTAyeYimivsKdtcV4fu3r710tpG5GmDKDhQ0HSZLExnNmyQ==}
+    dependencies:
+      balanced-match: 1.0.2
+    dev: false
 
   /redux@4.2.1:
     resolution: {integrity: sha512-LAUYz4lc+Do8/g7aeRa8JkyDErK6ekstQaqWQrNRW//MY1TvCEpMtpTWvlQ+FPbWCx+Xixu/6SHt5N0HR+SB4w==}
