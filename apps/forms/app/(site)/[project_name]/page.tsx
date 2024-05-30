@@ -12,6 +12,7 @@ import { CreateNewFormButton } from "@/components/create-form-button";
 import { Form } from "@/types";
 import Image from "next/image";
 import { Metadata } from "next";
+import { ProjectStats } from "@/scaffolds/analytics/stats";
 
 export const revalidate = 0;
 
@@ -122,6 +123,9 @@ export default async function FormsDashboardPage({
         <Link href="?layout=list" replace>
           <ViewHorizontalIcon />
         </Link>
+      </section>
+      <section>
+        <ProjectStats project_id={project_id} />
       </section>
       <hr className="mb-10 mt-5 dark:border-neutral-700" />
       <FormsGrid forms={forms} layout={layout} />
