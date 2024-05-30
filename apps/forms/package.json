@@ -60,6 +60,7 @@
     "@types/three": "^0.149.0",
     "@visx/axis": "^3.10.1",
     "@visx/group": "^1.7.0",
+    "@visx/responsive": "^3.10.2",
     "@visx/scale": "^3.5.0",
     "@visx/shape": "^1.8.0",
     "@visx/visx": "^3.11.0",

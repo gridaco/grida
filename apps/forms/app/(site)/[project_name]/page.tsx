@@ -92,11 +92,9 @@ export default async function FormsDashboardPage({
   );
   //
 
-  const count = forms.length;
-
   return (
     <main className="container mx-auto px-4">
-      <header className="py-10">
+      <header className="py-10 flex justify-between">
         <div>
           <Link href="/dashboard">
             <span className="flex items-center gap-2 text-2xl font-black select-none">
@@ -106,15 +104,12 @@ export default async function FormsDashboardPage({
           </Link>
           <span className="font-mono opacity-50">{project_name}</span>
         </div>
-        <h1 className="text-5xl font-mono font-black py-10 flex items-center gap-4">
-          Dashboard
-          <span className="text-2xl bg-neutral-500 text-white rounded-full py-2 px-3">
-            {count}
-          </span>
-        </h1>
+        <div>
+          <CreateNewFormButton project_id={project_id} />
+        </div>
       </header>
-      <section className="flex justify-end py-4">
-        <CreateNewFormButton project_id={project_id} />
+      <section>
+        <ProjectStats project_id={project_id} />
       </section>
       <section className="w-full flex justify-end gap-2 mt-10">
         <Link href="?layout=grid" replace>
@@ -123,9 +118,6 @@ export default async function FormsDashboardPage({
         <Link href="?layout=list" replace>
           <ViewHorizontalIcon />
         </Link>
-      </section>
-      <section>
-        <ProjectStats project_id={project_id} />
       </section>
       <hr className="mb-10 mt-5 dark:border-neutral-700" />
       <FormsGrid forms={forms} layout={layout} />
@@ -156,7 +148,10 @@ function FormsGrid({
   return (
     <div className="grid grid-cols-1 md:grid-cols-1 lg:grid-cols-1 gap-4">
       <header className="flex text-sm opacity-80">
-        <span className="flex-1">Form</span>
+        <span className="flex-1">
+          Form
+          <span className="ml-2 text-xs opacity-50">{forms.length}</span>
+        </span>
         <span className="w-32">Responses</span>
         <span className="w-44">Updated At</span>
       </header>
@@ -208,7 +203,7 @@ function RowCard({
   max_form_responses_in_total,
 }: FormDashboardItem) {
   return (
-    <div className="flex items-center border rounded-xl overflow-hidden h-16 shadow-md bg-white dark:bg-neutral-900">
+    <div className="flex items-center border rounded-md overflow-hidden h-16 shadow bg-white dark:bg-neutral-900">
       <Image
         className="object-cover max-w-16 bg-neutral-500 aspect-square"
         width={440}

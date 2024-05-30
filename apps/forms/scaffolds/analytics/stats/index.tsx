@@ -7,7 +7,7 @@ import {
 } from "@/lib/supabase/client";
 import { Skeleton } from "@/components/ui/skeleton";
 import LineChart from "../charts/basic-line-chart";
-import { GraphSkeleton, LabelSkeleton } from "../charts/skeleton";
+import { GraphSkeleton, NumberSkeleton } from "../charts/skeleton";
 import { SupabaseClient } from "@supabase/supabase-js";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Database } from "@/types/supabase";
@@ -70,14 +70,16 @@ export function ProjectStats({ project_id }: { project_id: number }) {
   const { range, setRange, from, to } = useDateRange();
   return (
     <div>
-      <h1 className="text-2xl font-semibold">Your Overview</h1>
-      <div>
-        <RangeSelect
-          value={range}
-          onValueChange={(value) => setRange(value as RangeKey)}
-        />
-      </div>
-      <div className="grid grid-cols-2 gap-4 mt-4">
+      <header>
+        <h1 className="text-2xl font-semibold">Your Overview</h1>
+        <div className="mt-4 w-min">
+          <RangeSelect
+            value={range}
+            onValueChange={(value) => setRange(value as RangeKey)}
+          />
+        </div>
+      </header>
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mt-4">
         <Customers project_id={project_id} from={from} to={to} />
         <Responses project_id={project_id} from={from} to={to} />
       </div>
@@ -219,11 +221,11 @@ export function Customers({
   }, [project_id, from, to]);
 
   return (
-    <Card className="p-4">
+    <Card className="overflow-hidden">
       <CardHeader>
         <h1 className="text-lg font-semibold">New Customers</h1>
         {loading ? (
-          <LabelSkeleton />
+          <NumberSkeleton />
         ) : (
           <div className="flex items-center space-x-2">
             <span className="text-3xl font-bold">
@@ -232,14 +234,13 @@ export function Customers({
           </div>
         )}
       </CardHeader>
-      <CardContent>
+      <CardContent className="p-0 h-40 w-full">
         {loading ? (
-          <GraphSkeleton />
+          <div className="p-6">
+            <GraphSkeleton />
+          </div>
         ) : (
-          <LineChart
-            data={data}
-            // hoverComponent={CustomHoverComponent}
-          />
+          <LineChart data={data} />
         )}
       </CardContent>
     </Card>
@@ -285,11 +286,11 @@ export function Responses({
   }, [project_id, from, to]);
 
   return (
-    <Card className="p-4">
+    <Card className="overflow-hidden">
       <CardHeader>
         <h1 className="text-lg font-semibold">New Responses</h1>
         {loading ? (
-          <LabelSkeleton />
+          <NumberSkeleton />
         ) : (
           <div className="flex items-center space-x-2">
             <span className="text-3xl font-bold">
@@ -298,14 +299,13 @@ export function Responses({
           </div>
         )}
       </CardHeader>
-      <CardContent>
+      <CardContent className="p-0 h-40 w-full">
         {loading ? (
-          <GraphSkeleton />
+          <div className="p-6">
+            <GraphSkeleton />
+          </div>
         ) : (
-          <LineChart
-            data={data}
-            // hoverComponent={CustomHoverComponent}
-          />
+          <LineChart data={data} />
         )}
       </CardContent>
     </Card>

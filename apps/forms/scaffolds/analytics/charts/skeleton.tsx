@@ -1,17 +1,17 @@
 import { Skeleton } from "@/components/ui/skeleton";
 
-export function LabelSkeleton() {
+export function NumberSkeleton() {
   return (
     <div>
-      <Skeleton className="h-[125px] w-[250px] rounded-xl" />
+      <Skeleton className="h-8 w-32 rounded-xl" />
     </div>
   );
 }
 
 export function GraphSkeleton() {
   return (
-    <div>
-      <Skeleton className="h-[125px] w-[250px] rounded-xl" />
+    <div className="w-full h-full">
+      <Skeleton className="h-full w-full rounded-xl" />
     </div>
   );
 }
