@@ -145,7 +145,45 @@ export default function PartnerPOC() {
               도움이 필요한 순간에 POC가 옆에서 도와드립니다.
             </span>
           </div>
-          <div></div>
+          <div className="flex flex-row gap-10 mt-12">
+            <div className="container px-8 py-8 border border-neutral-200 rounded shadow-lg">
+              <div className="container bg-neutral-400 w-full h-48 px-5 rounded">
+                ...
+              </div>
+              <p className="font-semibold text-2xl mt-3">
+                특별한 행사를 위한
+                <br /> 기획하기
+              </p>
+              <p className="flex justify-end text-sm mt-12 opacity-50">
+                더 알아보기
+              </p>
+            </div>
+            <div className="container px-8 py-8 border border-neutral-200 rounded shadow-lg">
+              <div className="container bg-neutral-400 w-full h-48 px-5 rounded">
+                ...
+              </div>
+              <p className="font-semibold text-2xl mt-3">
+                오프라인 행사
+                <br />
+                공간 찾기
+              </p>
+              <p className="flex justify-end text-sm mt-12 opacity-50">
+                더 알아보기
+              </p>
+            </div>
+            <div className="container px-8 py-8 border border-neutral-200 rounded shadow-lg">
+              <div className="container bg-neutral-400 w-full h-48 px-5 rounded">
+                ...
+              </div>
+              <p className="font-semibold text-2xl mt-3">
+                행사를 빛내줄
+                <br /> 협력사 찾기
+              </p>
+              <p className="flex justify-end text-sm mt-12 opacity-50">
+                더 알아보기
+              </p>
+            </div>
+          </div>
         </section>
         <section className="container mx-auto my-40">
           <div className=" max-w-full bg-muted py-36">
@@ -167,6 +205,17 @@ export default function PartnerPOC() {
         <section className="container mx-auto my-40">
           <div className=" max-w-full bg-muted ">hh</div>
         </section>
+        <div className="flex flex-col items-center justify-center gap-10 mb-40">
+          <span className="font-bold text-lg">Change Our Lives</span>
+          <h2 className="text-4xl font-extrabold text-center">
+            우리는 함께 즐길 수 있는
+            <br />
+            문화를 만듭니다.
+          </h2>
+          <button className=" px-8 py-2 rounded-full bg-black font-semibold text-white">
+            POC 문의하기
+          </button>
+        </div>
       </div>
     </main>
   );
