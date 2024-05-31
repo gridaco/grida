@@ -52,18 +52,11 @@ export async function GET(
   }
   // #endregion
 
-  const meta = {
-    useragent: req.headers.get("user-agent"),
-    ip:
-      req.ip ||
-      req.headers.get("x-real-ip") ||
-      req.headers.get("x-forwarded-for"),
-    geo: req.geo,
-    referer: req.headers.get("referer"),
-    browser: req.headers.get("sec-ch-ua"),
-  };
-
-  return submit({ data: req.nextUrl.searchParams as any, form_id, meta });
+  return submit({
+    data: req.nextUrl.searchParams as any,
+    form_id,
+    meta: meta(req),
+  });
 }
 
 export async function POST(
@@ -87,6 +80,18 @@ export async function POST(
   }
   // #endregion
 
+  return submit({ data, form_id, meta: meta(req) });
+}
+
+function meta(req: NextRequest) {
+  console.log("ip", {
+    ip: req.ip,
+    "x-real-ip": req.headers.get("x-real-ip"),
+    "x-forwarded-for": req.headers.get("x-forwarded-for"),
+  });
+
+  console.log("geo", req.geo);
+
   const meta = {
     useragent: req.headers.get("user-agent"),
     ip:
@@ -98,7 +103,7 @@ export async function POST(
     browser: req.headers.get("sec-ch-ua"),
   };
 
-  return submit({ data, form_id, meta });
+  return meta;
 }
 
 async function submit({
@@ -111,7 +116,7 @@ async function submit({
   meta: {
     useragent: string | null;
     ip: string | null;
-    geo: any;
+    geo: Geo | null | {} | undefined;
     referer: string | null;
     browser: string | null;
   };
@@ -170,7 +175,7 @@ async function submit({
   console.log("submit", meta);
 
   // pre meta processing
-  let ipinfo_data: any = null;
+  let ipinfo_data: IpInfo | null = null;
   if (meta.ip && isObjectEmpty(meta.geo)) {
     try {
       ipinfo_data = await ipinfo(meta.ip, process.env.IPINFO_ACCESS_TOKEN);
@@ -464,8 +469,12 @@ async function submit({
         customer_id: customer?.uid,
         x_referer: meta.referer,
         x_useragent: meta.useragent,
-        x_ipinfo: ipinfo_data,
-        geo: isObjectEmpty(meta.geo) ? undefined : meta.geo,
+        x_ipinfo: ipinfo_data as {},
+        geo: isObjectEmpty(meta.geo)
+          ? ipinfo_data
+            ? ipinfogeo(ipinfo_data)
+            : undefined
+          : (meta.geo as {}),
         platform_powered_by: "web_client",
       })
       .select("id")
@@ -639,8 +648,9 @@ const val = (v?: string | null) => {
   else return null;
 };
 
-function isObjectEmpty(obj: object) {
+function isObjectEmpty(obj: object | null | undefined) {
   try {
+    // @ts-ignore
     return Object.keys(obj).length === 0;
   } catch (e) {
     return true;
