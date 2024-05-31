@@ -22,7 +22,8 @@ import assert from "assert";
 import { GridaCommerceClient } from "@/services/commerce";
 import { SubmissionHooks } from "./hooks";
 import { Features } from "@/lib/features/scheduling";
-import { ipinfo } from "@/lib/ipinfo";
+import { IpInfo, ipinfo } from "@/lib/ipinfo";
+import { Geo } from "@/types";
 
 const HOST = process.env.HOST || "http://localhost:3000";
 
@@ -644,4 +645,24 @@ function isObjectEmpty(obj: object) {
   } catch (e) {
     return true;
   }
+}
+
+function ipinfogeo(ipinfo: IpInfo): Geo | null {
+  if (!ipinfo) return null;
+  if (ipinfo.loc) {
+    const [lat, long] = ipinfo.loc.split(",");
+    return {
+      city: ipinfo.city,
+      country: ipinfo.country,
+      region: ipinfo.region,
+      latitude: lat,
+      longitude: long,
+    };
+  }
+
+  return {
+    city: ipinfo.city,
+    country: ipinfo.country,
+    region: ipinfo.region,
+  };
 }

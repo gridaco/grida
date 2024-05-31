@@ -1,3 +1,4 @@
+import { IpInfo } from "@/lib/ipinfo";
 import type { JSONBooleanValueDescriptor } from "./logic";
 
 type UUID = string;
@@ -251,6 +252,8 @@ export interface FormResponse {
   updated_at: string;
   x_referer: string | null;
   x_useragent: string | null;
+  x_ipinfo: IpInfo | null;
+  geo: Geo | null;
   fields?: FormResponseField[];
 }
 
@@ -294,4 +297,12 @@ export interface EndingPageI18nOverrides {
   $schema: "https://forms.grida.co/schemas/v1/endingpage.json";
   template_id: EndingPageTemplateID;
   overrides: Record<string, string>;
+}
+
+export interface Geo {
+  city?: string | undefined;
+  country?: string | undefined;
+  region?: string | undefined;
+  latitude?: string | undefined;
+  longitude?: string | undefined;
 }

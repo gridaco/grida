@@ -145,7 +145,8 @@ function RangeSelect({
     </Select>
   );
 }
-function serialize<T extends Record<string, any>>(
+
+export function serialize<T extends Record<string, any>>(
   data: Array<T>,
   {
     from,
@@ -186,7 +187,7 @@ function serialize<T extends Record<string, any>>(
   return formattedData;
 }
 
-function fmtnum(num: number) {
+export function fmtnum(num: number) {
   return num.toString().replace(/(\d)(?=(\d{3})+(?!\d))/g, "$1,");
 }
 
