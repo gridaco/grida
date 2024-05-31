@@ -17,6 +17,9 @@ import {
   SelectContent,
   SelectItem,
 } from "@/components/ui/select";
+import { serialize } from "../charts/serialize";
+
+const DAY_MS = 24 * 60 * 60 * 1000;
 
 interface LineChartData {
   date: Date;
@@ -145,47 +148,6 @@ function RangeSelect({
   );
 }
 
-export function serialize<T extends Record<string, any>>(
-  data: Array<T>,
-  {
-    from,
-    to,
-    dateKey,
-  }: {
-    from: Date;
-    to: Date;
-    dateKey: keyof T;
-  }
-) {
-  // Step 1: Create a map for the new data with the provided dates range
-  const dateMap: Record<string, number> = {};
-  let currentDate = new Date(from);
-  while (currentDate <= to) {
-    const dateString = currentDate.toLocaleDateString();
-    dateMap[dateString] = 0;
-    currentDate.setDate(currentDate.getDate() + 1); // Move to the next day
-  }
-
-  // Step 2: Populate the map with actual data
-  data.forEach((item) => {
-    const dateValue = item[dateKey];
-    if (typeof dateValue === "string" || (dateValue as any) instanceof Date) {
-      const date = new Date(dateValue).toLocaleDateString();
-      if (dateMap[date] !== undefined) {
-        dateMap[date]++;
-      }
-    }
-  });
-
-  // Step 3: Format the data for output
-  const formattedData = Object.entries(dateMap).map(([date, count]) => ({
-    date: new Date(date),
-    count,
-  }));
-
-  return formattedData;
-}
-
 export function fmtnum(num: number) {
   return num.toString().replace(/(\d)(?=(\d{3})+(?!\d))/g, "$1,");
 }
@@ -225,6 +187,7 @@ export function Customers({
             from,
             to,
             dateKey: "created_at",
+            intervalMs: DAY_MS,
           })
         );
       }
@@ -296,6 +259,7 @@ export function Responses({
             from,
             to,
             dateKey: "created_at",
+            intervalMs: DAY_MS,
           })
         );
       }

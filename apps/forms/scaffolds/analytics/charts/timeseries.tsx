@@ -10,6 +10,7 @@ import {
   Tooltip,
   DataProvider,
 } from "@visx/xychart";
+import { useDarkMode } from "usehooks-ts";
 
 interface TimeSeriesChartData {
   date: Date;
@@ -21,13 +22,17 @@ interface TimeSeriesChartProps {
   chartType: "line" | "bar";
   height?: number;
   margin?: { top: number; right: number; bottom: number; left: number };
+  datefmt?: (date: Date) => string;
 }
 
 const TimeSeriesChart: React.FC<TimeSeriesChartProps> = ({
   data,
   chartType,
+  datefmt = (date) => date.toLocaleDateString(),
   margin = { top: 16, right: 16, bottom: 40, left: 40 },
 }) => {
+  const { isDarkMode } = useDarkMode();
+
   if (data.length === 0) return null;
 
   const accessors = {
@@ -51,6 +56,7 @@ const TimeSeriesChart: React.FC<TimeSeriesChartProps> = ({
             ) : (
               <AnimatedBarSeries
                 dataKey="BarChart"
+                colorAccessor={() => (isDarkMode ? "white" : "black")}
                 data={data}
                 {...accessors}
               />
@@ -84,6 +90,7 @@ const TimeSeriesChart: React.FC<TimeSeriesChartProps> = ({
               })}
             />
             <Tooltip
+              zIndex={10}
               showVerticalCrosshair
               verticalCrosshairStyle={{
                 strokeDasharray: "2 2",
@@ -102,9 +109,11 @@ const TimeSeriesChart: React.FC<TimeSeriesChartProps> = ({
                 <div>
                   <span>
                     <small>
-                      {accessors
-                        .xAccessor(tooltipData?.nearestDatum?.datum as any)
-                        .toLocaleDateString()}
+                      {datefmt(
+                        accessors.xAccessor(
+                          tooltipData?.nearestDatum?.datum as any
+                        )
+                      )}
                     </small>{" "}
                     <strong>
                       {accessors.yAccessor(

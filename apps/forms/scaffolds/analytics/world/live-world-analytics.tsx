@@ -1,6 +1,6 @@
 "use client";
 
-import { fmtnum, serialize } from "@/scaffolds/analytics/stats";
+import { fmtnum } from "@/scaffolds/analytics/stats";
 import { FormResponsesProvider, useEditorState } from "@/scaffolds/editor";
 import { MapGL } from "@/theme/templates/formstart/default/mapgl";
 import React, { useEffect, useMemo, useState } from "react";
@@ -13,6 +13,8 @@ import type { FeatureCollection } from "geojson";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import TimeSeriesChart from "@/scaffolds/analytics/charts/timeseries";
 import { useUxInitialTransform, useUxMapFocus } from "./use-ux-map-focus";
+import { serialize } from "../charts/serialize";
+import { format } from "date-fns";
 
 const layerstyles: { light: CircleLayer; dark: CircleLayer } = {
   light: {
@@ -126,16 +128,14 @@ function View() {
   }, [state.responses, debounceFlyTo]);
 
   const chartdata = useMemo(() => {
-    return serializeMs(state.responses || [], {
+    return serialize(state.responses || [], {
       dateKey: "created_at",
-      // last 30 minutes
-      from: new Date(new Date().getTime() - 30 * 60 * 1000),
+      // last 15 minutes
+      from: new Date(new Date().getTime() - 15 * 60 * 1000),
       to: new Date(),
-      intervalMs: 60 * 1000,
+      intervalMs: 15 * 1000, // 15 seconds
     });
   }, [state.responses]);
-
-  console.log(recent, chartdata);
 
   return (
     <main className="relative p-4 h-full">
@@ -156,8 +156,7 @@ function View() {
           </MapGL>
         </div>
       </div>
-      <div className="relative grid grid-cols-2 lg:grid-cols-4 gap-4 mt-4 z-10">
-        {/* @ts-ignore */}
+      <div className="relative grid grid-cols-2 lg:grid-cols-4 gap-4 mt-4 z-0">
         <Responses data={chartdata} />
       </div>
     </main>
@@ -176,56 +175,12 @@ function Responses({ data }: { data: { count: number; date: Date }[] }) {
         </div>
       </CardHeader>
       <CardContent className="p-0 h-40 w-full">
-        <TimeSeriesChart data={data} chartType="bar" />
+        <TimeSeriesChart
+          data={data}
+          chartType="bar"
+          datefmt={(date) => format(date, "HH:mm:ss.SSS")}
+        />
       </CardContent>
     </Card>
   );
-}
-
-export function serializeMs<T extends Record<string, any>>(
-  data: Array<T>,
-  {
-    from,
-    to,
-    dateKey,
-    intervalMs,
-  }: {
-    from: Date;
-    to: Date;
-    dateKey: keyof T;
-    intervalMs: number;
-  }
-) {
-  // Step 1: Create a map for the new data with the provided dates range
-  const dateMap: Record<string, number> = {};
-  let currentDate = new Date(from.getTime());
-  while (currentDate <= to) {
-    const dateString = new Date(
-      Math.floor(currentDate.getTime() / intervalMs) * intervalMs
-    ).toISOString();
-    dateMap[dateString] = 0;
-    currentDate = new Date(currentDate.getTime() + intervalMs); // Move to the next interval
-  }
-
-  // Step 2: Populate the map with actual data
-  data.forEach((item) => {
-    const dateValue = item[dateKey];
-    if (typeof dateValue === "string" || (dateValue as any) instanceof Date) {
-      const date = new Date(dateValue).toISOString();
-      const roundedDate = new Date(
-        Math.floor(new Date(date).getTime() / intervalMs) * intervalMs
-      ).toISOString();
-      if (dateMap[roundedDate] !== undefined) {
-        dateMap[roundedDate]++;
-      }
-    }
-  });
-
-  // Step 3: Format the data for output
-  const formattedData = Object.entries(dateMap).map(([date, count]) => ({
-    date,
-    count,
-  }));
-
-  return formattedData;
 }
