@@ -51,18 +51,11 @@ export async function GET(
   }
   // #endregion
 
-  const meta = {
-    useragent: req.headers.get("user-agent"),
-    ip:
-      req.ip ||
-      req.headers.get("x-real-ip") ||
-      req.headers.get("x-forwarded-for"),
-    geo: req.geo,
-    referer: req.headers.get("referer"),
-    browser: req.headers.get("sec-ch-ua"),
-  };
-
-  return submit({ data: req.nextUrl.searchParams as any, form_id, meta });
+  return submit({
+    data: req.nextUrl.searchParams as any,
+    form_id,
+    meta: meta(req),
+  });
 }
 
 export async function POST(
@@ -86,6 +79,18 @@ export async function POST(
   }
   // #endregion
 
+  return submit({ data, form_id, meta: meta(req) });
+}
+
+function meta(req: NextRequest) {
+  console.log("ip", {
+    ip: req.ip,
+    "x-real-ip": req.headers.get("x-real-ip"),
+    "x-forwarded-for": req.headers.get("x-forwarded-for"),
+  });
+
+  console.log("geo", req.geo);
+
   const meta = {
     useragent: req.headers.get("user-agent"),
     ip:
@@ -97,7 +102,7 @@ export async function POST(
     browser: req.headers.get("sec-ch-ua"),
   };
 
-  return submit({ data, form_id, meta });
+  return meta;
 }
 
 async function submit({
@@ -644,4 +649,12 @@ function isObjectEmpty(obj: object) {
   } catch (e) {
     return true;
   }
+}
+
+interface Geo {
+  city?: string | undefined;
+  country?: string | undefined;
+  region?: string | undefined;
+  latitude?: string | undefined;
+  longitude?: string | undefined;
 }
