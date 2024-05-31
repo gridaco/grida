@@ -85,7 +85,7 @@ export function InitialResponsesProvider({
       (data) => {
         dispatch({
           type: "editor/response/feed",
-          data: data,
+          data: data as any,
           reset: true,
         });
       }
@@ -110,7 +110,7 @@ export function InitialResponsesProvider({
       (data) => {
         dispatch({
           type: "editor/response/feed",
-          data: data,
+          data: data as any,
           reset: true,
         });
       }
@@ -181,7 +181,7 @@ export function FormResponsesProvider({
                 console.log("new response", data);
                 dispatch({
                   type: "editor/response/feed",
-                  data: [data],
+                  data: [data as any],
                 });
               });
 

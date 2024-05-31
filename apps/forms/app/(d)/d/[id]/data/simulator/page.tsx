@@ -435,7 +435,7 @@ function StartedAndCounting({
     if (isEnded) {
       pause();
     }
-  }, [isEnded]);
+  }, [isEnded, pause]);
 
   return (
     <Card>
