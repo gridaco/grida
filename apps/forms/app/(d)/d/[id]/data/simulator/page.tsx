@@ -137,11 +137,26 @@ function TaskHandler({
   }, [isRunning]);
 
   return (
-    <div className="relative h-full flex flex-col">
-      <div className="fixed z-10">
+    <div className="relative h-full flex flex-col pb-20">
+      <div className="fixed z-10 flex gap-10">
         <StartedAndCounting onRunningChange={setIsRunning} />
+        <Card>
+          <CardHeader>
+            <h2>Responses</h2>
+            <small className="text-muted-foreground">
+              Responses from the simulation
+            </small>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center justify-between">
+              <span>
+                <strong>Total:</strong> {responses.length}
+              </span>
+            </div>
+          </CardContent>
+        </Card>
       </div>
-      <div className="mt-40 mb-10 grow">
+      <div className="mt-40 grow">
         <Table className="h-full">
           <TableHeader>
             <TableRow>

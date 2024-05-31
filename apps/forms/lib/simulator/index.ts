@@ -1,3 +1,12 @@
+import {
+  SYSTEM_GF_CUSTOMER_UUID_KEY,
+  SYSTEM_GF_GEO_CITY_KEY,
+  SYSTEM_GF_GEO_COUNTRY_KEY,
+  SYSTEM_GF_GEO_LATITUDE_KEY,
+  SYSTEM_GF_GEO_LONGITUDE_KEY,
+  SYSTEM_GF_GEO_REGION_KEY,
+} from "@/k/system";
+import { faker } from "@faker-js/faker";
 import { nanoid } from "nanoid";
 
 export interface SimulationPlan {
@@ -92,6 +101,14 @@ export class Simulator {
   private generateFormData() {
     // Generate random form data
     return {
+      [SYSTEM_GF_CUSTOMER_UUID_KEY]: faker.string.uuid(),
+      [SYSTEM_GF_GEO_CITY_KEY]: faker.location.city(),
+      [SYSTEM_GF_GEO_LATITUDE_KEY]: faker.location.latitude(),
+      [SYSTEM_GF_GEO_LONGITUDE_KEY]: faker.location.longitude(),
+      [SYSTEM_GF_GEO_REGION_KEY]: faker.location.state(),
+      [SYSTEM_GF_GEO_COUNTRY_KEY]: faker.location.country(),
+
+      // TODO: use faker to generate random data based on form schema
       // Add your form data structure here
     };
   }

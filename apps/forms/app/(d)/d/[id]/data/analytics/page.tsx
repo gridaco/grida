@@ -158,14 +158,14 @@ function View() {
   }, [state.responses]);
 
   const chartdata = useMemo(() => {
-    return serializeMs(recent, {
-      dateKey: "at",
+    return serializeMs(state.responses || [], {
+      dateKey: "created_at",
       // last 30 minutes
       from: new Date(new Date().getTime() - 30 * 60 * 1000),
       to: new Date(),
       intervalMs: 60 * 1000 * 30,
     });
-  }, [recent]);
+  }, [state.responses]);
 
   console.log(recent, chartdata);
 
