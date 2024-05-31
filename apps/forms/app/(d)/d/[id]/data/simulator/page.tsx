@@ -1,0 +1,357 @@
+"use client";
+
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Slider } from "@/components/ui/slider";
+import { SimulationPlan, Simulator } from "@/lib/simulator";
+import { useEffect, useMemo, useState } from "react";
+import toast from "react-hot-toast";
+import { useStopwatch, useTimer } from "react-timer-hook";
+
+type SimulatorStatus = "none" | "idle" | "running" | "paused";
+
+export default function SimulatorPage({
+  params,
+}: {
+  params: {
+    id: string;
+  };
+}) {
+  const form_id = params.id;
+  const [status, setStatus] = useState<SimulatorStatus>("none");
+  const [startsAt, setStartsAt] = useState<Date | null>(null);
+  const [plan, setPlan] = useState<SimulationPlan | null>(null);
+
+  return (
+    <main className="p-10 font-mono">
+      <Dialog open={status === "none"}>
+        <DialogContent>
+          <SimulationPlanner
+            onStartQueued={(plan) => {
+              setPlan(plan);
+              setStatus("idle");
+              setStartsAt(new Date(Date.now() + 10000));
+              setTimeout(() => {
+                const width = 1280;
+                const height = 720;
+                const left = screen.width - width - 20; // 20 pixels margin from the right edge
+                const top = screen.height - height - 50; // 50 pixels margin from the bottom edge
+
+                window.open(
+                  "./analytics",
+                  "_blank",
+                  `width=${width},height=${height},left=${left},top=${top}`
+                );
+              }, 200);
+            }}
+          />
+        </DialogContent>
+      </Dialog>
+      {status === "idle" && (
+        <WillStartSoon
+          at={startsAt!}
+          onExpire={() => {
+            if (status === "idle") {
+              setStatus("running");
+              toast.success("Simulation started");
+            }
+          }}
+        />
+      )}
+      {status === "running" && <TaskHandler form_id={form_id} plan={plan!} />}
+    </main>
+  );
+}
+
+function TaskHandler({
+  form_id,
+  plan,
+}: {
+  form_id: string;
+  plan: SimulationPlan;
+}) {
+  const simulator = useMemo(
+    () => new Simulator(form_id, plan),
+    [form_id, plan]
+  );
+  const [isRunning, setIsRunning] = useState(false);
+  const [responses, setResponses] = useState<any[]>([]);
+
+  useEffect(() => {
+    const handleNewResponse = (newResponse: any) => {
+      setResponses((prevResponses) => [...prevResponses, newResponse]);
+    };
+
+    simulator.onResponse(handleNewResponse); // Assuming you add an onResponse method to handle new responses
+
+    simulator.start();
+    setIsRunning(true);
+
+    return () => {
+      simulator.pause();
+      simulator.offResponse(handleNewResponse); // Clean up the listener
+    };
+  }, [simulator]);
+
+  useEffect(() => {
+    if (!isRunning) {
+      simulator.pause();
+    } else {
+      simulator.resume();
+    }
+  }, [isRunning]);
+
+  return (
+    <div>
+      <StartedAndCounting onRunningChange={setIsRunning} />
+      <div>
+        {/* display simulated responses */}
+        <div>
+          {responses.map((response, index) => (
+            <div key={index}>
+              <pre>{JSON.stringify(response, null, 2)}</pre>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function SimulationPlanner({
+  onStartQueued,
+}: {
+  onStartQueued?: (plan: SimulationPlan) => void;
+}) {
+  const [n, setN] = useState(100);
+  const [maxq, setMaxQ] = useState(10);
+  const [delay, setDelay] = useState(1000);
+  const [randomness, setRandomness] = useState(0.5);
+
+  return (
+    <div className="max-w-xl flex flex-col gap-8">
+      <header>
+        <h1 className="text-xl font-bold">New Simulation</h1>
+        <small className="text-muted-foreground">
+          This is a simulator to simulate the form submission. This is useful
+          for testing purposes.{" "}
+          <i>Note: Closing this page will stop the simulation.</i>
+        </small>
+      </header>
+      <hr className="my-4" />
+      <div className="grid gap-4">
+        <Label htmlFor="n">Number of Bots</Label>
+        <Input
+          id="n"
+          min={1}
+          max={1000}
+          type="number"
+          placeholder="100"
+          value={n}
+          onChange={(e) => setN(Number(e.target.value))}
+        />
+      </div>
+      <div className="grid gap-4">
+        <Label htmlFor="maxq">
+          Max Q{" "}
+          <small className="text-muted-foreground">
+            (max number of concurrent submissions)
+          </small>
+        </Label>
+        <Slider
+          id="maxq"
+          min={1}
+          step={1}
+          max={100}
+          value={[maxq]}
+          onValueChange={(v) => setMaxQ(v[0])}
+        />
+        <small>{maxq}</small>
+      </div>
+      <div className="grid gap-4">
+        <Label htmlFor="delay">
+          Delay in Millisecond{" "}
+          <small className="text-muted-foreground">(1s = 1,000ms)</small>
+        </Label>
+        <Slider
+          id="delay"
+          min={0}
+          max={10000}
+          value={[delay]}
+          onValueChange={(v) => setDelay(v[0])}
+        />
+        <small>{delay}ms</small>
+      </div>
+      <div className="grid gap-4">
+        <Label htmlFor="randomness">
+          Random Coefficient{" "}
+          <small className="text-muted-foreground">
+            (randomness across simulation)
+          </small>
+        </Label>
+        <Slider
+          id="randomness"
+          min={0}
+          max={1}
+          step={0.01}
+          value={[randomness]}
+          onValueChange={(v) => setRandomness(v[0])}
+        />
+        <small>{randomness}</small>
+      </div>
+      <Dialog>
+        <DialogTrigger asChild>
+          <Button variant={"secondary"}>Start Simulation</Button>
+        </DialogTrigger>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>About This Simulation</DialogTitle>
+            <DialogDescription>
+              <strong>Note:</strong> Starting simulation <u>WILL INSERT</u>{" "}
+              actual data.
+              <br />
+              <br />
+              bots will act as humans and submit the form. Existing data will
+              not be affected, although global attributes such as Inventory,
+              etc. will be affected.
+              <br />
+              <br />
+              This is only recommended for testing purposes and before going
+              production.
+            </DialogDescription>
+          </DialogHeader>
+          <div></div>
+          <DialogFooter>
+            <DialogClose asChild>
+              <Button variant="secondary">Cancel</Button>
+            </DialogClose>
+            <DialogClose asChild>
+              <Button
+                variant={"destructive"}
+                onClick={() => {
+                  onStartQueued?.({
+                    n,
+                    delaybetween: delay,
+                    queue: maxq,
+                    randomness,
+                  });
+                }}
+              >
+                Understood, Start Simulation
+              </Button>
+            </DialogClose>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
+function WillStartSoon({ at, onExpire }: { at: Date; onExpire?: () => void }) {
+  const {
+    seconds,
+    minutes,
+    hours,
+    days,
+    isRunning,
+    start,
+    pause,
+    resume,
+    restart,
+  } = useTimer({
+    // +10 seconds
+    expiryTimestamp: at,
+    onExpire,
+  });
+
+  return (
+    <Card>
+      <CardHeader>
+        <h2>Simulation will start in</h2>
+      </CardHeader>
+      <CardContent>
+        <div className="flex gap-2 items-center">
+          <div className="text-4xl font-bold">
+            {days}d {hours}h {minutes}m {seconds}s
+          </div>
+          <div className="ms-10">
+            {isRunning ? (
+              <Button
+                variant="destructive"
+                onClick={() => {
+                  pause();
+                  toast.success("Simulation aborted");
+                }}
+              >
+                Abort
+              </Button>
+            ) : (
+              <Button
+                variant="secondary"
+                onClick={() => {
+                  restart(new Date(Date.now() + 10000));
+                  toast.success("Simulation restarted");
+                }}
+              >
+                Restart
+              </Button>
+            )}
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function StartedAndCounting({
+  onRunningChange,
+}: {
+  onRunningChange?: (running: boolean) => void;
+}) {
+  const { seconds, minutes, hours, days, isRunning, start, pause } =
+    useStopwatch({
+      autoStart: true,
+    });
+
+  useEffect(() => {
+    onRunningChange?.(isRunning);
+  }, [isRunning, onRunningChange]);
+
+  return (
+    <Card>
+      <CardHeader>
+        <h2>Simulation is Running</h2>
+      </CardHeader>
+      <CardContent>
+        <div className="flex gap-2 items-center">
+          <div className="text-4xl font-bold">
+            {days}d {hours}h {minutes}m {seconds}s
+          </div>
+          <div className="ms-10">
+            {isRunning ? (
+              <Button variant="secondary" onClick={pause}>
+                Pause
+              </Button>
+            ) : (
+              <Button variant="secondary" onClick={start}>
+                Resume
+              </Button>
+            )}
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}

@@ -57,7 +57,7 @@ export function PreviewButton({ form_id }: { form_id: string }) {
               Configure Agent
             </DropdownMenuItem>
           </Link>
-          <Link href={`/d/${form_id}/simulator`}>
+          <Link href={`/d/${form_id}/data/simulator`}>
             <DropdownMenuItem>
               <CommitIcon className="me-2 align-middle" />
               Simulator

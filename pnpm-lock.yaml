@@ -457,6 +457,9 @@ importers:
       react-textarea-autosize:
         specifier: ^8.5.3
         version: 8.5.3(@types/react@18.2.58)(react@18.3.1)
+      react-timer-hook:
+        specifier: ^3.0.7
+        version: 3.0.7(react@18.3.1)
       resend:
         specifier: ^3.2.0
         version: 3.2.0
@@ -36300,6 +36303,14 @@ packages:
       use-latest: 1.2.1(@types/react@18.2.58)(react@18.3.1)
     transitivePeerDependencies:
       - '@types/react'
+    dev: false
+
+  /react-timer-hook@3.0.7(react@18.3.1):
+    resolution: {integrity: sha512-ATpNcU+PQRxxfNBPVqce2+REtjGAlwmfoNQfcEBMZFxPj0r3GYdKhyPHdStvqrejejEi0QvqaJZjy2lBlFvAsA==}
+    peerDependencies:
+      react: ^18.2.0
+    dependencies:
+      react: 18.3.1
     dev: false
 
   /react-transition-group@4.4.5(react-dom@18.3.1)(react@18.3.1):

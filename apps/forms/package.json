@@ -99,6 +99,7 @@
     "react-pdf": "^7.7.1",
     "react-player": "^2.14.1",
     "react-textarea-autosize": "^8.5.3",
+    "react-timer-hook": "^3.0.7",
     "resend": "^3.2.0",
     "signature_pad": "^4.2.0",
     "swr": "^2.2.5",
