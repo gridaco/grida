@@ -70,7 +70,6 @@ export function ProjectStats({ project_id }: { project_id: number }) {
   return (
     <div>
       <header>
-        <h1 className="text-2xl font-semibold">Your Overview</h1>
         <div className="mt-4 w-min">
           <RangeSelect
             value={range}
