@@ -1,3 +1,5 @@
+import { nanoid } from "nanoid";
+
 export interface SimulationPlan {
   n: number; // Number of bots
   delaybetween: number; // Delay between submissions in ms
@@ -5,17 +7,24 @@ export interface SimulationPlan {
   randomness: number; // Random coefficient for submission timing
 }
 
-type ResponseCallback = (response: any) => void;
+type ResponseCallback = (id: string, response: SimulatorSubmission) => void;
+
+export interface SimulatorSubmission<T = any> {
+  _id: string;
+  status?: 200 | 400 | 500 | (number | {});
+  data?: T;
+}
 
 export class Simulator {
-  readonly responses: any[] = [];
+  readonly responses: SimulatorSubmission[] = [];
   private isPaused: boolean = false;
   private activeSubmissions: number = 0;
   private responseCallbacks: ResponseCallback[] = [];
 
   constructor(
     readonly form_id: string,
-    readonly plan: SimulationPlan
+    readonly plan: SimulationPlan,
+    readonly dryrun: boolean = false
   ) {}
 
   async start() {
@@ -59,9 +68,22 @@ export class Simulator {
   private async submitForm() {
     const data = this.generateFormData();
     try {
+      const _id = nanoid();
+      const request: SimulatorSubmission = {
+        _id,
+        status: undefined,
+        data: data,
+      };
+      this.responses.push(request);
+      // Notify initially
+      this.responseCallbacks.forEach((cb) => cb(_id, request));
+      if (this.dryrun) {
+        return;
+      }
       const response = await submit(this.form_id, data);
-      this.responses.push(response);
-      this.responseCallbacks.forEach((cb) => cb(response)); // Notify listeners of the new response
+      request.status = response.status;
+      // Notify after response
+      this.responseCallbacks.forEach((cb) => cb(_id, request));
     } catch (error) {
       console.error("Form submission failed", error);
     }

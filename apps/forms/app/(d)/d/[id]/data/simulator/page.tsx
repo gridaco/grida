@@ -15,7 +15,19 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
-import { SimulationPlan, Simulator } from "@/lib/simulator";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  SimulationPlan,
+  Simulator,
+  SimulatorSubmission,
+} from "@/lib/simulator";
 import { useEffect, useMemo, useState } from "react";
 import toast from "react-hot-toast";
 import { useStopwatch, useTimer } from "react-timer-hook";
@@ -35,7 +47,7 @@ export default function SimulatorPage({
   const [plan, setPlan] = useState<SimulationPlan | null>(null);
 
   return (
-    <main className="p-10 font-mono">
+    <main className="p-10 font-mono h-full">
       <Dialog open={status === "none"}>
         <DialogContent>
           <SimulationPlanner
@@ -46,8 +58,8 @@ export default function SimulatorPage({
               setTimeout(() => {
                 const width = 1280;
                 const height = 720;
-                const left = screen.width - width - 20; // 20 pixels margin from the right edge
-                const top = screen.height - height - 50; // 50 pixels margin from the bottom edge
+                const left = screen.width - width - 50;
+                const top = screen.height - height - 100;
 
                 window.open(
                   "./analytics",
@@ -74,6 +86,7 @@ export default function SimulatorPage({
     </main>
   );
 }
+import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 
 function TaskHandler({
   form_id,
@@ -87,11 +100,21 @@ function TaskHandler({
     [form_id, plan]
   );
   const [isRunning, setIsRunning] = useState(false);
-  const [responses, setResponses] = useState<any[]>([]);
+  const [responses, setResponses] = useState<SimulatorSubmission[]>([]);
 
   useEffect(() => {
-    const handleNewResponse = (newResponse: any) => {
-      setResponses((prevResponses) => [...prevResponses, newResponse]);
+    const handleNewResponse = (id: string, payload: SimulatorSubmission) => {
+      // push or update the response
+      const index = responses.findIndex((r) => r._id === id);
+      if (index >= 0) {
+        setResponses((prev) => {
+          const copy = [...prev];
+          copy[index] = payload;
+          return copy;
+        });
+      } else {
+        setResponses((prev) => [...prev, payload]);
+      }
     };
 
     simulator.onResponse(handleNewResponse); // Assuming you add an onResponse method to handle new responses
@@ -114,19 +137,55 @@ function TaskHandler({
   }, [isRunning]);
 
   return (
-    <div>
-      <StartedAndCounting onRunningChange={setIsRunning} />
-      <div>
-        {/* display simulated responses */}
-        <div>
-          {responses.map((response, index) => (
-            <div key={index}>
-              <pre>{JSON.stringify(response, null, 2)}</pre>
-            </div>
-          ))}
-        </div>
+    <div className="relative h-full flex flex-col">
+      <div className="fixed z-10">
+        <StartedAndCounting onRunningChange={setIsRunning} />
+      </div>
+      <div className="mt-40 mb-10 grow">
+        <Table className="h-full">
+          <TableHeader>
+            <TableRow>
+              <TableHead>Status</TableHead>
+              <TableHead>ID</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody className="overflow-y-auto">
+            {responses.map((response, index) => (
+              <TableRow key={index}>
+                <TableCell>
+                  <StatusBadge status={response.status as number} />
+                </TableCell>
+                <TableCell>{response._id}</TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
       </div>
     </div>
+  );
+}
+
+const status_colors = {
+  0: "gray",
+  200: "green",
+  400: "yellow",
+  500: "red",
+};
+
+function StatusBadge({ status }: { status?: number }) {
+  return (
+    <span>
+      <div
+        style={{
+          display: "inline-block",
+          width: 10,
+          height: 10,
+          borderRadius: "50%",
+          backgroundColor: (status_colors as any)[status ?? 0],
+        }}
+      />
+      <span className="ms-2">{status === undefined ? "idle" : status}</span>
+    </span>
   );
 }
 
