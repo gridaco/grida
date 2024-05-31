@@ -11,7 +11,7 @@ import type { CircleLayer, MapRef } from "react-map-gl";
 import { Source, Layer } from "react-map-gl";
 import type { FeatureCollection } from "geojson";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import LineChart from "@/scaffolds/analytics/charts/basic-line-chart";
+import TimeSeriesChart from "@/scaffolds/analytics/charts/basic-line-chart";
 import { useUxInitialTransform, useUxMapFocus } from "./use-ux-map-focus";
 
 const layerstyles: { light: CircleLayer; dark: CircleLayer } = {
@@ -176,7 +176,7 @@ function Responses({ data }: { data: { count: number; date: Date }[] }) {
         </div>
       </CardHeader>
       <CardContent className="p-0 h-40 w-full">
-        <LineChart data={data} />
+        <TimeSeriesChart data={data} chartType="bar" />
       </CardContent>
     </Card>
   );

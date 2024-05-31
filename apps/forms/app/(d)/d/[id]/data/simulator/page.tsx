@@ -136,8 +136,6 @@ function TaskHandler({
     };
   }, [simulator]);
 
-  console.log("isEnded", isEnded);
-
   return (
     <div className="relative h-full flex flex-col pb-20">
       <div className="fixed z-10 flex gap-10">
