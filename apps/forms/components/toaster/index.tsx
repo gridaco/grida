@@ -22,5 +22,13 @@ export function ToasterWithMax({
 }) {
   useMaxToasts(max);
 
-  return <Toaster {...props} />;
+  return (
+    <Toaster
+      toastOptions={{
+        className:
+          "border text-sm bg-background dark:bg-background text-foreground dark:text-foreground",
+      }}
+      {...props}
+    />
+  );
 }
