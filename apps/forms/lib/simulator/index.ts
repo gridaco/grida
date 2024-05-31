@@ -10,16 +10,18 @@ import { faker } from "@faker-js/faker";
 import { nanoid } from "nanoid";
 
 export interface SimulationPlan {
-  n: number; // Number of bots
+  n: number; // Total number of submissions
   delaybetween: number; // Delay between submissions in ms
-  queue: number; // Max number of concurrent submissions
+  queue: number; // Base number of concurrent submissions per batch
   randomness: number; // Random coefficient for submission timing
 }
 
 type ResponseCallback = (id: string, response: SimulatorSubmission) => void;
+type EndCallback = () => void;
 
 export interface SimulatorSubmission<T = any> {
   _id: string;
+  resolvedAt?: Date;
   status?: 200 | 400 | 500 | (number | {});
   data?: T;
 }
@@ -27,8 +29,11 @@ export interface SimulatorSubmission<T = any> {
 export class Simulator {
   readonly responses: SimulatorSubmission[] = [];
   private isPaused: boolean = false;
+  private isEnded: boolean = false;
   private activeSubmissions: number = 0;
   private responseCallbacks: ResponseCallback[] = [];
+  private endCallback?: EndCallback;
+  private totalSubmitted: number = 0;
 
   constructor(
     readonly form_id: string,
@@ -37,19 +42,22 @@ export class Simulator {
   ) {}
 
   async start() {
-    for (let i = 0; i < this.plan.n; i++) {
-      if (this.isPaused) break;
-      while (this.activeSubmissions >= this.plan.queue) {
-        await this.sleep(100); // Wait for a slot in the queue
-      }
-      this.activeSubmissions++;
-      this.submitForm().then(() => {
-        this.activeSubmissions--;
-      });
-      const delay =
-        this.plan.delaybetween *
-        (1 + (Math.random() - 0.5) * this.plan.randomness);
-      await this.sleep(delay);
+    while (this.totalSubmitted < this.plan.n && !this.isPaused) {
+      const randomizedQueue = Math.floor(
+        this.plan.queue * (1 + (Math.random() - 0.5) * this.plan.randomness)
+      );
+      const batchCount = Math.min(
+        randomizedQueue,
+        this.plan.n - this.totalSubmitted
+      );
+      await this.submitBatch(batchCount);
+    }
+
+    // end
+    if (this.isEnded) return;
+    if (this.totalSubmitted >= this.plan.n) {
+      this.isEnded = true;
+      this.endCallback?.();
     }
   }
 
@@ -74,6 +82,24 @@ export class Simulator {
     );
   }
 
+  onEnd(callback: EndCallback) {
+    this.endCallback = callback;
+  }
+
+  private async submitBatch(batchCount: number) {
+    const promises = [];
+    for (let i = 0; i < batchCount; i++) {
+      if (this.isPaused) break;
+      promises.push(this.submitForm());
+      const delay =
+        this.plan.delaybetween *
+        (1 + (Math.random() - 0.5) * this.plan.randomness);
+      await this.sleep(delay);
+    }
+    await Promise.all(promises);
+    this.totalSubmitted += batchCount;
+  }
+
   private async submitForm() {
     const data = this.generateFormData();
     try {
@@ -91,6 +117,7 @@ export class Simulator {
       }
       const response = await submit(this.form_id, data);
       request.status = response.status;
+      request.resolvedAt = new Date();
       // Notify after response
       this.responseCallbacks.forEach((cb) => cb(_id, request));
     } catch (error) {

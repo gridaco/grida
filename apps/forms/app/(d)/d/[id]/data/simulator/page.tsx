@@ -28,11 +28,14 @@ import {
   Simulator,
   SimulatorSubmission,
 } from "@/lib/simulator";
+import { format } from "date-fns";
 import { useEffect, useMemo, useState } from "react";
 import toast from "react-hot-toast";
 import { useStopwatch, useTimer } from "react-timer-hook";
 
 type SimulatorStatus = "none" | "idle" | "running" | "paused";
+
+const START_COUNTDOWN = 5 * 1000;
 
 export default function SimulatorPage({
   params,
@@ -54,7 +57,7 @@ export default function SimulatorPage({
             onStartQueued={(plan) => {
               setPlan(plan);
               setStatus("idle");
-              setStartsAt(new Date(Date.now() + 10000));
+              setStartsAt(new Date(Date.now() + START_COUNTDOWN));
               setTimeout(() => {
                 const width = 1280;
                 const height = 720;
@@ -86,7 +89,6 @@ export default function SimulatorPage({
     </main>
   );
 }
-import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 
 function TaskHandler({
   form_id,
@@ -99,47 +101,56 @@ function TaskHandler({
     () => new Simulator(form_id, plan),
     [form_id, plan]
   );
-  const [isRunning, setIsRunning] = useState(false);
+
+  const [isEnded, setIsEnded] = useState(false);
   const [responses, setResponses] = useState<SimulatorSubmission[]>([]);
 
   useEffect(() => {
     const handleNewResponse = (id: string, payload: SimulatorSubmission) => {
-      // push or update the response
-      const index = responses.findIndex((r) => r._id === id);
-      if (index >= 0) {
-        setResponses((prev) => {
+      setResponses((prev) => {
+        const index = prev.findIndex((r) => r._id === id);
+        if (index >= 0) {
           const copy = [...prev];
           copy[index] = payload;
           return copy;
-        });
-      } else {
-        setResponses((prev) => [...prev, payload]);
-      }
+        } else {
+          return [...prev, payload];
+        }
+      });
     };
 
-    simulator.onResponse(handleNewResponse); // Assuming you add an onResponse method to handle new responses
+    simulator.onResponse(handleNewResponse);
+
+    simulator.onEnd(() => {
+      setIsEnded(true);
+      toast.success("Simulation ended", {
+        duration: 10000,
+      });
+    });
 
     simulator.start();
-    setIsRunning(true);
 
     return () => {
       simulator.pause();
-      simulator.offResponse(handleNewResponse); // Clean up the listener
+      simulator.offResponse(handleNewResponse);
     };
   }, [simulator]);
 
-  useEffect(() => {
-    if (!isRunning) {
-      simulator.pause();
-    } else {
-      simulator.resume();
-    }
-  }, [isRunning]);
+  console.log("isEnded", isEnded);
 
   return (
     <div className="relative h-full flex flex-col pb-20">
       <div className="fixed z-10 flex gap-10">
-        <StartedAndCounting onRunningChange={setIsRunning} />
+        <StartedAndCounting
+          isEnded={isEnded}
+          onRunningChange={(running) => {
+            if (!running) {
+              simulator.pause();
+            } else {
+              simulator.resume();
+            }
+          }}
+        />
         <Card>
           <CardHeader>
             <h2>Responses</h2>
@@ -162,6 +173,7 @@ function TaskHandler({
             <TableRow>
               <TableHead>Status</TableHead>
               <TableHead>ID</TableHead>
+              <TableHead>Resolved At</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody className="overflow-y-auto">
@@ -170,7 +182,16 @@ function TaskHandler({
                 <TableCell>
                   <StatusBadge status={response.status as number} />
                 </TableCell>
-                <TableCell>{response._id}</TableCell>
+                <TableCell>
+                  <small className="text-muted-foreground">
+                    {response._id}
+                  </small>
+                </TableCell>
+                <TableCell>
+                  {response.resolvedAt
+                    ? format(response.resolvedAt, "HH:mm:ss.SSS")
+                    : ""}
+                </TableCell>
               </TableRow>
             ))}
           </TableBody>
@@ -187,6 +208,13 @@ const status_colors = {
   500: "red",
 };
 
+const status_texts = {
+  0: "idle",
+  200: "ok",
+  400: "bad",
+  500: "error",
+};
+
 function StatusBadge({ status }: { status?: number }) {
   return (
     <span>
@@ -199,7 +227,7 @@ function StatusBadge({ status }: { status?: number }) {
           backgroundColor: (status_colors as any)[status ?? 0],
         }}
       />
-      <span className="ms-2">{status === undefined ? "idle" : status}</span>
+      <span className="ms-2">{(status_texts as any)[status ?? 0]}</span>
     </span>
   );
 }
@@ -209,9 +237,9 @@ function SimulationPlanner({
 }: {
   onStartQueued?: (plan: SimulationPlan) => void;
 }) {
-  const [n, setN] = useState(100);
-  const [maxq, setMaxQ] = useState(10);
-  const [delay, setDelay] = useState(1000);
+  const [n, setN] = useState(50);
+  const [maxq, setMaxQ] = useState(5);
+  const [delay, setDelay] = useState(800);
   const [randomness, setRandomness] = useState(0.5);
 
   return (
@@ -390,8 +418,10 @@ function WillStartSoon({ at, onExpire }: { at: Date; onExpire?: () => void }) {
 }
 
 function StartedAndCounting({
+  isEnded,
   onRunningChange,
 }: {
+  isEnded?: boolean;
   onRunningChange?: (running: boolean) => void;
 }) {
   const { seconds, minutes, hours, days, isRunning, start, pause } =
@@ -403,10 +433,16 @@ function StartedAndCounting({
     onRunningChange?.(isRunning);
   }, [isRunning, onRunningChange]);
 
+  useEffect(() => {
+    if (isEnded) {
+      pause();
+    }
+  }, [isEnded]);
+
   return (
     <Card>
       <CardHeader>
-        <h2>Simulation is Running</h2>
+        {isEnded ? <h2>Simulation Ended</h2> : <h2>Simulation is Running</h2>}
       </CardHeader>
       <CardContent>
         <div className="flex gap-2 items-center">
@@ -414,14 +450,20 @@ function StartedAndCounting({
             {days}d {hours}h {minutes}m {seconds}s
           </div>
           <div className="ms-10">
-            {isRunning ? (
-              <Button variant="secondary" onClick={pause}>
-                Pause
-              </Button>
+            {isEnded ? (
+              <></>
             ) : (
-              <Button variant="secondary" onClick={start}>
-                Resume
-              </Button>
+              <>
+                {isRunning ? (
+                  <Button variant="secondary" onClick={pause}>
+                    Pause
+                  </Button>
+                ) : (
+                  <Button variant="secondary" onClick={start}>
+                    Resume
+                  </Button>
+                )}
+              </>
             )}
           </div>
         </div>
