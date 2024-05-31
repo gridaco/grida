@@ -5,7 +5,7 @@ import {
   createClientFormsClient,
   createClientWorkspaceClient,
 } from "@/lib/supabase/client";
-import TimeSeriesChart from "../charts/basic-line-chart";
+import TimeSeriesChart from "../charts/timeseries";
 import { GraphSkeleton, NumberSkeleton } from "../charts/skeleton";
 import { SupabaseClient } from "@supabase/supabase-js";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
