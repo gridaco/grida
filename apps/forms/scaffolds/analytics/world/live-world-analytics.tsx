@@ -93,7 +93,7 @@ function View() {
 
   const [state] = useEditorState();
   useUxInitialTransform(map, size);
-  const debounceFlyTo = useUxMapFocus(map, mapPadding);
+  const debounceFlyTo = useUxMapFocus(map, mapPadding, 1000);
 
   const geojson: FeatureCollection = useMemo(
     () => ({
@@ -131,7 +131,7 @@ function View() {
       // last 30 minutes
       from: new Date(new Date().getTime() - 30 * 60 * 1000),
       to: new Date(),
-      intervalMs: 60 * 1000 * 30,
+      intervalMs: 60 * 1000,
     });
   }, [state.responses]);
 

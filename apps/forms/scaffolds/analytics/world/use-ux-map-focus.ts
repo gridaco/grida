@@ -2,27 +2,42 @@ import { useEffect, useCallback, useRef } from "react";
 import type { MapRef } from "react-map-gl";
 import type { PaddingOptions } from "mapbox-gl";
 
-function useDebounce<T extends (...args: any[]) => void>(
+function useThrottledWithInitialTrigger<T extends (...args: any[]) => void>(
   callback: T,
-  delay: number
+  interval: number
 ): (...args: Parameters<T>) => void {
   const callbackRef = useRef(callback);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastCallTimeRef = useRef<number | null>(null);
 
   useEffect(() => {
     callbackRef.current = callback;
   }, [callback]);
 
-  const debounceCallback = useCallback(
+  const throttledCallback = useCallback(
     (...args: Parameters<T>) => {
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current);
-      }
-      timeoutRef.current = setTimeout(() => {
+      const now = Date.now();
+
+      if (
+        lastCallTimeRef.current === null ||
+        now - lastCallTimeRef.current >= interval
+      ) {
         callbackRef.current(...args);
-      }, delay);
+        lastCallTimeRef.current = now;
+      } else {
+        if (timeoutRef.current) {
+          clearTimeout(timeoutRef.current);
+        }
+        timeoutRef.current = setTimeout(
+          () => {
+            callbackRef.current(...args);
+            lastCallTimeRef.current = Date.now();
+          },
+          interval - (now - lastCallTimeRef.current)
+        );
+      }
     },
-    [delay]
+    [interval]
   );
 
   useEffect(() => {
@@ -33,25 +48,28 @@ function useDebounce<T extends (...args: any[]) => void>(
     };
   }, []);
 
-  return debounceCallback;
+  return throttledCallback;
 }
 
 export function useUxMapFocus(
   map: MapRef | undefined,
-  mapPadding: PaddingOptions
+  mapPadding: PaddingOptions,
+  interval: number = 300
 ) {
-  const debounceFlyTo = useDebounce((longitude: number, latitude: number) => {
-    if (map) {
-      map.flyTo({
-        padding: mapPadding,
-        center: [longitude, latitude],
-        zoom: 3,
-        maxDuration: 1500,
-      });
-    }
-  }, 300); // Adjust the delay as needed
+  const throttledFlyTo = useThrottledWithInitialTrigger(
+    (longitude: number, latitude: number) => {
+      if (map) {
+        map.flyTo({
+          padding: mapPadding,
+          center: [longitude, latitude],
+          zoom: 3,
+        });
+      }
+    },
+    interval
+  );
 
-  return debounceFlyTo;
+  return throttledFlyTo;
 }
 
 export function useUxInitialTransform(
