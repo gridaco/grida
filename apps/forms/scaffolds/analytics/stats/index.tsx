@@ -58,7 +58,7 @@ async function fetchResponses(
 ) {
   return await supabase
     .from("response")
-    .select("created_at, form:form_id( project_id )")
+    .select("created_at, form:form_id!inner( project_id )")
     .eq("form.project_id", q.project_id)
     .gte("created_at", q.from.toISOString())
     .lte("created_at", q.to.toISOString())
