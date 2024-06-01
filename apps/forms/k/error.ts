@@ -10,6 +10,12 @@ export const REQUIRED_HIDDEN_FIELD_NOT_USED = {
     "Hidden field is configured as required but not present in the form render blocks",
 } as const;
 
+export const UNKNOWN_FIELDS_NOT_ALLOWED = {
+  code: "UNKNOWN_FIELDS_NOT_ALLOWED",
+  message:
+    "To allow unknown fields, set 'unknown_field_handling_strategy' to 'ignore' or 'accept' in the form settings.",
+} as const;
+
 export const POSSIBLE_CUSTOMER_IDENTITY_FORGE = {
   code: "POSSIBLE_CUSTOMER_IDENTITY_FORGE",
   message: "Are you a hacker? - Possible customer identity forge detected",
@@ -40,6 +46,11 @@ export const FORM_CLOSED_WHILE_RESPONDING = {
   message: "Form closed while responding",
 } as const;
 
+export const FORM_SCHEDULE_NOT_IN_RANGE = {
+  code: "FORM_SCHEDULE_NOT_IN_RANGE",
+  message: "Form is not yet scheduled or already expired",
+} as const;
+
 export const FORM_FORCE_CLOSED = {
   code: "FORM_FORCE_CLOSED",
   message: "The form is force closed",
@@ -50,7 +61,7 @@ export const FORM_SOLD_OUT = {
   message: "The form is sold out",
 } as const;
 
-export const FORM_OPTION_SOLD_OUT = {
+export const FORM_OPTION_UNAVAILABLE = {
   code: "FORM_OPTION_UNAVAILABLE",
   message: "The form option is unavailable",
 } as const;

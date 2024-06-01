@@ -15,10 +15,7 @@ import { validate_max_access } from "@/services/form/validate-max-access";
 import { is_uuid_v4 } from "@/utils/is";
 import { NextRequest, NextResponse } from "next/server";
 import { formlink } from "@/lib/forms/url";
-import {
-  FORM_CLOSED_WHILE_RESPONDING,
-  MISSING_REQUIRED_HIDDEN_FIELDS,
-} from "@/k/error";
+import * as ERR from "@/k/error";
 import {
   FormFieldOptionsInventoryMap,
   form_field_options_inventory,
@@ -32,6 +29,7 @@ import { IpInfo, ipinfo } from "@/lib/ipinfo";
 import type { Geo, PlatformPoweredBy } from "@/types";
 import { PGXXError } from "@/k/errcode";
 import { qboolean, qval } from "@/utils/qs";
+import { notFound } from "next/navigation";
 
 const HOST = process.env.HOST || "http://localhost:3000";
 
@@ -198,7 +196,7 @@ async function submit({
     .single();
 
   if (!form_reference) {
-    return NextResponse.json({ error: "Form not found" }, { status: 404 });
+    return error(404, { form_id }, meta);
   }
 
   const {
@@ -233,17 +231,9 @@ async function submit({
   console.log("submit#meta", meta);
 
   // pre meta processing
-  let ipinfo_data: IpInfo | null = null;
-  if (meta.ip && isObjectEmpty(meta.geo)) {
-    try {
-      ipinfo_data = await ipinfo(meta.ip, process.env.IPINFO_ACCESS_TOKEN);
-      console.log("ipinfo", ipinfo_data);
-    } catch (e) {
-      console.error(e);
-    }
-  } else {
-    console.error("ip not found");
-  }
+  let ipinfo_data: IpInfo | null = isObjectEmpty(meta.geo)
+    ? await fetchipinfo(meta.ip)
+    : null;
 
   // customer handling
 
@@ -269,14 +259,7 @@ async function submit({
 
   // validation - check if form is force closed
   if (is_force_closed) {
-    return NextResponse.redirect(
-      formlink(HOST, form_id, "formclosed", {
-        oops: FORM_CLOSED_WHILE_RESPONDING.code,
-      }),
-      {
-        status: 301,
-      }
-    );
+    return error(ERR.FORM_CLOSED_WHILE_RESPONDING.code, { form_id }, meta);
   }
 
   const required_hidden_fields = fields.filter(
@@ -290,16 +273,14 @@ async function submit({
   });
 
   if (missing_required_hidden_fields.length > 0) {
-    console.error("error", MISSING_REQUIRED_HIDDEN_FIELDS);
-
-    // TODO: return json instead on devmode
-    return NextResponse.redirect(
-      formlink(HOST, form_id, "badrequest", {
-        error: MISSING_REQUIRED_HIDDEN_FIELDS.code,
-      }),
+    console.error("error", ERR.MISSING_REQUIRED_HIDDEN_FIELDS);
+    return error(
+      ERR.MISSING_REQUIRED_HIDDEN_FIELDS.code,
       {
-        status: 301,
-      }
+        form_id,
+        keys: missing_required_hidden_fields.filter(Boolean).map((f) => f.name),
+      },
+      meta
     );
   }
 
@@ -316,21 +297,9 @@ async function submit({
   if (max_access_error) {
     switch (max_access_error.code) {
       case "FORM_RESPONSE_LIMIT_BY_CUSTOMER_REACHED":
-        return NextResponse.redirect(
-          formlink(HOST, form_id, "alreadyresponded"),
-          {
-            status: 301,
-          }
-        );
-      case "FORM_RESPONSE_LIMIT_REACHED":
-        return NextResponse.redirect(
-          formlink(HOST, form_id, "formclosed", {
-            oops: FORM_CLOSED_WHILE_RESPONDING.code,
-          }),
-          {
-            status: 301,
-          }
-        );
+      case "FORM_RESPONSE_LIMIT_REACHED": {
+        return error(max_access_error.code, { form_id }, meta);
+      }
       default:
         return NextResponse.json(
           {
@@ -351,14 +320,7 @@ async function submit({
     });
 
     if (!isopen) {
-      return NextResponse.redirect(
-        formlink(HOST, form_id, "formclosed", {
-          oops: FORM_CLOSED_WHILE_RESPONDING.code,
-        }),
-        {
-          status: 301,
-        }
-      );
+      return error(ERR.FORM_SCHEDULE_NOT_IN_RANGE.code, { form_id }, meta);
     }
   }
 
@@ -413,20 +375,7 @@ async function submit({
     });
     if (inventory_access_error) {
       console.error(inventory_access_error);
-      switch (inventory_access_error.code) {
-        case "FORM_SOLD_OUT":
-          return NextResponse.redirect(formlink(HOST, form_id, "formsoldout"), {
-            status: 301,
-          });
-        case "FORM_OPTION_UNAVAILABLE": {
-          return NextResponse.redirect(
-            formlink(HOST, form_id, "formoptionsoldout"),
-            {
-              status: 301,
-            }
-          );
-        }
-      }
+      return error(inventory_access_error.code, { form_id }, meta);
     }
 
     if (selection_id) {
@@ -472,35 +421,20 @@ async function submit({
       // force close
       case PGXXError.XX211: {
         // form is force closed
-        return NextResponse.redirect(
-          formlink(HOST, form_id, "formclosed", {
-            oops: FORM_CLOSED_WHILE_RESPONDING.code,
-          }),
-          {
-            status: 301,
-          }
-        );
+        return error(ERR.FORM_FORCE_CLOSED.code, { form_id }, meta);
       }
       // max response (per form)
       case PGXXError.XX221: {
         // max response limit reached
-        return NextResponse.redirect(
-          formlink(HOST, form_id, "formclosed", {
-            oops: FORM_CLOSED_WHILE_RESPONDING.code,
-          }),
-          {
-            status: 301,
-          }
-        );
+        return error(ERR.FORM_RESPONSE_LIMIT_REACHED.code, { form_id }, meta);
       }
       // max response (per customer)
       case PGXXError.XX222: {
         // max response limit reached for this customer
-        return NextResponse.redirect(
-          formlink(HOST, form_id, "alreadyresponded"),
-          {
-            status: 301,
-          }
+        return error(
+          ERR.FORM_RESPONSE_LIMIT_BY_CUSTOMER_REACHED.code,
+          { form_id },
+          meta
         );
       }
       // scheduling
@@ -508,26 +442,12 @@ async function submit({
       case PGXXError.XX231: /* closed */
       case PGXXError.XX232 /* not open yet */: {
         // form is closed by scheduler
-        return NextResponse.redirect(
-          formlink(HOST, form_id, "formclosed", {
-            oops: FORM_CLOSED_WHILE_RESPONDING.code,
-          }),
-          {
-            status: 301,
-          }
-        );
+        return error(ERR.FORM_SCHEDULE_NOT_IN_RANGE.code, { form_id }, meta);
       }
       default: {
         // server error
         console.error("submit/err", 500);
-        return NextResponse.redirect(
-          formlink(HOST, form_id, "badrequest", {
-            error: response_insertion_error.code,
-          }),
-          {
-            status: 301,
-          }
-        );
+        return error(500, { form_id }, meta);
       }
     }
   }
@@ -566,18 +486,13 @@ async function submit({
     } else if (unknown_field_handling_strategy === "reject") {
       if (unknown_names.length > 0) {
         // reject all fields
-        return NextResponse.json(
+        return error(
+          ERR.UNKNOWN_FIELDS_NOT_ALLOWED.code,
           {
-            error: "Unknown fields are not allowed",
-            info: {
-              message:
-                "To allow unknown fields, set 'unknown_field_handling_strategy' to 'ignore' or 'accept' in the form settings.",
-              data: { keys: unknown_names },
-            },
+            form_id,
+            keys: unknown_names,
           },
-          {
-            status: 400,
-          }
+          meta
         );
       }
     }
@@ -747,6 +662,180 @@ async function submit({
   // endregion
 }
 
+function error(
+  code:
+    | 404
+    | 400
+    | 500
+    //
+    | typeof ERR.MISSING_REQUIRED_HIDDEN_FIELDS.code
+    | typeof ERR.UNKNOWN_FIELDS_NOT_ALLOWED.code
+    | typeof ERR.FORM_FORCE_CLOSED.code
+    | typeof ERR.FORM_CLOSED_WHILE_RESPONDING.code
+    | typeof ERR.FORM_RESPONSE_LIMIT_REACHED.code
+    | typeof ERR.FORM_RESPONSE_LIMIT_BY_CUSTOMER_REACHED.code
+    | typeof ERR.FORM_SOLD_OUT.code
+    | typeof ERR.FORM_OPTION_UNAVAILABLE.code
+    | typeof ERR.FORM_SCHEDULE_NOT_IN_RANGE.code,
+
+  data: {
+    form_id: string;
+    [key: string]: any;
+  },
+  meta: {
+    accept: "application/json" | "text/html";
+  }
+) {
+  const { form_id } = data;
+
+  const useredirect = meta.accept === "text/html";
+
+  if (useredirect) {
+    switch (code) {
+      case 404: {
+        return notFound();
+      }
+      case 400: {
+        return NextResponse.redirect(formlink(HOST, form_id, "badrequest"), {
+          status: 301,
+        });
+      }
+      case 500: {
+        return NextResponse.redirect(formlink(HOST, form_id, "badrequest"), {
+          status: 301,
+        });
+      }
+      case "MISSING_REQUIRED_HIDDEN_FIELDS": {
+        return NextResponse.redirect(
+          formlink(HOST, form_id, "badrequest", {
+            error: ERR.MISSING_REQUIRED_HIDDEN_FIELDS.code,
+          }),
+          {
+            status: 301,
+          }
+        );
+      }
+      case "UNKNOWN_FIELDS_NOT_ALLOWED": {
+        return NextResponse.redirect(
+          formlink(HOST, form_id, "badrequest", {
+            error: ERR.UNKNOWN_FIELDS_NOT_ALLOWED.code,
+          }),
+          {
+            status: 301,
+          }
+        );
+      }
+      case "FORM_FORCE_CLOSED": {
+        return NextResponse.redirect(
+          formlink(HOST, form_id, "formclosed", {
+            oops: ERR.FORM_CLOSED_WHILE_RESPONDING.code,
+          }),
+          {
+            status: 301,
+          }
+        );
+      }
+      case "FORM_CLOSED_WHILE_RESPONDING": {
+        return NextResponse.redirect(
+          formlink(HOST, form_id, "formclosed", {
+            oops: ERR.FORM_CLOSED_WHILE_RESPONDING.code,
+          }),
+          {
+            status: 301,
+          }
+        );
+      }
+      case "FORM_RESPONSE_LIMIT_REACHED": {
+        return NextResponse.redirect(
+          formlink(HOST, form_id, "formclosed", {
+            oops: ERR.FORM_CLOSED_WHILE_RESPONDING.code,
+          }),
+          {
+            status: 301,
+          }
+        );
+      }
+      case "FORM_RESPONSE_LIMIT_BY_CUSTOMER_REACHED": {
+        return NextResponse.redirect(
+          formlink(HOST, form_id, "alreadyresponded"),
+          {
+            status: 301,
+          }
+        );
+      }
+      case "FORM_SCHEDULE_NOT_IN_RANGE": {
+        return NextResponse.redirect(
+          formlink(HOST, form_id, "formclosed", {
+            oops: ERR.FORM_SCHEDULE_NOT_IN_RANGE.code,
+          }),
+          {
+            status: 301,
+          }
+        );
+      }
+      case "FORM_SOLD_OUT": {
+        return NextResponse.redirect(formlink(HOST, form_id, "formsoldout"), {
+          status: 301,
+        });
+      }
+      case "FORM_OPTION_UNAVAILABLE": {
+        return NextResponse.redirect(
+          formlink(HOST, form_id, "formoptionsoldout"),
+          {
+            status: 301,
+          }
+        );
+      }
+    }
+  } else {
+    let data: any = null;
+    switch (code) {
+      case 404: {
+        return NextResponse.json({ error: "Form not found" }, { status: 404 });
+      }
+      case 400: {
+        return NextResponse.json({ error: "Bad Request" }, { status: 400 });
+      }
+      case 500: {
+        return NextResponse.json(
+          { error: "Internal Server Error" },
+          { status: 500 }
+        );
+      }
+      case "MISSING_REQUIRED_HIDDEN_FIELDS":
+      case "UNKNOWN_FIELDS_NOT_ALLOWED": {
+        return NextResponse.json(
+          {
+            error: code,
+            message: ERR[code].message,
+            info: data,
+          },
+          { status: 400 }
+        );
+      }
+      case "FORM_FORCE_CLOSED":
+      case "FORM_CLOSED_WHILE_RESPONDING":
+      case "FORM_RESPONSE_LIMIT_REACHED":
+      case "FORM_RESPONSE_LIMIT_BY_CUSTOMER_REACHED":
+      case "FORM_SCHEDULE_NOT_IN_RANGE":
+      case "FORM_SOLD_OUT":
+      case "FORM_OPTION_UNAVAILABLE":
+      default: {
+        return NextResponse.json(
+          {
+            error: code,
+            message: ERR[code].message,
+            info: data,
+          },
+          { status: 403 }
+        );
+      }
+    }
+  }
+
+  //
+}
+
 async function hooks({ form_id }: { form_id: string }) {
   // FIXME: DEV MODE
 
@@ -818,4 +907,14 @@ function haccept(accept?: string | null): "application/json" | "text/html" {
     if (accept.includes("text/html")) return "text/html";
   }
   return "application/json";
+}
+
+async function fetchipinfo(ip?: string | null) {
+  if (!ip) return null;
+  try {
+    return await ipinfo(ip, process.env.IPINFO_ACCESS_TOKEN);
+  } catch (e) {
+    console.error(e);
+    return null;
+  }
 }
