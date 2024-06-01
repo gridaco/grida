@@ -1,5 +1,6 @@
 "use client";
 
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import {
@@ -243,6 +244,9 @@ function SimulationPlanner({
   return (
     <div className="max-w-xl flex flex-col gap-8">
       <header>
+        <Badge className="mb-2" variant="outline">
+          Beta
+        </Badge>
         <h1 className="text-xl font-bold">New Simulation</h1>
         <small className="text-muted-foreground">
           This is a simulator to simulate the form submission. This is useful
@@ -318,18 +322,30 @@ function SimulationPlanner({
         <DialogContent>
           <DialogHeader>
             <DialogTitle>About This Simulation</DialogTitle>
-            <DialogDescription>
-              <strong>Note:</strong> Starting simulation <u>WILL INSERT</u>{" "}
-              actual data.
-              <br />
-              <br />
-              bots will act as humans and submit the form. Existing data will
-              not be affected, although global attributes such as Inventory,
-              etc. will be affected.
-              <br />
-              <br />
-              This is only recommended for testing purposes and before going
-              production.
+            <DialogDescription className="pt-4 prose prose-sm dark:prose-invert">
+              <p>
+                <i>
+                  <strong>Note:</strong> Starting simulation <u>WILL INSERT</u>{" "}
+                  actual data.
+                </i>
+                <br />
+                <ul>
+                  <li>
+                    Recommended to run simulations on newly created forms, only.
+                  </li>
+                  <li>Existing data will not be affected.</li>
+                  <li>This will create new customer entries</li>
+                  <li>Bots will act as humans and submit the form.</li>
+                  <li>Gloabl attributes such as Inventory will be affected</li>
+                  <li>
+                    You will have to clean up the data manually after the
+                    simulation
+                  </li>
+                </ul>
+                This is only recommended for testing purposes and before going
+                production. (You will be charged for the simulation, as it uses
+                real data.)
+              </p>
             </DialogDescription>
           </DialogHeader>
           <div></div>

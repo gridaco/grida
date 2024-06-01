@@ -148,7 +148,7 @@ export function GridEditor() {
   return (
     <div className="flex flex-col h-full">
       <header className="h-14 w-full">
-        <div className="flex px-2 py-1 h-full items-center justify-between gap-4">
+        <div className="flex px-4 py-1 h-full items-center justify-between gap-4">
           <div hidden={!has_selected_responses}>
             <div className="flex gap-2 items-center">
               <span
@@ -180,10 +180,11 @@ export function GridEditor() {
               </AlertDialog>
             </div>
           </div>
+          <div />
           <div className="flex gap-2">
             <Link href={`./analytics`}>
               <Badge variant={"outline"} className="cursor-pointer">
-                Analytics
+                Realtime
                 <PieChartIcon className="align-middle ms-2" />
               </Badge>
             </Link>

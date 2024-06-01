@@ -156,8 +156,10 @@ function View() {
           </MapGL>
         </div>
       </div>
-      <div className="relative grid grid-cols-2 lg:grid-cols-4 gap-4 mt-4 z-0">
-        <Responses data={chartdata} />
+      <div className="relative grid grid-cols-2 lg:grid-cols-4 gap-4 mt-4 z-0 pointer-events-none">
+        <div className="pointer-events-auto">
+          <Responses data={chartdata} />
+        </div>
       </div>
     </main>
   );
@@ -167,8 +169,13 @@ function Responses({ data }: { data: { count: number; date: Date }[] }) {
   return (
     <Card className="overflow-hidden bg-white/10 dark:bg-black/10 backdrop-blur-lg">
       <CardHeader>
-        <h1 className="text-lg font-semibold">Responses</h1>
-        <div className="flex items-center space-x-2">
+        <header>
+          <h1 className="text-lg font-semibold">Responses</h1>
+          <h6 className="text-sm text-muted-foreground">
+            Responses in Last 15 Minutes
+          </h6>
+        </header>
+        <div className="mt-4 flex items-center space-x-2">
           <span className="text-3xl font-bold">
             {fmtnum(data.reduce((sum, item) => sum + item.count, 0))}
           </span>
