@@ -27,6 +27,10 @@ export interface SimulatorSubmission<T = any> {
   status?: 200 | 400 | 500 | (number | {});
   data?: T;
   headers?: { [key: string]: string };
+  error?: {
+    message: string;
+    code: number;
+  };
 }
 
 export class Simulator {
@@ -123,6 +127,14 @@ export class Simulator {
       const response = await submit(this.form_id, formdata, headers);
       request.status = response.status;
       request.resolvedAt = new Date();
+
+      if ((request.status as number) >= 400) {
+        const errdata = await response.json();
+        request.error = {
+          code: errdata.error,
+          message: errdata.message,
+        };
+      }
       // Notify after response
       this.responseCallbacks.forEach((cb) => cb(_id, request));
     } catch (error) {

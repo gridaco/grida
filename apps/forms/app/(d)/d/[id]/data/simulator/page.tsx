@@ -159,9 +159,19 @@ function TaskHandler({
           </CardHeader>
           <CardContent>
             <div className="flex items-center justify-between">
-              <span>
-                <strong>Total:</strong> {responses.length}
-              </span>
+              <ul>
+                <li>
+                  <strong>Total:</strong> {responses.length}
+                </li>
+                <li>
+                  <strong>Accepted:</strong>{" "}
+                  {responses.filter((r) => r.status === 200).length}
+                </li>
+                <li>
+                  <strong>Rejected:</strong>{" "}
+                  {responses.filter((r) => r.status !== 200).length}
+                </li>
+              </ul>
             </div>
           </CardContent>
         </Card>
@@ -171,6 +181,7 @@ function TaskHandler({
           <TableHeader>
             <TableRow>
               <TableHead>Status</TableHead>
+              <TableHead>Error Code</TableHead>
               <TableHead>ID</TableHead>
               <TableHead>Resolved At</TableHead>
             </TableRow>
@@ -181,15 +192,18 @@ function TaskHandler({
                 <TableCell>
                   <StatusBadge status={response.status as number} />
                 </TableCell>
+                <TableCell>{response.error?.code ?? "--"}</TableCell>
                 <TableCell>
                   <small className="text-muted-foreground">
                     {response._id}
                   </small>
                 </TableCell>
                 <TableCell>
-                  {response.resolvedAt
-                    ? format(response.resolvedAt, "HH:mm:ss.SSS")
-                    : ""}
+                  <small className="text-muted-foreground">
+                    {response.resolvedAt
+                      ? format(response.resolvedAt, "HH:mm:ss.SSS")
+                      : ""}
+                  </small>
                 </TableCell>
               </TableRow>
             ))}
@@ -203,15 +217,17 @@ function TaskHandler({
 const status_colors = {
   0: "gray",
   200: "green",
-  400: "yellow",
+  400: "red",
+  403: "orange",
   500: "red",
 };
 
 const status_texts = {
   0: "idle",
   200: "ok",
-  400: "bad",
-  500: "error",
+  400: "400",
+  403: "403",
+  500: "500",
 };
 
 function StatusBadge({ status }: { status?: number }) {
