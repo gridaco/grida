@@ -16,8 +16,9 @@ import toast from "react-hot-toast";
 import { useEditorState } from "../editor";
 import Link from "next/link";
 import {
+  CommitIcon,
   DownloadIcon,
-  OpenInNewWindowIcon,
+  PieChartIcon,
   TrashIcon,
 } from "@radix-ui/react-icons";
 import { fmt_local_index } from "@/utils/fmt";
@@ -147,23 +148,15 @@ export function GridEditor() {
   return (
     <div className="flex flex-col h-full">
       <header className="h-14 w-full">
-        <div className="flex px-2 py-1 h-full items-center gap-4">
-          {/* <Link href={`./analytics`}>
-            <Badge variant={"outline"} className="cursor-pointer">
-              Analytics
-              <OpenInNewWindowIcon className="align-middle ms-2" />
-            </Badge>
-          </Link> */}
-          {has_selected_responses && (
-            <span
-              className="text-sm font-normal text-neutral-500"
-              aria-label="selected responses"
-            >
-              {txt_n_responses(selected_responses.size)} selected
-            </span>
-          )}
-          {has_selected_responses ? (
-            <>
+        <div className="flex px-4 py-1 h-full items-center justify-between gap-4">
+          <div hidden={!has_selected_responses}>
+            <div className="flex gap-2 items-center">
+              <span
+                className="text-sm font-normal text-neutral-500"
+                aria-label="selected responses"
+              >
+                {txt_n_responses(selected_responses.size)} selected
+              </span>
               <AlertDialog>
                 <AlertDialogTrigger asChild>
                   <button className="flex items-center gap-1 p-2 rounded-md border text-sm">
@@ -185,10 +178,23 @@ export function GridEditor() {
                   </div>
                 </AlertDialogContent>
               </AlertDialog>
-            </>
-          ) : (
-            <></>
-          )}
+            </div>
+          </div>
+          <div />
+          <div className="flex gap-2">
+            <Link href={`./analytics`}>
+              <Badge variant={"outline"} className="cursor-pointer">
+                Realtime
+                <PieChartIcon className="align-middle ms-2" />
+              </Badge>
+            </Link>
+            <Link href={`./simulator`} target="_blank">
+              <Badge variant={"outline"} className="cursor-pointer">
+                Simulator
+                <CommitIcon className="align-middle ms-2" />
+              </Badge>
+            </Link>
+          </div>
         </div>
       </header>
       <DeleteFieldConfirmDialog

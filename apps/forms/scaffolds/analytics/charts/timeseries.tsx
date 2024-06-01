@@ -6,30 +6,38 @@ import {
   XYChart,
   AnimatedAxis,
   AnimatedLineSeries,
+  AnimatedBarSeries,
   Tooltip,
   DataProvider,
 } from "@visx/xychart";
+import { useDarkMode } from "usehooks-ts";
 
-interface LineChartData {
+interface TimeSeriesChartData {
   date: Date;
   count: number;
 }
 
-interface LineChartProps {
-  data: LineChartData[];
+interface TimeSeriesChartProps {
+  data: TimeSeriesChartData[];
+  chartType: "line" | "bar";
   height?: number;
   margin?: { top: number; right: number; bottom: number; left: number };
+  datefmt?: (date: Date) => string;
 }
 
-const LineChart: React.FC<LineChartProps> = ({
+const TimeSeriesChart: React.FC<TimeSeriesChartProps> = ({
   data,
+  chartType,
+  datefmt = (date) => date.toLocaleDateString(),
   margin = { top: 16, right: 16, bottom: 40, left: 40 },
 }) => {
+  const { isDarkMode } = useDarkMode();
+
   if (data.length === 0) return null;
 
   const accessors = {
-    xAccessor: (d: LineChartData) => d.date,
-    yAccessor: (d: LineChartData) => d.count,
+    xAccessor: (d: TimeSeriesChartData) => d.date,
+    yAccessor: (d: TimeSeriesChartData) => d.count,
   };
 
   return (
@@ -37,13 +45,22 @@ const LineChart: React.FC<LineChartProps> = ({
       {({ width, height }) => (
         <DataProvider xScale={{ type: "time" }} yScale={{ type: "linear" }}>
           <XYChart height={height} width={width} margin={margin}>
-            <AnimatedLineSeries
-              dataKey="LineChart"
-              data={data}
-              {...accessors}
-              strokeWidth={2.5}
-              className="stroke-primary"
-            />
+            {chartType === "line" ? (
+              <AnimatedLineSeries
+                dataKey="LineChart"
+                data={data}
+                {...accessors}
+                strokeWidth={2.5}
+                className="stroke-primary"
+              />
+            ) : (
+              <AnimatedBarSeries
+                dataKey="BarChart"
+                colorAccessor={() => (isDarkMode ? "white" : "black")}
+                data={data}
+                {...accessors}
+              />
+            )}
             <AnimatedAxis
               orientation="bottom"
               hideTicks
@@ -73,6 +90,7 @@ const LineChart: React.FC<LineChartProps> = ({
               })}
             />
             <Tooltip
+              zIndex={10}
               showVerticalCrosshair
               verticalCrosshairStyle={{
                 strokeDasharray: "2 2",
@@ -91,9 +109,11 @@ const LineChart: React.FC<LineChartProps> = ({
                 <div>
                   <span>
                     <small>
-                      {accessors
-                        .xAccessor(tooltipData?.nearestDatum?.datum as any)
-                        .toLocaleDateString()}
+                      {datefmt(
+                        accessors.xAccessor(
+                          tooltipData?.nearestDatum?.datum as any
+                        )
+                      )}
                     </small>{" "}
                     <strong>
                       {accessors.yAccessor(
@@ -111,4 +131,4 @@ const LineChart: React.FC<LineChartProps> = ({
   );
 };
 
-export default LineChart;
+export default TimeSeriesChart;

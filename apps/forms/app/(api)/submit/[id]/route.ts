@@ -2,6 +2,11 @@ import {
   SYSTEM_GF_KEY_STARTS_WITH,
   SYSTEM_GF_FINGERPRINT_VISITORID_KEY,
   SYSTEM_GF_CUSTOMER_UUID_KEY,
+  SYSTEM_GF_GEO_CITY_KEY,
+  SYSTEM_GF_GEO_COUNTRY_KEY,
+  SYSTEM_GF_GEO_LATITUDE_KEY,
+  SYSTEM_GF_GEO_LONGITUDE_KEY,
+  SYSTEM_GF_GEO_REGION_KEY,
 } from "@/k/system";
 import { client, grida_commerce_client } from "@/lib/supabase/server";
 import { upsert_customer_with } from "@/services/customer";
@@ -23,6 +28,7 @@ import { GridaCommerceClient } from "@/services/commerce";
 import { SubmissionHooks } from "./hooks";
 import { Features } from "@/lib/features/scheduling";
 import { IpInfo, ipinfo } from "@/lib/ipinfo";
+import { Geo } from "@/types";
 
 const HOST = process.env.HOST || "http://localhost:3000";
 
@@ -51,10 +57,11 @@ export async function GET(
   }
   // #endregion
 
+  const data = req.nextUrl.searchParams as any;
   return submit({
-    data: req.nextUrl.searchParams as any,
+    data: data,
     form_id,
-    meta: meta(req),
+    meta: meta(req, data),
   });
 }
 
@@ -79,10 +86,10 @@ export async function POST(
   }
   // #endregion
 
-  return submit({ data, form_id, meta: meta(req) });
+  return submit({ data, form_id, meta: meta(req, data) });
 }
 
-function meta(req: NextRequest) {
+function meta(req: NextRequest, data?: FormData) {
   console.log("ip", {
     ip: req.ip,
     "x-real-ip": req.headers.get("x-real-ip"),
@@ -101,6 +108,38 @@ function meta(req: NextRequest) {
     referer: req.headers.get("referer"),
     browser: req.headers.get("sec-ch-ua"),
   };
+
+  // optionally, developer can override the ip and geo via data body.
+  if (data) {
+    const __GF_GEO_LATITUDE = data.get(SYSTEM_GF_GEO_LATITUDE_KEY);
+    const __GF_GEO_LONGITUDE = data.get(SYSTEM_GF_GEO_LONGITUDE_KEY);
+    const __GF_GEO_REGION = data.get(SYSTEM_GF_GEO_REGION_KEY);
+    const __GF_GEO_COUNTRY = data.get(SYSTEM_GF_GEO_COUNTRY_KEY);
+    const __GF_GEO_CITY = data.get(SYSTEM_GF_GEO_CITY_KEY);
+
+    if (
+      __GF_GEO_LATITUDE ||
+      __GF_GEO_LONGITUDE ||
+      __GF_GEO_REGION ||
+      __GF_GEO_COUNTRY ||
+      __GF_GEO_CITY
+    ) {
+      // all or neither the lat and long should be present
+      assert(
+        (__GF_GEO_LATITUDE && __GF_GEO_LONGITUDE) ||
+          (!__GF_GEO_LATITUDE && !__GF_GEO_LONGITUDE),
+        "Both or neither latitude and longitude should be present"
+      );
+
+      meta.geo = {
+        latitude: __GF_GEO_LATITUDE ? String(__GF_GEO_LATITUDE) : undefined,
+        longitude: __GF_GEO_LONGITUDE ? String(__GF_GEO_LONGITUDE) : undefined,
+        region: __GF_GEO_REGION ? String(__GF_GEO_REGION) : undefined,
+        country: __GF_GEO_COUNTRY ? String(__GF_GEO_COUNTRY) : undefined,
+        city: __GF_GEO_CITY ? String(__GF_GEO_CITY) : undefined,
+      };
+    }
+  }
 
   return meta;
 }
@@ -674,12 +713,4 @@ function ipinfogeo(ipinfo: IpInfo): Geo | null {
     country: ipinfo.country,
     region: ipinfo.region,
   };
-}
-
-interface Geo {
-  city?: string | undefined;
-  country?: string | undefined;
-  region?: string | undefined;
-  latitude?: string | undefined;
-  longitude?: string | undefined;
 }
