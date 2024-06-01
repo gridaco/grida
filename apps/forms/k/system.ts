@@ -6,11 +6,11 @@ export const SYSTEM_GF_FINGERPRINT_VISITORID_KEY =
 export const SYSTEM_GF_CUSTOMER_UUID_KEY = "__gf_customer_uuid";
 export const SYSTEM_GF_CUSTOMER_EMAIL_KEY = "__gf_customer_email";
 // geo
-export const SYSTEM_GF_GEO_LATITUDE_KEY = "__gf_geo_latitude";
-export const SYSTEM_GF_GEO_LONGITUDE_KEY = "__gf_geo_longitude";
-export const SYSTEM_GF_GEO_CITY_KEY = "__gf_geo_city";
-export const SYSTEM_GF_GEO_REGION_KEY = "__gf_geo_region";
-export const SYSTEM_GF_GEO_COUNTRY_KEY = "__gf_geo_country";
+export const SYSTEM_X_GF_GEO_LATITUDE_KEY = "x-gf-geo-latitude";
+export const SYSTEM_X_GF_GEO_LONGITUDE_KEY = "x-gf-geo-longitude";
+export const SYSTEM_X_GF_GEO_CITY_KEY = "x-gf-geo-city";
+export const SYSTEM_X_GF_GEO_REGION_KEY = "x-gf-geo-region";
+export const SYSTEM_X_GF_GEO_COUNTRY_KEY = "x-gf-geo-country";
 
 // flags
-export const SYSTEM_GF_SIMULATOR_FLAG_KEY = "__gf_simulator";
+export const SYSTEM_X_GF_SIMULATOR_FLAG_KEY = "x-gf-simulator";

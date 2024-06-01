@@ -1,11 +1,11 @@
 import {
   SYSTEM_GF_CUSTOMER_UUID_KEY,
-  SYSTEM_GF_GEO_CITY_KEY,
-  SYSTEM_GF_GEO_COUNTRY_KEY,
-  SYSTEM_GF_GEO_LATITUDE_KEY,
-  SYSTEM_GF_GEO_LONGITUDE_KEY,
-  SYSTEM_GF_GEO_REGION_KEY,
-  SYSTEM_GF_SIMULATOR_FLAG_KEY,
+  SYSTEM_X_GF_GEO_CITY_KEY,
+  SYSTEM_X_GF_GEO_COUNTRY_KEY,
+  SYSTEM_X_GF_GEO_LATITUDE_KEY,
+  SYSTEM_X_GF_GEO_LONGITUDE_KEY,
+  SYSTEM_X_GF_GEO_REGION_KEY,
+  SYSTEM_X_GF_SIMULATOR_FLAG_KEY,
 } from "@/k/system";
 import { faker } from "@faker-js/faker";
 import { nanoid } from "nanoid";
@@ -25,6 +25,7 @@ export interface SimulatorSubmission<T = any> {
   resolvedAt?: Date;
   status?: 200 | 400 | 500 | (number | {});
   data?: T;
+  headers?: { [key: string]: string };
 }
 
 export class Simulator {
@@ -102,13 +103,14 @@ export class Simulator {
   }
 
   private async submitForm() {
-    const data = this.generateFormData();
+    const { formdata, headers } = this.fakedata();
     try {
       const _id = nanoid();
       const request: SimulatorSubmission = {
         _id,
         status: undefined,
-        data: data,
+        data: formdata,
+        headers,
       };
       this.responses.push(request);
       // Notify initially
@@ -116,7 +118,7 @@ export class Simulator {
       if (this.dryrun) {
         return;
       }
-      const response = await submit(this.form_id, data);
+      const response = await submit(this.form_id, formdata, headers);
       request.status = response.status;
       request.resolvedAt = new Date();
       // Notify after response
@@ -126,16 +128,20 @@ export class Simulator {
     }
   }
 
-  private generateFormData() {
+  private fakedata() {
     // Generate random form data
     return {
-      [SYSTEM_GF_CUSTOMER_UUID_KEY]: faker.string.uuid(),
-      [SYSTEM_GF_GEO_CITY_KEY]: faker.location.city(),
-      [SYSTEM_GF_GEO_LATITUDE_KEY]: faker.location.latitude(),
-      [SYSTEM_GF_GEO_LONGITUDE_KEY]: faker.location.longitude(),
-      [SYSTEM_GF_GEO_REGION_KEY]: faker.location.state(),
-      [SYSTEM_GF_GEO_COUNTRY_KEY]: faker.location.country(),
-      [SYSTEM_GF_SIMULATOR_FLAG_KEY]: true,
+      formdata: {},
+      headers: {
+        [SYSTEM_GF_CUSTOMER_UUID_KEY]: faker.string.uuid(),
+        [SYSTEM_X_GF_GEO_CITY_KEY]: faker.location.city(),
+        [SYSTEM_X_GF_GEO_LATITUDE_KEY]: faker.location.latitude().toString(),
+        [SYSTEM_X_GF_GEO_LONGITUDE_KEY]: faker.location.longitude().toString(),
+        [SYSTEM_X_GF_GEO_REGION_KEY]: faker.location.state(),
+        [SYSTEM_X_GF_GEO_COUNTRY_KEY]: faker.location.country(),
+        [SYSTEM_X_GF_SIMULATOR_FLAG_KEY]: "1",
+        accept: "application/json",
+      },
 
       // TODO: use faker to generate random data based on form schema
       // Add your form data structure here
@@ -147,7 +153,7 @@ export class Simulator {
   }
 }
 
-async function submit(form_id: string, data: any) {
+async function submit(form_id: string, data: any, headers: any = {}) {
   const formdata = new FormData();
   for (const key in data) {
     formdata.append(key, data[key]);
@@ -156,5 +162,6 @@ async function submit(form_id: string, data: any) {
   return fetch(`/submit/${form_id}`, {
     method: "POST",
     body: formdata,
+    headers,
   });
 }
