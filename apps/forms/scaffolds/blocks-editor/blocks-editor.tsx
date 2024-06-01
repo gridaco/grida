@@ -23,7 +23,12 @@ import {
   useSensors,
 } from "@dnd-kit/core";
 import { Block, BlocksCanvas } from "./blocks";
-import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { restrictToVerticalAxis } from "@dnd-kit/modifiers";
 import {
   SortableContext,
@@ -32,6 +37,7 @@ import {
 import { createClientFormsClient } from "@/lib/supabase/client";
 import toast from "react-hot-toast";
 import { FormBlockType } from "@/types";
+import { Button } from "@/components/ui/button";
 
 export default function BlocksEditorRoot() {
   return (
@@ -269,67 +275,55 @@ function AddBlockButton() {
   const addPdfBlock = useCallback(() => addBlock("pdf"), [addBlock]);
 
   return (
-    <DropdownMenu.Root modal={false}>
-      <DropdownMenu.Trigger asChild>
-        <button className="rounded-full w-12 h-12 flex items-center justify-center border bg-white dark:bg-neutral-800 dark:border-neutral-700 p-2">
+    <DropdownMenu modal={false}>
+      <DropdownMenuTrigger asChild>
+        <Button variant="secondary" size="icon" className="rounded-full">
           <PlusIcon />
-        </button>
-      </DropdownMenu.Trigger>
-      <DropdownMenu.Portal>
-        <DropdownMenu.Content
-          className="z-50 flex flex-col rounded border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 shadow-lg p-4 gap-2"
-          align="start"
-        >
-          <BlockItem onClick={addFieldBlock}>
-            <PlusCircledIcon />
-            Field
-          </BlockItem>
-          <BlockItem onClick={addImageBlock}>
-            <ImageIcon />
-            Image
-          </BlockItem>
-          <BlockItem onClick={addVideoBlock}>
-            <VideoIcon />
-            Video
-          </BlockItem>
-          <BlockItem onClick={addHtmlBlock}>
-            <CodeIcon />
-            HTML
-          </BlockItem>
-          <BlockItem onClick={addPdfBlock}>
-            <ReaderIcon />
-            Pdf
-          </BlockItem>
-          <BlockItem onClick={addDividerBlock}>
-            <DividerHorizontalIcon />
-            Divider
-          </BlockItem>
-          <BlockItem onClick={addSectionBlock}>
-            <SectionIcon />
-            Section
-          </BlockItem>
-          <BlockItem onClick={addHeaderBlock}>
-            <HeadingIcon />
-            Header
-          </BlockItem>
-        </DropdownMenu.Content>
-      </DropdownMenu.Portal>
-    </DropdownMenu.Root>
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="start">
+        <BlockItem onClick={addFieldBlock}>
+          <PlusCircledIcon className="me-2 align-middle" />
+          Field
+        </BlockItem>
+        <BlockItem onClick={addImageBlock}>
+          <ImageIcon className="me-2 align-middle" />
+          Image
+        </BlockItem>
+        <BlockItem onClick={addVideoBlock}>
+          <VideoIcon className="me-2 align-middle" />
+          Video
+        </BlockItem>
+        <BlockItem onClick={addHtmlBlock}>
+          <CodeIcon className="me-2 align-middle" />
+          HTML
+        </BlockItem>
+        <BlockItem onClick={addPdfBlock}>
+          <ReaderIcon className="me-2 align-middle" />
+          Pdf
+        </BlockItem>
+        <BlockItem onClick={addDividerBlock}>
+          <DividerHorizontalIcon className="me-2 align-middle" />
+          Divider
+        </BlockItem>
+        <BlockItem onClick={addSectionBlock}>
+          <SectionIcon className="me-2 align-middle" />
+          Section
+        </BlockItem>
+        <BlockItem onClick={addHeaderBlock}>
+          <HeadingIcon className="me-2 align-middle" />
+          Header
+        </BlockItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 
 function BlockItem({
   children,
   ...props
-}: React.ComponentProps<typeof DropdownMenu.Item>) {
-  return (
-    <DropdownMenu.Item
-      {...props}
-      className="flex gap-2 items-center p-1 cursor-pointer"
-    >
-      {children}
-    </DropdownMenu.Item>
-  );
+}: React.ComponentProps<typeof DropdownMenuItem>) {
+  return <DropdownMenuItem {...props}>{children}</DropdownMenuItem>;
 }
 
 function shallowEqual(obj1: any, obj2: any) {

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useMemo, useState } from "react";
 import {
   Sheet,
   SheetClose,
@@ -11,13 +11,13 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { Label } from "@/components/ui/label";
-import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import { PopoverClose } from "@radix-ui/react-popover";
 import {
   Select,
   SelectContent,
@@ -26,7 +26,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useEditorState } from "../editor";
-import { PopoverClose } from "@radix-ui/react-popover";
 import toast from "react-hot-toast";
 import { MixIcon } from "@radix-ui/react-icons";
 import { JSONConditionExpression, JSONConditionOperator } from "@/types/logic";
