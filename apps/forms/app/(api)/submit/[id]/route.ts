@@ -544,8 +544,45 @@ async function submit({
     console.error("submit/err", response_insertion_error);
 
     switch (response_insertion_error.code) {
+      // force close
+      case PGXXError.XX211: {
+        // form is force closed
+        return NextResponse.redirect(
+          formlink(HOST, form_id, "formclosed", {
+            oops: FORM_CLOSED_WHILE_RESPONDING.code,
+          }),
+          {
+            status: 301,
+          }
+        );
+      }
+      // max response (per form)
       case PGXXError.XX221: {
         // max response limit reached
+        return NextResponse.redirect(
+          formlink(HOST, form_id, "formclosed", {
+            oops: FORM_CLOSED_WHILE_RESPONDING.code,
+          }),
+          {
+            status: 301,
+          }
+        );
+      }
+      // max response (per customer)
+      case PGXXError.XX222: {
+        // max response limit reached for this customer
+        return NextResponse.redirect(
+          formlink(HOST, form_id, "alreadyresponded"),
+          {
+            status: 301,
+          }
+        );
+      }
+      // scheduling
+      case PGXXError.XX230: /* out of range */
+      case PGXXError.XX231: /* closed */
+      case PGXXError.XX232 /* not open yet */: {
+        // form is closed by scheduler
         return NextResponse.redirect(
           formlink(HOST, form_id, "formclosed", {
             oops: FORM_CLOSED_WHILE_RESPONDING.code,
