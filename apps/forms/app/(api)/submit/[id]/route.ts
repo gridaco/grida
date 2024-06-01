@@ -30,6 +30,7 @@ import { SubmissionHooks } from "./hooks";
 import { Features } from "@/lib/features/scheduling";
 import { IpInfo, ipinfo } from "@/lib/ipinfo";
 import type { Geo, PlatformPoweredBy } from "@/types";
+import { XX212 } from "@/k/errcode";
 
 const HOST = process.env.HOST || "http://localhost:3000";
 
@@ -511,7 +512,7 @@ async function submit({
   }
 
   // create new form response
-  const { data: response_reference_obj, error: response_ref_error } =
+  const { data: response_reference_obj, error: response_insertion_error } =
     await client
       .from("response")
       .insert({
@@ -533,7 +534,35 @@ async function submit({
       .select("id")
       .single();
 
-  if (response_ref_error) console.error(response_ref_error);
+  if (response_insertion_error) {
+    console.error("submit/err", response_insertion_error);
+
+    switch (response_insertion_error.code) {
+      case XX212: {
+        // max response limit reached
+        return NextResponse.redirect(
+          formlink(HOST, form_id, "formclosed", {
+            oops: FORM_CLOSED_WHILE_RESPONDING.code,
+          }),
+          {
+            status: 301,
+          }
+        );
+      }
+      default: {
+        // server error
+        console.error("submit/err", 500);
+        return NextResponse.redirect(
+          formlink(HOST, form_id, "badrequest", {
+            error: response_insertion_error.code,
+          }),
+          {
+            status: 301,
+          }
+        );
+      }
+    }
+  }
 
   // save each field value
   const { data: response_fields } = await client
