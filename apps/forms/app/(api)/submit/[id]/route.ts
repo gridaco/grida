@@ -43,8 +43,6 @@ export async function GET(
 ) {
   const form_id = context.params.id;
 
-  console.log("GET", form_id);
-
   // #region 1 prevalidate request form data (query)
   const __keys = Array.from(req.nextUrl.searchParams.keys());
   const system_gf_keys = __keys.filter((key) =>
@@ -75,8 +73,6 @@ export async function POST(
 ) {
   const form_id = context.params.id;
 
-  console.log("POST", form_id);
-
   // #region 1 prevalidate request form data
   let data: FormData;
   try {
@@ -105,13 +101,13 @@ interface SessionMeta {
 }
 
 function meta(req: NextRequest, data?: FormData) {
-  console.log("ip", {
-    ip: req.ip,
-    "x-real-ip": req.headers.get("x-real-ip"),
-    "x-forwarded-for": req.headers.get("x-forwarded-for"),
-  });
+  // console.log("ip", {
+  //   ip: req.ip,
+  //   "x-real-ip": req.headers.get("x-real-ip"),
+  //   "x-forwarded-for": req.headers.get("x-forwarded-for"),
+  // });
 
-  console.log("geo", req.geo);
+  // console.log("geo", req.geo);
 
   const meta: SessionMeta = {
     accept: haccept(req.headers.get("accept")),
@@ -177,7 +173,7 @@ async function submit({
   data: FormData;
   meta: SessionMeta;
 }) {
-  console.log("form_id", form_id);
+  // console.log("form_id", form_id);
 
   // check if form exists
   const { data: form_reference } = await client
@@ -228,7 +224,7 @@ async function submit({
     (key) => !system_gf_keys.includes(key)
   );
 
-  console.log("submit#meta", meta);
+  // console.log("submit#meta", meta);
 
   // pre meta processing
   let ipinfo_data: IpInfo | null = isObjectEmpty(meta.geo)
@@ -255,7 +251,7 @@ async function submit({
     },
   });
 
-  console.log("/submit::customer:", customer);
+  // console.log("/submit::customer:", customer);
 
   // validation - check if form is force closed
   if (is_force_closed) {
