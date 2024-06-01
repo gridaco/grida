@@ -30,7 +30,7 @@ import { SubmissionHooks } from "./hooks";
 import { Features } from "@/lib/features/scheduling";
 import { IpInfo, ipinfo } from "@/lib/ipinfo";
 import type { Geo, PlatformPoweredBy } from "@/types";
-import { XX212 } from "@/k/errcode";
+import { PGXXError } from "@/k/errcode";
 import { qboolean, qval } from "@/utils/qs";
 
 const HOST = process.env.HOST || "http://localhost:3000";
@@ -269,6 +269,18 @@ async function submit({
 
   console.log("/submit::customer:", customer);
 
+  // validation - check if form is force closed
+  if (is_force_closed) {
+    return NextResponse.redirect(
+      formlink(HOST, form_id, "formclosed", {
+        oops: FORM_CLOSED_WHILE_RESPONDING.code,
+      }),
+      {
+        status: 301,
+      }
+    );
+  }
+
   const required_hidden_fields = fields.filter(
     (f) => f.type === "hidden" && f.required
   );
@@ -331,18 +343,6 @@ async function submit({
           }
         );
     }
-  }
-
-  // validation - check if form is force closed
-  if (is_force_closed) {
-    return NextResponse.redirect(
-      formlink(HOST, form_id, "formclosed", {
-        oops: FORM_CLOSED_WHILE_RESPONDING.code,
-      }),
-      {
-        status: 301,
-      }
-    );
   }
 
   // validation - check if form is open by schedule
@@ -544,7 +544,7 @@ async function submit({
     console.error("submit/err", response_insertion_error);
 
     switch (response_insertion_error.code) {
-      case XX212: {
+      case PGXXError.XX221: {
         // max response limit reached
         return NextResponse.redirect(
           formlink(HOST, form_id, "formclosed", {
