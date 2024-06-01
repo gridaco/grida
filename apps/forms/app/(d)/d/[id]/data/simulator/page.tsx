@@ -237,6 +237,7 @@ function SimulationPlanner({
   onStartQueued?: (plan: SimulationPlan) => void;
 }) {
   const [n, setN] = useState(50);
+  const [bots, setBots] = useState(1);
   const [maxq, setMaxQ] = useState(5);
   const [delay, setDelay] = useState(800);
   const [randomness, setRandomness] = useState(0.5);
@@ -256,7 +257,7 @@ function SimulationPlanner({
       </header>
       <hr className="my-4" />
       <div className="grid gap-4">
-        <Label htmlFor="n">Number of Bots</Label>
+        <Label htmlFor="n">Number of Submissions</Label>
         <Input
           id="n"
           min={1}
@@ -265,6 +266,22 @@ function SimulationPlanner({
           placeholder="100"
           value={n}
           onChange={(e) => setN(Number(e.target.value))}
+        />
+      </div>
+      <div className="grid gap-4">
+        <Label htmlFor="n">
+          Number of Bots{" "}
+          <small className="text-muted-foreground">
+            Number of customer identities to simulate
+          </small>
+        </Label>
+        <Input
+          id="n"
+          min={1}
+          max={1000}
+          type="number"
+          value={bots}
+          onChange={(e) => setBots(Number(e.target.value))}
         />
       </div>
       <div className="grid gap-4">
@@ -359,6 +376,7 @@ function SimulationPlanner({
                 onClick={() => {
                   onStartQueued?.({
                     n,
+                    bots,
                     delaybetween: delay,
                     queue: maxq,
                     randomness,

@@ -12,6 +12,7 @@ import { nanoid } from "nanoid";
 
 export interface SimulationPlan {
   n: number; // Total number of submissions
+  bots: number; // Number of bots (customer identities to simulate)
   delaybetween: number; // Delay between submissions in ms
   queue: number; // Base number of concurrent submissions per batch
   randomness: number; // Random coefficient for submission timing
@@ -36,6 +37,7 @@ export class Simulator {
   private responseCallbacks: ResponseCallback[] = [];
   private endCallback?: EndCallback;
   private totalSubmitted: number = 0;
+  private readonly default_customer_uuid = faker.string.uuid();
 
   constructor(
     readonly form_id: string,
@@ -130,10 +132,14 @@ export class Simulator {
 
   private fakedata() {
     // Generate random form data
+    const customer_uuid =
+      this.plan.bots > 1 ? faker.string.uuid() : this.default_customer_uuid;
+
     return {
-      formdata: {},
+      formdata: {
+        [SYSTEM_GF_CUSTOMER_UUID_KEY]: customer_uuid,
+      },
       headers: {
-        [SYSTEM_GF_CUSTOMER_UUID_KEY]: faker.string.uuid(),
         [SYSTEM_X_GF_GEO_CITY_KEY]: faker.location.city(),
         [SYSTEM_X_GF_GEO_LATITUDE_KEY]: faker.location.latitude().toString(),
         [SYSTEM_X_GF_GEO_LONGITUDE_KEY]: faker.location.longitude().toString(),
