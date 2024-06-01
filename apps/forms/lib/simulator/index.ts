@@ -15,7 +15,7 @@ export interface SimulationPlan {
   n: number; // Total number of submissions
   bots: number; // Number of bots (customer identities to simulate)
   delaybetween: number; // Delay between submissions in ms
-  queue: number; // Base number of concurrent submissions per batch
+  maxq: number; // Base number of concurrent submissions per batch
   randomness: number; // Random coefficient for submission timing
 }
 
@@ -60,7 +60,7 @@ export class Simulator {
   async start() {
     while (this.totalSubmitted < this.plan.n && !this.isPaused) {
       const randomizedQueue = Math.floor(
-        this.plan.queue * (1 + (Math.random() - 0.5) * this.plan.randomness)
+        this.plan.maxq * (1 + (Math.random() - 0.5) * this.plan.randomness)
       );
       const batchCount = Math.min(
         randomizedQueue,
@@ -69,7 +69,7 @@ export class Simulator {
       await this.submitBatch(batchCount);
     }
 
-    // end
+    // End
     if (this.isEnded) return;
     if (this.totalSubmitted >= this.plan.n) {
       this.isEnded = true;
@@ -106,11 +106,22 @@ export class Simulator {
     const promises = [];
     for (let i = 0; i < batchCount; i++) {
       if (this.isPaused) break;
-      promises.push(this.submitForm());
+
       const delay =
         this.plan.delaybetween *
         (1 + (Math.random() - 0.5) * this.plan.randomness);
-      await this.sleep(delay);
+
+      promises.push(
+        new Promise((resolve) => {
+          setTimeout(() => {
+            this.activeSubmissions++;
+            this.submitForm().finally(() => {
+              this.activeSubmissions--;
+              resolve("done");
+            });
+          }, delay);
+        })
+      );
     }
     await Promise.all(promises);
     this.totalSubmitted += batchCount;

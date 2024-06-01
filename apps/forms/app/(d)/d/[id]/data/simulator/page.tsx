@@ -30,7 +30,7 @@ import {
   SimulatorSubmission,
 } from "@/lib/simulator";
 import { format } from "date-fns";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import toast from "react-hot-toast";
 import { useStopwatch, useTimer } from "react-timer-hook";
 
@@ -98,6 +98,7 @@ function TaskHandler({
   form_id: string;
   plan: SimulationPlan;
 }) {
+  const bottomRef = useRef<HTMLDivElement>(null);
   const simulator = useMemo(
     () => new Simulator(form_id, plan),
     [form_id, plan]
@@ -117,6 +118,11 @@ function TaskHandler({
         } else {
           return [...prev, payload];
         }
+      });
+
+      // scroll to bottom
+      bottomRef.current?.scrollIntoView({
+        behavior: "smooth",
       });
     };
 
@@ -157,26 +163,24 @@ function TaskHandler({
               Responses from the simulation
             </small>
           </CardHeader>
-          <CardContent>
-            <div className="flex items-center justify-between">
-              <ul>
-                <li>
-                  <strong>Total:</strong> {responses.length}
-                </li>
-                <li>
-                  <strong>Accepted:</strong>{" "}
-                  {responses.filter((r) => r.status === 200).length}
-                </li>
-                <li>
-                  <strong>Rejected:</strong>{" "}
-                  {responses.filter((r) => (r.status as number) >= 400).length}
-                </li>
-              </ul>
-            </div>
+          <CardContent className="text-sm">
+            <ul>
+              <li>
+                <strong>Total:</strong> {responses.length}
+              </li>
+              <li>
+                <strong>Accepted:</strong>{" "}
+                {responses.filter((r) => r.status === 200).length}
+              </li>
+              <li>
+                <strong>Rejected:</strong>{" "}
+                {responses.filter((r) => (r.status as number) >= 400).length}
+              </li>
+            </ul>
           </CardContent>
         </Card>
       </div>
-      <div className="mt-40 grow">
+      <div className="mt-64 grow">
         <Table className="h-full">
           <TableHeader>
             <TableRow>
@@ -215,6 +219,7 @@ function TaskHandler({
             ))}
           </TableBody>
         </Table>
+        <div ref={bottomRef} className="mb-20" />
       </div>
     </div>
   );
@@ -230,7 +235,7 @@ const status_colors = {
 
 const status_texts = {
   0: "idle",
-  200: "ok",
+  200: "200",
   400: "400",
   403: "403",
   500: "500",
@@ -400,7 +405,7 @@ function SimulationPlanner({
                     n,
                     bots,
                     delaybetween: delay,
-                    queue: maxq,
+                    maxq: maxq,
                     randomness,
                   });
                 }}
