@@ -96,7 +96,7 @@ export async function POST(
 }
 
 interface SessionMeta {
-  accept: string | null;
+  accept: "application/json" | "text/html";
   //
   ip: string | null;
   geo?: Geo | null;
@@ -442,79 +442,6 @@ async function submit({
     }
   }
 
-  // get the fields ready
-  // TODO: no need to fetch fields again
-  const { data: form_fields } = await client
-    .from("form_field")
-    .select("*, options:form_field_option(*)")
-    .eq("form_id", form_id);
-
-  // group by existing and new fields
-  const known_names = nonsystem_keys.filter((key) => {
-    return form_fields!.some((field: any) => field.name === key);
-  });
-
-  const unknown_names = nonsystem_keys.filter((key) => {
-    return !form_fields!.some((field: any) => field.name === key);
-  });
-  const ignored_names: string[] = [];
-  const target_names: string[] = [];
-  let needs_to_be_created: string[] | null = null;
-
-  // create new fields by preference
-  if (
-    unknown_field_handling_strategy === "ignore" &&
-    unknown_names.length > 0
-  ) {
-    // ignore new fields
-    ignored_names.push(...unknown_names);
-    // add only existing fields to mapping
-    target_names.push(...known_names);
-  } else {
-    // add all fields to mapping
-    target_names.push(...known_names);
-    target_names.push(...unknown_names);
-
-    if (unknown_field_handling_strategy === "accept") {
-      needs_to_be_created = [...unknown_names];
-    } else if (unknown_field_handling_strategy === "reject") {
-      if (unknown_names.length > 0) {
-        // reject all fields
-        return NextResponse.json(
-          {
-            error: "Unknown fields are not allowed",
-            info: {
-              message:
-                "To allow unknown fields, set 'unknown_field_handling_strategy' to 'ignore' or 'accept' in the form settings.",
-              data: { keys: unknown_names },
-            },
-          },
-          {
-            status: 400,
-          }
-        );
-      }
-    }
-  }
-
-  if (needs_to_be_created) {
-    // create new fields
-    const { data: new_fields } = await client
-      .from("form_field")
-      .insert(
-        needs_to_be_created.map((key) => ({
-          form_id: form_id,
-          name: key,
-          type: "text" as const,
-          description: "Automatically created",
-        }))
-      )
-      .select("*");
-
-    // extend form_fields with new fields (match the type)
-    form_fields!.push(...new_fields?.map((f) => ({ ...f, options: [] }))!);
-  }
-
   // create new form response
   const { data: response_reference_obj, error: response_insertion_error } =
     await client
@@ -605,96 +532,223 @@ async function submit({
     }
   }
 
-  // save each field value
-  const { data: response_fields } = await client
-    .from("response_field")
-    .insert(
-      form_fields!.map((field) => {
-        const { name, options } = field;
+  // get the fields ready
 
-        // the field's value can be a input value or a reference to form_field_option
-        const value_or_reference = data.get(name);
+  // group by existing and new fields
+  const v_form_fields = fields.slice();
+  const known_names = nonsystem_keys.filter((key) => {
+    return v_form_fields!.some((field: any) => field.name === key);
+  });
 
-        // check if the value is a reference to form_field_option
-        const is_value_fkey_and_found =
-          is_uuid_v4(value_or_reference as string) &&
-          options?.find((o: any) => o.id === value_or_reference);
+  const unknown_names = nonsystem_keys.filter((key) => {
+    return !v_form_fields!.some((field: any) => field.name === key);
+  });
+  const ignored_names: string[] = [];
+  const target_names: string[] = [];
+  let needs_to_be_created: string[] | null = null;
 
-        // locate the value
-        const value = is_value_fkey_and_found
-          ? is_value_fkey_and_found.value
-          : value_or_reference;
+  // create new fields by preference
+  if (
+    unknown_field_handling_strategy === "ignore" &&
+    unknown_names.length > 0
+  ) {
+    // ignore new fields
+    ignored_names.push(...unknown_names);
+    // add only existing fields to mapping
+    target_names.push(...known_names);
+  } else {
+    // add all fields to mapping
+    target_names.push(...known_names);
+    target_names.push(...unknown_names);
 
-        return {
-          type: field.type,
-          response_id: response_reference_obj!.id,
-          form_field_id: field.id,
+    if (unknown_field_handling_strategy === "accept") {
+      needs_to_be_created = [...unknown_names];
+    } else if (unknown_field_handling_strategy === "reject") {
+      if (unknown_names.length > 0) {
+        // reject all fields
+        return NextResponse.json(
+          {
+            error: "Unknown fields are not allowed",
+            info: {
+              message:
+                "To allow unknown fields, set 'unknown_field_handling_strategy' to 'ignore' or 'accept' in the form settings.",
+              data: { keys: unknown_names },
+            },
+          },
+          {
+            status: 400,
+          }
+        );
+      }
+    }
+  }
+
+  if (needs_to_be_created) {
+    // create new fields
+    const { data: new_fields } = await client
+      .from("form_field")
+      .insert(
+        needs_to_be_created.map((key) => ({
           form_id: form_id,
-          value: JSON.stringify(value),
-          form_field_option_id: is_value_fkey_and_found
-            ? is_value_fkey_and_found.id
-            : null,
-        };
-      })
-    )
-    .select();
+          name: key,
+          type: "text" as const,
+          description: "Automatically created",
+        }))
+      )
+      .select("*");
 
-  // finally fetch the response for pingback
-  const { data: response, error: select_response_error } = await client
-    .from("response")
-    .select(
-      `
+    // extend form_fields with new fields (match the type)
+    v_form_fields!.push(...new_fields?.map((f) => ({ ...f, options: [] }))!);
+  }
+
+  // save each field value
+  const { error: v_fields_error } = await client.from("response_field").insert(
+    v_form_fields!.map((field) => {
+      const { name, options } = field;
+
+      // the field's value can be a input value or a reference to form_field_option
+      const value_or_reference = data.get(name);
+
+      // check if the value is a reference to form_field_option
+      const is_value_fkey_and_found =
+        is_uuid_v4(value_or_reference as string) &&
+        options?.find((o: any) => o.id === value_or_reference);
+
+      // locate the value
+      const value = is_value_fkey_and_found
+        ? is_value_fkey_and_found.value
+        : value_or_reference;
+
+      return {
+        type: field.type,
+        response_id: response_reference_obj!.id,
+        form_field_id: field.id,
+        form_id: form_id,
+        value: JSON.stringify(value),
+        form_field_option_id: is_value_fkey_and_found
+          ? is_value_fkey_and_found.id
+          : null,
+      };
+    })
+  );
+
+  if (v_fields_error) console.error("submit/err/fields", v_fields_error);
+
+  // ==================================================
+  // region complete hooks
+  // ==================================================
+
+  // hooks are not ready yet
+  // try {
+  //   await hooks({ form_id });
+  // } catch (e) {
+  //   console.error("submit/err/hooks", e);
+  // }
+
+  // endregion
+
+  // ==================================================
+  // region final response
+  // ==================================================
+
+  switch (meta.accept) {
+    case "application/json": {
+      // ==================================================
+      // region response building
+      // ==================================================
+
+      // build info
+      let info: any = {};
+
+      // if there are new fields
+      if (needs_to_be_created?.length) {
+        info.new_keys = {
+          message:
+            "There were new unknown fields in the request and the definitions are created automatically. To disable them, set 'unknown_field_handling_strategy' to 'ignore' or 'reject' in the form settings.",
+          data: {
+            keys: needs_to_be_created,
+            fields: v_form_fields!.filter((field: any) =>
+              needs_to_be_created!.includes(field.name)
+            ),
+          },
+        };
+      }
+
+      // build warning
+      let warning: any = {};
+
+      // if there are ignored fields
+      if (ignored_names.length > 0) {
+        warning.ignored_keys = {
+          message:
+            "There were unknown fields in the request. To allow them, set 'unknown_field_handling_strategy' to 'accept' in the form settings.",
+          data: { keys: ignored_names },
+        };
+      }
+
+      // endregion
+
+      // finally fetch the response for pingback
+      const { data: response, error: select_response_error } = await client
+        .from("response")
+        .select(
+          `
         *,
         response_field (
           *
         )
       `
-    )
-    .eq("id", response_reference_obj!.id)
-    .single();
+        )
+        .eq("id", response_reference_obj!.id)
+        .single();
 
-  if (select_response_error) {
-    console.error(select_response_error);
-  }
+      if (select_response_error) console.error(select_response_error);
 
-  // ==================================================
-  // region response building
-  // ==================================================
+      return NextResponse.json({
+        data: response,
+        raw: response?.raw,
+        warning: Object.keys(warning).length > 0 ? warning : null,
+        info: Object.keys(info).length > 0 ? info : null,
+        error: null,
+      });
+    }
+    case "text/html": {
+      if (is_ending_page_enabled && ending_page_template_id) {
+        return NextResponse.redirect(
+          formlink(HOST, form_id, "complete", {
+            rid: response_reference_obj.id,
+          }),
+          {
+            status: 301,
+          }
+        );
+      }
 
-  // build info
-  let info: any = {};
+      if (
+        is_redirect_after_response_uri_enabled &&
+        redirect_after_response_uri
+      ) {
+        return NextResponse.redirect(redirect_after_response_uri, {
+          status: 301,
+        });
+      }
 
-  // if there are new fields
-  if (needs_to_be_created?.length) {
-    info.new_keys = {
-      message:
-        "There were new unknown fields in the request and the definitions are created automatically. To disable them, set 'unknown_field_handling_strategy' to 'ignore' or 'reject' in the form settings.",
-      data: {
-        keys: needs_to_be_created,
-        fields: form_fields!.filter((field: any) =>
-          needs_to_be_created!.includes(field.name)
-        ),
-      },
-    };
-  }
-
-  // build warning
-  let warning: any = {};
-
-  // if there are ignored fields
-  if (ignored_names.length > 0) {
-    warning.ignored_keys = {
-      message:
-        "There were unknown fields in the request. To allow them, set 'unknown_field_handling_strategy' to 'accept' in the form settings.",
-      data: { keys: ignored_names },
-    };
+      return NextResponse.redirect(
+        formlink(HOST, form_id, "complete", {
+          rid: response_reference_obj.id,
+        }),
+        {
+          status: 301,
+        }
+      );
+    }
   }
 
   // endregion
+}
 
-  // ==================================================
-  // region complete hooks
-  // ==================================================
+async function hooks({ form_id }: { form_id: string }) {
+  // FIXME: DEV MODE
 
   // [emails]
 
@@ -703,67 +757,25 @@ async function submit({
     email: "no-reply@cors.sh",
   };
 
-  // FIXME: DEV MODE
-  const _email_enabled = false;
-  if (_email_enabled) {
-    await SubmissionHooks.send_email({
-      form_id: form_id,
-      type: "formcomplete",
-      from: {
-        name: business_profile.name,
-        email: business_profile.email,
-      },
-      to: "universe@grida.co",
-      lang: "en",
-    });
-    // send email
-  }
+  await SubmissionHooks.send_email({
+    form_id: form_id,
+    type: "formcomplete",
+    from: {
+      name: business_profile.name,
+      email: business_profile.email,
+    },
+    to: "universe@grida.co",
+    lang: "en",
+  });
 
   // [sms]
 
-  const _sms_enabled = false;
-  if (_sms_enabled) {
-    await SubmissionHooks.send_sms({
-      form_id: form_id,
-      type: "formcomplete",
-      to: "...",
-      lang: "en",
-    });
-    // send sms
-  }
-
-  // endregion
-
-  // ==================================================
-  // region final response
-  // ==================================================
-
-  if (is_ending_page_enabled && ending_page_template_id) {
-    return NextResponse.redirect(
-      formlink(HOST, form_id, "complete", {
-        rid: response?.id,
-      }),
-      {
-        status: 301,
-      }
-    );
-  }
-
-  if (is_redirect_after_response_uri_enabled && redirect_after_response_uri) {
-    return NextResponse.redirect(redirect_after_response_uri, {
-      status: 301,
-    });
-  }
-
-  return NextResponse.json({
-    data: response,
-    raw: response?.raw,
-    warning: Object.keys(warning).length > 0 ? warning : null,
-    info: Object.keys(info).length > 0 ? info : null,
-    error: null,
+  await SubmissionHooks.send_sms({
+    form_id: form_id,
+    type: "formcomplete",
+    to: "...",
+    lang: "en",
   });
-
-  // endregion
 }
 
 function isObjectEmpty(obj: object | null | undefined) {
