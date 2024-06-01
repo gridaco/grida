@@ -31,6 +31,7 @@ import { Features } from "@/lib/features/scheduling";
 import { IpInfo, ipinfo } from "@/lib/ipinfo";
 import type { Geo, PlatformPoweredBy } from "@/types";
 import { XX212 } from "@/k/errcode";
+import { qboolean, qval } from "@/utils/qs";
 
 const HOST = process.env.HOST || "http://localhost:3000";
 
@@ -43,6 +44,8 @@ export async function GET(
   }
 ) {
   const form_id = context.params.id;
+
+  console.log("GET", form_id);
 
   // #region 1 prevalidate request form data (query)
   const __keys = Array.from(req.nextUrl.searchParams.keys());
@@ -58,7 +61,6 @@ export async function GET(
     );
   }
   // #endregion
-
   const data = req.nextUrl.searchParams as any;
   return submit({
     data: data,
@@ -74,6 +76,8 @@ export async function POST(
   }
 ) {
   const form_id = context.params.id;
+
+  console.log("POST", form_id);
 
   // #region 1 prevalidate request form data
   let data: FormData;
@@ -92,6 +96,7 @@ export async function POST(
 }
 
 interface SessionMeta {
+  accept: string | null;
   //
   ip: string | null;
   geo?: Geo | null;
@@ -111,6 +116,7 @@ function meta(req: NextRequest, data?: FormData) {
   console.log("geo", req.geo);
 
   const meta: SessionMeta = {
+    accept: haccept(req.headers.get("accept")),
     useragent: req.headers.get("user-agent"),
     ip:
       req.ip ||
@@ -226,7 +232,7 @@ async function submit({
     (key) => !system_gf_keys.includes(key)
   );
 
-  console.log("submit", meta);
+  console.log("submit#meta", meta);
 
   // pre meta processing
   let ipinfo_data: IpInfo | null = null;
@@ -243,7 +249,7 @@ async function submit({
 
   // customer handling
 
-  const _gf_customer_uuid: string | null = val(
+  const _gf_customer_uuid: string | null = qval(
     data.get(SYSTEM_GF_CUSTOMER_UUID_KEY) as string
   );
 
@@ -725,11 +731,6 @@ async function submit({
   // endregion
 }
 
-const val = (v?: string | null) => {
-  if (v) return v;
-  else return null;
-};
-
 function isObjectEmpty(obj: object | null | undefined) {
   try {
     // @ts-ignore
@@ -760,8 +761,14 @@ function ipinfogeo(ipinfo: IpInfo): Geo | null {
 }
 
 /**
- * Convert string to boolean (formdata, searchparams)
+ * parse accept header to determine to response with json or redirect
+ *
+ * default fallback is json
  */
-function qboolean(v: string | null): boolean {
-  return v === "1" || v === "true" || v === "on";
+function haccept(accept?: string | null): "application/json" | "text/html" {
+  if (accept) {
+    if (accept.includes("application/json")) return "application/json";
+    if (accept.includes("text/html")) return "text/html";
+  }
+  return "application/json";
 }
