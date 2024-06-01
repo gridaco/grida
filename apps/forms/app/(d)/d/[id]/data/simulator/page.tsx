@@ -169,7 +169,7 @@ function TaskHandler({
                 </li>
                 <li>
                   <strong>Rejected:</strong>{" "}
-                  {responses.filter((r) => r.status !== 200).length}
+                  {responses.filter((r) => (r.status as number) >= 400).length}
                 </li>
               </ul>
             </div>
@@ -183,6 +183,7 @@ function TaskHandler({
               <TableHead>Status</TableHead>
               <TableHead>Error Code</TableHead>
               <TableHead>ID</TableHead>
+              <TableHead>Bot</TableHead>
               <TableHead>Resolved At</TableHead>
             </TableRow>
           </TableHeader>
@@ -196,6 +197,11 @@ function TaskHandler({
                 <TableCell>
                   <small className="text-muted-foreground">
                     {response._id}
+                  </small>
+                </TableCell>
+                <TableCell>
+                  <small className="text-muted-foreground">
+                    {response.bot_id}
                   </small>
                 </TableCell>
                 <TableCell>

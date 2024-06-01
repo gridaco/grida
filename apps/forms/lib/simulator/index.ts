@@ -9,6 +9,7 @@ import {
 } from "@/k/system";
 import { faker } from "@faker-js/faker";
 import { nanoid } from "nanoid";
+import { v4 } from "uuid";
 
 export interface SimulationPlan {
   n: number; // Total number of submissions
@@ -23,6 +24,7 @@ type EndCallback = () => void;
 
 export interface SimulatorSubmission<T = any> {
   _id: string;
+  bot_id: string;
   resolvedAt?: Date;
   status?: 200 | 400 | 500 | (number | {});
   data?: T;
@@ -41,13 +43,19 @@ export class Simulator {
   private responseCallbacks: ResponseCallback[] = [];
   private endCallback?: EndCallback;
   private totalSubmitted: number = 0;
-  private readonly default_customer_uuid = faker.string.uuid();
+  private readonly bot_ids: ReadonlyArray<string> = [];
 
   constructor(
     readonly form_id: string,
     readonly plan: SimulationPlan,
     readonly dryrun: boolean = false
-  ) {}
+  ) {
+    const bot_ids = [];
+    for (let i = 0; i < plan.bots; i++) {
+      bot_ids.push(v4());
+    }
+    this.bot_ids = bot_ids;
+  }
 
   async start() {
     while (this.totalSubmitted < this.plan.n && !this.isPaused) {
@@ -109,11 +117,12 @@ export class Simulator {
   }
 
   private async submitForm() {
-    const { formdata, headers } = this.fakedata();
+    const { formdata, headers, bot_id } = this.fakedata();
     try {
       const _id = nanoid();
       const request: SimulatorSubmission = {
         _id,
+        bot_id,
         status: undefined,
         data: formdata,
         headers,
@@ -142,10 +151,14 @@ export class Simulator {
     }
   }
 
+  private get identity() {
+    // randomize bot_id
+    return this.bot_ids[Math.floor(Math.random() * this.bot_ids.length)];
+  }
+
   private fakedata() {
     // Generate random form data
-    const customer_uuid =
-      this.plan.bots > 1 ? faker.string.uuid() : this.default_customer_uuid;
+    const customer_uuid = this.identity;
 
     return {
       formdata: {
@@ -160,6 +173,7 @@ export class Simulator {
         [SYSTEM_X_GF_SIMULATOR_FLAG_KEY]: "1",
         accept: "application/json",
       },
+      bot_id: customer_uuid,
 
       // TODO: use faker to generate random data based on form schema
       // Add your form data structure here
