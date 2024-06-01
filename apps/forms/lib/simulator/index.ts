@@ -5,6 +5,7 @@ import {
   SYSTEM_GF_GEO_LATITUDE_KEY,
   SYSTEM_GF_GEO_LONGITUDE_KEY,
   SYSTEM_GF_GEO_REGION_KEY,
+  SYSTEM_GF_SIMULATOR_FLAG_KEY,
 } from "@/k/system";
 import { faker } from "@faker-js/faker";
 import { nanoid } from "nanoid";
@@ -134,6 +135,7 @@ export class Simulator {
       [SYSTEM_GF_GEO_LONGITUDE_KEY]: faker.location.longitude(),
       [SYSTEM_GF_GEO_REGION_KEY]: faker.location.state(),
       [SYSTEM_GF_GEO_COUNTRY_KEY]: faker.location.country(),
+      [SYSTEM_GF_SIMULATOR_FLAG_KEY]: true,
 
       // TODO: use faker to generate random data based on form schema
       // Add your form data structure here

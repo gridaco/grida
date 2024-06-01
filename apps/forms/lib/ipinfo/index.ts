@@ -7,6 +7,9 @@ export async function ipinfo(
   const res = await fetch(
     `https://ipinfo.io/${ip}/json?token=${access_token || ACCESS_TOKEN}`
   );
+  if (!res.ok) {
+    throw new Error(`Failed to fetch ipinfo: ${res.status}`);
+  }
   return res.json();
 }
 

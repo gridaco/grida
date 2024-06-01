@@ -7,6 +7,7 @@ import {
   SYSTEM_GF_GEO_LATITUDE_KEY,
   SYSTEM_GF_GEO_LONGITUDE_KEY,
   SYSTEM_GF_GEO_REGION_KEY,
+  SYSTEM_GF_SIMULATOR_FLAG_KEY,
 } from "@/k/system";
 import { client, grida_commerce_client } from "@/lib/supabase/server";
 import { upsert_customer_with } from "@/services/customer";
@@ -28,7 +29,7 @@ import { GridaCommerceClient } from "@/services/commerce";
 import { SubmissionHooks } from "./hooks";
 import { Features } from "@/lib/features/scheduling";
 import { IpInfo, ipinfo } from "@/lib/ipinfo";
-import { Geo } from "@/types";
+import type { Geo, PlatformPoweredBy } from "@/types";
 
 const HOST = process.env.HOST || "http://localhost:3000";
 
@@ -89,6 +90,16 @@ export async function POST(
   return submit({ data, form_id, meta: meta(req, data) });
 }
 
+interface SessionMeta {
+  //
+  ip: string | null;
+  geo?: Geo | null;
+  referer: string | null;
+  browser: string | null;
+  useragent: string | null;
+  platform_powered_by: PlatformPoweredBy | null;
+}
+
 function meta(req: NextRequest, data?: FormData) {
   console.log("ip", {
     ip: req.ip,
@@ -98,7 +109,7 @@ function meta(req: NextRequest, data?: FormData) {
 
   console.log("geo", req.geo);
 
-  const meta = {
+  const meta: SessionMeta = {
     useragent: req.headers.get("user-agent"),
     ip:
       req.ip ||
@@ -107,10 +118,12 @@ function meta(req: NextRequest, data?: FormData) {
     geo: req.geo,
     referer: req.headers.get("referer"),
     browser: req.headers.get("sec-ch-ua"),
+    platform_powered_by: "web_client",
   };
 
   // optionally, developer can override the ip and geo via data body.
   if (data) {
+    // gf geo
     const __GF_GEO_LATITUDE = data.get(SYSTEM_GF_GEO_LATITUDE_KEY);
     const __GF_GEO_LONGITUDE = data.get(SYSTEM_GF_GEO_LONGITUDE_KEY);
     const __GF_GEO_REGION = data.get(SYSTEM_GF_GEO_REGION_KEY);
@@ -139,6 +152,14 @@ function meta(req: NextRequest, data?: FormData) {
         city: __GF_GEO_CITY ? String(__GF_GEO_CITY) : undefined,
       };
     }
+
+    // gf simulator flag
+    const __GF_SIMULATOR_FLAG = data.get(SYSTEM_GF_SIMULATOR_FLAG_KEY);
+    if (__GF_SIMULATOR_FLAG) {
+      if (qboolean(String(__GF_SIMULATOR_FLAG))) {
+        meta.platform_powered_by = "simulator";
+      }
+    }
   }
 
   return meta;
@@ -151,13 +172,7 @@ async function submit({
 }: {
   form_id: string;
   data: FormData;
-  meta: {
-    useragent: string | null;
-    ip: string | null;
-    geo: Geo | null | {} | undefined;
-    referer: string | null;
-    browser: string | null;
-  };
+  meta: SessionMeta;
 }) {
   console.log("form_id", form_id);
 
@@ -513,7 +528,7 @@ async function submit({
             ? ipinfogeo(ipinfo_data)
             : undefined
           : (meta.geo as {}),
-        platform_powered_by: "web_client",
+        platform_powered_by: meta.platform_powered_by,
       })
       .select("id")
       .single();
@@ -713,4 +728,11 @@ function ipinfogeo(ipinfo: IpInfo): Geo | null {
     country: ipinfo.country,
     region: ipinfo.region,
   };
+}
+
+/**
+ * Convert string to boolean (formdata, searchparams)
+ */
+function qboolean(v: string | null): boolean {
+  return v === "1" || v === "true" || v === "on";
 }

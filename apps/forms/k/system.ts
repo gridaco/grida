@@ -11,3 +11,6 @@ export const SYSTEM_GF_GEO_LONGITUDE_KEY = "__gf_geo_longitude";
 export const SYSTEM_GF_GEO_CITY_KEY = "__gf_geo_city";
 export const SYSTEM_GF_GEO_REGION_KEY = "__gf_geo_region";
 export const SYSTEM_GF_GEO_COUNTRY_KEY = "__gf_geo_country";
+
+// flags
+export const SYSTEM_GF_SIMULATOR_FLAG_KEY = "__gf_simulator";
