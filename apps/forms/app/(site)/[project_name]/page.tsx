@@ -96,7 +96,7 @@ export default async function FormsDashboardPage({
     <main className="container mx-auto px-4">
       <header className="py-10 flex justify-between">
         <div>
-          <Link href="/dashboard">
+          <Link href="/dashboard" prefetch={false}>
             <span className="flex items-center gap-2 text-2xl font-black select-none">
               <GridaLogo />
               Forms
@@ -137,7 +137,7 @@ function FormsGrid({
     return (
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
         {forms?.map((form, i) => (
-          <Link key={i} href={`/d/${form.id}`}>
+          <Link key={i} href={`/d/${form.id}`} prefetch={false}>
             <GridCard {...form} thumbnail="/assets/placeholder-image.png" />
           </Link>
         ))}
@@ -156,7 +156,7 @@ function FormsGrid({
         <span className="w-44">Updated At</span>
       </header>
       {forms?.map((form, i) => (
-        <Link key={i} href={`/d/${form.id}`}>
+        <Link key={i} href={`/d/${form.id}`} prefetch={false}>
           <RowCard {...form} />
         </Link>
       ))}
