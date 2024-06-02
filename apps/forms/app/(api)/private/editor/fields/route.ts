@@ -1,4 +1,4 @@
-import { FielSupports } from "@/k/supported_field_types";
+import { FieldSupports } from "@/k/supported_field_types";
 import {
   grida_commerce_client,
   createRouteHandlerClient,
@@ -22,7 +22,7 @@ export async function POST(req: NextRequest) {
   const { form_id } = init;
   console.log("POST /private/editor/fields", init);
 
-  const is_options_allowed_for_this_field = FielSupports.options(init.type);
+  const is_options_allowed_for_this_field = FieldSupports.options(init.type);
 
   // validate options - remove if not allowed
   if (!is_options_allowed_for_this_field) {
