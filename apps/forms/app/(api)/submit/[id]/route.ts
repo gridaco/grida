@@ -674,7 +674,9 @@ function error(
       case "FORM_SCHEDULE_NOT_IN_RANGE":
       case "FORM_SOLD_OUT":
       case "FORM_OPTION_UNAVAILABLE": {
-        return formerrorlink(HOST, code, data);
+        return NextResponse.redirect(formerrorlink(HOST, code, data), {
+          status: 301,
+        });
       }
     }
   } else {
