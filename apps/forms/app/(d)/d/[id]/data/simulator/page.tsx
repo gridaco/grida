@@ -30,7 +30,7 @@ import {
   SimulatorSubmission,
 } from "@/lib/simulator";
 import { format } from "date-fns";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import toast from "react-hot-toast";
 import { useStopwatch, useTimer } from "react-timer-hook";
 
@@ -98,6 +98,7 @@ function TaskHandler({
   form_id: string;
   plan: SimulationPlan;
 }) {
+  const bottomRef = useRef<HTMLDivElement>(null);
   const simulator = useMemo(
     () => new Simulator(form_id, plan),
     [form_id, plan]
@@ -117,6 +118,11 @@ function TaskHandler({
         } else {
           return [...prev, payload];
         }
+      });
+
+      // scroll to bottom
+      bottomRef.current?.scrollIntoView({
+        behavior: "smooth",
       });
     };
 
@@ -157,21 +163,31 @@ function TaskHandler({
               Responses from the simulation
             </small>
           </CardHeader>
-          <CardContent>
-            <div className="flex items-center justify-between">
-              <span>
+          <CardContent className="text-sm">
+            <ul>
+              <li>
                 <strong>Total:</strong> {responses.length}
-              </span>
-            </div>
+              </li>
+              <li>
+                <strong>Accepted:</strong>{" "}
+                {responses.filter((r) => r.status === 200).length}
+              </li>
+              <li>
+                <strong>Rejected:</strong>{" "}
+                {responses.filter((r) => (r.status as number) >= 400).length}
+              </li>
+            </ul>
           </CardContent>
         </Card>
       </div>
-      <div className="mt-40 grow">
+      <div className="mt-64 grow">
         <Table className="h-full">
           <TableHeader>
             <TableRow>
               <TableHead>Status</TableHead>
+              <TableHead>Error Code</TableHead>
               <TableHead>ID</TableHead>
+              <TableHead>Bot</TableHead>
               <TableHead>Resolved At</TableHead>
             </TableRow>
           </TableHeader>
@@ -181,20 +197,29 @@ function TaskHandler({
                 <TableCell>
                   <StatusBadge status={response.status as number} />
                 </TableCell>
+                <TableCell>{response.error?.code ?? "--"}</TableCell>
                 <TableCell>
                   <small className="text-muted-foreground">
                     {response._id}
                   </small>
                 </TableCell>
                 <TableCell>
-                  {response.resolvedAt
-                    ? format(response.resolvedAt, "HH:mm:ss.SSS")
-                    : ""}
+                  <small className="text-muted-foreground">
+                    {response.bot_id}
+                  </small>
+                </TableCell>
+                <TableCell>
+                  <small className="text-muted-foreground">
+                    {response.resolvedAt
+                      ? format(response.resolvedAt, "HH:mm:ss.SSS")
+                      : ""}
+                  </small>
                 </TableCell>
               </TableRow>
             ))}
           </TableBody>
         </Table>
+        <div ref={bottomRef} className="mb-20" />
       </div>
     </div>
   );
@@ -203,15 +228,17 @@ function TaskHandler({
 const status_colors = {
   0: "gray",
   200: "green",
-  400: "yellow",
+  400: "red",
+  403: "orange",
   500: "red",
 };
 
 const status_texts = {
   0: "idle",
-  200: "ok",
-  400: "bad",
-  500: "error",
+  200: "200",
+  400: "400",
+  403: "403",
+  500: "500",
 };
 
 function StatusBadge({ status }: { status?: number }) {
@@ -237,6 +264,7 @@ function SimulationPlanner({
   onStartQueued?: (plan: SimulationPlan) => void;
 }) {
   const [n, setN] = useState(50);
+  const [bots, setBots] = useState(1);
   const [maxq, setMaxQ] = useState(5);
   const [delay, setDelay] = useState(800);
   const [randomness, setRandomness] = useState(0.5);
@@ -256,7 +284,7 @@ function SimulationPlanner({
       </header>
       <hr className="my-4" />
       <div className="grid gap-4">
-        <Label htmlFor="n">Number of Bots</Label>
+        <Label htmlFor="n">Number of Submissions</Label>
         <Input
           id="n"
           min={1}
@@ -265,6 +293,22 @@ function SimulationPlanner({
           placeholder="100"
           value={n}
           onChange={(e) => setN(Number(e.target.value))}
+        />
+      </div>
+      <div className="grid gap-4">
+        <Label htmlFor="n">
+          Number of Bots{" "}
+          <small className="text-muted-foreground">
+            Number of customer identities to simulate
+          </small>
+        </Label>
+        <Input
+          id="n"
+          min={1}
+          max={1000}
+          type="number"
+          value={bots}
+          onChange={(e) => setBots(Number(e.target.value))}
         />
       </div>
       <div className="grid gap-4">
@@ -359,8 +403,9 @@ function SimulationPlanner({
                 onClick={() => {
                   onStartQueued?.({
                     n,
+                    bots,
                     delaybetween: delay,
-                    queue: maxq,
+                    maxq: maxq,
                     randomness,
                   });
                 }}

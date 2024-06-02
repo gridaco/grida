@@ -6,7 +6,10 @@ import {
   CardHeader,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { FORM_CLOSED_WHILE_RESPONDING } from "@/k/error";
+import {
+  FORM_CLOSED_WHILE_RESPONDING,
+  FORM_SCHEDULE_NOT_IN_RANGE,
+} from "@/k/error";
 import Link from "next/link";
 import i18next from "i18next";
 import { ssr_page_init_i18n } from "@/i18n/ssr";
@@ -16,7 +19,12 @@ export default async function FormClosedPage({
   searchParams,
 }: {
   params: { id: string };
-  searchParams: { oops?: typeof FORM_CLOSED_WHILE_RESPONDING.code };
+  searchParams: {
+    oops?:
+      | typeof FORM_CLOSED_WHILE_RESPONDING.code
+      // TODO: need translation for FORM_SCHEDULE_NOT_IN_RANGE
+      | typeof FORM_SCHEDULE_NOT_IN_RANGE.code;
+  };
 }) {
   const form_id = params.id;
   await ssr_page_init_i18n({ form_id });

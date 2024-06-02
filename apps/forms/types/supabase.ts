@@ -1397,6 +1397,57 @@ export type Database = {
           },
         ]
       }
+      response_session: {
+        Row: {
+          created_at: string
+          customer_id: string | null
+          form_id: string
+          geo: Json | null
+          id: string
+          ip: string | null
+          x_ipinfo: Json | null
+          x_referer: string | null
+          x_useragent: string | null
+        }
+        Insert: {
+          created_at?: string
+          customer_id?: string | null
+          form_id: string
+          geo?: Json | null
+          id?: string
+          ip?: string | null
+          x_ipinfo?: Json | null
+          x_referer?: string | null
+          x_useragent?: string | null
+        }
+        Update: {
+          created_at?: string
+          customer_id?: string | null
+          form_id?: string
+          geo?: Json | null
+          id?: string
+          ip?: string | null
+          x_ipinfo?: Json | null
+          x_referer?: string | null
+          x_useragent?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "response_session_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customer"
+            referencedColumns: ["uid"]
+          },
+          {
+            foreignKeyName: "response_session_form_id_fkey"
+            columns: ["form_id"]
+            isOneToOne: false
+            referencedRelation: "form"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
@@ -1520,7 +1571,11 @@ export type Database = {
         | "ignore"
         | "accept"
         | "reject"
-      response_platform_powered_by: "api" | "grida_forms" | "web_client"
+      response_platform_powered_by:
+        | "api"
+        | "grida_forms"
+        | "web_client"
+        | "simulator"
     }
     CompositeTypes: {
       [_ in never]: never

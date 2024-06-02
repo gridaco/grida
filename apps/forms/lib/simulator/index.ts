@@ -1,18 +1,21 @@
 import {
   SYSTEM_GF_CUSTOMER_UUID_KEY,
-  SYSTEM_GF_GEO_CITY_KEY,
-  SYSTEM_GF_GEO_COUNTRY_KEY,
-  SYSTEM_GF_GEO_LATITUDE_KEY,
-  SYSTEM_GF_GEO_LONGITUDE_KEY,
-  SYSTEM_GF_GEO_REGION_KEY,
+  SYSTEM_X_GF_GEO_CITY_KEY,
+  SYSTEM_X_GF_GEO_COUNTRY_KEY,
+  SYSTEM_X_GF_GEO_LATITUDE_KEY,
+  SYSTEM_X_GF_GEO_LONGITUDE_KEY,
+  SYSTEM_X_GF_GEO_REGION_KEY,
+  SYSTEM_X_GF_SIMULATOR_FLAG_KEY,
 } from "@/k/system";
 import { faker } from "@faker-js/faker";
 import { nanoid } from "nanoid";
+import { v4 } from "uuid";
 
 export interface SimulationPlan {
   n: number; // Total number of submissions
+  bots: number; // Number of bots (customer identities to simulate)
   delaybetween: number; // Delay between submissions in ms
-  queue: number; // Base number of concurrent submissions per batch
+  maxq: number; // Base number of concurrent submissions per batch
   randomness: number; // Random coefficient for submission timing
 }
 
@@ -21,9 +24,15 @@ type EndCallback = () => void;
 
 export interface SimulatorSubmission<T = any> {
   _id: string;
+  bot_id: string;
   resolvedAt?: Date;
   status?: 200 | 400 | 500 | (number | {});
   data?: T;
+  headers?: { [key: string]: string };
+  error?: {
+    message: string;
+    code: number;
+  };
 }
 
 export class Simulator {
@@ -34,17 +43,24 @@ export class Simulator {
   private responseCallbacks: ResponseCallback[] = [];
   private endCallback?: EndCallback;
   private totalSubmitted: number = 0;
+  private readonly bot_ids: ReadonlyArray<string> = [];
 
   constructor(
     readonly form_id: string,
     readonly plan: SimulationPlan,
     readonly dryrun: boolean = false
-  ) {}
+  ) {
+    const bot_ids = [];
+    for (let i = 0; i < plan.bots; i++) {
+      bot_ids.push(v4());
+    }
+    this.bot_ids = bot_ids;
+  }
 
   async start() {
     while (this.totalSubmitted < this.plan.n && !this.isPaused) {
       const randomizedQueue = Math.floor(
-        this.plan.queue * (1 + (Math.random() - 0.5) * this.plan.randomness)
+        this.plan.maxq * (1 + (Math.random() - 0.5) * this.plan.randomness)
       );
       const batchCount = Math.min(
         randomizedQueue,
@@ -53,7 +69,7 @@ export class Simulator {
       await this.submitBatch(batchCount);
     }
 
-    // end
+    // End
     if (this.isEnded) return;
     if (this.totalSubmitted >= this.plan.n) {
       this.isEnded = true;
@@ -90,24 +106,37 @@ export class Simulator {
     const promises = [];
     for (let i = 0; i < batchCount; i++) {
       if (this.isPaused) break;
-      promises.push(this.submitForm());
+
       const delay =
         this.plan.delaybetween *
         (1 + (Math.random() - 0.5) * this.plan.randomness);
-      await this.sleep(delay);
+
+      promises.push(
+        new Promise((resolve) => {
+          setTimeout(() => {
+            this.activeSubmissions++;
+            this.submitForm().finally(() => {
+              this.activeSubmissions--;
+              resolve("done");
+            });
+          }, delay);
+        })
+      );
     }
     await Promise.all(promises);
     this.totalSubmitted += batchCount;
   }
 
   private async submitForm() {
-    const data = this.generateFormData();
+    const { formdata, headers, bot_id } = this.fakedata();
     try {
       const _id = nanoid();
       const request: SimulatorSubmission = {
         _id,
+        bot_id,
         status: undefined,
-        data: data,
+        data: formdata,
+        headers,
       };
       this.responses.push(request);
       // Notify initially
@@ -115,9 +144,17 @@ export class Simulator {
       if (this.dryrun) {
         return;
       }
-      const response = await submit(this.form_id, data);
+      const response = await submit(this.form_id, formdata, headers);
       request.status = response.status;
       request.resolvedAt = new Date();
+
+      if ((request.status as number) >= 400) {
+        const errdata = await response.json();
+        request.error = {
+          code: errdata.error,
+          message: errdata.message,
+        };
+      }
       // Notify after response
       this.responseCallbacks.forEach((cb) => cb(_id, request));
     } catch (error) {
@@ -125,15 +162,29 @@ export class Simulator {
     }
   }
 
-  private generateFormData() {
+  private get identity() {
+    // randomize bot_id
+    return this.bot_ids[Math.floor(Math.random() * this.bot_ids.length)];
+  }
+
+  private fakedata() {
     // Generate random form data
+    const customer_uuid = this.identity;
+
     return {
-      [SYSTEM_GF_CUSTOMER_UUID_KEY]: faker.string.uuid(),
-      [SYSTEM_GF_GEO_CITY_KEY]: faker.location.city(),
-      [SYSTEM_GF_GEO_LATITUDE_KEY]: faker.location.latitude(),
-      [SYSTEM_GF_GEO_LONGITUDE_KEY]: faker.location.longitude(),
-      [SYSTEM_GF_GEO_REGION_KEY]: faker.location.state(),
-      [SYSTEM_GF_GEO_COUNTRY_KEY]: faker.location.country(),
+      formdata: {
+        [SYSTEM_GF_CUSTOMER_UUID_KEY]: customer_uuid,
+      },
+      headers: {
+        [SYSTEM_X_GF_GEO_CITY_KEY]: faker.location.city(),
+        [SYSTEM_X_GF_GEO_LATITUDE_KEY]: faker.location.latitude().toString(),
+        [SYSTEM_X_GF_GEO_LONGITUDE_KEY]: faker.location.longitude().toString(),
+        [SYSTEM_X_GF_GEO_REGION_KEY]: faker.location.state(),
+        [SYSTEM_X_GF_GEO_COUNTRY_KEY]: faker.location.country(),
+        [SYSTEM_X_GF_SIMULATOR_FLAG_KEY]: "1",
+        accept: "application/json",
+      },
+      bot_id: customer_uuid,
 
       // TODO: use faker to generate random data based on form schema
       // Add your form data structure here
@@ -145,7 +196,7 @@ export class Simulator {
   }
 }
 
-async function submit(form_id: string, data: any) {
+async function submit(form_id: string, data: any, headers: any = {}) {
   const formdata = new FormData();
   for (const key in data) {
     formdata.append(key, data[key]);
@@ -154,5 +205,6 @@ async function submit(form_id: string, data: any) {
   return fetch(`/submit/${form_id}`, {
     method: "POST",
     body: formdata,
+    headers,
   });
 }

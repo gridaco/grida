@@ -2,11 +2,12 @@ import {
   SYSTEM_GF_KEY_STARTS_WITH,
   SYSTEM_GF_FINGERPRINT_VISITORID_KEY,
   SYSTEM_GF_CUSTOMER_UUID_KEY,
-  SYSTEM_GF_GEO_CITY_KEY,
-  SYSTEM_GF_GEO_COUNTRY_KEY,
-  SYSTEM_GF_GEO_LATITUDE_KEY,
-  SYSTEM_GF_GEO_LONGITUDE_KEY,
-  SYSTEM_GF_GEO_REGION_KEY,
+  SYSTEM_X_GF_GEO_CITY_KEY,
+  SYSTEM_X_GF_GEO_COUNTRY_KEY,
+  SYSTEM_X_GF_GEO_LATITUDE_KEY,
+  SYSTEM_X_GF_GEO_LONGITUDE_KEY,
+  SYSTEM_X_GF_GEO_REGION_KEY,
+  SYSTEM_X_GF_SIMULATOR_FLAG_KEY,
 } from "@/k/system";
 import { client, grida_commerce_client } from "@/lib/supabase/server";
 import { upsert_customer_with } from "@/services/customer";
@@ -14,10 +15,7 @@ import { validate_max_access } from "@/services/form/validate-max-access";
 import { is_uuid_v4 } from "@/utils/is";
 import { NextRequest, NextResponse } from "next/server";
 import { formlink } from "@/lib/forms/url";
-import {
-  FORM_CLOSED_WHILE_RESPONDING,
-  MISSING_REQUIRED_HIDDEN_FIELDS,
-} from "@/k/error";
+import * as ERR from "@/k/error";
 import {
   FormFieldOptionsInventoryMap,
   form_field_options_inventory,
@@ -28,7 +26,10 @@ import { GridaCommerceClient } from "@/services/commerce";
 import { SubmissionHooks } from "./hooks";
 import { Features } from "@/lib/features/scheduling";
 import { IpInfo, ipinfo } from "@/lib/ipinfo";
-import { Geo } from "@/types";
+import type { Geo, PlatformPoweredBy } from "@/types";
+import { PGXXError } from "@/k/errcode";
+import { qboolean, qval } from "@/utils/qs";
+import { notFound } from "next/navigation";
 
 const HOST = process.env.HOST || "http://localhost:3000";
 
@@ -56,7 +57,6 @@ export async function GET(
     );
   }
   // #endregion
-
   const data = req.nextUrl.searchParams as any;
   return submit({
     data: data,
@@ -89,16 +89,28 @@ export async function POST(
   return submit({ data, form_id, meta: meta(req, data) });
 }
 
+interface SessionMeta {
+  accept: "application/json" | "text/html";
+  //
+  ip: string | null;
+  geo?: Geo | null;
+  referer: string | null;
+  browser: string | null;
+  useragent: string | null;
+  platform_powered_by: PlatformPoweredBy | null;
+}
+
 function meta(req: NextRequest, data?: FormData) {
-  console.log("ip", {
-    ip: req.ip,
-    "x-real-ip": req.headers.get("x-real-ip"),
-    "x-forwarded-for": req.headers.get("x-forwarded-for"),
-  });
+  // console.log("ip", {
+  //   ip: req.ip,
+  //   "x-real-ip": req.headers.get("x-real-ip"),
+  //   "x-forwarded-for": req.headers.get("x-forwarded-for"),
+  // });
 
-  console.log("geo", req.geo);
+  // console.log("geo", req.geo);
 
-  const meta = {
+  const meta: SessionMeta = {
+    accept: haccept(req.headers.get("accept")),
     useragent: req.headers.get("user-agent"),
     ip:
       req.ip ||
@@ -107,37 +119,45 @@ function meta(req: NextRequest, data?: FormData) {
     geo: req.geo,
     referer: req.headers.get("referer"),
     browser: req.headers.get("sec-ch-ua"),
+    platform_powered_by: "web_client",
   };
 
   // optionally, developer can override the ip and geo via data body.
-  if (data) {
-    const __GF_GEO_LATITUDE = data.get(SYSTEM_GF_GEO_LATITUDE_KEY);
-    const __GF_GEO_LONGITUDE = data.get(SYSTEM_GF_GEO_LONGITUDE_KEY);
-    const __GF_GEO_REGION = data.get(SYSTEM_GF_GEO_REGION_KEY);
-    const __GF_GEO_COUNTRY = data.get(SYSTEM_GF_GEO_COUNTRY_KEY);
-    const __GF_GEO_CITY = data.get(SYSTEM_GF_GEO_CITY_KEY);
+  // gf geo
+  const __GF_GEO_LATITUDE = req.headers.get(SYSTEM_X_GF_GEO_LATITUDE_KEY);
+  const __GF_GEO_LONGITUDE = req.headers.get(SYSTEM_X_GF_GEO_LONGITUDE_KEY);
+  const __GF_GEO_REGION = req.headers.get(SYSTEM_X_GF_GEO_REGION_KEY);
+  const __GF_GEO_COUNTRY = req.headers.get(SYSTEM_X_GF_GEO_COUNTRY_KEY);
+  const __GF_GEO_CITY = req.headers.get(SYSTEM_X_GF_GEO_CITY_KEY);
 
-    if (
-      __GF_GEO_LATITUDE ||
-      __GF_GEO_LONGITUDE ||
-      __GF_GEO_REGION ||
-      __GF_GEO_COUNTRY ||
-      __GF_GEO_CITY
-    ) {
-      // all or neither the lat and long should be present
-      assert(
-        (__GF_GEO_LATITUDE && __GF_GEO_LONGITUDE) ||
-          (!__GF_GEO_LATITUDE && !__GF_GEO_LONGITUDE),
-        "Both or neither latitude and longitude should be present"
-      );
+  if (
+    __GF_GEO_LATITUDE ||
+    __GF_GEO_LONGITUDE ||
+    __GF_GEO_REGION ||
+    __GF_GEO_COUNTRY ||
+    __GF_GEO_CITY
+  ) {
+    // all or neither the lat and long should be present
+    assert(
+      (__GF_GEO_LATITUDE && __GF_GEO_LONGITUDE) ||
+        (!__GF_GEO_LATITUDE && !__GF_GEO_LONGITUDE),
+      "Both or neither latitude and longitude should be present"
+    );
 
-      meta.geo = {
-        latitude: __GF_GEO_LATITUDE ? String(__GF_GEO_LATITUDE) : undefined,
-        longitude: __GF_GEO_LONGITUDE ? String(__GF_GEO_LONGITUDE) : undefined,
-        region: __GF_GEO_REGION ? String(__GF_GEO_REGION) : undefined,
-        country: __GF_GEO_COUNTRY ? String(__GF_GEO_COUNTRY) : undefined,
-        city: __GF_GEO_CITY ? String(__GF_GEO_CITY) : undefined,
-      };
+    meta.geo = {
+      latitude: __GF_GEO_LATITUDE ? String(__GF_GEO_LATITUDE) : undefined,
+      longitude: __GF_GEO_LONGITUDE ? String(__GF_GEO_LONGITUDE) : undefined,
+      region: __GF_GEO_REGION ? String(__GF_GEO_REGION) : undefined,
+      country: __GF_GEO_COUNTRY ? String(__GF_GEO_COUNTRY) : undefined,
+      city: __GF_GEO_CITY ? String(__GF_GEO_CITY) : undefined,
+    };
+  }
+
+  // gf simulator flag
+  const __GF_SIMULATOR_FLAG = req.headers.get(SYSTEM_X_GF_SIMULATOR_FLAG_KEY);
+  if (__GF_SIMULATOR_FLAG) {
+    if (qboolean(String(__GF_SIMULATOR_FLAG))) {
+      meta.platform_powered_by = "simulator";
     }
   }
 
@@ -151,15 +171,9 @@ async function submit({
 }: {
   form_id: string;
   data: FormData;
-  meta: {
-    useragent: string | null;
-    ip: string | null;
-    geo: Geo | null | {} | undefined;
-    referer: string | null;
-    browser: string | null;
-  };
+  meta: SessionMeta;
 }) {
-  console.log("form_id", form_id);
+  // console.log("form_id", form_id);
 
   // check if form exists
   const { data: form_reference } = await client
@@ -178,7 +192,7 @@ async function submit({
     .single();
 
   if (!form_reference) {
-    return NextResponse.json({ error: "Form not found" }, { status: 404 });
+    return error(404, { form_id }, meta);
   }
 
   const {
@@ -210,24 +224,16 @@ async function submit({
     (key) => !system_gf_keys.includes(key)
   );
 
-  console.log("submit", meta);
+  // console.log("submit#meta", meta);
 
   // pre meta processing
-  let ipinfo_data: IpInfo | null = null;
-  if (meta.ip && isObjectEmpty(meta.geo)) {
-    try {
-      ipinfo_data = await ipinfo(meta.ip, process.env.IPINFO_ACCESS_TOKEN);
-      console.log("ipinfo", ipinfo_data);
-    } catch (e) {
-      console.error(e);
-    }
-  } else {
-    console.error("ip not found");
-  }
+  let ipinfo_data: IpInfo | null = isObjectEmpty(meta.geo)
+    ? await fetchipinfo(meta.ip)
+    : null;
 
   // customer handling
 
-  const _gf_customer_uuid: string | null = val(
+  const _gf_customer_uuid: string | null = qval(
     data.get(SYSTEM_GF_CUSTOMER_UUID_KEY) as string
   );
 
@@ -245,7 +251,12 @@ async function submit({
     },
   });
 
-  console.log("/submit::customer:", customer);
+  // console.log("/submit::customer:", customer);
+
+  // validation - check if form is force closed
+  if (is_force_closed) {
+    return error(ERR.FORM_CLOSED_WHILE_RESPONDING.code, { form_id }, meta);
+  }
 
   const required_hidden_fields = fields.filter(
     (f) => f.type === "hidden" && f.required
@@ -258,16 +269,14 @@ async function submit({
   });
 
   if (missing_required_hidden_fields.length > 0) {
-    console.error("error", MISSING_REQUIRED_HIDDEN_FIELDS);
-
-    // TODO: return json instead on devmode
-    return NextResponse.redirect(
-      formlink(HOST, form_id, "badrequest", {
-        error: MISSING_REQUIRED_HIDDEN_FIELDS.code,
-      }),
+    console.error("error", ERR.MISSING_REQUIRED_HIDDEN_FIELDS);
+    return error(
+      ERR.MISSING_REQUIRED_HIDDEN_FIELDS.code,
       {
-        status: 301,
-      }
+        form_id,
+        keys: missing_required_hidden_fields.filter(Boolean).map((f) => f.name),
+      },
+      meta
     );
   }
 
@@ -284,21 +293,9 @@ async function submit({
   if (max_access_error) {
     switch (max_access_error.code) {
       case "FORM_RESPONSE_LIMIT_BY_CUSTOMER_REACHED":
-        return NextResponse.redirect(
-          formlink(HOST, form_id, "alreadyresponded"),
-          {
-            status: 301,
-          }
-        );
-      case "FORM_RESPONSE_LIMIT_REACHED":
-        return NextResponse.redirect(
-          formlink(HOST, form_id, "formclosed", {
-            oops: FORM_CLOSED_WHILE_RESPONDING.code,
-          }),
-          {
-            status: 301,
-          }
-        );
+      case "FORM_RESPONSE_LIMIT_REACHED": {
+        return error(max_access_error.code, { form_id }, meta);
+      }
       default:
         return NextResponse.json(
           {
@@ -311,18 +308,6 @@ async function submit({
     }
   }
 
-  // validation - check if form is force closed
-  if (is_force_closed) {
-    return NextResponse.redirect(
-      formlink(HOST, form_id, "formclosed", {
-        oops: FORM_CLOSED_WHILE_RESPONDING.code,
-      }),
-      {
-        status: 301,
-      }
-    );
-  }
-
   // validation - check if form is open by schedule
   if (is_scheduling_enabled) {
     const isopen = Features.isopen({
@@ -331,14 +316,7 @@ async function submit({
     });
 
     if (!isopen) {
-      return NextResponse.redirect(
-        formlink(HOST, form_id, "formclosed", {
-          oops: FORM_CLOSED_WHILE_RESPONDING.code,
-        }),
-        {
-          status: 301,
-        }
-      );
+      return error(ERR.FORM_SCHEDULE_NOT_IN_RANGE.code, { form_id }, meta);
     }
   }
 
@@ -393,20 +371,7 @@ async function submit({
     });
     if (inventory_access_error) {
       console.error(inventory_access_error);
-      switch (inventory_access_error.code) {
-        case "FORM_SOLD_OUT":
-          return NextResponse.redirect(formlink(HOST, form_id, "formsoldout"), {
-            status: 301,
-          });
-        case "FORM_OPTION_UNAVAILABLE": {
-          return NextResponse.redirect(
-            formlink(HOST, form_id, "formoptionsoldout"),
-            {
-              status: 301,
-            }
-          );
-        }
-      }
+      return error(inventory_access_error.code, { form_id }, meta);
     }
 
     if (selection_id) {
@@ -422,20 +387,77 @@ async function submit({
     }
   }
 
+  // create new form response
+  const { data: response_reference_obj, error: response_insertion_error } =
+    await client
+      .from("response")
+      .insert({
+        raw: JSON.stringify(Object.fromEntries(entries)),
+        form_id: form_id,
+        browser: meta.browser,
+        ip: meta.ip,
+        customer_id: customer?.uid,
+        x_referer: meta.referer,
+        x_useragent: meta.useragent,
+        x_ipinfo: ipinfo_data as {},
+        geo: isObjectEmpty(meta.geo)
+          ? ipinfo_data
+            ? ipinfogeo(ipinfo_data)
+            : undefined
+          : (meta.geo as {}),
+        platform_powered_by: meta.platform_powered_by,
+      })
+      .select("id")
+      .single();
+
+  if (response_insertion_error) {
+    console.error("submit/err", response_insertion_error);
+
+    switch (response_insertion_error.code) {
+      // force close
+      case PGXXError.XX211: {
+        // form is force closed
+        return error(ERR.FORM_FORCE_CLOSED.code, { form_id }, meta);
+      }
+      // max response (per form)
+      case PGXXError.XX221: {
+        // max response limit reached
+        return error(ERR.FORM_RESPONSE_LIMIT_REACHED.code, { form_id }, meta);
+      }
+      // max response (per customer)
+      case PGXXError.XX222: {
+        // max response limit reached for this customer
+        return error(
+          ERR.FORM_RESPONSE_LIMIT_BY_CUSTOMER_REACHED.code,
+          { form_id },
+          meta
+        );
+      }
+      // scheduling
+      case PGXXError.XX230: /* out of range */
+      case PGXXError.XX231: /* closed */
+      case PGXXError.XX232 /* not open yet */: {
+        // form is closed by scheduler
+        return error(ERR.FORM_SCHEDULE_NOT_IN_RANGE.code, { form_id }, meta);
+      }
+      default: {
+        // server error
+        console.error("submit/err", 500);
+        return error(500, { form_id }, meta);
+      }
+    }
+  }
+
   // get the fields ready
-  // TODO: no need to fetch fields again
-  const { data: form_fields } = await client
-    .from("form_field")
-    .select("*, options:form_field_option(*)")
-    .eq("form_id", form_id);
 
   // group by existing and new fields
+  const v_form_fields = fields.slice();
   const known_names = nonsystem_keys.filter((key) => {
-    return form_fields!.some((field: any) => field.name === key);
+    return v_form_fields!.some((field: any) => field.name === key);
   });
 
   const unknown_names = nonsystem_keys.filter((key) => {
-    return !form_fields!.some((field: any) => field.name === key);
+    return !v_form_fields!.some((field: any) => field.name === key);
   });
   const ignored_names: string[] = [];
   const target_names: string[] = [];
@@ -460,18 +482,13 @@ async function submit({
     } else if (unknown_field_handling_strategy === "reject") {
       if (unknown_names.length > 0) {
         // reject all fields
-        return NextResponse.json(
+        return error(
+          ERR.UNKNOWN_FIELDS_NOT_ALLOWED.code,
           {
-            error: "Unknown fields are not allowed",
-            info: {
-              message:
-                "To allow unknown fields, set 'unknown_field_handling_strategy' to 'ignore' or 'accept' in the form settings.",
-              data: { keys: unknown_names },
-            },
+            form_id,
+            keys: unknown_names,
           },
-          {
-            status: 400,
-          }
+          meta
         );
       }
     }
@@ -492,124 +509,331 @@ async function submit({
       .select("*");
 
     // extend form_fields with new fields (match the type)
-    form_fields!.push(...new_fields?.map((f) => ({ ...f, options: [] }))!);
+    v_form_fields!.push(...new_fields?.map((f) => ({ ...f, options: [] }))!);
   }
 
-  // create new form response
-  const { data: response_reference_obj, error: response_ref_error } =
-    await client
-      .from("response")
-      .insert({
-        raw: JSON.stringify(Object.fromEntries(entries)),
-        form_id: form_id,
-        browser: meta.browser,
-        ip: meta.ip,
-        customer_id: customer?.uid,
-        x_referer: meta.referer,
-        x_useragent: meta.useragent,
-        x_ipinfo: ipinfo_data as {},
-        geo: isObjectEmpty(meta.geo)
-          ? ipinfo_data
-            ? ipinfogeo(ipinfo_data)
-            : undefined
-          : (meta.geo as {}),
-        platform_powered_by: "web_client",
-      })
-      .select("id")
-      .single();
-
-  if (response_ref_error) console.error(response_ref_error);
-
   // save each field value
-  const { data: response_fields } = await client
-    .from("response_field")
-    .insert(
-      form_fields!.map((field) => {
-        const { name, options } = field;
+  const { error: v_fields_error } = await client.from("response_field").insert(
+    v_form_fields!.map((field) => {
+      const { name, options } = field;
 
-        // the field's value can be a input value or a reference to form_field_option
-        const value_or_reference = data.get(name);
+      // the field's value can be a input value or a reference to form_field_option
+      const value_or_reference = data.get(name);
 
-        // check if the value is a reference to form_field_option
-        const is_value_fkey_and_found =
-          is_uuid_v4(value_or_reference as string) &&
-          options?.find((o: any) => o.id === value_or_reference);
+      // check if the value is a reference to form_field_option
+      const is_value_fkey_and_found =
+        is_uuid_v4(value_or_reference as string) &&
+        options?.find((o: any) => o.id === value_or_reference);
 
-        // locate the value
-        const value = is_value_fkey_and_found
-          ? is_value_fkey_and_found.value
-          : value_or_reference;
+      // locate the value
+      const value = is_value_fkey_and_found
+        ? is_value_fkey_and_found.value
+        : value_or_reference;
 
-        return {
-          type: field.type,
-          response_id: response_reference_obj!.id,
-          form_field_id: field.id,
-          form_id: form_id,
-          value: JSON.stringify(value),
-          form_field_option_id: is_value_fkey_and_found
-            ? is_value_fkey_and_found.id
-            : null,
+      return {
+        type: field.type,
+        response_id: response_reference_obj!.id,
+        form_field_id: field.id,
+        form_id: form_id,
+        value: JSON.stringify(value),
+        form_field_option_id: is_value_fkey_and_found
+          ? is_value_fkey_and_found.id
+          : null,
+      };
+    })
+  );
+
+  if (v_fields_error) console.error("submit/err/fields", v_fields_error);
+
+  // ==================================================
+  // region complete hooks
+  // ==================================================
+
+  // hooks are not ready yet
+  // try {
+  //   await hooks({ form_id });
+  // } catch (e) {
+  //   console.error("submit/err/hooks", e);
+  // }
+
+  // endregion
+
+  // ==================================================
+  // region final response
+  // ==================================================
+
+  switch (meta.accept) {
+    case "application/json": {
+      // ==================================================
+      // region response building
+      // ==================================================
+
+      // build info
+      let info: any = {};
+
+      // if there are new fields
+      if (needs_to_be_created?.length) {
+        info.new_keys = {
+          message:
+            "There were new unknown fields in the request and the definitions are created automatically. To disable them, set 'unknown_field_handling_strategy' to 'ignore' or 'reject' in the form settings.",
+          data: {
+            keys: needs_to_be_created,
+            fields: v_form_fields!.filter((field: any) =>
+              needs_to_be_created!.includes(field.name)
+            ),
+          },
         };
-      })
-    )
-    .select();
+      }
 
-  // finally fetch the response for pingback
-  const { data: response, error: select_response_error } = await client
-    .from("response")
-    .select(
-      `
+      // build warning
+      let warning: any = {};
+
+      // if there are ignored fields
+      if (ignored_names.length > 0) {
+        warning.ignored_keys = {
+          message:
+            "There were unknown fields in the request. To allow them, set 'unknown_field_handling_strategy' to 'accept' in the form settings.",
+          data: { keys: ignored_names },
+        };
+      }
+
+      // endregion
+
+      // finally fetch the response for pingback
+      const { data: response, error: select_response_error } = await client
+        .from("response")
+        .select(
+          `
         *,
         response_field (
           *
         )
       `
-    )
-    .eq("id", response_reference_obj!.id)
-    .single();
+        )
+        .eq("id", response_reference_obj!.id)
+        .single();
 
-  if (select_response_error) {
-    console.error(select_response_error);
-  }
+      if (select_response_error) console.error(select_response_error);
 
-  // ==================================================
-  // region response building
-  // ==================================================
+      return NextResponse.json({
+        data: response,
+        raw: response?.raw,
+        warning: Object.keys(warning).length > 0 ? warning : null,
+        info: Object.keys(info).length > 0 ? info : null,
+        error: null,
+      });
+    }
+    case "text/html": {
+      if (is_ending_page_enabled && ending_page_template_id) {
+        return NextResponse.redirect(
+          formlink(HOST, form_id, "complete", {
+            rid: response_reference_obj.id,
+          }),
+          {
+            status: 301,
+          }
+        );
+      }
 
-  // build info
-  let info: any = {};
+      if (
+        is_redirect_after_response_uri_enabled &&
+        redirect_after_response_uri
+      ) {
+        return NextResponse.redirect(redirect_after_response_uri, {
+          status: 301,
+        });
+      }
 
-  // if there are new fields
-  if (needs_to_be_created?.length) {
-    info.new_keys = {
-      message:
-        "There were new unknown fields in the request and the definitions are created automatically. To disable them, set 'unknown_field_handling_strategy' to 'ignore' or 'reject' in the form settings.",
-      data: {
-        keys: needs_to_be_created,
-        fields: form_fields!.filter((field: any) =>
-          needs_to_be_created!.includes(field.name)
-        ),
-      },
-    };
-  }
-
-  // build warning
-  let warning: any = {};
-
-  // if there are ignored fields
-  if (ignored_names.length > 0) {
-    warning.ignored_keys = {
-      message:
-        "There were unknown fields in the request. To allow them, set 'unknown_field_handling_strategy' to 'accept' in the form settings.",
-      data: { keys: ignored_names },
-    };
+      return NextResponse.redirect(
+        formlink(HOST, form_id, "complete", {
+          rid: response_reference_obj.id,
+        }),
+        {
+          status: 301,
+        }
+      );
+    }
   }
 
   // endregion
+}
 
-  // ==================================================
-  // region complete hooks
-  // ==================================================
+function error(
+  code:
+    | 404
+    | 400
+    | 500
+    //
+    | typeof ERR.MISSING_REQUIRED_HIDDEN_FIELDS.code
+    | typeof ERR.UNKNOWN_FIELDS_NOT_ALLOWED.code
+    | typeof ERR.FORM_FORCE_CLOSED.code
+    | typeof ERR.FORM_CLOSED_WHILE_RESPONDING.code
+    | typeof ERR.FORM_RESPONSE_LIMIT_REACHED.code
+    | typeof ERR.FORM_RESPONSE_LIMIT_BY_CUSTOMER_REACHED.code
+    | typeof ERR.FORM_SOLD_OUT.code
+    | typeof ERR.FORM_OPTION_UNAVAILABLE.code
+    | typeof ERR.FORM_SCHEDULE_NOT_IN_RANGE.code,
+
+  data: {
+    form_id: string;
+    [key: string]: any;
+  },
+  meta: {
+    accept: "application/json" | "text/html";
+  }
+) {
+  const { form_id } = data;
+
+  const useredirect = meta.accept === "text/html";
+
+  if (useredirect) {
+    switch (code) {
+      case 404: {
+        return notFound();
+      }
+      case 400: {
+        return NextResponse.redirect(formlink(HOST, form_id, "badrequest"), {
+          status: 301,
+        });
+      }
+      case 500: {
+        return NextResponse.redirect(formlink(HOST, form_id, "badrequest"), {
+          status: 301,
+        });
+      }
+      case "MISSING_REQUIRED_HIDDEN_FIELDS": {
+        return NextResponse.redirect(
+          formlink(HOST, form_id, "badrequest", {
+            error: ERR.MISSING_REQUIRED_HIDDEN_FIELDS.code,
+          }),
+          {
+            status: 301,
+          }
+        );
+      }
+      case "UNKNOWN_FIELDS_NOT_ALLOWED": {
+        return NextResponse.redirect(
+          formlink(HOST, form_id, "badrequest", {
+            error: ERR.UNKNOWN_FIELDS_NOT_ALLOWED.code,
+          }),
+          {
+            status: 301,
+          }
+        );
+      }
+      case "FORM_FORCE_CLOSED": {
+        return NextResponse.redirect(
+          formlink(HOST, form_id, "formclosed", {
+            oops: ERR.FORM_CLOSED_WHILE_RESPONDING.code,
+          }),
+          {
+            status: 301,
+          }
+        );
+      }
+      case "FORM_CLOSED_WHILE_RESPONDING": {
+        return NextResponse.redirect(
+          formlink(HOST, form_id, "formclosed", {
+            oops: ERR.FORM_CLOSED_WHILE_RESPONDING.code,
+          }),
+          {
+            status: 301,
+          }
+        );
+      }
+      case "FORM_RESPONSE_LIMIT_REACHED": {
+        return NextResponse.redirect(
+          formlink(HOST, form_id, "formclosed", {
+            oops: ERR.FORM_CLOSED_WHILE_RESPONDING.code,
+          }),
+          {
+            status: 301,
+          }
+        );
+      }
+      case "FORM_RESPONSE_LIMIT_BY_CUSTOMER_REACHED": {
+        return NextResponse.redirect(
+          formlink(HOST, form_id, "alreadyresponded"),
+          {
+            status: 301,
+          }
+        );
+      }
+      case "FORM_SCHEDULE_NOT_IN_RANGE": {
+        return NextResponse.redirect(
+          formlink(HOST, form_id, "formclosed", {
+            oops: ERR.FORM_SCHEDULE_NOT_IN_RANGE.code,
+          }),
+          {
+            status: 301,
+          }
+        );
+      }
+      case "FORM_SOLD_OUT": {
+        return NextResponse.redirect(formlink(HOST, form_id, "formsoldout"), {
+          status: 301,
+        });
+      }
+      case "FORM_OPTION_UNAVAILABLE": {
+        return NextResponse.redirect(
+          formlink(HOST, form_id, "formoptionsoldout"),
+          {
+            status: 301,
+          }
+        );
+      }
+    }
+  } else {
+    let data: any = null;
+    switch (code) {
+      case 404: {
+        return NextResponse.json({ error: "Form not found" }, { status: 404 });
+      }
+      case 400: {
+        return NextResponse.json({ error: "Bad Request" }, { status: 400 });
+      }
+      case 500: {
+        return NextResponse.json(
+          { error: "Internal Server Error" },
+          { status: 500 }
+        );
+      }
+      case "MISSING_REQUIRED_HIDDEN_FIELDS":
+      case "UNKNOWN_FIELDS_NOT_ALLOWED": {
+        return NextResponse.json(
+          {
+            error: code,
+            message: ERR[code].message,
+            info: data,
+          },
+          { status: 400 }
+        );
+      }
+      case "FORM_FORCE_CLOSED":
+      case "FORM_CLOSED_WHILE_RESPONDING":
+      case "FORM_RESPONSE_LIMIT_REACHED":
+      case "FORM_RESPONSE_LIMIT_BY_CUSTOMER_REACHED":
+      case "FORM_SCHEDULE_NOT_IN_RANGE":
+      case "FORM_SOLD_OUT":
+      case "FORM_OPTION_UNAVAILABLE":
+      default: {
+        return NextResponse.json(
+          {
+            error: code,
+            message: ERR[code].message,
+            info: data,
+          },
+          { status: 403 }
+        );
+      }
+    }
+  }
+
+  //
+}
+
+async function hooks({ form_id }: { form_id: string }) {
+  // FIXME: DEV MODE
 
   // [emails]
 
@@ -618,73 +842,26 @@ async function submit({
     email: "no-reply@cors.sh",
   };
 
-  // FIXME: DEV MODE
-  const _email_enabled = false;
-  if (_email_enabled) {
-    await SubmissionHooks.send_email({
-      form_id: form_id,
-      type: "formcomplete",
-      from: {
-        name: business_profile.name,
-        email: business_profile.email,
-      },
-      to: "universe@grida.co",
-      lang: "en",
-    });
-    // send email
-  }
+  await SubmissionHooks.send_email({
+    form_id: form_id,
+    type: "formcomplete",
+    from: {
+      name: business_profile.name,
+      email: business_profile.email,
+    },
+    to: "universe@grida.co",
+    lang: "en",
+  });
 
   // [sms]
 
-  const _sms_enabled = false;
-  if (_sms_enabled) {
-    await SubmissionHooks.send_sms({
-      form_id: form_id,
-      type: "formcomplete",
-      to: "...",
-      lang: "en",
-    });
-    // send sms
-  }
-
-  // endregion
-
-  // ==================================================
-  // region final response
-  // ==================================================
-
-  if (is_ending_page_enabled && ending_page_template_id) {
-    return NextResponse.redirect(
-      formlink(HOST, form_id, "complete", {
-        rid: response?.id,
-      }),
-      {
-        status: 301,
-      }
-    );
-  }
-
-  if (is_redirect_after_response_uri_enabled && redirect_after_response_uri) {
-    return NextResponse.redirect(redirect_after_response_uri, {
-      status: 301,
-    });
-  }
-
-  return NextResponse.json({
-    data: response,
-    raw: response?.raw,
-    warning: Object.keys(warning).length > 0 ? warning : null,
-    info: Object.keys(info).length > 0 ? info : null,
-    error: null,
+  await SubmissionHooks.send_sms({
+    form_id: form_id,
+    type: "formcomplete",
+    to: "...",
+    lang: "en",
   });
-
-  // endregion
 }
-
-const val = (v?: string | null) => {
-  if (v) return v;
-  else return null;
-};
 
 function isObjectEmpty(obj: object | null | undefined) {
   try {
@@ -713,4 +890,27 @@ function ipinfogeo(ipinfo: IpInfo): Geo | null {
     country: ipinfo.country,
     region: ipinfo.region,
   };
+}
+
+/**
+ * parse accept header to determine to response with json or redirect
+ *
+ * default fallback is json
+ */
+function haccept(accept?: string | null): "application/json" | "text/html" {
+  if (accept) {
+    if (accept.includes("application/json")) return "application/json";
+    if (accept.includes("text/html")) return "text/html";
+  }
+  return "application/json";
+}
+
+async function fetchipinfo(ip?: string | null) {
+  if (!ip) return null;
+  try {
+    return await ipinfo(ip, process.env.IPINFO_ACCESS_TOKEN);
+  } catch (e) {
+    console.error(e);
+    return null;
+  }
 }

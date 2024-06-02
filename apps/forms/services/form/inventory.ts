@@ -2,7 +2,7 @@ import { grida_commerce_client } from "@/lib/supabase/server";
 import { GridaCommerceClient } from "../commerce";
 import assert from "assert";
 import { Option } from "@/types";
-import { FORM_OPTION_SOLD_OUT, FORM_SOLD_OUT } from "@/k/error";
+import { FORM_OPTION_UNAVAILABLE, FORM_SOLD_OUT } from "@/k/error";
 
 export type FormFieldOptionsInventoryMap = { [sku: string]: number };
 
@@ -46,7 +46,7 @@ export async function validate_options_inventory({
      */
     available_counting_strategy: "sum_all" | "sum_positive";
   };
-}): Promise<null | typeof FORM_SOLD_OUT | typeof FORM_OPTION_SOLD_OUT> {
+}): Promise<null | typeof FORM_SOLD_OUT | typeof FORM_OPTION_UNAVAILABLE> {
   const used_inventory = options.reduce(
     (acc: FormFieldOptionsInventoryMap, option) => {
       if (option.id in inventory) acc[option.id] = inventory[option.id];
@@ -79,7 +79,7 @@ export async function validate_options_inventory({
     // TODO: add validation if its a required field.
     // check if the selection is provided (used on submission)
     if (inventory[selection.id] === 0) {
-      return FORM_OPTION_SOLD_OUT;
+      return FORM_OPTION_UNAVAILABLE;
     }
   }
 

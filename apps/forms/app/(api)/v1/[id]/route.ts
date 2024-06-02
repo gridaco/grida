@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
   FORM_FORCE_CLOSED,
-  FORM_OPTION_SOLD_OUT,
+  FORM_OPTION_UNAVAILABLE,
   FORM_RESPONSE_LIMIT_BY_CUSTOMER_REACHED,
   FORM_RESPONSE_LIMIT_REACHED,
   FORM_SOLD_OUT,
@@ -90,7 +90,7 @@ export type FormClientFetchResponseError =
         | typeof FORM_RESPONSE_LIMIT_REACHED.code
         | typeof FORM_FORCE_CLOSED.code
         | typeof FORM_SOLD_OUT.code
-        | typeof FORM_OPTION_SOLD_OUT.code;
+        | typeof FORM_OPTION_UNAVAILABLE.code;
       message: string;
     };
 export interface MissingRequiredHiddenFieldsError {

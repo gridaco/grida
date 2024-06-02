@@ -146,7 +146,11 @@ export type FormFieldAutocompleteType =
   | "photo"
   | "webauthn";
 
-export type PlatformPoweredBy = "api" | "grida_forms" | "web_client";
+export type PlatformPoweredBy =
+  | "api"
+  | "grida_forms"
+  | "web_client"
+  | "simulator";
 
 export type FormFieldInit = {
   id?: string;

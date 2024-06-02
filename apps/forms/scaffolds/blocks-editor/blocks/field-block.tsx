@@ -15,7 +15,7 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from "@editor-ui/dropdown-menu";
+} from "@/components/ui/dropdown-menu";
 import { EditorFlatFormBlock } from "@/scaffolds/editor/state";
 import {
   BlockHeader,
@@ -239,16 +239,16 @@ export function FieldBlock({
             <DropdownMenuContent>
               {form_field_id && (
                 <DropdownMenuItem onClick={onFieldEditClick}>
-                  <Pencil1Icon />
+                  <Pencil1Icon className="me-2 align-middle" />
                   Edit Field Definition
                 </DropdownMenuItem>
               )}
               <DropdownMenuItem onClick={onLogicEditClick}>
-                <MixIcon />
+                <MixIcon className="me-2 align-middle" />
                 Logic
               </DropdownMenuItem>
               <DropdownMenuItem onClick={() => deleteBlock(id)}>
-                <TrashIcon />
+                <TrashIcon className="me-2 align-middle" />
                 Delete Block
               </DropdownMenuItem>
             </DropdownMenuContent>
