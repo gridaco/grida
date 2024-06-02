@@ -7,9 +7,15 @@ import {
   SYSTEM_X_GF_GEO_REGION_KEY,
   SYSTEM_X_GF_SIMULATOR_FLAG_KEY,
 } from "@/k/system";
-import { faker } from "@faker-js/faker";
+import { faker, fi } from "@faker-js/faker";
 import { nanoid } from "nanoid";
 import { v4 } from "uuid";
+import { FormRenderTree } from "../forms";
+import { createClientFormsClient } from "../supabase/client";
+import assert from "assert";
+import { FormPage } from "@/types";
+import { FieldSupports } from "@/k/supported_field_types";
+import { FormSubmitErrorCode } from "@/types/private/api";
 
 export interface SimulationPlan {
   n: number; // Total number of submissions
@@ -23,16 +29,19 @@ type ResponseCallback = (id: string, response: SimulatorSubmission) => void;
 type EndCallback = () => void;
 
 export interface SimulatorSubmission<T = any> {
-  _id: string;
+  __id: string;
   bot_id: string;
   requestedAt: Date;
   resolvedAt?: Date;
   status?: 200 | 400 | 500 | (number | {});
   data?: T;
+  response?: {
+    id: string;
+  };
   headers?: { [key: string]: string };
   error?: {
     message: string;
-    code: number;
+    code: FormSubmitErrorCode;
   };
 }
 
@@ -46,6 +55,8 @@ export class Simulator {
   private totalSubmitted: number = 0;
   private readonly bot_ids: ReadonlyArray<string> = [];
 
+  private __schema: FormRenderTree | null = null;
+
   constructor(
     readonly form_id: string,
     readonly plan: SimulationPlan,
@@ -58,7 +69,41 @@ export class Simulator {
     this.bot_ids = bot_ids;
   }
 
+  private async _fetch_form_schema() {
+    const { data } = await createClientFormsClient()
+      .from("form")
+      .select(
+        `
+          *,
+          fields:form_field(
+            *,
+            options:form_field_option(*)
+          ),
+          default_page:form_page!default_form_page_id(
+            *,
+            blocks:form_block(*)
+          )
+        `
+      )
+      .eq("id", this.form_id)
+      .single();
+
+    assert(!!data, "form not found");
+
+    const page_blocks = (data.default_page as unknown as FormPage).blocks;
+
+    this.__schema = new FormRenderTree(
+      data.id,
+      data.title,
+      data.description,
+      data.default_form_page_language,
+      data.fields,
+      page_blocks
+    );
+  }
+
   async start() {
+    await this._fetch_form_schema();
     while (this.totalSubmitted < this.plan.n && !this.isPaused) {
       const randomizedQueue = Math.floor(
         this.plan.maxq * (1 + (Math.random() - 0.5) * this.plan.randomness)
@@ -89,11 +134,11 @@ export class Simulator {
     }
   }
 
-  onResponse(callback: ResponseCallback) {
+  addOnRequestChangeListener(callback: ResponseCallback) {
     this.responseCallbacks.push(callback);
   }
 
-  offResponse(callback: ResponseCallback) {
+  removeOnRequestChangeListener(callback: ResponseCallback) {
     this.responseCallbacks = this.responseCallbacks.filter(
       (cb) => cb !== callback
     );
@@ -133,7 +178,7 @@ export class Simulator {
     try {
       const _id = nanoid();
       const request: SimulatorSubmission = {
-        _id,
+        __id: _id,
         bot_id,
         requestedAt: new Date(),
         status: undefined,
@@ -147,14 +192,16 @@ export class Simulator {
         return;
       }
       const response = await submit(this.form_id, formdata, headers);
+      const responsejson = await response.json();
+
       request.status = response.status;
+      request.response = responsejson.data;
       request.resolvedAt = new Date();
 
       if ((request.status as number) >= 400) {
-        const errdata = await response.json();
         request.error = {
-          code: errdata.error,
-          message: errdata.message,
+          code: responsejson.error,
+          message: responsejson.message,
         };
       }
       // Notify after response
@@ -173,9 +220,14 @@ export class Simulator {
     // Generate random form data
     const customer_uuid = this.identity;
 
+    const datafaker = new FormDataFaker(this.__schema!);
+
+    const formdata = datafaker.generate();
+
     return {
       formdata: {
         [SYSTEM_GF_CUSTOMER_UUID_KEY]: customer_uuid,
+        ...formdata,
       },
       headers: {
         [SYSTEM_X_GF_GEO_CITY_KEY]: faker.location.city(),
@@ -209,4 +261,57 @@ async function submit(form_id: string, data: any, headers: any = {}) {
     body: formdata,
     headers,
   });
+}
+
+class FormDataFaker {
+  constructor(readonly schema: FormRenderTree) {}
+
+  private randoption(field: string) {
+    // random option
+    const options = this.schema.options({ of: field });
+    const randop = this.rand(options);
+    return randop.id;
+  }
+
+  private rand<T>(arr: T[]) {
+    // random from array
+    return arr[Math.floor(Math.random() * arr.length)];
+  }
+
+  private randtext() {
+    // random text
+    return "__SIMULATED__ " + faker.lorem.sentence();
+  }
+
+  private randnumber() {
+    // random number
+    return faker.number.int(100);
+  }
+
+  generate() {
+    //
+    const data: any = {};
+
+    for (const field of this.schema.fields({ render: true })) {
+      const { id, name, options, type } = field;
+
+      if (FieldSupports.options(type)) {
+        data[name] = this.randoption(id);
+      } else {
+        switch (field.type) {
+          case "number":
+            data[name] = this.randnumber();
+            break;
+          case "text":
+            data[name] = this.randtext();
+            break;
+          default:
+            data[name] = this.randtext();
+            break;
+        }
+      }
+    }
+
+    return data;
+  }
 }
