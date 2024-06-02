@@ -87,8 +87,6 @@ export async function POST(
   }
   // #endregion
 
-  console.log("submit", form_id, data);
-
   return submit({ data, form_id, meta: meta(req, data) });
 }
 
