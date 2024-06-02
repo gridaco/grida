@@ -2,6 +2,7 @@
 
 import { GridaLogo } from "@/components/grida-logo";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Container } from "lucide-react";
 import Image from "next/image";
 
 const demo_1_categories = [
@@ -145,7 +146,7 @@ export default function PartnerPOC() {
               도움이 필요한 순간에 POC가 옆에서 도와드립니다.
             </span>
           </div>
-          <div className="flex flex-row gap-10 mt-12">
+          <div className="flex flex-col md:flex-row gap-10 mt-12">
             <div className="container px-8 py-8 border border-neutral-200 rounded shadow-lg">
               <div className="container bg-neutral-400 w-full h-48 px-5 rounded">
                 ...
@@ -185,20 +186,25 @@ export default function PartnerPOC() {
             </div>
           </div>
         </section>
-        <section className="container mx-auto my-40">
-          <div className=" max-w-full bg-muted py-36">
-            <h2 className=" text-4xl font-bold">
-              다양한 기업과의
-              <br />
-              행사 기획부터 개최까지
-            </h2>
-            <p className=" text-muted-foreground mt-6">
-              저희는 공공기관부터 스포츠 브랜드에 이르기까지
-              <br />
-              다양한 분야의 기업들과 행사를 기획해왔습니다.
-            </p>
-          </div>
-        </section>
+        <div className="bg-muted">
+          <section className="container mx-auto my-40">
+            <div className="flex flex-col md:flex-row">
+              <aside className="md:flex-1 py-36">
+                <h2 className=" text-4xl font-bold">
+                  다양한 기업과의
+                  <br />
+                  행사 기획부터 개최까지
+                </h2>
+                <p className=" text-muted-foreground mt-6">
+                  저희는 공공기관부터 스포츠 브랜드에 이르기까지
+                  <br />
+                  다양한 분야의 기업들과 행사를 기획해왔습니다.
+                </p>
+              </aside>
+              <aside className="md:flex-1 bg-red-300 min-h-40 my-8"></aside>
+            </div>
+          </section>
+        </div>
         <section className="container mx-auto my-40">
           <div>hh</div>
         </section>
