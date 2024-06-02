@@ -99,7 +99,7 @@ export const options_supported_field_types: FormInputType[] = [
   "toggle-group",
 ];
 
-export namespace FielSupports {
+export namespace FieldSupports {
   export function options(type: FormInputType) {
     return options_supported_field_types.includes(type);
   }

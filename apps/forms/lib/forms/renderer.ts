@@ -120,6 +120,8 @@ interface RenderTreeConfig {
 export class FormRenderTree {
   private readonly _m_render_blocks: ClientRenderBlock[];
   private readonly _m_render_fields: FormFieldDefinition[];
+  private readonly _m_options: Option[];
+  private readonly _m_options_by_field: Record<string, Option[]>;
   private readonly _m_tree: FormBlockTree<ClientRenderBlock[]>;
 
   constructor(
@@ -229,6 +231,19 @@ export class FormRenderTree {
         (b) => b.type === "field"
       ) as ClientFieldRenderBlock[];
 
+    this._m_options = this._m_fields
+      .map((f) => f.options)
+      .filter(Boolean)
+      .flat() as Option[];
+
+    this._m_options_by_field = _field_blocks.reduce(
+      (acc, b) => {
+        acc[b.field.id] = b.field.options as Option[];
+        return acc;
+      },
+      {} as Record<string, Option[]>
+    );
+
     const _render_field_ids = _field_blocks.map(
       (b: ClientFieldRenderBlock) => b.field.id
     );
@@ -295,6 +310,13 @@ export class FormRenderTree {
       return this._m_render_fields;
     }
     return this._m_fields;
+  }
+
+  public options(q?: { of: string }) {
+    if (q?.of) {
+      return this._m_options_by_field[q.of];
+    }
+    return this._m_options;
   }
 
   public validate() {

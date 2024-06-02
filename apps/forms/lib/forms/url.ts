@@ -1,3 +1,6 @@
+import { FormSubmitErrorCode } from "@/types/private/api";
+import * as ERR from "@/k/error";
+
 export function editorlink(
   origin: string,
   form_id: string,
@@ -64,4 +67,57 @@ function _form_state_link(
 ) {
   if (state) return `${host}/d/e/${form_id}/${state}`;
   return `${host}/d/e/${form_id}`;
+}
+
+export function formerrorlink(
+  host: string,
+  code: FormSubmitErrorCode,
+  data: {
+    form_id: string;
+    [key: string]: any;
+  }
+) {
+  const { form_id } = data;
+
+  switch (code) {
+    case "MISSING_REQUIRED_HIDDEN_FIELDS": {
+      return formlink(host, form_id, "badrequest", {
+        error: ERR.MISSING_REQUIRED_HIDDEN_FIELDS.code,
+      });
+    }
+    case "UNKNOWN_FIELDS_NOT_ALLOWED": {
+      return formlink(host, form_id, "badrequest", {
+        error: ERR.UNKNOWN_FIELDS_NOT_ALLOWED.code,
+      });
+    }
+    case "FORM_FORCE_CLOSED": {
+      return formlink(host, form_id, "formclosed", {
+        oops: ERR.FORM_CLOSED_WHILE_RESPONDING.code,
+      });
+    }
+    case "FORM_CLOSED_WHILE_RESPONDING": {
+      return formlink(host, form_id, "formclosed", {
+        oops: ERR.FORM_CLOSED_WHILE_RESPONDING.code,
+      });
+    }
+    case "FORM_RESPONSE_LIMIT_REACHED": {
+      return formlink(host, form_id, "formclosed", {
+        oops: ERR.FORM_CLOSED_WHILE_RESPONDING.code,
+      });
+    }
+    case "FORM_RESPONSE_LIMIT_BY_CUSTOMER_REACHED": {
+      return formlink(host, form_id, "alreadyresponded");
+    }
+    case "FORM_SCHEDULE_NOT_IN_RANGE": {
+      return formlink(host, form_id, "formclosed", {
+        oops: ERR.FORM_SCHEDULE_NOT_IN_RANGE.code,
+      });
+    }
+    case "FORM_SOLD_OUT": {
+      return formlink(host, form_id, "formsoldout");
+    }
+    case "FORM_OPTION_UNAVAILABLE": {
+      return formlink(host, form_id, "formoptionsoldout");
+    }
+  }
 }

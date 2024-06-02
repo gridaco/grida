@@ -47,7 +47,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import {
-  FielSupports,
+  FieldSupports,
   html5_multiple_supported_field_types,
   supported_field_autocomplete_types,
   supported_field_types,
@@ -466,7 +466,7 @@ export function FieldEditPanel({
     }
   };
 
-  const supports_options = FielSupports.options(type);
+  const supports_options = FieldSupports.options(type);
   const supports_pattern = input_can_have_pattern.includes(type);
   const supports_accept = type === "file";
 

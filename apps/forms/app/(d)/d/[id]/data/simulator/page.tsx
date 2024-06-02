@@ -24,15 +24,21 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { formerrorlink, formlink } from "@/lib/forms/url";
 import {
   SimulationPlan,
   Simulator,
   SimulatorSubmission,
 } from "@/lib/simulator";
+import { FormSubmitErrorCode } from "@/types/private/api";
+import { OpenInNewWindowIcon } from "@radix-ui/react-icons";
 import { format } from "date-fns";
+import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import toast from "react-hot-toast";
 import { useStopwatch, useTimer } from "react-timer-hook";
+
+const HOST_NAME = process.env.NEXT_PUBLIC_HOST_NAME || "http://localhost:3000";
 
 type SimulatorStatus = "none" | "idle" | "running" | "paused";
 
@@ -105,12 +111,12 @@ function TaskHandler({
   );
 
   const [isEnded, setIsEnded] = useState(false);
-  const [responses, setResponses] = useState<SimulatorSubmission[]>([]);
+  const [requests, setRequests] = useState<SimulatorSubmission[]>([]);
 
   useEffect(() => {
-    const handleNewResponse = (id: string, payload: SimulatorSubmission) => {
-      setResponses((prev) => {
-        const index = prev.findIndex((r) => r._id === id);
+    const handleRequestUpdate = (id: string, payload: SimulatorSubmission) => {
+      setRequests((prev) => {
+        const index = prev.findIndex((r) => r.__id === id);
         if (index >= 0) {
           const copy = [...prev];
           copy[index] = payload;
@@ -126,7 +132,7 @@ function TaskHandler({
       });
     };
 
-    simulator.onResponse(handleNewResponse);
+    simulator.addOnRequestChangeListener(handleRequestUpdate);
 
     simulator.onEnd(() => {
       setIsEnded(true);
@@ -139,7 +145,7 @@ function TaskHandler({
 
     return () => {
       simulator.pause();
-      simulator.offResponse(handleNewResponse);
+      simulator.removeOnRequestChangeListener(handleRequestUpdate);
     };
   }, [simulator]);
 
@@ -166,16 +172,16 @@ function TaskHandler({
           <CardContent className="text-sm">
             <ul>
               <li>
-                <strong>Total:</strong> {responses.length}
+                <strong>Total:</strong> {requests.length}
               </li>
               <li>
                 <strong>Accepted:</strong>{" "}
-                {responses.filter((r) => r.status === 200).length}
+                {requests.filter((r) => r.status === 200).length}
               </li>
               <li>
                 <strong>Error:</strong>{" "}
                 {
-                  responses.filter(
+                  requests.filter(
                     (r) =>
                       (r.status as number) >= 400 && (r.status as number) < 500
                   ).length
@@ -183,7 +189,7 @@ function TaskHandler({
               </li>
               <li>
                 <strong>Failed:</strong>{" "}
-                {responses.filter((r) => (r.status as number) >= 500).length}
+                {requests.filter((r) => (r.status as number) >= 500).length}
               </li>
             </ul>
           </CardContent>
@@ -194,7 +200,7 @@ function TaskHandler({
           <TableHeader>
             <TableRow>
               <TableHead>Status</TableHead>
-              <TableHead>Error Code</TableHead>
+              <TableHead>Result</TableHead>
               <TableHead>ID</TableHead>
               <TableHead>Bot</TableHead>
               <TableHead>Requested At</TableHead>
@@ -202,34 +208,57 @@ function TaskHandler({
             </TableRow>
           </TableHeader>
           <TableBody className="overflow-y-auto">
-            {responses.map((response, index) => (
+            {requests.map((request, index) => (
               <TableRow key={index}>
                 <TableCell>
-                  <StatusBadge status={response.status as number} />
+                  <StatusBadge status={request.status as number} />
                 </TableCell>
-                <TableCell>{response.error?.code ?? "--"}</TableCell>
+                <TableCell>
+                  <ErrorCodeLink form_id={form_id} code={request.error?.code} />
+                </TableCell>
+                <TableCell>
+                  {request.response?.id ? (
+                    <>
+                      <Link
+                        href={
+                          request.response.id
+                            ? formlink(HOST_NAME, form_id, "complete", {
+                                rid: request.response?.id,
+                              })
+                            : "#"
+                        }
+                        target="_blank"
+                        prefetch={false}
+                      >
+                        <small className="text-muted-foreground">
+                          {request.response.id}
+                          <OpenInNewWindowIcon className="inline w-3 h-3 ms-2 align-middle" />
+                        </small>
+                      </Link>
+                    </>
+                  ) : (
+                    <>
+                      <small className="text-muted-foreground">--</small>
+                    </>
+                  )}
+                </TableCell>
                 <TableCell>
                   <small className="text-muted-foreground">
-                    {response._id}
+                    {request.bot_id}
                   </small>
                 </TableCell>
                 <TableCell>
                   <small className="text-muted-foreground">
-                    {response.bot_id}
+                    {format(request.requestedAt, "HH:mm:ss.S")}
                   </small>
                 </TableCell>
                 <TableCell>
                   <small className="text-muted-foreground">
-                    {format(response.requestedAt, "HH:mm:ss.S")}
-                  </small>
-                </TableCell>
-                <TableCell>
-                  <small className="text-muted-foreground">
-                    {response.resolvedAt
-                      ? format(response.resolvedAt, "mm:ss.S")
+                    {request.resolvedAt
+                      ? format(request.resolvedAt, "mm:ss.S")
                       : ""}{" "}
-                    {response.resolvedAt
-                      ? `(${response.resolvedAt.getTime() - response.requestedAt.getTime()}ms)`
+                    {request.resolvedAt
+                      ? `(${request.resolvedAt.getTime() - request.requestedAt.getTime()}ms)`
                       : ""}
                   </small>
                 </TableCell>
@@ -240,6 +269,27 @@ function TaskHandler({
         <div ref={bottomRef} className="mb-20" />
       </div>
     </div>
+  );
+}
+
+function ErrorCodeLink({
+  form_id,
+  code,
+}: {
+  form_id: string;
+  code?: FormSubmitErrorCode;
+}) {
+  if (!code) {
+    return <>--</>;
+  }
+
+  let href = formerrorlink(HOST_NAME, code, { form_id });
+
+  return (
+    <Link href={href} target="_blank" prefetch={false}>
+      {code}
+      <OpenInNewWindowIcon className="inline w-3 h-3 ms-2 align-middle" />
+    </Link>
   );
 }
 

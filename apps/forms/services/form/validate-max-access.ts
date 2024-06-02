@@ -58,6 +58,7 @@ export async function validate_max_access_by_form({
   if (!is_max_form_responses_in_total_enabled) {
     return null;
   }
+  // TODO: migrate with counter rpc, since it can raise 502 on high load
   //
   const { count, error } = await client
     .from("response")
@@ -94,6 +95,7 @@ export async function validate_max_access_by_customer({
   // response number by customer
   if (customer_id) {
     //
+    // TODO: migrate with counter rpc, since it can raise 502 on high load
     const { count, data, error } = await client
       .from("response")
       .select("id", { count: "exact" })
