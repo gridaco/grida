@@ -11,7 +11,7 @@ import {
 } from "@/k/system";
 import { client, grida_commerce_client } from "@/lib/supabase/server";
 import { upsert_customer_with } from "@/services/customer";
-import { validate_max_access } from "@/services/form/validate-max-access";
+import { validate_max_access_by_customer } from "@/services/form/validate-max-access";
 import { is_uuid_v4 } from "@/utils/is";
 import { NextRequest, NextResponse } from "next/server";
 import { formlink } from "@/lib/forms/url";
@@ -202,14 +202,9 @@ async function submit({
     is_ending_page_enabled,
     ending_page_template_id,
     redirect_after_response_uri,
-    is_max_form_responses_in_total_enabled,
-    max_form_responses_in_total,
     is_max_form_responses_by_customer_enabled,
     max_form_responses_by_customer,
     is_force_closed,
-    is_scheduling_enabled,
-    scheduling_open_at,
-    scheduling_close_at,
     store_connection,
     fields,
   } = form_reference;
@@ -281,43 +276,17 @@ async function submit({
   }
 
   // validation - check if new response is accepted for custoemer
-  const max_access_error = await validate_max_access({
+  // note: per form validation is ready with db constraints.
+  // TODO: this also needs to be migrated to db constraints
+  const max_access_by_customer_error = await validate_max_access_by_customer({
     form_id,
     customer_id: customer?.uid,
-    is_max_form_responses_in_total_enabled,
-    max_form_responses_in_total,
     is_max_form_responses_by_customer_enabled,
     max_form_responses_by_customer,
   });
 
-  if (max_access_error) {
-    switch (max_access_error.code) {
-      case "FORM_RESPONSE_LIMIT_BY_CUSTOMER_REACHED":
-      case "FORM_RESPONSE_LIMIT_REACHED": {
-        return error(max_access_error.code, { form_id }, meta);
-      }
-      default:
-        return NextResponse.json(
-          {
-            error: max_access_error,
-          },
-          {
-            status: 400,
-          }
-        );
-    }
-  }
-
-  // validation - check if form is open by schedule
-  if (is_scheduling_enabled) {
-    const isopen = Features.isopen({
-      open: scheduling_open_at,
-      close: scheduling_close_at,
-    });
-
-    if (!isopen) {
-      return error(ERR.FORM_SCHEDULE_NOT_IN_RANGE.code, { form_id }, meta);
-    }
+  if (max_access_by_customer_error) {
+    return error(max_access_by_customer_error.code, { form_id }, meta);
   }
 
   // validatopn - check if user selected option is connected to inventory and is available
