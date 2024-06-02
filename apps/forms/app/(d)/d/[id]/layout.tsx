@@ -136,7 +136,7 @@ function Header({ form_id, title }: { form_id: string; title: string }) {
     <header className="px-4 flex flex-col w-full gap-4 border-b z-10">
       <div className="w-full flex gap-4">
         <div className="w-1/3 flex items-center justify-start">
-          <Link href="/dashboard">
+          <Link href="/dashboard" prefetch={false}>
             <span className="flex items-center gap-2 text-md font-black select-none">
               <GridaLogo size={15} />
               Forms
