@@ -173,8 +173,17 @@ function TaskHandler({
                 {responses.filter((r) => r.status === 200).length}
               </li>
               <li>
-                <strong>Rejected:</strong>{" "}
-                {responses.filter((r) => (r.status as number) >= 400).length}
+                <strong>Error:</strong>{" "}
+                {
+                  responses.filter(
+                    (r) =>
+                      (r.status as number) >= 400 && (r.status as number) < 500
+                  ).length
+                }
+              </li>
+              <li>
+                <strong>Failed:</strong>{" "}
+                {responses.filter((r) => (r.status as number) >= 500).length}
               </li>
             </ul>
           </CardContent>
@@ -330,8 +339,8 @@ function SimulationPlanner({
         <Slider
           id="maxq"
           min={1}
-          step={1}
-          max={100}
+          step={5}
+          max={1000}
           value={[maxq]}
           onValueChange={(v) => setMaxQ(v[0])}
         />
