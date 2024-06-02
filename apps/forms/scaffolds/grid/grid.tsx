@@ -23,9 +23,8 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuPortal,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "@editor-ui/dropdown-menu";
+} from "@/components/ui/dropdown-menu";
 import { FormInputType } from "@/types";
 import { JsonEditCell } from "./json-cell";
 import { useEditorState } from "../editor";
@@ -220,11 +219,11 @@ function FieldHeaderCell({
         <DropdownMenuPortal>
           <DropdownMenuContent className="z-50">
             <DropdownMenuItem onClick={onEditClick}>
-              <Pencil1Icon />
+              <Pencil1Icon className="me-2 align-middle" />
               Edit Field
             </DropdownMenuItem>
             <DropdownMenuItem onClick={onDeleteClick}>
-              <TrashIcon />
+              <TrashIcon className="me-2 align-middle" />
               Delete Field
             </DropdownMenuItem>
           </DropdownMenuContent>

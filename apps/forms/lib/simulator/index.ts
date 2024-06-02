@@ -25,6 +25,7 @@ type EndCallback = () => void;
 export interface SimulatorSubmission<T = any> {
   _id: string;
   bot_id: string;
+  requestedAt: Date;
   resolvedAt?: Date;
   status?: 200 | 400 | 500 | (number | {});
   data?: T;
@@ -134,6 +135,7 @@ export class Simulator {
       const request: SimulatorSubmission = {
         _id,
         bot_id,
+        requestedAt: new Date(),
         status: undefined,
         data: formdata,
         headers,
