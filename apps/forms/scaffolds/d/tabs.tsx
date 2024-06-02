@@ -13,16 +13,16 @@ export function Tabs({ form_id: id }: { form_id: string }) {
 
   return (
     <nav className="flex items-center justify-between lg:justify-center gap-4">
-      <Link href={`/d/${id}/data`} className="flex-1">
+      <Link href={`/d/${id}/data`} prefetch={false} className="flex-1">
         <Tab selected={tab === "data"}>Data</Tab>
       </Link>
-      <Link href={`/d/${id}/blocks`} className="flex-1">
+      <Link href={`/d/${id}/blocks`} prefetch={false} className="flex-1">
         <Tab selected={tab === "blocks"}>Blocks</Tab>
       </Link>
-      <Link href={`/d/${id}/connect`} className="flex-1">
+      <Link href={`/d/${id}/connect`} prefetch={false} className="flex-1">
         <Tab selected={tab === "connect"}>Connect</Tab>
       </Link>
-      <Link href={`/d/${id}/settings`} className="flex-1">
+      <Link href={`/d/${id}/settings`} prefetch={false} className="flex-1">
         <Tab selected={tab === "settings"}>Settings</Tab>
       </Link>
     </nav>
