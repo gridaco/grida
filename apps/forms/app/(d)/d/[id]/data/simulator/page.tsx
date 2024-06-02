@@ -158,9 +158,9 @@ function TaskHandler({
         />
         <Card>
           <CardHeader>
-            <h2>Responses</h2>
+            <h2>Requests</h2>
             <small className="text-muted-foreground">
-              Responses from the simulation
+              Requests from the simulation
             </small>
           </CardHeader>
           <CardContent className="text-sm">
@@ -188,6 +188,7 @@ function TaskHandler({
               <TableHead>Error Code</TableHead>
               <TableHead>ID</TableHead>
               <TableHead>Bot</TableHead>
+              <TableHead>Requested At</TableHead>
               <TableHead>Resolved At</TableHead>
             </TableRow>
           </TableHeader>
@@ -210,8 +211,16 @@ function TaskHandler({
                 </TableCell>
                 <TableCell>
                   <small className="text-muted-foreground">
+                    {format(response.requestedAt, "HH:mm:ss.S")}
+                  </small>
+                </TableCell>
+                <TableCell>
+                  <small className="text-muted-foreground">
                     {response.resolvedAt
-                      ? format(response.resolvedAt, "HH:mm:ss.SSS")
+                      ? format(response.resolvedAt, "mm:ss.S")
+                      : ""}{" "}
+                    {response.resolvedAt
+                      ? `(${response.resolvedAt.getTime() - response.requestedAt.getTime()}ms)`
                       : ""}
                   </small>
                 </TableCell>
