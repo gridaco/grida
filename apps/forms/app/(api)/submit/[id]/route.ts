@@ -14,7 +14,7 @@ import { upsert_customer_with } from "@/services/customer";
 import { validate_max_access_by_customer } from "@/services/form/validate-max-access";
 import { is_uuid_v4 } from "@/utils/is";
 import { NextRequest, NextResponse } from "next/server";
-import { formlink } from "@/lib/forms/url";
+import { formerrorlink, formlink } from "@/lib/forms/url";
 import * as ERR from "@/k/error";
 import {
   FormFieldOptionsInventoryMap,
@@ -30,6 +30,7 @@ import type { Geo, PlatformPoweredBy } from "@/types";
 import { PGXXError } from "@/k/errcode";
 import { qboolean, qval } from "@/utils/qs";
 import { notFound } from "next/navigation";
+import { FormSubmitErrorCode } from "@/types/private/api";
 
 const HOST = process.env.HOST || "http://localhost:3000";
 
@@ -85,6 +86,8 @@ export async function POST(
     );
   }
   // #endregion
+
+  console.log("submit", form_id, data);
 
   return submit({ data, form_id, meta: meta(req, data) });
 }
@@ -633,15 +636,7 @@ function error(
     | 400
     | 500
     //
-    | typeof ERR.MISSING_REQUIRED_HIDDEN_FIELDS.code
-    | typeof ERR.UNKNOWN_FIELDS_NOT_ALLOWED.code
-    | typeof ERR.FORM_FORCE_CLOSED.code
-    | typeof ERR.FORM_CLOSED_WHILE_RESPONDING.code
-    | typeof ERR.FORM_RESPONSE_LIMIT_REACHED.code
-    | typeof ERR.FORM_RESPONSE_LIMIT_BY_CUSTOMER_REACHED.code
-    | typeof ERR.FORM_SOLD_OUT.code
-    | typeof ERR.FORM_OPTION_UNAVAILABLE.code
-    | typeof ERR.FORM_SCHEDULE_NOT_IN_RANGE.code,
+    | FormSubmitErrorCode,
 
   data: {
     form_id: string;
@@ -670,86 +665,16 @@ function error(
           status: 301,
         });
       }
-      case "MISSING_REQUIRED_HIDDEN_FIELDS": {
-        return NextResponse.redirect(
-          formlink(HOST, form_id, "badrequest", {
-            error: ERR.MISSING_REQUIRED_HIDDEN_FIELDS.code,
-          }),
-          {
-            status: 301,
-          }
-        );
-      }
-      case "UNKNOWN_FIELDS_NOT_ALLOWED": {
-        return NextResponse.redirect(
-          formlink(HOST, form_id, "badrequest", {
-            error: ERR.UNKNOWN_FIELDS_NOT_ALLOWED.code,
-          }),
-          {
-            status: 301,
-          }
-        );
-      }
-      case "FORM_FORCE_CLOSED": {
-        return NextResponse.redirect(
-          formlink(HOST, form_id, "formclosed", {
-            oops: ERR.FORM_CLOSED_WHILE_RESPONDING.code,
-          }),
-          {
-            status: 301,
-          }
-        );
-      }
-      case "FORM_CLOSED_WHILE_RESPONDING": {
-        return NextResponse.redirect(
-          formlink(HOST, form_id, "formclosed", {
-            oops: ERR.FORM_CLOSED_WHILE_RESPONDING.code,
-          }),
-          {
-            status: 301,
-          }
-        );
-      }
-      case "FORM_RESPONSE_LIMIT_REACHED": {
-        return NextResponse.redirect(
-          formlink(HOST, form_id, "formclosed", {
-            oops: ERR.FORM_CLOSED_WHILE_RESPONDING.code,
-          }),
-          {
-            status: 301,
-          }
-        );
-      }
-      case "FORM_RESPONSE_LIMIT_BY_CUSTOMER_REACHED": {
-        return NextResponse.redirect(
-          formlink(HOST, form_id, "alreadyresponded"),
-          {
-            status: 301,
-          }
-        );
-      }
-      case "FORM_SCHEDULE_NOT_IN_RANGE": {
-        return NextResponse.redirect(
-          formlink(HOST, form_id, "formclosed", {
-            oops: ERR.FORM_SCHEDULE_NOT_IN_RANGE.code,
-          }),
-          {
-            status: 301,
-          }
-        );
-      }
-      case "FORM_SOLD_OUT": {
-        return NextResponse.redirect(formlink(HOST, form_id, "formsoldout"), {
-          status: 301,
-        });
-      }
+      case "MISSING_REQUIRED_HIDDEN_FIELDS":
+      case "UNKNOWN_FIELDS_NOT_ALLOWED":
+      case "FORM_FORCE_CLOSED":
+      case "FORM_CLOSED_WHILE_RESPONDING":
+      case "FORM_RESPONSE_LIMIT_REACHED":
+      case "FORM_RESPONSE_LIMIT_BY_CUSTOMER_REACHED":
+      case "FORM_SCHEDULE_NOT_IN_RANGE":
+      case "FORM_SOLD_OUT":
       case "FORM_OPTION_UNAVAILABLE": {
-        return NextResponse.redirect(
-          formlink(HOST, form_id, "formoptionsoldout"),
-          {
-            status: 301,
-          }
-        );
+        return formerrorlink(HOST, code, data);
       }
     }
   } else {
