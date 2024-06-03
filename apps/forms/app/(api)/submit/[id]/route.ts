@@ -395,17 +395,29 @@ async function submit({
       return error(inventory_access_error.code, { form_id }, meta);
     }
 
-    // FIXME: this needs to be done after the response is inserted
     if (selection_id) {
       // TODO: only supports single inventory option selection
+      // TODO: this needs to be done via RPC
       // update the inventory as selected
-      await commerce.upsertInventoryItem({
+      const { error: inventory_error } = await commerce.upsertInventoryItem({
         sku: selection_id,
         level: {
           diff: -1,
           reason: "order",
         },
       });
+
+      if (inventory_error) {
+        switch (inventory_error.code) {
+          case PGXXError.XX320: {
+            return error(ERR.FORM_OPTION_UNAVAILABLE.code, { form_id }, meta);
+          }
+          default: {
+            console.error("submit/err/inventory", inventory_error);
+            return error(500, { form_id }, meta);
+          }
+        }
+      }
     }
   }
 

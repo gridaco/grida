@@ -34,23 +34,38 @@ export class GridaCommerceClient {
   async upsertInventoryItem({
     sku,
     level,
+    config,
   }: {
     sku: string;
     level?: {
       diff: number;
       reason?: "admin" | "order" | "other" | "initialize";
     };
+    config?: {
+      /**
+       * @default false
+       */
+      upsert?: boolean;
+      /**
+       * @default true
+       */
+      allow_negative_inventory?: boolean;
+    };
   }) {
     assert(this.store_id, "store_id is required");
     //
 
-    const upsert_result = await this.client.from("inventory_item").upsert(
-      {
-        store_id: this.store_id,
-        sku: sku,
-      },
-      { onConflict: "store_id, sku" }
-    );
+    if (config?.upsert) {
+      await this.client.from("inventory_item").upsert(
+        {
+          store_id: this.store_id,
+          sku: sku,
+          is_negative_level_allowed:
+            config?.allow_negative_inventory ?? undefined,
+        },
+        { onConflict: "store_id, sku" }
+      );
+    }
 
     if (level) {
       const { diff, reason } = level;
@@ -74,10 +89,10 @@ export class GridaCommerceClient {
 
       const { id: lowest_level_id } = _sorted_levels[0];
 
-      await this.adjustInventoryLevel(lowest_level_id, diff, reason);
+      return await this.adjustInventoryLevel(lowest_level_id, diff, reason);
     }
 
-    return upsert_result;
+    return { error: null };
   }
 
   async adjustInventoryLevel(
@@ -85,7 +100,7 @@ export class GridaCommerceClient {
     diff: number,
     reason?: "admin" | "order" | "other" | "initialize"
   ) {
-    return await this.client.from("inventory_level_commit").insert({
+    return this.client.from("inventory_level_commit").insert({
       inventory_level_id,
       diff,
       reason: reason,
