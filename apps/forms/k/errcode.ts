@@ -4,6 +4,10 @@
 ///
 
 export namespace PGXXError {
+  // ==================================================
+  // region 2 - grida_forms
+  // ==================================================
+
   /**
    * The form is force closed.
    *
@@ -62,4 +66,17 @@ export namespace PGXXError {
    * - 2(error code - form is not open yet by scheduler)
    */
   export const XX232 = "XX232";
+
+  // ==================================================
+  // region 3 - grida_commerce
+  // ==================================================
+  /**
+   * The Inventory Level is at 0 and configured to not allow negative inventory.
+   * An error is thrown when trying to reduce the inventory level, and the level is already at 0.
+   *
+   * - 3(grida_commerce)
+   * - 2(inventory)
+   * - 0(error code - 0 inventory)
+   */
+  export const XX320 = "XX320";
 }

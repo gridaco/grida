@@ -179,7 +179,7 @@ function TaskHandler({
                 {requests.filter((r) => r.status === 200).length}
               </li>
               <li>
-                <strong>Error:</strong>{" "}
+                <strong>Rejected:</strong>{" "}
                 {
                   requests.filter(
                     (r) =>
@@ -188,7 +188,7 @@ function TaskHandler({
                 }
               </li>
               <li>
-                <strong>Failed:</strong>{" "}
+                <strong>Error:</strong>{" "}
                 {requests.filter((r) => (r.status as number) >= 500).length}
               </li>
             </ul>

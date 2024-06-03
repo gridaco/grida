@@ -191,19 +191,32 @@ export class Simulator {
       if (this.dryrun) {
         return;
       }
-      const response = await submit(this.form_id, formdata, headers);
-      const responsejson = await response.json();
 
-      request.status = response.status;
-      request.response = responsejson.data;
-      request.resolvedAt = new Date();
+      try {
+        const response = await submit(this.form_id, formdata, headers);
+        const responsejson = await response
+          .json()
+          .catch(() => ({ error: null, message: "Invalid JSON response" }));
 
-      if ((request.status as number) >= 400) {
+        request.status = response.status;
+        request.response = responsejson.data;
+        request.resolvedAt = new Date();
+
+        if (!response.ok) {
+          request.error = {
+            code: responsejson.error,
+            message: responsejson.message,
+          };
+        }
+      } catch (e) {
+        console.error("Form submission failed", e);
+        // possibly when json parsing fails
         request.error = {
-          code: responsejson.error,
-          message: responsejson.message,
+          code: "INTERNAL_SERVER_ERROR",
+          message: "Internal server error",
         };
       }
+
       // Notify after response
       this.responseCallbacks.forEach((cb) => cb(_id, request));
     } catch (error) {

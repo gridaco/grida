@@ -15,6 +15,7 @@ export type Database = {
           cost: number | null
           created_at: string
           id: number
+          is_negative_level_allowed: boolean
           product_id: number | null
           sku: string
           store_id: number
@@ -25,6 +26,7 @@ export type Database = {
           cost?: number | null
           created_at?: string
           id?: number
+          is_negative_level_allowed?: boolean
           product_id?: number | null
           sku: string
           store_id: number
@@ -35,6 +37,7 @@ export type Database = {
           cost?: number | null
           created_at?: string
           id?: number
+          is_negative_level_allowed?: boolean
           product_id?: number | null
           sku?: string
           store_id?: number
@@ -1262,7 +1265,7 @@ export type Database = {
           browser: string | null
           created_at: string
           customer_id: string | null
-          form_id: string | null
+          form_id: string
           geo: Json | null
           id: string
           ip: string | null
@@ -1281,7 +1284,7 @@ export type Database = {
           browser?: string | null
           created_at?: string
           customer_id?: string | null
-          form_id?: string | null
+          form_id: string
           geo?: Json | null
           id?: string
           ip?: string | null
@@ -1300,7 +1303,7 @@ export type Database = {
           browser?: string | null
           created_at?: string
           customer_id?: string | null
-          form_id?: string | null
+          form_id?: string
           geo?: Json | null
           id?: string
           ip?: string | null
@@ -1453,7 +1456,18 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      core_check_max_responses: {
+        Args: {
+          p_form_id: string
+        }
+        Returns: undefined
+      }
+      rpc_check_max_responses: {
+        Args: {
+          form_id: string
+        }
+        Returns: undefined
+      }
     }
     Enums: {
       form_block_type:

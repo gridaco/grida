@@ -26,7 +26,10 @@ import {
   form_field_options_inventory,
   validate_options_inventory,
 } from "@/services/form/inventory";
-import { validate_max_access } from "@/services/form/validate-max-access";
+import {
+  validate_max_access_by_customer,
+  validate_max_access_by_form,
+} from "@/services/form/validate-max-access";
 import { is_uuid_v4 } from "@/utils/is";
 import i18next from "i18next";
 import { cookies } from "next/headers";
@@ -334,32 +337,48 @@ export async function GET(
     }
   }
 
-  // validation 3
-  const max_access_error = await validate_max_access({
-    form_id: id,
-    customer_id: customer?.uid,
-    is_max_form_responses_in_total_enabled,
-    max_form_responses_in_total,
-    is_max_form_responses_by_customer_enabled,
-    max_form_responses_by_customer,
-  });
-  if (max_access_error) {
-    switch (max_access_error.code) {
-      case "FORM_RESPONSE_LIMIT_BY_CUSTOMER_REACHED":
-        const error: MaxResponseByCustomerError = {
-          ...max_access_error,
-          customer_id: customer?.uid,
-          __gf_customer_email,
-          __gf_customer_uuid,
-          __gf_fp_fingerprintjs_visitorid,
-        };
-        console.error("max access error", error);
-        response.error = error;
-        break;
-      case "FORM_RESPONSE_LIMIT_REACHED": {
-        response.error = max_access_error;
-        console.error("max access error", max_access_error);
-        break;
+  // validation max access
+  if (is_max_form_responses_in_total_enabled) {
+    const max_access_error = await validate_max_access_by_form({ form_id: id });
+    if (max_access_error) {
+      switch (max_access_error.code) {
+        case "FORM_RESPONSE_LIMIT_REACHED": {
+          response.error = max_access_error;
+          console.error("session/err", max_access_error);
+          break;
+        }
+        default: {
+          return NextResponse.error();
+        }
+      }
+    }
+  }
+
+  // validation max access by customer
+  if (is_max_form_responses_by_customer_enabled) {
+    const max_access_by_customer_error = await validate_max_access_by_customer({
+      form_id: id,
+      customer_id: customer?.uid,
+      is_max_form_responses_by_customer_enabled,
+      max_form_responses_by_customer,
+    });
+    if (max_access_by_customer_error) {
+      switch (max_access_by_customer_error.code) {
+        case "FORM_RESPONSE_LIMIT_BY_CUSTOMER_REACHED": {
+          const error: MaxResponseByCustomerError = {
+            ...max_access_by_customer_error,
+            customer_id: customer?.uid,
+            __gf_customer_email,
+            __gf_customer_uuid,
+            __gf_fp_fingerprintjs_visitorid,
+          };
+          console.error("session/err", error);
+          response.error = error;
+          break;
+        }
+        default: {
+          return NextResponse.error();
+        }
       }
     }
   }
@@ -371,7 +390,7 @@ export async function GET(
 
   // validation - check if form is open by schedule
   if (is_scheduling_enabled) {
-    const isopen = Features.isopen({
+    const isopen = Features.schedule_in_range({
       open: scheduling_open_at,
       close: scheduling_close_at,
     });

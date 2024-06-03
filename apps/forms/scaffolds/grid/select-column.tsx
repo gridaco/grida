@@ -165,7 +165,7 @@ function SelectCellFormatter({
               <Tooltip.Arrow />
               <div
                 className={
-                  "rounded bg-white py-1 px-2 leading-none shadow border border-background"
+                  "bg-background rounded border py-1 px-2 leading-none shadow"
                 }
               >
                 <span className="text-xs text-foreground">Expand row</span>
