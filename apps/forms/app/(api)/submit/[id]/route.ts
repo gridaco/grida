@@ -9,9 +9,13 @@ import {
   SYSTEM_X_GF_GEO_REGION_KEY,
   SYSTEM_X_GF_SIMULATOR_FLAG_KEY,
 } from "@/k/system";
+// TODO: need RLS?
 import { client, grida_commerce_client } from "@/lib/supabase/server";
 import { upsert_customer_with } from "@/services/customer";
-import { validate_max_access_by_customer } from "@/services/form/validate-max-access";
+import {
+  validate_max_access_by_customer,
+  validate_max_access_by_form,
+} from "@/services/form/validate-max-access";
 import { is_uuid_v4 } from "@/utils/is";
 import { NextRequest, NextResponse } from "next/server";
 import { formerrorlink, formlink } from "@/lib/forms/url";
@@ -205,6 +209,7 @@ async function submit({
     redirect_after_response_uri,
     is_force_closed,
     is_scheduling_enabled,
+    is_max_form_responses_in_total_enabled,
     is_max_form_responses_by_customer_enabled,
     max_form_responses_by_customer,
     scheduling_open_at,
@@ -262,12 +267,6 @@ async function submit({
     return error(ERR.FORM_CLOSED_WHILE_RESPONDING.code, { form_id }, meta);
   }
 
-  // access validation - check max response limit
-  // (also checked in the db constraints)
-  // [PLACEHOLDER] ------------------------------------
-  // :: since this needs a exact counting, this will only be performed when inserting the response, checked by db constraints
-  // --------------------------------------------------
-
   // access validation - check if form is in schedule range
   // (also checked in the db constraints)
   if (is_scheduling_enabled) {
@@ -278,6 +277,23 @@ async function submit({
 
     if (!is_schedule_in_range) {
       return error(ERR.FORM_SCHEDULE_NOT_IN_RANGE.code, { form_id }, meta);
+    }
+  }
+
+  // access validation - check max response limit
+  // (also checked in the db constraints)
+  if (is_max_form_responses_in_total_enabled) {
+    const max_response_error = await validate_max_access_by_form({ form_id });
+
+    if (max_response_error) {
+      switch (max_response_error.code) {
+        case "FORM_RESPONSE_LIMIT_REACHED": {
+          return error(ERR.FORM_RESPONSE_LIMIT_REACHED.code, { form_id }, meta);
+        }
+        default: {
+          return error(500, { form_id }, meta);
+        }
+      }
     }
   }
 
@@ -298,7 +314,7 @@ async function submit({
   // endregion
 
   // ==================================================
-  // dara validation
+  // data validation
   // ==================================================
 
   // validation - check if all value is present for required hidden fields
