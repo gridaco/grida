@@ -112,7 +112,13 @@ export class GridaCommerceClient {
 
       const { id: lowest_level_id } = _sorted_levels[0];
 
-      return await this.adjustInventoryLevel(lowest_level_id, diff, reason);
+      const { error: commit_error } = await this.adjustInventoryLevel(
+        lowest_level_id,
+        diff,
+        reason
+      );
+
+      if (commit_error) return { error: commit_error };
     }
 
     if (config?.upsert && !is_upserted) {
