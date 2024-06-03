@@ -3,6 +3,7 @@ import { InventoryLevelCommit } from "../inventory";
 import * as ERR from "@/k/error";
 
 export type FormSubmitErrorCode =
+  | typeof ERR.SERVICE_ERROR.code
   | typeof ERR.MISSING_REQUIRED_HIDDEN_FIELDS.code
   | typeof ERR.UNKNOWN_FIELDS_NOT_ALLOWED.code
   | typeof ERR.FORM_FORCE_CLOSED.code

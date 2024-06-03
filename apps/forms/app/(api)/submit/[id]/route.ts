@@ -715,6 +715,7 @@ function error(
           status: 301,
         });
       }
+      case "INTERNAL_SERVER_ERROR":
       case "MISSING_REQUIRED_HIDDEN_FIELDS":
       case "UNKNOWN_FIELDS_NOT_ALLOWED":
       case "FORM_FORCE_CLOSED":
@@ -738,6 +739,7 @@ function error(
       case 400: {
         return NextResponse.json({ error: "Bad Request" }, { status: 400 });
       }
+      case "INTERNAL_SERVER_ERROR":
       case 500: {
         return NextResponse.json(
           { error: "Internal Server Error" },

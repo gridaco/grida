@@ -80,6 +80,9 @@ export function formerrorlink(
   const { form_id } = data;
 
   switch (code) {
+    case "INTERNAL_SERVER_ERROR": {
+      return formlink(host, form_id, "developererror");
+    }
     case "MISSING_REQUIRED_HIDDEN_FIELDS": {
       return formlink(host, form_id, "badrequest", {
         error: ERR.MISSING_REQUIRED_HIDDEN_FIELDS.code,
