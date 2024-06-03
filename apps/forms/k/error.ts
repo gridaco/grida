@@ -1,3 +1,8 @@
+export const SERVICE_ERROR = {
+  code: "INTERNAL_SERVER_ERROR",
+  message: "Internal server error",
+} as const;
+
 export const MISSING_REQUIRED_HIDDEN_FIELDS = {
   code: "MISSING_REQUIRED_HIDDEN_FIELDS",
   message:
