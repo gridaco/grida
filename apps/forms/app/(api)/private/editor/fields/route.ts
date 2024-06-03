@@ -148,15 +148,19 @@ export async function POST(req: NextRequest) {
     for (const inventory_item of Object.entries(options_inventory)) {
       const [sku, mut] = inventory_item;
       const { diff } = mut;
-      const { error } = await commerce.upsertInventoryItem({
-        sku,
-        level: { diff, reason: "admin" },
-        config: {
-          upsert: true,
-          // TODO: need a ui to toggle this.
-          allow_negative_inventory: false,
-        },
-      });
+      // TODO: this needs to be in a single transaction (otherwise, some would update and some would not)
+      const { error: inventory_upsertion_error } =
+        await commerce.upsertInventoryItem({
+          sku,
+          level: { diff, reason: "admin" },
+          config: {
+            upsert: true,
+            // TODO: need a ui to toggle this.
+            allow_negative_inventory: false,
+          },
+        });
+
+      if (inventory_upsertion_error) console.log(inventory_upsertion_error);
 
       assert(!error, "failed to update inventory");
     }
