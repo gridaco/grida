@@ -203,9 +203,12 @@ async function submit({
     is_ending_page_enabled,
     ending_page_template_id,
     redirect_after_response_uri,
+    is_force_closed,
+    is_scheduling_enabled,
     is_max_form_responses_by_customer_enabled,
     max_form_responses_by_customer,
-    is_force_closed,
+    scheduling_open_at,
+    scheduling_close_at,
     store_connection,
     fields,
   } = form_reference;
@@ -249,16 +252,60 @@ async function submit({
 
   // console.log("/submit::customer:", customer);
 
-  // validation - check if form is force closed
+  // ==================================================
+  // region access validation
+  // ==================================================
+
+  // access validation - check if form is force closed
+  // (also checked in the db constraints)
   if (is_force_closed) {
     return error(ERR.FORM_CLOSED_WHILE_RESPONDING.code, { form_id }, meta);
   }
 
+  // access validation - check max response limit
+  // (also checked in the db constraints)
+  // [PLACEHOLDER] ------------------------------------
+  // :: since this needs a exact counting, this will only be performed when inserting the response, checked by db constraints
+  // --------------------------------------------------
+
+  // access validation - check if form is in schedule range
+  // (also checked in the db constraints)
+  if (is_scheduling_enabled) {
+    const is_schedule_in_range = Features.schedule_in_range({
+      open: scheduling_open_at,
+      close: scheduling_close_at,
+    });
+
+    if (!is_schedule_in_range) {
+      return error(ERR.FORM_SCHEDULE_NOT_IN_RANGE.code, { form_id }, meta);
+    }
+  }
+
+  // access validation - check if new response is accepted for custoemer
+  // note: per form validation is ready with db constraints.
+  // TODO: this also needs to be migrated to db constraints
+  const max_access_by_customer_error = await validate_max_access_by_customer({
+    form_id,
+    customer_id: customer?.uid,
+    is_max_form_responses_by_customer_enabled,
+    max_form_responses_by_customer,
+  });
+
+  if (max_access_by_customer_error) {
+    return error(max_access_by_customer_error.code, { form_id }, meta);
+  }
+
+  // endregion
+
+  // ==================================================
+  // dara validation
+  // ==================================================
+
+  // validation - check if all value is present for required hidden fields
   const required_hidden_fields = fields.filter(
     (f) => f.type === "hidden" && f.required
   );
 
-  // validation - check if all value is present for required hidden fields
   const missing_required_hidden_fields = required_hidden_fields.filter((f) => {
     // TODO: to be more clear, rather than checking if the value is present, check if the value matches the required format, e.g. uuidv4 for __gf_customer_uuid
     return !(__keys_all.includes(f.name) && !!data.get(f.name));
@@ -276,19 +323,7 @@ async function submit({
     );
   }
 
-  // validation - check if new response is accepted for custoemer
-  // note: per form validation is ready with db constraints.
-  // TODO: this also needs to be migrated to db constraints
-  const max_access_by_customer_error = await validate_max_access_by_customer({
-    form_id,
-    customer_id: customer?.uid,
-    is_max_form_responses_by_customer_enabled,
-    max_form_responses_by_customer,
-  });
-
-  if (max_access_by_customer_error) {
-    return error(max_access_by_customer_error.code, { form_id }, meta);
-  }
+  // endregion
 
   // validatopn - check if user selected option is connected to inventory and is available
   let options_inventory: FormFieldOptionsInventoryMap | null = null;
@@ -344,6 +379,7 @@ async function submit({
       return error(inventory_access_error.code, { form_id }, meta);
     }
 
+    // FIXME: this needs to be done after the response is inserted
     if (selection_id) {
       // TODO: only supports single inventory option selection
       // update the inventory as selected
@@ -381,7 +417,7 @@ async function submit({
       .single();
 
   if (response_insertion_error) {
-    console.error("submit/err", response_insertion_error);
+    console.info("submit/rejected", response_insertion_error);
 
     switch (response_insertion_error.code) {
       // force close
@@ -412,7 +448,7 @@ async function submit({
       }
       default: {
         // server error
-        console.error("submit/err", 500);
+        console.error("submit/err", 500, response_insertion_error);
         return error(500, { form_id }, meta);
       }
     }

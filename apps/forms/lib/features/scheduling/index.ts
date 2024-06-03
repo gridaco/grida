@@ -16,7 +16,7 @@ export namespace Features {
    * @param schedule
    * @returns
    */
-  export function isopen(schedule: Schedule): boolean {
+  export function schedule_in_range(schedule: Schedule): boolean {
     const { open, close } = schedule;
 
     assert(

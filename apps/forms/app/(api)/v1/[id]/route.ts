@@ -371,7 +371,7 @@ export async function GET(
 
   // validation - check if form is open by schedule
   if (is_scheduling_enabled) {
-    const isopen = Features.isopen({
+    const isopen = Features.schedule_in_range({
       open: scheduling_open_at,
       close: scheduling_close_at,
     });
