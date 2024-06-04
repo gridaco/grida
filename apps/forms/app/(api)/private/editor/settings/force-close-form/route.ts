@@ -36,10 +36,7 @@ export async function POST(req: NextRequest) {
     .single();
 
   // redirect to the page requested
-  return NextResponse.redirect(
-    origin + `/d/${form_id}/settings/general#access`,
-    {
-      status: 301,
-    }
-  );
+  return NextResponse.redirect(origin + `/d/${form_id}/settings/general`, {
+    status: 301,
+  });
 }
