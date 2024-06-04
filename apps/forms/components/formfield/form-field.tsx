@@ -21,11 +21,8 @@ import { ClockIcon, PlusIcon } from "@radix-ui/react-icons";
 import { Checkbox } from "@/components/ui/checkbox";
 import useSafeSelectValue from "./use-safe-select-value";
 import { Switch } from "../ui/switch";
-// this causes hydration error
-// import { Slider } from "../ui/slider";
-const Slider = dynamic(() =>
-  import("../ui/slider").then((module) => module.Slider)
-);
+// TODO: this causes hydration error
+import { Slider } from "../ui/slider";
 import { Toggle } from "../ui/toggle";
 import { ToggleGroup, ToggleGroupItem } from "../ui/toggle-group";
 import { RadioGroup, RadioGroupItem } from "../ui/radio-group";
@@ -34,7 +31,6 @@ import { Input } from "../ui/input";
 import { Button } from "../ui/button";
 import { Card } from "../ui/card";
 import { Label } from "../ui/label";
-import dynamic from "next/dynamic";
 
 /**
  * this disables the auto zoom in input text tag safari on iphone by setting font-size to 16px
