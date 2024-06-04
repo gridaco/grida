@@ -37,6 +37,14 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
+import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 export default function ConnectDB() {
   return (
@@ -80,6 +88,7 @@ function ConnectSupabase() {
   const [schema, setSchema] = useState<
     SupabaseOpenAPIDocument["definitions"] | null
   >(null);
+  const [table, setTable] = useState<string | undefined>(undefined);
 
   const disabled = !url || !anonKey;
 
@@ -173,62 +182,65 @@ function ConnectSupabase() {
           </div>
           {schema && (
             <div>
-              <Tabs>
-                <TabsList>
+              <Select value={table} onValueChange={(value) => setTable(value)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select main datasource" />
+                </SelectTrigger>
+                <SelectContent>
                   {Object.keys(schema).map((key) => (
-                    <TabsTrigger key={key} value={key}>
+                    <SelectItem key={key} value={key}>
                       {key}
-                    </TabsTrigger>
+                    </SelectItem>
                   ))}
-                </TabsList>
-                {Object.keys(schema).map((key) => (
-                  <TabsContent key={key} value={key}>
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Column</TableHead>
-                          <TableHead>Data Type</TableHead>
-                          <TableHead>PostgreSQL Type</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {Object.entries(schema[key].properties).map(
-                          ([prop, value]) => {
-                            const required =
-                              schema[key].required.includes(prop);
-                            return (
-                              <TableRow key={prop}>
-                                <TableCell>
-                                  {prop}{" "}
-                                  {required && (
-                                    <span className="text-xs text-foreground-muted text-red-500">
-                                      *
-                                    </span>
-                                  )}
-                                </TableCell>
-                                <TableCell>{value.type}</TableCell>
-                                <TableCell>{value.format}</TableCell>
-                              </TableRow>
-                            );
-                          }
-                        )}
-                      </TableBody>
-                    </Table>
-                    <Collapsible className="mt-4">
-                      <CollapsibleTrigger>
-                        <Button variant="link" size="sm">
-                          <CodeIcon className="me-2 align-middle" /> Raw JSON
-                        </Button>
-                      </CollapsibleTrigger>
-                      <CollapsibleContent>
-                        <article className="prose dark:prose-invert">
-                          <pre>{JSON.stringify(schema[key], null, 2)}</pre>
-                        </article>
-                      </CollapsibleContent>
-                    </Collapsible>
-                  </TabsContent>
-                ))}
-              </Tabs>
+                </SelectContent>
+              </Select>
+              {table && (
+                <>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Column</TableHead>
+                        <TableHead>Data Type</TableHead>
+                        <TableHead>PostgreSQL Type</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {Object.entries(schema[table].properties).map(
+                        ([prop, value]) => {
+                          const required =
+                            schema[table].required.includes(prop);
+                          return (
+                            <TableRow key={prop}>
+                              <TableCell>
+                                {prop}{" "}
+                                {required && (
+                                  <span className="text-xs text-foreground-muted text-red-500">
+                                    *
+                                  </span>
+                                )}
+                              </TableCell>
+                              <TableCell>{value.type}</TableCell>
+                              <TableCell>{value.format}</TableCell>
+                            </TableRow>
+                          );
+                        }
+                      )}
+                    </TableBody>
+                  </Table>
+                  <Collapsible className="mt-4">
+                    <CollapsibleTrigger>
+                      <Button variant="link" size="sm">
+                        <CodeIcon className="me-2 align-middle" /> Raw JSON
+                      </Button>
+                    </CollapsibleTrigger>
+                    <CollapsibleContent>
+                      <article className="prose dark:prose-invert">
+                        <pre>{JSON.stringify(schema[table], null, 2)}</pre>
+                      </article>
+                    </CollapsibleContent>
+                  </Collapsible>
+                </>
+              )}
             </div>
           )}
         </div>
