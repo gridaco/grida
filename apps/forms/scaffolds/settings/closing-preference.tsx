@@ -1,18 +1,16 @@
 "use client";
 
 import React, { useState } from "react";
-import { Toggle } from "@/components/toggle";
 import {
   PreferenceBody,
   PreferenceBox,
   PreferenceBoxFooter,
   PreferenceBoxHeader,
   PreferenceDescription,
-  cls_input,
-  cls_save_button,
 } from "@/components/preferences";
-import clsx from "clsx";
 import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 
 export function ClosingFormPreferences({
   form_id,
@@ -38,13 +36,14 @@ export function ClosingFormPreferences({
           method="POST"
         >
           <input type="hidden" name="form_id" value={form_id} />
-          <div className="flex flex-col">
-            <Toggle
+          <div className="flex items-center space-x-2">
+            <Switch
+              id="is_force_closed"
               name="is_force_closed"
-              value={is_force_close_on}
-              label={"Force-Close this Form"}
-              onChange={set_is_force_close_on}
+              checked={is_force_close_on}
+              onCheckedChange={set_is_force_close_on}
             />
+            <Label htmlFor="is_force_closed">Force-Close this Form</Label>
           </div>
         </form>
       </PreferenceBody>

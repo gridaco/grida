@@ -1,19 +1,19 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
-import { Toggle } from "@/components/toggle";
+import React, { useState } from "react";
 import {
   PreferenceBody,
   PreferenceBox,
   PreferenceBoxFooter,
   PreferenceBoxHeader,
   PreferenceDescription,
-  SectorBlocks,
   cls_input,
-  cls_save_button,
 } from "@/components/preferences";
 import clsx from "clsx";
 import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
 
 export function RestrictNumberOfResponseByCustomer({
   form_id,
@@ -43,14 +43,19 @@ export function RestrictNumberOfResponseByCustomer({
         >
           <input type="hidden" name="form_id" value={form_id} />
           <div className="flex flex-col gap-2">
-            <Toggle
-              name="is_max_form_responses_by_customer_enabled"
-              value={enabled}
-              label={enabled ? "Enabled" : "Disabled"}
-              onChange={setEnabled}
-            />
+            <div className="flex items-center space-x-2">
+              <Switch
+                id="is_max_form_responses_by_customer_enabled"
+                name="is_max_form_responses_by_customer_enabled"
+                checked={enabled}
+                onCheckedChange={setEnabled}
+              />
+              <Label htmlFor="is_max_form_responses_by_customer_enabled">
+                {enabled ? "Enabled" : "Disabled"}
+              </Label>
+            </div>
             <div className={clsx(!enabled && "hidden")}>
-              <input
+              <Input
                 name="max_form_responses_by_customer"
                 type="number"
                 min={1}
@@ -58,7 +63,6 @@ export function RestrictNumberOfResponseByCustomer({
                 onChange={(e) => {
                   setN(parseInt(e.target.value));
                 }}
-                className={cls_input}
               />
             </div>
             {enabled && n ? (
@@ -120,18 +124,23 @@ export function MaxRespoonses({
         >
           <input type="hidden" name="form_id" value={form_id} />
           <div className="flex flex-col">
-            <Toggle
-              name="is_max_form_responses_in_total_enabled"
-              value={enabled}
-              label={enabled ? "Enabled" : "Disabled"}
-              onChange={setEnabled}
-            />
+            <div className="flex items-center space-x-2">
+              <Switch
+                id="is_max_form_responses_in_total_enabled"
+                name="is_max_form_responses_in_total_enabled"
+                checked={enabled}
+                onCheckedChange={setEnabled}
+              />
+              <Label htmlFor="is_max_form_responses_in_total_enabled">
+                {enabled ? "Enabled" : "Disabled"}
+              </Label>
+            </div>
             <div className={clsx(!enabled && "hidden")}>
               <label className="flex flex-col gap-2 cursor-pointer">
                 <PreferenceDescription>
                   Maximum number of responses allowed
                 </PreferenceDescription>
-                <input
+                <Input
                   name="max_form_responses_in_total"
                   type="number"
                   placeholder="Leave empty for unlimited responses"
@@ -140,7 +149,6 @@ export function MaxRespoonses({
                   onChange={(e) => {
                     setN(parseInt(e.target.value));
                   }}
-                  className={cls_input}
                 />
               </label>
             </div>
