@@ -82,12 +82,34 @@ function useThrottledWithInitialTrigger<T extends (...args: any[]) => void>(
   return throttledCallback;
 }
 
+function calculateDistance(
+  lat1: number,
+  lon1: number,
+  lat2: number,
+  lon2: number
+) {
+  const R = 6371; // Radius of the Earth in kilometers
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLon = ((lon2 - lon1) * Math.PI) / 180;
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos((lat1 * Math.PI) / 180) *
+      Math.cos((lat2 * Math.PI) / 180) *
+      Math.sin(dLon / 2) *
+      Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  const distance = R * c; // Distance in kilometers
+  return distance;
+}
+
 export function useUxMapFocus(
   map: MapRef | undefined,
   mapPadding: PaddingOptions,
   movementInterval: number = 1000,
-  zoomInterval: number = 3000
+  zoomInterval: number = 3000,
+  zoomThreshold: number = 10 // distance threshold in kilometers
 ) {
+  const lastZoomRef = useRef<number>(3);
   const lastPointRef = useRef<{ longitude: number; latitude: number } | null>(
     null
   );
@@ -95,18 +117,35 @@ export function useUxMapFocus(
 
   const throttledFlyTo = useThrottledWithInitialTrigger(
     (longitude: number, latitude: number) => {
-      if (map) {
+      if (!map) return;
+
+      if (lastPointRef.current) {
+        const distance = calculateDistance(
+          lastPointRef.current.latitude,
+          lastPointRef.current.longitude,
+          latitude,
+          longitude
+        );
+
         map.flyTo({
           padding: mapPadding,
           center: [longitude, latitude],
-          zoom: 3,
+          zoom: distance > zoomThreshold ? 3 : lastZoomRef.current,
         });
+      } else {
+        lastZoomRef.current = 3;
 
-        lastPointRef.current = {
-          longitude: longitude,
-          latitude: latitude,
-        };
+        map.flyTo({
+          padding: mapPadding,
+          center: [longitude, latitude],
+          zoom: lastZoomRef.current,
+        });
       }
+
+      lastPointRef.current = {
+        longitude: longitude,
+        latitude: latitude,
+      };
     },
     movementInterval
   );
@@ -118,12 +157,13 @@ export function useUxMapFocus(
 
     debounceRef.current = setTimeout(() => {
       if (lastPointRef.current && map) {
+        lastZoomRef.current = 13;
         map.flyTo({
           center: [
             lastPointRef.current.longitude,
             lastPointRef.current.latitude,
           ],
-          zoom: 13,
+          zoom: lastZoomRef.current,
           duration: 5000,
         });
       }

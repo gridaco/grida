@@ -363,7 +363,7 @@ function SimulationPlanner({
           console.error("geo/err", error);
           alert("Please allow location access to simulate the location");
         },
-        { timeout: 2500 }
+        { timeout: 5000 }
       );
     }
   }, [loctype]);

@@ -100,7 +100,8 @@ function View() {
 
   const [state] = useEditorState();
   useUxInitialTransform(map, size);
-  const debounceFlyTo = useUxMapFocus(map, mapPadding, 1000, 3000);
+  // const debounceFlyTo = useUxMapFocus(map, mapPadding, 1000, 3000);
+  const debounceFlyTo = useUxMapFocus(map, mapPadding, 1000, 5000, 10); // Adjust intervals and threshold as needed
 
   const geojson: FeatureCollection = useMemo(
     () => ({
