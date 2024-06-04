@@ -57,7 +57,6 @@ import {
   payments_service_providers_display_map,
 } from "@/k/payments_service_providers";
 import { cls_save_button } from "@/components/preferences";
-import { Toggle } from "@/components/toggle";
 import { fmt_snake_case_to_human_text } from "@/utils/fmt";
 import toast from "react-hot-toast";
 import { arrayMove } from "@dnd-kit/sortable";
@@ -672,7 +671,7 @@ export function FieldEditPanel({
               )}
               {FieldSupports.multiple(type) && (
                 <PanelPropertyField label={"Multiple"}>
-                  <Toggle value={multiple} onChange={setMultiple} />
+                  <Switch checked={multiple} onCheckedChange={setMultiple} />
                 </PanelPropertyField>
               )}
               {!FieldSupports.checkbox_alias(type) && type !== "range" && (
@@ -695,7 +694,7 @@ export function FieldEditPanel({
                   }
                   disabled={type === "checkboxes"}
                 >
-                  <Toggle value={required} onChange={setRequired} />
+                  <Switch checked={required} onCheckedChange={setRequired} />
                 </PanelPropertyField>
               )}
             </PanelPropertyFields>
@@ -780,7 +779,7 @@ export function FieldEditPanel({
                     </>
                   }
                 >
-                  <Toggle value={required} onChange={setRequired} />
+                  <Switch checked={required} onCheckedChange={setRequired} />
                 </PanelPropertyField>
               )}
             </PanelPropertyFields>
@@ -797,7 +796,7 @@ export function FieldEditPanel({
                   </>
                 }
               >
-                <Toggle value={required} onChange={setRequired} />
+                <Switch checked={required} onCheckedChange={setRequired} />
               </PanelPropertyField>
             </PanelPropertyFields>
           </PanelPropertySection>
