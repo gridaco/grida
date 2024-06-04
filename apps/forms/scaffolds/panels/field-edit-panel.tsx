@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useId, useMemo, useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   PanelClose,
   PanelContent,
@@ -48,7 +48,6 @@ import {
 } from "@/components/ui/popover";
 import {
   FieldSupports,
-  html5_multiple_supported_field_types,
   supported_field_autocomplete_types,
   supported_field_types,
 } from "@/k/supported_field_types";
@@ -66,15 +65,8 @@ import { draftid } from "@/utils/id";
 import { OptionsEdit } from "../options/options-edit";
 import { OptionsStockEdit } from "../options/options-sku";
 import { Switch } from "@/components/ui/switch";
-import { InventoryStock } from "@/types/inventory";
-import { INITIAL_INVENTORY_STOCK } from "@/k/inventory_defaults";
 import { FormFieldUpsert } from "@/types/private/api";
-import { GridaCommerceClient } from "@/services/commerce";
 import { useEditorState } from "../editor";
-import {
-  createClientFormsClient,
-  createClientCommerceClient,
-} from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
 import { editorlink } from "@/lib/forms/url";
 import { cn } from "@/utils";
@@ -148,41 +140,6 @@ const default_field_init: {
     } as PaymentFieldData,
   },
 };
-
-const html5_input_like_checkbox_field_types: FormInputType[] = [
-  "checkbox",
-  "switch",
-];
-
-/**
- * html5 pattern allowed input types
- * @see https://developer.mozilla.org/en-US/docs/Web/HTML/Attributes/pattern
- */
-const input_can_have_pattern: FormInputType[] = [
-  "text",
-  "tel",
-  // `date` uses pattern on fallback - https://developer.mozilla.org/en-US/docs/Web/HTML/Element/input/date#handling_browser_support
-  "date",
-  "email",
-  "url",
-  "password",
-  // "search", // not supported
-];
-
-const input_can_have_autocomplete: FormInputType[] =
-  supported_field_types.filter(
-    (type) =>
-      ![
-        "file",
-        "checkbox",
-        "checkboxes",
-        "switch",
-        "radio",
-        "range",
-        "hidden",
-        "payment",
-      ].includes(type)
-  );
 
 export type FormFieldSave = Omit<FormFieldUpsert, "form_id">;
 
@@ -283,13 +240,16 @@ export function FieldEditPanel({
   const [effect_cause, set_effect_cause] = useState<"ai" | "human" | "system">(
     "system"
   );
+  // columns
+  const [type, setType] = useState<FormInputType>(init?.type || "text");
   const [name, setName] = useState(init?.name || "");
   const [label, setLabel] = useState(init?.label || "");
   const [placeholder, setPlaceholder] = useState(init?.placeholder || "");
   const [helpText, setHelpText] = useState(init?.help_text || "");
-  const [type, setType] = useState<FormInputType>(init?.type || "text");
   const [required, setRequired] = useState(init?.required || false);
   const [pattern, setPattern] = useState<string | undefined>(init?.pattern);
+
+  // options
   const [options, setOptions] = useState<Option[]>(
     Array.from(init?.options ?? []).sort(
       (a, b) => (a.index || 0) - (b.index || 0)
@@ -349,7 +309,7 @@ export function FieldEditPanel({
   };
 
   const supports_options = FieldSupports.options(type);
-  const supports_pattern = input_can_have_pattern.includes(type);
+  const supports_pattern = FieldSupports.pattern(type);
   const supports_accept = type === "file";
 
   const preview_placeholder =
@@ -676,7 +636,7 @@ export function FieldEditPanel({
                   onChange={(e) => setHelpText(e.target.value)}
                 />
               </PanelPropertyField>
-              {input_can_have_autocomplete.includes(type) && (
+              {FieldSupports.autocomplete(type) && (
                 <PanelPropertyField label={"Auto Complete"}>
                   <Select
                     value={autocomplete ? autocomplete[0] : ""}
@@ -697,35 +657,34 @@ export function FieldEditPanel({
                   </Select>
                 </PanelPropertyField>
               )}
-              {html5_multiple_supported_field_types.includes(type) && (
+              {FieldSupports.multiple(type) && (
                 <PanelPropertyField label={"Multiple"}>
                   <Toggle value={multiple} onChange={setMultiple} />
                 </PanelPropertyField>
               )}
-              {!html5_input_like_checkbox_field_types.includes(type) &&
-                type !== "range" && (
-                  <PanelPropertyField
-                    label={"Required"}
-                    description={
-                      html5_input_like_checkbox_field_types.includes(type) ? (
-                        <>
-                          We follow html5 standards. Checkboxes cannot be
-                          required.{" "}
-                          <a
-                            className="underline"
-                            href="https://github.com/whatwg/html/issues/6868#issue-946624070"
-                            target="_blank"
-                          >
-                            Learn more
-                          </a>
-                        </>
-                      ) : undefined
-                    }
-                    disabled={type === "checkboxes"}
-                  >
-                    <Toggle value={required} onChange={setRequired} />
-                  </PanelPropertyField>
-                )}
+              {!FieldSupports.checkbox_alias(type) && type !== "range" && (
+                <PanelPropertyField
+                  label={"Required"}
+                  description={
+                    FieldSupports.checkbox_alias(type) ? (
+                      <>
+                        We follow html5 standards. Checkboxes cannot be
+                        required.{" "}
+                        <a
+                          className="underline"
+                          href="https://github.com/whatwg/html/issues/6868#issue-946624070"
+                          target="_blank"
+                        >
+                          Learn more
+                        </a>
+                      </>
+                    ) : undefined
+                  }
+                  disabled={type === "checkboxes"}
+                >
+                  <Toggle value={required} onChange={setRequired} />
+                </PanelPropertyField>
+              )}
             </PanelPropertyFields>
           </PanelPropertySection>
 
@@ -734,7 +693,7 @@ export function FieldEditPanel({
               type == "payment" ||
               (!supports_accept &&
                 !supports_pattern &&
-                !html5_input_like_checkbox_field_types.includes(type))
+                !FieldSupports.checkbox_alias(type))
             }
           >
             <PanelPropertySectionTitle>Validation</PanelPropertySectionTitle>
@@ -763,7 +722,7 @@ export function FieldEditPanel({
                   />
                 </PanelPropertyField>
               )}
-              {html5_input_like_checkbox_field_types.includes(type) && (
+              {FieldSupports.checkbox_alias(type) && (
                 <PanelPropertyField
                   label={"Required"}
                   description={
