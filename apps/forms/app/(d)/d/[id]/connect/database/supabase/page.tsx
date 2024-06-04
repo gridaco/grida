@@ -17,10 +17,26 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { QuestionMarkCircledIcon } from "@radix-ui/react-icons";
+import { CodeIcon, QuestionMarkCircledIcon } from "@radix-ui/react-icons";
 import OpenAPIParser from "@readme/openapi-parser";
 import type { OpenAPI } from "openapi-types";
 import toast from "react-hot-toast";
+import { SupabaseLogo } from "@/components/logos";
+import Link from "next/link";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 
 export default function ConnectDB() {
   return (
@@ -61,6 +77,9 @@ type SupabaseOpenAPIDocument = OpenAPI.Document & {
 function ConnectSupabase() {
   const [url, setUrl] = useState("");
   const [anonKey, setAnonKey] = useState("");
+  const [schema, setSchema] = useState<
+    SupabaseOpenAPIDocument["definitions"] | null
+  >(null);
 
   const disabled = !url || !anonKey;
 
@@ -84,7 +103,9 @@ function ConnectSupabase() {
           // validate
           if (apidoc.host.includes(projectref)) {
             toast.success("Connected to Supabase successfully");
-            console.log(api);
+            console.log(apidoc);
+
+            setSchema(apidoc.definitions);
           }
         }
       );
@@ -96,54 +117,128 @@ function ConnectSupabase() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Connect Supabase</CardTitle>
+        <CardTitle>
+          <SupabaseLogo size={20} className="inline me-2 align-middle" />
+          Connect Supabase
+        </CardTitle>
         <CardDescription>
-          Connect your Supabase account to access your database. Relavent data
-          can be found in your Supabase project settings / API Settings
+          Connect your Supabase account to access your database.{" "}
+          <Link
+            href="https://supabase.com/docs/guides/api#api-url-and-keys"
+            target="_blank"
+            className="underline"
+          >
+            Learn more
+          </Link>
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <div className="grid grid-cols-2 gap-4">
-          <div className="grid gap-2">
-            <Label htmlFor="url">Project URL</Label>
-            <Input
-              id="url"
-              name="url"
-              type="url"
-              required
-              placeholder="https://your-project-ref.supabase.co"
-              value={url}
-              onChange={(e) => setUrl(e.target.value)}
-            />
+        <div className="flex flex-col gap-10">
+          <div className="grid grid-cols-2 gap-4">
+            <div className="grid gap-2">
+              <Label htmlFor="url">Project URL</Label>
+              <Input
+                id="url"
+                name="url"
+                type="url"
+                required
+                placeholder="https://your-project-ref.supabase.co"
+                value={url}
+                onChange={(e) => setUrl(e.target.value)}
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="anonkey">
+                Anon API Key
+                <Tooltip>
+                  <TooltipTrigger>
+                    <QuestionMarkCircledIcon className="inline ms-2 align-middle" />
+                  </TooltipTrigger>
+                  <TooltipContent className="max-w-xs">
+                    This key is safe to use in a browser if you have enabled Row
+                    Level Security for your tables and configured policies.
+                  </TooltipContent>
+                </Tooltip>
+              </Label>
+              <Input
+                id="anonkey"
+                name="anonkey"
+                type="text"
+                required
+                placeholder="eyxxxxxxxxxxxxxxxxxxxxx.xxxxxxxxxxxxxxxx-xxxxxxxxx"
+                value={anonKey}
+                onChange={(e) => setAnonKey(e.target.value)}
+              />
+            </div>
           </div>
-          <div className="grid gap-2">
-            <Label htmlFor="anonkey">
-              Anon API Key
-              <Tooltip>
-                <TooltipTrigger>
-                  <QuestionMarkCircledIcon className="inline ms-2 align-middle" />
-                </TooltipTrigger>
-                <TooltipContent className="max-w-xs">
-                  This key is safe to use in a browser if you have enabled Row
-                  Level Security for your tables and configured policies.
-                </TooltipContent>
-              </Tooltip>
-            </Label>
-            <Input
-              id="anonkey"
-              name="anonkey"
-              type="text"
-              required
-              placeholder="eyxxxxxxxxxxxxxxxxxxxxx.xxxxxxxxxxxxxxxx-xxxxxxxxx"
-              value={anonKey}
-              onChange={(e) => setAnonKey(e.target.value)}
-            />
-          </div>
+          {schema && (
+            <div>
+              <Tabs>
+                <TabsList>
+                  {Object.keys(schema).map((key) => (
+                    <TabsTrigger key={key} value={key}>
+                      {key}
+                    </TabsTrigger>
+                  ))}
+                </TabsList>
+                {Object.keys(schema).map((key) => (
+                  <TabsContent key={key} value={key}>
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Column</TableHead>
+                          <TableHead>Data Type</TableHead>
+                          <TableHead>PostgreSQL Type</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {Object.entries(schema[key].properties).map(
+                          ([prop, value]) => {
+                            const required =
+                              schema[key].required.includes(prop);
+                            return (
+                              <TableRow key={prop}>
+                                <TableCell>
+                                  {prop}{" "}
+                                  {required && (
+                                    <span className="text-xs text-foreground-muted text-red-500">
+                                      *
+                                    </span>
+                                  )}
+                                </TableCell>
+                                <TableCell>{value.type}</TableCell>
+                                <TableCell>{value.format}</TableCell>
+                              </TableRow>
+                            );
+                          }
+                        )}
+                      </TableBody>
+                    </Table>
+                    <Collapsible className="mt-4">
+                      <CollapsibleTrigger>
+                        <Button variant="link" size="sm">
+                          <CodeIcon className="me-2 align-middle" /> Raw JSON
+                        </Button>
+                      </CollapsibleTrigger>
+                      <CollapsibleContent>
+                        <article className="prose dark:prose-invert">
+                          <pre>{JSON.stringify(schema[key], null, 2)}</pre>
+                        </article>
+                      </CollapsibleContent>
+                    </Collapsible>
+                  </TabsContent>
+                ))}
+              </Tabs>
+            </div>
+          )}
         </div>
       </CardContent>
-      <CardFooter className="flex justify-end">
+      <CardFooter className="flex justify-end gap-2">
+        <Button variant="secondary" onClick={onConnectClick}>
+          Clear Schema
+        </Button>
         <Button disabled={disabled} onClick={onConnectClick}>
-          Connect
+          Get Schema
         </Button>
       </CardFooter>
     </Card>
