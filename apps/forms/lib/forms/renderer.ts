@@ -46,6 +46,7 @@ export interface ClientFieldRenderBlock extends BaseRenderBlock {
     name: string;
     label?: string;
     help_text?: string;
+    step?: number;
     min?: number;
     max?: number;
     pattern?: string;
@@ -346,6 +347,9 @@ export class FormRenderTree {
       required: field.required ?? undefined,
       multiple: field.multiple ?? undefined,
       autocomplete: toArrayOf(field.autocomplete)?.join(" ") ?? undefined,
+      step: field.step ?? undefined,
+      min: field.min ?? undefined,
+      max: field.max ?? undefined,
     };
   }
 }

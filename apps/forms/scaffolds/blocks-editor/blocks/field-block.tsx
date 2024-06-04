@@ -282,6 +282,10 @@ export function FieldBlock({
             type={form_field?.type ?? "text"}
             required={form_field?.required ?? false}
             requiredAsterisk
+            pattern={form_field?.pattern ?? ""}
+            step={form_field?.step ?? undefined}
+            min={form_field?.min ?? undefined}
+            max={form_field?.max ?? undefined}
             helpText={form_field?.help_text ?? ""}
             placeholder={form_field?.placeholder ?? ""}
             options={form_field?.options}

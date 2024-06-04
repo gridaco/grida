@@ -86,7 +86,7 @@ export const supported_field_autocomplete_types: FormFieldAutocompleteType[] = [
   "webauthn",
 ];
 
-export const html5_multiple_supported_field_types: FormInputType[] = [
+const html5_multiple_supported_field_types: FormInputType[] = [
   "file",
   "email",
   "select",
@@ -99,8 +99,71 @@ export const options_supported_field_types: FormInputType[] = [
   "toggle-group",
 ];
 
+/**
+ * html5 pattern allowed input types
+ * @see https://developer.mozilla.org/en-US/docs/Web/HTML/Attributes/pattern
+ */
+const html5_pattern_supported_field_types: FormInputType[] = [
+  "text",
+  "tel",
+  // `date` uses pattern on fallback - https://developer.mozilla.org/en-US/docs/Web/HTML/Element/input/date#handling_browser_support
+  "date",
+  "email",
+  "url",
+  "password",
+  // "search", // not supported
+];
+
+const html5_autocomplete_supported_field_types: FormInputType[] =
+  supported_field_types.filter(
+    (type) =>
+      ![
+        "file",
+        "checkbox",
+        "checkboxes",
+        "switch",
+        "radio",
+        "range",
+        "hidden",
+        "payment",
+      ].includes(type)
+  );
+
+const html5_checkbox_alias_field_types: FormInputType[] = [
+  "checkbox",
+  "switch",
+];
+
 export namespace FieldSupports {
   export function options(type: FormInputType) {
     return options_supported_field_types.includes(type);
+  }
+
+  export function multiple(type: FormInputType) {
+    return html5_multiple_supported_field_types.includes(type);
+  }
+
+  export function autocomplete(type: FormInputType) {
+    return html5_autocomplete_supported_field_types.includes(type);
+  }
+
+  export function checkbox_alias(type: FormInputType) {
+    return html5_checkbox_alias_field_types.includes(type);
+  }
+
+  export function pattern(type: FormInputType) {
+    return html5_pattern_supported_field_types.includes(type);
+  }
+
+  /**
+   * whether the field type supports numeric input
+   *
+   * supports
+   * - min
+   * - max
+   * - step
+   */
+  export function numeric(type: FormInputType) {
+    return ["number", "range"].includes(type);
   }
 }

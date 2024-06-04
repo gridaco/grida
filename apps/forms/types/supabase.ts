@@ -1054,15 +1054,16 @@ export type Database = {
           is_array: boolean
           label: string | null
           local_index: number
-          max: Json | null
+          max: number | null
           maxlength: number | null
-          min: Json | null
+          min: number | null
           minlength: number | null
           multiple: boolean | null
           name: string
           pattern: Json | null
           placeholder: string | null
           required: boolean
+          step: number | null
           type: Database["grida_forms"]["Enums"]["form_field_type"]
           updated_at: string
         }
@@ -1081,15 +1082,16 @@ export type Database = {
           is_array?: boolean
           label?: string | null
           local_index?: number
-          max?: Json | null
+          max?: number | null
           maxlength?: number | null
-          min?: Json | null
+          min?: number | null
           minlength?: number | null
           multiple?: boolean | null
           name: string
           pattern?: Json | null
           placeholder?: string | null
           required?: boolean
+          step?: number | null
           type?: Database["grida_forms"]["Enums"]["form_field_type"]
           updated_at?: string
         }
@@ -1108,15 +1110,16 @@ export type Database = {
           is_array?: boolean
           label?: string | null
           local_index?: number
-          max?: Json | null
+          max?: number | null
           maxlength?: number | null
-          min?: Json | null
+          min?: number | null
           minlength?: number | null
           multiple?: boolean | null
           name?: string
           pattern?: Json | null
           placeholder?: string | null
           required?: boolean
+          step?: number | null
           type?: Database["grida_forms"]["Enums"]["form_field_type"]
           updated_at?: string
         }
