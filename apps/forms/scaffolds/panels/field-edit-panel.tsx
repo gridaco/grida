@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useId, useMemo, useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   PanelClose,
   PanelContent,
@@ -48,7 +48,6 @@ import {
 } from "@/components/ui/popover";
 import {
   FieldSupports,
-  html5_multiple_supported_field_types,
   supported_field_autocomplete_types,
   supported_field_types,
 } from "@/k/supported_field_types";
@@ -58,7 +57,6 @@ import {
   payments_service_providers_display_map,
 } from "@/k/payments_service_providers";
 import { cls_save_button } from "@/components/preferences";
-import { Toggle } from "@/components/toggle";
 import { fmt_snake_case_to_human_text } from "@/utils/fmt";
 import toast from "react-hot-toast";
 import { arrayMove } from "@dnd-kit/sortable";
@@ -66,19 +64,13 @@ import { draftid } from "@/utils/id";
 import { OptionsEdit } from "../options/options-edit";
 import { OptionsStockEdit } from "../options/options-sku";
 import { Switch } from "@/components/ui/switch";
-import { InventoryStock } from "@/types/inventory";
-import { INITIAL_INVENTORY_STOCK } from "@/k/inventory_defaults";
 import { FormFieldUpsert } from "@/types/private/api";
-import { GridaCommerceClient } from "@/services/commerce";
 import { useEditorState } from "../editor";
-import {
-  createClientFormsClient,
-  createClientCommerceClient,
-} from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
 import { editorlink } from "@/lib/forms/url";
 import { cn } from "@/utils";
 import { FormFieldTypeIcon } from "@/components/form-field-type-icon";
+import { useInventory, useInventoryState } from "../options/use-inventory";
 
 // @ts-ignore
 const default_field_init: {
@@ -148,161 +140,7 @@ const default_field_init: {
   },
 };
 
-const html5_input_like_checkbox_field_types: FormInputType[] = [
-  "checkbox",
-  "switch",
-];
-
-/**
- * html5 pattern allowed input types
- * @see https://developer.mozilla.org/en-US/docs/Web/HTML/Attributes/pattern
- */
-const input_can_have_pattern: FormInputType[] = [
-  "text",
-  "tel",
-  // `date` uses pattern on fallback - https://developer.mozilla.org/en-US/docs/Web/HTML/Element/input/date#handling_browser_support
-  "date",
-  "email",
-  "url",
-  "password",
-  // "search", // not supported
-];
-
-const input_can_have_autocomplete: FormInputType[] =
-  supported_field_types.filter(
-    (type) =>
-      ![
-        "file",
-        "checkbox",
-        "checkboxes",
-        "switch",
-        "radio",
-        "range",
-        "hidden",
-        "payment",
-      ].includes(type)
-  );
-
 export type FormFieldSave = Omit<FormFieldUpsert, "form_id">;
-
-function useCommerceClient() {
-  const [state] = useEditorState();
-
-  const supabase = useMemo(() => createClientCommerceClient(), []);
-
-  const commerce = useMemo(
-    () =>
-      new GridaCommerceClient(
-        supabase,
-        state.connections.project_id,
-        state.connections.store_id
-      ),
-    [supabase, state.connections.project_id, state.connections.store_id]
-  );
-
-  return commerce;
-}
-
-function useInventory(options: Option[]) {
-  const [state] = useEditorState();
-  const commerce = useCommerceClient();
-  const [loading, setLoading] = useState(true);
-  const [inventory, setInventory] = useState<{
-    [key: string]: InventoryStock;
-  } | null>(null);
-
-  useEffect(() => {
-    setLoading(true);
-
-    if (!state.connections.store_id) {
-      setLoading(false);
-      return;
-    }
-
-    console.log("fetching inventory");
-    commerce
-      .fetchInventoryItemsRPC()
-      .then(({ data, error }) => {
-        if (error) console.error(error);
-        if (!data) return;
-
-        // filter out items that are not in the options list
-        const filtered_data = data.filter((item) =>
-          options.some((option) => option.id === item.sku)
-        );
-
-        if (filtered_data.length === 0) {
-          return;
-        }
-
-        const inventorymap = options.reduce(
-          (acc: { [sku: string]: InventoryStock }, option) => {
-            const item = filtered_data.find((_) => _.sku === option.id);
-            if (item) {
-              acc[item.sku] = {
-                available: item.available,
-                on_hand: item.available, // TODO:
-                committed: item.committed,
-                unavailable: 0,
-                incoming: 0,
-              };
-            } else {
-              acc[option.id] = {
-                available: 0,
-                on_hand: 0,
-                committed: 0,
-                unavailable: 0,
-                incoming: 0,
-              };
-            }
-            return acc;
-          },
-          {}
-        );
-        setInventory(inventorymap);
-      })
-      .finally(() => {
-        setLoading(false);
-      });
-  }, [commerce, options, state.connections.store_id]);
-
-  return { inventory, loading };
-}
-
-function useInventoryState(
-  options: Option[],
-  _inventory: { [key: string]: InventoryStock } | null,
-  enabled: boolean
-) {
-  const [inventory, setInventory] = useState<{
-    [key: string]: InventoryStock;
-  } | null>(_inventory);
-
-  useEffect(() => {
-    if (enabled) {
-      setInventory(_inventory);
-
-      if (!_inventory) {
-        const initialmap = options.reduce(
-          (acc: { [sku: string]: InventoryStock }, option) => {
-            acc[option.id] = {
-              available: INITIAL_INVENTORY_STOCK,
-              on_hand: INITIAL_INVENTORY_STOCK,
-              committed: 0,
-              unavailable: 0,
-              incoming: 0,
-            };
-            return acc;
-          },
-          {}
-        );
-        setInventory(initialmap);
-      }
-    }
-  }, [_inventory, options, enabled]);
-
-  return [inventory, setInventory] as const;
-}
 
 export function TypeSelect({
   value,
@@ -401,13 +239,21 @@ export function FieldEditPanel({
   const [effect_cause, set_effect_cause] = useState<"ai" | "human" | "system">(
     "system"
   );
+  // columns
+  const [type, setType] = useState<FormInputType>(init?.type || "text");
   const [name, setName] = useState(init?.name || "");
   const [label, setLabel] = useState(init?.label || "");
   const [placeholder, setPlaceholder] = useState(init?.placeholder || "");
   const [helpText, setHelpText] = useState(init?.help_text || "");
-  const [type, setType] = useState<FormInputType>(init?.type || "text");
   const [required, setRequired] = useState(init?.required || false);
   const [pattern, setPattern] = useState<string | undefined>(init?.pattern);
+
+  // numeric
+  const [step, setStep] = useState<number | undefined>(init?.step);
+  const [min, setMin] = useState<number | undefined>(init?.min);
+  const [max, setMax] = useState<number | undefined>(init?.max);
+
+  // options
   const [options, setOptions] = useState<Option[]>(
     Array.from(init?.options ?? []).sort(
       (a, b) => (a.index || 0) - (b.index || 0)
@@ -467,7 +313,9 @@ export function FieldEditPanel({
   };
 
   const supports_options = FieldSupports.options(type);
-  const supports_pattern = input_can_have_pattern.includes(type);
+  const supports_pattern = FieldSupports.pattern(type);
+  const supports_numeric = FieldSupports.numeric(type);
+
   const supports_accept = type === "file";
 
   const preview_placeholder =
@@ -509,6 +357,9 @@ export function FieldEditPanel({
       type,
       required,
       pattern,
+      step,
+      min,
+      max,
       options: supports_options ? indexed_options : undefined,
       autocomplete,
       data,
@@ -586,6 +437,9 @@ export function FieldEditPanel({
                   disabled={preview_disabled}
                   options={supports_options ? options : undefined}
                   pattern={pattern}
+                  step={step}
+                  min={min}
+                  max={max}
                   autoComplete={autocomplete.join(" ")}
                   data={data}
                   accept={accept}
@@ -758,7 +612,7 @@ export function FieldEditPanel({
                   onChange={(e) => setLabel(e.target.value)}
                 />
               </PanelPropertyField>
-              {type !== "checkbox" && (
+              {type !== "checkbox" && type !== "range" && (
                 <PanelPropertyField
                   label={"Placeholder"}
                   description={
@@ -794,7 +648,7 @@ export function FieldEditPanel({
                   onChange={(e) => setHelpText(e.target.value)}
                 />
               </PanelPropertyField>
-              {input_can_have_autocomplete.includes(type) && (
+              {FieldSupports.autocomplete(type) && (
                 <PanelPropertyField label={"Auto Complete"}>
                   <Select
                     value={autocomplete ? autocomplete[0] : ""}
@@ -815,35 +669,34 @@ export function FieldEditPanel({
                   </Select>
                 </PanelPropertyField>
               )}
-              {html5_multiple_supported_field_types.includes(type) && (
+              {FieldSupports.multiple(type) && (
                 <PanelPropertyField label={"Multiple"}>
-                  <Toggle value={multiple} onChange={setMultiple} />
+                  <Switch checked={multiple} onCheckedChange={setMultiple} />
                 </PanelPropertyField>
               )}
-              {!html5_input_like_checkbox_field_types.includes(type) &&
-                type !== "range" && (
-                  <PanelPropertyField
-                    label={"Required"}
-                    description={
-                      html5_input_like_checkbox_field_types.includes(type) ? (
-                        <>
-                          We follow html5 standards. Checkboxes cannot be
-                          required.{" "}
-                          <a
-                            className="underline"
-                            href="https://github.com/whatwg/html/issues/6868#issue-946624070"
-                            target="_blank"
-                          >
-                            Learn more
-                          </a>
-                        </>
-                      ) : undefined
-                    }
-                    disabled={type === "checkboxes"}
-                  >
-                    <Toggle value={required} onChange={setRequired} />
-                  </PanelPropertyField>
-                )}
+              {!FieldSupports.checkbox_alias(type) && type !== "range" && (
+                <PanelPropertyField
+                  label={"Required"}
+                  description={
+                    FieldSupports.checkbox_alias(type) ? (
+                      <>
+                        We follow html5 standards. Checkboxes cannot be
+                        required.{" "}
+                        <a
+                          className="underline"
+                          href="https://github.com/whatwg/html/issues/6868#issue-946624070"
+                          target="_blank"
+                        >
+                          Learn more
+                        </a>
+                      </>
+                    ) : undefined
+                  }
+                  disabled={type === "checkboxes"}
+                >
+                  <Switch checked={required} onCheckedChange={setRequired} />
+                </PanelPropertyField>
+              )}
             </PanelPropertyFields>
           </PanelPropertySection>
 
@@ -852,7 +705,8 @@ export function FieldEditPanel({
               type == "payment" ||
               (!supports_accept &&
                 !supports_pattern &&
-                !html5_input_like_checkbox_field_types.includes(type))
+                !supports_numeric &&
+                !FieldSupports.checkbox_alias(type))
             }
           >
             <PanelPropertySectionTitle>Validation</PanelPropertySectionTitle>
@@ -881,7 +735,62 @@ export function FieldEditPanel({
                   />
                 </PanelPropertyField>
               )}
-              {html5_input_like_checkbox_field_types.includes(type) && (
+              {supports_numeric && (
+                <>
+                  <PanelPropertyField
+                    label={"Step"}
+                    description="The stepping interval for the input"
+                  >
+                    <PropertyTextInput
+                      type="number"
+                      placeholder="1"
+                      value={step}
+                      onChange={(e) =>
+                        setStep(
+                          e.target.value === ""
+                            ? undefined
+                            : Number(e.target.value)
+                        )
+                      }
+                    />
+                  </PanelPropertyField>
+                  <PanelPropertyField
+                    label={"Min"}
+                    description="The minimum value that the input can accept"
+                  >
+                    <PropertyTextInput
+                      type="number"
+                      placeholder="E.g. -100"
+                      value={min}
+                      onChange={(e) =>
+                        setMin(
+                          e.target.value === ""
+                            ? undefined
+                            : Number(e.target.value)
+                        )
+                      }
+                    />
+                  </PanelPropertyField>
+                  <PanelPropertyField
+                    label={"Max"}
+                    description="The maximum value that the input can accept"
+                  >
+                    <PropertyTextInput
+                      type="number"
+                      placeholder="E.g. 100"
+                      value={max}
+                      onChange={(e) =>
+                        setMax(
+                          e.target.value === ""
+                            ? undefined
+                            : Number(e.target.value)
+                        )
+                      }
+                    />
+                  </PanelPropertyField>
+                </>
+              )}
+              {FieldSupports.checkbox_alias(type) && (
                 <PanelPropertyField
                   label={"Required"}
                   description={
@@ -891,7 +800,7 @@ export function FieldEditPanel({
                     </>
                   }
                 >
-                  <Toggle value={required} onChange={setRequired} />
+                  <Switch checked={required} onCheckedChange={setRequired} />
                 </PanelPropertyField>
               )}
             </PanelPropertyFields>
@@ -908,7 +817,7 @@ export function FieldEditPanel({
                   </>
                 }
               >
-                <Toggle value={required} onChange={setRequired} />
+                <Switch checked={required} onCheckedChange={setRequired} />
               </PanelPropertyField>
             </PanelPropertyFields>
           </PanelPropertySection>
@@ -916,17 +825,11 @@ export function FieldEditPanel({
       </PanelContent>
       <PanelFooter>
         <PanelClose>
-          <button className="rounded p-2 bg-neutral-100 dark:bg-neutral-900">
-            Cancel
-          </button>
+          <Button variant="ghost">Cancel</Button>
         </PanelClose>
-        <button
-          type="submit"
-          form="field-edit-form"
-          className={cls_save_button}
-        >
+        <Button variant="default" type="submit" form="field-edit-form">
           Save
-        </button>
+        </Button>
       </PanelFooter>
     </SidePanel>
   );

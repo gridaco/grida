@@ -198,7 +198,7 @@ function Body({
       id="form-view"
       data-cjk={options.optimize_for_cjk}
       className={clsx(
-        "prose dark:prose-invert prose-headings:text-foreground prose-p:text-foreground text-foreground",
+        "prose dark:prose-invert prose-headings:text-foreground prose-p:text-foreground prose-hr:border-border text-foreground",
         "w-full h-full md:h-auto grow md:grow-0",
         "relative",
         "data-[cjk='true']:break-keep",
@@ -422,6 +422,9 @@ function BlockRenderer({
                   helpText={field.help_text}
                   options={field.options}
                   pattern={field.pattern}
+                  step={field.step}
+                  min={field.min}
+                  max={field.max}
                   defaultValue={defaultValue}
                   data={field.data}
                   autoComplete={field.autocomplete}

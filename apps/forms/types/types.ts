@@ -161,6 +161,9 @@ export type FormFieldInit = {
   required: boolean;
   help_text: string;
   pattern?: string;
+  step?: number;
+  min?: number;
+  max?: number;
   options?: Option[];
   autocomplete?: FormFieldAutocompleteType[] | null;
   data?: FormFieldDataSchema | null;
@@ -178,6 +181,9 @@ export interface IFormField {
   required: boolean;
   help_text?: string | null;
   pattern?: any | null;
+  step?: number | null;
+  min?: number | null;
+  max?: number | null;
   options?: Option[];
   autocomplete?: FormFieldAutocompleteType[] | null;
   data?: FormFieldDataSchema | null;

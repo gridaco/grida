@@ -11,7 +11,7 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from "@editor-ui/dropdown-menu";
+} from "@/components/ui/dropdown-menu";
 import { EditorFlatFormBlock } from "@/scaffolds/editor/state";
 import { useEditorState } from "@/scaffolds/editor";
 import {
@@ -21,6 +21,7 @@ import {
   useDeleteBlock,
 } from "./base-block";
 import TextareaAutosize from "react-textarea-autosize";
+import { Button } from "@/components/ui/button";
 
 export function HeaderBlock({
   id,
@@ -67,13 +68,13 @@ export function HeaderBlock({
         <div>
           <DropdownMenu modal={false}>
             <DropdownMenuTrigger asChild>
-              <button>
+              <Button variant="ghost" size="icon">
                 <DotsHorizontalIcon />
-              </button>
+              </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent>
               <DropdownMenuItem onClick={() => deleteBlock(id)}>
-                <TrashIcon />
+                <TrashIcon className="me-2 align-middle" />
                 Delete Block
               </DropdownMenuItem>
             </DropdownMenuContent>

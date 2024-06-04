@@ -51,6 +51,9 @@ export async function POST(req: NextRequest) {
       help_text: init.help_text,
       required: init.required,
       pattern: init.pattern,
+      step: init.step,
+      min: init.min,
+      max: init.max,
       autocomplete: init.autocomplete,
       data: safe_data_field({
         type: init.type,
@@ -59,9 +62,6 @@ export async function POST(req: NextRequest) {
       accept: init.accept,
       multiple: init.multiple,
       // 'description': init.description,
-      // 'max': init.max,
-      // 'min': init.min,
-      // 'step': init.step,
       updated_at: new Date().toISOString(),
     })
     .select("*, existing_options:form_field_option(*)")
