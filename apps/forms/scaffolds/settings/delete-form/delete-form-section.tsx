@@ -7,7 +7,9 @@ import {
   AlertDialogContent,
   AlertDialogTitle,
   AlertDialogTrigger,
-} from "@editor-ui/alert-dialog";
+} from "@/components/ui/alert-dialog";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 
 export function DeleteFormSection() {
   const [state] = useEditorState();
@@ -47,13 +49,12 @@ export function DeleteFormSection() {
               <label className="flex flex-col gap-2">
                 <span className="opacity-80">
                   Type{" "}
-                  <code className="bg-neutral-100 p-1 rounded-md text-sm font-mono">
+                  <code className="bg-muted p-1 rounded-md text-sm font-mono">
                     {confirmationText}
                   </code>{" "}
                   to delete this form
                 </span>
-                <input
-                  className="bg-neutral-50 border border-neutral-300 text-neutral-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-neutral-700 dark:border-neutral-600 dark:placeholder-neutral-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500"
+                <Input
                   required
                   autoCorrect="off"
                   autoCapitalize="off"
@@ -68,14 +69,17 @@ export function DeleteFormSection() {
               </label>
             </form>
             <div className="flex justify-end gap-2 p-2">
-              <AlertDialogCancel>Cancel</AlertDialogCancel>
-              <button
+              <AlertDialogCancel asChild>
+                <Button variant="secondary">Cancel</Button>
+              </AlertDialogCancel>
+              <Button
+                variant="destructive"
                 form="delete-form"
                 type="submit"
                 className="focus:outline-none text-white bg-red-700 hover:bg-red-800 focus:ring-4 focus:ring-red-300 font-medium rounded-lg text-sm px-5 py-2.5 me-2 mb-2 dark:bg-red-600 dark:hover:bg-red-700 dark:focus:ring-red-900"
               >
                 Delete
-              </button>
+              </Button>
             </div>
           </AlertDialogContent>
         </AlertDialog>
