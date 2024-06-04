@@ -198,7 +198,7 @@ function Body({
       id="form-view"
       data-cjk={options.optimize_for_cjk}
       className={clsx(
-        "prose dark:prose-invert prose-headings:text-foreground prose-p:text-foreground text-foreground",
+        "prose dark:prose-invert prose-headings:text-foreground prose-p:text-foreground prose-hr:border-border text-foreground",
         "w-full h-full md:h-auto grow md:grow-0",
         "relative",
         "data-[cjk='true']:break-keep",
