@@ -2,6 +2,37 @@ import { useEffect, useCallback, useRef } from "react";
 import type { MapRef } from "react-map-gl";
 import type { PaddingOptions } from "mapbox-gl";
 
+/**
+ *
+ * @param latitude
+ * @param longitude
+ * @param maxDisplacement 1 = 111km (1 degree of latitude)
+ * @returns
+ */
+export function getRandomDisplacement(
+  point: { latitude: number; longitude: number },
+  maxDisplacement = 0.1
+) {
+  const { latitude, longitude } = point;
+  const randomOffset = () => (Math.random() - 0.5) * 2 * maxDisplacement;
+
+  let newLatitude = latitude + randomOffset();
+  let newLongitude = longitude + randomOffset();
+
+  // Ensure the latitude stays within the range of -90 to 90
+  if (newLatitude > 90) newLatitude = 90;
+  if (newLatitude < -90) newLatitude = -90;
+
+  // Ensure the longitude stays within the range of -180 to 180
+  if (newLongitude > 180) newLongitude = 180;
+  if (newLongitude < -180) newLongitude = -180;
+
+  return {
+    latitude: newLatitude,
+    longitude: newLongitude,
+  };
+}
+
 function useThrottledWithInitialTrigger<T extends (...args: any[]) => void>(
   callback: T,
   interval: number
@@ -54,8 +85,14 @@ function useThrottledWithInitialTrigger<T extends (...args: any[]) => void>(
 export function useUxMapFocus(
   map: MapRef | undefined,
   mapPadding: PaddingOptions,
-  interval: number = 300
+  movementInterval: number = 1000,
+  zoomInterval: number = 3000
 ) {
+  const lastPointRef = useRef<{ longitude: number; latitude: number } | null>(
+    null
+  );
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const throttledFlyTo = useThrottledWithInitialTrigger(
     (longitude: number, latitude: number) => {
       if (map) {
@@ -64,10 +101,40 @@ export function useUxMapFocus(
           center: [longitude, latitude],
           zoom: 3,
         });
+
+        lastPointRef.current = {
+          longitude: longitude,
+          latitude: latitude,
+        };
       }
     },
-    interval
+    movementInterval
   );
+
+  useEffect(() => {
+    if (debounceRef.current) {
+      clearTimeout(debounceRef.current);
+    }
+
+    debounceRef.current = setTimeout(() => {
+      if (lastPointRef.current && map) {
+        map.flyTo({
+          center: [
+            lastPointRef.current.longitude,
+            lastPointRef.current.latitude,
+          ],
+          zoom: 13,
+          duration: 5000,
+        });
+      }
+    }, zoomInterval);
+
+    return () => {
+      if (debounceRef.current) {
+        clearTimeout(debounceRef.current);
+      }
+    };
+  }, [lastPointRef.current, map, zoomInterval]);
 
   return throttledFlyTo;
 }

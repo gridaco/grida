@@ -12,7 +12,11 @@ import { Source, Layer } from "react-map-gl";
 import type { FeatureCollection } from "geojson";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import TimeSeriesChart from "@/scaffolds/analytics/charts/timeseries";
-import { useUxInitialTransform, useUxMapFocus } from "./use-ux-map-focus";
+import {
+  getRandomDisplacement,
+  useUxInitialTransform,
+  useUxMapFocus,
+} from "./use-ux-map-focus";
 import { serialize } from "../charts/serialize";
 import { format } from "date-fns";
 
@@ -69,7 +73,7 @@ export default function LiveWorldAnalytics() {
   );
 }
 
-const RECENT_N = 5;
+const RECENT_N = 50;
 
 interface Response {
   id: string;
@@ -83,6 +87,7 @@ function View() {
   const { map } = useMap();
   const size = useWindowSize();
   const [recent, setRecent] = useState<Response[]>([]);
+  const [displaced, setDisplaced] = useState<Response[]>([]);
   const mapPadding = useMemo(
     () => ({
       top: 0,
@@ -95,18 +100,18 @@ function View() {
 
   const [state] = useEditorState();
   useUxInitialTransform(map, size);
-  const debounceFlyTo = useUxMapFocus(map, mapPadding, 1000);
+  const debounceFlyTo = useUxMapFocus(map, mapPadding, 1000, 3000);
 
   const geojson: FeatureCollection = useMemo(
     () => ({
       type: "FeatureCollection",
-      features: recent.map((r) => ({
+      features: displaced.map((r) => ({
         type: "Feature",
         geometry: { type: "Point", coordinates: [r.longitude, r.latitude] },
         properties: { id: r.id },
       })),
     }),
-    [recent]
+    [displaced]
   );
 
   useEffect(() => {
@@ -114,18 +119,49 @@ function View() {
       const sorted = state.responses
         .slice()
         .sort((a, b) => a.local_index - b.local_index);
-      const recent = sorted.slice(-RECENT_N).map((r) => ({
-        id: r.id,
-        at: new Date(r.created_at),
-        latitude: Number(r.geo?.latitude) || 0,
-        longitude: Number(r.geo?.longitude) || 0,
-      }));
-      const last = recent[recent.length - 1];
-      setRecent(recent);
 
-      debounceFlyTo(last.longitude, last.latitude);
+      const recent = sorted.slice(-RECENT_N).map((r) => {
+        return {
+          id: r.id,
+          at: new Date(r.created_at),
+          latitude: Number(r.geo?.latitude) || 0,
+          longitude: Number(r.geo?.longitude) || 0,
+        };
+      });
+      setRecent(recent);
     }
-  }, [state.responses, debounceFlyTo]);
+  }, [state.responses]);
+
+  useEffect(() => {
+    if (recent.length === 0) return;
+    const _displaced = recent.map((r) => {
+      // if already displaced, skip
+      const done = displaced.find((d) => d.id === r.id);
+      if (done) {
+        return done;
+      }
+
+      const { latitude, longitude } = getRandomDisplacement(
+        {
+          latitude: r.latitude,
+          longitude: r.longitude,
+        },
+        0.005 // approx 500m
+      );
+
+      return {
+        ...r,
+        latitude: latitude,
+        longitude: longitude,
+      };
+    });
+
+    setDisplaced(_displaced);
+
+    const last = _displaced[_displaced.length - 1];
+
+    debounceFlyTo(last.longitude, last.latitude);
+  }, [debounceFlyTo, recent]);
 
   const chartdata = useMemo(() => {
     return serialize(state.responses || [], {

@@ -23,6 +23,9 @@ export interface SimulationPlan {
   delaybetween: number; // Delay between submissions in ms
   maxq: number; // Base number of concurrent submissions per batch
   randomness: number; // Random coefficient for submission timing
+  location:
+    | { type: "world" }
+    | { type: "point"; latitude: number; longitude: number };
 }
 
 type ResponseCallback = (id: string, response: SimulatorSubmission) => void;
@@ -237,6 +240,16 @@ export class Simulator {
 
     const formdata = datafaker.generate();
 
+    const lat =
+      this.plan.location.type === "point"
+        ? this.plan.location.latitude
+        : faker.location.latitude();
+
+    const lon =
+      this.plan.location.type === "point"
+        ? this.plan.location.longitude
+        : faker.location.longitude();
+
     return {
       formdata: {
         [SYSTEM_GF_CUSTOMER_UUID_KEY]: customer_uuid,
@@ -244,8 +257,8 @@ export class Simulator {
       },
       headers: {
         [SYSTEM_X_GF_GEO_CITY_KEY]: faker.location.city(),
-        [SYSTEM_X_GF_GEO_LATITUDE_KEY]: faker.location.latitude().toString(),
-        [SYSTEM_X_GF_GEO_LONGITUDE_KEY]: faker.location.longitude().toString(),
+        [SYSTEM_X_GF_GEO_LATITUDE_KEY]: lat.toString(),
+        [SYSTEM_X_GF_GEO_LONGITUDE_KEY]: lon.toString(),
         [SYSTEM_X_GF_GEO_REGION_KEY]: faker.location.state(),
         [SYSTEM_X_GF_GEO_COUNTRY_KEY]: faker.location.country(),
         [SYSTEM_X_GF_SIMULATOR_FLAG_KEY]: "1",
