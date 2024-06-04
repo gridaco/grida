@@ -55,6 +55,11 @@ export async function validate_options_inventory({
     {}
   );
 
+  // if there is no inventory used, then return null - no need to validate
+  if (Object.keys(used_inventory).length === 0) {
+    return null;
+  }
+
   const available = options.reduce((acc: number, option) => {
     switch (config.available_counting_strategy) {
       case "sum_all": {
