@@ -168,6 +168,7 @@ function GridCard({
   title,
   responses,
   thumbnail,
+  is_max_form_responses_in_total_enabled,
   max_form_responses_in_total,
 }: FormDashboardItem & { thumbnail: string }) {
   return (
@@ -182,7 +183,7 @@ function GridCard({
       <div className="px-4 py-2 flex flex-col gap-2">
         <span>{title}</span>
         <span className="text-xs opacity-50">
-          {max_form_responses_in_total ? (
+          {is_max_form_responses_in_total_enabled ? (
             <>
               {responses} / {max_form_responses_in_total} responses
             </>
@@ -200,6 +201,7 @@ function RowCard({
   responses,
   created_at,
   updated_at,
+  is_max_form_responses_in_total_enabled,
   max_form_responses_in_total,
 }: FormDashboardItem) {
   return (
@@ -220,7 +222,7 @@ function RowCard({
         </div>
       </div>
       <div className="opacity-80 w-32 text-sm">
-        {max_form_responses_in_total ? (
+        {is_max_form_responses_in_total_enabled ? (
           <>
             {responses} / {max_form_responses_in_total}
           </>

@@ -293,19 +293,19 @@ export async function GET(
       .map((f) => f.options ?? [])
       .flat();
     const inventory_access_error = await validate_options_inventory({
-      options: render_options,
       inventory: options_inventory,
+      options: render_options,
       config: {
         available_counting_strategy: "sum_positive",
       },
     });
 
     if (inventory_access_error) {
-      console.error(
-        "inventory_access_error",
-        render_options,
-        inventory_access_error
-      );
+      console.error("inventory_access_error", {
+        keys: Object.keys(options_inventory),
+        options: render_options?.length,
+        err: inventory_access_error,
+      });
       response.error = inventory_access_error;
     }
   }
@@ -337,7 +337,7 @@ export async function GET(
     }
   }
 
-  // validation max access
+  // access validation - check max response limit
   if (is_max_form_responses_in_total_enabled) {
     const max_access_error = await validate_max_access_by_form({ form_id: id });
     if (max_access_error) {
@@ -354,7 +354,7 @@ export async function GET(
     }
   }
 
-  // validation max access by customer
+  // access validation - check if new response is accepted for custoemer
   if (is_max_form_responses_by_customer_enabled) {
     const max_access_by_customer_error = await validate_max_access_by_customer({
       form_id: id,

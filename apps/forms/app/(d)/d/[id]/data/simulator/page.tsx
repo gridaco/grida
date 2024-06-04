@@ -15,6 +15,13 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
 import {
   Table,
@@ -336,6 +343,30 @@ function SimulationPlanner({
   const [maxq, setMaxQ] = useState(5);
   const [delay, setDelay] = useState(800);
   const [randomness, setRandomness] = useState(0.5);
+  const [loctype, setLoctype] = useState<"world" | "point">("world");
+  const [point, setPoint] = useState<{
+    latitude: number;
+    longitude: number;
+  } | null>(null);
+
+  useEffect(() => {
+    if (loctype === "point") {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          console.log(position);
+          setPoint({
+            latitude: position.coords.latitude,
+            longitude: position.coords.longitude,
+          });
+        },
+        (error) => {
+          console.error("geo/err", error);
+          alert("Please allow location access to simulate the location");
+        },
+        { timeout: 5000 }
+      );
+    }
+  }, [loctype]);
 
   return (
     <div className="max-w-xl flex flex-col gap-8">
@@ -427,6 +458,37 @@ function SimulationPlanner({
         />
         <small>{randomness}</small>
       </div>
+      <div className="grid gap-4">
+        <Label htmlFor="loctype">
+          Location{" "}
+          <small className="text-muted-foreground">
+            (where each submission will be from)
+          </small>
+        </Label>
+        <Select
+          value={loctype}
+          // @ts-ignore
+          onValueChange={setLoctype}
+        >
+          <SelectTrigger>
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="world">World Wide</SelectItem>
+            <SelectItem value="point">Based on Your Location</SelectItem>
+          </SelectContent>
+        </Select>
+        <small className="text-muted-foreground">
+          {loctype === "point" ? (
+            <span>
+              Your location:{" "}
+              {point ? `${point.latitude}, ${point.longitude}` : "Loading..."}
+            </span>
+          ) : (
+            "World wide"
+          )}
+        </small>
+      </div>
       <Dialog>
         <DialogTrigger asChild>
           <Button variant={"secondary"}>Start Simulation</Button>
@@ -475,6 +537,14 @@ function SimulationPlanner({
                     delaybetween: delay,
                     maxq: maxq,
                     randomness,
+                    location:
+                      loctype === "point"
+                        ? {
+                            type: "point",
+                            latitude: point?.latitude ?? 0,
+                            longitude: point?.longitude ?? 0,
+                          }
+                        : { type: "world" },
                   });
                 }}
               >

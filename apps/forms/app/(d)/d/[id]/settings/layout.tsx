@@ -43,7 +43,9 @@ export default function Layout({
           </li>
         </ul>
       </nav>
-      <div className="w-full h-full overflow-scroll p-4 pb-20">{children}</div>
+      <div className="w-full h-full overflow-y-scroll p-4 pb-20">
+        {children}
+      </div>
     </main>
   );
 }

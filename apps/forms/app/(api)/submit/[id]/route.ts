@@ -396,8 +396,25 @@ async function submit({
     }
 
     if (selection_id) {
+      // THIS CAN FAIL / MALFORM THE DATA ON HIGH CONCURRENCY
+      // when:
+      // - 0. this can malform the inventory data since this does not has a roll-back mechanism - when
+      //    - 1. prevalidation success
+      //    - 2. inventory validation success
+      //    - 3. form response insertion fails
+      // - 1. when near scheduling_close_at - when very close to the close time, the inventory can be malform since the time was valid at the prevalidation time, but not valid at the response insertion time.
+      // - 2. when near max_response_by_customer - when customer has multiple windows open and submitting the form at the same time. (but has to be almost at the same time)
+      // - 3. when sum of inventory is higher than max_response_in_total - this can cause sum of committed inventory being higher than the max_response_in_total
+      // SOLUTION:
+      // - rollback mechanism
+      // - linked transaction
+      // QUESTIONS:
+      // - will having a queue help?
+      // - will having a rpc (isolated) help?
+      // - will rollback mechanism be enough?
+
       // TODO: only supports single inventory option selection
-      // TODO: this needs to be done via RPC
+      // TODO: this needs to be done via RPC - first we will need a relation between response field and inventory item
       // update the inventory as selected
       const { error: inventory_error } = await commerce.upsertInventoryItem({
         sku: selection_id,
