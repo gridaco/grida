@@ -422,6 +422,9 @@ function BlockRenderer({
                   helpText={field.help_text}
                   options={field.options}
                   pattern={field.pattern}
+                  step={field.step}
+                  min={field.min}
+                  max={field.max}
                   defaultValue={defaultValue}
                   data={field.data}
                   autoComplete={field.autocomplete}

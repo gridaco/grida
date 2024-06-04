@@ -249,6 +249,11 @@ export function FieldEditPanel({
   const [required, setRequired] = useState(init?.required || false);
   const [pattern, setPattern] = useState<string | undefined>(init?.pattern);
 
+  // numeric
+  const [step, setStep] = useState<number | undefined>(init?.step);
+  const [min, setMin] = useState<number | undefined>(init?.min);
+  const [max, setMax] = useState<number | undefined>(init?.max);
+
   // options
   const [options, setOptions] = useState<Option[]>(
     Array.from(init?.options ?? []).sort(
@@ -310,6 +315,8 @@ export function FieldEditPanel({
 
   const supports_options = FieldSupports.options(type);
   const supports_pattern = FieldSupports.pattern(type);
+  const supports_numeric = FieldSupports.numeric(type);
+
   const supports_accept = type === "file";
 
   const preview_placeholder =
@@ -351,6 +358,9 @@ export function FieldEditPanel({
       type,
       required,
       pattern,
+      step,
+      min,
+      max,
       options: supports_options ? indexed_options : undefined,
       autocomplete,
       data,
@@ -428,6 +438,9 @@ export function FieldEditPanel({
                   disabled={preview_disabled}
                   options={supports_options ? options : undefined}
                   pattern={pattern}
+                  step={step}
+                  min={min}
+                  max={max}
                   autoComplete={autocomplete.join(" ")}
                   data={data}
                   accept={accept}
@@ -693,6 +706,7 @@ export function FieldEditPanel({
               type == "payment" ||
               (!supports_accept &&
                 !supports_pattern &&
+                !supports_numeric &&
                 !FieldSupports.checkbox_alias(type))
             }
           >
@@ -721,6 +735,40 @@ export function FieldEditPanel({
                     onChange={(e) => setPattern(e.target.value)}
                   />
                 </PanelPropertyField>
+              )}
+              {supports_numeric && (
+                <>
+                  <PanelPropertyField
+                    label={"Step"}
+                    description="The stepping interval for the input"
+                  >
+                    <PropertyTextInput
+                      type="number"
+                      value={step}
+                      onChange={(e) => setStep(Number(e.target.value))}
+                    />
+                  </PanelPropertyField>
+                  <PanelPropertyField
+                    label={"Min"}
+                    description="The minimum value that the input can accept"
+                  >
+                    <PropertyTextInput
+                      type="number"
+                      value={min}
+                      onChange={(e) => setMin(Number(e.target.value))}
+                    />
+                  </PanelPropertyField>
+                  <PanelPropertyField
+                    label={"Max"}
+                    description="The maximum value that the input can accept"
+                  >
+                    <PropertyTextInput
+                      type="number"
+                      value={max}
+                      onChange={(e) => setMax(Number(e.target.value))}
+                    />
+                  </PanelPropertyField>
+                </>
               )}
               {FieldSupports.checkbox_alias(type) && (
                 <PanelPropertyField

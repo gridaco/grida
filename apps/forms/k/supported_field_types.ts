@@ -161,6 +161,7 @@ export namespace FieldSupports {
    * supports
    * - min
    * - max
+   * - step
    */
   export function numeric(type: FormInputType) {
     return ["number", "range"].includes(type);

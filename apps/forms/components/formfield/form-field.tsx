@@ -48,6 +48,9 @@ interface IInputField {
   defaultValue?: string;
   options?: Option[];
   pattern?: string;
+  step?: number;
+  min?: number;
+  max?: number;
   readonly?: boolean;
   disabled?: boolean;
   autoComplete?: string;
@@ -133,6 +136,9 @@ function MonoFormField({
   accept,
   multiple,
   pattern,
+  step,
+  min,
+  max,
   data,
   novalidate,
   vanilla,
@@ -167,9 +173,9 @@ function MonoFormField({
     pattern: novalidate ? undefined : pattern || undefined,
     // minLength: novalidate ? undefined : data?.min_length,
     // maxLength: novalidate ? undefined : data?.max_length,
-    // min: novalidate ? undefined : data?.min,
-    // max: novalidate ? undefined : data?.max,
-    // step: novalidate ? undefined : data?.step,
+    min: novalidate ? undefined : min,
+    max: novalidate ? undefined : max,
+    step: novalidate ? undefined : step,
 
     // extended
     onChange: __onchange,
