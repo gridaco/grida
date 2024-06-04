@@ -10,7 +10,7 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from "@editor-ui/dropdown-menu";
+} from "@/components/ui/dropdown-menu";
 import { EditorFlatFormBlock } from "@/scaffolds/editor/state";
 import {
   BlockHeader,
@@ -18,6 +18,7 @@ import {
   useBlockFocus,
   useDeleteBlock,
 } from "./base-block";
+import { Button } from "@/components/ui/button";
 
 export function DividerBlock({ id }: EditorFlatFormBlock) {
   const [focused, setFocus] = useBlockFocus(id);
@@ -37,13 +38,13 @@ export function DividerBlock({ id }: EditorFlatFormBlock) {
         <div>
           <DropdownMenu modal={false}>
             <DropdownMenuTrigger asChild>
-              <button>
+              <Button variant="ghost" size="icon">
                 <DotsHorizontalIcon />
-              </button>
+              </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent>
               <DropdownMenuItem onClick={() => deleteBlock(id)}>
-                <TrashIcon />
+                <TrashIcon className="me-2 align-middle" />
                 Delete Block
               </DropdownMenuItem>
             </DropdownMenuContent>

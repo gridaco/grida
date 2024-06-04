@@ -7,7 +7,7 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from "@editor-ui/dropdown-menu";
+} from "@/components/ui/dropdown-menu";
 import { EditorFlatFormBlock } from "@/scaffolds/editor/state";
 import {
   BlockHeader,
@@ -17,6 +17,7 @@ import {
 } from "./base-block";
 import { useEditorState } from "@/scaffolds/editor";
 import { Editor } from "@monaco-editor/react";
+import { Button } from "@/components/ui/button";
 
 export function HtmlBlock({ id, body_html }: EditorFlatFormBlock) {
   const [state, dispatch] = useEditorState();
@@ -66,13 +67,13 @@ export function HtmlBlock({ id, body_html }: EditorFlatFormBlock) {
         <div>
           <DropdownMenu modal={false}>
             <DropdownMenuTrigger asChild>
-              <button>
+              <Button variant="ghost" size="icon">
                 <DotsHorizontalIcon />
-              </button>
+              </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent>
               <DropdownMenuItem onClick={() => deleteBlock(id)}>
-                <TrashIcon />
+                <TrashIcon className="me-2 align-middle" />
                 Delete Block
               </DropdownMenuItem>
             </DropdownMenuContent>

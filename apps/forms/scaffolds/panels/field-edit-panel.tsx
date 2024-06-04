@@ -612,7 +612,7 @@ export function FieldEditPanel({
                   onChange={(e) => setLabel(e.target.value)}
                 />
               </PanelPropertyField>
-              {type !== "checkbox" && (
+              {type !== "checkbox" && type !== "range" && (
                 <PanelPropertyField
                   label={"Placeholder"}
                   description={
@@ -743,8 +743,15 @@ export function FieldEditPanel({
                   >
                     <PropertyTextInput
                       type="number"
+                      placeholder="1"
                       value={step}
-                      onChange={(e) => setStep(Number(e.target.value))}
+                      onChange={(e) =>
+                        setStep(
+                          e.target.value === ""
+                            ? undefined
+                            : Number(e.target.value)
+                        )
+                      }
                     />
                   </PanelPropertyField>
                   <PanelPropertyField
@@ -753,8 +760,15 @@ export function FieldEditPanel({
                   >
                     <PropertyTextInput
                       type="number"
+                      placeholder="E.g. -100"
                       value={min}
-                      onChange={(e) => setMin(Number(e.target.value))}
+                      onChange={(e) =>
+                        setMin(
+                          e.target.value === ""
+                            ? undefined
+                            : Number(e.target.value)
+                        )
+                      }
                     />
                   </PanelPropertyField>
                   <PanelPropertyField
@@ -763,8 +777,15 @@ export function FieldEditPanel({
                   >
                     <PropertyTextInput
                       type="number"
+                      placeholder="E.g. 100"
                       value={max}
-                      onChange={(e) => setMax(Number(e.target.value))}
+                      onChange={(e) =>
+                        setMax(
+                          e.target.value === ""
+                            ? undefined
+                            : Number(e.target.value)
+                        )
+                      }
                     />
                   </PanelPropertyField>
                 </>
@@ -804,17 +825,11 @@ export function FieldEditPanel({
       </PanelContent>
       <PanelFooter>
         <PanelClose>
-          <button className="rounded p-2 bg-neutral-100 dark:bg-neutral-900">
-            Cancel
-          </button>
+          <Button variant="ghost">Cancel</Button>
         </PanelClose>
-        <button
-          type="submit"
-          form="field-edit-form"
-          className={cls_save_button}
-        >
+        <Button variant="default" type="submit" form="field-edit-form">
           Save
-        </button>
+        </Button>
       </PanelFooter>
     </SidePanel>
   );
