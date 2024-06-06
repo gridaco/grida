@@ -801,6 +801,98 @@ export type Database = {
           },
         ]
       }
+      connection_supabase: {
+        Row: {
+          created_at: string
+          form_id: string
+          id: number
+          project_id: number
+          sb_anon_key: string
+          sb_project_reference_id: string
+          sb_project_url: string
+          sb_public_schema: Json
+          sb_service_key_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          form_id: string
+          id?: number
+          project_id: number
+          sb_anon_key: string
+          sb_project_reference_id: string
+          sb_project_url: string
+          sb_public_schema: Json
+          sb_service_key_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          form_id?: string
+          id?: number
+          project_id?: number
+          sb_anon_key?: string
+          sb_project_reference_id?: string
+          sb_project_url?: string
+          sb_public_schema?: Json
+          sb_service_key_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "connection_supabase_form_id_fkey"
+            columns: ["form_id"]
+            isOneToOne: true
+            referencedRelation: "form"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "connection_supabase_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "project"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      connection_supabase_table: {
+        Row: {
+          created_at: string
+          id: number
+          sb_table_name: string
+          sb_table_schema: Json
+          schema_name: string
+          supabase_connection_id: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: number
+          sb_table_name: string
+          sb_table_schema: Json
+          schema_name: string
+          supabase_connection_id: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: number
+          sb_table_name?: string
+          sb_table_schema?: Json
+          schema_name?: string
+          supabase_connection_id?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "connection_supabase_table_supabase_connection_id_fkey"
+            columns: ["supabase_connection_id"]
+            isOneToOne: false
+            referencedRelation: "connection_supabase"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       form: {
         Row: {
           created_at: string
@@ -1598,6 +1690,35 @@ export type Database = {
       [_ in never]: never
     }
   }
+  grida_forms_secure: {
+    Tables: {
+      [_ in never]: never
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      create_secret_connection_supabase_service_key: {
+        Args: {
+          p_connection_id: number
+          p_secret: string
+        }
+        Returns: string
+      }
+      reveal_secret_connection_supabase_service_key: {
+        Args: {
+          p_connection_id: number
+        }
+        Returns: string
+      }
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
   public: {
     Tables: {
       customer: {
@@ -1646,6 +1767,24 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      dummy: {
+        Row: {
+          created_at: string
+          id: number
+          text: string
+        }
+        Insert: {
+          created_at?: string
+          id?: number
+          text: string
+        }
+        Update: {
+          created_at?: string
+          id?: number
+          text?: string
+        }
+        Relationships: []
       }
       organization: {
         Row: {

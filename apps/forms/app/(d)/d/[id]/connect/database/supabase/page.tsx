@@ -1,6 +1,6 @@
 "use client";
-
-import React, { useState } from "react";
+import Axios from "axios";
+import React, { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -17,13 +17,16 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { CodeIcon, QuestionMarkCircledIcon } from "@radix-ui/react-icons";
+import {
+  CodeIcon,
+  LockClosedIcon,
+  QuestionMarkCircledIcon,
+} from "@radix-ui/react-icons";
 import OpenAPIParser from "@readme/openapi-parser";
 import type { OpenAPI } from "openapi-types";
 import toast from "react-hot-toast";
 import { SupabaseLogo } from "@/components/logos";
 import Link from "next/link";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Table,
   TableBody,
@@ -37,7 +40,6 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
-import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import {
   Select,
   SelectContent,
@@ -47,10 +49,18 @@ import {
 } from "@/components/ui/select";
 import { ping } from "@/lib/postgrest/ping";
 
-export default function ConnectDB() {
+export default function ConnectDB({
+  params,
+}: {
+  params: {
+    id: string;
+  };
+}) {
+  const form_id = params.id;
+
   return (
     <main className="max-w-2xl mx-auto">
-      <ConnectSupabase />
+      <ConnectSupabase form_id={form_id} />
     </main>
   );
 }
@@ -87,7 +97,38 @@ type SupabaseOpenAPIDocument = OpenAPI.Document & {
   swagger: string;
 };
 
-function ConnectSupabase() {
+async function sbconn_create_connection(
+  form_id: string,
+  data: {
+    sb_anon_key: string;
+    sb_project_url: string;
+  }
+) {
+  return Axios.post(`/private/editor/connect/${form_id}/supabase`, data);
+}
+
+async function sbconn_get_connection(form_id: string) {
+  return Axios.get(`/private/editor/connect/${form_id}/supabase`);
+}
+
+async function sbconn_remove_connection(form_id: string) {
+  return Axios.delete(`/private/editor/connect/${form_id}/supabase`);
+}
+
+async function sbconn_create_secret(form_id: string, data: { secret: string }) {
+  return Axios.post(
+    `/private/editor/connect/${form_id}/supabase/secure-service-key`,
+    data
+  );
+}
+
+async function sbconn_reveal_secret(form_id: string) {
+  return Axios.get(
+    `/private/editor/connect/${form_id}/supabase/secure-service-key`
+  );
+}
+
+function ConnectSupabase({ form_id }: { form_id: string }) {
   const [url, setUrl] = useState("");
   const [anonKey, setAnonKey] = useState("");
   const [serviceKey, setServiceKey] = useState("");
@@ -97,8 +138,8 @@ function ConnectSupabase() {
   const [table, setTable] = useState<string | undefined>(undefined);
 
   const [connection, setConnection] = useState<{
-    url: string;
-    anonKey: string;
+    sb_anon_key: string;
+    sb_project_url: string;
   } | null>(null);
 
   const connected = connection !== null;
@@ -106,6 +147,15 @@ function ConnectSupabase() {
   const loaded = schema !== null;
 
   const disabled = !url || !anonKey;
+
+  useEffect(() => {
+    sbconn_get_connection(form_id).then((res) => {
+      setConnection(res.data.data);
+      setUrl(res.data.data.sb_project_url);
+      setAnonKey(res.data.data.sb_anon_key);
+      // TODO: others
+    });
+  }, [form_id]);
 
   const onClearClick = () => {
     setUrl("");
@@ -115,12 +165,37 @@ function ConnectSupabase() {
     setConnection(null);
   };
 
+  const onRevealServiceKeyClick = async () => {
+    const res = sbconn_reveal_secret(form_id);
+
+    toast
+      .promise(res, {
+        loading: "Revealing Service Key...",
+        success: "Service Key Revealed",
+        error: "Failed to reveal service key",
+      })
+      .then((res) => {
+        setServiceKey(res.data.secret);
+      });
+  };
+
   const onServiceKeySaveClick = async () => {
     // validate service key
     // ping test
     ping({ url: build_supabase_rest_url(url), key: serviceKey }).then((res) => {
       if (res.status === 200) {
-        toast.success("Service Key is valid");
+        // create secret key connection
+        const data = {
+          secret: serviceKey,
+        };
+
+        const res = sbconn_create_secret(form_id, data);
+
+        toast.promise(res, {
+          loading: "Saving Service Key...",
+          success: "Service Key Saved",
+          error: "Failed to save service key",
+        });
       } else {
         toast.error("Service Key is invalid");
       }
@@ -159,14 +234,36 @@ function ConnectSupabase() {
   };
 
   const onConnectClick = async () => {
-    setConnection({
-      url,
-      anonKey,
-    });
+    const data = {
+      sb_anon_key: anonKey,
+      sb_project_url: url,
+    };
+
+    const res = sbconn_create_connection(form_id, data);
+
+    toast
+      .promise(res, {
+        loading: "Creating Connection...",
+        success: "Connection Created",
+        error: "Failed to create connection",
+      })
+      .then((res) => {
+        setConnection(res.data.data);
+      });
   };
 
   const onRemoveConnectionClick = async () => {
-    setConnection(null);
+    const res = sbconn_remove_connection(form_id);
+
+    toast
+      .promise(res, {
+        loading: "Removing Connection...",
+        success: "Connection Removed",
+        error: "Failed to remove connection",
+      })
+      .then(() => {
+        setConnection(null);
+      });
   };
 
   return (
@@ -222,6 +319,7 @@ function ConnectSupabase() {
                   id="anonkey"
                   name="anonkey"
                   type="text"
+                  autoComplete="off"
                   disabled={loaded}
                   required
                   placeholder="eyxxxxxxxxxxxxxxxxxxxxx.xxxxxxxxxxxxxxxx-xxxxxxxxx"
@@ -260,8 +358,8 @@ function ConnectSupabase() {
       <Card hidden={!connected}>
         <CardHeader>
           <CardTitle>
-            <SupabaseLogo size={20} className="inline me-2 align-middle" />
-            Service Role
+            <LockClosedIcon className="inline me-2 align-middle w-5 h-5" />
+            Service Role Key
           </CardTitle>
           <CardDescription>
             If you wish to bypass RLS and use Form as a admin, you can provide{" "}
@@ -271,6 +369,14 @@ function ConnectSupabase() {
             >
               <u>service_role key.</u>
             </Link>
+            <br />
+            We securely handle and save your service key in{" "}
+            <Link
+              href="https://supabase.com/docs/guides/database/vault"
+              target="_blank"
+            >
+              <u>supabase vault</u>
+            </Link>{" "}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -306,10 +412,7 @@ function ConnectSupabase() {
       </Card>
       <Card hidden={!connected}>
         <CardHeader>
-          <CardTitle>
-            <SupabaseLogo size={20} className="inline me-2 align-middle" />
-            Main Datasource
-          </CardTitle>
+          <CardTitle>Main Datasource</CardTitle>
           <CardDescription>
             Grida Forms Allow you to connect to one of your supabase table to
             the form.
