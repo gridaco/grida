@@ -45,6 +45,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { ping } from "@/lib/postgrest/ping";
 
 export default function ConnectDB() {
   return (
@@ -54,8 +55,12 @@ export default function ConnectDB() {
   );
 }
 
-function build_supabase_openapi_url(url: string, anonKey: string) {
-  return `${url}/rest/v1/?apikey=${anonKey}`;
+function build_supabase_openapi_url(url: string, apiKey: string) {
+  return `${url}/rest/v1/?apikey=${apiKey}`;
+}
+
+function build_supabase_rest_url(url: string) {
+  return `${url}/rest/v1/`;
 }
 
 type SupabaseOpenAPIDocument = OpenAPI.Document & {
@@ -85,14 +90,44 @@ type SupabaseOpenAPIDocument = OpenAPI.Document & {
 function ConnectSupabase() {
   const [url, setUrl] = useState("");
   const [anonKey, setAnonKey] = useState("");
+  const [serviceKey, setServiceKey] = useState("");
   const [schema, setSchema] = useState<
     SupabaseOpenAPIDocument["definitions"] | null
   >(null);
   const [table, setTable] = useState<string | undefined>(undefined);
 
+  const [connection, setConnection] = useState<{
+    url: string;
+    anonKey: string;
+  } | null>(null);
+
+  const connected = connection !== null;
+
+  const loaded = schema !== null;
+
   const disabled = !url || !anonKey;
 
-  const onConnectClick = async () => {
+  const onClearClick = () => {
+    setUrl("");
+    setAnonKey("");
+    setSchema(null);
+    setTable(undefined);
+    setConnection(null);
+  };
+
+  const onServiceKeySaveClick = async () => {
+    // validate service key
+    // ping test
+    ping({ url: build_supabase_rest_url(url), key: serviceKey }).then((res) => {
+      if (res.status === 200) {
+        toast.success("Service Key is valid");
+      } else {
+        toast.error("Service Key is invalid");
+      }
+    });
+  };
+
+  const onTestConnectionClick = async () => {
     try {
       const u = new URL(url);
       const projectref = u.hostname.split(".")[0];
@@ -111,7 +146,7 @@ function ConnectSupabase() {
 
           // validate
           if (apidoc.host.includes(projectref)) {
-            toast.success("Connected to Supabase successfully");
+            toast.success("Valid Connection");
             console.log(apidoc);
 
             setSchema(apidoc.definitions);
@@ -123,63 +158,164 @@ function ConnectSupabase() {
     }
   };
 
+  const onConnectClick = async () => {
+    setConnection({
+      url,
+      anonKey,
+    });
+  };
+
+  const onRemoveConnectionClick = async () => {
+    setConnection(null);
+  };
+
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>
-          <SupabaseLogo size={20} className="inline me-2 align-middle" />
-          Connect Supabase
-        </CardTitle>
-        <CardDescription>
-          Connect your Supabase account to access your database.{" "}
-          <Link
-            href="https://supabase.com/docs/guides/api#api-url-and-keys"
-            target="_blank"
-            className="underline"
-          >
-            Learn more
-          </Link>
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        <div className="flex flex-col gap-10">
-          <div className="grid grid-cols-2 gap-4">
-            <div className="grid gap-2">
-              <Label htmlFor="url">Project URL</Label>
-              <Input
-                id="url"
-                name="url"
-                type="url"
-                required
-                placeholder="https://your-project-ref.supabase.co"
-                value={url}
-                onChange={(e) => setUrl(e.target.value)}
-              />
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="anonkey">
-                Anon API Key
-                <Tooltip>
-                  <TooltipTrigger>
-                    <QuestionMarkCircledIcon className="inline ms-2 align-middle" />
-                  </TooltipTrigger>
-                  <TooltipContent className="max-w-xs">
-                    This key is safe to use in a browser if you have enabled Row
-                    Level Security for your tables and configured policies.
-                  </TooltipContent>
-                </Tooltip>
-              </Label>
-              <Input
-                id="anonkey"
-                name="anonkey"
-                type="text"
-                required
-                placeholder="eyxxxxxxxxxxxxxxxxxxxxx.xxxxxxxxxxxxxxxx-xxxxxxxxx"
-                value={anonKey}
-                onChange={(e) => setAnonKey(e.target.value)}
-              />
+    <div className="space-y-10">
+      <Card>
+        <CardHeader>
+          <CardTitle>
+            <SupabaseLogo size={20} className="inline me-2 align-middle" />
+            Connect Supabase
+          </CardTitle>
+          <CardDescription>
+            Connect your Supabase account to access your database.{" "}
+            <Link
+              href="https://supabase.com/docs/guides/api#api-url-and-keys"
+              target="_blank"
+              className="underline"
+            >
+              Learn more
+            </Link>
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-col gap-10">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="grid gap-2">
+                <Label htmlFor="url">Project URL</Label>
+                <Input
+                  id="url"
+                  name="url"
+                  type="url"
+                  disabled={loaded}
+                  required
+                  placeholder="https://your-project-ref.supabase.co"
+                  value={url}
+                  onChange={(e) => setUrl(e.target.value)}
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="anonkey">
+                  Anon Key
+                  <Tooltip>
+                    <TooltipTrigger>
+                      <QuestionMarkCircledIcon className="inline ms-2 align-middle" />
+                    </TooltipTrigger>
+                    <TooltipContent className="max-w-xs">
+                      This key is safe to use in a browser if you have enabled
+                      Row Level Security for your tables and configured
+                      policies.
+                    </TooltipContent>
+                  </Tooltip>
+                </Label>
+                <Input
+                  id="anonkey"
+                  name="anonkey"
+                  type="text"
+                  disabled={loaded}
+                  required
+                  placeholder="eyxxxxxxxxxxxxxxxxxxxxx.xxxxxxxxxxxxxxxx-xxxxxxxxx"
+                  value={anonKey}
+                  onChange={(e) => setAnonKey(e.target.value)}
+                />
+              </div>
             </div>
           </div>
+        </CardContent>
+        <CardFooter className="flex justify-end gap-2">
+          {!loaded && (
+            <Button
+              variant="secondary"
+              disabled={disabled}
+              onClick={onTestConnectionClick}
+            >
+              Test Connection
+            </Button>
+          )}
+          {loaded && !connected && (
+            <Button variant="outline" onClick={onClearClick}>
+              Clear
+            </Button>
+          )}
+          {connected && (
+            <Button variant="destructive" onClick={onRemoveConnectionClick}>
+              Remove Connection
+            </Button>
+          )}
+          {loaded && !connected && (
+            <Button onClick={onConnectClick}>Connect</Button>
+          )}
+        </CardFooter>
+      </Card>
+      <Card hidden={!connected}>
+        <CardHeader>
+          <CardTitle>
+            <SupabaseLogo size={20} className="inline me-2 align-middle" />
+            Service Role
+          </CardTitle>
+          <CardDescription>
+            If you wish to bypass RLS and use Form as a admin, you can provide{" "}
+            <Link
+              href="https://supabase.com/docs/guides/api/api-keys"
+              target="_blank"
+            >
+              <u>service_role key.</u>
+            </Link>
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid gap-2">
+            <Label htmlFor="service_role">
+              Service Key
+              <Tooltip>
+                <TooltipTrigger>
+                  <QuestionMarkCircledIcon className="inline ms-2 align-middle" />
+                </TooltipTrigger>
+                <TooltipContent className="max-w-xs">
+                  This key has the ability to bypass Row Level Security. We
+                  never use this key on the client side. Only opt-in functions
+                  will use this key to perform the request
+                </TooltipContent>
+              </Tooltip>
+            </Label>
+            <Input
+              id="service_role"
+              name="service_role"
+              type="password"
+              placeholder="eyxxxxxxxxxxxxxxxxxxxxx.xxxxxxxxxxxxxxxx-xxxxxxxxx"
+              value={serviceKey}
+              onChange={(e) => setServiceKey(e.target.value)}
+            />
+          </div>
+        </CardContent>
+        <CardFooter className="flex justify-end">
+          <Button disabled={!serviceKey} onClick={onServiceKeySaveClick}>
+            Save
+          </Button>
+        </CardFooter>
+      </Card>
+      <Card hidden={!connected}>
+        <CardHeader>
+          <CardTitle>
+            <SupabaseLogo size={20} className="inline me-2 align-middle" />
+            Main Datasource
+          </CardTitle>
+          <CardDescription>
+            Grida Forms Allow you to connect to one of your supabase table to
+            the form.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
           {schema && (
             <div>
               <Select value={table} onValueChange={(value) => setTable(value)}>
@@ -196,6 +332,7 @@ function ConnectSupabase() {
               </Select>
               {table && (
                 <>
+                  <hr className="my-4" />
                   <Table>
                     <TableHeader>
                       <TableRow>
@@ -243,16 +380,18 @@ function ConnectSupabase() {
               )}
             </div>
           )}
-        </div>
-      </CardContent>
-      <CardFooter className="flex justify-end gap-2">
-        <Button variant="secondary" onClick={onConnectClick}>
-          Clear Schema
-        </Button>
-        <Button disabled={disabled} onClick={onConnectClick}>
-          Get Schema
-        </Button>
-      </CardFooter>
-    </Card>
+        </CardContent>
+        <CardFooter className="flex justify-end">
+          <Button
+            disabled={!table}
+            onClick={() => {
+              console.log("save", table);
+            }}
+          >
+            Save
+          </Button>
+        </CardFooter>
+      </Card>
+    </div>
   );
 }
