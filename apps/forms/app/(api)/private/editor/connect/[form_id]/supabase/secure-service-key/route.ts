@@ -6,7 +6,12 @@ import { cookies } from "next/headers";
 
 const secureformsclient = createClient<Database, "grida_forms_secure">(
   process.env.NEXT_PUBLIC_SUPABASE_URL as string,
-  process.env.SUPABASE_SERVICE_KEY as string
+  process.env.SUPABASE_SERVICE_KEY as string,
+  {
+    db: {
+      schema: "grida_forms_secure",
+    },
+  }
 );
 
 interface Context {
@@ -67,13 +72,18 @@ export async function POST(req: NextRequest, context: Context) {
   const { secret } = await req.json();
 
   // handle secret value with service client, using secure RPC.
-  const { data } = await secureformsclient.rpc(
+  const { data, error } = await secureformsclient.rpc(
     "create_secret_connection_supabase_service_key",
     {
       p_connection_id: conn.id,
       p_secret: secret,
     }
   );
+
+  if (error) {
+    console.error(error);
+    return NextResponse.error();
+  }
 
   return NextResponse.json({ data });
 }
