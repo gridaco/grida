@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { insert } from "@/lib/postgrest/querybuilder";
+import { insert } from "@/lib/supabase-postgrest/querybuilder";
 
 export default function PostgrestPage() {
   const onSubmit = async (e: any) => {
