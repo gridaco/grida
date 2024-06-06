@@ -1,3 +1,4 @@
+import { parseSupabaseSchema } from "@/lib/supabase-postgrest";
 import { createRouteHandlerClient } from "@/lib/supabase/server";
 import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
@@ -35,18 +36,14 @@ export async function POST(req: NextRequest, context: Context) {
   const cookieStore = cookies();
   const supabase = createRouteHandlerClient(cookieStore);
 
-  const { data: ud } = await supabase.auth.getUser();
-
-  console.log(ud);
-
   const data = await req.json();
   const { sb_project_url, sb_anon_key } = data;
 
-  // TODO: parse
-  const { sb_project_reference_id, sb_public_schema } = {
-    sb_project_reference_id: "",
-    sb_public_schema: "",
-  };
+  const { sb_project_reference_id, sb_public_schema } =
+    await parseSupabaseSchema({
+      url: sb_project_url,
+      anonKey: sb_anon_key,
+    });
 
   const { data: form_ref, error: form_ref_err } = await supabase
     .from("form")

@@ -316,3 +316,13 @@ export interface Geo {
   latitude?: string | undefined;
   longitude?: string | undefined;
 }
+
+export interface SupabaseConnection {
+  form_id: string;
+  project_id: number;
+  sb_anon_key: string;
+  sb_project_reference_id: string;
+  sb_public_schema: { [key: string]: any };
+  sb_project_url: string;
+  sb_service_key_id: string;
+}
