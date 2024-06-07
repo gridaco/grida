@@ -1,13 +1,4 @@
-import {
-  SYSTEM_GF_CUSTOMER_UUID_KEY,
-  SYSTEM_X_GF_GEO_CITY_KEY,
-  SYSTEM_X_GF_GEO_COUNTRY_KEY,
-  SYSTEM_X_GF_GEO_LATITUDE_KEY,
-  SYSTEM_X_GF_GEO_LONGITUDE_KEY,
-  SYSTEM_X_GF_GEO_REGION_KEY,
-  SYSTEM_X_GF_SIMULATOR_FLAG_KEY,
-} from "@/k/system";
-
+import { SYSTEM_X_GF_SIMULATOR_FLAG_KEY } from "@/k/system";
 import { nanoid } from "nanoid";
 import { v4 } from "uuid";
 import { FormRenderTree } from "../forms";
@@ -231,8 +222,8 @@ export class Simulator {
     const datafaker = new FormDataFaker(this.__schema!);
     const customerfaker = new CustomerFaker(this.bot_ids, this.plan.location);
 
-    const formdata = datafaker.generate();
-    const customerdata = customerfaker.generate();
+    const formdata = datafaker.formdata();
+    const customerdata = customerfaker.clientdata();
 
     return {
       formdata: {

@@ -25,7 +25,7 @@ export class CustomerFaker {
     return this.identities[Math.floor(Math.random() * this.identities.length)];
   }
 
-  generate() {
+  clientdata() {
     const lat =
       this.location.type === "point"
         ? this.location.latitude
@@ -78,7 +78,7 @@ export class FormDataFaker {
     return faker.number.int(100);
   }
 
-  generate() {
+  formdata() {
     //
     const data: any = {};
 
