@@ -887,7 +887,7 @@ export type Database = {
           {
             foreignKeyName: "connection_supabase_table_supabase_connection_id_fkey"
             columns: ["supabase_connection_id"]
-            isOneToOne: false
+            isOneToOne: true
             referencedRelation: "connection_supabase"
             referencedColumns: ["id"]
           },

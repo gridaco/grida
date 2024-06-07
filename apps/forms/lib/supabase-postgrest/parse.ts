@@ -27,7 +27,11 @@ type SupabaseOpenAPIDocument = OpenAPI.Document & {
 
 export type SupabasePublicSchema = SupabaseOpenAPIDocument["definitions"];
 
-function build_supabase_openapi_url(url: string, apiKey: string) {
+export function build_supabase_rest_url(url: string) {
+  return `${url}/rest/v1/`;
+}
+
+export function build_supabase_openapi_url(url: string, apiKey: string) {
   return `${url}/rest/v1/?apikey=${apiKey}`;
 }
 

@@ -26,6 +26,11 @@ export async function PUT(req: NextRequest, context: Context) {
     .eq("form_id", form_id)
     .single();
 
+  if (conn_ref_error) {
+    console.error(conn_ref_error);
+    return NextResponse.error();
+  }
+
   if (!conn_ref) return notFound();
 
   const schema = (conn_ref.sb_public_schema as any)[data.table];
@@ -38,7 +43,7 @@ export async function PUT(req: NextRequest, context: Context) {
       sb_table_schema: schema,
     },
     {
-      onConflict: "supabase_connection_id, sb_table_name",
+      onConflict: "supabase_connection_id",
     }
   );
 

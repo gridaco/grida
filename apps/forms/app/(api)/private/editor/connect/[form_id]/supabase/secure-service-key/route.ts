@@ -1,18 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { Database } from "@/types/supabase";
-import { createClient } from "@supabase/supabase-js";
 import { createRouteHandlerClient } from "@/lib/supabase/server";
+import { secureformsclient } from "@/lib/supabase/vault";
 import { cookies } from "next/headers";
-
-const secureformsclient = createClient<Database, "grida_forms_secure">(
-  process.env.NEXT_PUBLIC_SUPABASE_URL as string,
-  process.env.SUPABASE_SERVICE_KEY as string,
-  {
-    db: {
-      schema: "grida_forms_secure",
-    },
-  }
-);
 
 interface Context {
   params: {

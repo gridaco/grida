@@ -31,6 +31,52 @@ export async function GET(req: NextRequest, context: Context) {
   return NextResponse.json({ data: conn });
 }
 
+export async function PATCH(req: NextRequest, context: Context) {
+  const form_id = context.params.form_id;
+  const cookieStore = cookies();
+  const supabase = createRouteHandlerClient(cookieStore);
+
+  const { data: conn } = await supabase
+    .from("connection_supabase")
+    .select(`*, connection_table:connection_supabase_table(*)`)
+    .eq("form_id", form_id)
+    .single();
+
+  if (!conn) {
+    return NextResponse.json(
+      { error: "Connection not found" },
+      { status: 404 }
+    );
+  }
+
+  const { sb_public_schema } = await parseSupabaseSchema({
+    url: conn.sb_project_url,
+    anonKey: conn.sb_anon_key,
+  });
+
+  if (conn.connection_table) {
+    await supabase.from("connection_supabase_table").update({
+      sb_table_schema: sb_public_schema[conn.connection_table.sb_table_name],
+    });
+  }
+
+  const { data: patch, error: patch_error } = await supabase
+    .from("connection_supabase")
+    .update({
+      sb_public_schema: sb_public_schema,
+    })
+    .eq("form_id", form_id)
+    .select(`*, connection_table:connection_supabase_table(*)`)
+    .single();
+
+  if (patch_error) {
+    console.error(patch_error);
+    return NextResponse.error();
+  }
+
+  return NextResponse.json({ data: patch });
+}
+
 export async function POST(req: NextRequest, context: Context) {
   const form_id = context.params.form_id;
   const cookieStore = cookies();

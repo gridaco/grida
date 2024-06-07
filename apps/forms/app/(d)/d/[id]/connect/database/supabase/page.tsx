@@ -1,7 +1,7 @@
 "use client";
 import Axios from "axios";
 import React, { useEffect, useState } from "react";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import {
   Card,
   CardContent,
@@ -49,12 +49,24 @@ import {
 } from "@/components/ui/select";
 import {
   SupabasePublicSchema,
+  build_supabase_rest_url,
   parseSupabaseSchema,
   ping,
 } from "@/lib/supabase-postgrest";
-import { SupabaseConnection } from "@/types";
+import { SupabaseConnection, SupabaseConnectionTable } from "@/types";
 import { Skeleton } from "@/components/ui/skeleton";
 import assert from "assert";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 export default function ConnectDB({
   params,
@@ -72,10 +84,6 @@ export default function ConnectDB({
   );
 }
 
-function build_supabase_rest_url(url: string) {
-  return `${url}/rest/v1/`;
-}
-
 async function sbconn_create_connection(
   form_id: string,
   data: {
@@ -86,16 +94,14 @@ async function sbconn_create_connection(
   return Axios.post(`/private/editor/connect/${form_id}/supabase`, data);
 }
 
+async function sbconn_refresh_connection(form_id: string) {
+  return Axios.patch(`/private/editor/connect/${form_id}/supabase`);
+}
+
 async function sbconn_get_connection(form_id: string) {
   return Axios.get<{
     data: SupabaseConnection & {
-      connection_table: [
-        {
-          id: string;
-          sb_table_name: string;
-          sb_table_schema: { [key: string]: any };
-        },
-      ];
+      connection_table: SupabaseConnectionTable | null;
     };
   }>(`/private/editor/connect/${form_id}/supabase`);
 }
@@ -149,7 +155,7 @@ function ConnectSupabase({ form_id }: { form_id: string }) {
         setUrl(data.sb_project_url);
         setAnonKey(data.sb_anon_key);
         setSchema(data.sb_public_schema as {});
-        setTable(data.connection_table?.[0]?.sb_table_name);
+        setTable(data.connection_table?.sb_table_name);
         console.log(data);
       })
       .catch((err) => {
@@ -177,6 +183,19 @@ function ConnectSupabase({ form_id }: { form_id: string }) {
       loading: "Parsing OpenAPI...",
       success: "Valid Connection",
       error: "Failed to connect to Supabase",
+    });
+  };
+
+  const onRefreshSchemaClick = async () => {
+    const res = sbconn_refresh_connection(form_id);
+    toast.promise(res, {
+      loading: "Refreshing Schema...",
+      success: "Schema Refreshed",
+      error: "Failed to refresh schema",
+    });
+
+    res.then((res) => {
+      setSchema(res.data.data.sb_public_schema);
     });
   };
 
@@ -343,9 +362,41 @@ function ConnectSupabase({ form_id }: { form_id: string }) {
               </Button>
             )}
             {is_connected && (
-              <Button variant="destructive" onClick={onRemoveConnectionClick}>
-                Remove Connection
+              <Button
+                variant="secondary"
+                disabled={disabled}
+                onClick={onRefreshSchemaClick}
+              >
+                Refresh Schema
               </Button>
+            )}
+            {is_connected && (
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button variant="destructive">Remove Connection</Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>
+                      Are you sure you want to remove the connection?
+                    </AlertDialogTitle>
+                    <AlertDialogDescription>
+                      This action is irreversible. You will lose access to your
+                      database.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogAction
+                      className={buttonVariants({ variant: "destructive" })}
+                      onClick={onRemoveConnectionClick}
+                    >
+                      Remove
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
             )}
             {is_loaded && !is_connected && (
               <Button onClick={onConnectClick}>Connect</Button>
