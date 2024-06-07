@@ -72,6 +72,7 @@ import { cn } from "@/utils";
 import { FormFieldTypeIcon } from "@/components/form-field-type-icon";
 import { useInventory, useInventoryState } from "../options/use-inventory";
 import Link from "next/link";
+import { SupabaseLogo } from "@/components/logos";
 
 // @ts-ignore
 const default_field_init: {
@@ -649,7 +650,19 @@ export function FieldEditPanel({
                 />
               </PanelPropertyField>
               {FieldSupports.autocomplete(type) && (
-                <PanelPropertyField label={"Auto Complete"}>
+                <PanelPropertyField
+                  label={"Auto Complete"}
+                  tooltip={
+                    <>
+                      <Link
+                        href="https://developer.mozilla.org/en-US/docs/Web/HTML/Attributes/autocomplete"
+                        target="_blank"
+                      >
+                        Learn more
+                      </Link>
+                    </>
+                  }
+                >
                   <Select
                     value={autocomplete ? autocomplete[0] : ""}
                     onValueChange={(value) => {
@@ -670,13 +683,35 @@ export function FieldEditPanel({
                 </PanelPropertyField>
               )}
               {FieldSupports.multiple(type) && (
-                <PanelPropertyField label={"Multiple"}>
+                <PanelPropertyField
+                  label={"Multiple"}
+                  tooltip={
+                    <>
+                      <Link
+                        href="https://developer.mozilla.org/en-US/docs/Web/HTML/Attributes/multiple"
+                        target="_blank"
+                      >
+                        Learn more
+                      </Link>
+                    </>
+                  }
+                >
                   <Switch checked={multiple} onCheckedChange={setMultiple} />
                 </PanelPropertyField>
               )}
               {!FieldSupports.checkbox_alias(type) && type !== "range" && (
                 <PanelPropertyField
                   label={"Required"}
+                  tooltip={
+                    <>
+                      <Link
+                        href="https://developer.mozilla.org/en-US/docs/Web/HTML/Attributes/required"
+                        target="_blank"
+                      >
+                        Learn more
+                      </Link>
+                    </>
+                  }
                   description={
                     FieldSupports.checkbox_alias(type) ? (
                       <>
@@ -828,6 +863,39 @@ export function FieldEditPanel({
                 }
               >
                 <Switch checked={required} onCheckedChange={setRequired} />
+              </PanelPropertyField>
+            </PanelPropertyFields>
+          </PanelPropertySection>
+          <hr />
+          <PanelPropertySection
+            hidden={
+              !(FieldSupports.file_alias(type) && state.connections.supabase)
+            }
+          >
+            {/* TODO: wip */}
+            <PanelPropertySectionTitle>
+              <SupabaseLogo className="inline me-2 w-5 h-5 align-middle" />
+              Supabase Storage
+            </PanelPropertySectionTitle>
+            <PanelPropertyFields>
+              <PanelPropertyField
+                label={"Bucket"}
+                description="The bucket name to upload the file to."
+              >
+                <PropertyTextInput placeholder="bucket-name" />
+              </PanelPropertyField>
+              <PanelPropertyField
+                label={"Folder Path"}
+                description="The folder path to upload the file to. (Leave leading and trailing slashes off)"
+              >
+                <PropertyTextInput placeholder="path/to/folder" />
+              </PanelPropertyField>
+              <PanelPropertyField
+                label={"Fixed File Name"}
+                description="Leave blank to use default behavior."
+                optional
+              >
+                <PropertyTextInput placeholder="avatar.png" />
               </PanelPropertyField>
             </PanelPropertyFields>
           </PanelPropertySection>

@@ -162,6 +162,10 @@ export namespace FieldSupports {
     return html5_checkbox_alias_field_types.includes(type);
   }
 
+  export function file_alias(type: FormInputType) {
+    return html5_file_alias_field_types.includes(type);
+  }
+
   export function pattern(type: FormInputType) {
     return html5_pattern_supported_field_types.includes(type);
   }
