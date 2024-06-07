@@ -24,6 +24,7 @@ export default async function SubmitCompletePage({
     .select(
       `
         *,
+        fields:form_field(*),
         default_page:form_page!default_form_page_id(
           *
         )
@@ -38,7 +39,8 @@ export default async function SubmitCompletePage({
 
   await ssr_page_init_i18n({ lng: data.default_form_page_language });
 
-  const { title, ending_page_template_id, ending_page_i18n_overrides } = data;
+  const { title, fields, ending_page_template_id, ending_page_i18n_overrides } =
+    data;
 
   if (!response_id) {
     return notFound();
@@ -46,13 +48,32 @@ export default async function SubmitCompletePage({
 
   const { data: response } = await client
     .from("response")
-    .select("*")
+    .select(
+      `
+      *,
+      fields:response_field(*)
+    `
+    )
     .eq("id", response_id)
     .single();
 
   if (!response) {
     return notFound();
   }
+
+  // id:val map
+  const responsefields: Record<string, string> = response.fields.reduce(
+    (acc: any, field) => {
+      const key = fields.find((f) => f.id === field.form_field_id)?.name;
+      if (!key) return acc; // this can't happen - but just in case
+
+      acc[key] =
+        // FIXME: need investigation (case:FIELDVAL)
+        JSON.parse(field.value as any);
+      return acc;
+    },
+    {} as Record<string, string>
+  );
 
   const { local_index, local_id } = response;
 
@@ -72,7 +93,7 @@ export default async function SubmitCompletePage({
           },
 
           // FIXME:
-          fields: {},
+          fields: responsefields,
           session: {},
           customer: {
             short_id: "",

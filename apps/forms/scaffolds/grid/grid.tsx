@@ -324,6 +324,7 @@ function FieldEditCell(props: RenderEditCellProps<any>) {
 
   const { type, value } = data;
 
+  // FIXME: need investigation (case:FIELDVAL)
   const unwrapped = JSON.parse(value);
 
   switch (type as FormInputType) {
