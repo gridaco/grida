@@ -247,6 +247,18 @@ function MonoFormField({
           />
         );
       }
+      case "image": {
+        return (
+          <HtmlFileInput
+            type="file"
+            {...(sharedInputProps as React.ComponentProps<"input">)}
+            accept={
+              (sharedInputProps as React.ComponentProps<"input">).accept ??
+              "image/*"
+            }
+          />
+        );
+      }
       case "file": {
         return (
           <HtmlFileInput

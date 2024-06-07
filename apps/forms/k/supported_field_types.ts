@@ -21,6 +21,7 @@ export const supported_field_types: FormInputType[] = [
   "month",
   "week",
   "file",
+  "image",
   "color",
   "hidden",
   "range",
@@ -86,10 +87,16 @@ export const supported_field_autocomplete_types: FormFieldAutocompleteType[] = [
   "webauthn",
 ];
 
+const html5_file_alias_field_types: FormInputType[] = ["file", "image"];
+
 const html5_multiple_supported_field_types: FormInputType[] = [
-  "file",
+  ...html5_file_alias_field_types,
   "email",
   "select",
+];
+
+const html5_accept_supported_field_types: FormInputType[] = [
+  ...html5_file_alias_field_types,
 ];
 
 export const options_supported_field_types: FormInputType[] = [
@@ -141,6 +148,10 @@ export namespace FieldSupports {
 
   export function multiple(type: FormInputType) {
     return html5_multiple_supported_field_types.includes(type);
+  }
+
+  export function accept(type: FormInputType) {
+    return html5_accept_supported_field_types.includes(type);
   }
 
   export function autocomplete(type: FormInputType) {

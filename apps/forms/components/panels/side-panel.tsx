@@ -1,5 +1,11 @@
 import * as Dialog from "@radix-ui/react-dialog";
 import React from "react";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { QuestionMarkCircledIcon } from "@radix-ui/react-icons";
 
 export function SidePanel({
   children,
@@ -61,12 +67,14 @@ export function PanelPropertyFields({ children }: React.PropsWithChildren<{}>) {
 
 export function PanelPropertyField({
   label,
+  tooltip,
   description,
   optional,
   children,
   disabled,
 }: React.PropsWithChildren<{
   label: React.ReactNode;
+  tooltip?: React.ReactNode;
   description?: React.ReactNode;
   optional?: boolean;
   disabled?: boolean;
@@ -75,7 +83,17 @@ export function PanelPropertyField({
     <fieldset disabled={disabled} className="disabled:opacity-50">
       <label className="text-sm grid gap-2 md:grid md:grid-cols-12">
         <div className="flex flex-row space-x-2 justify-between col-span-12">
-          <span className="block text-sm">{label}</span>
+          <Tooltip>
+            <TooltipTrigger>
+              <span className="block text-sm">
+                {label}
+                {tooltip && (
+                  <QuestionMarkCircledIcon className="inline ms-2 align-middle" />
+                )}
+              </span>
+            </TooltipTrigger>
+            {tooltip && <TooltipContent>{tooltip}</TooltipContent>}
+          </Tooltip>
           {optional && <span className="text-sm">Optional</span>}
         </div>
         <div className="col-span-12">

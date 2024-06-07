@@ -71,6 +71,7 @@ import { editorlink } from "@/lib/forms/url";
 import { cn } from "@/utils";
 import { FormFieldTypeIcon } from "@/components/form-field-type-icon";
 import { useInventory, useInventoryState } from "../options/use-inventory";
+import Link from "next/link";
 
 // @ts-ignore
 const default_field_init: {
@@ -315,8 +316,7 @@ export function FieldEditPanel({
   const supports_options = FieldSupports.options(type);
   const supports_pattern = FieldSupports.pattern(type);
   const supports_numeric = FieldSupports.numeric(type);
-
-  const supports_accept = type === "file";
+  const supports_accept = FieldSupports.accept(type);
 
   const preview_placeholder =
     placeholder ||
@@ -714,6 +714,16 @@ export function FieldEditPanel({
               {supports_accept && (
                 <PanelPropertyField
                   label={"Accept"}
+                  tooltip={
+                    <>
+                      <Link
+                        href="https://developer.mozilla.org/en-US/docs/Web/HTML/Attributes/accept"
+                        target="_blank"
+                      >
+                        Learn more
+                      </Link>
+                    </>
+                  }
                   description="A comma-separated list of file types that the input should accept"
                 >
                   <PropertyTextInput
