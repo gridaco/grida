@@ -1,21 +1,12 @@
-import {
-  SYSTEM_GF_CUSTOMER_UUID_KEY,
-  SYSTEM_X_GF_GEO_CITY_KEY,
-  SYSTEM_X_GF_GEO_COUNTRY_KEY,
-  SYSTEM_X_GF_GEO_LATITUDE_KEY,
-  SYSTEM_X_GF_GEO_LONGITUDE_KEY,
-  SYSTEM_X_GF_GEO_REGION_KEY,
-  SYSTEM_X_GF_SIMULATOR_FLAG_KEY,
-} from "@/k/system";
-import { faker, fi } from "@faker-js/faker";
+import { SYSTEM_X_GF_SIMULATOR_FLAG_KEY } from "@/k/system";
 import { nanoid } from "nanoid";
 import { v4 } from "uuid";
 import { FormRenderTree } from "../forms";
 import { createClientFormsClient } from "../supabase/client";
 import assert from "assert";
 import { FormPage } from "@/types";
-import { FieldSupports } from "@/k/supported_field_types";
 import { FormSubmitErrorCode } from "@/types/private/api";
+import { type FakeLocationPlan, FormDataFaker, CustomerFaker } from "./faker";
 
 export interface SimulationPlan {
   n: number; // Total number of submissions
@@ -23,9 +14,7 @@ export interface SimulationPlan {
   delaybetween: number; // Delay between submissions in ms
   maxq: number; // Base number of concurrent submissions per batch
   randomness: number; // Random coefficient for submission timing
-  location:
-    | { type: "world" }
-    | { type: "point"; latitude: number; longitude: number };
+  location: FakeLocationPlan;
 }
 
 type ResponseCallback = (id: string, response: SimulatorSubmission) => void;
@@ -227,44 +216,26 @@ export class Simulator {
     }
   }
 
-  private get identity() {
-    // randomize bot_id
-    return this.bot_ids[Math.floor(Math.random() * this.bot_ids.length)];
-  }
-
   private fakedata() {
     // Generate random form data
-    const customer_uuid = this.identity;
 
     const datafaker = new FormDataFaker(this.__schema!);
+    const customerfaker = new CustomerFaker(this.bot_ids, this.plan.location);
 
-    const formdata = datafaker.generate();
-
-    const lat =
-      this.plan.location.type === "point"
-        ? this.plan.location.latitude
-        : faker.location.latitude();
-
-    const lon =
-      this.plan.location.type === "point"
-        ? this.plan.location.longitude
-        : faker.location.longitude();
+    const formdata = datafaker.formdata();
+    const customerdata = customerfaker.clientdata();
 
     return {
       formdata: {
-        [SYSTEM_GF_CUSTOMER_UUID_KEY]: customer_uuid,
+        ...customerdata.data,
         ...formdata,
       },
       headers: {
-        [SYSTEM_X_GF_GEO_CITY_KEY]: faker.location.city(),
-        [SYSTEM_X_GF_GEO_LATITUDE_KEY]: lat.toString(),
-        [SYSTEM_X_GF_GEO_LONGITUDE_KEY]: lon.toString(),
-        [SYSTEM_X_GF_GEO_REGION_KEY]: faker.location.state(),
-        [SYSTEM_X_GF_GEO_COUNTRY_KEY]: faker.location.country(),
+        ...customerdata.headers,
         [SYSTEM_X_GF_SIMULATOR_FLAG_KEY]: "1",
         accept: "application/json",
       },
-      bot_id: customer_uuid,
+      bot_id: customerdata.data.__gf_customer_uuid,
 
       // TODO: use faker to generate random data based on form schema
       // Add your form data structure here
@@ -287,57 +258,4 @@ async function submit(form_id: string, data: any, headers: any = {}) {
     body: formdata,
     headers,
   });
-}
-
-class FormDataFaker {
-  constructor(readonly schema: FormRenderTree) {}
-
-  private randoption(field: string) {
-    // random option
-    const options = this.schema.options({ of: field });
-    const randop = this.rand(options);
-    return randop.id;
-  }
-
-  private rand<T>(arr: T[]) {
-    // random from array
-    return arr[Math.floor(Math.random() * arr.length)];
-  }
-
-  private randtext() {
-    // random text
-    return "__SIMULATED__ " + faker.lorem.sentence();
-  }
-
-  private randnumber() {
-    // random number
-    return faker.number.int(100);
-  }
-
-  generate() {
-    //
-    const data: any = {};
-
-    for (const field of this.schema.fields({ render: true })) {
-      const { id, name, options, type } = field;
-
-      if (FieldSupports.options(type)) {
-        data[name] = this.randoption(id);
-      } else {
-        switch (field.type) {
-          case "number":
-            data[name] = this.randnumber();
-            break;
-          case "text":
-            data[name] = this.randtext();
-            break;
-          default:
-            data[name] = this.randtext();
-            break;
-        }
-      }
-    }
-
-    return data;
-  }
 }

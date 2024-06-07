@@ -76,14 +76,15 @@ export function Component({
       <CardContent className="p-0" />
       <CardFooter className="flex w-full p-0">
         {href && (
-          <Link className="w-full" href={href}>
+          // use a instead of Link to prevent app from crashing on object href (this can happen on editor)
+          <a className="w-full" href={href}>
             <Button
               className="w-full"
               dangerouslySetInnerHTML={{
                 __html: button,
               }}
             />
-          </Link>
+          </a>
         )}
       </CardFooter>
     </Card>

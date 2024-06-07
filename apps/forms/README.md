@@ -14,7 +14,13 @@ Open [http://localhost:3000](http://localhost:3000) with your browser to see the
 ## Supabase Types
 
 ```bash
-npx supabase gen types typescript --project-id "$PROJECT_REF" --schema public --schema grida_forms > types/supabase.ts
+npx supabase gen types typescript \
+  --project-id "$PROJECT_REF" \
+  --schema public \
+  --schema grida_commerce \
+  --schema grida_forms \
+  --schema grida_forms_secure \
+  > types/supabase.ts
 ```
 
 ## Grida Forms Client Library

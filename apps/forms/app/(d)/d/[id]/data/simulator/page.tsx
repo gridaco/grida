@@ -376,9 +376,7 @@ function SimulationPlanner({
         </Badge>
         <h1 className="text-xl font-bold">New Simulation</h1>
         <small className="text-muted-foreground">
-          This is a simulator to simulate the form submission. This is useful
-          for testing purposes.{" "}
-          <i>Note: Closing this page will stop the simulation.</i>
+          Simulate high traffic on your form
         </small>
       </header>
       <hr className="my-4" />
@@ -514,6 +512,9 @@ function SimulationPlanner({
                   <li>
                     You will have to clean up the data manually after the
                     simulation
+                  </li>
+                  <li>
+                    <i>Note: Closing this page will stop the simulation.</i>
                   </li>
                 </ul>
                 This is only recommended for testing purposes and before going

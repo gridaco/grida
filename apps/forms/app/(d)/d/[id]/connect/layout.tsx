@@ -1,3 +1,4 @@
+import { SupabaseLogo } from "@/components/logos";
 import { SideNavBadge, SideNavItem } from "@/components/sidenav";
 import {
   ArchiveIcon,
@@ -55,19 +56,19 @@ export default function Layout({
             </Link>
           </li>
           <li>
+            <Link href={`/d/${id}/connect/database/supabase`}>
+              <SideNavItem>
+                <SupabaseLogo size={15} />
+                Supabase
+                <SideNavBadge>alpha</SideNavBadge>
+              </SideNavItem>
+            </Link>
+          </li>
+          <li>
             {/* <Link href={`/d/${id}/connect/parameters`}> */}
             <SideNavItem disabled>
               <CodeIcon />
               URL parameters
-              <SideNavBadge>soon</SideNavBadge>
-            </SideNavItem>
-            {/* </Link> */}
-          </li>
-          <li>
-            {/* <Link href={`/d/${id}/connect/datasource/db`}> */}
-            <SideNavItem disabled>
-              <CodeIcon />
-              Data Source
               <SideNavBadge>soon</SideNavBadge>
             </SideNavItem>
             {/* </Link> */}

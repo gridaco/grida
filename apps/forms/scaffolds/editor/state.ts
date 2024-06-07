@@ -4,6 +4,7 @@ import type {
   FormBlockType,
   FormFieldDefinition,
   FormResponse,
+  SupabaseConnection,
 } from "@/types";
 
 export type DraftID = `[draft]${string}`;
@@ -14,6 +15,7 @@ export interface FormEditorInit {
   form_id: string;
   connections?: {
     store_id?: number | null;
+    supabase?: SupabaseConnection | null;
   };
   form_title: string;
   page_id: string | null;
@@ -35,6 +37,7 @@ export function initialFormEditorState(init: FormEditorInit): FormEditorState {
     connections: {
       project_id: init.project_id,
       store_id: init.connections?.store_id,
+      supabase: init.connections?.supabase,
     },
     form_id: init.form_id,
     form_title: init.form_title,
@@ -51,6 +54,7 @@ export interface FormEditorState {
   connections: {
     project_id: number;
     store_id?: number | null;
+    supabase?: SupabaseConnection | null;
   };
   form_id: string;
   form_title: string;

@@ -12,6 +12,7 @@ import {
   RadiobuttonIcon,
   SwitchIcon,
   SliderIcon,
+  FileIcon,
 } from "@radix-ui/react-icons";
 
 export function FormFieldTypeIcon({ type }: { type: FormInputType }) {
@@ -48,6 +49,8 @@ export function FormFieldTypeIcon({ type }: { type: FormInputType }) {
     case "number":
     case "range":
       return <SliderIcon />;
+    case "file":
+      return <FileIcon />;
     case "signature":
       // TODO: replace icon
       return <>✍️</>;
