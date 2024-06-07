@@ -30,6 +30,7 @@ import { qval } from "@/utils/qs";
 import { notFound } from "next/navigation";
 import { FormSubmitErrorCode } from "@/types/private/api";
 import { SessionMeta, meta } from "./meta";
+import { sbconn_insert } from "./sbconn";
 
 const HOST = process.env.HOST || "http://localhost:3000";
 
@@ -110,7 +111,11 @@ async function submit({
           *,
           options:form_field_option(*)
         ),
-        store_connection:connection_commerce_store(*)
+        store_connection:connection_commerce_store(*),
+        supabase_connection:connection_supabase(
+          *,
+          connection_table:connection_supabase_table(*)
+        )
       `
     )
     .eq("id", form_id)
@@ -122,6 +127,7 @@ async function submit({
 
   const {
     project_id,
+    fields,
     unknown_field_handling_strategy,
     is_redirect_after_response_uri_enabled,
     is_ending_page_enabled,
@@ -135,7 +141,7 @@ async function submit({
     scheduling_open_at,
     scheduling_close_at,
     store_connection,
-    fields,
+    supabase_connection,
   } = form_reference;
 
   const entries = data.entries();
@@ -261,6 +267,10 @@ async function submit({
 
   // endregion
 
+  // ==================================================
+  // region inventory
+  // ==================================================
+
   // validatopn - check if user selected option is connected to inventory and is available
   let options_inventory: FormFieldOptionsInventoryMap | null = null;
   if (store_connection) {
@@ -355,6 +365,27 @@ async function submit({
           }
         }
       }
+    }
+  }
+
+  // endregion
+
+  // ==================================================
+  // region user supabase connection
+
+  if (supabase_connection && supabase_connection.connection_table) {
+    const insertion = await sbconn_insert(
+      supabase_connection as any,
+      data // needs json conversion
+    );
+
+    console.log("sbconn_insertion", insertion);
+
+    const { data: sbconn_inserted, error: sbconn_insertion_error } = insertion;
+
+    if (sbconn_insertion_error) {
+      console.error("submit/err/sbconn", sbconn_insertion_error);
+      return error(500, { form_id }, meta);
     }
   }
 

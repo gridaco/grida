@@ -175,9 +175,11 @@ function ConnectSupabase({ form_id }: { form_id: string }) {
     const parsing = parseSupabaseSchema({
       url,
       anonKey,
-    }).then((res) => {
-      setSchema(res.sb_public_schema);
-    });
+    })
+      .then((res) => {
+        setSchema(res.sb_public_schema);
+      })
+      .catch(console.error);
 
     toast.promise(parsing, {
       loading: "Parsing OpenAPI...",
@@ -633,7 +635,8 @@ function RevealSecret({ fetcher }: { fetcher: () => Promise<string> }) {
         value={
           secret ||
           // dummy value for password
-          "123456789"
+          // its usually 219 characters long
+          "·".repeat(219)
         }
       />
     </div>

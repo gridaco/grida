@@ -62,7 +62,7 @@ export async function parseSupabaseSchema({
           const apidoc = api as SupabaseOpenAPIDocument;
 
           // validate
-          if (apidoc.host.includes(projectref)) {
+          if ("definitions" in apidoc) {
             return resolve({
               sb_anon_key: anonKey,
               sb_project_reference_id: projectref,
