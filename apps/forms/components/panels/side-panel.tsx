@@ -20,7 +20,7 @@ export function SidePanel({
       {trigger && <Dialog.Trigger asChild>{trigger}</Dialog.Trigger>}
       <Dialog.Portal>
         <Dialog.Overlay className="z-40 fixed bg-neutral-500/50 dark:bg-neutral-900/80 h-full w-full left-0 top-0 opacity-75 data-[state='closed']:animate-fade-out-overlay-bg data-[staet='open']:animate-fade-in-overlay-bg " />
-        <Dialog.Content className="z-40 bg-background flex flex-col fixed inset-y-0 lg:h-screen border-l border-overlay shadow-xl  w-screen max-w-3xl h-full  right-0 data-[state='open']:animate-panel-slide-right-out data-[state='closed']:animate-panel-slide-right-in">
+        <Dialog.Content className="z-40 bg-background flex flex-col fixed inset-y-0 lg:h-screen border-l border-overlay shadow-xl  w-screen max-w-3xl h-full  right-0 data-[state='open']:animate-panel-slide-right-out data-[state='closed']:animate-panel-slide-right-in focus:outline-none">
           {children}
         </Dialog.Content>
       </Dialog.Portal>
@@ -83,18 +83,22 @@ export function PanelPropertyField({
     <fieldset disabled={disabled} className="disabled:opacity-50">
       <label className="text-sm grid gap-2 md:grid md:grid-cols-12">
         <div className="flex flex-row space-x-2 justify-between col-span-12">
-          <Tooltip>
-            <TooltipTrigger>
-              <span className="block text-sm">
-                {label}
-                {tooltip && (
-                  <QuestionMarkCircledIcon className="inline ms-2 align-middle" />
-                )}
-              </span>
-            </TooltipTrigger>
-            {tooltip && <TooltipContent>{tooltip}</TooltipContent>}
-          </Tooltip>
-          {optional && <span className="text-sm">Optional</span>}
+          <span className="block text-sm">
+            {label}
+            {tooltip && (
+              <Tooltip>
+                <TooltipTrigger type="button">
+                  <QuestionMarkCircledIcon className="inline ms-2 align-middle opacity-50" />
+                </TooltipTrigger>
+                <TooltipContent>{tooltip}</TooltipContent>
+              </Tooltip>
+            )}
+          </span>
+          {optional && (
+            <span className="text-sm text-muted-foreground italic">
+              Optional
+            </span>
+          )}
         </div>
         <div className="col-span-12">
           <div className="relative">{children}</div>

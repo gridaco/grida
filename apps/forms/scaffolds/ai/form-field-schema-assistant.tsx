@@ -84,9 +84,14 @@ export function FormFieldAssistant({
           rows={4}
           disabled={isLoading}
         />
-        <Button className={`w-full`} onClick={assist} disabled={isLoading}>
+        <Button
+          variant="outline"
+          className={`w-full`}
+          onClick={assist}
+          disabled={isLoading}
+        >
           {isLoading ? (
-            <Spinner className="w-5 h-5 fill-background text-foreground" />
+            <Spinner className="w-5 h-5" />
           ) : (
             <MagicWandIcon className="w-5 h-5" />
           )}
