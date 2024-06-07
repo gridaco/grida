@@ -54,6 +54,7 @@ import {
 } from "@/lib/supabase-postgrest";
 import { SupabaseConnection } from "@/types";
 import { Skeleton } from "@/components/ui/skeleton";
+import assert from "assert";
 
 export default function ConnectDB({
   params,
@@ -86,9 +87,17 @@ async function sbconn_create_connection(
 }
 
 async function sbconn_get_connection(form_id: string) {
-  return Axios.get<{ data: SupabaseConnection }>(
-    `/private/editor/connect/${form_id}/supabase`
-  );
+  return Axios.get<{
+    data: SupabaseConnection & {
+      connection_table: [
+        {
+          id: string;
+          sb_table_name: string;
+          sb_table_schema: { [key: string]: any };
+        },
+      ];
+    };
+  }>(`/private/editor/connect/${form_id}/supabase`);
 }
 
 async function sbconn_remove_connection(form_id: string) {
@@ -106,6 +115,13 @@ async function sbconn_reveal_secret(form_id: string) {
   return Axios.get(
     `/private/editor/connect/${form_id}/supabase/secure-service-key`
   );
+}
+
+async function sbconn_create_connection_table(
+  form_id: string,
+  data: { table: string }
+) {
+  return Axios.put(`/private/editor/connect/${form_id}/supabase/table`, data);
 }
 
 function ConnectSupabase({ form_id }: { form_id: string }) {
@@ -128,10 +144,13 @@ function ConnectSupabase({ form_id }: { form_id: string }) {
   useEffect(() => {
     sbconn_get_connection(form_id)
       .then((res) => {
-        setConnection(res.data.data);
-        setUrl(res.data.data.sb_project_url);
-        setAnonKey(res.data.data.sb_anon_key);
-        setSchema(res.data.data.sb_public_schema as {});
+        const data = res.data.data;
+        setConnection(data);
+        setUrl(data.sb_project_url);
+        setAnonKey(data.sb_anon_key);
+        setSchema(data.sb_public_schema as {});
+        setTable(data.connection_table?.[0]?.sb_table_name);
+        console.log(data);
       })
       .catch((err) => {
         setConnection(null);
@@ -144,29 +163,6 @@ function ConnectSupabase({ form_id }: { form_id: string }) {
     setSchema(null);
     setTable(undefined);
     setConnection(null);
-  };
-
-  const onServiceKeySaveClick = async () => {
-    // validate service key
-    // ping test
-    ping({ url: build_supabase_rest_url(url), key: serviceKey }).then((res) => {
-      if (res.status === 200) {
-        // create secret key connection
-        const data = {
-          secret: serviceKey,
-        };
-
-        const res = sbconn_create_secret(form_id, data);
-
-        toast.promise(res, {
-          loading: "Saving Service Key...",
-          success: "Service Key Saved",
-          error: "Failed to save service key",
-        });
-      } else {
-        toast.error("Service Key is invalid");
-      }
-    });
   };
 
   const onTestConnectionClick = async () => {
@@ -221,6 +217,47 @@ function ConnectSupabase({ form_id }: { form_id: string }) {
       });
   };
 
+  const onServiceKeySaveClick = async () => {
+    // validate service key
+    // ping test
+    ping({ url: build_supabase_rest_url(url), key: serviceKey }).then((res) => {
+      if (res.status === 200) {
+        // create secret key connection
+        const data = {
+          secret: serviceKey,
+        };
+
+        const res = sbconn_create_secret(form_id, data);
+
+        res.then((res) => {
+          setConnection((prev) => ({
+            ...prev!,
+            sb_service_key_id: res.data.data,
+          }));
+        });
+
+        toast.promise(res, {
+          loading: "Saving Service Key...",
+          success: "Service Key Saved",
+          error: "Failed to save service key",
+        });
+      } else {
+        toast.error("Service Key is invalid");
+      }
+    });
+  };
+
+  const onSaveMainTableClick = async () => {
+    assert(table);
+    const res = sbconn_create_connection_table(form_id, { table });
+
+    toast.promise(res, {
+      loading: "Saving Main Table...",
+      success: "Main Table Saved",
+      error: "Failed to save main table",
+    });
+  };
+
   return (
     <div className="space-y-10">
       {connection === undefined ? (
@@ -249,6 +286,7 @@ function ConnectSupabase({ form_id }: { form_id: string }) {
                 <div className="grid gap-2">
                   <Label htmlFor="url">Project URL</Label>
                   <Input
+                    className="font-mono"
                     id="url"
                     name="url"
                     type="url"
@@ -274,6 +312,7 @@ function ConnectSupabase({ form_id }: { form_id: string }) {
                     </Tooltip>
                   </Label>
                   <Input
+                    className="font-mono"
                     id="anonkey"
                     name="anonkey"
                     type="text"
@@ -366,6 +405,7 @@ function ConnectSupabase({ form_id }: { form_id: string }) {
               ) : (
                 <>
                   <Input
+                    className="font-mono"
                     id="service_role"
                     name="service_role"
                     type="password"
@@ -379,9 +419,11 @@ function ConnectSupabase({ form_id }: { form_id: string }) {
           </div>
         </CardContent>
         <CardFooter className="flex justify-end">
-          <Button disabled={!serviceKey} onClick={onServiceKeySaveClick}>
-            Save
-          </Button>
+          <div hidden={!!connection?.sb_service_key_id}>
+            <Button disabled={!serviceKey} onClick={onServiceKeySaveClick}>
+              Save
+            </Button>
+          </div>
         </CardFooter>
       </Card>
       <Card hidden={!is_connected}>
@@ -459,12 +501,7 @@ function ConnectSupabase({ form_id }: { form_id: string }) {
           )}
         </CardContent>
         <CardFooter className="flex justify-end">
-          <Button
-            disabled={!table}
-            onClick={() => {
-              alert("TODO: save table to form");
-            }}
-          >
+          <Button disabled={!table} onClick={onSaveMainTableClick}>
             Save
           </Button>
         </CardFooter>
@@ -477,17 +514,19 @@ function LoadingCard() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>
-          <Skeleton className="w-24 h-4" />
-        </CardTitle>
-        <CardDescription>
-          <Skeleton className="w-full h-2" />
-        </CardDescription>
+        <Skeleton className="w-24 h-5" />
+        <Skeleton className="w-full h-2" />
       </CardHeader>
       <CardContent>
         <div className="grid grid-cols-2 gap-4">
-          <Skeleton className="w-full h-8" />
-          <Skeleton className="w-full h-8" />
+          <div className="grid gap-2">
+            <Skeleton className="w-10 h-4" />
+            <Skeleton className="w-full h-8" />
+          </div>
+          <div className="grid gap-2">
+            <Skeleton className="w-10 h-4" />
+            <Skeleton className="w-full h-8" />
+          </div>
         </div>
       </CardContent>
       <CardFooter className="flex justify-end">

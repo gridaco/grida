@@ -17,7 +17,7 @@ export async function GET(req: NextRequest, context: Context) {
 
   const { data: conn } = await supabase
     .from("connection_supabase")
-    .select()
+    .select(`*, connection_table:connection_supabase_table(*)`)
     .eq("form_id", form_id)
     .single();
 
