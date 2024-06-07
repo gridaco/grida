@@ -18,45 +18,7 @@ export async function sbconn_insert(
 
   const schema = sb_table_schema as JSONSchemaType<Record<string, any>>;
 
-  // data contains only recognized keys
-  const data: { [key: string]: any } = {};
-
-  const formdata_keys = Array.from(formdata.keys());
-
-  Object.keys(schema.properties).forEach((key) => {
-    const { type, format } = schema.properties[key];
-    switch (type) {
-      case "number": {
-        data[key] = Number(formdata.get(key));
-        break;
-      }
-      case "boolean": {
-        // TODO: this needs to be cross cheked with the form field type (e.g. checkbox)
-        const sval = formdata.get(key);
-        const bval = sval === "on" || sval === "true" || sval === "1";
-        data[key] = bval;
-
-        break;
-      }
-      default: {
-        if (format === "json") {
-          const constructedjson = unflatten(
-            formdata_keys.reduce((acc: any, key) => {
-              if (key.startsWith(`${key}.`)) {
-                acc[key] = formdata.get(key);
-              }
-              return acc;
-            }, {})
-          );
-          console.log("constructedjson", constructedjson);
-          data[key] = constructedjson;
-          break;
-        }
-        data[key] = formdata.get(key) || undefined;
-        break;
-      }
-    }
-  });
+  const data = parseFormData(formdata, schema);
 
   // TODO: use service key only if configured to do so
   const apiKey = (await secureFetchServiceKey(id)) || sb_anon_key;
@@ -85,6 +47,57 @@ async function secureFetchServiceKey(connection_id: number) {
       p_connection_id: connection_id,
     }
   );
+
+  return data;
+}
+
+function parseFormData(
+  formdata: FormData,
+  schema: JSONSchemaType<Record<string, any>>
+) {
+  //
+
+  // data contains only recognized keys
+  const data: { [key: string]: any } = {};
+
+  const formdata_keys = Array.from(formdata.keys());
+
+  Object.keys(schema.properties).forEach((key) => {
+    const { type, format } = schema.properties[key];
+    switch (type) {
+      case "number": {
+        data[key] = Number(formdata.get(key));
+        break;
+      }
+      case "boolean": {
+        // TODO: this needs to be cross cheked with the form field type (e.g. checkbox)
+        const sval = formdata.get(key);
+        const bval = sval === "on" || sval === "true" || sval === "1";
+        data[key] = bval;
+
+        break;
+      }
+      default: {
+        if (format === "json") {
+          const flat = formdata_keys.reduce((acc: any, k) => {
+            if (k.startsWith(`${key}.`)) {
+              // TODO: need scalar type support
+              acc[k] = formdata.get(k);
+            }
+            return acc;
+          }, {});
+
+          const constructedjson = unflatten(flat);
+          console.log("constructedjson", constructedjson);
+
+          data[key] = (constructedjson as any)[key];
+          break;
+        }
+        data[key] = formdata.get(key) || undefined;
+        break;
+      }
+    }
+  });
 
   return data;
 }
