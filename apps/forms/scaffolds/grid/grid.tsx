@@ -297,6 +297,7 @@ function FieldCell({ column, row }: RenderCellProps<any>) {
   });
 
   switch (type as FormInputType) {
+    case "switch":
     case "checkbox": {
       return <input type="checkbox" checked={unwrapped as boolean} disabled />;
     }

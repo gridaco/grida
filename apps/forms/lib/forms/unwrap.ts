@@ -16,9 +16,14 @@ export function unwrapFeildValue(
       return unwrapped;
     case "password":
       return options?.obscure ? "●".repeat(unwrapped.length) : unwrapped;
+    case "switch":
     case "checkbox":
-      return unwrapped as boolean;
+      return parseCheckboxValue(unwrapped);
     default:
       return unwrapped;
   }
+}
+
+function parseCheckboxValue(value: "on" | "off"): boolean {
+  return value === "on";
 }

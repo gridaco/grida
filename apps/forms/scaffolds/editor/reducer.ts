@@ -170,9 +170,8 @@ export function reducer(
       return produce(state, (draft) => {
         // update focus block id
         draft.focus_block_id = block_id;
-
-        // if no available field, but field block provided, open a field editor panel
         draft.focus_field_id = null;
+        // open a field editor panel
         draft.is_field_edit_panel_open = true;
       });
     }
