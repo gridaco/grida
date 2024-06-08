@@ -60,7 +60,7 @@ export interface SortBlockAction {
 export interface ChangeBlockFieldAction {
   type: "blocks/field/change";
   block_id: string;
-  field_id: string;
+  field_id: string | null;
 }
 
 export interface CreateFielFromBlockdAction {

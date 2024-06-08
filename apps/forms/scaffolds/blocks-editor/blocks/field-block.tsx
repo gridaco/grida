@@ -62,10 +62,6 @@ export function FieldBlock({
 
   const { available_field_ids, fields } = state;
   const [advanced, setAdvanced] = useState(false);
-  const no_available_fields = available_field_ids.length === 0;
-
-  const can_create_new_field_from_this_block =
-    no_available_fields && !form_field;
 
   const can_advanced_mode = fields.length > 0;
 
@@ -83,6 +79,11 @@ export function FieldBlock({
   );
 
   const onNewFieldClick = useCallback(() => {
+    dispatch({
+      type: "blocks/field/change",
+      block_id: id,
+      field_id: null,
+    });
     dispatch({
       type: "blocks/field/new",
       block_id: id,
@@ -207,14 +208,12 @@ export function FieldBlock({
                         {f.name}
                       </SelectItem>
                     ))}
-                    {can_create_new_field_from_this_block && (
-                      <SelectItem value="__gf_new">
-                        <div className="flex items-center">
-                          <PlusIcon className="me-2" />
-                          Create New Field
-                        </div>
-                      </SelectItem>
-                    )}
+                    <SelectItem value="__gf_new">
+                      <div className="flex items-center">
+                        <PlusIcon className="me-2" />
+                        Create New Field
+                      </div>
+                    </SelectItem>
                     {can_advanced_mode && (
                       <SelectItem value="__gf_advanced">
                         <div className="flex items-center">
