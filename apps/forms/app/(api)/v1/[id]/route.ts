@@ -35,7 +35,12 @@ import i18next from "i18next";
 import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
 import { FormRenderTree, type ClientRenderBlock } from "@/lib/forms";
-import type { FormFieldDefinition, FormPage, Option } from "@/types";
+import type {
+  FormFieldDefinition,
+  FormMethod,
+  FormPage,
+  Option,
+} from "@/types";
 import { Features } from "@/lib/features/scheduling";
 
 export const revalidate = 0;
@@ -49,6 +54,7 @@ interface FormClientFetchResponse {
 
 export interface FormClientFetchResponseData {
   title: string;
+  method: FormMethod;
   tree: FormBlockTree<ClientRenderBlock[]>;
   blocks: ClientRenderBlock[];
   fields: FormFieldDefinition[];
@@ -171,6 +177,7 @@ export async function GET(
 
   const {
     title,
+    method,
     description,
     default_page,
     fields,
@@ -404,6 +411,7 @@ export async function GET(
   const is_open = !__is_force_closed && response.error === null;
   const payload: FormClientFetchResponseData = {
     title: title,
+    method,
     tree: renderer.tree(),
     blocks: renderer.blocks(),
     fields: fields,

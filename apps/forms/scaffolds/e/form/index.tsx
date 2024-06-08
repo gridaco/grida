@@ -13,7 +13,7 @@ import {
   SYSTEM_GF_FINGERPRINT_VISITORID_KEY,
 } from "@/k/system";
 import type { EditorApiResponse } from "@/types/private/api";
-import type { FormPageBackgroundSchema } from "@/types";
+import type { FormMethod, FormPageBackgroundSchema } from "@/types";
 import type {
   FormClientFetchResponseData,
   FormClientFetchResponseError,
@@ -87,6 +87,7 @@ export function Form({
   const {
     //
     title,
+    method,
     blocks,
     tree,
     fields,
@@ -124,7 +125,7 @@ export function Form({
   return (
     <main className="min-h-screen flex flex-col items-center pt-10 md:pt-16">
       <FormView
-        method="POST"
+        method={method}
         form_id={form_id}
         action={submit_action}
         title={title}
