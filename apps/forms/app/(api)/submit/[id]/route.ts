@@ -31,6 +31,10 @@ import { notFound } from "next/navigation";
 import { FormSubmitErrorCode } from "@/types/private/api";
 import { SessionMeta, meta } from "./meta";
 import { sbconn_insert } from "./sbconn";
+import { FieldSupports } from "@/k/supported_field_types";
+import { UniqueFileNameGenerator } from "@/lib/forms/storage";
+import { GRIDA_FORMS_RESPONSE_BUCKET_UPLOAD_LIMIT } from "@/k/env";
+import type { InsertDto } from "@/types/supabase-ext";
 
 const HOST = process.env.HOST || "http://localhost:3000";
 
@@ -514,10 +518,15 @@ async function submit({
     v_form_fields!.push(...new_fields?.map((f) => ({ ...f, options: [] }))!);
   }
 
+  const field_file_uploads: Record<
+    string,
+    Promise<SupabaseStorageUploadReturnType[]>
+  > = {};
+
   // save each field value
   const { error: v_fields_error } = await client.from("response_field").insert(
     v_form_fields!.map((field) => {
-      const { name, options } = field;
+      const { type, name, options } = field;
 
       // the field's value can be a input value or a reference to form_field_option
       const value_or_reference = data.get(name);
@@ -532,11 +541,24 @@ async function submit({
         ? is_value_fkey_and_found.value
         : value_or_reference;
 
+      // handle file uploads
+      if (FieldSupports.file_alias(type)) {
+        const files = data.getAll(name);
+
+        console.log("submit/file", files);
+
+        field_file_uploads[field.id] = upload_response_field_files(files, {
+          response_id: response_reference_obj!.id,
+          field_id: field.id,
+        });
+      }
+
       return {
-        type: field.type,
+        type: type,
         response_id: response_reference_obj!.id,
         form_field_id: field.id,
         form_id: form_id,
+        // TODO: save value with schema type accordinglly
         value: JSON.stringify(value),
         form_field_option_id: is_value_fkey_and_found
           ? is_value_fkey_and_found.id
@@ -546,6 +568,68 @@ async function submit({
   );
 
   if (v_fields_error) console.error("submit/err/fields", v_fields_error);
+
+  // ==================================================
+  // post-upload processing
+  // ==================================================
+
+  // update fields with file uploads
+  const awaited_uploads = (
+    await Promise.all(Object.values(field_file_uploads))
+  ).flat();
+
+  const uploads_errors = awaited_uploads
+    .map((result) => (result.error ? result.error : null))
+    .filter(Boolean);
+
+  if (uploads_errors.length > 0) {
+    console.error("submit/err/file_uploads", uploads_errors);
+  }
+
+  const field_file_upload_results: Record<
+    string,
+    SupabaseStorageUploadReturnType[]
+  > = {};
+
+  for (const [field_id, results] of Object.entries(field_file_uploads)) {
+    // although already resolved
+    field_file_upload_results[field_id] = await results;
+  }
+
+  const file_upserts = Object.keys(field_file_uploads).map((field_id, i) => {
+    const success_results = field_file_upload_results[field_id].filter(
+      (res) => !!res.data
+    );
+
+    const uploadedfileval = success_results.map((res) => {
+      const filename = res.data!.path.split("/").pop();
+      return filename;
+    }) as string[];
+
+    const upsertion: InsertDto<"response_field"> = {
+      form_field_id: field_id,
+      response_id: response_reference_obj!.id,
+      form_id: form_id,
+      // FIXME: need investigation (case:FIELDVAL)
+      value: JSON.stringify(uploadedfileval),
+      storage_object_paths: success_results.map(
+        (res) => res.data!.path
+      ) as string[],
+    };
+    return upsertion;
+  });
+
+  const { error: file_upload_upsertion_error } = await client
+    .from("response_field")
+    .upsert(file_upserts);
+  if (file_upload_upsertion_error) {
+    console.error(
+      "submit/err/file_upload_upsertion",
+      file_upload_upsertion_error
+    );
+  }
+
+  // endregion
 
   // ==================================================
   // region complete hooks
@@ -658,6 +742,59 @@ async function submit({
   }
 
   // endregion
+}
+
+type SupabaseStorageUploadReturnType =
+  | {
+      data: { path: string };
+      error: null;
+    }
+  | {
+      data: null;
+      error: any;
+    };
+
+/**
+ * Handles the uploading of response files, ensuring that each file has a unique name within its path.
+ *
+ * @param pathparams - An object containing the response ID and field ID.
+ * @param files - An array of FormDataEntryValue containing the files to be uploaded.
+ * @returns A promise that resolves when all file uploads are complete.
+ */
+async function upload_response_field_files(
+  files: FormDataEntryValue[],
+  pathparams: {
+    response_id: string;
+    field_id: string;
+  }
+) {
+  const uploads: Promise<SupabaseStorageUploadReturnType>[] = [];
+  const { response_id, field_id } = pathparams;
+  const basepath = `${response_id}/${field_id}/`;
+
+  const uniqueFileNameGenerator = new UniqueFileNameGenerator();
+
+  for (const file of files) {
+    if (file instanceof File && file.size > 0) {
+      if (file.size > GRIDA_FORMS_RESPONSE_BUCKET_UPLOAD_LIMIT) {
+        // silently ignore the file
+        console.warn(
+          `File ${file.name} exceeds the maximum upload limit of ${GRIDA_FORMS_RESPONSE_BUCKET_UPLOAD_LIMIT} bytes.`
+        );
+      } else {
+        const uniqueFileName = uniqueFileNameGenerator.name(file.name);
+        const path = basepath + uniqueFileName;
+
+        const upload = client.storage
+          .from("grida-forms-response")
+          .upload(path, file);
+        uploads.push(upload);
+      }
+    }
+  }
+
+  // TODO: need to handle the case where file size exceeds the limit
+  return Promise.all(uploads);
 }
 
 function error(
