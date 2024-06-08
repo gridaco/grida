@@ -621,7 +621,9 @@ async function submit({
 
   const { error: file_upload_upsertion_error } = await client
     .from("response_field")
-    .upsert(file_upserts);
+    .upsert(file_upserts, {
+      onConflict: "response_id, form_field_id",
+    });
   if (file_upload_upsertion_error) {
     console.error(
       "submit/err/file_upload_upsertion",
