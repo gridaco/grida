@@ -7,20 +7,24 @@ export function unwrapFeildValue(
     obscure?: boolean;
   }
 ): string | number | boolean {
-  const unwrapped = JSON.parse(value);
+  try {
+    const unwrapped = JSON.parse(value);
 
-  switch (type) {
-    case "email":
-    case "tel":
-    case "text":
-      return unwrapped;
-    case "password":
-      return options?.obscure ? "●".repeat(unwrapped.length) : unwrapped;
-    case "switch":
-    case "checkbox":
-      return parseCheckboxValue(unwrapped);
-    default:
-      return unwrapped;
+    switch (type) {
+      case "email":
+      case "tel":
+      case "text":
+        return unwrapped;
+      case "password":
+        return options?.obscure ? "●".repeat(unwrapped.length) : unwrapped;
+      case "switch":
+      case "checkbox":
+        return parseCheckboxValue(unwrapped);
+      default:
+        return unwrapped;
+    }
+  } catch (e) {
+    return "N/A";
   }
 }
 

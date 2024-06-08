@@ -279,7 +279,7 @@ export interface FormResponseField {
   type: FormInputType;
   updated_at: string;
   value: any;
-  storage_paths: string[] | null;
+  storage_object_paths: string[] | null;
 }
 
 export type FormFieldDataSchema = PaymentFieldData | {};

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import DataGrid, {
   Column,
   RenderCellProps,
@@ -17,6 +17,7 @@ import {
   TrashIcon,
   AvatarIcon,
   ArrowRightIcon,
+  DownloadIcon,
 } from "@radix-ui/react-icons";
 import {
   DropdownMenu,
@@ -25,7 +26,7 @@ import {
   DropdownMenuPortal,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { FormInputType } from "@/types";
+import { FormInputType, FormResponseField } from "@/types";
 import { JsonEditCell } from "./json-cell";
 import { useEditorState } from "../editor";
 import { GFRow } from "./types";
@@ -34,6 +35,7 @@ import "./grid.css";
 import { unwrapFeildValue } from "@/lib/forms/unwrap";
 import { Button } from "@/components/ui/button";
 import { FormFieldTypeIcon } from "@/components/form-field-type-icon";
+import { createClientFormsClient } from "@/lib/supabase/client";
 
 function rowKeyGetter(row: GFRow) {
   return row.__gf_id;
@@ -284,13 +286,15 @@ function FKButton({ onClick }: { onClick?: () => void }) {
 }
 
 function FieldCell({ column, row }: RenderCellProps<any>) {
-  const data = row[column.key];
+  const data: FormResponseField = row[column.key];
+
+  const supabase = useMemo(() => createClientFormsClient(), []);
 
   if (!data) {
     return <></>;
   }
 
-  const { type, value } = data;
+  const { type, value, storage_object_paths } = data;
 
   const unwrapped = unwrapFeildValue(value, type as FormInputType, {
     obscure: true,
@@ -301,6 +305,33 @@ function FieldCell({ column, row }: RenderCellProps<any>) {
     case "checkbox": {
       return <input type="checkbox" checked={unwrapped as boolean} disabled />;
     }
+    case "file": {
+      return (
+        <div className="w-full h-full flex gap-2">
+          {storage_object_paths?.map((path) => (
+            <span key={path}>{path.split("/").pop()}</span>
+          ))}
+        </div>
+      );
+    }
+    case "image": {
+      return (
+        <div className="w-full h-full flex gap-2">
+          {storage_object_paths?.map((path) => (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              key={path}
+              src={
+                supabase.storage.from("grida-forms-response").getPublicUrl(path)
+                  .data.publicUrl
+              }
+              alt={path}
+              className="w-full h-full object-scale-down"
+            />
+          ))}
+        </div>
+      );
+    }
     default:
       return <div>{unwrapped}</div>;
   }
@@ -308,7 +339,7 @@ function FieldCell({ column, row }: RenderCellProps<any>) {
 
 function FieldEditCell(props: RenderEditCellProps<any>) {
   const { column, row } = props;
-  const data = row[column.key];
+  const data: FormResponseField = row[column.key];
   const ref = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -319,11 +350,13 @@ function FieldEditCell(props: RenderEditCellProps<any>) {
     }
   }, [ref]);
 
+  const supabase = useMemo(() => createClientFormsClient(), []);
+
   if (!data) {
     return <></>;
   }
 
-  const { type, value } = data;
+  const { type, value, storage_object_paths } = data;
 
   // FIXME: need investigation (case:FIELDVAL)
   const unwrapped = JSON.parse(value);
@@ -349,6 +382,30 @@ function FieldEditCell(props: RenderEditCellProps<any>) {
     case "color":
       return <input readOnly disabled type="color" defaultValue={unwrapped} />;
     case "checkbox":
+    case "file":
+    case "image": {
+      return (
+        <div>
+          {storage_object_paths?.map((path) => (
+            <a
+              key={path}
+              href={
+                supabase.storage.from("grida-forms-response").getPublicUrl(path)
+                  .data.publicUrl
+              }
+              target="_blank"
+              rel="noreferrer"
+              download
+            >
+              <Button variant="link" size="sm">
+                <DownloadIcon className="me-2 align-middle" />
+                Download {path.split("/").pop()}
+              </Button>
+            </a>
+          ))}
+        </div>
+      );
+    }
     // return (
     //   <input readOnly disabled type="checkbox" defaultChecked={unwrapped} />
     // );
