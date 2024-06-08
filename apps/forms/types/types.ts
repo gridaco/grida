@@ -2,6 +2,9 @@ import { IpInfo } from "@/lib/ipinfo";
 import type { JSONBooleanValueDescriptor } from "./logic";
 
 type UUID = string;
+
+export type FormMethod = "get" | "post" | "dialog";
+
 export interface Form {
   created_at: string;
   custom_preview_url_path: string | null;
@@ -23,6 +26,7 @@ export interface Form {
   title: string;
   unknown_field_handling_strategy: FormResponseUnknownFieldHandlingStrategyType;
   updated_at: string;
+  method: FormMethod;
 }
 
 export interface Customer {

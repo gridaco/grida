@@ -915,6 +915,7 @@ export type Database = {
           is_scheduling_enabled: boolean
           max_form_responses_by_customer: number | null
           max_form_responses_in_total: number | null
+          method: Database["grida_forms"]["Enums"]["form_method"]
           project_id: number
           redirect_after_response_uri: string | null
           scheduling_close_at: string | null
@@ -945,6 +946,7 @@ export type Database = {
           is_scheduling_enabled?: boolean
           max_form_responses_by_customer?: number | null
           max_form_responses_in_total?: number | null
+          method?: Database["grida_forms"]["Enums"]["form_method"]
           project_id: number
           redirect_after_response_uri?: string | null
           scheduling_close_at?: string | null
@@ -975,6 +977,7 @@ export type Database = {
           is_scheduling_enabled?: boolean
           max_form_responses_by_customer?: number | null
           max_form_responses_in_total?: number | null
+          method?: Database["grida_forms"]["Enums"]["form_method"]
           project_id?: number
           redirect_after_response_uri?: string | null
           scheduling_close_at?: string | null
@@ -1662,6 +1665,7 @@ export type Database = {
         | "time"
         | "datetime-local"
         | "range"
+      form_method: "post" | "get" | "dialog"
       form_page_language:
         | "en"
         | "ko"
