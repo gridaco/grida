@@ -249,33 +249,32 @@ function MonoFormField({
           />
         );
       }
-      case "image": {
-        return (
-          <HtmlFileInput
-            type="file"
-            {...(sharedInputProps as React.ComponentProps<"input">)}
-            accept={
-              (sharedInputProps as React.ComponentProps<"input">).accept ??
-              "image/*"
-            }
-          />
-        );
-      }
+      case "image":
       case "file": {
+        const accept =
+          (sharedInputProps as React.ComponentProps<"input">).accept ??
+          type === "image"
+            ? "image/*"
+            : undefined;
+
         if (vanilla) {
           return (
             <HtmlFileInput
               type="file"
               {...(sharedInputProps as React.ComponentProps<"input">)}
+              accept={accept}
             />
           );
         }
 
+        console.log(name, multiple);
+
         return (
           <FileUploadDropzone
             name={sharedInputProps.name}
-            accept={(sharedInputProps as React.ComponentProps<"input">).accept}
+            accept={accept}
             multiple={multiple}
+            maxFiles={multiple ? 100 : 1}
             maxSize={GRIDA_FORMS_RESPONSE_BUCKET_UPLOAD_LIMIT}
           />
         );

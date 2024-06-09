@@ -18,8 +18,8 @@ import {
   FileRejection,
   DropzoneOptions,
 } from "react-dropzone";
-import { Trash2 as RemoveIcon } from "lucide-react";
-import { buttonVariants } from "@/components/ui/button";
+import { TrashIcon } from "@radix-ui/react-icons";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "../ui/input";
 
 type DirectionOptions = "rtl" | "ltr" | undefined;
@@ -51,7 +51,6 @@ type FileUploaderProps = {
   onValueChange: (value: File[] | null) => void;
   dropzoneOptions: DropzoneOptions;
   orientation?: "horizontal" | "vertical";
-  inputName?: string; // Add this line
 };
 
 export const FileUploader = forwardRef<
@@ -68,7 +67,6 @@ export const FileUploader = forwardRef<
       orientation = "vertical",
       children,
       dir,
-      inputName, // Add this line
       ...props
     },
     ref
@@ -76,7 +74,6 @@ export const FileUploader = forwardRef<
     const [isFileTooBig, setIsFileTooBig] = useState(false);
     const [isLOF, setIsLOF] = useState(false);
     const [activeIndex, setActiveIndex] = useState(-1);
-    const hiddenFileInputRef = useRef<HTMLInputElement | null>(null); // Add this line
 
     const {
       accept = {
@@ -192,11 +189,10 @@ export const FileUploader = forwardRef<
           }
         }
 
-        // Update hidden file input
-        if (hiddenFileInputRef.current) {
+        if (dropzoneState.inputRef.current) {
           const dataTransfer = new DataTransfer();
           newValues.forEach((file) => dataTransfer.items.add(file));
-          hiddenFileInputRef.current.files = dataTransfer.files;
+          dropzoneState.inputRef.current.files = dataTransfer.files;
         }
       },
       [reSelectAll, value]
@@ -239,23 +235,12 @@ export const FileUploader = forwardRef<
           ref={ref}
           tabIndex={0}
           onKeyDownCapture={handleKeyDown}
-          className={cn(
-            "grid w-full focus:outline-none overflow-hidden ",
-            className,
-            {
-              "gap-2": value && value.length > 0,
-            }
-          )}
+          className={cn("grid w-full focus:outline-none ", className, {
+            "gap-4": value && value.length > 0,
+          })}
           dir={dir}
           {...props}
         >
-          <input // Hidden file input
-            type="file"
-            name={inputName}
-            ref={hiddenFileInputRef}
-            style={{ display: "none" }}
-            multiple
-          />
           {children}
         </div>
       </FileUploaderContext.Provider>
@@ -273,11 +258,7 @@ export const FileUploaderContent = forwardRef<
   const containerRef = useRef<HTMLDivElement>(null);
 
   return (
-    <div
-      className={cn("w-full px-1")}
-      ref={containerRef}
-      aria-description="content file holder"
-    >
+    <div ref={containerRef} aria-description="content file holder">
       <div
         {...props}
         ref={ref}
@@ -324,7 +305,9 @@ export const FileUploaderItem = forwardRef<
         onClick={() => removeFileFromSet(index)}
       >
         <span className="sr-only">remove item {index}</span>
-        <RemoveIcon className="w-4 h-4 hover:stroke-destructive duration-200 ease-in-out" />
+        <span className="hover:text-destructive duration-200 ease-in-out">
+          <TrashIcon className="w-4 h-4" />
+        </span>
       </button>
     </div>
   );
@@ -334,8 +317,8 @@ FileUploaderItem.displayName = "FileUploaderItem";
 
 export const FileInput = forwardRef<
   HTMLDivElement,
-  React.HTMLAttributes<HTMLDivElement>
->(({ className, children, ...props }, ref) => {
+  React.HTMLAttributes<HTMLDivElement> & { name?: string }
+>(({ className, name, children, ...props }, ref) => {
   const { dropzoneState, isFileTooBig, isLOF } = useFileUpload();
   const rootProps = isLOF ? {} : dropzoneState.getRootProps();
   return (
@@ -363,6 +346,7 @@ export const FileInput = forwardRef<
         {children}
       </div>
       <Input
+        name={name}
         ref={dropzoneState.inputRef}
         disabled={isLOF}
         {...dropzoneState.getInputProps()}

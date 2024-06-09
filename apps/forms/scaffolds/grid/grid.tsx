@@ -18,6 +18,7 @@ import {
   AvatarIcon,
   ArrowRightIcon,
   DownloadIcon,
+  FileIcon,
 } from "@radix-ui/react-icons";
 import {
   DropdownMenu,
@@ -309,7 +310,10 @@ function FieldCell({ column, row }: RenderCellProps<any>) {
       return (
         <div className="w-full h-full flex gap-2">
           {storage_object_paths?.map((path) => (
-            <span key={path}>{path.split("/").pop()}</span>
+            <span key={path}>
+              <FileIcon className="inline w-4 h-4 align-middle me-2" />
+              {path.split("/").pop()}
+            </span>
           ))}
         </div>
       );
@@ -319,15 +323,19 @@ function FieldCell({ column, row }: RenderCellProps<any>) {
         <div className="w-full h-full flex gap-2">
           {storage_object_paths?.map((path) => (
             // eslint-disable-next-line @next/next/no-img-element
-            <img
-              key={path}
-              src={
-                supabase.storage.from("grida-forms-response").getPublicUrl(path)
-                  .data.publicUrl
-              }
-              alt={path}
-              className="w-full h-full object-scale-down"
-            />
+            <picture className="p-1 flex items-center gap-2" key={path}>
+              <img
+                key={path}
+                src={
+                  supabase.storage
+                    .from("grida-forms-response")
+                    .getPublicUrl(path).data.publicUrl
+                }
+                alt={path}
+                className="h-full aspect-square rounded overflow-hidden object-cover"
+              />
+              <caption>{path.split("/").pop()}</caption>
+            </picture>
           ))}
         </div>
       );
