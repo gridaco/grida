@@ -10,16 +10,29 @@ import Image from "next/image";
 import { useState } from "react";
 import { DropzoneOptions } from "react-dropzone";
 
-export const FileUploadDropzone = ({ name }: { name?: string }) => {
+type Accept = {
+  [key: string]: string[];
+};
+export const FileUploadDropzone = ({
+  name,
+  accept,
+  multiple,
+  maxSize,
+}: {
+  name?: string;
+  accept?: string;
+  multiple?: boolean;
+  maxSize?: number;
+}) => {
   const [files, setFiles] = useState<File[] | null>([]);
 
   const dropzone = {
-    accept: {
-      "image/*": [".jpg", ".jpeg", ".png"],
-    },
-    multiple: true,
-    maxFiles: 4,
-    maxSize: 1 * 1024 * 1024,
+    accept: accept?.split(",").reduce((acc: Accept, type) => {
+      acc[type] = [];
+      return acc;
+    }, {}),
+    multiple: multiple,
+    maxSize: maxSize,
   } satisfies DropzoneOptions;
 
   return (
@@ -31,7 +44,7 @@ export const FileUploadDropzone = ({ name }: { name?: string }) => {
     >
       <FileInput>
         <div className="flex items-center justify-center h-32 w-full border bg-background rounded-md">
-          <p className="text-gray-400">Drop files here</p>
+          <p className="text-muted-foreground">Drop files here</p>
         </div>
       </FileInput>
       <FileUploaderContent className="flex items-center flex-row gap-2">

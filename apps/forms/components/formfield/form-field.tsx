@@ -32,6 +32,7 @@ import { Button } from "../ui/button";
 import { Card } from "../ui/card";
 import { Label } from "../ui/label";
 import { FileUploadDropzone } from "./file-upload";
+import { GRIDA_FORMS_RESPONSE_BUCKET_UPLOAD_LIMIT } from "@/k/env";
 
 /**
  * this disables the auto zoom in input text tag safari on iphone by setting font-size to 16px
@@ -270,7 +271,14 @@ function MonoFormField({
           );
         }
 
-        return <FileUploadDropzone name={sharedInputProps.name} />;
+        return (
+          <FileUploadDropzone
+            name={sharedInputProps.name}
+            accept={(sharedInputProps as React.ComponentProps<"input">).accept}
+            multiple={multiple}
+            maxSize={GRIDA_FORMS_RESPONSE_BUCKET_UPLOAD_LIMIT}
+          />
+        );
       }
       case "select": {
         if (vanilla || multiple) {
