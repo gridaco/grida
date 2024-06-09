@@ -7,24 +7,18 @@ import {
   FileUploaderContent,
   FileUploaderItem,
 } from "@/components/extension/file-upload";
+import { Spinner } from "@/components/spinner";
 import { Card } from "@/components/ui/card";
 import { FileIcon } from "@radix-ui/react-icons";
 import Image from "next/image";
-import { useMemo, useState } from "react";
+import { useMemo, useState, useCallback, useEffect } from "react";
 import { DropzoneOptions } from "react-dropzone";
 
 type Accept = {
   [key: string]: string[];
 };
 
-export const FileUploadDropzone = ({
-  name,
-  accept,
-  multiple,
-  maxSize,
-  maxFiles,
-  required,
-}: {
+type FileUploadDropzoneProps = {
   name?: string;
   accept?: string;
   multiple?: boolean;
@@ -35,10 +29,21 @@ export const FileUploadDropzone = ({
     file: File,
     i: number
   ) => Promise<{
-    path?: string;
+    path: string;
   }>;
-}) => {
-  const [files, setFiles] = useState<File[] | null>([]);
+};
+
+export const FileUploadDropzone = ({
+  name,
+  accept,
+  multiple,
+  maxSize,
+  maxFiles,
+  required,
+  uploader,
+}: FileUploadDropzoneProps) => {
+  const [files, setFiles] = useState<File[]>([]);
+  const { isUploading, getUploadStatus } = useFileUploader(files, uploader);
 
   const dropzone = {
     accept: accept?.split(",").reduce((acc: Accept, type) => {
@@ -50,10 +55,14 @@ export const FileUploadDropzone = ({
     maxSize: maxSize,
   } satisfies DropzoneOptions;
 
+  const handleValueChange = (newFiles: File[] | null) => {
+    setFiles(newFiles || []);
+  };
+
   return (
     <FileUploader
       value={files}
-      onValueChange={setFiles}
+      onValueChange={handleValueChange}
       dropzoneOptions={dropzone}
     >
       <FileInput name={name} required={required} />
@@ -81,7 +90,7 @@ export const FileUploadDropzone = ({
             className="h-20 p-0 rounded-md overflow-hidden"
             aria-roledescription={`file ${i + 1} containing ${file.name}`}
           >
-            <FilePreview file={file} />
+            <FilePreview file={file} status={getUploadStatus(i)} />
           </FileUploaderItem>
         ))}
       </FileUploaderContent>
@@ -89,18 +98,25 @@ export const FileUploadDropzone = ({
   );
 };
 
-function FilePreview({ file }: { file: File }) {
+function FilePreview({ file, status }: { file: File; status: UploadStatus }) {
   const src = useMemo(() => URL.createObjectURL(file), [file]);
 
   if (file.type.startsWith("image/")) {
     return (
-      <Image
-        className="size-20 rounded-md object-cover"
-        src={src}
-        alt={file.name}
-        height={80}
-        width={80}
-      />
+      <div className="relative">
+        <Image
+          className="size-20 rounded-md object-cover"
+          src={src}
+          alt={file.name}
+          height={80}
+          width={80}
+        />
+        {status !== "uploaded" && (
+          <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center">
+            <Spinner />
+          </div>
+        )}
+      </div>
     );
   }
 
@@ -113,3 +129,55 @@ function FilePreview({ file }: { file: File }) {
     </div>
   );
 }
+
+type UploadStatus = "pending" | "uploading" | "uploaded" | "failed";
+
+const useFileUploader = (
+  files: File[],
+  uploader?: (file: File, i: number) => Promise<{ path: string }>
+) => {
+  const [uploadStatus, setUploadStatus] = useState<UploadStatus[]>([]);
+  const [isUploading, setIsUploading] = useState(false);
+
+  useEffect(() => {
+    if (files.length > 0) {
+      setUploadStatus(new Array(files.length).fill("pending"));
+    }
+  }, [files]);
+
+  const getUploadStatus = (index: number) => uploadStatus[index];
+
+  useEffect(() => {
+    const startUploading = async () => {
+      if (!uploader) return;
+
+      setIsUploading(true);
+      const status = [...uploadStatus];
+      try {
+        for (let i = 0; i < files.length; i++) {
+          if (status[i] === "pending") {
+            status[i] = "uploading";
+            setUploadStatus([...status]);
+            try {
+              const { path } = await uploader(files[i], i);
+              if (!!path) {
+                status[i] = "uploaded";
+              } else {
+                status[i] = "failed";
+              }
+            } catch {
+              status[i] = "failed";
+            }
+            setUploadStatus([...status]);
+          }
+        }
+      } finally {
+        setIsUploading(false);
+      }
+    };
+
+    startUploading();
+  }, [files, uploader, uploadStatus]);
+
+  return { isUploading, getUploadStatus };
+};
