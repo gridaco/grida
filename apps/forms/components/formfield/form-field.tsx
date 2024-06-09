@@ -13,7 +13,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { SignatureCanvas } from "../signature-canvas";
+import { SignatureCanvas } from "./signature-canvas";
 import { StripePaymentFormFieldPreview } from "./form-field-preview-payment-stripe";
 import { TossPaymentsPaymentFormFieldPreview } from "./form-field-preview-payment-tosspayments";
 import clsx from "clsx";

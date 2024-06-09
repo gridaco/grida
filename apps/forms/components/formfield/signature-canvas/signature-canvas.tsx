@@ -3,7 +3,7 @@
 import { useEffect, useRef } from "react";
 import SignaturePad from "signature_pad";
 import { useDarkMode } from "usehooks-ts";
-import { Card } from "../ui/card";
+import { Card } from "../../ui/card";
 
 export function SignatureCanvas({ name }: React.ComponentProps<"input">) {
   const { isDarkMode } = useDarkMode();
