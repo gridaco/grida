@@ -2,6 +2,7 @@
 
 import {
   FileUploader,
+  FileUploaderTrigger,
   FileInput,
   FileUploaderContent,
   FileUploaderItem,
@@ -22,10 +23,12 @@ export const FileUploadDropzone = ({
   multiple,
   maxSize,
   maxFiles,
+  required,
 }: {
   name?: string;
   accept?: string;
   multiple?: boolean;
+  required?: boolean;
   maxSize?: number;
   maxFiles?: number;
 }) => {
@@ -47,7 +50,8 @@ export const FileUploadDropzone = ({
       onValueChange={setFiles}
       dropzoneOptions={dropzone}
     >
-      <FileInput name={name}>
+      <FileInput name={name} required={required} />
+      <FileUploaderTrigger>
         <Card>
           <div className="flex items-center justify-center h-40 w-full rounded-md">
             <p className="text-muted-foreground text-center">
@@ -62,7 +66,7 @@ export const FileUploadDropzone = ({
             </p>
           </div>
         </Card>
-      </FileInput>
+      </FileUploaderTrigger>
       <FileUploaderContent className="flex items-center flex-row gap-2">
         {files?.map((file, i) => (
           <FileUploaderItem

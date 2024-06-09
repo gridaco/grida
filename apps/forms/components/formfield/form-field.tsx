@@ -272,6 +272,7 @@ function MonoFormField({
         return (
           <FileUploadDropzone
             name={sharedInputProps.name}
+            required={required}
             accept={accept}
             multiple={multiple}
             maxFiles={multiple ? 100 : 1}

@@ -315,10 +315,10 @@ export const FileUploaderItem = forwardRef<
 
 FileUploaderItem.displayName = "FileUploaderItem";
 
-export const FileInput = forwardRef<
+export const FileUploaderTrigger = forwardRef<
   HTMLDivElement,
-  React.HTMLAttributes<HTMLDivElement> & { name?: string }
->(({ className, name, children, ...props }, ref) => {
+  React.HTMLAttributes<HTMLDivElement>
+>(({ className, children, ...props }, ref) => {
   const { dropzoneState, isFileTooBig, isLOF } = useFileUpload();
   const rootProps = isLOF ? {} : dropzoneState.getRootProps();
   return (
@@ -345,14 +345,27 @@ export const FileInput = forwardRef<
       >
         {children}
       </div>
-      <Input
-        name={name}
-        ref={dropzoneState.inputRef}
-        disabled={isLOF}
-        {...dropzoneState.getInputProps()}
-        className={`${isLOF ? "cursor-not-allowed" : ""}`}
-      />
     </div>
+  );
+});
+
+FileUploaderTrigger.displayName = "FileUploaderTrigger";
+
+export const FileInput = forwardRef<
+  HTMLInputElement,
+  React.InputHTMLAttributes<HTMLInputElement>
+>(({ className, name, required, children, ...props }, ref) => {
+  const { dropzoneState, isLOF } = useFileUpload();
+  return (
+    <Input
+      name={name}
+      required={required}
+      ref={dropzoneState.inputRef}
+      disabled={isLOF}
+      {...dropzoneState.getInputProps()}
+      style={{}}
+      className={cn("sr-only", `${isLOF ? "cursor-not-allowed" : ""}`)}
+    />
   );
 });
 
