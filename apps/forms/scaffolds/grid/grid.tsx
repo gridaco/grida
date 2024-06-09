@@ -37,6 +37,7 @@ import { unwrapFeildValue } from "@/lib/forms/unwrap";
 import { Button } from "@/components/ui/button";
 import { FormFieldTypeIcon } from "@/components/form-field-type-icon";
 import { createClientFormsClient } from "@/lib/supabase/client";
+import { GRIDA_FORMS_RESPONSE_BUCKET } from "@/k/env";
 
 function rowKeyGetter(row: GFRow) {
   return row.__gf_id;
@@ -328,7 +329,7 @@ function FieldCell({ column, row }: RenderCellProps<any>) {
                 key={path}
                 src={
                   supabase.storage
-                    .from("grida-forms-response")
+                    .from(GRIDA_FORMS_RESPONSE_BUCKET)
                     .getPublicUrl(path).data.publicUrl
                 }
                 alt={path}
@@ -398,8 +399,9 @@ function FieldEditCell(props: RenderEditCellProps<any>) {
             <a
               key={path}
               href={
-                supabase.storage.from("grida-forms-response").getPublicUrl(path)
-                  .data.publicUrl
+                supabase.storage
+                  .from(GRIDA_FORMS_RESPONSE_BUCKET)
+                  .getPublicUrl(path).data.publicUrl
               }
               target="_blank"
               rel="noreferrer"

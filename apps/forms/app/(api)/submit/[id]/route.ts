@@ -33,7 +33,10 @@ import { SessionMeta, meta } from "./meta";
 import { sbconn_insert } from "./sbconn";
 import { FieldSupports } from "@/k/supported_field_types";
 import { UniqueFileNameGenerator } from "@/lib/forms/storage";
-import { GRIDA_FORMS_RESPONSE_BUCKET_UPLOAD_LIMIT } from "@/k/env";
+import {
+  GRIDA_FORMS_RESPONSE_BUCKET,
+  GRIDA_FORMS_RESPONSE_BUCKET_UPLOAD_LIMIT,
+} from "@/k/env";
 import type { InsertDto } from "@/types/supabase-ext";
 
 const HOST = process.env.HOST || "http://localhost:3000";
@@ -772,7 +775,7 @@ async function process_response_field_files(
 ) {
   const uploads: Promise<SupabaseStorageUploadReturnType>[] = [];
   const { response_id, field_id } = pathparams;
-  const basepath = `${response_id}/${field_id}/`;
+  const basepath = `response/${response_id}/${field_id}/`;
 
   const uniqueFileNameGenerator = new UniqueFileNameGenerator();
 
@@ -788,14 +791,14 @@ async function process_response_field_files(
         const path = basepath + uniqueFileName;
 
         const upload = client.storage
-          .from("grida-forms-response")
+          .from(GRIDA_FORMS_RESPONSE_BUCKET)
           .upload(path, file);
         uploads.push(upload);
       }
     } else {
       // if not file, it means it is already uploaded on client side with session, it needs to be moved to response folder.
       // from : {bucket}/session/{session_id}/{field_id}/{i}
-      // to: {bucket}/{response_id}/{field_id}/{i}
+      // to: {bucket}/response/{response_id}/{field_id}/{i}
       // TODO:
       console.log("TODO: mv file - file uploaded from client", file);
     }

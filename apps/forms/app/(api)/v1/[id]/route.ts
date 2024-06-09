@@ -43,7 +43,10 @@ import type {
 } from "@/types";
 import { Features } from "@/lib/features/scheduling";
 import assert from "assert";
-import { GRIDA_FORMS_RESPONSE_FILES_MAX_COUNT_PER_FIELD } from "@/k/env";
+import {
+  GRIDA_FORMS_RESPONSE_BUCKET,
+  GRIDA_FORMS_RESPONSE_FILES_MAX_COUNT_PER_FIELD,
+} from "@/k/env";
 import { FieldSupports } from "@/k/supported_field_types";
 
 export const revalidate = 0;
@@ -581,7 +584,7 @@ async function prepare_response_file_upload_storage_presigned_url(
 
   for (let i = 0; i < n; i++) {
     const task = client.storage
-      .from("grida-forms-response")
+      .from(GRIDA_FORMS_RESPONSE_BUCKET)
       // valid for 2 hours - https://supabase.com/docs/reference/javascript/storage-from-createsigneduploadurl
       .createSignedUploadUrl(`session/${session_id}/${field_id}/${i}`);
     tasks.push(task);
