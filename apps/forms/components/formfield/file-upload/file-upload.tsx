@@ -31,6 +31,12 @@ export const FileUploadDropzone = ({
   required?: boolean;
   maxSize?: number;
   maxFiles?: number;
+  uploader?: (
+    file: File,
+    i: number
+  ) => Promise<{
+    url: string;
+  }>;
 }) => {
   const [files, setFiles] = useState<File[] | null>([]);
 

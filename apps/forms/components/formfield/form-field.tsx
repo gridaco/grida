@@ -32,7 +32,13 @@ import { Button } from "../ui/button";
 import { Card } from "../ui/card";
 import { Label } from "../ui/label";
 import { FileUploadDropzone } from "./file-upload";
-import { GRIDA_FORMS_RESPONSE_BUCKET_UPLOAD_LIMIT } from "@/k/env";
+import {
+  GRIDA_FORMS_RESPONSE_BUCKET_UPLOAD_LIMIT,
+  GRIDA_FORMS_RESPONSE_FILES_MAX_COUNT_PER_FIELD,
+  GRIDA_FORMS_RESPONSE_MULTIPART_FILE_UOLOAD_LIMIT,
+} from "@/k/env";
+import type { FieldFileUpload } from "@/lib/forms";
+import assert from "assert";
 
 /**
  * this disables the auto zoom in input text tag safari on iphone by setting font-size to 16px
@@ -61,6 +67,7 @@ interface IInputField {
   multiple?: boolean;
   labelCapitalize?: boolean;
   data?: FormFieldDataSchema | null;
+  fileupload?: FieldFileUpload;
   onValueChange?: (value: string) => void;
   onCheckedChange?: (checked: boolean) => void;
 }
@@ -143,6 +150,7 @@ function MonoFormField({
   min,
   max,
   data,
+  fileupload,
   novalidate,
   vanilla,
   locked,
@@ -258,6 +266,11 @@ function MonoFormField({
             : undefined;
 
         if (vanilla) {
+          assert(
+            fileupload?.type === "multipart" || fileupload?.type === undefined,
+            "fileupload type must be multipart"
+          );
+
           return (
             <HtmlFileInput
               type="file"
@@ -273,8 +286,20 @@ function MonoFormField({
             required={required}
             accept={accept}
             multiple={multiple}
-            maxFiles={multiple ? 100 : 1}
-            maxSize={GRIDA_FORMS_RESPONSE_BUCKET_UPLOAD_LIMIT}
+            maxFiles={
+              multiple ? GRIDA_FORMS_RESPONSE_FILES_MAX_COUNT_PER_FIELD : 1
+            }
+            maxSize={
+              fileupload?.type === "signedurl"
+                ? GRIDA_FORMS_RESPONSE_BUCKET_UPLOAD_LIMIT
+                : GRIDA_FORMS_RESPONSE_MULTIPART_FILE_UOLOAD_LIMIT
+            }
+            uploader={
+              fileupload?.type === "signedurl"
+                ? // TODO:
+                  async (file) => ({ url: "" })
+                : undefined
+            }
           />
         );
       }

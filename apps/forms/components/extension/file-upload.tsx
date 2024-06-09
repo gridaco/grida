@@ -76,12 +76,10 @@ export const FileUploader = forwardRef<
     const [activeIndex, setActiveIndex] = useState(-1);
 
     const {
-      accept = {
-        "image/*": [".jpg", ".jpeg", ".png", ".gif"],
-      },
+      accept,
       maxFiles = 1,
-      maxSize = 4 * 1024 * 1024,
-      multiple = true,
+      maxSize = 1048576, // 1MB
+      multiple = false,
     } = dropzoneOptions;
 
     const reSelectAll = maxFiles === 1 ? true : reSelect;
