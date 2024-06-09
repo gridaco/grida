@@ -31,6 +31,7 @@ import { Input } from "../ui/input";
 import { Button } from "../ui/button";
 import { Card } from "../ui/card";
 import { Label } from "../ui/label";
+import { FileUploadDropzone } from "./file-upload";
 
 /**
  * this disables the auto zoom in input text tag safari on iphone by setting font-size to 16px
@@ -260,11 +261,16 @@ function MonoFormField({
         );
       }
       case "file": {
-        return (
-          <HtmlFileInput
-            {...(sharedInputProps as React.ComponentProps<"input">)}
-          />
-        );
+        if (vanilla) {
+          return (
+            <HtmlFileInput
+              type="file"
+              {...(sharedInputProps as React.ComponentProps<"input">)}
+            />
+          );
+        }
+
+        return <FileUploadDropzone name={sharedInputProps.name} />;
       }
       case "select": {
         if (vanilla || multiple) {
