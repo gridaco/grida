@@ -267,8 +267,6 @@ function MonoFormField({
           );
         }
 
-        console.log(name, multiple);
-
         return (
           <FileUploadDropzone
             name={sharedInputProps.name}

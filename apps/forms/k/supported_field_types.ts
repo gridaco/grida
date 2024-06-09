@@ -141,6 +141,12 @@ const html5_checkbox_alias_field_types: FormInputType[] = [
   "switch",
 ];
 
+const html5_placeholder_not_supported_field_types: FormInputType[] = [
+  ...html5_file_alias_field_types,
+  ...html5_checkbox_alias_field_types,
+  "range",
+];
+
 export namespace FieldSupports {
   export function options(type: FormInputType) {
     return options_supported_field_types.includes(type);
@@ -156,6 +162,10 @@ export namespace FieldSupports {
 
   export function autocomplete(type: FormInputType) {
     return html5_autocomplete_supported_field_types.includes(type);
+  }
+
+  export function placeholder(type: FormInputType) {
+    return !html5_placeholder_not_supported_field_types.includes(type);
   }
 
   export function checkbox_alias(type: FormInputType) {
