@@ -259,7 +259,13 @@ export async function GET(
   }
 
   // region file upload presigned urls
-  const field_upload_urls: Record<string, string[]> = {};
+  const field_upload_urls: Record<
+    string,
+    Array<{
+      path: string;
+      token: string;
+    }>
+  > = {};
 
   for (const field of fields) {
     if (FieldSupports.file_alias(field.type)) {
@@ -559,7 +565,12 @@ async function prepare_response_file_upload_storage_presigned_url(
   session_id: string,
   field_id: string,
   n: number
-): Promise<string[]> {
+): Promise<
+  Array<{
+    path: string;
+    token: string;
+  }>
+> {
   assert(n > 0, "n should be greater than 0");
   assert(
     n <= GRIDA_FORMS_RESPONSE_FILES_MAX_COUNT_PER_FIELD,
@@ -582,7 +593,8 @@ async function prepare_response_file_upload_storage_presigned_url(
 
   if (failures) console.error("session/sign-upload-urls/failures", failures);
 
-  return results
-    .map((r) => r.data?.signedUrl)
-    .filter((url) => !!url) as string[];
+  return results.map((r) => r.data).filter(Boolean) as Array<{
+    path: string;
+    token: string;
+  }>;
 }

@@ -547,7 +547,7 @@ async function submit({
 
         console.log("submit/file", files);
 
-        field_file_uploads[field.id] = upload_response_field_files(files, {
+        field_file_uploads[field.id] = process_response_field_files(files, {
           response_id: response_reference_obj!.id,
           field_id: field.id,
         });
@@ -763,7 +763,7 @@ type SupabaseStorageUploadReturnType =
  * @param files - An array of FormDataEntryValue containing the files to be uploaded.
  * @returns A promise that resolves when all file uploads are complete.
  */
-async function upload_response_field_files(
+async function process_response_field_files(
   files: FormDataEntryValue[],
   pathparams: {
     response_id: string;
@@ -792,6 +792,12 @@ async function upload_response_field_files(
           .upload(path, file);
         uploads.push(upload);
       }
+    } else {
+      // if not file, it means it is already uploaded on client side with session, it needs to be moved to response folder.
+      // from : {bucket}/session/{session_id}/{field_id}/{i}
+      // to: {bucket}/{response_id}/{field_id}/{i}
+      // TODO:
+      console.log("TODO: mv file - file uploaded from client", file);
     }
   }
 

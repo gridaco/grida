@@ -35,7 +35,7 @@ export const FileUploadDropzone = ({
     file: File,
     i: number
   ) => Promise<{
-    url: string;
+    path?: string;
   }>;
 }) => {
   const [files, setFiles] = useState<File[] | null>([]);

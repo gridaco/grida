@@ -39,6 +39,7 @@ import {
 } from "@/k/env";
 import type { FieldFileUpload } from "@/lib/forms";
 import assert from "assert";
+import { createClientFormsClient } from "@/lib/supabase/client";
 
 /**
  * this disables the auto zoom in input text tag safari on iphone by setting font-size to 16px
@@ -296,8 +297,17 @@ function MonoFormField({
             }
             uploader={
               fileupload?.type === "signedurl"
-                ? // TODO:
-                  async (file) => ({ url: "" })
+                ? 
+                  async (file, i) => {
+                    const supabase = createClientFormsClient();
+                    const { path, token } = fileupload.upload_urls[i];
+
+                    const { data } = await supabase.storage
+                      .from("grida-forms-response")
+                      .uploadToSignedUrl(path, token, file);
+
+                    return { path: data?.path };
+                  }
                 : undefined
             }
           />
