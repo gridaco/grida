@@ -18,13 +18,18 @@ export const requesturl = ({ session_id, field_id }: SessionStoragePath) =>
 const tmp_storage_object_path = ({
   session_id,
   field_id,
+  unique,
   name,
 }: SessionStoragePath & {
+  unique?: string;
   name?: string;
-}) =>
-  !!name
-    ? `${GRIDA_FORMS_RESPONSE_BUCKET_TMP_STARTS_WITH}${session_id}/${field_id}/${name}`
-    : `${GRIDA_FORMS_RESPONSE_BUCKET_TMP_STARTS_WITH}${session_id}/${field_id}`;
+}) => {
+  const _ = `${GRIDA_FORMS_RESPONSE_BUCKET_TMP_STARTS_WITH}${session_id}/${field_id}`;
+
+  const paths = [_, unique, name].filter(Boolean);
+
+  return paths.join("/");
+};
 
 function sign(path: string) {
   return (
@@ -38,28 +43,24 @@ function sign(path: string) {
 export async function response_file_upload_storage_presigned_url(
   path: SessionStoragePath,
   name: string,
-  replace: boolean = false
+  unique?: boolean
 ) {
-  const namer = new UniqueFileNameGenerator();
-
-  if (!replace) {
-    const { data } = await client.storage
-      .from(GRIDA_FORMS_RESPONSE_BUCKET)
-      .list(tmp_storage_object_path(path));
-
-    const existing = data?.map((d) => d.name) ?? [];
-
-    namer.seed(new Set(existing));
-  }
-
-  const newuniquename = namer.name(name);
-
-  return sign(
-    tmp_storage_object_path({
-      ...path,
-      name: newuniquename,
-    })
+  const namer = new UniqueFileNameGenerator(undefined, {
+    // the comma in file name (which is allowed by the storage) needs to be rejected with our file uploader since it uses the uploaded file paths as <input type='text'/> value, which on serverside, needs to be parsed with .split(',') for multiple file uploads.
+    rejectComma: true,
+  });
+  const objectpath = tmp_storage_object_path({
+    ...path,
+    unique: unique ? Date.now().toString() : undefined,
+    name: namer.name(name),
+  });
+  console.log(
+    "response_file_upload_storage_presigned_url",
+    name,
+    unique,
+    objectpath
   );
+  return sign(objectpath);
   //
 }
 

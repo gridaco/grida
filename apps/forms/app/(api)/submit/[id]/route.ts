@@ -801,27 +801,30 @@ async function process_response_field_files(
       // from : {bucket}/tmp/{session_id}/{field_id}/{i}
       // to: {bucket}/response/{response_id}/{field_id}/{i}
 
-      const tmppath = String(file);
+      const pl = String(file);
 
-      if (tmppath.startsWith(GRIDA_FORMS_RESPONSE_BUCKET_TMP_STARTS_WITH)) {
-        const name = tmppath.split("/").pop();
-        const targetpath = basepath + name;
-        const { error } = await client.storage
-          .from(GRIDA_FORMS_RESPONSE_BUCKET)
-          .move(tmppath, targetpath);
+      // when file input is uploaded and includes the path, the input will have a value of path[], which on formdata, it will be a comma separated string
+      for (const tmppath of pl.split(",")) {
+        if (tmppath.startsWith(GRIDA_FORMS_RESPONSE_BUCKET_TMP_STARTS_WITH)) {
+          const name = tmppath.split("/").pop();
+          const targetpath = basepath + name;
+          const { error } = await client.storage
+            .from(GRIDA_FORMS_RESPONSE_BUCKET)
+            .move(tmppath, targetpath);
 
-        if (error) console.error("submit/err/tmp-mv", tmppath, error);
-        else {
-          // push the result (mocked)
-          uploads.push(
-            Promise.resolve({
-              data: { path: targetpath },
-              error: null,
-            })
-          );
+          if (error) console.error("submit/err/tmp-mv", tmppath, error);
+          else {
+            // push the result (mocked)
+            uploads.push(
+              Promise.resolve({
+                data: { path: targetpath },
+                error: null,
+              })
+            );
+          }
+        } else {
+          console.log("submit/err/unknown-file", file);
         }
-      } else {
-        console.log("submit/err/unknown-file", file);
       }
     }
   }

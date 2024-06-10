@@ -1,21 +1,20 @@
-/**
- * UniqueFileNameGenerator is a helper class designed to ensure unique file names
- * within a specified base path. It is particularly useful in scenarios where
- * multiple files might have the same name and need to be stored in the same directory.
- *
- * @example
- * const generator = new UniqueFileNameGenerator();
- * const uniqueFileName = generator.name('file.png', '/path/to/directory/');
- * console.log(uniqueFileName); // Outputs: file.png, file(1).png, file(2).png, etc.
- */
+interface UniqueFileNameGeneratorConfig {
+  rejectComma?: boolean;
+}
+
 export class UniqueFileNameGenerator {
   private fileNames: Set<string>;
+  private config: UniqueFileNameGeneratorConfig;
 
   /**
    * Constructs a new UniqueFileNameGenerator.
+   *
+   * @param seed - A set of existing file names to initialize the generator with.
+   * @param config - Configuration options for the generator.
    */
-  constructor(seed?: Set<string>) {
+  constructor(seed?: Set<string>, config?: UniqueFileNameGeneratorConfig) {
     this.fileNames = seed ?? new Set<string>();
+    this.config = config ?? {};
   }
 
   /**
@@ -26,7 +25,7 @@ export class UniqueFileNameGenerator {
    * @returns A unique file name that does not conflict with existing file names in the base path.
    */
   name(filename: string, basepath: string = ""): string {
-    filename = sanitizeFileName(filename);
+    filename = this.sanitizeFileName(filename);
 
     let uniqueFileName = filename;
     let counter = 1;
@@ -40,7 +39,7 @@ export class UniqueFileNameGenerator {
       uniqueFileName = `${nameWithoutExtension}(${counter})${extension}`;
       uniqueFileName = isValidKey(uniqueFileName)
         ? uniqueFileName
-        : sanitizeFileName(uniqueFileName);
+        : this.sanitizeFileName(uniqueFileName);
       counter++;
     }
 
@@ -51,6 +50,20 @@ export class UniqueFileNameGenerator {
   seed(seed: Set<string>) {
     this.fileNames = seed;
   }
+
+  /**
+   * Sanitizes a file name to ensure it only contains S3 safe characters and
+   * replaces commas if the rejectComma config is set to true.
+   *
+   * @param key - The file name to sanitize.
+   * @returns A sanitized file name.
+   */
+  private sanitizeFileName(key: string): string {
+    if (this.config.rejectComma) {
+      key = key.replace(/,/g, "-"); // Replace commas with the specified separator
+    }
+    return sanitizeKey(key);
+  }
 }
 
 /**
@@ -59,7 +72,7 @@ export class UniqueFileNameGenerator {
  * @param key - The file name to sanitize.
  * @returns A sanitized file name.
  */
-export function sanitizeFileName(key: string, sep: "-" | "_" = "-"): string {
+export function sanitizeKey(key: string, sep: "-" | "_" = "-"): string {
   // Replace invalid characters with underscores or another safe character
   return key.replace(/[^\w\/!-.()*' &@$=;:+,?]/g, sep);
 }
