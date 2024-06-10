@@ -69,10 +69,14 @@ export type FieldFileUpload =
   | { type: "multipart" }
   | {
       type: "signedurl";
-      upload_urls: {
+      signed_urls: Array<{
         path: string;
         token: string;
-      }[];
+      }>;
+    }
+  | {
+      type: "requesturl";
+      request_url: string;
     };
 
 export interface ClientFileUploadFieldRenderBlock
@@ -158,9 +162,7 @@ export class FormRenderTree {
     private readonly config?: RenderTreeConfig,
     private readonly plugins?: {
       option_renderer: (option: Option) => Option;
-      upload_url_resolver?: (
-        field_id: string
-      ) => { path: string; token: string }[];
+      upload_resolver?: (field_id: string) => FieldFileUpload;
     }
   ) {
     this._m_render_blocks = _m_blocks
@@ -365,9 +367,8 @@ export class FormRenderTree {
 
     const mkupload = (): FieldFileUpload | undefined => {
       if (FieldSupports.file_alias(field.type)) {
-        if (this.plugins?.upload_url_resolver) {
-          const upload_urls = this.plugins.upload_url_resolver(field.id);
-          return { type: "signedurl", upload_urls };
+        if (this.plugins?.upload_resolver) {
+          return this.plugins.upload_resolver(field.id);
         } else {
           return { type: "multipart" };
         }

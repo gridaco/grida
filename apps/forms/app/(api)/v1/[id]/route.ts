@@ -42,12 +42,9 @@ import type {
   Option,
 } from "@/types";
 import { Features } from "@/lib/features/scheduling";
-import assert from "assert";
-import {
-  GRIDA_FORMS_RESPONSE_BUCKET,
-  GRIDA_FORMS_RESPONSE_FILES_MAX_COUNT_PER_FIELD,
-} from "@/k/env";
+import { GRIDA_FORMS_RESPONSE_FILES_MAX_COUNT_PER_FIELD } from "@/k/env";
 import { FieldSupports } from "@/k/supported_field_types";
+import { prepare_response_file_upload_storage_presigned_url } from "@/services/form/session-storage";
 
 export const revalidate = 0;
 
@@ -273,8 +270,10 @@ export async function GET(
   for (const field of fields) {
     if (FieldSupports.file_alias(field.type)) {
       const urls = await prepare_response_file_upload_storage_presigned_url(
-        session.id,
-        field.id,
+        {
+          session_id: session.id,
+          field_id: field.id,
+        },
         field.multiple ? GRIDA_FORMS_RESPONSE_FILES_MAX_COUNT_PER_FIELD : 1
       );
       field_upload_urls[field.id] = urls;
@@ -291,7 +290,10 @@ export async function GET(
     undefined,
     {
       option_renderer: mkoption,
-      upload_url_resolver: (field_id: string) => field_upload_urls[field_id],
+      upload_resolver: (field_id: string) => ({
+        type: "signedurl",
+        signed_urls: field_upload_urls[field_id],
+      }),
     }
   );
 
@@ -562,42 +564,4 @@ function parse_system_keys(
   }
 
   return map;
-}
-
-async function prepare_response_file_upload_storage_presigned_url(
-  session_id: string,
-  field_id: string,
-  n: number
-): Promise<
-  Array<{
-    path: string;
-    token: string;
-  }>
-> {
-  assert(n > 0, "n should be greater than 0");
-  assert(
-    n <= GRIDA_FORMS_RESPONSE_FILES_MAX_COUNT_PER_FIELD,
-    "n should be less than " + GRIDA_FORMS_RESPONSE_FILES_MAX_COUNT_PER_FIELD
-  );
-
-  const tasks = [];
-
-  for (let i = 0; i < n; i++) {
-    const task = client.storage
-      .from(GRIDA_FORMS_RESPONSE_BUCKET)
-      // valid for 2 hours - https://supabase.com/docs/reference/javascript/storage-from-createsigneduploadurl
-      .createSignedUploadUrl(`session/${session_id}/${field_id}/${i}`);
-    tasks.push(task);
-  }
-
-  const results = await Promise.all(tasks);
-
-  const failures = results.filter((r) => r.error);
-
-  if (failures) console.error("session/sign-upload-urls/failures", failures);
-
-  return results.map((r) => r.data).filter(Boolean) as Array<{
-    path: string;
-    token: string;
-  }>;
 }

@@ -14,8 +14,8 @@ export class UniqueFileNameGenerator {
   /**
    * Constructs a new UniqueFileNameGenerator.
    */
-  constructor() {
-    this.fileNames = new Set<string>();
+  constructor(seed?: Set<string>) {
+    this.fileNames = seed ?? new Set<string>();
   }
 
   /**
@@ -46,6 +46,10 @@ export class UniqueFileNameGenerator {
 
     this.fileNames.add(basepath + uniqueFileName);
     return uniqueFileName;
+  }
+
+  seed(seed: Set<string>) {
+    this.fileNames = seed;
   }
 }
 

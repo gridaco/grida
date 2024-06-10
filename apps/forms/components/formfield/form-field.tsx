@@ -300,7 +300,7 @@ function MonoFormField({
               fileupload?.type === "signedurl"
                 ? async (file, i) => {
                     const supabase = createClientFormsClient();
-                    const { path, token } = fileupload.upload_urls[i];
+                    const { path, token } = fileupload.signed_urls[i];
 
                     const { data } = await supabase.storage
                       .from(GRIDA_FORMS_RESPONSE_BUCKET)
