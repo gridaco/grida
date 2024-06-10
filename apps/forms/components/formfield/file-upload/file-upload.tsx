@@ -29,7 +29,7 @@ type FileUploadDropzoneProps = {
     file: File,
     i: number
   ) => Promise<{
-    path: string;
+    path?: string;
   }>;
 };
 
@@ -134,7 +134,7 @@ type UploadStatus = "pending" | "uploading" | "uploaded" | "failed";
 
 const useFileUploader = (
   files: File[],
-  uploader?: (file: File, i: number) => Promise<{ path: string }>
+  uploader?: (file: File, i: number) => Promise<{ path?: string }>
 ) => {
   const [uploadStatus, setUploadStatus] = useState<UploadStatus[]>([]);
   const [isUploading, setIsUploading] = useState(false);
