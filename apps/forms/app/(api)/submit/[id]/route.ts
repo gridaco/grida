@@ -623,16 +623,24 @@ async function submit({
     return upsertion;
   });
 
-  const { error: file_upload_upsertion_error } = await client
-    .from("response_field")
-    .upsert(file_upserts, {
-      onConflict: "response_id, form_field_id",
-    });
-  if (file_upload_upsertion_error) {
-    console.error(
-      "submit/err/file_upload_upsertion",
-      file_upload_upsertion_error
-    );
+  if (file_upserts.length > 0) {
+    const { error: file_upload_upsertion_error } = await client
+      .from("response_field")
+      .upsert(file_upserts, {
+        onConflict: "response_id, form_field_id",
+      });
+    if (file_upload_upsertion_error) {
+      console.error(
+        "submit/err/file_upload_upsertion",
+        file_upload_upsertion_error
+      );
+    }
+
+    // notify response change with updating updated_at
+    await client
+      .from("response")
+      .update({ updated_at: new Date().toISOString() })
+      .eq("id", response_reference_obj!.id);
   }
 
   // endregion

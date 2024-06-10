@@ -47,8 +47,6 @@ export const FileUploadDropzone = ({
     autoUpload: true,
   });
 
-  console.log("data", data);
-
   const dropzone = {
     accept: accept?.split(",").reduce((acc: Accept, type) => {
       acc[type] = [];
