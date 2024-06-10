@@ -65,19 +65,23 @@ export interface ClientFieldRenderBlock<T extends FormInputType = FormInputType>
   };
 }
 
-export type FieldFileUpload =
-  | { type: "multipart" }
-  | {
-      type: "signedurl";
-      signed_urls: Array<{
-        path: string;
-        token: string;
-      }>;
-    }
-  | {
-      type: "requesturl";
-      request_url: string;
-    };
+export type FileUploadStrategyMultipart = { type: "multipart" };
+export type FileUploadStrategySignedUrl = {
+  type: "signedurl";
+  signed_urls: Array<{
+    path: string;
+    token: string;
+  }>;
+};
+export type FileUploadStrategyRequesUploadtUrl = {
+  type: "requesturl";
+  request_url: string;
+};
+
+export type FieldUploadStrategy =
+  | FileUploadStrategyMultipart
+  | FileUploadStrategySignedUrl
+  | FileUploadStrategyRequesUploadtUrl;
 
 export interface ClientFileUploadFieldRenderBlock
   extends ClientFieldRenderBlock<"file" | "image"> {
@@ -85,7 +89,7 @@ export interface ClientFileUploadFieldRenderBlock
     accept?: string;
     multiple?: boolean;
   } & {
-    upload: FieldFileUpload;
+    upload: FieldUploadStrategy;
   };
 }
 
@@ -162,7 +166,7 @@ export class FormRenderTree {
     private readonly config?: RenderTreeConfig,
     private readonly plugins?: {
       option_renderer: (option: Option) => Option;
-      upload_resolver?: (field_id: string) => FieldFileUpload;
+      upload_resolver?: (field_id: string) => FieldUploadStrategy;
     }
   ) {
     this._m_render_blocks = _m_blocks
@@ -365,7 +369,7 @@ export class FormRenderTree {
             : (option) => option
         );
 
-    const mkupload = (): FieldFileUpload | undefined => {
+    const mkupload = (): FieldUploadStrategy | undefined => {
       if (FieldSupports.file_alias(field.type)) {
         if (this.plugins?.upload_resolver) {
           return this.plugins.upload_resolver(field.id);

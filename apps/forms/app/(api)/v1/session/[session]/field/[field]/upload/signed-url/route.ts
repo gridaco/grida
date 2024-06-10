@@ -1,12 +1,10 @@
 import { response_file_upload_storage_presigned_url } from "@/services/form/session-storage";
+import type {
+  CreateSessionSignedUploadUrlRequest,
+  FormsApiResponse,
+  SessionSignedUploadUrlData,
+} from "@/types/private/api";
 import { NextRequest, NextResponse } from "next/server";
-
-interface CreateSessionSignedUploadUrlRequest {
-  file: {
-    name: string;
-    size: number;
-  };
-}
 
 export async function POST(
   req: NextRequest,
@@ -35,7 +33,7 @@ export async function POST(
     file.name
   );
 
-  return NextResponse.json({
+  return NextResponse.json(<FormsApiResponse<SessionSignedUploadUrlData>>{
     data: data,
     error: error,
   });
@@ -70,7 +68,7 @@ export async function PUT(
     true
   );
 
-  return NextResponse.json({
+  return NextResponse.json(<FormsApiResponse<SessionSignedUploadUrlData>>{
     data: data,
     error: error,
   });

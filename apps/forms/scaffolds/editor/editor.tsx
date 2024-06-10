@@ -260,12 +260,14 @@ function FieldEditPanelProvider({ children }: React.PropsWithChildren<{}>) {
           const { data } =
             (await res.json()) as EditorApiResponse<FormFieldDefinition>;
 
-          // else save the field
-          dispatch({
-            type: "editor/field/save",
-            field_id: data.id,
-            data: data,
-          });
+          if (data) {
+            // else save the field
+            dispatch({
+              type: "editor/field/save",
+              field_id: data.id,
+              data: data,
+            });
+          }
         })
         .finally(() => {
           closeFieldPanel({ refresh: true });

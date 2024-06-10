@@ -14,6 +14,7 @@ import { FileIcon } from "@radix-ui/react-icons";
 import Image from "next/image";
 import { useMemo, useState, useCallback, useEffect } from "react";
 import { DropzoneOptions } from "react-dropzone";
+import { FileUploaderFn } from "./uploader";
 
 type Accept = {
   [key: string]: string[];
@@ -26,12 +27,7 @@ type FileUploadDropzoneProps = {
   required?: boolean;
   maxSize?: number;
   maxFiles?: number;
-  uploader?: (
-    file: File,
-    i: number
-  ) => Promise<{
-    path?: string;
-  }>;
+  uploader?: FileUploaderFn;
 };
 
 export const FileUploadDropzone = ({

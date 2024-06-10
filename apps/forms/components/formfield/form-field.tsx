@@ -38,9 +38,10 @@ import {
   GRIDA_FORMS_RESPONSE_FILES_MAX_COUNT_PER_FIELD,
   GRIDA_FORMS_RESPONSE_MULTIPART_FILE_UOLOAD_LIMIT,
 } from "@/k/env";
-import type { FieldFileUpload } from "@/lib/forms";
+import type { FieldUploadStrategy } from "@/lib/forms";
 import assert from "assert";
 import { createClientFormsClient } from "@/lib/supabase/client";
+import { makeUploader } from "./file-upload/uploader";
 
 /**
  * this disables the auto zoom in input text tag safari on iphone by setting font-size to 16px
@@ -69,7 +70,7 @@ interface IInputField {
   multiple?: boolean;
   labelCapitalize?: boolean;
   data?: FormFieldDataSchema | null;
-  fileupload?: FieldFileUpload;
+  fileupload?: FieldUploadStrategy;
   onValueChange?: (value: string) => void;
   onCheckedChange?: (checked: boolean) => void;
 }
@@ -296,20 +297,7 @@ function MonoFormField({
                 ? GRIDA_FORMS_RESPONSE_BUCKET_UPLOAD_LIMIT
                 : GRIDA_FORMS_RESPONSE_MULTIPART_FILE_UOLOAD_LIMIT
             }
-            uploader={
-              fileupload?.type === "signedurl"
-                ? async (file, i) => {
-                    const supabase = createClientFormsClient();
-                    const { path, token } = fileupload.signed_urls[i];
-
-                    const { data } = await supabase.storage
-                      .from(GRIDA_FORMS_RESPONSE_BUCKET)
-                      .uploadToSignedUrl(path, token, file);
-
-                    return { path: data?.path };
-                  }
-                : undefined
-            }
+            uploader={makeUploader(fileupload)}
           />
         );
       }
