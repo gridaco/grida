@@ -125,10 +125,8 @@ const html5_autocomplete_supported_field_types: FormInputType[] =
   supported_field_types.filter(
     (type) =>
       ![
-        "file",
-        "checkbox",
-        "checkboxes",
-        "switch",
+        ...html5_file_alias_field_types,
+        ...html5_checkbox_alias_field_types,
         "radio",
         "range",
         "hidden",
