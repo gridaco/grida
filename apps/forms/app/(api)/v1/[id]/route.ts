@@ -42,6 +42,7 @@ import type {
   Option,
 } from "@/types";
 import { Features } from "@/lib/features/scheduling";
+import { requesturl } from "@/services/form/session-storage";
 
 export const revalidate = 0;
 
@@ -175,6 +176,19 @@ export async function GET(
     return notFound();
   }
 
+  const { data: session, error: session_error } = await supabase
+    .from("response_session")
+    .insert({
+      form_id: id,
+    })
+    .select()
+    .single();
+
+  if (session_error || !session) {
+    console.error("error while creating session", session_error);
+    return NextResponse.error();
+  }
+
   const {
     title,
     method,
@@ -252,6 +266,13 @@ export async function GET(
     undefined,
     {
       option_renderer: mkoption,
+      upload_resolver: (field_id: string) => ({
+        type: "requesturl",
+        request_url: requesturl({
+          session_id: session.id,
+          field_id: field_id,
+        }),
+      }),
     }
   );
 

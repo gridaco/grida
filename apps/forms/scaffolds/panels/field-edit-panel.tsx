@@ -613,7 +613,7 @@ export function FieldEditPanel({
                   onChange={(e) => setLabel(e.target.value)}
                 />
               </PanelPropertyField>
-              {type !== "checkbox" && type !== "range" && (
+              {FieldSupports.placeholder(type) && (
                 <PanelPropertyField
                   label={"Placeholder"}
                   description={

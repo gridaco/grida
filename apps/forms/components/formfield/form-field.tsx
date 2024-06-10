@@ -13,7 +13,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { SignatureCanvas } from "../signature-canvas";
+import { SignatureCanvas } from "./signature-canvas";
 import { StripePaymentFormFieldPreview } from "./form-field-preview-payment-stripe";
 import { TossPaymentsPaymentFormFieldPreview } from "./form-field-preview-payment-tosspayments";
 import clsx from "clsx";
@@ -21,8 +21,7 @@ import { ClockIcon, PlusIcon } from "@radix-ui/react-icons";
 import { Checkbox } from "@/components/ui/checkbox";
 import useSafeSelectValue from "./use-safe-select-value";
 import { Switch } from "../ui/switch";
-// TODO: this causes hydration error
-import { Slider } from "../ui/slider";
+import { Slider } from "../ui/slider"; // TODO: this causes hydration error
 import { Toggle } from "../ui/toggle";
 import { ToggleGroup, ToggleGroupItem } from "../ui/toggle-group";
 import { RadioGroup, RadioGroupItem } from "../ui/radio-group";
@@ -31,6 +30,18 @@ import { Input } from "../ui/input";
 import { Button } from "../ui/button";
 import { Card } from "../ui/card";
 import { Label } from "../ui/label";
+import {
+  FileUploadDropzone,
+  getMaxUploadSize,
+  makeUploader,
+} from "./file-upload";
+import {
+  GRIDA_FORMS_RESPONSE_BUCKET_UPLOAD_LIMIT,
+  GRIDA_FORMS_RESPONSE_FILES_MAX_COUNT_PER_FIELD,
+  GRIDA_FORMS_RESPONSE_MULTIPART_FILE_UOLOAD_LIMIT,
+} from "@/k/env";
+import type { FieldUploadStrategy } from "@/lib/forms";
+import assert from "assert";
 
 /**
  * this disables the auto zoom in input text tag safari on iphone by setting font-size to 16px
@@ -59,6 +70,7 @@ interface IInputField {
   multiple?: boolean;
   labelCapitalize?: boolean;
   data?: FormFieldDataSchema | null;
+  fileupload?: FieldUploadStrategy;
   onValueChange?: (value: string) => void;
   onCheckedChange?: (checked: boolean) => void;
 }
@@ -141,6 +153,7 @@ function MonoFormField({
   min,
   max,
   data,
+  fileupload,
   novalidate,
   vanilla,
   locked,
@@ -247,22 +260,40 @@ function MonoFormField({
           />
         );
       }
-      case "image": {
-        return (
-          <HtmlFileInput
-            type="file"
-            {...(sharedInputProps as React.ComponentProps<"input">)}
-            accept={
-              (sharedInputProps as React.ComponentProps<"input">).accept ??
-              "image/*"
-            }
-          />
-        );
-      }
+      case "image":
       case "file": {
+        const accept =
+          (sharedInputProps as React.ComponentProps<"input">).accept ??
+          type === "image"
+            ? "image/*"
+            : undefined;
+
+        if (vanilla) {
+          assert(
+            fileupload?.type === "multipart" || fileupload?.type === undefined,
+            "fileupload type must be multipart"
+          );
+
+          return (
+            <HtmlFileInput
+              type="file"
+              {...(sharedInputProps as React.ComponentProps<"input">)}
+              accept={accept}
+            />
+          );
+        }
+
         return (
-          <HtmlFileInput
-            {...(sharedInputProps as React.ComponentProps<"input">)}
+          <FileUploadDropzone
+            name={sharedInputProps.name}
+            required={required}
+            accept={accept}
+            multiple={multiple}
+            maxFiles={
+              multiple ? GRIDA_FORMS_RESPONSE_FILES_MAX_COUNT_PER_FIELD : 1
+            }
+            maxSize={getMaxUploadSize(fileupload?.type)}
+            uploader={makeUploader(fileupload)}
           />
         );
       }

@@ -30,6 +30,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
+import { FormResponseField } from "@/types";
 
 export function GridEditor() {
   const [state, dispatch] = useEditorState();
@@ -61,10 +62,11 @@ export function GridEditor() {
           __gf_created_at: response.created_at,
           __gf_customer_uuid: response.customer_id,
         }; // react-data-grid expects each row to have a unique 'id' property
-        response?.fields?.forEach((field: any) => {
+        response?.fields?.forEach((field: FormResponseField) => {
           row[field.form_field_id] = {
             type: field.type,
             value: field.value,
+            storage_object_paths: field.storage_object_paths,
           };
         });
         return row;

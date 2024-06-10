@@ -19,6 +19,7 @@ import { useFingerprint } from "@/scaffolds/fingerprint";
 import { SYSTEM_GF_FINGERPRINT_VISITORID_KEY } from "@/k/system";
 import {
   ClientFieldRenderBlock,
+  ClientFileUploadFieldRenderBlock,
   ClientRenderBlock,
   ClientSectionRenderBlock,
 } from "@/lib/forms";
@@ -27,6 +28,7 @@ import { FormAgentProvider } from "./core/agent";
 import { init } from "./core/state";
 import { useFormAgentState } from "./core/provider";
 import { useLogical } from "./use-logical";
+import { FieldSupports } from "@/k/supported_field_types";
 
 const cls_button_submit =
   "text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:ring-blue-300 font-medium rounded-lg text-sm px-5 py-2.5 me-2 mb-2 dark:bg-blue-600 dark:hover:bg-blue-700 focus:outline-none dark:focus:ring-blue-800";
@@ -387,6 +389,9 @@ function BlockRenderer({
       const { field } = block;
       const { type } = field;
 
+      const is_not_in_current_section = !context?.is_in_current_section;
+      const defaultValue = getDefaultValue?.(field.name);
+
       switch (type) {
         case "payment": {
           switch ((field.data as PaymentFieldData)?.service_provider) {
@@ -402,9 +407,6 @@ function BlockRenderer({
           }
         }
         default: {
-          const defaultValue = getDefaultValue?.(field.name);
-          const is_not_in_current_section = !context?.is_in_current_section;
-
           return (
             <div {...__shared_root_attr}>
               {/* we are unmounting the field on hidden to prevent the hidden block field value being submitted */}
@@ -432,6 +434,12 @@ function BlockRenderer({
                   multiple={field.multiple}
                   novalidate={is_not_in_current_section || hidden}
                   locked={is_not_in_current_section || hidden}
+                  fileupload={
+                    FieldSupports.file_alias(type)
+                      ? (field as ClientFileUploadFieldRenderBlock["field"])
+                          .upload
+                      : undefined
+                  }
                   onValueChange={onValueChange}
                   onCheckedChange={onValueChange}
                 />

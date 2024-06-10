@@ -1441,6 +1441,7 @@ export type Database = {
           form_id: string | null
           id: string
           response_id: string
+          storage_object_paths: string[] | null
           type: Database["grida_forms"]["Enums"]["form_field_type"]
           updated_at: string
           value: Json | null
@@ -1452,6 +1453,7 @@ export type Database = {
           form_id?: string | null
           id?: string
           response_id: string
+          storage_object_paths?: string[] | null
           type?: Database["grida_forms"]["Enums"]["form_field_type"]
           updated_at?: string
           value?: Json | null
@@ -1463,6 +1465,7 @@ export type Database = {
           form_id?: string | null
           id?: string
           response_id?: string
+          storage_object_paths?: string[] | null
           type?: Database["grida_forms"]["Enums"]["form_field_type"]
           updated_at?: string
           value?: Json | null

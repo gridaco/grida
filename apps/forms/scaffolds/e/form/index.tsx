@@ -126,6 +126,7 @@ export function Form({
     <main className="min-h-screen flex flex-col items-center pt-10 md:pt-16">
       <FormView
         method={method}
+        encType={method === "post" ? "multipart/form-data" : undefined}
         form_id={form_id}
         action={submit_action}
         title={title}

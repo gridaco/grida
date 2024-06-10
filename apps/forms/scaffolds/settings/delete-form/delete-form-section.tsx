@@ -68,7 +68,8 @@ export function DeleteFormSection() {
                 type="text"
                 name="comfirmation_text"
                 placeholder={confirmationText}
-                pattern={confirmationText}
+                // TODO: this fails on '[]' chars?
+                // pattern={confirmationText}
               />
             </form>
             <AlertDialogFooter>

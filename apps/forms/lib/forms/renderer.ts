@@ -10,9 +10,11 @@ import type {
 import { blockstree } from "./tree";
 import { FormBlockTree } from "./types";
 import { toArrayOf } from "@/types/utility";
+import { FieldSupports } from "@/k/supported_field_types";
 
 export type ClientRenderBlock =
   | ClientFieldRenderBlock
+  | ClientFileUploadFieldRenderBlock
   | ClientSectionRenderBlock
   | ClientHtmlRenderBlock
   | ClientImageRenderBlock
@@ -37,11 +39,12 @@ type ClientRenderOption = {
   index?: number;
 };
 
-export interface ClientFieldRenderBlock extends BaseRenderBlock {
+export interface ClientFieldRenderBlock<T extends FormInputType = FormInputType>
+  extends BaseRenderBlock {
   type: "field";
   field: {
     id: string;
-    type: FormInputType;
+    type: T;
     is_array?: boolean;
     name: string;
     label?: string;
@@ -59,6 +62,34 @@ export interface ClientFieldRenderBlock extends BaseRenderBlock {
     data?: FormFieldDataSchema | null;
     accept?: string;
     multiple?: boolean;
+  };
+}
+
+export type FileUploadStrategyMultipart = { type: "multipart" };
+export type FileUploadStrategySignedUrl = {
+  type: "signedurl";
+  signed_urls: Array<{
+    path: string;
+    token: string;
+  }>;
+};
+export type FileUploadStrategyRequesUploadtUrl = {
+  type: "requesturl";
+  request_url: string;
+};
+
+export type FieldUploadStrategy =
+  | FileUploadStrategyMultipart
+  | FileUploadStrategySignedUrl
+  | FileUploadStrategyRequesUploadtUrl;
+
+export interface ClientFileUploadFieldRenderBlock
+  extends ClientFieldRenderBlock<"file" | "image"> {
+  field: ClientFieldRenderBlock<"file" | "image">["field"] & {
+    accept?: string;
+    multiple?: boolean;
+  } & {
+    upload: FieldUploadStrategy;
   };
 }
 
@@ -135,6 +166,7 @@ export class FormRenderTree {
     private readonly config?: RenderTreeConfig,
     private readonly plugins?: {
       option_renderer: (option: Option) => Option;
+      upload_resolver?: (field_id: string) => FieldUploadStrategy;
     }
   ) {
     this._m_render_blocks = _m_blocks
@@ -157,7 +189,7 @@ export class FormRenderTree {
             return null; // this will be filtered out
           }
 
-          return <ClientFieldRenderBlock>{
+          return <ClientFieldRenderBlock | ClientFileUploadFieldRenderBlock>{
             ...shared,
             type: "field",
             field: this._field_block_field_definition(field),
@@ -326,7 +358,7 @@ export class FormRenderTree {
 
   private _field_block_field_definition(
     field: FormFieldDefinition
-  ): ClientFieldRenderBlock["field"] {
+  ): (ClientFieldRenderBlock | ClientFileUploadFieldRenderBlock)["field"] {
     const mkoption = (options?: Option[]) =>
       options
         ?.sort((a, b) => (a?.index || 0) - (b?.index || 0))
@@ -337,7 +369,20 @@ export class FormRenderTree {
             : (option) => option
         );
 
-    return {
+    const mkupload = (): FieldUploadStrategy | undefined => {
+      if (FieldSupports.file_alias(field.type)) {
+        if (this.plugins?.upload_resolver) {
+          return this.plugins.upload_resolver(field.id);
+        } else {
+          return { type: "multipart" };
+        }
+        //
+      } else {
+        return undefined;
+      }
+    };
+
+    const base: ClientFieldRenderBlock["field"] = {
       ...field,
       options: mkoption(field.options),
       label: field.label || undefined,
@@ -351,5 +396,14 @@ export class FormRenderTree {
       min: field.min ?? undefined,
       max: field.max ?? undefined,
     };
+
+    if (FieldSupports.file_alias(field.type)) {
+      return {
+        ...base,
+        upload: mkupload(),
+      } as ClientFileUploadFieldRenderBlock["field"];
+    } else {
+      return base as ClientFieldRenderBlock["field"];
+    }
   }
 }
