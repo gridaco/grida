@@ -1,5 +1,9 @@
 import { createClientFormsClient } from "@/lib/supabase/client";
-import { GRIDA_FORMS_RESPONSE_BUCKET } from "@/k/env";
+import {
+  GRIDA_FORMS_RESPONSE_BUCKET,
+  GRIDA_FORMS_RESPONSE_BUCKET_UPLOAD_LIMIT,
+  GRIDA_FORMS_RESPONSE_MULTIPART_FILE_UOLOAD_LIMIT,
+} from "@/k/env";
 import type { FieldUploadStrategy } from "@/lib/forms";
 import type {
   CreateSessionSignedUploadUrlRequest,
@@ -8,6 +12,17 @@ import type {
 } from "@/types/private/api";
 
 export type FileUploaderFn = (file: File) => Promise<{ path?: string }>;
+
+export function getMaxUploadSize(strategy?: FieldUploadStrategy["type"]) {
+  switch (strategy) {
+    case "requesturl":
+    case "signedurl":
+      return GRIDA_FORMS_RESPONSE_BUCKET_UPLOAD_LIMIT;
+    case "multipart":
+    default:
+      return GRIDA_FORMS_RESPONSE_MULTIPART_FILE_UOLOAD_LIMIT;
+  }
+}
 
 export function makeUploader(strategy?: FieldUploadStrategy) {
   switch (strategy?.type) {

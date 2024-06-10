@@ -30,7 +30,11 @@ import { Input } from "../ui/input";
 import { Button } from "../ui/button";
 import { Card } from "../ui/card";
 import { Label } from "../ui/label";
-import { FileUploadDropzone, makeUploader } from "./file-upload";
+import {
+  FileUploadDropzone,
+  getMaxUploadSize,
+  makeUploader,
+} from "./file-upload";
 import {
   GRIDA_FORMS_RESPONSE_BUCKET_UPLOAD_LIMIT,
   GRIDA_FORMS_RESPONSE_FILES_MAX_COUNT_PER_FIELD,
@@ -288,11 +292,7 @@ function MonoFormField({
             maxFiles={
               multiple ? GRIDA_FORMS_RESPONSE_FILES_MAX_COUNT_PER_FIELD : 1
             }
-            maxSize={
-              fileupload?.type === "signedurl"
-                ? GRIDA_FORMS_RESPONSE_BUCKET_UPLOAD_LIMIT
-                : GRIDA_FORMS_RESPONSE_MULTIPART_FILE_UOLOAD_LIMIT
-            }
+            maxSize={getMaxUploadSize(fileupload?.type)}
             uploader={makeUploader(fileupload)}
           />
         );

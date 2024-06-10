@@ -333,7 +333,7 @@ function FieldCell({ column, row }: RenderCellProps<any>) {
                     .getPublicUrl(path).data.publicUrl
                 }
                 alt={path}
-                className="h-full aspect-square rounded overflow-hidden object-cover bg-neutral-500"
+                className="h-full min-w-10 aspect-square rounded overflow-hidden object-cover bg-neutral-500"
               />
               <caption>{path.split("/").pop()}</caption>
             </picture>

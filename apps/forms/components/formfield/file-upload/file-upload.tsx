@@ -41,10 +41,13 @@ export const FileUploadDropzone = ({
   uploader,
 }: FileUploadDropzoneProps) => {
   const [files, setFiles] = useState<File[]>([]);
-  const { isUploading, getUploadStatus, uploadedFiles } = useFileUploader({
+  const { getStatus, data } = useFileUploader({
     files,
     uploader,
+    autoUpload: true,
   });
+
+  console.log("data", data);
 
   const dropzone = {
     accept: accept?.split(",").reduce((acc: Accept, type) => {
@@ -61,6 +64,10 @@ export const FileUploadDropzone = ({
   };
 
   const isMultipartFile = !uploader;
+  const uploadedFilesPaths = useMemo(
+    () => data.map((info) => info.path).filter(Boolean) as string[],
+    [data]
+  );
 
   return (
     <FileUploader
@@ -74,11 +81,7 @@ export const FileUploadDropzone = ({
         <UploadedFileValue
           name={name}
           required={required}
-          value={
-            uploadedFiles.length > 0
-              ? uploadedFiles.map((file) => file.path)
-              : undefined
-          }
+          value={uploadedFilesPaths}
         />
       )}
       <FileUploaderTrigger>
@@ -105,7 +108,7 @@ export const FileUploadDropzone = ({
             className="h-20 p-0 rounded-md overflow-hidden"
             aria-roledescription={`file ${i + 1} containing ${file.name}`}
           >
-            <FilePreview file={file} status={getUploadStatus(i)} />
+            <FilePreview file={file} status={getStatus(file)} />
           </FileUploaderItem>
         ))}
       </FileUploaderContent>
@@ -116,9 +119,9 @@ export const FileUploadDropzone = ({
 function FilePreview({ file, status }: { file: File; status: UploadStatus }) {
   const src = useMemo(() => URL.createObjectURL(file), [file]);
 
-  if (file.type.startsWith("image/")) {
-    return (
-      <div className="relative">
+  const Body = () => {
+    if (file.type.startsWith("image/")) {
+      return (
         <Image
           className="size-20 rounded-md object-cover"
           src={src}
@@ -126,21 +129,27 @@ function FilePreview({ file, status }: { file: File; status: UploadStatus }) {
           height={80}
           width={80}
         />
-        {status !== "uploaded" && (
-          <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center">
-            <Spinner />
-          </div>
-        )}
+      );
+    }
+
+    return (
+      <div className="w-full flex justify-center gap-2 p-2 items-center">
+        <FileIcon className="w-8 h-8" />
+        <span className="pr-4 inline-block max-w-40 break-all whitespace-normal text-xs text-muted-foreground">
+          {file.name}
+        </span>
       </div>
     );
-  }
+  };
 
   return (
-    <div className="w-full flex justify-center gap-2 p-2 items-center">
-      <FileIcon className="w-8 h-8" />
-      <span className="pr-4 inline-block max-w-40 break-all whitespace-normal text-xs text-muted-foreground">
-        {file.name}
-      </span>
+    <div className="relativ h-20e">
+      <Body />
+      {status !== "uploaded" && (
+        <div className="absolute top-0 left-0 right-0 bottom-0 bg-black bg-opacity-50 flex items-center justify-center">
+          <Spinner />
+        </div>
+      )}
     </div>
   );
 }
