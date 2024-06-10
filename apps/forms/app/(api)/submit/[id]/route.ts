@@ -35,6 +35,7 @@ import { FieldSupports } from "@/k/supported_field_types";
 import { UniqueFileNameGenerator } from "@/lib/forms/storage";
 import {
   GRIDA_FORMS_RESPONSE_BUCKET,
+  GRIDA_FORMS_RESPONSE_BUCKET_TMP_STARTS_WITH,
   GRIDA_FORMS_RESPONSE_BUCKET_UPLOAD_LIMIT,
 } from "@/k/env";
 import type { InsertDto } from "@/types/supabase-ext";
@@ -797,10 +798,31 @@ async function process_response_field_files(
       }
     } else {
       // if not file, it means it is already uploaded on client side with session, it needs to be moved to response folder.
-      // from : {bucket}/session/{session_id}/{field_id}/{i}
+      // from : {bucket}/tmp/{session_id}/{field_id}/{i}
       // to: {bucket}/response/{response_id}/{field_id}/{i}
-      // TODO:
-      console.log("TODO: mv file - file uploaded from client", file);
+
+      const tmppath = String(file);
+
+      if (tmppath.startsWith(GRIDA_FORMS_RESPONSE_BUCKET_TMP_STARTS_WITH)) {
+        const name = tmppath.split("/").pop();
+        const targetpath = basepath + name;
+        const { error } = await client.storage
+          .from(GRIDA_FORMS_RESPONSE_BUCKET)
+          .move(tmppath, targetpath);
+
+        if (error) console.error("submit/err/tmp-mv", tmppath, error);
+        else {
+          // push the result (mocked)
+          uploads.push(
+            Promise.resolve({
+              data: { path: targetpath },
+              error: null,
+            })
+          );
+        }
+      } else {
+        console.log("submit/err/unknown-file", file);
+      }
     }
   }
 

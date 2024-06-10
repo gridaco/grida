@@ -18,9 +18,8 @@ import {
   FileRejection,
   DropzoneOptions,
 } from "react-dropzone";
-import { TrashIcon } from "@radix-ui/react-icons";
-import { Button, buttonVariants } from "@/components/ui/button";
-import { Input } from "../ui/input";
+import { Cross2Icon } from "@radix-ui/react-icons";
+import { buttonVariants } from "@/components/ui/button";
 
 type DirectionOptions = "rtl" | "ltr" | undefined;
 
@@ -51,6 +50,10 @@ type FileUploaderProps = {
   onValueChange: (value: File[] | null) => void;
   dropzoneOptions: DropzoneOptions;
   orientation?: "horizontal" | "vertical";
+  /**
+   * when true, the component will include the files in the input field - included in form submission with multipart/form-data
+   */
+  includeFiles?: boolean;
 };
 
 export const FileUploader = forwardRef<
@@ -65,6 +68,7 @@ export const FileUploader = forwardRef<
       onValueChange,
       reSelect,
       orientation = "vertical",
+      includeFiles,
       children,
       dir,
       ...props
@@ -188,12 +192,14 @@ export const FileUploader = forwardRef<
         }
 
         if (dropzoneState.inputRef.current) {
-          const dataTransfer = new DataTransfer();
-          newValues.forEach((file) => dataTransfer.items.add(file));
-          dropzoneState.inputRef.current.files = dataTransfer.files;
+          if (includeFiles) {
+            const dataTransfer = new DataTransfer();
+            newValues.forEach((file) => dataTransfer.items.add(file));
+            dropzoneState.inputRef.current.files = dataTransfer.files;
+          }
         }
       },
-      [reSelectAll, value]
+      [reSelectAll, value, includeFiles]
     );
 
     useEffect(() => {
@@ -284,7 +290,7 @@ export const FileUploaderItem = forwardRef<
     <div
       ref={ref}
       className={cn(
-        buttonVariants({ variant: "ghost" }),
+        buttonVariants({ variant: "outline" }),
         "h-6 p-1 justify-between cursor-pointer relative",
         className,
         isSelected ? "bg-muted" : ""
@@ -298,13 +304,14 @@ export const FileUploaderItem = forwardRef<
         type="button"
         className={cn(
           "absolute",
-          direction === "rtl" ? "top-1 left-1" : "top-1 right-1"
+          direction === "rtl" ? "top-1 left-1" : "top-1 right-1",
+          "p-0.5 rounded-full bg-background border"
         )}
         onClick={() => removeFileFromSet(index)}
       >
         <span className="sr-only">remove item {index}</span>
         <span className="hover:text-destructive duration-200 ease-in-out">
-          <TrashIcon className="w-4 h-4" />
+          <Cross2Icon className="w-3 h-3" />
         </span>
       </button>
     </div>
@@ -349,13 +356,13 @@ export const FileUploaderTrigger = forwardRef<
 
 FileUploaderTrigger.displayName = "FileUploaderTrigger";
 
-export const FileInput = forwardRef<
+export const FileValue = forwardRef<
   HTMLInputElement,
   React.InputHTMLAttributes<HTMLInputElement>
 >(({ className, name, required, children, ...props }, ref) => {
   const { dropzoneState, isLOF } = useFileUpload();
   return (
-    <Input
+    <input
       name={name}
       required={required}
       ref={dropzoneState.inputRef}
@@ -367,4 +374,24 @@ export const FileInput = forwardRef<
   );
 });
 
-FileInput.displayName = "FileInput";
+FileValue.displayName = "FileValue";
+
+export const UploadedFileValue = forwardRef<
+  HTMLInputElement,
+  React.InputHTMLAttributes<HTMLInputElement>
+>(({ className, name, required, value, children, ...props }, ref) => {
+  return (
+    <>
+      <input
+        ref={ref}
+        {...props}
+        name={name}
+        required={required}
+        value={value}
+        className={cn("sr-only", className)}
+      />
+    </>
+  );
+});
+
+UploadedFileValue.displayName = "UploadedFileValue";

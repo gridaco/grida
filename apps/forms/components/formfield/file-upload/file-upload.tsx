@@ -3,9 +3,10 @@
 import {
   FileUploader,
   FileUploaderTrigger,
-  FileInput,
+  FileValue,
   FileUploaderContent,
   FileUploaderItem,
+  UploadedFileValue,
 } from "@/components/extension/file-upload";
 import { Spinner } from "@/components/spinner";
 import { Card } from "@/components/ui/card";
@@ -43,7 +44,10 @@ export const FileUploadDropzone = ({
   uploader,
 }: FileUploadDropzoneProps) => {
   const [files, setFiles] = useState<File[]>([]);
-  const { isUploading, getUploadStatus } = useFileUploader(files, uploader);
+  const { isUploading, getUploadStatus, uploadedFiles } = useFileUploader(
+    files,
+    uploader
+  );
 
   const dropzone = {
     accept: accept?.split(",").reduce((acc: Accept, type) => {
@@ -59,13 +63,27 @@ export const FileUploadDropzone = ({
     setFiles(newFiles || []);
   };
 
+  const isMultipartFile = !uploader;
+
   return (
     <FileUploader
       value={files}
       onValueChange={handleValueChange}
       dropzoneOptions={dropzone}
+      includeFiles={isMultipartFile}
     >
-      <FileInput name={name} required={required} />
+      {isMultipartFile && <FileValue name={name} required={required} />}
+      {!isMultipartFile && (
+        <UploadedFileValue
+          name={name}
+          required={required}
+          value={
+            uploadedFiles.length > 0
+              ? uploadedFiles.map((file) => file.path)
+              : undefined
+          }
+        />
+      )}
       <FileUploaderTrigger>
         <Card>
           <div className="flex items-center justify-center h-40 w-full rounded-md">
@@ -122,7 +140,7 @@ function FilePreview({ file, status }: { file: File; status: UploadStatus }) {
 
   return (
     <div className="w-full flex justify-center gap-2 p-2 items-center">
-      <FileIcon className="w-10 h-10" />
+      <FileIcon className="w-8 h-8" />
       <span className="pr-4 inline-block max-w-40 break-all whitespace-normal text-xs text-muted-foreground">
         {file.name}
       </span>
@@ -137,6 +155,7 @@ const useFileUploader = (
   uploader?: (file: File, i: number) => Promise<{ path?: string }>
 ) => {
   const [uploadStatus, setUploadStatus] = useState<UploadStatus[]>([]);
+  const [uploadedFiles, setUploadedFiles] = useState<{ path: string }[]>([]);
   const [isUploading, setIsUploading] = useState(false);
 
   useEffect(() => {
@@ -153,6 +172,7 @@ const useFileUploader = (
 
       setIsUploading(true);
       const status = [...uploadStatus];
+      const uploadedFilesTemp: { path: string }[] = [];
       try {
         for (let i = 0; i < files.length; i++) {
           if (status[i] === "pending") {
@@ -160,8 +180,9 @@ const useFileUploader = (
             setUploadStatus([...status]);
             try {
               const { path } = await uploader(files[i], i);
-              if (!!path) {
+              if (path) {
                 status[i] = "uploaded";
+                uploadedFilesTemp.push({ path });
               } else {
                 status[i] = "failed";
               }
@@ -173,11 +194,12 @@ const useFileUploader = (
         }
       } finally {
         setIsUploading(false);
+        setUploadedFiles(uploadedFilesTemp);
       }
     };
 
     startUploading();
   }, [files, uploader, uploadStatus]);
 
-  return { isUploading, getUploadStatus };
+  return { isUploading, getUploadStatus, uploadedFiles };
 };

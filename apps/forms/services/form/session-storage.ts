@@ -2,6 +2,7 @@ import { client } from "@/lib/supabase/server";
 import assert from "assert";
 import {
   GRIDA_FORMS_RESPONSE_BUCKET,
+  GRIDA_FORMS_RESPONSE_BUCKET_TMP_STARTS_WITH,
   GRIDA_FORMS_RESPONSE_FILES_MAX_COUNT_PER_FIELD,
 } from "@/k/env";
 import { UniqueFileNameGenerator } from "@/lib/forms/storage";
@@ -11,7 +12,7 @@ interface SessionStoragePath {
   field_id: string;
 }
 
-const session_storage_object_path = ({
+const tmp_storage_object_path = ({
   session_id,
   field_id,
   name,
@@ -19,8 +20,8 @@ const session_storage_object_path = ({
   name?: string;
 }) =>
   !!name
-    ? `session/${session_id}/${field_id}/${name}`
-    : `session/${session_id}/${field_id}`;
+    ? `${GRIDA_FORMS_RESPONSE_BUCKET_TMP_STARTS_WITH}${session_id}/${field_id}/${name}`
+    : `${GRIDA_FORMS_RESPONSE_BUCKET_TMP_STARTS_WITH}${session_id}/${field_id}`;
 
 function sign(path: string) {
   return (
@@ -41,7 +42,7 @@ export async function response_file_upload_storage_presigned_url(
   if (!replace) {
     const { data } = await client.storage
       .from(GRIDA_FORMS_RESPONSE_BUCKET)
-      .list(session_storage_object_path(path));
+      .list(tmp_storage_object_path(path));
 
     const existing = data?.map((d) => d.name) ?? [];
 
@@ -51,7 +52,7 @@ export async function response_file_upload_storage_presigned_url(
   const newuniquename = namer.name(name);
 
   return sign(
-    session_storage_object_path({
+    tmp_storage_object_path({
       ...path,
       name: newuniquename,
     })
@@ -86,7 +87,7 @@ export async function prepare_response_file_upload_storage_presigned_url(
 
   for (let i = 0; i < n; i++) {
     const task = sign(
-      session_storage_object_path({
+      tmp_storage_object_path({
         name: i.toString(),
         field_id: field_id,
         session_id: session_id,
@@ -99,7 +100,9 @@ export async function prepare_response_file_upload_storage_presigned_url(
 
   const failures = results.filter((r) => r.error);
 
-  if (failures) console.error("session/sign-upload-urls/failures", failures);
+  if (failures.length > 0) {
+    console.error("session/sign-upload-urls/failures", failures);
+  }
 
   return results.map((r) => r.data).filter(Boolean) as Array<{
     path: string;
