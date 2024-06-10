@@ -49,18 +49,14 @@ export async function response_file_upload_storage_presigned_url(
     // the comma in file name (which is allowed by the storage) needs to be rejected with our file uploader since it uses the uploaded file paths as <input type='text'/> value, which on serverside, needs to be parsed with .split(',') for multiple file uploads.
     rejectComma: true,
   });
-  const objectpath = tmp_storage_object_path({
-    ...path,
-    unique: unique ? Date.now().toString() : undefined,
-    name: namer.name(name),
-  });
-  console.log(
-    "response_file_upload_storage_presigned_url",
-    name,
-    unique,
-    objectpath
+
+  return sign(
+    tmp_storage_object_path({
+      ...path,
+      unique: unique ? Date.now().toString() : undefined,
+      name: namer.name(name),
+    })
   );
-  return sign(objectpath);
   //
 }
 
