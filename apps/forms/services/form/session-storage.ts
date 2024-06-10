@@ -12,6 +12,9 @@ interface SessionStoragePath {
   field_id: string;
 }
 
+export const requesturl = ({ session_id, field_id }: SessionStoragePath) =>
+  `/v1/session/${session_id}/field/${field_id}/upload/signed-url`;
+
 const tmp_storage_object_path = ({
   session_id,
   field_id,
@@ -108,4 +111,54 @@ export async function prepare_response_file_upload_storage_presigned_url(
     path: string;
     token: string;
   }>;
+}
+
+/**
+ * @deprecated forms agent by default, now uses 'requesturl' strategy instead of 'presignedurl' strategy.
+ * @param session_id
+ * @param fields
+ * @returns {Promise<Record<string, { path: string; token: string; }[]>>}
+ *
+ * @example
+ * ```
+ * const field_upload_urls = await prepare_presigned_upload_url_for_fields(
+ *   session.id,
+ *   fields
+ * );
+ * const resolver = (field_id: string) => ({
+ *   type: "signedurl",
+ *   signed_urls: field_upload_urls[field_id],
+ * });
+ * ```
+ *
+ */
+export async function prepare_presigned_upload_url_for_fields(
+  session_id: string,
+  fields: {
+    id: string;
+    type: "file" | "image";
+    multiple: boolean;
+  }[]
+) {
+  // region file upload presigned urls
+  const field_upload_urls: Record<
+    string,
+    Array<{
+      path: string;
+      token: string;
+    }>
+  > = {};
+
+  for (const field of fields) {
+    const urls = await prepare_response_file_upload_storage_presigned_url(
+      {
+        session_id: session_id,
+        field_id: field.id,
+      },
+      field.multiple ? GRIDA_FORMS_RESPONSE_FILES_MAX_COUNT_PER_FIELD : 1
+    );
+    field_upload_urls[field.id] = urls;
+  }
+
+  return field_upload_urls;
 }

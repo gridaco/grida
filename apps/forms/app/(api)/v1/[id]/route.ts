@@ -42,9 +42,7 @@ import type {
   Option,
 } from "@/types";
 import { Features } from "@/lib/features/scheduling";
-import { GRIDA_FORMS_RESPONSE_FILES_MAX_COUNT_PER_FIELD } from "@/k/env";
-import { FieldSupports } from "@/k/supported_field_types";
-import { prepare_response_file_upload_storage_presigned_url } from "@/services/form/session-storage";
+import { requesturl } from "@/services/form/session-storage";
 
 export const revalidate = 0;
 
@@ -258,28 +256,6 @@ export async function GET(
     };
   }
 
-  // region file upload presigned urls
-  const field_upload_urls: Record<
-    string,
-    Array<{
-      path: string;
-      token: string;
-    }>
-  > = {};
-
-  for (const field of fields) {
-    if (FieldSupports.file_alias(field.type)) {
-      const urls = await prepare_response_file_upload_storage_presigned_url(
-        {
-          session_id: session.id,
-          field_id: field.id,
-        },
-        field.multiple ? GRIDA_FORMS_RESPONSE_FILES_MAX_COUNT_PER_FIELD : 1
-      );
-      field_upload_urls[field.id] = urls;
-    }
-  }
-
   const renderer = new FormRenderTree(
     id,
     title,
@@ -291,8 +267,11 @@ export async function GET(
     {
       option_renderer: mkoption,
       upload_resolver: (field_id: string) => ({
-        type: "signedurl",
-        signed_urls: field_upload_urls[field_id],
+        type: "requesturl",
+        request_url: requesturl({
+          session_id: session.id,
+          field_id: field_id,
+        }),
       }),
     }
   );
