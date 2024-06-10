@@ -1,5 +1,6 @@
 "use client";
 
+import React, { useMemo, useState, useCallback, useEffect } from "react";
 import {
   FileUploader,
   FileUploaderTrigger,
@@ -11,10 +12,10 @@ import {
 import { Spinner } from "@/components/spinner";
 import { Card } from "@/components/ui/card";
 import { FileIcon } from "@radix-ui/react-icons";
-import Image from "next/image";
-import { useMemo, useState, useCallback, useEffect } from "react";
 import { DropzoneOptions } from "react-dropzone";
 import { FileUploaderFn } from "./uploader";
+import Image from "next/image";
+import { UploadStatus, useFileUploader } from "./use-file-uploader";
 
 type Accept = {
   [key: string]: string[];
@@ -40,10 +41,10 @@ export const FileUploadDropzone = ({
   uploader,
 }: FileUploadDropzoneProps) => {
   const [files, setFiles] = useState<File[]>([]);
-  const { isUploading, getUploadStatus, uploadedFiles } = useFileUploader(
+  const { isUploading, getUploadStatus, uploadedFiles } = useFileUploader({
     files,
-    uploader
-  );
+    uploader,
+  });
 
   const dropzone = {
     accept: accept?.split(",").reduce((acc: Accept, type) => {
@@ -143,59 +144,3 @@ function FilePreview({ file, status }: { file: File; status: UploadStatus }) {
     </div>
   );
 }
-
-type UploadStatus = "pending" | "uploading" | "uploaded" | "failed";
-
-const useFileUploader = (
-  files: File[],
-  uploader?: (file: File, i: number) => Promise<{ path?: string }>
-) => {
-  const [uploadStatus, setUploadStatus] = useState<UploadStatus[]>([]);
-  const [uploadedFiles, setUploadedFiles] = useState<{ path: string }[]>([]);
-  const [isUploading, setIsUploading] = useState(false);
-
-  useEffect(() => {
-    if (files.length > 0) {
-      setUploadStatus(new Array(files.length).fill("pending"));
-    }
-  }, [files]);
-
-  const getUploadStatus = (index: number) => uploadStatus[index];
-
-  useEffect(() => {
-    const startUploading = async () => {
-      if (!uploader) return;
-
-      setIsUploading(true);
-      const status = [...uploadStatus];
-      const uploadedFilesTemp: { path: string }[] = [];
-      try {
-        for (let i = 0; i < files.length; i++) {
-          if (status[i] === "pending") {
-            status[i] = "uploading";
-            setUploadStatus([...status]);
-            try {
-              const { path } = await uploader(files[i], i);
-              if (path) {
-                status[i] = "uploaded";
-                uploadedFilesTemp.push({ path });
-              } else {
-                status[i] = "failed";
-              }
-            } catch {
-              status[i] = "failed";
-            }
-            setUploadStatus([...status]);
-          }
-        }
-      } finally {
-        setIsUploading(false);
-        setUploadedFiles(uploadedFilesTemp);
-      }
-    };
-
-    startUploading();
-  }, [files, uploader, uploadStatus]);
-
-  return { isUploading, getUploadStatus, uploadedFiles };
-};

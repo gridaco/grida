@@ -21,8 +21,7 @@ import { ClockIcon, PlusIcon } from "@radix-ui/react-icons";
 import { Checkbox } from "@/components/ui/checkbox";
 import useSafeSelectValue from "./use-safe-select-value";
 import { Switch } from "../ui/switch";
-// TODO: this causes hydration error
-import { Slider } from "../ui/slider";
+import { Slider } from "../ui/slider"; // TODO: this causes hydration error
 import { Toggle } from "../ui/toggle";
 import { ToggleGroup, ToggleGroupItem } from "../ui/toggle-group";
 import { RadioGroup, RadioGroupItem } from "../ui/radio-group";
@@ -31,17 +30,14 @@ import { Input } from "../ui/input";
 import { Button } from "../ui/button";
 import { Card } from "../ui/card";
 import { Label } from "../ui/label";
-import { FileUploadDropzone } from "./file-upload";
+import { FileUploadDropzone, makeUploader } from "./file-upload";
 import {
-  GRIDA_FORMS_RESPONSE_BUCKET,
   GRIDA_FORMS_RESPONSE_BUCKET_UPLOAD_LIMIT,
   GRIDA_FORMS_RESPONSE_FILES_MAX_COUNT_PER_FIELD,
   GRIDA_FORMS_RESPONSE_MULTIPART_FILE_UOLOAD_LIMIT,
 } from "@/k/env";
 import type { FieldUploadStrategy } from "@/lib/forms";
 import assert from "assert";
-import { createClientFormsClient } from "@/lib/supabase/client";
-import { makeUploader } from "./file-upload/uploader";
 
 /**
  * this disables the auto zoom in input text tag safari on iphone by setting font-size to 16px
