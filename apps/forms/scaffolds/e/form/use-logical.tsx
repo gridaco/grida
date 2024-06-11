@@ -4,7 +4,7 @@ import type {
   JSONFieldReference,
   Scalar,
 } from "@/types/logic";
-import { useFormAgentState } from "./core/provider";
+import { useFormAgentState } from "@/lib/formstate";
 import { useMemo } from "react";
 
 export function LogicalProvider() {

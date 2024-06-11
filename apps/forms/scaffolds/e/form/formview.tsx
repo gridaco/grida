@@ -27,9 +27,7 @@ import {
   ClientSectionRenderBlock,
 } from "@/lib/forms";
 import { Button } from "@/components/ui/button";
-import { FormAgentProvider } from "./core/agent";
-import { init } from "./core/state";
-import { useFormAgentState } from "./core/provider";
+import { FormAgentProvider, useFormAgentState, init } from "@/lib/formstate";
 import { useLogical } from "./use-logical";
 import { FieldSupports } from "@/k/supported_field_types";
 
