@@ -26,8 +26,10 @@ import {
   ResponseFeedRowsAction,
   SaveFieldAction,
   SelectResponse,
+  ResponseSessionsDisplayAction,
   SortBlockAction,
   VideoBlockSrcAction,
+  FeedResponseSessionsAction,
 } from "./action";
 import { arrayMove } from "@dnd-kit/sortable";
 import { blockstreeflat } from "@/lib/forms/tree";
@@ -523,6 +525,49 @@ export function reducer(
       return produce(state, (draft) => {
         draft.is_response_edit_panel_open = open ?? true;
         draft.focus_response_id = response_id;
+      });
+    }
+    case "editor/data/sessions/feed": {
+      const { data, reset } = <FeedResponseSessionsAction>action;
+      return produce(state, (draft) => {
+        // Initialize draft.sessions if it's not already an array
+        if (!Array.isArray(draft.sessions)) {
+          draft.sessions = [];
+        }
+
+        if (reset) {
+          draft.sessions = data;
+          return;
+        }
+
+        // Merge & Add new responses to the existing responses
+        // Map of ids to responses for the existing responses
+        const existingSessionsById = draft.sessions.reduce(
+          (acc: any, session) => {
+            acc[session.id] = session;
+            return acc;
+          },
+          {}
+        );
+
+        data.forEach((newSession) => {
+          if (existingSessionsById.hasOwnProperty(newSession.id)) {
+            // Update existing response
+            Object.assign(
+              (existingSessionsById as any)[newSession.id],
+              newSession
+            );
+          } else {
+            // Add new response if id does not exist
+            draft.sessions!.push(newSession);
+          }
+        });
+      });
+    }
+    case "editor/data/sessions/display": {
+      const { display } = <ResponseSessionsDisplayAction>action;
+      return produce(state, (draft) => {
+        draft.is_display_sessions = display;
       });
     }
     case "editor/customers/edit": {

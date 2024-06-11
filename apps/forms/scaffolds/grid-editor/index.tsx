@@ -18,6 +18,7 @@ import Link from "next/link";
 import {
   CommitIcon,
   DownloadIcon,
+  GearIcon,
   PieChartIcon,
   TrashIcon,
 } from "@radix-ui/react-icons";
@@ -31,6 +32,15 @@ import {
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { FormResponseField } from "@/types";
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Button } from "@/components/ui/button";
 
 export function GridEditor() {
   const [state, dispatch] = useEditorState();
@@ -183,7 +193,7 @@ export function GridEditor() {
             </div>
           </div>
           <div />
-          <div className="flex gap-2">
+          <div className="flex gap-2 items-center">
             <Link href={`./analytics`}>
               <Badge variant={"outline"} className="cursor-pointer">
                 Realtime
@@ -196,6 +206,7 @@ export function GridEditor() {
                 <CommitIcon className="align-middle ms-2" />
               </Badge>
             </Link>
+            <GridViewSettings />
           </div>
         </div>
       </header>
@@ -220,17 +231,52 @@ export function GridEditor() {
           }}
         />
       </div>
-      <footer className="flex gap-4 min-h-9 overflow-hidden items-center px-2 w-full border-t dark:border-t-neutral-700">
-        <MaxRowsSelect />
-        <div>{txt_n_responses(state.responses?.length ?? 0)}</div>
+      <footer className="flex gap-4 min-h-9 overflow-hidden items-center px-2 py-2 w-full border-t dark:border-t-neutral-700 divide-x">
+        <div className="flex gap-2 items-center">
+          <MaxRowsSelect />
+          <span className="text-sm font-medium">
+            {txt_n_responses(state.responses?.length ?? 0)}
+          </span>
+        </div>
         <Link href={`/v1/${form_id}/export/csv`} download target="_blank">
-          <button className="flex items-center gap-1 p-2 bg-neutral-100 dark:bg-neutral-900 rounded">
+          <Button variant="ghost">
             Export to CSV
             <DownloadIcon />
-          </button>
+          </Button>
         </Link>
       </footer>
     </div>
+  );
+}
+
+function GridViewSettings() {
+  const [state, dispatch] = useEditorState();
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button className="flex items-center justify-center">
+          <Badge variant="outline" className="cursor-pointer">
+            <GearIcon />
+          </Badge>
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-56">
+        <DropdownMenuLabel>Grid Settings</DropdownMenuLabel>
+        <DropdownMenuSeparator />
+        <DropdownMenuCheckboxItem
+          checked={state.is_display_sessions}
+          onCheckedChange={(checked) => {
+            dispatch({
+              type: "editor/data/sessions/display",
+              display: checked,
+            });
+          }}
+        >
+          Show Sessions
+        </DropdownMenuCheckboxItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 

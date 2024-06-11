@@ -4,6 +4,7 @@ import type {
   FormBlockType,
   FormFieldDefinition,
   FormResponse,
+  FormResponseSession,
   SupabaseConnection,
 } from "@/types";
 
@@ -70,6 +71,8 @@ export interface FormEditorState {
   selected_responses: Set<string>;
   // TODO: add effect on this value to update responses
   responses_pagination_rows: number;
+  sessions?: FormResponseSession[];
+  is_display_sessions?: boolean;
   is_field_edit_panel_open?: boolean;
   is_response_edit_panel_open?: boolean;
   is_customer_edit_panel_open?: boolean;

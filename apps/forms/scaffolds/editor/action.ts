@@ -31,6 +31,8 @@ export type BlocksEditorAction =
   | FeedResponseAction
   | OpenResponseEditAction
   | ResponseFeedRowsAction
+  | FeedResponseSessionsAction
+  | ResponseSessionsDisplayAction
   | OpenCustomerEditAction
   | OpenBlockEditPanelAction
   | DataGridReorderColumnAction;
@@ -156,6 +158,17 @@ export interface DeleteResponseAction {
 export interface ResponseFeedRowsAction {
   type: "editor/responses/pagination/rows";
   max: number;
+}
+
+export interface FeedResponseSessionsAction {
+  type: "editor/data/sessions/feed";
+  data: FormResponse[];
+  reset?: boolean;
+}
+
+export interface ResponseSessionsDisplayAction {
+  type: "editor/data/sessions/display";
+  display: boolean;
 }
 
 export interface OpenResponseEditAction {

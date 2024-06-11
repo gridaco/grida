@@ -405,6 +405,7 @@ async function submit({
       .insert({
         raw: JSON.stringify(Object.fromEntries(entries)),
         form_id: form_id,
+        session_id: meta.session,
         browser: meta.browser,
         ip: meta.ip,
         customer_id: customer?.uid,

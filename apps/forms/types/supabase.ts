@@ -1373,6 +1373,7 @@ export type Database = {
             | Database["grida_forms"]["Enums"]["response_platform_powered_by"]
             | null
           raw: Json
+          session_id: string | null
           updated_at: string
           x_ipinfo: Json | null
           x_referer: string | null
@@ -1392,6 +1393,7 @@ export type Database = {
             | Database["grida_forms"]["Enums"]["response_platform_powered_by"]
             | null
           raw: Json
+          session_id?: string | null
           updated_at?: string
           x_ipinfo?: Json | null
           x_referer?: string | null
@@ -1411,6 +1413,7 @@ export type Database = {
             | Database["grida_forms"]["Enums"]["response_platform_powered_by"]
             | null
           raw?: Json
+          session_id?: string | null
           updated_at?: string
           x_ipinfo?: Json | null
           x_referer?: string | null
@@ -1429,6 +1432,13 @@ export type Database = {
             columns: ["form_id"]
             isOneToOne: false
             referencedRelation: "form"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "response_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "response_session"
             referencedColumns: ["id"]
           },
         ]
