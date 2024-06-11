@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useEffect, useRef, useState } from "react";
 import useSWR from "swr";
 import { notFound, redirect } from "next/navigation";
 import { FormPageDeveloperErrorDialog } from "@/scaffolds/e/form/error";
@@ -11,9 +11,10 @@ import { FormView, FormViewTranslation } from "./formview";
 import {
   SYSTEM_GF_CUSTOMER_UUID_KEY,
   SYSTEM_GF_FINGERPRINT_VISITORID_KEY,
+  SYSTEM_GF_SESSION_KEY,
 } from "@/k/system";
 import type { EditorApiResponse } from "@/types/private/api";
-import type { FormMethod, FormPageBackgroundSchema } from "@/types";
+import type { FormPageBackgroundSchema } from "@/types";
 import type {
   FormClientFetchResponseData,
   FormClientFetchResponseError,
@@ -21,6 +22,38 @@ import type {
 import { FormPageBackground } from "./background";
 
 const HOST_NAME = process.env.NEXT_PUBLIC_HOST_NAME || "http://localhost:3000";
+
+function useFormResponseSession(form_id: string) {
+  const storekey = SYSTEM_GF_SESSION_KEY + "/" + form_id;
+  const [session, set_session] = useState<string | null>(null);
+  const isFetched = useRef(false);
+
+  useEffect(() => {
+    if (isFetched.current) {
+      return;
+    }
+    isFetched.current = true;
+
+    const windowsession = sessionStorage.getItem(storekey);
+    if (windowsession) {
+      set_session(windowsession);
+      return;
+    }
+
+    console.log("fetching session");
+    fetch(HOST_NAME + `/v1/${form_id}/session`).then((res) => {
+      res.json().then(({ data }: EditorApiResponse<{ id: string }>) => {
+        if (data?.id) {
+          set_session(data.id);
+          sessionStorage.setItem(storekey, data.id);
+        }
+      });
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  return session;
+}
 
 export function Form({
   form_id,
@@ -31,11 +64,13 @@ export function Form({
   params: { [key: string]: string };
   translation: FormViewTranslation;
 }) {
+  const session = useFormResponseSession(form_id);
   const { result: fingerprint } = useFingerprint();
 
   const __fingerprint_ready = !!fingerprint?.visitorId;
   const __gf_customer_uuid = params[SYSTEM_GF_CUSTOMER_UUID_KEY];
-  const can_make_initial_request = !!__gf_customer_uuid || __fingerprint_ready;
+  const can_make_initial_request =
+    (!!__gf_customer_uuid || __fingerprint_ready) && !!session;
 
   const req_url = can_make_initial_request
     ? HOST_NAME +
@@ -45,6 +80,7 @@ export function Form({
           ? new URLSearchParams({
               ...params,
               [SYSTEM_GF_FINGERPRINT_VISITORID_KEY]: fingerprint?.visitorId,
+              [SYSTEM_GF_SESSION_KEY]: session,
             })
           : new URLSearchParams(params)
       }`
@@ -70,7 +106,7 @@ export function Form({
 
   const { data, error } = res || {};
 
-  if (isLoading || !data) {
+  if (isLoading || !session || !data) {
     return (
       <main className="h-screen min-h-screen">
         <div className="prose mx-auto p-4 pt-10 md:pt-16 h-full overflow-auto flex-1">
@@ -129,7 +165,7 @@ export function Form({
         encType={method === "post" ? "multipart/form-data" : undefined}
         action={submit_action}
         form_id={form_id}
-        session_id={data.session_id}
+        session_id={session}
         title={title}
         fields={fields}
         defaultValues={default_values}

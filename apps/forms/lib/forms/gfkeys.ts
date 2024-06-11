@@ -30,6 +30,7 @@ export function parseGFKeys(
 
   for (const key of system_gf_keys) {
     const value = data.get(key) as string;
+    if (!value) continue; // ignore empty values this is often with search params
     switch (key) {
       case SYSTEM_GF_SESSION_KEY: {
         if (is_uuid_v4(value)) {

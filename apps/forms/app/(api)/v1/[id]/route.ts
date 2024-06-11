@@ -178,11 +178,17 @@ export async function GET(
 
   const { data: session, error: session_error } = await supabase
     .from("response_session")
-    .insert({
-      form_id: id,
-    })
+    .upsert(
+      {
+        id: system_keys.__gf_session ?? undefined,
+        form_id: id,
+      },
+      { onConflict: "id" }
+    )
     .select()
     .single();
+
+  console.log("session", system_keys.__gf_session, session);
 
   if (session_error || !session) {
     console.error("error while creating session", session_error);
