@@ -6,6 +6,14 @@ import type { NextRequest } from "next/server";
 export async function middleware(req: NextRequest) {
   const res = NextResponse.next();
 
+  // Check if the request path starts with /dev/ and NODE_ENV is not development
+  if (
+    req.nextUrl.pathname.startsWith("/dev/") &&
+    process.env.NODE_ENV !== "development"
+  ) {
+    return new NextResponse("Not Found", { status: 404 });
+  }
+
   // Create a Supabase client configured to use cookies
   const supabase = createMiddlewareClient({ req, res });
 
