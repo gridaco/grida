@@ -41,6 +41,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
+import clsx from "clsx";
 
 function rows_from_responses(responses?: FormResponse[]) {
   return (
@@ -68,12 +69,12 @@ function rows_from_sessions(sessions?: FormResponseSession[]) {
     sessions?.map((session, index) => {
       const row: any = {
         __gf_id: session.id,
-        __gf_local_index: 'TMP' +fmt_local_index(index),
+        __gf_local_index: "TMP" + fmt_local_index(index),
         __gf_created_at: session.created_at,
         __gf_customer_uuid: session.customer_id,
       }; // react-data-grid expects each row to have a unique 'id' property
       Object.entries(session.raw).forEach(([key, value]) => {
-        row[key] = JSON.stringify(value);
+        row[key] = { value };
       });
       return row;
     }) ?? []
@@ -187,12 +188,18 @@ export function GridEditor() {
   const has_selected_responses = selected_responses.size > 0;
   const keyword = is_display_sessions ? "session" : "response";
   const selectionDisabled = is_display_sessions; // TODO: session does not support selection
+  const readonly = is_display_sessions;
 
   return (
     <div className="flex flex-col h-full">
       <header className="h-14 w-full">
-        <div className="flex px-4 py-1 h-full items-center justify-between gap-4">
-          <div hidden={!has_selected_responses || selectionDisabled}>
+        <div className="flex px-4 py-1 h-full justify-between gap-4">
+          <div
+            className={clsx(
+              "flex items-center",
+              !has_selected_responses || selectionDisabled ? "hidden" : ""
+            )}
+          >
             <div className="flex gap-2 items-center">
               <span
                 className="text-sm font-normal text-neutral-500"
@@ -223,7 +230,18 @@ export function GridEditor() {
               </AlertDialog>
             </div>
           </div>
-          <div />
+          <div
+            className={clsx(
+              "flex items-center",
+              !is_display_sessions && "hidden"
+            )}
+          >
+            <h2 className="text-lg font-bold">Sessions</h2>
+            <span className="ms-2 text-xs text-muted-foreground">
+              Displaying Responses & In-Progress Sessions
+            </span>
+          </div>
+          <div className="flex-1" />
           <div className="flex gap-2 items-center">
             <Link href={`./analytics`}>
               <Badge variant={"outline"} className="cursor-pointer">
@@ -251,6 +269,7 @@ export function GridEditor() {
         <Grid
           columns={columns}
           rows={rows}
+          readonly={readonly}
           selectionDisabled={selectionDisabled}
           onAddNewFieldClick={openNewFieldPanel}
           onEditFieldClick={openEditFieldPanel}

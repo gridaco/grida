@@ -56,10 +56,11 @@ export function JsonEditCell({ column, row }: RenderEditCellProps<any>) {
                 }}
               />
             </BlockKeys>
-            <footer className="flex justify-between p-2 border-t border-neutral-200">
+            {/* TODO: add edit-save feature */}
+            {/* <footer className="flex justify-between p-2 border-t border-neutral-200">
               <button onClick={cancelChanges}>Cancel</button>
               <button>Save</button>
-            </footer>
+            </footer> */}
           </div>
         </Popover.Content>
       </Popover.PopoverPortal>
