@@ -176,17 +176,17 @@ function ConnectSupabase({ form_id }: { form_id: string }) {
     const parsing = parseSupabaseSchema({
       url,
       anonKey,
-    })
-      .then((res) => {
-        setSchema(res.sb_public_schema);
+    }).then((res) => {
+      setSchema(res.sb_public_schema);
+    });
+
+    toast
+      .promise(parsing, {
+        loading: "Parsing OpenAPI...",
+        success: "Valid Connection",
+        error: "Failed to connect to Supabase",
       })
       .catch(console.error);
-
-    toast.promise(parsing, {
-      loading: "Parsing OpenAPI...",
-      success: "Valid Connection",
-      error: "Failed to connect to Supabase",
-    });
   };
 
   const onRefreshSchemaClick = async () => {
