@@ -46,6 +46,7 @@ function rowKeyGetter(row: GFRow) {
 export function Grid({
   columns,
   rows,
+  selectionDisabled,
   onAddNewFieldClick,
   onEditFieldClick,
   onDeleteFieldClick,
@@ -56,6 +57,7 @@ export function Grid({
     type?: string;
   }[];
   rows: GFRow[];
+  selectionDisabled?: boolean;
   onAddNewFieldClick?: () => void;
   onEditFieldClick?: (id: string) => void;
   onDeleteFieldClick?: (id: string) => void;
@@ -110,7 +112,6 @@ export function Grid({
   };
 
   const formattedColumns = [
-    SelectColumn,
     __id_column,
     __created_at_column,
     __customer_uuid_column,
@@ -144,13 +145,19 @@ export function Grid({
     )
     .concat(__new_column);
 
+  if (!selectionDisabled) {
+    formattedColumns.unshift(SelectColumn);
+  }
+
   return (
     <DataGrid
       className="flex-grow border border-neutral-200 dark:border-neutral-900 select-none"
       rowKeyGetter={rowKeyGetter}
       columns={formattedColumns}
-      selectedRows={selected_responses}
-      onSelectedRowsChange={onSelectedRowsChange}
+      selectedRows={selectionDisabled ? undefined : selected_responses}
+      onSelectedRowsChange={
+        selectionDisabled ? undefined : onSelectedRowsChange
+      }
       rows={rows}
       rowHeight={44}
     />
