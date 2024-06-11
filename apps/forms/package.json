@@ -49,7 +49,6 @@
     "@react-email/components": "^0.0.18",
     "@react-three/drei": "^9.101.0",
     "@react-three/fiber": "^8.15.19",
-    "@readme/openapi-parser": "^2.6.0",
     "@supabase/auth-helpers-nextjs": "^0.9.0",
     "@supabase/postgrest-js": "^1.15.5",
     "@supabase/ssr": "^0.1.0",
@@ -119,6 +118,7 @@
     "zod": "^3.23.8"
   },
   "devDependencies": {
+    "@supabase/storage-js": "^2.5.5",
     "@tailwindcss/typography": "^0.5.10",
     "@types/css-tree": "^2.3.1",
     "@types/geojson": "^7946.0.14",

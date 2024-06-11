@@ -1373,6 +1373,7 @@ export type Database = {
             | Database["grida_forms"]["Enums"]["response_platform_powered_by"]
             | null
           raw: Json
+          session_id: string | null
           updated_at: string
           x_ipinfo: Json | null
           x_referer: string | null
@@ -1392,6 +1393,7 @@ export type Database = {
             | Database["grida_forms"]["Enums"]["response_platform_powered_by"]
             | null
           raw: Json
+          session_id?: string | null
           updated_at?: string
           x_ipinfo?: Json | null
           x_referer?: string | null
@@ -1411,6 +1413,7 @@ export type Database = {
             | Database["grida_forms"]["Enums"]["response_platform_powered_by"]
             | null
           raw?: Json
+          session_id?: string | null
           updated_at?: string
           x_ipinfo?: Json | null
           x_referer?: string | null
@@ -1429,6 +1432,13 @@ export type Database = {
             columns: ["form_id"]
             isOneToOne: false
             referencedRelation: "form"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "response_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "response_session"
             referencedColumns: ["id"]
           },
         ]
@@ -1503,34 +1513,55 @@ export type Database = {
       }
       response_session: {
         Row: {
+          browser: string | null
           created_at: string
           customer_id: string | null
           form_id: string
           geo: Json | null
           id: string
           ip: string | null
+          platform_powered_by:
+            | Database["grida_forms"]["Enums"]["response_platform_powered_by"]
+            | null
+          raw: Json | null
+          updated_at: string
+          visitor_id: string | null
           x_ipinfo: Json | null
           x_referer: string | null
           x_useragent: string | null
         }
         Insert: {
+          browser?: string | null
           created_at?: string
           customer_id?: string | null
           form_id: string
           geo?: Json | null
           id?: string
           ip?: string | null
+          platform_powered_by?:
+            | Database["grida_forms"]["Enums"]["response_platform_powered_by"]
+            | null
+          raw?: Json | null
+          updated_at?: string
+          visitor_id?: string | null
           x_ipinfo?: Json | null
           x_referer?: string | null
           x_useragent?: string | null
         }
         Update: {
+          browser?: string | null
           created_at?: string
           customer_id?: string | null
           form_id?: string
           geo?: Json | null
           id?: string
           ip?: string | null
+          platform_powered_by?:
+            | Database["grida_forms"]["Enums"]["response_platform_powered_by"]
+            | null
+          raw?: Json | null
+          updated_at?: string
+          visitor_id?: string | null
           x_ipinfo?: Json | null
           x_referer?: string | null
           x_useragent?: string | null
@@ -1550,6 +1581,13 @@ export type Database = {
             referencedRelation: "form"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "response_session_visitor_id_fkey"
+            columns: ["visitor_id"]
+            isOneToOne: true
+            referencedRelation: "visitor"
+            referencedColumns: ["id"]
+          },
         ]
       }
     }
@@ -1566,6 +1604,14 @@ export type Database = {
       rpc_check_max_responses: {
         Args: {
           form_id: string
+        }
+        Returns: undefined
+      }
+      set_response_session_field_value: {
+        Args: {
+          session_id: string
+          key: string
+          value: Json
         }
         Returns: undefined
       }
@@ -1740,6 +1786,7 @@ export type Database = {
           project_id: number
           uid: string
           uuid: string | null
+          visitor_id: string | null
         }
         Insert: {
           _fp_fingerprintjs_visitorid?: string | null
@@ -1752,6 +1799,7 @@ export type Database = {
           project_id: number
           uid?: string
           uuid?: string | null
+          visitor_id?: string | null
         }
         Update: {
           _fp_fingerprintjs_visitorid?: string | null
@@ -1764,8 +1812,16 @@ export type Database = {
           project_id?: number
           uid?: string
           uuid?: string | null
+          visitor_id?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "customer_visitor_id_fkey"
+            columns: ["visitor_id"]
+            isOneToOne: true
+            referencedRelation: "visitor"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "public_customer_project_id_fkey"
             columns: ["project_id"]
@@ -1889,6 +1945,41 @@ export type Database = {
             columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "organization"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      visitor: {
+        Row: {
+          created_at: string
+          fingerprint_visitor_id: string | null
+          id: string
+          ip: unknown | null
+          project_id: number
+          user_agent: string | null
+        }
+        Insert: {
+          created_at?: string
+          fingerprint_visitor_id?: string | null
+          id?: string
+          ip?: unknown | null
+          project_id: number
+          user_agent?: string | null
+        }
+        Update: {
+          created_at?: string
+          fingerprint_visitor_id?: string | null
+          id?: string
+          ip?: unknown | null
+          project_id?: number
+          user_agent?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "visitor_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "project"
             referencedColumns: ["id"]
           },
         ]

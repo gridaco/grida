@@ -126,7 +126,7 @@ export function InitialResponsesProvider({
   return <>{children}</>;
 }
 
-export function FormResponsesProvider({
+export function ResponseFeedProvider({
   children,
 }: React.PropsWithChildren<{}>) {
   const [state, dispatch] = useEditorState();
@@ -210,6 +210,56 @@ export function FormResponsesProvider({
       changes.unsubscribe();
     };
   }, [dispatch, fetchResponse, state.form_id, supabase]);
+
+  return <>{children}</>;
+}
+
+export function ResponseSessionFeedProvider({
+  children,
+}: React.PropsWithChildren<{}>) {
+  const [state, dispatch] = useEditorState();
+
+  const supabase = useMemo(() => createClientFormsClient(), []);
+
+  const fetchResponseSessions = useCallback(
+    async (limit: number = 100) => {
+      // fetch the responses
+      const { data, error } = await supabase
+        .from("response_session")
+        .select()
+        .eq("form_id", state.form_id)
+        .order("created_at")
+        .limit(limit);
+
+      if (error) {
+        throw new Error();
+      }
+
+      return data;
+    },
+    [supabase, state.form_id]
+  );
+
+  useEffect(() => {
+    if (!state.is_display_sessions) return;
+
+    const feed = fetchResponseSessions(state.responses_pagination_rows).then(
+      (data) => {
+        dispatch({
+          type: "editor/data/sessions/feed",
+          data: data as any,
+          reset: true,
+        });
+      }
+    );
+
+    toast.promise(feed, {
+      loading: "Fetching sessions...",
+      success: "Sessions fetched",
+      error: "Failed to fetch sessions",
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dispatch, state.is_display_sessions]);
 
   return <>{children}</>;
 }

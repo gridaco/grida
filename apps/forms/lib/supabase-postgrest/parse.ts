@@ -1,4 +1,3 @@
-import OpenAPIParser from "@readme/openapi-parser";
 import type { OpenAPI } from "openapi-types";
 
 type SupabaseOpenAPIDocument = OpenAPI.Document & {
@@ -47,33 +46,31 @@ export async function parseSupabaseSchema({
   sb_public_schema: { [key: string]: any };
   sb_project_url: string;
 }> {
-  return new Promise((resolve, reject) => {
+  return new Promise(async (resolve, reject) => {
     try {
       const u = new URL(url);
       const projectref = u.hostname.split(".")[0];
 
-      OpenAPIParser.parse(
-        build_supabase_openapi_url(url, anonKey),
-        (error, api) => {
-          if (error || !api) {
-            return reject(error);
-          }
+      const res = await fetch(build_supabase_openapi_url(url, anonKey));
+      const api = await res.json();
 
-          const apidoc = api as SupabaseOpenAPIDocument;
+      if (!res.ok || !api) {
+        return reject();
+      }
 
-          // validate
-          if ("definitions" in apidoc) {
-            return resolve({
-              sb_anon_key: anonKey,
-              sb_project_reference_id: projectref,
-              sb_public_schema: apidoc.definitions,
-              sb_project_url: url,
-            });
-          }
+      const apidoc = api as SupabaseOpenAPIDocument;
 
-          reject("Invalid URL");
-        }
-      );
+      // validate
+      if ("definitions" in apidoc) {
+        return resolve({
+          sb_anon_key: anonKey,
+          sb_project_reference_id: projectref,
+          sb_public_schema: apidoc.definitions,
+          sb_project_url: url,
+        });
+      }
+
+      reject("Invalid URL");
     } catch (e) {
       reject(e);
     }

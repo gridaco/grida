@@ -28,7 +28,10 @@ import {
 import { useEditorState } from "../editor";
 import toast from "react-hot-toast";
 import { MixIcon } from "@radix-ui/react-icons";
-import { JSONConditionExpression, JSONConditionOperator } from "@/types/logic";
+import type {
+  JSONConditionExpression,
+  JSONConditionOperator,
+} from "@/types/logic";
 
 /**
  * NOTE - the type string represents a id, not a scalar for this component, atm.

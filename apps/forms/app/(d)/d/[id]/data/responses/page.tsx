@@ -1,6 +1,7 @@
 import {
-  FormResponsesProvider,
+  ResponseFeedProvider,
   InitialResponsesProvider,
+  ResponseSessionFeedProvider,
 } from "@/scaffolds/editor";
 import { GridEditor } from "@/scaffolds/grid-editor";
 
@@ -8,9 +9,11 @@ export default function FormResponsesPage() {
   return (
     <>
       <InitialResponsesProvider>
-        <FormResponsesProvider>
-          <GridEditor />
-        </FormResponsesProvider>
+        <ResponseFeedProvider>
+          <ResponseSessionFeedProvider>
+            <GridEditor />
+          </ResponseSessionFeedProvider>
+        </ResponseFeedProvider>
       </InitialResponsesProvider>
     </>
   );

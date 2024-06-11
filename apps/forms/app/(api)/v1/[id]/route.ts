@@ -16,7 +16,6 @@ import {
   SYSTEM_GF_CUSTOMER_EMAIL_KEY,
   SYSTEM_GF_CUSTOMER_UUID_KEY,
   SYSTEM_GF_FINGERPRINT_VISITORID_KEY,
-  SYSTEM_GF_KEY_STARTS_WITH,
 } from "@/k/system";
 import { FormBlockTree } from "@/lib/forms/types";
 import { client } from "@/lib/supabase/server";
@@ -30,7 +29,6 @@ import {
   validate_max_access_by_customer,
   validate_max_access_by_form,
 } from "@/services/form/validate-max-access";
-import { is_uuid_v4 } from "@/utils/is";
 import i18next from "i18next";
 import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
@@ -43,6 +41,7 @@ import type {
 } from "@/types";
 import { Features } from "@/lib/features/scheduling";
 import { requesturl } from "@/services/form/session-storage";
+import { type GFKeys, parseGFKeys } from "@/lib/forms/gfkeys";
 
 export const revalidate = 0;
 
@@ -55,6 +54,7 @@ interface FormClientFetchResponse {
 
 export interface FormClientFetchResponseData {
   title: string;
+  session_id: string;
   method: FormMethod;
   tree: FormBlockTree<ClientRenderBlock[]>;
   blocks: ClientRenderBlock[];
@@ -137,9 +137,9 @@ export async function GET(
   const id = context.params.id;
   const searchParams = req.nextUrl.searchParams;
 
-  let system_keys: SystemKeys = {};
+  let system_keys: GFKeys = {};
   try {
-    system_keys = parse_system_keys(searchParams);
+    system_keys = parseGFKeys(searchParams);
   } catch (e) {
     console.error("error while parsing system keys:", e);
     // @ts-ignore
@@ -178,11 +178,17 @@ export async function GET(
 
   const { data: session, error: session_error } = await supabase
     .from("response_session")
-    .insert({
-      form_id: id,
-    })
+    .upsert(
+      {
+        id: system_keys.__gf_session ?? undefined,
+        form_id: id,
+      },
+      { onConflict: "id" }
+    )
     .select()
     .single();
+
+  console.log("session", system_keys.__gf_session, session);
 
   if (session_error || !session) {
     console.error("error while creating session", session_error);
@@ -429,9 +435,15 @@ export async function GET(
     }
   }
 
+  const default_values = merge(
+    seed, // seed from search params
+    session.raw ? idkeytonamekey(session.raw as {}, fields) : {} // data from ongoing session
+  );
+
   const is_open = !__is_force_closed && response.error === null;
   const payload: FormClientFetchResponseData = {
     title: title,
+    session_id: session.id,
     method,
     tree: renderer.tree(),
     blocks: renderer.blocks(),
@@ -446,7 +458,7 @@ export async function GET(
     stylesheet: (data.default_page as unknown as FormPage).stylesheet,
 
     // default value
-    default_values: seed,
+    default_values: default_values,
 
     // access
     is_open: is_open,
@@ -468,6 +480,24 @@ export async function GET(
   response.data = payload;
 
   return NextResponse.json(response);
+}
+
+function idkeytonamekey(
+  data: Record<string, any>,
+  fields: FormFieldDefinition[]
+) {
+  const result: Record<string, any> = {};
+  for (const key in data) {
+    const field = fields.find((f) => f.id === key);
+    if (field) {
+      result[field.name] = data[key];
+    }
+  }
+  return result;
+}
+
+function merge<A = any, B = any>(a: A, b: B): A & B {
+  return { ...a, ...b };
 }
 
 function parseSeedFromSearchParams({
@@ -493,54 +523,4 @@ function parseSeedFromSearchParams({
   );
 
   return { seed, missing_required_hidden_fields };
-}
-
-interface SystemKeys {
-  [SYSTEM_GF_FINGERPRINT_VISITORID_KEY]?: string;
-  [SYSTEM_GF_CUSTOMER_UUID_KEY]?: string;
-  [SYSTEM_GF_CUSTOMER_EMAIL_KEY]?: string;
-}
-
-function parse_system_keys(
-  data: URLSearchParams | Map<string, string>
-): SystemKeys {
-  const map: SystemKeys = {};
-  const keys = Array.from(data.keys());
-  const system_gf_keys: string[] = keys.filter((key) =>
-    key.startsWith(SYSTEM_GF_KEY_STARTS_WITH)
-  );
-
-  for (const key of system_gf_keys) {
-    const value = data.get(key) as string;
-    switch (key) {
-      case SYSTEM_GF_FINGERPRINT_VISITORID_KEY: {
-        if (value.length === 32) {
-          map[key] = value;
-          break;
-        } else {
-          throw VISITORID_FORMAT_MISMATCH;
-        }
-      }
-      case SYSTEM_GF_CUSTOMER_UUID_KEY: {
-        if (is_uuid_v4(value)) {
-          map[key] = value;
-          break;
-        } else {
-          console.error("uuid format mismatch", value);
-          throw UUID_FORMAT_MISMATCH;
-        }
-      }
-      case SYSTEM_GF_CUSTOMER_EMAIL_KEY: {
-        if (!value.includes("@")) {
-          // TODO: more strict email validation
-          map[key] = value;
-          break;
-        }
-      }
-      default:
-        break;
-    }
-  }
-
-  return map;
 }

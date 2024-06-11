@@ -1,4 +1,5 @@
 import {
+  SYSTEM_GF_SESSION_KEY,
   SYSTEM_X_GF_GEO_CITY_KEY,
   SYSTEM_X_GF_GEO_COUNTRY_KEY,
   SYSTEM_X_GF_GEO_LATITUDE_KEY,
@@ -10,10 +11,12 @@ import { qboolean, qval } from "@/utils/qs";
 import assert from "assert";
 import type { Geo, PlatformPoweredBy } from "@/types";
 import type { NextRequest } from "next/server";
+import { parseGFKeys } from "@/lib/forms/gfkeys";
 
 export interface SessionMeta {
   accept: "application/json" | "text/html";
   //
+  session?: string | null;
   ip: string | null;
   geo?: Geo | null;
   referer: string | null;
@@ -22,7 +25,10 @@ export interface SessionMeta {
   platform_powered_by: PlatformPoweredBy | null;
 }
 
-export function meta(req: NextRequest, data?: FormData) {
+export function meta(
+  req: NextRequest,
+  data?: FormData | URLSearchParams | Map<string, string>
+) {
   // console.log("ip", {
   //   ip: req.ip,
   //   "x-real-ip": req.headers.get("x-real-ip"),
@@ -31,7 +37,12 @@ export function meta(req: NextRequest, data?: FormData) {
 
   // console.log("geo", req.geo);
 
+  const system_keys = parseGFKeys(data);
+
+  const session = system_keys[SYSTEM_GF_SESSION_KEY];
+
   const meta: SessionMeta = {
+    session: session,
     accept: haccept(req.headers.get("accept")),
     useragent: req.headers.get("user-agent"),
     ip:

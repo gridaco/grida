@@ -7,6 +7,7 @@ export function unwrapFeildValue(
     obscure?: boolean;
   }
 ): string | number | boolean {
+  if (!value) return "N/A";
   try {
     const unwrapped = JSON.parse(value);
 
@@ -24,7 +25,14 @@ export function unwrapFeildValue(
         return unwrapped;
     }
   } catch (e) {
-    return "N/A";
+    switch (typeof value) {
+      case "object":
+      case "symbol":
+      case "undefined":
+        return "N/A";
+      default:
+        return value;
+    }
   }
 }
 

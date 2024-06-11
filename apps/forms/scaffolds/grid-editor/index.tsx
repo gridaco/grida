@@ -18,6 +18,7 @@ import Link from "next/link";
 import {
   CommitIcon,
   DownloadIcon,
+  GearIcon,
   PieChartIcon,
   TrashIcon,
 } from "@radix-ui/react-icons";
@@ -30,14 +31,69 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { FormResponseField } from "@/types";
+import { FormResponse, FormResponseField, FormResponseSession } from "@/types";
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Button } from "@/components/ui/button";
+import clsx from "clsx";
+
+function rows_from_responses(responses?: FormResponse[]) {
+  return (
+    responses?.map((response, index) => {
+      const row: any = {
+        __gf_id: response.id,
+        __gf_local_index: fmt_local_index(response.local_index),
+        __gf_created_at: response.created_at,
+        __gf_customer_uuid: response.customer_id,
+      }; // react-data-grid expects each row to have a unique 'id' property
+      response?.fields?.forEach((field: FormResponseField) => {
+        row[field.form_field_id] = {
+          type: field.type,
+          value: field.value,
+          storage_object_paths: field.storage_object_paths,
+        };
+      });
+      return row;
+    }) ?? []
+  );
+}
+
+function rows_from_sessions(sessions?: FormResponseSession[]) {
+  return (
+    sessions?.map((session, index) => {
+      const row: any = {
+        __gf_id: session.id,
+        __gf_local_index: "TMP" + fmt_local_index(index),
+        __gf_created_at: session.created_at,
+        __gf_customer_uuid: session.customer_id,
+      }; // react-data-grid expects each row to have a unique 'id' property
+      Object.entries(session.raw || {}).forEach(([key, value]) => {
+        row[key] = { value };
+      });
+      return row;
+    }) ?? []
+  );
+}
 
 export function GridEditor() {
   const [state, dispatch] = useEditorState();
   const [deleteFieldConfirmOpen, setDeleteFieldConfirmOpen] = useState(false);
 
-  const { form_id, focus_field_id, fields, responses, selected_responses } =
-    state;
+  const {
+    form_id,
+    focus_field_id,
+    fields,
+    responses,
+    sessions,
+    is_display_sessions,
+    selected_responses,
+  } = state;
   const supabase = createClientFormsClient();
 
   const columns = useMemo(
@@ -54,26 +110,10 @@ export function GridEditor() {
 
   // Transforming the responses into the format expected by react-data-grid
   const rows = useMemo(() => {
-    return (
-      responses?.map((response, index) => {
-        const row: any = {
-          __gf_id: response.id,
-          __gf_local_index: fmt_local_index(response.local_index),
-          __gf_created_at: response.created_at,
-          __gf_customer_uuid: response.customer_id,
-        }; // react-data-grid expects each row to have a unique 'id' property
-        response?.fields?.forEach((field: FormResponseField) => {
-          row[field.form_field_id] = {
-            type: field.type,
-            value: field.value,
-            storage_object_paths: field.storage_object_paths,
-          };
-        });
-        return row;
-      }) ?? []
-    );
+    if (is_display_sessions) return rows_from_sessions(sessions);
+    return rows_from_responses(responses);
     // TODO: need to update dpes with fields
-  }, [responses]);
+  }, [responses, sessions, is_display_sessions]);
 
   const openNewFieldPanel = useCallback(() => {
     dispatch({
@@ -146,24 +186,32 @@ export function GridEditor() {
   }, [supabase, selected_responses, dispatch]);
 
   const has_selected_responses = selected_responses.size > 0;
+  const keyword = is_display_sessions ? "session" : "response";
+  const selectionDisabled = is_display_sessions; // TODO: session does not support selection
+  const readonly = is_display_sessions;
 
   return (
     <div className="flex flex-col h-full">
       <header className="h-14 w-full">
-        <div className="flex px-4 py-1 h-full items-center justify-between gap-4">
-          <div hidden={!has_selected_responses}>
+        <div className="flex px-4 py-1 h-full justify-between gap-4">
+          <div
+            className={clsx(
+              "flex items-center",
+              !has_selected_responses || selectionDisabled ? "hidden" : ""
+            )}
+          >
             <div className="flex gap-2 items-center">
               <span
                 className="text-sm font-normal text-neutral-500"
                 aria-label="selected responses"
               >
-                {txt_n_responses(selected_responses.size)} selected
+                {txt_n_plural(selected_responses.size, keyword)} selected
               </span>
               <AlertDialog>
                 <AlertDialogTrigger asChild>
                   <button className="flex items-center gap-1 p-2 rounded-md border text-sm">
                     <TrashIcon />
-                    Delete {txt_n_responses(selected_responses.size)}
+                    Delete {txt_n_plural(selected_responses.size, keyword)}
                   </button>
                 </AlertDialogTrigger>
                 <AlertDialogContent>
@@ -182,8 +230,19 @@ export function GridEditor() {
               </AlertDialog>
             </div>
           </div>
-          <div />
-          <div className="flex gap-2">
+          <div
+            className={clsx(
+              "flex items-center",
+              !is_display_sessions && "hidden"
+            )}
+          >
+            <h2 className="text-lg font-bold">Sessions</h2>
+            <span className="ms-2 text-xs text-muted-foreground">
+              Displaying Responses & In-Progress Sessions
+            </span>
+          </div>
+          <div className="flex-1" />
+          <div className="flex gap-2 items-center">
             <Link href={`./analytics`}>
               <Badge variant={"outline"} className="cursor-pointer">
                 Realtime
@@ -196,6 +255,7 @@ export function GridEditor() {
                 <CommitIcon className="align-middle ms-2" />
               </Badge>
             </Link>
+            <GridViewSettings />
           </div>
         </div>
       </header>
@@ -209,6 +269,8 @@ export function GridEditor() {
         <Grid
           columns={columns}
           rows={rows}
+          readonly={readonly}
+          selectionDisabled={selectionDisabled}
           onAddNewFieldClick={openNewFieldPanel}
           onEditFieldClick={openEditFieldPanel}
           onDeleteFieldClick={(field_id) => {
@@ -220,22 +282,57 @@ export function GridEditor() {
           }}
         />
       </div>
-      <footer className="flex gap-4 min-h-9 overflow-hidden items-center px-2 w-full border-t dark:border-t-neutral-700">
-        <MaxRowsSelect />
-        <div>{txt_n_responses(state.responses?.length ?? 0)}</div>
+      <footer className="flex gap-4 min-h-9 overflow-hidden items-center px-2 py-2 w-full border-t dark:border-t-neutral-700 divide-x">
+        <div className="flex gap-2 items-center">
+          <MaxRowsSelect />
+          <span className="text-sm font-medium">
+            {txt_n_plural(rows.length, keyword)}
+          </span>
+        </div>
         <Link href={`/v1/${form_id}/export/csv`} download target="_blank">
-          <button className="flex items-center gap-1 p-2 bg-neutral-100 dark:bg-neutral-900 rounded">
+          <Button variant="ghost">
             Export to CSV
             <DownloadIcon />
-          </button>
+          </Button>
         </Link>
       </footer>
     </div>
   );
 }
 
-function txt_n_responses(n: number) {
-  return n === 1 ? "1 response" : `${n} responses`;
+function GridViewSettings() {
+  const [state, dispatch] = useEditorState();
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button className="flex items-center justify-center">
+          <Badge variant="outline" className="cursor-pointer">
+            <GearIcon />
+          </Badge>
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-56">
+        <DropdownMenuLabel>Grid Settings</DropdownMenuLabel>
+        <DropdownMenuSeparator />
+        <DropdownMenuCheckboxItem
+          checked={state.is_display_sessions}
+          onCheckedChange={(checked) => {
+            dispatch({
+              type: "editor/data/sessions/display",
+              display: checked,
+            });
+          }}
+        >
+          Show Sessions
+        </DropdownMenuCheckboxItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
+function txt_n_plural(n: number | undefined, singular: string) {
+  return (n || 0) > 1 ? `${n} ${singular}s` : `1 ${singular}`;
 }
 
 function MaxRowsSelect() {

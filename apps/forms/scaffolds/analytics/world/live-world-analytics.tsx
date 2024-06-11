@@ -1,7 +1,7 @@
 "use client";
 
 import { fmtnum } from "@/scaffolds/analytics/stats";
-import { FormResponsesProvider, useEditorState } from "@/scaffolds/editor";
+import { ResponseFeedProvider, useEditorState } from "@/scaffolds/editor";
 import { MapGL } from "@/theme/templates/formstart/default/mapgl";
 import React, { useEffect, useMemo, useState } from "react";
 import { MapProvider, useMap } from "react-map-gl";
@@ -65,9 +65,9 @@ export default function LiveWorldAnalytics() {
   return (
     <MapProvider>
       <DisableSwipeBack>
-        <FormResponsesProvider>
+        <ResponseFeedProvider>
           <View />
-        </FormResponsesProvider>
+        </ResponseFeedProvider>
       </DisableSwipeBack>
     </MapProvider>
   );

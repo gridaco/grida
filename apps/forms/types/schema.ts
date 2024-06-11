@@ -5,7 +5,7 @@ import type {
   FormInputType,
   FormsPageLanguage,
   Option,
-} from ".";
+} from "./types";
 import type { JSONBooleanValueDescriptor, JSONFieldReference } from "./logic";
 import { toArrayOf, MaybeArray } from "./utility";
 

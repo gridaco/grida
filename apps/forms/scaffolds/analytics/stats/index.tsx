@@ -26,6 +26,27 @@ interface LineChartData {
   count: number;
 }
 
+async function fetchSession(
+  q: {
+    project_id: number;
+    from: Date;
+    to: Date;
+  },
+  {
+    supabase,
+  }: {
+    supabase: SupabaseClient<Database, "grida_forms">;
+  }
+) {
+  return await supabase
+    .from("response_session")
+    .select("created_at, form:form_id!inner( project_id )")
+    .eq("form.project_id", q.project_id)
+    .gte("created_at", q.from.toISOString())
+    .lte("created_at", q.to.toISOString())
+    .order("created_at", { ascending: true });
+}
+
 async function fetchCustomers(
   q: {
     project_id: number;
@@ -83,6 +104,7 @@ export function ProjectStats({ project_id }: { project_id: number }) {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mt-4">
         <Customers project_id={project_id} from={from} to={to} />
         <Responses project_id={project_id} from={from} to={to} />
+        <Sessions project_id={project_id} from={from} to={to} />
       </div>
     </div>
   );
@@ -150,6 +172,78 @@ function RangeSelect({
 
 export function fmtnum(num: number) {
   return num.toString().replace(/(\d)(?=(\d{3})+(?!\d))/g, "$1,");
+}
+
+export function Sessions({
+  from,
+  to,
+  project_id,
+}: {
+  project_id: number;
+  from: Date;
+  to: Date;
+}) {
+  const supabase = createClientFormsClient();
+
+  const [data, setData] = useState<LineChartData[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      setLoading(true);
+      let { data, error } = await fetchSession(
+        {
+          project_id,
+          from: from,
+          to: to,
+        },
+        { supabase }
+      );
+
+      if (error) {
+        console.error(error);
+      } else {
+        // Process data to count new customers per day
+        setData(
+          serialize(data || [], {
+            from,
+            to,
+            dateKey: "created_at",
+            intervalMs: DAY_MS,
+          })
+        );
+      }
+      setLoading(false);
+    };
+
+    fetchData();
+  }, [project_id, from, to]);
+
+  return (
+    <Card className="overflow-hidden">
+      <CardHeader>
+        <h1 className="text-lg font-semibold">Sessions</h1>
+        {loading ? (
+          <NumberSkeleton />
+        ) : (
+          <div className="flex items-center space-x-2">
+            <span className="text-3xl font-bold">
+              {fmtnum(data.reduce((sum, item) => sum + item.count, 0))}
+            </span>
+          </div>
+        )}
+      </CardHeader>
+      <CardContent className="p-0 h-40 w-full">
+        {loading ? (
+          <div className="p-6">
+            <GraphSkeleton />
+          </div>
+        ) : (
+          <TimeSeriesChart data={data} chartType="line" />
+        )}
+      </CardContent>
+    </Card>
+  );
 }
 
 export function Customers({

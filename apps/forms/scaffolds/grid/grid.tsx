@@ -46,6 +46,8 @@ function rowKeyGetter(row: GFRow) {
 export function Grid({
   columns,
   rows,
+  selectionDisabled,
+  readonly,
   onAddNewFieldClick,
   onEditFieldClick,
   onDeleteFieldClick,
@@ -56,6 +58,8 @@ export function Grid({
     type?: string;
   }[];
   rows: GFRow[];
+  selectionDisabled?: boolean;
+  readonly?: boolean;
   onAddNewFieldClick?: () => void;
   onEditFieldClick?: (id: string) => void;
   onDeleteFieldClick?: (id: string) => void;
@@ -110,7 +114,6 @@ export function Grid({
   };
 
   const formattedColumns = [
-    SelectColumn,
     __id_column,
     __created_at_column,
     __customer_uuid_column,
@@ -138,19 +141,25 @@ export function Grid({
               />
             ),
             renderCell: FieldCell,
-            renderEditCell: FieldEditCell,
+            renderEditCell: !readonly ? FieldEditCell : undefined,
           }) as Column<any>
       )
     )
     .concat(__new_column);
+
+  if (!selectionDisabled) {
+    formattedColumns.unshift(SelectColumn);
+  }
 
   return (
     <DataGrid
       className="flex-grow border border-neutral-200 dark:border-neutral-900 select-none"
       rowKeyGetter={rowKeyGetter}
       columns={formattedColumns}
-      selectedRows={selected_responses}
-      onSelectedRowsChange={onSelectedRowsChange}
+      selectedRows={selectionDisabled ? undefined : selected_responses}
+      onSelectedRowsChange={
+        selectionDisabled ? undefined : onSelectedRowsChange
+      }
       rows={rows}
       rowHeight={44}
     />
@@ -323,8 +332,8 @@ function FieldCell({ column, row }: RenderCellProps<any>) {
       return (
         <div className="w-full h-full flex gap-2">
           {storage_object_paths?.map((path) => (
-            // eslint-disable-next-line @next/next/no-img-element
-            <picture className="p-1 flex items-center gap-2" key={path}>
+            <figure className="p-1 flex items-center gap-2" key={path}>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 key={path}
                 src={
@@ -335,8 +344,8 @@ function FieldCell({ column, row }: RenderCellProps<any>) {
                 alt={path}
                 className="h-full min-w-10 aspect-square rounded overflow-hidden object-cover bg-neutral-500"
               />
-              <caption>{path.split("/").pop()}</caption>
-            </picture>
+              <figcaption>{path.split("/").pop()}</figcaption>
+            </figure>
           ))}
         </div>
       );
@@ -367,59 +376,64 @@ function FieldEditCell(props: RenderEditCellProps<any>) {
 
   const { type, value, storage_object_paths } = data;
 
-  // FIXME: need investigation (case:FIELDVAL)
-  const unwrapped = JSON.parse(value);
-
-  switch (type as FormInputType) {
-    case "email":
-    case "password":
-    case "tel":
-    case "textarea":
-    case "url":
-    case "text":
-      return (
-        <input
-          ref={ref}
-          readOnly
-          className="w-full px-2 appearance-none outline-none border-none"
-          type="text"
-          defaultValue={unwrapped}
-        />
-      );
-    case "select":
-      return <JsonEditCell {...props} />;
-    case "color":
-      return <input readOnly disabled type="color" defaultValue={unwrapped} />;
-    case "checkbox":
-    case "file":
-    case "image": {
-      return (
-        <div>
-          {storage_object_paths?.map((path) => (
-            <a
-              key={path}
-              href={
-                supabase.storage
-                  .from(GRIDA_FORMS_RESPONSE_BUCKET)
-                  .getPublicUrl(path).data.publicUrl
-              }
-              target="_blank"
-              rel="noreferrer"
-              download
-            >
-              <Button variant="link" size="sm">
-                <DownloadIcon className="me-2 align-middle" />
-                Download {path.split("/").pop()}
-              </Button>
-            </a>
-          ))}
-        </div>
-      );
+  try {
+    // FIXME: need investigation (case:FIELDVAL)
+    const unwrapped = JSON.parse(value);
+    switch (type as FormInputType) {
+      case "email":
+      case "password":
+      case "tel":
+      case "textarea":
+      case "url":
+      case "text":
+        return (
+          <input
+            ref={ref}
+            readOnly
+            className="w-full px-2 appearance-none outline-none border-none"
+            type="text"
+            defaultValue={unwrapped}
+          />
+        );
+      case "select":
+        return <JsonEditCell {...props} />;
+      case "color":
+        return (
+          <input readOnly disabled type="color" defaultValue={unwrapped} />
+        );
+      case "checkbox":
+      case "file":
+      case "image": {
+        return (
+          <div>
+            {storage_object_paths?.map((path) => (
+              <a
+                key={path}
+                href={
+                  supabase.storage
+                    .from(GRIDA_FORMS_RESPONSE_BUCKET)
+                    .getPublicUrl(path).data.publicUrl
+                }
+                target="_blank"
+                rel="noreferrer"
+                download
+              >
+                <Button variant="link" size="sm">
+                  <DownloadIcon className="me-2 align-middle" />
+                  Download {path.split("/").pop()}
+                </Button>
+              </a>
+            ))}
+          </div>
+        );
+      }
+      // return (
+      //   <input readOnly disabled type="checkbox" defaultChecked={unwrapped} />
+      // );
+      default:
+        return <JsonEditCell {...props} />;
     }
-    // return (
-    //   <input readOnly disabled type="checkbox" defaultChecked={unwrapped} />
-    // );
-    default:
-      return <JsonEditCell {...props} />;
+  } catch (e) {
+    return <JsonEditCell {...props} />;
   }
 }

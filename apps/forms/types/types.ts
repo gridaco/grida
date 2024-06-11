@@ -252,6 +252,13 @@ export type FormBlockType =
 // not supported yet
 // | "layout"
 
+export interface FormResponseSession {
+  id: string;
+  created_at: string;
+  customer_id: string | null;
+  raw: Record<string, any> | null;
+}
+
 export interface FormResponse {
   id: string;
   local_id: string | null;

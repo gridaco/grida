@@ -21,7 +21,7 @@ import {
 } from "@/services/form/inventory";
 import assert from "assert";
 import { GridaCommerceClient } from "@/services/commerce";
-import { SubmissionHooks } from "./hooks";
+import { OnSubmitProcessors, OnSubmit } from "./hooks";
 import { Features } from "@/lib/features/scheduling";
 import { IpInfo, ipinfo } from "@/lib/ipinfo";
 import type { Geo } from "@/types";
@@ -35,10 +35,11 @@ import { FieldSupports } from "@/k/supported_field_types";
 import { UniqueFileNameGenerator } from "@/lib/forms/storage";
 import {
   GRIDA_FORMS_RESPONSE_BUCKET,
-  GRIDA_FORMS_RESPONSE_BUCKET_TMP_STARTS_WITH,
   GRIDA_FORMS_RESPONSE_BUCKET_UPLOAD_LIMIT,
 } from "@/k/env";
 import type { InsertDto } from "@/types/supabase-ext";
+import { parseGFKeys } from "@/lib/forms/gfkeys";
+import { parse_tmp_storage_object_path } from "@/services/form/session-storage";
 
 const HOST = process.env.HOST || "http://localhost:3000";
 
@@ -66,7 +67,7 @@ export async function GET(
     );
   }
   // #endregion
-  const data = req.nextUrl.searchParams as any;
+  const data = req.nextUrl.searchParams;
   return submit({
     data: data,
     form_id,
@@ -104,7 +105,7 @@ async function submit({
   meta,
 }: {
   form_id: string;
-  data: FormData;
+  data: FormData | URLSearchParams | Map<string, string>;
   meta: SessionMeta;
 }) {
   // console.log("form_id", form_id);
@@ -155,14 +156,14 @@ async function submit({
   const entries = data.entries();
 
   const __keys_all = Array.from(data.keys());
-  const system_gf_keys = __keys_all.filter((key) =>
-    key.startsWith(SYSTEM_GF_KEY_STARTS_WITH)
-  );
+
+  const system_keys = parseGFKeys(data);
+
   const nonsystem_keys = __keys_all.filter(
-    (key) => !system_gf_keys.includes(key)
+    (key) => !Object.keys(system_keys).includes(key)
   );
 
-  // console.log("submit#meta", meta);
+  console.log("submit#meta", meta);
 
   // pre meta processing
   let ipinfo_data: IpInfo | null = isObjectEmpty(meta.geo)
@@ -404,6 +405,7 @@ async function submit({
       .insert({
         raw: JSON.stringify(Object.fromEntries(entries)),
         form_id: form_id,
+        session_id: meta.session,
         browser: meta.browser,
         ip: meta.ip,
         customer_id: customer?.uid,
@@ -547,11 +549,12 @@ async function submit({
 
       // handle file uploads
       if (FieldSupports.file_alias(type)) {
-        const files = data.getAll(name);
+        const files = (data as FormData).getAll(name);
 
         console.log("submit/file", files);
 
         field_file_uploads[field.id] = process_response_field_files(files, {
+          session_id: meta.session || undefined,
           response_id: response_reference_obj!.id,
           field_id: field.id,
         });
@@ -649,9 +652,12 @@ async function submit({
   // region complete hooks
   // ==================================================
 
-  // hooks are not ready yet
+  // system hooks
+  if (meta.session) OnSubmit.clearsession(form_id, meta.session);
+
+  // notification hooks are not ready yet
   // try {
-  //   await hooks({ form_id });
+  //   await hook_notifications({ form_id });
   // } catch (e) {
   //   console.error("submit/err/hooks", e);
   // }
@@ -768,32 +774,40 @@ type SupabaseStorageUploadReturnType =
       error: any;
     };
 
+// region file upload
+
 /**
  * Handles the uploading of response files, ensuring that each file has a unique name within its path.
  *
  * @param pathparams - An object containing the response ID and field ID.
  * @param files - An array of FormDataEntryValue containing the files to be uploaded.
  * @returns A promise that resolves when all file uploads are complete.
+ *
+ * TODO: this should return a error info
  */
 async function process_response_field_files(
   files: FormDataEntryValue[],
   pathparams: {
+    session_id?: string;
     response_id: string;
     field_id: string;
   }
 ) {
   const uploads: Promise<SupabaseStorageUploadReturnType>[] = [];
-  const { response_id, field_id } = pathparams;
+  const { response_id, field_id, session_id } = pathparams;
   const basepath = `response/${response_id}/${field_id}/`;
 
   const uniqueFileNameGenerator = new UniqueFileNameGenerator();
 
   for (const file of files) {
-    if (file instanceof File && file.size > 0) {
-      if (file.size > GRIDA_FORMS_RESPONSE_BUCKET_UPLOAD_LIMIT) {
+    if (file instanceof File) {
+      if (
+        file.size == 0 ||
+        file.size > GRIDA_FORMS_RESPONSE_BUCKET_UPLOAD_LIMIT
+      ) {
         // silently ignore the file
         console.warn(
-          `File ${file.name} exceeds the maximum upload limit of ${GRIDA_FORMS_RESPONSE_BUCKET_UPLOAD_LIMIT} bytes.`
+          `File '${file.name}' (${file.size} bytes) size is 0 or exceeds the upload limit. (limit: ${GRIDA_FORMS_RESPONSE_BUCKET_UPLOAD_LIMIT} bytes)`
         );
       } else {
         const uniqueFileName = uniqueFileNameGenerator.name(file.name);
@@ -811,11 +825,19 @@ async function process_response_field_files(
 
       const pl = String(file);
 
+      if (!pl) continue; // empty string
+
       // when file input is uploaded and includes the path, the input will have a value of path[], which on formdata, it will be a comma separated string
       for (const tmppath of pl.split(",")) {
-        if (tmppath.startsWith(GRIDA_FORMS_RESPONSE_BUCKET_TMP_STARTS_WITH)) {
-          const name = tmppath.split("/").pop();
-          const targetpath = basepath + name;
+        try {
+          const _p = parse_tmp_storage_object_path(tmppath);
+
+          assert(
+            _p.session_id === session_id,
+            `session_id mismatch. expected: ${session_id}, got: ${_p.session_id}`
+          );
+
+          const targetpath = basepath + _p.name;
           const { error } = await client.storage
             .from(GRIDA_FORMS_RESPONSE_BUCKET)
             .move(tmppath, targetpath);
@@ -830,8 +852,10 @@ async function process_response_field_files(
               })
             );
           }
-        } else {
+        } catch (e) {
           console.log("submit/err/unknown-file", file);
+          console.error("submit/err/tmp-path-parse", e);
+          continue;
         }
       }
     }
@@ -840,6 +864,8 @@ async function process_response_field_files(
   // TODO: need to handle the case where file size exceeds the limit
   return Promise.all(uploads);
 }
+
+// endregion
 
 function error(
   code:
@@ -941,7 +967,7 @@ function error(
   //
 }
 
-async function hooks({ form_id }: { form_id: string }) {
+async function hook_notifications({ form_id }: { form_id: string }) {
   // FIXME: DEV MODE
 
   // [emails]
@@ -951,7 +977,7 @@ async function hooks({ form_id }: { form_id: string }) {
     email: "no-reply@cors.sh",
   };
 
-  await SubmissionHooks.send_email({
+  await OnSubmitProcessors.send_email({
     form_id: form_id,
     type: "formcomplete",
     from: {
@@ -964,7 +990,7 @@ async function hooks({ form_id }: { form_id: string }) {
 
   // [sms]
 
-  await SubmissionHooks.send_sms({
+  await OnSubmitProcessors.send_sms({
     form_id: form_id,
     type: "formcomplete",
     to: "...",
