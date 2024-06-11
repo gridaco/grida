@@ -2,6 +2,7 @@ import {
   SYSTEM_GF_KEY_STARTS_WITH,
   SYSTEM_GF_FINGERPRINT_VISITORID_KEY,
   SYSTEM_GF_CUSTOMER_UUID_KEY,
+  SYSTEM_GF_SESSION_KEY,
 } from "@/k/system";
 // TODO: need RLS?
 import { client, grida_commerce_client } from "@/lib/supabase/server";
@@ -39,6 +40,7 @@ import {
   GRIDA_FORMS_RESPONSE_BUCKET_UPLOAD_LIMIT,
 } from "@/k/env";
 import type { InsertDto } from "@/types/supabase-ext";
+import { parseGFKeys } from "@/lib/forms/gfkeys";
 
 const HOST = process.env.HOST || "http://localhost:3000";
 
@@ -155,12 +157,14 @@ async function submit({
   const entries = data.entries();
 
   const __keys_all = Array.from(data.keys());
-  const system_gf_keys = __keys_all.filter((key) =>
-    key.startsWith(SYSTEM_GF_KEY_STARTS_WITH)
-  );
+
+  const system_keys = parseGFKeys(data);
+
   const nonsystem_keys = __keys_all.filter(
-    (key) => !system_gf_keys.includes(key)
+    (key) => !Object.keys(system_keys).includes(key)
   );
+
+  const session = system_keys[SYSTEM_GF_SESSION_KEY];
 
   // console.log("submit#meta", meta);
 

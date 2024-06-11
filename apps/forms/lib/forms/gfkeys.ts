@@ -4,17 +4,19 @@ import {
   SYSTEM_GF_CUSTOMER_UUID_KEY,
   SYSTEM_GF_FINGERPRINT_VISITORID_KEY,
   SYSTEM_GF_KEY_STARTS_WITH,
+  SYSTEM_GF_SESSION_KEY,
 } from "@/k/system";
 import { is_uuid_v4 } from "@/utils/is";
 
-export interface GFKeys {
+export type GFKeys = {
+  [SYSTEM_GF_SESSION_KEY]?: string;
   [SYSTEM_GF_FINGERPRINT_VISITORID_KEY]?: string;
   [SYSTEM_GF_CUSTOMER_UUID_KEY]?: string;
   [SYSTEM_GF_CUSTOMER_EMAIL_KEY]?: string;
-}
+};
 
 export function parseGFKeys(
-  data: URLSearchParams | Map<string, string>
+  data: URLSearchParams | FormData | Map<string, string>
 ): GFKeys {
   const map: GFKeys = {};
   const keys = Array.from(data.keys());
@@ -25,6 +27,14 @@ export function parseGFKeys(
   for (const key of system_gf_keys) {
     const value = data.get(key) as string;
     switch (key) {
+      case SYSTEM_GF_SESSION_KEY: {
+        if (is_uuid_v4(value)) {
+          map[key] = value;
+          break;
+        } else {
+          throw UUID_FORMAT_MISMATCH;
+        }
+      }
       case SYSTEM_GF_FINGERPRINT_VISITORID_KEY: {
         if (value.length === 32) {
           map[key] = value;
@@ -38,7 +48,6 @@ export function parseGFKeys(
           map[key] = value;
           break;
         } else {
-          console.error("uuid format mismatch", value);
           throw UUID_FORMAT_MISMATCH;
         }
       }
@@ -50,6 +59,7 @@ export function parseGFKeys(
         }
       }
       default:
+        // unrecognized key - possible forgery, ignore.
         break;
     }
   }
