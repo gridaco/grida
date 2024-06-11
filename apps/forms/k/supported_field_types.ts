@@ -121,6 +121,17 @@ const html5_pattern_supported_field_types: FormInputType[] = [
   // "search", // not supported
 ];
 
+const html5_checkbox_alias_field_types: FormInputType[] = [
+  "checkbox",
+  "switch",
+];
+
+const html5_placeholder_not_supported_field_types: FormInputType[] = [
+  ...html5_file_alias_field_types,
+  ...html5_checkbox_alias_field_types,
+  "range",
+];
+
 const html5_autocomplete_supported_field_types: FormInputType[] =
   supported_field_types.filter(
     (type) =>
@@ -133,17 +144,6 @@ const html5_autocomplete_supported_field_types: FormInputType[] =
         "payment",
       ].includes(type)
   );
-
-const html5_checkbox_alias_field_types: FormInputType[] = [
-  "checkbox",
-  "switch",
-];
-
-const html5_placeholder_not_supported_field_types: FormInputType[] = [
-  ...html5_file_alias_field_types,
-  ...html5_checkbox_alias_field_types,
-  "range",
-];
 
 export namespace FieldSupports {
   export function options(type: FormInputType) {
