@@ -118,6 +118,7 @@
     "zod": "^3.23.8"
   },
   "devDependencies": {
+    "@supabase/storage-js": "^2.5.5",
     "@tailwindcss/typography": "^0.5.10",
     "@types/css-tree": "^2.3.1",
     "@types/geojson": "^7946.0.14",
