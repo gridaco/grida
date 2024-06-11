@@ -64,6 +64,7 @@ export function FormView(
       optimize_for_cjk?: boolean;
     };
     stylesheet?: any;
+    afterSubmit?: () => void;
   } & React.FormHTMLAttributes<HTMLFormElement>
 ) {
   return (
@@ -118,6 +119,7 @@ function Body({
   translation,
   options,
   stylesheet,
+  afterSubmit,
   ...formattributes
 }: {
   form_id: string;
@@ -133,6 +135,7 @@ function Body({
     optimize_for_cjk?: boolean;
   };
   stylesheet?: any;
+  afterSubmit?: () => void;
 } & React.FormHTMLAttributes<HTMLFormElement>) {
   const [state, dispatch] = useFormAgentState();
 
@@ -233,6 +236,7 @@ function Body({
               // submit
               // disable submit button
               dispatch({ type: "form/submit" });
+              afterSubmit?.();
             }
           }}
           className="p-4 h-full md:h-auto flex-1"

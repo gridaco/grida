@@ -52,7 +52,10 @@ function useFormResponseSession(form_id: string) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  return session;
+  return {
+    session,
+    clearSessionStorage: () => sessionStorage.removeItem(storekey),
+  };
 }
 
 export function Form({
@@ -64,8 +67,12 @@ export function Form({
   params: { [key: string]: string };
   translation: FormViewTranslation;
 }) {
-  const session = useFormResponseSession(form_id);
+  const { session, clearSessionStorage } = useFormResponseSession(form_id);
   const { result: fingerprint } = useFingerprint();
+
+  const onAfterSubmit = () => {
+    clearSessionStorage();
+  };
 
   const __fingerprint_ready = !!fingerprint?.visitorId;
   const __gf_customer_uuid = params[SYSTEM_GF_CUSTOMER_UUID_KEY];
@@ -174,6 +181,7 @@ export function Form({
         translation={translation}
         options={options}
         stylesheet={stylesheet}
+        afterSubmit={onAfterSubmit}
       />
       {background && (
         <FormPageBackground {...(background as FormPageBackgroundSchema)} />
