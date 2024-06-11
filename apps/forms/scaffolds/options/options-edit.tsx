@@ -29,9 +29,9 @@ import {
 } from "@dnd-kit/core";
 import { fmt_snake_case_to_human_text } from "@/utils/fmt";
 import { restrictToVerticalAxis } from "@dnd-kit/modifiers";
-import type { Option } from "@/types";
 import { Button } from "@/components/ui/button";
 import { MediaPicker } from "../mediapicker";
+import type { Option } from "@/types";
 
 export function OptionsEdit({
   options,

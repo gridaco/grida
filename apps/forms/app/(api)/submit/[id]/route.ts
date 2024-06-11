@@ -2,7 +2,6 @@ import {
   SYSTEM_GF_KEY_STARTS_WITH,
   SYSTEM_GF_FINGERPRINT_VISITORID_KEY,
   SYSTEM_GF_CUSTOMER_UUID_KEY,
-  SYSTEM_GF_SESSION_KEY,
 } from "@/k/system";
 // TODO: need RLS?
 import { client, grida_commerce_client } from "@/lib/supabase/server";
@@ -36,7 +35,6 @@ import { FieldSupports } from "@/k/supported_field_types";
 import { UniqueFileNameGenerator } from "@/lib/forms/storage";
 import {
   GRIDA_FORMS_RESPONSE_BUCKET,
-  GRIDA_FORMS_RESPONSE_BUCKET_TMP_FOLDER,
   GRIDA_FORMS_RESPONSE_BUCKET_UPLOAD_LIMIT,
 } from "@/k/env";
 import type { InsertDto } from "@/types/supabase-ext";
@@ -772,6 +770,8 @@ type SupabaseStorageUploadReturnType =
       error: any;
     };
 
+// region file upload
+
 /**
  * Handles the uploading of response files, ensuring that each file has a unique name within its path.
  *
@@ -853,6 +853,27 @@ async function process_response_field_files(
   // TODO: need to handle the case where file size exceeds the limit
   return Promise.all(uploads);
 }
+
+// async function cleanup_tmp_files(session_id: string) {
+//   //
+//   //
+//   const { data: list, error } = await client.storage
+//     .from(GRIDA_FORMS_RESPONSE_BUCKET)
+//     .list(`${GRIDA_FORMS_RESPONSE_BUCKET_TMP_FOLDER}/${session_id}`);
+
+//   if (error) {
+//     console.error("ERR:cleanup_tmp_files", error);
+//     return;
+//   }
+
+//   const filesToRemove = list?.map(
+//     (x) => `${GRIDA_FORMS_RESPONSE_BUCKET_TMP_FOLDER}/${session_id}/${x.name}`
+//   );
+
+//   await client.storage.from(bucket).remove(filesToRemove);
+// }
+
+// endregion
 
 function error(
   code:

@@ -4,12 +4,16 @@ import {
   createRouteHandlerClient,
 } from "@/lib/supabase/server";
 import { GridaCommerceClient } from "@/services/commerce";
-import { FormFieldDataSchema, FormInputType, PaymentFieldData } from "@/types";
-import { FormFieldUpsert } from "@/types/private/api";
 import assert from "assert";
 import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
 import { NextRequest, NextResponse } from "next/server";
+import type { FormFieldUpsert } from "@/types/private/api";
+import type {
+  FormFieldDataSchema,
+  FormInputType,
+  PaymentFieldData,
+} from "@/types";
 
 export const revalidate = 0;
 
