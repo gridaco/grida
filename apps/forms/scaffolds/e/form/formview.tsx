@@ -36,7 +36,7 @@ import { Button } from "@/components/ui/button";
 import { FormAgentProvider, useFormAgentState, init } from "@/lib/formstate";
 import { useLogical } from "./use-logical";
 import { FieldSupports } from "@/k/supported_field_types";
-import { useDebounce, usePrevious } from "@uidotdev/usehooks";
+import { SessionDataSyncProvider } from "./sync";
 
 const cls_button_submit =
   "text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:ring-blue-300 font-medium rounded-lg text-sm px-5 py-2.5 me-2 mb-2 dark:bg-blue-600 dark:hover:bg-blue-700 focus:outline-none dark:focus:ring-blue-800";
@@ -115,48 +115,6 @@ function Providers({
       </FormAgentProvider>
     </>
   );
-}
-
-function SessionDataSyncProvider({
-  session_id,
-  children,
-}: React.PropsWithChildren<{
-  session_id?: string;
-}>) {
-  const [state] = useFormAgentState();
-
-  const prevRecord = usePrevious(state.fields);
-  const debouncedRecord = useDebounce(state.fields, 1000);
-
-  useEffect(() => {
-    if (!session_id) return;
-    const syncToServer = async (
-      field_id: string,
-      value: string | boolean | undefined
-    ) => {
-      try {
-        // Replace with your API endpoint and method
-        fetch(`/v1/session/${session_id}/field/${field_id}`, {
-          method: "PATCH",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ value: value }),
-        });
-      } catch (error) {}
-    };
-
-    if (prevRecord) {
-      Object.keys(debouncedRecord).forEach((field) => {
-        if (debouncedRecord[field] !== prevRecord[field]) {
-          syncToServer(field, debouncedRecord[field].value);
-        }
-      });
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [debouncedRecord]);
-
-  return <>{children}</>;
 }
 
 function Body({

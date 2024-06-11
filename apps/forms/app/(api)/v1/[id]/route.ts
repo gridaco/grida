@@ -435,6 +435,11 @@ export async function GET(
     }
   }
 
+  const default_values = merge(
+    seed, // seed from search params
+    session.raw ? idkeytonamekey(session.raw as {}, fields) : {} // data from ongoing session
+  );
+
   const is_open = !__is_force_closed && response.error === null;
   const payload: FormClientFetchResponseData = {
     title: title,
@@ -453,7 +458,7 @@ export async function GET(
     stylesheet: (data.default_page as unknown as FormPage).stylesheet,
 
     // default value
-    default_values: seed,
+    default_values: default_values,
 
     // access
     is_open: is_open,
@@ -475,6 +480,24 @@ export async function GET(
   response.data = payload;
 
   return NextResponse.json(response);
+}
+
+function idkeytonamekey(
+  data: Record<string, any>,
+  fields: FormFieldDefinition[]
+) {
+  const result: Record<string, any> = {};
+  for (const key in data) {
+    const field = fields.find((f) => f.id === key);
+    if (field) {
+      result[field.name] = data[key];
+    }
+  }
+  return result;
+}
+
+function merge<A = any, B = any>(a: A, b: B): A & B {
+  return { ...a, ...b };
 }
 
 function parseSeedFromSearchParams({
