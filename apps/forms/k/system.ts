@@ -6,6 +6,9 @@ export const SYSTEM_GF_FINGERPRINT_VISITORID_KEY =
 export const SYSTEM_GF_CUSTOMER_UUID_KEY = "__gf_customer_uuid";
 export const SYSTEM_GF_CUSTOMER_EMAIL_KEY = "__gf_customer_email";
 
+// session
+export const SYSTEM_GF_SESSION_KEY = "__gf_session";
+
 // region x-headers
 export const SYSTEM_X_GF_KEY_STARTS_WITH = "x-gf-";
 // geo
