@@ -54,6 +54,7 @@ interface FormClientFetchResponse {
 
 export interface FormClientFetchResponseData {
   title: string;
+  session_id: string;
   method: FormMethod;
   tree: FormBlockTree<ClientRenderBlock[]>;
   blocks: ClientRenderBlock[];
@@ -431,6 +432,7 @@ export async function GET(
   const is_open = !__is_force_closed && response.error === null;
   const payload: FormClientFetchResponseData = {
     title: title,
+    session_id: session.id,
     method,
     tree: renderer.tree(),
     blocks: renderer.blocks(),

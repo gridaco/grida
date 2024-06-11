@@ -127,8 +127,9 @@ export function Form({
       <FormView
         method={method}
         encType={method === "post" ? "multipart/form-data" : undefined}
-        form_id={form_id}
         action={submit_action}
+        form_id={form_id}
+        session_id={data.session_id}
         title={title}
         fields={fields}
         defaultValues={default_values}

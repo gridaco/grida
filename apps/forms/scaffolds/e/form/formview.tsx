@@ -16,7 +16,10 @@ import {
 } from "@/components/tosspayments";
 import { StripePaymentFormFieldPreview } from "@/components/formfield/form-field-preview-payment-stripe";
 import { useFingerprint } from "@/scaffolds/fingerprint";
-import { SYSTEM_GF_FINGERPRINT_VISITORID_KEY } from "@/k/system";
+import {
+  SYSTEM_GF_FINGERPRINT_VISITORID_KEY,
+  SYSTEM_GF_SESSION_KEY,
+} from "@/k/system";
 import {
   ClientFieldRenderBlock,
   ClientFileUploadFieldRenderBlock,
@@ -49,6 +52,7 @@ export interface FormViewTranslation {
 export function FormView(
   props: {
     form_id: string;
+    session_id?: string;
     title: string;
     defaultValues?: { [key: string]: string };
     fields: FormFieldDefinition[];
@@ -105,6 +109,7 @@ function Providers({
 
 function Body({
   form_id,
+  session_id,
   title,
   blocks,
   fields,
@@ -116,6 +121,7 @@ function Body({
   ...formattributes
 }: {
   form_id: string;
+  session_id?: string;
   title: string;
   defaultValues?: { [key: string]: string };
   fields: FormFieldDefinition[];
@@ -231,7 +237,16 @@ function Body({
           }}
           className="p-4 h-full md:h-auto flex-1"
         >
-          <FingerprintField />
+          <div hidden>
+            <FingerprintField />
+            {session_id && (
+              <input
+                type="hidden"
+                name={SYSTEM_GF_SESSION_KEY}
+                value={session_id}
+              />
+            )}
+          </div>
           <GroupLayout>
             {tree.children.map((b) => (
               <BlockRenderer
