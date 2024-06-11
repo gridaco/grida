@@ -10,7 +10,7 @@ export async function sbconn_insert(
   connection: SupabaseConnection & {
     connection_table: SupabaseConnectionTable;
   },
-  formdata: FormData
+  formdata: FormData | URLSearchParams | Map<string, string>
 ) {
   // const
   const { id, connection_table, sb_project_url, sb_anon_key } = connection;
@@ -52,7 +52,7 @@ async function secureFetchServiceKey(connection_id: number) {
 }
 
 function parseFormData(
-  formdata: FormData,
+  formdata: FormData | URLSearchParams | Map<string, string>,
   schema: JSONSchemaType<Record<string, any>>
 ) {
   //

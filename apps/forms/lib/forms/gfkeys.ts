@@ -16,8 +16,12 @@ export type GFKeys = {
 };
 
 export function parseGFKeys(
-  data: URLSearchParams | FormData | Map<string, string>
+  data?: URLSearchParams | FormData | Map<string, string>
 ): GFKeys {
+  if (!data) {
+    return {};
+  }
+
   const map: GFKeys = {};
   const keys = Array.from(data.keys());
   const system_gf_keys: string[] = keys.filter((key) =>

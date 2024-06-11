@@ -36,11 +36,12 @@ import { FieldSupports } from "@/k/supported_field_types";
 import { UniqueFileNameGenerator } from "@/lib/forms/storage";
 import {
   GRIDA_FORMS_RESPONSE_BUCKET,
-  GRIDA_FORMS_RESPONSE_BUCKET_TMP_STARTS_WITH,
+  GRIDA_FORMS_RESPONSE_BUCKET_TMP_FOLDER,
   GRIDA_FORMS_RESPONSE_BUCKET_UPLOAD_LIMIT,
 } from "@/k/env";
 import type { InsertDto } from "@/types/supabase-ext";
 import { parseGFKeys } from "@/lib/forms/gfkeys";
+import { parse_tmp_storage_object_path } from "@/services/form/session-storage";
 
 const HOST = process.env.HOST || "http://localhost:3000";
 
@@ -68,7 +69,7 @@ export async function GET(
     );
   }
   // #endregion
-  const data = req.nextUrl.searchParams as any;
+  const data = req.nextUrl.searchParams;
   return submit({
     data: data,
     form_id,
@@ -106,7 +107,7 @@ async function submit({
   meta,
 }: {
   form_id: string;
-  data: FormData;
+  data: FormData | URLSearchParams | Map<string, string>;
   meta: SessionMeta;
 }) {
   // console.log("form_id", form_id);
@@ -163,8 +164,6 @@ async function submit({
   const nonsystem_keys = __keys_all.filter(
     (key) => !Object.keys(system_keys).includes(key)
   );
-
-  const session = system_keys[SYSTEM_GF_SESSION_KEY];
 
   // console.log("submit#meta", meta);
 
@@ -551,11 +550,12 @@ async function submit({
 
       // handle file uploads
       if (FieldSupports.file_alias(type)) {
-        const files = data.getAll(name);
+        const files = (data as FormData).getAll(name);
 
         console.log("submit/file", files);
 
         field_file_uploads[field.id] = process_response_field_files(files, {
+          session_id: meta.session || undefined,
           response_id: response_reference_obj!.id,
           field_id: field.id,
         });
@@ -782,22 +782,26 @@ type SupabaseStorageUploadReturnType =
 async function process_response_field_files(
   files: FormDataEntryValue[],
   pathparams: {
+    session_id?: string;
     response_id: string;
     field_id: string;
   }
 ) {
   const uploads: Promise<SupabaseStorageUploadReturnType>[] = [];
-  const { response_id, field_id } = pathparams;
+  const { response_id, field_id, session_id } = pathparams;
   const basepath = `response/${response_id}/${field_id}/`;
 
   const uniqueFileNameGenerator = new UniqueFileNameGenerator();
 
   for (const file of files) {
-    if (file instanceof File && file.size > 0) {
-      if (file.size > GRIDA_FORMS_RESPONSE_BUCKET_UPLOAD_LIMIT) {
+    if (file instanceof File) {
+      if (
+        file.size == 0 ||
+        file.size > GRIDA_FORMS_RESPONSE_BUCKET_UPLOAD_LIMIT
+      ) {
         // silently ignore the file
         console.warn(
-          `File ${file.name} exceeds the maximum upload limit of ${GRIDA_FORMS_RESPONSE_BUCKET_UPLOAD_LIMIT} bytes.`
+          `File '${file.name}' (${file.size} bytes) size is 0 or exceeds the upload limit. (limit: ${GRIDA_FORMS_RESPONSE_BUCKET_UPLOAD_LIMIT} bytes)`
         );
       } else {
         const uniqueFileName = uniqueFileNameGenerator.name(file.name);
@@ -817,9 +821,12 @@ async function process_response_field_files(
 
       // when file input is uploaded and includes the path, the input will have a value of path[], which on formdata, it will be a comma separated string
       for (const tmppath of pl.split(",")) {
-        if (tmppath.startsWith(GRIDA_FORMS_RESPONSE_BUCKET_TMP_STARTS_WITH)) {
-          const name = tmppath.split("/").pop();
-          const targetpath = basepath + name;
+        try {
+          const _p = parse_tmp_storage_object_path(tmppath);
+
+          assert(_p.session_id === session_id, "session_id mismatch");
+
+          const targetpath = basepath + _p.name;
           const { error } = await client.storage
             .from(GRIDA_FORMS_RESPONSE_BUCKET)
             .move(tmppath, targetpath);
@@ -834,8 +841,10 @@ async function process_response_field_files(
               })
             );
           }
-        } else {
+        } catch (e) {
           console.log("submit/err/unknown-file", file);
+          console.error("submit/err/tmp-path-parse", tmppath);
+          continue;
         }
       }
     }
