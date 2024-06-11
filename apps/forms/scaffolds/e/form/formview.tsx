@@ -2,7 +2,13 @@
 
 import FormField from "@/components/formfield";
 import { PoweredByGridaFooter } from "./powered-by-brand-footer";
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { FormBlockTree } from "@/lib/forms/types";
 import { FormFieldDefinition, PaymentFieldData } from "@/types";
 import dynamic from "next/dynamic";
@@ -30,6 +36,7 @@ import { Button } from "@/components/ui/button";
 import { FormAgentProvider, useFormAgentState, init } from "@/lib/formstate";
 import { useLogical } from "./use-logical";
 import { FieldSupports } from "@/k/supported_field_types";
+import { useDebounce, usePrevious } from "@uidotdev/usehooks";
 
 const cls_button_submit =
   "text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:ring-blue-300 font-medium rounded-lg text-sm px-5 py-2.5 me-2 mb-2 dark:bg-blue-600 dark:hover:bg-blue-700 focus:outline-none dark:focus:ring-blue-800";
@@ -74,12 +81,14 @@ export function FormView(
 
 function Providers({
   form_id,
+  session_id,
   fields,
   blocks,
   children,
   tree,
 }: React.PropsWithChildren<{
   form_id: string;
+  session_id?: string;
   fields: FormFieldDefinition[];
   blocks: ClientRenderBlock[];
   tree: FormBlockTree<ClientRenderBlock[]>;
@@ -98,12 +107,56 @@ function Providers({
   return (
     <>
       <FormAgentProvider initial={init({ fields, blocks, tree })}>
-        <TossPaymentsCheckoutProvider initial={checkoutSession}>
-          {children}
-        </TossPaymentsCheckoutProvider>
+        <SessionDataSyncProvider session_id={session_id}>
+          <TossPaymentsCheckoutProvider initial={checkoutSession}>
+            {children}
+          </TossPaymentsCheckoutProvider>
+        </SessionDataSyncProvider>
       </FormAgentProvider>
     </>
   );
+}
+
+function SessionDataSyncProvider({
+  session_id,
+  children,
+}: React.PropsWithChildren<{
+  session_id?: string;
+}>) {
+  const [state] = useFormAgentState();
+
+  const prevRecord = usePrevious(state.fields);
+  const debouncedRecord = useDebounce(state.fields, 1000);
+
+  useEffect(() => {
+    if (!session_id) return;
+    const syncToServer = async (
+      field_id: string,
+      value: string | boolean | undefined
+    ) => {
+      try {
+        // Replace with your API endpoint and method
+        fetch(`/v1/session/${session_id}/field/${field_id}`, {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ value: value }),
+        });
+      } catch (error) {}
+    };
+
+    if (prevRecord) {
+      Object.keys(debouncedRecord).forEach((field) => {
+        if (debouncedRecord[field] !== prevRecord[field]) {
+          syncToServer(field, debouncedRecord[field].value);
+        }
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [debouncedRecord]);
+
+  return <>{children}</>;
 }
 
 function Body({
