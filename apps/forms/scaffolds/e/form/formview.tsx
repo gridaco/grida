@@ -148,6 +148,9 @@ function Body({
 } & React.FormHTMLAttributes<HTMLFormElement>) {
   const [state, dispatch] = useFormAgentState();
 
+  // the default value shall be fixed on the first render (since the defaultValues can be changed due to session data sync. - which might cause data loss on the form field.)
+  const initialDefaultValues = useRef(defaultValues);
+
   const {
     is_submitting,
     sections,
@@ -209,8 +212,8 @@ function Body({
   };
 
   const getDefaultValue = useCallback(
-    (key: string) => defaultValues?.[key],
-    [defaultValues]
+    (key: string) => initialDefaultValues.current?.[key],
+    []
   );
 
   return (

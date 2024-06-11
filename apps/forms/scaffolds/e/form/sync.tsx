@@ -33,7 +33,6 @@ export function SessionDataSyncProvider({
     if (prevRecord) {
       Object.keys(debouncedRecord).forEach((field) => {
         if (debouncedRecord[field] !== prevRecord[field]) {
-          console.log("syncing", field, debouncedRecord[field].value);
           syncToServer(field, debouncedRecord[field].value);
         }
       });
