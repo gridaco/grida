@@ -256,7 +256,7 @@ export interface FormResponseSession {
   id: string;
   created_at: string;
   customer_id: string | null;
-  raw: Record<string, any>;
+  raw: Record<string, any> | null;
 }
 
 export interface FormResponse {

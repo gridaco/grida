@@ -73,7 +73,7 @@ function rows_from_sessions(sessions?: FormResponseSession[]) {
         __gf_created_at: session.created_at,
         __gf_customer_uuid: session.customer_id,
       }; // react-data-grid expects each row to have a unique 'id' property
-      Object.entries(session.raw).forEach(([key, value]) => {
+      Object.entries(session.raw || {}).forEach(([key, value]) => {
         row[key] = { value };
       });
       return row;
