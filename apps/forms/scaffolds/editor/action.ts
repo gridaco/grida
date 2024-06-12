@@ -4,7 +4,7 @@ import {
   FormFieldInit,
   FormResponse,
 } from "@/types";
-import type { EditorFlatFormBlock } from "./state";
+import type { EditorFlatFormBlock, FormEditorState } from "./state";
 import type { JSONConditionExpression } from "@/types/logic";
 import { LOCALTZ } from "./symbols";
 
@@ -31,14 +31,15 @@ export type BlocksEditorAction =
   | DeleteFieldAction
   | FeedResponseAction
   | OpenResponseEditAction
-  | ResponseFeedRowsAction
+  | DataGridRowsAction
   | FeedResponseSessionsAction
-  | ResponseSessionsDisplayAction
+  | DataGridTableAction
   | OpenCustomerEditAction
   | OpenBlockEditPanelAction
   | DataGridReorderColumnAction
   | DataGridDateFormatAction
-  | DataGridDateTZAction;
+  | DataGridDateTZAction
+  | DataGridFilterAction;
 
 export interface CreateNewPendingBlockAction {
   type: "blocks/new";
@@ -158,20 +159,10 @@ export interface DeleteResponseAction {
   id: string;
 }
 
-export interface ResponseFeedRowsAction {
-  type: "editor/responses/pagination/rows";
-  max: number;
-}
-
 export interface FeedResponseSessionsAction {
   type: "editor/data/sessions/feed";
   data: FormResponse[];
   reset?: boolean;
-}
-
-export interface ResponseSessionsDisplayAction {
-  type: "editor/data/sessions/display";
-  display: boolean;
 }
 
 export interface OpenResponseEditAction {
@@ -209,4 +200,19 @@ export interface DataGridDateFormatAction {
 export interface DataGridDateTZAction {
   type: "editor/data-grid/tz";
   tz: typeof LOCALTZ | string;
+}
+
+export interface DataGridTableAction {
+  type: "editor/data-grid/table";
+  table: "response" | "session";
+}
+
+export interface DataGridRowsAction {
+  type: "editor/data-grid/rows";
+  rows: number;
+}
+
+export interface DataGridFilterAction
+  extends Partial<FormEditorState["datagrid_filter"]> {
+  type: "editor/data-grid/filter";
 }

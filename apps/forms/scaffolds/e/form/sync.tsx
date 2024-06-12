@@ -11,7 +11,7 @@ export function SessionDataSyncProvider({
   const [state] = useFormAgentState();
 
   const prevRecord = usePrevious(state.fields);
-  const debouncedRecord = useDebounce(state.fields, 1000);
+  const debouncedRecord = useDebounce(state.fields, 300);
 
   useEffect(() => {
     if (!session_id) return;

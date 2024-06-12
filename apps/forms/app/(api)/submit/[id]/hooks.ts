@@ -2,13 +2,6 @@ import { Resend } from "resend";
 import { EmailTemplate } from "@/theme/templates-email/formcomplete/default";
 import { Bird } from "@/lib/bird";
 import { toArrayOf } from "@/types/utility";
-import { SupabaseStorageExt } from "@/lib/supabase/storage-ext";
-import { client } from "@/lib/supabase/server";
-import {
-  GRIDA_FORMS_RESPONSE_BUCKET,
-  GRIDA_FORMS_RESPONSE_BUCKET_TMP_FOLDER,
-} from "@/k/env";
-import assert from "assert";
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 const bird = new Bird(
@@ -118,19 +111,5 @@ export namespace OnSubmitProcessors {
           .catch(console.error);
       }
     }
-  }
-
-  export async function clean_tmp_files(session_id: string) {
-    assert(session_id, "session_id is required");
-
-    SupabaseStorageExt.rmdir(
-      client.storage,
-      GRIDA_FORMS_RESPONSE_BUCKET,
-      GRIDA_FORMS_RESPONSE_BUCKET_TMP_FOLDER + "/" + session_id
-    )
-      .then(() => {
-        console.log("cleaned tmp files for session", session_id);
-      })
-      .catch(console.error);
   }
 }

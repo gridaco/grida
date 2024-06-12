@@ -23,15 +23,16 @@ import {
   OpenEditFieldAction,
   OpenResponseEditAction,
   ResolvePendingBlockAction,
-  ResponseFeedRowsAction,
+  DataGridRowsAction,
   SaveFieldAction,
   SelectResponse,
-  ResponseSessionsDisplayAction,
+  DataGridTableAction,
   SortBlockAction,
   VideoBlockSrcAction,
   FeedResponseSessionsAction,
   DataGridDateFormatAction,
   DataGridDateTZAction,
+  DataGridFilterAction,
 } from "./action";
 import { arrayMove } from "@dnd-kit/sortable";
 import { blockstreeflat } from "@/lib/forms/tree";
@@ -479,10 +480,10 @@ export function reducer(
         draft.selected_responses = new_selected_responses;
       });
     }
-    case "editor/responses/pagination/rows": {
-      const { max } = <ResponseFeedRowsAction>action;
+    case "editor/data-grid/rows": {
+      const { rows: max } = <DataGridRowsAction>action;
       return produce(state, (draft) => {
-        draft.responses_pagination_rows = max;
+        draft.datagrid_rows = max;
       });
     }
     case "editor/response/feed": {
@@ -566,10 +567,13 @@ export function reducer(
         });
       });
     }
-    case "editor/data/sessions/display": {
-      const { display } = <ResponseSessionsDisplayAction>action;
+    case "editor/data-grid/table": {
+      const { table } = <DataGridTableAction>action;
       return produce(state, (draft) => {
-        draft.is_display_sessions = display;
+        draft.datagrid_table = table;
+
+        draft.realtime_sessions_enabled = table === "session";
+        draft.realtime_responses_enabled = table === "response";
       });
     }
     case "editor/customers/edit": {
@@ -607,6 +611,16 @@ export function reducer(
       const { tz } = <DataGridDateTZAction>action;
       return produce(state, (draft) => {
         draft.datetz = tz;
+      });
+    }
+    case "editor/data-grid/filter": {
+      const { type, ...pref } = <DataGridFilterAction>action;
+
+      return produce(state, (draft) => {
+        draft.datagrid_filter = {
+          ...draft.datagrid_filter,
+          ...pref,
+        };
       });
     }
     default:

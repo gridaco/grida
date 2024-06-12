@@ -39,7 +39,7 @@ export function CustomerEditPanel({
 
   return (
     <Sheet {...props}>
-      <SheetContent>
+      <SheetContent className="overflow-y-scroll">
         <SheetHeader>
           {/* <SheetTitle>{title}</SheetTitle> */}
           {/* <SheetDescription></SheetDescription> */}

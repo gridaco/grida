@@ -177,22 +177,9 @@ export async function GET(
     return notFound();
   }
 
-  const { data: session, error: session_error } = await supabase
-    .from("response_session")
-    .upsert(
-      {
-        id: system_keys.__gf_session ?? undefined,
-        form_id: id,
-      },
-      { onConflict: "id" }
-    )
-    .select()
-    .single();
-
-  if (session_error || !session) {
-    console.error("error while creating session", session_error);
-    return NextResponse.error();
-  }
+  // ==================================================
+  // bare setup
+  // ==================================================
 
   const {
     title,
@@ -222,6 +209,62 @@ export async function GET(
   });
 
   const page_blocks = (data.default_page as unknown as FormPage).blocks;
+
+  const __gf_fp_fingerprintjs_visitorid =
+    system_keys[SYSTEM_GF_FINGERPRINT_VISITORID_KEY];
+  const __gf_customer_uuid = system_keys[SYSTEM_GF_CUSTOMER_UUID_KEY];
+  const __gf_customer_email = system_keys[SYSTEM_GF_CUSTOMER_EMAIL_KEY];
+
+  // endregion
+
+  // ==================================================
+  // customer
+  // ==================================================
+
+  // fetch customer
+  let customer: { uid: string } | null = null;
+  if (
+    __gf_customer_uuid ||
+    __gf_fp_fingerprintjs_visitorid ||
+    __gf_customer_email
+  ) {
+    try {
+      customer = await upsert_customer_with({
+        project_id: __project_id,
+        uuid: __gf_customer_uuid,
+        hints: {
+          email: __gf_customer_email,
+          _fp_fingerprintjs_visitorid: __gf_fp_fingerprintjs_visitorid,
+        },
+      });
+    } catch (e) {
+      response.error = POSSIBLE_CUSTOMER_IDENTITY_FORGE;
+      console.error("error while upserting customer:", e);
+    }
+  }
+
+  // ==================================================
+  // session
+  // ==================================================
+  const { data: session, error: session_error } = await supabase
+    .from("response_session")
+    .upsert(
+      {
+        id: system_keys.__gf_session ?? undefined,
+        form_id: id,
+        customer_id: customer?.uid,
+      },
+      { onConflict: "id" }
+    )
+    .select()
+    .single();
+
+  if (session_error || !session) {
+    console.error("error while creating session", session_error);
+    return NextResponse.error();
+  }
+
+  // endregion
 
   // store connection - inventory data
   let options_inventory: FormFieldOptionsInventoryMap | null = null;
@@ -299,7 +342,24 @@ export async function GET(
   // validation execution order matters (does not affect this logic, but logic on the client side, since only one error is shown at a time.
   // to fix this we need to add support for multiple errors in the response, and client side should handle it.
 
-  // validation 1
+  // access validation - check max response limit
+  if (is_max_form_responses_in_total_enabled) {
+    const max_access_error = await validate_max_access_by_form({ form_id: id });
+    if (max_access_error) {
+      switch (max_access_error.code) {
+        case "FORM_RESPONSE_LIMIT_REACHED": {
+          response.error = max_access_error;
+          console.error("session/err", max_access_error);
+          break;
+        }
+        default: {
+          return NextResponse.error();
+        }
+      }
+    }
+  }
+
+  // data validation - check if all required hidden fields are provided.
   if (not_included_required_hidden_fields.length > 0) {
     // check if required hidden fields are not used.
     response.error = {
@@ -317,8 +377,7 @@ export async function GET(
     }
   }
 
-  // validation 2
-  // validate inventory TODO: (this can be moved above with some refactoring)
+  // connection status validation - grida_commerce inventory
   if (options_inventory) {
     // TODO: [might have been resolved] we need to pass inventory map witch only present in render_fields (for whole sold out validation)
     const render_options = renderer
@@ -340,50 +399,6 @@ export async function GET(
         err: inventory_access_error,
       });
       response.error = inventory_access_error;
-    }
-  }
-
-  const __gf_fp_fingerprintjs_visitorid =
-    system_keys[SYSTEM_GF_FINGERPRINT_VISITORID_KEY];
-  const __gf_customer_uuid = system_keys[SYSTEM_GF_CUSTOMER_UUID_KEY];
-  const __gf_customer_email = system_keys[SYSTEM_GF_CUSTOMER_EMAIL_KEY];
-
-  // fetch customer
-  let customer: { uid: string } | null = null;
-  if (
-    __gf_customer_uuid ||
-    __gf_fp_fingerprintjs_visitorid ||
-    __gf_customer_email
-  ) {
-    try {
-      customer = await upsert_customer_with({
-        project_id: __project_id,
-        uuid: __gf_customer_uuid,
-        hints: {
-          email: __gf_customer_email,
-          _fp_fingerprintjs_visitorid: __gf_fp_fingerprintjs_visitorid,
-        },
-      });
-    } catch (e) {
-      response.error = POSSIBLE_CUSTOMER_IDENTITY_FORGE;
-      console.error("error while upserting customer:", e);
-    }
-  }
-
-  // access validation - check max response limit
-  if (is_max_form_responses_in_total_enabled) {
-    const max_access_error = await validate_max_access_by_form({ form_id: id });
-    if (max_access_error) {
-      switch (max_access_error.code) {
-        case "FORM_RESPONSE_LIMIT_REACHED": {
-          response.error = max_access_error;
-          console.error("session/err", max_access_error);
-          break;
-        }
-        default: {
-          return NextResponse.error();
-        }
-      }
     }
   }
 
