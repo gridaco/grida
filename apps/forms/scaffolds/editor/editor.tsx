@@ -44,9 +44,9 @@ export function InitialResponsesProvider({
 }: React.PropsWithChildren<{}>) {
   const [state, dispatch] = useEditorState();
 
-  const supabase = useMemo(() => createClientFormsClient(), []);
+  const { form_id, datagrid_table, datagrid_rows } = state;
 
-  const initially_fetched_responses = React.useRef(false);
+  const supabase = useMemo(() => createClientFormsClient(), []);
 
   const fetchResponses = useCallback(
     async (limit: number = 100) => {
@@ -57,9 +57,9 @@ export function InitialResponsesProvider({
           `
             *,
             fields:response_field(*)
-        `
+          `
         )
-        .eq("form_id", state.form_id)
+        .eq("form_id", form_id)
         .order("local_index")
         .limit(limit);
 
@@ -69,19 +69,12 @@ export function InitialResponsesProvider({
 
       return data;
     },
-    [supabase, state.form_id]
+    [supabase, form_id]
   );
 
   useEffect(() => {
-    // initially fetch the responses
-    // this should be done only once
-    if (initially_fetched_responses.current) {
-      return;
-    }
-
-    initially_fetched_responses.current = true;
-
-    const feed = fetchResponses(state.datagrid_rows).then((data) => {
+    if (datagrid_table !== "response") return;
+    const feed = fetchResponses(datagrid_rows).then((data) => {
       dispatch({
         type: "editor/response/feed",
         data: data as any,
@@ -94,30 +87,7 @@ export function InitialResponsesProvider({
       success: "Responses fetched",
       error: "Failed to fetch responses",
     });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dispatch, fetchResponses]);
-
-  // TODO: this gets called twice after the first hook, initially.
-  useEffect(() => {
-    // re-fetch when the pagination rows change, only if the initial fetch is done
-    if (!initially_fetched_responses.current) {
-      return;
-    }
-
-    const feed = fetchResponses(state.datagrid_rows).then((data) => {
-      dispatch({
-        type: "editor/response/feed",
-        data: data as any,
-        reset: true,
-      });
-    });
-
-    toast.promise(feed, {
-      loading: "Fetching responses...",
-      success: "Responses fetched",
-      error: "Failed to fetch responses",
-    });
-  }, [dispatch, fetchResponses, state.datagrid_rows]);
+  }, [dispatch, fetchResponses, datagrid_rows, datagrid_table]);
 
   return <>{children}</>;
 }
@@ -126,6 +96,8 @@ export function ResponseFeedProvider({
   children,
 }: React.PropsWithChildren<{}>) {
   const [state, dispatch] = useEditorState();
+
+  const { form_id, realtime_responses_enabled } = state;
 
   const supabase = useMemo(() => createClientFormsClient(), []);
 
@@ -160,7 +132,7 @@ export function ResponseFeedProvider({
           event: "*",
           schema: "grida_forms",
           table: "response",
-          filter: `form_id=eq.${state.form_id}`,
+          filter: `form_id=eq.${form_id}`,
         },
         (payload) => {
           const { old, new: _new } = payload;
@@ -205,7 +177,7 @@ export function ResponseFeedProvider({
     return () => {
       changes.unsubscribe();
     };
-  }, [dispatch, fetchResponse, state.form_id, supabase]);
+  }, [dispatch, fetchResponse, form_id, supabase]);
 
   return <>{children}</>;
 }
@@ -215,6 +187,9 @@ export function ResponseSessionFeedProvider({
 }: React.PropsWithChildren<{}>) {
   const [state, dispatch] = useEditorState();
 
+  const { form_id, datagrid_table, datagrid_rows, realtime_sessions_enabled } =
+    state;
+
   const supabase = useMemo(() => createClientFormsClient(), []);
 
   const fetchResponseSessions = useCallback(
@@ -223,7 +198,7 @@ export function ResponseSessionFeedProvider({
       const { data, error } = await supabase
         .from("response_session")
         .select()
-        .eq("form_id", state.form_id)
+        .eq("form_id", form_id)
         .order("created_at")
         .limit(limit);
 
@@ -233,13 +208,13 @@ export function ResponseSessionFeedProvider({
 
       return data;
     },
-    [supabase, state.form_id]
+    [supabase, form_id]
   );
 
   useEffect(() => {
-    if (state.datagrid_table !== "session") return;
+    if (datagrid_table !== "session") return;
 
-    const feed = fetchResponseSessions(state.datagrid_rows).then((data) => {
+    const feed = fetchResponseSessions(datagrid_rows).then((data) => {
       dispatch({
         type: "editor/data/sessions/feed",
         data: data as any,
@@ -252,8 +227,7 @@ export function ResponseSessionFeedProvider({
       success: "Sessions fetched",
       error: "Failed to fetch sessions",
     });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dispatch, state.datagrid_table]);
+  }, [dispatch, datagrid_table, datagrid_rows, fetchResponseSessions]);
 
   return <>{children}</>;
 }
