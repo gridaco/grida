@@ -1,7 +1,64 @@
+"use client";
+
 import React, { useCallback, useEffect, useMemo } from "react";
 import { useEditorState } from "./provider";
 import toast from "react-hot-toast";
 import { createClientFormsClient } from "@/lib/supabase/client";
+import { RealtimePostgresChangesPayload } from "@supabase/supabase-js";
+
+type RealtimeTableChangeData = {
+  id: string;
+  [key: string]: any;
+};
+
+export const useSubscription = ({
+  table,
+  form_id,
+  onInsert,
+  onDelete,
+  enabled,
+}: {
+  table: "response" | "response_session";
+  form_id: string;
+  onInsert?: (data: RealtimeTableChangeData) => void;
+  onDelete?: (data: RealtimeTableChangeData | {}) => void;
+  enabled: boolean;
+}) => {
+  const supabase = useMemo(() => createClientFormsClient(), []);
+
+  useEffect(() => {
+    if (!enabled) return;
+
+    const changes = supabase
+      .channel("table-filter-changes")
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "grida_forms",
+          table,
+          filter: `form_id=eq.${form_id}`,
+        },
+        async (
+          payload: RealtimePostgresChangesPayload<RealtimeTableChangeData>
+        ) => {
+          const { old, new: _new } = payload;
+          const new_id = (_new as RealtimeTableChangeData).id;
+
+          if (new_id) {
+            onInsert?.(_new as RealtimeTableChangeData);
+          } else {
+            onDelete?.(old);
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      changes.unsubscribe();
+    };
+  }, [supabase, form_id, table, enabled, onInsert, onDelete]);
+};
 
 export function ResponseFeedProvider({
   children,
@@ -76,63 +133,41 @@ export function ResponseFeedProvider({
     });
   }, [dispatch, fetchResponses, datagrid_rows, datagrid_table]);
 
-  useEffect(() => {
-    if (!realtime_responses_enabled) return;
-
-    const changes = supabase
-      .channel("table-filter-changes")
-      .on(
-        "postgres_changes",
-        {
-          event: "*",
-          schema: "grida_forms",
-          table: "response",
-          filter: `form_id=eq.${form_id}`,
-        },
-        (payload) => {
-          const { old, new: _new } = payload;
-
-          // if deleted, the `new` is empty object `{}`
-          const new_id: string | undefined = (_new as { id: string }).id;
-
-          if (new_id) {
-            // fetch the response in detail (delay is required for nested fields to be available)
-            setTimeout(() => {
-              const newresponse = fetchResponse(
-                (_new as { id: string }).id
-              ).then((data) => {
-                console.log("new response", data);
-                dispatch({
-                  type: "editor/response/feed",
-                  data: [data as any],
-                });
-              });
-
-              toast.promise(
-                newresponse,
-                {
-                  loading: "Fetching new response...",
-                  success: "New response",
-                  error: "Failed to fetch new response",
-                },
-                { id: new_id }
-              );
-            }, 1000);
-          } else {
-            // deleted
+  useSubscription({
+    table: "response",
+    form_id,
+    onInsert: (data) => {
+      setTimeout(() => {
+        const newresponse = fetchResponse((data as { id: string }).id).then(
+          (data) => {
             dispatch({
-              type: "editor/response/delete",
-              id: (old as { id: string }).id,
+              type: "editor/response/feed",
+              data: [data as any],
             });
           }
-        }
-      )
-      .subscribe();
+        );
 
-    return () => {
-      changes.unsubscribe();
-    };
-  }, [dispatch, fetchResponse, form_id, supabase, realtime_responses_enabled]);
+        toast.promise(
+          newresponse,
+          {
+            loading: "Fetching new response...",
+            success: "New response",
+            error: "Failed to fetch new response",
+          },
+          { id: data.id }
+        );
+      }, 100);
+    },
+    onDelete: (data) => {
+      if ("id" in data) {
+        dispatch({
+          type: "editor/response/delete",
+          id: data.id,
+        });
+      }
+    },
+    enabled: realtime_responses_enabled,
+  });
 
   return <>{children}</>;
 }
@@ -183,6 +218,18 @@ export function ResponseSessionFeedProvider({
       error: "Failed to fetch sessions",
     });
   }, [dispatch, datagrid_table, datagrid_rows, fetchResponseSessions]);
+
+  useSubscription({
+    table: "response_session",
+    form_id,
+    onInsert: (data) => {
+      dispatch({
+        type: "editor/data/sessions/feed",
+        data: [data as any],
+      });
+    },
+    enabled: realtime_sessions_enabled,
+  });
 
   return <>{children}</>;
 }

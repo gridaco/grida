@@ -570,6 +570,9 @@ export function reducer(
       const { table } = <DataGridTableAction>action;
       return produce(state, (draft) => {
         draft.datagrid_table = table;
+
+        draft.realtime_sessions_enabled = table === "session";
+        draft.realtime_responses_enabled = table === "response";
       });
     }
     case "editor/customers/edit": {

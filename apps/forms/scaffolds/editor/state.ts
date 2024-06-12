@@ -82,8 +82,8 @@ export interface FormEditorState {
   sessions?: FormResponseSession[];
   datagrid_rows: number;
   datagrid_table: "response" | "session";
-  realtime_sessions_enabled?: boolean;
-  realtime_responses_enabled?: boolean;
+  realtime_sessions_enabled: boolean;
+  realtime_responses_enabled: boolean;
   is_field_edit_panel_open?: boolean;
   is_response_edit_panel_open?: boolean;
   is_customer_edit_panel_open?: boolean;
