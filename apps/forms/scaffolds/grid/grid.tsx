@@ -38,6 +38,8 @@ import { Button } from "@/components/ui/button";
 import { FormFieldTypeIcon } from "@/components/form-field-type-icon";
 import { createClientFormsClient } from "@/lib/supabase/client";
 import { GRIDA_FORMS_RESPONSE_BUCKET } from "@/k/env";
+import { toZonedTime } from "date-fns-tz";
+import { tztostr } from "../editor/symbols";
 
 function rowKeyGetter(row: GFRow) {
   return row.__gf_id;
@@ -267,18 +269,28 @@ function DefaultPropertyDateCell({ column, row }: RenderCellProps<any>) {
 
   const data = row[column.key];
 
-  state.dateformat;
+  const { dateformat, datetz } = state;
+
   if (!data) {
     return <></>;
   }
 
-  return <>{fmtdate(data, state.dateformat)}</>;
+  return <>{fmtdate(data, dateformat, tztostr(datetz))}</>;
 }
 
-function fmtdate(date: Date | string, format: "date" | "time" | "datetime") {
+function fmtdate(
+  date: Date | string,
+  format: "date" | "time" | "datetime",
+  tz?: string
+) {
   if (typeof date === "string") {
     date = new Date(date);
   }
+
+  if (tz) {
+    date = toZonedTime(date, tz);
+  }
+
   switch (format) {
     case "date":
       return date.toLocaleDateString();

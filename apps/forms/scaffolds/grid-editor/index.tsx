@@ -52,6 +52,9 @@ import {
 import { Button } from "@/components/ui/button";
 import clsx from "clsx";
 import type { GFRow } from "../grid/types";
+import { format, startOfDay, addSeconds } from "date-fns";
+import { format as formatTZ } from "date-fns-tz";
+import { LOCALTZ, tztostr } from "../editor/symbols";
 
 function rows_from_responses(responses?: FormResponse[]) {
   return (
@@ -326,6 +329,18 @@ function GridViewSettings() {
     []
   );
 
+  const tzoffset = useMemo(
+    () => s2Hmm(new Date().getTimezoneOffset() * -1 * 60),
+    []
+  );
+  const tzoffset_scheduling_tz = useMemo(
+    () =>
+      state.scheduling_tz
+        ? formatTZ(new Date(), "XXX", { timeZone: state.scheduling_tz })
+        : undefined,
+    [state.scheduling_tz]
+  );
+
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -379,15 +394,53 @@ function GridViewSettings() {
           </DropdownMenuRadioItem>
         </DropdownMenuRadioGroup>
         <DropdownMenuSeparator />
-        {/* <DropdownMenuRadioGroup defaultValue="a">
-          <DropdownMenuRadioItem value="a">Local Time</DropdownMenuRadioItem>
-          <DropdownMenuRadioItem value="a">
-            Form Timezone Setting
+        <DropdownMenuRadioGroup
+          value={tztostr(state.datetz, "browser")}
+          onValueChange={(tz) => {
+            switch (tz) {
+              case "browser":
+                dispatch({ type: "editor/data-grid/tz", tz: LOCALTZ });
+                return;
+              default:
+                dispatch({ type: "editor/data-grid/tz", tz: tz });
+                return;
+            }
+          }}
+        >
+          <DropdownMenuRadioItem value="browser">
+            Local Time
+            <DropdownMenuShortcut>(UTC+{tzoffset})</DropdownMenuShortcut>
           </DropdownMenuRadioItem>
-        </DropdownMenuRadioGroup> */}
+          <DropdownMenuRadioItem value="UTC">
+            UTC Time
+            <DropdownMenuShortcut>(UTC+0)</DropdownMenuShortcut>
+          </DropdownMenuRadioItem>
+          <DropdownMenuRadioItem
+            disabled={!state.scheduling_tz}
+            value={state.scheduling_tz ?? "N/A"}
+          >
+            Scheduling Time
+            {state.scheduling_tz && (
+              <DropdownMenuShortcut className="text-end">
+                {state.scheduling_tz}
+                <br />
+                (UTC{tzoffset_scheduling_tz})
+              </DropdownMenuShortcut>
+            )}
+          </DropdownMenuRadioItem>
+        </DropdownMenuRadioGroup>
       </DropdownMenuContent>
     </DropdownMenu>
   );
+}
+
+function s2Hmm(s: number) {
+  const now = new Date();
+  const startOfDayDate = startOfDay(now);
+  const updatedDate = addSeconds(startOfDayDate, s);
+  const formattedTime = format(updatedDate, "H:mm");
+
+  return formattedTime;
 }
 
 function txt_n_plural(n: number | undefined, singular: string) {

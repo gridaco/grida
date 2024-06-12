@@ -5,7 +5,8 @@ import {
   FormResponse,
 } from "@/types";
 import type { EditorFlatFormBlock } from "./state";
-import { JSONConditionExpression } from "@/types/logic";
+import type { JSONConditionExpression } from "@/types/logic";
+import { LOCALTZ } from "./symbols";
 
 export type BlocksEditorAction =
   | CreateNewPendingBlockAction
@@ -36,7 +37,8 @@ export type BlocksEditorAction =
   | OpenCustomerEditAction
   | OpenBlockEditPanelAction
   | DataGridReorderColumnAction
-  | DataGridDateFormatAction;
+  | DataGridDateFormatAction
+  | DataGridDateTZAction;
 
 export interface CreateNewPendingBlockAction {
   type: "blocks/new";
@@ -202,4 +204,9 @@ export interface DataGridReorderColumnAction {
 export interface DataGridDateFormatAction {
   type: "editor/data-grid/dateformat";
   dateformat: "datetime" | "date" | "time";
+}
+
+export interface DataGridDateTZAction {
+  type: "editor/data-grid/tz";
+  tz: typeof LOCALTZ | string;
 }
