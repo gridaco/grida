@@ -32,6 +32,7 @@ import type {
   JSONConditionExpression,
   JSONConditionOperator,
 } from "@/types/logic";
+import { KeyIcon } from "lucide-react";
 
 /**
  * NOTE - the type string represents a id, not a scalar for this component, atm.
@@ -60,6 +61,8 @@ export function BlockEditPanel({
     useState<ConditionExpression>();
 
   // console.log("block?.v_hidden", block?.v_hidden);
+
+  const _v_hidden_set = !!block?.v_hidden;
 
   const onSave = (e: any) => {
     const [l, op, r] = condition_v_hidden || [];
@@ -101,12 +104,18 @@ export function BlockEditPanel({
     >
       <SheetContent>
         <SheetHeader>
-          <SheetTitle>
-            {"Block"} {block?.id}
-          </SheetTitle>
-          <SheetDescription>{/* // */}</SheetDescription>
+          <SheetTitle>{"Block"}</SheetTitle>
+          <SheetDescription>
+            <span className="font-mono text-xs text-muted-foreground">
+              <KeyIcon className="inline w-4 h-4 me-2 align-middle" />
+              {block?.id}
+            </span>
+          </SheetDescription>
         </SheetHeader>
         <div className="grid gap-4 py-4">
+          <hr />
+          <Label>Logics</Label>
+          <hr />
           <div className="grid grid-cols-4 items-center gap-4">
             <Label htmlFor="phone" className="text-right">
               Hidden
@@ -116,7 +125,11 @@ export function BlockEditPanel({
                 <div>
                   <Button variant="outline">
                     <MixIcon className="me-2" />
-                    Set conditional logic
+                    {_v_hidden_set ? (
+                      <>Update conditional logic</>
+                    ) : (
+                      <>Set conditional logic</>
+                    )}
                   </Button>
                 </div>
               </PopoverTrigger>
@@ -129,6 +142,17 @@ export function BlockEditPanel({
                 />
               </PopoverContent>
             </Popover>
+            <div className="col-span-3">
+              <div className="text-muted-foreground text-sm">
+                {_v_hidden_set ? (
+                  <code>
+                    <pre>{JSON.stringify(block?.v_hidden, null, 2)}</pre>
+                  </code>
+                ) : (
+                  "No condition set"
+                )}
+              </div>
+            </div>
           </div>
           {/* Add logic testing tool */}
           <hr />
