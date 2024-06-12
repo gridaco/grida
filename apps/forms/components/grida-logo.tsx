@@ -1,10 +1,18 @@
-export const GridaLogo = ({ size = 24 }: { size?: number }) => {
+import clsx from "clsx";
+
+export const GridaLogo = ({
+  size = 24,
+  className,
+}: {
+  size?: number;
+  className?: string;
+}) => {
   return (
     <svg
       width={size}
       height={size}
       viewBox="0 0 42 42"
-      className="fill-black dark:fill-white"
+      className={clsx("fill-black dark:fill-white", className)}
       xmlns="http://www.w3.org/2000/svg"
     >
       <path
