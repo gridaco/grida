@@ -11,7 +11,7 @@ type RealtimeTableChangeData = {
   [key: string]: any;
 };
 
-export const useSubscription = ({
+const useSubscription = ({
   table,
   form_id,
   onInsert,
@@ -29,8 +29,10 @@ export const useSubscription = ({
   useEffect(() => {
     if (!enabled) return;
 
+    const channelname = `table-filter-changes-${table}-${form_id}`;
+
     const changes = supabase
-      .channel("table-filter-changes")
+      .channel(channelname)
       .on(
         "postgres_changes",
         {

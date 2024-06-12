@@ -67,15 +67,15 @@ const DisableSwipeBack = ({ children }: React.PropsWithChildren<{}>) => {
 
 export default function LiveWorldAnalytics() {
   return (
-    <MapProvider>
-      <DisableSwipeBack>
-        <ResponseFeedProvider>
-          <ResponseSessionFeedProvider forceEnableRealtime>
+    <DisableSwipeBack>
+      <ResponseFeedProvider>
+        <ResponseSessionFeedProvider forceEnableRealtime>
+          <MapProvider>
             <View />
-          </ResponseSessionFeedProvider>
-        </ResponseFeedProvider>
-      </DisableSwipeBack>
-    </MapProvider>
+          </MapProvider>
+        </ResponseSessionFeedProvider>
+      </ResponseFeedProvider>
+    </DisableSwipeBack>
   );
 }
 
