@@ -55,7 +55,7 @@ export function initialFormEditorState(init: FormEditorInit): FormEditorState {
     datetz: LOCALTZ,
     datagrid_table: "response",
     datagrid_filter: {
-      empty_data_hidden: false,
+      empty_data_hidden: true,
     },
     realtime_responses_enabled: true,
     realtime_sessions_enabled: false,
