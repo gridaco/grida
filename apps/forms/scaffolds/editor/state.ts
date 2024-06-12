@@ -53,6 +53,7 @@ export function initialFormEditorState(init: FormEditorInit): FormEditorState {
     responses_pagination_rows: 100,
     dateformat: "datetime",
     datetz: LOCALTZ,
+    datagrid_table: "response",
   };
 }
 
@@ -78,7 +79,7 @@ export interface FormEditorState {
   // TODO: add effect on this value to update responses
   responses_pagination_rows: number;
   sessions?: FormResponseSession[];
-  is_display_sessions?: boolean;
+  datagrid_table: "response" | "session";
   is_field_edit_panel_open?: boolean;
   is_response_edit_panel_open?: boolean;
   is_customer_edit_panel_open?: boolean;

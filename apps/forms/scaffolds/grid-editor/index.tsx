@@ -111,7 +111,7 @@ export function GridEditor() {
     fields,
     responses,
     sessions,
-    is_display_sessions,
+    datagrid_table,
     selected_responses,
   } = state;
   const supabase = createClientFormsClient();
@@ -130,11 +130,14 @@ export function GridEditor() {
 
   // Transforming the responses into the format expected by react-data-grid
   const rows = useMemo(() => {
-    if (is_display_sessions)
-      return sessions ? rows_from_sessions(sessions, state.fields) : [];
-    return rows_from_responses(responses);
+    switch (datagrid_table) {
+      case "response":
+        return rows_from_responses(responses);
+      case "session":
+        return sessions ? rows_from_sessions(sessions, state.fields) : [];
+    }
     // TODO: need to update dpes with fields
-  }, [is_display_sessions, sessions, state.fields, responses]);
+  }, [datagrid_table, sessions, state.fields, responses]);
 
   const openNewFieldPanel = useCallback(() => {
     dispatch({
@@ -207,9 +210,9 @@ export function GridEditor() {
   }, [supabase, selected_responses, dispatch]);
 
   const has_selected_responses = selected_responses.size > 0;
-  const keyword = is_display_sessions ? "session" : "response";
-  const selectionDisabled = is_display_sessions; // TODO: session does not support selection
-  const readonly = is_display_sessions;
+  const keyword = table_keyword(datagrid_table);
+  const selectionDisabled = datagrid_table !== "response"; // TODO: session does not support selection
+  const readonly = datagrid_table !== "response";
 
   return (
     <div className="flex flex-col h-full">
@@ -254,7 +257,7 @@ export function GridEditor() {
           <div
             className={clsx(
               "flex items-center",
-              !is_display_sessions && "hidden"
+              datagrid_table !== "session" && "hidden"
             )}
           >
             <h2 className="text-lg font-bold">Sessions</h2>
@@ -321,6 +324,15 @@ export function GridEditor() {
   );
 }
 
+function table_keyword(table: "response" | "session") {
+  switch (table) {
+    case "response":
+      return "response";
+    case "session":
+      return "session";
+  }
+}
+
 function GridViewSettings() {
   const [state, dispatch] = useEditorState();
 
@@ -354,11 +366,11 @@ function GridViewSettings() {
         <DropdownMenuLabel>Grid Settings</DropdownMenuLabel>
         <DropdownMenuSeparator />
         <DropdownMenuCheckboxItem
-          checked={state.is_display_sessions}
+          checked={state.datagrid_table === "session"}
           onCheckedChange={(checked) => {
             dispatch({
-              type: "editor/data/sessions/display",
-              display: checked,
+              type: "editor/data-grid/table",
+              table: checked ? "session" : "response",
             });
           }}
         >

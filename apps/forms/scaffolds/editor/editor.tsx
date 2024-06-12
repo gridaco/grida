@@ -241,7 +241,7 @@ export function ResponseSessionFeedProvider({
   );
 
   useEffect(() => {
-    if (!state.is_display_sessions) return;
+    if (state.datagrid_table !== "session") return;
 
     const feed = fetchResponseSessions(state.responses_pagination_rows).then(
       (data) => {
@@ -259,7 +259,7 @@ export function ResponseSessionFeedProvider({
       error: "Failed to fetch sessions",
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dispatch, state.is_display_sessions]);
+  }, [dispatch, state.datagrid_table]);
 
   return <>{children}</>;
 }

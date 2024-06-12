@@ -26,7 +26,7 @@ import {
   ResponseFeedRowsAction,
   SaveFieldAction,
   SelectResponse,
-  ResponseSessionsDisplayAction,
+  DataGridTableAction,
   SortBlockAction,
   VideoBlockSrcAction,
   FeedResponseSessionsAction,
@@ -566,10 +566,10 @@ export function reducer(
         });
       });
     }
-    case "editor/data/sessions/display": {
-      const { display } = <ResponseSessionsDisplayAction>action;
+    case "editor/data-grid/table": {
+      const { table } = <DataGridTableAction>action;
       return produce(state, (draft) => {
-        draft.is_display_sessions = display;
+        draft.datagrid_table = table;
       });
     }
     case "editor/customers/edit": {

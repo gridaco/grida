@@ -33,7 +33,7 @@ export type BlocksEditorAction =
   | OpenResponseEditAction
   | ResponseFeedRowsAction
   | FeedResponseSessionsAction
-  | ResponseSessionsDisplayAction
+  | DataGridTableAction
   | OpenCustomerEditAction
   | OpenBlockEditPanelAction
   | DataGridReorderColumnAction
@@ -169,11 +169,6 @@ export interface FeedResponseSessionsAction {
   reset?: boolean;
 }
 
-export interface ResponseSessionsDisplayAction {
-  type: "editor/data/sessions/display";
-  display: boolean;
-}
-
 export interface OpenResponseEditAction {
   type: "editor/responses/edit";
   response_id?: string;
@@ -209,4 +204,9 @@ export interface DataGridDateFormatAction {
 export interface DataGridDateTZAction {
   type: "editor/data-grid/tz";
   tz: typeof LOCALTZ | string;
+}
+
+export interface DataGridTableAction {
+  type: "editor/data-grid/table";
+  table: "response" | "session";
 }
