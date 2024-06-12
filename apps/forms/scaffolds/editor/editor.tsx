@@ -39,12 +39,13 @@ export function FormEditorProvider({
   );
 }
 
-export function InitialResponsesProvider({
+export function ResponseFeedProvider({
   children,
 }: React.PropsWithChildren<{}>) {
   const [state, dispatch] = useEditorState();
 
-  const { form_id, datagrid_table, datagrid_rows } = state;
+  const { form_id, datagrid_table, datagrid_rows, realtime_responses_enabled } =
+    state;
 
   const supabase = useMemo(() => createClientFormsClient(), []);
 
@@ -72,35 +73,6 @@ export function InitialResponsesProvider({
     [supabase, form_id]
   );
 
-  useEffect(() => {
-    if (datagrid_table !== "response") return;
-    const feed = fetchResponses(datagrid_rows).then((data) => {
-      dispatch({
-        type: "editor/response/feed",
-        data: data as any,
-        reset: true,
-      });
-    });
-
-    toast.promise(feed, {
-      loading: "Fetching responses...",
-      success: "Responses fetched",
-      error: "Failed to fetch responses",
-    });
-  }, [dispatch, fetchResponses, datagrid_rows, datagrid_table]);
-
-  return <>{children}</>;
-}
-
-export function ResponseFeedProvider({
-  children,
-}: React.PropsWithChildren<{}>) {
-  const [state, dispatch] = useEditorState();
-
-  const { form_id, realtime_responses_enabled } = state;
-
-  const supabase = useMemo(() => createClientFormsClient(), []);
-
   const fetchResponse = useCallback(
     async (id: string) => {
       const { data, error } = await supabase
@@ -124,6 +96,25 @@ export function ResponseFeedProvider({
   );
 
   useEffect(() => {
+    if (datagrid_table !== "response") return;
+    const feed = fetchResponses(datagrid_rows).then((data) => {
+      dispatch({
+        type: "editor/response/feed",
+        data: data as any,
+        reset: true,
+      });
+    });
+
+    toast.promise(feed, {
+      loading: "Fetching responses...",
+      success: "Responses fetched",
+      error: "Failed to fetch responses",
+    });
+  }, [dispatch, fetchResponses, datagrid_rows, datagrid_table]);
+
+  useEffect(() => {
+    if (!realtime_responses_enabled) return;
+
     const changes = supabase
       .channel("table-filter-changes")
       .on(
@@ -177,7 +168,7 @@ export function ResponseFeedProvider({
     return () => {
       changes.unsubscribe();
     };
-  }, [dispatch, fetchResponse, form_id, supabase]);
+  }, [dispatch, fetchResponse, form_id, supabase, realtime_responses_enabled]);
 
   return <>{children}</>;
 }
