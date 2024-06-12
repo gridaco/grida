@@ -365,17 +365,22 @@ function GridViewSettings() {
       <DropdownMenuContent align="end" className="min-w-56">
         <DropdownMenuLabel>Grid Settings</DropdownMenuLabel>
         <DropdownMenuSeparator />
-        <DropdownMenuCheckboxItem
-          checked={state.datagrid_table === "session"}
-          onCheckedChange={(checked) => {
+        <DropdownMenuRadioGroup
+          value={state.datagrid_table}
+          onValueChange={(value) => {
             dispatch({
               type: "editor/data-grid/table",
-              table: checked ? "session" : "response",
+              table: value as any,
             });
           }}
         >
-          Display Sessions
-        </DropdownMenuCheckboxItem>
+          <DropdownMenuRadioItem value="response">
+            Responses
+          </DropdownMenuRadioItem>
+          <DropdownMenuRadioItem value="session">
+            Sessions
+          </DropdownMenuRadioItem>
+        </DropdownMenuRadioGroup>
         <DropdownMenuSeparator />
         <DropdownMenuRadioGroup
           value={state.dateformat}
