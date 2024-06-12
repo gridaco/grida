@@ -43,7 +43,10 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuLabel,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
   DropdownMenuSeparator,
+  DropdownMenuShortcut,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
@@ -318,6 +321,11 @@ export function GridEditor() {
 function GridViewSettings() {
   const [state, dispatch] = useEditorState();
 
+  const starwarsday = useMemo(
+    () => new Date(new Date().getFullYear(), 4, 4),
+    []
+  );
+
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -327,7 +335,7 @@ function GridViewSettings() {
           </Badge>
         </button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-56">
+      <DropdownMenuContent align="end" className="min-w-56">
         <DropdownMenuLabel>Grid Settings</DropdownMenuLabel>
         <DropdownMenuSeparator />
         <DropdownMenuCheckboxItem
@@ -341,6 +349,42 @@ function GridViewSettings() {
         >
           Display Sessions
         </DropdownMenuCheckboxItem>
+        <DropdownMenuSeparator />
+        <DropdownMenuRadioGroup
+          value={state.dateformat}
+          onValueChange={(value) => {
+            dispatch({
+              type: "editor/data-grid/dateformat",
+              dateformat: value as any,
+            });
+          }}
+        >
+          <DropdownMenuRadioItem value="date">
+            Date
+            <DropdownMenuShortcut>
+              {starwarsday.toLocaleDateString()}
+            </DropdownMenuShortcut>
+          </DropdownMenuRadioItem>
+          <DropdownMenuRadioItem value="time">
+            Time
+            <DropdownMenuShortcut>
+              {starwarsday.toLocaleTimeString()}
+            </DropdownMenuShortcut>
+          </DropdownMenuRadioItem>
+          <DropdownMenuRadioItem value="datetime">
+            Date Time
+            <DropdownMenuShortcut className="ms-4">
+              {starwarsday.toLocaleString()}
+            </DropdownMenuShortcut>
+          </DropdownMenuRadioItem>
+        </DropdownMenuRadioGroup>
+        <DropdownMenuSeparator />
+        {/* <DropdownMenuRadioGroup defaultValue="a">
+          <DropdownMenuRadioItem value="a">Local Time</DropdownMenuRadioItem>
+          <DropdownMenuRadioItem value="a">
+            Form Timezone Setting
+          </DropdownMenuRadioItem>
+        </DropdownMenuRadioGroup> */}
       </DropdownMenuContent>
     </DropdownMenu>
   );

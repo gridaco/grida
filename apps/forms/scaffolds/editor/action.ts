@@ -35,7 +35,8 @@ export type BlocksEditorAction =
   | ResponseSessionsDisplayAction
   | OpenCustomerEditAction
   | OpenBlockEditPanelAction
-  | DataGridReorderColumnAction;
+  | DataGridReorderColumnAction
+  | DataGridDateFormatAction;
 
 export interface CreateNewPendingBlockAction {
   type: "blocks/new";
@@ -196,4 +197,9 @@ export interface DataGridReorderColumnAction {
   type: "editor/data-grid/column/reorder";
   a: string;
   b: string;
+}
+
+export interface DataGridDateFormatAction {
+  type: "editor/data-grid/dateformat";
+  dateformat: "datetime" | "date" | "time";
 }

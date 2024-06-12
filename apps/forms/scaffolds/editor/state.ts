@@ -48,6 +48,7 @@ export function initialFormEditorState(init: FormEditorInit): FormEditorState {
     selected_responses: new Set(),
     available_field_ids: block_available_field_ids,
     responses_pagination_rows: 100,
+    dateformat: "datetime",
   };
 }
 
@@ -78,6 +79,7 @@ export interface FormEditorState {
   is_customer_edit_panel_open?: boolean;
   is_block_edit_panel_open?: boolean;
   field_edit_panel_refresh_key?: number;
+  dateformat: "date" | "time" | "datetime";
 }
 
 export interface EditorFlatFormBlock<T = FormBlockType> extends FormBlock<T> {
