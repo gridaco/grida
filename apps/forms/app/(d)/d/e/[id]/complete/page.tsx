@@ -76,7 +76,7 @@ export default async function SubmitCompletePage({
   const { local_index, local_id } = response;
 
   return (
-    <main className="flex items-center justify-center min-h-screen">
+    <main className="container mx-auto flex items-center justify-center w-screen h-screen">
       <EndingPageWithContext
         template_id={ending_page_template_id}
         overrides={ending_page_i18n_overrides as {} as EndingPageI18nOverrides}
