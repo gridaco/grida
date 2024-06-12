@@ -36,6 +36,7 @@ export function unwrapFeildValue(
   }
 }
 
-function parseCheckboxValue(value: "on" | "off"): boolean {
+function parseCheckboxValue(value: "on" | "off" | boolean): boolean {
+  if (typeof value === "boolean") return value;
   return value === "on";
 }

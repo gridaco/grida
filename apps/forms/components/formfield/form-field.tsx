@@ -668,8 +668,8 @@ function SelectWithSafeValue({
     // @ts-ignore
     <Select
       {...(inputProps as React.ComponentProps<"select">)}
-      // this is required, unless, the real native select won't change and fail to validate accurately
-      key={value}
+      // !!this is required, otherwise, the real native select won't change and fail to validate accurately
+      /*!!*/ key={value} /*!!*/
       value={value || undefined}
       // TODO: same reason, disabling defaultValue to display placeholder
       defaultValue={(defaultValue || undefined) as string}

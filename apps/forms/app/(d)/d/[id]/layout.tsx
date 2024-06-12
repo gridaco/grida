@@ -115,6 +115,7 @@ export default async function RootLayout({
                 },
                 form_id: id,
                 form_title: data.title,
+                scheduling_tz: data.scheduling_tz || undefined,
                 page_id: data.default_form_page_id,
                 fields: data.fields,
                 blocks: data.default_page

@@ -31,24 +31,37 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { FormResponse, FormResponseField, FormResponseSession } from "@/types";
+import {
+  FormFieldDefinition,
+  FormResponse,
+  FormResponseField,
+  FormResponseSession,
+} from "@/types";
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
   DropdownMenuContent,
+  DropdownMenuItem,
   DropdownMenuLabel,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
   DropdownMenuSeparator,
+  DropdownMenuShortcut,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import clsx from "clsx";
+import type { GFRow } from "../grid/types";
+import { format, startOfDay, addSeconds } from "date-fns";
+import { format as formatTZ } from "date-fns-tz";
+import { LOCALTZ, tztostr } from "../editor/symbols";
 
 function rows_from_responses(responses?: FormResponse[]) {
   return (
     responses?.map((response, index) => {
-      const row: any = {
+      const row: GFRow = {
         __gf_id: response.id,
-        __gf_local_index: fmt_local_index(response.local_index),
+        __gf_display_id: fmt_local_index(response.local_index),
         __gf_created_at: response.created_at,
         __gf_customer_uuid: response.customer_id,
       }; // react-data-grid expects each row to have a unique 'id' property
@@ -64,17 +77,24 @@ function rows_from_responses(responses?: FormResponse[]) {
   );
 }
 
-function rows_from_sessions(sessions?: FormResponseSession[]) {
+function rows_from_sessions(
+  sessions: FormResponseSession[],
+  fields: FormFieldDefinition[]
+) {
   return (
     sessions?.map((session, index) => {
-      const row: any = {
+      const row: GFRow = {
         __gf_id: session.id,
-        __gf_local_index: "TMP" + fmt_local_index(index),
+        __gf_display_id: session.id,
         __gf_created_at: session.created_at,
         __gf_customer_uuid: session.customer_id,
       }; // react-data-grid expects each row to have a unique 'id' property
       Object.entries(session.raw || {}).forEach(([key, value]) => {
-        row[key] = { value };
+        const field = fields.find((f) => f.id === key);
+        row[key] = {
+          value: value,
+          type: field?.type,
+        };
       });
       return row;
     }) ?? []
@@ -110,10 +130,11 @@ export function GridEditor() {
 
   // Transforming the responses into the format expected by react-data-grid
   const rows = useMemo(() => {
-    if (is_display_sessions) return rows_from_sessions(sessions);
+    if (is_display_sessions)
+      return sessions ? rows_from_sessions(sessions, state.fields) : [];
     return rows_from_responses(responses);
     // TODO: need to update dpes with fields
-  }, [responses, sessions, is_display_sessions]);
+  }, [is_display_sessions, sessions, state.fields, responses]);
 
   const openNewFieldPanel = useCallback(() => {
     dispatch({
@@ -303,6 +324,23 @@ export function GridEditor() {
 function GridViewSettings() {
   const [state, dispatch] = useEditorState();
 
+  const starwarsday = useMemo(
+    () => new Date(new Date().getFullYear(), 4, 4),
+    []
+  );
+
+  const tzoffset = useMemo(
+    () => s2Hmm(new Date().getTimezoneOffset() * -1 * 60),
+    []
+  );
+  const tzoffset_scheduling_tz = useMemo(
+    () =>
+      state.scheduling_tz
+        ? formatTZ(new Date(), "XXX", { timeZone: state.scheduling_tz })
+        : undefined,
+    [state.scheduling_tz]
+  );
+
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -312,7 +350,7 @@ function GridViewSettings() {
           </Badge>
         </button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-56">
+      <DropdownMenuContent align="end" className="min-w-56">
         <DropdownMenuLabel>Grid Settings</DropdownMenuLabel>
         <DropdownMenuSeparator />
         <DropdownMenuCheckboxItem
@@ -324,11 +362,85 @@ function GridViewSettings() {
             });
           }}
         >
-          Show Sessions
+          Display Sessions
         </DropdownMenuCheckboxItem>
+        <DropdownMenuSeparator />
+        <DropdownMenuRadioGroup
+          value={state.dateformat}
+          onValueChange={(value) => {
+            dispatch({
+              type: "editor/data-grid/dateformat",
+              dateformat: value as any,
+            });
+          }}
+        >
+          <DropdownMenuRadioItem value="date">
+            Date
+            <DropdownMenuShortcut>
+              {starwarsday.toLocaleDateString()}
+            </DropdownMenuShortcut>
+          </DropdownMenuRadioItem>
+          <DropdownMenuRadioItem value="time">
+            Time
+            <DropdownMenuShortcut>
+              {starwarsday.toLocaleTimeString()}
+            </DropdownMenuShortcut>
+          </DropdownMenuRadioItem>
+          <DropdownMenuRadioItem value="datetime">
+            Date Time
+            <DropdownMenuShortcut className="ms-4">
+              {starwarsday.toLocaleString()}
+            </DropdownMenuShortcut>
+          </DropdownMenuRadioItem>
+        </DropdownMenuRadioGroup>
+        <DropdownMenuSeparator />
+        <DropdownMenuRadioGroup
+          value={tztostr(state.datetz, "browser")}
+          onValueChange={(tz) => {
+            switch (tz) {
+              case "browser":
+                dispatch({ type: "editor/data-grid/tz", tz: LOCALTZ });
+                return;
+              default:
+                dispatch({ type: "editor/data-grid/tz", tz: tz });
+                return;
+            }
+          }}
+        >
+          <DropdownMenuRadioItem value="browser">
+            Local Time
+            <DropdownMenuShortcut>(UTC+{tzoffset})</DropdownMenuShortcut>
+          </DropdownMenuRadioItem>
+          <DropdownMenuRadioItem value="UTC">
+            UTC Time
+            <DropdownMenuShortcut>(UTC+0)</DropdownMenuShortcut>
+          </DropdownMenuRadioItem>
+          <DropdownMenuRadioItem
+            disabled={!state.scheduling_tz}
+            value={state.scheduling_tz ?? "N/A"}
+          >
+            Scheduling Time
+            {state.scheduling_tz && (
+              <DropdownMenuShortcut className="text-end">
+                {state.scheduling_tz}
+                <br />
+                (UTC{tzoffset_scheduling_tz})
+              </DropdownMenuShortcut>
+            )}
+          </DropdownMenuRadioItem>
+        </DropdownMenuRadioGroup>
       </DropdownMenuContent>
     </DropdownMenu>
   );
+}
+
+function s2Hmm(s: number) {
+  const now = new Date();
+  const startOfDayDate = startOfDay(now);
+  const updatedDate = addSeconds(startOfDayDate, s);
+  const formattedTime = format(updatedDate, "H:mm");
+
+  return formattedTime;
 }
 
 function txt_n_plural(n: number | undefined, singular: string) {

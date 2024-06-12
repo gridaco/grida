@@ -30,6 +30,8 @@ import {
   SortBlockAction,
   VideoBlockSrcAction,
   FeedResponseSessionsAction,
+  DataGridDateFormatAction,
+  DataGridDateTZAction,
 } from "./action";
 import { arrayMove } from "@dnd-kit/sortable";
 import { blockstreeflat } from "@/lib/forms/tree";
@@ -593,6 +595,18 @@ export function reducer(
         // TODO:
 
         console.error("reorder:: Not implemented yet");
+      });
+    }
+    case "editor/data-grid/dateformat": {
+      const { dateformat } = <DataGridDateFormatAction>action;
+      return produce(state, (draft) => {
+        draft.dateformat = dateformat;
+      });
+    }
+    case "editor/data-grid/tz": {
+      const { tz } = <DataGridDateTZAction>action;
+      return produce(state, (draft) => {
+        draft.datetz = tz;
       });
     }
     default:

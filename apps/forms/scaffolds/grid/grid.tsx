@@ -38,6 +38,8 @@ import { Button } from "@/components/ui/button";
 import { FormFieldTypeIcon } from "@/components/form-field-type-icon";
 import { createClientFormsClient } from "@/lib/supabase/client";
 import { GRIDA_FORMS_RESPONSE_BUCKET } from "@/k/env";
+import { toZonedTime } from "date-fns-tz";
+import { tztostr } from "../editor/symbols";
 
 function rowKeyGetter(row: GFRow) {
   return row.__gf_id;
@@ -75,7 +77,7 @@ export function Grid({
   };
 
   const __id_column: Column<any> = {
-    key: "__gf_local_index",
+    key: "__gf_display_id",
     name: "id",
     frozen: true,
     resizable: true,
@@ -90,6 +92,7 @@ export function Grid({
     resizable: true,
     width: 100,
     renderHeaderCell: DefaultPropertyHeaderCell,
+    renderCell: DefaultPropertyDateCell,
   };
 
   const __customer_uuid_column: Column<any> = {
@@ -99,7 +102,7 @@ export function Grid({
     resizable: true,
     width: 100,
     renderHeaderCell: DefaultPropertyHeaderCell,
-    renderCell: CustomerCell,
+    renderCell: DefaultPropertyCustomerCell,
   };
 
   const __new_column: Column<any> = {
@@ -195,7 +198,7 @@ function DefaultPropertyHeaderCell({ column }: RenderHeaderCellProps<any>) {
 function DefaultPropertyIcon({ __key: key }: { __key: string }) {
   switch (key) {
     case "__gf_id":
-    case "__gf_local_index":
+    case "__gf_display_id":
       return <Link2Icon className="min-w-4" />;
     case "__gf_created_at":
       return <CalendarIcon className="min-w-4" />;
@@ -261,7 +264,44 @@ function NewFieldHeaderCell({
   );
 }
 
-function CustomerCell({ column, row }: RenderCellProps<any>) {
+function DefaultPropertyDateCell({ column, row }: RenderCellProps<any>) {
+  const [state, dispatch] = useEditorState();
+
+  const data = row[column.key];
+
+  const { dateformat, datetz } = state;
+
+  if (!data) {
+    return <></>;
+  }
+
+  return <>{fmtdate(data, dateformat, tztostr(datetz))}</>;
+}
+
+function fmtdate(
+  date: Date | string,
+  format: "date" | "time" | "datetime",
+  tz?: string
+) {
+  if (typeof date === "string") {
+    date = new Date(date);
+  }
+
+  if (tz) {
+    date = toZonedTime(date, tz);
+  }
+
+  switch (format) {
+    case "date":
+      return date.toLocaleDateString();
+    case "time":
+      return date.toLocaleTimeString();
+    case "datetime":
+      return date.toLocaleString();
+  }
+}
+
+function DefaultPropertyCustomerCell({ column, row }: RenderCellProps<any>) {
   const [state, dispatch] = useEditorState();
 
   const data = row[column.key];

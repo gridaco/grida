@@ -7,6 +7,7 @@ import type {
   FormResponseSession,
   SupabaseConnection,
 } from "@/types";
+import { LOCALTZ } from "./symbols";
 
 export type DraftID = `[draft]${string}`;
 export const DRAFT_ID_START_WITH = "[draft]";
@@ -14,6 +15,7 @@ export const DRAFT_ID_START_WITH = "[draft]";
 export interface FormEditorInit {
   project_id: number;
   form_id: string;
+  scheduling_tz?: string;
   connections?: {
     store_id?: number | null;
     supabase?: SupabaseConnection | null;
@@ -42,12 +44,15 @@ export function initialFormEditorState(init: FormEditorInit): FormEditorState {
     },
     form_id: init.form_id,
     form_title: init.form_title,
+    scheduling_tz: init.scheduling_tz,
     page_id: init.page_id,
     blocks: blockstreeflat(init.blocks),
     fields: init.fields,
     selected_responses: new Set(),
     available_field_ids: block_available_field_ids,
     responses_pagination_rows: 100,
+    dateformat: "datetime",
+    datetz: LOCALTZ,
   };
 }
 
@@ -59,6 +64,7 @@ export interface FormEditorState {
   };
   form_id: string;
   form_title: string;
+  scheduling_tz?: string;
   page_id: string | null;
   blocks: EditorFlatFormBlock[];
   fields: FormFieldDefinition[];
@@ -78,6 +84,8 @@ export interface FormEditorState {
   is_customer_edit_panel_open?: boolean;
   is_block_edit_panel_open?: boolean;
   field_edit_panel_refresh_key?: number;
+  dateformat: "date" | "time" | "datetime";
+  datetz: typeof LOCALTZ | string;
 }
 
 export interface EditorFlatFormBlock<T = FormBlockType> extends FormBlock<T> {
