@@ -189,8 +189,6 @@ export async function GET(
     .select()
     .single();
 
-  console.log("session", system_keys.__gf_session, session);
-
   if (session_error || !session) {
     console.error("error while creating session", session_error);
     return NextResponse.error();
