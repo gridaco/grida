@@ -163,7 +163,7 @@ async function submit({
     (key) => !Object.keys(system_keys).includes(key)
   );
 
-  console.log("submit#meta", meta);
+  // console.log("submit#meta", meta);
 
   // pre meta processing
   let ipinfo_data: IpInfo | null = isObjectEmpty(meta.geo)
@@ -403,7 +403,7 @@ async function submit({
     await client
       .from("response")
       .insert({
-        raw: JSON.stringify(Object.fromEntries(entries)),
+        raw: safejson(Object.fromEntries(entries)),
         form_id: form_id,
         session_id: meta.session,
         browser: meta.browser,
@@ -653,7 +653,13 @@ async function submit({
   // ==================================================
 
   // system hooks
-  if (meta.session) OnSubmit.clearsession(form_id, meta.session);
+  if (meta.session) {
+    OnSubmit.clearsession({
+      form_id,
+      response_id: response_reference_obj.id,
+      session_id: meta.session,
+    });
+  }
 
   // notification hooks are not ready yet
   // try {
@@ -996,6 +1002,10 @@ async function hook_notifications({ form_id }: { form_id: string }) {
     to: "...",
     lang: "en",
   });
+}
+
+function safejson(data: any) {
+  return JSON.parse(JSON.stringify(data));
 }
 
 function isObjectEmpty(obj: object | null | undefined) {

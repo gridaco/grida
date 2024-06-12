@@ -42,6 +42,7 @@ import type {
 import { Features } from "@/lib/features/scheduling";
 import { requesturl } from "@/services/form/session-storage";
 import { type GFKeys, parseGFKeys } from "@/lib/forms/gfkeys";
+import { RawdataProcessing } from "@/lib/forms/rawdata";
 
 export const revalidate = 0;
 
@@ -437,7 +438,9 @@ export async function GET(
 
   const default_values = merge(
     seed, // seed from search params
-    session.raw ? idkeytonamekey(session.raw as {}, fields) : {} // data from ongoing session
+    session.raw // data from ongoing session
+      ? RawdataProcessing.idkeytonamekey(session.raw as {}, fields)
+      : {}
   );
 
   const is_open = !__is_force_closed && response.error === null;
@@ -480,20 +483,6 @@ export async function GET(
   response.data = payload;
 
   return NextResponse.json(response);
-}
-
-function idkeytonamekey(
-  data: Record<string, any>,
-  fields: FormFieldDefinition[]
-) {
-  const result: Record<string, any> = {};
-  for (const key in data) {
-    const field = fields.find((f) => f.id === key);
-    if (field) {
-      result[field.name] = data[key];
-    }
-  }
-  return result;
 }
 
 function merge<A = any, B = any>(a: A, b: B): A & B {
