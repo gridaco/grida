@@ -31,24 +31,31 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { FormResponse, FormResponseField, FormResponseSession } from "@/types";
+import {
+  FormFieldDefinition,
+  FormResponse,
+  FormResponseField,
+  FormResponseSession,
+} from "@/types";
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
   DropdownMenuContent,
+  DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import clsx from "clsx";
+import type { GFRow } from "../grid/types";
 
 function rows_from_responses(responses?: FormResponse[]) {
   return (
     responses?.map((response, index) => {
-      const row: any = {
+      const row: GFRow = {
         __gf_id: response.id,
-        __gf_local_index: fmt_local_index(response.local_index),
+        __gf_display_id: fmt_local_index(response.local_index),
         __gf_created_at: response.created_at,
         __gf_customer_uuid: response.customer_id,
       }; // react-data-grid expects each row to have a unique 'id' property
@@ -64,17 +71,24 @@ function rows_from_responses(responses?: FormResponse[]) {
   );
 }
 
-function rows_from_sessions(sessions?: FormResponseSession[]) {
+function rows_from_sessions(
+  sessions: FormResponseSession[],
+  fields: FormFieldDefinition[]
+) {
   return (
     sessions?.map((session, index) => {
-      const row: any = {
+      const row: GFRow = {
         __gf_id: session.id,
-        __gf_local_index: "TMP" + fmt_local_index(index),
+        __gf_display_id: session.id,
         __gf_created_at: session.created_at,
         __gf_customer_uuid: session.customer_id,
       }; // react-data-grid expects each row to have a unique 'id' property
       Object.entries(session.raw || {}).forEach(([key, value]) => {
-        row[key] = { value };
+        const field = fields.find((f) => f.id === key);
+        row[key] = {
+          value: value,
+          type: field?.type,
+        };
       });
       return row;
     }) ?? []
@@ -110,10 +124,11 @@ export function GridEditor() {
 
   // Transforming the responses into the format expected by react-data-grid
   const rows = useMemo(() => {
-    if (is_display_sessions) return rows_from_sessions(sessions);
+    if (is_display_sessions)
+      return sessions ? rows_from_sessions(sessions, state.fields) : [];
     return rows_from_responses(responses);
     // TODO: need to update dpes with fields
-  }, [responses, sessions, is_display_sessions]);
+  }, [is_display_sessions, sessions, state.fields, responses]);
 
   const openNewFieldPanel = useCallback(() => {
     dispatch({
@@ -324,7 +339,7 @@ function GridViewSettings() {
             });
           }}
         >
-          Show Sessions
+          Display Sessions
         </DropdownMenuCheckboxItem>
       </DropdownMenuContent>
     </DropdownMenu>

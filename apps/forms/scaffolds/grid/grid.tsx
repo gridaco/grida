@@ -75,7 +75,7 @@ export function Grid({
   };
 
   const __id_column: Column<any> = {
-    key: "__gf_local_index",
+    key: "__gf_display_id",
     name: "id",
     frozen: true,
     resizable: true,
@@ -195,7 +195,7 @@ function DefaultPropertyHeaderCell({ column }: RenderHeaderCellProps<any>) {
 function DefaultPropertyIcon({ __key: key }: { __key: string }) {
   switch (key) {
     case "__gf_id":
-    case "__gf_local_index":
+    case "__gf_display_id":
       return <Link2Icon className="min-w-4" />;
     case "__gf_created_at":
       return <CalendarIcon className="min-w-4" />;
