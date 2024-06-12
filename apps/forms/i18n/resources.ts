@@ -25,7 +25,8 @@ export interface Translation {
   home: string;
   left_in_stock: string;
   sold_out: string;
-  your_customer_id_is: string;
+  support_metadata: string;
+  support_metadata_no_share: string;
   formclosed: {
     default: {
       title: string;
@@ -92,7 +93,9 @@ const resources: Record<
       home: "Home",
       left_in_stock: `${use("available")} left`,
       sold_out: "Sold Out",
-      your_customer_id_is: `Your Customer ID is <code>${use("customer.short_id")}</code>`,
+      support_metadata: `Support Metadata`,
+      support_metadata_no_share:
+        "Please do not share this information with anyone except support.",
       formclosed: {
         default: {
           title: "Form Closed",
@@ -156,7 +159,9 @@ const resources: Record<
       home: "Inicio",
       left_in_stock: `${use("available")} restantes`,
       sold_out: "Agotado",
-      your_customer_id_is: `Su ID de cliente es <code>${use("customer.short_id")}</code>`,
+      support_metadata: `Metadatos de soporte`,
+      support_metadata_no_share:
+        "Por favor, no comparta esta información con nadie excepto con el soporte.",
       formclosed: {
         default: {
           title: "Formulario Cerrado",
@@ -220,7 +225,9 @@ const resources: Record<
       home: "홈",
       left_in_stock: `${use("available")}개 남음`,
       sold_out: "매진됨",
-      your_customer_id_is: `고객 ID는 <code>${use("customer.short_id")}</code>입니다`,
+      support_metadata: `서포트 메타데이터`,
+      support_metadata_no_share:
+        "지원팀을 제외하고 이 정보를 공유하지 마십시오.",
       formclosed: {
         default: {
           title: "폼이 마감되었습니다",
@@ -283,7 +290,9 @@ const resources: Record<
       home: "ホーム",
       left_in_stock: `残り${use("available")}個`,
       sold_out: "完売",
-      your_customer_id_is: `お客様の顧客IDは<code>${use("customer.short_id")}</code>です`,
+      support_metadata: `サポートメタデータ`,
+      support_metadata_no_share:
+        "この情報はサポート以外の誰とも共有しないでください。",
       formclosed: {
         default: {
           title: "フォームは閉鎖されました",
@@ -346,7 +355,8 @@ const resources: Record<
       home: "首页",
       left_in_stock: `剩余${use("available")}件`,
       sold_out: "售罄",
-      your_customer_id_is: `您的客户ID是<code>${use("customer.short_id")}</code>`,
+      support_metadata: `支持元数据`,
+      support_metadata_no_share: "请勿与支持团队之外的任何人分享此信息。",
       formclosed: {
         default: {
           title: "表格已关闭",
@@ -407,7 +417,9 @@ const resources: Record<
       home: "Accueil",
       left_in_stock: `${use("available")} restants`,
       sold_out: "Épuisé",
-      your_customer_id_is: `Votre identifiant client est <code>${use("customer.short_id")}</code>`,
+      support_metadata: `Métadonnées de support`,
+      support_metadata_no_share:
+        "Veuillez ne pas partager ces informations avec quiconque sauf le support.",
       formclosed: {
         default: {
           title: "Formulaire Fermé",
@@ -471,7 +483,9 @@ const resources: Record<
       home: "Início",
       left_in_stock: `${use("available")} restantes`,
       sold_out: "Esgotado",
-      your_customer_id_is: `Seu ID de cliente é <code>${use("customer.short_id")}</code>`,
+      support_metadata: `Metadados de suporte`,
+      support_metadata_no_share:
+        "Por favor, não compartilhe essas informações com ninguém, exceto o suporte.",
       formclosed: {
         default: {
           title: "Formulário Fechado",
@@ -535,7 +549,9 @@ const resources: Record<
       home: "Home",
       left_in_stock: `${use("available")} rimasti`,
       sold_out: "Esaurito",
-      your_customer_id_is: `Il tuo ID cliente è <code>${use("customer.short_id")}</code>`,
+      support_metadata: `Metadati di supporto`,
+      support_metadata_no_share:
+        "Si prega di non condividere queste informazioni con nessuno tranne il supporto.",
       formclosed: {
         default: {
           title: "Modulo Chiuso",
@@ -599,7 +615,9 @@ const resources: Record<
       home: "Startseite",
       left_in_stock: `${use("available")} übrig`,
       sold_out: "Ausverkauft",
-      your_customer_id_is: `Ihre Kundennummer lautet <code>${use("customer.short_id")}</code>`,
+      support_metadata: `Support-Metadaten`,
+      support_metadata_no_share:
+        "Bitte teilen Sie diese Informationen nur mit dem Support und sonst niemandem.",
       formclosed: {
         default: {
           title: "Formular Geschlossen",
@@ -663,7 +681,9 @@ const resources: Record<
       home: "Главная",
       left_in_stock: `Осталось ${use("available")} шт.`,
       sold_out: "Распродано",
-      your_customer_id_is: `Ваш ID клиента - <code>${use("customer.short_id")}</code>`,
+      support_metadata: `Метаданные поддержки`,
+      support_metadata_no_share:
+        "Пожалуйста, не делитесь этой информацией ни с кем, кроме службы поддержки.",
       formclosed: {
         default: {
           title: "Форма закрыта",
@@ -725,7 +745,9 @@ const resources: Record<
       home: "الرئيسية",
       left_in_stock: `${use("available")} متبقية`,
       sold_out: "نفذت الكمية",
-      your_customer_id_is: `رقم هوية العميل الخاص بك هو <code>${use("customer.short_id")}</code>`,
+      support_metadata: `بيانات الدعم الوصفية`,
+      support_metadata_no_share:
+        "يرجى عدم مشاركة هذه المعلومات مع أي شخص باستثناء الدعم.",
       formclosed: {
         default: {
           title: "النموذج مغلق",
@@ -787,7 +809,9 @@ const resources: Record<
       home: "होम",
       left_in_stock: `${use("available")} बचे हैं`,
       sold_out: "बिक गया",
-      your_customer_id_is: `आपका ग्राहक आईडी है <code>${use("customer.short_id")}</code>`,
+      support_metadata: `सहायता मेटाडाटा`,
+      support_metadata_no_share:
+        "कृपया इस जानकारी को सहायता के अलावा किसी के साथ साझा न करें।",
       formclosed: {
         default: {
           title: "फॉर्म बंद है",
@@ -850,7 +874,9 @@ const resources: Record<
       home: "Home",
       left_in_stock: `Nog ${use("available")} beschikbaar`,
       sold_out: "Uitverkocht",
-      your_customer_id_is: `Uw klant-ID is <code>${use("customer.short_id")}</code>`,
+      support_metadata: `Ondersteuningsmetadata`,
+      support_metadata_no_share:
+        "Deel deze informatie alstublieft niet met iemand anders dan de ondersteuning.",
       formclosed: {
         default: {
           title: "Formulier Gesloten",

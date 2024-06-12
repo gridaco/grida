@@ -19,7 +19,7 @@ export default async function AlreadyRespondedPage({
   searchParams?: FormLinkURLParams["alreadyresponded"];
 }) {
   const form_id = params.id;
-  const { customer_id } = searchParams || {};
+  const { fingerprint, customer_id, session_id } = searchParams || {};
   await ssr_page_init_i18n({ form_id });
 
   return (
@@ -37,19 +37,28 @@ export default async function AlreadyRespondedPage({
               <InfoCircledIcon className="" />
             </summary>
             <div className="mt-2 border border-dashed rounded p-2">
-              <p className="prose prose-sm dark:prose-invert">
-                <span
-                  dangerouslySetInnerHTML={{
-                    __html: i18next.t("your_customer_id_is", {
-                      customer: {
-                        // FIXME: use short_id
-                        short_id: customer_id,
-                      },
-                      interpolation: { escapeValue: false },
-                    }),
-                  }}
-                />
-              </p>
+              <article className="text-start prose prose-sm dark:prose-invert">
+                <small>
+                  <strong>{i18next.t("support_metadata")}</strong>
+                </small>
+                <br />
+                <small>{i18next.t("support_metadata_no_share")}</small>
+                <br />
+                <ul>
+                  <li>
+                    fid: <code>{form_id}</code>
+                  </li>
+                  <li>
+                    cid: <code>{customer_id}</code>
+                  </li>
+                  <li>
+                    sid: <code>{session_id}</code>
+                  </li>
+                  <li>
+                    sig: <code>{fingerprint}</code>
+                  </li>
+                </ul>
+              </article>
             </div>
           </details>
         </CardHeader>

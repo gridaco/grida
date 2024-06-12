@@ -150,7 +150,8 @@ export function Form({
         return redirect(
           formlink(HOST_NAME, form_id, "alreadyresponded", {
             fingerprint: __gf_fp_fingerprintjs_visitorid,
-            customer: customer_id,
+            customer_id: customer_id,
+            session_id: session,
           })
         );
       case "FORM_FORCE_CLOSED":

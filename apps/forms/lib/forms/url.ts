@@ -38,7 +38,7 @@ export interface FormLinkURLParams {
   alreadyresponded: {
     fingerprint?: string;
     customer_id?: string;
-    session_id: string;
+    session_id?: string;
   };
   complete: {
     // response id
@@ -127,7 +127,11 @@ export function formerrorlink(
       });
     }
     case "FORM_RESPONSE_LIMIT_BY_CUSTOMER_REACHED": {
-      return formlink(host, form_id, "alreadyresponded");
+      return formlink(host, form_id, "alreadyresponded", {
+        fingerprint: data.fingerprint,
+        customer_id: data.customer_id,
+        session_id: data.session_id,
+      });
     }
     case "FORM_SCHEDULE_NOT_IN_RANGE": {
       return formlink(host, form_id, "formclosed", {

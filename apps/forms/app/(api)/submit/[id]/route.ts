@@ -12,7 +12,7 @@ import {
 } from "@/services/form/validate-max-access";
 import { is_uuid_v4 } from "@/utils/is";
 import { NextRequest, NextResponse } from "next/server";
-import { formerrorlink, formlink } from "@/lib/forms/url";
+import { FormLinkURLParams, formerrorlink, formlink } from "@/lib/forms/url";
 import * as ERR from "@/k/error";
 import {
   FormFieldOptionsInventoryMap,
@@ -441,7 +441,14 @@ async function submit({
         // max response limit reached for this customer
         return error(
           ERR.FORM_RESPONSE_LIMIT_BY_CUSTOMER_REACHED.code,
-          { form_id },
+          {
+            form_id,
+            ...({
+              fingerprint: _fp_fingerprintjs_visitorid,
+              customer_id: customer?.uid,
+              session_id: meta.session || undefined,
+            } satisfies FormLinkURLParams["alreadyresponded"]),
+          },
           meta
         );
       }
