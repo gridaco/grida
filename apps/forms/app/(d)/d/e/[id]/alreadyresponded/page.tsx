@@ -9,19 +9,17 @@ import Link from "next/link";
 import i18next from "i18next";
 import { ssr_page_init_i18n } from "@/i18n/ssr";
 import { InfoCircledIcon } from "@radix-ui/react-icons";
+import type { FormLinkURLParams } from "@/lib/forms/url";
 
 export default async function AlreadyRespondedPage({
   params,
   searchParams,
 }: {
   params: { id: string };
-  searchParams?: {
-    fingerprint?: string;
-    customer?: string;
-  };
+  searchParams?: FormLinkURLParams["alreadyresponded"];
 }) {
   const form_id = params.id;
-  const { customer: customer_id } = searchParams || {};
+  const { customer_id } = searchParams || {};
   await ssr_page_init_i18n({ form_id });
 
   return (

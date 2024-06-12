@@ -1,4 +1,4 @@
-import { FormSubmitErrorCode } from "@/types/private/api";
+import type { FormSubmitErrorCode } from "@/types/private/api";
 import * as ERR from "@/k/error";
 
 export function editorlink(
@@ -34,18 +34,36 @@ export function editorlink(
   }
 }
 
-export function formlink(
-  host: string,
-  form_id: string,
-  state?:
-    | "complete"
-    | "alreadyresponded"
-    | "developererror"
-    | "badrequest"
-    | "formclosed"
-    | "formsoldout"
-    | "formoptionsoldout",
-  params?: { [key: string]: string | number | undefined }
+export interface FormLinkURLParams {
+  alreadyresponded: {
+    fingerprint?: string;
+    customer_id?: string;
+    session_id: string;
+  };
+  complete: {
+    // response id
+    rid: string;
+  };
+  developererror?: {};
+  badrequest?: {};
+  formclosed: {
+    oops?:
+      | typeof ERR.FORM_CLOSED_WHILE_RESPONDING.code
+      | typeof ERR.FORM_SCHEDULE_NOT_IN_RANGE.code;
+  };
+  formsoldout?: {};
+  formoptionsoldout?: {};
+}
+
+type ParamsForState<T extends keyof FormLinkURLParams> =
+  T extends keyof FormLinkURLParams ? FormLinkURLParams[T] : never;
+
+type FormLinkParams<T extends keyof FormLinkURLParams> =
+  | [host: string, form_id: string, state: T, params: ParamsForState<T>]
+  | [host: string, form_id: string, state?: T, params?: ParamsForState<T>];
+
+export function formlink<T extends keyof FormLinkURLParams>(
+  ...[host, form_id, state, params]: FormLinkParams<T>
 ) {
   const q = params ? new URLSearchParams(params as any).toString() : null;
   let url = _form_state_link(host, form_id, state);

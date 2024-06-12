@@ -5,16 +5,14 @@ import { EndingPageWithContext } from "@/theme/templates/formcomplete";
 import { ssr_page_init_i18n } from "@/i18n/ssr";
 import { fmt_local_index } from "@/utils/fmt";
 import { EndingPageI18nOverrides } from "@/types";
+import type { FormLinkURLParams } from "@/lib/forms/url";
 
 export default async function SubmitCompletePage({
   params,
   searchParams,
 }: {
   params: { id: string };
-  searchParams: {
-    // response id
-    rid?: string;
-  };
+  searchParams: FormLinkURLParams["complete"];
 }) {
   const form_id = params.id;
   const response_id = searchParams.rid;
