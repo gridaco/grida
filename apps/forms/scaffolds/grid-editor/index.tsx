@@ -55,6 +55,7 @@ import type { GFRow } from "../grid/types";
 import { format, startOfDay, addSeconds } from "date-fns";
 import { format as formatTZ } from "date-fns-tz";
 import { LOCALTZ, tztostr } from "../editor/symbols";
+import type { DataGridFilterSettings } from "../editor/state";
 
 function rows_from_responses(responses?: FormResponse[]) {
   return (
@@ -101,6 +102,34 @@ function rows_from_sessions(
   );
 }
 
+function applyFilter<
+  T extends FormResponse | FormResponseSession =
+    | FormResponse
+    | FormResponseSession,
+>(
+  rows: Array<T>,
+  filter: DataGridFilterSettings,
+  datakey: keyof T = "raw"
+): Array<T> {
+  const { empty_data_hidden } = filter;
+  return rows.filter((row) => {
+    if (empty_data_hidden) {
+      if (row === null) return false;
+      if (row === undefined) return false;
+
+      const v = row[datakey];
+      return (
+        v !== null &&
+        v !== undefined &&
+        v !== "" &&
+        JSON.stringify(v) !== "{}" &&
+        JSON.stringify(v) !== "[]"
+      );
+    }
+    return true;
+  });
+}
+
 export function GridEditor() {
   const [state, dispatch] = useEditorState();
   const [deleteFieldConfirmOpen, setDeleteFieldConfirmOpen] = useState(false);
@@ -111,6 +140,7 @@ export function GridEditor() {
     fields,
     responses,
     sessions,
+    datagrid_filter,
     datagrid_table,
     selected_responses,
   } = state;
@@ -132,12 +162,15 @@ export function GridEditor() {
   const rows = useMemo(() => {
     switch (datagrid_table) {
       case "response":
-        return rows_from_responses(responses);
+        return responses
+          ? rows_from_responses(applyFilter(responses, datagrid_filter))
+          : [];
       case "session":
-        return sessions ? rows_from_sessions(sessions, state.fields) : [];
+        return sessions
+          ? rows_from_sessions(applyFilter(sessions, datagrid_filter), fields)
+          : [];
     }
-    // TODO: need to update dpes with fields
-  }, [datagrid_table, sessions, state.fields, responses]);
+  }, [datagrid_table, sessions, fields, responses, datagrid_filter]);
 
   const openNewFieldPanel = useCallback(() => {
     dispatch({
@@ -363,7 +396,7 @@ function GridViewSettings() {
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="min-w-56">
-        <DropdownMenuLabel>Grid Settings</DropdownMenuLabel>
+        <DropdownMenuLabel>Data View</DropdownMenuLabel>
         <DropdownMenuSeparator />
         <DropdownMenuRadioGroup
           value={state.datagrid_table}
@@ -381,6 +414,18 @@ function GridViewSettings() {
             Sessions
           </DropdownMenuRadioItem>
         </DropdownMenuRadioGroup>
+        <DropdownMenuSeparator />
+        <DropdownMenuCheckboxItem
+          checked={state.datagrid_filter?.empty_data_hidden}
+          onCheckedChange={(checked) => {
+            dispatch({
+              type: "editor/data-grid/filter",
+              empty_data_hidden: checked,
+            });
+          }}
+        >
+          Hide records with empty data
+        </DropdownMenuCheckboxItem>
         <DropdownMenuSeparator />
         <DropdownMenuRadioGroup
           value={state.dateformat}

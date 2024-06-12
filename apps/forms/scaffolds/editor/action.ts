@@ -4,7 +4,7 @@ import {
   FormFieldInit,
   FormResponse,
 } from "@/types";
-import type { EditorFlatFormBlock } from "./state";
+import type { EditorFlatFormBlock, FormEditorState } from "./state";
 import type { JSONConditionExpression } from "@/types/logic";
 import { LOCALTZ } from "./symbols";
 
@@ -38,7 +38,8 @@ export type BlocksEditorAction =
   | OpenBlockEditPanelAction
   | DataGridReorderColumnAction
   | DataGridDateFormatAction
-  | DataGridDateTZAction;
+  | DataGridDateTZAction
+  | DataGridFilterAction;
 
 export interface CreateNewPendingBlockAction {
   type: "blocks/new";
@@ -209,4 +210,9 @@ export interface DataGridTableAction {
 export interface DataGridRowsAction {
   type: "editor/data-grid/rows";
   rows: number;
+}
+
+export interface DataGridFilterAction
+  extends Partial<FormEditorState["datagrid_filter"]> {
+  type: "editor/data-grid/filter";
 }

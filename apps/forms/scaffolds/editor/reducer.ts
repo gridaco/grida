@@ -32,6 +32,7 @@ import {
   FeedResponseSessionsAction,
   DataGridDateFormatAction,
   DataGridDateTZAction,
+  DataGridFilterAction,
 } from "./action";
 import { arrayMove } from "@dnd-kit/sortable";
 import { blockstreeflat } from "@/lib/forms/tree";
@@ -610,6 +611,16 @@ export function reducer(
       const { tz } = <DataGridDateTZAction>action;
       return produce(state, (draft) => {
         draft.datetz = tz;
+      });
+    }
+    case "editor/data-grid/filter": {
+      const { type, ...pref } = <DataGridFilterAction>action;
+
+      return produce(state, (draft) => {
+        draft.datagrid_filter = {
+          ...draft.datagrid_filter,
+          ...pref,
+        };
       });
     }
     default:

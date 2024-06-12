@@ -54,9 +54,16 @@ export function initialFormEditorState(init: FormEditorInit): FormEditorState {
     dateformat: "datetime",
     datetz: LOCALTZ,
     datagrid_table: "response",
+    datagrid_filter: {
+      empty_data_hidden: false,
+    },
     realtime_responses_enabled: true,
     realtime_sessions_enabled: false,
   };
+}
+
+export interface DataGridFilterSettings {
+  empty_data_hidden: boolean;
 }
 
 export interface FormEditorState {
@@ -82,6 +89,7 @@ export interface FormEditorState {
   sessions?: FormResponseSession[];
   datagrid_rows: number;
   datagrid_table: "response" | "session";
+  datagrid_filter: DataGridFilterSettings;
   realtime_sessions_enabled: boolean;
   realtime_responses_enabled: boolean;
   is_field_edit_panel_open?: boolean;
