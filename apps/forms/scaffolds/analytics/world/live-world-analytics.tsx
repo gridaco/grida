@@ -2,7 +2,10 @@
 
 import { fmtnum } from "@/scaffolds/analytics/stats";
 import { useEditorState } from "@/scaffolds/editor";
-import { ResponseFeedProvider } from "@/scaffolds/editor/feed";
+import {
+  ResponseFeedProvider,
+  ResponseSessionFeedProvider,
+} from "@/scaffolds/editor/feed";
 import { MapGL } from "@/theme/templates/formstart/default/mapgl";
 import React, { useEffect, useMemo, useState } from "react";
 import { MapProvider, useMap } from "react-map-gl";
@@ -67,7 +70,9 @@ export default function LiveWorldAnalytics() {
     <MapProvider>
       <DisableSwipeBack>
         <ResponseFeedProvider>
-          <View />
+          <ResponseSessionFeedProvider forceEnableRealtime>
+            <View />
+          </ResponseSessionFeedProvider>
         </ResponseFeedProvider>
       </DisableSwipeBack>
     </MapProvider>
@@ -165,7 +170,7 @@ function View() {
     debounceFlyTo(last.longitude, last.latitude);
   }, [debounceFlyTo, recent]);
 
-  const chartdata = useMemo(() => {
+  const responseChartData = useMemo(() => {
     return serialize(state.responses || [], {
       dateKey: "created_at",
       // last 15 minutes
@@ -174,6 +179,16 @@ function View() {
       intervalMs: 15 * 1000, // 15 seconds
     });
   }, [state.responses]);
+
+  const sessionChartData = useMemo(() => {
+    return serialize(state.sessions || [], {
+      dateKey: "created_at",
+      // last 15 minutes
+      from: new Date(new Date().getTime() - 15 * 60 * 1000),
+      to: new Date(),
+      intervalMs: 15 * 1000, // 15 seconds
+    });
+  }, [state.sessions]);
 
   return (
     <main className="relative p-4 h-full">
@@ -196,7 +211,10 @@ function View() {
       </div>
       <div className="relative grid grid-cols-2 lg:grid-cols-4 gap-4 mt-4 z-0 pointer-events-none">
         <div className="pointer-events-auto">
-          <Responses data={chartdata} />
+          <Responses data={responseChartData} />
+        </div>
+        <div className="pointer-events-auto">
+          <Sessions data={sessionChartData} />
         </div>
       </div>
     </main>
@@ -211,6 +229,33 @@ function Responses({ data }: { data: { count: number; date: Date }[] }) {
           <h1 className="text-lg font-semibold">Responses</h1>
           <h6 className="text-sm text-muted-foreground">
             Responses in Last 15 Minutes
+          </h6>
+        </header>
+        <div className="mt-4 flex items-center space-x-2">
+          <span className="text-3xl font-bold">
+            {fmtnum(data.reduce((sum, item) => sum + item.count, 0))}
+          </span>
+        </div>
+      </CardHeader>
+      <CardContent className="p-0 h-40 w-full">
+        <TimeSeriesChart
+          data={data}
+          chartType="bar"
+          datefmt={(date) => format(date, "HH:mm:ss.SSS")}
+        />
+      </CardContent>
+    </Card>
+  );
+}
+
+function Sessions({ data }: { data: { count: number; date: Date }[] }) {
+  return (
+    <Card className="overflow-hidden bg-white/10 dark:bg-black/10 backdrop-blur-lg">
+      <CardHeader>
+        <header>
+          <h1 className="text-lg font-semibold">Sessions</h1>
+          <h6 className="text-sm text-muted-foreground">
+            Sessions in Last 15 Minutes
           </h6>
         </header>
         <div className="mt-4 flex items-center space-x-2">

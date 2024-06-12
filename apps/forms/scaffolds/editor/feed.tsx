@@ -174,11 +174,21 @@ export function ResponseFeedProvider({
 
 export function ResponseSessionFeedProvider({
   children,
-}: React.PropsWithChildren<{}>) {
+  forceEnableRealtime,
+}: React.PropsWithChildren<{
+  forceEnableRealtime?: boolean;
+}>) {
   const [state, dispatch] = useEditorState();
 
-  const { form_id, datagrid_table, datagrid_rows, realtime_sessions_enabled } =
-    state;
+  const {
+    form_id,
+    datagrid_table,
+    datagrid_rows,
+    realtime_sessions_enabled: _realtime_sessions_enabled,
+  } = state;
+
+  const realtime_sessions_enabled =
+    forceEnableRealtime ?? _realtime_sessions_enabled;
 
   const supabase = useMemo(() => createClientFormsClient(), []);
 
