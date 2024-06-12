@@ -23,7 +23,7 @@ import {
   OpenEditFieldAction,
   OpenResponseEditAction,
   ResolvePendingBlockAction,
-  ResponseFeedRowsAction,
+  DataGridRowsAction,
   SaveFieldAction,
   SelectResponse,
   DataGridTableAction,
@@ -479,10 +479,10 @@ export function reducer(
         draft.selected_responses = new_selected_responses;
       });
     }
-    case "editor/responses/pagination/rows": {
-      const { max } = <ResponseFeedRowsAction>action;
+    case "editor/data-grid/rows": {
+      const { rows: max } = <DataGridRowsAction>action;
       return produce(state, (draft) => {
-        draft.responses_pagination_rows = max;
+        draft.datagrid_rows = max;
       });
     }
     case "editor/response/feed": {

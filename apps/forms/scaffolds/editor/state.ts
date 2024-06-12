@@ -50,10 +50,12 @@ export function initialFormEditorState(init: FormEditorInit): FormEditorState {
     fields: init.fields,
     selected_responses: new Set(),
     available_field_ids: block_available_field_ids,
-    responses_pagination_rows: 100,
+    datagrid_rows: 100,
     dateformat: "datetime",
     datetz: LOCALTZ,
     datagrid_table: "response",
+    realtime_responses_enabled: true,
+    realtime_sessions_enabled: false,
   };
 }
 
@@ -77,9 +79,11 @@ export interface FormEditorState {
   responses?: FormResponse[];
   selected_responses: Set<string>;
   // TODO: add effect on this value to update responses
-  responses_pagination_rows: number;
   sessions?: FormResponseSession[];
+  datagrid_rows: number;
   datagrid_table: "response" | "session";
+  realtime_sessions_enabled?: boolean;
+  realtime_responses_enabled?: boolean;
   is_field_edit_panel_open?: boolean;
   is_response_edit_panel_open?: boolean;
   is_customer_edit_panel_open?: boolean;

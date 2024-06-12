@@ -81,15 +81,13 @@ export function InitialResponsesProvider({
 
     initially_fetched_responses.current = true;
 
-    const feed = fetchResponses(state.responses_pagination_rows).then(
-      (data) => {
-        dispatch({
-          type: "editor/response/feed",
-          data: data as any,
-          reset: true,
-        });
-      }
-    );
+    const feed = fetchResponses(state.datagrid_rows).then((data) => {
+      dispatch({
+        type: "editor/response/feed",
+        data: data as any,
+        reset: true,
+      });
+    });
 
     toast.promise(feed, {
       loading: "Fetching responses...",
@@ -106,22 +104,20 @@ export function InitialResponsesProvider({
       return;
     }
 
-    const feed = fetchResponses(state.responses_pagination_rows).then(
-      (data) => {
-        dispatch({
-          type: "editor/response/feed",
-          data: data as any,
-          reset: true,
-        });
-      }
-    );
+    const feed = fetchResponses(state.datagrid_rows).then((data) => {
+      dispatch({
+        type: "editor/response/feed",
+        data: data as any,
+        reset: true,
+      });
+    });
 
     toast.promise(feed, {
       loading: "Fetching responses...",
       success: "Responses fetched",
       error: "Failed to fetch responses",
     });
-  }, [dispatch, fetchResponses, state.responses_pagination_rows]);
+  }, [dispatch, fetchResponses, state.datagrid_rows]);
 
   return <>{children}</>;
 }
@@ -243,15 +239,13 @@ export function ResponseSessionFeedProvider({
   useEffect(() => {
     if (state.datagrid_table !== "session") return;
 
-    const feed = fetchResponseSessions(state.responses_pagination_rows).then(
-      (data) => {
-        dispatch({
-          type: "editor/data/sessions/feed",
-          data: data as any,
-          reset: true,
-        });
-      }
-    );
+    const feed = fetchResponseSessions(state.datagrid_rows).then((data) => {
+      dispatch({
+        type: "editor/data/sessions/feed",
+        data: data as any,
+        reset: true,
+      });
+    });
 
     toast.promise(feed, {
       loading: "Fetching sessions...",

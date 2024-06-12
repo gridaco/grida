@@ -465,11 +465,11 @@ function MaxRowsSelect() {
   return (
     <div>
       <Select
-        value={state.responses_pagination_rows + ""}
+        value={state.datagrid_rows + ""}
         onValueChange={(value) => {
           dispatch({
-            type: "editor/responses/pagination/rows",
-            max: parseInt(value),
+            type: "editor/data-grid/rows",
+            rows: parseInt(value),
           });
         }}
       >
