@@ -2,10 +2,7 @@ import type { FormInputType } from "@/types";
 
 export function unwrapFeildValue(
   value: any,
-  type: FormInputType,
-  options?: {
-    obscure?: boolean;
-  }
+  type: FormInputType
 ): string | number | boolean {
   if (!value) return "N/A";
   try {
@@ -15,9 +12,11 @@ export function unwrapFeildValue(
       case "email":
       case "tel":
       case "text":
+      case "number":
+      case "textarea":
         return unwrapped;
       case "password":
-        return options?.obscure ? "●".repeat(unwrapped.length) : unwrapped;
+        return "●".repeat(unwrapped.length);
       case "switch":
       case "checkbox":
         return parseCheckboxValue(unwrapped);

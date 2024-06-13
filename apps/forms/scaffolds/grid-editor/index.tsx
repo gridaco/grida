@@ -416,7 +416,7 @@ function GridViewSettings() {
         </DropdownMenuRadioGroup>
         <DropdownMenuSeparator />
         <DropdownMenuCheckboxItem
-          checked={state.datagrid_filter?.empty_data_hidden}
+          checked={state.datagrid_filter.empty_data_hidden}
           onCheckedChange={(checked) => {
             dispatch({
               type: "editor/data-grid/filter",
@@ -425,6 +425,17 @@ function GridViewSettings() {
           }}
         >
           Hide records with empty data
+        </DropdownMenuCheckboxItem>
+        <DropdownMenuCheckboxItem
+          checked={state.datagrid_filter.masking_enabled}
+          onCheckedChange={(checked) => {
+            dispatch({
+              type: "editor/data-grid/filter",
+              masking_enabled: checked,
+            });
+          }}
+        >
+          Mask data
         </DropdownMenuCheckboxItem>
         <DropdownMenuSeparator />
         <DropdownMenuRadioGroup

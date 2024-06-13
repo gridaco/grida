@@ -40,7 +40,7 @@ import { createClientFormsClient } from "@/lib/supabase/client";
 import { GRIDA_FORMS_RESPONSE_BUCKET } from "@/k/env";
 import { toZonedTime } from "date-fns-tz";
 import { tztostr } from "../editor/symbols";
-
+import { mask } from "./mask";
 function rowKeyGetter(row: GFRow) {
   return row.__gf_id;
 }
@@ -337,6 +337,7 @@ function FKButton({ onClick }: { onClick?: () => void }) {
 }
 
 function FieldCell({ column, row }: RenderCellProps<any>) {
+  const [state] = useEditorState();
   const data: FormResponseField = row[column.key];
 
   const supabase = useMemo(() => createClientFormsClient(), []);
@@ -347,9 +348,7 @@ function FieldCell({ column, row }: RenderCellProps<any>) {
 
   const { type, value, storage_object_paths } = data;
 
-  const unwrapped = unwrapFeildValue(value, type as FormInputType, {
-    obscure: true,
-  });
+  const unwrapped = unwrapFeildValue(value, type as FormInputType);
 
   switch (type as FormInputType) {
     case "switch":
@@ -391,7 +390,14 @@ function FieldCell({ column, row }: RenderCellProps<any>) {
       );
     }
     default:
-      return <div>{unwrapped}</div>;
+      return (
+        <div>
+          {state.datagrid_filter.masking_enabled &&
+          typeof unwrapped === "string"
+            ? mask(unwrapped)
+            : unwrapped}
+        </div>
+      );
   }
 }
 
