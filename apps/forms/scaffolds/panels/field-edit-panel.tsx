@@ -652,7 +652,7 @@ export function FieldEditPanel({
               {FieldSupports.autocomplete(type) && (
                 <PanelPropertyField
                   label={"Auto Complete"}
-                  tooltip={
+                  help={
                     <>
                       <Link
                         href="https://developer.mozilla.org/en-US/docs/Web/HTML/Attributes/autocomplete"
@@ -685,7 +685,7 @@ export function FieldEditPanel({
               {FieldSupports.multiple(type) && (
                 <PanelPropertyField
                   label={"Multiple"}
-                  tooltip={
+                  help={
                     <>
                       <Link
                         href="https://developer.mozilla.org/en-US/docs/Web/HTML/Attributes/multiple"
@@ -702,7 +702,7 @@ export function FieldEditPanel({
               {!FieldSupports.checkbox_alias(type) && type !== "range" && (
                 <PanelPropertyField
                   label={"Required"}
-                  tooltip={
+                  help={
                     <>
                       <Link
                         href="https://developer.mozilla.org/en-US/docs/Web/HTML/Attributes/required"
@@ -749,7 +749,7 @@ export function FieldEditPanel({
               {supports_accept && (
                 <PanelPropertyField
                   label={"Accept"}
-                  tooltip={
+                  help={
                     <>
                       <Link
                         href="https://developer.mozilla.org/en-US/docs/Web/HTML/Attributes/accept"
@@ -866,39 +866,53 @@ export function FieldEditPanel({
               </PanelPropertyField>
             </PanelPropertyFields>
           </PanelPropertySection>
-          <hr />
-          <PanelPropertySection
-            hidden={
-              !(FieldSupports.file_alias(type) && state.connections.supabase)
-            }
-          >
-            {/* TODO: wip */}
-            <PanelPropertySectionTitle>
-              <SupabaseLogo className="inline me-2 w-5 h-5 align-middle" />
-              Supabase Storage
-            </PanelPropertySectionTitle>
-            <PanelPropertyFields>
-              <PanelPropertyField
-                label={"Bucket"}
-                description="The bucket name to upload the file to."
-              >
-                <PropertyTextInput placeholder="bucket-name" />
-              </PanelPropertyField>
-              <PanelPropertyField
-                label={"Folder Path"}
-                description="The folder path to upload the file to. (Leave leading and trailing slashes off)"
-              >
-                <PropertyTextInput placeholder="path/to/folder" />
-              </PanelPropertyField>
-              <PanelPropertyField
-                label={"Fixed File Name"}
-                description="Leave blank to use default behavior."
-                optional
-              >
-                <PropertyTextInput placeholder="avatar.png" />
-              </PanelPropertyField>
-            </PanelPropertyFields>
-          </PanelPropertySection>
+          {/* TODO: wip */}
+          {FieldSupports.file_alias(type) && state.connections.supabase && (
+            <>
+              <hr />
+              <PanelPropertySection>
+                <PanelPropertySectionTitle>
+                  <SupabaseLogo className="inline me-2 w-5 h-5 align-middle" />
+                  Supabase Storage
+                </PanelPropertySectionTitle>
+                <PanelPropertyFields>
+                  <PanelPropertyField
+                    label={"Bucket"}
+                    description="The bucket name to upload the file to."
+                  >
+                    <PropertyTextInput placeholder="bucket-name" />
+                  </PanelPropertyField>
+                  <PanelPropertyField
+                    label={"Upload Path"}
+                    description="The folder path to upload the file to. (Leave leading and trailing slashes off)"
+                  >
+                    <PropertyTextInput placeholder="public/{{new.id}}/avatar.png" />
+                  </PanelPropertyField>
+                  <PanelPropertyField
+                    label={"Staged Uploading"}
+                    help={
+                      <>
+                        Staged uploading allows you to upload first under{" "}
+                        <code>tmp/[session]/</code>
+                        folder and then move to the final destination. This is
+                        useful when you want to upload files under{" "}
+                        <code>path/to/[id]/</code>
+                        and you don&apos;t have the <code>id</code> yet.
+                      </>
+                    }
+                    description={
+                      <>
+                        Use staged uploading to upload first, then move to final
+                        path once transaction is complete.
+                      </>
+                    }
+                  >
+                    <Switch />
+                  </PanelPropertyField>
+                </PanelPropertyFields>
+              </PanelPropertySection>
+            </>
+          )}
         </form>
       </PanelContent>
       <PanelFooter>

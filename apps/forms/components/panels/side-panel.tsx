@@ -5,6 +5,11 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import {
+  HoverCard,
+  HoverCardTrigger,
+  HoverCardContent,
+} from "@/components/ui/hover-card";
 import { QuestionMarkCircledIcon } from "@radix-ui/react-icons";
 
 export function SidePanel({
@@ -67,14 +72,14 @@ export function PanelPropertyFields({ children }: React.PropsWithChildren<{}>) {
 
 export function PanelPropertyField({
   label,
-  tooltip,
+  help,
   description,
   optional,
   children,
   disabled,
 }: React.PropsWithChildren<{
   label: React.ReactNode;
-  tooltip?: React.ReactNode;
+  help?: React.ReactNode;
   description?: React.ReactNode;
   optional?: boolean;
   disabled?: boolean;
@@ -85,13 +90,17 @@ export function PanelPropertyField({
         <div className="flex flex-row space-x-2 justify-between col-span-12">
           <span className="block text-sm">
             {label}
-            {tooltip && (
-              <Tooltip>
-                <TooltipTrigger type="button">
+            {help && (
+              <HoverCard>
+                <HoverCardTrigger type="button">
                   <QuestionMarkCircledIcon className="inline ms-2 align-middle opacity-50" />
-                </TooltipTrigger>
-                <TooltipContent>{tooltip}</TooltipContent>
-              </Tooltip>
+                </HoverCardTrigger>
+                <HoverCardContent>
+                  <article className="prose prose-sm dark:prose-invert text-muted-foreground">
+                    {help}
+                  </article>
+                </HoverCardContent>
+              </HoverCard>
             )}
           </span>
           {optional && (
