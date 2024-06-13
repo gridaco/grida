@@ -661,11 +661,15 @@ async function submit({
 
   // system hooks
   if (meta.session) {
-    OnSubmit.clearsession({
-      form_id,
-      response_id: response_reference_obj.id,
-      session_id: meta.session,
-    });
+    try {
+      OnSubmit.clearsession({
+        form_id,
+        response_id: response_reference_obj.id,
+        session_id: meta.session,
+      });
+    } catch (e) {
+      console.error("submit/err/hooks", e);
+    }
   }
 
   // notification hooks are not ready yet
