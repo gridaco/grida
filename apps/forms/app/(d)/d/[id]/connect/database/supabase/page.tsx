@@ -22,6 +22,7 @@ import {
   EyeNoneIcon,
   EyeOpenIcon,
   LockClosedIcon,
+  OpenInNewWindowIcon,
   QuestionMarkCircledIcon,
 } from "@radix-ui/react-icons";
 import toast from "react-hot-toast";
@@ -287,9 +288,22 @@ function ConnectSupabase({ form_id }: { form_id: string }) {
       ) : (
         <Card>
           <CardHeader>
-            <CardTitle>
-              <SupabaseLogo size={20} className="inline me-2 align-middle" />
-              Connect Supabase
+            <CardTitle className="flex items-center justify-between">
+              <span>
+                <SupabaseLogo size={20} className="inline me-2 align-middle" />
+                Connect Supabase
+              </span>
+              {is_connected && (
+                <Link
+                  href={`https://supabase.com/dashboard/project/${connection.sb_project_reference_id}`}
+                  target="_blank"
+                >
+                  <Button variant="link">
+                    <OpenInNewWindowIcon className="inline me-2 align-middle" />
+                    Dashboard
+                  </Button>
+                </Link>
+              )}
             </CardTitle>
             <CardDescription>
               Connect your Supabase account to access your database.{" "}
