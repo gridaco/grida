@@ -73,8 +73,7 @@ export default async function RootLayout({
           *,
           blocks:form_block(*)
         ),
-        store_connection:connection_commerce_store(*),
-        supabase_connection:connection_supabase(*)
+        store_connection:connection_commerce_store(*)
       `
     )
     .eq("id", id)
@@ -111,7 +110,8 @@ export default async function RootLayout({
                 project_id: data.project_id,
                 connections: {
                   store_id: data.store_connection?.store_id,
-                  supabase: data.supabase_connection as any,
+                  // [UNDER MIGRATION]
+                  // supabase: data.supabase_connection as any,
                 },
                 form_id: id,
                 form_title: data.title,
