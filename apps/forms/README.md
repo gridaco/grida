@@ -17,9 +17,10 @@ Open [http://localhost:3000](http://localhost:3000) with your browser to see the
 npx supabase gen types typescript \
   --project-id "$PROJECT_REF" \
   --schema public \
+  --schema grida_x_supabase \
   --schema grida_commerce \
-  --schema grida_forms \
   --schema grida_forms_secure \
+  --schema grida_forms \
   > types/supabase.ts
 ```
 
