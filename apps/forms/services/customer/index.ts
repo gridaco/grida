@@ -27,17 +27,11 @@ export async function upsert_customer_with({
     last_seen_at: new Date().toISOString(),
   };
 
-  if (uuid && is_uuid_v4(uuid)) {
-    const { data: customer, error } = await workspaceclient
-      .from("customer")
-      .upsert(pl, {
-        onConflict: "project_id, uuid",
-      })
-      .select()
-      .single();
-
-    if (error) {
+  try {
+    if (uuid && is_uuid_v4(uuid)) {
+      // if uuid is provided, we don't need to store fingerprint (vulnerable)
       delete pl._fp_fingerprintjs_visitorid;
+
       const { data: customer, error } = await workspaceclient
         .from("customer")
         .upsert(pl, {
@@ -47,22 +41,27 @@ export async function upsert_customer_with({
         .single();
 
       if (error) {
-        console.error("customer::error-2:", error);
+        console.error("customer::uuid_upsert_error:", error);
+        throw error;
+      }
+      return customer;
+    } else {
+      const { data: customer, error } = await workspaceclient
+        .from("customer")
+        .upsert(pl, {
+          onConflict: "project_id, _fp_fingerprintjs_visitorid",
+        })
+        .select()
+        .single();
+
+      if (error) {
+        console.error("customer::fingerprint_upsert_error:", error);
         throw error;
       }
       return customer;
     }
-
-    return customer;
-  } else {
-    const { data: customer, error } = await workspaceclient
-      .from("customer")
-      .upsert(pl)
-      .select()
-      .single();
-
-    error && console.error("customer::error-1:", error);
-    // console.log("customer::upserted:", customer);
-    return customer;
+  } catch (e) {
+    console.error("customer::unexpected_error:", e);
+    throw e;
   }
 }
