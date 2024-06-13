@@ -7,13 +7,19 @@ import {
   PreferenceBoxFooter,
   PreferenceBoxHeader,
   PreferenceDescription,
-  cls_input,
 } from "@/components/preferences";
 import clsx from "clsx";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
+import Link from "next/link";
+import {
+  HoverCard,
+  HoverCardContent,
+  HoverCardTrigger,
+} from "@/components/ui/hover-card";
+import { InfoCircledIcon } from "@radix-ui/react-icons";
 
 export function RestrictNumberOfResponseByCustomer({
   form_id,
@@ -34,6 +40,46 @@ export function RestrictNumberOfResponseByCustomer({
     <PreferenceBox>
       <PreferenceBoxHeader
         heading={<>Limit number of responses by customer</>}
+        description={
+          <>
+            Make sure you have{" "}
+            <Link href={`/d/${form_id}/connect/customer`}>
+              <u>customer identity</u>
+            </Link>{" "}
+            configured or login page enabled.
+            <br />
+            Otherwise this feature may not work as intended.{" "}
+            <HoverCard>
+              <HoverCardTrigger>
+                <u>
+                  <InfoCircledIcon className="inline me-0.5 align-middle" />
+                  Lean more
+                </u>
+              </HoverCardTrigger>
+              <HoverCardContent>
+                <article className="prose prose-sm dark:prose-invert">
+                  Fingerprint generation for some platform/environment may
+                  confict customer identity, thus this feature may not work as
+                  intended.
+                  <br />
+                  <br />
+                  <strong>Vunarable platforms:</strong>
+                  <ul>
+                    <li>
+                      <a href="https://fingerprint.com/blog/ios15-icloud-private-relay-vulnerability/">
+                        iOS 15+ with iCloud Private Relay
+                      </a>
+                    </li>
+                    <li>iOS / Android Webviews</li>
+                  </ul>
+                  Please note that setting up customer identity or having a
+                  login page will resolve this issue.
+                </article>
+              </HoverCardContent>
+            </HoverCard>
+            <br />
+          </>
+        }
       />
       <PreferenceBody>
         <form
