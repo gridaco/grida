@@ -49,11 +49,11 @@ export default async function FormsDashboardPage({
   const supabase = createServerComponentClient(cookieStore);
   const wsclient = createServerComponentWorkspaceClient(cookieStore);
 
-  const { data: auth } = await supabase.auth.getSession();
+  const { data: auth } = await supabase.auth.getUser();
 
   const layout = searchParams.layout ?? "list";
 
-  if (!auth.session) {
+  if (!auth.user) {
     return redirect("/sign-in");
   }
 

@@ -84,6 +84,7 @@
     "immer": "^9.0.3",
     "lucide-react": "^0.367.0",
     "mapbox-gl": "^3.4.0",
+    "mdn-data": "^2.8.0",
     "mini-svg-data-uri": "^1.4.4",
     "monaco-editor": "^0.47.0",
     "monaco-themes": "^0.4.4",
