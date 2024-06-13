@@ -55,6 +55,7 @@ export function initialFormEditorState(init: FormEditorInit): FormEditorState {
     datetz: LOCALTZ,
     datagrid_table: "response",
     datagrid_filter: {
+      masking_enabled: false,
       empty_data_hidden: true,
     },
     realtime_responses_enabled: true,
@@ -63,6 +64,7 @@ export function initialFormEditorState(init: FormEditorInit): FormEditorState {
 }
 
 export interface DataGridFilterSettings {
+  masking_enabled: boolean;
   empty_data_hidden: boolean;
 }
 
