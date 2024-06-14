@@ -496,7 +496,7 @@ function ConnectSupabase({ form_id }: { form_id: string }) {
       </Card>
       <Card hidden={!is_connected}>
         <CardHeader>
-          <CardTitle>Main Datasource</CardTitle>
+          <CardTitle>Main Table Connection</CardTitle>
           <CardDescription>
             Grida Forms Allow you to connect to one of your supabase table to
             the form.

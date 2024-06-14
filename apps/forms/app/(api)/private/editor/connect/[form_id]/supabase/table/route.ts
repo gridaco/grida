@@ -44,19 +44,31 @@ export async function PUT(req: NextRequest, context: Context) {
 
   const schema = (supabase_project!.sb_public_schema as any)[data.table];
 
-  const { error } = await grida_xsupabase_client.from("supabase_table").upsert(
-    {
-      supabase_project_id: conn_ref!.supabase_project_id,
-      sb_table_name: data.table,
-      sb_schema_name: "public",
-      sb_table_schema: schema,
-    },
-    {
-      onConflict: "supabase_project_id, sb_table_name, sb_schema_name",
-    }
-  );
+  const { data: upserted_supabase_table, error } = await grida_xsupabase_client
+    .from("supabase_table")
+    .upsert(
+      {
+        supabase_project_id: conn_ref!.supabase_project_id,
+        sb_table_name: data.table,
+        sb_schema_name: "public",
+        sb_table_schema: schema,
+      },
+      {
+        onConflict: "supabase_project_id, sb_table_name, sb_schema_name",
+      }
+    )
+    .select()
+    .single();
 
   if (error) return NextResponse.error();
+
+  // update connection_supabase
+  await supabase
+    .from("connection_supabase")
+    .update({
+      main_supabase_table_id: upserted_supabase_table.id,
+    })
+    .eq("id", conn_ref.id);
 
   return NextResponse.json({ data: null, error: null }, { status: 200 });
 }
