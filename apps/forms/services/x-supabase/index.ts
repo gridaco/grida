@@ -1,9 +1,11 @@
 import { grida_xsupabase_client } from "@/lib/supabase/server";
 import { secureformsclient } from "@/lib/supabase/vault";
 import { SupabaseClient, createClient } from "@supabase/supabase-js";
+import assert from "assert";
 
 export async function createXSupabaseClient(
-  supabase_project_id: number
+  supabase_project_id: number,
+  config?: { service_role?: boolean }
 ): Promise<SupabaseClient<any, any>> {
   // fetch connection table
   const { data: supabase_project, error: supabase_project_err } =
@@ -18,9 +20,15 @@ export async function createXSupabaseClient(
   }
   const { sb_project_url, sb_anon_key } = supabase_project;
 
-  // TODO: use service key only if configured to do so
-  const apiKey =
-    (await secureFetchServiceKey(supabase_project.id)) || sb_anon_key;
+  const serviceRoleKey = config?.service_role
+    ? await secureFetchServiceKey(supabase_project.id)
+    : null;
+
+  if (config?.service_role) {
+    assert(serviceRoleKey, "serviceRoleKey is required");
+  }
+
+  const apiKey = serviceRoleKey || sb_anon_key;
 
   const sbclient = createClient(sb_project_url, apiKey);
 

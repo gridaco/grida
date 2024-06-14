@@ -132,7 +132,10 @@ async function sign({
       case "x-supabase": {
         assert(form.supabase_connection, "supabase_connection not found");
         const client = await createXSupabaseClient(
-          form.supabase_connection.supabase_project_id
+          form.supabase_connection.supabase_project_id,
+          {
+            service_role: true,
+          }
         );
         switch (mode) {
           case "direct": {

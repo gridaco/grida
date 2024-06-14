@@ -34,7 +34,10 @@ export async function sbconn_insert(
 
   const data = parseFormData(formdata, schema);
 
-  const sbclient = await createXSupabaseClient(connection.supabase_project_id);
+  const sbclient = await createXSupabaseClient(connection.supabase_project_id, {
+    // TODO: use service key only if configured to do so
+    service_role: true,
+  });
 
   return sbclient.from(sb_table_name).insert(data).select().single();
 }
