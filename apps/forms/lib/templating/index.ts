@@ -72,6 +72,13 @@ export namespace TemplateVariables {
     };
   }
 
+  export interface ConnectedDatasourcePostgresTransactionCompleteContext
+    extends FormResponseContext {
+    NEW: {
+      [column: string]: any;
+    };
+  }
+
   export const schema = z.object({
     form_title: z.string().describe("Form title"),
     title: z.string().describe("Page / Campaign title"),

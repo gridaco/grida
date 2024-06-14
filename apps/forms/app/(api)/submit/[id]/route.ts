@@ -24,7 +24,7 @@ import { GridaCommerceClient } from "@/services/commerce";
 import { OnSubmitProcessors, OnSubmit } from "./hooks";
 import { Features } from "@/lib/features/scheduling";
 import { IpInfo, ipinfo } from "@/lib/ipinfo";
-import type { Geo } from "@/types";
+import type { FormFieldStorageSchema, Geo } from "@/types";
 import { PGXXError } from "@/k/errcode";
 import { qval } from "@/utils/qs";
 import { notFound } from "next/navigation";
@@ -564,11 +564,17 @@ async function submit({
 
         console.log("submit/file", files);
 
-        field_file_uploads[field.id] = process_response_field_files(files, {
-          session_id: meta.session || undefined,
-          response_id: response_reference_obj!.id,
-          field_id: field.id,
-        });
+        field_file_uploads[field.id] = process_response_field_files(
+          files,
+          {
+            session_id: meta.session || undefined,
+            response_id: response_reference_obj!.id,
+            field_id: field.id,
+          },
+          {
+            storage: field.storage as FormFieldStorageSchema | null,
+          }
+        );
       }
 
       return {
@@ -812,6 +818,9 @@ async function process_response_field_files(
     session_id?: string;
     response_id: string;
     field_id: string;
+  },
+  connections?: {
+    storage: FormFieldStorageSchema | null;
   }
 ) {
   const uploads: Promise<SupabaseStorageUploadReturnType>[] = [];
