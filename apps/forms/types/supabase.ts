@@ -1707,14 +1707,14 @@ export type Database = {
     Functions: {
       create_secret_connection_supabase_service_key: {
         Args: {
-          p_connection_id: number
+          p_supabase_project_id: number
           p_secret: string
         }
         Returns: string
       }
       reveal_secret_connection_supabase_service_key: {
         Args: {
-          p_connection_id: number
+          p_supabase_project_id: number
         }
         Returns: string
       }
@@ -1768,6 +1768,20 @@ export type Database = {
             columns: ["project_id"]
             isOneToOne: false
             referencedRelation: "project"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "supabase_project_sb_service_key_id_fkey"
+            columns: ["sb_service_key_id"]
+            isOneToOne: false
+            referencedRelation: "decrypted_secrets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "supabase_project_sb_service_key_id_fkey"
+            columns: ["sb_service_key_id"]
+            isOneToOne: false
+            referencedRelation: "secrets"
             referencedColumns: ["id"]
           },
         ]

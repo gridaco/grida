@@ -17,7 +17,7 @@ export async function GET(req: NextRequest, context: Context) {
   // TODO: This is secure (protected by RLS), but we need to add extra verification of the ownership of the form.
   const { data: conn } = await supabase
     .from("connection_supabase")
-    .select("id")
+    .select()
     .eq("form_id", form_id)
     .single();
 
@@ -32,7 +32,7 @@ export async function GET(req: NextRequest, context: Context) {
   const { data } = await secureformsclient.rpc(
     "reveal_secret_connection_supabase_service_key",
     {
-      p_connection_id: conn.id,
+      p_supabase_project_id: conn.supabase_project_id,
     }
   );
 
@@ -47,7 +47,7 @@ export async function POST(req: NextRequest, context: Context) {
   // TODO: This is secure (protected by RLS), but we need to add extra verification of the ownership of the form.
   const { data: conn } = await supabase
     .from("connection_supabase")
-    .select("id")
+    .select()
     .eq("form_id", form_id)
     .single();
 
@@ -64,7 +64,7 @@ export async function POST(req: NextRequest, context: Context) {
   const { data, error } = await secureformsclient.rpc(
     "create_secret_connection_supabase_service_key",
     {
-      p_connection_id: conn.id,
+      p_supabase_project_id: conn.supabase_project_id,
       p_secret: secret,
     }
   );

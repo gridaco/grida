@@ -39,7 +39,8 @@ export async function sbconn_insert(
   const data = parseFormData(formdata, schema);
 
   // TODO: use service key only if configured to do so
-  const apiKey = (await secureFetchServiceKey(id)) || sb_anon_key;
+  const apiKey =
+    (await secureFetchServiceKey(supabase_project.id)) || sb_anon_key;
 
   const insertion = {
     url: build_supabase_rest_url(sb_project_url),
@@ -58,11 +59,11 @@ export async function sbconn_insert(
   return postgrest.insert(insertion);
 }
 
-async function secureFetchServiceKey(connection_id: number) {
+async function secureFetchServiceKey(supabase_project_id: number) {
   const { data } = await secureformsclient.rpc(
     "reveal_secret_connection_supabase_service_key",
     {
-      p_connection_id: connection_id,
+      p_supabase_project_id: supabase_project_id,
     }
   );
 
