@@ -52,7 +52,7 @@
     "@supabase/auth-helpers-nextjs": "^0.9.0",
     "@supabase/postgrest-js": "^1.15.5",
     "@supabase/ssr": "^0.1.0",
-    "@supabase/supabase-js": "^2.39.7",
+    "@supabase/supabase-js": "^2.43.4",
     "@tiptap/extension-mention": "^2.4.0",
     "@tiptap/pm": "^2.4.0",
     "@tiptap/react": "^2.4.0",
