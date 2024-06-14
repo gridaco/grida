@@ -918,10 +918,12 @@ function SupabaseStorageSettings({
   );
 
   useEffect(() => {
+    // check if path contains template
+
     onValueChange?.({
       type: "x-supabase",
       bucket,
-      mode,
+      mode: isHandlebarTemplate(path) ? "staged" : mode,
       path,
     });
   }, [enabled, bucket, mode, path, onValueChange]);
@@ -997,6 +999,12 @@ function SupabaseStorageSettings({
       </PanelPropertyFields>
     </PanelPropertySection>
   );
+}
+
+function isHandlebarTemplate(str?: string) {
+  if (!str) return false;
+  const handlebarRegex = /\{\{[^{}]*\}\}/;
+  return handlebarRegex.test(str);
 }
 
 function next_option_default(options: Option[]): Option {
