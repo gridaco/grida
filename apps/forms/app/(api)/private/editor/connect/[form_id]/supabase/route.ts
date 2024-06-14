@@ -163,10 +163,15 @@ export async function DELETE(req: NextRequest, context: Context) {
   const cookieStore = cookies();
   const supabase = createRouteHandlerClient(cookieStore);
 
-  const { count } = await supabase
+  const { count, error } = await supabase
     .from("connection_supabase")
     .delete({ count: "exact" })
     .eq("form_id", form_id);
+
+  if (error) {
+    console.error(error);
+    return NextResponse.error();
+  }
 
   if (count) {
     return NextResponse.json({ data: null }, { status: 200 });
