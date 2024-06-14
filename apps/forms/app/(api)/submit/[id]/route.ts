@@ -379,7 +379,6 @@ async function submit({
   // ==================================================
   // region user supabase connection
 
-  // [UNDER MIGRATION]
   if (supabase_connection && supabase_connection.main_supabase_table_id) {
     try {
       const insertion = await sbconn_insert(

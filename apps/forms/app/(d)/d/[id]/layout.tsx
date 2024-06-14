@@ -111,8 +111,7 @@ export default async function RootLayout({
                 project_id: data.project_id,
                 connections: {
                   store_id: data.store_connection?.store_id,
-                  // [UNDER MIGRATION]
-                  // supabase: data.supabase_connection as any,
+                  supabase: data.supabase_connection,
                 },
                 form_id: id,
                 form_title: data.title,
