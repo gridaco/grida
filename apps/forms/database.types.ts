@@ -1113,6 +1113,7 @@ export type Database = {
           placeholder: string | null
           required: boolean
           step: number | null
+          storage: Json | null
           type: Database["grida_forms"]["Enums"]["form_field_type"]
           updated_at: string
         }
@@ -1141,6 +1142,7 @@ export type Database = {
           placeholder?: string | null
           required?: boolean
           step?: number | null
+          storage?: Json | null
           type?: Database["grida_forms"]["Enums"]["form_field_type"]
           updated_at?: string
         }
@@ -1169,6 +1171,7 @@ export type Database = {
           placeholder?: string | null
           required?: boolean
           step?: number | null
+          storage?: Json | null
           type?: Database["grida_forms"]["Enums"]["form_field_type"]
           updated_at?: string
         }

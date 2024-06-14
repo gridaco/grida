@@ -21,7 +21,7 @@ npx supabase gen types typescript \
   --schema grida_commerce \
   --schema grida_forms_secure \
   --schema grida_forms \
-  > types/supabase.ts
+  > database.types.ts
 ```
 
 ## Grida Forms Client Library

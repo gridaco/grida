@@ -1,4 +1,4 @@
-import type { Database } from "./supabase";
+import type { Database } from "@/database.types";
 
 const schema = "grida_forms" as const;
 

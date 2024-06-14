@@ -1,4 +1,4 @@
-import { Database } from "@/types/supabase";
+import type { Database } from "@/database.types";
 import { createServerComponentClient as _createServerComponentClient } from "@supabase/auth-helpers-nextjs";
 import { createRouteHandlerClient as _createRouteHandlerClient } from "@supabase/auth-helpers-nextjs";
 import { createClient } from "@supabase/supabase-js";

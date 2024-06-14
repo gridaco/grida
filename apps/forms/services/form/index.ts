@@ -1,4 +1,4 @@
-import { Database } from "@/types/supabase";
+import type { Database } from "@/database.types";
 import { SupabaseClient } from "@supabase/supabase-js";
 import assert from "assert";
 
