@@ -74,6 +74,7 @@ import { FormFieldTypeIcon } from "@/components/form-field-type-icon";
 import { useInventory, useInventoryState } from "../options/use-inventory";
 import Link from "next/link";
 import { SupabaseLogo } from "@/components/logos";
+import { Spinner } from "@/components/spinner";
 
 // @ts-ignore
 const default_field_init: {
@@ -900,6 +901,17 @@ export function FieldEditPanel({
   );
 }
 
+interface SupabaseBucketInfo {
+  id: string;
+  name: string;
+  owner: string;
+  public: boolean;
+  file_size_limit: number;
+  allowed_mime_types: string[];
+  created_at: string;
+  updated_at: string;
+}
+
 function SupabaseStorageSettings({
   value,
   onValueChange,
@@ -911,6 +923,8 @@ function SupabaseStorageSettings({
   enabled?: boolean;
   onEnabledChange?: (enabled: boolean) => void;
 }) {
+  const [state] = useEditorState();
+  const [buckets, setBuckets] = useState<SupabaseBucketInfo[]>();
   const [bucket, setBucket] = useState<string | undefined>(value?.bucket);
   const [path, setPath] = useState<string | undefined>(value?.path);
   const [mode, setMode] = useState<FormFieldStorageSchema["mode"]>(
@@ -927,6 +941,21 @@ function SupabaseStorageSettings({
       path,
     });
   }, [enabled, bucket, mode, path, onValueChange]);
+
+  // list buckets
+  useEffect(() => {
+    if (enabled) {
+      fetch(
+        `/private/editor/connect/${state.form_id}/supabase/storage/buckets`
+      ).then((res) => {
+        res.json().then(({ data, error }) => {
+          if (data) {
+            setBuckets(data);
+          }
+        });
+      });
+    }
+  }, [enabled, state.form_id]);
 
   useEffect(() => {
     setBucket(value?.bucket);
@@ -953,18 +982,43 @@ function SupabaseStorageSettings({
               label={"Bucket"}
               description="The bucket name to upload the file to."
             >
-              <PropertyTextInput
-                placeholder="bucket-name"
+              <Select
                 value={bucket}
-                onChange={(e) => setBucket(e.target.value)}
-              />
+                onValueChange={(value) => setBucket(value)}
+              >
+                <SelectTrigger>
+                  <SelectValue
+                    placeholder={
+                      buckets ? (
+                        <>Select Bucket</>
+                      ) : (
+                        <div className="flex gap-2">
+                          <Spinner /> Loading...
+                        </div>
+                      )
+                    }
+                  />
+                </SelectTrigger>
+                <SelectContent>
+                  {buckets?.map((bucket) => (
+                    <SelectItem key={bucket.id} value={bucket.id}>
+                      <span>
+                        {bucket.name}
+                        <small className="ms-2 text-muted-foreground">
+                          {bucket.public ? "public" : ""}
+                        </small>
+                      </span>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </PanelPropertyField>
             <PanelPropertyField
               label={"Upload Path"}
-              description="The folder path to upload the file to. (Leave leading and trailing slashes off)"
+              description="The file upload path. (Leave leading and trailing slashes off)"
             >
               <PropertyTextInput
-                placeholder="public/{{new.id}}/avatar.png"
+                placeholder="public/{{NEW.id}}/photos/{{file.name}}"
                 value={path}
                 onChange={(e) => setPath(e.target.value)}
               />
