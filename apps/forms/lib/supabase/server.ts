@@ -34,6 +34,15 @@ export const grida_commerce_client = createClient<Database, "grida_commerce">(
   }
 );
 
+export const grida_xsupabase_client = createClient<
+  Database,
+  "grida_x_supabase"
+>(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_KEY!, {
+  db: {
+    schema: "grida_x_supabase",
+  },
+});
+
 export const createServerComponentClient = (
   cookieStore: ReadonlyRequestCookies
 ) =>

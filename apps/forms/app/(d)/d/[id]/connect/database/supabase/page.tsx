@@ -54,7 +54,7 @@ import {
   parseSupabaseSchema,
   ping,
 } from "@/lib/supabase-postgrest";
-import { SupabaseConnection, SupabaseConnectionTable } from "@/types";
+import { GridaSupabase } from "@/types";
 import { Skeleton } from "@/components/ui/skeleton";
 import assert from "assert";
 import {
@@ -102,8 +102,8 @@ async function sbconn_refresh_connection(form_id: string) {
 
 async function sbconn_get_connection(form_id: string) {
   return Axios.get<{
-    data: SupabaseConnection & {
-      connection_table: SupabaseConnectionTable | null;
+    data: GridaSupabase.SupabaseProject & {
+      connection_table: GridaSupabase.SupabaseTable | null;
     };
   }>(`/private/editor/connect/${form_id}/supabase`);
 }
@@ -140,7 +140,7 @@ function ConnectSupabase({ form_id }: { form_id: string }) {
   const [table, setTable] = useState<string | undefined>(undefined);
 
   const [connection, setConnection] = useState<
-    SupabaseConnection | null | undefined
+    GridaSupabase.SupabaseProject | null | undefined
   >(undefined);
 
   const is_loaded = schema !== null;

@@ -801,7 +801,7 @@ export type Database = {
           },
         ]
       }
-      connection_supabase_project: {
+      connection_supabase: {
         Row: {
           created_at: string
           form_id: string
@@ -839,9 +839,9 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "connection_supabase_project_supabase_project_id_fkey"
+            foreignKeyName: "connection_supabase_supabase_project_id_fkey"
             columns: ["supabase_project_id"]
-            isOneToOne: false
+            isOneToOne: true
             referencedRelation: "supabase_project"
             referencedColumns: ["id"]
           },
@@ -1776,35 +1776,35 @@ export type Database = {
         Row: {
           created_at: string
           id: number
+          sb_schema_name: string
           sb_table_name: string
           sb_table_schema: Json
-          schema_name: string
-          supabase_connection_id: number
+          supabase_project_id: number
           updated_at: string
         }
         Insert: {
           created_at?: string
           id?: number
+          sb_schema_name: string
           sb_table_name: string
           sb_table_schema: Json
-          schema_name: string
-          supabase_connection_id: number
+          supabase_project_id: number
           updated_at?: string
         }
         Update: {
           created_at?: string
           id?: number
+          sb_schema_name?: string
           sb_table_name?: string
           sb_table_schema?: Json
-          schema_name?: string
-          supabase_connection_id?: number
+          supabase_project_id?: number
           updated_at?: string
         }
         Relationships: [
           {
-            foreignKeyName: "connection_supabase_table_supabase_connection_id_fkey"
-            columns: ["supabase_connection_id"]
-            isOneToOne: true
+            foreignKeyName: "supabase_table_supabase_project_id_fkey"
+            columns: ["supabase_project_id"]
+            isOneToOne: false
             referencedRelation: "supabase_project"
             referencedColumns: ["id"]
           },

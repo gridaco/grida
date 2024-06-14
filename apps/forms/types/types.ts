@@ -329,21 +329,10 @@ export interface Geo {
   longitude?: string | undefined;
 }
 
-export interface SupabaseConnection {
-  id: number;
+export interface ConnectionSupabaseJoint {
+  created_at: string;
   form_id: string;
-  project_id: number;
-  sb_anon_key: string;
-  sb_project_reference_id: string;
-  sb_public_schema: { [key: string]: any };
-  sb_project_url: string;
-  sb_service_key_id: string;
-}
-
-export interface SupabaseConnectionTable {
-  id: string;
-  supabase_connection_id: string;
-  schema_name: "public";
-  sb_table_name: string;
-  sb_table_schema: any;
+  id: number;
+  main_supabase_table_id: number | null;
+  supabase_project_id: number;
 }

@@ -73,7 +73,8 @@ export default async function RootLayout({
           *,
           blocks:form_block(*)
         ),
-        store_connection:connection_commerce_store(*)
+        store_connection:connection_commerce_store(*),
+        supabase_connection:connection_supabase(*)
       `
     )
     .eq("id", id)

@@ -1,4 +1,7 @@
-import { createRouteHandlerClient } from "@/lib/supabase/server";
+import {
+  createRouteHandlerClient,
+  grida_xsupabase_client,
+} from "@/lib/supabase/server";
 import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
 import { NextRequest, NextResponse } from "next/server";
@@ -33,17 +36,23 @@ export async function PUT(req: NextRequest, context: Context) {
 
   if (!conn_ref) return notFound();
 
-  const schema = (conn_ref.sb_public_schema as any)[data.table];
+  const { data: supabase_project } = await grida_xsupabase_client
+    .from("supabase_project")
+    .select("*, tables:supabase_table(*)")
+    .eq("id", conn_ref.supabase_project_id)
+    .single();
 
-  const { error } = await supabase.from("connection_supabase_table").upsert(
+  const schema = (supabase_project!.sb_public_schema as any)[data.table];
+
+  const { error } = await grida_xsupabase_client.from("supabase_table").upsert(
     {
-      supabase_connection_id: conn_ref.id,
+      supabase_project_id: conn_ref!.supabase_project_id,
       sb_table_name: data.table,
-      schema_name: "public",
+      sb_schema_name: "public",
       sb_table_schema: schema,
     },
     {
-      onConflict: "supabase_connection_id",
+      onConflict: "supabase_project_id, sb_table_name, sb_schema_name",
     }
   );
 

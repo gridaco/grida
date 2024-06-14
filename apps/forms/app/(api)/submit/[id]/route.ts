@@ -120,7 +120,8 @@ async function submit({
           *,
           options:form_field_option(*)
         ),
-        store_connection:connection_commerce_store(*)
+        store_connection:connection_commerce_store(*),
+        supabase_connection:connection_supabase(*)
       `
     )
     .eq("id", form_id)
@@ -146,7 +147,7 @@ async function submit({
     scheduling_open_at,
     scheduling_close_at,
     store_connection,
-    // supabase_connection,
+    supabase_connection,
   } = form_reference;
 
   const entries = data.entries();
@@ -379,21 +380,28 @@ async function submit({
   // region user supabase connection
 
   // [UNDER MIGRATION]
-  // if (supabase_connection && supabase_connection.connection_table) {
-  //   const insertion = await sbconn_insert(
-  //     supabase_connection as any,
-  //     data // needs json conversion
-  //   );
+  if (supabase_connection && supabase_connection.main_supabase_table_id) {
+    try {
+      const insertion = await sbconn_insert(
+        supabase_connection,
+        data // needs json conversion
+      );
 
-  //   console.log("sbconn_insertion", insertion);
+      console.log("sbconn_insertion", insertion);
 
-  //   const { data: sbconn_inserted, error: sbconn_insertion_error } = insertion;
+      const { data: sbconn_inserted, error: sbconn_insertion_error } =
+        insertion;
 
-  //   if (sbconn_insertion_error) {
-  //     console.error("submit/err/sbconn", sbconn_insertion_error);
-  //     return error(500, { form_id }, meta);
-  //   }
-  // }
+      if (sbconn_insertion_error) {
+        console.error("submit/err/sbconn", sbconn_insertion_error);
+        return error(500, { form_id }, meta);
+      }
+    } catch (e) {
+      console.error("submit/err/sbconn", e);
+      // TODO: enhance error message
+      return error(500, { form_id }, meta);
+    }
+  }
 
   // create new form response
   const { data: response_reference_obj, error: response_insertion_error } =

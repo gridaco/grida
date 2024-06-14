@@ -1,11 +1,11 @@
 import { blockstreeflat } from "@/lib/forms/tree";
 import type {
+  ConnectionSupabaseJoint,
   FormBlock,
   FormBlockType,
   FormFieldDefinition,
   FormResponse,
   FormResponseSession,
-  SupabaseConnection,
 } from "@/types";
 import { LOCALTZ } from "./symbols";
 
@@ -18,7 +18,7 @@ export interface FormEditorInit {
   scheduling_tz?: string;
   connections?: {
     store_id?: number | null;
-    supabase?: SupabaseConnection | null;
+    supabase?: ConnectionSupabaseJoint | null;
   };
   form_title: string;
   page_id: string | null;
@@ -72,7 +72,7 @@ export interface FormEditorState {
   connections: {
     project_id: number;
     store_id?: number | null;
-    supabase?: SupabaseConnection | null;
+    supabase?: ConnectionSupabaseJoint | null;
   };
   form_id: string;
   form_title: string;
