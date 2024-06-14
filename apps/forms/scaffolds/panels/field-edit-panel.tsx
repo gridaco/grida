@@ -21,6 +21,7 @@ import {
   FormFieldInit,
   PaymentFieldData,
   Option,
+  FormFieldStorageSchema,
 } from "@/types";
 import { LockClosedIcon } from "@radix-ui/react-icons";
 import { FormFieldAssistant } from "../ai/form-field-schema-assistant";
@@ -273,6 +274,11 @@ export function FieldEditPanel({
   );
   const [multiple, setMultiple] = useState(init?.multiple || false);
 
+  const [storage_enabled, __set_storage_enabled] = useState(!!init?.storage);
+  const [storage, setStorage] = useState<
+    Partial<FormFieldStorageSchema | null | undefined>
+  >(init?.storage);
+
   const preview_label = buildPreviewLabel({
     name,
     label,
@@ -367,6 +373,7 @@ export function FieldEditPanel({
       accept,
       multiple,
       options_inventory: options_inventory_upsert_diff,
+      storage: storage_enabled ? storage : undefined,
     });
   };
 
@@ -870,47 +877,13 @@ export function FieldEditPanel({
           {FieldSupports.file_alias(type) && state.connections.supabase && (
             <>
               <hr />
-              <PanelPropertySection>
-                <PanelPropertySectionTitle>
-                  <SupabaseLogo className="inline me-2 w-5 h-5 align-middle" />
-                  Supabase Storage
-                </PanelPropertySectionTitle>
-                <PanelPropertyFields>
-                  <PanelPropertyField
-                    label={"Bucket"}
-                    description="The bucket name to upload the file to."
-                  >
-                    <PropertyTextInput placeholder="bucket-name" />
-                  </PanelPropertyField>
-                  <PanelPropertyField
-                    label={"Upload Path"}
-                    description="The folder path to upload the file to. (Leave leading and trailing slashes off)"
-                  >
-                    <PropertyTextInput placeholder="public/{{new.id}}/avatar.png" />
-                  </PanelPropertyField>
-                  <PanelPropertyField
-                    label={"Staged Uploading"}
-                    help={
-                      <>
-                        Staged uploading allows you to upload first under{" "}
-                        <code>tmp/[session]/</code>
-                        folder and then move to the final destination. This is
-                        useful when you want to upload files under{" "}
-                        <code>path/to/[id]/</code>
-                        and you don&apos;t have the <code>id</code> yet.
-                      </>
-                    }
-                    description={
-                      <>
-                        Use staged uploading to upload first, then move to final
-                        path once transaction is complete.
-                      </>
-                    }
-                  >
-                    <Switch />
-                  </PanelPropertyField>
-                </PanelPropertyFields>
-              </PanelPropertySection>
+
+              <SupabaseStorageSettings
+                value={storage}
+                onValueChange={setStorage}
+                enabled={storage_enabled}
+                onEnabledChange={__set_storage_enabled}
+              />
             </>
           )}
         </form>
@@ -924,6 +897,105 @@ export function FieldEditPanel({
         </Button>
       </PanelFooter>
     </SidePanel>
+  );
+}
+
+function SupabaseStorageSettings({
+  value,
+  onValueChange,
+  enabled,
+  onEnabledChange,
+}: {
+  value?: Partial<FormFieldStorageSchema> | null | undefined;
+  onValueChange?: (value: Partial<FormFieldStorageSchema>) => void;
+  enabled?: boolean;
+  onEnabledChange?: (enabled: boolean) => void;
+}) {
+  const [bucket, setBucket] = useState<string | undefined>(value?.bucket);
+  const [path, setPath] = useState<string | undefined>(value?.path);
+  const [mode, setMode] = useState<FormFieldStorageSchema["mode"]>(
+    value?.mode ?? "direct"
+  );
+
+  useEffect(() => {
+    onValueChange?.({
+      type: "x-supabase",
+      bucket,
+      mode,
+      path,
+    });
+  }, [enabled, bucket, mode, path, onValueChange]);
+
+  useEffect(() => {
+    setBucket(value?.bucket);
+    setMode(value?.mode ?? "direct");
+    setPath(value?.path);
+  }, [value]);
+
+  return (
+    <PanelPropertySection>
+      <PanelPropertySectionTitle>
+        <SupabaseLogo className="inline me-2 w-5 h-5 align-middle" />
+        Supabase Storage
+      </PanelPropertySectionTitle>
+      <PanelPropertyFields>
+        <PanelPropertyField
+          label={"Enabled Storage"}
+          description="Enable Supabase Storage to store files in your Supabase project."
+        >
+          <Switch checked={enabled} onCheckedChange={onEnabledChange} />
+        </PanelPropertyField>
+        {enabled && (
+          <>
+            <PanelPropertyField
+              label={"Bucket"}
+              description="The bucket name to upload the file to."
+            >
+              <PropertyTextInput
+                placeholder="bucket-name"
+                value={bucket}
+                onChange={(e) => setBucket(e.target.value)}
+              />
+            </PanelPropertyField>
+            <PanelPropertyField
+              label={"Upload Path"}
+              description="The folder path to upload the file to. (Leave leading and trailing slashes off)"
+            >
+              <PropertyTextInput
+                placeholder="public/{{new.id}}/avatar.png"
+                value={path}
+                onChange={(e) => setPath(e.target.value)}
+              />
+            </PanelPropertyField>
+            <PanelPropertyField
+              label={"Staged Uploading"}
+              help={
+                <>
+                  Staged uploading allows you to upload first under{" "}
+                  <code>tmp/[session]/</code>
+                  folder and then move to the final destination. This is useful
+                  when you want to upload files under <code>path/to/[id]/</code>
+                  and you don&apos;t have the <code>id</code> yet.
+                </>
+              }
+              description={
+                <>
+                  Use staged uploading to upload first, then move to final path
+                  once transaction is complete.
+                </>
+              }
+            >
+              <Switch
+                checked={mode === "staged"}
+                onCheckedChange={(checked) =>
+                  setMode(checked ? "staged" : "direct")
+                }
+              />
+            </PanelPropertyField>
+          </>
+        )}
+      </PanelPropertyFields>
+    </PanelPropertySection>
   );
 }
 

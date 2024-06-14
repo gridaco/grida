@@ -173,6 +173,7 @@ export type FormFieldInit = {
   data?: FormFieldDataSchema | null;
   accept?: string | null;
   multiple?: boolean;
+  storage?: FormFieldStorageSchema | {} | null;
   // options_inventory?: { [option_id: string]: MutableInventoryStock };
 };
 
@@ -193,6 +194,7 @@ export interface IFormField {
   data?: FormFieldDataSchema | null;
   accept?: string | null;
   multiple?: boolean | null;
+  storage?: FormFieldStorageSchema | {} | null;
 }
 
 export interface FormFieldDefinition extends IFormField {
@@ -290,6 +292,13 @@ export interface FormResponseField {
 }
 
 export type FormFieldDataSchema = PaymentFieldData | {};
+
+export interface FormFieldStorageSchema {
+  type: "grida" | "x-supabase" | "x-s3";
+  bucket: string;
+  path: string;
+  mode: "direct" | "staged";
+}
 
 export type PaymentsServiceProviders = "stripe" | "tosspayments";
 

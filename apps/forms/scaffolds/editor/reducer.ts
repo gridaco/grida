@@ -383,19 +383,8 @@ export function reducer(
       return produce(state, (draft) => {
         const field = draft.fields.find((f) => f.id === field_id);
         if (field) {
+          Object.assign(field, { ...data });
           field.id = field_id;
-          field.name = data.name;
-          field.label = data.label;
-          field.placeholder = data.placeholder;
-          field.help_text = data.help_text;
-          field.type = data.type;
-          field.required = data.required;
-          field.pattern = data.pattern;
-          field.options = data.options;
-          field.autocomplete = data.autocomplete;
-          field.data = data.data;
-          field.accept = data.accept;
-          field.multiple = data.multiple;
         } else {
           // create new field
           draft.fields.push({
