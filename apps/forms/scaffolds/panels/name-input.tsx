@@ -5,10 +5,8 @@ import { Command as CommandPrimitive } from "cmdk";
 import {
   Command,
   CommandGroup,
-  CommandInput,
   CommandItem,
   CommandList,
-  CommandSeparator,
 } from "@/components/ui/command";
 import { useState } from "react";
 import { useEditorState } from "../editor";
@@ -37,7 +35,12 @@ const Input = React.forwardRef<
 Input.displayName = "CommandInput";
 
 export function NameInput({}: {}) {
+  const ref = React.useRef<React.ElementRef<
+    typeof CommandPrimitive.Input
+  > | null>(null);
   const [state] = useEditorState();
+  const [open, setOpen] = useState<boolean>(false);
+  const [focus, setFocus] = useState<boolean>(false);
   const [value, setValue] = useState<string>("");
 
   const [tableSchema, setTableSchema] = useState<
@@ -54,46 +57,66 @@ export function NameInput({}: {}) {
     }
   }, [state.form_id, state.connections.supabase]);
 
+  useEffect(() => {
+    setOpen(focus && !!value);
+  }, [value, focus]);
+
+  useEffect(() => {
+    if (open || (!open && !value)) {
+      ref.current?.focus();
+    }
+  }, [open, ref, value]);
+
+  const onSelect = (val: string) => {
+    setValue(val);
+    setOpen(false);
+    setFocus(false);
+  };
+
   return (
-    <Command className="rounded-lg border">
-      <Input placeholder="field_name" value={value} onValueChange={setValue} />
+    <Command key={String(open)} className="rounded-lg border">
+      <Input
+        ref={ref}
+        placeholder="field_name"
+        value={value}
+        onValueChange={setValue}
+        onFocus={() => setFocus(true)}
+        onBlur={() => setFocus(false)}
+      />
       <CommandList>
-        {value && (
-          <>
-            <CommandSeparator />
-            <CommandGroup heading="Reserved">
-              <CommandItem>
-                <PersonIcon className="mr-2 h-4 w-4" />
-                <span>{SYSTEM_GF_CUSTOMER_UUID_KEY}</span>
-              </CommandItem>
-            </CommandGroup>
-            <CommandSeparator />
-            {state.connections.supabase && (
-              <CommandGroup
-                heading={
-                  <>
-                    <SupabaseLogo className="inline w-4 h-4 me-1 align-middle" />{" "}
-                    Supabase
-                  </>
-                }
-              >
-                {Object.keys(tableSchema?.properties ?? {}).map((key) => {
-                  // const property = tableSchema?.properties[key];
-                  return (
-                    <CommandItem key={key}>
-                      <Link1Icon className="mr-2 h-4 w-4" />
-                      <span>{key}</span>
-                    </CommandItem>
-                  );
-                })}
-              </CommandGroup>
-            )}
-            <CommandSeparator />
-            <CommandItem>
-              <PlusIcon className="mr-2 h-4 w-4" />
-              <span>{value}</span>
+        {open && value && (
+          <CommandItem key={"current"} onSelect={onSelect}>
+            <PlusIcon className="mr-2 h-4 w-4" />
+            <span>{value}</span>
+          </CommandItem>
+        )}
+        {open && (
+          <CommandGroup heading="System">
+            <CommandItem key={SYSTEM_GF_CUSTOMER_UUID_KEY} onSelect={onSelect}>
+              <PersonIcon className="mr-2 h-4 w-4" />
+              <span>{SYSTEM_GF_CUSTOMER_UUID_KEY}</span>
             </CommandItem>
-          </>
+          </CommandGroup>
+        )}
+        {open && state.connections.supabase && (
+          <CommandGroup
+            heading={
+              <>
+                <SupabaseLogo className="inline w-4 h-4 me-1 align-middle" />{" "}
+                Supabase
+              </>
+            }
+          >
+            {Object.keys(tableSchema?.properties ?? {}).map((key) => {
+              // const property = tableSchema?.properties[key];
+              return (
+                <CommandItem key={key} onSelect={onSelect}>
+                  <Link1Icon className="mr-2 h-4 w-4" />
+                  <span>{key}</span>
+                </CommandItem>
+              );
+            })}
+          </CommandGroup>
         )}
       </CommandList>
     </Command>
