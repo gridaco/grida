@@ -3,7 +3,7 @@ import Axios from "axios";
 
 export namespace PrivateEditorApi {
   export namespace SupabaseConnection {
-    export async function sbconn_create_connection(
+    export async function createConnection(
       form_id: string,
       data: {
         sb_anon_key: string;
@@ -13,11 +13,11 @@ export namespace PrivateEditorApi {
       return Axios.post(`/private/editor/connect/${form_id}/supabase`, data);
     }
 
-    export async function sbconn_refresh_connection(form_id: string) {
+    export async function refreshConnection(form_id: string) {
       return Axios.patch(`/private/editor/connect/${form_id}/supabase`);
     }
 
-    export async function sbconn_get_connection(form_id: string) {
+    export async function getConnection(form_id: string) {
       return Axios.get<{
         data: GridaSupabase.SupabaseProject & {
           connection_table: GridaSupabase.SupabaseTable | null;
@@ -25,11 +25,11 @@ export namespace PrivateEditorApi {
       }>(`/private/editor/connect/${form_id}/supabase`);
     }
 
-    export async function sbconn_remove_connection(form_id: string) {
+    export async function removeConnection(form_id: string) {
       return Axios.delete(`/private/editor/connect/${form_id}/supabase`);
     }
 
-    export async function sbconn_create_secret(
+    export async function createSecret(
       form_id: string,
       data: { secret: string }
     ) {
@@ -39,13 +39,13 @@ export namespace PrivateEditorApi {
       );
     }
 
-    export async function sbconn_reveal_secret(form_id: string) {
+    export async function revealSecret(form_id: string) {
       return Axios.get(
         `/private/editor/connect/${form_id}/supabase/secure-service-key`
       );
     }
 
-    export async function sbconn_create_connection_table(
+    export async function createConnectionTable(
       form_id: string,
       data: { table: string }
     ) {

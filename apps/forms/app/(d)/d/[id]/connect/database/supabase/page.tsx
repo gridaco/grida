@@ -104,7 +104,7 @@ function ConnectSupabase({ form_id }: { form_id: string }) {
   const disabled = !url || !anonKey;
 
   useEffect(() => {
-    PrivateEditorApi.SupabaseConnection.sbconn_get_connection(form_id)
+    PrivateEditorApi.SupabaseConnection.getConnection(form_id)
       .then((res) => {
         const data = res.data.data;
         setConnection(data);
@@ -145,8 +145,7 @@ function ConnectSupabase({ form_id }: { form_id: string }) {
   };
 
   const onRefreshSchemaClick = async () => {
-    const res =
-      PrivateEditorApi.SupabaseConnection.sbconn_refresh_connection(form_id);
+    const res = PrivateEditorApi.SupabaseConnection.refreshConnection(form_id);
     toast.promise(res, {
       loading: "Refreshing Schema...",
       success: "Schema Refreshed",
@@ -164,7 +163,7 @@ function ConnectSupabase({ form_id }: { form_id: string }) {
       sb_project_url: url,
     };
 
-    const res = PrivateEditorApi.SupabaseConnection.sbconn_create_connection(
+    const res = PrivateEditorApi.SupabaseConnection.createConnection(
       form_id,
       data
     );
@@ -181,8 +180,7 @@ function ConnectSupabase({ form_id }: { form_id: string }) {
   };
 
   const onRemoveConnectionClick = async () => {
-    const res =
-      PrivateEditorApi.SupabaseConnection.sbconn_remove_connection(form_id);
+    const res = PrivateEditorApi.SupabaseConnection.removeConnection(form_id);
 
     toast
       .promise(res, {
@@ -209,7 +207,7 @@ function ConnectSupabase({ form_id }: { form_id: string }) {
           secret: serviceKey,
         };
 
-        const res = PrivateEditorApi.SupabaseConnection.sbconn_create_secret(
+        const res = PrivateEditorApi.SupabaseConnection.createSecret(
           form_id,
           data
         );
@@ -234,11 +232,10 @@ function ConnectSupabase({ form_id }: { form_id: string }) {
 
   const onSaveMainTableClick = async () => {
     assert(table);
-    const res =
-      PrivateEditorApi.SupabaseConnection.sbconn_create_connection_table(
-        form_id,
-        { table }
-      );
+    const res = PrivateEditorApi.SupabaseConnection.createConnectionTable(
+      form_id,
+      { table }
+    );
 
     toast.promise(res, {
       loading: "Saving Main Table...",
@@ -432,7 +429,7 @@ function ConnectSupabase({ form_id }: { form_id: string }) {
                   <RevealSecret
                     fetcher={async () => {
                       const res =
-                        await PrivateEditorApi.SupabaseConnection.sbconn_reveal_secret(
+                        await PrivateEditorApi.SupabaseConnection.revealSecret(
                           form_id
                         );
                       return res.data.data;
