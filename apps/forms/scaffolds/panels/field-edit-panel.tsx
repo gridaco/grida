@@ -22,6 +22,7 @@ import {
   PaymentFieldData,
   Option,
   FormFieldStorageSchema,
+  GridaSupabase,
 } from "@/types";
 import { FormFieldAssistant } from "../ai/form-field-schema-assistant";
 import {
@@ -858,16 +859,28 @@ export function FieldEditPanel({
               </PanelPropertyField>
             </PanelPropertyFields>
           </PanelPropertySection>
-          {/* TODO: wip */}
           {FieldSupports.file_alias(type) && state.connections.supabase && (
             <>
               <hr />
-
               <SupabaseStorageSettings
                 value={storage}
                 onValueChange={setStorage}
                 enabled={storage_enabled}
                 onEnabledChange={__set_storage_enabled}
+              />
+            </>
+          )}
+          {FieldSupports.fk(type) && state.connections.supabase && !!name && (
+            <>
+              <hr />
+              <SupabaseForeignKeySearchSettings
+                format={
+                  state.connections.supabase.main_supabase_table
+                    ?.sb_table_schema?.properties?.[name]?.format
+                } // value={storage}
+                // onValueChange={setStorage}
+                // enabled={storage_enabled}
+                // onEnabledChange={__set_storage_enabled}
               />
             </>
           )}
@@ -1031,6 +1044,127 @@ function SupabaseStorageSettings({
                   setMode(checked ? "staged" : "direct")
                 }
               />
+            </PanelPropertyField>
+          </>
+        )}
+      </PanelPropertyFields>
+    </PanelPropertySection>
+  );
+}
+
+function SupabaseForeignKeySearchSettings({
+  format,
+  enabled = true,
+  onEnabledChange,
+}: {
+  format?: string;
+  enabled?: boolean;
+  onEnabledChange?: (enabled: boolean) => void;
+}) {
+  const [state] = useEditorState();
+
+  const { supabase_project } = state.connections.supabase!;
+
+  const [table, setTable] = useState<string | undefined>();
+  const [column, setColumn] = useState<string | undefined>();
+
+  return (
+    <PanelPropertySection>
+      <PanelPropertySectionTitle>
+        <SupabaseLogo className="inline me-2 w-5 h-5 align-middle" />
+        Supabase Foreign Key
+      </PanelPropertySectionTitle>
+      <PanelPropertyFields>
+        <PanelPropertyField
+          label={"Enable Foreign Key Search"}
+          description="Enable Supabase Storage to store files in your Supabase project."
+        >
+          <Switch checked={enabled} onCheckedChange={onEnabledChange} />
+        </PanelPropertyField>
+        {enabled && (
+          <>
+            <PanelPropertyField
+              label={"Reference Table"}
+              description="The bucket name to upload the file to."
+            >
+              <Select value={table} onValueChange={setTable}>
+                <SelectTrigger>
+                  <SelectValue placeholder={"Select Table"} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="auth.users">
+                    <span>auth.users</span>
+                  </SelectItem>
+                  {Object.keys(supabase_project.sb_public_schema!)?.map(
+                    (key) => {
+                      return (
+                        <SelectItem key={key} value={key}>
+                          <span>public.{key}</span>
+                        </SelectItem>
+                      );
+                    }
+                  )}
+                </SelectContent>
+              </Select>
+            </PanelPropertyField>
+            <PanelPropertyField
+              label={"Column"}
+              description="The file upload path. (Leave leading and trailing slashes off)"
+            >
+              <Select value={column} onValueChange={setColumn}>
+                <SelectTrigger>
+                  <SelectValue placeholder={"Select Column"} />
+                </SelectTrigger>
+                <SelectContent>
+                  {table &&
+                    (table === "auth.users" ? (
+                      <>
+                        {Object.keys(
+                          GridaSupabase.SupabaseUserJsonSchema.properties
+                        ).map((key) => {
+                          const property =
+                            GridaSupabase.SupabaseUserJsonSchema.properties[
+                              key as GridaSupabase.SupabaseUserColumn
+                            ];
+                          return (
+                            <SelectItem
+                              disabled={format !== property.format}
+                              key={key}
+                              value={key}
+                            >
+                              <span>{key}</span>{" "}
+                              <small className="ms-1 text-muted-foreground">
+                                {property.type} | {property.format}
+                              </small>
+                            </SelectItem>
+                          );
+                        })}
+                      </>
+                    ) : (
+                      <>
+                        {Object.keys(
+                          supabase_project.sb_public_schema![table].properties
+                        )?.map((key) => {
+                          const property =
+                            supabase_project.sb_public_schema![table]
+                              .properties?.[key];
+                          return (
+                            <SelectItem
+                              disabled={format !== property.format}
+                              key={key}
+                              value={key}
+                            >
+                              <span>{key}</span>{" "}
+                              <small className="ms-1 text-muted-foreground">
+                                {property.type} | {property.format}
+                              </small>
+                            </SelectItem>
+                          );
+                        })}
+                      </>
+                    ))}
+                </SelectContent>
+              </Select>
             </PanelPropertyField>
           </>
         )}

@@ -1111,6 +1111,7 @@ export type Database = {
           name: string
           pattern: Json | null
           placeholder: string | null
+          reference: Json | null
           required: boolean
           step: number | null
           storage: Json | null
@@ -1140,6 +1141,7 @@ export type Database = {
           name: string
           pattern?: Json | null
           placeholder?: string | null
+          reference?: Json | null
           required?: boolean
           step?: number | null
           storage?: Json | null
@@ -1169,6 +1171,7 @@ export type Database = {
           name?: string
           pattern?: Json | null
           placeholder?: string | null
+          reference?: Json | null
           required?: boolean
           step?: number | null
           storage?: Json | null

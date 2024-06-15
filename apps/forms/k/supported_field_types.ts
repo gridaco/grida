@@ -175,6 +175,10 @@ export namespace FieldSupports {
     return html5_file_alias_field_types.includes(type);
   }
 
+  export function fk(type: FormInputType) {
+    return type === "search";
+  }
+
   export function pattern(type: FormInputType) {
     return html5_pattern_supported_field_types.includes(type);
   }
