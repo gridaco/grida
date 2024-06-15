@@ -62,6 +62,7 @@ export function NameInput({}: {}) {
   }, [value, focus]);
 
   useEffect(() => {
+    // https://github.com/pacocoursey/cmdk/issues/267
     if (open || (!open && !value)) {
       ref.current?.focus();
     }
