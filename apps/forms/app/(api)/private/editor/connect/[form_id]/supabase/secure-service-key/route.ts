@@ -2,6 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { createRouteHandlerClient } from "@/lib/supabase/server";
 import { secureformsclient } from "@/lib/supabase/vault";
 import { cookies } from "next/headers";
+import {
+  secureCreateServiceKey,
+  secureFetchServiceKey,
+} from "@/services/x-supabase";
 
 interface Context {
   params: {
@@ -29,12 +33,7 @@ export async function GET(req: NextRequest, context: Context) {
   }
 
   // handle secret value with service client, using secure RPC.
-  const { data } = await secureformsclient.rpc(
-    "reveal_secret_connection_supabase_service_key",
-    {
-      p_supabase_project_id: conn.supabase_project_id,
-    }
-  );
+  const { data } = await secureFetchServiceKey(conn.supabase_project_id);
 
   return NextResponse.json({ data });
 }
@@ -61,12 +60,9 @@ export async function POST(req: NextRequest, context: Context) {
   const { secret } = await req.json();
 
   // handle secret value with service client, using secure RPC.
-  const { data, error } = await secureformsclient.rpc(
-    "create_secret_connection_supabase_service_key",
-    {
-      p_supabase_project_id: conn.supabase_project_id,
-      p_secret: secret,
-    }
+  const { data, error } = await secureCreateServiceKey(
+    conn.supabase_project_id,
+    secret
   );
 
   if (error) {

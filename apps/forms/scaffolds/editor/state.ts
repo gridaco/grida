@@ -6,6 +6,7 @@ import type {
   FormFieldDefinition,
   FormResponse,
   FormResponseSession,
+  GridaSupabase,
 } from "@/types";
 import { LOCALTZ } from "./symbols";
 
@@ -18,7 +19,7 @@ export interface FormEditorInit {
   scheduling_tz?: string;
   connections?: {
     store_id?: number | null;
-    supabase?: ConnectionSupabaseJoint | null;
+    supabase?: GridaSupabase.SupabaseConnectionState;
   };
   form_title: string;
   page_id: string | null;
@@ -72,7 +73,7 @@ export interface FormEditorState {
   connections: {
     project_id: number;
     store_id?: number | null;
-    supabase?: ConnectionSupabaseJoint | null;
+    supabase?: GridaSupabase.SupabaseConnectionState;
   };
   form_id: string;
   form_title: string;

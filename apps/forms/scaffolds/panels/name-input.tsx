@@ -14,8 +14,6 @@ import { useEditorState } from "../editor";
 import { SupabaseLogo } from "@/components/logos";
 import { SYSTEM_GF_CUSTOMER_UUID_KEY } from "@/k/system";
 import { cn } from "@/utils";
-import { PrivateEditorApi } from "@/lib/private";
-import { GridaSupabase } from "@/types";
 import {
   Popover,
   PopoverContent,
@@ -60,20 +58,6 @@ export function NameInput({
   const [state] = useEditorState();
   const [open, setOpen] = useState<boolean>(false);
   const [focus, setFocus] = useState<boolean>(false);
-
-  const [tableSchema, setTableSchema] = useState<
-    GridaSupabase.SupabaseTable["sb_table_schema"] | undefined
-  >();
-
-  useEffect(() => {
-    if (state.connections.supabase) {
-      PrivateEditorApi.SupabaseConnection.getConnectionTable(
-        state.form_id
-      ).then(({ data }) => {
-        setTableSchema(data.data.sb_table_schema);
-      });
-    }
-  }, [state.form_id, state.connections.supabase]);
 
   useEffect(() => {
     setOpen(focus && !!value);
@@ -136,8 +120,6 @@ export function NameInput({
             onBlur={() => setFocus(false)}
           />
           <CommandList>
-            {/* {open && (
-            )} */}
             <>
               {value && (
                 <>
@@ -159,7 +141,7 @@ export function NameInput({
                   <span>{SYSTEM_GF_CUSTOMER_UUID_KEY}</span>
                 </CommandItem>
               </CommandGroup>
-              {state.connections.supabase && (
+              {state.connections.supabase?.main_supabase_table && (
                 <>
                   <CommandSeparator />
                   <CommandGroup
@@ -170,12 +152,20 @@ export function NameInput({
                       </>
                     }
                   >
-                    {Object.keys(tableSchema?.properties ?? {}).map((key) => {
-                      // const property = tableSchema?.properties[key];
+                    {Object.keys(
+                      state.connections.supabase?.main_supabase_table
+                        ?.sb_table_schema?.properties ?? {}
+                    ).map((key) => {
+                      const property =
+                        state.connections.supabase?.main_supabase_table
+                          ?.sb_table_schema?.properties[key];
                       return (
-                        <CommandItem key={key} onSelect={onSelect}>
+                        <CommandItem key={key} value={key} onSelect={onSelect}>
                           <Link1Icon className="mr-2 h-4 w-4" />
-                          <span>{key}</span>
+                          <span>{key}</span>{" "}
+                          <small className="ms-1 text-muted-foreground">
+                            {property.type} | {property.format}
+                          </small>
                         </CommandItem>
                       );
                     })}

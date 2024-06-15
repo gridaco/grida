@@ -1,4 +1,4 @@
-import { GridaSupabase } from "@/types";
+import type { ConnectionSupabaseJoint, GridaSupabase } from "@/types";
 import Axios from "axios";
 
 export namespace PrivateEditorApi {
@@ -19,10 +19,7 @@ export namespace PrivateEditorApi {
 
     export async function getConnection(form_id: string) {
       return Axios.get<{
-        data: GridaSupabase.SupabaseProject & {
-          tables: GridaSupabase.SupabaseTable[];
-          main_supabase_table_id: number;
-        };
+        data: GridaSupabase.SupabaseConnectionState;
       }>(`/private/editor/connect/${form_id}/supabase`);
     }
 

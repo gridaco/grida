@@ -93,13 +93,13 @@ function ConnectSupabase({ form_id }: { form_id: string }) {
   const [schema, setSchema] = useState<SupabasePublicSchema | null>(null);
   const [table, setTable] = useState<string | undefined>(undefined);
 
-  const [connection, setConnection] = useState<
+  const [project, setProject] = useState<
     GridaSupabase.SupabaseProject | null | undefined
   >(undefined);
 
   const is_loaded = schema !== null;
-  const is_connected = !!connection;
-  const is_service_key_set = !!connection?.sb_service_key_id;
+  const is_connected = !!project;
+  const is_service_key_set = !!project?.sb_service_key_id;
 
   const disabled = !url || !anonKey;
 
@@ -107,10 +107,10 @@ function ConnectSupabase({ form_id }: { form_id: string }) {
     PrivateEditorApi.SupabaseConnection.getConnection(form_id)
       .then((res) => {
         const data = res.data.data;
-        setConnection(data);
-        setUrl(data.sb_project_url);
-        setAnonKey(data.sb_anon_key);
-        setSchema(data.sb_public_schema as {});
+        setProject(data.supabase_project);
+        setUrl(data.supabase_project.sb_project_url);
+        setAnonKey(data.supabase_project.sb_anon_key);
+        setSchema(data.supabase_project.sb_public_schema as {});
         setTable(
           data.tables.find((t) => t.id === data.main_supabase_table_id)
             ?.sb_table_name
@@ -118,7 +118,7 @@ function ConnectSupabase({ form_id }: { form_id: string }) {
         console.log(data);
       })
       .catch((err) => {
-        setConnection(null);
+        setProject(null);
       });
   }, [form_id]);
 
@@ -127,7 +127,7 @@ function ConnectSupabase({ form_id }: { form_id: string }) {
     setAnonKey("");
     setSchema(null);
     setTable(undefined);
-    setConnection(null);
+    setProject(null);
   };
 
   const onTestConnectionClick = async () => {
@@ -178,7 +178,7 @@ function ConnectSupabase({ form_id }: { form_id: string }) {
         error: "Failed to create connection",
       })
       .then((res) => {
-        setConnection(res.data.data);
+        setProject(res.data.data);
       });
   };
 
@@ -192,7 +192,7 @@ function ConnectSupabase({ form_id }: { form_id: string }) {
         error: "Failed to remove connection",
       })
       .then(() => {
-        setConnection(null);
+        setProject(null);
         setUrl("");
         setAnonKey("");
         setSchema(null);
@@ -216,7 +216,7 @@ function ConnectSupabase({ form_id }: { form_id: string }) {
         );
 
         res.then((res) => {
-          setConnection((prev) => ({
+          setProject((prev) => ({
             ...prev!,
             sb_service_key_id: res.data.data,
           }));
@@ -251,7 +251,7 @@ function ConnectSupabase({ form_id }: { form_id: string }) {
 
   return (
     <div className="space-y-10">
-      {connection === undefined ? (
+      {project === undefined ? (
         <LoadingCard />
       ) : (
         <Card>
@@ -263,7 +263,7 @@ function ConnectSupabase({ form_id }: { form_id: string }) {
               </span>
               {is_connected && (
                 <Link
-                  href={`https://supabase.com/dashboard/project/${connection.sb_project_reference_id}`}
+                  href={`https://supabase.com/dashboard/project/${project.sb_project_reference_id}`}
                   target="_blank"
                 >
                   <Button variant="link">
@@ -458,7 +458,7 @@ function ConnectSupabase({ form_id }: { form_id: string }) {
           </div>
         </CardContent>
         <CardFooter className="flex justify-end">
-          <div hidden={!!connection?.sb_service_key_id}>
+          <div hidden={!!project?.sb_service_key_id}>
             <Button disabled={!serviceKey} onClick={onServiceKeySaveClick}>
               Save
             </Button>
