@@ -1,5 +1,4 @@
 "use client";
-import Axios from "axios";
 import React, { useEffect, useState } from "react";
 import { Button, buttonVariants } from "@/components/ui/button";
 import {
@@ -69,6 +68,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Spinner } from "@/components/spinner";
+import { PrivateEditorApi } from "@/lib/private";
 
 export default function ConnectDB({
   params,
@@ -84,52 +84,6 @@ export default function ConnectDB({
       <ConnectSupabase form_id={form_id} />
     </main>
   );
-}
-
-async function sbconn_create_connection(
-  form_id: string,
-  data: {
-    sb_anon_key: string;
-    sb_project_url: string;
-  }
-) {
-  return Axios.post(`/private/editor/connect/${form_id}/supabase`, data);
-}
-
-async function sbconn_refresh_connection(form_id: string) {
-  return Axios.patch(`/private/editor/connect/${form_id}/supabase`);
-}
-
-async function sbconn_get_connection(form_id: string) {
-  return Axios.get<{
-    data: GridaSupabase.SupabaseProject & {
-      connection_table: GridaSupabase.SupabaseTable | null;
-    };
-  }>(`/private/editor/connect/${form_id}/supabase`);
-}
-
-async function sbconn_remove_connection(form_id: string) {
-  return Axios.delete(`/private/editor/connect/${form_id}/supabase`);
-}
-
-async function sbconn_create_secret(form_id: string, data: { secret: string }) {
-  return Axios.post(
-    `/private/editor/connect/${form_id}/supabase/secure-service-key`,
-    data
-  );
-}
-
-async function sbconn_reveal_secret(form_id: string) {
-  return Axios.get(
-    `/private/editor/connect/${form_id}/supabase/secure-service-key`
-  );
-}
-
-async function sbconn_create_connection_table(
-  form_id: string,
-  data: { table: string }
-) {
-  return Axios.put(`/private/editor/connect/${form_id}/supabase/table`, data);
 }
 
 function ConnectSupabase({ form_id }: { form_id: string }) {
@@ -150,7 +104,7 @@ function ConnectSupabase({ form_id }: { form_id: string }) {
   const disabled = !url || !anonKey;
 
   useEffect(() => {
-    sbconn_get_connection(form_id)
+    PrivateEditorApi.SupabaseConnection.sbconn_get_connection(form_id)
       .then((res) => {
         const data = res.data.data;
         setConnection(data);
@@ -191,7 +145,8 @@ function ConnectSupabase({ form_id }: { form_id: string }) {
   };
 
   const onRefreshSchemaClick = async () => {
-    const res = sbconn_refresh_connection(form_id);
+    const res =
+      PrivateEditorApi.SupabaseConnection.sbconn_refresh_connection(form_id);
     toast.promise(res, {
       loading: "Refreshing Schema...",
       success: "Schema Refreshed",
@@ -209,7 +164,10 @@ function ConnectSupabase({ form_id }: { form_id: string }) {
       sb_project_url: url,
     };
 
-    const res = sbconn_create_connection(form_id, data);
+    const res = PrivateEditorApi.SupabaseConnection.sbconn_create_connection(
+      form_id,
+      data
+    );
 
     toast
       .promise(res, {
@@ -223,7 +181,8 @@ function ConnectSupabase({ form_id }: { form_id: string }) {
   };
 
   const onRemoveConnectionClick = async () => {
-    const res = sbconn_remove_connection(form_id);
+    const res =
+      PrivateEditorApi.SupabaseConnection.sbconn_remove_connection(form_id);
 
     toast
       .promise(res, {
@@ -250,7 +209,10 @@ function ConnectSupabase({ form_id }: { form_id: string }) {
           secret: serviceKey,
         };
 
-        const res = sbconn_create_secret(form_id, data);
+        const res = PrivateEditorApi.SupabaseConnection.sbconn_create_secret(
+          form_id,
+          data
+        );
 
         res.then((res) => {
           setConnection((prev) => ({
@@ -272,7 +234,11 @@ function ConnectSupabase({ form_id }: { form_id: string }) {
 
   const onSaveMainTableClick = async () => {
     assert(table);
-    const res = sbconn_create_connection_table(form_id, { table });
+    const res =
+      PrivateEditorApi.SupabaseConnection.sbconn_create_connection_table(
+        form_id,
+        { table }
+      );
 
     toast.promise(res, {
       loading: "Saving Main Table...",
@@ -465,7 +431,10 @@ function ConnectSupabase({ form_id }: { form_id: string }) {
                 <>
                   <RevealSecret
                     fetcher={async () => {
-                      const res = await sbconn_reveal_secret(form_id);
+                      const res =
+                        await PrivateEditorApi.SupabaseConnection.sbconn_reveal_secret(
+                          form_id
+                        );
                       return res.data.data;
                     }}
                   />
