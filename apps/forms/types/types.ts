@@ -89,7 +89,8 @@ export type FormInputType =
   | "payment"
   | "hidden"
   | "signature"
-  | "range";
+  | "range"
+  | "search";
 
 export type FormFieldAutocompleteType =
   | "off"

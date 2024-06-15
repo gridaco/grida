@@ -25,6 +25,7 @@ export const supported_field_types: FormInputType[] = [
   "color",
   "hidden",
   "range",
+  "search",
 ];
 
 export const supported_field_autocomplete_types: FormFieldAutocompleteType[] = [
@@ -118,7 +119,7 @@ const html5_pattern_supported_field_types: FormInputType[] = [
   "email",
   "url",
   "password",
-  // "search", // not supported
+  "search",
 ];
 
 const html5_checkbox_alias_field_types: FormInputType[] = [

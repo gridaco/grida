@@ -1671,6 +1671,7 @@ export type Database = {
         | "time"
         | "datetime-local"
         | "range"
+        | "search"
       form_method: "post" | "get" | "dialog"
       form_page_language:
         | "en"
@@ -1905,18 +1906,29 @@ export type Database = {
           created_at: string
           id: number
           text: string
+          user_id: string | null
         }
         Insert: {
           created_at?: string
           id?: number
           text: string
+          user_id?: string | null
         }
         Update: {
           created_at?: string
           id?: number
           text?: string
+          user_id?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "dummy_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       organization: {
         Row: {
