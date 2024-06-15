@@ -7,6 +7,7 @@ import {
   CommandGroup,
   CommandItem,
   CommandList,
+  CommandSeparator,
 } from "@/components/ui/command";
 import { useState } from "react";
 import { useEditorState } from "../editor";
@@ -35,9 +36,11 @@ const Input = React.forwardRef<
 Input.displayName = "CommandInput";
 
 export function NameInput({
+  autoFocus,
   value,
   onValueChange,
 }: {
+  autoFocus?: boolean;
   value?: string;
   onValueChange?: (value: string) => void;
 }) {
@@ -83,6 +86,7 @@ export function NameInput({
     <Command key={String(open)} className="rounded-lg border">
       <Input
         required
+        autoFocus={autoFocus}
         ref={ref}
         placeholder="field_name"
         value={value}
@@ -91,39 +95,52 @@ export function NameInput({
         onBlur={() => setFocus(false)}
       />
       <CommandList>
-        {open && value && (
-          <CommandItem key={"current"} onSelect={onSelect}>
-            <PlusIcon className="mr-2 h-4 w-4" />
-            <span>{value}</span>
-          </CommandItem>
-        )}
         {open && (
-          <CommandGroup heading="System">
-            <CommandItem key={SYSTEM_GF_CUSTOMER_UUID_KEY} onSelect={onSelect}>
-              <PersonIcon className="mr-2 h-4 w-4" />
-              <span>{SYSTEM_GF_CUSTOMER_UUID_KEY}</span>
-            </CommandItem>
-          </CommandGroup>
-        )}
-        {open && state.connections.supabase && (
-          <CommandGroup
-            heading={
+          <>
+            {value && (
               <>
-                <SupabaseLogo className="inline w-4 h-4 me-1 align-middle" />{" "}
-                Supabase
+                <CommandGroup>
+                  <CommandItem key={"current"} onSelect={onSelect}>
+                    <PlusIcon className="mr-2 h-4 w-4" />
+                    <span>{value}</span>
+                  </CommandItem>
+                </CommandGroup>
               </>
-            }
-          >
-            {Object.keys(tableSchema?.properties ?? {}).map((key) => {
-              // const property = tableSchema?.properties[key];
-              return (
-                <CommandItem key={key} onSelect={onSelect}>
-                  <Link1Icon className="mr-2 h-4 w-4" />
-                  <span>{key}</span>
-                </CommandItem>
-              );
-            })}
-          </CommandGroup>
+            )}
+            <CommandSeparator />
+            <CommandGroup heading="System">
+              <CommandItem
+                key={SYSTEM_GF_CUSTOMER_UUID_KEY}
+                onSelect={onSelect}
+              >
+                <PersonIcon className="mr-2 h-4 w-4" />
+                <span>{SYSTEM_GF_CUSTOMER_UUID_KEY}</span>
+              </CommandItem>
+            </CommandGroup>
+            {state.connections.supabase && (
+              <>
+                <CommandSeparator />
+                <CommandGroup
+                  heading={
+                    <>
+                      <SupabaseLogo className="inline w-4 h-4 me-1 align-middle" />{" "}
+                      Supabase
+                    </>
+                  }
+                >
+                  {Object.keys(tableSchema?.properties ?? {}).map((key) => {
+                    // const property = tableSchema?.properties[key];
+                    return (
+                      <CommandItem key={key} onSelect={onSelect}>
+                        <Link1Icon className="mr-2 h-4 w-4" />
+                        <span>{key}</span>
+                      </CommandItem>
+                    );
+                  })}
+                </CommandGroup>
+              </>
+            )}
+          </>
         )}
       </CommandList>
     </Command>
