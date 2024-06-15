@@ -1,54 +1,45 @@
-import { build_supabase_rest_url } from "@/lib/supabase-postgrest";
-import * as postgrest from "@/lib/supabase-postgrest/postgrest";
-import { secureformsclient } from "@/lib/supabase/vault";
-import { SupabaseConnection, SupabaseConnectionTable } from "@/types";
-import { createClient } from "@supabase/supabase-js";
+import { grida_xsupabase_client } from "@/lib/supabase/server";
+import { createXSupabaseClient } from "@/services/x-supabase";
+import { ConnectionSupabaseJoint, GridaSupabase } from "@/types";
 import { JSONSchemaType } from "ajv";
 import { unflatten } from "flat";
 
 export async function sbconn_insert(
-  connection: SupabaseConnection & {
-    connection_table: SupabaseConnectionTable;
-  },
+  connection: ConnectionSupabaseJoint,
   formdata: FormData | URLSearchParams | Map<string, string>
 ) {
-  // const
-  const { id, connection_table, sb_project_url, sb_anon_key } = connection;
-  const { sb_table_name, schema_name, sb_table_schema } = connection_table;
+  // fetch connection table
+  const { data: supabase_project, error: supabase_project_err } =
+    await grida_xsupabase_client
+      .from("supabase_project")
+      .select("*, tables:supabase_table(*)")
+      .eq("id", connection.supabase_project_id)
+      .single();
+
+  if (supabase_project_err || !supabase_project) {
+    throw new Error("supabase_project not found");
+  }
+
+  const connection_table: GridaSupabase.SupabaseTable | undefined =
+    supabase_project!.tables.find(
+      (t) => t.id === connection.main_supabase_table_id
+    );
+
+  if (!connection_table) {
+    throw new Error("connection_table not found");
+  }
+  const { sb_table_name, sb_schema_name, sb_table_schema } = connection_table;
 
   const schema = sb_table_schema as JSONSchemaType<Record<string, any>>;
 
   const data = parseFormData(formdata, schema);
 
-  // TODO: use service key only if configured to do so
-  const apiKey = (await secureFetchServiceKey(id)) || sb_anon_key;
+  const sbclient = await createXSupabaseClient(connection.supabase_project_id, {
+    // TODO: use service key only if configured to do so
+    service_role: true,
+  });
 
-  const insertion = {
-    url: build_supabase_rest_url(sb_project_url),
-    apiKey: apiKey,
-    schema: schema_name,
-    table: sb_table_name,
-    data: data,
-  };
-
-  const sbclient = createClient(sb_project_url, apiKey);
   return sbclient.from(sb_table_name).insert(data).select().single();
-
-  // console.log("sbconn_insert", insertion);
-
-  //
-  return postgrest.insert(insertion);
-}
-
-async function secureFetchServiceKey(connection_id: number) {
-  const { data } = await secureformsclient.rpc(
-    "reveal_secret_connection_supabase_service_key",
-    {
-      p_connection_id: connection_id,
-    }
-  );
-
-  return data;
 }
 
 function parseFormData(

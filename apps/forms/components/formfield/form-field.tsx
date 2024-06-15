@@ -31,10 +31,10 @@ import { Button } from "../ui/button";
 import { Card } from "../ui/card";
 import { Label } from "../ui/label";
 import {
-  FileUploadDropzone,
+  FileUploadField,
   getMaxUploadSize,
   makeUploader,
-} from "./file-upload";
+} from "./file-upload-field";
 import {
   GRIDA_FORMS_RESPONSE_BUCKET_UPLOAD_LIMIT,
   GRIDA_FORMS_RESPONSE_FILES_MAX_COUNT_PER_FIELD,
@@ -284,7 +284,7 @@ function MonoFormField({
         }
 
         return (
-          <FileUploadDropzone
+          <FileUploadField
             name={sharedInputProps.name}
             required={required}
             accept={accept}

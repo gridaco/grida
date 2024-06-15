@@ -69,7 +69,7 @@ function FieldEditPanelProvider({ children }: React.PropsWithChildren<{}>) {
 
       console.log("[EDITOR] saving..", data);
 
-      const promise = fetch("/private/editor/fields", {
+      const promise = fetch(`/private/editor/${state.form_id}/fields`, {
         body: JSON.stringify(data),
         method: "POST",
         headers: {
@@ -136,6 +136,7 @@ function FieldEditPanelProvider({ children }: React.PropsWithChildren<{}>) {
                 accept: field.accept,
                 multiple: field.multiple ?? undefined,
                 options: field.options,
+                storage: field.storage,
                 // TODO: add inventory support
                 // options_inventory: undefined,
               }

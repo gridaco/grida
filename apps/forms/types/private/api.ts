@@ -44,6 +44,7 @@ export interface CreateSessionSignedUploadUrlRequest {
 }
 
 export interface SessionSignedUploadUrlData {
+  signedUrl: string;
   path: string;
   token: string;
 }

@@ -22,6 +22,7 @@ import {
   EyeNoneIcon,
   EyeOpenIcon,
   LockClosedIcon,
+  OpenInNewWindowIcon,
   QuestionMarkCircledIcon,
 } from "@radix-ui/react-icons";
 import toast from "react-hot-toast";
@@ -53,7 +54,7 @@ import {
   parseSupabaseSchema,
   ping,
 } from "@/lib/supabase-postgrest";
-import { SupabaseConnection, SupabaseConnectionTable } from "@/types";
+import { GridaSupabase } from "@/types";
 import { Skeleton } from "@/components/ui/skeleton";
 import assert from "assert";
 import {
@@ -101,8 +102,8 @@ async function sbconn_refresh_connection(form_id: string) {
 
 async function sbconn_get_connection(form_id: string) {
   return Axios.get<{
-    data: SupabaseConnection & {
-      connection_table: SupabaseConnectionTable | null;
+    data: GridaSupabase.SupabaseProject & {
+      connection_table: GridaSupabase.SupabaseTable | null;
     };
   }>(`/private/editor/connect/${form_id}/supabase`);
 }
@@ -139,7 +140,7 @@ function ConnectSupabase({ form_id }: { form_id: string }) {
   const [table, setTable] = useState<string | undefined>(undefined);
 
   const [connection, setConnection] = useState<
-    SupabaseConnection | null | undefined
+    GridaSupabase.SupabaseProject | null | undefined
   >(undefined);
 
   const is_loaded = schema !== null;
@@ -287,9 +288,22 @@ function ConnectSupabase({ form_id }: { form_id: string }) {
       ) : (
         <Card>
           <CardHeader>
-            <CardTitle>
-              <SupabaseLogo size={20} className="inline me-2 align-middle" />
-              Connect Supabase
+            <CardTitle className="flex items-center justify-between">
+              <span>
+                <SupabaseLogo size={20} className="inline me-2 align-middle" />
+                Connect Supabase
+              </span>
+              {is_connected && (
+                <Link
+                  href={`https://supabase.com/dashboard/project/${connection.sb_project_reference_id}`}
+                  target="_blank"
+                >
+                  <Button variant="link">
+                    <OpenInNewWindowIcon className="inline me-2 align-middle" />
+                    Dashboard
+                  </Button>
+                </Link>
+              )}
             </CardTitle>
             <CardDescription>
               Connect your Supabase account to access your database.{" "}
@@ -482,7 +496,7 @@ function ConnectSupabase({ form_id }: { form_id: string }) {
       </Card>
       <Card hidden={!is_connected}>
         <CardHeader>
-          <CardTitle>Main Datasource</CardTitle>
+          <CardTitle>Main Table Connection</CardTitle>
           <CardDescription>
             Grida Forms Allow you to connect to one of your supabase table to
             the form.

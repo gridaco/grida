@@ -61,11 +61,12 @@ export async function POST(
     .eq("id", session_id);
 
   // clear tmp files
-  await SupabaseStorageExt.rmdir(
-    client.storage,
-    GRIDA_FORMS_RESPONSE_BUCKET,
-    GRIDA_FORMS_RESPONSE_BUCKET_TMP_FOLDER + "/" + session_id
-  );
+  // TODO: disabling this since we now support x-supabase, this can be a possible attack point. for clearing tmp files, we can use a cron job.
+  // await SupabaseStorageExt.rmdir(
+  //   client.storage,
+  //   GRIDA_FORMS_RESPONSE_BUCKET,
+  //   GRIDA_FORMS_RESPONSE_BUCKET_TMP_FOLDER + "/" + session_id
+  // );
 
   return NextResponse.json({ ok: true });
 }

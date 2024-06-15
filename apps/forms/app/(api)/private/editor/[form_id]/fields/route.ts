@@ -17,14 +17,22 @@ import type {
 
 export const revalidate = 0;
 
-export async function POST(req: NextRequest) {
+export async function POST(
+  req: NextRequest,
+  context: {
+    params: {
+      form_id: string;
+    };
+  }
+) {
+  const { form_id } = context.params;
   const cookieStore = cookies();
   const supabase = createRouteHandlerClient(cookieStore);
   const init = (await req.json()) as FormFieldUpsert;
   const operation = init.id ? "update" : "create";
 
-  const { form_id } = init;
-  console.log("POST /private/editor/fields", init);
+  assert(form_id === init.form_id, "form_id mismatch");
+  // console.log("POST /private/editor/fields", init);
 
   const is_options_allowed_for_this_field = FieldSupports.options(init.type);
 
@@ -46,6 +54,7 @@ export async function POST(req: NextRequest) {
   const { data: upserted, error } = await supabase
     .from("form_field")
     .upsert({
+      updated_at: new Date().toISOString(),
       id: init.id,
       form_id: form_id,
       type: init.type,
@@ -65,8 +74,8 @@ export async function POST(req: NextRequest) {
       }) as any,
       accept: init.accept,
       multiple: init.multiple,
+      storage: init.storage ?? null,
       // 'description': init.description,
-      updated_at: new Date().toISOString(),
     })
     .select("*, existing_options:form_field_option(*)")
     .single();

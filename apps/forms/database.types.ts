@@ -806,89 +806,43 @@ export type Database = {
           created_at: string
           form_id: string
           id: number
-          project_id: number
-          sb_anon_key: string
-          sb_project_reference_id: string
-          sb_project_url: string
-          sb_public_schema: Json
-          sb_service_key_id: string | null
-          updated_at: string
+          main_supabase_table_id: number | null
+          supabase_project_id: number
         }
         Insert: {
           created_at?: string
           form_id: string
           id?: number
-          project_id: number
-          sb_anon_key: string
-          sb_project_reference_id: string
-          sb_project_url: string
-          sb_public_schema: Json
-          sb_service_key_id?: string | null
-          updated_at?: string
+          main_supabase_table_id?: number | null
+          supabase_project_id: number
         }
         Update: {
           created_at?: string
           form_id?: string
           id?: number
-          project_id?: number
-          sb_anon_key?: string
-          sb_project_reference_id?: string
-          sb_project_url?: string
-          sb_public_schema?: Json
-          sb_service_key_id?: string | null
-          updated_at?: string
+          main_supabase_table_id?: number | null
+          supabase_project_id?: number
         }
         Relationships: [
           {
-            foreignKeyName: "connection_supabase_form_id_fkey"
+            foreignKeyName: "connection_supabase_project_form_id_fkey"
             columns: ["form_id"]
             isOneToOne: true
             referencedRelation: "form"
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "connection_supabase_project_id_fkey"
-            columns: ["project_id"]
+            foreignKeyName: "connection_supabase_project_main_supabase_table_id_fkey"
+            columns: ["main_supabase_table_id"]
             isOneToOne: false
-            referencedRelation: "project"
+            referencedRelation: "supabase_table"
             referencedColumns: ["id"]
           },
-        ]
-      }
-      connection_supabase_table: {
-        Row: {
-          created_at: string
-          id: number
-          sb_table_name: string
-          sb_table_schema: Json
-          schema_name: string
-          supabase_connection_id: number
-          updated_at: string
-        }
-        Insert: {
-          created_at?: string
-          id?: number
-          sb_table_name: string
-          sb_table_schema: Json
-          schema_name: string
-          supabase_connection_id: number
-          updated_at?: string
-        }
-        Update: {
-          created_at?: string
-          id?: number
-          sb_table_name?: string
-          sb_table_schema?: Json
-          schema_name?: string
-          supabase_connection_id?: number
-          updated_at?: string
-        }
-        Relationships: [
           {
-            foreignKeyName: "connection_supabase_table_supabase_connection_id_fkey"
-            columns: ["supabase_connection_id"]
+            foreignKeyName: "connection_supabase_supabase_project_id_fkey"
+            columns: ["supabase_project_id"]
             isOneToOne: true
-            referencedRelation: "connection_supabase"
+            referencedRelation: "supabase_project"
             referencedColumns: ["id"]
           },
         ]
@@ -1159,6 +1113,7 @@ export type Database = {
           placeholder: string | null
           required: boolean
           step: number | null
+          storage: Json | null
           type: Database["grida_forms"]["Enums"]["form_field_type"]
           updated_at: string
         }
@@ -1187,6 +1142,7 @@ export type Database = {
           placeholder?: string | null
           required?: boolean
           step?: number | null
+          storage?: Json | null
           type?: Database["grida_forms"]["Enums"]["form_field_type"]
           updated_at?: string
         }
@@ -1215,6 +1171,7 @@ export type Database = {
           placeholder?: string | null
           required?: boolean
           step?: number | null
+          storage?: Json | null
           type?: Database["grida_forms"]["Enums"]["form_field_type"]
           updated_at?: string
         }
@@ -1437,7 +1394,7 @@ export type Database = {
           {
             foreignKeyName: "response_session_id_fkey"
             columns: ["session_id"]
-            isOneToOne: false
+            isOneToOne: true
             referencedRelation: "response_session"
             referencedColumns: ["id"]
           },
@@ -1753,17 +1710,129 @@ export type Database = {
     Functions: {
       create_secret_connection_supabase_service_key: {
         Args: {
-          p_connection_id: number
+          p_supabase_project_id: number
           p_secret: string
         }
         Returns: string
       }
       reveal_secret_connection_supabase_service_key: {
         Args: {
-          p_connection_id: number
+          p_supabase_project_id: number
         }
         Returns: string
       }
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
+  grida_x_supabase: {
+    Tables: {
+      supabase_project: {
+        Row: {
+          created_at: string
+          id: number
+          project_id: number
+          sb_anon_key: string
+          sb_project_reference_id: string
+          sb_project_url: string
+          sb_public_schema: Json
+          sb_service_key_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: number
+          project_id: number
+          sb_anon_key: string
+          sb_project_reference_id: string
+          sb_project_url: string
+          sb_public_schema: Json
+          sb_service_key_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: number
+          project_id?: number
+          sb_anon_key?: string
+          sb_project_reference_id?: string
+          sb_project_url?: string
+          sb_public_schema?: Json
+          sb_service_key_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "connection_supabase_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "project"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "supabase_project_sb_service_key_id_fkey"
+            columns: ["sb_service_key_id"]
+            isOneToOne: false
+            referencedRelation: "decrypted_secrets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "supabase_project_sb_service_key_id_fkey"
+            columns: ["sb_service_key_id"]
+            isOneToOne: false
+            referencedRelation: "secrets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      supabase_table: {
+        Row: {
+          created_at: string
+          id: number
+          sb_schema_name: string
+          sb_table_name: string
+          sb_table_schema: Json
+          supabase_project_id: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: number
+          sb_schema_name: string
+          sb_table_name: string
+          sb_table_schema: Json
+          supabase_project_id: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: number
+          sb_schema_name?: string
+          sb_table_name?: string
+          sb_table_schema?: Json
+          supabase_project_id?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "supabase_table_supabase_project_id_fkey"
+            columns: ["supabase_project_id"]
+            isOneToOne: false
+            referencedRelation: "supabase_project"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      [_ in never]: never
     }
     Enums: {
       [_ in never]: never

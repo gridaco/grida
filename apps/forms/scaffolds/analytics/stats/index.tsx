@@ -1,5 +1,6 @@
 "use client";
 
+import type { Database } from "@/database.types";
 import React, { useEffect, useMemo, useState } from "react";
 import {
   createClientFormsClient,
@@ -9,7 +10,6 @@ import TimeSeriesChart from "../charts/timeseries";
 import { GraphSkeleton, NumberSkeleton } from "../charts/skeleton";
 import { SupabaseClient } from "@supabase/supabase-js";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { Database } from "@/types/supabase";
 import {
   Select,
   SelectValue,

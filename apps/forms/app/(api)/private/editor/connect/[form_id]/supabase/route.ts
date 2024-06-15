@@ -1,5 +1,9 @@
 import { parseSupabaseSchema } from "@/lib/supabase-postgrest";
-import { createRouteHandlerClient } from "@/lib/supabase/server";
+import {
+  createRouteHandlerClient,
+  grida_xsupabase_client,
+} from "@/lib/supabase/server";
+import { GridaSupabase } from "@/types";
 import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
 import { NextRequest, NextResponse } from "next/server";
@@ -17,7 +21,7 @@ export async function GET(req: NextRequest, context: Context) {
 
   const { data: conn } = await supabase
     .from("connection_supabase")
-    .select(`*, connection_table:connection_supabase_table(*)`)
+    .select(`*`)
     .eq("form_id", form_id)
     .single();
 
@@ -28,7 +32,17 @@ export async function GET(req: NextRequest, context: Context) {
     );
   }
 
-  return NextResponse.json({ data: conn });
+  const { supabase_project_id } = conn;
+
+  const { data: supabase_project } = await grida_xsupabase_client
+    .from("supabase_project")
+    .select(`*`)
+    .eq("id", supabase_project_id)
+    .single();
+
+  return NextResponse.json({
+    data: supabase_project! satisfies GridaSupabase.SupabaseProject,
+  });
 }
 
 export async function PATCH(req: NextRequest, context: Context) {
@@ -38,7 +52,7 @@ export async function PATCH(req: NextRequest, context: Context) {
 
   const { data: conn } = await supabase
     .from("connection_supabase")
-    .select(`*, connection_table:connection_supabase_table(*)`)
+    .select(`*`)
     .eq("form_id", form_id)
     .single();
 
@@ -49,24 +63,38 @@ export async function PATCH(req: NextRequest, context: Context) {
     );
   }
 
+  const { supabase_project_id, main_supabase_table_id } = conn;
+
+  const { data: supabase_project } = await grida_xsupabase_client
+    .from("supabase_project")
+    .select(`*`)
+    .eq("id", supabase_project_id)
+    .single();
+
   const { sb_public_schema } = await parseSupabaseSchema({
-    url: conn.sb_project_url,
-    anonKey: conn.sb_anon_key,
+    url: supabase_project!.sb_project_url,
+    anonKey: supabase_project!.sb_anon_key,
   });
 
-  if (conn.connection_table) {
-    await supabase.from("connection_supabase_table").update({
-      sb_table_schema: sb_public_schema[conn.connection_table.sb_table_name],
+  if (conn.main_supabase_table_id) {
+    const { data: main_table } = await grida_xsupabase_client
+      .from("supabase_table")
+      .select(`sb_table_name`)
+      .eq("id", conn.main_supabase_table_id)
+      .single();
+
+    await grida_xsupabase_client.from("supabase_table").update({
+      sb_table_schema: sb_public_schema[main_table!.sb_table_name],
     });
   }
 
-  const { data: patch, error: patch_error } = await supabase
-    .from("connection_supabase")
+  const { data: patch, error: patch_error } = await grida_xsupabase_client
+    .from("supabase_project")
     .update({
       sb_public_schema: sb_public_schema,
     })
-    .eq("form_id", form_id)
-    .select(`*, connection_table:connection_supabase_table(*)`)
+    .eq("id", supabase_project_id)
+    .select(`*, tables:supabase_table(*)`)
     .single();
 
   if (patch_error) {
@@ -100,25 +128,34 @@ export async function POST(req: NextRequest, context: Context) {
   if (!form_ref) return notFound();
   if (form_ref_err) console.error(form_ref_err);
 
-  const { data: conn, error } = await supabase
-    .from("connection_supabase")
+  // 1. create supabase project
+  const { data: supabase_project } = await grida_xsupabase_client
+    .from("supabase_project")
     .insert({
+      project_id: form_ref.project_id,
       sb_anon_key,
       sb_project_reference_id,
       sb_public_schema,
       sb_project_url,
-      form_id,
-      project_id: form_ref.project_id,
     })
-    .select();
+    .select()
+    .single();
 
-  if (error) console.error(error);
+  const { data: conn, error } = await supabase
+    .from("connection_supabase")
+    .insert({
+      form_id,
+      supabase_project_id: supabase_project!.id,
+    })
+    .select()
+    .single();
 
-  if (conn) {
-    return NextResponse.json({ data: conn });
+  if (error) {
+    console.error(error);
+    return NextResponse.json({ error }, { status: 401 });
   }
 
-  return NextResponse.json({ error }, { status: 401 });
+  return NextResponse.json({ data: conn });
 }
 
 export async function DELETE(req: NextRequest, context: Context) {
@@ -126,10 +163,15 @@ export async function DELETE(req: NextRequest, context: Context) {
   const cookieStore = cookies();
   const supabase = createRouteHandlerClient(cookieStore);
 
-  const { count } = await supabase
+  const { count, error } = await supabase
     .from("connection_supabase")
     .delete({ count: "exact" })
     .eq("form_id", form_id);
+
+  if (error) {
+    console.error(error);
+    return NextResponse.error();
+  }
 
   if (count) {
     return NextResponse.json({ data: null }, { status: 200 });

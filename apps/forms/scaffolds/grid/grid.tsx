@@ -264,18 +264,18 @@ function NewFieldHeaderCell({
   );
 }
 
-function DefaultPropertyDateCell({ column, row }: RenderCellProps<any>) {
-  const [state, dispatch] = useEditorState();
+function DefaultPropertyDateCell({ column, row }: RenderCellProps<GFRow>) {
+  const [state] = useEditorState();
 
-  const data = row[column.key];
+  const date = row.__gf_created_at;
 
   const { dateformat, datetz } = state;
 
-  if (!data) {
+  if (!date) {
     return <></>;
   }
 
-  return <>{fmtdate(data, dateformat, tztostr(datetz))}</>;
+  return <>{fmtdate(date, dateformat, tztostr(datetz))}</>;
 }
 
 function fmtdate(
@@ -301,10 +301,10 @@ function fmtdate(
   }
 }
 
-function DefaultPropertyCustomerCell({ column, row }: RenderCellProps<any>) {
+function DefaultPropertyCustomerCell({ column, row }: RenderCellProps<GFRow>) {
   const [state, dispatch] = useEditorState();
 
-  const data = row[column.key];
+  const data = row.__gf_customer_id;
 
   if (!data) {
     return <></>;
@@ -336,17 +336,15 @@ function FKButton({ onClick }: { onClick?: () => void }) {
   );
 }
 
-function FieldCell({ column, row }: RenderCellProps<any>) {
+function FieldCell({ column, row }: RenderCellProps<GFRow>) {
   const [state] = useEditorState();
-  const data: FormResponseField = row[column.key];
-
-  const supabase = useMemo(() => createClientFormsClient(), []);
+  const data = row.fields[column.key];
 
   if (!data) {
     return <></>;
   }
 
-  const { type, value, storage_object_paths } = data;
+  const { type, value, files } = data;
 
   const unwrapped = unwrapFeildValue(value, type as FormInputType);
 
@@ -358,10 +356,10 @@ function FieldCell({ column, row }: RenderCellProps<any>) {
     case "file": {
       return (
         <div className="w-full h-full flex gap-2">
-          {storage_object_paths?.map((path) => (
-            <span key={path}>
+          {files?.map((f, i) => (
+            <span key={i}>
               <FileIcon className="inline w-4 h-4 align-middle me-2" />
-              {path.split("/").pop()}
+              {f.name}
             </span>
           ))}
         </div>
@@ -370,20 +368,15 @@ function FieldCell({ column, row }: RenderCellProps<any>) {
     case "image": {
       return (
         <div className="w-full h-full flex gap-2">
-          {storage_object_paths?.map((path) => (
-            <figure className="p-1 flex items-center gap-2" key={path}>
+          {files?.map((file, i) => (
+            <figure className="p-1 flex items-center gap-2" key={i}>
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
-                key={path}
-                src={
-                  supabase.storage
-                    .from(GRIDA_FORMS_RESPONSE_BUCKET)
-                    .getPublicUrl(path).data.publicUrl
-                }
-                alt={path}
+                src={file.src}
+                alt={file.name}
                 className="h-full min-w-10 aspect-square rounded overflow-hidden object-cover bg-neutral-500"
               />
-              <figcaption>{path.split("/").pop()}</figcaption>
+              <figcaption>{file.name}</figcaption>
             </figure>
           ))}
         </div>
@@ -401,9 +394,9 @@ function FieldCell({ column, row }: RenderCellProps<any>) {
   }
 }
 
-function FieldEditCell(props: RenderEditCellProps<any>) {
+function FieldEditCell(props: RenderEditCellProps<GFRow>) {
   const { column, row } = props;
-  const data: FormResponseField = row[column.key];
+  const data = row.fields[column.key];
   const ref = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -414,13 +407,11 @@ function FieldEditCell(props: RenderEditCellProps<any>) {
     }
   }, [ref]);
 
-  const supabase = useMemo(() => createClientFormsClient(), []);
-
   if (!data) {
     return <></>;
   }
 
-  const { type, value, storage_object_paths } = data;
+  const { type, value, files } = data;
 
   try {
     // FIXME: need investigation (case:FIELDVAL)
@@ -452,21 +443,17 @@ function FieldEditCell(props: RenderEditCellProps<any>) {
       case "image": {
         return (
           <div>
-            {storage_object_paths?.map((path) => (
+            {files?.map((f, i) => (
               <a
-                key={path}
-                href={
-                  supabase.storage
-                    .from(GRIDA_FORMS_RESPONSE_BUCKET)
-                    .getPublicUrl(path).data.publicUrl
-                }
+                key={i}
+                href={f.download}
                 target="_blank"
                 rel="noreferrer"
                 download
               >
                 <Button variant="link" size="sm">
                   <DownloadIcon className="me-2 align-middle" />
-                  Download {path.split("/").pop()}
+                  Download {f.name}
                 </Button>
               </a>
             ))}

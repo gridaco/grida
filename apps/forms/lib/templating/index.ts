@@ -1,6 +1,14 @@
 import { z } from "zod";
 
 export namespace TemplateVariables {
+  export type Context =
+    | GlobalContext
+    | FormContext
+    | FormAgentContext
+    | FormSessionContext
+    | FormResponseContext
+    | ConnectedDatasourcePostgresTransactionCompleteContext;
+
   export interface GlobalContext {}
 
   /**
@@ -69,6 +77,13 @@ export namespace TemplateVariables {
        * @example #123
        */
       idx: string;
+    };
+  }
+
+  export interface ConnectedDatasourcePostgresTransactionCompleteContext
+    extends FormResponseContext {
+    NEW: {
+      [column: string]: any;
     };
   }
 

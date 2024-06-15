@@ -21,6 +21,7 @@ import {
   FormFieldInit,
   PaymentFieldData,
   Option,
+  FormFieldStorageSchema,
 } from "@/types";
 import { LockClosedIcon } from "@radix-ui/react-icons";
 import { FormFieldAssistant } from "../ai/form-field-schema-assistant";
@@ -73,6 +74,7 @@ import { FormFieldTypeIcon } from "@/components/form-field-type-icon";
 import { useInventory, useInventoryState } from "../options/use-inventory";
 import Link from "next/link";
 import { SupabaseLogo } from "@/components/logos";
+import { Spinner } from "@/components/spinner";
 
 // @ts-ignore
 const default_field_init: {
@@ -273,6 +275,11 @@ export function FieldEditPanel({
   );
   const [multiple, setMultiple] = useState(init?.multiple || false);
 
+  const [storage_enabled, __set_storage_enabled] = useState(!!init?.storage);
+  const [storage, setStorage] = useState<
+    Partial<FormFieldStorageSchema | null | undefined>
+  >(init?.storage);
+
   const preview_label = buildPreviewLabel({
     name,
     label,
@@ -367,6 +374,7 @@ export function FieldEditPanel({
       accept,
       multiple,
       options_inventory: options_inventory_upsert_diff,
+      storage: storage_enabled ? storage : undefined,
     });
   };
 
@@ -652,7 +660,7 @@ export function FieldEditPanel({
               {FieldSupports.autocomplete(type) && (
                 <PanelPropertyField
                   label={"Auto Complete"}
-                  tooltip={
+                  help={
                     <>
                       <Link
                         href="https://developer.mozilla.org/en-US/docs/Web/HTML/Attributes/autocomplete"
@@ -685,7 +693,7 @@ export function FieldEditPanel({
               {FieldSupports.multiple(type) && (
                 <PanelPropertyField
                   label={"Multiple"}
-                  tooltip={
+                  help={
                     <>
                       <Link
                         href="https://developer.mozilla.org/en-US/docs/Web/HTML/Attributes/multiple"
@@ -702,7 +710,7 @@ export function FieldEditPanel({
               {!FieldSupports.checkbox_alias(type) && type !== "range" && (
                 <PanelPropertyField
                   label={"Required"}
-                  tooltip={
+                  help={
                     <>
                       <Link
                         href="https://developer.mozilla.org/en-US/docs/Web/HTML/Attributes/required"
@@ -749,7 +757,7 @@ export function FieldEditPanel({
               {supports_accept && (
                 <PanelPropertyField
                   label={"Accept"}
-                  tooltip={
+                  help={
                     <>
                       <Link
                         href="https://developer.mozilla.org/en-US/docs/Web/HTML/Attributes/accept"
@@ -866,39 +874,19 @@ export function FieldEditPanel({
               </PanelPropertyField>
             </PanelPropertyFields>
           </PanelPropertySection>
-          <hr />
-          <PanelPropertySection
-            hidden={
-              !(FieldSupports.file_alias(type) && state.connections.supabase)
-            }
-          >
-            {/* TODO: wip */}
-            <PanelPropertySectionTitle>
-              <SupabaseLogo className="inline me-2 w-5 h-5 align-middle" />
-              Supabase Storage
-            </PanelPropertySectionTitle>
-            <PanelPropertyFields>
-              <PanelPropertyField
-                label={"Bucket"}
-                description="The bucket name to upload the file to."
-              >
-                <PropertyTextInput placeholder="bucket-name" />
-              </PanelPropertyField>
-              <PanelPropertyField
-                label={"Folder Path"}
-                description="The folder path to upload the file to. (Leave leading and trailing slashes off)"
-              >
-                <PropertyTextInput placeholder="path/to/folder" />
-              </PanelPropertyField>
-              <PanelPropertyField
-                label={"Fixed File Name"}
-                description="Leave blank to use default behavior."
-                optional
-              >
-                <PropertyTextInput placeholder="avatar.png" />
-              </PanelPropertyField>
-            </PanelPropertyFields>
-          </PanelPropertySection>
+          {/* TODO: wip */}
+          {FieldSupports.file_alias(type) && state.connections.supabase && (
+            <>
+              <hr />
+
+              <SupabaseStorageSettings
+                value={storage}
+                onValueChange={setStorage}
+                enabled={storage_enabled}
+                onEnabledChange={__set_storage_enabled}
+              />
+            </>
+          )}
         </form>
       </PanelContent>
       <PanelFooter>
@@ -911,6 +899,166 @@ export function FieldEditPanel({
       </PanelFooter>
     </SidePanel>
   );
+}
+
+interface SupabaseBucketInfo {
+  id: string;
+  name: string;
+  owner: string;
+  public: boolean;
+  file_size_limit: number;
+  allowed_mime_types: string[];
+  created_at: string;
+  updated_at: string;
+}
+
+function SupabaseStorageSettings({
+  value,
+  onValueChange,
+  enabled,
+  onEnabledChange,
+}: {
+  value?: Partial<FormFieldStorageSchema> | null | undefined;
+  onValueChange?: (value: Partial<FormFieldStorageSchema>) => void;
+  enabled?: boolean;
+  onEnabledChange?: (enabled: boolean) => void;
+}) {
+  const [state] = useEditorState();
+  const [buckets, setBuckets] = useState<SupabaseBucketInfo[]>();
+  const [bucket, setBucket] = useState<string | undefined>(value?.bucket);
+  const [path, setPath] = useState<string | undefined>(value?.path);
+  const [mode, setMode] = useState<FormFieldStorageSchema["mode"]>(
+    value?.mode ?? "direct"
+  );
+
+  useEffect(() => {
+    // check if path contains template
+
+    onValueChange?.({
+      type: "x-supabase",
+      bucket,
+      mode: isHandlebarTemplate(path) ? "staged" : mode,
+      path,
+    });
+  }, [enabled, bucket, mode, path, onValueChange]);
+
+  // list buckets
+  useEffect(() => {
+    if (enabled) {
+      fetch(
+        `/private/editor/connect/${state.form_id}/supabase/storage/buckets`
+      ).then((res) => {
+        res.json().then(({ data, error }) => {
+          if (data) {
+            setBuckets(data);
+          }
+        });
+      });
+    }
+  }, [enabled, state.form_id]);
+
+  useEffect(() => {
+    setBucket(value?.bucket);
+    setMode(value?.mode ?? "direct");
+    setPath(value?.path);
+  }, [value]);
+
+  return (
+    <PanelPropertySection>
+      <PanelPropertySectionTitle>
+        <SupabaseLogo className="inline me-2 w-5 h-5 align-middle" />
+        Supabase Storage
+      </PanelPropertySectionTitle>
+      <PanelPropertyFields>
+        <PanelPropertyField
+          label={"Enabled Storage"}
+          description="Enable Supabase Storage to store files in your Supabase project."
+        >
+          <Switch checked={enabled} onCheckedChange={onEnabledChange} />
+        </PanelPropertyField>
+        {enabled && (
+          <>
+            <PanelPropertyField
+              label={"Bucket"}
+              description="The bucket name to upload the file to."
+            >
+              <Select
+                value={bucket}
+                onValueChange={(value) => setBucket(value)}
+              >
+                <SelectTrigger>
+                  <SelectValue
+                    placeholder={
+                      buckets ? (
+                        <>Select Bucket</>
+                      ) : (
+                        <div className="flex gap-2">
+                          <Spinner /> Loading...
+                        </div>
+                      )
+                    }
+                  />
+                </SelectTrigger>
+                <SelectContent>
+                  {buckets?.map((bucket) => (
+                    <SelectItem key={bucket.id} value={bucket.id}>
+                      <span>
+                        {bucket.name}
+                        <small className="ms-2 text-muted-foreground">
+                          {bucket.public ? "public" : ""}
+                        </small>
+                      </span>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </PanelPropertyField>
+            <PanelPropertyField
+              label={"Upload Path"}
+              description="The file upload path. (Leave leading and trailing slashes off)"
+            >
+              <PropertyTextInput
+                placeholder="public/{{NEW.id}}/photos/{{file.name}}"
+                value={path}
+                onChange={(e) => setPath(e.target.value)}
+              />
+            </PanelPropertyField>
+            <PanelPropertyField
+              label={"Staged Uploading"}
+              help={
+                <>
+                  Staged uploading allows you to upload first under{" "}
+                  <code>tmp/[session]/</code>
+                  folder and then move to the final destination. This is useful
+                  when you want to upload files under <code>path/to/[id]/</code>
+                  and you don&apos;t have the <code>id</code> yet.
+                </>
+              }
+              description={
+                <>
+                  Use staged uploading to upload first, then move to final path
+                  once transaction is complete.
+                </>
+              }
+            >
+              <Switch
+                checked={mode === "staged"}
+                onCheckedChange={(checked) =>
+                  setMode(checked ? "staged" : "direct")
+                }
+              />
+            </PanelPropertyField>
+          </>
+        )}
+      </PanelPropertyFields>
+    </PanelPropertySection>
+  );
+}
+
+function isHandlebarTemplate(str?: string) {
+  if (!str) return false;
+  const handlebarRegex = /\{\{[^{}]*\}\}/;
+  return handlebarRegex.test(str);
 }
 
 function next_option_default(options: Option[]): Option {

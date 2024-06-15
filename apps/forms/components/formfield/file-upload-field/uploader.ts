@@ -49,7 +49,9 @@ export async function makeSignedUrlUploader({
 
     const { data: uploaded } = await supabase.storage
       .from(GRIDA_FORMS_RESPONSE_BUCKET)
-      .uploadToSignedUrl(path, token, file);
+      .uploadToSignedUrl(path, token, file, {
+        upsert: true,
+      });
 
     return { path: uploaded?.path };
   };
@@ -80,15 +82,63 @@ export function makeRequestUrlUploader({
       (await res.json()) as FormsApiResponse<SessionSignedUploadUrlData>;
 
     if (data) {
-      const { path, token } = data;
+      const { signedUrl, path, token } = data;
 
-      const { data: uploaded } = await supabase.storage
-        .from(GRIDA_FORMS_RESPONSE_BUCKET)
-        .uploadToSignedUrl(path, token, file);
+      // const { data: uploaded } = await supabase.storage
+      //   .from(GRIDA_FORMS_RESPONSE_BUCKET)
+      //   .uploadToSignedUrl(path, token, file, {
+      //     upsert: true,
+      //   });
+
+      // using this for more dynamic control - x-supabase integrations
+      const { data: uploaded } = await uploadToSupabaseS3SignedUrl(
+        signedUrl,
+        file
+      );
 
       return { path: uploaded?.path };
     } else {
-      return { path: undefined };
+      throw new Error("Failed to get signed url");
     }
   };
+}
+
+async function uploadToSupabaseS3SignedUrl(
+  signed_url: string,
+  file: File
+): Promise<{
+  data: {
+    fullPath: string;
+    path: string;
+  } | null;
+  error: any;
+}> {
+  try {
+    const response = await fetch(signed_url, {
+      method: "PUT",
+      headers: {
+        "Content-Type": file.type,
+      },
+      body: file,
+    });
+
+    if (response.ok) {
+      const uploaded = await response.json();
+
+      return {
+        data: {
+          path: uploaded.Key.split("/").slice(1).join("/"),
+          fullPath: uploaded.Key,
+        },
+        error: null,
+      };
+    } else {
+      return { data: null, error: response.statusText };
+    }
+  } catch (error) {
+    return {
+      data: null,
+      error,
+    };
+  }
 }

@@ -6,6 +6,7 @@ import {
   GRIDA_FORMS_RESPONSE_FILES_MAX_COUNT_PER_FIELD,
 } from "@/k/env";
 import { UniqueFileNameGenerator } from "@/lib/forms/storage";
+import type { SupabaseClient } from "@supabase/supabase-js";
 
 interface SessionStoragePath {
   session_id: string;
@@ -85,33 +86,48 @@ export const parse_tmp_storage_object_path = (path: string) => {
   assert(false, "invalid path");
 };
 
-function sign(path: string) {
-  return (
-    client.storage
-      .from(GRIDA_FORMS_RESPONSE_BUCKET)
-      // valid for 2 hours - https://supabase.com/docs/reference/javascript/storage-from-createsigneduploadurl
-      .createSignedUploadUrl(path)
-  );
+export class FileStorage {
+  constructor(
+    readonly client: SupabaseClient<any, any>,
+    readonly bucket: string
+  ) {
+    //
+  }
+
+  sign(path: string) {
+    return (
+      client.storage
+        .from(this.bucket)
+        // valid for 2 hours - https://supabase.com/docs/reference/javascript/storage-from-createsigneduploadurl
+        .createSignedUploadUrl(path)
+    );
+  }
 }
 
-export async function response_file_upload_storage_presigned_url(
-  path: SessionStoragePath,
-  name: string,
-  unique?: boolean
-) {
-  const namer = new UniqueFileNameGenerator(undefined, {
-    // the comma in file name (which is allowed by the storage) needs to be rejected with our file uploader since it uses the uploaded file paths as <input type='text'/> value, which on serverside, needs to be parsed with .split(',') for multiple file uploads.
-    rejectComma: true,
-  });
+export class SessionStagedFileStorage extends FileStorage {
+  async sessionStagedUploadPresingedUrl(
+    path: SessionStoragePath,
+    name: string,
+    unique?: boolean
+  ) {
+    const namer = new UniqueFileNameGenerator(undefined, {
+      // the comma in file name (which is allowed by the storage) needs to be rejected with our file uploader since it uses the uploaded file paths as <input type='text'/> value, which on serverside, needs to be parsed with .split(',') for multiple file uploads.
+      rejectComma: true,
+    });
 
-  return sign(
-    tmp_storage_object_path({
-      ...path,
-      unique: unique ? Date.now().toString() : undefined,
-      name: namer.name(name),
-    })
-  );
-  //
+    return this.sign(
+      tmp_storage_object_path({
+        ...path,
+        unique: unique ? Date.now().toString() : undefined,
+        name: namer.name(name),
+      })
+    );
+    //
+  }
+
+  async resolveStagedFile(tmp: string, target: string) {
+    return client.storage.from(this.bucket).move(tmp, target);
+  }
 }
 
 /**
@@ -137,10 +153,15 @@ export async function prepare_response_file_upload_storage_presigned_url(
     "n should be less than " + GRIDA_FORMS_RESPONSE_FILES_MAX_COUNT_PER_FIELD
   );
 
+  const storage = new SessionStagedFileStorage(
+    client,
+    GRIDA_FORMS_RESPONSE_BUCKET
+  );
+
   const tasks = [];
 
   for (let i = 0; i < n; i++) {
-    const task = sign(
+    const task = storage.sign(
       tmp_storage_object_path({
         name: i.toString(),
         field_id: field_id,
