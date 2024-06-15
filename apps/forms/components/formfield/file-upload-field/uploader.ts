@@ -89,12 +89,14 @@ export function makeRequestUrlUploader({
       //   .uploadToSignedUrl(path, token, file, {
       //     upsert: true,
       //   });
-      // return { path: uploaded?.path };
 
       // using this for more dynamic control - x-supabase integrations
-      const { Key } = await uploadToSupabaseS3SignedUrl(signedUrl, file);
+      const { data: uploaded } = await uploadToSupabaseS3SignedUrl(
+        signedUrl,
+        file
+      );
 
-      return { path: Key };
+      return { path: uploaded?.path };
     } else {
       throw new Error("Failed to get signed url");
     }
@@ -105,24 +107,38 @@ async function uploadToSupabaseS3SignedUrl(
   signed_url: string,
   file: File
 ): Promise<{
-  Key: string | undefined;
+  data: {
+    fullPath: string;
+    path: string;
+  } | null;
+  error: any;
 }> {
   try {
     const response = await fetch(signed_url, {
       method: "PUT",
       headers: {
         "Content-Type": file.type,
-        "x-amz-meta-originalname": file.name, // Example of setting custom metadata
       },
       body: file,
     });
 
     if (response.ok) {
-      return response.json();
+      const uploaded = await response.json();
+
+      return {
+        data: {
+          path: uploaded.Key.split("/").slice(1).join("/"),
+          fullPath: uploaded.Key,
+        },
+        error: null,
+      };
     } else {
-      throw new Error("Failed to upload file");
+      return { data: null, error: response.statusText };
     }
   } catch (error) {
-    throw new Error("Failed to upload file");
+    return {
+      data: null,
+      error,
+    };
   }
 }

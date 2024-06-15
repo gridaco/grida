@@ -124,6 +124,10 @@ export class SessionStagedFileStorage extends FileStorage {
     );
     //
   }
+
+  async resolveStagedFile(tmp: string, target: string) {
+    return client.storage.from(this.bucket).move(tmp, target);
+  }
 }
 
 /**

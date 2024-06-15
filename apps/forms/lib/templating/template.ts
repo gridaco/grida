@@ -5,10 +5,7 @@ import type { TemplateVariables } from ".";
 import type { i18n } from "i18next";
 import type { Translation } from "@/i18n/resources";
 
-export function render(
-  source: string,
-  context: TemplateVariables.FormResponseContext
-) {
+export function render(source: string, context: TemplateVariables.Context) {
   return Handlebars.compile(source)(context);
 }
 

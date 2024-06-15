@@ -24,7 +24,11 @@ import { GridaCommerceClient } from "@/services/commerce";
 import { OnSubmitProcessors, OnSubmit } from "./hooks";
 import { Features } from "@/lib/features/scheduling";
 import { IpInfo, ipinfo } from "@/lib/ipinfo";
-import type { FormFieldStorageSchema, Geo } from "@/types";
+import type {
+  ConnectionSupabaseJoint,
+  FormFieldStorageSchema,
+  Geo,
+} from "@/types";
 import { PGXXError } from "@/k/errcode";
 import { qval } from "@/utils/qs";
 import { notFound } from "next/navigation";
@@ -39,7 +43,12 @@ import {
 } from "@/k/env";
 import type { InsertDto } from "@/types/supabase-ext";
 import { parseGFKeys } from "@/lib/forms/gfkeys";
-import { parse_tmp_storage_object_path } from "@/services/form/session-storage";
+import {
+  SessionStagedFileStorage,
+  parse_tmp_storage_object_path,
+} from "@/services/form/session-storage";
+import { createXSupabaseClient } from "@/services/x-supabase";
+import { render } from "@/lib/templating/template";
 
 const HOST = process.env.HOST || "http://localhost:3000";
 
@@ -379,6 +388,7 @@ async function submit({
   // ==================================================
   // region user supabase connection
 
+  let NEW: any = undefined;
   if (supabase_connection && supabase_connection.main_supabase_table_id) {
     try {
       const insertion = await sbconn_insert(
@@ -395,6 +405,8 @@ async function submit({
         console.error("submit/err/sbconn", sbconn_insertion_error);
         return error(500, { form_id }, meta);
       }
+
+      NEW = sbconn_inserted;
     } catch (e) {
       console.error("submit/err/sbconn", e);
       // TODO: enhance error message
@@ -573,6 +585,10 @@ async function submit({
           },
           {
             storage: field.storage as FormFieldStorageSchema | null,
+            supabase: supabase_connection,
+            context: {
+              NEW: NEW,
+            },
           }
         );
       }
@@ -820,7 +836,9 @@ async function process_response_field_files(
     field_id: string;
   },
   connections?: {
+    supabase: ConnectionSupabaseJoint | null;
     storage: FormFieldStorageSchema | null;
+    context: any;
   }
 ) {
   const uploads: Promise<SupabaseStorageUploadReturnType>[] = [];
@@ -867,13 +885,66 @@ async function process_response_field_files(
             `session_id mismatch. expected: ${session_id}, got: ${_p.session_id}`
           );
 
-          const targetpath = basepath + _p.name;
-          const { error } = await client.storage
-            .from(GRIDA_FORMS_RESPONSE_BUCKET)
-            .move(tmppath, targetpath);
+          if (connections?.storage) {
+            try {
+              const { type, mode, bucket, path } = connections.storage;
 
-          if (error) console.error("submit/err/tmp-mv", tmppath, error);
-          else {
+              switch (type) {
+                case "x-supabase": {
+                  assert(mode === "staged", "mode must be staged");
+                  assert(connections.supabase, "supabase_connection not found");
+                  const client = await createXSupabaseClient(
+                    connections.supabase.supabase_project_id,
+                    {
+                      service_role: true,
+                    }
+                  );
+
+                  const renderedpath = render(path, connections.context);
+                  const storage = new SessionStagedFileStorage(client, bucket);
+                  const { error } = await storage.resolveStagedFile(
+                    tmppath,
+                    renderedpath
+                  );
+                  if (error) {
+                    console.error("submit/err/tmp-mv", tmppath, error);
+                    continue;
+                  }
+                  uploads.push(
+                    Promise.resolve({
+                      data: { path: renderedpath },
+                      error: null,
+                    })
+                  );
+                  break;
+                }
+                case "grida":
+                case "x-s3":
+                default:
+                  throw new Error("storage type not supported");
+              }
+            } catch (e) {
+              console.error("submit/err/storageconn", e);
+              continue;
+            }
+          } else {
+            // default grida forms behavior
+            const targetpath = basepath + _p.name;
+            const storage = new SessionStagedFileStorage(
+              client,
+              GRIDA_FORMS_RESPONSE_BUCKET
+            );
+
+            const { error } = await storage.resolveStagedFile(
+              tmppath,
+              targetpath
+            );
+
+            if (error) {
+              console.error("submit/err/tmp-mv", tmppath, error);
+              continue;
+            }
+
             // push the result (mocked)
             uploads.push(
               Promise.resolve({

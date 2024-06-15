@@ -1,6 +1,14 @@
 import { z } from "zod";
 
 export namespace TemplateVariables {
+  export type Context =
+    | GlobalContext
+    | FormContext
+    | FormAgentContext
+    | FormSessionContext
+    | FormResponseContext
+    | ConnectedDatasourcePostgresTransactionCompleteContext;
+
   export interface GlobalContext {}
 
   /**
