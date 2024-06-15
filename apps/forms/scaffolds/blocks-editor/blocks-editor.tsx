@@ -4,18 +4,6 @@ import React, { useCallback, useEffect, useId, useRef } from "react";
 import { type EditorFlatFormBlock, DRAFT_ID_START_WITH } from "../editor/state";
 import { useEditorState } from "../editor";
 import {
-  CodeIcon,
-  DividerHorizontalIcon,
-  HeadingIcon,
-  ImageIcon,
-  PlusCircledIcon,
-  PlusIcon,
-  ReaderIcon,
-  SectionIcon,
-  TextIcon,
-  VideoIcon,
-} from "@radix-ui/react-icons";
-import {
   DndContext,
   PointerSensor,
   closestCorners,
@@ -23,12 +11,6 @@ import {
   useSensors,
 } from "@dnd-kit/core";
 import { Block, BlocksCanvas } from "./blocks";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { restrictToVerticalAxis } from "@dnd-kit/modifiers";
 import {
   SortableContext,
@@ -36,8 +18,7 @@ import {
 } from "@dnd-kit/sortable";
 import { createClientFormsClient } from "@/lib/supabase/client";
 import toast from "react-hot-toast";
-import { FormBlockType } from "@/types";
-import { Button } from "@/components/ui/button";
+import { NewBlockButton } from "./new-block-button";
 
 export default function BlocksEditorRoot() {
   return (
@@ -231,7 +212,7 @@ function BlocksEditor() {
       <OptimisticBlocksSyncProvider />
       <div className="sticky top-20 z-10">
         <div className="absolute -left-6">
-          <AddBlockButton />
+          <NewBlockButton />
         </div>
       </div>
       <BlocksCanvas id="root" className="flex flex-col gap-4 mt-10">
@@ -250,80 +231,6 @@ function BlocksEditor() {
       </BlocksCanvas>
     </div>
   );
-}
-
-function AddBlockButton() {
-  const [state, dispatch] = useEditorState();
-
-  const addBlock = useCallback(
-    (block: FormBlockType) => {
-      dispatch({
-        type: "blocks/new",
-        block: block,
-      });
-    },
-    [dispatch]
-  );
-
-  const addSectionBlock = useCallback(() => addBlock("section"), [addBlock]);
-  const addFieldBlock = useCallback(() => addBlock("field"), [addBlock]);
-  const addHtmlBlock = useCallback(() => addBlock("html"), [addBlock]);
-  const addDividerBlock = useCallback(() => addBlock("divider"), [addBlock]);
-  const addHeaderBlock = useCallback(() => addBlock("header"), [addBlock]);
-  const addImageBlock = useCallback(() => addBlock("image"), [addBlock]);
-  const addVideoBlock = useCallback(() => addBlock("video"), [addBlock]);
-  const addPdfBlock = useCallback(() => addBlock("pdf"), [addBlock]);
-
-  return (
-    <DropdownMenu modal={false}>
-      <DropdownMenuTrigger asChild>
-        <Button variant="secondary" size="icon" className="rounded-full">
-          <PlusIcon />
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="start">
-        <BlockItem onClick={addFieldBlock}>
-          <PlusCircledIcon className="me-2 align-middle" />
-          Field
-        </BlockItem>
-        <BlockItem onClick={addImageBlock}>
-          <ImageIcon className="me-2 align-middle" />
-          Image
-        </BlockItem>
-        <BlockItem onClick={addVideoBlock}>
-          <VideoIcon className="me-2 align-middle" />
-          Video
-        </BlockItem>
-        <BlockItem onClick={addHtmlBlock}>
-          <CodeIcon className="me-2 align-middle" />
-          HTML
-        </BlockItem>
-        <BlockItem onClick={addPdfBlock}>
-          <ReaderIcon className="me-2 align-middle" />
-          Pdf
-        </BlockItem>
-        <BlockItem onClick={addDividerBlock}>
-          <DividerHorizontalIcon className="me-2 align-middle" />
-          Divider
-        </BlockItem>
-        <BlockItem onClick={addSectionBlock}>
-          <SectionIcon className="me-2 align-middle" />
-          Section
-        </BlockItem>
-        <BlockItem onClick={addHeaderBlock}>
-          <HeadingIcon className="me-2 align-middle" />
-          Header
-        </BlockItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
-  );
-}
-
-function BlockItem({
-  children,
-  ...props
-}: React.ComponentProps<typeof DropdownMenuItem>) {
-  return <DropdownMenuItem {...props}>{children}</DropdownMenuItem>;
 }
 
 function shallowEqual(obj1: any, obj2: any) {

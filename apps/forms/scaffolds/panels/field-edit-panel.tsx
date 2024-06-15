@@ -494,7 +494,11 @@ export function FieldEditPanel({
                 }
                 description="The input's name, identifier. Recommended to use lowercase and use an underscore to separate words e.g. column_name"
               >
-                <NameInput value={name} onValueChange={setName} />
+                <NameInput
+                  autoFocus={mode === "edit"}
+                  value={name}
+                  onValueChange={setName}
+                />
               </PanelPropertyField>
             </PanelPropertyFields>
           </PanelPropertySection>
