@@ -16,8 +16,14 @@ import { SYSTEM_GF_CUSTOMER_UUID_KEY } from "@/k/system";
 import { cn } from "@/utils";
 import { PrivateEditorApi } from "@/lib/private";
 import { GridaSupabase } from "@/types";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { Input } from "@/components/ui/input";
 
-const Input = React.forwardRef<
+const CommandInput = React.forwardRef<
   React.ElementRef<typeof CommandPrimitive.Input>,
   React.ComponentPropsWithoutRef<typeof CommandPrimitive.Input>
 >(({ className, ...props }, ref) => (
@@ -33,7 +39,7 @@ const Input = React.forwardRef<
   </div>
 ));
 
-Input.displayName = "CommandInput";
+CommandInput.displayName = "CommandInput";
 
 export function NameInput({
   autoFocus,
@@ -69,13 +75,6 @@ export function NameInput({
     setOpen(focus && !!value);
   }, [value, focus]);
 
-  useEffect(() => {
-    // https://github.com/pacocoursey/cmdk/issues/267
-    if (open || (!open && !value)) {
-      ref.current?.focus();
-    }
-  }, [open, ref, value]);
-
   const onSelect = (val: string) => {
     onValueChange?.(val);
     setOpen(false);
@@ -83,66 +82,85 @@ export function NameInput({
   };
 
   return (
-    <Command key={String(open)} className="rounded-lg border">
-      <Input
-        required
-        autoFocus={autoFocus}
-        ref={ref}
-        placeholder="field_name"
-        value={value}
-        onValueChange={onValueChange}
-        onFocus={() => setFocus(true)}
-        onBlur={() => setFocus(false)}
-      />
-      <CommandList>
-        {open && (
-          <>
-            {value && (
-              <>
-                <CommandGroup>
-                  <CommandItem key={"current"} onSelect={onSelect}>
-                    <PlusIcon className="mr-2 h-4 w-4" />
-                    <span>{value}</span>
-                  </CommandItem>
-                </CommandGroup>
-              </>
-            )}
-            <CommandSeparator />
-            <CommandGroup heading="System">
-              <CommandItem
-                key={SYSTEM_GF_CUSTOMER_UUID_KEY}
-                onSelect={onSelect}
-              >
-                <PersonIcon className="mr-2 h-4 w-4" />
-                <span>{SYSTEM_GF_CUSTOMER_UUID_KEY}</span>
-              </CommandItem>
-            </CommandGroup>
-            {state.connections.supabase && (
-              <>
-                <CommandSeparator />
-                <CommandGroup
-                  heading={
-                    <>
-                      <SupabaseLogo className="inline w-4 h-4 me-1 align-middle" />{" "}
-                      Supabase
-                    </>
-                  }
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger>
+        <Input
+          required
+          autoFocus={autoFocus}
+          ref={ref}
+          placeholder="field_name"
+          value={value}
+          className="w-[200px]"
+          onChange={(e) => {
+            onValueChange?.(e.target.value);
+          }}
+          onFocus={() => setFocus(true)}
+          onBlur={() => setFocus(false)}
+        />
+      </PopoverTrigger>
+      <PopoverContent sideOffset={-40} className="w-[200px] p-0">
+        <Command>
+          <CommandInput
+            required
+            autoFocus={autoFocus}
+            ref={ref}
+            placeholder="field_name"
+            value={value}
+            onValueChange={onValueChange}
+            onFocus={() => setFocus(true)}
+            onBlur={() => setFocus(false)}
+          />
+          <CommandList>
+            {/* {open && (
+            )} */}
+            <>
+              {value && (
+                <>
+                  <CommandGroup>
+                    <CommandItem key={"current"} onSelect={onSelect}>
+                      <PlusIcon className="mr-2 h-4 w-4" />
+                      <span>{value}</span>
+                    </CommandItem>
+                  </CommandGroup>
+                </>
+              )}
+              <CommandSeparator />
+              <CommandGroup heading="System">
+                <CommandItem
+                  key={SYSTEM_GF_CUSTOMER_UUID_KEY}
+                  onSelect={onSelect}
                 >
-                  {Object.keys(tableSchema?.properties ?? {}).map((key) => {
-                    // const property = tableSchema?.properties[key];
-                    return (
-                      <CommandItem key={key} onSelect={onSelect}>
-                        <Link1Icon className="mr-2 h-4 w-4" />
-                        <span>{key}</span>
-                      </CommandItem>
-                    );
-                  })}
-                </CommandGroup>
-              </>
-            )}
-          </>
-        )}
-      </CommandList>
-    </Command>
+                  <PersonIcon className="mr-2 h-4 w-4" />
+                  <span>{SYSTEM_GF_CUSTOMER_UUID_KEY}</span>
+                </CommandItem>
+              </CommandGroup>
+              {state.connections.supabase && (
+                <>
+                  <CommandSeparator />
+                  <CommandGroup
+                    heading={
+                      <>
+                        <SupabaseLogo className="inline w-4 h-4 me-1 align-middle" />{" "}
+                        Supabase
+                      </>
+                    }
+                  >
+                    {Object.keys(tableSchema?.properties ?? {}).map((key) => {
+                      // const property = tableSchema?.properties[key];
+                      return (
+                        <CommandItem key={key} onSelect={onSelect}>
+                          <Link1Icon className="mr-2 h-4 w-4" />
+                          <span>{key}</span>
+                        </CommandItem>
+                      );
+                    })}
+                  </CommandGroup>
+                </>
+              )}
+            </>
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
   );
 }
