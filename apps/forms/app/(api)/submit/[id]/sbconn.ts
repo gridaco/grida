@@ -1,7 +1,7 @@
 import { grida_xsupabase_client } from "@/lib/supabase/server";
 import { createXSupabaseClient } from "@/services/x-supabase";
 import { ConnectionSupabaseJoint, GridaSupabase } from "@/types";
-import { JSONSchemaType } from "ajv";
+import type { JSONSchemaType } from "ajv";
 import { unflatten } from "flat";
 
 export async function sbconn_insert(
@@ -23,7 +23,7 @@ export async function sbconn_insert(
   const connection_table: GridaSupabase.SupabaseTable | undefined =
     supabase_project!.tables.find(
       (t) => t.id === connection.main_supabase_table_id
-    );
+    ) as any;
 
   if (!connection_table) {
     throw new Error("connection_table not found");

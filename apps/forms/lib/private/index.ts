@@ -54,5 +54,11 @@ export namespace PrivateEditorApi {
         data
       );
     }
+
+    export async function getConnectionTable(form_id: string) {
+      return Axios.get<{ data: GridaSupabase.SupabaseTable; error: any }>(
+        `/private/editor/connect/${form_id}/supabase/table`
+      );
+    }
   }
 }

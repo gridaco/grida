@@ -23,7 +23,6 @@ import {
   Option,
   FormFieldStorageSchema,
 } from "@/types";
-import { LockClosedIcon } from "@radix-ui/react-icons";
 import { FormFieldAssistant } from "../ai/form-field-schema-assistant";
 import {
   Select,
@@ -75,6 +74,8 @@ import { useInventory, useInventoryState } from "../options/use-inventory";
 import Link from "next/link";
 import { SupabaseLogo } from "@/components/logos";
 import { Spinner } from "@/components/spinner";
+import { NameInput } from "./name-input";
+import { LockClosedIcon } from "@radix-ui/react-icons";
 
 // @ts-ignore
 const default_field_init: {
@@ -493,13 +494,14 @@ export function FieldEditPanel({
                 }
                 description="The input's name, identifier. Recommended to use lowercase and use an underscore to separate words e.g. column_name"
               >
-                <PropertyTextInput
+                {/* <PropertyTextInput
                   required
                   autoFocus={mode === "edit"}
                   placeholder={"field_name"}
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                />
+                /> */}
+                <NameInput />
               </PanelPropertyField>
             </PanelPropertyFields>
           </PanelPropertySection>
