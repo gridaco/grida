@@ -20,6 +20,19 @@ export async function GET(
   const { form_id, response_id, response_field_id } = context.params;
   const qpath = req.nextUrl.searchParams.get("path");
   const qwidth = req.nextUrl.searchParams.get("width");
+  const width = Number(qwidth) || undefined;
+  const qdownload = req.nextUrl.searchParams.get("download");
+  const download = qdownload === "true" || qdownload === "1";
+  const format = download ? "origin" : undefined;
+  const expiresIn = 60 * 60;
+  const options = {
+    download: download,
+    format: format,
+    transform: {
+      width: width,
+      resize: width ? ("contain" as const) : undefined,
+    },
+  };
   // TODO: support RLS
   // const cookieStore = cookies();
   // const supabase = createRouteHandlerClient(cookieStore);
@@ -55,9 +68,7 @@ export async function GET(
   assert(form);
 
   if (field.storage) {
-    console.log("field.storage", field.storage);
-    const { type, bucket, path } =
-      field.storage as any as FormFieldStorageSchema;
+    const { type, bucket } = field.storage as any as FormFieldStorageSchema;
     switch (type) {
       case "x-supabase": {
         assert(form.supabase_connection);
@@ -69,12 +80,7 @@ export async function GET(
         );
         const { data: singed } = await client.storage
           .from(bucket)
-          .createSignedUrl(path, 60 * 60, {
-            download: true,
-            transform: {
-              width: Number(qwidth) || undefined,
-            },
-          });
+          .createSignedUrl(qpath, expiresIn, options);
 
         const src = singed?.signedUrl;
 
@@ -94,12 +100,7 @@ export async function GET(
 
   const { data: singed } = await supabase.storage
     .from(GRIDA_FORMS_RESPONSE_BUCKET)
-    .createSignedUrl(qpath, 60 * 60, {
-      download: true,
-      transform: {
-        width: Number(qwidth) || undefined,
-      },
-    });
+    .createSignedUrl(qpath, expiresIn, options);
   const src = singed?.signedUrl;
 
   if (!src) {

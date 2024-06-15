@@ -444,7 +444,13 @@ function FieldEditCell(props: RenderEditCellProps<GFRow>) {
         return (
           <div>
             {files?.map((f, i) => (
-              <a key={i} href={f.src} target="_blank" rel="noreferrer" download>
+              <a
+                key={i}
+                href={f.download}
+                target="_blank"
+                rel="noreferrer"
+                download
+              >
                 <Button variant="link" size="sm">
                   <DownloadIcon className="me-2 align-middle" />
                   Download {f.name}

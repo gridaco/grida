@@ -65,11 +65,14 @@ export namespace GridData {
             type: field.type,
             value: field.value,
             files: field.storage_object_paths?.map((path) => {
-              const src = `/private/editor/${response.form_id}/responses/${response.id}/fields/${field.id}/src?path=${path}`;
+              const base = `/private/editor/${response.form_id}/responses/${response.id}/fields/${field.id}/src?path=${path}`;
+              const src = base + "&width=200";
+              const download = base + "&download=true";
               const name = path.split("/").pop() ?? "";
               return {
-                src,
+                src: src,
                 name,
+                download,
               };
             }),
           };

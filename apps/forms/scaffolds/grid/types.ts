@@ -12,6 +12,7 @@ export type GFRow = {
       value: any;
       files?: {
         src: string;
+        download: string;
         name: string;
       }[];
     }
