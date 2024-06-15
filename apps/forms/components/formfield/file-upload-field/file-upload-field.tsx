@@ -31,7 +31,7 @@ type FileUploadDropzoneProps = {
   uploader?: FileUploaderFn;
 };
 
-export const FileUploadDropzone = ({
+export const FileUploadField = ({
   name,
   accept,
   multiple,
