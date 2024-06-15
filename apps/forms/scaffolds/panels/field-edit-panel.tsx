@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import {
   PanelClose,
   PanelContent,
@@ -23,6 +23,7 @@ import {
   Option,
   FormFieldStorageSchema,
   GridaSupabase,
+  FormFieldReferenceSchema,
 } from "@/types";
 import { FormFieldAssistant } from "../ai/form-field-schema-assistant";
 import {
@@ -57,7 +58,6 @@ import {
   payments_service_providers_default,
   payments_service_providers_display_map,
 } from "@/k/payments_service_providers";
-import { cls_save_button } from "@/components/preferences";
 import { fmt_snake_case_to_human_text } from "@/utils/fmt";
 import toast from "react-hot-toast";
 import { arrayMove } from "@dnd-kit/sortable";
@@ -77,6 +77,7 @@ import { SupabaseLogo } from "@/components/logos";
 import { Spinner } from "@/components/spinner";
 import { NameInput } from "./name-input";
 import { LockClosedIcon } from "@radix-ui/react-icons";
+import { PrivateEditorApi } from "@/lib/private";
 
 // @ts-ignore
 const default_field_init: {
@@ -267,6 +268,13 @@ export function FieldEditPanel({
     Partial<FormFieldStorageSchema | null | undefined>
   >(init?.storage);
 
+  const [reference_enabled, __set_reference_enabled] = useState(
+    !!init?.reference
+  );
+  const [reference, setReference] = useState<
+    Partial<FormFieldReferenceSchema | null | undefined>
+  >(init?.reference);
+
   const preview_label = buildPreviewLabel({
     name,
     label,
@@ -362,6 +370,7 @@ export function FieldEditPanel({
       multiple,
       options_inventory: options_inventory_upsert_diff,
       storage: storage_enabled ? storage : undefined,
+      reference: reference_enabled ? reference : undefined,
     });
   };
 
@@ -873,14 +882,15 @@ export function FieldEditPanel({
           {FieldSupports.fk(type) && state.connections.supabase && !!name && (
             <>
               <hr />
-              <SupabaseForeignKeySearchSettings
+              <SupabaseReferencesSettings
                 format={
                   state.connections.supabase.main_supabase_table
                     ?.sb_table_schema?.properties?.[name]?.format
-                } // value={storage}
-                // onValueChange={setStorage}
-                // enabled={storage_enabled}
-                // onEnabledChange={__set_storage_enabled}
+                }
+                value={reference}
+                onValueChange={setReference}
+                enabled={reference_enabled}
+                onEnabledChange={__set_reference_enabled}
               />
             </>
           )}
@@ -898,17 +908,6 @@ export function FieldEditPanel({
   );
 }
 
-interface SupabaseBucketInfo {
-  id: string;
-  name: string;
-  owner: string;
-  public: boolean;
-  file_size_limit: number;
-  allowed_mime_types: string[];
-  created_at: string;
-  updated_at: string;
-}
-
 function SupabaseStorageSettings({
   value,
   onValueChange,
@@ -921,7 +920,7 @@ function SupabaseStorageSettings({
   onEnabledChange?: (enabled: boolean) => void;
 }) {
   const [state] = useEditorState();
-  const [buckets, setBuckets] = useState<SupabaseBucketInfo[]>();
+  const [buckets, setBuckets] = useState<GridaSupabase.SupabaseBucket[]>();
   const [bucket, setBucket] = useState<string | undefined>(value?.bucket);
   const [path, setPath] = useState<string | undefined>(value?.path);
   const [mode, setMode] = useState<FormFieldStorageSchema["mode"]>(
@@ -942,15 +941,11 @@ function SupabaseStorageSettings({
   // list buckets
   useEffect(() => {
     if (enabled) {
-      fetch(
-        `/private/editor/connect/${state.form_id}/supabase/storage/buckets`
-      ).then((res) => {
-        res.json().then(({ data, error }) => {
-          if (data) {
-            setBuckets(data);
-          }
-        });
-      });
+      PrivateEditorApi.SupabaseConnection.listBucket(state.form_id).then(
+        (res) => {
+          res.data.data && setBuckets(res.data.data);
+        }
+      );
     }
   }, [enabled, state.form_id]);
 
@@ -1052,12 +1047,16 @@ function SupabaseStorageSettings({
   );
 }
 
-function SupabaseForeignKeySearchSettings({
+function SupabaseReferencesSettings({
   format,
-  enabled = true,
+  value,
+  onValueChange,
+  enabled,
   onEnabledChange,
 }: {
   format?: string;
+  value?: Partial<FormFieldReferenceSchema> | null | undefined;
+  onValueChange?: (value: Partial<FormFieldReferenceSchema>) => void;
   enabled?: boolean;
   onEnabledChange?: (enabled: boolean) => void;
 }) {
@@ -1065,8 +1064,33 @@ function SupabaseForeignKeySearchSettings({
 
   const { supabase_project } = state.connections.supabase!;
 
-  const [table, setTable] = useState<string | undefined>();
-  const [column, setColumn] = useState<string | undefined>();
+  const { schema, table, column } = value || {};
+
+  const onTableChange = useCallback(
+    (table: string) => {
+      const [schema, _table] = table.split(".");
+
+      onValueChange?.({
+        schema,
+        table: _table,
+        column: undefined,
+      });
+    },
+    [onValueChange]
+  );
+
+  const onColumnCahnge = useCallback(
+    (column: string) => {
+      onValueChange?.({
+        schema,
+        table,
+        column,
+      });
+    },
+    [onValueChange, schema, table]
+  );
+
+  const fulltable = `${schema}.${table}`;
 
   return (
     <PanelPropertySection>
@@ -1077,7 +1101,7 @@ function SupabaseForeignKeySearchSettings({
       <PanelPropertyFields>
         <PanelPropertyField
           label={"Enable Foreign Key Search"}
-          description="Enable Supabase Storage to store files in your Supabase project."
+          description="Enable Supabase Foreign Key Search to reference data from your Supabase project."
         >
           <Switch checked={enabled} onCheckedChange={onEnabledChange} />
         </PanelPropertyField>
@@ -1085,9 +1109,9 @@ function SupabaseForeignKeySearchSettings({
           <>
             <PanelPropertyField
               label={"Reference Table"}
-              description="The bucket name to upload the file to."
+              description="The table to reference data from."
             >
-              <Select value={table} onValueChange={setTable}>
+              <Select value={fulltable} onValueChange={onTableChange}>
                 <SelectTrigger>
                   <SelectValue placeholder={"Select Table"} />
                 </SelectTrigger>
@@ -1097,9 +1121,10 @@ function SupabaseForeignKeySearchSettings({
                   </SelectItem>
                   {Object.keys(supabase_project.sb_public_schema!)?.map(
                     (key) => {
+                      const fulltable = `public.${key}`;
                       return (
-                        <SelectItem key={key} value={key}>
-                          <span>public.{key}</span>
+                        <SelectItem key={fulltable} value={fulltable}>
+                          <span>{fulltable}</span>
                         </SelectItem>
                       );
                     }
@@ -1109,15 +1134,15 @@ function SupabaseForeignKeySearchSettings({
             </PanelPropertyField>
             <PanelPropertyField
               label={"Column"}
-              description="The file upload path. (Leave leading and trailing slashes off)"
+              description="The column to reference data from."
             >
-              <Select value={column} onValueChange={setColumn}>
+              <Select value={column} onValueChange={onColumnCahnge}>
                 <SelectTrigger>
                   <SelectValue placeholder={"Select Column"} />
                 </SelectTrigger>
                 <SelectContent>
                   {table &&
-                    (table === "auth.users" ? (
+                    (schema === "auth" && table === "users" ? (
                       <>
                         {Object.keys(
                           GridaSupabase.SupabaseUserJsonSchema.properties

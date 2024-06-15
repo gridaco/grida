@@ -1,7 +1,7 @@
 import type { JSONSchemaType } from "ajv";
 import type { ConnectionSupabaseJoint } from "./types";
 import type { User } from "@supabase/supabase-js";
-
+import type { Bucket } from "@supabase/storage-js";
 export namespace GridaSupabase {
   export interface SupabaseProject {
     id: number;
@@ -148,4 +148,6 @@ export namespace GridaSupabase {
 
   export type SupabaseUserColumn =
     keyof (typeof SupabaseUserJsonSchema)["properties"];
+
+  export type SupabaseBucket = Bucket;
 }

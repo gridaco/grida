@@ -58,5 +58,12 @@ export namespace PrivateEditorApi {
         `/private/editor/connect/${form_id}/supabase/table`
       );
     }
+
+    export async function listBucket(form_id: string) {
+      return Axios.get<{
+        data: GridaSupabase.SupabaseBucket[];
+        error: any;
+      }>(`/private/editor/connect/${form_id}/supabase/storage/buckets`);
+    }
   }
 }
