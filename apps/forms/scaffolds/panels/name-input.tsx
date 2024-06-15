@@ -106,6 +106,12 @@ export function NameInput({
           }}
           onFocus={() => setFocus(true)}
           onBlur={() => setFocus(false)}
+          onKeyDown={(e) => {
+            // open on keydown (arrow down)
+            if (e.key === "ArrowDown") {
+              setOpen(true);
+            }
+          }}
         />
       </PopoverTrigger>
       <PopoverContent
