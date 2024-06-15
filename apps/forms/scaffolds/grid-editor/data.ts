@@ -7,6 +7,9 @@ import {
 import { fmt_local_index } from "@/utils/fmt";
 import type { GFRow } from "../grid/types";
 import type { DataGridFilterSettings } from "../editor/state";
+import { createClientFormsClient } from "@/lib/supabase/client";
+import { SupabaseClient } from "@supabase/supabase-js";
+import { GRIDA_FORMS_RESPONSE_BUCKET } from "@/k/env";
 
 export namespace GridData {
   type DataGridInput = {
@@ -24,10 +27,15 @@ export namespace GridData {
   );
 
   export function rows(data: DataGridInput) {
+    const supabase = createClientFormsClient();
+
     switch (data.table) {
       case "response":
         return data.responses
-          ? rows_from_responses(applyFilter(data.responses, data.filter))
+          ? rows_from_responses(
+              applyFilter(data.responses, data.filter),
+              supabase.storage
+            )
           : [];
       case "session":
         return data.sessions
@@ -39,20 +47,33 @@ export namespace GridData {
     }
   }
 
-  function rows_from_responses(responses?: FormResponse[]) {
+  function rows_from_responses(
+    responses: FormResponse[],
+    storage: SupabaseClient<any, any>["storage"]
+  ) {
     return (
-      responses?.map((response, index) => {
+      responses.map((response, index) => {
         const row: GFRow = {
           __gf_id: response.id,
           __gf_display_id: fmt_local_index(response.local_index),
           __gf_created_at: response.created_at,
-          __gf_customer_uuid: response.customer_id,
+          __gf_customer_id: response.customer_id,
+          fields: {},
         }; // react-data-grid expects each row to have a unique 'id' property
         response?.fields?.forEach((field: FormResponseField) => {
-          row[field.form_field_id] = {
+          row.fields[field.form_field_id] = {
             type: field.type,
             value: field.value,
-            storage_object_paths: field.storage_object_paths,
+            files: field.storage_object_paths?.map((path) => {
+              const src = storage
+                .from(GRIDA_FORMS_RESPONSE_BUCKET)
+                .getPublicUrl(path).data.publicUrl;
+              const name = path.split("/").pop() ?? "";
+              return {
+                src,
+                name,
+              };
+            }),
           };
         });
         return row;
@@ -70,11 +91,12 @@ export namespace GridData {
           __gf_id: session.id,
           __gf_display_id: session.id,
           __gf_created_at: session.created_at,
-          __gf_customer_uuid: session.customer_id,
+          __gf_customer_id: session.customer_id,
+          fields: {},
         }; // react-data-grid expects each row to have a unique 'id' property
         Object.entries(session.raw || {}).forEach(([key, value]) => {
           const field = fields.find((f) => f.id === key);
-          row[key] = {
+          row.fields[key] = {
             value: value,
             type: field?.type,
           };
