@@ -34,14 +34,19 @@ const Input = React.forwardRef<
 
 Input.displayName = "CommandInput";
 
-export function NameInput({}: {}) {
+export function NameInput({
+  value,
+  onValueChange,
+}: {
+  value?: string;
+  onValueChange?: (value: string) => void;
+}) {
   const ref = React.useRef<React.ElementRef<
     typeof CommandPrimitive.Input
   > | null>(null);
   const [state] = useEditorState();
   const [open, setOpen] = useState<boolean>(false);
   const [focus, setFocus] = useState<boolean>(false);
-  const [value, setValue] = useState<string>("");
 
   const [tableSchema, setTableSchema] = useState<
     GridaSupabase.SupabaseTable["sb_table_schema"] | undefined
@@ -69,7 +74,7 @@ export function NameInput({}: {}) {
   }, [open, ref, value]);
 
   const onSelect = (val: string) => {
-    setValue(val);
+    onValueChange?.(val);
     setOpen(false);
     setFocus(false);
   };
@@ -77,10 +82,11 @@ export function NameInput({}: {}) {
   return (
     <Command key={String(open)} className="rounded-lg border">
       <Input
+        required
         ref={ref}
         placeholder="field_name"
         value={value}
-        onValueChange={setValue}
+        onValueChange={onValueChange}
         onFocus={() => setFocus(true)}
         onBlur={() => setFocus(false)}
       />
