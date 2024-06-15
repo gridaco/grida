@@ -983,6 +983,7 @@ function SupabaseStorageSettings({
               description="The bucket name to upload the file to."
             >
               <Select
+                required
                 value={bucket}
                 onValueChange={(value) => setBucket(value)}
               >
@@ -1020,6 +1021,8 @@ function SupabaseStorageSettings({
               <PropertyTextInput
                 placeholder="public/{{NEW.id}}/photos/{{file.name}}"
                 value={path}
+                required
+                pattern="^(?!\/).*"
                 onChange={(e) => setPath(e.target.value)}
               />
             </PanelPropertyField>
