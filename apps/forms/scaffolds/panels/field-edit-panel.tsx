@@ -163,7 +163,7 @@ export function TypeSelect({
           variant="outline"
           role="combobox"
           aria-expanded={open}
-          className="w-[200px] justify-between capitalize"
+          className="w-full justify-between capitalize"
         >
           <div className="flex gap-2 items-center">
             <FormFieldTypeIcon type={value} />
@@ -172,7 +172,7 @@ export function TypeSelect({
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-[200px] p-0">
+      <PopoverContent className="w-[--radix-popover-trigger-width] max-h-[--radix-popover-content-available-height] p-0">
         <Command>
           <CommandInput placeholder="Search" />
           <CommandEmpty>No input found.</CommandEmpty>

@@ -50,9 +50,13 @@ export function NameInput({
   value?: string;
   onValueChange?: (value: string) => void;
 }) {
-  const ref = React.useRef<React.ElementRef<
+  const inputref = React.useRef<React.ElementRef<
     typeof CommandPrimitive.Input
   > | null>(null);
+  const commandinputref = React.useRef<React.ElementRef<
+    typeof CommandPrimitive.Input
+  > | null>(null);
+
   const [state] = useEditorState();
   const [open, setOpen] = useState<boolean>(false);
   const [focus, setFocus] = useState<boolean>(false);
@@ -75,6 +79,12 @@ export function NameInput({
     setOpen(focus && !!value);
   }, [value, focus]);
 
+  useEffect(() => {
+    if (!open && !value) {
+      inputref.current?.focus();
+    }
+  }, [value, open]);
+
   const onSelect = (val: string) => {
     onValueChange?.(val);
     setOpen(false);
@@ -82,15 +92,15 @@ export function NameInput({
   };
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger>
+    <Popover open={open} onOpenChange={setOpen} modal>
+      <PopoverTrigger disabled className="w-full">
         <Input
           required
           autoFocus={autoFocus}
-          ref={ref}
+          ref={inputref}
           placeholder="field_name"
           value={value}
-          className="w-[200px]"
+          className="w-full"
           onChange={(e) => {
             onValueChange?.(e.target.value);
           }}
@@ -98,16 +108,25 @@ export function NameInput({
           onBlur={() => setFocus(false)}
         />
       </PopoverTrigger>
-      <PopoverContent sideOffset={-40} className="w-[200px] p-0">
+      <PopoverContent
+        sideOffset={-40}
+        className="w-[--radix-popover-trigger-width] max-h-[--radix-popover-content-available-height] p-0"
+      >
         <Command>
           <CommandInput
-            required
-            autoFocus={autoFocus}
-            ref={ref}
+            ref={commandinputref}
             placeholder="field_name"
             value={value}
             onValueChange={onValueChange}
-            onFocus={() => setFocus(true)}
+            onFocusCapture={(event) => {
+              setFocus(true);
+
+              // cursor at the end
+              setTimeout(() => {
+                const length = event.target.value.length;
+                event.target.setSelectionRange(length, length);
+              }, 0);
+            }}
             onBlur={() => setFocus(false)}
           />
           <CommandList>
