@@ -65,9 +65,7 @@ export namespace GridData {
             type: field.type,
             value: field.value,
             files: field.storage_object_paths?.map((path) => {
-              const src = storage
-                .from(GRIDA_FORMS_RESPONSE_BUCKET)
-                .getPublicUrl(path).data.publicUrl;
+              const src = `/private/editor/${response.form_id}/responses/${response.id}/fields/${field.id}/src?path=${path}`;
               const name = path.split("/").pop() ?? "";
               return {
                 src,
