@@ -69,7 +69,7 @@ function FieldEditPanelProvider({ children }: React.PropsWithChildren<{}>) {
 
       console.log("[EDITOR] saving..", data);
 
-      const promise = fetch("/private/editor/fields", {
+      const promise = fetch(`/private/editor/${state.form_id}/fields`, {
         body: JSON.stringify(data),
         method: "POST",
         headers: {

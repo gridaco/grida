@@ -17,14 +17,22 @@ import type {
 
 export const revalidate = 0;
 
-export async function POST(req: NextRequest) {
+export async function POST(
+  req: NextRequest,
+  context: {
+    params: {
+      form_id: string;
+    };
+  }
+) {
+  const { form_id } = context.params;
   const cookieStore = cookies();
   const supabase = createRouteHandlerClient(cookieStore);
   const init = (await req.json()) as FormFieldUpsert;
   const operation = init.id ? "update" : "create";
 
-  const { form_id } = init;
-  console.log("POST /private/editor/fields", init);
+  assert(form_id === init.form_id, "form_id mismatch");
+  // console.log("POST /private/editor/fields", init);
 
   const is_options_allowed_for_this_field = FieldSupports.options(init.type);
 
