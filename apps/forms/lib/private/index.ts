@@ -20,7 +20,8 @@ export namespace PrivateEditorApi {
     export async function getConnection(form_id: string) {
       return Axios.get<{
         data: GridaSupabase.SupabaseProject & {
-          connection_table: GridaSupabase.SupabaseTable | null;
+          tables: GridaSupabase.SupabaseTable[];
+          main_supabase_table_id: number;
         };
       }>(`/private/editor/connect/${form_id}/supabase`);
     }

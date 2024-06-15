@@ -111,7 +111,10 @@ function ConnectSupabase({ form_id }: { form_id: string }) {
         setUrl(data.sb_project_url);
         setAnonKey(data.sb_anon_key);
         setSchema(data.sb_public_schema as {});
-        setTable(data.connection_table?.sb_table_name);
+        setTable(
+          data.tables.find((t) => t.id === data.main_supabase_table_id)
+            ?.sb_table_name
+        );
         console.log(data);
       })
       .catch((err) => {
@@ -243,6 +246,8 @@ function ConnectSupabase({ form_id }: { form_id: string }) {
       error: "Failed to save main table",
     });
   };
+
+  console.log(schema, table);
 
   return (
     <div className="space-y-10">

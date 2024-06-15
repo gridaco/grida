@@ -32,16 +32,16 @@ export async function GET(req: NextRequest, context: Context) {
     );
   }
 
-  const { supabase_project_id } = conn;
+  const { supabase_project_id, main_supabase_table_id } = conn;
 
   const { data: supabase_project } = await grida_xsupabase_client
     .from("supabase_project")
-    .select(`*`)
+    .select(`*, tables:supabase_table(*)`)
     .eq("id", supabase_project_id)
     .single();
 
   return NextResponse.json({
-    data: supabase_project! satisfies GridaSupabase.SupabaseProject,
+    data: { ...supabase_project!, main_supabase_table_id },
   });
 }
 
