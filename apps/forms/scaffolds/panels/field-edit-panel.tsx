@@ -154,48 +154,30 @@ export function TypeSelect({
   value: FormInputType;
   onValueChange: (value: FormInputType) => void;
 }) {
-  return (
-    <Select value={value} onValueChange={onValueChange}>
-      <SelectTrigger id="type" aria-label="Select Field Type">
-        <SelectValue placeholder="Type" />
-      </SelectTrigger>
-      <SelectContent>
-        {supported_field_types.map((type) => (
-          <SelectItem key={type} value={type}>
-            <div className="flex items-center gap-2">
-              <FormFieldTypeIcon type={type} />{" "}
-              <span className="capitalize">{type}</span>
-            </div>
-          </SelectItem>
-        ))}
-      </SelectContent>
-    </Select>
-  );
-
-  // TODO: below won't display properly on panel
   const [open, setOpen] = React.useState(false);
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    <Popover open={open} onOpenChange={setOpen} modal>
       <PopoverTrigger asChild>
         <Button
           variant="outline"
           role="combobox"
           aria-expanded={open}
-          className="w-[200px] justify-between"
+          className="w-[200px] justify-between capitalize"
         >
-          {value
-            ? supported_field_types.find((t) => t === value)
-            : "Select input..."}
+          <div className="flex gap-2 items-center">
+            <FormFieldTypeIcon type={value} />
+            {value ? value : "Type"}
+          </div>
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-[200px] p-0">
         <Command>
-          <CommandInput placeholder="Search framework..." />
+          <CommandInput placeholder="Search" />
           <CommandEmpty>No input found.</CommandEmpty>
-          <CommandGroup>
-            <CommandList>
+          <CommandList>
+            <CommandGroup>
               {supported_field_types.map((t) => (
                 <CommandItem
                   key={t}
@@ -211,11 +193,14 @@ export function TypeSelect({
                       value === t ? "opacity-100" : "opacity-0"
                     )}
                   />
-                  {t}
+                  <div className="flex items-center gap-2">
+                    <FormFieldTypeIcon type={t} />
+                    <span className="capitalize">{t}</span>
+                  </div>
                 </CommandItem>
               ))}
-            </CommandList>
-          </CommandGroup>
+            </CommandGroup>
+          </CommandList>
         </Command>
       </PopoverContent>
     </Popover>
@@ -495,7 +480,7 @@ export function FieldEditPanel({
                 description="The input's name, identifier. Recommended to use lowercase and use an underscore to separate words e.g. column_name"
               >
                 <NameInput
-                  autoFocus={mode === "edit"}
+                  autoFocus={mode === "new"}
                   value={name}
                   onValueChange={setName}
                 />
