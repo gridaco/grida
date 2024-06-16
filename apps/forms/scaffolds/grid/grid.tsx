@@ -27,7 +27,7 @@ import {
   DropdownMenuPortal,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { FormInputType, FormResponseField } from "@/types";
+import { FormInputType } from "@/types";
 import { JsonEditCell } from "./json-cell";
 import { useEditorState } from "../editor";
 import { GFRow } from "./types";
@@ -36,8 +36,6 @@ import "./grid.css";
 import { unwrapFeildValue } from "@/lib/forms/unwrap";
 import { Button } from "@/components/ui/button";
 import { FormFieldTypeIcon } from "@/components/form-field-type-icon";
-import { createClientFormsClient } from "@/lib/supabase/client";
-import { GRIDA_FORMS_RESPONSE_BUCKET } from "@/k/env";
 import { toZonedTime } from "date-fns-tz";
 import { tztostr } from "../editor/symbols";
 import { mask } from "./mask";
