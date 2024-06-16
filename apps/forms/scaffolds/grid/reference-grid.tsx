@@ -4,6 +4,7 @@ import React from "react";
 import DataGrid, { Column, RenderCellProps } from "react-data-grid";
 import { ReferenceTableRow } from "./types";
 import "./grid.css";
+import { Skeleton } from "@/components/ui/skeleton";
 
 export function ReferenceTableGrid({
   columns: _columns,
@@ -53,20 +54,21 @@ export function ReferenceTableGrid({
         const k = rowKey ? args.row[rowKey] : undefined;
         onSelected?.(k, args.row);
       }}
+      renderers={{ noRowsFallback: <EmptyRowsRenderer /> }}
       rowKeyGetter={rowKey ? (row) => row[rowKey] : undefined}
       rowHeight={44}
     />
   );
 }
 
-// function ColumnCell({ column, row }: RenderCellProps<ReferenceTableRow>) {
-//   const data = row[column.key];
-
-//   if (!data) {
-//     return <></>;
-//   }
-
-//   const { type, format, value } = data;
-
-//   return <div>{JSON.stringify(value)}</div>;
-// }
+function EmptyRowsRenderer() {
+  return (
+    <div className="p-4 flex flex-col space-y-3">
+      <div className="space-y-2">
+        <Skeleton className="h-4 w-[250px]" />
+        <Skeleton className="h-4 w-[250px]" />
+        <Skeleton className="h-4 w-[200px]" />
+      </div>
+    </div>
+  );
+}
