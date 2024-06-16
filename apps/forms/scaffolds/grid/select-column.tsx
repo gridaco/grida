@@ -35,7 +35,6 @@ export const SelectColumn: CalculatedColumn<any, any> = {
   resizable: false,
   sortable: false,
   frozen: true,
-  isLastFrozenColumn: false,
   renderHeaderCell: (props: RenderHeaderCellProps<unknown>) => {
     // eslint-disable-next-line react-hooks/rules-of-hooks
     const [isRowSelected, onRowSelectionChange] = useRowSelection();

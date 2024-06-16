@@ -51,11 +51,11 @@ export function ReferenceTableGrid({
       columns={columns}
       rows={rows}
       onCellDoubleClick={(args) => {
-        const k = rowKey ? args.row[rowKey] : undefined;
+        const k = rowKey ? (args.row as any)[rowKey] : undefined;
         onSelected?.(k, args.row);
       }}
       renderers={{ noRowsFallback: <EmptyRowsRenderer /> }}
-      rowKeyGetter={rowKey ? (row) => row[rowKey] : undefined}
+      rowKeyGetter={rowKey ? (row) => (row as any)[rowKey] : undefined}
       rowHeight={44}
     />
   );
