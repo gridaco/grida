@@ -89,7 +89,8 @@ export type FormInputType =
   | "payment"
   | "hidden"
   | "signature"
-  | "range";
+  | "range"
+  | "search";
 
 export type FormFieldAutocompleteType =
   | "off"
@@ -174,6 +175,7 @@ export type FormFieldInit = {
   accept?: string | null;
   multiple?: boolean;
   storage?: FormFieldStorageSchema | {} | null;
+  reference?: FormFieldReferenceSchema | {} | null;
   // options_inventory?: { [option_id: string]: MutableInventoryStock };
 };
 
@@ -195,6 +197,7 @@ export interface IFormField {
   accept?: string | null;
   multiple?: boolean | null;
   storage?: FormFieldStorageSchema | {} | null;
+  reference?: FormFieldReferenceSchema | {} | null;
 }
 
 export interface FormFieldDefinition extends IFormField {
@@ -298,6 +301,13 @@ export interface FormFieldStorageSchema {
   bucket: string;
   path: string;
   mode: "direct" | "staged";
+}
+
+export interface FormFieldReferenceSchema {
+  type: "x-supabase";
+  schema: string;
+  table: string;
+  column: string;
 }
 
 export type PaymentsServiceProviders = "stripe" | "tosspayments";

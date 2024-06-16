@@ -1,4 +1,4 @@
-import { client } from "@/lib/supabase/server";
+import { client as grida_forms_client } from "@/lib/supabase/server";
 import assert from "assert";
 import {
   GRIDA_FORMS_RESPONSE_BUCKET,
@@ -96,7 +96,7 @@ export class FileStorage {
 
   sign(path: string) {
     return (
-      client.storage
+      this.client.storage
         .from(this.bucket)
         // valid for 2 hours - https://supabase.com/docs/reference/javascript/storage-from-createsigneduploadurl
         .createSignedUploadUrl(path)
@@ -126,7 +126,7 @@ export class SessionStagedFileStorage extends FileStorage {
   }
 
   async resolveStagedFile(tmp: string, target: string) {
-    return client.storage.from(this.bucket).move(tmp, target);
+    return this.client.storage.from(this.bucket).move(tmp, target);
   }
 }
 
@@ -154,7 +154,7 @@ export async function prepare_response_file_upload_storage_presigned_url(
   );
 
   const storage = new SessionStagedFileStorage(
-    client,
+    grida_forms_client,
     GRIDA_FORMS_RESPONSE_BUCKET
   );
 

@@ -16,6 +16,42 @@ interface CreateConnectionTableRequestData {
   table: string;
 }
 
+export async function GET(req: NextRequest, context: Context) {
+  const form_id = context.params.form_id;
+  const cookieStore = cookies();
+  const supabase = createRouteHandlerClient(cookieStore);
+
+  const { data: conn_ref, error: conn_ref_error } = await supabase
+    .from("connection_supabase")
+    .select()
+    .eq("form_id", form_id)
+    .single();
+
+  if (conn_ref_error) {
+    console.error(conn_ref_error);
+    return NextResponse.error();
+  }
+
+  if (!conn_ref) return notFound();
+  if (!conn_ref.main_supabase_table_id) {
+    return NextResponse.json(
+      { data: null, error: "No table connected" },
+      { status: 404 }
+    );
+  }
+
+  const { data: table } = await grida_xsupabase_client
+    .from("supabase_table")
+    .select("*")
+    .eq("id", conn_ref.main_supabase_table_id)
+    .single();
+
+  return NextResponse.json({
+    data: table,
+    error: null,
+  });
+}
+
 export async function PUT(req: NextRequest, context: Context) {
   const form_id = context.params.form_id;
   const cookieStore = cookies();

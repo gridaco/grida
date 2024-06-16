@@ -13,6 +13,7 @@ import {
   SwitchIcon,
   SliderIcon,
   FileIcon,
+  MagnifyingGlassIcon,
 } from "@radix-ui/react-icons";
 
 export function FormFieldTypeIcon({ type }: { type: FormInputType }) {
@@ -57,6 +58,8 @@ export function FormFieldTypeIcon({ type }: { type: FormInputType }) {
     case "payment":
       // TODO: replace icon
       return <>💰</>;
+    case "search":
+      return <MagnifyingGlassIcon />;
     default:
       return <TextIcon />;
   }

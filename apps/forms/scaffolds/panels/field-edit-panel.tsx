@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import {
   PanelClose,
   PanelContent,
@@ -22,8 +22,9 @@ import {
   PaymentFieldData,
   Option,
   FormFieldStorageSchema,
+  GridaSupabase,
+  FormFieldReferenceSchema,
 } from "@/types";
-import { LockClosedIcon } from "@radix-ui/react-icons";
 import { FormFieldAssistant } from "../ai/form-field-schema-assistant";
 import {
   Select,
@@ -57,7 +58,6 @@ import {
   payments_service_providers_default,
   payments_service_providers_display_map,
 } from "@/k/payments_service_providers";
-import { cls_save_button } from "@/components/preferences";
 import { fmt_snake_case_to_human_text } from "@/utils/fmt";
 import toast from "react-hot-toast";
 import { arrayMove } from "@dnd-kit/sortable";
@@ -75,6 +75,9 @@ import { useInventory, useInventoryState } from "../options/use-inventory";
 import Link from "next/link";
 import { SupabaseLogo } from "@/components/logos";
 import { Spinner } from "@/components/spinner";
+import { NameInput } from "./name-input";
+import { LockClosedIcon } from "@radix-ui/react-icons";
+import { PrivateEditorApi } from "@/lib/private";
 
 // @ts-ignore
 const default_field_init: {
@@ -153,48 +156,30 @@ export function TypeSelect({
   value: FormInputType;
   onValueChange: (value: FormInputType) => void;
 }) {
-  return (
-    <Select value={value} onValueChange={onValueChange}>
-      <SelectTrigger id="type" aria-label="Select Field Type">
-        <SelectValue placeholder="Type" />
-      </SelectTrigger>
-      <SelectContent>
-        {supported_field_types.map((type) => (
-          <SelectItem key={type} value={type}>
-            <div className="flex items-center gap-2">
-              <FormFieldTypeIcon type={type} />{" "}
-              <span className="capitalize">{type}</span>
-            </div>
-          </SelectItem>
-        ))}
-      </SelectContent>
-    </Select>
-  );
-
-  // TODO: below won't display properly on panel
   const [open, setOpen] = React.useState(false);
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    <Popover open={open} onOpenChange={setOpen} modal>
       <PopoverTrigger asChild>
         <Button
           variant="outline"
           role="combobox"
           aria-expanded={open}
-          className="w-[200px] justify-between"
+          className="w-full justify-between capitalize"
         >
-          {value
-            ? supported_field_types.find((t) => t === value)
-            : "Select input..."}
+          <div className="flex gap-2 items-center">
+            <FormFieldTypeIcon type={value} />
+            {value ? value : "Type"}
+          </div>
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-[200px] p-0">
+      <PopoverContent className="w-[--radix-popover-trigger-width] max-h-[--radix-popover-content-available-height] p-0">
         <Command>
-          <CommandInput placeholder="Search framework..." />
+          <CommandInput placeholder="Search" />
           <CommandEmpty>No input found.</CommandEmpty>
-          <CommandGroup>
-            <CommandList>
+          <CommandList>
+            <CommandGroup>
               {supported_field_types.map((t) => (
                 <CommandItem
                   key={t}
@@ -210,11 +195,14 @@ export function TypeSelect({
                       value === t ? "opacity-100" : "opacity-0"
                     )}
                   />
-                  {t}
+                  <div className="flex items-center gap-2">
+                    <FormFieldTypeIcon type={t} />
+                    <span className="capitalize">{t}</span>
+                  </div>
                 </CommandItem>
               ))}
-            </CommandList>
-          </CommandGroup>
+            </CommandGroup>
+          </CommandList>
         </Command>
       </PopoverContent>
     </Popover>
@@ -279,6 +267,13 @@ export function FieldEditPanel({
   const [storage, setStorage] = useState<
     Partial<FormFieldStorageSchema | null | undefined>
   >(init?.storage);
+
+  const [reference_enabled, __set_reference_enabled] = useState(
+    !!init?.reference
+  );
+  const [reference, setReference] = useState<
+    Partial<FormFieldReferenceSchema | null | undefined>
+  >(init?.reference);
 
   const preview_label = buildPreviewLabel({
     name,
@@ -375,6 +370,7 @@ export function FieldEditPanel({
       multiple,
       options_inventory: options_inventory_upsert_diff,
       storage: storage_enabled ? storage : undefined,
+      reference: reference_enabled ? reference : undefined,
     });
   };
 
@@ -493,12 +489,10 @@ export function FieldEditPanel({
                 }
                 description="The input's name, identifier. Recommended to use lowercase and use an underscore to separate words e.g. column_name"
               >
-                <PropertyTextInput
-                  required
-                  autoFocus={mode === "edit"}
-                  placeholder={"field_name"}
+                <NameInput
+                  autoFocus={mode === "new"}
                   value={name}
-                  onChange={(e) => setName(e.target.value)}
+                  onValueChange={setName}
                 />
               </PanelPropertyField>
             </PanelPropertyFields>
@@ -874,16 +868,29 @@ export function FieldEditPanel({
               </PanelPropertyField>
             </PanelPropertyFields>
           </PanelPropertySection>
-          {/* TODO: wip */}
           {FieldSupports.file_alias(type) && state.connections.supabase && (
             <>
               <hr />
-
               <SupabaseStorageSettings
                 value={storage}
                 onValueChange={setStorage}
                 enabled={storage_enabled}
                 onEnabledChange={__set_storage_enabled}
+              />
+            </>
+          )}
+          {FieldSupports.fk(type) && state.connections.supabase && !!name && (
+            <>
+              <hr />
+              <SupabaseReferencesSettings
+                format={
+                  state.connections.supabase.main_supabase_table
+                    ?.sb_table_schema?.properties?.[name]?.format
+                }
+                value={reference}
+                onValueChange={setReference}
+                enabled={reference_enabled}
+                onEnabledChange={__set_reference_enabled}
               />
             </>
           )}
@@ -901,17 +908,6 @@ export function FieldEditPanel({
   );
 }
 
-interface SupabaseBucketInfo {
-  id: string;
-  name: string;
-  owner: string;
-  public: boolean;
-  file_size_limit: number;
-  allowed_mime_types: string[];
-  created_at: string;
-  updated_at: string;
-}
-
 function SupabaseStorageSettings({
   value,
   onValueChange,
@@ -924,7 +920,7 @@ function SupabaseStorageSettings({
   onEnabledChange?: (enabled: boolean) => void;
 }) {
   const [state] = useEditorState();
-  const [buckets, setBuckets] = useState<SupabaseBucketInfo[]>();
+  const [buckets, setBuckets] = useState<GridaSupabase.SupabaseBucket[]>();
   const [bucket, setBucket] = useState<string | undefined>(value?.bucket);
   const [path, setPath] = useState<string | undefined>(value?.path);
   const [mode, setMode] = useState<FormFieldStorageSchema["mode"]>(
@@ -945,15 +941,11 @@ function SupabaseStorageSettings({
   // list buckets
   useEffect(() => {
     if (enabled) {
-      fetch(
-        `/private/editor/connect/${state.form_id}/supabase/storage/buckets`
-      ).then((res) => {
-        res.json().then(({ data, error }) => {
-          if (data) {
-            setBuckets(data);
-          }
-        });
-      });
+      PrivateEditorApi.SupabaseConnection.listBucket(state.form_id).then(
+        (res) => {
+          res.data.data && setBuckets(res.data.data);
+        }
+      );
     }
   }, [enabled, state.form_id]);
 
@@ -1047,6 +1039,164 @@ function SupabaseStorageSettings({
                   setMode(checked ? "staged" : "direct")
                 }
               />
+            </PanelPropertyField>
+          </>
+        )}
+      </PanelPropertyFields>
+    </PanelPropertySection>
+  );
+}
+
+function SupabaseReferencesSettings({
+  format,
+  value,
+  onValueChange,
+  enabled,
+  onEnabledChange,
+}: {
+  format?: string;
+  value?: Partial<FormFieldReferenceSchema> | null | undefined;
+  onValueChange?: (value: Partial<FormFieldReferenceSchema>) => void;
+  enabled?: boolean;
+  onEnabledChange?: (enabled: boolean) => void;
+}) {
+  const [state] = useEditorState();
+
+  const { supabase_project } = state.connections.supabase!;
+
+  const { schema, table, column } = value || {};
+
+  const onTableChange = useCallback(
+    (table: string) => {
+      const [schema, _table] = table.split(".");
+
+      onValueChange?.({
+        type: "x-supabase",
+        schema,
+        table: _table,
+        column: undefined,
+      });
+    },
+    [onValueChange]
+  );
+
+  const onColumnCahnge = useCallback(
+    (column: string) => {
+      onValueChange?.({
+        type: "x-supabase",
+        schema,
+        table,
+        column,
+      });
+    },
+    [onValueChange, schema, table]
+  );
+
+  const fulltable = `${schema}.${table}`;
+
+  return (
+    <PanelPropertySection>
+      <PanelPropertySectionTitle>
+        <SupabaseLogo className="inline me-2 w-5 h-5 align-middle" />
+        Supabase Foreign Key
+      </PanelPropertySectionTitle>
+      <PanelPropertyFields>
+        <PanelPropertyField
+          label={"Enable Foreign Key Search"}
+          description="Enable Supabase Foreign Key Search to reference data from your Supabase project."
+        >
+          <Switch checked={enabled} onCheckedChange={onEnabledChange} />
+        </PanelPropertyField>
+        {enabled && (
+          <>
+            <PanelPropertyField
+              label={"Reference Table"}
+              description="The table to reference data from."
+            >
+              <Select value={fulltable} onValueChange={onTableChange}>
+                <SelectTrigger>
+                  <SelectValue placeholder={"Select Table"} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="auth.users">
+                    <span>auth.users</span>
+                  </SelectItem>
+                  {Object.keys(supabase_project.sb_public_schema!)?.map(
+                    (key) => {
+                      const fulltable = `public.${key}`;
+                      return (
+                        <SelectItem key={fulltable} value={fulltable}>
+                          <span>{fulltable}</span>
+                        </SelectItem>
+                      );
+                    }
+                  )}
+                </SelectContent>
+              </Select>
+            </PanelPropertyField>
+            <PanelPropertyField
+              label={"Column"}
+              description="The column to reference data from."
+            >
+              <Select
+                // setting this to undefined will throw (don't know why)
+                value={column ?? ""}
+                onValueChange={onColumnCahnge}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder={"Select Column"} />
+                </SelectTrigger>
+                <SelectContent>
+                  {table &&
+                    (schema === "auth" && table === "users" ? (
+                      <>
+                        {Object.keys(
+                          GridaSupabase.SupabaseUserJsonSchema.properties
+                        ).map((key) => {
+                          const property =
+                            GridaSupabase.SupabaseUserJsonSchema.properties[
+                              key as GridaSupabase.SupabaseUserColumn
+                            ];
+                          return (
+                            <SelectItem
+                              disabled={format !== property.format}
+                              key={key}
+                              value={key}
+                            >
+                              <span>{key}</span>{" "}
+                              <small className="ms-1 text-muted-foreground">
+                                {property.type} | {property.format}
+                              </small>
+                            </SelectItem>
+                          );
+                        })}
+                      </>
+                    ) : (
+                      <>
+                        {Object.keys(
+                          supabase_project.sb_public_schema![table]
+                            ?.properties ?? {}
+                        )?.map((key) => {
+                          const property =
+                            supabase_project.sb_public_schema![table]
+                              .properties?.[key];
+                          return (
+                            <SelectItem
+                              disabled={format !== property.format}
+                              key={key}
+                              value={key}
+                            >
+                              <span>{key}</span>{" "}
+                              <small className="ms-1 text-muted-foreground">
+                                {property.type} | {property.format}
+                              </small>
+                            </SelectItem>
+                          );
+                        })}
+                      </>
+                    ))}
+                </SelectContent>
+              </Select>
             </PanelPropertyField>
           </>
         )}

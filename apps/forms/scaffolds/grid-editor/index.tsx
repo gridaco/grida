@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useCallback, useMemo, useState } from "react";
-import { Grid } from "../grid";
+import { ResponseGrid } from "../grid";
 import { createClientFormsClient } from "@/lib/supabase/client";
 import {
   AlertDialog,
@@ -239,7 +239,7 @@ export function GridEditor() {
         onDeleteConfirm={onDeleteField}
       />
       <div className="flex flex-col w-full h-full">
-        <Grid
+        <ResponseGrid
           columns={columns}
           rows={rows}
           readonly={readonly}

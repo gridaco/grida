@@ -1,5 +1,4 @@
 "use client";
-import Axios from "axios";
 import React, { useEffect, useState } from "react";
 import { Button, buttonVariants } from "@/components/ui/button";
 import {
@@ -69,6 +68,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Spinner } from "@/components/spinner";
+import { PrivateEditorApi } from "@/lib/private";
 
 export default function ConnectDB({
   params,
@@ -86,52 +86,6 @@ export default function ConnectDB({
   );
 }
 
-async function sbconn_create_connection(
-  form_id: string,
-  data: {
-    sb_anon_key: string;
-    sb_project_url: string;
-  }
-) {
-  return Axios.post(`/private/editor/connect/${form_id}/supabase`, data);
-}
-
-async function sbconn_refresh_connection(form_id: string) {
-  return Axios.patch(`/private/editor/connect/${form_id}/supabase`);
-}
-
-async function sbconn_get_connection(form_id: string) {
-  return Axios.get<{
-    data: GridaSupabase.SupabaseProject & {
-      connection_table: GridaSupabase.SupabaseTable | null;
-    };
-  }>(`/private/editor/connect/${form_id}/supabase`);
-}
-
-async function sbconn_remove_connection(form_id: string) {
-  return Axios.delete(`/private/editor/connect/${form_id}/supabase`);
-}
-
-async function sbconn_create_secret(form_id: string, data: { secret: string }) {
-  return Axios.post(
-    `/private/editor/connect/${form_id}/supabase/secure-service-key`,
-    data
-  );
-}
-
-async function sbconn_reveal_secret(form_id: string) {
-  return Axios.get(
-    `/private/editor/connect/${form_id}/supabase/secure-service-key`
-  );
-}
-
-async function sbconn_create_connection_table(
-  form_id: string,
-  data: { table: string }
-) {
-  return Axios.put(`/private/editor/connect/${form_id}/supabase/table`, data);
-}
-
 function ConnectSupabase({ form_id }: { form_id: string }) {
   const [url, setUrl] = useState("");
   const [anonKey, setAnonKey] = useState("");
@@ -139,29 +93,32 @@ function ConnectSupabase({ form_id }: { form_id: string }) {
   const [schema, setSchema] = useState<SupabasePublicSchema | null>(null);
   const [table, setTable] = useState<string | undefined>(undefined);
 
-  const [connection, setConnection] = useState<
+  const [project, setProject] = useState<
     GridaSupabase.SupabaseProject | null | undefined
   >(undefined);
 
   const is_loaded = schema !== null;
-  const is_connected = !!connection;
-  const is_service_key_set = !!connection?.sb_service_key_id;
+  const is_connected = !!project;
+  const is_service_key_set = !!project?.sb_service_key_id;
 
   const disabled = !url || !anonKey;
 
   useEffect(() => {
-    sbconn_get_connection(form_id)
+    PrivateEditorApi.SupabaseConnection.getConnection(form_id)
       .then((res) => {
         const data = res.data.data;
-        setConnection(data);
-        setUrl(data.sb_project_url);
-        setAnonKey(data.sb_anon_key);
-        setSchema(data.sb_public_schema as {});
-        setTable(data.connection_table?.sb_table_name);
+        setProject(data.supabase_project);
+        setUrl(data.supabase_project.sb_project_url);
+        setAnonKey(data.supabase_project.sb_anon_key);
+        setSchema(data.supabase_project.sb_public_schema as {});
+        setTable(
+          data.tables.find((t) => t.id === data.main_supabase_table_id)
+            ?.sb_table_name
+        );
         console.log(data);
       })
       .catch((err) => {
-        setConnection(null);
+        setProject(null);
       });
   }, [form_id]);
 
@@ -170,7 +127,7 @@ function ConnectSupabase({ form_id }: { form_id: string }) {
     setAnonKey("");
     setSchema(null);
     setTable(undefined);
-    setConnection(null);
+    setProject(null);
   };
 
   const onTestConnectionClick = async () => {
@@ -191,7 +148,7 @@ function ConnectSupabase({ form_id }: { form_id: string }) {
   };
 
   const onRefreshSchemaClick = async () => {
-    const res = sbconn_refresh_connection(form_id);
+    const res = PrivateEditorApi.SupabaseConnection.refreshConnection(form_id);
     toast.promise(res, {
       loading: "Refreshing Schema...",
       success: "Schema Refreshed",
@@ -209,7 +166,10 @@ function ConnectSupabase({ form_id }: { form_id: string }) {
       sb_project_url: url,
     };
 
-    const res = sbconn_create_connection(form_id, data);
+    const res = PrivateEditorApi.SupabaseConnection.createConnection(
+      form_id,
+      data
+    );
 
     toast
       .promise(res, {
@@ -218,12 +178,12 @@ function ConnectSupabase({ form_id }: { form_id: string }) {
         error: "Failed to create connection",
       })
       .then((res) => {
-        setConnection(res.data.data);
+        setProject(res.data.data);
       });
   };
 
   const onRemoveConnectionClick = async () => {
-    const res = sbconn_remove_connection(form_id);
+    const res = PrivateEditorApi.SupabaseConnection.removeConnection(form_id);
 
     toast
       .promise(res, {
@@ -232,7 +192,7 @@ function ConnectSupabase({ form_id }: { form_id: string }) {
         error: "Failed to remove connection",
       })
       .then(() => {
-        setConnection(null);
+        setProject(null);
         setUrl("");
         setAnonKey("");
         setSchema(null);
@@ -250,10 +210,13 @@ function ConnectSupabase({ form_id }: { form_id: string }) {
           secret: serviceKey,
         };
 
-        const res = sbconn_create_secret(form_id, data);
+        const res = PrivateEditorApi.SupabaseConnection.createSecret(
+          form_id,
+          data
+        );
 
         res.then((res) => {
-          setConnection((prev) => ({
+          setProject((prev) => ({
             ...prev!,
             sb_service_key_id: res.data.data,
           }));
@@ -272,7 +235,10 @@ function ConnectSupabase({ form_id }: { form_id: string }) {
 
   const onSaveMainTableClick = async () => {
     assert(table);
-    const res = sbconn_create_connection_table(form_id, { table });
+    const res = PrivateEditorApi.SupabaseConnection.createConnectionTable(
+      form_id,
+      { table }
+    );
 
     toast.promise(res, {
       loading: "Saving Main Table...",
@@ -281,9 +247,11 @@ function ConnectSupabase({ form_id }: { form_id: string }) {
     });
   };
 
+  console.log(schema, table);
+
   return (
     <div className="space-y-10">
-      {connection === undefined ? (
+      {project === undefined ? (
         <LoadingCard />
       ) : (
         <Card>
@@ -295,7 +263,7 @@ function ConnectSupabase({ form_id }: { form_id: string }) {
               </span>
               {is_connected && (
                 <Link
-                  href={`https://supabase.com/dashboard/project/${connection.sb_project_reference_id}`}
+                  href={`https://supabase.com/dashboard/project/${project.sb_project_reference_id}`}
                   target="_blank"
                 >
                   <Button variant="link">
@@ -465,7 +433,10 @@ function ConnectSupabase({ form_id }: { form_id: string }) {
                 <>
                   <RevealSecret
                     fetcher={async () => {
-                      const res = await sbconn_reveal_secret(form_id);
+                      const res =
+                        await PrivateEditorApi.SupabaseConnection.revealSecret(
+                          form_id
+                        );
                       return res.data.data;
                     }}
                   />
@@ -487,7 +458,7 @@ function ConnectSupabase({ form_id }: { form_id: string }) {
           </div>
         </CardContent>
         <CardFooter className="flex justify-end">
-          <div hidden={!!connection?.sb_service_key_id}>
+          <div hidden={!!project?.sb_service_key_id}>
             <Button disabled={!serviceKey} onClick={onServiceKeySaveClick}>
               Save
             </Button>

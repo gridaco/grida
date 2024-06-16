@@ -75,6 +75,7 @@ export async function POST(
       accept: init.accept,
       multiple: init.multiple,
       storage: init.storage ?? null,
+      reference: init.reference ?? null,
       // 'description': init.description,
     })
     .select("*, existing_options:form_field_option(*)")

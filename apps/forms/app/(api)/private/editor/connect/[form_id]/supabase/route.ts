@@ -3,6 +3,7 @@ import {
   createRouteHandlerClient,
   grida_xsupabase_client,
 } from "@/lib/supabase/server";
+import { GridaXSupabaseClient } from "@/services/x-supabase";
 import { GridaSupabase } from "@/types";
 import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
@@ -32,16 +33,16 @@ export async function GET(req: NextRequest, context: Context) {
     );
   }
 
-  const { supabase_project_id } = conn;
+  const client = new GridaXSupabaseClient();
 
-  const { data: supabase_project } = await grida_xsupabase_client
-    .from("supabase_project")
-    .select(`*`)
-    .eq("id", supabase_project_id)
-    .single();
+  const data = await client.getConnection(conn);
+
+  if (!data) {
+    return notFound();
+  }
 
   return NextResponse.json({
-    data: supabase_project! satisfies GridaSupabase.SupabaseProject,
+    data: data,
   });
 }
 

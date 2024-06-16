@@ -3,6 +3,8 @@ import { FormBlockTree } from "@/lib/forms/types";
 import type { FormFieldDefinition } from "@/types";
 
 export interface FormAgentState {
+  form_id: string;
+  session_id?: string;
   // do not change the keys
   // #/fields/${string}/value
   fields: {
@@ -23,10 +25,14 @@ export interface FormAgentState {
 }
 
 export function init({
+  form_id,
+  session_id,
   fields,
   blocks,
   tree,
 }: {
+  form_id: string;
+  session_id?: string;
   fields: FormFieldDefinition[];
   blocks: ClientRenderBlock[];
   tree: FormBlockTree<ClientRenderBlock[]>;
@@ -72,6 +78,8 @@ export function init({
   );
 
   return {
+    form_id,
+    session_id,
     fields: fields_state,
     blocks: blocks_state,
     sections,

@@ -446,8 +446,8 @@ importers:
         specifier: ^5.6.1
         version: 5.6.1(react-dom@18.3.1)(react@18.3.1)
       react-data-grid:
-        specifier: 7.0.0-beta.42
-        version: 7.0.0-beta.42(react-dom@18.3.1)(react@18.3.1)
+        specifier: 7.0.0-beta.44
+        version: 7.0.0-beta.44(react-dom@18.3.1)(react@18.3.1)
       react-day-picker:
         specifier: ^8.10.1
         version: 8.10.1(date-fns@3.6.0)(react@18.3.1)
@@ -37520,8 +37520,8 @@ packages:
       universal-cookie: 4.0.4
     dev: false
 
-  /react-data-grid@7.0.0-beta.42(react-dom@18.3.1)(react@18.3.1):
-    resolution: {integrity: sha512-N5ToEOxMlQGkRYhed3ahFz34fgJTccrCA9PZqIGVoO1vsZADNISXk6ywODJOdCz/1yB78MLu+T7q6cnJd2024A==}
+  /react-data-grid@7.0.0-beta.44(react-dom@18.3.1)(react@18.3.1):
+    resolution: {integrity: sha512-VTql8VPBJEf7E+zkrqYW+jaQT1/m47dxigWzPq59QESJ8LhU59kHyzIx06BUpjdZKdK/tzbWaw2yyJpKoNnt5g==}
     peerDependencies:
       react: ^18.2.0
       react-dom: ^18.2.0

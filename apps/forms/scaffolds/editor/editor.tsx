@@ -137,6 +137,7 @@ function FieldEditPanelProvider({ children }: React.PropsWithChildren<{}>) {
                 multiple: field.multiple ?? undefined,
                 options: field.options,
                 storage: field.storage,
+                reference: field.reference,
                 // TODO: add inventory support
                 // options_inventory: undefined,
               }

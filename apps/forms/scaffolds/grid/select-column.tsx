@@ -15,7 +15,7 @@ import {
   SyntheticEvent,
   useCallback,
 } from "react";
-import { GFRow } from "./types";
+import { GFResponseRow } from "./types";
 import * as Tooltip from "@radix-ui/react-tooltip";
 import { EnterFullScreenIcon } from "@radix-ui/react-icons";
 import { useEditorState } from "../editor";
@@ -35,7 +35,6 @@ export const SelectColumn: CalculatedColumn<any, any> = {
   resizable: false,
   sortable: false,
   frozen: true,
-  isLastFrozenColumn: false,
   renderHeaderCell: (props: RenderHeaderCellProps<unknown>) => {
     // eslint-disable-next-line react-hooks/rules-of-hooks
     const [isRowSelected, onRowSelectionChange] = useRowSelection();
@@ -51,7 +50,7 @@ export const SelectColumn: CalculatedColumn<any, any> = {
       />
     );
   },
-  renderCell: (props: RenderCellProps<GFRow>) => {
+  renderCell: (props: RenderCellProps<GFResponseRow>) => {
     // eslint-disable-next-line react-hooks/rules-of-hooks
     const [isRowSelected, onRowSelectionChange] = useRowSelection();
     return (
@@ -73,7 +72,7 @@ export const SelectColumn: CalculatedColumn<any, any> = {
       />
     );
   },
-  renderGroupCell: (props: RenderGroupCellProps<GFRow>) => {
+  renderGroupCell: (props: RenderGroupCellProps<GFResponseRow>) => {
     // eslint-disable-next-line react-hooks/rules-of-hooks
     const [isRowSelected, onRowSelectionChange] = useRowSelection();
     return (
@@ -108,7 +107,7 @@ type SharedInputProps = Pick<
 
 interface SelectCellFormatterProps extends SharedInputProps {
   value: boolean;
-  row?: GFRow;
+  row?: GFResponseRow;
   onChange: (value: boolean, isShiftClick: boolean) => void;
 }
 
