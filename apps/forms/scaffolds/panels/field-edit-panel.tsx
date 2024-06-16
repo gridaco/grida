@@ -1071,6 +1071,7 @@ function SupabaseReferencesSettings({
       const [schema, _table] = table.split(".");
 
       onValueChange?.({
+        type: "x-supabase",
         schema,
         table: _table,
         column: undefined,
@@ -1082,6 +1083,7 @@ function SupabaseReferencesSettings({
   const onColumnCahnge = useCallback(
     (column: string) => {
       onValueChange?.({
+        type: "x-supabase",
         schema,
         table,
         column,
@@ -1136,7 +1138,11 @@ function SupabaseReferencesSettings({
               label={"Column"}
               description="The column to reference data from."
             >
-              <Select value={column} onValueChange={onColumnCahnge}>
+              <Select
+                // setting this to undefined will throw (don't know why)
+                value={column ?? ""}
+                onValueChange={onColumnCahnge}
+              >
                 <SelectTrigger>
                   <SelectValue placeholder={"Select Column"} />
                 </SelectTrigger>
@@ -1168,7 +1174,8 @@ function SupabaseReferencesSettings({
                     ) : (
                       <>
                         {Object.keys(
-                          supabase_project.sb_public_schema![table].properties
+                          supabase_project.sb_public_schema![table]
+                            ?.properties ?? {}
                         )?.map((key) => {
                           const property =
                             supabase_project.sb_public_schema![table]

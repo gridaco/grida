@@ -106,7 +106,15 @@ function Providers({
 
   return (
     <>
-      <FormAgentProvider initial={init({ fields, blocks, tree })}>
+      <FormAgentProvider
+        initial={init({
+          form_id,
+          session_id,
+          fields,
+          blocks,
+          tree,
+        })}
+      >
         <SessionDataSyncProvider session_id={session_id}>
           <TossPaymentsCheckoutProvider initial={checkoutSession}>
             {children}
@@ -445,6 +453,7 @@ function BlockRenderer({
               {!hidden ? (
                 <FormField
                   key={field.id}
+                  id={field.id}
                   name={field.name}
                   label={field.label}
                   placeholder={field.placeholder}

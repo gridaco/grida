@@ -42,6 +42,10 @@ import {
 } from "@/k/env";
 import type { FieldUploadStrategy } from "@/lib/forms";
 import assert from "assert";
+import {
+  ReferenceSearch,
+  ReferenceSearchPreview,
+} from "./reference-search-field";
 
 /**
  * this disables the auto zoom in input text tag safari on iphone by setting font-size to 16px
@@ -50,6 +54,7 @@ import assert from "assert";
 const cls_input_ios_zoom_disable = "!text-base sm:!text-sm";
 
 interface IInputField {
+  id?: string;
   name: string;
   label?: string;
   type: FormInputType;
@@ -133,6 +138,7 @@ function FormField({ is_array, ...props }: IFormFieldRenderingProps) {
 }
 
 function MonoFormField({
+  id,
   name,
   label,
   labelCapitalize,
@@ -449,6 +455,13 @@ function MonoFormField({
             {...(sharedInputProps as React.ComponentProps<"input">)}
           />
         );
+      }
+
+      case "search": {
+        if (preview) {
+          return <ReferenceSearchPreview />;
+        }
+        return <ReferenceSearch id={id ?? ""} />;
       }
       default: {
         return (
