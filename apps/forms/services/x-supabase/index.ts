@@ -26,9 +26,6 @@ export async function createXSupabaseClient(
   if (config?.service_role) {
     const { data } = await secureFetchServiceKey(supabase_project.id);
     serviceRoleKey = data;
-  }
-
-  if (config?.service_role) {
     assert(serviceRoleKey, "serviceRoleKey is required");
   }
 

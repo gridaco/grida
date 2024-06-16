@@ -45,7 +45,6 @@ export async function GET(
     const { type, schema, table, column } =
       field.reference as any as FormFieldReferenceSchema;
 
-    console.log("type", type);
     switch (type) {
       case "x-supabase": {
         console.log("schema", schema);

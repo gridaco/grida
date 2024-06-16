@@ -65,11 +65,6 @@ export async function PUT(
   // TODO: validate if anonymous user is owner of this session
   // TODO: validate if session is open
 
-  const storage = new SessionStagedFileStorage(
-    client,
-    GRIDA_FORMS_RESPONSE_BUCKET
-  );
-
   const { data, error } = await sign({
     session_id: session_id,
     field_id: field_id,
@@ -78,6 +73,11 @@ export async function PUT(
       unique: true,
     },
   });
+
+  if (error) {
+    console.error("session/sign-upload-urls", error);
+    return NextResponse.error();
+  }
 
   return NextResponse.json(<FormsApiResponse<SessionSignedUploadUrlData>>{
     data: data,
