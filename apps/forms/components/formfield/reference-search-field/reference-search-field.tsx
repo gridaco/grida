@@ -16,34 +16,47 @@ import { GridaSupabase } from "@/types";
 import { Search } from "lucide-react";
 import useSWR from "swr";
 import "react-data-grid/lib/styles.css";
+import { useState } from "react";
 
-function SearchInput() {
+function SearchInput(props: React.ComponentProps<typeof Input>) {
   return (
     <div className="relative ml-auto flex-1 md:grow-0">
       <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
       <Input
         type="search"
-        placeholder="Search..."
+        placeholder="Search"
         className="w-full rounded-lg bg-background pl-8 md:w-[200px] lg:w-[320px]"
+        {...props}
       />
     </div>
   );
 }
 
-export function ReferenceSearchPreview() {
-  return <SearchInput />;
+export function ReferenceSearchPreview(
+  props: React.ComponentProps<typeof SearchInput>
+) {
+  return <SearchInput {...props} />;
 }
-export function ReferenceSearch({ id }: { id: string }) {
+
+export function ReferenceSearch({
+  field_id,
+  ...props
+}: React.ComponentProps<typeof SearchInput> & {
+  field_id: string;
+}) {
+  const [open, setOpen] = useState(false);
   const [state] = useFormAgentState();
+  const [value, setValue] = useState<string>("");
 
   const res = useSWR<{
     data: {
       schema: string;
       table: string;
+      column: string;
       users: GridaSupabase.SupabaseUser[];
     };
   }>(
-    `/v1/session/${state.session_id}/field/${id}/search`,
+    `/v1/session/${state.session_id}/field/${field_id}/search`,
     async (url: string) => {
       const res = await fetch(url);
       return res.json();
@@ -55,9 +68,9 @@ export function ReferenceSearch({ id }: { id: string }) {
     .join(".");
 
   return (
-    <Sheet>
+    <Sheet open={open} onOpenChange={setOpen}>
       <SheetTrigger>
-        <SearchInput />
+        <SearchInput value={value} {...props} />
       </SheetTrigger>
       <SheetContent className="flex flex-col p-0 py-6 xl:w-[800px] xl:max-w-none sm:w-[500px] sm:max-w-none w-screen max-w-none">
         <SheetHeader className="px-6">
@@ -69,6 +82,11 @@ export function ReferenceSearch({ id }: { id: string }) {
         <div className="flex-1">
           <div className="flex flex-col w-full h-full">
             <ReferenceTableGrid
+              onSelected={(key, row) => {
+                setValue(key);
+                setOpen(false);
+              }}
+              rowKey={res.data?.data?.column}
               columns={Object.keys(
                 GridaSupabase.SupabaseUserJsonSchema.properties
               ).map((key) => {
@@ -82,18 +100,7 @@ export function ReferenceSearch({ id }: { id: string }) {
                   name: key,
                 };
               })}
-              rows={
-                res.data?.data?.users.map((user) => {
-                  return Object.keys(user).reduce((acc, k) => {
-                    const val = user[k as keyof GridaSupabase.SupabaseUser];
-                    if (typeof val === "object") {
-                      return { ...acc, [k]: JSON.stringify(val) };
-                    }
-
-                    return { ...acc, [k]: val };
-                  }, {});
-                }) ?? []
-              }
+              rows={res.data?.data?.users ?? []}
             />
           </div>
         </div>

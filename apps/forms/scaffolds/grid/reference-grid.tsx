@@ -6,8 +6,10 @@ import { ReferenceTableRow } from "./types";
 import "./grid.css";
 
 export function ReferenceTableGrid({
-  columns,
-  rows,
+  columns: _columns,
+  rows: _rows,
+  rowKey,
+  onSelected,
 }: {
   columns: {
     key: string;
@@ -15,8 +17,10 @@ export function ReferenceTableGrid({
     type?: string;
   }[];
   rows: ReferenceTableRow[];
+  rowKey?: string;
+  onSelected?: (key: string, row: ReferenceTableRow) => void;
 }) {
-  const cols = columns.map(
+  const columns = _columns.map(
     (col) =>
       ({
         key: col.key,
@@ -24,15 +28,32 @@ export function ReferenceTableGrid({
         resizable: true,
         draggable: true,
         editable: false,
+        // frozen: col.key === rowKey,
         width: undefined,
       }) as Column<any>
   );
 
+  const rows = _rows.map((row) => {
+    return Object.keys(row).reduce((acc, k) => {
+      const val = row[k as keyof ReferenceTableRow];
+      if (typeof val === "object") {
+        return { ...acc, [k]: JSON.stringify(val) };
+      }
+
+      return { ...acc, [k]: val };
+    }, {});
+  });
+
   return (
     <DataGrid
       className="flex-grow border border-neutral-200 dark:border-neutral-900 select-none"
-      columns={cols}
+      columns={columns}
       rows={rows}
+      onCellDoubleClick={(args) => {
+        const k = rowKey ? args.row[rowKey] : undefined;
+        onSelected?.(k, args.row);
+      }}
+      rowKeyGetter={rowKey ? (row) => row[rowKey] : undefined}
       rowHeight={44}
     />
   );

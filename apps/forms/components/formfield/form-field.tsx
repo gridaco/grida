@@ -461,7 +461,13 @@ function MonoFormField({
         if (preview) {
           return <ReferenceSearchPreview />;
         }
-        return <ReferenceSearch id={id ?? ""} />;
+        return (
+          // @ts-ignore
+          <ReferenceSearch
+            {...(sharedInputProps as React.ComponentProps<"input">)}
+            field_id={id ?? ""}
+          />
+        );
       }
       default: {
         return (

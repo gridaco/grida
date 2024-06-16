@@ -42,7 +42,7 @@ export async function GET(
   }
 
   if (field.reference) {
-    const { type, schema, table } =
+    const { type, schema, table, column } =
       field.reference as any as FormFieldReferenceSchema;
 
     console.log("type", type);
@@ -72,6 +72,7 @@ export async function GET(
               data: {
                 schema: schema,
                 table: table,
+                column: column,
                 ...data,
               },
             });
