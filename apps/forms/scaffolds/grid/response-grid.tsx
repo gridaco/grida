@@ -43,7 +43,7 @@ function rowKeyGetter(row: GFRow) {
   return row.__gf_id;
 }
 
-export function Grid({
+export function ResponseGrid({
   columns,
   rows,
   selectionDisabled,
