@@ -64,11 +64,17 @@ export async function GET(
               table === "users",
               `Unsupported table "${table}" on schena "${schema}"`
             );
-            const res = await client.auth.admin.listUsers({
+            const { data } = await client.auth.admin.listUsers({
               page: page,
             });
 
-            return NextResponse.json(res);
+            return NextResponse.json({
+              data: {
+                schema: schema,
+                table: table,
+                ...data,
+              },
+            });
           }
           case "public": {
             break;

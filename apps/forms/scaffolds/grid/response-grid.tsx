@@ -30,7 +30,7 @@ import {
 import { FormInputType } from "@/types";
 import { JsonEditCell } from "./json-cell";
 import { useEditorState } from "../editor";
-import { GFRow } from "./types";
+import { GFResponseRow } from "./types";
 import { SelectColumn } from "./select-column";
 import "./grid.css";
 import { unwrapFeildValue } from "@/lib/forms/unwrap";
@@ -39,7 +39,7 @@ import { FormFieldTypeIcon } from "@/components/form-field-type-icon";
 import { toZonedTime } from "date-fns-tz";
 import { tztostr } from "../editor/symbols";
 import { mask } from "./mask";
-function rowKeyGetter(row: GFRow) {
+function rowKeyGetter(row: GFResponseRow) {
   return row.__gf_id;
 }
 
@@ -57,7 +57,7 @@ export function ResponseGrid({
     name: string;
     type?: string;
   }[];
-  rows: GFRow[];
+  rows: GFResponseRow[];
   selectionDisabled?: boolean;
   readonly?: boolean;
   onAddNewFieldClick?: () => void;
@@ -262,7 +262,10 @@ function NewFieldHeaderCell({
   );
 }
 
-function DefaultPropertyDateCell({ column, row }: RenderCellProps<GFRow>) {
+function DefaultPropertyDateCell({
+  column,
+  row,
+}: RenderCellProps<GFResponseRow>) {
   const [state] = useEditorState();
 
   const date = row.__gf_created_at;
@@ -299,7 +302,10 @@ function fmtdate(
   }
 }
 
-function DefaultPropertyCustomerCell({ column, row }: RenderCellProps<GFRow>) {
+function DefaultPropertyCustomerCell({
+  column,
+  row,
+}: RenderCellProps<GFResponseRow>) {
   const [state, dispatch] = useEditorState();
 
   const data = row.__gf_customer_id;
@@ -334,7 +340,7 @@ function FKButton({ onClick }: { onClick?: () => void }) {
   );
 }
 
-function FieldCell({ column, row }: RenderCellProps<GFRow>) {
+function FieldCell({ column, row }: RenderCellProps<GFResponseRow>) {
   const [state] = useEditorState();
   const data = row.fields[column.key];
 
@@ -392,7 +398,7 @@ function FieldCell({ column, row }: RenderCellProps<GFRow>) {
   }
 }
 
-function FieldEditCell(props: RenderEditCellProps<GFRow>) {
+function FieldEditCell(props: RenderEditCellProps<GFResponseRow>) {
   const { column, row } = props;
   const data = row.fields[column.key];
   const ref = useRef<HTMLInputElement>(null);
