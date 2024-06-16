@@ -38,6 +38,14 @@ export function ReferenceSearchPreview(
   return <SearchInput {...props} />;
 }
 
+type SearchRes = {
+  schema_name: string;
+  table_name: string;
+  table_schema: GridaSupabase.SupabaseTable["sb_table_schema"];
+  column: string;
+  rows: Record<string, any>[];
+};
+
 export function ReferenceSearch({
   field_id,
   ...props
@@ -49,12 +57,7 @@ export function ReferenceSearch({
   const [value, setValue] = useState<string>("");
 
   const res = useSWR<{
-    data: {
-      schema: string;
-      table: string;
-      column: string;
-      users: GridaSupabase.SupabaseUser[];
-    };
+    data: SearchRes;
   }>(
     `/v1/session/${state.session_id}/field/${field_id}/search`,
     async (url: string) => {
@@ -63,9 +66,16 @@ export function ReferenceSearch({
     }
   );
 
-  const fulltable = [res.data?.data?.schema, res.data?.data?.table]
-    .filter(Boolean)
-    .join(".");
+  const {
+    schema_name: schema,
+    table_name: table,
+    column: rowKey,
+    rows,
+    table_schema,
+  } = res.data?.data ?? {};
+  const fulltable = [schema, table].filter(Boolean).join(".");
+
+  const is_auth_users_table = schema === "auth" && table === "users";
 
   return (
     <Sheet open={open} onOpenChange={setOpen}>
@@ -86,21 +96,19 @@ export function ReferenceSearch({
                 setValue(key);
                 setOpen(false);
               }}
-              rowKey={res.data?.data?.column}
-              columns={Object.keys(
-                GridaSupabase.SupabaseUserJsonSchema.properties
-              ).map((key) => {
-                const _ =
-                  GridaSupabase.SupabaseUserJsonSchema.properties[
-                    key as GridaSupabase.SupabaseUserColumn
-                  ];
-
-                return {
-                  key: key,
-                  name: key,
-                };
-              })}
-              rows={res.data?.data?.users ?? []}
+              rowKey={rowKey}
+              columns={Object.keys(table_schema?.properties ?? {}).map(
+                (key) => {
+                  const _ = (table_schema?.properties as any)[key];
+                  return {
+                    key: key,
+                    name: key,
+                    type: _.type,
+                    format: _.format,
+                  };
+                }
+              )}
+              rows={rows ?? []}
             />
           </div>
         </div>
@@ -113,3 +121,19 @@ export function ReferenceSearch({
     </Sheet>
   );
 }
+
+const _auth_user_columns = Object.keys(
+  GridaSupabase.SupabaseUserJsonSchema.properties
+).map((key) => {
+  const _ =
+    GridaSupabase.SupabaseUserJsonSchema.properties[
+      key as GridaSupabase.SupabaseUserColumn
+    ];
+
+  return {
+    key: key,
+    name: key,
+    type: _.type,
+    format: _.format,
+  };
+});
