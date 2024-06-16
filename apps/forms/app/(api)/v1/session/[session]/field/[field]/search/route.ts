@@ -30,7 +30,7 @@ export async function GET(
   const _q_page = req.nextUrl.searchParams.get("page");
   const page = _q_page ? parseInt(_q_page) : 1;
 
-  // TODO: Strict Authorization
+  // FIXME: Strict Authorization
 
   const { data, error } = await client
     .from("response_session")

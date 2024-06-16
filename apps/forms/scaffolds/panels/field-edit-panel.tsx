@@ -839,7 +839,7 @@ export function FieldEditPanel({
               )}
               {FieldSupports.checkbox_alias(type) && (
                 <PanelPropertyField
-                  label={"Required"}
+                  label={"Check Required"}
                   description={
                     <>
                       The checkbox / switch will be required if it is checked.
