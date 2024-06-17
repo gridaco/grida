@@ -76,8 +76,9 @@ import Link from "next/link";
 import { SupabaseLogo } from "@/components/logos";
 import { Spinner } from "@/components/spinner";
 import { NameInput } from "./name-input";
-import { LockClosedIcon } from "@radix-ui/react-icons";
+import { LockClosedIcon, ReloadIcon } from "@radix-ui/react-icons";
 import { PrivateEditorApi } from "@/lib/private";
+import { Badge } from "@/components/ui/badge";
 
 // @ts-ignore
 const default_field_init: {
@@ -451,12 +452,16 @@ export function FieldEditPanel({
                   multiple={multiple}
                 />
                 <div className="absolute bottom-0 right-0 m-2">
-                  <button
-                    type="submit"
-                    className="rounded-full px-2 py-1 bg-neutral-100 dark:bg-neutral-900 text-xs font-mono"
-                  >
-                    Test
-                  </button>
+                  <div className="font-mono flex gap-2">
+                    <button type="submit">
+                      <Badge variant="secondary">Test</Badge>
+                    </button>
+                    <button type="reset">
+                      <Badge className="h-full" variant="secondary">
+                        <ReloadIcon className="w-3 h-3" />
+                      </Badge>
+                    </button>
+                  </div>
                 </div>
               </form>
             </div>
@@ -786,7 +791,7 @@ export function FieldEditPanel({
                 <>
                   <PanelPropertyField
                     label={"Step"}
-                    description="The stepping interval for the input"
+                    description="Defines the intervals for the slider values."
                   >
                     <PropertyTextInput
                       type="number"
@@ -803,7 +808,7 @@ export function FieldEditPanel({
                   </PanelPropertyField>
                   <PanelPropertyField
                     label={"Min"}
-                    description="The minimum value that the input can accept"
+                    description="Sets the minimum value for the slider."
                   >
                     <PropertyTextInput
                       type="number"
@@ -820,7 +825,7 @@ export function FieldEditPanel({
                   </PanelPropertyField>
                   <PanelPropertyField
                     label={"Max"}
-                    description="The maximum value that the input can accept"
+                    description="Sets the maximum value for the slider."
                   >
                     <PropertyTextInput
                       type="number"
