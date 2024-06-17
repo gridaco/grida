@@ -16,7 +16,8 @@ import { GridaSupabase } from "@/types";
 import { Search } from "lucide-react";
 import useSWR from "swr";
 import "react-data-grid/lib/styles.css";
-import { useState } from "react";
+import { useMemo, useState } from "react";
+import Fuse from "fuse.js";
 
 /**
  * general & common priorities for columns order (only for auth.users table)
@@ -78,6 +79,7 @@ export function ReferenceSearch({
   const [open, setOpen] = useState(false);
   const [state] = useFormAgentState();
   const [value, setValue] = useState<string>("");
+  const [localSearch, setLocalSearch] = useState<string>("");
 
   const res = useSWR<{
     data: SearchRes;
@@ -93,12 +95,25 @@ export function ReferenceSearch({
     schema_name: schema,
     table_name: table,
     column: rowKey,
-    rows,
+    rows: _rows,
     table_schema,
   } = res.data?.data ?? {};
+
   const fulltable = [schema, table].filter(Boolean).join(".");
 
-  const is_auth_users_table = schema === "auth" && table === "users";
+  const fuse = useMemo(() => {
+    return new Fuse(_rows ?? [], {
+      keys: Object.keys(table_schema?.properties ?? {}),
+    });
+  }, [_rows, table_schema]);
+
+  const rows = useMemo(() => {
+    if (!localSearch) {
+      return _rows;
+    }
+
+    return fuse.search(localSearch).map((r) => r.item);
+  }, [fuse, localSearch, _rows]);
 
   return (
     <Sheet open={open} onOpenChange={setOpen}>
@@ -112,6 +127,12 @@ export function ReferenceSearch({
             Select a record to reference from <code>{fulltable}</code>
           </SheetDescription>
         </SheetHeader>
+        <div className="px-6">
+          <SearchInput
+            value={localSearch}
+            onChange={(e) => setLocalSearch(e.target.value)}
+          />
+        </div>
         <div className="flex-1">
           <div className="flex flex-col w-full h-full">
             <ReferenceTableGrid
