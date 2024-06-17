@@ -1,13 +1,19 @@
 import { grida_xsupabase_client } from "@/lib/supabase/server";
+import { FormServiceUtils } from "@/services/form";
 import { createXSupabaseClient } from "@/services/x-supabase";
-import { ConnectionSupabaseJoint, GridaSupabase } from "@/types";
+import { ConnectionSupabaseJoint, GridaSupabase, Option } from "@/types";
 import type { JSONSchemaType } from "ajv";
 import { unflatten } from "flat";
 
-export async function sbconn_insert(
-  connection: ConnectionSupabaseJoint,
-  formdata: FormData | URLSearchParams | Map<string, string>
-) {
+export async function sbconn_insert({
+  connection,
+  formdata,
+  enums,
+}: {
+  connection: ConnectionSupabaseJoint;
+  formdata: FormData | URLSearchParams | Map<string, string>;
+  enums: Option[];
+}) {
   // fetch connection table
   const { data: supabase_project, error: supabase_project_err } =
     await grida_xsupabase_client
@@ -32,7 +38,7 @@ export async function sbconn_insert(
 
   const schema = sb_table_schema as JSONSchemaType<Record<string, any>>;
 
-  const data = parseFormData(formdata, schema);
+  const data = parseFormData(formdata, { schema, enums });
 
   const sbclient = await createXSupabaseClient(connection.supabase_project_id, {
     // TODO: use service key only if configured to do so
@@ -44,7 +50,13 @@ export async function sbconn_insert(
 
 function parseFormData(
   formdata: FormData | URLSearchParams | Map<string, string>,
-  schema: JSONSchemaType<Record<string, any>>
+  {
+    schema,
+    enums,
+  }: {
+    schema: JSONSchemaType<Record<string, any>>;
+    enums: Option[];
+  }
 ) {
   //
 
@@ -69,11 +81,13 @@ function parseFormData(
         break;
       }
       default: {
+        const v = formdata.get(key);
+        const value = FormServiceUtils.parseValue(v, enums);
         if (format === "json") {
           const flat = formdata_keys.reduce((acc: any, k) => {
             if (k.startsWith(`${key}.`)) {
               // TODO: need scalar type support
-              acc[k] = formdata.get(k);
+              acc[k] = value;
             }
             return acc;
           }, {});
@@ -84,7 +98,7 @@ function parseFormData(
           data[key] = (constructedjson as any)[key];
           break;
         }
-        data[key] = formdata.get(key) || undefined;
+        data[key] = value || undefined;
         break;
       }
     }
