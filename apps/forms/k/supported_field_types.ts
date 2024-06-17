@@ -115,7 +115,7 @@ const html5_pattern_supported_field_types: FormInputType[] = [
   "text",
   "tel",
   // `date` uses pattern on fallback - https://developer.mozilla.org/en-US/docs/Web/HTML/Element/input/date#handling_browser_support
-  "date",
+  // "date",
   "email",
   "url",
   "password",

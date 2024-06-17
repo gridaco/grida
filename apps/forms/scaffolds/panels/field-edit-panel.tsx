@@ -359,7 +359,7 @@ export function FieldEditPanel({
       help_text: helpText,
       type,
       required,
-      pattern,
+      pattern: supports_pattern ? pattern : undefined,
       step,
       min,
       max,
