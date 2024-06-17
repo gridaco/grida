@@ -82,7 +82,7 @@ function parseFormData(
       }
       default: {
         const v = formdata.get(key);
-        const value = FormServiceUtils.parseValue(v, enums);
+        const { value } = FormServiceUtils.parseValue(v, enums);
         if (format === "json") {
           const flat = formdata_keys.reduce((acc: any, k) => {
             if (k.startsWith(`${key}.`)) {
