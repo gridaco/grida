@@ -5,7 +5,7 @@ import {
   FormResponseSession,
 } from "@/types";
 import { fmt_local_index } from "@/utils/fmt";
-import type { GFRow } from "../grid/types";
+import type { GFResponseRow } from "../grid/types";
 import type { DataGridFilterSettings } from "../editor/state";
 import { createClientFormsClient } from "@/lib/supabase/client";
 import { SupabaseClient } from "@supabase/supabase-js";
@@ -53,7 +53,7 @@ export namespace GridData {
   ) {
     return (
       responses.map((response, index) => {
-        const row: GFRow = {
+        const row: GFResponseRow = {
           __gf_id: response.id,
           __gf_display_id: fmt_local_index(response.local_index),
           __gf_created_at: response.created_at,
@@ -88,7 +88,7 @@ export namespace GridData {
   ) {
     return (
       sessions?.map((session, index) => {
-        const row: GFRow = {
+        const row: GFResponseRow = {
           __gf_id: session.id,
           __gf_display_id: session.id,
           __gf_created_at: session.created_at,

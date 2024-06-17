@@ -16,6 +16,7 @@ import { ThemeProvider } from "@/components/theme-provider";
 import "../../../editor.css";
 import { ToasterWithMax } from "@/components/toaster";
 import clsx from "clsx";
+import { GridaXSupabaseClient } from "@/services/x-supabase";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -85,6 +86,12 @@ export default async function RootLayout({
     return notFound();
   }
 
+  const client = new GridaXSupabaseClient();
+
+  const supabase_connection_state = data.supabase_connection
+    ? await client.getConnection(data.supabase_connection)
+    : null;
+
   return (
     <html lang="en">
       <body
@@ -111,7 +118,7 @@ export default async function RootLayout({
                 project_id: data.project_id,
                 connections: {
                   store_id: data.store_connection?.store_id,
-                  supabase: data.supabase_connection,
+                  supabase: supabase_connection_state || undefined,
                 },
                 form_id: id,
                 form_title: data.title,

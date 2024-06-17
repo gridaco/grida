@@ -5,6 +5,9 @@ import { useEditorState } from "./provider";
 import toast from "react-hot-toast";
 import { createClientFormsClient } from "@/lib/supabase/client";
 import { RealtimePostgresChangesPayload } from "@supabase/supabase-js";
+import useSWR from "swr";
+import type { EditorApiResponse } from "@/types/private/api";
+import type { FormResponse, FormResponseField } from "@/types";
 
 type RealtimeTableChangeData = {
   id: string;
@@ -242,6 +245,73 @@ export function ResponseSessionFeedProvider({
     },
     enabled: realtime_sessions_enabled,
   });
+
+  return <>{children}</>;
+}
+
+export function XSupabaseMainTableFeedProvider({
+  children,
+}: React.PropsWithChildren<{}>) {
+  const [state, dispatch] = useEditorState();
+
+  const request = state.connections.supabase?.main_supabase_table_id
+    ? `/private/editor/connect/${state.form_id}/supabase/table/${state.connections.supabase.main_supabase_table_id}/query`
+    : null;
+
+  const res = useSWR<EditorApiResponse<Record<string, any>[], any>>(
+    request,
+    async (url: string) => {
+      const res = await fetch(url);
+      return res.json();
+    }
+  );
+
+  useEffect(() => {
+    if (res.data?.data) {
+      const rows = res.data.data;
+
+      // TODO: process data to match the response interface
+      const data = rows.map((row, i) => {
+        return {
+          id: row.id,
+          local_id: null,
+          local_index: 0,
+          browser: null,
+          created_at: new Date().toISOString(),
+          customer_id: null,
+          form_id: state.form_id,
+          ip: null,
+          platform_powered_by: null,
+          raw: row,
+          updated_at: new Date().toISOString(),
+          x_referer: null,
+          x_useragent: null,
+          x_ipinfo: null,
+          geo: null,
+          fields: Object.keys(row).map((key) => {
+            return {
+              id: key,
+              created_at: new Date().toISOString(),
+              form_field_id: key,
+              response_id: row.id,
+              type: "text",
+              updated_at: new Date().toISOString(),
+              value: row[key],
+              storage_object_paths: null,
+            } satisfies FormResponseField;
+          }),
+        } satisfies FormResponse;
+      });
+
+      console.log("XSupabaseMainTableFeedProvider", data);
+
+      dispatch({
+        type: "editor/response/feed",
+        data: data,
+        reset: true,
+      });
+    }
+  }, [dispatch, res.data, state.form_id]);
 
   return <>{children}</>;
 }
