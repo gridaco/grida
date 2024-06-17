@@ -18,6 +18,29 @@ import useSWR from "swr";
 import "react-data-grid/lib/styles.css";
 import { useState } from "react";
 
+/**
+ * general & common priorities for columns order (only for auth.users table)
+ */
+const priorities = ["id", "email", "name", "username"];
+
+const sort_by_priorities = (a: string, b: string) => {
+  const _a = priorities.indexOf(a);
+  const _b = priorities.indexOf(b);
+  if (_a === -1 && _b === -1) {
+    return a.localeCompare(b);
+  }
+
+  if (_a === -1) {
+    return 1;
+  }
+
+  if (_b === -1) {
+    return -1;
+  }
+
+  return _a - _b;
+};
+
 function SearchInput(props: React.ComponentProps<typeof Input>) {
   return (
     <div className="relative ml-auto flex-1 md:grow-0">
@@ -97,8 +120,9 @@ export function ReferenceSearch({
                 setOpen(false);
               }}
               rowKey={rowKey}
-              columns={Object.keys(table_schema?.properties ?? {}).map(
-                (key) => {
+              columns={Object.keys(table_schema?.properties ?? {})
+                .sort(sort_by_priorities)
+                .map((key) => {
                   const _ = (table_schema?.properties as any)[key];
                   return {
                     key: key,
@@ -106,8 +130,7 @@ export function ReferenceSearch({
                     type: _.type,
                     format: _.format,
                   };
-                }
-              )}
+                })}
               rows={rows ?? []}
             />
           </div>
