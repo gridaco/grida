@@ -16,7 +16,31 @@ import { GridaSupabase } from "@/types";
 import { Search } from "lucide-react";
 import useSWR from "swr";
 import "react-data-grid/lib/styles.css";
-import { useState } from "react";
+import { useMemo, useState } from "react";
+import Fuse from "fuse.js";
+
+/**
+ * general & common priorities for columns order (only for auth.users table)
+ */
+const priorities = ["id", "email", "name", "username"];
+
+const sort_by_priorities = (a: string, b: string) => {
+  const _a = priorities.indexOf(a);
+  const _b = priorities.indexOf(b);
+  if (_a === -1 && _b === -1) {
+    return a.localeCompare(b);
+  }
+
+  if (_a === -1) {
+    return 1;
+  }
+
+  if (_b === -1) {
+    return -1;
+  }
+
+  return _a - _b;
+};
 
 function SearchInput(props: React.ComponentProps<typeof Input>) {
   return (
@@ -38,6 +62,14 @@ export function ReferenceSearchPreview(
   return <SearchInput {...props} />;
 }
 
+type SearchRes = {
+  schema_name: string;
+  table_name: string;
+  table_schema: GridaSupabase.SupabaseTable["sb_table_schema"];
+  column: string;
+  rows: Record<string, any>[];
+};
+
 export function ReferenceSearch({
   field_id,
   ...props
@@ -47,14 +79,10 @@ export function ReferenceSearch({
   const [open, setOpen] = useState(false);
   const [state] = useFormAgentState();
   const [value, setValue] = useState<string>("");
+  const [localSearch, setLocalSearch] = useState<string>("");
 
   const res = useSWR<{
-    data: {
-      schema: string;
-      table: string;
-      column: string;
-      users: GridaSupabase.SupabaseUser[];
-    };
+    data: SearchRes;
   }>(
     `/v1/session/${state.session_id}/field/${field_id}/search`,
     async (url: string) => {
@@ -63,9 +91,29 @@ export function ReferenceSearch({
     }
   );
 
-  const fulltable = [res.data?.data?.schema, res.data?.data?.table]
-    .filter(Boolean)
-    .join(".");
+  const {
+    schema_name: schema,
+    table_name: table,
+    column: rowKey,
+    rows: _rows,
+    table_schema,
+  } = res.data?.data ?? {};
+
+  const fulltable = [schema, table].filter(Boolean).join(".");
+
+  const fuse = useMemo(() => {
+    return new Fuse(_rows ?? [], {
+      keys: Object.keys(table_schema?.properties ?? {}),
+    });
+  }, [_rows, table_schema]);
+
+  const rows = useMemo(() => {
+    if (!localSearch) {
+      return _rows;
+    }
+
+    return fuse.search(localSearch).map((r) => r.item);
+  }, [fuse, localSearch, _rows]);
 
   return (
     <Sheet open={open} onOpenChange={setOpen}>
@@ -79,6 +127,12 @@ export function ReferenceSearch({
             Select a record to reference from <code>{fulltable}</code>
           </SheetDescription>
         </SheetHeader>
+        <div className="px-6">
+          <SearchInput
+            value={localSearch}
+            onChange={(e) => setLocalSearch(e.target.value)}
+          />
+        </div>
         <div className="flex-1">
           <div className="flex flex-col w-full h-full">
             <ReferenceTableGrid
@@ -86,21 +140,19 @@ export function ReferenceSearch({
                 setValue(key);
                 setOpen(false);
               }}
-              rowKey={res.data?.data?.column}
-              columns={Object.keys(
-                GridaSupabase.SupabaseUserJsonSchema.properties
-              ).map((key) => {
-                const _ =
-                  GridaSupabase.SupabaseUserJsonSchema.properties[
-                    key as GridaSupabase.SupabaseUserColumn
-                  ];
-
-                return {
-                  key: key,
-                  name: key,
-                };
-              })}
-              rows={res.data?.data?.users ?? []}
+              rowKey={rowKey}
+              columns={Object.keys(table_schema?.properties ?? {})
+                .sort(sort_by_priorities)
+                .map((key) => {
+                  const _ = (table_schema?.properties as any)[key];
+                  return {
+                    key: key,
+                    name: key,
+                    type: _.type,
+                    format: _.format,
+                  };
+                })}
+              rows={rows ?? []}
             />
           </div>
         </div>
@@ -113,3 +165,19 @@ export function ReferenceSearch({
     </Sheet>
   );
 }
+
+const _auth_user_columns = Object.keys(
+  GridaSupabase.SupabaseUserJsonSchema.properties
+).map((key) => {
+  const _ =
+    GridaSupabase.SupabaseUserJsonSchema.properties[
+      key as GridaSupabase.SupabaseUserColumn
+    ];
+
+  return {
+    key: key,
+    name: key,
+    type: _.type,
+    format: _.format,
+  };
+});

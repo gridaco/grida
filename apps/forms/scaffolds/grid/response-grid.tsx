@@ -74,7 +74,7 @@ export function ResponseGrid({
     });
   };
 
-  const __id_column: Column<any> = {
+  const __id_column: Column<GFResponseRow> = {
     key: "__gf_display_id",
     name: "id",
     frozen: true,
@@ -83,7 +83,7 @@ export function ResponseGrid({
     renderHeaderCell: DefaultPropertyHeaderCell,
   };
 
-  const __created_at_column: Column<any> = {
+  const __created_at_column: Column<GFResponseRow> = {
     key: "__gf_created_at",
     name: "time",
     frozen: true,
@@ -93,7 +93,7 @@ export function ResponseGrid({
     renderCell: DefaultPropertyDateCell,
   };
 
-  const __customer_uuid_column: Column<any> = {
+  const __customer_uuid_column: Column<GFResponseRow> = {
     key: "__gf_customer_uuid",
     name: "customer",
     frozen: true,
@@ -103,7 +103,7 @@ export function ResponseGrid({
     renderCell: DefaultPropertyCustomerCell,
   };
 
-  const __new_column: Column<any> = {
+  const __new_column: Column<GFResponseRow> = {
     key: "__gf_new",
     name: "+",
     resizable: false,
@@ -128,6 +128,7 @@ export function ResponseGrid({
             resizable: true,
             draggable: true,
             editable: true,
+            minWidth: 150,
             width: undefined,
             renderHeaderCell: (props) => (
               <FieldHeaderCell

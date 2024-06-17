@@ -148,7 +148,18 @@ export function NameInput({
                     heading={
                       <>
                         <SupabaseLogo className="inline w-4 h-4 me-1 align-middle" />{" "}
-                        Supabase
+                        Supabase{" "}
+                        <code className="ms-2 text-xs font-mono text-muted-foreground">
+                          {
+                            state.connections.supabase.main_supabase_table
+                              .sb_schema_name as string
+                          }
+                          .
+                          {
+                            state.connections.supabase.main_supabase_table
+                              .sb_table_name
+                          }
+                        </code>
                       </>
                     }
                   >
@@ -159,8 +170,21 @@ export function NameInput({
                       const property =
                         state.connections.supabase?.main_supabase_table
                           ?.sb_table_schema?.properties[key];
+
+                      const keywords = [
+                        state.connections.supabase?.main_supabase_table
+                          ?.sb_schema_name as string,
+                        state.connections.supabase?.main_supabase_table
+                          ?.sb_table_name as string,
+                      ].filter(Boolean) as string[];
+
                       return (
-                        <CommandItem key={key} value={key} onSelect={onSelect}>
+                        <CommandItem
+                          key={key}
+                          keywords={keywords}
+                          value={key}
+                          onSelect={onSelect}
+                        >
                           <Link1Icon className="mr-2 h-4 w-4" />
                           <span>{key}</span>{" "}
                           <small className="ms-1 text-muted-foreground">

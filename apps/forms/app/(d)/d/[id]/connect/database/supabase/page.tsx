@@ -203,6 +203,7 @@ function ConnectSupabase({ form_id }: { form_id: string }) {
   const onServiceKeySaveClick = async () => {
     // validate service key
     // ping test
+    // TODO: to verify service_role key, we need to make a request to administartion api (below would only verify if the key is valid, not if it has the correct permissions)
     ping({ url: build_supabase_rest_url(url), key: serviceKey }).then((res) => {
       if (res.status === 200) {
         // create secret key connection
@@ -295,6 +296,7 @@ function ConnectSupabase({ form_id }: { form_id: string }) {
                     name="url"
                     type="url"
                     disabled={is_loaded}
+                    autoComplete="off"
                     required
                     placeholder="https://your-project-ref.supabase.co"
                     value={url}

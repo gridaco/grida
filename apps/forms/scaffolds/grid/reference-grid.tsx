@@ -31,6 +31,7 @@ export function ReferenceTableGrid({
         editable: false,
         // frozen: col.key === rowKey,
         width: undefined,
+        maxWidth: 300,
       }) as Column<any>
   );
 

@@ -81,7 +81,7 @@ export async function POST(
     .select("*, existing_options:form_field_option(*)")
     .single();
 
-  console.log("upserted", upserted, init.data);
+  // console.log("upserted", upserted, init.data);
 
   if (error) {
     console.error("error while upserting field", error);
