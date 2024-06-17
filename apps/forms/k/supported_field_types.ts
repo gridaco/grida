@@ -130,6 +130,9 @@ const html5_checkbox_alias_field_types: FormInputType[] = [
 const html5_placeholder_not_supported_field_types: FormInputType[] = [
   ...html5_file_alias_field_types,
   ...html5_checkbox_alias_field_types,
+  "date",
+  "datetime-local",
+  "time",
   "range",
 ];
 
