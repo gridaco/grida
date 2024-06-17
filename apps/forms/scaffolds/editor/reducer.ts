@@ -59,11 +59,22 @@ export function reducer(
       const focus_index =
         focus_block_index >= 0 ? focus_block_index + 1 : old_index;
 
-      // find the last parent section
-      const parent_section = state.blocks
-        .filter((block) => block.type === "section")
-        .sort((a, b) => b.local_index - a.local_index)[0];
-      const parent_id = parent_section?.id ?? null;
+      // Get the parent section of the focus block
+      const focus_block = state.blocks[focus_block_index];
+      let parent_id = focus_block?.parent_id ?? null;
+
+      if (block === "section") {
+        parent_id = null; // Sections are always at root level
+      } else {
+        if (!parent_id) {
+          // Find the last parent section if no focus block or parent_id is null
+          const parent_section = state.blocks
+            .filter((block) => block.type === "section")
+            .sort((a, b) => b.local_index - a.local_index)[0];
+          parent_id = parent_section?.id ?? null;
+        }
+      }
+
       const id = draftid();
 
       const __shared: EditorFlatFormBlock = {
