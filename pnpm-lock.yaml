@@ -469,6 +469,9 @@ importers:
       react-pdf:
         specifier: ^7.7.1
         version: 7.7.3(@types/react@18.2.58)(react-dom@18.3.1)(react@18.3.1)
+      react-phone-number-input:
+        specifier: ^3.4.3
+        version: 3.4.3(react-dom@18.3.1)(react@18.3.1)
       react-player:
         specifier: ^2.14.1
         version: 2.16.0(react@18.3.1)
@@ -24658,6 +24661,10 @@ packages:
       typescript: 5.4.5
     dev: false
 
+  /country-flag-icons@1.5.12:
+    resolution: {integrity: sha512-ksBaQqQEFSvSFg1NV8tlAk4IjgDRNMu5ImjnCac0C409CiN6ObTI0vCFaNfaPusxLrr5O9pueT1R3G4XMMwErg==}
+    dev: false
+
   /cp-file@7.0.0:
     resolution: {integrity: sha512-0Cbj7gyvFVApzpK/uhCtQ/9kE9UnYpxMzaq5nQQC/Dh4iaj5fxp7iEFIullrYwzj8nf0qnsI1Qsx34hAeAebvw==}
     engines: {node: '>=8'}
@@ -29679,6 +29686,12 @@ packages:
       fast-loops: 1.1.3
     dev: false
 
+  /input-format@0.3.10:
+    resolution: {integrity: sha512-5cFv/kOZD7Ch0viprVkuYPDkAU7HBZYBx8QrIpQ6yXUWbAQ0+RQ8IIojDJOf/RO6FDJLL099HDSK2KoVZ2zevg==}
+    dependencies:
+      prop-types: 15.8.1
+    dev: false
+
   /inquirer@6.5.2:
     resolution: {integrity: sha512-cntlB5ghuB0iuO65Ovoi8ogLHiWGs/5yNrtUcKjFhSSiVeAIVpD7koaSU9RM8mpXw5YDi9RdYXGQMaOURB7ycQ==}
     engines: {node: '>=6.0.0'}
@@ -31894,6 +31907,10 @@ packages:
     hasBin: true
     dependencies:
       isomorphic.js: 0.2.5
+    dev: false
+
+  /libphonenumber-js@1.11.3:
+    resolution: {integrity: sha512-RU0CTsLCu2v6VEzdP+W6UU2n5+jEpMDRkGxUeBgsAJgre3vKgm17eApISH9OQY4G0jZYJVIc8qXmz6CJFueAFg==}
     dev: false
 
   /lie@3.1.1:
@@ -38126,6 +38143,21 @@ packages:
     transitivePeerDependencies:
       - encoding
       - supports-color
+    dev: false
+
+  /react-phone-number-input@3.4.3(react-dom@18.3.1)(react@18.3.1):
+    resolution: {integrity: sha512-n0dD9V1T8EWeRoGwVMcNK6bwOdEbIk0U3EQ87K0WTADgyJZUJd9NIQMmpcl9mtWSL+LwPaEMzre0yGkhwZYTzg==}
+    peerDependencies:
+      react: ^18.2.0
+      react-dom: ^18.2.0
+    dependencies:
+      classnames: 2.5.1
+      country-flag-icons: 1.5.12
+      input-format: 0.3.10
+      libphonenumber-js: 1.11.3
+      prop-types: 15.8.1
+      react: 18.3.1
+      react-dom: 18.3.1(react@18.3.1)
     dev: false
 
   /react-player@1.15.3(react@18.3.1):

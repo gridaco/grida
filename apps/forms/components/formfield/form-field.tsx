@@ -46,6 +46,7 @@ import {
   ReferenceSearch,
   ReferenceSearchPreview,
 } from "./reference-search-field";
+import { PhoneField } from "./phone-field";
 
 /**
  * this disables the auto zoom in input text tag safari on iphone by setting font-size to 16px
@@ -228,7 +229,6 @@ function MonoFormField({
   function renderInput() {
     switch (type) {
       case "text":
-      case "tel":
       case "email":
       case "number":
       case "url":
@@ -263,6 +263,32 @@ function MonoFormField({
           // @ts-ignore
           <Textarea
             {...(sharedInputProps as React.ComponentProps<"textarea">)}
+          />
+        );
+      }
+      case "tel": {
+        if (vanilla) {
+          return (
+            <HtmlInput
+              type={type}
+              {...(sharedInputProps as React.ComponentProps<"input">)}
+            />
+          );
+        }
+
+        return (
+          // @ts-ignore
+          <Input
+            type={type}
+            {...(sharedInputProps as React.ComponentProps<"input">)}
+          />
+        );
+
+        // TODO: phone field is not ready yet due to lack of reliable way for setting initial country code
+        return (
+          // @ts-ignore
+          <PhoneField
+            {...(sharedInputProps as React.ComponentProps<"input">)}
           />
         );
       }
