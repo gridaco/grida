@@ -250,11 +250,6 @@ export const pricing: Pricing = {
         },
         usage_based: false,
       },
-    ],
-  },
-  commingsoon: {
-    title: "Comming Soon",
-    features: [
       {
         title: "Inventory Management",
         plans: {
@@ -265,6 +260,21 @@ export const pricing: Pricing = {
         },
         usage_based: false,
       },
+      {
+        title: "Supabase Integration",
+        plans: {
+          free: false,
+          pro: false,
+          team: true,
+          enterprise: true,
+        },
+        usage_based: false,
+      },
+    ],
+  },
+  commingsoon: {
+    title: "Comming Soon",
+    features: [
       {
         title: "Payments with Toss (For South Korea)",
         plans: {
