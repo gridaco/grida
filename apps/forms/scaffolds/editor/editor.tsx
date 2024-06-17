@@ -67,7 +67,7 @@ function FieldEditPanelProvider({ children }: React.PropsWithChildren<{}>) {
         data: init.data,
       };
 
-      console.log("[EDITOR] saving..", data);
+      // console.log("[EDITOR] saving..", data);
 
       const promise = fetch(`/private/editor/${state.form_id}/fields`, {
         body: JSON.stringify(data),
@@ -91,10 +91,13 @@ function FieldEditPanelProvider({ children }: React.PropsWithChildren<{}>) {
               field_id: data.id,
               data: data,
             });
+
+            // only close when successful
+            closeFieldPanel({ refresh: true });
           }
         })
         .finally(() => {
-          closeFieldPanel({ refresh: true });
+          //
         });
 
       toast.promise(promise, {

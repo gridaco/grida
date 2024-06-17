@@ -10,7 +10,6 @@ import {
   validate_max_access_by_customer,
   validate_max_access_by_form,
 } from "@/services/form/validate-max-access";
-import { is_uuid_v4 } from "@/utils/is";
 import { NextRequest, NextResponse } from "next/server";
 import { FormLinkURLParams, formerrorlink, formlink } from "@/lib/forms/url";
 import * as ERR from "@/k/error";
@@ -49,6 +48,7 @@ import {
 } from "@/services/form/session-storage";
 import { createXSupabaseClient } from "@/services/x-supabase";
 import { render } from "@/lib/templating/template";
+import { FormServiceUtils } from "@/services/form";
 
 const HOST = process.env.HOST || "http://localhost:3000";
 
@@ -129,6 +129,7 @@ async function submit({
           *,
           options:form_field_option(*)
         ),
+        options:form_field_option(*),
         store_connection:connection_commerce_store(*),
         supabase_connection:connection_supabase(*)
       `
@@ -157,6 +158,7 @@ async function submit({
     scheduling_close_at,
     store_connection,
     supabase_connection,
+    options,
   } = form_reference;
 
   const entries = data.entries();
@@ -391,10 +393,11 @@ async function submit({
   let NEW: any = undefined;
   if (supabase_connection && supabase_connection.main_supabase_table_id) {
     try {
-      const insertion = await sbconn_insert(
-        supabase_connection,
-        data // needs json conversion
-      );
+      const insertion = await sbconn_insert({
+        connection: supabase_connection,
+        formdata: data,
+        enums: options,
+      });
 
       console.log("sbconn_insertion", insertion);
 
@@ -419,7 +422,7 @@ async function submit({
     await client
       .from("response")
       .insert({
-        raw: safejson(Object.fromEntries(entries)),
+        raw: FormServiceUtils.safejson(Object.fromEntries(entries)),
         form_id: form_id,
         session_id: meta.session,
         browser: meta.browser,
@@ -559,16 +562,10 @@ async function submit({
 
       // the field's value can be a input value or a reference to form_field_option
       const value_or_reference = data.get(name);
-
-      // check if the value is a reference to form_field_option
-      const is_value_fkey_and_found =
-        is_uuid_v4(value_or_reference as string) &&
-        options?.find((o: any) => o.id === value_or_reference);
-
-      // locate the value
-      const value = is_value_fkey_and_found
-        ? is_value_fkey_and_found.value
-        : value_or_reference;
+      const { value, enum_id } = FormServiceUtils.parseValue(
+        value_or_reference,
+        options
+      );
 
       // handle file uploads
       if (FieldSupports.file_alias(type)) {
@@ -600,9 +597,7 @@ async function submit({
         form_id: form_id,
         // TODO: save value with schema type accordinglly
         value: JSON.stringify(value),
-        form_field_option_id: is_value_fkey_and_found
-          ? is_value_fkey_and_found.id
-          : null,
+        form_field_option_id: enum_id,
       };
     })
   );
@@ -1097,10 +1092,6 @@ async function hook_notifications({ form_id }: { form_id: string }) {
     to: "...",
     lang: "en",
   });
-}
-
-function safejson(data: any) {
-  return JSON.parse(JSON.stringify(data));
 }
 
 function isObjectEmpty(obj: object | null | undefined) {

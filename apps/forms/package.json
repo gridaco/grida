@@ -103,6 +103,7 @@
     "react-i18next": "^13.5.0",
     "react-map-gl": "^7.1.7",
     "react-pdf": "^7.7.1",
+    "react-phone-number-input": "^3.4.3",
     "react-player": "^2.14.1",
     "react-textarea-autosize": "^8.5.3",
     "react-timer-hook": "^3.0.7",

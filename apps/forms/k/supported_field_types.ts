@@ -115,7 +115,7 @@ const html5_pattern_supported_field_types: FormInputType[] = [
   "text",
   "tel",
   // `date` uses pattern on fallback - https://developer.mozilla.org/en-US/docs/Web/HTML/Element/input/date#handling_browser_support
-  "date",
+  // "date",
   "email",
   "url",
   "password",
@@ -130,6 +130,9 @@ const html5_checkbox_alias_field_types: FormInputType[] = [
 const html5_placeholder_not_supported_field_types: FormInputType[] = [
   ...html5_file_alias_field_types,
   ...html5_checkbox_alias_field_types,
+  "date",
+  "datetime-local",
+  "time",
   "range",
 ];
 

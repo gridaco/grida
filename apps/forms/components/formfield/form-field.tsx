@@ -46,6 +46,7 @@ import {
   ReferenceSearch,
   ReferenceSearchPreview,
 } from "./reference-search-field";
+import { PhoneField } from "./phone-field";
 
 /**
  * this disables the auto zoom in input text tag safari on iphone by setting font-size to 16px
@@ -228,7 +229,6 @@ function MonoFormField({
   function renderInput() {
     switch (type) {
       case "text":
-      case "tel":
       case "email":
       case "number":
       case "url":
@@ -263,6 +263,32 @@ function MonoFormField({
           // @ts-ignore
           <Textarea
             {...(sharedInputProps as React.ComponentProps<"textarea">)}
+          />
+        );
+      }
+      case "tel": {
+        if (vanilla) {
+          return (
+            <HtmlInput
+              type={type}
+              {...(sharedInputProps as React.ComponentProps<"input">)}
+            />
+          );
+        }
+
+        return (
+          // @ts-ignore
+          <Input
+            type={type}
+            {...(sharedInputProps as React.ComponentProps<"input">)}
+          />
+        );
+
+        // TODO: phone field is not ready yet due to lack of reliable way for setting initial country code
+        return (
+          // @ts-ignore
+          <PhoneField
+            {...(sharedInputProps as React.ComponentProps<"input">)}
           />
         );
       }
@@ -441,11 +467,15 @@ function MonoFormField({
       case "range": {
         return (
           // @ts-ignore
-          <Slider
+          <SliderWithValueLabel
             {...(sharedInputProps as React.ComponentProps<"input">)}
-            // TODO:
-            // onValueChange={}
           />
+          // @ts-ignore
+          // <Slider
+          //   {...(sharedInputProps as React.ComponentProps<"input">)}
+          //   // TODO:
+          //   // onValueChange={}
+          // />
         );
       }
       case "signature": {
@@ -868,6 +898,29 @@ function PaymentField({
     default:
       return <StripePaymentFormFieldPreview />;
   }
+}
+
+function SliderWithValueLabel(
+  props: Omit<React.ComponentProps<typeof Slider>, "onValueChange">
+) {
+  const [value, setValue] = useState(props.value);
+
+  const onValueChange = (value: number[]) => {
+    setValue(value);
+  };
+
+  return (
+    <div className="relative">
+      <Slider {...props} onValueChange={onValueChange} />
+      <div className="absolute end-0 bottom-2">
+        {value && (
+          <span className="text-sm text-muted-foreground">
+            {value?.[0]}/{props.max ?? 100}
+          </span>
+        )}
+      </div>
+    </div>
+  );
 }
 
 export default FormField;
