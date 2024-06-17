@@ -441,11 +441,15 @@ function MonoFormField({
       case "range": {
         return (
           // @ts-ignore
-          <Slider
+          <SliderWithValueLabel
             {...(sharedInputProps as React.ComponentProps<"input">)}
-            // TODO:
-            // onValueChange={}
           />
+          // @ts-ignore
+          // <Slider
+          //   {...(sharedInputProps as React.ComponentProps<"input">)}
+          //   // TODO:
+          //   // onValueChange={}
+          // />
         );
       }
       case "signature": {
@@ -868,6 +872,29 @@ function PaymentField({
     default:
       return <StripePaymentFormFieldPreview />;
   }
+}
+
+function SliderWithValueLabel(
+  props: Omit<React.ComponentProps<typeof Slider>, "onValueChange">
+) {
+  const [value, setValue] = useState(props.value);
+
+  const onValueChange = (value: number[]) => {
+    setValue(value);
+  };
+
+  return (
+    <div className="relative">
+      <Slider {...props} onValueChange={onValueChange} />
+      <div className="absolute end-0 bottom-2">
+        {value && (
+          <span className="text-sm text-muted-foreground">
+            {value?.[0]}/{props.max ?? 100}
+          </span>
+        )}
+      </div>
+    </div>
+  );
 }
 
 export default FormField;
