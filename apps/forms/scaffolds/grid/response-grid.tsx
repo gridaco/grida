@@ -3,6 +3,8 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import DataGrid, {
   Column,
+  CopyEvent,
+  PasteEvent,
   RenderCellProps,
   RenderEditCellProps,
   RenderHeaderCellProps,
@@ -39,6 +41,7 @@ import { FormFieldTypeIcon } from "@/components/form-field-type-icon";
 import { toZonedTime } from "date-fns-tz";
 import { tztostr } from "../editor/symbols";
 import { mask } from "./mask";
+import toast from "react-hot-toast";
 function rowKeyGetter(row: GFResponseRow) {
   return row.__gf_id;
 }
@@ -94,7 +97,7 @@ export function ResponseGrid({
   };
 
   const __customer_uuid_column: Column<GFResponseRow> = {
-    key: "__gf_customer_uuid",
+    key: "__gf_customer_id",
     name: "customer",
     frozen: true,
     resizable: true,
@@ -153,12 +156,35 @@ export function ResponseGrid({
     formattedColumns.unshift(SelectColumn);
   }
 
+  const onCopy = (e: CopyEvent<GFResponseRow>) => {
+    console.log(e);
+    let val = "";
+    if (e.sourceColumnKey.startsWith("__gf_")) {
+      // copy value as is
+      val = (e.sourceRow as any)[e.sourceColumnKey];
+    } else {
+      // copy value from fields
+      const field = e.sourceRow.fields[e.sourceColumnKey];
+      const value = field.value;
+      val = unwrapFeildValue(value, field.type as FormInputType).toString();
+    }
+
+    // copy to clipboard
+    const cp = navigator.clipboard.writeText(val);
+    toast.promise(cp, {
+      loading: "Copying to clipboard...",
+      success: "Copied to clipboard",
+      error: "Failed to copy to clipboard",
+    });
+  };
+
   return (
     <DataGrid
       className="flex-grow border border-neutral-200 dark:border-neutral-900 select-none"
       rowKeyGetter={rowKeyGetter}
       columns={formattedColumns}
       selectedRows={selectionDisabled ? undefined : selected_responses}
+      onCopy={onCopy}
       onSelectedRowsChange={
         selectionDisabled ? undefined : onSelectedRowsChange
       }
@@ -201,7 +227,7 @@ function DefaultPropertyIcon({ __key: key }: { __key: string }) {
       return <Link2Icon className="min-w-4" />;
     case "__gf_created_at":
       return <CalendarIcon className="min-w-4" />;
-    case "__gf_customer_uuid":
+    case "__gf_customer_id":
     case "__gf_customer":
       return <AvatarIcon className="min-w-4" />;
   }
