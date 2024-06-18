@@ -7,9 +7,6 @@ import {
 import { fmt_local_index } from "@/utils/fmt";
 import type { GFResponseRow } from "../grid/types";
 import type { DataGridFilterSettings } from "../editor/state";
-import { createClientFormsClient } from "@/lib/supabase/client";
-import { SupabaseClient } from "@supabase/supabase-js";
-import { GRIDA_FORMS_RESPONSE_BUCKET } from "@/k/env";
 
 export namespace GridData {
   type DataGridInput = {
@@ -27,14 +24,12 @@ export namespace GridData {
   );
 
   export function rows(data: DataGridInput) {
-    const supabase = createClientFormsClient();
-
     switch (data.table) {
       case "response":
         return data.responses
           ? rows_from_responses(
               applyFilter(data.responses, data.filter),
-              supabase.storage
+              data.fields
             )
           : [];
       case "session":
@@ -49,7 +44,7 @@ export namespace GridData {
 
   function rows_from_responses(
     responses: FormResponse[],
-    storage: SupabaseClient<any, any>["storage"]
+    fields: FormFieldDefinition[]
   ) {
     return (
       responses.map((response, index) => {
@@ -60,21 +55,26 @@ export namespace GridData {
           __gf_customer_id: response.customer_id,
           fields: {},
         }; // react-data-grid expects each row to have a unique 'id' property
-        response?.fields?.forEach((field: FormResponseField) => {
-          row.fields[field.form_field_id] = {
-            type: field.type,
-            value: field.value,
-            files: field.storage_object_paths?.map((path) => {
-              const base = `/private/editor/${response.form_id}/responses/${response.id}/fields/${field.id}/src?path=${path}`;
-              const src = base + "&width=200";
-              const download = base + "&download=true";
-              const name = path.split("/").pop() ?? "";
-              return {
-                src: src,
-                name,
-                download,
-              };
-            }),
+
+        fields.forEach((field) => {
+          const responseField = response.fields?.find(
+            (f) => f.form_field_id === field.id
+          );
+          row.fields[field.id] = {
+            type: responseField?.type || field.type,
+            value: responseField?.value || "",
+            files:
+              responseField?.storage_object_paths?.map((path) => {
+                const base = `/private/editor/${response.form_id}/responses/${response.id}/fields/${responseField.id}/src?path=${path}`;
+                const src = base + "&width=200";
+                const download = base + "&download=true";
+                const name = path.split("/").pop() ?? "";
+                return {
+                  src: src,
+                  name,
+                  download,
+                };
+              }) || [],
           };
         });
         return row;
