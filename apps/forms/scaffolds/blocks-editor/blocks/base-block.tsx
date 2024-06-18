@@ -77,7 +77,7 @@ export function FlatBlockBase({
       data-focused={focused}
       className={clsx(
         "rounded-md flex flex-col gap-4 border dark:border-neutral-700 w-full p-4 bg-white dark:bg-neutral-900 shadow-md",
-        'data-[invalid="true"]:border-red-500/50 data-[invalid="true"]:bg-red-500/10',
+        'data-[invalid="true"]:border-red-500/50 data-[invalid="true"]:bg-red-500/10 dark:data-[invalid="true"]:border-red-500/50 dark:data-[invalid="true"]:bg-red-500/10',
         'data-[focused="true"]:border-blue-500/50 data-[focused="true"]:bg-blue-500/10 data-[focused="true"]:dark:border-blue-400/50 data-[focused="true"]:dark:bg-blue-400/10'
       )}
       onPointerDown={onPointerDown}
