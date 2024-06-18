@@ -276,6 +276,16 @@ function MonoFormField({
           );
         }
 
+        if (process.env.NODE_ENV === "development") {
+          // TODO: phone field is not ready yet due to lack of reliable way for setting initial country code
+          return (
+            // @ts-ignore
+            <PhoneField
+              {...(sharedInputProps as React.ComponentProps<"input">)}
+            />
+          );
+        }
+
         return (
           // @ts-ignore
           <Input
@@ -284,13 +294,6 @@ function MonoFormField({
           />
         );
 
-        // TODO: phone field is not ready yet due to lack of reliable way for setting initial country code
-        return (
-          // @ts-ignore
-          <PhoneField
-            {...(sharedInputProps as React.ComponentProps<"input">)}
-          />
-        );
       }
       case "image":
       case "file": {
@@ -470,12 +473,6 @@ function MonoFormField({
           <SliderWithValueLabel
             {...(sharedInputProps as React.ComponentProps<"input">)}
           />
-          // @ts-ignore
-          // <Slider
-          //   {...(sharedInputProps as React.ComponentProps<"input">)}
-          //   // TODO:
-          //   // onValueChange={}
-          // />
         );
       }
       case "signature": {

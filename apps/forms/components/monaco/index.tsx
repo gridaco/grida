@@ -7,7 +7,6 @@ export function useMonacoTheme(
   monaco: ReturnType<typeof useMonaco>,
   theme: "dark" | "light" | (string | {})
 ) {
-  console.log("useMonacoTheme", theme);
   // load theme initially
   useEffect(() => {
     import("monaco-themes/themes/Blackboard.json").then((data) => {
