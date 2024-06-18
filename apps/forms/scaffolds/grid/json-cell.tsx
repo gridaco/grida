@@ -6,7 +6,7 @@ import {
   PopoverTrigger,
   PopoverContent,
 } from "@/components/ui/popover";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { RenderEditCellProps } from "react-data-grid";
 import { BlockKeys } from "./block-keys";
 import { useMonacoTheme } from "@/components/monaco";
@@ -34,18 +34,21 @@ export function JsonEditCell({ column, row }: RenderEditCellProps<any>) {
   return (
     <Popover open={open}>
       <PopoverTrigger asChild>
-        <button>Open</button>
+        <button className="w-full h-full" />
       </PopoverTrigger>
       <PopoverContent
         side="bottom"
         align="start"
         sideOffset={-44}
         asChild
-        className="p-0"
+        className="w-[--radix-popover-trigger-width] max-h-[--radix-popover-content-available-height] p-0"
       >
         <div className="bg-white border border-neutral-200 rounded shadow-lg overflow-hidden">
           <BlockKeys value={value} onEscape={cancelChanges} onEnter={() => {}}>
             <Editor
+              onMount={(editor) => {
+                editor.focus();
+              }}
               width={300}
               height={200}
               value={value ?? ""}

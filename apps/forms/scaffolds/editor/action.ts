@@ -39,7 +39,8 @@ export type BlocksEditorAction =
   | DataGridReorderColumnAction
   | DataGridDateFormatAction
   | DataGridDateTZAction
-  | DataGridFilterAction;
+  | DataGridFilterAction
+  | DataGridCellChangeAction;
 
 export interface CreateNewPendingBlockAction {
   type: "blocks/new";
@@ -215,4 +216,11 @@ export interface DataGridRowsAction {
 export interface DataGridFilterAction
   extends Partial<FormEditorState["datagrid_filter"]> {
   type: "editor/data-grid/filter";
+}
+
+export interface DataGridCellChangeAction {
+  type: "editor/data-grid/cell/change";
+  row: string;
+  column: string;
+  value: any;
 }

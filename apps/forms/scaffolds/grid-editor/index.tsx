@@ -253,6 +253,14 @@ export function GridEditor() {
             });
             openDeleteFieldConfirm();
           }}
+          onCellChange={(row, column, value) => {
+            dispatch({
+              type: "editor/data-grid/cell/change",
+              row: row.__gf_id,
+              column: column,
+              value: value,
+            });
+          }}
         />
       </div>
       <footer className="flex gap-4 min-h-9 overflow-hidden items-center px-2 py-2 w-full border-t dark:border-t-neutral-700 divide-x">

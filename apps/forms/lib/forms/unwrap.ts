@@ -3,8 +3,9 @@ import type { FormInputType } from "@/types";
 export function unwrapFeildValue(
   value: any,
   type: FormInputType
-): string | number | boolean {
-  if (!value) return "N/A";
+): string | number | boolean | undefined | null {
+  if (value === null) return null;
+  if (value === undefined) return undefined;
   try {
     const unwrapped = JSON.parse(value);
 

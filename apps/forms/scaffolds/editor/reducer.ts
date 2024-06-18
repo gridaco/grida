@@ -33,6 +33,7 @@ import {
   DataGridDateFormatAction,
   DataGridDateTZAction,
   DataGridFilterAction,
+  DataGridCellChangeAction,
 } from "./action";
 import { arrayMove } from "@dnd-kit/sortable";
 import { blockstreeflat } from "@/lib/forms/tree";
@@ -621,6 +622,48 @@ export function reducer(
           ...draft.datagrid_filter,
           ...pref,
         };
+      });
+    }
+
+    // TODO: WIP
+    // 1. data sync
+    // 2. insert when new field
+    // 3. update raw data (trigger)
+    case "editor/data-grid/cell/change": {
+      const { row, column, value } = <DataGridCellChangeAction>action;
+      return produce(state, (draft) => {
+        const response = state.responses?.find((r) => r.id === row);
+
+        if (response) {
+          const field = response.fields?.find(
+            (f) => f.form_field_id === column
+          );
+
+          if (field) {
+            const _new_responses = Array.from(state.responses ?? []).map(
+              (r) => {
+                if (r.id === row) {
+                  return {
+                    ...r,
+                    // TODO: needs to use form field, not response field to handle new field
+                    fields: r.fields?.map((f) => {
+                      if (f.form_field_id === column) {
+                        return {
+                          ...f,
+                          value,
+                        };
+                      }
+                      return f;
+                    }),
+                  };
+                }
+                return r;
+              }
+            );
+
+            draft.responses = _new_responses;
+          }
+        }
       });
     }
     default:

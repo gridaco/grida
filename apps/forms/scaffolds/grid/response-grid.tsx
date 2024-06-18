@@ -54,6 +54,7 @@ export function ResponseGrid({
   onAddNewFieldClick,
   onEditFieldClick,
   onDeleteFieldClick,
+  onCellChange,
 }: {
   columns: {
     key: string;
@@ -66,6 +67,7 @@ export function ResponseGrid({
   onAddNewFieldClick?: () => void;
   onEditFieldClick?: (id: string) => void;
   onDeleteFieldClick?: (id: string) => void;
+  onCellChange?: (row: GFResponseRow, column: string, value: any) => void;
 }) {
   const [state, dispatch] = useEditorState();
   const { selected_responses } = state;
@@ -158,7 +160,7 @@ export function ResponseGrid({
 
   const onCopy = (e: CopyEvent<GFResponseRow>) => {
     console.log(e);
-    let val = "";
+    let val: string | undefined;
     if (e.sourceColumnKey.startsWith("__gf_")) {
       // copy value as is
       val = (e.sourceRow as any)[e.sourceColumnKey];
@@ -166,16 +168,18 @@ export function ResponseGrid({
       // copy value from fields
       const field = e.sourceRow.fields[e.sourceColumnKey];
       const value = field.value;
-      val = unwrapFeildValue(value, field.type as FormInputType).toString();
+      val = unwrapFeildValue(value, field.type as FormInputType)?.toString();
     }
 
-    // copy to clipboard
-    const cp = navigator.clipboard.writeText(val);
-    toast.promise(cp, {
-      loading: "Copying to clipboard...",
-      success: "Copied to clipboard",
-      error: "Failed to copy to clipboard",
-    });
+    if (val) {
+      // copy to clipboard
+      const cp = navigator.clipboard.writeText(val);
+      toast.promise(cp, {
+        loading: "Copying to clipboard...",
+        success: "Copied to clipboard",
+        error: "Failed to copy to clipboard",
+      });
+    }
   };
 
   return (
@@ -185,6 +189,18 @@ export function ResponseGrid({
       columns={formattedColumns}
       selectedRows={selectionDisabled ? undefined : selected_responses}
       onCopy={onCopy}
+      onRowsChange={(rows, data) => {
+        const key = data.column.key;
+        const indexes = data.indexes;
+
+        for (const i of indexes) {
+          const row = rows[i];
+          const field = row.fields[key];
+          const value = field.value;
+
+          onCellChange?.(row, key, value);
+        }
+      }}
       onSelectedRowsChange={
         selectionDisabled ? undefined : onSelectedRowsChange
       }
@@ -428,7 +444,7 @@ function FieldCell({ column, row }: RenderCellProps<GFResponseRow>) {
 function FieldEditCell(props: RenderEditCellProps<GFResponseRow>) {
   const { column, row } = props;
   const data = row.fields[column.key];
-  const ref = useRef<HTMLInputElement>(null);
+  const ref = useRef<HTMLInputElement | HTMLTextAreaElement>(null);
 
   useEffect(() => {
     if (ref.current) {
@@ -438,38 +454,96 @@ function FieldEditCell(props: RenderEditCellProps<GFResponseRow>) {
     }
   }, [ref]);
 
-  if (!data) {
-    return <></>;
-  }
+  const { type, value, files } = data ?? {};
 
-  const { type, value, files } = data;
+  const onKeydown = (
+    e: React.KeyboardEvent<HTMLInputElement | HTMLTextAreaElement>
+  ) => {
+    if (e.key === "Enter") {
+      const val = ref.current?.value;
+      onCommit(val);
+    }
+  };
+
+  const onCommit = (val: any) => {
+    props.onRowChange(
+      {
+        ...row,
+        fields: {
+          ...row.fields,
+          [column.key]: {
+            ...data,
+            value: JSON.stringify(val),
+          },
+        },
+      },
+      true
+    );
+    // console.log(val);
+    // if (val !== undefined) {
+    //   props.onCommit({ ...data, value: val });
+    // }
+  };
 
   try {
     // FIXME: need investigation (case:FIELDVAL)
-    const unwrapped = JSON.parse(value);
+    const unwrapped = value ? JSON.parse(value) : undefined;
     switch (type as FormInputType) {
       case "email":
       case "password":
       case "tel":
-      case "textarea":
       case "url":
-      case "text":
+      case "text": {
         return (
           <input
-            ref={ref}
-            readOnly
+            ref={ref as React.RefObject<HTMLInputElement>}
+            type={type}
             className="w-full px-2 appearance-none outline-none border-none"
-            type="text"
             defaultValue={unwrapped}
+            onKeyDown={onKeydown}
           />
         );
-      case "select":
-        return <JsonEditCell {...props} />;
+      }
+      case "textarea": {
+        return (
+          <textarea
+            ref={ref as React.RefObject<HTMLTextAreaElement>}
+            className="w-full px-2 appearance-none outline-none border-none"
+            defaultValue={unwrapped}
+            onKeyDown={onKeydown}
+          />
+        );
+      }
+      case "number": {
+        return (
+          <input
+            ref={ref as React.RefObject<HTMLInputElement>}
+            className="w-full px-2 appearance-none outline-none border-none"
+            type="number"
+            defaultValue={unwrapped}
+            onKeyDown={onKeydown}
+          />
+        );
+      }
+      case "date":
+      case "datetime-local":
+      case "time":
+      case "month":
+      case "week": {
+        return (
+          <input
+            ref={ref as React.RefObject<HTMLInputElement>}
+            type={type}
+            className="w-full px-2 appearance-none outline-none border-none"
+            defaultValue={unwrapped}
+            onKeyDown={onKeydown}
+          />
+        );
+      }
       case "color":
         return (
           <input readOnly disabled type="color" defaultValue={unwrapped} />
         );
-      case "checkbox":
       case "file":
       case "image": {
         return (
@@ -491,13 +565,39 @@ function FieldEditCell(props: RenderEditCellProps<GFResponseRow>) {
           </div>
         );
       }
-      // return (
-      //   <input readOnly disabled type="checkbox" defaultChecked={unwrapped} />
-      // );
+      case "toggle":
+      case "switch":
+      case "checkbox": {
+        return (
+          <div className="px-2 w-full h-full flex justify-between items-center">
+            <input
+              ref={ref as React.RefObject<HTMLInputElement>}
+              type="checkbox"
+              defaultChecked={unwrapped}
+            />
+            <Button
+              size="sm"
+              variant="default"
+              onClick={() =>
+                onCommit(
+                  (ref as React.RefObject<HTMLInputElement>).current?.checked
+                )
+              }
+            >
+              Save
+            </Button>
+          </div>
+        );
+      }
+      case "toggle-group":
+      case "radio":
+      case "select":
+        return <JsonEditCell {...props} />;
       default:
         return <JsonEditCell {...props} />;
     }
   } catch (e) {
+    console.error(e);
     return <JsonEditCell {...props} />;
   }
 }
