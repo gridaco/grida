@@ -81,12 +81,12 @@ function parseFormData(
         break;
       }
       default: {
-        const { value } = FormValue.decode(formdata.get(key), enums);
+        const { value } = FormValue.parse(formdata.get(key), { enums });
         if (format === "json" || format === "jsonb") {
           const flat = formdata_keys.reduce((acc: any, k) => {
             if (k.startsWith(`${key}.`)) {
               // TODO: need scalar type support
-              const { value } = FormValue.decode(formdata.get(k), enums);
+              const { value } = FormValue.parse(formdata.get(k), { enums });
               acc[k] = value;
             }
             return acc;

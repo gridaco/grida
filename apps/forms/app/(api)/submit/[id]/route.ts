@@ -562,7 +562,9 @@ async function submit({
 
       // the field's value can be a input value or a reference to form_field_option
       const value_or_reference = data.get(name);
-      const { value, enum_id } = FormValue.decode(value_or_reference, options);
+      const { value, enum_id } = FormValue.parse(value_or_reference, {
+        enums: options,
+      });
 
       // handle file uploads
       if (FieldSupports.file_alias(type)) {
