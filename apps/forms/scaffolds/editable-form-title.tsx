@@ -1,5 +1,6 @@
 "use client";
 
+import { Input } from "@/components/ui/input";
 import { createClientFormsClient } from "@/lib/supabase/client";
 import React, { useState, useEffect, useCallback } from "react";
 import toast from "react-hot-toast";
@@ -46,17 +47,7 @@ export function EditableFormTitle({
 
   return (
     <>
-      <input
-        className="
-          hover:shadow focus:shadow
-          hover:border-neutral-300 focus:border-neutral-300
-          dark:hover:border-neutral-600 dark:focus:border-neutral-600
-          focus:outline-none focus:ring-2 focus:ring-opacity-50
-          text-neutral-700 dark:text-neutral-300
-          bg-white dark:bg-neutral-800
-          border border-neutral-300 dark:border-neutral-700
-          box-border appearance-none rounded py-2 px-3 leading-tight transition-all
-        "
+      <Input
         type="text"
         placeholder="Form title"
         value={value}

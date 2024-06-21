@@ -32,5 +32,6 @@
 }
 
 .rdg-header-row > .rdg-cell {
+  border-top: 1px solid hsl(var(--border));
   border-bottom: 1px solid hsl(var(--border));
 }

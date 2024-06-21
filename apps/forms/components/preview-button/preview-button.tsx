@@ -31,7 +31,7 @@ export function PreviewButton({ form_id }: { form_id: string }) {
           )}
           title="Preview"
         >
-          <EyeOpenIcon className="mx-auto" width={20} height={20} />
+          {/* <EyeOpenIcon className="mx-auto" width={20} height={20} /> */}
           Preview
         </button>
       </Link>
@@ -39,7 +39,7 @@ export function PreviewButton({ form_id }: { form_id: string }) {
         <DropdownMenuTrigger asChild>
           <button
             type="button"
-            className="inline-flex items-center px-4 py-2 text-sm font-medium text-neutral-900 bg-white border border-neutral-200 rounded-e-lg hover:bg-neutral-100 hover:text-blue-700 focus:z-10 focus:ring-2 focus:ring-blue-700 focus:text-blue-700 dark:bg-neutral-800 dark:border-neutral-700 dark:text-white dark:hover:text-white dark:hover:bg-neutral-700 dark:focus:ring-blue-500 dark:focus:text-white"
+            className="inline-flex items-center px-4 py-2 text-sm font-medium text-neutral-900 bg-white border-t border-b border-r border-neutral-200 rounded-e-lg hover:bg-neutral-100 hover:text-blue-700 focus:z-10 focus:ring-2 focus:ring-blue-700 focus:text-blue-700 dark:bg-neutral-800 dark:border-neutral-700 dark:text-white dark:hover:text-white dark:hover:bg-neutral-700 dark:focus:ring-blue-500 dark:focus:text-white"
           >
             <ChevronDownIcon />
           </button>

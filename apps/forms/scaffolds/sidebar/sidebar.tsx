@@ -7,10 +7,12 @@ import {
   BoxIcon,
   BoxModelIcon,
   CodeIcon,
+  FileIcon,
   Link2Icon,
 } from "@radix-ui/react-icons";
 import Link from "next/link";
 import { useEditorState } from "../editor";
+import { Table2Icon, TabletSmartphoneIcon } from "lucide-react";
 
 export function Siebar() {
   const [state] = useEditorState();
@@ -19,19 +21,19 @@ export function Siebar() {
   return (
     <nav className="py-4 col-span-1 max-w-xs min-w-60 w-min border-r dark:border-r-neutral-800 h-full">
       <ul className="flex flex-col">
-        <label className="text-xs text-muted-foreground py-4 px-4">Data</label>
+        <label className="text-xs text-muted-foreground py-4 px-4">Table</label>
         <li>
           <Link href={`/d/${form_id}/data/responses`}>
             <SideNavItem>
-              <BoxModelIcon />
-              Responses
+              <Table2Icon className="w-4 h-4" />
+              Form
             </SideNavItem>
           </Link>
         </li>
         <li>
           <Link href={`/d/${form_id}/data/responses`}>
             <SideNavItem>
-              <BoxModelIcon />
+              <Table2Icon className="w-4 h-4" />
               Sessions
             </SideNavItem>
           </Link>
@@ -39,18 +41,26 @@ export function Siebar() {
         <li>
           <Link href={`/d/${form_id}/data/responses`}>
             <SideNavItem>
-              <BoxModelIcon />
+              <Table2Icon className="w-4 h-4" />
               Customers
             </SideNavItem>
           </Link>
         </li>
+        <li>
+          <Link href={`/d/${form_id}/data/responses`}>
+            <SideNavItem>
+              <FileIcon className="w-4 h-4" />
+              Files
+            </SideNavItem>
+          </Link>
+        </li>
         <label className="text-xs text-muted-foreground py-4 px-4">
-          Applications
+          App / Campaign
         </label>
         <li>
           <Link href={`/d/${form_id}/data/responses`}>
             <SideNavItem>
-              <BoxModelIcon />
+              <TabletSmartphoneIcon className="w-4 h-4" />
               Main
             </SideNavItem>
           </Link>

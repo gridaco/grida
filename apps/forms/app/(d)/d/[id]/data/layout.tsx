@@ -1,5 +1,3 @@
-import { Siebar } from "@/scaffolds/sidebar/sidebar";
-
 export default function Layout({
   params,
   children,
@@ -9,13 +7,5 @@ export default function Layout({
 }>) {
   const id = params.id;
 
-  return (
-    <main className="h-full flex flex-1 w-full">
-      {/* side */}
-      {/* <aside className="flex h-full">
-        <Siebar />
-      </aside> */}
-      <div className="w-full h-full overflow-x-hidden">{children}</div>
-    </main>
-  );
+  return <main className="h-full flex flex-1 w-full">{children}</main>;
 }

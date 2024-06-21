@@ -196,7 +196,7 @@ export function ResponseGrid({
 
   return (
     <DataGrid
-      className="flex-grow border border-neutral-200 dark:border-neutral-900 select-none"
+      className="flex-grow select-none"
       rowKeyGetter={rowKeyGetter}
       columns={formattedColumns}
       selectedRows={selectionDisabled ? undefined : selected_responses}

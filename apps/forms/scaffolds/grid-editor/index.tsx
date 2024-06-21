@@ -216,16 +216,10 @@ export function GridEditor() {
           </div>
           <div className="flex-1" />
           <div className="flex gap-2 items-center">
-            <Link href={`./analytics`}>
+            <Link href={`./analytics`} className="flex">
               <Badge variant={"outline"} className="cursor-pointer">
+                <PieChartIcon className="align-middle me-2" />
                 Realtime
-                <PieChartIcon className="align-middle ms-2" />
-              </Badge>
-            </Link>
-            <Link href={`./simulator`} target="_blank">
-              <Badge variant={"outline"} className="cursor-pointer">
-                Simulator
-                <CommitIcon className="align-middle ms-2" />
               </Badge>
             </Link>
             <GridViewSettings />
@@ -426,6 +420,13 @@ function GridViewSettings() {
             )}
           </DropdownMenuRadioItem>
         </DropdownMenuRadioGroup>
+        <DropdownMenuSeparator />
+        <Link href={`./simulator`} target="_blank">
+          <DropdownMenuItem className="cursor-pointer">
+            <CommitIcon className="inline align-middle me-2" />
+            Open Simulator
+          </DropdownMenuItem>
+        </Link>
       </DropdownMenuContent>
     </DropdownMenu>
   );
