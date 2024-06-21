@@ -1,5 +1,5 @@
 import { grida_xsupabase_client } from "@/lib/supabase/server";
-import { FormServiceUtils } from "@/services/form";
+import { FormValue } from "@/services/form";
 import { createXSupabaseClient } from "@/services/x-supabase";
 import { ConnectionSupabaseJoint, GridaSupabase, Option } from "@/types";
 import type { JSONSchemaType } from "ajv";
@@ -81,15 +81,12 @@ function parseFormData(
         break;
       }
       default: {
-        const { value } = FormServiceUtils.parseValue(formdata.get(key), enums);
+        const { value } = FormValue.parse(formdata.get(key), { enums });
         if (format === "json" || format === "jsonb") {
           const flat = formdata_keys.reduce((acc: any, k) => {
             if (k.startsWith(`${key}.`)) {
               // TODO: need scalar type support
-              const { value } = FormServiceUtils.parseValue(
-                formdata.get(k),
-                enums
-              );
+              const { value } = FormValue.parse(formdata.get(k), { enums });
               acc[k] = value;
             }
             return acc;

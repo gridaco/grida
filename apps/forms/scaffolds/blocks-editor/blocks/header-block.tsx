@@ -82,7 +82,7 @@ export function HeaderBlock({
         </div>
       </BlockHeader>
       <div>
-        <div className="bg-neutral-200 dark:bg-neutral-800 rounded overflow-hidden border border-black/20 aspect-auto">
+        <div className="bg-card rounded overflow-hidden border border-black/20 aspect-auto">
           <input
             type="text"
             className="w-full p-4 text-2xl font-bold outline-none dark:text-white dark:bg-neutral-900"

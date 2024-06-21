@@ -2,7 +2,7 @@
 
 import React from "react";
 import DataGrid, { Column, RenderCellProps } from "react-data-grid";
-import { ReferenceTableRow } from "./types";
+import { XSupabaseReferenceTableRow } from "./types";
 import "./grid.css";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -17,9 +17,9 @@ export function ReferenceTableGrid({
     name: string;
     type?: string;
   }[];
-  rows: ReferenceTableRow[];
+  rows: XSupabaseReferenceTableRow[];
   rowKey?: string;
-  onSelected?: (key: string, row: ReferenceTableRow) => void;
+  onSelected?: (key: string, row: XSupabaseReferenceTableRow) => void;
 }) {
   const columns = _columns.map(
     (col) =>
@@ -37,7 +37,7 @@ export function ReferenceTableGrid({
 
   const rows = _rows.map((row) => {
     return Object.keys(row).reduce((acc, k) => {
-      const val = row[k as keyof ReferenceTableRow];
+      const val = row[k as keyof XSupabaseReferenceTableRow];
       if (typeof val === "object") {
         return { ...acc, [k]: JSON.stringify(val) };
       }
@@ -48,7 +48,7 @@ export function ReferenceTableGrid({
 
   return (
     <DataGrid
-      className="flex-grow border border-neutral-200 dark:border-neutral-900 select-none"
+      className="flex-grow select-none"
       columns={columns}
       rows={rows}
       onCellDoubleClick={(args) => {

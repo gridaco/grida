@@ -122,8 +122,8 @@ function View() {
   );
 
   useEffect(() => {
-    if (state.responses && state.responses.length > 0) {
-      const sorted = state.responses
+    if (state.responses && state.responses.rows.length > 0) {
+      const sorted = state.responses.rows
         .slice()
         .sort((a, b) => a.local_index - b.local_index);
 
@@ -171,7 +171,7 @@ function View() {
   }, [debounceFlyTo, recent]);
 
   const responseChartData = useMemo(() => {
-    return serialize(state.responses || [], {
+    return serialize(state.responses?.rows || [], {
       dateKey: "created_at",
       // last 15 minutes
       from: new Date(new Date().getTime() - 15 * 60 * 1000),

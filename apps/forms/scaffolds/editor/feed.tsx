@@ -7,7 +7,12 @@ import { createClientFormsClient } from "@/lib/supabase/client";
 import { RealtimePostgresChangesPayload } from "@supabase/supabase-js";
 import useSWR from "swr";
 import type { EditorApiResponse } from "@/types/private/api";
-import type { FormResponse, FormResponseField } from "@/types";
+import type {
+  FormResponse,
+  FormResponseField,
+  FormResponseWithFields,
+} from "@/types";
+import { usePrevious } from "@uidotdev/usehooks";
 
 type RealtimeTableChangeData = {
   id: string;
@@ -18,11 +23,13 @@ const useSubscription = ({
   table,
   form_id,
   onInsert,
+  onUpdate,
   onDelete,
   enabled,
 }: {
   table: "response" | "response_session";
   form_id: string;
+  onUpdate?: (data: RealtimeTableChangeData) => void;
   onInsert?: (data: RealtimeTableChangeData) => void;
   onDelete?: (data: RealtimeTableChangeData | {}) => void;
   enabled: boolean;
@@ -48,9 +55,12 @@ const useSubscription = ({
           payload: RealtimePostgresChangesPayload<RealtimeTableChangeData>
         ) => {
           const { old, new: _new } = payload;
+          const old_id = (old as RealtimeTableChangeData).id;
           const new_id = (_new as RealtimeTableChangeData).id;
 
-          if (new_id) {
+          if (new_id && old_id) {
+            onUpdate?.(_new as RealtimeTableChangeData);
+          } else if (new_id) {
             onInsert?.(_new as RealtimeTableChangeData);
           } else {
             onDelete?.(old);
@@ -62,8 +72,83 @@ const useSubscription = ({
     return () => {
       changes.unsubscribe();
     };
-  }, [supabase, form_id, table, enabled, onInsert, onDelete]);
+  }, [supabase, form_id, table, enabled, onInsert, onUpdate, onDelete]);
 };
+
+export function ResponseSyncProvider({
+  children,
+}: React.PropsWithChildren<{}>) {
+  const [state] = useEditorState();
+  const supabase = useMemo(() => createClientFormsClient(), []);
+  const prev = usePrevious(state.responses);
+
+  const sync = useCallback(
+    async (id: string, payload: { value: any; option_id?: string | null }) => {
+      const { data, error } = await supabase
+        .from("response_field")
+        .update({
+          // TODO:
+          value: payload.value,
+          form_field_option_id: payload.option_id,
+          // 'storage_object_paths': []
+        })
+        .eq("id", id)
+        .select()
+        .single();
+
+      if (error || !data) {
+        throw new Error();
+      }
+
+      return data;
+    },
+    [supabase]
+  );
+
+  useEffect(() => {
+    //
+
+    Object.keys(state.responses.fields).forEach((key) => {
+      const fields = state.responses.fields[key];
+
+      // - if field id is draft and value is not empty, create a new response field - we don't handle this case - there will be no empty cells (db trigger)
+      // - if field id is not draft and value is updated, update the response field
+      // - we don't handle delete since field can't be deleted individually (deletes when row deleted)
+
+      for (const cell of fields) {
+        const prevField = prev?.fields[key]?.find(
+          (f: FormResponseField) => f.id === cell.id
+        );
+
+        if (prevField) {
+          // check if field value is updated
+          if (prevField.value !== cell.value) {
+            const _ = sync(cell.id, {
+              value: cell.value,
+              option_id: cell.form_field_option_id,
+            });
+
+            toast
+              .promise(_, {
+                loading: "Updating...",
+                success: "Updated",
+                error: "Failed",
+              })
+              .then((data) => {
+                // TODO:
+                // update state (although its already updated, but let's update it again with db response - triggers & other metadata)
+              })
+              .catch((error) => {
+                // else revert the change
+              });
+          }
+        }
+      }
+    });
+  }, [prev?.fields, state.responses, sync]);
+
+  return <>{children}</>;
+}
 
 export function ResponseFeedProvider({
   children,
@@ -163,6 +248,14 @@ export function ResponseFeedProvider({
         );
       }, 100);
     },
+    onUpdate: (data) => {
+      fetchResponse((data as { id: string }).id).then((data) => {
+        dispatch({
+          type: "editor/response/feed",
+          data: [data as any],
+        });
+      });
+    },
     onDelete: (data) => {
       if ("id" in data) {
         dispatch({
@@ -243,6 +336,15 @@ export function ResponseSessionFeedProvider({
         data: [data as any],
       });
     },
+    onUpdate: (data) => {
+      dispatch({
+        type: "editor/data/sessions/feed",
+        data: [data as any],
+      });
+    },
+    onDelete: (data) => {
+      // this cant happen
+    },
     enabled: realtime_sessions_enabled,
   });
 
@@ -295,15 +397,14 @@ export function XSupabaseMainTableFeedProvider({
               form_field_id: key,
               response_id: row.id,
               type: "text",
+              form_field_option_id: null,
               updated_at: new Date().toISOString(),
               value: row[key],
               storage_object_paths: null,
             } satisfies FormResponseField;
           }),
-        } satisfies FormResponse;
+        } satisfies FormResponseWithFields;
       });
-
-      console.log("XSupabaseMainTableFeedProvider", data);
 
       dispatch({
         type: "editor/response/feed",

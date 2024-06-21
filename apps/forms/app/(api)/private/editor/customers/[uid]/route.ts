@@ -43,7 +43,7 @@ export async function GET(
 
   const data: FormCustomerDetail = {
     ...customer,
-    responses: responses as (FormResponse & { form: Form })[],
+    responses: responses as FormCustomerDetail["responses"],
   };
 
   return NextResponse.json(data);

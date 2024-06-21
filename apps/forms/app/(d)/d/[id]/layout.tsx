@@ -143,26 +143,27 @@ export default async function RootLayout({
 
 function Header({ form_id, title }: { form_id: string; title: string }) {
   return (
-    <header className="px-4 flex flex-col w-full gap-4 border-b z-10">
+    <header className="flex flex-col w-full gap-4 border-b z-10">
       <div className="w-full flex gap-4">
-        <div className="w-1/3 flex items-center justify-start">
-          <Link href="/dashboard" prefetch={false}>
-            <span className="flex items-center gap-2 text-md font-black select-none">
-              <GridaLogo size={15} />
-              Forms
-            </span>
-          </Link>
-          <SlashIcon className="min-w-[20px] ml-2" width={15} height={15} />
-          <EditableFormTitle form_id={form_id} defaultValue={title} />
+        <div className="w-1/3">
+          <div className="h-full px-4 min-w-60 w-min flex items-center lg:border-e">
+            <Link href="/dashboard" prefetch={false}>
+              <span className="flex items-center gap-2 text-md font-black select-none">
+                <GridaLogo size={15} />
+              </span>
+            </Link>
+            <SlashIcon className="min-w-[20px] ms-2" width={15} height={15} />
+            <EditableFormTitle form_id={form_id} defaultValue={title} />
+          </div>
         </div>
-        <div className="invisible lg:visible w-1/3">
+        <div className="px-4 invisible lg:visible w-1/3">
           <Tabs form_id={form_id} />
         </div>
-        <div className="w-1/3 flex gap-4 items-center justify-end">
+        <div className="px-4 w-1/3 flex gap-4 items-center justify-end">
           <PreviewButton form_id={form_id} />
         </div>
       </div>
-      <div className="block lg:hidden">
+      <div className="px-4 block lg:hidden">
         <Tabs form_id={form_id} />
       </div>
     </header>

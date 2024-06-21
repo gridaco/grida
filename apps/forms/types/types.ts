@@ -280,7 +280,10 @@ export interface FormResponse {
   x_useragent: string | null;
   x_ipinfo: IpInfo | null;
   geo: Geo | null;
-  fields?: FormResponseField[];
+}
+
+export interface FormResponseWithFields extends FormResponse {
+  fields: FormResponseField[];
 }
 
 export interface FormResponseField {
@@ -291,6 +294,7 @@ export interface FormResponseField {
   type: FormInputType;
   updated_at: string;
   value: any;
+  form_field_option_id: string | null;
   storage_object_paths: string[] | null;
 }
 

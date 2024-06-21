@@ -2,9 +2,10 @@ import type { FormInputType } from "@/types";
 
 export function unwrapFeildValue(
   value: any,
-  type: FormInputType
-): string | number | boolean {
-  if (!value) return "N/A";
+  type?: FormInputType
+): string | number | boolean | undefined | null {
+  if (value === null) return null;
+  if (value === undefined) return undefined;
   try {
     const unwrapped = JSON.parse(value);
 
@@ -27,7 +28,7 @@ export function unwrapFeildValue(
     switch (typeof value) {
       case "object":
       case "symbol":
-      case "undefined":
+      case "function":
         return "N/A";
       default:
         return value;

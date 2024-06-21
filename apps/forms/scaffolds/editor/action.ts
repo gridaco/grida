@@ -3,6 +3,8 @@ import {
   FormFieldDefinition,
   FormFieldInit,
   FormResponse,
+  FormResponseField,
+  FormResponseWithFields,
 } from "@/types";
 import type { EditorFlatFormBlock, FormEditorState } from "./state";
 import type { JSONConditionExpression } from "@/types/logic";
@@ -39,7 +41,8 @@ export type BlocksEditorAction =
   | DataGridReorderColumnAction
   | DataGridDateFormatAction
   | DataGridDateTZAction
-  | DataGridFilterAction;
+  | DataGridFilterAction
+  | DataGridCellChangeAction;
 
 export interface CreateNewPendingBlockAction {
   type: "blocks/new";
@@ -141,7 +144,7 @@ export interface DeleteFieldAction {
 
 export interface FeedResponseAction {
   type: "editor/response/feed";
-  data: FormResponse[];
+  data: FormResponseWithFields[];
   reset?: boolean;
 }
 
@@ -215,4 +218,11 @@ export interface DataGridRowsAction {
 export interface DataGridFilterAction
   extends Partial<FormEditorState["datagrid_filter"]> {
   type: "editor/data-grid/filter";
+}
+
+export interface DataGridCellChangeAction {
+  type: "editor/data-grid/cell/change";
+  row: string;
+  column: string;
+  data: { value: any; option_id?: string | null };
 }

@@ -3,6 +3,8 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import DataGrid, {
   Column,
+  CopyEvent,
+  PasteEvent,
   RenderCellProps,
   RenderEditCellProps,
   RenderHeaderCellProps,
@@ -30,7 +32,7 @@ import {
 import { FormInputType } from "@/types";
 import { JsonEditCell } from "./json-cell";
 import { useEditorState } from "../editor";
-import { GFResponseRow } from "./types";
+import type { GFResponseFieldData, GFResponseRow } from "./types";
 import { SelectColumn } from "./select-column";
 import "./grid.css";
 import { unwrapFeildValue } from "@/lib/forms/unwrap";
@@ -39,6 +41,15 @@ import { FormFieldTypeIcon } from "@/components/form-field-type-icon";
 import { toZonedTime } from "date-fns-tz";
 import { tztostr } from "../editor/symbols";
 import { mask } from "./mask";
+import toast from "react-hot-toast";
+import { FormValue } from "@/services/form";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 function rowKeyGetter(row: GFResponseRow) {
   return row.__gf_id;
 }
@@ -51,6 +62,7 @@ export function ResponseGrid({
   onAddNewFieldClick,
   onEditFieldClick,
   onDeleteFieldClick,
+  onCellChange,
 }: {
   columns: {
     key: string;
@@ -63,6 +75,11 @@ export function ResponseGrid({
   onAddNewFieldClick?: () => void;
   onEditFieldClick?: (id: string) => void;
   onDeleteFieldClick?: (id: string) => void;
+  onCellChange?: (
+    row: GFResponseRow,
+    column: string,
+    data: GFResponseFieldData
+  ) => void;
 }) {
   const [state, dispatch] = useEditorState();
   const { selected_responses } = state;
@@ -94,7 +111,7 @@ export function ResponseGrid({
   };
 
   const __customer_uuid_column: Column<GFResponseRow> = {
-    key: "__gf_customer_uuid",
+    key: "__gf_customer_id",
     name: "customer",
     frozen: true,
     resizable: true,
@@ -153,12 +170,48 @@ export function ResponseGrid({
     formattedColumns.unshift(SelectColumn);
   }
 
+  const onCopy = (e: CopyEvent<GFResponseRow>) => {
+    console.log(e);
+    let val: string | undefined;
+    if (e.sourceColumnKey.startsWith("__gf_")) {
+      // copy value as is
+      val = (e.sourceRow as any)[e.sourceColumnKey];
+    } else {
+      // copy value from fields
+      const field = e.sourceRow.fields[e.sourceColumnKey];
+      const value = field.value;
+      val = unwrapFeildValue(value, field.type as FormInputType)?.toString();
+    }
+
+    if (val) {
+      // copy to clipboard
+      const cp = navigator.clipboard.writeText(val);
+      toast.promise(cp, {
+        loading: "Copying to clipboard...",
+        success: "Copied to clipboard",
+        error: "Failed to copy to clipboard",
+      });
+    }
+  };
+
   return (
     <DataGrid
-      className="flex-grow border border-neutral-200 dark:border-neutral-900 select-none"
+      className="flex-grow select-none"
       rowKeyGetter={rowKeyGetter}
       columns={formattedColumns}
       selectedRows={selectionDisabled ? undefined : selected_responses}
+      onCopy={onCopy}
+      onRowsChange={(rows, data) => {
+        const key = data.column.key;
+        const indexes = data.indexes;
+
+        for (const i of indexes) {
+          const row = rows[i];
+          const field = row.fields[key];
+
+          onCellChange?.(row, key, field);
+        }
+      }}
       onSelectedRowsChange={
         selectionDisabled ? undefined : onSelectedRowsChange
       }
@@ -201,7 +254,7 @@ function DefaultPropertyIcon({ __key: key }: { __key: string }) {
       return <Link2Icon className="min-w-4" />;
     case "__gf_created_at":
       return <CalendarIcon className="min-w-4" />;
-    case "__gf_customer_uuid":
+    case "__gf_customer_id":
     case "__gf_customer":
       return <AvatarIcon className="min-w-4" />;
   }
@@ -222,7 +275,7 @@ function FieldHeaderCell({
   return (
     <div className="flex items-center justify-between">
       <span className="flex items-center gap-2">
-        <FormFieldTypeIcon type={type} />
+        <FormFieldTypeIcon type={type} className="w-4 h-4" />
         <span className="font-normal">{name}</span>
       </span>
       <DropdownMenu modal={false}>
@@ -349,14 +402,43 @@ function FieldCell({ column, row }: RenderCellProps<GFResponseRow>) {
     return <></>;
   }
 
-  const { type, value, files } = data;
+  const { type, value, options, files } = data;
 
-  const unwrapped = unwrapFeildValue(value, type as FormInputType);
+  const unwrapped = unwrapFeildValue(
+    FormValue.parse(value, {
+      enums: options
+        ? Object.keys(options).map((key) => ({
+            id: key,
+            value: options[key].value,
+          }))
+        : [],
+    }).value,
+    type as FormInputType
+  );
+
+  if (unwrapped === null || unwrapped === "") {
+    return (
+      <span className="text-muted-foreground/50">
+        <Empty value={unwrapped} />
+      </span>
+    );
+  }
 
   switch (type as FormInputType) {
     case "switch":
     case "checkbox": {
       return <input type="checkbox" checked={unwrapped as boolean} disabled />;
+    }
+    case "color": {
+      return (
+        <div className="w-full h-full p-2 flex gap-2 items-center">
+          <div
+            className="aspect-square min-w-4 rounded bg-neutral-500 border border-ring"
+            style={{ backgroundColor: unwrapped as string }}
+          />
+          <span>{unwrapped}</span>
+        </div>
+      );
     }
     case "file": {
       return (
@@ -402,7 +484,8 @@ function FieldCell({ column, row }: RenderCellProps<GFResponseRow>) {
 function FieldEditCell(props: RenderEditCellProps<GFResponseRow>) {
   const { column, row } = props;
   const data = row.fields[column.key];
-  const ref = useRef<HTMLInputElement>(null);
+  const ref = useRef<HTMLInputElement | HTMLTextAreaElement>(null);
+  const wasEscPressed = useRef(false);
 
   useEffect(() => {
     if (ref.current) {
@@ -412,38 +495,137 @@ function FieldEditCell(props: RenderEditCellProps<GFResponseRow>) {
     }
   }, [ref]);
 
-  if (!data) {
-    return <></>;
-  }
+  const { type, value, option_id, options, files } = data ?? {};
 
-  const { type, value, files } = data;
+  const onKeydown = (
+    e: React.KeyboardEvent<HTMLInputElement | HTMLTextAreaElement>
+  ) => {
+    if (e.key === "Enter") {
+      const val = ref.current?.value;
+      onCommit(e);
+    }
+    if (e.key === "Escape") {
+      wasEscPressed.current = true;
+    }
+  };
+
+  const onBlur = (
+    e: React.FocusEvent<HTMLInputElement | HTMLTextAreaElement>
+  ) => {
+    if (!wasEscPressed.current) {
+      onCommit(e);
+    } else {
+      wasEscPressed.current = false;
+    }
+  };
+
+  const commit = (change: { value: any; option_id?: string }) => {
+    props.onRowChange(
+      {
+        ...row,
+        fields: {
+          ...row.fields,
+          [column.key]: {
+            ...data,
+            value: FormValue.encode(change.value),
+            option_id: change.option_id,
+          },
+        },
+      },
+      true
+    );
+  };
+
+  const onCommit = (
+    e:
+      | React.KeyboardEvent<HTMLInputElement | HTMLTextAreaElement>
+      | React.FocusEvent<HTMLInputElement | HTMLTextAreaElement>
+  ) => {
+    let val: any = ref.current?.value;
+    switch (e.currentTarget.type) {
+      case "checkbox": {
+        val = (e.currentTarget as HTMLInputElement).checked;
+        break;
+      }
+      case "number":
+        val = parseFloat(val);
+        break;
+    }
+
+    commit({ value: val });
+  };
 
   try {
-    // FIXME: need investigation (case:FIELDVAL)
-    const unwrapped = JSON.parse(value);
+    const unwrapped = value ? unwrapFeildValue(value, type) : undefined;
+
     switch (type as FormInputType) {
       case "email":
       case "password":
       case "tel":
-      case "textarea":
       case "url":
       case "text":
+      case "hidden": {
         return (
           <input
-            ref={ref}
-            readOnly
+            ref={ref as React.RefObject<HTMLInputElement>}
+            type={type === "hidden" ? "text" : type}
             className="w-full px-2 appearance-none outline-none border-none"
-            type="text"
-            defaultValue={unwrapped}
+            defaultValue={unwrapped as string}
+            onKeyDown={onKeydown}
+            onBlur={onBlur}
           />
         );
-      case "select":
-        return <JsonEditCell {...props} />;
+      }
+      case "textarea": {
+        return (
+          <textarea
+            ref={ref as React.RefObject<HTMLTextAreaElement>}
+            className="w-full px-2 appearance-none outline-none border-none"
+            defaultValue={unwrapped as string}
+            onKeyDown={onKeydown}
+            onBlur={onBlur}
+          />
+        );
+      }
+      case "number": {
+        return (
+          <input
+            ref={ref as React.RefObject<HTMLInputElement>}
+            className="w-full px-2 appearance-none outline-none border-none"
+            type="number"
+            defaultValue={unwrapped as string | number}
+            onKeyDown={onKeydown}
+            onBlur={onBlur}
+          />
+        );
+      }
+      case "date":
+      case "datetime-local":
+      case "time":
+      case "month":
+      case "week": {
+        return (
+          <input
+            ref={ref as React.RefObject<HTMLInputElement>}
+            type={type}
+            className="w-full px-2 appearance-none outline-none border-none"
+            defaultValue={unwrapped as string}
+            onKeyDown={onKeydown}
+            onBlur={onBlur}
+          />
+        );
+      }
       case "color":
         return (
-          <input readOnly disabled type="color" defaultValue={unwrapped} />
+          <input
+            ref={ref as React.RefObject<HTMLInputElement>}
+            type="color"
+            className="w-full px-2 appearance-none outline-none border-none"
+            defaultValue={unwrapped as string}
+            onKeyDown={onKeydown}
+            onBlur={onBlur}
+          />
         );
-      case "checkbox":
       case "file":
       case "image": {
         return (
@@ -465,13 +647,71 @@ function FieldEditCell(props: RenderEditCellProps<GFResponseRow>) {
           </div>
         );
       }
-      // return (
-      //   <input readOnly disabled type="checkbox" defaultChecked={unwrapped} />
-      // );
+      case "switch":
+      case "checkbox": {
+        return (
+          <div className="px-2 w-full h-full flex justify-between items-center">
+            <input
+              ref={ref as React.RefObject<HTMLInputElement>}
+              type="checkbox"
+              defaultChecked={unwrapped === true}
+              onKeyDown={onKeydown}
+              onBlur={onBlur}
+            />
+          </div>
+        );
+      }
+      case "radio":
+      case "select":
+        return (
+          <Select
+            defaultValue={option_id ?? undefined}
+            onValueChange={(v) => {
+              commit({ value: options?.[v]?.value, option_id: v });
+            }}
+          >
+            <SelectTrigger>
+              <SelectValue className="w-full h-full m-0" placeholder="Select" />
+            </SelectTrigger>
+            <SelectContent>
+              {options &&
+                Object.keys(options)?.map((key, i) => {
+                  const opt = options[key];
+                  return (
+                    <SelectItem key={key} value={key}>
+                      {opt.value}{" "}
+                      <small className="text-muted-foreground">
+                        {opt.label || opt.value}
+                      </small>
+                    </SelectItem>
+                  );
+                })}
+            </SelectContent>
+          </Select>
+        );
+      // not supported
+      case "checkboxes":
+      case "signature":
+      case "payment":
       default:
-        return <JsonEditCell {...props} />;
+        return (
+          <div className="px-2 w-full text-muted-foreground">
+            This field can&apos;t be edited
+          </div>
+        );
     }
   } catch (e) {
+    console.error(e);
     return <JsonEditCell {...props} />;
   }
+}
+
+function Empty({ value }: { value?: null | undefined | "" }) {
+  if (value === null) {
+    return <>NULL</>;
+  }
+  if (value === "") {
+    return <>EMPTY</>;
+  }
+  return <></>;
 }

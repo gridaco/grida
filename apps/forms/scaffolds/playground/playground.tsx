@@ -30,6 +30,7 @@ import { ThemePalette } from "../theme-editor/palette-editor";
 import { stringfyThemeVariables } from "../theme-editor/serialize";
 import * as palettes from "@/theme/palettes";
 import { useTheme } from "next-themes";
+import { useMonacoTheme } from "@/components/monaco";
 
 const HOST_NAME = process.env.NEXT_PUBLIC_HOST_NAME || "http://localhost:3000";
 
@@ -354,13 +355,10 @@ function Editor({
   onChange?: (fileName: EditorFileName, value?: string) => void;
   readonly?: boolean;
 }) {
-  const monaco = useMonaco();
-  // const { isDarkMode } = useDarkMode();
-  const { theme } = useTheme();
-
-  const isDarkMode = theme === "dark";
-
   const file = files[fileName];
+
+  const monaco = useMonaco();
+  const { resolvedTheme } = useTheme();
 
   useEffect(() => {
     monaco?.languages.json.jsonDefaults.setDiagnosticsOptions({
@@ -368,13 +366,9 @@ function Editor({
       enableSchemaRequest: true,
       schemas: [schema],
     });
-
-    import("monaco-themes/themes/Blackboard.json").then((data) => {
-      data.colors["editor.background"] = "#0D0D0D";
-      monaco?.editor.defineTheme("dark", data as any);
-      monaco?.editor.setTheme(isDarkMode ? "dark" : "light");
-    });
   }, [monaco]);
+
+  useMonacoTheme(monaco, resolvedTheme ?? "light");
 
   return (
     <div className="font-mono flex-1 flex flex-col w-full h-full">
@@ -407,7 +401,6 @@ function Editor({
           defaultLanguage={file.language}
           defaultValue={file.value}
           value={file.value}
-          theme={isDarkMode ? "dark" : "light"}
           options={{
             readOnly: readonly || fileName === "variables.css",
             automaticLayout: true,

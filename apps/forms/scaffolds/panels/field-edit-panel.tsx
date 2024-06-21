@@ -169,7 +169,7 @@ export function TypeSelect({
           className="w-full justify-between capitalize"
         >
           <div className="flex gap-2 items-center">
-            <FormFieldTypeIcon type={value} />
+            <FormFieldTypeIcon type={value} className="w-4 h-4" />
             {value ? value : "Type"}
           </div>
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
@@ -197,7 +197,7 @@ export function TypeSelect({
                     )}
                   />
                   <div className="flex items-center gap-2">
-                    <FormFieldTypeIcon type={t} />
+                    <FormFieldTypeIcon type={t} className="w-4 h-4" />
                     <span className="capitalize">{t}</span>
                   </div>
                 </CommandItem>
@@ -421,7 +421,7 @@ export function FieldEditPanel({
         <PanelPropertySection>
           <PanelPropertySectionTitle>Preview</PanelPropertySectionTitle>
           <PanelPropertyFields>
-            <div className="relative w-full min-h-40 bg-neutral-200 dark:bg-neutral-800 rounded p-10 border border-black/20">
+            <div className="relative w-full min-h-40 bg-card rounded p-10 border">
               <form
                 onSubmit={(e) => {
                   e.preventDefault();

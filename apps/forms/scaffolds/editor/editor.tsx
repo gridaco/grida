@@ -26,13 +26,11 @@ export function FormEditorProvider({
   return (
     <StateProvider state={state} dispatch={dispatch}>
       <TooltipProvider>
-        <BlockPanelProvider>
-          <FieldEditPanelProvider>
-            <ResponseEditPanelProvider>
-              <CustomerPanelProvider>{children}</CustomerPanelProvider>
-            </ResponseEditPanelProvider>
-          </FieldEditPanelProvider>
-        </BlockPanelProvider>
+        <BlockEditPanel />
+        <FieldEditPanelProvider />
+        <ResponseEditPanelProvider />
+        <CustomerPanelProvider />
+        {children}
       </TooltipProvider>
     </StateProvider>
   );
@@ -161,7 +159,7 @@ function ResponseEditPanelProvider({ children }: React.PropsWithChildren<{}>) {
   const [state, dispatch] = useEditorState();
 
   const response = useMemo(() => {
-    return state.responses?.find((r) => r.id === state.focus_response_id);
+    return state.responses?.rows?.find((r) => r.id === state.focus_response_id);
   }, [state.responses, state.focus_response_id]);
 
   return (
@@ -170,7 +168,13 @@ function ResponseEditPanelProvider({ children }: React.PropsWithChildren<{}>) {
         key={response?.id}
         title={`Response ${response?.local_index ? fmt_local_index(response?.local_index) : ""}`}
         open={state.is_response_edit_panel_open}
-        init={{ response, field_defs: state.fields }}
+        init={{
+          response,
+          response_fields: response?.id
+            ? state.responses.fields[response?.id]
+            : [],
+          field_defs: state.fields,
+        }}
         onOpenChange={(open) => {
           dispatch({ type: "editor/responses/edit", open });
         }}
@@ -193,15 +197,6 @@ function CustomerPanelProvider({ children }: React.PropsWithChildren<{}>) {
           dispatch({ type: "editor/customers/edit", open });
         }}
       />
-      {children}
-    </>
-  );
-}
-
-function BlockPanelProvider({ children }: React.PropsWithChildren<{}>) {
-  return (
-    <>
-      <BlockEditPanel />
       {children}
     </>
   );

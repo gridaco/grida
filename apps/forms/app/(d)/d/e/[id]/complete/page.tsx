@@ -6,6 +6,7 @@ import { ssr_page_init_i18n } from "@/i18n/ssr";
 import { fmt_local_index } from "@/utils/fmt";
 import { EndingPageI18nOverrides } from "@/types";
 import type { FormLinkURLParams } from "@/lib/forms/url";
+import { FormValue } from "@/services/form";
 
 export default async function SubmitCompletePage({
   params,
@@ -23,6 +24,7 @@ export default async function SubmitCompletePage({
       `
         *,
         fields:form_field(*),
+        options:form_field_option(*),
         default_page:form_page!default_form_page_id(
           *
         )
@@ -37,8 +39,13 @@ export default async function SubmitCompletePage({
 
   await ssr_page_init_i18n({ lng: data.default_form_page_language });
 
-  const { title, fields, ending_page_template_id, ending_page_i18n_overrides } =
-    data;
+  const {
+    title,
+    fields,
+    options,
+    ending_page_template_id,
+    ending_page_i18n_overrides,
+  } = data;
 
   if (!response_id) {
     return notFound();
@@ -65,9 +72,7 @@ export default async function SubmitCompletePage({
       const key = fields.find((f) => f.id === field.form_field_id)?.name;
       if (!key) return acc; // this can't happen - but just in case
 
-      acc[key] =
-        // FIXME: need investigation (case:FIELDVAL)
-        JSON.parse(field.value as any);
+      acc[key] = FormValue.parse(field.value, { enums: options }).value;
       return acc;
     },
     {} as Record<string, string>

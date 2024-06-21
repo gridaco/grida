@@ -33,6 +33,7 @@ import {
   DataGridDateFormatAction,
   DataGridDateTZAction,
   DataGridFilterAction,
+  DataGridCellChangeAction,
 } from "./action";
 import { arrayMove } from "@dnd-kit/sortable";
 import { blockstreeflat } from "@/lib/forms/tree";
@@ -453,7 +454,7 @@ export function reducer(
       return produce(state, (draft) => {
         const ids = Array.from(state.selected_responses);
 
-        draft.responses = draft.responses?.filter(
+        draft.responses.rows = draft.responses.rows.filter(
           (response) => !ids.includes(response.id)
         );
 
@@ -469,7 +470,7 @@ export function reducer(
     case "editor/response/delete": {
       const { id } = <DeleteResponseAction>action;
       return produce(state, (draft) => {
-        draft.responses = draft.responses?.filter(
+        draft.responses.rows = draft.responses.rows.filter(
           (response) => response.id !== id
         );
 
@@ -488,20 +489,24 @@ export function reducer(
     }
     case "editor/response/feed": {
       const { data, reset } = <FeedResponseAction>action;
-      return produce(state, (draft) => {
-        // Initialize draft.responses if it's not already an array
-        if (!Array.isArray(draft.responses)) {
-          draft.responses = [];
-        }
 
+      const responses = {
+        rows: data,
+        fields: data.reduce((acc: any, response) => {
+          acc[response.id] = response.fields;
+          return acc;
+        }, {}),
+      };
+
+      return produce(state, (draft) => {
         if (reset) {
-          draft.responses = data;
+          draft.responses = responses;
           return;
         }
 
         // Merge & Add new responses to the existing responses
         // Map of ids to responses for the existing responses
-        const existingResponsesById = draft.responses.reduce(
+        const existingResponsesById = draft.responses.rows.reduce(
           (acc: any, response) => {
             acc[response.id] = response;
             return acc;
@@ -509,7 +514,7 @@ export function reducer(
           {}
         );
 
-        data.forEach((newResponse) => {
+        responses.rows.forEach((newResponse) => {
           if (existingResponsesById.hasOwnProperty(newResponse.id)) {
             // Update existing response
             Object.assign(
@@ -518,8 +523,11 @@ export function reducer(
             );
           } else {
             // Add new response if id does not exist
-            draft.responses!.push(newResponse);
+            draft.responses.rows.push(newResponse);
           }
+
+          // Update fields
+          draft.responses.fields[newResponse.id] = newResponse.fields;
         });
       });
     }
@@ -621,6 +629,28 @@ export function reducer(
           ...draft.datagrid_filter,
           ...pref,
         };
+      });
+    }
+
+    case "editor/data-grid/cell/change": {
+      const { row, column, data } = <DataGridCellChangeAction>action;
+
+      const { value, option_id } = data;
+      return produce(state, (draft) => {
+        const cellid = state.responses.fields[row].find(
+          (f) => f.form_field_id === column && f.response_id === row
+        )?.id;
+
+        draft.responses.fields[row] = draft.responses.fields[row].map((f) => {
+          if (f.id === cellid) {
+            return {
+              ...f,
+              form_field_option_id: option_id ?? null,
+              value,
+            };
+          }
+          return f;
+        });
       });
     }
     default:

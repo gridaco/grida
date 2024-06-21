@@ -18,6 +18,7 @@ import {
   FormInputType,
   FormResponse,
   FormFieldInit,
+  FormResponseField,
 } from "@/types";
 import { LockClosedIcon } from "@radix-ui/react-icons";
 import toast from "react-hot-toast";
@@ -32,11 +33,15 @@ export function ResponseEditPanel({
   ...props
 }: React.ComponentProps<typeof SidePanel> & {
   title?: string;
-  init?: Partial<{ response: FormResponse; field_defs: FormFieldDefinition[] }>;
+  init?: Partial<{
+    response: FormResponse;
+    response_fields: FormResponseField[];
+    field_defs: FormFieldDefinition[];
+  }>;
   disableAI?: boolean;
   onSave?: (field: FormFieldInit) => void;
 }) {
-  const { response, field_defs } = init ?? {};
+  const { response, response_fields, field_defs } = init ?? {};
 
   const onSaveClick = () => {};
 
@@ -89,7 +94,7 @@ export function ResponseEditPanel({
             <PanelPropertySectionTitle>Response</PanelPropertySectionTitle>
             <PanelPropertyFields>
               {field_defs?.map((def) => {
-                const record = response?.fields?.find(
+                const record = response_fields?.find(
                   (f) => f.form_field_id === def.id
                 );
 

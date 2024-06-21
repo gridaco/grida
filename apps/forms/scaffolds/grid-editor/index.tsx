@@ -46,7 +46,7 @@ import { Button } from "@/components/ui/button";
 import { format, startOfDay, addSeconds } from "date-fns";
 import { format as formatTZ } from "date-fns-tz";
 import { LOCALTZ, tztostr } from "../editor/symbols";
-import { GridData } from "./data";
+import { GridData } from "./grid-data";
 import clsx from "clsx";
 
 export function GridEditor() {
@@ -83,7 +83,7 @@ export function GridEditor() {
       table: datagrid_table,
       fields: fields,
       filter: datagrid_filter,
-      responses: responses ?? [],
+      responses: responses,
       sessions: sessions ?? [],
     });
   }, [datagrid_table, sessions, fields, responses, datagrid_filter]);
@@ -216,16 +216,10 @@ export function GridEditor() {
           </div>
           <div className="flex-1" />
           <div className="flex gap-2 items-center">
-            <Link href={`./analytics`}>
+            <Link href={`./analytics`} className="flex">
               <Badge variant={"outline"} className="cursor-pointer">
+                <PieChartIcon className="align-middle me-2" />
                 Realtime
-                <PieChartIcon className="align-middle ms-2" />
-              </Badge>
-            </Link>
-            <Link href={`./simulator`} target="_blank">
-              <Badge variant={"outline"} className="cursor-pointer">
-                Simulator
-                <CommitIcon className="align-middle ms-2" />
               </Badge>
             </Link>
             <GridViewSettings />
@@ -252,6 +246,14 @@ export function GridEditor() {
               field_id,
             });
             openDeleteFieldConfirm();
+          }}
+          onCellChange={(row, column, data) => {
+            dispatch({
+              type: "editor/data-grid/cell/change",
+              row: row.__gf_id,
+              column: column,
+              data: data,
+            });
           }}
         />
       </div>
@@ -418,6 +420,13 @@ function GridViewSettings() {
             )}
           </DropdownMenuRadioItem>
         </DropdownMenuRadioGroup>
+        <DropdownMenuSeparator />
+        <Link href={`./simulator`} target="_blank">
+          <DropdownMenuItem className="cursor-pointer">
+            <CommitIcon className="inline align-middle me-2" />
+            Open Simulator
+          </DropdownMenuItem>
+        </Link>
       </DropdownMenuContent>
     </DropdownMenu>
   );

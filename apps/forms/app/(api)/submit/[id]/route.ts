@@ -48,7 +48,7 @@ import {
 } from "@/services/form/session-storage";
 import { createXSupabaseClient } from "@/services/x-supabase";
 import { render } from "@/lib/templating/template";
-import { FormServiceUtils } from "@/services/form";
+import { FormValue } from "@/services/form";
 
 const HOST = process.env.HOST || "http://localhost:3000";
 
@@ -422,7 +422,7 @@ async function submit({
     await client
       .from("response")
       .insert({
-        raw: FormServiceUtils.safejson(Object.fromEntries(entries)),
+        raw: FormValue.safejson(Object.fromEntries(entries)),
         form_id: form_id,
         session_id: meta.session,
         browser: meta.browser,
@@ -562,10 +562,9 @@ async function submit({
 
       // the field's value can be a input value or a reference to form_field_option
       const value_or_reference = data.get(name);
-      const { value, enum_id } = FormServiceUtils.parseValue(
-        value_or_reference,
-        options
-      );
+      const { value, enum_id } = FormValue.parse(value_or_reference, {
+        enums: options,
+      });
 
       // handle file uploads
       if (FieldSupports.file_alias(type)) {
@@ -645,8 +644,7 @@ async function submit({
       form_field_id: field_id,
       response_id: response_reference_obj!.id,
       form_id: form_id,
-      // FIXME: need investigation (case:FIELDVAL)
-      value: JSON.stringify(uploadedfileval),
+      value: FormValue.encode(uploadedfileval),
       storage_object_paths: success_results.map(
         (res) => res.data!.path
       ) as string[],
