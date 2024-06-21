@@ -23,11 +23,13 @@ const useSubscription = ({
   table,
   form_id,
   onInsert,
+  onUpdate,
   onDelete,
   enabled,
 }: {
   table: "response" | "response_session";
   form_id: string;
+  onUpdate?: (data: RealtimeTableChangeData) => void;
   onInsert?: (data: RealtimeTableChangeData) => void;
   onDelete?: (data: RealtimeTableChangeData | {}) => void;
   enabled: boolean;
@@ -53,9 +55,12 @@ const useSubscription = ({
           payload: RealtimePostgresChangesPayload<RealtimeTableChangeData>
         ) => {
           const { old, new: _new } = payload;
+          const old_id = (old as RealtimeTableChangeData).id;
           const new_id = (_new as RealtimeTableChangeData).id;
 
-          if (new_id) {
+          if (new_id && old_id) {
+            onUpdate?.(_new as RealtimeTableChangeData);
+          } else if (new_id) {
             onInsert?.(_new as RealtimeTableChangeData);
           } else {
             onDelete?.(old);
@@ -67,7 +72,7 @@ const useSubscription = ({
     return () => {
       changes.unsubscribe();
     };
-  }, [supabase, form_id, table, enabled, onInsert, onDelete]);
+  }, [supabase, form_id, table, enabled, onInsert, onUpdate, onDelete]);
 };
 
 export function ResponseSyncProvider({
@@ -240,6 +245,14 @@ export function ResponseFeedProvider({
         );
       }, 100);
     },
+    onUpdate: (data) => {
+      fetchResponse((data as { id: string }).id).then((data) => {
+        dispatch({
+          type: "editor/response/feed",
+          data: [data as any],
+        });
+      });
+    },
     onDelete: (data) => {
       if ("id" in data) {
         dispatch({
@@ -319,6 +332,15 @@ export function ResponseSessionFeedProvider({
         type: "editor/data/sessions/feed",
         data: [data as any],
       });
+    },
+    onUpdate: (data) => {
+      dispatch({
+        type: "editor/data/sessions/feed",
+        data: [data as any],
+      });
+    },
+    onDelete: (data) => {
+      // this cant happen
     },
     enabled: realtime_sessions_enabled,
   });
