@@ -111,7 +111,7 @@ export function FieldBlock({
       invalid={!form_field}
       onPointerDown={setFocus}
     >
-      <BlockHeader>
+      <BlockHeader border>
         <div className="flex flex-row items-center gap-8">
           <span className="flex flex-row gap-2 items-center">
             <InputIcon />
@@ -254,7 +254,7 @@ export function FieldBlock({
           </DropdownMenu>
         </div>
       </BlockHeader>
-      <div className={clsx("w-full min-h-40 bg-card rounded p-10 border")}>
+      <div className={clsx("w-full bg-card rounded px-4 py-10")}>
         {is_hidden_field ? (
           <div>
             <p className="text-xs opacity-50">
