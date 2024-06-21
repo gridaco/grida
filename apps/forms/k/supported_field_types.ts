@@ -5,15 +5,12 @@ export const supported_field_types: FormInputType[] = [
   "textarea",
   "select",
   "checkbox",
-  "checkboxes",
   "switch",
   "radio",
   "email",
   "tel",
   "url",
   "password",
-  "signature",
-  "payment",
   "number",
   "date",
   "datetime-local",
@@ -27,6 +24,16 @@ export const supported_field_types: FormInputType[] = [
   "range",
   "search",
 ];
+
+if (process.env.NODE_ENV === "development") {
+  const dev: FormInputType[] = [
+    //
+    "checkboxes",
+    "signature",
+    "payment",
+  ] as const;
+  supported_field_types.push(...dev);
+}
 
 export const supported_field_autocomplete_types: FormFieldAutocompleteType[] = [
   "off",

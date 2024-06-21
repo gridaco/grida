@@ -533,7 +533,7 @@ function FieldEditCell(props: RenderEditCellProps<GFResponseRow>) {
         return (
           <input
             ref={ref as React.RefObject<HTMLInputElement>}
-            type={type}
+            type={type === "hidden" ? "text" : type}
             className="w-full px-2 appearance-none outline-none border-none"
             defaultValue={unwrapped as string}
             onKeyDown={onKeydown}

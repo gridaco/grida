@@ -2,7 +2,7 @@ import type { FormInputType } from "@/types";
 
 export function unwrapFeildValue(
   value: any,
-  type: FormInputType
+  type?: FormInputType
 ): string | number | boolean | undefined | null {
   if (value === null) return null;
   if (value === undefined) return undefined;
@@ -28,7 +28,7 @@ export function unwrapFeildValue(
     switch (typeof value) {
       case "object":
       case "symbol":
-      case "undefined":
+      case "function":
         return "N/A";
       default:
         return value;

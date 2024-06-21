@@ -6,6 +6,7 @@ import { ssr_page_init_i18n } from "@/i18n/ssr";
 import { fmt_local_index } from "@/utils/fmt";
 import { EndingPageI18nOverrides } from "@/types";
 import type { FormLinkURLParams } from "@/lib/forms/url";
+import { FormValue } from "@/services/form";
 
 export default async function SubmitCompletePage({
   params,
@@ -65,9 +66,7 @@ export default async function SubmitCompletePage({
       const key = fields.find((f) => f.id === field.form_field_id)?.name;
       if (!key) return acc; // this can't happen - but just in case
 
-      acc[key] =
-        // FIXME: need investigation (case:FIELDVAL)
-        JSON.parse(field.value as any);
+      acc[key] = FormValue.decode(field.value);
       return acc;
     },
     {} as Record<string, string>
