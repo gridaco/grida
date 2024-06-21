@@ -169,7 +169,6 @@ function useSyncBlocks(blocks: EditorFlatFormBlock[]) {
             description_html: block.description_html,
             body_html: block.body_html,
             src: block.src,
-            updated_at: new Date().toISOString(),
           })
           .eq("id", block.id)
           .single();

@@ -85,7 +85,6 @@ export function ResponseSyncProvider({
           // TODO:
           value: payload.value,
           form_field_option_id: payload.option_id,
-          updated_at: new Date().toISOString(),
           // 'storage_object_paths': []
         })
         .eq("id", id)

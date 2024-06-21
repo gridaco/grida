@@ -54,7 +54,6 @@ export async function POST(
   const { data: upserted, error } = await supabase
     .from("form_field")
     .upsert({
-      updated_at: new Date().toISOString(),
       id: init.id,
       form_id: form_id,
       type: init.type,
