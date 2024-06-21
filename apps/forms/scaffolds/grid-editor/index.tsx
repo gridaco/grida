@@ -46,7 +46,7 @@ import { Button } from "@/components/ui/button";
 import { format, startOfDay, addSeconds } from "date-fns";
 import { format as formatTZ } from "date-fns-tz";
 import { LOCALTZ, tztostr } from "../editor/symbols";
-import { GridData } from "./data";
+import { GridData } from "./grid-data";
 import clsx from "clsx";
 
 export function GridEditor() {
