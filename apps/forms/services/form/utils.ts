@@ -2,7 +2,10 @@ import { is_uuid_v4 } from "@/utils/is";
 import type { FormInputType, Option } from "@/types";
 
 export namespace FormValue {
-  export function parse(value_or_reference: any, extra?: { enums?: Option[] }) {
+  export function parse(
+    value_or_reference: any,
+    extra?: { enums?: { id: string; value: string }[] }
+  ) {
     // check if the value is a reference to form_field_option
     const is_value_fkey_and_found =
       is_uuid_v4(value_or_reference as string) &&
@@ -19,7 +22,10 @@ export namespace FormValue {
     };
   }
 
-  export function encode(value: any) {
+  export function encode(
+    value: any,
+    extra?: { enums?: { id: string; value: string }[] }
+  ) {
     return JSON.stringify(value);
   }
 

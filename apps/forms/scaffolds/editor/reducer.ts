@@ -633,7 +633,9 @@ export function reducer(
     }
 
     case "editor/data-grid/cell/change": {
-      const { row, column, value } = <DataGridCellChangeAction>action;
+      const { row, column, data } = <DataGridCellChangeAction>action;
+
+      const { value, option_id } = data;
       return produce(state, (draft) => {
         const cellid = state.responses.fields[row].find(
           (f) => f.form_field_id === column && f.response_id === row
@@ -643,7 +645,7 @@ export function reducer(
           if (f.id === cellid) {
             return {
               ...f,
-              // TODO: support option_id
+              form_field_option_id: option_id ?? null,
               value,
             };
           }

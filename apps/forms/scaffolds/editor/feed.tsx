@@ -83,7 +83,7 @@ export function ResponseSyncProvider({
   const prev = usePrevious(state.responses);
 
   const sync = useCallback(
-    async (id: string, payload: { value: any; option_id?: string }) => {
+    async (id: string, payload: { value: any; option_id?: string | null }) => {
       const { data, error } = await supabase
         .from("response_field")
         .update({
@@ -123,7 +123,10 @@ export function ResponseSyncProvider({
         if (prevField) {
           // check if field value is updated
           if (prevField.value !== cell.value) {
-            const _ = sync(cell.id, { value: cell.value });
+            const _ = sync(cell.id, {
+              value: cell.value,
+              option_id: cell.form_field_option_id,
+            });
 
             toast
               .promise(_, {
@@ -394,6 +397,7 @@ export function XSupabaseMainTableFeedProvider({
               form_field_id: key,
               response_id: row.id,
               type: "text",
+              form_field_option_id: null,
               updated_at: new Date().toISOString(),
               value: row[key],
               storage_object_paths: null,

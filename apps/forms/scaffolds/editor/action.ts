@@ -224,5 +224,5 @@ export interface DataGridCellChangeAction {
   type: "editor/data-grid/cell/change";
   row: string;
   column: string;
-  value: any;
+  data: { value: any; option_id?: string | null };
 }

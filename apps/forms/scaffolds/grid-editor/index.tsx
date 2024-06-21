@@ -253,12 +253,12 @@ export function GridEditor() {
             });
             openDeleteFieldConfirm();
           }}
-          onCellChange={(row, column, value) => {
+          onCellChange={(row, column, data) => {
             dispatch({
               type: "editor/data-grid/cell/change",
               row: row.__gf_id,
               column: column,
-              value: value,
+              data: data,
             });
           }}
         />

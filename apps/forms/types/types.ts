@@ -294,6 +294,7 @@ export interface FormResponseField {
   type: FormInputType;
   updated_at: string;
   value: any;
+  form_field_option_id: string | null;
   storage_object_paths: string[] | null;
 }
 

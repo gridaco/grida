@@ -32,7 +32,7 @@ import {
 import { FormInputType } from "@/types";
 import { JsonEditCell } from "./json-cell";
 import { useEditorState } from "../editor";
-import { GFResponseRow } from "./types";
+import type { GFResponseFieldData, GFResponseRow } from "./types";
 import { SelectColumn } from "./select-column";
 import "./grid.css";
 import { unwrapFeildValue } from "@/lib/forms/unwrap";
@@ -43,6 +43,13 @@ import { tztostr } from "../editor/symbols";
 import { mask } from "./mask";
 import toast from "react-hot-toast";
 import { FormValue } from "@/services/form";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 function rowKeyGetter(row: GFResponseRow) {
   return row.__gf_id;
 }
@@ -68,7 +75,11 @@ export function ResponseGrid({
   onAddNewFieldClick?: () => void;
   onEditFieldClick?: (id: string) => void;
   onDeleteFieldClick?: (id: string) => void;
-  onCellChange?: (row: GFResponseRow, column: string, value: any) => void;
+  onCellChange?: (
+    row: GFResponseRow,
+    column: string,
+    data: GFResponseFieldData
+  ) => void;
 }) {
   const [state, dispatch] = useEditorState();
   const { selected_responses } = state;
@@ -197,9 +208,8 @@ export function ResponseGrid({
         for (const i of indexes) {
           const row = rows[i];
           const field = row.fields[key];
-          const value = field.value;
 
-          onCellChange?.(row, key, value);
+          onCellChange?.(row, key, field);
         }
       }}
       onSelectedRowsChange={
@@ -392,9 +402,19 @@ function FieldCell({ column, row }: RenderCellProps<GFResponseRow>) {
     return <></>;
   }
 
-  const { type, value, files } = data;
+  const { type, value, options, files } = data;
 
-  const unwrapped = unwrapFeildValue(value, type as FormInputType);
+  const unwrapped = unwrapFeildValue(
+    FormValue.parse(value, {
+      enums: options
+        ? Object.keys(options).map((key) => ({
+            id: key,
+            value: options[key].value,
+          }))
+        : [],
+    }).value,
+    type as FormInputType
+  );
 
   if (unwrapped === null || unwrapped === "") {
     return (
@@ -475,7 +495,7 @@ function FieldEditCell(props: RenderEditCellProps<GFResponseRow>) {
     }
   }, [ref]);
 
-  const { type, value, files } = data ?? {};
+  const { type, value, option_id, options, files } = data ?? {};
 
   const onKeydown = (
     e: React.KeyboardEvent<HTMLInputElement | HTMLTextAreaElement>
@@ -499,6 +519,23 @@ function FieldEditCell(props: RenderEditCellProps<GFResponseRow>) {
     }
   };
 
+  const commit = (change: { value: any; option_id?: string }) => {
+    props.onRowChange(
+      {
+        ...row,
+        fields: {
+          ...row.fields,
+          [column.key]: {
+            ...data,
+            value: FormValue.encode(change.value),
+            option_id: change.option_id,
+          },
+        },
+      },
+      true
+    );
+  };
+
   const onCommit = (
     e:
       | React.KeyboardEvent<HTMLInputElement | HTMLTextAreaElement>
@@ -515,19 +552,7 @@ function FieldEditCell(props: RenderEditCellProps<GFResponseRow>) {
         break;
     }
 
-    props.onRowChange(
-      {
-        ...row,
-        fields: {
-          ...row.fields,
-          [column.key]: {
-            ...data,
-            value: JSON.stringify(val),
-          },
-        },
-      },
-      true
-    );
+    commit({ value: val });
   };
 
   try {
@@ -638,7 +663,32 @@ function FieldEditCell(props: RenderEditCellProps<GFResponseRow>) {
       }
       case "radio":
       case "select":
-        return <JsonEditCell {...props} />;
+        return (
+          <Select
+            defaultValue={option_id ?? undefined}
+            onValueChange={(v) => {
+              commit({ value: options?.[v]?.value, option_id: v });
+            }}
+          >
+            <SelectTrigger>
+              <SelectValue className="w-full h-full m-0" />
+            </SelectTrigger>
+            <SelectContent>
+              {options &&
+                Object.keys(options)?.map((key, i) => {
+                  const opt = options[key];
+                  return (
+                    <SelectItem key={key} value={key}>
+                      {opt.value}{" "}
+                      <small className="text-muted-foreground">
+                        {opt.label || opt.value}
+                      </small>
+                    </SelectItem>
+                  );
+                })}
+            </SelectContent>
+          </Select>
+        );
       // not supported
       case "checkboxes":
       case "signature":

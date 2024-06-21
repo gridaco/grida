@@ -71,7 +71,21 @@ export namespace GridData {
           );
           row.fields[field.id] = {
             type: responseField?.type || field.type,
-            value: responseField?.value || "",
+            value: responseField?.value || null,
+            option_id: responseField?.form_field_option_id,
+            options: field.options?.reduce(
+              (
+                acc: { [key: string]: { value: string; label?: string } },
+                option
+              ) => {
+                acc[option.id] = {
+                  value: option.value,
+                  label: option.label,
+                };
+                return acc;
+              },
+              {}
+            ),
             files:
               responseField?.storage_object_paths?.map((path) => {
                 const base = `/private/editor/${response.form_id}/responses/${response.id}/fields/${responseField.id}/src?path=${path}`;

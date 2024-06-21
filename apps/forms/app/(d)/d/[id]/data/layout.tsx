@@ -12,9 +12,9 @@ export default function Layout({
   return (
     <main className="h-full flex flex-1 w-full">
       {/* side */}
-      <aside className="flex h-full">
+      {/* <aside className="flex h-full">
         <Siebar />
-      </aside>
+      </aside> */}
       <div className="w-full h-full overflow-x-hidden">{children}</div>
     </main>
   );
