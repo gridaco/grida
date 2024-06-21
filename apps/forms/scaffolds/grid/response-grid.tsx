@@ -671,7 +671,7 @@ function FieldEditCell(props: RenderEditCellProps<GFResponseRow>) {
             }}
           >
             <SelectTrigger>
-              <SelectValue className="w-full h-full m-0" />
+              <SelectValue className="w-full h-full m-0" placeholder="Select" />
             </SelectTrigger>
             <SelectContent>
               {options &&
