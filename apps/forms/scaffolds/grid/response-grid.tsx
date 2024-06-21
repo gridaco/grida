@@ -409,6 +409,17 @@ function FieldCell({ column, row }: RenderCellProps<GFResponseRow>) {
     case "checkbox": {
       return <input type="checkbox" checked={unwrapped as boolean} disabled />;
     }
+    case "color": {
+      return (
+        <div className="w-full h-full p-2 flex gap-2 items-center">
+          <div
+            className="aspect-square min-w-4 rounded bg-neutral-500"
+            style={{ backgroundColor: unwrapped as string }}
+          />
+          <span>{unwrapped}</span>
+        </div>
+      );
+    }
     case "file": {
       return (
         <div className="w-full h-full flex gap-2">
@@ -482,7 +493,6 @@ function FieldEditCell(props: RenderEditCellProps<GFResponseRow>) {
     e: React.FocusEvent<HTMLInputElement | HTMLTextAreaElement>
   ) => {
     if (!wasEscPressed.current) {
-      const val = ref.current?.value;
       onCommit(e);
     } else {
       wasEscPressed.current = false;
@@ -583,7 +593,9 @@ function FieldEditCell(props: RenderEditCellProps<GFResponseRow>) {
       case "color":
         return (
           <input
+            ref={ref as React.RefObject<HTMLInputElement>}
             type="color"
+            className="w-full px-2 appearance-none outline-none border-none"
             defaultValue={unwrapped as string}
             onKeyDown={onKeydown}
             onBlur={onBlur}
@@ -610,7 +622,6 @@ function FieldEditCell(props: RenderEditCellProps<GFResponseRow>) {
           </div>
         );
       }
-      case "toggle":
       case "switch":
       case "checkbox": {
         return (
@@ -625,7 +636,6 @@ function FieldEditCell(props: RenderEditCellProps<GFResponseRow>) {
           </div>
         );
       }
-      case "toggle-group":
       case "radio":
       case "select":
         return <JsonEditCell {...props} />;
@@ -633,13 +643,12 @@ function FieldEditCell(props: RenderEditCellProps<GFResponseRow>) {
       case "checkboxes":
       case "signature":
       case "payment":
+      default:
         return (
           <div className="px-2 w-full text-muted-foreground">
             Editing not supported
           </div>
         );
-      default:
-        return <JsonEditCell {...props} />;
     }
   } catch (e) {
     console.error(e);

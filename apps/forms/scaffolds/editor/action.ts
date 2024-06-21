@@ -3,6 +3,8 @@ import {
   FormFieldDefinition,
   FormFieldInit,
   FormResponse,
+  FormResponseField,
+  FormResponseWithFields,
 } from "@/types";
 import type { EditorFlatFormBlock, FormEditorState } from "./state";
 import type { JSONConditionExpression } from "@/types/logic";
@@ -142,7 +144,7 @@ export interface DeleteFieldAction {
 
 export interface FeedResponseAction {
   type: "editor/response/feed";
-  data: FormResponse[];
+  data: FormResponseWithFields[];
   reset?: boolean;
 }
 

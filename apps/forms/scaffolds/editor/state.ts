@@ -5,6 +5,7 @@ import type {
   FormBlockType,
   FormFieldDefinition,
   FormResponse,
+  FormResponseField,
   FormResponseSession,
   GridaSupabase,
 } from "@/types";
@@ -49,6 +50,10 @@ export function initialFormEditorState(init: FormEditorInit): FormEditorState {
     page_id: init.page_id,
     blocks: blockstreeflat(init.blocks),
     fields: init.fields,
+    responses: {
+      rows: [],
+      fields: {},
+    },
     selected_responses: new Set(),
     available_field_ids: block_available_field_ids,
     datagrid_rows: 100,
@@ -86,9 +91,11 @@ export interface FormEditorState {
   focus_customer_id?: string;
   focus_block_id?: string;
   available_field_ids: string[];
-  responses?: FormResponse[];
+  responses: {
+    rows: FormResponse[];
+    fields: { [key: string]: FormResponseField[] };
+  };
   selected_responses: Set<string>;
-  // TODO: add effect on this value to update responses
   sessions?: FormResponseSession[];
   datagrid_rows: number;
   datagrid_table: "response" | "session";

@@ -7,7 +7,12 @@ import { createClientFormsClient } from "@/lib/supabase/client";
 import { RealtimePostgresChangesPayload } from "@supabase/supabase-js";
 import useSWR from "swr";
 import type { EditorApiResponse } from "@/types/private/api";
-import type { FormResponse, FormResponseField } from "@/types";
+import type {
+  FormResponse,
+  FormResponseField,
+  FormResponseWithFields,
+} from "@/types";
+import { usePrevious } from "@uidotdev/usehooks";
 
 type RealtimeTableChangeData = {
   id: string;
@@ -64,6 +69,79 @@ const useSubscription = ({
     };
   }, [supabase, form_id, table, enabled, onInsert, onDelete]);
 };
+
+export function ResponseSyncProvider({
+  children,
+}: React.PropsWithChildren<{}>) {
+  const [state] = useEditorState();
+  const supabase = useMemo(() => createClientFormsClient(), []);
+  const prev = usePrevious(state.responses);
+
+  const sync = useCallback(
+    async (id: string, payload: { value: any; option_id?: string }) => {
+      const { data, error } = await supabase
+        .from("response_field")
+        .update({
+          // TODO:
+          value: payload.value,
+          form_field_option_id: payload.option_id,
+          updated_at: new Date().toISOString(),
+          // 'storage_object_paths': []
+        })
+        .eq("id", id)
+        .select()
+        .single();
+
+      if (error || !data) {
+        throw new Error();
+      }
+
+      return data;
+    },
+    [supabase]
+  );
+
+  useEffect(() => {
+    //
+
+    Object.keys(state.responses.fields).forEach((key) => {
+      const fields = state.responses.fields[key];
+
+      // - if field id is draft and value is not empty, create a new response field - we don't handle this case - there will be no empty cells (db trigger)
+      // - if field id is not draft and value is updated, update the response field
+      // - we don't handle delete since field can't be deleted individually (deletes when row deleted)
+
+      for (const cell of fields) {
+        const prevField = prev?.fields[key]?.find(
+          (f: FormResponseField) => f.id === cell.id
+        );
+
+        if (prevField) {
+          // check if field value is updated
+          if (prevField.value !== cell.value) {
+            const _ = sync(cell.id, { value: cell.value });
+
+            toast
+              .promise(_, {
+                loading: "Updating...",
+                success: "Updated",
+                error: "Failed",
+              })
+              .then((data) => {
+                // TODO:
+                // update state (although its already updated, but let's update it again with db response - triggers & other metadata)
+              })
+              .catch((error) => {
+                // else revert the change
+              });
+          }
+        }
+      }
+    });
+  }, [prev?.fields, state.responses, sync]);
+
+  return <>{children}</>;
+}
 
 export function ResponseFeedProvider({
   children,
@@ -300,7 +378,7 @@ export function XSupabaseMainTableFeedProvider({
               storage_object_paths: null,
             } satisfies FormResponseField;
           }),
-        } satisfies FormResponse;
+        } satisfies FormResponseWithFields;
       });
 
       console.log("XSupabaseMainTableFeedProvider", data);

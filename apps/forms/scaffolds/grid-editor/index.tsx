@@ -83,7 +83,7 @@ export function GridEditor() {
       table: datagrid_table,
       fields: fields,
       filter: datagrid_filter,
-      responses: responses ?? [],
+      responses: responses,
       sessions: sessions ?? [],
     });
   }, [datagrid_table, sessions, fields, responses, datagrid_filter]);

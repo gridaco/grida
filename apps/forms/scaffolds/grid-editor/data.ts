@@ -19,7 +19,10 @@ export namespace GridData {
       }
     | {
         table: "response";
-        responses: FormResponse[];
+        responses: {
+          rows: FormResponse[];
+          fields: { [key: string]: FormResponseField[] };
+        };
       }
   );
 
@@ -28,7 +31,10 @@ export namespace GridData {
       case "response":
         return data.responses
           ? rows_from_responses(
-              applyFilter(data.responses, data.filter),
+              data.responses,
+              // TODO:
+              // applyFilter(data.responses, data.filter),
+
               data.fields
             )
           : [];
@@ -43,11 +49,14 @@ export namespace GridData {
   }
 
   function rows_from_responses(
-    responses: FormResponse[],
+    responses: {
+      rows: FormResponse[];
+      fields: { [key: string]: FormResponseField[] };
+    },
     fields: FormFieldDefinition[]
   ) {
     return (
-      responses.map((response, index) => {
+      responses.rows.map((response, index) => {
         const row: GFResponseRow = {
           __gf_id: response.id,
           __gf_display_id: fmt_local_index(response.local_index),
@@ -57,7 +66,7 @@ export namespace GridData {
         }; // react-data-grid expects each row to have a unique 'id' property
 
         fields.forEach((field) => {
-          const responseField = response.fields?.find(
+          const responseField = responses.fields[response.id]?.find(
             (f) => f.form_field_id === field.id
           );
           row.fields[field.id] = {
