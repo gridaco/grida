@@ -31,7 +31,7 @@ export function Siebar() {
           </Link>
         </li>
         <li>
-          <Link href={`/d/${form_id}/data/responses`}>
+          <Link href={`/d/${form_id}/data/sessions`}>
             <SideNavItem>
               <Table2Icon className="w-4 h-4" />
               Sessions
@@ -39,15 +39,15 @@ export function Siebar() {
           </Link>
         </li>
         <li>
-          <Link href={`/d/${form_id}/data/responses`}>
+          <Link href={`/d/${form_id}/data/customers`}>
             <SideNavItem>
-              <Table2Icon className="w-4 h-4" />
+              <AvatarIcon className="w-4 h-4" />
               Customers
             </SideNavItem>
           </Link>
         </li>
         <li>
-          <Link href={`/d/${form_id}/data/responses`}>
+          <Link href={`/d/${form_id}/data/files`}>
             <SideNavItem>
               <FileIcon className="w-4 h-4" />
               Files
@@ -58,7 +58,7 @@ export function Siebar() {
           App / Campaign
         </label>
         <li>
-          <Link href={`/d/${form_id}/data/responses`}>
+          <Link href={`/`}>
             <SideNavItem>
               <TabletSmartphoneIcon className="w-4 h-4" />
               Main
@@ -69,7 +69,7 @@ export function Siebar() {
           Commerce
         </label>
         <li>
-          <Link href={`/d/${form_id}/data/orders`}>
+          <Link href={`/d/${form_id}/connect/commerce/orders`}>
             <SideNavItem>
               <ArchiveIcon />
               Orders
@@ -77,7 +77,7 @@ export function Siebar() {
           </Link>
         </li>
         <li>
-          <Link href={`/d/${form_id}/data/orders`}>
+          <Link href={`/d/${form_id}/connect/commerce/products`}>
             <SideNavItem>
               <ArchiveIcon />
               Inventory

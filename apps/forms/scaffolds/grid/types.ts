@@ -22,4 +22,14 @@ export type GFResponseRow = {
   fields: Record<string, GFResponseFieldData>;
 };
 
+export type CFCustomerRow = {
+  uid: string;
+  email: string | null;
+  // name: string;
+  phone: string | null;
+  // address: string;
+  created_at: string;
+  last_seen_at: string;
+};
+
 export type XSupabaseReferenceTableRow = GridaSupabase.SupabaseUser | any;
