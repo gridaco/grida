@@ -406,8 +406,6 @@ export function XSupabaseMainTableFeedProvider({
         } satisfies FormResponseWithFields;
       });
 
-      console.log("XSupabaseMainTableFeedProvider", data);
-
       dispatch({
         type: "editor/response/feed",
         data: data,
