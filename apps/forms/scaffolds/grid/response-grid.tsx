@@ -433,7 +433,7 @@ function FieldCell({ column, row }: RenderCellProps<GFResponseRow>) {
       return (
         <div className="w-full h-full p-2 flex gap-2 items-center">
           <div
-            className="aspect-square min-w-4 rounded bg-neutral-500"
+            className="aspect-square min-w-4 rounded bg-neutral-500 border border-ring"
             style={{ backgroundColor: unwrapped as string }}
           />
           <span>{unwrapped}</span>
@@ -696,7 +696,7 @@ function FieldEditCell(props: RenderEditCellProps<GFResponseRow>) {
       default:
         return (
           <div className="px-2 w-full text-muted-foreground">
-            Editing not supported
+            This field can&apos;t be edited
           </div>
         );
     }
