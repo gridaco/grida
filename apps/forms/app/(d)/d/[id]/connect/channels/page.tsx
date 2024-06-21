@@ -1,6 +1,6 @@
 "use client";
 
-import { BirdLogo } from "@/components/logos";
+import { BirdLogo, KakaoTalkLogo, WhatsAppLogo } from "@/components/logos";
 import Link from "next/link";
 import {
   PreferenceBody,
@@ -23,6 +23,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
 import {
+  EnvelopeClosedIcon,
   LightningBoltIcon,
   QuestionMarkCircledIcon,
 } from "@radix-ui/react-icons";
@@ -56,6 +57,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useState } from "react";
 import toast from "react-hot-toast";
 import React from "react";
+import { MessageCircleIcon } from "lucide-react";
 
 const SMS_DEFAULT_ORIGINATOR = process.env
   .NEXT_PUBLIC_BIRD_SMS_DEFAULT_ORIGINATOR as string;
@@ -86,6 +88,7 @@ export default function ConnectChannels({
             <PreferenceBoxHeader
               heading={
                 <>
+                  <MessageCircleIcon className="inline me-2 w-5 h-5 align-middle" />
                   SMS Notifications
                   <Badge variant="outline" className="ms-2 align-middle">
                     Add-on
@@ -136,7 +139,14 @@ export default function ConnectChannels({
             </PreferenceBody>
           </PreferenceBox>
           <PreferenceBox>
-            <PreferenceBoxHeader heading={<>Email Notifications</>} />
+            <PreferenceBoxHeader
+              heading={
+                <>
+                  <EnvelopeClosedIcon className="inline me-2 w-5 h-5 align-middle" />
+                  Email Notifications
+                </>
+              }
+            />
             <PreferenceBody>
               <div className="max-h-96 rounded-3xl border-4 overflow-hidden">
                 <MailAppFrame
@@ -210,6 +220,38 @@ export default function ConnectChannels({
                   </Select>
                 </div>
               </section>
+            </PreferenceBody>
+          </PreferenceBox>
+          <PreferenceBox>
+            <PreferenceBoxHeader
+              heading={
+                <>
+                  <WhatsAppLogo className="inline me-2 w-5 h-5 align-middle" />
+                  WhatsApp
+                  <Badge variant="outline" className="ms-2 align-middle">
+                    Add-on
+                  </Badge>
+                </>
+              }
+            />
+            <PreferenceBody>
+              Contact us to enable WhatsApp for your project.
+            </PreferenceBody>
+          </PreferenceBox>
+          <PreferenceBox>
+            <PreferenceBoxHeader
+              heading={
+                <>
+                  <KakaoTalkLogo className="inline me-2 w-5 h-5 align-middle" />
+                  Kakao Talk
+                  <Badge variant="outline" className="ms-2 align-middle">
+                    Enterprise
+                  </Badge>
+                </>
+              }
+            />
+            <PreferenceBody>
+              Contact us to enable Kakao Talk for your enterprise account.
             </PreferenceBody>
           </PreferenceBox>
         </SectorBlocks>
