@@ -52,7 +52,7 @@
     "@supabase/auth-helpers-nextjs": "^0.9.0",
     "@supabase/postgrest-js": "^1.15.5",
     "@supabase/ssr": "^0.1.0",
-    "@supabase/supabase-js": "^2.43.4",
+    "@supabase/supabase-js": "^2.43.5",
     "@tiptap/extension-mention": "^2.4.0",
     "@tiptap/pm": "^2.4.0",
     "@tiptap/react": "^2.4.0",
@@ -121,7 +121,7 @@
     "zod": "^3.23.8"
   },
   "devDependencies": {
-    "@supabase/storage-js": "^2.5.5",
+    "@supabase/storage-js": "^2.6.0",
     "@tailwindcss/typography": "^0.5.10",
     "@types/css-tree": "^2.3.1",
     "@types/geojson": "^7946.0.14",
