@@ -19,6 +19,7 @@ import {
 import {
   CreditCardIcon,
   FilePenLineIcon,
+  KeyRoundIcon,
   MapPinnedIcon,
   PhoneIcon,
 } from "lucide-react";
@@ -63,7 +64,7 @@ export function FormFieldTypeIcon({
     case "week":
       return <CalendarIcon {...props} />;
     case "password":
-      return <EyeClosedIcon {...props} />;
+      return <KeyRoundIcon {...props} />;
     case "color":
       return <ColorWheelIcon {...props} />;
     case "hidden":
