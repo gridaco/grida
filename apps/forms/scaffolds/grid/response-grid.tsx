@@ -42,6 +42,7 @@ import { toZonedTime } from "date-fns-tz";
 import { tztostr } from "../editor/symbols";
 import { mask } from "./mask";
 import toast from "react-hot-toast";
+import { FormValue } from "@/services/form";
 function rowKeyGetter(row: GFResponseRow) {
   return row.__gf_id;
 }
@@ -264,7 +265,7 @@ function FieldHeaderCell({
   return (
     <div className="flex items-center justify-between">
       <span className="flex items-center gap-2">
-        <FormFieldTypeIcon type={type} />
+        <FormFieldTypeIcon type={type} className="w-4 h-4" />
         <span className="font-normal">{name}</span>
       </span>
       <DropdownMenu modal={false}>
@@ -395,6 +396,14 @@ function FieldCell({ column, row }: RenderCellProps<GFResponseRow>) {
 
   const unwrapped = unwrapFeildValue(value, type as FormInputType);
 
+  if (unwrapped === null || unwrapped === "") {
+    return (
+      <span className="text-muted-foreground/50">
+        <Empty value={unwrapped} />
+      </span>
+    );
+  }
+
   switch (type as FormInputType) {
     case "switch":
     case "checkbox": {
@@ -445,6 +454,7 @@ function FieldEditCell(props: RenderEditCellProps<GFResponseRow>) {
   const { column, row } = props;
   const data = row.fields[column.key];
   const ref = useRef<HTMLInputElement | HTMLTextAreaElement>(null);
+  const wasEscPressed = useRef(false);
 
   useEffect(() => {
     if (ref.current) {
@@ -461,11 +471,40 @@ function FieldEditCell(props: RenderEditCellProps<GFResponseRow>) {
   ) => {
     if (e.key === "Enter") {
       const val = ref.current?.value;
-      onCommit(val);
+      onCommit(e);
+    }
+    if (e.key === "Escape") {
+      wasEscPressed.current = true;
     }
   };
 
-  const onCommit = (val: any) => {
+  const onBlur = (
+    e: React.FocusEvent<HTMLInputElement | HTMLTextAreaElement>
+  ) => {
+    if (!wasEscPressed.current) {
+      const val = ref.current?.value;
+      onCommit(e);
+    } else {
+      wasEscPressed.current = false;
+    }
+  };
+
+  const onCommit = (
+    e:
+      | React.KeyboardEvent<HTMLInputElement | HTMLTextAreaElement>
+      | React.FocusEvent<HTMLInputElement | HTMLTextAreaElement>
+  ) => {
+    let val: any = ref.current?.value;
+    switch (e.currentTarget.type) {
+      case "checkbox": {
+        val = (e.currentTarget as HTMLInputElement).checked;
+        break;
+      }
+      case "number":
+        val = parseFloat(val);
+        break;
+    }
+
     props.onRowChange(
       {
         ...row,
@@ -479,28 +518,26 @@ function FieldEditCell(props: RenderEditCellProps<GFResponseRow>) {
       },
       true
     );
-    // console.log(val);
-    // if (val !== undefined) {
-    //   props.onCommit({ ...data, value: val });
-    // }
   };
 
   try {
-    // FIXME: need investigation (case:FIELDVAL)
-    const unwrapped = value ? JSON.parse(value) : undefined;
+    const unwrapped = value ? unwrapFeildValue(value, type) : undefined;
+
     switch (type as FormInputType) {
       case "email":
       case "password":
       case "tel":
       case "url":
-      case "text": {
+      case "text":
+      case "hidden": {
         return (
           <input
             ref={ref as React.RefObject<HTMLInputElement>}
             type={type}
             className="w-full px-2 appearance-none outline-none border-none"
-            defaultValue={unwrapped}
+            defaultValue={unwrapped as string}
             onKeyDown={onKeydown}
+            onBlur={onBlur}
           />
         );
       }
@@ -509,8 +546,9 @@ function FieldEditCell(props: RenderEditCellProps<GFResponseRow>) {
           <textarea
             ref={ref as React.RefObject<HTMLTextAreaElement>}
             className="w-full px-2 appearance-none outline-none border-none"
-            defaultValue={unwrapped}
+            defaultValue={unwrapped as string}
             onKeyDown={onKeydown}
+            onBlur={onBlur}
           />
         );
       }
@@ -520,8 +558,9 @@ function FieldEditCell(props: RenderEditCellProps<GFResponseRow>) {
             ref={ref as React.RefObject<HTMLInputElement>}
             className="w-full px-2 appearance-none outline-none border-none"
             type="number"
-            defaultValue={unwrapped}
+            defaultValue={unwrapped as string | number}
             onKeyDown={onKeydown}
+            onBlur={onBlur}
           />
         );
       }
@@ -535,14 +574,20 @@ function FieldEditCell(props: RenderEditCellProps<GFResponseRow>) {
             ref={ref as React.RefObject<HTMLInputElement>}
             type={type}
             className="w-full px-2 appearance-none outline-none border-none"
-            defaultValue={unwrapped}
+            defaultValue={unwrapped as string}
             onKeyDown={onKeydown}
+            onBlur={onBlur}
           />
         );
       }
       case "color":
         return (
-          <input readOnly disabled type="color" defaultValue={unwrapped} />
+          <input
+            type="color"
+            defaultValue={unwrapped as string}
+            onKeyDown={onKeydown}
+            onBlur={onBlur}
+          />
         );
       case "file":
       case "image": {
@@ -573,19 +618,10 @@ function FieldEditCell(props: RenderEditCellProps<GFResponseRow>) {
             <input
               ref={ref as React.RefObject<HTMLInputElement>}
               type="checkbox"
-              defaultChecked={unwrapped}
+              defaultChecked={unwrapped === true}
+              onKeyDown={onKeydown}
+              onBlur={onBlur}
             />
-            <Button
-              size="sm"
-              variant="default"
-              onClick={() =>
-                onCommit(
-                  (ref as React.RefObject<HTMLInputElement>).current?.checked
-                )
-              }
-            >
-              Save
-            </Button>
           </div>
         );
       }
@@ -593,6 +629,15 @@ function FieldEditCell(props: RenderEditCellProps<GFResponseRow>) {
       case "radio":
       case "select":
         return <JsonEditCell {...props} />;
+      // not supported
+      case "checkboxes":
+      case "signature":
+      case "payment":
+        return (
+          <div className="px-2 w-full text-muted-foreground">
+            Editing not supported
+          </div>
+        );
       default:
         return <JsonEditCell {...props} />;
     }
@@ -600,4 +645,14 @@ function FieldEditCell(props: RenderEditCellProps<GFResponseRow>) {
     console.error(e);
     return <JsonEditCell {...props} />;
   }
+}
+
+function Empty({ value }: { value?: null | undefined | "" }) {
+  if (value === null) {
+    return <>NULL</>;
+  }
+  if (value === "") {
+    return <>EMPTY</>;
+  }
+  return <></>;
 }
