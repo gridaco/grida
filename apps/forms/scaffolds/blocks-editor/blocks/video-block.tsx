@@ -91,7 +91,7 @@ export function VideoBlock({
             placeholder="Video URL"
           />
         </div>
-        <div className="bg-neutral-200 dark:bg-neutral-800 rounded overflow-hidden border border-black/20 aspect-video">
+        <div className="bg-card rounded overflow-hidden border aspect-video">
           <ReactPlayer width={"100%"} height={"100%"} url={src ?? ""} />
         </div>
       </div>

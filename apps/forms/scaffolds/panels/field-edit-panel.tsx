@@ -421,7 +421,7 @@ export function FieldEditPanel({
         <PanelPropertySection>
           <PanelPropertySectionTitle>Preview</PanelPropertySectionTitle>
           <PanelPropertyFields>
-            <div className="relative w-full min-h-40 bg-neutral-200 dark:bg-neutral-800 rounded p-10 border border-black/20">
+            <div className="relative w-full min-h-40 bg-card rounded p-10 border">
               <form
                 onSubmit={(e) => {
                   e.preventDefault();
