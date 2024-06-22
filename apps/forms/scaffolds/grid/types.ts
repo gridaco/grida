@@ -7,15 +7,17 @@ export type GFResponseFieldData = {
   options?: {
     [key: string]: { value: string; label?: string };
   };
-  files?: {
-    src: string;
-    srcset: {
-      thumbnail: string;
-      original: string;
-    };
-    download: string;
-    name: string;
-  }[];
+  files?: GFFile[];
+};
+
+export type GFFile = {
+  src: string;
+  srcset: {
+    thumbnail: string;
+    original: string;
+  };
+  download: string;
+  name: string;
 };
 
 export type GFResponseRow = {

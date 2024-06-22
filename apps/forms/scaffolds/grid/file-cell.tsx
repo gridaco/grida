@@ -37,6 +37,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import type { GFFile } from "./types";
 import { useMediaViewer } from "../mediaviewer";
 
 export function FileEditCell({
@@ -53,6 +54,10 @@ export function FileEditCell({
   }[];
 }) {
   const { open } = useMediaViewer();
+
+  const openFullScreen = (f: GFFile) => {
+    open(f, "image/*");
+  };
 
   return (
     <Popover open>
@@ -78,7 +83,10 @@ export function FileEditCell({
                   <DragHandleDots2Icon />
                 </Button> */}
                 <div className="w-4" />
-                <figure className="flex-1 cursor-zoom-in">
+                <figure
+                  className="flex-1 cursor-zoom-in"
+                  onClick={() => openFullScreen(f)}
+                >
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={f.src}
@@ -108,7 +116,7 @@ export function FileEditCell({
                     <DropdownMenuContent className="min-w-40">
                       <DropdownMenuItem
                         onSelect={() => {
-                          open(f, "image/*");
+                          openFullScreen(f);
                         }}
                       >
                         <EnterFullScreenIcon className="me-2" />

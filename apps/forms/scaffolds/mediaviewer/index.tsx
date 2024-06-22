@@ -14,14 +14,20 @@ import {
   DialogClose,
   DialogOverlay,
 } from "@radix-ui/react-dialog";
-import { Cross2Icon } from "@radix-ui/react-icons";
+import {
+  Cross2Icon,
+  DownloadIcon,
+  ExitFullScreenIcon,
+} from "@radix-ui/react-icons";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/spinner";
+import { Menubar } from "@/components/ui/menubar";
 
 type MediaViewerAcceptedMimeTypes = "image/*" | "video/*" | "audio/*";
 
 type Src = {
   src: string;
+  download?: string;
   srcset?: {
     thumbnail: string;
     original: string;
@@ -107,6 +113,29 @@ export function MediaViewerProvider({ children }: MediaViewerProviderProps) {
                 </audio>
               )}
             </div>
+            <footer className="absolute bottom-4 left-4 right-4 flex items-center justify-center">
+              <Menubar>
+                <Button
+                  disabled={!mediaSrc?.download}
+                  onClick={() => {
+                    if (mediaSrc?.download) {
+                      window.open(mediaSrc.download, "_blank");
+                    }
+                  }}
+                  variant="ghost"
+                  size="icon"
+                >
+                  <DownloadIcon />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setIsOpen(false)}
+                >
+                  <ExitFullScreenIcon />
+                </Button>
+              </Menubar>
+            </footer>
           </DialogContent>
         </DialogPortal>
       </Dialog>
