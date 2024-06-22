@@ -50,6 +50,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { FileEditCell } from "./file-cell";
+
 function rowKeyGetter(row: GFResponseRow) {
   return row.__gf_id;
 }
@@ -628,24 +630,7 @@ function FieldEditCell(props: RenderEditCellProps<GFResponseRow>) {
         );
       case "file":
       case "image": {
-        return (
-          <div>
-            {files?.map((f, i) => (
-              <a
-                key={i}
-                href={f.download}
-                target="_blank"
-                rel="noreferrer"
-                download
-              >
-                <Button variant="link" size="sm">
-                  <DownloadIcon className="me-2 align-middle" />
-                  Download {f.name}
-                </Button>
-              </a>
-            ))}
-          </div>
-        );
+        return <FileEditCell files={files || []} />;
       }
       case "switch":
       case "checkbox": {
