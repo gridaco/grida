@@ -9,6 +9,10 @@ export type GFResponseFieldData = {
   };
   files?: {
     src: string;
+    srcset: {
+      thumbnail: string;
+      original: string;
+    };
     download: string;
     name: string;
   }[];

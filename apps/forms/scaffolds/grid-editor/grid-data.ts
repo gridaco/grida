@@ -94,6 +94,10 @@ export namespace GridData {
                 const name = path.split("/").pop() ?? "";
                 return {
                   src: src,
+                  srcset: {
+                    thumbnail: src,
+                    original: base,
+                  },
                   name,
                   download,
                 };

@@ -1,6 +1,12 @@
 "use client";
 
-import React, { createContext, useContext, useState, ReactNode } from "react";
+import React, {
+  createContext,
+  useContext,
+  useState,
+  ReactNode,
+  useEffect,
+} from "react";
 import {
   Dialog,
   DialogPortal,
@@ -10,11 +16,20 @@ import {
 } from "@radix-ui/react-dialog";
 import { Cross2Icon } from "@radix-ui/react-icons";
 import { Button } from "@/components/ui/button";
+import { Spinner } from "@/components/spinner";
 
 type MediaViewerAcceptedMimeTypes = "image/*" | "video/*" | "audio/*";
 
+type Src = {
+  src: string;
+  srcset?: {
+    thumbnail: string;
+    original: string;
+  };
+};
+
 interface MediaViewerContextType {
-  open: (src: string, type: MediaViewerAcceptedMimeTypes) => void;
+  open: (src: Src, type: MediaViewerAcceptedMimeTypes) => void;
   close: () => void;
 }
 
@@ -36,11 +51,11 @@ interface MediaViewerProviderProps {
 
 export function MediaViewerProvider({ children }: MediaViewerProviderProps) {
   const [isOpen, setIsOpen] = useState(false);
-  const [mediaSrc, setMediaSrc] = useState("");
+  const [mediaSrc, setMediaSrc] = useState<Src | undefined>(undefined);
   const [mediaType, setMediaType] =
     useState<MediaViewerAcceptedMimeTypes>("image/*");
 
-  const open = (src: string, type: MediaViewerAcceptedMimeTypes) => {
+  const open = (src: Src, type: MediaViewerAcceptedMimeTypes) => {
     setMediaSrc(src);
     setMediaType(type);
     setIsOpen(true);
@@ -62,17 +77,24 @@ export function MediaViewerProvider({ children }: MediaViewerProviderProps) {
               </Button>
             </DialogClose>
             <div className="w-full h-full p-10">
-              {mediaType.startsWith("image/") && (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={mediaSrc}
-                  alt="Media"
-                  className="w-full h-full object-contain"
-                />
-              )}
+              {mediaType.startsWith("image/") &&
+                (mediaSrc?.srcset ? (
+                  <ProgressiveImage
+                    smallSrc={mediaSrc.srcset.thumbnail}
+                    largeSrc={mediaSrc.srcset.original}
+                    alt=""
+                  />
+                ) : (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={mediaSrc?.src}
+                    alt="Media"
+                    className="w-full h-full object-contain"
+                  />
+                ))}
               {mediaType.startsWith("video/") && (
                 <video
-                  src={mediaSrc}
+                  src={mediaSrc?.src}
                   controls
                   className="max-w-full max-h-full"
                 >
@@ -80,7 +102,7 @@ export function MediaViewerProvider({ children }: MediaViewerProviderProps) {
                 </video>
               )}
               {mediaType.startsWith("audio/") && (
-                <audio src={mediaSrc} controls className="w-full">
+                <audio src={mediaSrc?.src} controls className="w-full">
                   Your browser does not support the audio tag.
                 </audio>
               )}
@@ -92,3 +114,55 @@ export function MediaViewerProvider({ children }: MediaViewerProviderProps) {
     </MediaViewerContext.Provider>
   );
 }
+
+const ProgressiveImage = ({
+  smallSrc,
+  largeSrc,
+  alt,
+}: {
+  smallSrc: string;
+  largeSrc: string;
+  alt: string;
+}) => {
+  const [src, setSrc] = useState(smallSrc);
+  const [isLoaded, setIsLoaded] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const img = new Image();
+    img.src = largeSrc;
+    img.onload = () => {
+      setSrc(largeSrc);
+      setIsLoaded(true);
+      setIsLoading(false);
+    };
+  }, [largeSrc]);
+
+  return (
+    <>
+      {isLoading && (
+        <div
+          style={{
+            position: "absolute",
+            top: "50%",
+            left: "50%",
+            transform: "translate(-50%, -50%)",
+            zIndex: 1,
+          }}
+        >
+          <Spinner />
+        </div>
+      )}
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={src}
+        alt={alt}
+        className="w-full h-full object-contain"
+        style={{
+          filter: isLoaded ? "none" : "blur(10px)",
+          transition: "filter 0.5s ease-in-out",
+        }}
+      />
+    </>
+  );
+};

@@ -44,6 +44,10 @@ export function FileEditCell({
 }: {
   files: {
     src: string;
+    srcset: {
+      thumbnail: string;
+      original: string;
+    };
     download: string;
     name: string;
   }[];
@@ -104,7 +108,7 @@ export function FileEditCell({
                     <DropdownMenuContent className="min-w-40">
                       <DropdownMenuItem
                         onSelect={() => {
-                          open(f.src, "image/*");
+                          open(f, "image/*");
                         }}
                       >
                         <EnterFullScreenIcon className="me-2" />
@@ -121,7 +125,11 @@ export function FileEditCell({
                           Download
                         </DropdownMenuItem>
                       </a>
-                      <a href={f.src} target="_blank" rel="noreferrer">
+                      <a
+                        href={f.srcset.original}
+                        target="_blank"
+                        rel="noreferrer"
+                      >
                         <DropdownMenuItem>
                           <OpenInNewWindowIcon className="me-2" />
                           View Original
