@@ -39,10 +39,20 @@ import {
 } from "@/components/ui/alert-dialog";
 import type { GFFile } from "./types";
 import { useMediaViewer } from "../mediaviewer";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { useState } from "react";
 
 export function FileEditCell({
+  accept,
+  multiple,
   files,
 }: {
+  accept?: string;
+  multiple?: boolean;
   files: {
     src: string;
     srcset: {
@@ -53,11 +63,13 @@ export function FileEditCell({
     name: string;
   }[];
 }) {
-  const { open } = useMediaViewer();
+  const { open: openMediaViewer } = useMediaViewer();
 
-  const openFullScreen = (f: GFFile) => {
-    open(f, "image/*");
+  const onEnterFullScreen = (f: GFFile) => {
+    openMediaViewer(f, "image/*");
   };
+
+  const canAddNewFile = multiple || files?.length === 0;
 
   return (
     <Popover open>
@@ -85,7 +97,7 @@ export function FileEditCell({
                 <div className="w-4" />
                 <figure
                   className="flex-1 cursor-zoom-in"
-                  onClick={() => openFullScreen(f)}
+                  onClick={() => onEnterFullScreen(f)}
                 >
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
@@ -116,7 +128,7 @@ export function FileEditCell({
                     <DropdownMenuContent className="min-w-40">
                       <DropdownMenuItem
                         onSelect={() => {
-                          openFullScreen(f);
+                          onEnterFullScreen(f);
                         }}
                       >
                         <EnterFullScreenIcon className="me-2" />
@@ -143,7 +155,7 @@ export function FileEditCell({
                           View Original
                         </DropdownMenuItem>
                       </a>
-                      <DropdownMenuItem>
+                      {/* <DropdownMenuItem>
                         <ReloadIcon className="me-2" />
                         Replace
                       </DropdownMenuItem>
@@ -154,7 +166,7 @@ export function FileEditCell({
                             Delete
                           </button>
                         </AlertDialogTrigger>
-                      </DropdownMenuItem>
+                      </DropdownMenuItem> */}
                     </DropdownMenuContent>
                   </DropdownMenu>
                   <AlertDialogContent>
@@ -183,10 +195,24 @@ export function FileEditCell({
           <footer className="p-2 border-t">
             <Popover>
               <PopoverTrigger asChild>
-                <Button variant="outline" size="sm" className="w-full">
-                  <PlusIcon className="me-2" />
-                  Add File
-                </Button>
+                <Tooltip>
+                  <TooltipTrigger className="w-full">
+                    <Button
+                      disabled={!canAddNewFile}
+                      variant="outline"
+                      size="sm"
+                      className="w-full"
+                    >
+                      <PlusIcon className="me-2" />
+                      Add File
+                    </Button>
+                  </TooltipTrigger>
+                  {!canAddNewFile && (
+                    <TooltipContent>
+                      multiple is set to false, only one file is allowed.
+                    </TooltipContent>
+                  )}
+                </Tooltip>
               </PopoverTrigger>
               <PopoverContent>upload here</PopoverContent>
             </Popover>
