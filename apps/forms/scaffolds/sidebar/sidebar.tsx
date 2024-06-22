@@ -69,7 +69,7 @@ export function Siebar() {
           Commerce
         </label>
         <li>
-          <Link href={`/d/${form_id}/connect/commerce/orders`}>
+          <Link href={`/d/${form_id}/connect/store/orders`}>
             <SideNavItem>
               <ArchiveIcon />
               Orders
@@ -77,7 +77,7 @@ export function Siebar() {
           </Link>
         </li>
         <li>
-          <Link href={`/d/${form_id}/connect/commerce/products`}>
+          <Link href={`/d/${form_id}/connect/store/products`}>
             <SideNavItem>
               <ArchiveIcon />
               Inventory
