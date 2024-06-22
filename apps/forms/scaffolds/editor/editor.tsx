@@ -11,8 +11,9 @@ import { TooltipProvider } from "@radix-ui/react-tooltip";
 import { ResponseEditPanel } from "../panels/response-edit-panel";
 import { fmt_local_index } from "@/utils/fmt";
 import { CustomerEditPanel } from "../panels/customer-panel";
-import toast from "react-hot-toast";
 import { BlockEditPanel } from "../panels/block-edit-panel";
+import { MediaViewerProvider } from "../mediaviewer";
+import toast from "react-hot-toast";
 
 export function FormEditorProvider({
   initial,
@@ -26,11 +27,13 @@ export function FormEditorProvider({
   return (
     <StateProvider state={state} dispatch={dispatch}>
       <TooltipProvider>
-        <BlockEditPanel />
-        <FieldEditPanelProvider />
-        <ResponseEditPanelProvider />
-        <CustomerPanelProvider />
-        {children}
+        <MediaViewerProvider>
+          <BlockEditPanel />
+          <FieldEditPanelProvider />
+          <ResponseEditPanelProvider />
+          <CustomerPanelProvider />
+          {children}
+        </MediaViewerProvider>
       </TooltipProvider>
     </StateProvider>
   );

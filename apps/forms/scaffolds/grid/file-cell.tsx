@@ -37,6 +37,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import { useMediaViewer } from "../mediaviewer";
 
 export function FileEditCell({
   files,
@@ -47,6 +48,8 @@ export function FileEditCell({
     name: string;
   }[];
 }) {
+  const { open } = useMediaViewer();
+
   return (
     <Popover open>
       <PopoverTrigger asChild>
@@ -99,7 +102,11 @@ export function FileEditCell({
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent className="min-w-40">
-                      <DropdownMenuItem>
+                      <DropdownMenuItem
+                        onSelect={() => {
+                          open(f.src, "image/*");
+                        }}
+                      >
                         <EnterFullScreenIcon className="me-2" />
                         Full Screen
                       </DropdownMenuItem>
