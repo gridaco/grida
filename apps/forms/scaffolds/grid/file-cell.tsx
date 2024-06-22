@@ -45,12 +45,15 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { useState } from "react";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 export function FileEditCell({
+  type,
   accept,
   multiple,
   files,
 }: {
+  type: "image" | "file";
   accept?: string;
   multiple?: boolean;
   files: {
@@ -72,9 +75,9 @@ export function FileEditCell({
   const canAddNewFile = multiple || files?.length === 0;
 
   return (
-    <Popover open>
+    <Popover open modal>
       <PopoverTrigger asChild>
-        <button className="w-full h-full" />
+        <button className="w-full h-full max-w-sm" />
       </PopoverTrigger>
       <PopoverContent
         side="bottom"
@@ -82,80 +85,103 @@ export function FileEditCell({
         sideOffset={-44}
         className="min-w-[--radix-popover-trigger-width] max-w-sm max-h-[--radix-popover-content-available-height] p-0"
       >
-        <div>
-          <div className="flex flex-col gap-2">
-            {files?.map((f, i) => (
-              <div
-                //
-                className="flex items-start hover:bg-secondary rounded "
-                key={i}
-              >
-                {/* TODO: dnd & sort */}
-                {/* <Button variant="ghost" size="icon" className="cursor-move">
+        <div className="">
+          <ScrollArea>
+            <div className="max-h-[500px] flex flex-col gap-2">
+              {files?.map((f, i) => (
+                <div
+                  //
+                  className="flex items-start hover:bg-secondary rounded"
+                  key={i}
+                >
+                  {/* TODO: dnd & sort */}
+                  {/* <Button variant="ghost" size="icon" className="cursor-move">
                   <DragHandleDots2Icon />
                 </Button> */}
-                <div className="w-4" />
-                <figure
-                  className="flex-1 cursor-zoom-in"
-                  onClick={() => onEnterFullScreen(f)}
-                >
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={f.src}
-                    alt={f.name}
-                    className="w-full h-full object-fit"
-                  />
-                  <figcaption className="py-2 text-xs text-muted-foreground">
-                    <a
-                      href={f.download}
-                      target="_blank"
-                      rel="noreferrer"
-                      download
-                      className="hover:underline"
-                    >
-                      <DownloadIcon className="inline align-middle me-1" />
-                      {f.name}
-                    </a>
-                  </figcaption>
-                </figure>
-                <AlertDialog>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="icon">
-                        <DotsHorizontalIcon />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent className="min-w-40">
-                      <DropdownMenuItem
-                        onSelect={() => {
-                          onEnterFullScreen(f);
-                        }}
+                  <div className="w-4" />
+                  {type === "image" ? (
+                    <>
+                      <figure
+                        className="flex-1 cursor-zoom-in  py-4"
+                        onClick={() => onEnterFullScreen(f)}
                       >
-                        <EnterFullScreenIcon className="me-2" />
-                        Full Screen
-                      </DropdownMenuItem>
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={f.src}
+                          alt={f.name}
+                          className="w-full h-full object-fit"
+                        />
+                        <figcaption className="py-2 text-xs text-muted-foreground">
+                          <a
+                            href={f.download}
+                            target="_blank"
+                            rel="noreferrer"
+                            download
+                            className="hover:underline"
+                          >
+                            <DownloadIcon className="inline align-middle me-1" />
+                            {f.name}
+                          </a>
+                        </figcaption>
+                      </figure>
+                    </>
+                  ) : (
+                    <div className="flex-1 flex h-10 items-center ">
                       <a
                         href={f.download}
                         target="_blank"
                         rel="noreferrer"
                         download
+                        className="hover:underline"
                       >
-                        <DropdownMenuItem>
-                          <DownloadIcon className="me-2" />
-                          Download
-                        </DropdownMenuItem>
+                        <span
+                          key={i}
+                          className="cursor-pointer hover:underline text-sm"
+                        >
+                          <FileIcon className="inline w-4 h-4 align-middle me-2" />
+                          {f.name}
+                        </span>
                       </a>
-                      <a
-                        href={f.srcset.original}
-                        target="_blank"
-                        rel="noreferrer"
-                      >
-                        <DropdownMenuItem>
-                          <OpenInNewWindowIcon className="me-2" />
-                          View Original
+                    </div>
+                  )}
+                  <AlertDialog>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon">
+                          <DotsHorizontalIcon />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent className="min-w-40">
+                        <DropdownMenuItem
+                          onSelect={() => {
+                            onEnterFullScreen(f);
+                          }}
+                        >
+                          <EnterFullScreenIcon className="me-2" />
+                          Full Screen
                         </DropdownMenuItem>
-                      </a>
-                      {/* <DropdownMenuItem>
+                        <a
+                          href={f.download}
+                          target="_blank"
+                          rel="noreferrer"
+                          download
+                        >
+                          <DropdownMenuItem>
+                            <DownloadIcon className="me-2" />
+                            Download
+                          </DropdownMenuItem>
+                        </a>
+                        <a
+                          href={f.srcset.original}
+                          target="_blank"
+                          rel="noreferrer"
+                        >
+                          <DropdownMenuItem>
+                            <OpenInNewWindowIcon className="me-2" />
+                            View Original
+                          </DropdownMenuItem>
+                        </a>
+                        {/* <DropdownMenuItem>
                         <ReloadIcon className="me-2" />
                         Replace
                       </DropdownMenuItem>
@@ -167,31 +193,32 @@ export function FileEditCell({
                           </button>
                         </AlertDialogTrigger>
                       </DropdownMenuItem> */}
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                  <AlertDialogContent>
-                    <AlertDialogHeader>
-                      <AlertDialogTitle>
-                        Are you sure you want to delete this file?
-                      </AlertDialogTitle>
-                      <AlertDialogDescription>
-                        This action cannot be undone.
-                      </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                      <AlertDialogCancel>Cancel</AlertDialogCancel>
-                      <AlertDialogAction
-                        className={buttonVariants({ variant: "destructive" })}
-                      >
-                        <TrashIcon className="inline me-2" />
-                        Delete
-                      </AlertDialogAction>
-                    </AlertDialogFooter>
-                  </AlertDialogContent>
-                </AlertDialog>
-              </div>
-            ))}
-          </div>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>
+                          Are you sure you want to delete this file?
+                        </AlertDialogTitle>
+                        <AlertDialogDescription>
+                          This action cannot be undone.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction
+                          className={buttonVariants({ variant: "destructive" })}
+                        >
+                          <TrashIcon className="inline me-2" />
+                          Delete
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                </div>
+              ))}
+            </div>
+          </ScrollArea>
           <footer className="p-2 border-t">
             <Popover>
               <PopoverTrigger asChild>

@@ -3,6 +3,7 @@ import type { FormInputType, GridaSupabase } from "@/types";
 export type GFResponseFieldData = {
   type?: FormInputType;
   value: any;
+  multiple?: boolean;
   option_id?: string | null;
   options?: {
     [key: string]: { value: string; label?: string };
