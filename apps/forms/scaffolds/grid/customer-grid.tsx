@@ -1,27 +1,48 @@
 "use client";
 
 import React from "react";
-import DataGrid, { Column, RenderCellProps } from "react-data-grid";
+import DataGrid, {
+  Column,
+  RenderCellProps,
+  RenderHeaderCellProps,
+} from "react-data-grid";
 import { CFCustomerRow } from "./types";
 import { EmptyRowsRenderer } from "./empty";
 import "./grid.css";
+import { CalendarIcon, EnvelopeClosedIcon } from "@radix-ui/react-icons";
+import { PhoneIcon } from "lucide-react";
 
 export function CustomerGrid({
-  columns: _columns,
   rows: _rows,
   rowKey,
   onSelected,
 }: {
-  columns: {
-    key: string;
-    name: string;
-    type?: string;
-  }[];
   rows: CFCustomerRow[];
   rowKey?: string;
   onSelected?: (key: string, row: CFCustomerRow) => void;
 }) {
-  const columns = _columns.map(
+  const columns = [
+    {
+      key: "uid",
+      name: "ID",
+    },
+    {
+      key: "email",
+      name: "Email",
+    },
+    {
+      key: "phone",
+      name: "Phone",
+    },
+    {
+      key: "created_at",
+      name: "Created At",
+    },
+    {
+      key: "last_seen_at",
+      name: "Last Seen At",
+    },
+  ].map(
     (col) =>
       ({
         key: col.key,
@@ -31,6 +52,7 @@ export function CustomerGrid({
         editable: false,
         // frozen: col.key === rowKey,
         width: undefined,
+        renderHeaderCell: HeaderCell,
       }) as Column<any>
   );
 
@@ -55,4 +77,38 @@ export function CustomerGrid({
       rowHeight={44}
     />
   );
+}
+
+function HeaderCell({ column }: RenderHeaderCellProps<any>) {
+  const { name, key } = column;
+
+  return (
+    <div className="flex items-center gap-2">
+      <CustomerPropertyIcon property={key as any} className="w-4 h-4" />
+      <span className="font-normal">{name}</span>
+    </div>
+  );
+}
+
+function CustomerPropertyIcon({
+  property,
+  className,
+}: {
+  property: "email" | "phone" | "created_at" | "last_seen_at";
+  className?: string;
+}) {
+  const props = {
+    className: className,
+  };
+  switch (property) {
+    case "email":
+      return <EnvelopeClosedIcon {...props} />;
+    case "phone":
+      return <PhoneIcon {...props} />;
+    case "created_at":
+    case "last_seen_at":
+      return <CalendarIcon {...props} />;
+    default:
+      return <></>;
+  }
 }

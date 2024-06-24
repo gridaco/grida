@@ -39,34 +39,26 @@ export function Siebar() {
             </SideNavItem>
           </Link>
         </li>
-        <li>
+        {/* <li>
           <Link href={`/d/${form_id}/data/files`}>
             <SideNavItem>
               <FileIcon className="w-4 h-4" />
               Files
             </SideNavItem>
           </Link>
-        </li>
-        <li>
-          <Link href={`/d/${form_id}/data/analytics`}>
-            <SideNavItem>
-              <PieChartIcon className="w-4 h-4" />
-              Realtime
-            </SideNavItem>
-          </Link>
-        </li>
+        </li> */}
         <label className="text-xs text-muted-foreground py-4 px-4">
           App / Campaign
         </label>
         <li>
-          <Link href={`/`}>
+          <Link href={`/d/${form_id}/blocks`}>
             <SideNavItem>
               <TabletSmartphoneIcon className="w-4 h-4" />
               Main
             </SideNavItem>
           </Link>
         </li>
-        <label className="text-xs text-muted-foreground py-4 px-4">
+        {/* <label className="text-xs text-muted-foreground py-4 px-4">
           Commerce
         </label>
         <li>
@@ -82,6 +74,17 @@ export function Siebar() {
             <SideNavItem>
               <ArchiveIcon />
               Inventory
+            </SideNavItem>
+          </Link>
+        </li> */}
+        <label className="text-xs text-muted-foreground py-4 px-4">
+          Analytics
+        </label>
+        <li>
+          <Link href={`/d/${form_id}/data/analytics`}>
+            <SideNavItem>
+              <PieChartIcon className="w-4 h-4" />
+              Realtime
             </SideNavItem>
           </Link>
         </li>
