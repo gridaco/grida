@@ -3,16 +3,9 @@
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import {
-  Popover,
-  PopoverTrigger,
-  PopoverContent,
-} from "@/components/ui/popover";
-import {
   CalendarIcon,
-  ChatBubbleIcon,
   EnvelopeClosedIcon,
   GitHubLogoIcon,
-  QuestionMarkCircledIcon,
   QuestionMarkIcon,
 } from "@radix-ui/react-icons";
 import {
@@ -23,6 +16,42 @@ import {
 } from "@/components/ui/dropdown-menu";
 import Link from "next/link";
 import { SlackIcon } from "lucide-react";
+import { useState } from "react";
+import Head from "next/head";
+
+function AnimatedAvatar() {
+  const [isHovered, setIsHovered] = useState(false);
+  return (
+    <>
+      <Head>
+        <link
+          rel="preload"
+          href="/images/customer-support-ceo-wink.png"
+          as="image"
+        />
+        <link
+          rel="preload"
+          href="/images/customer-support-ceo.png"
+          as="image"
+        />
+      </Head>
+      <Image
+        priority
+        src={
+          isHovered
+            ? "/images/customer-support-ceo-wink.png"
+            : "/images/customer-support-ceo.png"
+        }
+        width={400}
+        height={400}
+        alt="customer-support-hi"
+        className="w-32 h-32 rounded-lg object-cover border shadow"
+        onMouseEnter={() => setIsHovered(true)}
+        onMouseLeave={() => setIsHovered(false)}
+      />
+    </>
+  );
+}
 
 export function EditorHelpFab() {
   return (
@@ -40,13 +69,7 @@ export function EditorHelpFab() {
           className="max-w-sm overflow-hidden"
         >
           <div className="m-2 p-4 flex flex-col justify-center items-center text-center mb-4 gap-4 rounded">
-            <Image
-              src="/images/customer-support-ceo.png"
-              width={200}
-              height={400}
-              alt="customer-support-hi"
-              className="w-32 h-32 rounded-lg object-cover border shadow"
-            />
+            <AnimatedAvatar />
             <article className="prose prose-sm dark:prose-invert">
               <p>
                 👋 Hi! I&apos;m the CEO of Grida.
