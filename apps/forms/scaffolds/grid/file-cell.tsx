@@ -219,7 +219,7 @@ export function FileEditCell({
               ))}
             </div>
           </ScrollArea>
-          <footer className="p-2 border-t">
+          {/* <footer className="p-2 border-t">
             <Popover>
               <PopoverTrigger asChild>
                 <Tooltip>
@@ -243,7 +243,7 @@ export function FileEditCell({
               </PopoverTrigger>
               <PopoverContent>upload here</PopoverContent>
             </Popover>
-          </footer>
+          </footer> */}
         </div>
       </PopoverContent>
     </Popover>
