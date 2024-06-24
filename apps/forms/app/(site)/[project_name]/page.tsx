@@ -7,7 +7,11 @@ import {
   createServerComponentWorkspaceClient,
 } from "@/lib/supabase/server";
 import { GridaLogo } from "@/components/grida-logo";
-import { ViewGridIcon, ViewHorizontalIcon } from "@radix-ui/react-icons";
+import {
+  FileIcon,
+  ViewGridIcon,
+  ViewHorizontalIcon,
+} from "@radix-ui/react-icons";
 import { CreateNewFormButton } from "@/components/create-form-button";
 import { Form } from "@/types";
 import Image from "next/image";
@@ -138,7 +142,7 @@ function FormsGrid({
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
         {forms?.map((form, i) => (
           <Link key={i} href={`/d/${form.id}`} prefetch={false}>
-            <GridCard {...form} thumbnail="/assets/placeholder-image.png" />
+            <GridCard {...form} />
           </Link>
         ))}
       </div>
@@ -170,16 +174,22 @@ function GridCard({
   thumbnail,
   is_max_form_responses_in_total_enabled,
   max_form_responses_in_total,
-}: FormDashboardItem & { thumbnail: string }) {
+}: FormDashboardItem & { thumbnail?: string }) {
   return (
     <div className="rounded border border-neutral-500/10 bg-white dark:bg-neutral-900 shadow-md">
-      <Image
-        className="object-cover w-full h-full"
-        width={240}
-        height={300}
-        src={thumbnail}
-        alt="thumbnail"
-      />
+      {thumbnail ? (
+        <Image
+          className="object-cover w-full h-full"
+          width={240}
+          height={300}
+          src={thumbnail}
+          alt="thumbnail"
+        />
+      ) : (
+        <div className="p-2 aspect-square w-full flex items-center justify-center border-b">
+          <FileIcon className="w-10 h-10" />
+        </div>
+      )}
       <div className="px-4 py-2 flex flex-col gap-2">
         <span>{title}</span>
         <span className="text-xs opacity-50">
@@ -198,21 +208,28 @@ function GridCard({
 
 function RowCard({
   title,
+  thumbnail,
   responses,
   created_at,
   updated_at,
   is_max_form_responses_in_total_enabled,
   max_form_responses_in_total,
-}: FormDashboardItem) {
+}: FormDashboardItem & { thumbnail?: string }) {
   return (
     <div className="flex items-center border rounded-md overflow-hidden h-16 shadow bg-white dark:bg-neutral-900">
-      <Image
-        className="object-cover max-w-16 bg-neutral-500 aspect-square"
-        width={440}
-        height={440}
-        src={"/assets/placeholder-image.png"}
-        alt="thumbnail"
-      />
+      {thumbnail ? (
+        <Image
+          className="object-cover max-w-16 bg-neutral-500 aspect-square"
+          width={440}
+          height={440}
+          src={thumbnail}
+          alt="thumbnail"
+        />
+      ) : (
+        <div className="p-2 aspect-square h-full flex items-center justify-center border-r">
+          <FileIcon className="w-5 h-5" />
+        </div>
+      )}
       <div className="flex-1 px-6 font-medium text-gray-900 whitespace-nowrap dark:text-white">
         <div className="flex flex-col">
           <span>{title}</span>
