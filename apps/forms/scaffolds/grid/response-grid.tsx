@@ -84,7 +84,7 @@ export function ResponseGrid({
   ) => void;
 }) {
   const [state, dispatch] = useEditorState();
-  const { selected_responses } = state;
+  const { selected_rows: selected_responses } = state;
 
   const onSelectedRowsChange = (selectedRows: ReadonlySet<string>) => {
     dispatch({

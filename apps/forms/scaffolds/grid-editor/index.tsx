@@ -62,7 +62,7 @@ export function GridEditor() {
     sessions,
     datagrid_filter,
     datagrid_table,
-    selected_responses,
+    selected_rows: selected_responses,
   } = state;
   const supabase = createClientFormsClient();
 
@@ -264,7 +264,7 @@ function DeleteSelectedRowsButton() {
   const supabase = createClientFormsClient();
   const [state, dispatch] = useEditorState();
 
-  const { datagrid_table, selected_responses } = state;
+  const { datagrid_table, selected_rows: selected_responses } = state;
 
   const keyword = table_keyword(datagrid_table);
 
