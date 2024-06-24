@@ -446,25 +446,25 @@ export function reducer(
     case "editor/response/select": {
       const { selection } = <SelectResponse>action;
       return produce(state, (draft) => {
-        draft.selected_responses = new Set(selection);
+        draft.selected_rows = new Set(selection);
       });
     }
     case "editor/response/delete/selected": {
       const {} = <DeleteSelectedResponsesAction>action;
       return produce(state, (draft) => {
-        const ids = Array.from(state.selected_responses);
+        const ids = Array.from(state.selected_rows);
 
         draft.responses.rows = draft.responses.rows.filter(
           (response) => !ids.includes(response.id)
         );
 
         // also remove from selected_responses
-        const new_selected_responses = new Set(state.selected_responses);
+        const new_selected_responses = new Set(state.selected_rows);
         ids.forEach((id) => {
           new_selected_responses.delete(id);
         });
 
-        draft.selected_responses = new_selected_responses;
+        draft.selected_rows = new_selected_responses;
       });
     }
     case "editor/response/delete": {
@@ -475,10 +475,10 @@ export function reducer(
         );
 
         // also remove from selected_responses
-        const new_selected_responses = new Set(state.selected_responses);
+        const new_selected_responses = new Set(state.selected_rows);
         new_selected_responses.delete(id);
 
-        draft.selected_responses = new_selected_responses;
+        draft.selected_rows = new_selected_responses;
       });
     }
     case "editor/data-grid/rows": {

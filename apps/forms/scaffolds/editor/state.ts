@@ -54,7 +54,7 @@ export function initialFormEditorState(init: FormEditorInit): FormEditorState {
       rows: [],
       fields: {},
     },
-    selected_responses: new Set(),
+    selected_rows: new Set(),
     available_field_ids: block_available_field_ids,
     datagrid_rows: 100,
     dateformat: "datetime",
@@ -91,11 +91,11 @@ export interface FormEditorState {
   focus_customer_id?: string;
   focus_block_id?: string;
   available_field_ids: string[];
+  selected_rows: Set<string>;
   responses: {
     rows: FormResponse[];
     fields: { [key: string]: FormResponseField[] };
   };
-  selected_responses: Set<string>;
   sessions?: FormResponseSession[];
   datagrid_rows: number;
   datagrid_table: "response" | "session";

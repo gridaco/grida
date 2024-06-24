@@ -57,7 +57,8 @@ export default async function Customers({
             </TabsList>
           </Tabs> */}
           <h1 className="text-2xl font-bold p-4">
-            <small className="text-muted-foreground">
+            All Customers
+            <small className="ms-2 text-muted-foreground">
               ({customers.length})
             </small>
           </h1>

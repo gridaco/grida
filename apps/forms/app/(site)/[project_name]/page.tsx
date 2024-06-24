@@ -17,6 +17,8 @@ import { Form } from "@/types";
 import Image from "next/image";
 import { Metadata } from "next";
 import { ProjectStats } from "@/scaffolds/analytics/stats";
+import { EditorHelpFab } from "@/scaffolds/help/editor-help-fab";
+import { PoweredByGridaFooter } from "@/scaffolds/e/form/powered-by-brand-footer";
 
 export const revalidate = 0;
 
@@ -125,7 +127,10 @@ export default async function FormsDashboardPage({
       </section>
       <hr className="mb-10 mt-5 dark:border-neutral-700" />
       <FormsGrid forms={forms} layout={layout} />
-      <footer className="h-44" />
+      <footer className="mt-10 mb-5">
+        <PoweredByGridaFooter />
+      </footer>
+      <EditorHelpFab />
     </main>
   );
 }
