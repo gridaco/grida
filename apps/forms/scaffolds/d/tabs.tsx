@@ -13,7 +13,7 @@ export function Tabs({ form_id: id }: { form_id: string }) {
   const tab = pathname.split("/")[3];
 
   return (
-    <nav className="flex items-center justify-center gap-2">
+    <nav className="flex items-center justify-start md:justify-center gap-2">
       <Link href={`/d/${id}/data`} prefetch={false}>
         <Tab selected={tab === "data"}>Data</Tab>
       </Link>

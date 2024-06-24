@@ -9,6 +9,7 @@ import {
   CodeIcon,
   FileIcon,
   Link2Icon,
+  PieChartIcon,
 } from "@radix-ui/react-icons";
 import Link from "next/link";
 import { useEditorState } from "../editor";
@@ -31,14 +32,6 @@ export function Siebar() {
           </Link>
         </li>
         <li>
-          <Link href={`/d/${form_id}/data/sessions`}>
-            <SideNavItem>
-              <Table2Icon className="w-4 h-4" />
-              Sessions
-            </SideNavItem>
-          </Link>
-        </li>
-        <li>
           <Link href={`/d/${form_id}/data/customers`}>
             <SideNavItem>
               <AvatarIcon className="w-4 h-4" />
@@ -51,6 +44,14 @@ export function Siebar() {
             <SideNavItem>
               <FileIcon className="w-4 h-4" />
               Files
+            </SideNavItem>
+          </Link>
+        </li>
+        <li>
+          <Link href={`/d/${form_id}/data/analytics`}>
+            <SideNavItem>
+              <PieChartIcon className="w-4 h-4" />
+              Realtime
             </SideNavItem>
           </Link>
         </li>

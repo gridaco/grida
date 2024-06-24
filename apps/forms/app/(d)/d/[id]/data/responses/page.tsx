@@ -14,9 +14,9 @@ export default function FormResponsesPage() {
           <ResponseSessionFeedProvider>
             <div className="h-full flex flex-1 w-full">
               {/* side */}
-              {/* <aside className="hidden lg:flex h-full">
+              <aside className="hidden lg:flex h-full">
                 <Siebar />
-              </aside> */}
+              </aside>
               <div className="w-full h-full overflow-x-hidden">
                 <GridEditor />
               </div>
