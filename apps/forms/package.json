@@ -119,6 +119,7 @@
     "use-file-picker": "^2.1.1",
     "usehooks-ts": "^3.1.0",
     "uuid": "^9.0.1",
+    "validator": "^13.12.0",
     "zod": "^3.23.8"
   },
   "devDependencies": {
@@ -131,6 +132,7 @@
     "@types/react": "^18",
     "@types/react-dom": "^18",
     "@types/uuid": "^9.0.8",
+    "@types/validator": "^13.12.0",
     "autoprefixer": "^10.0.1",
     "eslint": "^8",
     "eslint-config-next": "14.2.3",
