@@ -26,7 +26,7 @@ import { SlackIcon } from "lucide-react";
 
 export function EditorHelpFab() {
   return (
-    <div className="absolute right-4 bottom-4">
+    <div className="fixed right-4 bottom-4">
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button className="rounded-full" size="icon">
