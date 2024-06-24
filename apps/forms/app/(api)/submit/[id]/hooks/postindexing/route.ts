@@ -1,4 +1,6 @@
 import { client, workspaceclient } from "@/lib/supabase/server";
+import { process_response_provisional_info } from "@/services/customer/utils";
+import { unique } from "@/utils/unique";
 import assert from "assert";
 import { notFound } from "next/navigation";
 import { NextRequest, NextResponse } from "next/server";
@@ -87,19 +89,18 @@ export async function POST(
     return NextResponse.error();
   }
 
-  const email_provisional = unique(
-    customer_prev.email_provisional.concat(provisionals.provisional_email)
-  );
-
-  const phone_provisional = unique(
-    customer_prev.phone_provisional.concat(provisionals.provisional_phone)
-  );
+  const { email_provisional, phone_provisional } =
+    process_response_provisional_info([response as any]);
 
   const { error } = await workspaceclient
     .from("customer")
     .update({
-      email_provisional: email_provisional,
-      phone_provisional: phone_provisional,
+      email_provisional: unique(
+        customer_prev.email_provisional.concat(email_provisional)
+      ),
+      phone_provisional: unique(
+        customer_prev.phone_provisional.concat(phone_provisional)
+      ),
     })
     .eq("uid", response.customer_id);
 
@@ -116,8 +117,4 @@ export async function POST(
       status: 200,
     }
   );
-}
-
-function unique<T>(arr: T[]): T[] {
-  return Array.from(new Set(arr));
 }
