@@ -72,6 +72,7 @@ export namespace GridData {
           row.fields[field.id] = {
             type: responseField?.type || field.type,
             value: responseField?.value || null,
+            multiple: field.multiple || false,
             option_id: responseField?.form_field_option_id,
             options: field.options?.reduce(
               (
@@ -94,6 +95,10 @@ export namespace GridData {
                 const name = path.split("/").pop() ?? "";
                 return {
                   src: src,
+                  srcset: {
+                    thumbnail: src,
+                    original: base,
+                  },
                   name,
                   download,
                 };

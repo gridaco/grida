@@ -1,4 +1,9 @@
-import { SupabaseLogo } from "@/components/logos";
+import {
+  StripeLogo1,
+  StripeLogo2,
+  SupabaseLogo,
+  TossLogo,
+} from "@/components/logos";
 import { SideNavBadge, SideNavItem } from "@/components/sidenav";
 import {
   ArchiveIcon,
@@ -58,11 +63,29 @@ export default function Layout({
           <li>
             <Link href={`/d/${id}/connect/database/supabase`}>
               <SideNavItem>
-                <SupabaseLogo size={15} />
+                <SupabaseLogo className="w-4 h-4" />
                 Supabase
                 <SideNavBadge>alpha</SideNavBadge>
               </SideNavItem>
             </Link>
+          </li>
+          <li>
+            {/* <Link href={`/d/${id}/connect/pg/stripe`}> */}
+            <SideNavItem disabled>
+              <StripeLogo1 className="w-4 h-4" />
+              Stripe
+              <SideNavBadge>soon</SideNavBadge>
+            </SideNavItem>
+            {/* </Link> */}
+          </li>
+          <li>
+            {/* <Link href={`/d/${id}/connect/pg/tosspayments`}> */}
+            <SideNavItem disabled>
+              <TossLogo className="w-4 h-4" />
+              Toss Payments
+              <SideNavBadge>soon</SideNavBadge>
+            </SideNavItem>
+            {/* </Link> */}
           </li>
           <li>
             {/* <Link href={`/d/${id}/connect/parameters`}> */}

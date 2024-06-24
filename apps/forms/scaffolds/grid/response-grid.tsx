@@ -50,6 +50,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { FileEditCell } from "./file-cell";
+
 function rowKeyGetter(row: GFResponseRow) {
   return row.__gf_id;
 }
@@ -456,14 +458,14 @@ function FieldCell({ column, row }: RenderCellProps<GFResponseRow>) {
       return (
         <div className="w-full h-full flex gap-2">
           {files?.map((file, i) => (
-            <figure className="p-1 flex items-center gap-2" key={i}>
+            <figure className="py-1 flex items-center gap-2" key={i}>
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={file.src}
                 alt={file.name}
                 className="h-full min-w-10 aspect-square rounded overflow-hidden object-cover bg-neutral-500"
               />
-              <figcaption>{file.name}</figcaption>
+              {/* <figcaption>{file.name}</figcaption> */}
             </figure>
           ))}
         </div>
@@ -495,7 +497,7 @@ function FieldEditCell(props: RenderEditCellProps<GFResponseRow>) {
     }
   }, [ref]);
 
-  const { type, value, option_id, options, files } = data ?? {};
+  const { type, value, option_id, multiple, options, files } = data ?? {};
 
   const onKeydown = (
     e: React.KeyboardEvent<HTMLInputElement | HTMLTextAreaElement>
@@ -629,22 +631,11 @@ function FieldEditCell(props: RenderEditCellProps<GFResponseRow>) {
       case "file":
       case "image": {
         return (
-          <div>
-            {files?.map((f, i) => (
-              <a
-                key={i}
-                href={f.download}
-                target="_blank"
-                rel="noreferrer"
-                download
-              >
-                <Button variant="link" size="sm">
-                  <DownloadIcon className="me-2 align-middle" />
-                  Download {f.name}
-                </Button>
-              </a>
-            ))}
-          </div>
+          <FileEditCell
+            type={type as "file" | "image"}
+            multiple={multiple}
+            files={files || []}
+          />
         );
       }
       case "switch":
