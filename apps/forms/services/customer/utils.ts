@@ -26,3 +26,11 @@ export function process_response_provisional_info(
     phone_provisional: unique(provisional_phone),
   };
 }
+
+export function provisional<T>(clear: T | null, provisional?: T[]): T[] {
+  if (clear) {
+    return [clear];
+  }
+
+  return provisional || [];
+}

@@ -5,6 +5,7 @@ import {
 } from "@/lib/supabase/server";
 import { CustomerGrid } from "@/scaffolds/grid/customer-grid";
 import { Siebar } from "@/scaffolds/sidebar/sidebar";
+import { provisional } from "@/services/customer/utils";
 import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
 
@@ -81,12 +82,4 @@ export default async function Customers({
       </div>
     </div>
   );
-}
-
-function provisional<T>(clear: T | null, provisional?: T[]): T[] {
-  if (clear) {
-    return [clear];
-  }
-
-  return provisional || [];
 }
