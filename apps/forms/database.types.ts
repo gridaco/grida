@@ -1852,10 +1852,13 @@ export type Database = {
           _fp_fingerprintjs_visitorid: string | null
           created_at: string
           email: string | null
+          email_provisional: string[]
           is_email_verified: boolean
           is_phone_verified: boolean
           last_seen_at: string
+          name_provisional: string[]
           phone: string | null
+          phone_provisional: string[]
           project_id: number
           uid: string
           uuid: string | null
@@ -1865,10 +1868,13 @@ export type Database = {
           _fp_fingerprintjs_visitorid?: string | null
           created_at?: string
           email?: string | null
+          email_provisional?: string[]
           is_email_verified?: boolean
           is_phone_verified?: boolean
           last_seen_at?: string
+          name_provisional?: string[]
           phone?: string | null
+          phone_provisional?: string[]
           project_id: number
           uid?: string
           uuid?: string | null
@@ -1878,10 +1884,13 @@ export type Database = {
           _fp_fingerprintjs_visitorid?: string | null
           created_at?: string
           email?: string | null
+          email_provisional?: string[]
           is_email_verified?: boolean
           is_phone_verified?: boolean
           last_seen_at?: string
+          name_provisional?: string[]
           phone?: string | null
+          phone_provisional?: string[]
           project_id?: number
           uid?: string
           uuid?: string | null
@@ -1907,18 +1916,21 @@ export type Database = {
       dummy: {
         Row: {
           created_at: string
+          data: Json | null
           id: number
           text: string
           user_id: string | null
         }
         Insert: {
           created_at?: string
+          data?: Json | null
           id?: number
           text: string
           user_id?: string | null
         }
         Update: {
           created_at?: string
+          data?: Json | null
           id?: number
           text?: string
           user_id?: string | null
@@ -2159,19 +2171,12 @@ export type Database = {
         }
         Returns: number[]
       }
-      is_organization_member:
-        | {
-            Args: {
-              project_id: number
-            }
-            Returns: boolean
-          }
-        | {
-            Args: {
-              project_id: number
-            }
-            Returns: boolean
-          }
+      is_organization_member: {
+        Args: {
+          project_id: number
+        }
+        Returns: boolean
+      }
       recursive_option_combinations:
         | {
             Args: {
