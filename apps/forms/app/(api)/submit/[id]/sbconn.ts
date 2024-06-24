@@ -84,10 +84,12 @@ function parseFormData(
         const { value } = FormValue.parse(formdata.get(key), { enums });
         if (format === "json" || format === "jsonb") {
           const flat = formdata_keys.reduce((acc: any, k) => {
-            if (k.startsWith(`${key}.`)) {
+            if (k.startsWith(`${key}.$.`)) {
+              // Convert 'field.$.a.b' to 'field.a.b' for unflatten to work correctly
+              const flatKey = k.replace(`${key}.$.`, `${key}.`);
               // TODO: need scalar type support
               const { value } = FormValue.parse(formdata.get(k), { enums });
-              acc[k] = value;
+              acc[flatKey] = value;
             }
             return acc;
           }, {});
