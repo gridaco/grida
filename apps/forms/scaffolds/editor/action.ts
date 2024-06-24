@@ -5,6 +5,7 @@ import {
   FormResponse,
   FormResponseField,
   FormResponseWithFields,
+  GridaSupabase,
 } from "@/types";
 import type { EditorFlatFormBlock, FormEditorState } from "./state";
 import type { JSONConditionExpression } from "@/types/logic";
@@ -42,7 +43,8 @@ export type BlocksEditorAction =
   | DataGridDateFormatAction
   | DataGridDateTZAction
   | DataGridFilterAction
-  | DataGridCellChangeAction;
+  | DataGridCellChangeAction
+  | FeedXSupabaseMainTableRowsAction;
 
 export interface CreateNewPendingBlockAction {
   type: "blocks/new";
@@ -225,4 +227,9 @@ export interface DataGridCellChangeAction {
   row: string;
   column: string;
   data: { value: any; option_id?: string | null };
+}
+
+export interface FeedXSupabaseMainTableRowsAction {
+  type: "editor/x-supabase/main-table/feed";
+  data: GridaSupabase.XDataRow[];
 }

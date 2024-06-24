@@ -62,6 +62,7 @@ export function GridEditor() {
     sessions,
     datagrid_filter,
     datagrid_table,
+    x_supabase_main_table,
     selected_rows: selected_responses,
   } = state;
   const supabase = createClientFormsClient();
@@ -86,8 +87,20 @@ export function GridEditor() {
       filter: datagrid_filter,
       responses: responses,
       sessions: sessions ?? [],
+      // TODO:
+      data: {
+        rows: x_supabase_main_table?.rows ?? [],
+        fields: {},
+      },
     });
-  }, [datagrid_table, sessions, fields, responses, datagrid_filter]);
+  }, [
+    datagrid_table,
+    sessions,
+    fields,
+    responses,
+    x_supabase_main_table,
+    datagrid_filter,
+  ]);
 
   const openNewFieldPanel = useCallback(() => {
     dispatch({
@@ -143,8 +156,8 @@ export function GridEditor() {
 
   const has_selected_responses = selected_responses.size > 0;
   const keyword = table_keyword(datagrid_table);
-  const selectionDisabled = datagrid_table !== "response"; // TODO: session does not support selection
-  const readonly = datagrid_table !== "response";
+  const selectionDisabled = datagrid_table === "session";
+  const readonly = datagrid_table === "session";
 
   return (
     <div className="flex flex-col h-full">
@@ -182,8 +195,16 @@ export function GridEditor() {
                   }}
                 >
                   <TabsList>
-                    <TabsTrigger value="response">Responses</TabsTrigger>
-                    <TabsTrigger value="session">Sessions</TabsTrigger>
+                    {state.tables.map((table) => {
+                      return (
+                        <TabsTrigger
+                          key={table.type + table.name}
+                          value={table.name}
+                        >
+                          {table.label}
+                        </TabsTrigger>
+                      );
+                    })}
                   </TabsList>
                 </Tabs>
               </div>
@@ -311,12 +332,16 @@ function DeleteSelectedRowsButton() {
   );
 }
 
-function table_keyword(table: "response" | "session") {
+function table_keyword(
+  table: "response" | "session" | "x-supabase-main-table"
+) {
   switch (table) {
     case "response":
       return "response";
     case "session":
       return "session";
+    case "x-supabase-main-table":
+      return "row";
   }
 }
 
@@ -470,7 +495,7 @@ function MaxRowsSelect() {
   return (
     <div>
       <Select
-        value={state.datagrid_rows + ""}
+        value={state.datagrid_rows_per_page + ""}
         onValueChange={(value) => {
           dispatch({
             type: "editor/data-grid/rows",

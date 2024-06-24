@@ -3,6 +3,8 @@ import type { ConnectionSupabaseJoint } from "./types";
 import type { User } from "@supabase/supabase-js";
 import type { Bucket } from "@supabase/storage-js";
 export namespace GridaSupabase {
+  export type XDataRow = Record<string, any>;
+
   export interface SupabaseProject {
     id: number;
     project_id: number;

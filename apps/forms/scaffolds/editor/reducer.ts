@@ -34,6 +34,7 @@ import {
   DataGridDateTZAction,
   DataGridFilterAction,
   DataGridCellChangeAction,
+  FeedXSupabaseMainTableRowsAction,
 } from "./action";
 import { arrayMove } from "@dnd-kit/sortable";
 import { blockstreeflat } from "@/lib/forms/tree";
@@ -484,7 +485,7 @@ export function reducer(
     case "editor/data-grid/rows": {
       const { rows: max } = <DataGridRowsAction>action;
       return produce(state, (draft) => {
-        draft.datagrid_rows = max;
+        draft.datagrid_rows_per_page = max;
       });
     }
     case "editor/response/feed": {
@@ -652,6 +653,17 @@ export function reducer(
           return f;
         });
       });
+    }
+    case "editor/x-supabase/main-table/feed": {
+      const { data } = <FeedXSupabaseMainTableRowsAction>action;
+
+      return produce(state, (draft) => {
+        draft.x_supabase_main_table = {
+          rows: data,
+        };
+        return;
+      });
+      //
     }
     default:
       return state;
