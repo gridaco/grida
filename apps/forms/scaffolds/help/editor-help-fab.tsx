@@ -39,13 +39,13 @@ export function EditorHelpFab() {
           sideOffset={10}
           className="max-w-sm overflow-hidden"
         >
-          <div className="m-2 p-4 flex flex-col justify-center items-center text-center mb-4 gap-4 border rounded">
+          <div className="m-2 p-4 flex flex-col justify-center items-center text-center mb-4 gap-4 rounded">
             <Image
               src="/images/customer-support-ceo.png"
               width={200}
               height={400}
               alt="customer-support-hi"
-              className="w-32 h-32 rounded-lg object-cover"
+              className="w-32 h-32 rounded-lg object-cover border shadow"
             />
             <article className="prose prose-sm dark:prose-invert">
               <p>
