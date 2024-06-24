@@ -687,8 +687,17 @@ async function submit({
         session_id: meta.session,
       });
     } catch (e) {
-      console.error("submit/err/hooks", e);
+      console.error("submit/err/hooks/clearsession", e);
     }
+  }
+
+  try {
+    OnSubmit.postindexing({
+      form_id,
+      response_id: response_reference_obj.id,
+    });
+  } catch (e) {
+    console.error("submit/err/hooks/postindexing", e);
   }
 
   // notification hooks are not ready yet
