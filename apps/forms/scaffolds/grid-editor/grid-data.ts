@@ -133,6 +133,19 @@ export namespace GridData {
             gfRow.fields[field.id] = {
               type: field.type,
               value: valuefn(row, field.name),
+              options: field.options?.reduce(
+                (
+                  acc: { [key: string]: { value: string; label?: string } },
+                  option
+                ) => {
+                  acc[option.id] = {
+                    value: option.value,
+                    label: option.label,
+                  };
+                  return acc;
+                },
+                {}
+              ),
             };
           });
           acc.push(gfRow);
