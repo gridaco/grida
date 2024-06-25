@@ -7,6 +7,7 @@ import {
 import { fmt_local_index } from "@/utils/fmt";
 import type { GFResponseRow } from "../grid/types";
 import type { DataGridFilterSettings } from "../editor/state";
+import { FlatPostgREST } from "@/lib/supabase-postgrest/flat";
 
 export namespace GridData {
   type DataGridInput = {
@@ -56,6 +57,13 @@ export namespace GridData {
           : [];
       }
       case "x-supabase-main-table": {
+        const valuefn = (row: any, fieldname: string) => {
+          if (FlatPostgREST.testPath(fieldname)) {
+            return FlatPostgREST.get(fieldname, row);
+          }
+          return row[fieldname];
+        };
+
         return input.data.rows.reduce((acc, row, index) => {
           // TODO: support multiple PKs
           const pk = input.data.pks.length > 0 ? input.data.pks[0] : null;
@@ -67,7 +75,7 @@ export namespace GridData {
           input.fields.forEach((field) => {
             gfRow.fields[field.id] = {
               type: field.type,
-              value: row[field.name],
+              value: valuefn(row, field.name),
             };
           });
           acc.push(gfRow);

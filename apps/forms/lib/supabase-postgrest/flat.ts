@@ -1,4 +1,8 @@
-import { flatten, unflatten as _unflatten, FlattenOptions } from "flat";
+import {
+  flatten as _flatten,
+  unflatten as _unflatten,
+  FlattenOptions,
+} from "flat";
 /**
  * Namespace FlatPostgREST
  *
@@ -60,23 +64,23 @@ export namespace FlatPostgREST {
     return POSTGREST_JSON_PATH_REGEX.test(path);
   }
 
-  export function decodePath(path: string): string {
+  export function decodePath(path: string): { column: string; path: string } {
     const match = POSTGREST_JSON_PATH_REGEX.exec(path);
     if (match) {
       // Remove the initial field and '.$' part
       const extractedPath = path.replace(/^([^.]+)\.\$\./, "");
-      return extractedPath;
+      return { column: match[1], path: extractedPath };
     } else {
       throw new Error(`Invalid JSON path: ${path}`);
     }
   }
 
-  export function encodePath(key: string, ...path: string[]): string {
-    return `${key}.\$${path.map((p) => `.${p}`).join("")}`;
+  export function encodePath(column: string, ...path: string[]): string {
+    return `${column}.\$.${path.join(".")}`;
   }
 
   export function unflatten(
-    data: { [key: string]: any },
+    data: Record<string, any>,
     options?: FlattenOptions,
     {
       value: valuefn,
@@ -92,15 +96,25 @@ export namespace FlatPostgREST {
       (acc, _key) => {
         const key = keyfilterfn ? (keyfilterfn(_key) ? _key : undefined) : _key;
         if (key && testPath(key)) {
-          const path = decodePath(key);
+          const { path } = decodePath(key);
           const value = valuefn ? valuefn(key, data[key]) : data[key];
           acc[path] = value;
         }
         return acc;
       },
-      {} as { [key: string]: any }
+      {} as Record<string, any>
     );
 
     return _unflatten(jsonpath_data, options);
+  }
+
+  export function get(path: string, row: Record<string, any>): any {
+    const { column, path: jsonpath } = decodePath(path);
+
+    const json = row[column];
+
+    const flat = _flatten(json) as Record<string, any>;
+
+    return flat[jsonpath];
   }
 }
