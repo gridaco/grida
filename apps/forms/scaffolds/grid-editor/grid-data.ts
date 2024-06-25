@@ -27,6 +27,7 @@ export namespace GridData {
     | {
         table: "x-supabase-main-table";
         data: {
+          pks: string[];
           rows: any[];
           fields: { [key: string]: any[] };
         };
@@ -55,13 +56,12 @@ export namespace GridData {
           : [];
       }
       case "x-supabase-main-table": {
-        // TODO:
         return input.data.rows.reduce((acc, row, index) => {
+          // TODO: support multiple PKs
+          const pk = input.data.pks.length > 0 ? input.data.pks[0] : null;
           const gfRow: GFResponseRow = {
-            __gf_id: "-",
-            __gf_display_id: "-",
-            __gf_created_at: "-",
-            __gf_customer_id: "-",
+            __gf_id: pk ? row[pk] : "",
+            __gf_display_id: pk ? row[pk] : "",
             fields: {},
           };
           input.fields.forEach((field) => {

@@ -509,9 +509,9 @@ function ConnectSupabase({ form_id }: { form_id: string }) {
 }
 
 function SupabaseTableInfo({ table }: { table: GridaSupabase.JSONSChema }) {
-  const parsed = useMemo(
+  const { properties } = useMemo(
     () =>
-      SupabasePostgRESTOpenApi.parse_supabase_postgrest_schema_definitions(
+      SupabasePostgRESTOpenApi.parse_supabase_postgrest_schema_definition(
         table
       ),
     [table]
@@ -530,7 +530,7 @@ function SupabaseTableInfo({ table }: { table: GridaSupabase.JSONSChema }) {
           </TableRow>
         </TableHeader>
         <TableBody>
-          {Object.entries(parsed).map(
+          {Object.entries(properties).map(
             ([prop, { pk, fk, type, format, required, name }]) => {
               return (
                 <TableRow key={prop}>

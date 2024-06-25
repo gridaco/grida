@@ -89,6 +89,7 @@ export function GridEditor() {
       sessions: sessions ?? [],
       // TODO:
       data: {
+        pks: x_supabase_main_table?.pks ?? [],
         rows: x_supabase_main_table?.rows ?? [],
         fields: {},
       },

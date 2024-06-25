@@ -24,8 +24,8 @@ export type GFFile = {
 export type GFResponseRow = {
   __gf_id: string;
   __gf_display_id: string;
-  __gf_created_at: string;
-  __gf_customer_id: string | null;
+  __gf_created_at?: string;
+  __gf_customer_id?: string | null;
   fields: Record<string, GFResponseFieldData>;
 };
 

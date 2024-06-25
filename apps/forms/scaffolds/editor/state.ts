@@ -10,6 +10,7 @@ import type {
   GridaSupabase,
 } from "@/types";
 import { LOCALTZ } from "./symbols";
+import { SupabasePostgRESTOpenApi } from "@/lib/supabase-postgrest";
 
 export type DraftID = `[draft]${string}`;
 export const DRAFT_ID_START_WITH = "[draft]";
@@ -85,6 +86,11 @@ export function initialFormEditorState(init: FormEditorInit): FormEditorState {
     realtime_sessions_enabled: false,
     x_supabase_main_table: is_main_table_supabase
       ? {
+          schema:
+            init.connections!.supabase!.main_supabase_table!.sb_table_schema,
+          pks: SupabasePostgRESTOpenApi.parse_supabase_postgrest_schema_definition(
+            init.connections!.supabase!.main_supabase_table!.sb_table_schema
+          ).pks,
           rows: [],
         }
       : undefined,
@@ -145,6 +151,8 @@ export interface FormEditorState {
   dateformat: "date" | "time" | "datetime";
   datetz: typeof LOCALTZ | string;
   x_supabase_main_table?: {
+    schema: GridaSupabase.JSONSChema;
+    pks: string[];
     rows: GridaSupabase.XDataRow[];
   };
 }

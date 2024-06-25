@@ -658,9 +658,7 @@ export function reducer(
       const { data } = <FeedXSupabaseMainTableRowsAction>action;
 
       return produce(state, (draft) => {
-        draft.x_supabase_main_table = {
-          rows: data,
-        };
+        draft.x_supabase_main_table!.rows = data;
         return;
       });
       //

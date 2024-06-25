@@ -97,10 +97,18 @@ export namespace SupabasePostgRESTOpenApi {
     default: string;
   };
 
-  export function parse_supabase_postgrest_schema_definitions(
+  export function parse_supabase_postgrest_schema_definition(
     schema: GridaSupabase.JSONSChema
   ) {
-    const parsed: { [key: string]: PostgRESTColumnMeta } = {};
+    const parsed: {
+      pks: string[];
+      fks: FKMeta[];
+      properties: { [key: string]: PostgRESTColumnMeta };
+    } = {
+      pks: [],
+      fks: [],
+      properties: {},
+    };
 
     // for (const table in definitions) {
     const { pks, fks } =
@@ -131,7 +139,9 @@ export namespace SupabasePostgRESTOpenApi {
         };
       })
       .reduce((acc, columnMeta) => {
-        acc[columnMeta.name] = columnMeta;
+        acc.properties[columnMeta.name] = columnMeta;
+        if (columnMeta.pk) acc.pks.push(columnMeta.name);
+        if (columnMeta.fk) acc.fks.push(columnMeta.fk);
         return acc;
       }, parsed);
 
