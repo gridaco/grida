@@ -53,13 +53,13 @@ export default function PartnerPOC() {
             </div>
           </div>
         </section>
-        <section className="container mx-auto my-40">
+        <section className="container my-40">
           <div className="gap-10 flex flex-col items-center justify-center">
             <h2 className=" text-lg font-bold">POC와 함께한 브랜드</h2>
             <Logos />
           </div>
         </section>
-        <section className="container mx-auto my-40">
+        <section className="container my-40">
           <div className="flex flex-col gap-10">
             <header className="flex flex-col gap-4">
               <div className="flex flex-row items-center justify-center">
@@ -99,7 +99,14 @@ export default function PartnerPOC() {
             </div>
           </div>
         </section>
-        <section className="container bg-red-50 mx-auto py-40">
+        <section className="relative container mx-auto py-40">
+          <Image
+            src="/affiliate/poc/images/bg-image.png"
+            alt="bg"
+            width={1700}
+            height={1800}
+            className=" absolute top-0 left-0 w-full h-full object-cover -z-10"
+          />
           <div className="flex flex-col gap-10">
             <header className="flex flex-col gap-4">
               <div className="flex flex-row items-center justify-center gap-2">
