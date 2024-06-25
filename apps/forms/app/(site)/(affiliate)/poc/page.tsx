@@ -90,8 +90,8 @@ export default function PartnerPOC() {
                       className="aspect-video rounded-xl shadow-xl overflow-hidden object-cover"
                       src="/images/abstract-placeholder.jpg"
                       alt=""
-                      width={1000}
-                      height={1000}
+                      width={1500}
+                      height={1500}
                     />
                   </TabsContent>
                 ))}
@@ -99,7 +99,7 @@ export default function PartnerPOC() {
             </div>
           </div>
         </section>
-        <section className="container mx-auto my-40">
+        <section className="container bg-red-50 mx-auto py-40">
           <div className="flex flex-col gap-10">
             <header className="flex flex-col gap-4">
               <div className="flex flex-row items-center justify-center gap-2">
@@ -113,7 +113,7 @@ export default function PartnerPOC() {
                 모든걸 관리하세요
               </h2>
             </header>
-            <div className="container max-w-full bg-muted">
+            <div>
               <Tabs
                 className="flex flex-col items-center justify-center mt-10 gap-10"
                 defaultValue={demo_2_categories[0]}
@@ -127,17 +127,19 @@ export default function PartnerPOC() {
                 </TabsList>
                 {demo_2_categories.map((category) => (
                   <TabsContent key={category} value={category}>
-                    <Image
-                      className="aspect-video rounded-xl shadow-xl overflow-hidden object-cover"
-                      src="/images/abstract-placeholder.jpg"
-                      alt=""
-                      width={1000}
-                      height={1000}
-                    />
-                    <div className="flex h-48 gap-10">
-                      <div className="w-2/3 h-full bg-red-400"></div>
-                      <div className="w-1/3 h-full bg-red-400"></div>
-                      <div className="w-1/3 h-full bg-red-400"></div>
+                    <div className="flex flex-col gap-5">
+                      <Image
+                        className="aspect-video rounded-xl shadow-xl overflow-hidden object-cover"
+                        src="/images/abstract-placeholder.jpg"
+                        alt=""
+                        width={1500}
+                        height={1500}
+                      />
+                      <div className="flex h-72 gap-5">
+                        <div className="w-2/3 h-full rounded-xl shadow-xl bg-red-400"></div>
+                        <div className="w-1/3 h-full rounded-xl shadow-xl bg-red-400"></div>
+                        <div className="w-1/3 h-full rounded-xl shadow-xl bg-red-400"></div>
+                      </div>
                     </div>
                   </TabsContent>
                 ))}
