@@ -53,7 +53,17 @@ export async function PATCH(req: NextRequest, context: Context) {
       table_id,
     });
 
-  // TODO:
+  const body: XSupabaseQuery.Body = await req.json();
+
+  const query = new XSupabaseQueryBuilder(x_client);
+
+  const res = await query
+    .from(main_supabase_table.sb_table_name)
+    .update(body.values)
+    .fromFilters(body.filters)
+    .done();
+
+  return NextResponse.json(res);
 }
 
 export async function DELETE(req: NextRequest, context: Context) {
@@ -66,14 +76,14 @@ export async function DELETE(req: NextRequest, context: Context) {
       table_id,
     });
 
-  const q: ReadonlyArray<XSupabaseQuery.Filter> = await req.json();
+  const body: XSupabaseQuery.Body = await req.json();
 
   const query = new XSupabaseQueryBuilder(x_client);
 
   const res = await query
     .from(main_supabase_table.sb_table_name)
     .delete()
-    .fromFilters(q)
+    .fromFilters(body.filters)
     .done();
 
   return NextResponse.json(res);

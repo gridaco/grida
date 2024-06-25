@@ -3,6 +3,7 @@ import {
   ResponseSessionFeedProvider,
   ResponseSyncProvider,
   XSupabaseMainTableFeedProvider,
+  XSupabaseMainTableSyncProvider,
 } from "@/scaffolds/editor/feed";
 import { GridEditor } from "@/scaffolds/grid-editor";
 import { Siebar } from "@/scaffolds/sidebar/sidebar";
@@ -14,6 +15,7 @@ export default function FormResponsesPage() {
       <ResponseSyncProvider />
       <ResponseSessionFeedProvider />
       <XSupabaseMainTableFeedProvider />
+      <XSupabaseMainTableSyncProvider />
       <div className="h-full flex flex-1 w-full">
         {/* side */}
         <aside className="hidden lg:flex h-full">

@@ -9,6 +9,7 @@ import useSWR from "swr";
 import type { EditorApiResponse } from "@/types/private/api";
 import type { FormResponseField } from "@/types";
 import { usePrevious } from "@uidotdev/usehooks";
+import { XSupabaseQuery } from "@/lib/supabase-postgrest/builder";
 
 type RealtimeTableChangeData = {
   id: string;
@@ -349,6 +350,78 @@ export function ResponseSessionFeedProvider({
   });
 
   return <>{children}</>;
+}
+
+export function XSupabaseMainTableSyncProvider({
+  children,
+}: React.PropsWithChildren<{}>) {
+  const [state] = useEditorState();
+
+  const { x_supabase_main_table } = state;
+
+  const pref = usePrevious(x_supabase_main_table?.rows);
+
+  const pkname = state.x_supabase_main_table?.gfpk;
+
+  const update = useCallback(
+    (key: number | string, value: Record<string, any>) => {
+      if (!state.connections.supabase?.main_supabase_table_id) return;
+      if (!pkname) return;
+
+      fetch(
+        `/private/editor/connect/${state.form_id}/supabase/table/${state.connections.supabase.main_supabase_table_id}/query`,
+        {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            values: value,
+            filters: [
+              {
+                type: "eq",
+                column: pkname,
+                value: key,
+              },
+            ],
+          } satisfies XSupabaseQuery.Body),
+        }
+      );
+    },
+    [pkname, state.connections.supabase?.main_supabase_table_id, state.form_id]
+  );
+
+  useEffect(() => {
+    if (!x_supabase_main_table?.rows) return;
+    if (!pref) return;
+    if (!pkname) return;
+
+    const rows = x_supabase_main_table.rows;
+
+    // check if rows are updated
+    for (const row of rows) {
+      const prevRow = pref?.find((r) => r.id === row.id);
+
+      if (prevRow) {
+        // check if row value is updated
+        if (JSON.stringify(prevRow) !== JSON.stringify(row)) {
+          update(row[pkname], row);
+        }
+      }
+    }
+  }, [pkname, pref, update, x_supabase_main_table]);
+
+  return <>{children}</>;
+}
+
+function rowdiff(prevRow: Record<string, any>, newRow: Record<string, any>) {
+  const changedFields: Record<string, any> = {};
+  for (const key in newRow) {
+    if (newRow[key] !== prevRow[key]) {
+      changedFields[key] = newRow[key];
+    }
+  }
+  return changedFields;
 }
 
 export function XSupabaseMainTableFeedProvider({

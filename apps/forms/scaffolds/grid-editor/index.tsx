@@ -49,6 +49,7 @@ import { LOCALTZ, tztostr } from "../editor/symbols";
 import { GridData } from "./grid-data";
 import clsx from "clsx";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import type { XSupabaseQuery } from "@/lib/supabase-postgrest/builder";
 
 export function GridEditor() {
   const [state, dispatch] = useEditorState();
@@ -303,17 +304,24 @@ function DeleteSelectedRowsButton() {
   }, [supabase, selected_rows, dispatch]);
 
   const delete_selected_x_supabase_main_table_rows = useCallback(() => {
+    if (!state.x_supabase_main_table?.gfpk) {
+      toast.error("Cannot delete rows without a primary key");
+      return;
+    }
+
     const res = fetch(
       `/private/editor/connect/${state.form_id}/supabase/table/${state.connections!.supabase!.main_supabase_table_id}/query`,
       {
         method: "DELETE",
-        body: JSON.stringify([
-          {
-            type: "in",
-            column: state.x_supabase_main_table?.gfpk,
-            values: Array.from(selected_rows),
-          },
-        ]),
+        body: JSON.stringify({
+          filters: [
+            {
+              type: "in",
+              column: state.x_supabase_main_table.gfpk,
+              values: Array.from(selected_rows),
+            },
+          ],
+        } satisfies XSupabaseQuery.Body),
       }
     ).then(() => {
       dispatch({

@@ -6,6 +6,10 @@ import type {
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 export namespace XSupabaseQuery {
+  export interface Body {
+    values?: any;
+    filters?: ReadonlyArray<Filter>;
+  }
   export type Filter = EQ | IN;
 
   type Scalar = string | number | boolean | null;
@@ -64,6 +68,22 @@ export class XSupabaseQueryBuilder {
     return this;
   }
 
+  update(
+    ...parameters: Parameters<PostgrestQueryBuilder<any, any, any>["update"]>
+  ) {
+    this.query = (this.query as PostgrestQueryBuilder<any, any>).update(
+      ...parameters
+    );
+    return this;
+  }
+
+  eq(...parameters: Parameters<PostgrestFilterBuilder<any, any, any>["eq"]>) {
+    this.query = (this.query as PostgrestFilterBuilder<any, any, any>).eq(
+      ...parameters
+    );
+    return this;
+  }
+
   in(...parameters: Parameters<PostgrestFilterBuilder<any, any, any>["in"]>) {
     this.query = (this.query as PostgrestFilterBuilder<any, any, any>).in(
       ...parameters
@@ -84,7 +104,7 @@ export class XSupabaseQueryBuilder {
   fromFilter(filter: XSupabaseQuery.Filter) {
     switch (filter.type) {
       case "eq":
-        throw new Error("Not implemented");
+        this.eq(...XSupabaseQuery.asParams(filter));
         break;
       case "in":
         this.in(...XSupabaseQuery.asParams(filter));
@@ -94,7 +114,9 @@ export class XSupabaseQueryBuilder {
     return this;
   }
 
-  fromFilters(filters: ReadonlyArray<XSupabaseQuery.Filter>) {
+  fromFilters(filters?: ReadonlyArray<XSupabaseQuery.Filter>) {
+    if (!filters) return this;
+
     for (const filter of filters) {
       this.fromFilter(filter);
     }
