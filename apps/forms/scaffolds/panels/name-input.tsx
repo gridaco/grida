@@ -188,7 +188,7 @@ export function NameInput({
                           <Link1Icon className="mr-2 h-4 w-4" />
                           <span>{key}</span>{" "}
                           <small className="ms-1 text-muted-foreground">
-                            {property.type} | {property.format}
+                            {property?.type} | {property?.format}
                           </small>
                         </CommandItem>
                       );
