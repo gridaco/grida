@@ -2,9 +2,10 @@
 
 import { GridaLogo } from "@/components/grida-logo";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Container } from "lucide-react";
 import Image from "next/image";
 import { Logos } from "./logos";
+import React from "react";
+import { CaretRightIcon, CheckIcon } from "@radix-ui/react-icons";
 
 const demo_1_categories = [
   "event",
@@ -14,11 +15,19 @@ const demo_1_categories = [
   "cyber",
   "art",
 ];
+const demo_2_categories = [
+  "캠페인 매니저",
+  "대용량 트래픽",
+  "티켓/인벤토리",
+  "고객관리",
+  "실시간 모니터링",
+  "개발자",
+];
 
 export default function PartnerPOC() {
   return (
     <main>
-      <header className="p-4 w-full">
+      <header className="p-10 w-full">
         <div className="flex justify-end w-full">
           <button className="px-8 py-2 rounded bg-black font-semibold text-white">
             시작하기
@@ -45,7 +54,7 @@ export default function PartnerPOC() {
           </div>
         </section>
         <section className="container mx-auto my-40">
-          <div className="gap-20 flex flex-col items-center justify-center">
+          <div className="gap-10 flex flex-col items-center justify-center">
             <h2 className=" text-lg font-bold">POC와 함께한 브랜드</h2>
             <Logos />
           </div>
@@ -107,16 +116,16 @@ export default function PartnerPOC() {
             <div className="container max-w-full bg-muted">
               <Tabs
                 className="flex flex-col items-center justify-center mt-10 gap-10"
-                defaultValue={demo_1_categories[0]}
+                defaultValue={demo_2_categories[0]}
               >
                 <TabsList>
-                  {demo_1_categories.map((category) => (
+                  {demo_2_categories.map((category) => (
                     <TabsTrigger key={category} value={category}>
                       {category}
                     </TabsTrigger>
                   ))}
                 </TabsList>
-                {demo_1_categories.map((category) => (
+                {demo_2_categories.map((category) => (
                   <TabsContent key={category} value={category}>
                     <Image
                       className="aspect-video rounded-xl shadow-xl overflow-hidden object-cover"
@@ -125,6 +134,11 @@ export default function PartnerPOC() {
                       width={1000}
                       height={1000}
                     />
+                    <div className="flex h-48 gap-10">
+                      <div className="w-2/3 h-full bg-red-400"></div>
+                      <div className="w-1/3 h-full bg-red-400"></div>
+                      <div className="w-1/3 h-full bg-red-400"></div>
+                    </div>
                   </TabsContent>
                 ))}
               </Tabs>
@@ -147,50 +161,43 @@ export default function PartnerPOC() {
               도움이 필요한 순간에 POC가 옆에서 도와드립니다.
             </span>
           </div>
-          <div className="flex flex-col md:flex-row gap-10 mt-12">
-            <div className="container px-8 py-8 border border-neutral-200 rounded shadow-lg">
-              <div className="container bg-neutral-400 w-full h-48 px-5 rounded">
-                ...
-              </div>
-              <p className="font-semibold text-2xl mt-3">
-                특별한 행사를 위한
-                <br /> 기획하기
-              </p>
-              <p className="flex justify-end text-sm mt-12 opacity-50">
-                더 알아보기
-              </p>
-            </div>
-            <div className="container px-8 py-8 border border-neutral-200 rounded shadow-lg">
-              <div className="container bg-neutral-400 w-full h-48 px-5 rounded">
-                ...
-              </div>
-              <p className="font-semibold text-2xl mt-3">
-                오프라인 행사
-                <br />
-                공간 찾기
-              </p>
-              <p className="flex justify-end text-sm mt-12 opacity-50">
-                더 알아보기
-              </p>
-            </div>
-            <div className="container px-8 py-8 border border-neutral-200 rounded shadow-lg">
-              <div className="container bg-neutral-400 w-full h-48 px-5 rounded">
-                ...
-              </div>
-              <p className="font-semibold text-2xl mt-3">
-                행사를 빛내줄
-                <br /> 협력사 찾기
-              </p>
-              <p className="flex justify-end text-sm mt-12 opacity-50">
-                더 알아보기
-              </p>
-            </div>
+          <div className="flex flex-col flex-wrap items-center justify-center md:flex-row gap-10 mt-12">
+            <SolutionCard
+              cover="/affiliate/poc/images/solution-card-cover-1.png"
+              alt="solution 1"
+              title={
+                <>
+                  특별한 행사를 위한 <br />
+                  기획하기
+                </>
+              }
+            />
+            <SolutionCard
+              cover="/affiliate/poc/images/solution-card-cover-2.png"
+              alt="solution 2"
+              title={
+                <>
+                  오프라인 행사 <br />
+                  공간 찾기
+                </>
+              }
+            />
+            <SolutionCard
+              cover="/affiliate/poc/images/solution-card-cover-3.png"
+              alt="solution 3"
+              title={
+                <>
+                  행사를 빛내줄 <br />
+                  협력사 찾기
+                </>
+              }
+            />
           </div>
         </section>
-        <div className="bg-muted">
-          <section className="container mx-auto my-40">
+        <section className="flex flex-col my-40">
+          <div className="bg-neutral-50 container mx-auto overflow-hidden">
             <div className="flex flex-col md:flex-row">
-              <aside className="md:flex-1 py-36">
+              <aside className="md:flex-1 py-32">
                 <h2 className=" text-4xl font-bold">
                   다양한 기업과의
                   <br />
@@ -201,17 +208,89 @@ export default function PartnerPOC() {
                   <br />
                   다양한 분야의 기업들과 행사를 기획해왔습니다.
                 </p>
+                <ul className="flex flex-col mt-8 font-medium gap-2 text-muted-foreground">
+                  {[
+                    "서울특별시 여의나루역 러너스테이션 사업",
+                    "한국관광공사 인구감소지역 관광활성화 ‘디주 런트립’",
+                    "광진구 주최, 지구 온도 낮추는 ‘2023 함께 뛰는 제로광진 3K’",
+                  ].map((it, i) => (
+                    <li key={i} className="flex items-center gap-2">
+                      <CheckIcon />
+                      {it}
+                    </li>
+                  ))}
+                </ul>
               </aside>
-              <aside className="md:flex-1 bg-red-300 min-h-40 my-8"></aside>
+              <aside>
+                <Image
+                  src="/affiliate/poc/images/section-cover-1.png"
+                  alt="section 1"
+                  width={650}
+                  height={400}
+                  className="transition-transform duration-200 ease-in-out hover:scale-105"
+                />
+              </aside>
             </div>
-          </section>
-        </div>
-        <section className="container mx-auto my-40">
-          <div>hh</div>
+          </div>
+
+          <div>
+            <section className="container mx-auto overflow-hidden">
+              <div className="flex flex-col md:flex-row">
+                <aside className="md:flex-1">
+                  <TopBottomFadingGradientOverlay>
+                    <Image
+                      src="/affiliate/poc/images/section-cover-2.png"
+                      alt="section 2"
+                      width={650}
+                      height={400}
+                      className="transition-transform duration-200 ease-in-out hover:scale-105"
+                    />
+                  </TopBottomFadingGradientOverlay>
+                </aside>
+                <aside className="md:flex-1 py-32 content-center">
+                  <div className="flex flex-col px-32">
+                    <h2 className=" text-4xl font-bold">
+                      POC와 함께라면
+                      <br />
+                      정말 쉬운 이벤트 준비
+                    </h2>
+                    <p className=" text-muted-foreground mt-6">
+                      기업 및 브랜드에 알맞은 이벤트 폼으로,
+                      <br />
+                      고객의 높은 참여율과 편리한 이벤트 관리를 보장할 수
+                      있습니다.
+                    </p>
+                  </div>
+                </aside>
+              </div>
+            </section>
+          </div>
+          <div className=" bg-neutral-50 container mx-auto overflow-hidden">
+            <div className="flex flex-col md:flex-row">
+              <aside className="md:flex-1 py-32 content-center">
+                <h2 className=" text-4xl font-bold">오직 여기서만 가능한.</h2>
+                <p className=" text-muted-foreground mt-6">
+                  오직 POC와 Grida Forms에서만 가능한 것을 체험해보세요.
+                  <br />
+                  머릿 속에 그리는 것을 현실로 만들어드립니다.
+                </p>
+                <button className="px-8 py-2 mt-8 rounded-full bg-black font-semibold text-white">
+                  시작하기
+                </button>
+              </aside>
+              <aside>
+                <Image
+                  src="/affiliate/poc/images/section-cover-3.png"
+                  alt="section 3"
+                  width={650}
+                  height={400}
+                  className="transition-transform duration-200 ease-in-out hover:scale-105"
+                />
+              </aside>
+            </div>
+          </div>
         </section>
-        <section className="container mx-auto my-40">
-          <div className=" max-w-full bg-muted ">hh</div>
-        </section>
+
         <div className="flex flex-col items-center justify-center gap-10 mb-40">
           <span className="font-bold text-lg">Change Our Lives</span>
           <h2 className="text-4xl font-extrabold text-center">
@@ -225,5 +304,49 @@ export default function PartnerPOC() {
         </div>
       </div>
     </main>
+  );
+}
+
+function TopBottomFadingGradientOverlay({
+  children,
+}: React.PropsWithChildren<{}>) {
+  return (
+    <div className="relative">
+      {/* Top gradient overlay */}
+      <div className="z-50 absolute top-0 left-0 right-0 h-24 bg-gradient-to-b from-background to-transparent pointer-events-none" />
+      {/* Bottom gradient overlay */}
+      <div className="z-50 absolute bottom-0 left-0 right-0 h-24 bg-gradient-to-t from-background to-transparent pointer-events-none" />
+      {/* Content */}
+      {children}
+    </div>
+  );
+}
+
+function SolutionCard({
+  cover,
+  alt,
+  title,
+}: {
+  cover: string;
+  alt?: string;
+  title: React.ReactNode;
+}) {
+  return (
+    <div className="max-w-sm px-4 py-4 border border-neutral-200 rounded shadow-lg transition-transform duration-200 ease-in-out hover:scale-105">
+      <Image
+        src={cover}
+        alt={alt ?? ""}
+        width={400}
+        height={400}
+        className="bg-neutral-400 w-full h-48 rounded object-cover"
+      />
+      <p className="font-semibold text-2xl mt-3">{title}</p>
+      <div className="flex justify-end text-sm mt-12 opacity-50">
+        <button>
+          더 알아보기
+          <CaretRightIcon className="inline align-middle ms-2" />
+        </button>
+      </div>
+    </div>
   );
 }
