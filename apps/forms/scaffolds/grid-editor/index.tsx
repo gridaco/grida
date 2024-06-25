@@ -584,13 +584,31 @@ function DeleteFieldConfirmDialog({
   onCancel: () => void;
   onDeleteConfirm: () => void;
 }) {
+  const [state] = useEditorState();
+
+  const { datagrid_table } = state;
+
   return (
     <AlertDialog {...props}>
       <AlertDialogContent>
         <AlertDialogTitle>Delete Field</AlertDialogTitle>
         <AlertDialogDescription>
-          Deleting this field will remove all data associated with it. Are you
-          sure you want to delete this field?
+          {datagrid_table === "x-supabase-main-table" ? (
+            <>
+              Deleting this field will remove all data associated with it
+              (within Grida Forms). Are you sure you want to delete this field?
+              <br />
+              <strong>
+                Your supabase column stays untouched. - We do not have
+                permission to do that.
+              </strong>
+            </>
+          ) : (
+            <>
+              Deleting this field will remove all data associated with it. Are
+              you sure you want to delete this field?
+            </>
+          )}
         </AlertDialogDescription>
         <div className="flex justify-end gap-2 p-2">
           <AlertDialogCancel onClick={onCancel}>Cancel</AlertDialogCancel>
