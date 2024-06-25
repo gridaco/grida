@@ -47,12 +47,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  SupabasePublicSchema,
-  build_supabase_rest_url,
-  fetch_supabase_postgrest_swagger,
-  ping,
-} from "@/lib/supabase-postgrest";
+import { SupabasePostgRESTOpenApi, ping } from "@/lib/supabase-postgrest";
 import { GridaSupabase } from "@/types";
 import { Skeleton } from "@/components/ui/skeleton";
 import assert from "assert";
@@ -91,7 +86,8 @@ function ConnectSupabase({ form_id }: { form_id: string }) {
   const [url, setUrl] = useState("");
   const [anonKey, setAnonKey] = useState("");
   const [serviceKey, setServiceKey] = useState("");
-  const [schema, setSchema] = useState<SupabasePublicSchema | null>(null);
+  const [schema, setSchema] =
+    useState<SupabasePostgRESTOpenApi.SupabasePublicSchema | null>(null);
   const [table, setTable] = useState<string | undefined>(undefined);
 
   const [project, setProject] = useState<
@@ -132,7 +128,7 @@ function ConnectSupabase({ form_id }: { form_id: string }) {
   };
 
   const onTestConnectionClick = async () => {
-    const parsing = fetch_supabase_postgrest_swagger({
+    const parsing = SupabasePostgRESTOpenApi.fetch_supabase_postgrest_swagger({
       url,
       anonKey,
     }).then((res) => {
@@ -205,7 +201,10 @@ function ConnectSupabase({ form_id }: { form_id: string }) {
     // validate service key
     // ping test
     // TODO: to verify service_role key, we need to make a request to administartion api (below would only verify if the key is valid, not if it has the correct permissions)
-    ping({ url: build_supabase_rest_url(url), key: serviceKey }).then((res) => {
+    ping({
+      url: SupabasePostgRESTOpenApi.build_supabase_rest_url(url),
+      key: serviceKey,
+    }).then((res) => {
       if (res.status === 200) {
         // create secret key connection
         const data = {

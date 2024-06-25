@@ -5,14 +5,22 @@ import type { Bucket } from "@supabase/storage-js";
 export namespace GridaSupabase {
   export type XDataRow = Record<string, any>;
 
+  export type JSONSChema = JSONSchemaType<Record<string, any>> & {
+    properties: {
+      [key: string]: JSONSchemaType<any>;
+    };
+  };
+
+  export type SchemaDefinitions = {
+    [key: string]: JSONSChema;
+  };
+
   export interface SupabaseProject {
     id: number;
     project_id: number;
     sb_anon_key: string;
     sb_project_reference_id: string;
-    sb_public_schema: {
-      [key: string]: JSONSchemaType<Record<string, any>>;
-    } | null;
+    sb_public_schema: SchemaDefinitions | null;
     sb_project_url: string;
     sb_service_key_id: string | null;
   }
@@ -22,7 +30,7 @@ export namespace GridaSupabase {
     supabase_project_id: number;
     sb_schema_name: "public" | (string | {});
     sb_table_name: string;
-    sb_table_schema: JSONSchemaType<Record<string, any>> | null;
+    sb_table_schema: JSONSChema;
   }
 
   export type SupabaseConnectionState = ConnectionSupabaseJoint & {
