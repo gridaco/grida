@@ -618,9 +618,10 @@ export function reducer(
       const { a, b } = <DataGridReorderColumnAction>action;
       return produce(state, (draft) => {
         // update field local_index
-        const field_a = draft.fields.find((f) => f.id === a);
-        const field_b = draft.fields.find((f) => f.id === b);
+        const index_a = draft.fields.findIndex((f) => f.id === a);
+        const index_b = draft.fields.findIndex((f) => f.id === b);
         // TODO:
+        draft.fields = arrayMove(draft.fields, index_a, index_b);
 
         console.error("reorder:: Not implemented yet");
       });

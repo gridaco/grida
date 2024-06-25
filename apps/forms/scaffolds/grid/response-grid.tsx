@@ -93,6 +93,15 @@ export function ResponseGrid({
     });
   };
 
+  const onColumnsReorder = (sourceKey: string, targetKey: string) => {
+    // FIXME: the reorder won't work. we are using custom header cell, which needs a custom dnd handling.
+    dispatch({
+      type: "editor/data-grid/column/reorder",
+      a: sourceKey,
+      b: targetKey,
+    });
+  };
+
   const __id_column: Column<GFResponseRow> = {
     key: "__gf_display_id",
     name: "id",
@@ -201,6 +210,7 @@ export function ResponseGrid({
       className="flex-grow select-none"
       rowKeyGetter={rowKeyGetter}
       columns={formattedColumns}
+      onColumnsReorder={onColumnsReorder}
       selectedRows={selectionDisabled ? undefined : selected_responses}
       onCopy={onCopy}
       onRowsChange={(rows, data) => {
@@ -220,21 +230,6 @@ export function ResponseGrid({
       rows={rows}
       rowHeight={44}
     />
-  );
-}
-
-function LeadingHeaderCell({ column }: RenderHeaderCellProps<any>) {
-  return <div></div>;
-}
-
-function LeadingCell({ column }: RenderCellProps<any>) {
-  return (
-    <div className="flex group items-center justify-between h-full w-full">
-      <input type="checkbox" />
-      <button className="opacity-0 group-hover:opacity-100">
-        <EnterFullScreenIcon />
-      </button>
-    </div>
   );
 }
 
