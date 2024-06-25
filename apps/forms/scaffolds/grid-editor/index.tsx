@@ -67,16 +67,9 @@ export function GridEditor() {
   } = state;
   const supabase = createClientFormsClient();
 
-  const columns = useMemo(
-    () =>
-      fields?.map((field) => ({
-        key: field.id,
-        name: field.name,
-        frozen: false,
-        type: field.type,
-        // You can add more properties here as needed by react-data-grid
-      })) ?? [],
-    [fields]
+  const { systemcolumns, columns } = useMemo(
+    () => GridData.columns(datagrid_table, fields),
+    [datagrid_table, fields]
   );
 
   // Transforming the responses into the format expected by react-data-grid
@@ -241,6 +234,7 @@ export function GridEditor() {
       />
       <div className="flex flex-col w-full h-full">
         <ResponseGrid
+          systemcolumns={systemcolumns}
           columns={columns}
           rows={rows}
           readonly={readonly}

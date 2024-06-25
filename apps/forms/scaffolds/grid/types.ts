@@ -1,5 +1,10 @@
 import type { FormInputType, GridaSupabase } from "@/types";
 
+export type GFSystemColumnTypes =
+  | "__gf_display_id"
+  | "__gf_created_at"
+  | "__gf_customer_id";
+
 export type GFResponseFieldData = {
   type?: FormInputType;
   value: any;

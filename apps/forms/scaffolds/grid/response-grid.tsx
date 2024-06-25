@@ -32,7 +32,11 @@ import {
 import { FormInputType } from "@/types";
 import { JsonEditCell } from "./json-cell";
 import { useEditorState } from "../editor";
-import type { GFResponseFieldData, GFResponseRow } from "./types";
+import type {
+  GFResponseFieldData,
+  GFResponseRow,
+  GFSystemColumnTypes,
+} from "./types";
 import { SelectColumn } from "./select-column";
 import "./grid.css";
 import { unwrapFeildValue } from "@/lib/forms/unwrap";
@@ -57,6 +61,7 @@ function rowKeyGetter(row: GFResponseRow) {
 }
 
 export function ResponseGrid({
+  systemcolumns: _systemcolumns,
   columns,
   rows,
   selectionDisabled,
@@ -66,10 +71,14 @@ export function ResponseGrid({
   onDeleteFieldClick,
   onCellChange,
 }: {
+  systemcolumns: {
+    key: GFSystemColumnTypes;
+    name?: string;
+  }[];
   columns: {
     key: string;
     name: string;
-    type?: string;
+    type?: FormInputType;
   }[];
   rows: GFResponseRow[];
   selectionDisabled?: boolean;
@@ -108,7 +117,7 @@ export function ResponseGrid({
     frozen: true,
     resizable: true,
     width: 100,
-    renderHeaderCell: DefaultPropertyHeaderCell,
+    renderHeaderCell: GFSystemPropertyHeaderCell,
   };
 
   const __created_at_column: Column<GFResponseRow> = {
@@ -117,7 +126,7 @@ export function ResponseGrid({
     frozen: true,
     resizable: true,
     width: 100,
-    renderHeaderCell: DefaultPropertyHeaderCell,
+    renderHeaderCell: GFSystemPropertyHeaderCell,
     renderCell: DefaultPropertyDateCell,
   };
 
@@ -127,7 +136,7 @@ export function ResponseGrid({
     frozen: true,
     resizable: true,
     width: 100,
-    renderHeaderCell: DefaultPropertyHeaderCell,
+    renderHeaderCell: GFSystemPropertyHeaderCell,
     renderCell: DefaultPropertyCustomerCell,
   };
 
@@ -142,11 +151,22 @@ export function ResponseGrid({
     ),
   };
 
-  const formattedColumns = [
-    __id_column,
-    __created_at_column,
-    __customer_uuid_column,
-  ]
+  const systemcolumns = _systemcolumns.map((c) => {
+    switch (c.key) {
+      case "__gf_display_id":
+        return {
+          ...__id_column,
+          // name for display id can be customized
+          name: c.name || __id_column.name,
+        };
+      case "__gf_created_at":
+        return __created_at_column;
+      case "__gf_customer_id":
+        return __customer_uuid_column;
+    }
+  });
+
+  const allcolumns = systemcolumns
     .concat(
       columns.map(
         (col) =>
@@ -178,7 +198,7 @@ export function ResponseGrid({
     .concat(__new_column);
 
   if (!selectionDisabled) {
-    formattedColumns.unshift(SelectColumn);
+    allcolumns.unshift(SelectColumn);
   }
 
   const onCopy = (e: CopyEvent<GFResponseRow>) => {
@@ -209,7 +229,7 @@ export function ResponseGrid({
     <DataGrid
       className="flex-grow select-none"
       rowKeyGetter={rowKeyGetter}
-      columns={formattedColumns}
+      columns={allcolumns}
       onColumnsReorder={onColumnsReorder}
       selectedRows={selectionDisabled ? undefined : selected_responses}
       onCopy={onCopy}
@@ -233,26 +253,24 @@ export function ResponseGrid({
   );
 }
 
-function DefaultPropertyHeaderCell({ column }: RenderHeaderCellProps<any>) {
+function GFSystemPropertyHeaderCell({ column }: RenderHeaderCellProps<any>) {
   const { name, key } = column;
 
   return (
     <div className="flex items-center gap-2">
-      <DefaultPropertyIcon __key={key} />
+      <DefaultPropertyIcon __key={key as GFSystemColumnTypes} />
       <span className="font-normal">{name}</span>
     </div>
   );
 }
 
-function DefaultPropertyIcon({ __key: key }: { __key: string }) {
+function DefaultPropertyIcon({ __key: key }: { __key: GFSystemColumnTypes }) {
   switch (key) {
-    case "__gf_id":
     case "__gf_display_id":
       return <Link2Icon className="min-w-4" />;
     case "__gf_created_at":
       return <CalendarIcon className="min-w-4" />;
     case "__gf_customer_id":
-    case "__gf_customer":
       return <AvatarIcon className="min-w-4" />;
   }
 }

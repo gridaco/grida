@@ -1,11 +1,12 @@
-import {
+import type {
   FormFieldDefinition,
+  FormInputType,
   FormResponse,
   FormResponseField,
   FormResponseSession,
 } from "@/types";
 import { fmt_local_index } from "@/utils/fmt";
-import type { GFResponseRow } from "../grid/types";
+import type { GFResponseRow, GFSystemColumnTypes } from "../grid/types";
 import type { DataGridFilterSettings } from "../editor/state";
 import { FlatPostgREST } from "@/lib/supabase-postgrest/flat";
 
@@ -34,6 +35,62 @@ export namespace GridData {
         };
       }
   );
+
+  export function columns(
+    table: "response" | "session" | "x-supabase-main-table",
+    fields: FormFieldDefinition[]
+  ): {
+    systemcolumns: {
+      key: GFSystemColumnTypes;
+      name?: string;
+    }[];
+    columns: {
+      key: string;
+      name: string;
+      type?: FormInputType;
+    }[];
+  } {
+    const fieldcolumns =
+      fields?.map((field) => ({
+        key: field.id,
+        name: field.name,
+        type: field.type,
+        // You can add more properties here as needed by react-data-grid
+      })) ?? [];
+
+    switch (table) {
+      case "response":
+      case "session": {
+        return {
+          systemcolumns: [
+            {
+              key: "__gf_display_id",
+            },
+            {
+              key: "__gf_created_at",
+            },
+            {
+              key: "__gf_customer_id",
+            },
+          ],
+          columns: fieldcolumns,
+        };
+      }
+      case "x-supabase-main-table": {
+        return {
+          systemcolumns: [
+            {
+              key: "__gf_display_id",
+              // TODO:
+              // 1. pass the name of pk
+              // 2. allow multiple PKs
+            },
+          ],
+          columns: fieldcolumns,
+        };
+      }
+    }
+  }
 
   export function rows(input: DataGridInput) {
     switch (input.table) {
