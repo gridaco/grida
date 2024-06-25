@@ -1,4 +1,4 @@
-import { flatten, unflatten, FlattenOptions } from "flat";
+import { flatten, unflatten as _unflatten, FlattenOptions } from "flat";
 /**
  * Namespace FlatPostgREST
  *
@@ -16,12 +16,12 @@ import { flatten, unflatten, FlattenOptions } from "flat";
  *
  * ```typescript
  * // Encoding a JSON path
- * const encodedPath = FlatPostgREST.encodePath('data', ['a', 'b']);
+ * const encodedPath = FlatPostgREST.encodePath('data', 'a.b');
  * console.log(encodedPath);  // Outputs: "data.$.a.b"
  *
  * // Decoding a JSON path
  * const decodedPath = FlatPostgREST.decodePath('data.$.a.b');
- * console.log(decodedPath);  // Outputs: { key: "data", path: ["a", "b"] }
+ * console.log(decodedPath);  // Outputs: "a.b"
  *
  * // Parsing form data
  * const formdata = new FormData();
@@ -44,10 +44,63 @@ import { flatten, unflatten, FlattenOptions } from "flat";
  *   }
  * };
  * const enums = []; // Assuming FormValue and enums are defined appropriately
- * const parsedData = FlatPostgREST.parseFormData(formdata, { schema, enums });
- * console.log(parsedData);  // Outputs: { data: { a: { b: "value" } } }
+ * const parsedData = FlatPostgREST.unflatten(formdata, { enums });
+ * console.log(parsedData);  // Outputs: { a: { b: "value" } }
  * ```
  */
 export namespace FlatPostgREST {
   //
+
+  /**
+   * Regular expression to match JSON path formats like field.$.patha.pathb.pathc
+   */
+  export const POSTGREST_JSON_PATH_REGEX = /^([^.]+)\.\$\.[^.]+(?:\.[^.]+)*$/;
+
+  export function testPath(path: string): boolean {
+    return POSTGREST_JSON_PATH_REGEX.test(path);
+  }
+
+  export function decodePath(path: string): string {
+    const match = POSTGREST_JSON_PATH_REGEX.exec(path);
+    if (match) {
+      // Remove the initial field and '.$' part
+      const extractedPath = path.replace(/^([^.]+)\.\$\./, "");
+      return extractedPath;
+    } else {
+      throw new Error(`Invalid JSON path: ${path}`);
+    }
+  }
+
+  export function encodePath(key: string, ...path: string[]): string {
+    return `${key}.\$${path.map((p) => `.${p}`).join("")}`;
+  }
+
+  export function unflatten(
+    data: { [key: string]: any },
+    options?: FlattenOptions,
+    {
+      value: valuefn,
+      key: keyfilterfn,
+    }: {
+      key?: (key: string) => boolean;
+      value?: (key: string, value?: any) => any;
+    } = {}
+  ): any {
+    const keys = Object.keys(data);
+
+    const jsonpath_data = keys.reduce(
+      (acc, _key) => {
+        const key = keyfilterfn ? (keyfilterfn(_key) ? _key : undefined) : _key;
+        if (key && testPath(key)) {
+          const path = decodePath(key);
+          const value = valuefn ? valuefn(key, data[key]) : data[key];
+          acc[path] = value;
+        }
+        return acc;
+      },
+      {} as { [key: string]: any }
+    );
+
+    return _unflatten(jsonpath_data, options);
+  }
 }

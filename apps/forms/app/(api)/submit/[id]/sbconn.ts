@@ -1,3 +1,4 @@
+import { FlatPostgREST } from "@/lib/supabase-postgrest/flat";
 import { grida_xsupabase_client } from "@/lib/supabase/server";
 import { FormValue } from "@/services/form";
 import { createXSupabaseClient } from "@/services/x-supabase";
@@ -63,8 +64,6 @@ function parseFormData(
   // data contains only recognized keys
   const data: { [key: string]: any } = {};
 
-  const formdata_keys = Array.from(formdata.keys());
-
   Object.keys(schema.properties).forEach((key) => {
     const { type, format } = schema.properties[key];
     switch (type) {
@@ -83,21 +82,26 @@ function parseFormData(
       default: {
         const { value } = FormValue.parse(formdata.get(key), { enums });
         if (format === "json" || format === "jsonb") {
-          const flat = formdata_keys.reduce((acc: any, k) => {
-            if (k.startsWith(`${key}.$.`)) {
-              // Convert 'field.$.a.b' to 'field.a.b' for unflatten to work correctly
-              const flatKey = k.replace(`${key}.$.`, `${key}.`);
-              // TODO: need scalar type support
-              const { value } = FormValue.parse(formdata.get(k), { enums });
-              acc[flatKey] = value;
+          //
+          const constructedjson = FlatPostgREST.unflatten(
+            Array.from(formdata.keys()).reduce((acc, k) => {
+              acc[k] = formdata.get(k);
+              return acc;
+            }, {} as any),
+            undefined,
+            {
+              key: (k) => k.startsWith(key + "."),
+              value: (k, v) => {
+                //     // TODO: need scalar type support
+                const { value } = FormValue.parse(v, { enums });
+                return value;
+              },
             }
-            return acc;
-          }, {});
+          );
 
-          const constructedjson = unflatten(flat);
           console.log("constructedjson", constructedjson);
 
-          data[key] = (constructedjson as any)[key];
+          data[key] = constructedjson as any;
           break;
         }
         data[key] = value || undefined;
