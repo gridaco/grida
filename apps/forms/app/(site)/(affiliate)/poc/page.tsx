@@ -4,6 +4,7 @@ import { GridaLogo } from "@/components/grida-logo";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Container } from "lucide-react";
 import Image from "next/image";
+import { Logos } from "./logos";
 
 const demo_1_categories = [
   "event",
@@ -46,7 +47,7 @@ export default function PartnerPOC() {
         <section className="container mx-auto my-40">
           <div className="gap-20 flex flex-col items-center justify-center">
             <h2 className=" text-lg font-bold">POC와 함께한 브랜드</h2>
-            <GridaLogo />
+            <Logos />
           </div>
         </section>
         <section className="container mx-auto my-40">
