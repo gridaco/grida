@@ -99,8 +99,6 @@ function parseFormData(
             }
           );
 
-          console.log("constructedjson", constructedjson);
-
           data[key] = constructedjson as any;
           break;
         }

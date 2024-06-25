@@ -95,7 +95,6 @@ export class XSupabaseQueryBuilder {
   }
 
   fromFilters(filters: ReadonlyArray<XSupabaseQuery.Filter>) {
-    console.log("filters", filters);
     for (const filter of filters) {
       this.fromFilter(filter);
     }
