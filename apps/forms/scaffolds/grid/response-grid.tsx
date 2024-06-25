@@ -324,7 +324,7 @@ function NewFieldHeaderCell({
   return (
     <button
       onClick={onClick}
-      className="rounded p-2 bg-neutral-100 dark:bg-neutral-900 w-full flex items-center justify-center"
+      className="w-full h-full flex items-center justify-center"
     >
       <PlusIcon />
     </button>

@@ -654,20 +654,51 @@ export function reducer(
 
       const { value, option_id } = data;
       return produce(state, (draft) => {
-        const cellid = state.responses.fields[row].find(
-          (f) => f.form_field_id === column && f.response_id === row
-        )?.id;
+        switch (state.datagrid_table) {
+          case "response": {
+            const cellid = state.responses.fields[row].find(
+              (f) => f.form_field_id === column && f.response_id === row
+            )?.id;
 
-        draft.responses.fields[row] = draft.responses.fields[row].map((f) => {
-          if (f.id === cellid) {
-            return {
-              ...f,
-              form_field_option_id: option_id ?? null,
-              value,
-            };
+            draft.responses.fields[row] = draft.responses.fields[row].map(
+              (f) => {
+                if (f.id === cellid) {
+                  return {
+                    ...f,
+                    form_field_option_id: option_id ?? null,
+                    value,
+                  };
+                }
+                return f;
+              }
+            );
+
+            break;
           }
-          return f;
-        });
+          case "x-supabase-main-table": {
+            const pk = state.x_supabase_main_table!.gfpk!;
+            const field = state.fields.find((f) => f.id === column);
+
+            draft.x_supabase_main_table!.rows =
+              draft.x_supabase_main_table!.rows.map((r) => {
+                if (r[pk] === row) {
+                  // FIXME: WRAP-UNWRAP
+                  const unwrapped = JSON.parse(value);
+                  return {
+                    ...r,
+                    [field!.name]: unwrapped,
+                  };
+                }
+                return r;
+              });
+
+            break;
+          }
+          case "session":
+          default: {
+            throw new Error("Unsupported table type: " + state.datagrid_table);
+          }
+        }
       });
     }
     case "editor/x-supabase/main-table/feed": {
