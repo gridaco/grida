@@ -1,4 +1,7 @@
-import { XSupabaseQueryBuilder } from "@/lib/supabase-postgrest/builder";
+import {
+  XSupabaseQuery,
+  XSupabaseQueryBuilder,
+} from "@/lib/supabase-postgrest/builder";
 import { createRouteHandlerClient } from "@/lib/supabase/server";
 import {
   GridaXSupabaseClient,
@@ -60,6 +63,60 @@ export async function GET(
     .from(main_supabase_table.sb_table_name)
     .select("*")
     .limit(limit)
+    .done();
+
+  return NextResponse.json(res);
+}
+
+export async function DELETE(
+  req: NextRequest,
+  context: {
+    params: {
+      form_id: string;
+      table_id: string;
+    };
+  }
+) {
+  const { form_id, table_id: _table_id } = context.params;
+  const table_id = parseInt(_table_id);
+  const cookieStore = cookies();
+  const grida_forms_client = createRouteHandlerClient(cookieStore);
+
+  const { data: form, error } = await grida_forms_client
+    .from("form")
+    .select(`id, supabase_connection:connection_supabase(*)`)
+    .eq("id", form_id)
+    .single();
+
+  if (!form) {
+    return notFound();
+  }
+
+  const { supabase_connection } = form;
+  assert(supabase_connection, "supabase_connection is required");
+
+  const x = new GridaXSupabaseClient();
+  const conn = await x.getConnection(supabase_connection);
+  assert(conn, "connection fetch failed");
+  const { main_supabase_table } = conn;
+
+  assert(main_supabase_table?.id === table_id, "only supports main table atm");
+
+  const x_client = await createXSupabaseClient(
+    supabase_connection.supabase_project_id,
+    {
+      service_role: true,
+    }
+  );
+
+  const q: ReadonlyArray<XSupabaseQuery.Filter> = await req.json();
+
+  const query = new XSupabaseQueryBuilder(x_client);
+
+  const res = await query
+    .from(main_supabase_table.sb_table_name)
+    .delete()
+    .fromFilters(q)
     .done();
 
   return NextResponse.json(res);

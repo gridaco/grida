@@ -42,7 +42,7 @@ import {
   DropdownMenuShortcut,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { format, startOfDay, addSeconds } from "date-fns";
 import { format as formatTZ } from "date-fns-tz";
 import { LOCALTZ, tztostr } from "../editor/symbols";
@@ -286,18 +286,18 @@ function DeleteSelectedRowsButton() {
   const supabase = createClientFormsClient();
   const [state, dispatch] = useEditorState();
 
-  const { datagrid_table, selected_rows: selected_responses } = state;
+  const { datagrid_table, selected_rows } = state;
 
   const keyword = table_keyword(datagrid_table);
 
-  const onDeleteResponse = useCallback(() => {
+  const delete_selected_responses = useCallback(() => {
     const deleting = supabase
       .from("response")
       .delete()
-      .in("id", Array.from(selected_responses))
+      .in("id", Array.from(selected_rows))
       .then(() => {
         dispatch({
-          type: "editor/response/delete/selected",
+          type: "editor/data-grid/delete/selected",
         });
       });
 
@@ -306,25 +306,80 @@ function DeleteSelectedRowsButton() {
       success: "Response deleted",
       error: "", // this won't be shown (supabase does not return error for delete operation)
     });
-  }, [supabase, selected_responses, dispatch]);
+  }, [supabase, selected_rows, dispatch]);
+
+  const delete_selected_x_supabase_main_table_rows = useCallback(() => {
+    const res = fetch(
+      `/private/editor/connect/${state.form_id}/supabase/table/${state.connections!.supabase!.main_supabase_table_id}/query`,
+      {
+        method: "DELETE",
+        body: JSON.stringify([
+          {
+            type: "in",
+            column: state.x_supabase_main_table?.gfpk,
+            values: Array.from(selected_rows),
+          },
+        ]),
+      }
+    ).then(() => {
+      dispatch({
+        type: "editor/data-grid/delete/selected",
+      });
+    });
+
+    toast.promise(res, {
+      loading: "Deleting...",
+      success: "Deleted",
+      error: "Failed",
+    });
+  }, [
+    state.form_id,
+    state.connections,
+    state.x_supabase_main_table?.gfpk,
+    selected_rows,
+    dispatch,
+  ]);
+
+  const onDeleteSelection = useCallback(() => {
+    switch (datagrid_table) {
+      case "response":
+        delete_selected_responses();
+        break;
+      case "session":
+        toast.error("Cannot delete sessions");
+        break;
+      case "x-supabase-main-table":
+        delete_selected_x_supabase_main_table_rows();
+        break;
+    }
+  }, [
+    datagrid_table,
+    delete_selected_responses,
+    delete_selected_x_supabase_main_table_rows,
+  ]);
 
   return (
     <AlertDialog>
       <AlertDialogTrigger asChild>
         <button className="flex items-center gap-1 p-2 rounded-md border text-sm">
           <TrashIcon />
-          Delete {txt_n_plural(selected_responses.size, keyword)}
+          Delete {txt_n_plural(selected_rows.size, keyword)}
         </button>
       </AlertDialogTrigger>
       <AlertDialogContent>
-        <AlertDialogTitle>Delete Response</AlertDialogTitle>
+        <AlertDialogTitle>
+          Delete {txt_n_plural(selected_rows.size, keyword)}
+        </AlertDialogTitle>
         <AlertDialogDescription>
-          Deleting this response will remove all data associated with it. Are
-          you sure you want to delete this response?
+          Deleting this record will remove all data associated with it. Are you
+          sure you want to delete this record?
         </AlertDialogDescription>
         <div className="flex justify-end gap-2 p-2">
           <AlertDialogCancel>Cancel</AlertDialogCancel>
-          <AlertDialogAction onClick={onDeleteResponse}>
+          <AlertDialogAction
+            className={buttonVariants({ variant: "destructive" })}
+            onClick={onDeleteSelection}
+          >
             Delete
           </AlertDialogAction>
         </div>

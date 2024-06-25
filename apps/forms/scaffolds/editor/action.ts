@@ -28,7 +28,7 @@ export type BlocksEditorAction =
   | BlockTitleAction
   | BlockDescriptionAction
   | SelectResponse
-  | DeleteSelectedResponsesAction
+  | DataGridDeleteSelectedRows
   | DeleteResponseAction
   | SaveFieldAction
   | DeleteFieldAction
@@ -155,10 +155,6 @@ export interface SelectResponse {
   selection: ReadonlySet<string>;
 }
 
-export interface DeleteSelectedResponsesAction {
-  type: "editor/response/delete/selected";
-}
-
 export interface DeleteResponseAction {
   type: "editor/response/delete";
   id: string;
@@ -215,6 +211,10 @@ export interface DataGridTableAction {
 export interface DataGridRowsAction {
   type: "editor/data-grid/rows";
   rows: number;
+}
+
+export interface DataGridDeleteSelectedRows {
+  type: "editor/data-grid/delete/selected";
 }
 
 export interface DataGridFilterAction

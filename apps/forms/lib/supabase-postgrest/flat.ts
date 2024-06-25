@@ -113,8 +113,11 @@ export namespace FlatPostgREST {
 
     const json = row[column];
 
-    const flat = _flatten(json) as Record<string, any>;
+    if (json) {
+      const flat = _flatten(json) as Record<string, any>;
+      return flat[jsonpath];
+    }
 
-    return flat[jsonpath];
+    return undefined;
   }
 }

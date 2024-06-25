@@ -12,7 +12,7 @@ import {
   DeleteBlockAction,
   DeleteFieldAction,
   DeleteResponseAction,
-  DeleteSelectedResponsesAction,
+  DataGridDeleteSelectedRows,
   FeedResponseAction,
   FocusBlockAction,
   FocusFieldAction,
@@ -450,24 +450,6 @@ export function reducer(
         draft.selected_rows = new Set(selection);
       });
     }
-    case "editor/response/delete/selected": {
-      const {} = <DeleteSelectedResponsesAction>action;
-      return produce(state, (draft) => {
-        const ids = Array.from(state.selected_rows);
-
-        draft.responses.rows = draft.responses.rows.filter(
-          (response) => !ids.includes(response.id)
-        );
-
-        // also remove from selected_responses
-        const new_selected_responses = new Set(state.selected_rows);
-        ids.forEach((id) => {
-          new_selected_responses.delete(id);
-        });
-
-        draft.selected_rows = new_selected_responses;
-      });
-    }
     case "editor/response/delete": {
       const { id } = <DeleteResponseAction>action;
       return produce(state, (draft) => {
@@ -583,6 +565,39 @@ export function reducer(
 
         draft.realtime_sessions_enabled = table === "session";
         draft.realtime_responses_enabled = table === "response";
+
+        // clear selected rows
+        draft.selected_rows = new Set();
+      });
+    }
+    case "editor/data-grid/delete/selected": {
+      const {} = <DataGridDeleteSelectedRows>action;
+      return produce(state, (draft) => {
+        switch (state.datagrid_table) {
+          case "response": {
+            const ids = Array.from(state.selected_rows);
+            draft.responses.rows = draft.responses.rows.filter(
+              (response) => !ids.includes(response.id)
+            );
+
+            break;
+          }
+          case "x-supabase-main-table": {
+            const pk = state.x_supabase_main_table!.gfpk!;
+            draft.x_supabase_main_table!.rows =
+              draft.x_supabase_main_table!.rows.filter(
+                (row) => !state.selected_rows.has(row[pk])
+              );
+
+            break;
+          }
+          case "session":
+          default:
+            throw new Error("Unsupported table type: " + state.datagrid_table);
+        }
+
+        // clear selected rows
+        draft.selected_rows = new Set();
       });
     }
     case "editor/customers/edit": {

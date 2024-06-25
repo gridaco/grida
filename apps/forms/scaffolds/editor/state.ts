@@ -84,16 +84,27 @@ export function initialFormEditorState(init: FormEditorInit): FormEditorState {
     },
     realtime_responses_enabled: true,
     realtime_sessions_enabled: false,
-    x_supabase_main_table: is_main_table_supabase
-      ? {
-          schema:
-            init.connections!.supabase!.main_supabase_table!.sb_table_schema,
-          pks: SupabasePostgRESTOpenApi.parse_supabase_postgrest_schema_definition(
-            init.connections!.supabase!.main_supabase_table!.sb_table_schema
-          ).pks,
-          rows: [],
-        }
+    x_supabase_main_table: init.connections?.supabase
+      ? xsbmtinit(init.connections.supabase)
       : undefined,
+  };
+}
+
+function xsbmtinit(conn?: GridaSupabase.SupabaseConnectionState) {
+  // TODO: need inspection - will supbaseconn present even when main table is not present?
+  // if yes, we need to adjust the state to be nullable
+  if (!conn) return undefined;
+  const parsed = conn.main_supabase_table?.sb_table_schema
+    ? SupabasePostgRESTOpenApi.parse_supabase_postgrest_schema_definition(
+        conn.main_supabase_table?.sb_table_schema
+      )
+    : undefined;
+
+  return {
+    schema: conn.main_supabase_table!.sb_table_schema,
+    pks: parsed?.pks || [],
+    gfpk: (parsed?.pks?.length || 0) > 0 ? parsed?.pks[0] : undefined,
+    rows: [],
   };
 }
 
@@ -152,6 +163,8 @@ export interface FormEditorState {
   datetz: typeof LOCALTZ | string;
   x_supabase_main_table?: {
     schema: GridaSupabase.JSONSChema;
+    // we need a single pk for editor operations
+    gfpk: string | undefined;
     pks: string[];
     rows: GridaSupabase.XDataRow[];
   };
