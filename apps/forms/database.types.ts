@@ -1947,6 +1947,7 @@ export type Database = {
       }
       organization: {
         Row: {
+          avatar_path: string | null
           created_at: string
           id: number
           name: string
@@ -1954,6 +1955,7 @@ export type Database = {
           uuid: string
         }
         Insert: {
+          avatar_path?: string | null
           created_at?: string
           id?: number
           name: string
@@ -1961,6 +1963,7 @@ export type Database = {
           uuid?: string
         }
         Update: {
+          avatar_path?: string | null
           created_at?: string
           id?: number
           name?: string
@@ -2206,6 +2209,12 @@ export type Database = {
             }
             Returns: undefined
           }
+      rls_organization: {
+        Args: {
+          p_organization_id: number
+        }
+        Returns: boolean
+      }
     }
     Enums: {
       [_ in never]: never
