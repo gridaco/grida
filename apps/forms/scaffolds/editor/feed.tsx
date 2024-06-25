@@ -400,12 +400,13 @@ export function XSupabaseMainTableSyncProvider({
 
     // check if rows are updated
     for (const row of rows) {
-      const prevRow = pref?.find((r) => r.id === row.id);
+      const prevRow = pref.find((r) => r.id === row.id);
 
       if (prevRow) {
-        // check if row value is updated
-        if (JSON.stringify(prevRow) !== JSON.stringify(row)) {
-          update(row[pkname], row);
+        // get changed fields
+        const diff = rowdiff(prevRow, row);
+        if (Object.keys(diff).length > 0) {
+          update(row[pkname], diff);
         }
       }
     }

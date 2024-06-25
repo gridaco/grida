@@ -60,18 +60,21 @@ export namespace FlatPostgREST {
    */
   export const POSTGREST_JSON_PATH_REGEX = /^([^.]+)\.\$\.[^.]+(?:\.[^.]+)*$/;
 
-  export function testPath(path: string): boolean {
-    return POSTGREST_JSON_PATH_REGEX.test(path);
+  export function testPath(fullpath: string): boolean {
+    return POSTGREST_JSON_PATH_REGEX.test(fullpath);
   }
 
-  export function decodePath(path: string): { column: string; path: string } {
-    const match = POSTGREST_JSON_PATH_REGEX.exec(path);
+  export function decodePath(fullpath: string): {
+    column: string;
+    path: string;
+  } {
+    const match = POSTGREST_JSON_PATH_REGEX.exec(fullpath);
     if (match) {
       // Remove the initial field and '.$' part
-      const extractedPath = path.replace(/^([^.]+)\.\$\./, "");
+      const extractedPath = fullpath.replace(/^([^.]+)\.\$\./, "");
       return { column: match[1], path: extractedPath };
     } else {
-      throw new Error(`Invalid JSON path: ${path}`);
+      throw new Error(`Invalid JSON path: ${fullpath}`);
     }
   }
 
@@ -108,16 +111,41 @@ export namespace FlatPostgREST {
     return _unflatten(jsonpath_data, options);
   }
 
-  export function get(path: string, row: Record<string, any>): any {
-    const { column, path: jsonpath } = decodePath(path);
+  export function get<T = any>(
+    fullpath: string,
+    row: Record<string, T>
+  ): T | undefined {
+    const { column, path: jsonpath } = decodePath(fullpath);
 
     const json = row[column];
 
     if (json) {
-      const flat = _flatten(json) as Record<string, any>;
+      const flat = _flatten(json) as Record<string, T>;
       return flat[jsonpath];
     }
 
     return undefined;
+  }
+
+  export function update<T = any>(
+    row: Record<string, Record<string, T>>,
+    fullpath: string,
+    value: T
+  ) {
+    const data = Object.assign({}, row);
+
+    const { column, path: jsonpath } = decodePath(fullpath);
+
+    if (!data[column]) {
+      data[column] = {};
+    }
+
+    const json = data[column] as Record<string, T>;
+    const flat = _flatten(json) as Record<string, T>;
+    flat[jsonpath] = value;
+
+    data[column] = _unflatten(flat);
+
+    return data;
   }
 }

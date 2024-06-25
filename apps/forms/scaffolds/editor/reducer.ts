@@ -44,6 +44,7 @@ import { IMAGE_BLOCK_SRC_DEFAULT_VALUE } from "@/k/image_block_defaults";
 import { PDF_BLOCK_SRC_DEFAULT_VALUE } from "@/k/pdf_block_defaults";
 import { draftid } from "@/utils/id";
 import { FormBlockType } from "@/types";
+import { FlatPostgREST } from "@/lib/supabase-postgrest/flat";
 
 export function reducer(
   state: FormEditorState,
@@ -650,12 +651,12 @@ export function reducer(
     }
 
     case "editor/data-grid/cell/change": {
-      const { row, column, data } = <DataGridCellChangeAction>action;
-
-      const { value, option_id } = data;
       return produce(state, (draft) => {
         switch (state.datagrid_table) {
           case "response": {
+            const { row, column, data } = <DataGridCellChangeAction>action;
+            const { value, option_id } = data;
+
             const cellid = state.responses.fields[row].find(
               (f) => f.form_field_id === column && f.response_id === row
             )?.id;
@@ -676,17 +677,48 @@ export function reducer(
             break;
           }
           case "x-supabase-main-table": {
-            const pk = state.x_supabase_main_table!.gfpk!;
+            const {
+              row: row_pk,
+              column,
+              data,
+            } = <DataGridCellChangeAction>action;
+            const { value: _value, option_id } = data;
+
+            // FIXME: WRAP-UNWRAP
+            const value = JSON.parse(_value);
+
             const field = state.fields.find((f) => f.id === column);
+            if (!field) return;
+            const pk = state.x_supabase_main_table!.gfpk!;
+
+            // handle jsonpaths - partial object update
+            if (FlatPostgREST.testPath(field.name)) {
+              const { column } = FlatPostgREST.decodePath(field.name);
+              const row = state.x_supabase_main_table!.rows.find(
+                (r) => r[pk] === row_pk
+              );
+
+              if (!row) return;
+
+              const newrow = FlatPostgREST.update(row, field.name, value);
+
+              draft.x_supabase_main_table!.rows =
+                draft.x_supabase_main_table!.rows.map((r) => {
+                  if (r[pk] === row_pk) {
+                    return newrow;
+                  }
+                  return r;
+                });
+
+              return;
+            }
 
             draft.x_supabase_main_table!.rows =
               draft.x_supabase_main_table!.rows.map((r) => {
-                if (r[pk] === row) {
-                  // FIXME: WRAP-UNWRAP
-                  const unwrapped = JSON.parse(value);
+                if (r[pk] === row_pk) {
                   return {
                     ...r,
-                    [field!.name]: unwrapped,
+                    [field!.name]: value,
                   };
                 }
                 return r;
