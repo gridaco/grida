@@ -38,6 +38,9 @@ export function initialFormEditorState(init: FormEditorInit): FormEditorState {
     (id) => !block_referenced_field_ids.includes(id)
   );
 
+  const is_main_table_supabase =
+    !!init.connections?.supabase?.main_supabase_table;
+
   return {
     connections: {
       project_id: init.project_id,
@@ -46,6 +49,18 @@ export function initialFormEditorState(init: FormEditorInit): FormEditorState {
     },
     form_id: init.form_id,
     form_title: init.form_title,
+    tables: init.connections?.supabase?.main_supabase_table
+      ? [
+          {
+            type: "x-supabase",
+            name: init.connections.supabase.main_supabase_table.sb_table_name,
+            label: init.connections.supabase.main_supabase_table.sb_table_name,
+          },
+        ]
+      : [
+          { type: "response", name: "response", label: "Responses" },
+          { type: "session", name: "session", label: "Sessions" },
+        ],
     scheduling_tz: init.scheduling_tz,
     page_id: init.page_id,
     blocks: blockstreeflat(init.blocks),
@@ -54,18 +69,25 @@ export function initialFormEditorState(init: FormEditorInit): FormEditorState {
       rows: [],
       fields: {},
     },
-    selected_responses: new Set(),
+    selected_rows: new Set(),
     available_field_ids: block_available_field_ids,
-    datagrid_rows: 100,
+    datagrid_rows_per_page: 100,
     dateformat: "datetime",
     datetz: LOCALTZ,
-    datagrid_table: "response",
+    datagrid_table: is_main_table_supabase
+      ? "x-supabase-main-table"
+      : "response",
     datagrid_filter: {
       masking_enabled: false,
       empty_data_hidden: true,
     },
     realtime_responses_enabled: true,
     realtime_sessions_enabled: false,
+    x_supabase_main_table: is_main_table_supabase
+      ? {
+          rows: [],
+        }
+      : undefined,
   };
 }
 
@@ -73,6 +95,18 @@ export interface DataGridFilterSettings {
   masking_enabled: boolean;
   empty_data_hidden: boolean;
 }
+
+type GFTable =
+  | {
+      type: "response" | "session";
+      name: string;
+      label: string;
+    }
+  | {
+      type: "x-supabase";
+      name: string;
+      label: string;
+    };
 
 export interface FormEditorState {
   connections: {
@@ -91,14 +125,15 @@ export interface FormEditorState {
   focus_customer_id?: string;
   focus_block_id?: string;
   available_field_ids: string[];
+  selected_rows: Set<string>;
   responses: {
     rows: FormResponse[];
     fields: { [key: string]: FormResponseField[] };
   };
-  selected_responses: Set<string>;
   sessions?: FormResponseSession[];
-  datagrid_rows: number;
-  datagrid_table: "response" | "session";
+  tables: GFTable[];
+  datagrid_rows_per_page: number;
+  datagrid_table: "response" | "session" | "x-supabase-main-table";
   datagrid_filter: DataGridFilterSettings;
   realtime_sessions_enabled: boolean;
   realtime_responses_enabled: boolean;
@@ -109,6 +144,9 @@ export interface FormEditorState {
   field_edit_panel_refresh_key?: number;
   dateformat: "date" | "time" | "datetime";
   datetz: typeof LOCALTZ | string;
+  x_supabase_main_table?: {
+    rows: GridaSupabase.XDataRow[];
+  };
 }
 
 export interface EditorFlatFormBlock<T = FormBlockType> extends FormBlock<T> {

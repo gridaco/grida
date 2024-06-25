@@ -191,7 +191,7 @@ function View() {
   }, [state.sessions]);
 
   return (
-    <main className="relative p-4 h-full">
+    <main className="relative p-4 w-full h-full">
       <div className="absolute top-0 left-0 right-0 bottom-0">
         <div className="w-full h-full">
           <MapGL

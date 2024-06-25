@@ -7,11 +7,7 @@ import { createClientFormsClient } from "@/lib/supabase/client";
 import { RealtimePostgresChangesPayload } from "@supabase/supabase-js";
 import useSWR from "swr";
 import type { EditorApiResponse } from "@/types/private/api";
-import type {
-  FormResponse,
-  FormResponseField,
-  FormResponseWithFields,
-} from "@/types";
+import type { FormResponseField } from "@/types";
 import { usePrevious } from "@uidotdev/usehooks";
 
 type RealtimeTableChangeData = {
@@ -155,8 +151,12 @@ export function ResponseFeedProvider({
 }: React.PropsWithChildren<{}>) {
   const [state, dispatch] = useEditorState();
 
-  const { form_id, datagrid_table, datagrid_rows, realtime_responses_enabled } =
-    state;
+  const {
+    form_id,
+    datagrid_table,
+    datagrid_rows_per_page,
+    realtime_responses_enabled,
+  } = state;
 
   const supabase = useMemo(() => createClientFormsClient(), []);
 
@@ -208,7 +208,7 @@ export function ResponseFeedProvider({
 
   useEffect(() => {
     if (datagrid_table !== "response") return;
-    const feed = fetchResponses(datagrid_rows).then((data) => {
+    const feed = fetchResponses(datagrid_rows_per_page).then((data) => {
       dispatch({
         type: "editor/response/feed",
         data: data as any,
@@ -221,7 +221,7 @@ export function ResponseFeedProvider({
       success: "Responses fetched",
       error: "Failed to fetch responses",
     });
-  }, [dispatch, fetchResponses, datagrid_rows, datagrid_table]);
+  }, [dispatch, fetchResponses, datagrid_rows_per_page, datagrid_table]);
 
   useSubscription({
     table: "response",
@@ -281,7 +281,7 @@ export function ResponseSessionFeedProvider({
   const {
     form_id,
     datagrid_table,
-    datagrid_rows,
+    datagrid_rows_per_page,
     realtime_sessions_enabled: _realtime_sessions_enabled,
   } = state;
 
@@ -312,7 +312,7 @@ export function ResponseSessionFeedProvider({
   useEffect(() => {
     if (datagrid_table !== "session") return;
 
-    const feed = fetchResponseSessions(datagrid_rows).then((data) => {
+    const feed = fetchResponseSessions(datagrid_rows_per_page).then((data) => {
       dispatch({
         type: "editor/data/sessions/feed",
         data: data as any,
@@ -325,7 +325,7 @@ export function ResponseSessionFeedProvider({
       success: "Sessions fetched",
       error: "Failed to fetch sessions",
     });
-  }, [dispatch, datagrid_table, datagrid_rows, fetchResponseSessions]);
+  }, [dispatch, datagrid_table, datagrid_rows_per_page, fetchResponseSessions]);
 
   useSubscription({
     table: "response_session",
@@ -356,8 +356,10 @@ export function XSupabaseMainTableFeedProvider({
 }: React.PropsWithChildren<{}>) {
   const [state, dispatch] = useEditorState();
 
+  const { datagrid_rows_per_page } = state;
+
   const request = state.connections.supabase?.main_supabase_table_id
-    ? `/private/editor/connect/${state.form_id}/supabase/table/${state.connections.supabase.main_supabase_table_id}/query`
+    ? `/private/editor/connect/${state.form_id}/supabase/table/${state.connections.supabase.main_supabase_table_id}/query?limit=${datagrid_rows_per_page}`
     : null;
 
   const res = useSWR<EditorApiResponse<Record<string, any>[], any>>(
@@ -372,44 +374,9 @@ export function XSupabaseMainTableFeedProvider({
     if (res.data?.data) {
       const rows = res.data.data;
 
-      // TODO: process data to match the response interface
-      const data = rows.map((row, i) => {
-        return {
-          id: row.id,
-          local_id: null,
-          local_index: 0,
-          browser: null,
-          created_at: new Date().toISOString(),
-          customer_id: null,
-          form_id: state.form_id,
-          ip: null,
-          platform_powered_by: null,
-          raw: row,
-          updated_at: new Date().toISOString(),
-          x_referer: null,
-          x_useragent: null,
-          x_ipinfo: null,
-          geo: null,
-          fields: Object.keys(row).map((key) => {
-            return {
-              id: key,
-              created_at: new Date().toISOString(),
-              form_field_id: key,
-              response_id: row.id,
-              type: "text",
-              form_field_option_id: null,
-              updated_at: new Date().toISOString(),
-              value: row[key],
-              storage_object_paths: null,
-            } satisfies FormResponseField;
-          }),
-        } satisfies FormResponseWithFields;
-      });
-
       dispatch({
-        type: "editor/response/feed",
-        data: data,
-        reset: true,
+        type: "editor/x-supabase/main-table/feed",
+        data: rows,
       });
     }
   }, [dispatch, res.data, state.form_id]);

@@ -1,8 +1,10 @@
+import { XSupabaseQueryBuilder } from "@/lib/supabase-postgrest/builder";
 import { createRouteHandlerClient } from "@/lib/supabase/server";
 import {
   GridaXSupabaseClient,
   createXSupabaseClient,
 } from "@/services/x-supabase";
+
 import assert from "assert";
 import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
@@ -21,6 +23,9 @@ export async function GET(
   const table_id = parseInt(_table_id);
   const cookieStore = cookies();
   const grida_forms_client = createRouteHandlerClient(cookieStore);
+
+  const _q_limit = req.nextUrl.searchParams.get("limit");
+  const limit = _q_limit ? parseInt(_q_limit) : undefined;
 
   const { data, error } = await grida_forms_client
     .from("form")
@@ -49,9 +54,13 @@ export async function GET(
     }
   );
 
-  const res = await x_client
+  const query = new XSupabaseQueryBuilder(x_client);
+
+  const res = await query
     .from(main_supabase_table.sb_table_name)
-    .select("*");
+    .select("*")
+    .limit(limit)
+    .done();
 
   return NextResponse.json(res);
 }

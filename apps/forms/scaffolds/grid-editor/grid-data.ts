@@ -24,27 +24,56 @@ export namespace GridData {
           fields: { [key: string]: FormResponseField[] };
         };
       }
+    | {
+        table: "x-supabase-main-table";
+        data: {
+          rows: any[];
+          fields: { [key: string]: any[] };
+        };
+      }
   );
 
-  export function rows(data: DataGridInput) {
-    switch (data.table) {
-      case "response":
-        return data.responses
+  export function rows(input: DataGridInput) {
+    switch (input.table) {
+      case "response": {
+        return input.responses
           ? rows_from_responses(
-              data.responses,
+              input.responses,
               // TODO:
               // applyFilter(data.responses, data.filter),
 
-              data.fields
+              input.fields
             )
           : [];
-      case "session":
-        return data.sessions
+      }
+      case "session": {
+        return input.sessions
           ? rows_from_sessions(
-              applyFilter(data.sessions, data.filter),
-              data.fields
+              applyFilter(input.sessions, input.filter),
+              input.fields
             )
           : [];
+      }
+      case "x-supabase-main-table": {
+        // TODO:
+        return input.data.rows.reduce((acc, row, index) => {
+          const gfRow: GFResponseRow = {
+            __gf_id: "-",
+            __gf_display_id: "-",
+            __gf_created_at: "-",
+            __gf_customer_id: "-",
+            fields: {},
+          };
+          input.fields.forEach((field) => {
+            gfRow.fields[field.id] = {
+              type: field.type,
+              value: row[field.name],
+            };
+          });
+          acc.push(gfRow);
+          return acc;
+        }, []);
+      }
     }
   }
 

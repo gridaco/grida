@@ -1,9 +1,11 @@
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   createRouteHandlerClient,
   createRouteHandlerWorkspaceClient,
 } from "@/lib/supabase/server";
 import { CustomerGrid } from "@/scaffolds/grid/customer-grid";
 import { Siebar } from "@/scaffolds/sidebar/sidebar";
+import { provisional } from "@/services/customer/utils";
 import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
 
@@ -32,6 +34,7 @@ export default async function Customers({
   const { data: customers, error: customers_error } = await wsclient
     .from("customer")
     .select()
+    .order("last_seen_at", { ascending: false })
     .eq("project_id", form_ref.project_id);
 
   if (customers_error || !customers) {
@@ -46,40 +49,31 @@ export default async function Customers({
       </aside>
       <div className="w-full h-full overflow-x-hidden">
         <main className="flex flex-col h-full">
+          {/* <Tabs>
+            <TabsList>
+              <TabsTrigger value="1">All</TabsTrigger>
+              <TabsTrigger value="2">Repeat Customers</TabsTrigger>
+              <TabsTrigger value="2">First-time Customers</TabsTrigger>
+            </TabsList>
+          </Tabs> */}
           <h1 className="text-2xl font-bold p-4">
-            Customers{" "}
-            <small className="text-muted-foreground">
+            All Customers
+            <small className="ms-2 text-muted-foreground">
               ({customers.length})
             </small>
           </h1>
           <div className="flex flex-col w-full h-full">
             <CustomerGrid
-              columns={[
-                {
-                  key: "uid",
-                  name: "UID",
-                },
-                {
-                  key: "email",
-                  name: "Email",
-                },
-                {
-                  key: "phone",
-                  name: "Phone",
-                },
-                {
-                  key: "created_at",
-                  name: "Created At",
-                },
-                {
-                  key: "last_seen_at",
-                  name: "Last Seen At",
-                },
-              ]}
               rows={customers.map((customer) => ({
                 uid: customer.uid,
-                email: customer.email,
-                phone: customer.phone,
+                email: provisional(
+                  customer.email,
+                  customer.email_provisional
+                ).join(", "),
+                phone: provisional(
+                  customer.phone,
+                  customer.phone_provisional
+                ).join(", "),
                 created_at: customer.created_at,
                 last_seen_at: customer.last_seen_at,
               }))}

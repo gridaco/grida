@@ -34,8 +34,10 @@ export interface Customer {
   created_at: string;
   last_seen_at: string;
   email: string | null;
-  uuid: string | null;
+  email_provisional: string[];
   phone: string | null;
+  phone_provisional: string[];
+  uuid: string | null;
 }
 
 /**

@@ -4,19 +4,20 @@ import { notFound } from "next/navigation";
 import { cookies } from "next/headers";
 import { createServerComponentClient } from "@/lib/supabase/server";
 import { GridaLogo } from "@/components/grida-logo";
-import { EyeOpenIcon, SlashIcon } from "@radix-ui/react-icons";
+import { SlashIcon } from "@radix-ui/react-icons";
 import { Tabs } from "@/scaffolds/d/tabs";
 import { FormEditorProvider } from "@/scaffolds/editor";
-import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import { GoogleAnalytics } from "@next/third-parties/google";
 import { FormPage } from "@/types";
 import { PreviewButton } from "@/components/preview-button";
 import { ThemeProvider } from "@/components/theme-provider";
-import "../../../editor.css";
 import { ToasterWithMax } from "@/components/toaster";
-import clsx from "clsx";
 import { GridaXSupabaseClient } from "@/services/x-supabase";
+import type { Metadata } from "next";
+import clsx from "clsx";
+import "../../../editor.css";
+import { EditorHelpFab } from "@/scaffolds/help/editor-help-fab";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -134,6 +135,7 @@ export default async function RootLayout({
             >
               <div className="flex flex-1 overflow-y-auto">{children}</div>
             </FormEditorProvider>
+            <EditorHelpFab />
           </ThemeProvider>
         </div>
       </body>

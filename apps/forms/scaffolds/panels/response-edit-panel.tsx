@@ -22,8 +22,10 @@ import {
 } from "@/types";
 import { LockClosedIcon } from "@radix-ui/react-icons";
 import toast from "react-hot-toast";
-import { Editor } from "@monaco-editor/react";
+import { Editor, useMonaco } from "@monaco-editor/react";
 import { fmt_local_index } from "@/utils/fmt";
+import { useTheme } from "next-themes";
+import { useMonacoTheme } from "@/components/monaco";
 
 export function ResponseEditPanel({
   title,
@@ -42,6 +44,11 @@ export function ResponseEditPanel({
   onSave?: (field: FormFieldInit) => void;
 }) {
   const { response, response_fields, field_defs } = init ?? {};
+
+  const { resolvedTheme } = useTheme();
+
+  const monaco = useMonaco();
+  useMonacoTheme(monaco, resolvedTheme ?? "light");
 
   const onSaveClick = () => {};
 
