@@ -74,7 +74,7 @@ export default function PartnerPOC() {
             </header>
             <div className="container max-w-full bg-muted">
               <Tabs
-                className="flex flex-col items-center justify-center mt-10 gap-10"
+                className="flex flex-col items-center justify-center my-16 gap-10"
                 defaultValue={demo_1_categories[0]}
               >
                 <TabsList>
@@ -170,7 +170,7 @@ export default function PartnerPOC() {
               도움이 필요한 순간에 POC가 옆에서 도와드립니다.
             </span>
           </div>
-          <div className="flex flex-col flex-wrap items-center justify-center md:flex-row gap-10 mt-12">
+          <div className="flex flex-col flex-wrap items-center justify-center md:flex-row gap-10 mt-20">
             <SolutionCard
               cover="/affiliate/poc/images/solution-card-cover-1.png"
               alt="solution 1"
