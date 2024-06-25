@@ -27,6 +27,7 @@ export function unwrapFeildValue(
   } catch (e) {
     switch (typeof value) {
       case "object":
+        return JSON.stringify(value);
       case "symbol":
       case "function":
         return "N/A";

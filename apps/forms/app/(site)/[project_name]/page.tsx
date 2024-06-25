@@ -6,7 +6,6 @@ import {
   createServerComponentClient,
   createServerComponentWorkspaceClient,
 } from "@/lib/supabase/server";
-import { GridaLogo } from "@/components/grida-logo";
 import {
   FileIcon,
   ViewGridIcon,
@@ -19,6 +18,7 @@ import { Metadata } from "next";
 import { ProjectStats } from "@/scaffolds/analytics/stats";
 import { EditorHelpFab } from "@/scaffolds/help/editor-help-fab";
 import { PoweredByGridaFooter } from "@/scaffolds/e/form/powered-by-brand-footer";
+import { OrganizationAvatar } from "@/components/organization-avatar";
 
 export const revalidate = 0;
 
@@ -65,7 +65,7 @@ export default async function FormsDashboardPage({
 
   const { data: project_ref, error: _project_ref_err } = await wsclient
     .from("project")
-    .select("id")
+    .select("id, organization:organization(id, name, avatar_path)")
     .eq("name", project_name)
     // TODO: in theory, there can be multiple projects with the same name in different organizations that the user is part of
     .limit(1)
@@ -75,6 +75,12 @@ export default async function FormsDashboardPage({
   if (!project_ref) {
     return notFound();
   }
+
+  const avatar_url = project_ref.organization?.avatar_path
+    ? supabase.storage
+        .from("avatars")
+        .getPublicUrl(project_ref.organization?.avatar_path).data.publicUrl
+    : null;
 
   const project_id = project_ref.id;
 
@@ -104,7 +110,10 @@ export default async function FormsDashboardPage({
         <div>
           <Link href="/dashboard" prefetch={false}>
             <span className="flex items-center gap-2 text-2xl font-black select-none">
-              <GridaLogo />
+              <OrganizationAvatar
+                avatar_url={avatar_url}
+                alt={project_ref.organization?.name}
+              />
               Forms
             </span>
           </Link>

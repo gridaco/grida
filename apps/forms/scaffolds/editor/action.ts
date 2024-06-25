@@ -5,6 +5,7 @@ import {
   FormResponse,
   FormResponseField,
   FormResponseWithFields,
+  GridaSupabase,
 } from "@/types";
 import type { EditorFlatFormBlock, FormEditorState } from "./state";
 import type { JSONConditionExpression } from "@/types/logic";
@@ -27,7 +28,7 @@ export type BlocksEditorAction =
   | BlockTitleAction
   | BlockDescriptionAction
   | SelectResponse
-  | DeleteSelectedResponsesAction
+  | DataGridDeleteSelectedRows
   | DeleteResponseAction
   | SaveFieldAction
   | DeleteFieldAction
@@ -42,7 +43,8 @@ export type BlocksEditorAction =
   | DataGridDateFormatAction
   | DataGridDateTZAction
   | DataGridFilterAction
-  | DataGridCellChangeAction;
+  | DataGridCellChangeAction
+  | FeedXSupabaseMainTableRowsAction;
 
 export interface CreateNewPendingBlockAction {
   type: "blocks/new";
@@ -153,10 +155,6 @@ export interface SelectResponse {
   selection: ReadonlySet<string>;
 }
 
-export interface DeleteSelectedResponsesAction {
-  type: "editor/response/delete/selected";
-}
-
 export interface DeleteResponseAction {
   type: "editor/response/delete";
   id: string;
@@ -215,6 +213,10 @@ export interface DataGridRowsAction {
   rows: number;
 }
 
+export interface DataGridDeleteSelectedRows {
+  type: "editor/data-grid/delete/selected";
+}
+
 export interface DataGridFilterAction
   extends Partial<FormEditorState["datagrid_filter"]> {
   type: "editor/data-grid/filter";
@@ -225,4 +227,9 @@ export interface DataGridCellChangeAction {
   row: string;
   column: string;
   data: { value: any; option_id?: string | null };
+}
+
+export interface FeedXSupabaseMainTableRowsAction {
+  type: "editor/x-supabase/main-table/feed";
+  data: GridaSupabase.XDataRow[];
 }

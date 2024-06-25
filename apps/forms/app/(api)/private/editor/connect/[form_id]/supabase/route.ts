@@ -1,10 +1,9 @@
-import { parseSupabaseSchema } from "@/lib/supabase-postgrest";
+import { SupabasePostgRESTOpenApi } from "@/lib/supabase-postgrest";
 import {
   createRouteHandlerClient,
   grida_xsupabase_client,
 } from "@/lib/supabase/server";
 import { GridaXSupabaseClient } from "@/services/x-supabase";
-import { GridaSupabase } from "@/types";
 import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
 import { NextRequest, NextResponse } from "next/server";
@@ -72,10 +71,11 @@ export async function PATCH(req: NextRequest, context: Context) {
     .eq("id", supabase_project_id)
     .single();
 
-  const { sb_public_schema } = await parseSupabaseSchema({
-    url: supabase_project!.sb_project_url,
-    anonKey: supabase_project!.sb_anon_key,
-  });
+  const { sb_public_schema } =
+    await SupabasePostgRESTOpenApi.fetch_supabase_postgrest_swagger({
+      url: supabase_project!.sb_project_url,
+      anonKey: supabase_project!.sb_anon_key,
+    });
 
   if (conn.main_supabase_table_id) {
     const { data: main_table } = await grida_xsupabase_client
@@ -115,7 +115,7 @@ export async function POST(req: NextRequest, context: Context) {
   const { sb_project_url, sb_anon_key } = data;
 
   const { sb_project_reference_id, sb_public_schema } =
-    await parseSupabaseSchema({
+    await SupabasePostgRESTOpenApi.fetch_supabase_postgrest_swagger({
       url: sb_project_url,
       anonKey: sb_anon_key,
     });

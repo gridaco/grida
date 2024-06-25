@@ -1,22 +1,14 @@
 "use client";
 
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useFilePicker } from "use-file-picker";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogDescription,
-  DialogHeader,
-} from "@/components/ui/dialog";
-import { createClientFormsClient } from "@/lib/supabase/client";
-import { useEditorState } from "../editor";
-import { nanoid } from "nanoid";
+import { Dialog, DialogContent, DialogHeader } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Spinner } from "@/components/spinner";
+import { useUploadFile } from "../media";
 
 export function MediaPicker({
   open,
@@ -82,30 +74,6 @@ function FromUrl() {
         )}
       </div>
     </div>
-  );
-}
-
-export function useUploadFile() {
-  const [state] = useEditorState();
-  const supabase = createClientFormsClient();
-
-  return useCallback(
-    async (file: Blob | File) => {
-      const fileKey = `${state.form_id}/${nanoid()}`;
-      return await supabase.storage
-        .from("grida-forms")
-        .upload(fileKey, file, {
-          contentType: file.type,
-        })
-        .then(({ data, error }) => {
-          if (error) {
-            throw new Error("Failed to upload file");
-          }
-          return supabase.storage.from("grida-forms").getPublicUrl(fileKey).data
-            .publicUrl;
-        });
-    },
-    [supabase.storage, state.form_id]
   );
 }
 

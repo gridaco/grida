@@ -82,11 +82,11 @@ export class GridaXSupabaseClient {
       ...conn,
       supabase_project: supabase_project! as GridaSupabase.SupabaseProject,
       main_supabase_table_id,
-      tables: supabase_project!.tables as GridaSupabase.SupabaseTable[],
+      tables: supabase_project!.tables as any as GridaSupabase.SupabaseTable[],
       main_supabase_table:
         (supabase_project!.tables.find(
           (t) => t.id === main_supabase_table_id
-        ) as GridaSupabase.SupabaseTable) || null,
+        ) as any as GridaSupabase.SupabaseTable) || null,
     };
   }
 }

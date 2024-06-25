@@ -12,7 +12,7 @@ import {
   DeleteBlockAction,
   DeleteFieldAction,
   DeleteResponseAction,
-  DeleteSelectedResponsesAction,
+  DataGridDeleteSelectedRows,
   FeedResponseAction,
   FocusBlockAction,
   FocusFieldAction,
@@ -34,6 +34,7 @@ import {
   DataGridDateTZAction,
   DataGridFilterAction,
   DataGridCellChangeAction,
+  FeedXSupabaseMainTableRowsAction,
 } from "./action";
 import { arrayMove } from "@dnd-kit/sortable";
 import { blockstreeflat } from "@/lib/forms/tree";
@@ -43,6 +44,7 @@ import { IMAGE_BLOCK_SRC_DEFAULT_VALUE } from "@/k/image_block_defaults";
 import { PDF_BLOCK_SRC_DEFAULT_VALUE } from "@/k/pdf_block_defaults";
 import { draftid } from "@/utils/id";
 import { FormBlockType } from "@/types";
+import { FlatPostgREST } from "@/lib/supabase-postgrest/flat";
 
 export function reducer(
   state: FormEditorState,
@@ -449,24 +451,6 @@ export function reducer(
         draft.selected_rows = new Set(selection);
       });
     }
-    case "editor/response/delete/selected": {
-      const {} = <DeleteSelectedResponsesAction>action;
-      return produce(state, (draft) => {
-        const ids = Array.from(state.selected_rows);
-
-        draft.responses.rows = draft.responses.rows.filter(
-          (response) => !ids.includes(response.id)
-        );
-
-        // also remove from selected_responses
-        const new_selected_responses = new Set(state.selected_rows);
-        ids.forEach((id) => {
-          new_selected_responses.delete(id);
-        });
-
-        draft.selected_rows = new_selected_responses;
-      });
-    }
     case "editor/response/delete": {
       const { id } = <DeleteResponseAction>action;
       return produce(state, (draft) => {
@@ -484,7 +468,7 @@ export function reducer(
     case "editor/data-grid/rows": {
       const { rows: max } = <DataGridRowsAction>action;
       return produce(state, (draft) => {
-        draft.datagrid_rows = max;
+        draft.datagrid_rows_per_page = max;
       });
     }
     case "editor/response/feed": {
@@ -582,6 +566,39 @@ export function reducer(
 
         draft.realtime_sessions_enabled = table === "session";
         draft.realtime_responses_enabled = table === "response";
+
+        // clear selected rows
+        draft.selected_rows = new Set();
+      });
+    }
+    case "editor/data-grid/delete/selected": {
+      const {} = <DataGridDeleteSelectedRows>action;
+      return produce(state, (draft) => {
+        switch (state.datagrid_table) {
+          case "response": {
+            const ids = Array.from(state.selected_rows);
+            draft.responses.rows = draft.responses.rows.filter(
+              (response) => !ids.includes(response.id)
+            );
+
+            break;
+          }
+          case "x-supabase-main-table": {
+            const pk = state.x_supabase_main_table!.gfpk!;
+            draft.x_supabase_main_table!.rows =
+              draft.x_supabase_main_table!.rows.filter(
+                (row) => !state.selected_rows.has(row[pk])
+              );
+
+            break;
+          }
+          case "session":
+          default:
+            throw new Error("Unsupported table type: " + state.datagrid_table);
+        }
+
+        // clear selected rows
+        draft.selected_rows = new Set();
       });
     }
     case "editor/customers/edit": {
@@ -602,9 +619,10 @@ export function reducer(
       const { a, b } = <DataGridReorderColumnAction>action;
       return produce(state, (draft) => {
         // update field local_index
-        const field_a = draft.fields.find((f) => f.id === a);
-        const field_b = draft.fields.find((f) => f.id === b);
+        const index_a = draft.fields.findIndex((f) => f.id === a);
+        const index_b = draft.fields.findIndex((f) => f.id === b);
         // TODO:
+        draft.fields = arrayMove(draft.fields, index_a, index_b);
 
         console.error("reorder:: Not implemented yet");
       });
@@ -633,25 +651,96 @@ export function reducer(
     }
 
     case "editor/data-grid/cell/change": {
-      const { row, column, data } = <DataGridCellChangeAction>action;
-
-      const { value, option_id } = data;
       return produce(state, (draft) => {
-        const cellid = state.responses.fields[row].find(
-          (f) => f.form_field_id === column && f.response_id === row
-        )?.id;
+        switch (state.datagrid_table) {
+          case "response": {
+            const { row, column, data } = <DataGridCellChangeAction>action;
+            const { value, option_id } = data;
 
-        draft.responses.fields[row] = draft.responses.fields[row].map((f) => {
-          if (f.id === cellid) {
-            return {
-              ...f,
-              form_field_option_id: option_id ?? null,
-              value,
-            };
+            const cellid = state.responses.fields[row].find(
+              (f) => f.form_field_id === column && f.response_id === row
+            )?.id;
+
+            draft.responses.fields[row] = draft.responses.fields[row].map(
+              (f) => {
+                if (f.id === cellid) {
+                  return {
+                    ...f,
+                    form_field_option_id: option_id ?? null,
+                    value,
+                  };
+                }
+                return f;
+              }
+            );
+
+            break;
           }
-          return f;
-        });
+          case "x-supabase-main-table": {
+            const {
+              row: row_pk,
+              column,
+              data,
+            } = <DataGridCellChangeAction>action;
+            const { value: _value, option_id } = data;
+
+            // FIXME: WRAP-UNWRAP
+            const value = JSON.parse(_value);
+
+            const field = state.fields.find((f) => f.id === column);
+            if (!field) return;
+            const pk = state.x_supabase_main_table!.gfpk!;
+
+            // handle jsonpaths - partial object update
+            if (FlatPostgREST.testPath(field.name)) {
+              const { column } = FlatPostgREST.decodePath(field.name);
+              const row = state.x_supabase_main_table!.rows.find(
+                (r) => r[pk] === row_pk
+              );
+
+              if (!row) return;
+
+              const newrow = FlatPostgREST.update(row, field.name, value);
+
+              draft.x_supabase_main_table!.rows =
+                draft.x_supabase_main_table!.rows.map((r) => {
+                  if (r[pk] === row_pk) {
+                    return newrow;
+                  }
+                  return r;
+                });
+
+              return;
+            }
+
+            draft.x_supabase_main_table!.rows =
+              draft.x_supabase_main_table!.rows.map((r) => {
+                if (r[pk] === row_pk) {
+                  return {
+                    ...r,
+                    [field!.name]: value,
+                  };
+                }
+                return r;
+              });
+
+            break;
+          }
+          case "session":
+          default: {
+            throw new Error("Unsupported table type: " + state.datagrid_table);
+          }
+        }
       });
+    }
+    case "editor/x-supabase/main-table/feed": {
+      const { data } = <FeedXSupabaseMainTableRowsAction>action;
+
+      return produce(state, (draft) => {
+        draft.x_supabase_main_table!.rows = data;
+        return;
+      });
+      //
     }
     default:
       return state;

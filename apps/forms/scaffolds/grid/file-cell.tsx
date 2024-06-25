@@ -1,17 +1,10 @@
 import {
   PlusIcon,
-  ChevronDownIcon,
   EnterFullScreenIcon,
-  Link2Icon,
-  Pencil1Icon,
   TrashIcon,
   DotsHorizontalIcon,
   DownloadIcon,
   FileIcon,
-  DragHandleDots1Icon,
-  DragHandleDots2Icon,
-  UploadIcon,
-  ReloadIcon,
   OpenInNewWindowIcon,
 } from "@radix-ui/react-icons";
 import {
@@ -46,6 +39,7 @@ import {
 } from "@/components/ui/tooltip";
 import { useState } from "react";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { MediaPicker } from "../mediapicker";
 
 export function FileEditCell({
   type,
@@ -66,6 +60,7 @@ export function FileEditCell({
     name: string;
   }[];
 }) {
+  const [mediaPickerOpen, setMediaPickerOpen] = useState(false);
   const { open: openMediaViewer } = useMediaViewer();
 
   const onEnterFullScreen = (f: GFFile) => {
@@ -219,31 +214,34 @@ export function FileEditCell({
               ))}
             </div>
           </ScrollArea>
-          {/* <footer className="p-2 border-t">
-            <Popover>
-              <PopoverTrigger asChild>
-                <Tooltip>
-                  <TooltipTrigger className="w-full">
-                    <Button
-                      disabled={!canAddNewFile}
-                      variant="outline"
-                      size="sm"
-                      className="w-full"
-                    >
-                      <PlusIcon className="me-2" />
-                      Add File
-                    </Button>
-                  </TooltipTrigger>
-                  {!canAddNewFile && (
-                    <TooltipContent>
-                      multiple is set to false, only one file is allowed.
-                    </TooltipContent>
-                  )}
-                </Tooltip>
-              </PopoverTrigger>
-              <PopoverContent>upload here</PopoverContent>
-            </Popover>
-          </footer> */}
+          <footer className="p-2 border-t">
+            <Tooltip>
+              <TooltipTrigger className="w-full">
+                <Button
+                  disabled={!canAddNewFile}
+                  variant="outline"
+                  size="sm"
+                  className="w-full"
+                  onClick={() => setMediaPickerOpen(true)}
+                >
+                  <PlusIcon className="me-2" />
+                  Add File
+                </Button>
+              </TooltipTrigger>
+              {!canAddNewFile && (
+                <TooltipContent>
+                  multiple is set to false, only one file is allowed.
+                </TooltipContent>
+              )}
+            </Tooltip>
+            <MediaPicker
+              open={mediaPickerOpen}
+              onOpenChange={setMediaPickerOpen}
+              onUseImage={(src) => {
+                setMediaPickerOpen(false);
+              }}
+            />
+          </footer>
         </div>
       </PopoverContent>
     </Popover>

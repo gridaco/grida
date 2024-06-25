@@ -42,13 +42,14 @@ import {
   DropdownMenuShortcut,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { format, startOfDay, addSeconds } from "date-fns";
 import { format as formatTZ } from "date-fns-tz";
 import { LOCALTZ, tztostr } from "../editor/symbols";
 import { GridData } from "./grid-data";
 import clsx from "clsx";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import type { XSupabaseQuery } from "@/lib/supabase-postgrest/builder";
 
 export function GridEditor() {
   const [state, dispatch] = useEditorState();
@@ -62,20 +63,14 @@ export function GridEditor() {
     sessions,
     datagrid_filter,
     datagrid_table,
+    x_supabase_main_table,
     selected_rows: selected_responses,
   } = state;
   const supabase = createClientFormsClient();
 
-  const columns = useMemo(
-    () =>
-      fields?.map((field) => ({
-        key: field.id,
-        name: field.name,
-        frozen: false,
-        type: field.type,
-        // You can add more properties here as needed by react-data-grid
-      })) ?? [],
-    [fields]
+  const { systemcolumns, columns } = useMemo(
+    () => GridData.columns(datagrid_table, fields),
+    [datagrid_table, fields]
   );
 
   // Transforming the responses into the format expected by react-data-grid
@@ -86,8 +81,21 @@ export function GridEditor() {
       filter: datagrid_filter,
       responses: responses,
       sessions: sessions ?? [],
+      // TODO:
+      data: {
+        pks: x_supabase_main_table?.pks ?? [],
+        rows: x_supabase_main_table?.rows ?? [],
+        fields: {},
+      },
     });
-  }, [datagrid_table, sessions, fields, responses, datagrid_filter]);
+  }, [
+    datagrid_table,
+    sessions,
+    fields,
+    responses,
+    x_supabase_main_table,
+    datagrid_filter,
+  ]);
 
   const openNewFieldPanel = useCallback(() => {
     dispatch({
@@ -143,8 +151,8 @@ export function GridEditor() {
 
   const has_selected_responses = selected_responses.size > 0;
   const keyword = table_keyword(datagrid_table);
-  const selectionDisabled = datagrid_table !== "response"; // TODO: session does not support selection
-  const readonly = datagrid_table !== "response";
+  const selectionDisabled = datagrid_table === "session";
+  const readonly = datagrid_table === "session";
 
   return (
     <div className="flex flex-col h-full">
@@ -182,8 +190,16 @@ export function GridEditor() {
                   }}
                 >
                   <TabsList>
-                    <TabsTrigger value="response">Responses</TabsTrigger>
-                    <TabsTrigger value="session">Sessions</TabsTrigger>
+                    {state.tables.map((table) => {
+                      return (
+                        <TabsTrigger
+                          key={table.type + table.name}
+                          value={table.name}
+                        >
+                          {table.label}
+                        </TabsTrigger>
+                      );
+                    })}
                   </TabsList>
                 </Tabs>
               </div>
@@ -219,6 +235,7 @@ export function GridEditor() {
       />
       <div className="flex flex-col w-full h-full">
         <ResponseGrid
+          systemcolumns={systemcolumns}
           columns={columns}
           rows={rows}
           readonly={readonly}
@@ -264,18 +281,18 @@ function DeleteSelectedRowsButton() {
   const supabase = createClientFormsClient();
   const [state, dispatch] = useEditorState();
 
-  const { datagrid_table, selected_rows: selected_responses } = state;
+  const { datagrid_table, selected_rows } = state;
 
   const keyword = table_keyword(datagrid_table);
 
-  const onDeleteResponse = useCallback(() => {
+  const delete_selected_responses = useCallback(() => {
     const deleting = supabase
       .from("response")
       .delete()
-      .in("id", Array.from(selected_responses))
+      .in("id", Array.from(selected_rows))
       .then(() => {
         dispatch({
-          type: "editor/response/delete/selected",
+          type: "editor/data-grid/delete/selected",
         });
       });
 
@@ -284,25 +301,87 @@ function DeleteSelectedRowsButton() {
       success: "Response deleted",
       error: "", // this won't be shown (supabase does not return error for delete operation)
     });
-  }, [supabase, selected_responses, dispatch]);
+  }, [supabase, selected_rows, dispatch]);
+
+  const delete_selected_x_supabase_main_table_rows = useCallback(() => {
+    if (!state.x_supabase_main_table?.gfpk) {
+      toast.error("Cannot delete rows without a primary key");
+      return;
+    }
+
+    const res = fetch(
+      `/private/editor/connect/${state.form_id}/supabase/table/${state.connections!.supabase!.main_supabase_table_id}/query`,
+      {
+        method: "DELETE",
+        body: JSON.stringify({
+          filters: [
+            {
+              type: "in",
+              column: state.x_supabase_main_table.gfpk,
+              values: Array.from(selected_rows),
+            },
+          ],
+        } satisfies XSupabaseQuery.Body),
+      }
+    ).then(() => {
+      dispatch({
+        type: "editor/data-grid/delete/selected",
+      });
+    });
+
+    toast.promise(res, {
+      loading: "Deleting...",
+      success: "Deleted",
+      error: "Failed",
+    });
+  }, [
+    state.form_id,
+    state.connections,
+    state.x_supabase_main_table?.gfpk,
+    selected_rows,
+    dispatch,
+  ]);
+
+  const onDeleteSelection = useCallback(() => {
+    switch (datagrid_table) {
+      case "response":
+        delete_selected_responses();
+        break;
+      case "session":
+        toast.error("Cannot delete sessions");
+        break;
+      case "x-supabase-main-table":
+        delete_selected_x_supabase_main_table_rows();
+        break;
+    }
+  }, [
+    datagrid_table,
+    delete_selected_responses,
+    delete_selected_x_supabase_main_table_rows,
+  ]);
 
   return (
     <AlertDialog>
       <AlertDialogTrigger asChild>
         <button className="flex items-center gap-1 p-2 rounded-md border text-sm">
           <TrashIcon />
-          Delete {txt_n_plural(selected_responses.size, keyword)}
+          Delete {txt_n_plural(selected_rows.size, keyword)}
         </button>
       </AlertDialogTrigger>
       <AlertDialogContent>
-        <AlertDialogTitle>Delete Response</AlertDialogTitle>
+        <AlertDialogTitle>
+          Delete {txt_n_plural(selected_rows.size, keyword)}
+        </AlertDialogTitle>
         <AlertDialogDescription>
-          Deleting this response will remove all data associated with it. Are
-          you sure you want to delete this response?
+          Deleting this record will remove all data associated with it. Are you
+          sure you want to delete this record?
         </AlertDialogDescription>
         <div className="flex justify-end gap-2 p-2">
           <AlertDialogCancel>Cancel</AlertDialogCancel>
-          <AlertDialogAction onClick={onDeleteResponse}>
+          <AlertDialogAction
+            className={buttonVariants({ variant: "destructive" })}
+            onClick={onDeleteSelection}
+          >
             Delete
           </AlertDialogAction>
         </div>
@@ -311,12 +390,16 @@ function DeleteSelectedRowsButton() {
   );
 }
 
-function table_keyword(table: "response" | "session") {
+function table_keyword(
+  table: "response" | "session" | "x-supabase-main-table"
+) {
   switch (table) {
     case "response":
       return "response";
     case "session":
       return "session";
+    case "x-supabase-main-table":
+      return "row";
   }
 }
 
@@ -470,7 +553,7 @@ function MaxRowsSelect() {
   return (
     <div>
       <Select
-        value={state.datagrid_rows + ""}
+        value={state.datagrid_rows_per_page + ""}
         onValueChange={(value) => {
           dispatch({
             type: "editor/data-grid/rows",
@@ -501,13 +584,31 @@ function DeleteFieldConfirmDialog({
   onCancel: () => void;
   onDeleteConfirm: () => void;
 }) {
+  const [state] = useEditorState();
+
+  const { datagrid_table } = state;
+
   return (
     <AlertDialog {...props}>
       <AlertDialogContent>
         <AlertDialogTitle>Delete Field</AlertDialogTitle>
         <AlertDialogDescription>
-          Deleting this field will remove all data associated with it. Are you
-          sure you want to delete this field?
+          {datagrid_table === "x-supabase-main-table" ? (
+            <>
+              Deleting this field will remove all data associated with it
+              (within Grida Forms). Are you sure you want to delete this field?
+              <br />
+              <strong>
+                Your supabase column stays untouched. - We do not have
+                permission to do that.
+              </strong>
+            </>
+          ) : (
+            <>
+              Deleting this field will remove all data associated with it. Are
+              you sure you want to delete this field?
+            </>
+          )}
         </AlertDialogDescription>
         <div className="flex justify-end gap-2 p-2">
           <AlertDialogCancel onClick={onCancel}>Cancel</AlertDialogCancel>

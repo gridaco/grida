@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React from "react";
 import {
   PanelClose,
   PanelContent,
@@ -15,17 +15,15 @@ import {
 } from "@/components/panels/side-panel";
 import {
   FormFieldDefinition,
-  FormInputType,
   FormResponse,
   FormFieldInit,
   FormResponseField,
 } from "@/types";
-import { LockClosedIcon } from "@radix-ui/react-icons";
-import toast from "react-hot-toast";
 import { Editor, useMonaco } from "@monaco-editor/react";
 import { fmt_local_index } from "@/utils/fmt";
 import { useTheme } from "next-themes";
 import { useMonacoTheme } from "@/components/monaco";
+import { Button } from "@/components/ui/button";
 
 export function ResponseEditPanel({
   title,
@@ -150,9 +148,7 @@ export function ResponseEditPanel({
       </PanelContent>
       <PanelFooter>
         <PanelClose>
-          <button className="rounded p-2 bg-neutral-100 dark:bg-neutral-900">
-            Close
-          </button>
+          <Button variant="secondary">Close</Button>
         </PanelClose>
         {/* <button onClick={onSaveClick} className="rounded p-2 bg-neutral-100">
           Save

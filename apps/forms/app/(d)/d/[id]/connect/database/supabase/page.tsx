@@ -1,5 +1,5 @@
 "use client";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { Button, buttonVariants } from "@/components/ui/button";
 import {
   Card,
@@ -47,12 +47,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  SupabasePublicSchema,
-  build_supabase_rest_url,
-  parseSupabaseSchema,
-  ping,
-} from "@/lib/supabase-postgrest";
+import { SupabasePostgRESTOpenApi, ping } from "@/lib/supabase-postgrest";
 import { GridaSupabase } from "@/types";
 import { Skeleton } from "@/components/ui/skeleton";
 import assert from "assert";
@@ -69,6 +64,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Spinner } from "@/components/spinner";
 import { PrivateEditorApi } from "@/lib/private";
+import { KeyIcon, LinkIcon } from "lucide-react";
 
 export default function ConnectDB({
   params,
@@ -90,7 +86,8 @@ function ConnectSupabase({ form_id }: { form_id: string }) {
   const [url, setUrl] = useState("");
   const [anonKey, setAnonKey] = useState("");
   const [serviceKey, setServiceKey] = useState("");
-  const [schema, setSchema] = useState<SupabasePublicSchema | null>(null);
+  const [schema, setSchema] =
+    useState<SupabasePostgRESTOpenApi.SupabasePublicSchema | null>(null);
   const [table, setTable] = useState<string | undefined>(undefined);
 
   const [project, setProject] = useState<
@@ -131,7 +128,7 @@ function ConnectSupabase({ form_id }: { form_id: string }) {
   };
 
   const onTestConnectionClick = async () => {
-    const parsing = parseSupabaseSchema({
+    const parsing = SupabasePostgRESTOpenApi.fetch_supabase_postgrest_swagger({
       url,
       anonKey,
     }).then((res) => {
@@ -204,7 +201,10 @@ function ConnectSupabase({ form_id }: { form_id: string }) {
     // validate service key
     // ping test
     // TODO: to verify service_role key, we need to make a request to administartion api (below would only verify if the key is valid, not if it has the correct permissions)
-    ping({ url: build_supabase_rest_url(url), key: serviceKey }).then((res) => {
+    ping({
+      url: SupabasePostgRESTOpenApi.build_supabase_rest_url(url),
+      key: serviceKey,
+    }).then((res) => {
       if (res.status === 200) {
         // create secret key connection
         const data = {
@@ -491,52 +491,9 @@ function ConnectSupabase({ form_id }: { form_id: string }) {
                 </SelectContent>
               </Select>
               {table && (
-                <>
-                  <hr className="my-4" />
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Column</TableHead>
-                        <TableHead>Data Type</TableHead>
-                        <TableHead>PostgreSQL Type</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {Object.entries(schema[table].properties).map(
-                        ([prop, value]) => {
-                          const required =
-                            schema[table].required.includes(prop);
-                          return (
-                            <TableRow key={prop}>
-                              <TableCell>
-                                {prop}{" "}
-                                {required && (
-                                  <span className="text-xs text-foreground-muted text-red-500">
-                                    *
-                                  </span>
-                                )}
-                              </TableCell>
-                              <TableCell>{value.type}</TableCell>
-                              <TableCell>{value.format}</TableCell>
-                            </TableRow>
-                          );
-                        }
-                      )}
-                    </TableBody>
-                  </Table>
-                  <Collapsible className="mt-4">
-                    <CollapsibleTrigger>
-                      <Button variant="link" size="sm">
-                        <CodeIcon className="me-2 align-middle" /> Raw JSON
-                      </Button>
-                    </CollapsibleTrigger>
-                    <CollapsibleContent>
-                      <article className="prose dark:prose-invert">
-                        <pre>{JSON.stringify(schema[table], null, 2)}</pre>
-                      </article>
-                    </CollapsibleContent>
-                  </Collapsible>
-                </>
+                <SupabaseTableInfo
+                  table={schema[table] as GridaSupabase.JSONSChema}
+                />
               )}
             </div>
           )}
@@ -548,6 +505,72 @@ function ConnectSupabase({ form_id }: { form_id: string }) {
         </CardFooter>
       </Card>
     </div>
+  );
+}
+
+function SupabaseTableInfo({ table }: { table: GridaSupabase.JSONSChema }) {
+  const { properties } = useMemo(
+    () =>
+      SupabasePostgRESTOpenApi.parse_supabase_postgrest_schema_definition(
+        table
+      ),
+    [table]
+  );
+
+  return (
+    <>
+      <hr className="my-4" />
+      <Table className="font-mono">
+        <TableHeader>
+          <TableRow>
+            <TableHead></TableHead>
+            <TableHead>Column</TableHead>
+            <TableHead>Data Type</TableHead>
+            <TableHead>PostgreSQL Type</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {Object.entries(properties).map(
+            ([prop, { pk, fk, type, format, required, name }]) => {
+              return (
+                <TableRow key={prop}>
+                  <TableCell>
+                    {pk && (
+                      <KeyIcon className="me-1 inline align-middle w-4 h-4" />
+                    )}
+                    {fk && (
+                      <LinkIcon className="me-1 inline align-middle w-4 h-4" />
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    {name}{" "}
+                    {required && (
+                      <span className="text-xs text-foreground-muted text-red-500">
+                        *
+                      </span>
+                    )}
+                  </TableCell>
+                  <TableCell>{type}</TableCell>
+                  <TableCell>{format}</TableCell>
+                </TableRow>
+              );
+            }
+          )}
+        </TableBody>
+      </Table>
+      <Collapsible className="mt-4">
+        <CollapsibleTrigger>
+          <Button variant="link" size="sm">
+            <CodeIcon className="me-2 align-middle" /> Raw JSON
+          </Button>
+        </CollapsibleTrigger>
+        <CollapsibleContent>
+          <article className="prose dark:prose-invert">
+            <pre>{JSON.stringify(table, null, 2)}</pre>
+          </article>
+        </CollapsibleContent>
+      </Collapsible>
+    </>
   );
 }
 

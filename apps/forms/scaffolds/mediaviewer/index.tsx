@@ -51,11 +51,7 @@ export function useMediaViewer() {
   return context;
 }
 
-interface MediaViewerProviderProps {
-  children: ReactNode;
-}
-
-export function MediaViewerProvider({ children }: MediaViewerProviderProps) {
+export function MediaViewerProvider({ children }: React.PropsWithChildren<{}>) {
   const [isOpen, setIsOpen] = useState(false);
   const [mediaSrc, setMediaSrc] = useState<Src | undefined>(undefined);
   const [mediaType, setMediaType] =
