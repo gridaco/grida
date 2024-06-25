@@ -234,10 +234,12 @@ export function FileEditCell({
                 </TooltipContent>
               )}
             </Tooltip>
+            {/* TODO: need a custom uploader */}
             <MediaPicker
               open={mediaPickerOpen}
               onOpenChange={setMediaPickerOpen}
               onUseImage={(src) => {
+                // TODO: commit the changes
                 setMediaPickerOpen(false);
               }}
             />
