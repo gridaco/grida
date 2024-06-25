@@ -1,10 +1,8 @@
-import { parseSupabaseSchema } from "@/lib/supabase-postgrest";
 import {
   createRouteHandlerClient,
   grida_xsupabase_client,
 } from "@/lib/supabase/server";
 import { createXSupabaseClient } from "@/services/x-supabase";
-import { GridaSupabase } from "@/types";
 import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
 import { NextRequest, NextResponse } from "next/server";

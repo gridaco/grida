@@ -50,7 +50,7 @@ import {
 import {
   SupabasePublicSchema,
   build_supabase_rest_url,
-  parseSupabaseSchema,
+  fetch_supabase_postgrest_swagger,
   ping,
 } from "@/lib/supabase-postgrest";
 import { GridaSupabase } from "@/types";
@@ -69,6 +69,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Spinner } from "@/components/spinner";
 import { PrivateEditorApi } from "@/lib/private";
+import { KeyIcon, LinkIcon } from "lucide-react";
 
 export default function ConnectDB({
   params,
@@ -131,7 +132,7 @@ function ConnectSupabase({ form_id }: { form_id: string }) {
   };
 
   const onTestConnectionClick = async () => {
-    const parsing = parseSupabaseSchema({
+    const parsing = fetch_supabase_postgrest_swagger({
       url,
       anonKey,
     }).then((res) => {
@@ -493,9 +494,10 @@ function ConnectSupabase({ form_id }: { form_id: string }) {
               {table && (
                 <>
                   <hr className="my-4" />
-                  <Table>
+                  <Table className="font-mono">
                     <TableHeader>
                       <TableRow>
+                        <TableHead></TableHead>
                         <TableHead>Column</TableHead>
                         <TableHead>Data Type</TableHead>
                         <TableHead>PostgreSQL Type</TableHead>
@@ -504,10 +506,23 @@ function ConnectSupabase({ form_id }: { form_id: string }) {
                     <TableBody>
                       {Object.entries(schema[table].properties).map(
                         ([prop, value]) => {
+                          const pk = value.description?.includes("<pk/>");
+                          const fk =
+                            value.description?.includes("<fk") &&
+                            value.description?.includes("/>");
+
                           const required =
                             schema[table].required.includes(prop);
                           return (
                             <TableRow key={prop}>
+                              <TableCell>
+                                {pk && (
+                                  <KeyIcon className="me-1 inline align-middle w-4 h-4" />
+                                )}
+                                {fk && (
+                                  <LinkIcon className="me-1 inline align-middle w-4 h-4" />
+                                )}
+                              </TableCell>
                               <TableCell>
                                 {prop}{" "}
                                 {required && (

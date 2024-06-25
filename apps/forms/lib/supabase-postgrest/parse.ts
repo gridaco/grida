@@ -34,7 +34,7 @@ export function build_supabase_openapi_url(url: string, apiKey: string) {
   return `${url}/rest/v1/?apikey=${apiKey}`;
 }
 
-export async function parseSupabaseSchema({
+export async function fetch_supabase_postgrest_swagger({
   url,
   anonKey,
 }: {
