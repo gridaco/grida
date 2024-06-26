@@ -77,9 +77,13 @@ export default function PartnerPOC() {
                 className="flex flex-col items-center justify-center my-16 gap-10"
                 defaultValue={demo_1_categories[0]}
               >
-                <TabsList>
+                <TabsList className="flex flex-wrap bg-transparent h-9 items-center content-center gap-3 justify-center p-1 text-muted-foreground">
                   {demo_1_categories.map((category) => (
-                    <TabsTrigger key={category} value={category}>
+                    <TabsTrigger
+                      key={category}
+                      value={category}
+                      className="inline-flex items-center justify-center whitespace-nowrap rounded-full border px-4 py-1 text-sm font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 data-[state=active]:bg-black/90 data-[state=active]:text-white data-[state=active]:dark:invert"
+                    >
                       {category}
                     </TabsTrigger>
                   ))}
@@ -125,9 +129,13 @@ export default function PartnerPOC() {
                 className="flex flex-col items-center justify-center mt-10 gap-10"
                 defaultValue={demo_2_categories[0]}
               >
-                <TabsList>
+                <TabsList className="flex flex-wrap h-9 bg-transparent items-center content-center gap-3 justify-center p-1 text-muted-foreground">
                   {demo_2_categories.map((category) => (
-                    <TabsTrigger key={category} value={category}>
+                    <TabsTrigger
+                      key={category}
+                      value={category}
+                      className="inline-flex items-center justify-center whitespace-nowrap rounded-full border px-4 py-1 text-sm font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 data-[state=active]:bg-black/90 data-[state=active]:text-white data-[state=active]:dark:invert"
+                    >
                       {category}
                     </TabsTrigger>
                   ))}
