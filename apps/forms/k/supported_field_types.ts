@@ -27,6 +27,8 @@ export const supported_field_types: FormInputType[] = [
 
 if (process.env.NODE_ENV === "development") {
   const dev: FormInputType[] = [
+    "audio",
+    "video",
     //
     "checkboxes",
     "signature",
@@ -95,7 +97,12 @@ export const supported_field_autocomplete_types: FormFieldAutocompleteType[] = [
   "webauthn",
 ];
 
-const html5_file_alias_field_types: FormInputType[] = ["file", "image"];
+const html5_file_alias_field_types: FormInputType[] = [
+  "file",
+  "image",
+  "audio",
+  "video",
+];
 
 const html5_multiple_supported_field_types: FormInputType[] = [
   ...html5_file_alias_field_types,
@@ -155,6 +162,21 @@ const html5_autocomplete_supported_field_types: FormInputType[] =
         "payment",
       ].includes(type)
   );
+
+export namespace FieldProperties {
+  export function accept(type: FormInputType) {
+    switch (type) {
+      case "audio":
+        return "audio/*";
+      case "video":
+        return "video/*";
+      case "image":
+        return "image/*";
+      default:
+        return undefined;
+    }
+  }
+}
 
 export namespace FieldSupports {
   export function options(type: FormInputType) {

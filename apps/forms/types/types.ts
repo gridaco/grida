@@ -83,6 +83,8 @@ export type FormInputType =
   | "email"
   | "file"
   | "image"
+  | "audio"
+  | "video"
   | "select"
   | "latlng"
   | "password"

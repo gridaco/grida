@@ -18,7 +18,10 @@ import {
 } from "@radix-ui/react-icons";
 import {
   CreditCardIcon,
+  FileAudioIcon,
+  FileImageIcon,
   FilePenLineIcon,
+  FileVideoIcon,
   KeyRoundIcon,
   MapPinnedIcon,
   PhoneIcon,
@@ -51,8 +54,6 @@ export function FormFieldTypeIcon({
       return <DropdownMenuIcon {...props} />;
     case "url":
       return <GlobeIcon {...props} />;
-    case "image":
-      return <ImageIcon {...props} />;
     case "checkbox":
     case "checkboxes":
       return <CheckCircledIcon {...props} />;
@@ -74,6 +75,12 @@ export function FormFieldTypeIcon({
     case "number":
     case "range":
       return <SliderIcon {...props} />;
+    case "image":
+      return <FileImageIcon {...props} />;
+    case "audio":
+      return <FileAudioIcon {...props} />;
+    case "video":
+      return <FileVideoIcon {...props} />;
     case "file":
       return <FileIcon {...props} />;
     case "signature":
