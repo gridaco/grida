@@ -47,8 +47,9 @@ import {
   parse_tmp_storage_object_path,
 } from "@/services/form/session-storage";
 import { createXSupabaseClient } from "@/services/x-supabase";
-import { render } from "@/lib/templating/template";
 import { FormValue } from "@/services/form";
+import { XSupabase } from "@/services/x-supabase";
+import { TemplateVariables } from "@/lib/templating";
 
 const HOST = process.env.HOST || "http://localhost:3000";
 
@@ -390,7 +391,7 @@ async function submit({
   // ==================================================
   // region user supabase connection
 
-  let NEW: any = undefined;
+  let RECORD: any = undefined;
   if (supabase_connection && supabase_connection.main_supabase_table_id) {
     try {
       const insertion = await sbconn_insert({
@@ -409,7 +410,7 @@ async function submit({
         return error(500, { form_id }, meta);
       }
 
-      NEW = sbconn_inserted;
+      RECORD = sbconn_inserted;
     } catch (e) {
       console.error("submit/err/sbconn", e);
       // TODO: enhance error message
@@ -582,8 +583,10 @@ async function submit({
           {
             storage: field.storage as FormFieldStorageSchema | null,
             supabase: supabase_connection,
+            // @ts-ignore // TODO: provide all context - currently this is only used for x-supabase storage
             context: {
-              NEW: NEW,
+              NEW: RECORD,
+              RECORD: RECORD,
             },
           }
         );
@@ -840,7 +843,7 @@ async function process_response_field_files(
   connections?: {
     supabase: ConnectionSupabaseJoint | null;
     storage: FormFieldStorageSchema | null;
-    context: any;
+    context: TemplateVariables.ConnectedDatasourcePostgresTransactionCompleteContext;
   }
 ) {
   const uploads: Promise<SupabaseStorageUploadReturnType>[] = [];
@@ -902,7 +905,11 @@ async function process_response_field_files(
                     }
                   );
 
-                  const renderedpath = render(path, connections.context);
+                  const renderedpath = XSupabase.Storage.renderpath(
+                    path,
+                    connections.context
+                  );
+                  // const renderedpath = render(path, connections.context);
                   const storage = new SessionStagedFileStorage(client, bucket);
                   const { error } = await storage.resolveStagedFile(
                     tmppath,
