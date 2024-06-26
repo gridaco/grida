@@ -1,12 +1,14 @@
+import { FieldSupports } from "@/k/supported_field_types";
 import {
   XSupabaseQuery,
   XSupabaseQueryBuilder,
 } from "@/lib/supabase-postgrest/builder";
 import { createRouteHandlerClient } from "@/lib/supabase/server";
 import {
-  GridaXSupabaseClient,
+  GridaXSupabaseService,
   createXSupabaseClient,
 } from "@/services/x-supabase";
+import { FormFieldStorageSchema } from "@/types";
 
 import assert from "assert";
 import { cookies } from "next/headers";
@@ -101,7 +103,13 @@ async function get_forms_x_supabase_table_connector({
 
   const { data: form, error } = await grida_forms_client
     .from("form")
-    .select(`id, supabase_connection:connection_supabase(*)`)
+    .select(
+      `
+        id,
+        supabase_connection:connection_supabase(*),
+        fields:form_field(*)
+      `
+    )
     .eq("id", form_id)
     .single();
 
@@ -109,10 +117,16 @@ async function get_forms_x_supabase_table_connector({
     return notFound();
   }
 
+  const { fields } = form;
+
+  const file_fields = fields.filter((f) => FieldSupports.file_alias(f.type));
+
+  // file_fields.map(f => (f.storage as {}  as  FormFieldStorageSchema).mode)
+
   const { supabase_connection } = form;
   assert(supabase_connection, "supabase_connection is required");
 
-  const x = new GridaXSupabaseClient();
+  const x = new GridaXSupabaseService();
   const conn = await x.getConnection(supabase_connection);
   assert(conn, "connection fetch failed");
   const { main_supabase_table } = conn;
@@ -126,5 +140,5 @@ async function get_forms_x_supabase_table_connector({
     }
   );
 
-  return { main_supabase_table, x_client };
+  return { form, main_supabase_table, x_client };
 }

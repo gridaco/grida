@@ -1,4 +1,3 @@
-import type { Database } from "@/database.types";
 import { grida_xsupabase_client } from "@/lib/supabase/server";
 import { secureformsclient } from "@/lib/supabase/vault";
 import { ConnectionSupabaseJoint, GridaSupabase } from "@/types";
@@ -58,7 +57,7 @@ export async function secureCreateServiceKey(
   );
 }
 
-export class GridaXSupabaseClient {
+export class GridaXSupabaseService {
   constructor() {}
 
   async getConnection(
