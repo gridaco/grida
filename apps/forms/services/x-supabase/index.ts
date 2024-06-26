@@ -2,6 +2,10 @@ import { grida_xsupabase_client } from "@/lib/supabase/server";
 import { secureformsclient } from "@/lib/supabase/vault";
 import { ConnectionSupabaseJoint, GridaSupabase } from "@/types";
 import { SupabaseClient, createClient } from "@supabase/supabase-js";
+import { SupabaseStorageExtensions } from "@/lib/supabase/storage-ext";
+import { render } from "@/lib/templating/template";
+import type { XSupabaseStorageSchema } from "@/types";
+import type { TemplateVariables } from "@/lib/templating";
 import assert from "assert";
 
 export async function createXSupabaseClient(
@@ -87,5 +91,62 @@ export class GridaXSupabaseService {
           (t) => t.id === main_supabase_table_id
         ) as any as GridaSupabase.SupabaseTable) || null,
     };
+  }
+}
+
+export namespace XSupabase {
+  //
+  //
+
+  export namespace Storage {
+    export type CreateSignedUrlResult =
+      | { data: { signedUrl: string }; error: null }
+      | { data: null; error: any };
+
+    export class ConnectedClient {
+      constructor(public readonly storage: SupabaseClient["storage"]) {}
+
+      async exists(storage: XSupabaseStorageSchema, row: Record<string, any>) {
+        assert(storage.type === "x-supabase");
+        const { bucket, path: pathtemplate } = storage;
+        const renderedpath = renderpath(pathtemplate, {
+          NEW: row,
+          RECORD: row,
+        });
+
+        return await SupabaseStorageExtensions.exists(
+          this.storage,
+          bucket,
+          renderedpath
+        );
+      }
+
+      createSignedUrl(
+        storagedata: XSupabaseStorageSchema,
+        row: Record<string, any>
+      ) {
+        assert(storagedata.type === "x-supabase");
+        const { bucket, path: pathtemplate } = storagedata;
+        const renderedpath = renderpath(pathtemplate, {
+          NEW: row,
+          RECORD: row,
+        });
+
+        return this.storage.from(bucket).createSignedUrl(renderedpath, 60);
+      }
+
+      createSignedUrls() {
+        throw new Error("Not implemented");
+      }
+    }
+
+    export function renderpath<
+      R extends Record<string, any> = Record<string, any>,
+    >(
+      pathtemplate: string,
+      data: TemplateVariables.ConnectedDatasourcePostgresSelectRecordContext<R>
+    ) {
+      return render(pathtemplate, data);
+    }
   }
 }
