@@ -80,11 +80,18 @@ export namespace TemplateVariables {
     };
   }
 
-  export interface ConnectedDatasourcePostgresTransactionCompleteContext
-    extends FormResponseContext {
-    NEW: {
-      [column: string]: any;
-    };
+  export interface ConnectedDatasourcePostgresTransactionCompleteContext<
+    R extends Record<string, any> = Record<string, any>,
+  > extends FormResponseContext {
+    NEW: R;
+    RECORD: R;
+  }
+
+  export interface ConnectedDatasourcePostgresSelectRecordContext<
+    R extends Record<string, any> = Record<string, any>,
+  > {
+    RECORD: R;
+    NEW: R;
   }
 
   export const schema = z.object({
