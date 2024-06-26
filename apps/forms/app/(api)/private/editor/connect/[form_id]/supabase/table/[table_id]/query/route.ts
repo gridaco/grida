@@ -52,6 +52,8 @@ export async function GET(req: NextRequest, context: Context) {
   pooler.queue(data, fields);
   const files = await pooler.resolve();
 
+  console.log("files", files);
+
   const datawithstorage = data.map((row: Record<string, any>) => {
     // TODO: get pk based on table schema (read comment in GridaXSupabaseStorageTaskPooler class)
     const pk = row.id;
