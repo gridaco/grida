@@ -1,6 +1,7 @@
 import type {
   PostgrestFilterBuilder,
   PostgrestQueryBuilder,
+  PostgrestSingleResponse,
   PostgrestTransformBuilder,
 } from "@supabase/postgrest-js";
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -125,6 +126,6 @@ export class XSupabaseQueryBuilder {
   }
 
   done() {
-    return this.query;
+    return this.query as any as PostgrestSingleResponse<any | any[]>;
   }
 }

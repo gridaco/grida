@@ -7,7 +7,7 @@ import { createClientFormsClient } from "@/lib/supabase/client";
 import { RealtimePostgresChangesPayload } from "@supabase/supabase-js";
 import useSWR from "swr";
 import type { EditorApiResponse } from "@/types/private/api";
-import type { FormResponseField } from "@/types";
+import type { FormResponseField, GridaSupabase } from "@/types";
 import { usePrevious } from "@uidotdev/usehooks";
 import { XSupabaseQuery } from "@/lib/supabase-postgrest/builder";
 
@@ -368,7 +368,7 @@ export function XSupabaseMainTableSyncProvider({
       if (!state.connections.supabase?.main_supabase_table_id) return;
       if (!pkname) return;
 
-      fetch(
+      const task = fetch(
         `/private/editor/connect/${state.form_id}/supabase/table/${state.connections.supabase.main_supabase_table_id}/query`,
         {
           method: "PATCH",
@@ -387,6 +387,16 @@ export function XSupabaseMainTableSyncProvider({
           } satisfies XSupabaseQuery.Body),
         }
       );
+
+      toast
+        .promise(task, {
+          loading: "Updating...",
+          success: "Updated",
+          error: "Failed",
+        })
+        .then((data) => {
+          // NOTE: Do not dispatch data based on this result. this does not contain extended data
+        });
     },
     [pkname, state.connections.supabase?.main_supabase_table_id, state.form_id]
   );
@@ -436,7 +446,7 @@ export function XSupabaseMainTableFeedProvider({
     ? `/private/editor/connect/${state.form_id}/supabase/table/${state.connections.supabase.main_supabase_table_id}/query?limit=${datagrid_rows_per_page}`
     : null;
 
-  const res = useSWR<EditorApiResponse<Record<string, any>[], any>>(
+  const res = useSWR<EditorApiResponse<GridaSupabase.XDataRow[], any>>(
     request,
     async (url: string) => {
       const res = await fetch(url);

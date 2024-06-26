@@ -43,7 +43,7 @@ import { VIDEO_BLOCK_SRC_DEFAULT_VALUE } from "@/k/video_block_defaults";
 import { IMAGE_BLOCK_SRC_DEFAULT_VALUE } from "@/k/image_block_defaults";
 import { PDF_BLOCK_SRC_DEFAULT_VALUE } from "@/k/pdf_block_defaults";
 import { draftid } from "@/utils/id";
-import { FormBlockType } from "@/types";
+import { FormBlockType, GridaSupabase } from "@/types";
 import { FlatPostgREST } from "@/lib/supabase-postgrest/flat";
 
 export function reducer(
@@ -700,7 +700,11 @@ export function reducer(
 
               if (!row) return;
 
-              const newrow = FlatPostgREST.update(row, field.name, value);
+              const newrow = FlatPostgREST.update(
+                row,
+                field.name,
+                value
+              ) as GridaSupabase.XDataRow;
 
               draft.x_supabase_main_table!.rows =
                 draft.x_supabase_main_table!.rows.map((r) => {
