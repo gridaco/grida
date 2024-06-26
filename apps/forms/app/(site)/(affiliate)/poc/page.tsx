@@ -8,12 +8,12 @@ import React from "react";
 import { CaretRightIcon, CheckIcon } from "@radix-ui/react-icons";
 
 const demo_1_categories = [
-  "event",
-  "sports",
-  "music",
-  "fasion",
-  "cyber",
-  "art",
+  "이벤트",
+  "스포츠",
+  "음악",
+  "패션",
+  "미술",
+  "사이버펑크",
 ];
 const demo_2_categories = [
   "캠페인 매니저",
@@ -59,7 +59,7 @@ export default function PartnerPOC() {
             <Logos />
           </div>
         </section>
-        <section className="container my-40">
+        <section className="relative container mx-auto py-40">
           <div className="flex flex-col gap-10">
             <header className="flex flex-col gap-4">
               <div className="flex flex-row items-center justify-center">
@@ -72,7 +72,7 @@ export default function PartnerPOC() {
                 브랜드를 가장 잘 담는 나만의 폼 빌더
               </h2>
             </header>
-            <div className="container max-w-full bg-muted/50">
+            <div className="relative container mx-auto bg-muted/50">
               <Tabs
                 className="flex flex-col items-center justify-center my-16 gap-10"
                 defaultValue={demo_1_categories[0]}
@@ -91,11 +91,11 @@ export default function PartnerPOC() {
                 {demo_1_categories.map((category) => (
                   <TabsContent key={category} value={category}>
                     <Image
-                      className="aspect-video rounded-xl shadow-xl overflow-hidden object-cover"
+                      className="md:h-[776px] w-full rounded-xl shadow-xl overflow-hidden object-cover"
                       src="/images/abstract-placeholder.jpg"
                       alt=""
-                      width={1500}
-                      height={1500}
+                      width={1400}
+                      height={776}
                     />
                   </TabsContent>
                 ))}
@@ -144,16 +144,34 @@ export default function PartnerPOC() {
                   <TabsContent key={category} value={category}>
                     <div className="flex flex-col gap-5">
                       <Image
-                        className="aspect-video rounded-xl shadow-xl overflow-hidden object-cover"
+                        className="md:h-[776px] w-full rounded-xl shadow-xl overflow-hidden object-cover"
                         src="/images/abstract-placeholder.jpg"
                         alt=""
-                        width={1500}
-                        height={1500}
+                        width={1400}
+                        height={776}
                       />
-                      <div className="flex h-72 gap-5">
-                        <div className="w-2/3 h-full rounded-xl shadow-xl bg-red-400"></div>
-                        <div className="w-1/3 h-full rounded-xl shadow-xl bg-red-400"></div>
-                        <div className="w-1/3 h-full rounded-xl shadow-xl bg-red-400"></div>
+                      <div className="flex flex-col md:grid md:grid-cols-4 gap-5">
+                        <Image
+                          className="md:h-[340px] w-full md:col-start-1 md:col-span-2 rounded-xl shadow-xl overflow-hidden object-cover"
+                          src="/images/abstract-placeholder.jpg"
+                          alt=""
+                          width={680}
+                          height={340}
+                        />
+                        <Image
+                          className=" md:h-[340px] w-full rounded-xl shadow-xl overflow-hidden object-cover"
+                          src="/images/abstract-placeholder.jpg"
+                          alt=""
+                          width={340}
+                          height={340}
+                        />
+                        <Image
+                          className="md:h-[340px] w-full rounded-xl shadow-xl overflow-hidden object-cover"
+                          src="/images/abstract-placeholder.jpg"
+                          alt=""
+                          width={340}
+                          height={340}
+                        />
                       </div>
                     </div>
                   </TabsContent>
