@@ -4,7 +4,6 @@ import {
   TrashIcon,
   DotsHorizontalIcon,
   DownloadIcon,
-  FileIcon,
   OpenInNewWindowIcon,
 } from "@radix-ui/react-icons";
 import {
@@ -113,7 +112,7 @@ export function FileEditCell({
                     {...f}
                   />
                   <AlertDialog>
-                    <DropdownMenu>
+                    <DropdownMenu modal={false}>
                       <DropdownMenuTrigger asChild>
                         <Button variant="ghost" size="icon">
                           <DotsHorizontalIcon />
