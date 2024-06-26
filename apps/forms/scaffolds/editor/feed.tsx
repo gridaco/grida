@@ -437,7 +437,6 @@ function rowdiff(
       continue;
     }
     if (!equal(newRow[key], prevRow[key])) {
-      console.log("changed", key, newRow[key], prevRow[key]);
       changedFields[key] = newRow[key];
     }
   }
@@ -452,7 +451,10 @@ export function XSupabaseMainTableFeedProvider({
   const { datagrid_rows_per_page } = state;
 
   const request = state.connections.supabase?.main_supabase_table_id
-    ? `/private/editor/connect/${state.form_id}/supabase/table/${state.connections.supabase.main_supabase_table_id}/query?limit=${datagrid_rows_per_page}`
+    ? `/private/editor/connect/${state.form_id}/supabase/table/${state.connections.supabase.main_supabase_table_id}/query?limit=${datagrid_rows_per_page}` +
+      // refresh when fields are updated
+      "&r=" +
+      state.fields.length
     : null;
 
   const res = useSWR<EditorApiResponse<GridaSupabase.XDataRow[], any>>(

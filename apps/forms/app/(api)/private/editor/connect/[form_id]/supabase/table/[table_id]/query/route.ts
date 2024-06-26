@@ -52,7 +52,7 @@ export async function GET(req: NextRequest, context: Context) {
   pooler.queue(data, fields);
   const files = await pooler.resolve();
 
-  console.log("files", files);
+  // console.log("files", files);
 
   const datawithstorage = data.map((row: Record<string, any>) => {
     // TODO: get pk based on table schema (read comment in GridaXSupabaseStorageTaskPooler class)
@@ -180,14 +180,18 @@ class GridaXSupabaseStorageTaskPooler {
     rows: ReadonlyArray<Record<string, any>>,
     fields: FormFieldDefinition[]
   ) {
-    const file_fields = fields.filter((f) => FieldSupports.file_alias(f.type));
+    const x_supabase_storage_file_fields = fields.filter(
+      (f) =>
+        FieldSupports.file_alias(f.type) &&
+        (f.storage as XSupabaseStorageSchema)?.type === "x-supabase"
+    );
 
     for (const row of rows) {
       // TODO: get pk based on table schema (alternatively, we can use index as well - doesnt have to be a data from a fetched row)
       const pk = row.id;
       const task = this.storage.createSignedUrls(
         row,
-        file_fields.map((ff) => ({
+        x_supabase_storage_file_fields.map((ff) => ({
           ...(ff.storage as XSupabaseStorageSchema),
           id: ff.id,
         }))

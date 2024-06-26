@@ -164,10 +164,11 @@ export namespace XSupabase {
         // group fields by bucket
         const grouped_by_bucket = Map.groupBy(fields, (f) => f.bucket);
 
-        const tasks: Promise<CreateSignedUrlsResult>[] = [];
+        const tasks_by_bucket: Promise<CreateSignedUrlsResult>[] = [];
 
+        // bulk create signed urls by bucket
         Array.from(grouped_by_bucket.entries()).map(
-          async ([bucket, fields]: [string, XSupabaseStorageSchema[]]) => {
+          ([bucket, fields]: [string, XSupabaseStorageSchema[]]) => {
             const paths = fields.map((f) => {
               const renderedpath = renderpath(f.path, {
                 NEW: row,
@@ -175,18 +176,31 @@ export namespace XSupabase {
               });
               return renderedpath;
             });
-            tasks.push(this.storage.from(bucket).createSignedUrls(paths, 60));
+            tasks_by_bucket.push(
+              this.storage.from(bucket).createSignedUrls(paths, 60)
+            );
           }
         );
 
-        const resolved = await Promise.all(tasks);
+        const resolved_by_bucket = await Promise.all(tasks_by_bucket);
 
-        const result: Record<string, CreateSignedUrlsResult["data"]> = {};
+        const result: Record<
+          string,
+          NonNullable<CreateSignedUrlsResult["data"]>
+        > = {};
 
-        resolved.forEach((curr, index) => {
+        resolved_by_bucket.forEach((curr, index) => {
+          const bucket = Array.from(grouped_by_bucket.keys())[index];
+          const fields = grouped_by_bucket.get(bucket)!;
           if (!curr.error) {
-            const field = fields[index];
-            result[field.id] = curr.data;
+            curr.data.forEach((signedUrl, index) => {
+              const field = fields[index];
+              if (!result[field.id]) {
+                result[field.id] = [];
+              }
+
+              result[field.id].push(signedUrl);
+            });
           }
         });
 

@@ -40,6 +40,7 @@ import {
 import { useState } from "react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { MediaPicker } from "../mediapicker";
+import { FileTypeIcon } from "@/components/form-field-type-icon";
 
 export function FileEditCell({
   type,
@@ -47,7 +48,7 @@ export function FileEditCell({
   multiple,
   files,
 }: {
-  type: "image" | "file";
+  type: "image" | "file" | "audio" | "video";
   accept?: string;
   multiple?: boolean;
   files: {
@@ -64,7 +65,19 @@ export function FileEditCell({
   const { open: openMediaViewer } = useMediaViewer();
 
   const onEnterFullScreen = (f: GFFile) => {
-    openMediaViewer(f, "image/*");
+    switch (type) {
+      case "audio":
+        openMediaViewer(f, "audio/*");
+        break;
+      case "video":
+        openMediaViewer(f, "video/*");
+        break;
+      case "image":
+        openMediaViewer(f, "image/*");
+      default:
+        openMediaViewer(f);
+        break;
+    }
   };
 
   const canAddNewFile = multiple || files?.length === 0;
@@ -94,51 +107,11 @@ export function FileEditCell({
                   <DragHandleDots2Icon />
                 </Button> */}
                   <div className="w-4" />
-                  {type === "image" ? (
-                    <>
-                      <figure
-                        className="flex-1 cursor-zoom-in  py-4"
-                        onClick={() => onEnterFullScreen(f)}
-                      >
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img
-                          src={f.src}
-                          alt={f.name}
-                          className="w-full h-full object-fit"
-                        />
-                        <figcaption className="py-2 text-xs text-muted-foreground">
-                          <a
-                            href={f.download}
-                            target="_blank"
-                            rel="noreferrer"
-                            download
-                            className="hover:underline"
-                          >
-                            <DownloadIcon className="inline align-middle me-1" />
-                            {f.name}
-                          </a>
-                        </figcaption>
-                      </figure>
-                    </>
-                  ) : (
-                    <div className="flex-1 flex h-10 items-center ">
-                      <a
-                        href={f.download}
-                        target="_blank"
-                        rel="noreferrer"
-                        download
-                        className="hover:underline"
-                      >
-                        <span
-                          key={i}
-                          className="cursor-pointer hover:underline text-sm"
-                        >
-                          <FileIcon className="inline w-4 h-4 align-middle me-2" />
-                          {f.name}
-                        </span>
-                      </a>
-                    </div>
-                  )}
+                  <FileCard
+                    type={type}
+                    onEnterFullScreen={() => onEnterFullScreen(f)}
+                    {...f}
+                  />
                   <AlertDialog>
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
@@ -248,4 +221,71 @@ export function FileEditCell({
       </PopoverContent>
     </Popover>
   );
+}
+
+function FileCard(props: {
+  type: "image" | "file" | "audio" | "video";
+  src: string;
+  srcset: {
+    thumbnail: string;
+    original: string;
+  };
+  download: string;
+  name: string;
+  onEnterFullScreen?: () => void;
+}) {
+  //
+
+  const { type, onEnterFullScreen, ...f } = props;
+
+  switch (type) {
+    case "image":
+      return (
+        <>
+          <figure
+            className="flex-1 cursor-zoom-in  py-4"
+            onClick={onEnterFullScreen}
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={f.src}
+              alt={f.name}
+              className="w-full h-full object-fit"
+            />
+            <figcaption className="py-2 text-xs text-muted-foreground">
+              <a
+                href={f.download}
+                target="_blank"
+                rel="noreferrer"
+                download
+                className="hover:underline"
+              >
+                <DownloadIcon className="inline align-middle me-1" />
+                {f.name}
+              </a>
+            </figcaption>
+          </figure>
+        </>
+      );
+    default:
+      return (
+        <div className="flex-1 flex h-10 items-center ">
+          <a
+            href={f.download}
+            target="_blank"
+            rel="noreferrer"
+            download
+            className="hover:underline"
+          >
+            <span className="cursor-pointer hover:underline text-sm">
+              <FileTypeIcon
+                type={type}
+                className="inline w-4 h-4 align-middle me-2"
+              />
+              {f.name}
+            </span>
+          </a>
+        </div>
+      );
+  }
 }
