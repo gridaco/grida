@@ -1,3 +1,6 @@
+import { NextRequest, NextResponse } from "next/server";
+import { cookies } from "next/headers";
+import { notFound } from "next/navigation";
 import { FieldSupports } from "@/k/supported_field_types";
 import {
   XSupabaseQuery,
@@ -8,12 +11,13 @@ import {
   GridaXSupabaseService,
   createXSupabaseClient,
 } from "@/services/x-supabase";
-import { FormFieldStorageSchema } from "@/types";
-
+import { XSupabase } from "@/services/x-supabase";
+import type {
+  FormFieldDefinition,
+  GridaSupabase,
+  XSupabaseStorageSchema,
+} from "@/types";
 import assert from "assert";
-import { cookies } from "next/headers";
-import { notFound } from "next/navigation";
-import { NextRequest, NextResponse } from "next/server";
 
 type Context = {
   params: {
@@ -28,21 +32,41 @@ export async function GET(req: NextRequest, context: Context) {
   const { form_id, table_id: _table_id } = context.params;
   const table_id = parseInt(_table_id);
 
-  const { main_supabase_table, x_client } =
+  const { form, main_supabase_table, x_client, x_storage_client } =
     await get_forms_x_supabase_table_connector({
       form_id,
       table_id,
     });
 
+  const { fields } = form;
+
   const query = new XSupabaseQueryBuilder(x_client);
 
-  const res = await query
+  const { data, error } = await query
     .from(main_supabase_table.sb_table_name)
     .select("*")
     .limit(limit)
     .done();
 
-  return NextResponse.json(res);
+  const pooler = new GridaXSupabaseStorageTaskPooler(x_storage_client);
+  pooler.queue(data, fields);
+  const files = pooler.resolve();
+
+  // console.log(files);
+
+  const datawithstorage = data.map((row: Record<string, any>) => {
+    // TODO: get pk based on table schema (read comment in GridaXSupabaseStorageTaskPooler class)
+    const pk = row.id;
+    return {
+      ...row,
+      __storage_fields: (files as any)[pk],
+    } satisfies GridaSupabase.XDataRow;
+  });
+
+  return NextResponse.json({
+    data: datawithstorage,
+    error,
+  });
 }
 
 export async function PATCH(req: NextRequest, context: Context) {
@@ -58,6 +82,9 @@ export async function PATCH(req: NextRequest, context: Context) {
   const body: XSupabaseQuery.Body = await req.json();
 
   const query = new XSupabaseQueryBuilder(x_client);
+
+  // console.log("PATCH", body.values, body.filters);
+  // return NextResponse.json({ ok: true });
 
   const res = await query
     .from(main_supabase_table.sb_table_name)
@@ -117,12 +144,6 @@ async function get_forms_x_supabase_table_connector({
     return notFound();
   }
 
-  const { fields } = form;
-
-  const file_fields = fields.filter((f) => FieldSupports.file_alias(f.type));
-
-  // file_fields.map(f => (f.storage as {}  as  FormFieldStorageSchema).mode)
-
   const { supabase_connection } = form;
   assert(supabase_connection, "supabase_connection is required");
 
@@ -140,5 +161,59 @@ async function get_forms_x_supabase_table_connector({
     }
   );
 
-  return { form, main_supabase_table, x_client };
+  const x_storage_client = new XSupabase.Storage.ConnectedClient(
+    x_client.storage
+  );
+
+  return { form, main_supabase_table, x_client, x_storage_client };
+}
+
+class GridaXSupabaseStorageTaskPooler {
+  private tasks: Record<
+    string,
+    Record<string, Promise<XSupabase.Storage.CreateSignedUrlResult>>
+  > = {};
+
+  constructor(private readonly storage: XSupabase.Storage.ConnectedClient) {}
+
+  queue(
+    rows: ReadonlyArray<Record<string, any>>,
+    fields: FormFieldDefinition[]
+  ) {
+    const file_fields = fields.filter((f) => FieldSupports.file_alias(f.type));
+
+    for (const row of rows) {
+      // TODO: get pk based on table schema (alternatively, we can use index as well - doesnt have to be a data from a fetched row)
+      const pk = row.id;
+      for (const f of file_fields) {
+        const task = this.storage.createSignedUrl(
+          f.storage as {} as XSupabaseStorageSchema,
+          row
+        );
+
+        this.tasks[pk] = this.tasks[pk] || {};
+        this.tasks[pk][f.id] = task;
+      }
+    }
+
+    return this.tasks;
+  }
+
+  async resolve(): Promise<
+    Record<string, Record<string, XSupabase.Storage.CreateSignedUrlResult>>
+  > {
+    const resolvedEntries = await Promise.all(
+      Object.entries(this.tasks).map(async ([fieldId, tasks]) => {
+        const resolvedTasks = await Promise.all(
+          Object.entries(tasks).map(async ([rowId, task]) => {
+            const result = await task;
+            return [rowId, result];
+          })
+        );
+        return [fieldId, Object.fromEntries(resolvedTasks)];
+      })
+    );
+
+    return Object.fromEntries(resolvedEntries);
+  }
 }

@@ -6,9 +6,10 @@ import type {
   FormResponseSession,
 } from "@/types";
 import { fmt_local_index } from "@/utils/fmt";
-import type { GFResponseRow, GFSystemColumnTypes } from "../grid/types";
+import type { GFFile, GFResponseRow, GFSystemColumnTypes } from "../grid/types";
 import type { DataGridFilterSettings } from "../editor/state";
 import { FlatPostgREST } from "@/lib/supabase-postgrest/flat";
+import { FieldSupports } from "@/k/supported_field_types";
 
 export namespace GridData {
   type DataGridInput = {
@@ -114,11 +115,43 @@ export namespace GridData {
           : [];
       }
       case "x-supabase-main-table": {
-        const valuefn = (row: any, fieldname: string) => {
-          if (FlatPostgREST.testPath(fieldname)) {
-            return FlatPostgREST.get(fieldname, row);
+        const valuefn = (
+          row: Record<string, any>,
+          field: FormFieldDefinition
+        ) => {
+          // jsonpath field
+          if (FlatPostgREST.testPath(field.name)) {
+            return FlatPostgREST.get(field.name, row);
           }
-          return row[fieldname];
+
+          return row[field.name];
+        };
+
+        const filesfn = (
+          row: Record<string, any>,
+          field: FormFieldDefinition
+        ) => {
+          // file field
+          if (
+            FieldSupports.file_alias(field.type) &&
+            row.__storage_fields[field.id]
+          ) {
+            const { data, error } = row.__storage_fields[field.id];
+            if (data) {
+              const { signedUrl } = data;
+              const gffile = {
+                src: signedUrl,
+                srcset: {
+                  thumbnail: signedUrl,
+                  original: signedUrl,
+                },
+                name: "unknwon",
+                download: signedUrl,
+              };
+
+              return [gffile];
+            }
+          }
         };
 
         return input.data.rows.reduce((acc, row, index) => {
@@ -132,7 +165,7 @@ export namespace GridData {
           input.fields.forEach((field) => {
             gfRow.fields[field.id] = {
               type: field.type,
-              value: valuefn(row, field.name),
+              value: valuefn(row, field),
               options: field.options?.reduce(
                 (
                   acc: { [key: string]: { value: string; label?: string } },
@@ -146,6 +179,7 @@ export namespace GridData {
                 },
                 {}
               ),
+              files: filesfn(row, field),
             };
           });
           acc.push(gfRow);
@@ -196,25 +230,45 @@ export namespace GridData {
             ),
             files:
               responseField?.storage_object_paths?.map((path) => {
-                const base = `/private/editor/${response.form_id}/responses/${response.id}/fields/${responseField.id}/src?path=${path}`;
-                const src = base + "&width=200";
-                const download = base + "&download=true";
-                const name = path.split("/").pop() ?? "";
-                return {
-                  src: src,
-                  srcset: {
-                    thumbnail: src,
-                    original: base,
-                  },
-                  name,
-                  download,
-                };
+                return gf_response_file({
+                  form_id: response.form_id,
+                  response_id: response.id,
+                  field_id: responseField.id,
+                  filepath: path,
+                });
               }) || [],
           };
         });
         return row;
       }) ?? []
     );
+  }
+
+  function gf_response_file({
+    form_id,
+    response_id,
+    field_id,
+    filepath,
+  }: {
+    form_id: string;
+    response_id: string;
+    field_id: string;
+    filepath: string;
+  }): GFFile {
+    const base = `/private/editor/${form_id}/responses/${response_id}/fields/${field_id}/src?path=${filepath}`;
+    const src = base + "&width=200";
+    const download = base + "&download=true";
+    const name = filepath.split("/").pop() ?? "";
+
+    return {
+      src: src,
+      srcset: {
+        thumbnail: src,
+        original: base,
+      },
+      name,
+      download,
+    };
   }
 
   function rows_from_sessions(
