@@ -10,6 +10,7 @@ import type { EditorApiResponse } from "@/types/private/api";
 import type { FormResponseField, GridaSupabase } from "@/types";
 import { usePrevious } from "@uidotdev/usehooks";
 import { XSupabaseQuery } from "@/lib/supabase-postgrest/builder";
+import equal from "deep-equal";
 
 type RealtimeTableChangeData = {
   id: string;
@@ -84,9 +85,9 @@ export function ResponseSyncProvider({
       const { data, error } = await supabase
         .from("response_field")
         .update({
-          // TODO:
           value: payload.value,
           form_field_option_id: payload.option_id,
+          // TODO:
           // 'storage_object_paths': []
         })
         .eq("id", id)
@@ -414,7 +415,7 @@ export function XSupabaseMainTableSyncProvider({
 
       if (prevRow) {
         // get changed fields
-        const diff = rowdiff(prevRow, row);
+        const diff = rowdiff(prevRow, row, (key) => key.startsWith("__gf_"));
         if (Object.keys(diff).length > 0) {
           update(row[pkname], diff);
         }
@@ -425,10 +426,18 @@ export function XSupabaseMainTableSyncProvider({
   return <>{children}</>;
 }
 
-function rowdiff(prevRow: Record<string, any>, newRow: Record<string, any>) {
+function rowdiff(
+  prevRow: Record<string, any>,
+  newRow: Record<string, any>,
+  ignoreKey?: (key: string) => boolean
+) {
   const changedFields: Record<string, any> = {};
   for (const key in newRow) {
-    if (newRow[key] !== prevRow[key]) {
+    if (ignoreKey && ignoreKey(key)) {
+      continue;
+    }
+    if (!equal(newRow[key], prevRow[key])) {
+      console.log("changed", key, newRow[key], prevRow[key]);
       changedFields[key] = newRow[key];
     }
   }
