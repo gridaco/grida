@@ -154,7 +154,7 @@ export namespace XSupabase {
           RECORD: row,
         });
 
-        return this.storage.from(bucket).createSignedUrl(renderedpath, 60);
+        return this.storage.from(bucket).createSignedUrl(renderedpath, 60 * 60);
       }
 
       async createSignedUrls(
@@ -177,7 +177,7 @@ export namespace XSupabase {
               return renderedpath;
             });
             tasks_by_bucket.push(
-              this.storage.from(bucket).createSignedUrls(paths, 60)
+              this.storage.from(bucket).createSignedUrls(paths, 60 * 60)
             );
           }
         );
