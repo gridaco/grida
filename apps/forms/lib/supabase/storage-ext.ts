@@ -1,7 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { FileObject } from "@supabase/storage-js";
 
-export namespace SupabaseStorageExt {
+export namespace SupabaseStorageExtensions {
   type StorageClient = SupabaseClient["storage"];
 
   async function list(storage: StorageClient, bucket: string, path: string) {
@@ -56,5 +56,22 @@ export namespace SupabaseStorageExt {
     }
 
     return data;
+  }
+
+  /**
+   * @see https://github.com/supabase/storage/issues/266#issuecomment-2191254105
+   */
+  export async function exists(
+    storage: StorageClient,
+    bucket: string,
+    path: string
+  ) {
+    const { data, error } = await storage.from(bucket).list(path);
+
+    if (error) {
+      throw error;
+    }
+
+    return data.some((file) => file.name === path.split("/").pop());
   }
 }

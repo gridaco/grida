@@ -3,11 +3,6 @@ import assert from "assert";
 import { client } from "@/lib/supabase/server";
 import { notFound } from "next/navigation";
 import { RawdataProcessing } from "@/lib/forms/rawdata";
-import { SupabaseStorageExt } from "@/lib/supabase/storage-ext";
-import {
-  GRIDA_FORMS_RESPONSE_BUCKET,
-  GRIDA_FORMS_RESPONSE_BUCKET_TMP_FOLDER,
-} from "@/k/env";
 
 export async function POST(
   req: NextRequest,
