@@ -6,6 +6,7 @@ import { SupabaseStorageExtensions } from "@/lib/supabase/storage-ext";
 import { render } from "@/lib/templating/template";
 import type { XSupabaseStorageSchema } from "@/types";
 import type { TemplateVariables } from "@/lib/templating";
+import type { StorageError } from "@supabase/storage-js";
 import assert from "assert";
 
 export async function createXSupabaseClient(
@@ -100,8 +101,28 @@ export namespace XSupabase {
 
   export namespace Storage {
     export type CreateSignedUrlResult =
-      | { data: { signedUrl: string }; error: null }
-      | { data: null; error: any };
+      | {
+          data: { signedUrl: string };
+          error: null;
+        }
+      | {
+          data: null;
+          error: StorageError;
+        };
+
+    export type CreateSignedUrlsResult =
+      | {
+          data: {
+            error: string | null;
+            path: string | null;
+            signedUrl: string;
+          }[];
+          error: null;
+        }
+      | {
+          data: null;
+          error: StorageError;
+        };
 
     export class ConnectedClient {
       constructor(public readonly storage: SupabaseClient["storage"]) {}
@@ -122,11 +143,11 @@ export namespace XSupabase {
       }
 
       createSignedUrl(
-        storagedata: XSupabaseStorageSchema,
-        row: Record<string, any>
+        row: Record<string, any>,
+        fieldstorage: XSupabaseStorageSchema
       ) {
-        assert(storagedata.type === "x-supabase");
-        const { bucket, path: pathtemplate } = storagedata;
+        assert(fieldstorage.type === "x-supabase");
+        const { bucket, path: pathtemplate } = fieldstorage;
         const renderedpath = renderpath(pathtemplate, {
           NEW: row,
           RECORD: row,
@@ -135,9 +156,33 @@ export namespace XSupabase {
         return this.storage.from(bucket).createSignedUrl(renderedpath, 60);
       }
 
-      createSignedUrls() {
-        throw new Error("Not implemented");
-      }
+      // async createSignedUrls(
+      //   row: Record<string, any>,
+      //   fields: XSupabaseStorageSchema[]
+      // ) {
+      //   // group fields by bucket
+      //   const grouped_by_bucket = Map.groupBy(fields, (f) => f.bucket);
+
+      //   const tasks: Promise<CreateSignedUrlsResult>[] = [];
+
+      //   Object.entries(grouped_by_bucket).map(
+      //     async ([bucket, fields]: [string, XSupabaseStorageSchema[]]) => {
+      //       const paths = fields.map((f) => {
+      //         const renderedpath = renderpath(f.path, {
+      //           NEW: row,
+      //           RECORD: row,
+      //         });
+      //         return renderedpath;
+      //       });
+      //       tasks.push(this.storage.from(bucket).createSignedUrls(paths, 60));
+      //     }
+      //   );
+
+      //   const resolved = await Promise.all(tasks);
+
+      //   // HERE!
+      //   return x satisfies CreateSignedUrlsResult;
+      // }
     }
 
     export function renderpath<
