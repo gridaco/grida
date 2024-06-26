@@ -29,7 +29,7 @@ export default function PartnerPOC() {
     <main>
       <header className="p-10 w-full">
         <div className="flex justify-end w-full">
-          <button className="px-8 py-2 rounded bg-black font-semibold text-white">
+          <button className="px-8 py-2 rounded bg-black font-semibold text-white dark:invert">
             시작하기
           </button>
         </div>
@@ -47,7 +47,7 @@ export default function PartnerPOC() {
                 POC와 함께하는 <br />
                 편리한 이벤트 준비
               </h1>
-              <button className=" px-8 py-2 rounded-full bg-black font-semibold text-white">
+              <button className=" px-8 py-2 rounded-full bg-black font-semibold text-white dark:invert">
                 문의하기
               </button>
             </div>
@@ -72,7 +72,7 @@ export default function PartnerPOC() {
                 브랜드를 가장 잘 담는 나만의 폼 빌더
               </h2>
             </header>
-            <div className="container max-w-full bg-muted">
+            <div className="container max-w-full bg-muted/50">
               <Tabs
                 className="flex flex-col items-center justify-center my-16 gap-10"
                 defaultValue={demo_1_categories[0]}
@@ -204,7 +204,7 @@ export default function PartnerPOC() {
           </div>
         </section>
         <section className="flex flex-col my-40">
-          <div className="bg-neutral-50 container mx-auto overflow-hidden">
+          <div className=" bg-muted/50 container mx-auto overflow-hidden">
             <div className="flex flex-col md:flex-row">
               <aside className="md:flex-1 py-32">
                 <h2 className=" text-4xl font-bold">
@@ -274,7 +274,7 @@ export default function PartnerPOC() {
               </div>
             </section>
           </div>
-          <div className=" bg-neutral-50 container mx-auto overflow-hidden">
+          <div className="bg-muted/50 container mx-auto overflow-hidden">
             <div className="flex flex-col md:flex-row">
               <aside className="md:flex-1 py-32 content-center">
                 <h2 className=" text-4xl font-bold">오직 여기서만 가능한.</h2>
@@ -283,7 +283,7 @@ export default function PartnerPOC() {
                   <br />
                   머릿 속에 그리는 것을 현실로 만들어드립니다.
                 </p>
-                <button className="px-8 py-2 mt-8 rounded-full bg-black font-semibold text-white">
+                <button className="px-8 py-2 mt-8 rounded-full bg-black font-semibold text-white dark:invert">
                   시작하기
                 </button>
               </aside>
@@ -307,7 +307,7 @@ export default function PartnerPOC() {
             <br />
             문화를 만듭니다.
           </h2>
-          <button className=" px-8 py-2 rounded-full bg-black font-semibold text-white">
+          <button className=" px-8 py-2 rounded-full bg-black font-semibold text-white dark:invert">
             POC 문의하기
           </button>
         </div>
@@ -341,13 +341,13 @@ function SolutionCard({
   title: React.ReactNode;
 }) {
   return (
-    <div className="max-w-sm px-4 py-4 border border-neutral-200 rounded shadow-lg transition-transform duration-200 ease-in-out hover:scale-105">
+    <div className="max-w-sm px-4 py-4 border bg-white/5 border-muted rounded shadow-lg transition-transform duration-200 ease-in-out hover:scale-105">
       <Image
         src={cover}
         alt={alt ?? ""}
         width={400}
         height={400}
-        className="bg-neutral-400 w-full h-48 rounded object-cover"
+        className="w-full h-48 rounded object-cover"
       />
       <p className="font-semibold text-2xl mt-3">{title}</p>
       <div className="flex justify-end text-sm mt-12 opacity-50">
