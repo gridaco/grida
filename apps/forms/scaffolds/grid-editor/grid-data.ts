@@ -4,6 +4,7 @@ import type {
   FormResponse,
   FormResponseField,
   FormResponseSession,
+  GridaSupabase,
 } from "@/types";
 import { fmt_local_index } from "@/utils/fmt";
 import type { GFFile, GFResponseRow, GFSystemColumnTypes } from "../grid/types";
@@ -128,29 +129,31 @@ export namespace GridData {
         };
 
         const filesfn = (
-          row: Record<string, any>,
+          row: GridaSupabase.XDataRow,
           field: FormFieldDefinition
         ) => {
           // file field
           if (
             FieldSupports.file_alias(field.type) &&
-            row.__storage_fields[field.id]
+            row.__gf_storage_fields[field.id]
           ) {
-            const { data, error } = row.__storage_fields[field.id];
-            if (data) {
-              const { signedUrl } = data;
-              const gffile = {
-                src: signedUrl,
-                srcset: {
-                  thumbnail: signedUrl,
-                  original: signedUrl,
-                },
-                name: "unknwon",
-                download: signedUrl,
-              };
+            const objects = row.__gf_storage_fields[field.id];
+            return objects
+              ?.map((obj) => {
+                const { path, signedUrl } = obj;
 
-              return [gffile];
-            }
+                return {
+                  src: signedUrl,
+                  srcset: {
+                    thumbnail: signedUrl,
+                    original: signedUrl,
+                  },
+                  // use path as name for x-supabase
+                  name: path,
+                  download: signedUrl,
+                } satisfies GFFile;
+              })
+              .filter((f) => f) as GFFile[] | [];
           }
         };
 

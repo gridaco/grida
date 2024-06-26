@@ -50,16 +50,14 @@ export async function GET(req: NextRequest, context: Context) {
 
   const pooler = new GridaXSupabaseStorageTaskPooler(x_storage_client);
   pooler.queue(data, fields);
-  const files = pooler.resolve();
-
-  // console.log(files);
+  const files = await pooler.resolve();
 
   const datawithstorage = data.map((row: Record<string, any>) => {
     // TODO: get pk based on table schema (read comment in GridaXSupabaseStorageTaskPooler class)
     const pk = row.id;
     return {
       ...row,
-      __storage_fields: (files as any)[pk],
+      __gf_storage_fields: (files as any)[pk],
     } satisfies GridaSupabase.XDataRow;
   });
 
@@ -171,7 +169,7 @@ async function get_forms_x_supabase_table_connector({
 class GridaXSupabaseStorageTaskPooler {
   private tasks: Record<
     string,
-    Record<string, Promise<XSupabase.Storage.CreateSignedUrlResult>>
+    Promise<Record<string, XSupabase.Storage.CreateSignedUrlsResult["data"]>>
   > = {};
 
   constructor(private readonly storage: XSupabase.Storage.ConnectedClient) {}
@@ -185,32 +183,49 @@ class GridaXSupabaseStorageTaskPooler {
     for (const row of rows) {
       // TODO: get pk based on table schema (alternatively, we can use index as well - doesnt have to be a data from a fetched row)
       const pk = row.id;
-      for (const f of file_fields) {
-        const task = this.storage.createSignedUrl(
-          f.storage as {} as XSupabaseStorageSchema,
-          row
-        );
+      const task = this.storage.createSignedUrls(
+        row,
+        file_fields.map((ff) => ({
+          ...(ff.storage as XSupabaseStorageSchema),
+          id: ff.id,
+        }))
+      );
 
-        this.tasks[pk] = this.tasks[pk] || {};
-        this.tasks[pk][f.id] = task;
-      }
+      this.tasks[pk] = task;
     }
 
     return this.tasks;
   }
 
   async resolve(): Promise<
-    Record<string, Record<string, XSupabase.Storage.CreateSignedUrlResult>>
+    Record<
+      string,
+      Record<
+        string,
+        | {
+            signedUrl: string;
+            path: string;
+          }[]
+        | null
+      >
+    >
   > {
     const resolvedEntries = await Promise.all(
-      Object.entries(this.tasks).map(async ([fieldId, tasks]) => {
-        const resolvedTasks = await Promise.all(
-          Object.entries(tasks).map(async ([rowId, task]) => {
-            const result = await task;
-            return [rowId, result];
-          })
-        );
-        return [fieldId, Object.fromEntries(resolvedTasks)];
+      Object.entries(this.tasks).map(async ([rowId, task]) => {
+        const result = await task;
+
+        const success = Object.entries(result).reduce((acc, [fieldId, r]) => {
+          if (r) {
+            return {
+              ...acc,
+              [fieldId]: r.filter((r) => r.signedUrl),
+            };
+          }
+
+          return acc;
+        }, {});
+
+        return [rowId, success];
       })
     );
 

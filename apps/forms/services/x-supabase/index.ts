@@ -8,6 +8,7 @@ import type { XSupabaseStorageSchema } from "@/types";
 import type { TemplateVariables } from "@/lib/templating";
 import type { StorageError } from "@supabase/storage-js";
 import assert from "assert";
+import "core-js/features/map/group-by";
 
 export async function createXSupabaseClient(
   supabase_project_id: number,
@@ -156,33 +157,41 @@ export namespace XSupabase {
         return this.storage.from(bucket).createSignedUrl(renderedpath, 60);
       }
 
-      // async createSignedUrls(
-      //   row: Record<string, any>,
-      //   fields: XSupabaseStorageSchema[]
-      // ) {
-      //   // group fields by bucket
-      //   const grouped_by_bucket = Map.groupBy(fields, (f) => f.bucket);
+      async createSignedUrls(
+        row: Record<string, any>,
+        fields: (XSupabaseStorageSchema & { id: string })[]
+      ): Promise<Record<string, CreateSignedUrlsResult["data"]>> {
+        // group fields by bucket
+        const grouped_by_bucket = Map.groupBy(fields, (f) => f.bucket);
 
-      //   const tasks: Promise<CreateSignedUrlsResult>[] = [];
+        const tasks: Promise<CreateSignedUrlsResult>[] = [];
 
-      //   Object.entries(grouped_by_bucket).map(
-      //     async ([bucket, fields]: [string, XSupabaseStorageSchema[]]) => {
-      //       const paths = fields.map((f) => {
-      //         const renderedpath = renderpath(f.path, {
-      //           NEW: row,
-      //           RECORD: row,
-      //         });
-      //         return renderedpath;
-      //       });
-      //       tasks.push(this.storage.from(bucket).createSignedUrls(paths, 60));
-      //     }
-      //   );
+        Array.from(grouped_by_bucket.entries()).map(
+          async ([bucket, fields]: [string, XSupabaseStorageSchema[]]) => {
+            const paths = fields.map((f) => {
+              const renderedpath = renderpath(f.path, {
+                NEW: row,
+                RECORD: row,
+              });
+              return renderedpath;
+            });
+            tasks.push(this.storage.from(bucket).createSignedUrls(paths, 60));
+          }
+        );
 
-      //   const resolved = await Promise.all(tasks);
+        const resolved = await Promise.all(tasks);
 
-      //   // HERE!
-      //   return x satisfies CreateSignedUrlsResult;
-      // }
+        const result: Record<string, CreateSignedUrlsResult["data"]> = {};
+
+        resolved.forEach((curr, index) => {
+          if (!curr.error) {
+            const field = fields[index];
+            result[field.id] = curr.data;
+          }
+        });
+
+        return result;
+      }
     }
 
     export function renderpath<

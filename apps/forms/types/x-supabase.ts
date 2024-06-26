@@ -4,12 +4,13 @@ import type { User } from "@supabase/supabase-js";
 import type { Bucket } from "@supabase/storage-js";
 export namespace GridaSupabase {
   export type XDataRow = Record<string, any> & {
-    __storage_fields: Record<
+    __gf_storage_fields: Record<
       string,
-      {
-        signedUrl: string;
-        path: string;
-      } | null
+      | {
+          signedUrl: string;
+          path: string;
+        }[]
+      | null
     >;
   };
 

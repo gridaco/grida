@@ -73,6 +73,7 @@
     "class-variance-authority": "^0.7.0",
     "clsx": "^1.2.1",
     "cmdk": "^1.0.0",
+    "core-js": "^3.37.1",
     "css-tree": "^2.3.1",
     "csv-stringify": "^6.4.6",
     "date-fns": "^3.6.0",
@@ -126,6 +127,7 @@
   "devDependencies": {
     "@supabase/storage-js": "^2.6.0",
     "@tailwindcss/typography": "^0.5.10",
+    "@types/core-js": "^2.5.8",
     "@types/css-tree": "^2.3.1",
     "@types/geojson": "^7946.0.14",
     "@types/mapbox-gl": "^3.1.0",
