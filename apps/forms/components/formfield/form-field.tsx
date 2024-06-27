@@ -321,7 +321,7 @@ function MonoFormField({
         return (
           <FileUploadField
             name={sharedInputProps.name}
-            required={required}
+            required={novalidate ? false : required}
             accept={accept}
             multiple={multiple}
             maxFiles={
