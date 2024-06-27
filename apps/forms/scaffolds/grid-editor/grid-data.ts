@@ -236,7 +236,7 @@ export namespace GridData {
                 return gf_response_file({
                   form_id: response.form_id,
                   response_id: response.id,
-                  field_id: responseField.id,
+                  field_id: field.id,
                   filepath: path,
                 });
               }) || [],
