@@ -274,7 +274,7 @@ export namespace GridData {
   }) {
     const { form_id, field_id, filepath } = path;
 
-    const base = `/private/editor/${form_id}/fields/${field_id}/preview/src?path=${filepath}`;
+    const base = `/private/editor/${form_id}/fields/${field_id}/file/preview/src?path=${filepath}`;
 
     if (options) {
       const { width, download } = options;

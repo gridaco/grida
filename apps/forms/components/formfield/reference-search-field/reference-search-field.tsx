@@ -15,9 +15,9 @@ import { ReferenceTableGrid } from "@/scaffolds/grid/reference-grid";
 import { GridaSupabase } from "@/types";
 import { Search } from "lucide-react";
 import useSWR from "swr";
-import "react-data-grid/lib/styles.css";
 import { useMemo, useState } from "react";
 import Fuse from "fuse.js";
+import "react-data-grid/lib/styles.css";
 
 /**
  * general & common priorities for columns order (only for auth.users table)
