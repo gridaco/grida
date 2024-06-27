@@ -247,21 +247,54 @@ export namespace GridData {
     );
   }
 
-  function gf_response_file({
-    form_id,
-    response_id,
-    field_id,
-    filepath,
+  function image_src_url({
+    path,
+    options,
   }: {
+    path: {
+      form_id: string;
+      response_id: string;
+      field_id: string;
+      filepath: string;
+    };
+    options?: {
+      width?: number;
+      download?: boolean;
+    };
+  }) {
+    const { form_id, response_id, field_id, filepath } = path;
+
+    const base = `/private/editor/${form_id}/responses/${response_id}/fields/${field_id}/src?path=${filepath}`;
+
+    if (options) {
+      const { width, download } = options;
+      const params = new URLSearchParams();
+      if (width) params.set("width", width.toString());
+      if (download) params.set("download", "true");
+
+      return base + "&" + params.toString();
+    }
+
+    return base;
+  }
+
+  function gf_response_file(params: {
     form_id: string;
     response_id: string;
     field_id: string;
     filepath: string;
   }): GFFile {
-    const base = `/private/editor/${form_id}/responses/${response_id}/fields/${field_id}/src?path=${filepath}`;
-    const src = base + "&width=200";
-    const download = base + "&download=true";
-    const name = filepath.split("/").pop() ?? "";
+    const base = image_src_url({
+      path: params,
+    });
+    const src = image_src_url({ path: params, options: { width: 200 } });
+
+    const download = image_src_url({
+      path: params,
+      options: { download: true },
+    });
+
+    const name = params.filepath.split("/").pop() ?? "";
 
     return {
       src: src,
