@@ -53,12 +53,14 @@ export namespace GridData {
     }[];
   } {
     const fieldcolumns =
-      fields?.map((field) => ({
-        key: field.id,
-        name: field.name,
-        type: field.type,
-        // You can add more properties here as needed by react-data-grid
-      })) ?? [];
+      fields
+        ?.sort((a, b) => a.local_index - b.local_index)
+        ?.map((field) => ({
+          key: field.id,
+          name: field.name,
+          type: field.type,
+          // You can add more properties here as needed by react-data-grid
+        })) ?? [];
 
     switch (table) {
       case "response":
