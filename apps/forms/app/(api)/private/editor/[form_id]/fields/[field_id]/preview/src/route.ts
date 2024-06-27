@@ -12,12 +12,11 @@ export async function GET(
   context: {
     params: {
       form_id: string;
-      response_id: string;
       field_id: string;
     };
   }
 ) {
-  const { form_id, response_id, field_id } = context.params;
+  const { form_id, field_id } = context.params;
   const qpath = req.nextUrl.searchParams.get("path");
   const qwidth = req.nextUrl.searchParams.get("width");
   const width = Number(qwidth) || undefined;

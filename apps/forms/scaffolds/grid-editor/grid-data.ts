@@ -235,7 +235,6 @@ export namespace GridData {
               responseField?.storage_object_paths?.map((path) => {
                 return gf_response_file({
                   form_id: response.form_id,
-                  response_id: response.id,
                   field_id: field.id,
                   filepath: path,
                 });
@@ -253,7 +252,6 @@ export namespace GridData {
   }: {
     path: {
       form_id: string;
-      response_id: string;
       field_id: string;
       filepath: string;
     };
@@ -262,9 +260,9 @@ export namespace GridData {
       download?: boolean;
     };
   }) {
-    const { form_id, response_id, field_id, filepath } = path;
+    const { form_id, field_id, filepath } = path;
 
-    const base = `/private/editor/${form_id}/responses/${response_id}/fields/${field_id}/src?path=${filepath}`;
+    const base = `/private/editor/${form_id}/fields/${field_id}/preview/src?path=${filepath}`;
 
     if (options) {
       const { width, download } = options;
@@ -280,7 +278,6 @@ export namespace GridData {
 
   function gf_response_file(params: {
     form_id: string;
-    response_id: string;
     field_id: string;
     filepath: string;
   }): GFFile {
