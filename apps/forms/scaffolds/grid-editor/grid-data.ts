@@ -143,8 +143,6 @@ export namespace GridData {
               ?.map((obj) => {
                 const { path, signedUrl } = obj;
 
-                console.log("obj", signedUrl, path);
-
                 const thumbnail = file_preview_url({
                   params: {
                     form_id: input.form_id,

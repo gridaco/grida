@@ -321,10 +321,10 @@ function ReplaceFileDialog({
       return;
     }
 
+    setUploading(true);
     fetch(f.upsert!, {
       method: "PUT",
     }).then((res) => {
-      setUploading(true);
       res
         .json()
         .then(({ data }) => {
@@ -352,7 +352,7 @@ function ReplaceFileDialog({
             toast.error("Please try again later.");
           }
         })
-        .finally(() => {
+        .catch(() => {
           setUploading(false);
         });
     });
