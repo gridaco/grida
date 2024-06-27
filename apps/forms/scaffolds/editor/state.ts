@@ -53,7 +53,7 @@ export function initialFormEditorState(init: FormEditorInit): FormEditorState {
     tables: init.connections?.supabase?.main_supabase_table
       ? [
           {
-            type: "x-supabase",
+            type: "x-supabase-main-table",
             name: init.connections.supabase.main_supabase_table.sb_table_name,
             label: init.connections.supabase.main_supabase_table.sb_table_name,
           },
@@ -122,7 +122,7 @@ type GFTable =
       label: string;
     }
   | {
-      type: "x-supabase";
+      type: "x-supabase-main-table";
       name: string;
       label: string;
     };

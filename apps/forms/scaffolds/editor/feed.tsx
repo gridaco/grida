@@ -462,6 +462,10 @@ export function XSupabaseMainTableFeedProvider({
     async (url: string) => {
       const res = await fetch(url);
       return res.json();
+    },
+    {
+      // disable this since this feed replaces (not updates) the data, which causes the ui to refresh, causing certain ux fails (e.g. dialog on cell)
+      revalidateOnFocus: false,
     }
   );
 

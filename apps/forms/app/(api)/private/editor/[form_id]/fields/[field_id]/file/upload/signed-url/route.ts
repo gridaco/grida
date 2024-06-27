@@ -2,13 +2,13 @@ import { createRouteHandlerClient } from "@/lib/supabase/server";
 import { createSignedUpsertUploadUrl } from "@/services/form/storage";
 import { ConnectionSupabaseJoint, FormFieldDefinition } from "@/types";
 import type {
-  CreateSignedUploadUrlUpsertRequest,
   FormsApiResponse,
   SignedUploadUrlData,
 } from "@/types/private/api";
 import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
 import { NextRequest, NextResponse } from "next/server";
+import assert from "assert";
 
 type Context = {
   params: {
@@ -20,9 +20,8 @@ type Context = {
 export async function PUT(req: NextRequest, context: Context) {
   const { form_id, field_id } = context.params;
 
-  const body = (await req.json()) as CreateSignedUploadUrlUpsertRequest;
-
-  const { path } = body;
+  const path = req.nextUrl.searchParams.get("path");
+  assert(path);
 
   const cookieStore = cookies();
   const supabase = createRouteHandlerClient(cookieStore);

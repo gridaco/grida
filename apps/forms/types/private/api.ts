@@ -36,10 +36,6 @@ export type FormsApiResponse<T, E = any> = (
   | { data: T; error: null }
 ) & { message?: string };
 
-export interface CreateSignedUploadUrlUpsertRequest {
-  path: string;
-}
-
 export interface CreateSessionSignedUploadUrlRequest {
   file: {
     name: string;

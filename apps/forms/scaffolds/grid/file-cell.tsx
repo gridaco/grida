@@ -5,6 +5,7 @@ import {
   DotsHorizontalIcon,
   DownloadIcon,
   OpenInNewWindowIcon,
+  ReloadIcon,
 } from "@radix-ui/react-icons";
 import {
   Popover,
@@ -36,10 +37,15 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { useState } from "react";
+import React, { useState } from "react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { MediaPicker } from "../mediapicker";
 import { FileTypeIcon } from "@/components/form-field-type-icon";
+import toast from "react-hot-toast";
+import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
+import { SignedUploadUrlData } from "@/types/private/api";
+import { SupabaseStorageExtensions } from "@/lib/supabase/storage-ext";
+import { Spinner } from "@/components/spinner";
 
 export function FileEditCell({
   type,
@@ -50,17 +56,10 @@ export function FileEditCell({
   type: "image" | "file" | "audio" | "video";
   accept?: string;
   multiple?: boolean;
-  files: {
-    src: string;
-    srcset: {
-      thumbnail: string;
-      original: string;
-    };
-    download: string;
-    name: string;
-  }[];
+  files: GFFile[];
 }) {
   const [mediaPickerOpen, setMediaPickerOpen] = useState(false);
+  const [replaceFileDialogOpen, setReplaceFileDialogOpen] = useState(false);
   const { open: openMediaViewer } = useMediaViewer();
 
   const onEnterFullScreen = (f: GFFile) => {
@@ -111,6 +110,7 @@ export function FileEditCell({
                     onEnterFullScreen={() => onEnterFullScreen(f)}
                     {...f}
                   />
+
                   <AlertDialog>
                     <DropdownMenu modal={false}>
                       <DropdownMenuTrigger asChild>
@@ -148,11 +148,15 @@ export function FileEditCell({
                             View Original
                           </DropdownMenuItem>
                         </a>
+                        {f.upsert && (
+                          <DropdownMenuItem
+                            onClick={() => setReplaceFileDialogOpen(true)}
+                          >
+                            <ReloadIcon className="me-2" />
+                            Replace
+                          </DropdownMenuItem>
+                        )}
                         {/* <DropdownMenuItem>
-                        <ReloadIcon className="me-2" />
-                        Replace
-                      </DropdownMenuItem>
-                      <DropdownMenuItem>
                         <AlertDialogTrigger asChild>
                           <button>
                             <TrashIcon className="inline me-2" />
@@ -182,6 +186,12 @@ export function FileEditCell({
                       </AlertDialogFooter>
                     </AlertDialogContent>
                   </AlertDialog>
+                  <ReplaceFileDialog
+                    f={f}
+                    accept={accept}
+                    open={replaceFileDialogOpen}
+                    onOpenChange={setReplaceFileDialogOpen}
+                  />
                 </div>
               ))}
             </div>
@@ -213,6 +223,7 @@ export function FileEditCell({
               onUseImage={(src) => {
                 // TODO: commit the changes
                 setMediaPickerOpen(false);
+                toast.error("Not implemented yet - contact support");
               }}
             />
           </footer>
@@ -287,4 +298,89 @@ function FileCard(props: {
         </div>
       );
   }
+}
+
+function ReplaceFileDialog({
+  f,
+  accept,
+  ...props
+}: React.ComponentProps<typeof Dialog> & {
+  f: GFFile;
+  accept?: string;
+}) {
+  const [file, setFile] = useState<File | undefined>();
+  const [uploading, setUploading] = useState(false);
+
+  const onReplaceClick = async () => {
+    if (!file) {
+      toast.error("Please select a file to replace.");
+      return;
+    }
+    if (!f.upsert) {
+      toast.error("Replace is not supported for this file");
+      return;
+    }
+
+    fetch(f.upsert!, {
+      method: "PUT",
+    }).then((res) => {
+      setUploading(true);
+      res
+        .json()
+        .then(({ data }) => {
+          if (data) {
+            const { signedUrl } = data as SignedUploadUrlData;
+
+            //
+            SupabaseStorageExtensions.uploadToSupabaseS3SignedUrl(
+              signedUrl,
+              file
+            )
+              .then(({ data, error }) => {
+                if (error || !data) {
+                  toast.error("Failed to replace file.");
+                  return;
+                }
+                toast.success(
+                  "File replaced successfully. (refresh to see changes)"
+                );
+              })
+              .finally(() => {
+                setUploading(false);
+              });
+          } else {
+            toast.error("Please try again later.");
+          }
+        })
+        .finally(() => {
+          setUploading(false);
+        });
+    });
+  };
+
+  return (
+    <Dialog {...props}>
+      <DialogContent>
+        <div>
+          <input
+            type="file"
+            multiple={false}
+            accept={accept}
+            onChange={(e) => {
+              setFile(e.target.files?.[0]);
+            }}
+          />
+        </div>
+        <Button disabled={!file || uploading} onClick={onReplaceClick}>
+          {uploading ? (
+            <>
+              <Spinner />
+            </>
+          ) : (
+            <>Replace</>
+          )}
+        </Button>
+      </DialogContent>
+    </Dialog>
+  );
 }

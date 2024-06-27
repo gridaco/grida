@@ -74,4 +74,44 @@ export namespace SupabaseStorageExtensions {
 
     return data.some((file) => file.name === path.split("/").pop());
   }
+
+  export async function uploadToSupabaseS3SignedUrl(
+    signed_url: string,
+    file: File
+  ): Promise<{
+    data: {
+      fullPath: string;
+      path: string;
+    } | null;
+    error: any;
+  }> {
+    try {
+      const response = await fetch(signed_url, {
+        method: "PUT",
+        headers: {
+          "Content-Type": file.type,
+        },
+        body: file,
+      });
+
+      if (response.ok) {
+        const uploaded = await response.json();
+
+        return {
+          data: {
+            path: uploaded.Key.split("/").slice(1).join("/"),
+            fullPath: uploaded.Key,
+          },
+          error: null,
+        };
+      } else {
+        return { data: null, error: response.statusText };
+      }
+    } catch (error) {
+      return {
+        data: null,
+        error,
+      };
+    }
+  }
 }

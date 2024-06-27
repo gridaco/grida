@@ -143,18 +143,27 @@ export namespace GridData {
               ?.map((obj) => {
                 const { path, signedUrl } = obj;
 
-                const thumbnail = image_src_url({
-                  path: {
+                console.log("obj", signedUrl, path);
+
+                const thumbnail = file_preview_url({
+                  params: {
                     form_id: input.form_id,
                     field_id: field.id,
                     filepath: path,
                   },
                   options: {
-                    width: 4,
+                    width: 200,
                   },
                 });
 
+                const upsert = file_request_upsert_url({
+                  form_id: input.form_id,
+                  field_id: field.id,
+                  filepath: path,
+                });
+
                 return {
+                  // use thumbnail as src
                   src: thumbnail,
                   srcset: {
                     thumbnail: thumbnail,
@@ -163,6 +172,7 @@ export namespace GridData {
                   // use path as name for x-supabase
                   name: path,
                   download: signedUrl,
+                  upsert: upsert,
                 } satisfies GFFile;
               })
               .filter((f) => f) as GFFile[] | [];
@@ -258,11 +268,23 @@ export namespace GridData {
     );
   }
 
-  function image_src_url({
-    path,
+  function file_request_upsert_url({
+    form_id,
+    field_id,
+    filepath,
+  }: {
+    form_id: string;
+    field_id: string;
+    filepath: string;
+  }) {
+    return `/private/editor/${form_id}/fields/${field_id}/file/upload/signed-url?path=${filepath}`;
+  }
+
+  function file_preview_url({
+    params,
     options,
   }: {
-    path: {
+    params: {
       form_id: string;
       field_id: string;
       filepath: string;
@@ -272,7 +294,7 @@ export namespace GridData {
       download?: boolean;
     };
   }) {
-    const { form_id, field_id, filepath } = path;
+    const { form_id, field_id, filepath } = params;
 
     const base = `/private/editor/${form_id}/fields/${field_id}/file/preview/src?path=${filepath}`;
 
@@ -293,17 +315,19 @@ export namespace GridData {
     field_id: string;
     filepath: string;
   }): GFFile {
-    const base = image_src_url({
-      path: params,
+    const base = file_preview_url({
+      params: params,
     });
-    const src = image_src_url({ path: params, options: { width: 200 } });
+    const src = file_preview_url({ params: params, options: { width: 200 } });
 
-    const download = image_src_url({
-      path: params,
+    const download = file_preview_url({
+      params: params,
       options: { download: true },
     });
 
     const name = params.filepath.split("/").pop() ?? "";
+
+    // TODO: upsert - file upsert is not ready for responses
 
     return {
       src: src,

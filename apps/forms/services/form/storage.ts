@@ -15,6 +15,7 @@ import assert from "assert";
 export async function createSignedUpsertUploadUrl({
   form,
   field_id,
+  path,
 }: {
   field_id: string;
   path: string;
@@ -27,7 +28,7 @@ export async function createSignedUpsertUploadUrl({
   assert(field, "field not found");
 
   if (field.storage) {
-    const { type, mode, bucket, path } =
+    const { type, bucket } =
       field.storage as any as FormFieldStorageSchema;
 
     switch (type) {
