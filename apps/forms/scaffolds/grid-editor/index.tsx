@@ -78,6 +78,7 @@ export function GridEditor() {
   // Transforming the responses into the format expected by react-data-grid
   const rows = useMemo(() => {
     return GridData.rows({
+      form_id: form_id,
       table: datagrid_table,
       fields: fields,
       filter: datagrid_filter,
@@ -91,6 +92,7 @@ export function GridEditor() {
       },
     });
   }, [
+    form_id,
     datagrid_table,
     sessions,
     fields,

@@ -14,6 +14,7 @@ import { FieldSupports } from "@/k/supported_field_types";
 
 export namespace GridData {
   type DataGridInput = {
+    form_id: string;
     fields: FormFieldDefinition[];
     filter: DataGridFilterSettings;
   } & (
@@ -142,10 +143,21 @@ export namespace GridData {
               ?.map((obj) => {
                 const { path, signedUrl } = obj;
 
+                const thumbnail = image_src_url({
+                  path: {
+                    form_id: input.form_id,
+                    field_id: field.id,
+                    filepath: path,
+                  },
+                  options: {
+                    width: 4,
+                  },
+                });
+
                 return {
-                  src: signedUrl,
+                  src: thumbnail,
                   srcset: {
-                    thumbnail: signedUrl,
+                    thumbnail: thumbnail,
                     original: signedUrl,
                   },
                   // use path as name for x-supabase

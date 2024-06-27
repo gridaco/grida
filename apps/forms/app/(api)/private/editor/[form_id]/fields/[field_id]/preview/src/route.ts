@@ -29,7 +29,8 @@ export async function GET(
     format: format,
     transform: {
       width: width,
-      resize: width ? ("contain" as const) : undefined,
+      height: width,
+      // resize: width ? ("contain" as const) : undefined,
     },
   };
   // TODO: support RLS
@@ -38,9 +39,6 @@ export async function GET(
   const supabase = client;
 
   assert(qpath);
-
-  // const { data: field } = await supabase.from('form_field').select('*').eq('id', field_id).eq('form_id', form_id).single();
-  // if (!field) return notFound();
 
   const { data } = await supabase
     .from("form")
@@ -105,5 +103,10 @@ export async function GET(
     return notFound();
   }
 
-  return NextResponse.redirect(src);
+  return NextResponse.redirect(src, {
+    status: 301,
+    headers: {
+      "Cache-Control": `public, max-age=${expiresIn}, s-maxage=${expiresIn}, stale-while-revalidate=59`,
+    },
+  });
 }
