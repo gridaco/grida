@@ -196,7 +196,7 @@ export function GridEditor() {
                       return (
                         <TabsTrigger
                           key={table.type + table.name}
-                          value={table.name}
+                          value={table.type}
                         >
                           {table.label}
                         </TabsTrigger>

@@ -52,15 +52,13 @@ export namespace GridData {
       type?: FormInputType;
     }[];
   } {
-    const fieldcolumns =
-      fields
-        ?.sort((a, b) => a.local_index - b.local_index)
-        ?.map((field) => ({
-          key: field.id,
-          name: field.name,
-          type: field.type,
-          // You can add more properties here as needed by react-data-grid
-        })) ?? [];
+    const fieldcolumns = Array.from(fields)
+      .sort((a, b) => a.local_index - b.local_index)
+      .map((field) => ({
+        key: field.id,
+        name: field.name,
+        type: field.type,
+      }));
 
     switch (table) {
       case "response":

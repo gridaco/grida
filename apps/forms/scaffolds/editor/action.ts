@@ -207,7 +207,7 @@ export interface DataGridDateTZAction {
 
 export interface DataGridTableAction {
   type: "editor/data-grid/table";
-  table: "response" | "session";
+  table: "response" | "session" | "x-supabase-main-table";
 }
 
 export interface DataGridRowsAction {
