@@ -407,6 +407,7 @@ async function submit({
 
       if (sbconn_insertion_error) {
         console.error("submit/err/sbconn", sbconn_insertion_error);
+        // TODO: use 400 - developer error with error info
         return error(500, { form_id }, meta);
       }
 
