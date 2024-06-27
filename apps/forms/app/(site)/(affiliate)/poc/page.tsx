@@ -59,7 +59,7 @@ export default function PartnerPOC() {
             <Logos />
           </div>
         </section>
-        <section className="relative container mx-auto py-40">
+        <section className="py-40">
           <div className="flex flex-col gap-10">
             <header className="flex flex-col gap-4">
               <div className="flex flex-row items-center justify-center">
@@ -68,16 +68,16 @@ export default function PartnerPOC() {
                   할인된 가격에
                 </span>
               </div>
-              <h2 className="text-4xl font-extrabold text-center">
+              <h2 className="text-4xl font-extrabold text-center px-20 sm:px-0">
                 브랜드를 가장 잘 담는 나만의 폼 빌더
               </h2>
             </header>
-            <div className="relative container mx-auto bg-muted/50">
+            <div className="w-full mx-0 bg-muted/50 px-8 sm:px-24">
               <Tabs
                 className="flex flex-col items-center justify-center my-16 gap-10"
                 defaultValue={demo_1_categories[0]}
               >
-                <TabsList className="flex flex-wrap bg-transparent h-9 items-center content-center gap-3 justify-center p-1 text-muted-foreground">
+                <TabsList className="flex flex-wrap bg-transparent h-9 items-center content-center gap-3 justify-center text-muted-foreground">
                   {demo_1_categories.map((category) => (
                     <TabsTrigger
                       key={category}
@@ -103,14 +103,7 @@ export default function PartnerPOC() {
             </div>
           </div>
         </section>
-        <section className="relative container mx-auto py-40">
-          <Image
-            src="/affiliate/poc/images/bg-image.png"
-            alt="bg"
-            width={1700}
-            height={1800}
-            className=" absolute top-0 left-0 w-full h-full object-cover -z-10"
-          />
+        <section className="w-full mx-0 py-40">
           <div className="flex flex-col gap-10">
             <header className="flex flex-col gap-4">
               <div className="flex flex-row items-center justify-center gap-2">
@@ -142,7 +135,7 @@ export default function PartnerPOC() {
                 </TabsList>
                 {demo_2_categories.map((category) => (
                   <TabsContent key={category} value={category}>
-                    <div className="flex flex-col gap-5">
+                    <div className="flex flex-col gap-5 px-8 sm:px-24">
                       <Image
                         className="md:h-[776px] w-full rounded-xl shadow-xl overflow-hidden object-cover"
                         src="/images/abstract-placeholder.jpg"
@@ -230,7 +223,7 @@ export default function PartnerPOC() {
           </div>
         </section>
         <section className="flex flex-col my-40">
-          <div className=" bg-muted/50 container mx-auto overflow-hidden">
+          <div className=" bg-muted/50 w-full mx-0 sm:px-32 overflow-hidden">
             <div className="flex flex-col md:flex-row">
               <aside className="md:flex-1 py-32">
                 <h2 className=" text-4xl font-bold text-center sm:text-left">
@@ -269,7 +262,7 @@ export default function PartnerPOC() {
           </div>
 
           <div>
-            <section className="container mx-auto overflow-hidden">
+            <section className="w-full mx-0 sm:px-32 overflow-hidden">
               <div className="flex flex-col-reverse md:flex-row">
                 <aside className="md:flex-1">
                   <TopBottomFadingGradientOverlay>
@@ -300,7 +293,7 @@ export default function PartnerPOC() {
               </div>
             </section>
           </div>
-          <div className="bg-muted/50 container mx-auto overflow-hidden">
+          <div className="bg-muted/50 w-full mx-0 sm:px-32 overflow-hidden">
             <div className="flex flex-col md:flex-row">
               <aside className="flex flex-col md:flex-1 py-32 items-center sm:items-start">
                 <h2 className=" text-4xl font-bold text-center sm:text-left">
