@@ -466,6 +466,13 @@ export function XSupabaseMainTableFeedProvider({
   );
 
   useEffect(() => {
+    dispatch({
+      type: "editor/data-grid/loading",
+      isloading: res.isLoading || res.isValidating,
+    });
+  }, [dispatch, res.isLoading, res.isValidating]);
+
+  useEffect(() => {
     // trigger data refresh
     dispatch({
       type: "editor/data-grid/refresh",

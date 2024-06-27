@@ -74,6 +74,7 @@ export function initialFormEditorState(init: FormEditorInit): FormEditorState {
     available_field_ids: block_available_field_ids,
     datagrid_rows_per_page: 100,
     datagrid_table_refresh_key: 0,
+    datagrid_isloading: false,
     dateformat: "datetime",
     datetz: LOCALTZ,
     datagrid_table: is_main_table_supabase
@@ -153,6 +154,7 @@ export interface FormEditorState {
   datagrid_rows_per_page: number;
   datagrid_table: "response" | "session" | "x-supabase-main-table";
   datagrid_table_refresh_key: number;
+  datagrid_isloading: boolean;
   datagrid_filter: DataGridFilterSettings;
   realtime_sessions_enabled: boolean;
   realtime_responses_enabled: boolean;

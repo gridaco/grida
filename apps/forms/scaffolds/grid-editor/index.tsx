@@ -50,6 +50,7 @@ import { GridData } from "./grid-data";
 import clsx from "clsx";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { XSupabaseQuery } from "@/lib/supabase-postgrest/builder";
+import { Spinner } from "@/components/spinner";
 
 export function GridEditor() {
   const [state, dispatch] = useEditorState();
@@ -272,8 +273,24 @@ export function GridEditor() {
             <DownloadIcon />
           </Button>
         </Link>
+        <DataLoadingIndicator />
       </footer>
     </div>
+  );
+}
+
+function DataLoadingIndicator() {
+  const [state, dispatch] = useEditorState();
+  const { datagrid_isloading } = state;
+
+  const onRefresh = useCallback(() => {
+    dispatch({ type: "editor/data-grid/refresh" });
+  }, [dispatch]);
+
+  return (
+    <Button onClick={onRefresh} variant="ghost">
+      {datagrid_isloading ? <Spinner /> : <>Refresh</>}
+    </Button>
   );
 }
 

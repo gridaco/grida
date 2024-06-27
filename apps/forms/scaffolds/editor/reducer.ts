@@ -36,6 +36,7 @@ import {
   DataGridCellChangeAction,
   FeedXSupabaseMainTableRowsAction,
   DataTableRefreshAction,
+  DataTableLoadingAction,
 } from "./action";
 import { arrayMove } from "@dnd-kit/sortable";
 import { blockstreeflat } from "@/lib/forms/tree";
@@ -657,7 +658,13 @@ export function reducer(
         draft.datagrid_table_refresh_key = draft.datagrid_table_refresh_key + 1;
       });
     }
+    case "editor/data-grid/loading": {
+      const { isloading } = <DataTableLoadingAction>action;
 
+      return produce(state, (draft) => {
+        draft.datagrid_isloading = isloading;
+      });
+    }
     case "editor/data-grid/cell/change": {
       return produce(state, (draft) => {
         switch (state.datagrid_table) {

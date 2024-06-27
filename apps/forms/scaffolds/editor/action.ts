@@ -44,6 +44,7 @@ export type BlocksEditorAction =
   | DataGridDateTZAction
   | DataGridFilterAction
   | DataTableRefreshAction
+  | DataTableLoadingAction
   | DataGridCellChangeAction
   | FeedXSupabaseMainTableRowsAction;
 
@@ -225,6 +226,11 @@ export interface DataGridFilterAction
 
 export interface DataTableRefreshAction {
   type: "editor/data-grid/refresh";
+}
+
+export interface DataTableLoadingAction {
+  type: "editor/data-grid/loading";
+  isloading: boolean;
 }
 
 export interface DataGridCellChangeAction {
