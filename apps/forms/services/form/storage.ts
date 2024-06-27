@@ -5,15 +5,54 @@ import {
   SessionStagedFileStorage,
 } from "@/services/form/session-storage";
 import { createXSupabaseClient } from "@/services/x-supabase";
-import { FormFieldStorageSchema } from "@/types";
+import {
+  ConnectionSupabaseJoint,
+  FormFieldDefinition,
+  FormFieldStorageSchema,
+} from "@/types";
 import assert from "assert";
 
-export function createSignedUploadUrl({}: {
-  form_id: string;
+export async function createSignedUpsertUploadUrl({
+  form,
+  field_id,
+}: {
   field_id: string;
   path: string;
+  form: {
+    fields: FormFieldDefinition[];
+    supabase_connection: ConnectionSupabaseJoint | null;
+  };
 }) {
-  //
+  const field = form.fields.find((field) => field.id === field_id);
+  assert(field, "field not found");
+
+  if (field.storage) {
+    const { type, mode, bucket, path } =
+      field.storage as any as FormFieldStorageSchema;
+
+    switch (type) {
+      case "x-supabase": {
+        assert(form.supabase_connection, "supabase_connection not found");
+        const client = await createXSupabaseClient(
+          form.supabase_connection.supabase_project_id,
+          {
+            service_role: true,
+          }
+        );
+
+        const storage = new FileStorage(client, bucket);
+        return storage.sign(path, {
+          upsert: true,
+        });
+      }
+      case "grida":
+      case "x-s3":
+      default:
+        throw new Error("storage type not supported");
+    }
+  } else {
+    throw new Error("not implemented");
+  }
 }
 
 export async function session_storage_createSignedUploadUrl({
