@@ -20,6 +20,7 @@ import {
   DownloadIcon,
   GearIcon,
   PieChartIcon,
+  ReloadIcon,
   TrashIcon,
 } from "@radix-ui/react-icons";
 import {
@@ -288,8 +289,11 @@ function DataLoadingIndicator() {
   }, [dispatch]);
 
   return (
-    <Button onClick={onRefresh} variant="ghost">
-      {datagrid_isloading ? <Spinner /> : <>Refresh</>}
+    <Button disabled={datagrid_isloading} onClick={onRefresh} variant="ghost">
+      <span className="me-2">
+        {datagrid_isloading ? <Spinner /> : <ReloadIcon />}
+      </span>
+      Refresh
     </Button>
   );
 }
