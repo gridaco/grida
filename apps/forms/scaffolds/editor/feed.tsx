@@ -448,13 +448,13 @@ export function XSupabaseMainTableFeedProvider({
 }: React.PropsWithChildren<{}>) {
   const [state, dispatch] = useEditorState();
 
-  const { datagrid_rows_per_page } = state;
+  const { datagrid_rows_per_page, datagrid_table_refresh_key } = state;
 
   const request = state.connections.supabase?.main_supabase_table_id
     ? `/private/editor/connect/${state.form_id}/supabase/table/${state.connections.supabase.main_supabase_table_id}/query?limit=${datagrid_rows_per_page}` +
       // refresh when fields are updated
       "&r=" +
-      state.fields.length
+      datagrid_table_refresh_key
     : null;
 
   const res = useSWR<EditorApiResponse<GridaSupabase.XDataRow[], any>>(
@@ -464,6 +464,13 @@ export function XSupabaseMainTableFeedProvider({
       return res.json();
     }
   );
+
+  useEffect(() => {
+    // trigger data refresh
+    dispatch({
+      type: "editor/data-grid/refresh",
+    });
+  }, [dispatch, state.fields]);
 
   useEffect(() => {
     if (res.data?.data) {

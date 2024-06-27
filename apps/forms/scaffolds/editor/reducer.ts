@@ -35,6 +35,7 @@ import {
   DataGridFilterAction,
   DataGridCellChangeAction,
   FeedXSupabaseMainTableRowsAction,
+  DataTableRefreshAction,
 } from "./action";
 import { arrayMove } from "@dnd-kit/sortable";
 import { blockstreeflat } from "@/lib/forms/tree";
@@ -647,6 +648,13 @@ export function reducer(
           ...draft.datagrid_filter,
           ...pref,
         };
+      });
+    }
+    case "editor/data-grid/refresh": {
+      const {} = <DataTableRefreshAction>action;
+
+      return produce(state, (draft) => {
+        draft.datagrid_table_refresh_key = draft.datagrid_table_refresh_key + 1;
       });
     }
 

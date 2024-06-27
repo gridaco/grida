@@ -43,6 +43,7 @@ export type BlocksEditorAction =
   | DataGridDateFormatAction
   | DataGridDateTZAction
   | DataGridFilterAction
+  | DataTableRefreshAction
   | DataGridCellChangeAction
   | FeedXSupabaseMainTableRowsAction;
 
@@ -220,6 +221,10 @@ export interface DataGridDeleteSelectedRows {
 export interface DataGridFilterAction
   extends Partial<FormEditorState["datagrid_filter"]> {
   type: "editor/data-grid/filter";
+}
+
+export interface DataTableRefreshAction {
+  type: "editor/data-grid/refresh";
 }
 
 export interface DataGridCellChangeAction {
