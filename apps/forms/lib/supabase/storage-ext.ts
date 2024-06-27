@@ -1,7 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { FileObject } from "@supabase/storage-js";
 
-export namespace SupabaseStorageExt {
+export namespace SupabaseStorageExtensions {
   type StorageClient = SupabaseClient["storage"];
 
   async function list(storage: StorageClient, bucket: string, path: string) {
@@ -56,5 +56,62 @@ export namespace SupabaseStorageExt {
     }
 
     return data;
+  }
+
+  /**
+   * @see https://github.com/supabase/storage/issues/266#issuecomment-2191254105
+   */
+  export async function exists(
+    storage: StorageClient,
+    bucket: string,
+    path: string
+  ) {
+    const { data, error } = await storage.from(bucket).list(path);
+
+    if (error) {
+      throw error;
+    }
+
+    return data.some((file) => file.name === path.split("/").pop());
+  }
+
+  export async function uploadToSupabaseS3SignedUrl(
+    signed_url: string,
+    file: File
+  ): Promise<{
+    data: {
+      fullPath: string;
+      path: string;
+    } | null;
+    error: any;
+  }> {
+    try {
+      const response = await fetch(signed_url, {
+        method: "PUT",
+        headers: {
+          "Content-Type": file.type,
+        },
+        body: file,
+      });
+
+      if (response.ok) {
+        const uploaded = await response.json();
+
+        return {
+          data: {
+            path: uploaded.Key.split("/").slice(1).join("/"),
+            fullPath: uploaded.Key,
+          },
+          error: null,
+        };
+      } else {
+        return { data: null, error: response.statusText };
+      }
+    } catch (error) {
+      return {
+        data: null,
+        error,
+      };
+    }
   }
 }

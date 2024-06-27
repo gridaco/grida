@@ -3,7 +3,16 @@ import type { ConnectionSupabaseJoint } from "./types";
 import type { User } from "@supabase/supabase-js";
 import type { Bucket } from "@supabase/storage-js";
 export namespace GridaSupabase {
-  export type XDataRow = Record<string, any>;
+  export type XDataRow = Record<string, any> & {
+    __gf_storage_fields: Record<
+      string,
+      | {
+          signedUrl: string;
+          path: string;
+        }[]
+      | null
+    >;
+  };
 
   export type JSONSChema = JSONSchemaType<Record<string, any>> & {
     properties: {

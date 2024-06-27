@@ -7,9 +7,10 @@ import { createClientFormsClient } from "@/lib/supabase/client";
 import { RealtimePostgresChangesPayload } from "@supabase/supabase-js";
 import useSWR from "swr";
 import type { EditorApiResponse } from "@/types/private/api";
-import type { FormResponseField } from "@/types";
+import type { FormResponseField, GridaSupabase } from "@/types";
 import { usePrevious } from "@uidotdev/usehooks";
 import { XSupabaseQuery } from "@/lib/supabase-postgrest/builder";
+import equal from "deep-equal";
 
 type RealtimeTableChangeData = {
   id: string;
@@ -84,9 +85,9 @@ export function ResponseSyncProvider({
       const { data, error } = await supabase
         .from("response_field")
         .update({
-          // TODO:
           value: payload.value,
           form_field_option_id: payload.option_id,
+          // TODO:
           // 'storage_object_paths': []
         })
         .eq("id", id)
@@ -368,7 +369,7 @@ export function XSupabaseMainTableSyncProvider({
       if (!state.connections.supabase?.main_supabase_table_id) return;
       if (!pkname) return;
 
-      fetch(
+      const task = fetch(
         `/private/editor/connect/${state.form_id}/supabase/table/${state.connections.supabase.main_supabase_table_id}/query`,
         {
           method: "PATCH",
@@ -387,6 +388,16 @@ export function XSupabaseMainTableSyncProvider({
           } satisfies XSupabaseQuery.Body),
         }
       );
+
+      toast
+        .promise(task, {
+          loading: "Updating...",
+          success: "Updated",
+          error: "Failed",
+        })
+        .then((data) => {
+          // NOTE: Do not dispatch data based on this result. this does not contain extended data
+        });
     },
     [pkname, state.connections.supabase?.main_supabase_table_id, state.form_id]
   );
@@ -404,7 +415,7 @@ export function XSupabaseMainTableSyncProvider({
 
       if (prevRow) {
         // get changed fields
-        const diff = rowdiff(prevRow, row);
+        const diff = rowdiff(prevRow, row, (key) => key.startsWith("__gf_"));
         if (Object.keys(diff).length > 0) {
           update(row[pkname], diff);
         }
@@ -415,10 +426,17 @@ export function XSupabaseMainTableSyncProvider({
   return <>{children}</>;
 }
 
-function rowdiff(prevRow: Record<string, any>, newRow: Record<string, any>) {
+function rowdiff(
+  prevRow: Record<string, any>,
+  newRow: Record<string, any>,
+  ignoreKey?: (key: string) => boolean
+) {
   const changedFields: Record<string, any> = {};
   for (const key in newRow) {
-    if (newRow[key] !== prevRow[key]) {
+    if (ignoreKey && ignoreKey(key)) {
+      continue;
+    }
+    if (!equal(newRow[key], prevRow[key])) {
       changedFields[key] = newRow[key];
     }
   }
@@ -430,19 +448,40 @@ export function XSupabaseMainTableFeedProvider({
 }: React.PropsWithChildren<{}>) {
   const [state, dispatch] = useEditorState();
 
-  const { datagrid_rows_per_page } = state;
+  const { datagrid_rows_per_page, datagrid_table_refresh_key } = state;
 
   const request = state.connections.supabase?.main_supabase_table_id
-    ? `/private/editor/connect/${state.form_id}/supabase/table/${state.connections.supabase.main_supabase_table_id}/query?limit=${datagrid_rows_per_page}`
+    ? `/private/editor/connect/${state.form_id}/supabase/table/${state.connections.supabase.main_supabase_table_id}/query?limit=${datagrid_rows_per_page}` +
+      // refresh when fields are updated
+      "&r=" +
+      datagrid_table_refresh_key
     : null;
 
-  const res = useSWR<EditorApiResponse<Record<string, any>[], any>>(
+  const res = useSWR<EditorApiResponse<GridaSupabase.XDataRow[], any>>(
     request,
     async (url: string) => {
       const res = await fetch(url);
       return res.json();
+    },
+    {
+      // disable this since this feed replaces (not updates) the data, which causes the ui to refresh, causing certain ux fails (e.g. dialog on cell)
+      revalidateOnFocus: false,
     }
   );
+
+  useEffect(() => {
+    dispatch({
+      type: "editor/data-grid/loading",
+      isloading: res.isLoading || res.isValidating,
+    });
+  }, [dispatch, res.isLoading, res.isValidating]);
+
+  useEffect(() => {
+    // trigger data refresh
+    dispatch({
+      type: "editor/data-grid/refresh",
+    });
+  }, [dispatch, state.fields]);
 
   useEffect(() => {
     if (res.data?.data) {

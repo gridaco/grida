@@ -43,6 +43,8 @@ export type BlocksEditorAction =
   | DataGridDateFormatAction
   | DataGridDateTZAction
   | DataGridFilterAction
+  | DataTableRefreshAction
+  | DataTableLoadingAction
   | DataGridCellChangeAction
   | FeedXSupabaseMainTableRowsAction;
 
@@ -205,7 +207,7 @@ export interface DataGridDateTZAction {
 
 export interface DataGridTableAction {
   type: "editor/data-grid/table";
-  table: "response" | "session";
+  table: "response" | "session" | "x-supabase-main-table";
 }
 
 export interface DataGridRowsAction {
@@ -220,6 +222,15 @@ export interface DataGridDeleteSelectedRows {
 export interface DataGridFilterAction
   extends Partial<FormEditorState["datagrid_filter"]> {
   type: "editor/data-grid/filter";
+}
+
+export interface DataTableRefreshAction {
+  type: "editor/data-grid/refresh";
+}
+
+export interface DataTableLoadingAction {
+  type: "editor/data-grid/loading";
+  isloading: boolean;
 }
 
 export interface DataGridCellChangeAction {

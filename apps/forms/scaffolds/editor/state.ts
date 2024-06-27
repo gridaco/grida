@@ -53,7 +53,7 @@ export function initialFormEditorState(init: FormEditorInit): FormEditorState {
     tables: init.connections?.supabase?.main_supabase_table
       ? [
           {
-            type: "x-supabase",
+            type: "x-supabase-main-table",
             name: init.connections.supabase.main_supabase_table.sb_table_name,
             label: init.connections.supabase.main_supabase_table.sb_table_name,
           },
@@ -73,6 +73,8 @@ export function initialFormEditorState(init: FormEditorInit): FormEditorState {
     selected_rows: new Set(),
     available_field_ids: block_available_field_ids,
     datagrid_rows_per_page: 100,
+    datagrid_table_refresh_key: 0,
+    datagrid_isloading: false,
     dateformat: "datetime",
     datetz: LOCALTZ,
     datagrid_table: is_main_table_supabase
@@ -120,7 +122,7 @@ type GFTable =
       label: string;
     }
   | {
-      type: "x-supabase";
+      type: "x-supabase-main-table";
       name: string;
       label: string;
     };
@@ -151,6 +153,8 @@ export interface FormEditorState {
   tables: GFTable[];
   datagrid_rows_per_page: number;
   datagrid_table: "response" | "session" | "x-supabase-main-table";
+  datagrid_table_refresh_key: number;
+  datagrid_isloading: boolean;
   datagrid_filter: DataGridFilterSettings;
   realtime_sessions_enabled: boolean;
   realtime_responses_enabled: boolean;

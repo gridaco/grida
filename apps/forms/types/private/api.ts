@@ -43,8 +43,10 @@ export interface CreateSessionSignedUploadUrlRequest {
   };
 }
 
-export interface SessionSignedUploadUrlData {
+export interface SignedUploadUrlData {
   signedUrl: string;
   path: string;
   token: string;
 }
+
+export type SessionSignedUploadUrlData = SignedUploadUrlData;

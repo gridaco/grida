@@ -1,6 +1,6 @@
 import { client } from "@/lib/supabase/server";
 import {
-  GridaXSupabaseClient,
+  GridaXSupabaseService,
   createXSupabaseClient,
 } from "@/services/x-supabase";
 import { FormFieldReferenceSchema, GridaSupabase } from "@/types";
@@ -60,7 +60,7 @@ export async function GET(
       case "x-supabase": {
         assert(supabase_connection, "No connection found");
 
-        const xsupabase = new GridaXSupabaseClient();
+        const xsupabase = new GridaXSupabaseService();
         const conn = await xsupabase.getConnection(supabase_connection);
         assert(conn, "connection fetch failed");
         const {

@@ -94,14 +94,12 @@ export class FileStorage {
     //
   }
 
-  sign(path: string) {
+  sign(path: string, options?: { upsert: boolean }) {
     return (
       this.client.storage
         .from(this.bucket)
         // valid for 2 hours - https://supabase.com/docs/reference/javascript/storage-from-createsigneduploadurl
-        .createSignedUploadUrl(path, {
-          upsert: true,
-        })
+        .createSignedUploadUrl(path, options)
     );
   }
 }

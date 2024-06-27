@@ -83,6 +83,8 @@ export type FormInputType =
   | "email"
   | "file"
   | "image"
+  | "audio"
+  | "video"
   | "select"
   | "latlng"
   | "password"
@@ -273,7 +275,7 @@ export interface FormResponse {
   browser: string | null;
   created_at: string;
   customer_id: string | null;
-  form_id: string | null;
+  form_id: string;
   ip: string | null;
   platform_powered_by: PlatformPoweredBy | null;
   raw: any;
@@ -302,12 +304,32 @@ export interface FormResponseField {
 
 export type FormFieldDataSchema = PaymentFieldData | {};
 
-export interface FormFieldStorageSchema {
-  type: "grida" | "x-supabase" | "x-s3";
+/**
+ * @deprecated not used
+ */
+export interface XS3StorageSchema {
+  type: "x-s3";
   bucket: string;
   path: string;
   mode: "direct" | "staged";
 }
+
+export interface XSupabaseStorageSchema {
+  type: "x-supabase";
+  bucket: string;
+  path: string;
+  mode: "direct" | "staged";
+}
+
+export type FormFieldStorageSchema =
+  | {
+      type: "grida";
+      bucket: string;
+      path: string;
+      mode: "direct" | "staged";
+    }
+  | XS3StorageSchema
+  | XSupabaseStorageSchema;
 
 export interface FormFieldReferenceSchema {
   type: "x-supabase";

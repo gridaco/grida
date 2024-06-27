@@ -22,8 +22,10 @@ import {
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/spinner";
 import { Menubar } from "@/components/ui/menubar";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { FileTypeIcon } from "@/components/form-field-type-icon";
 
-type MediaViewerAcceptedMimeTypes = "image/*" | "video/*" | "audio/*";
+type MediaViewerAcceptedMimeTypes = "image/*" | "video/*" | "audio/*" | "*/*";
 
 type Src = {
   src: string;
@@ -35,7 +37,7 @@ type Src = {
 };
 
 interface MediaViewerContextType {
-  open: (src: Src, type: MediaViewerAcceptedMimeTypes) => void;
+  open: (src: Src, type?: MediaViewerAcceptedMimeTypes) => void;
   close: () => void;
 }
 
@@ -55,17 +57,39 @@ export function MediaViewerProvider({ children }: React.PropsWithChildren<{}>) {
   const [isOpen, setIsOpen] = useState(false);
   const [mediaSrc, setMediaSrc] = useState<Src | undefined>(undefined);
   const [mediaType, setMediaType] =
-    useState<MediaViewerAcceptedMimeTypes>("image/*");
+    useState<MediaViewerAcceptedMimeTypes>("*/*");
+  const [contentType, setContentType] = useState<
+    "unknwon" | (string & {}) | undefined
+  >(undefined);
 
-  const open = (src: Src, type: MediaViewerAcceptedMimeTypes) => {
+  const open = (src: Src, type?: MediaViewerAcceptedMimeTypes) => {
     setMediaSrc(src);
-    setMediaType(type);
+    if (type && type !== "*/*") {
+      setMediaType(type);
+      setContentType(type);
+    } else {
+      setMediaType("*/*");
+      setContentType(undefined);
+    }
     setIsOpen(true);
   };
 
   const close = () => {
     setIsOpen(false);
   };
+
+  useEffect(() => {
+    // Fetch content type if not provided
+    if ((!mediaType || mediaType === "*/*") && mediaSrc?.src) {
+      head(mediaSrc.src)
+        .then((res) => {
+          setContentType(res["content-type"]);
+        })
+        .catch(() => {
+          setContentType("unknwon");
+        });
+    }
+  }, [mediaSrc?.src, mediaType]);
 
   return (
     <MediaViewerContext.Provider value={{ open, close }}>
@@ -79,35 +103,7 @@ export function MediaViewerProvider({ children }: React.PropsWithChildren<{}>) {
               </Button>
             </DialogClose>
             <div className="w-full h-full p-10">
-              {mediaType.startsWith("image/") &&
-                (mediaSrc?.srcset ? (
-                  <ProgressiveImage
-                    smallSrc={mediaSrc.srcset.thumbnail}
-                    largeSrc={mediaSrc.srcset.original}
-                    alt=""
-                  />
-                ) : (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={mediaSrc?.src}
-                    alt="Media"
-                    className="w-full h-full object-contain"
-                  />
-                ))}
-              {mediaType.startsWith("video/") && (
-                <video
-                  src={mediaSrc?.src}
-                  controls
-                  className="max-w-full max-h-full"
-                >
-                  Your browser does not support the video tag.
-                </video>
-              )}
-              {mediaType.startsWith("audio/") && (
-                <audio src={mediaSrc?.src} controls className="w-full">
-                  Your browser does not support the audio tag.
-                </audio>
-              )}
+              <Content mediaSrc={mediaSrc} contentType={contentType} />
             </div>
             <footer className="absolute bottom-4 left-4 right-4 flex items-center justify-center">
               <Menubar>
@@ -138,6 +134,79 @@ export function MediaViewerProvider({ children }: React.PropsWithChildren<{}>) {
       {children}
     </MediaViewerContext.Provider>
   );
+}
+
+function Content({
+  mediaSrc,
+  contentType,
+}: {
+  mediaSrc?: Src;
+  contentType: string | undefined | "unknwon";
+}) {
+  //
+  //
+  //
+  if (contentType === "unknwon") {
+    return (
+      <div className="flex items-center justify-center h-full text-2xl">
+        Unable to read the file
+      </div>
+    );
+  }
+
+  if (contentType?.startsWith("image/")) {
+    return mediaSrc?.srcset ? (
+      <ProgressiveImage
+        smallSrc={mediaSrc.srcset.thumbnail}
+        largeSrc={mediaSrc.srcset.original}
+        alt=""
+      />
+    ) : (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
+        src={mediaSrc?.src}
+        alt="Media"
+        className="w-full h-full object-contain"
+      />
+    );
+  }
+
+  if (contentType?.startsWith("video/")) {
+    return (
+      <video
+        src={mediaSrc?.src}
+        controls
+        className="max-w-full max-h-full aspect-video"
+      >
+        Your browser does not support the video tag.
+      </video>
+    );
+  }
+
+  if (contentType?.startsWith("audio/")) {
+    return (
+      <div className="w-full h-full flex items-center justify-center">
+        <Card className="aspect-video">
+          <CardHeader>
+            <CardTitle>
+              <FileTypeIcon
+                type="audio"
+                className="inline mr-2 align-middle w-5 h-5"
+              />
+              Audio
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="w-full h-full flex items-center justify-center">
+            <audio src={mediaSrc?.src} controls className="min-w-full">
+              Your browser does not support the audio tag.
+            </audio>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  return <div>Preview not available for this file type ({contentType})</div>;
 }
 
 const ProgressiveImage = ({
@@ -191,3 +260,39 @@ const ProgressiveImage = ({
     </>
   );
 };
+
+function head(src: string): Promise<{
+  "content-type": string;
+  "content-length"?: string;
+  "last-modified"?: string;
+  etag?: string;
+  "accept-ranges"?: string;
+  "cache-control"?: string;
+  expires?: string;
+  server?: string;
+  date?: string;
+  connection?: string;
+  allow?: string;
+}> {
+  return fetch(src, {
+    method: "HEAD",
+  }).then((res) => {
+    const contentType = res.headers.get("content-type");
+    if (!contentType) {
+      throw new Error("Content-Type header is missing");
+    }
+    return {
+      "content-type": contentType,
+      "content-length": res.headers.get("content-length") || undefined,
+      "last-modified": res.headers.get("last-modified") || undefined,
+      etag: res.headers.get("etag") || undefined,
+      "accept-ranges": res.headers.get("accept-ranges") || undefined,
+      "cache-control": res.headers.get("cache-control") || undefined,
+      expires: res.headers.get("expires") || undefined,
+      server: res.headers.get("server") || undefined,
+      date: res.headers.get("date") || undefined,
+      connection: res.headers.get("connection") || undefined,
+      allow: res.headers.get("allow") || undefined,
+    };
+  });
+}

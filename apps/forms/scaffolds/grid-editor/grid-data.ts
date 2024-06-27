@@ -4,14 +4,17 @@ import type {
   FormResponse,
   FormResponseField,
   FormResponseSession,
+  GridaSupabase,
 } from "@/types";
 import { fmt_local_index } from "@/utils/fmt";
-import type { GFResponseRow, GFSystemColumnTypes } from "../grid/types";
+import type { GFFile, GFResponseRow, GFSystemColumnTypes } from "../grid/types";
 import type { DataGridFilterSettings } from "../editor/state";
 import { FlatPostgREST } from "@/lib/supabase-postgrest/flat";
+import { FieldSupports } from "@/k/supported_field_types";
 
 export namespace GridData {
   type DataGridInput = {
+    form_id: string;
     fields: FormFieldDefinition[];
     filter: DataGridFilterSettings;
   } & (
@@ -50,13 +53,13 @@ export namespace GridData {
       type?: FormInputType;
     }[];
   } {
-    const fieldcolumns =
-      fields?.map((field) => ({
+    const fieldcolumns = Array.from(fields)
+      .sort((a, b) => a.local_index - b.local_index)
+      .map((field) => ({
         key: field.id,
         name: field.name,
         type: field.type,
-        // You can add more properties here as needed by react-data-grid
-      })) ?? [];
+      }));
 
     switch (table) {
       case "response":
@@ -114,11 +117,64 @@ export namespace GridData {
           : [];
       }
       case "x-supabase-main-table": {
-        const valuefn = (row: any, fieldname: string) => {
-          if (FlatPostgREST.testPath(fieldname)) {
-            return FlatPostgREST.get(fieldname, row);
+        const valuefn = (
+          row: Record<string, any>,
+          field: FormFieldDefinition
+        ) => {
+          // jsonpath field
+          if (FlatPostgREST.testPath(field.name)) {
+            return FlatPostgREST.get(field.name, row);
           }
-          return row[fieldname];
+
+          return row[field.name];
+        };
+
+        const filesfn = (
+          row: GridaSupabase.XDataRow,
+          field: FormFieldDefinition
+        ) => {
+          // file field
+          if (
+            FieldSupports.file_alias(field.type) &&
+            row.__gf_storage_fields[field.id]
+          ) {
+            const objects = row.__gf_storage_fields[field.id];
+            return objects
+              ?.map((obj) => {
+                const { path, signedUrl } = obj;
+
+                const thumbnail = file_preview_url({
+                  params: {
+                    form_id: input.form_id,
+                    field_id: field.id,
+                    filepath: path,
+                  },
+                  options: {
+                    width: 200,
+                  },
+                });
+
+                const upsert = file_request_upsert_url({
+                  form_id: input.form_id,
+                  field_id: field.id,
+                  filepath: path,
+                });
+
+                return {
+                  // use thumbnail as src
+                  src: thumbnail,
+                  srcset: {
+                    thumbnail: thumbnail,
+                    original: signedUrl,
+                  },
+                  // use path as name for x-supabase
+                  name: path,
+                  download: signedUrl,
+                  upsert: upsert,
+                } satisfies GFFile;
+              })
+              .filter((f) => f) as GFFile[] | [];
+          }
         };
 
         return input.data.rows.reduce((acc, row, index) => {
@@ -132,7 +188,7 @@ export namespace GridData {
           input.fields.forEach((field) => {
             gfRow.fields[field.id] = {
               type: field.type,
-              value: valuefn(row, field.name),
+              value: valuefn(row, field),
               options: field.options?.reduce(
                 (
                   acc: { [key: string]: { value: string; label?: string } },
@@ -146,6 +202,7 @@ export namespace GridData {
                 },
                 {}
               ),
+              files: filesfn(row, field),
             };
           });
           acc.push(gfRow);
@@ -196,25 +253,89 @@ export namespace GridData {
             ),
             files:
               responseField?.storage_object_paths?.map((path) => {
-                const base = `/private/editor/${response.form_id}/responses/${response.id}/fields/${responseField.id}/src?path=${path}`;
-                const src = base + "&width=200";
-                const download = base + "&download=true";
-                const name = path.split("/").pop() ?? "";
-                return {
-                  src: src,
-                  srcset: {
-                    thumbnail: src,
-                    original: base,
-                  },
-                  name,
-                  download,
-                };
+                return gf_response_file({
+                  form_id: response.form_id,
+                  field_id: field.id,
+                  filepath: path,
+                });
               }) || [],
           };
         });
         return row;
       }) ?? []
     );
+  }
+
+  function file_request_upsert_url({
+    form_id,
+    field_id,
+    filepath,
+  }: {
+    form_id: string;
+    field_id: string;
+    filepath: string;
+  }) {
+    return `/private/editor/${form_id}/fields/${field_id}/file/upload/signed-url?path=${filepath}`;
+  }
+
+  function file_preview_url({
+    params,
+    options,
+  }: {
+    params: {
+      form_id: string;
+      field_id: string;
+      filepath: string;
+    };
+    options?: {
+      width?: number;
+      download?: boolean;
+    };
+  }) {
+    const { form_id, field_id, filepath } = params;
+
+    const base = `/private/editor/${form_id}/fields/${field_id}/file/preview/src?path=${filepath}`;
+
+    if (options) {
+      const { width, download } = options;
+      const params = new URLSearchParams();
+      if (width) params.set("width", width.toString());
+      if (download) params.set("download", "true");
+
+      return base + "&" + params.toString();
+    }
+
+    return base;
+  }
+
+  function gf_response_file(params: {
+    form_id: string;
+    field_id: string;
+    filepath: string;
+  }): GFFile {
+    const base = file_preview_url({
+      params: params,
+    });
+    const src = file_preview_url({ params: params, options: { width: 200 } });
+
+    const download = file_preview_url({
+      params: params,
+      options: { download: true },
+    });
+
+    const name = params.filepath.split("/").pop() ?? "";
+
+    // TODO: upsert - file upsert is not ready for responses
+
+    return {
+      src: src,
+      srcset: {
+        thumbnail: src,
+        original: base,
+      },
+      name,
+      download,
+    };
   }
 
   function rows_from_sessions(

@@ -20,6 +20,7 @@ import {
   DownloadIcon,
   GearIcon,
   PieChartIcon,
+  ReloadIcon,
   TrashIcon,
 } from "@radix-ui/react-icons";
 import {
@@ -50,6 +51,7 @@ import { GridData } from "./grid-data";
 import clsx from "clsx";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { XSupabaseQuery } from "@/lib/supabase-postgrest/builder";
+import { Spinner } from "@/components/spinner";
 
 export function GridEditor() {
   const [state, dispatch] = useEditorState();
@@ -76,6 +78,7 @@ export function GridEditor() {
   // Transforming the responses into the format expected by react-data-grid
   const rows = useMemo(() => {
     return GridData.rows({
+      form_id: form_id,
       table: datagrid_table,
       fields: fields,
       filter: datagrid_filter,
@@ -89,6 +92,7 @@ export function GridEditor() {
       },
     });
   }, [
+    form_id,
     datagrid_table,
     sessions,
     fields,
@@ -194,7 +198,7 @@ export function GridEditor() {
                       return (
                         <TabsTrigger
                           key={table.type + table.name}
-                          value={table.name}
+                          value={table.type}
                         >
                           {table.label}
                         </TabsTrigger>
@@ -272,8 +276,27 @@ export function GridEditor() {
             <DownloadIcon />
           </Button>
         </Link>
+        <DataLoadingIndicator />
       </footer>
     </div>
+  );
+}
+
+function DataLoadingIndicator() {
+  const [state, dispatch] = useEditorState();
+  const { datagrid_isloading } = state;
+
+  const onRefresh = useCallback(() => {
+    dispatch({ type: "editor/data-grid/refresh" });
+  }, [dispatch]);
+
+  return (
+    <Button disabled={datagrid_isloading} onClick={onRefresh} variant="ghost">
+      <span className="me-2">
+        {datagrid_isloading ? <Spinner /> : <ReloadIcon />}
+      </span>
+      Refresh
+    </Button>
   );
 }
 

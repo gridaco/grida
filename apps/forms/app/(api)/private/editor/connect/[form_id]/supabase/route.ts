@@ -3,7 +3,7 @@ import {
   createRouteHandlerClient,
   grida_xsupabase_client,
 } from "@/lib/supabase/server";
-import { GridaXSupabaseClient } from "@/services/x-supabase";
+import { GridaXSupabaseService } from "@/services/x-supabase";
 import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
 import { NextRequest, NextResponse } from "next/server";
@@ -32,7 +32,7 @@ export async function GET(req: NextRequest, context: Context) {
     );
   }
 
-  const client = new GridaXSupabaseClient();
+  const client = new GridaXSupabaseService();
 
   const data = await client.getConnection(conn);
 

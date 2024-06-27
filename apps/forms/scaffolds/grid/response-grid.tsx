@@ -41,7 +41,10 @@ import { SelectColumn } from "./select-column";
 import "./grid.css";
 import { unwrapFeildValue } from "@/lib/forms/unwrap";
 import { Button } from "@/components/ui/button";
-import { FormFieldTypeIcon } from "@/components/form-field-type-icon";
+import {
+  FileTypeIcon,
+  FormFieldTypeIcon,
+} from "@/components/form-field-type-icon";
 import { toZonedTime } from "date-fns-tz";
 import { tztostr } from "../editor/symbols";
 import { mask } from "./mask";
@@ -455,12 +458,17 @@ function FieldCell({ column, row }: RenderCellProps<GFResponseRow>) {
         </div>
       );
     }
+    case "video":
+    case "audio":
     case "file": {
       return (
         <div className="w-full h-full flex gap-2">
           {files?.map((f, i) => (
             <span key={i}>
-              <FileIcon className="inline w-4 h-4 align-middle me-2" />
+              <FileTypeIcon
+                type={type as "file"}
+                className="inline w-4 h-4 align-middle me-2"
+              />
               {f.name}
             </span>
           ))}
@@ -477,6 +485,7 @@ function FieldCell({ column, row }: RenderCellProps<GFResponseRow>) {
                 src={file.src}
                 alt={file.name}
                 className="h-full min-w-10 aspect-square rounded overflow-hidden object-cover bg-neutral-500"
+                loading="lazy"
               />
               {/* <figcaption>{file.name}</figcaption> */}
             </figure>
@@ -642,10 +651,12 @@ function FieldEditCell(props: RenderEditCellProps<GFResponseRow>) {
           />
         );
       case "file":
+      case "audio":
+      case "video":
       case "image": {
         return (
           <FileEditCell
-            type={type as "file" | "image"}
+            type={type as "file" | "image" | "audio" | "video"}
             multiple={multiple}
             files={files || []}
           />

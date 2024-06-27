@@ -13,7 +13,7 @@ import { FormPage } from "@/types";
 import { PreviewButton } from "@/components/preview-button";
 import { ThemeProvider } from "@/components/theme-provider";
 import { ToasterWithMax } from "@/components/toaster";
-import { GridaXSupabaseClient } from "@/services/x-supabase";
+import { GridaXSupabaseService } from "@/services/x-supabase";
 import type { Metadata } from "next";
 import clsx from "clsx";
 import "../../../editor.css";
@@ -87,7 +87,7 @@ export default async function RootLayout({
     return notFound();
   }
 
-  const client = new GridaXSupabaseClient();
+  const client = new GridaXSupabaseService();
 
   const supabase_connection_state = data.supabase_connection
     ? await client.getConnection(data.supabase_connection)

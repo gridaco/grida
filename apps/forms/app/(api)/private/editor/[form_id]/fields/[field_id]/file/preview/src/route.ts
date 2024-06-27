@@ -12,12 +12,11 @@ export async function GET(
   context: {
     params: {
       form_id: string;
-      response_id: string;
-      response_field_id: string;
+      field_id: string;
     };
   }
 ) {
-  const { form_id, response_id, response_field_id } = context.params;
+  const { form_id, field_id } = context.params;
   const qpath = req.nextUrl.searchParams.get("path");
   const qwidth = req.nextUrl.searchParams.get("width");
   const width = Number(qwidth) || undefined;
@@ -30,7 +29,8 @@ export async function GET(
     format: format,
     transform: {
       width: width,
-      resize: width ? ("contain" as const) : undefined,
+      height: width,
+      // resize: width ? ("contain" as const) : undefined,
     },
   };
   // TODO: support RLS
@@ -40,40 +40,36 @@ export async function GET(
 
   assert(qpath);
 
-  // supabase.from()
   const { data } = await supabase
-    .from("response_field")
+    .from("form")
     .select(
       `
-        field:form_field( storage ),
-        form:form(
-          supabase_connection:connection_supabase(
-            *
-          )
+        fields:form_field( id, storage ),
+        supabase_connection:connection_supabase(
+          *
         )
         `
     )
-
-    .eq("id", response_field_id)
-    .eq("response_id", response_id)
-    .eq("form_id", form_id)
+    .eq("id", form_id)
+    .filter("fields.id", "eq", field_id)
     .single();
 
   if (!data) {
     return notFound();
   }
 
-  const { form, field } = data;
+  const { fields, supabase_connection } = data;
+  assert(fields.length === 1);
+  const field = fields[0];
   assert(field);
-  assert(form);
 
   if (field.storage) {
     const { type, bucket } = field.storage as any as FormFieldStorageSchema;
     switch (type) {
       case "x-supabase": {
-        assert(form.supabase_connection);
+        assert(supabase_connection);
         const client = await createXSupabaseClient(
-          form.supabase_connection.supabase_project_id,
+          supabase_connection.supabase_project_id,
           {
             service_role: true,
           }
@@ -107,5 +103,10 @@ export async function GET(
     return notFound();
   }
 
-  return NextResponse.redirect(src);
+  return NextResponse.redirect(src, {
+    status: 301,
+    headers: {
+      "Cache-Control": `public, max-age=${expiresIn}, s-maxage=${expiresIn}, stale-while-revalidate=59`,
+    },
+  });
 }

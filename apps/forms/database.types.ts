@@ -1675,6 +1675,8 @@ export type Database = {
         | "datetime-local"
         | "range"
         | "search"
+        | "audio"
+        | "video"
       form_method: "post" | "get" | "dialog"
       form_page_language:
         | "en"
@@ -1917,6 +1919,7 @@ export type Database = {
         Row: {
           created_at: string
           data: Json | null
+          enum: Database["grida_commerce"]["Enums"]["currency"] | null
           id: number
           text: string
           user_id: string | null
@@ -1924,6 +1927,7 @@ export type Database = {
         Insert: {
           created_at?: string
           data?: Json | null
+          enum?: Database["grida_commerce"]["Enums"]["currency"] | null
           id?: number
           text: string
           user_id?: string | null
@@ -1931,6 +1935,7 @@ export type Database = {
         Update: {
           created_at?: string
           data?: Json | null
+          enum?: Database["grida_commerce"]["Enums"]["currency"] | null
           id?: number
           text?: string
           user_id?: string | null

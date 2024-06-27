@@ -47,6 +47,7 @@ import {
   ReferenceSearchPreview,
 } from "./reference-search-field";
 import { PhoneField } from "./phone-field";
+import { FieldProperties } from "@/k/supported_field_types";
 
 /**
  * this disables the auto zoom in input text tag safari on iphone by setting font-size to 16px
@@ -293,15 +294,14 @@ function MonoFormField({
             {...(sharedInputProps as React.ComponentProps<"input">)}
           />
         );
-
       }
       case "image":
+      case "audio":
+      case "video":
       case "file": {
         const accept =
           (sharedInputProps as React.ComponentProps<"input">).accept ??
-          type === "image"
-            ? "image/*"
-            : undefined;
+          FieldProperties.accept(type);
 
         if (vanilla) {
           assert(
@@ -321,7 +321,7 @@ function MonoFormField({
         return (
           <FileUploadField
             name={sharedInputProps.name}
-            required={required}
+            required={novalidate ? false : required}
             accept={accept}
             multiple={multiple}
             maxFiles={

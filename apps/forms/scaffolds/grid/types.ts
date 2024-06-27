@@ -23,6 +23,7 @@ export type GFFile = {
     original: string;
   };
   download: string;
+  upsert?: string;
   name: string;
 };
 
