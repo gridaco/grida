@@ -475,7 +475,7 @@ function BlockRenderer({
                   novalidate={is_not_in_current_section || hidden}
                   locked={is_not_in_current_section || hidden}
                   fileupload={
-                    FieldSupports.file_alias(type)
+                    FieldSupports.file_upload(type)
                       ? (field as ClientFileUploadFieldRenderBlock["field"])
                           .upload
                       : undefined

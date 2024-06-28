@@ -84,12 +84,19 @@ export type FieldUploadStrategy =
   | FileUploadStrategyRequesUploadtUrl;
 
 export interface ClientFileUploadFieldRenderBlock
-  extends ClientFieldRenderBlock<"file" | "image"> {
-  field: ClientFieldRenderBlock<"file" | "image">["field"] & {
+  extends ClientFieldRenderBlock<
+    "file" | "image" | "audio" | "video" | "richtext"
+  > {
+  field: ClientFieldRenderBlock<
+    "file" | "image" | "audio" | "video" | "richtext"
+  >["field"] & {
     accept?: string;
     multiple?: boolean;
   } & {
     upload: FieldUploadStrategy;
+    resolve?: {
+      resolve_url: string;
+    };
   };
 }
 
@@ -370,7 +377,7 @@ export class FormRenderTree {
         );
 
     const mkupload = (): FieldUploadStrategy | undefined => {
-      if (FieldSupports.file_alias(field.type)) {
+      if (FieldSupports.file_upload(field.type)) {
         if (this.plugins?.upload_resolver) {
           return this.plugins.upload_resolver(field.id);
         } else {
@@ -397,7 +404,7 @@ export class FormRenderTree {
       max: field.max ?? undefined,
     };
 
-    if (FieldSupports.file_alias(field.type)) {
+    if (FieldSupports.file_upload(field.type)) {
       return {
         ...base,
         upload: mkupload(),

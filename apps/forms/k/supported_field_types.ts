@@ -217,6 +217,10 @@ export namespace FieldSupports {
     return html5_file_alias_field_types.includes(type);
   }
 
+  export function file_upload(type: FormInputType) {
+    return file_alias(type) || richtext(type);
+  }
+
   export function fk(type: FormInputType) {
     return type === "search";
   }
