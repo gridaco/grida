@@ -72,10 +72,8 @@ export default async function SubmitCompletePage({
       const key = fields.find((f) => f.id === field.form_field_id)?.name;
       if (!key) return acc; // this can't happen - but just in case
 
-      // FIXME: WRAP-UNWRAP
       try {
-        const value = JSON.parse(field.value as string);
-        acc[key] = FormValue.parse(value, { enums: options }).value;
+        acc[key] = FormValue.value(field.value, { enums: options }).value;
       } catch (e) {}
       return acc;
     },

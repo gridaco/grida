@@ -423,7 +423,7 @@ function FieldCell({ column, row }: RenderCellProps<GFResponseRow>) {
   const { type, value, options, files } = data;
 
   const unwrapped = unwrapFeildValue(
-    FormValue.parse(value, {
+    FormValue.value(value, {
       enums: options
         ? Object.keys(options).map((key) => ({
             id: key,
@@ -434,7 +434,7 @@ function FieldCell({ column, row }: RenderCellProps<GFResponseRow>) {
     type as FormInputType
   );
 
-  if (unwrapped === null || unwrapped === "") {
+  if (unwrapped === null || unwrapped === "" || unwrapped === undefined) {
     return (
       <span className="text-muted-foreground/50">
         <Empty value={unwrapped} />
@@ -551,7 +551,7 @@ function FieldEditCell(props: RenderEditCellProps<GFResponseRow>) {
           ...row.fields,
           [column.key]: {
             ...data,
-            value: FormValue.encode(change.value),
+            value: change.value,
             option_id: change.option_id,
           },
         },
@@ -727,6 +727,9 @@ function Empty({ value }: { value?: null | undefined | "" }) {
   }
   if (value === "") {
     return <>EMPTY</>;
+  }
+  if (value === undefined) {
+    return <>UNDEFINED</>;
   }
   return <></>;
 }

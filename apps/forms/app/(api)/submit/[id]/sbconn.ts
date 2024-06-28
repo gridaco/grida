@@ -1,3 +1,4 @@
+import { SupabasePostgRESTOpenApi } from "@/lib/supabase-postgrest";
 import { FlatPostgREST } from "@/lib/supabase-postgrest/flat";
 import { grida_xsupabase_client } from "@/lib/supabase/server";
 import { FormValue } from "@/services/form";
@@ -65,22 +66,27 @@ function parseFormData(
   const data: { [key: string]: any } = {};
 
   Object.keys(schema.properties).forEach((key) => {
-    const { type, format } = schema.properties[key];
+    let parsedvalue: any;
+
+    const { type, format, is_array } = SupabasePostgRESTOpenApi.analyze_format(
+      schema.properties[key]
+    );
+
     switch (type) {
       case "number": {
-        data[key] = Number(formdata.get(key));
+        parsedvalue = Number(formdata.get(key));
         break;
       }
       case "boolean": {
         // TODO: this needs to be cross cheked with the form field type (e.g. checkbox)
         const sval = formdata.get(key);
         const bval = sval === "on" || sval === "true" || sval === "1";
-        data[key] = bval;
+        parsedvalue = bval;
 
         break;
       }
       default: {
-        const { value } = FormValue.parse(formdata.get(key), { enums });
+        const { value } = FormValue.value(formdata.get(key), { enums });
         if (format === "json" || format === "jsonb") {
           //
           const constructedjson = FlatPostgREST.unflatten(
@@ -93,19 +99,28 @@ function parseFormData(
               key: (k) => k.startsWith(key + "."),
               value: (k, v) => {
                 //     // TODO: need scalar type support
-                const { value } = FormValue.parse(v, { enums });
+                const { value } = FormValue.value(v, { enums });
                 return value;
               },
             }
           );
 
-          data[key] = constructedjson as any;
+          parsedvalue = constructedjson as any;
           break;
         }
-        data[key] = value || undefined;
+        parsedvalue = value || undefined;
         break;
       }
     }
+
+    if (is_array) {
+      // we wrap the value as array if the schema expects an array. this is because our form does not support array inputs
+      // do not wrap if the value is undefined (undefined means no data input through the postgrest api)
+      if (parsedvalue !== undefined) {
+        parsedvalue = [parsedvalue];
+      }
+    }
+    data[key] = parsedvalue;
   });
 
   return data;

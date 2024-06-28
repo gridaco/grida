@@ -1,5 +1,6 @@
 import type { OpenAPI } from "openapi-types";
 import type { GridaSupabase } from "@/types";
+import type { ColumnType } from "./@types/column-types";
 import { XMLParser } from "fast-xml-parser";
 
 export namespace SupabasePostgRESTOpenApi {
@@ -241,5 +242,40 @@ export namespace SupabasePostgRESTOpenApi {
     }
 
     return result;
+  }
+
+  type Format =
+    | ColumnType
+    | `${ColumnType}[]`
+    // else
+    | (string & {});
+
+  export function analyze_format(property: {
+    type: string;
+    format: Format;
+    enum?: string[];
+  }): {
+    is_enum: boolean;
+    is_array: boolean;
+    format: ColumnType;
+    type: string;
+  } {
+    const is_array = property.format.includes("[]");
+    const scalar = is_array
+      ? (property.format.replace("[]", "") as ColumnType)
+      : (property.format as ColumnType);
+
+    // switch (scalar) {
+    //   case ''
+    // }
+
+    const is_enum = !!property.enum;
+
+    return {
+      is_enum,
+      is_array,
+      format: scalar,
+      type: property.type,
+    };
   }
 }

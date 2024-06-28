@@ -407,6 +407,7 @@ async function submit({
 
       if (sbconn_insertion_error) {
         console.error("submit/err/sbconn", sbconn_insertion_error);
+        // TODO: use 400 - developer error with error info
         return error(500, { form_id }, meta);
       }
 
@@ -563,7 +564,7 @@ async function submit({
 
       // the field's value can be a input value or a reference to form_field_option
       const value_or_reference = data.get(name);
-      const { value, enum_id } = FormValue.parse(value_or_reference, {
+      const { value, enum_id } = FormValue.value(value_or_reference, {
         enums: options,
       });
 
@@ -597,8 +598,8 @@ async function submit({
         response_id: response_reference_obj!.id,
         form_field_id: field.id,
         form_id: form_id,
-        // TODO: save value with schema type accordinglly
-        value: JSON.stringify(value),
+        // TODO: save value with schema type accordinglly (number, boolean, etc.)
+        value: value,
         form_field_option_id: enum_id,
       };
     })
@@ -647,7 +648,7 @@ async function submit({
       form_field_id: field_id,
       response_id: response_reference_obj!.id,
       form_id: form_id,
-      value: FormValue.encode(uploadedfileval),
+      value: uploadedfileval,
       storage_object_paths: success_results.map(
         (res) => res.data!.path
       ) as string[],
