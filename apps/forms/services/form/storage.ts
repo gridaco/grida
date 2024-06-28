@@ -55,76 +55,81 @@ export async function createSignedUpsertUploadUrl({
   }
 }
 
-export async function session_storage_createSignedUploadUrl({
-  session_id,
-  field,
-  file,
-  config,
-  connection,
-}: {
-  session_id: string;
-  field: Pick<FormFieldDefinition, "id" | "storage">;
-  file: {
-    name: string;
-  };
-  config?: {
-    unique?: boolean;
-  };
-  connection: {
-    supabase_connection: ConnectionSupabaseJoint | null;
-  };
-}) {
-  if (field.storage) {
-    const { type, mode, bucket, path } =
-      field.storage as any as FormFieldStorageSchema;
+export namespace SessionStorageServices {
+  export async function createSignedUploadUrl({
+    session_id,
+    field,
+    file,
+    config,
+    connection,
+  }: {
+    session_id: string;
+    field: Pick<FormFieldDefinition, "id" | "storage">;
+    file: {
+      name: string;
+    };
+    config?: {
+      unique?: boolean;
+    };
+    connection: {
+      supabase_connection: ConnectionSupabaseJoint | null;
+    };
+  }) {
+    if (field.storage) {
+      const { type, mode, bucket, path } =
+        field.storage as any as FormFieldStorageSchema;
 
-    switch (type) {
-      case "x-supabase": {
-        assert(connection.supabase_connection, "supabase_connection not found");
-        const client = await createXSupabaseClient(
-          connection.supabase_connection.supabase_project_id,
-          {
-            service_role: true,
+      switch (type) {
+        case "x-supabase": {
+          assert(
+            connection.supabase_connection,
+            "supabase_connection not found"
+          );
+          const client = await createXSupabaseClient(
+            connection.supabase_connection.supabase_project_id,
+            {
+              service_role: true,
+            }
+          );
+          switch (mode) {
+            case "direct": {
+              const storage = new FileStorage(client, bucket);
+              return storage.sign(path);
+              break;
+            }
+            case "staged": {
+              const storage = new SessionStagedFileStorage(client, bucket);
+              return storage.sessionStagedUploadPresingedUrl(
+                {
+                  field_id: field.id,
+                  session_id: session_id,
+                },
+                file.name,
+                config?.unique
+              );
+            }
           }
-        );
-        switch (mode) {
-          case "direct": {
-            const storage = new FileStorage(client, bucket);
-            return storage.sign(path);
-            break;
-          }
-          case "staged": {
-            const storage = new SessionStagedFileStorage(client, bucket);
-            return storage.sessionStagedUploadPresingedUrl(
-              {
-                field_id: field.id,
-                session_id: session_id,
-              },
-              file.name,
-              config?.unique
-            );
-          }
+          break;
         }
-        break;
+        case "grida":
+        case "x-s3":
+        default:
+          throw new Error("storage type not supported");
       }
-      case "grida":
-      case "x-s3":
-      default:
-        throw new Error("storage type not supported");
-    }
-  } else {
-    const storage = new SessionStagedFileStorage(
-      client,
-      GRIDA_FORMS_RESPONSE_BUCKET
-    );
+    } else {
+      const storage = new SessionStagedFileStorage(
+        client,
+        GRIDA_FORMS_RESPONSE_BUCKET
+      );
 
-    return storage.sessionStagedUploadPresingedUrl(
-      {
-        field_id: field.id,
-        session_id: session_id,
-      },
-      file.name,
-      config?.unique
-    );
+      return storage.sessionStagedUploadPresingedUrl(
+        {
+          field_id: field.id,
+          session_id: session_id,
+        },
+        file.name,
+        config?.unique
+      );
+    }
   }
 }

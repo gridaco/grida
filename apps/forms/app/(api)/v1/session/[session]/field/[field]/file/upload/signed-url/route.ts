@@ -1,5 +1,5 @@
 import { client } from "@/lib/supabase/server";
-import { session_storage_createSignedUploadUrl } from "@/services/form/storage";
+import { SessionStorageServices } from "@/services/form/storage";
 import type {
   CreateSessionSignedUploadUrlRequest,
   FormsApiResponse,
@@ -46,7 +46,7 @@ export async function POST(
   assert(field, "form not found");
 
   const { data: signeduploadurldata, error: signerr } =
-    await session_storage_createSignedUploadUrl({
+    await SessionStorageServices.createSignedUploadUrl({
       session_id: session_id,
       field: field,
       connection: { supabase_connection: form.supabase_connection },
@@ -98,7 +98,7 @@ export async function PUT(
   assert(field, "form not found");
 
   const { data: signeduploadurldata, error: signerr } =
-    await session_storage_createSignedUploadUrl({
+    await SessionStorageServices.createSignedUploadUrl({
       session_id: session_id,
       field: field,
       connection: { supabase_connection: form.supabase_connection },
