@@ -12,7 +12,9 @@ import type {
 } from "@/types/private/api";
 import { SupabaseStorageExtensions } from "@/lib/supabase/storage-ext";
 
-export type FileUploaderFn = (file: File) => Promise<{ path?: string }>;
+export type FileUploaderFn = (
+  file: File
+) => Promise<{ path?: string; fullPath?: string }>;
 
 export function getMaxUploadSize(strategy?: FieldUploadStrategy["type"]) {
   switch (strategy) {
@@ -98,7 +100,7 @@ export function makeRequestUrlUploader({
           file
         );
 
-      return { path: uploaded?.path };
+      return { path: uploaded?.path, fullpath: uploaded?.fullPath };
     } else {
       throw new Error("Failed to get signed url");
     }
