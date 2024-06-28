@@ -6,6 +6,8 @@ import { createXSupabaseClient } from "@/services/x-supabase";
 import { ConnectionSupabaseJoint, GridaSupabase, Option } from "@/types";
 import type { JSONSchemaType } from "ajv";
 
+// TODO: make it as a class to optimize performance (duplicated network requests)
+
 export async function sbconn_insert({
   data,
   connection,
@@ -35,7 +37,10 @@ export async function sbconn_insert({
   }
   const { sb_table_name, sb_schema_name, sb_table_schema } = connection_table;
 
-  const schema = sb_table_schema as JSONSchemaType<Record<string, any>>;
+  const schema = sb_table_schema as GridaSupabase.JSONSChema;
+
+  const { pks } =
+    SupabasePostgRESTOpenApi.parse_supabase_postgrest_schema_definition(schema);
 
   const row = asTableRowData(data, { schema });
 
@@ -44,7 +49,56 @@ export async function sbconn_insert({
     service_role: true,
   });
 
-  return sbclient.from(sb_table_name).insert(row).select().single();
+  return {
+    insertion: sbclient.from(sb_table_name).insert(row).select().single(),
+    pks,
+  };
+}
+
+export async function sbconn_update(
+  {
+    OLD,
+    NEW,
+    pks,
+  }: {
+    OLD: Record<string, any>;
+    NEW: Record<string, any>;
+    pks: string[];
+  },
+  connection: ConnectionSupabaseJoint
+) {
+  // fetch connection table
+  const { data: supabase_project, error: supabase_project_err } =
+    await grida_xsupabase_client
+      .from("supabase_project")
+      .select("*, tables:supabase_table(*)")
+      .eq("id", connection.supabase_project_id)
+      .single();
+
+  if (supabase_project_err || !supabase_project) {
+    throw new Error("supabase_project not found");
+  }
+
+  const connection_table: GridaSupabase.SupabaseTable | undefined =
+    supabase_project!.tables.find(
+      (t) => t.id === connection.main_supabase_table_id
+    ) as any;
+
+  if (!connection_table) {
+    throw new Error("connection_table not found");
+  }
+  const { sb_table_name, sb_schema_name, sb_table_schema } = connection_table;
+
+  const schema = sb_table_schema as GridaSupabase.JSONSChema;
+
+  const sbclient = await createXSupabaseClient(connection.supabase_project_id, {
+    // TODO: use service key only if configured to do so
+    service_role: true,
+  });
+
+  const pk1 = pks[0];
+
+  return sbclient.from(sb_table_name).update(NEW).eq(pk1, OLD[pk1]);
 }
 
 function asTableRowData(

@@ -33,7 +33,7 @@ import { qval } from "@/utils/qs";
 import { notFound } from "next/navigation";
 import { FormSubmitErrorCode } from "@/types/private/api";
 import { SessionMeta, meta } from "./meta";
-import { sbconn_insert } from "./sbconn";
+import { sbconn_insert, sbconn_update } from "./sbconn";
 import { FieldSupports } from "@/k/supported_field_types";
 import { UniqueFileNameGenerator } from "@/lib/forms/storage";
 import {
@@ -525,7 +525,8 @@ async function submit({
   // ==================================================
   // region user supabase connection
 
-  let RECORD: any = undefined;
+  let RECORD: Record<string, any> | undefined = undefined;
+  let X_SUPABASE_MAIN_TABLE_PKS: string[] = [];
   if (supabase_connection && supabase_connection.main_supabase_table_id) {
     try {
       // parsed values
@@ -544,15 +545,18 @@ async function submit({
       });
       const data: Record<string, any> = Object.fromEntries(entries);
 
-      const insertion = await sbconn_insert({
+      const { pks, insertion } = await sbconn_insert({
         data: data,
         connection: supabase_connection,
       });
 
-      console.log("sbconn_insertion", insertion);
-
       const { data: sbconn_inserted, error: sbconn_insertion_error } =
-        insertion;
+        await insertion;
+
+      console.log("sbconn_insertion", {
+        sbconn_inserted,
+        sbconn_insertion_error,
+      });
 
       if (sbconn_insertion_error) {
         console.error("submit/err/sbconn", sbconn_insertion_error);
@@ -560,6 +564,7 @@ async function submit({
         return error(500, { form_id }, meta);
       }
 
+      X_SUPABASE_MAIN_TABLE_PKS = pks;
       RECORD = sbconn_inserted;
     } catch (e) {
       console.error("submit/err/sbconn", e);
@@ -578,8 +583,9 @@ async function submit({
   // @ts-ignore // TODO: provide all context - currently this is only used for x-supabase storage
   const pathrendercontext: TemplateVariables.ConnectedDatasourcePostgresTransactionCompleteContext =
     {
-      NEW: RECORD,
-      RECORD: RECORD,
+      TABLE: { pks: X_SUPABASE_MAIN_TABLE_PKS },
+      NEW: RECORD!,
+      RECORD: RECORD!,
     };
 
   const field_file_processor = new ResponseFieldFilesProcessor(
@@ -682,7 +688,90 @@ async function submit({
     field_file_upload_results[field_id] = await results;
   }
 
-  const file_upserts = Object.keys(field_file_uploads).map((field_id, i) => {
+  // ==================================================
+  // post-upload processing - x-supabase
+  // ==================================================
+
+  const x_supabase_row_with_resolved_file_upate_data = Object.keys(
+    field_file_uploads
+  ).reduce(
+    (acc, field_id) => {
+      const field = v_form_fields!.find((f) => f.id === field_id);
+
+      if (!field) {
+        throw new Error(
+          "field not found - unknown fields are not allowed with x-supabase connection"
+        );
+      }
+
+      const success_results = field_file_upload_results[field_id].filter(
+        (res) => !!res.data
+      );
+
+      const uploadedfileval = success_results.map((res) => {
+        return filename(res.data!.path);
+      }) as string[];
+
+      // TODO: this not yet supports object_path columns
+      // this is partially implemented only for 'richtext' cms implementation
+      if (FieldSupports.richtext(field.type)) {
+        // const value = RECORD![field.name]; // -> this can cause side effects with user's db trugger. (but also makes sence to use the updated one?)
+        const { value } = FormValue.parse(
+          (formdata as FormData).get(field.name),
+          {
+            enums: field.options,
+            type: field.type,
+          }
+        );
+
+        const document = RichTextStagedFileUtils.renderDocument(value, {
+          files: field_file_processor.file_commits[field_id],
+        });
+
+        return {
+          ...acc,
+          [field.name]: document,
+        };
+      }
+
+      return acc;
+    },
+    {} as Record<string, any>
+  );
+
+  if (
+    supabase_connection &&
+    // only update if changes are present
+    Object.keys(x_supabase_row_with_resolved_file_upate_data).length > 0
+  ) {
+    const xsupabasepostfileuploadupdate = await sbconn_update(
+      {
+        OLD: RECORD!,
+        NEW: x_supabase_row_with_resolved_file_upate_data,
+        pks: X_SUPABASE_MAIN_TABLE_PKS,
+      },
+      supabase_connection
+    );
+
+    if (xsupabasepostfileuploadupdate.error) {
+      console.error(
+        "submit/err/post-upload/sbconn",
+        xsupabasepostfileuploadupdate.error
+      );
+    }
+
+    // do not throw since the response / row is already created
+  }
+
+  //
+
+  // ==================================================
+  // post-upload processing - response_field & response
+  // ==================================================
+
+  const response_field_with_resolved_file_upserts = Object.keys(
+    field_file_uploads
+  ).map((field_id, i) => {
     const field = v_form_fields!.find((f) => f.id === field_id);
     if (!field) {
       throw new Error(
@@ -695,8 +784,7 @@ async function submit({
     );
 
     const uploadedfileval = success_results.map((res) => {
-      const filename = res.data!.path.split("/").pop();
-      return filename;
+      return filename(res.data!.path);
     }) as string[];
 
     const upsertion_base: Omit<InsertDto<"response_field">, "value"> = {
@@ -708,7 +796,7 @@ async function submit({
       ) as string[],
     };
 
-    if (FieldSupports.richtext(field?.type)) {
+    if (FieldSupports.richtext(field.type)) {
       const { value } = FormValue.parse(
         (formdata as FormData).get(field.name),
         {
@@ -717,13 +805,13 @@ async function submit({
         }
       );
 
-      const rendereddoctxt = RichTextStagedFileUtils.renderDocument(value, {
+      const document = RichTextStagedFileUtils.renderDocument(value, {
         files: field_file_processor.file_commits[field_id],
       });
 
       return {
         ...upsertion_base,
-        value: rendereddoctxt as {},
+        value: document as {},
       } satisfies InsertDto<"response_field">;
     }
 
@@ -734,10 +822,10 @@ async function submit({
     } satisfies InsertDto<"response_field">;
   });
 
-  if (file_upserts.length > 0) {
+  if (response_field_with_resolved_file_upserts.length > 0) {
     const { error: file_upload_upsertion_error } = await client
       .from("response_field")
-      .upsert(file_upserts, {
+      .upsert(response_field_with_resolved_file_upserts, {
         onConflict: "response_id, form_field_id",
       });
     if (file_upload_upsertion_error) {
@@ -1309,4 +1397,8 @@ async function fetchipinfo(ip?: string | null) {
     console.error(e);
     return null;
   }
+}
+
+function filename(path: string) {
+  return path.split("/").pop();
 }
