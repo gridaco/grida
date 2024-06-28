@@ -2,17 +2,21 @@
 
 import { ThemedRichTextEditorContent } from "@/components/richtext";
 import { useCreateBlockNote } from "@blocknote/react";
-import { locales } from "@blocknote/core";
+import { Block, locales } from "@blocknote/core";
 import { useEffect, useState } from "react";
 
 export function RichTextEditorField({
   name,
   required,
   placeholder,
+  initialContent,
+  onContentChange,
 }: {
   name: string;
   required?: boolean;
   placeholder?: string;
+  initialContent?: Block[];
+  onContentChange?: (content: Block[]) => void;
 }) {
   const [txtjsonvalue, settxtjsonvalue] = useState<string | undefined>(
     undefined
@@ -26,14 +30,21 @@ export function RichTextEditorField({
         default: placeholder || locales.en.placeholders.default,
       },
     },
+    trailingBlock: false,
+    initialContent: initialContent,
+    // TODO:
+    // uploadFile: async (file) => file,
+    // resolveFileUrl: async (url) => url,
   });
 
   useEffect(() => {
     const fn = () => {
-      settxtjsonvalue(JSON.stringify(editor.document));
+      const content = editor.document;
+      settxtjsonvalue(JSON.stringify(content));
+      onContentChange?.(content);
     };
     editor.onEditorContentChange(fn);
-  }, [editor]);
+  }, [editor, onContentChange]);
 
   return (
     <div className="shadow-sm h-full w-full py-10 rounded-md border border-input bg-transparent text-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50">

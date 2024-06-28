@@ -274,6 +274,10 @@ function MonoFormField({
             name={name}
             required={required}
             placeholder={placeholder}
+            initialContent={defaultValue ? JSON.parse(defaultValue) : undefined}
+            onContentChange={(content) => {
+              onValueChange?.(JSON.stringify(content));
+            }}
           />
         );
       }
