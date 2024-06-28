@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useCallback, useEffect, useMemo } from "react";
+import React, { useCallback, useMemo } from "react";
 import { StateProvider, useEditorState } from "./provider";
 import { reducer } from "./reducer";
 import { FormEditorInit, initialFormEditorState } from "./state";
@@ -9,7 +9,6 @@ import { FormFieldDefinition } from "@/types";
 import { FormFieldUpsert, EditorApiResponse } from "@/types/private/api";
 import { TooltipProvider } from "@radix-ui/react-tooltip";
 import { RowEditPanel } from "../panels/response-edit-panel";
-import { fmt_local_index } from "@/utils/fmt";
 import { CustomerEditPanel } from "../panels/customer-panel";
 import { BlockEditPanel } from "../panels/block-edit-panel";
 import { MediaViewerProvider } from "../mediaviewer";
