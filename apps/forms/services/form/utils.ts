@@ -81,7 +81,7 @@ export namespace RichTextStagedFileUtils {
   // Define the prefix and suffix regex patterns
   const _TMP_PREFIX_REGEXP = /grida-tmp:\/\//;
   const _TMP_SUFFIX_REGEXP = /\?grida-tmp=true/;
-  const _PATH_REGEXP = /grida-tmp:\/\/(.+)\?grida-tmp=true/;
+  const _PATH_REGEXP = /grida-tmp:\/\/(.+)\?grida-tmp=true/g;
 
   export function encodeTmpUrl(path: string) {
     return TMP_PREFIX_SCHEMA + path + TMP_SUFFIX_QUERY;
@@ -122,6 +122,7 @@ export namespace RichTextStagedFileUtils {
     let match;
     while ((match = _PATH_REGEXP.exec(doc)) !== null) {
       paths.push(match[1]);
+      _PATH_REGEXP.lastIndex = match.index + match[0].length; // Move to the next match
     }
 
     return {
@@ -132,10 +133,16 @@ export namespace RichTextStagedFileUtils {
   export function renderDocument(
     doc: object | string,
     context: {
-      file_paths: Record<string, string>;
+      files: Record<
+        string,
+        {
+          path: string;
+          publicUrl: string;
+        }
+      >;
     }
-  ): string {
-    const { file_paths } = context;
+  ): object {
+    const { files } = context;
 
     // Ensure the document is a string
     let docString = typeof doc === "string" ? doc : JSON.stringify(doc);
@@ -145,7 +152,7 @@ export namespace RichTextStagedFileUtils {
       match: string,
       ps: { prefix: string; suffix: string }
     ) => {
-      return file_paths[match] || `${ps.prefix}${match}${ps.suffix}`;
+      return files[match].publicUrl || `${ps.prefix}${match}${ps.suffix}`;
     };
 
     // Replace the placeholders in the document string
@@ -156,7 +163,7 @@ export namespace RichTextStagedFileUtils {
       formatter
     );
 
-    return docString;
+    return JSON.parse(docString);
   }
 }
 

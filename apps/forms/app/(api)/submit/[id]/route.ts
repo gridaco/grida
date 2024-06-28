@@ -50,6 +50,7 @@ import { createXSupabaseClient } from "@/services/x-supabase";
 import { FormValue } from "@/services/form";
 import { XSupabase } from "@/services/x-supabase";
 import { TemplateVariables } from "@/lib/templating";
+import { RichTextStagedFileUtils } from "@/services/form/utils";
 
 const HOST = process.env.HOST || "http://localhost:3000";
 
@@ -578,9 +579,6 @@ async function submit({
   // save each field value
   const { error: v_fields_error } = await client.from("response_field").insert(
     v_form_fields!.map((field) => {
-      // use this to override the value to saved to the database
-      let value_override: any;
-
       const { type, name, options } = field;
 
       // the field's value can be a input value or a reference to form_field_option
@@ -605,6 +603,25 @@ async function submit({
               },
               files
             );
+        } else if (FieldSupports.richtext(type)) {
+          // 1. parse the tmp files
+          const { staged_file_paths } =
+            RichTextStagedFileUtils.parseDocument(value);
+
+          console.log("submit/richtext/files", staged_file_paths);
+
+          // 2. upload the files
+          field_file_uploads[field.id] =
+            field_file_processor.process_field_files(
+              {
+                id: field.id,
+                storage: field.storage as FormFieldStorageSchema | null,
+              },
+              staged_file_paths
+            );
+
+          // 3. replace the tmp file path with the uploaded file path
+          // => this will happen after the file upload is completed - FileProcessCompleteContext
         }
       }
 
@@ -613,8 +630,7 @@ async function submit({
         response_id: response_reference_obj!.id,
         form_field_id: field.id,
         form_id: form_id,
-        // TODO: save value with schema type accordinglly (number, boolean, etc.)
-        value: value_override || value,
+        value: value,
         form_field_option_id: enum_id,
       };
     })
@@ -650,6 +666,13 @@ async function submit({
   }
 
   const file_upserts = Object.keys(field_file_uploads).map((field_id, i) => {
+    const field = v_form_fields!.find((f) => f.id === field_id);
+    if (!field) {
+      throw new Error(
+        "field not found - this is possibly caused by dynamic field, where we do not allow file uploads in dynamic fields."
+      );
+    }
+
     const success_results = field_file_upload_results[field_id].filter(
       (res) => !!res.data
     );
@@ -659,16 +682,36 @@ async function submit({
       return filename;
     }) as string[];
 
-    const upsertion: InsertDto<"response_field"> = {
+    const upsertion_base: Omit<InsertDto<"response_field">, "value"> = {
       form_field_id: field_id,
       response_id: response_reference_obj!.id,
       form_id: form_id,
-      value: uploadedfileval,
       storage_object_paths: success_results.map(
         (res) => res.data!.path
       ) as string[],
     };
-    return upsertion;
+
+    if (FieldSupports.richtext(field?.type)) {
+      const { value } = FormValue.parse((data as FormData).get(field.name), {
+        enums: field.options,
+        type: field.type,
+      });
+
+      const rendereddoctxt = RichTextStagedFileUtils.renderDocument(value, {
+        files: field_file_processor.file_commits[field_id],
+      });
+
+      return {
+        ...upsertion_base,
+        value: rendereddoctxt as {},
+      } satisfies InsertDto<"response_field">;
+    }
+
+    // return upsertion;
+    return {
+      ...upsertion_base,
+      value: uploadedfileval,
+    } satisfies InsertDto<"response_field">;
   });
 
   if (file_upserts.length > 0) {
@@ -852,6 +895,72 @@ class ResponseFieldFilesProcessor {
     readonly context: TemplateVariables.ConnectedDatasourcePostgresTransactionCompleteContext
   ) {}
 
+  // this can be reused since we only support one connection per form.
+  private _m_client: XSupabase.Client | null = null;
+  private async createXSupabaseClient() {
+    if (this._m_client) return this._m_client;
+    assert(this.connections.supabase, "supabase_connection not found");
+    this._m_client = await createXSupabaseClient(
+      this.connections.supabase.supabase_project_id,
+      {
+        service_role: true,
+      }
+    );
+
+    return this._m_client;
+  }
+
+  /**
+   * { field_id: { from: to } }
+   */
+  private _m_file_commits: Record<
+    string,
+    Record<
+      string,
+      {
+        path: string;
+        publicUrl: string;
+      }
+    >
+  > = {};
+
+  /**
+   * stores the successful file commits - be sure to call this after the process_field_files is fully awaited
+   * RISK: developer should be aware to call this within the right lifecycle
+   * This should be carefully used only for staged strategy, e.g. 'richtext' field
+   * TODO: room for improvements
+   */
+  get file_commits() {
+    return this._m_file_commits;
+  }
+
+  private async commitStagedFile(
+    storage: SessionStagedFileStorage,
+    commit: {
+      from: string;
+      to: string;
+      field_id: string;
+    }
+  ) {
+    const { from, to, field_id } = commit;
+    const result = await storage.commitStagedFile(from, to);
+
+    if (result.error) {
+      console.error("submit/err/tmp-mv", from, error);
+      return result;
+    }
+
+    if (!this._m_file_commits[field_id]) {
+      this._m_file_commits[field_id] = {};
+    }
+    this._m_file_commits[field_id][from] = {
+      path: to,
+      publicUrl: storage.getPublicUrl(to).data.publicUrl,
+    };
+
+    return result;
+  }
+
   /**
    * Handles the uploading of response files, ensuring that each file has a unique name within its path.
    *
@@ -862,6 +971,7 @@ class ResponseFieldFilesProcessor {
    * TODO: this should return a error info
    * TODO: need to handle the case where file size exceeds the limit
    * TODO: theres a room for m=optimization in performance (speed)
+   * TODO: this needs a naming context window since the session files paths are ensured to be unique, but the mv commit is based on the file name, wich can be duplicated (when user uploads multiple files with the same filename). refer: *(1)
    *
    */
   async process_field_files(
@@ -928,12 +1038,7 @@ class ResponseFieldFilesProcessor {
                       this.connections.supabase,
                       "supabase_connection not found"
                     );
-                    const client = await createXSupabaseClient(
-                      this.connections.supabase.supabase_project_id,
-                      {
-                        service_role: true,
-                      }
-                    );
+                    const client = await this.createXSupabaseClient();
 
                     const renderedpath = XSupabase.Storage.renderpath(
                       path,
@@ -944,14 +1049,18 @@ class ResponseFieldFilesProcessor {
                       client,
                       bucket
                     );
-                    const { error } = await storage.commitStagedFile(
-                      tmppath,
-                      renderedpath
-                    );
+
+                    const { error } = await this.commitStagedFile(storage, {
+                      from: tmppath,
+                      to: renderedpath,
+                      field_id,
+                    });
+
                     if (error) {
-                      console.error("submit/err/tmp-mv", tmppath, error);
+                      // skip the file
                       continue;
                     }
+
                     uploads.push(
                       Promise.resolve({
                         data: { path: renderedpath },
@@ -971,19 +1080,21 @@ class ResponseFieldFilesProcessor {
               }
             } else {
               // default grida forms behavior
+              // refer: *(1) (see comment above)
               const targetpath = basepath + _p.name;
               const storage = new SessionStagedFileStorage(
                 client,
                 GRIDA_FORMS_RESPONSE_BUCKET
               );
 
-              const { error } = await storage.commitStagedFile(
-                tmppath,
-                targetpath
-              );
+              const { error } = await this.commitStagedFile(storage, {
+                from: tmppath,
+                to: targetpath,
+                field_id,
+              });
 
               if (error) {
-                console.error("submit/err/tmp-mv", tmppath, error);
+                // skip the file
                 continue;
               }
 

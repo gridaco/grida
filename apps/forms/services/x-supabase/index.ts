@@ -99,6 +99,7 @@ export class GridaXSupabaseService {
 export namespace XSupabase {
   //
   //
+  export type Client = SupabaseClient<any, any>;
 
   export namespace Storage {
     export type CreateSignedUrlResult =
