@@ -2,7 +2,6 @@ import { FormInputType } from "@/types";
 import {
   EnvelopeClosedIcon,
   TextIcon,
-  ImageIcon,
   CalendarIcon,
   GlobeIcon,
   DropdownMenuIcon,
@@ -15,6 +14,7 @@ import {
   FileIcon,
   MagnifyingGlassIcon,
   ClockIcon,
+  Component1Icon,
 } from "@radix-ui/react-icons";
 import {
   CreditCardIcon,
@@ -42,6 +42,8 @@ export function FormFieldTypeIcon({
     case "textarea":
     case "text":
       return <TextIcon {...props} />;
+    case "richtext":
+      return <Component1Icon {...props} />;
     case "tel":
       return <PhoneIcon {...props} />;
     case "email":

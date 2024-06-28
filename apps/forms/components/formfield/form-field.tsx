@@ -47,6 +47,7 @@ import {
   ReferenceSearchPreview,
 } from "./reference-search-field";
 import { PhoneField } from "./phone-field";
+import { RichTextEditorField } from "./richtext-field";
 import { FieldProperties } from "@/k/supported_field_types";
 
 /**
@@ -266,6 +267,9 @@ function MonoFormField({
             {...(sharedInputProps as React.ComponentProps<"textarea">)}
           />
         );
+      }
+      case "richtext": {
+        return <RichTextEditorField name={name} required={required} />;
       }
       case "tel": {
         if (vanilla) {
@@ -653,11 +657,11 @@ function MonoFormField({
   }
 
   return (
-    <label data-field-type={type} className="flex flex-col gap-1">
+    <div data-field-type={type} className="grid gap-2">
       <LabelText />
       {renderInput()}
       <HelpText />
-    </label>
+    </div>
   );
 }
 

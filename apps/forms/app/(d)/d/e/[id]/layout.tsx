@@ -71,7 +71,7 @@ export default async function Layout({
   const { default_form_page_language } = data;
 
   return (
-    <html lang={default_form_page_language}>
+    <html lang={default_form_page_language} suppressHydrationWarning>
       <body className={inter.className}>
         <ThemeProvider
           attribute="class"

@@ -66,6 +66,7 @@ export type FormResponseUnknownFieldHandlingStrategyType =
 export type FormInputType =
   | "text"
   | "textarea"
+  | "richtext"
   | "tel"
   | "url"
   | "checkbox"

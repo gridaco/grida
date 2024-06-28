@@ -58,6 +58,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { FileEditCell } from "./file-cell";
+import { RichTextEditCell } from "./richtext-cell";
 
 function rowKeyGetter(row: GFResponseRow) {
   return row.__gf_id;
@@ -423,7 +424,8 @@ function FieldCell({ column, row }: RenderCellProps<GFResponseRow>) {
   const { type, value, options, files } = data;
 
   const unwrapped = unwrapFeildValue(
-    FormValue.value(value, {
+    FormValue.parse(value, {
+      type,
       enums: options
         ? Object.keys(options).map((key) => ({
             id: key,
@@ -454,7 +456,7 @@ function FieldCell({ column, row }: RenderCellProps<GFResponseRow>) {
             className="aspect-square min-w-4 rounded bg-neutral-500 border border-ring"
             style={{ backgroundColor: unwrapped as string }}
           />
-          <span>{unwrapped}</span>
+          <span>{unwrapped.toString()}</span>
         </div>
       );
     }
@@ -493,13 +495,16 @@ function FieldCell({ column, row }: RenderCellProps<GFResponseRow>) {
         </div>
       );
     }
+    case "richtext": {
+      return <div>{JSON.stringify(unwrapped)}</div>;
+    }
     default:
       return (
         <div>
           {state.datagrid_filter.masking_enabled &&
           typeof unwrapped === "string"
             ? mask(unwrapped)
-            : unwrapped}
+            : unwrapped?.toString()}
         </div>
       );
   }
@@ -661,6 +666,9 @@ function FieldEditCell(props: RenderEditCellProps<GFResponseRow>) {
             files={files || []}
           />
         );
+      }
+      case "richtext": {
+        return <RichTextEditCell defaultValue={unwrapped} />;
       }
       case "switch":
       case "checkbox": {

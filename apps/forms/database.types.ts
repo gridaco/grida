@@ -1648,6 +1648,7 @@ export type Database = {
       form_field_type:
         | "text"
         | "textarea"
+        | "richtext"
         | "tel"
         | "url"
         | "checkbox"
@@ -1920,25 +1921,49 @@ export type Database = {
           created_at: string
           data: Json | null
           enum: Database["grida_commerce"]["Enums"]["currency"] | null
+          float4: number | null
+          float8: number | null
           id: number
+          int2: number | null
+          int4: number | null
+          json: Json | null
+          jsonb: Json | null
+          numeric: number | null
           text: string
           user_id: string | null
+          varchar: string | null
         }
         Insert: {
           created_at?: string
           data?: Json | null
           enum?: Database["grida_commerce"]["Enums"]["currency"] | null
+          float4?: number | null
+          float8?: number | null
           id?: number
+          int2?: number | null
+          int4?: number | null
+          json?: Json | null
+          jsonb?: Json | null
+          numeric?: number | null
           text: string
           user_id?: string | null
+          varchar?: string | null
         }
         Update: {
           created_at?: string
           data?: Json | null
           enum?: Database["grida_commerce"]["Enums"]["currency"] | null
+          float4?: number | null
+          float8?: number | null
           id?: number
+          int2?: number | null
+          int4?: number | null
+          json?: Json | null
+          jsonb?: Json | null
+          numeric?: number | null
           text?: string
           user_id?: string | null
+          varchar?: string | null
         }
         Relationships: [
           {

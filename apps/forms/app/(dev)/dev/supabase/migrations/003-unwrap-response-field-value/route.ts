@@ -21,7 +21,7 @@ export async function POST() {
 
       await client
         .from("response_field")
-        .update({ value: unwrapped })
+        .update({ value: unwrapped as any })
         .eq("id", rf.id);
 
       console.log(`${ii} of ${data?.length}:`, "processed", rf.id);

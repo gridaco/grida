@@ -19,6 +19,8 @@ export const supported_field_types: FormInputType[] = [
   "week",
   "file",
   "image",
+  "audio",
+  "video",
   "color",
   "hidden",
   "range",
@@ -27,8 +29,7 @@ export const supported_field_types: FormInputType[] = [
 
 if (process.env.NODE_ENV === "development") {
   const dev: FormInputType[] = [
-    "audio",
-    "video",
+    "richtext",
     //
     "checkboxes",
     "signature",
@@ -157,6 +158,7 @@ const html5_autocomplete_supported_field_types: FormInputType[] =
         ...html5_file_alias_field_types,
         ...html5_checkbox_alias_field_types,
         "radio",
+        "richtext",
         "range",
         "hidden",
         "payment",
@@ -203,6 +205,14 @@ export namespace FieldSupports {
     return html5_checkbox_alias_field_types.includes(type);
   }
 
+  export function boolean(type: FormInputType) {
+    return checkbox_alias(type);
+  }
+
+  export function enums(type: FormInputType) {
+    return options(type);
+  }
+
   export function file_alias(type: FormInputType) {
     return html5_file_alias_field_types.includes(type);
   }
@@ -225,5 +235,20 @@ export namespace FieldSupports {
    */
   export function numeric(type: FormInputType) {
     return ["number", "range"].includes(type);
+  }
+
+  export function richtext(type: FormInputType) {
+    return type === "richtext";
+  }
+
+  export function payments(type: FormInputType) {
+    return type === "payment";
+  }
+
+  /**
+   * if the value must be a json object
+   */
+  export function jsonobject(type: FormInputType) {
+    return richtext(type) || payments(type);
   }
 }

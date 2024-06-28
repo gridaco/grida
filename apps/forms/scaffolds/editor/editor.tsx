@@ -8,7 +8,7 @@ import { FieldEditPanel, FormFieldSave } from "../panels/field-edit-panel";
 import { FormFieldDefinition } from "@/types";
 import { FormFieldUpsert, EditorApiResponse } from "@/types/private/api";
 import { TooltipProvider } from "@radix-ui/react-tooltip";
-import { ResponseEditPanel } from "../panels/response-edit-panel";
+import { RowEditPanel } from "../panels/response-edit-panel";
 import { fmt_local_index } from "@/utils/fmt";
 import { CustomerEditPanel } from "../panels/customer-panel";
 import { BlockEditPanel } from "../panels/block-edit-panel";
@@ -30,7 +30,7 @@ export function FormEditorProvider({
         <MediaViewerProvider>
           <BlockEditPanel />
           <FieldEditPanelProvider />
-          <ResponseEditPanelProvider />
+          <RowEditPanelProvider />
           <CustomerPanelProvider />
           {children}
         </MediaViewerProvider>
@@ -158,23 +158,34 @@ function FieldEditPanelProvider({ children }: React.PropsWithChildren<{}>) {
   );
 }
 
-function ResponseEditPanelProvider({ children }: React.PropsWithChildren<{}>) {
+function RowEditPanelProvider({ children }: React.PropsWithChildren<{}>) {
   const [state, dispatch] = useEditorState();
 
-  const response = useMemo(() => {
+  const focusresponse = useMemo(() => {
     return state.responses?.rows?.find((r) => r.id === state.focus_response_id);
   }, [state.responses, state.focus_response_id]);
 
+  const focusxsupabasemaintablerow = useMemo(() => {
+    const pk = state.x_supabase_main_table?.gfpk;
+    if (!pk) return;
+    return state.x_supabase_main_table?.rows?.find(
+      (r) => r[pk] === state.focus_response_id // TODO: - pk
+    );
+  }, [
+    state.x_supabase_main_table?.rows,
+    state.x_supabase_main_table?.gfpk,
+    state.focus_response_id,
+  ]);
+
   return (
     <>
-      <ResponseEditPanel
-        key={response?.id}
-        title={`Response ${response?.local_index ? fmt_local_index(response?.local_index) : ""}`}
+      <RowEditPanel
+        key={focusresponse?.id}
         open={state.is_response_edit_panel_open}
         init={{
-          response,
-          response_fields: response?.id
-            ? state.responses.fields[response?.id]
+          response: focusresponse,
+          response_fields: focusresponse?.id
+            ? state.responses.fields[focusresponse?.id]
             : [],
           field_defs: state.fields,
         }}

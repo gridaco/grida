@@ -3,24 +3,9 @@ import type { FormInputType } from "@/types";
 export function unwrapFeildValue(
   value: any,
   type?: FormInputType
-): string | number | boolean | undefined | null {
+): object | string | number | boolean | undefined | null {
   if (value === null) return null;
   if (value === undefined) return undefined;
-
-  let unwrapped = value;
-  try {
-    unwrapped = JSON.parse(value);
-  } catch (e) {
-    switch (typeof value) {
-      case "object":
-        return JSON.stringify(value);
-      case "symbol":
-      case "function":
-        return "N/A";
-      default:
-        break; // continue
-    }
-  }
 
   switch (type) {
     case "email":
@@ -28,14 +13,14 @@ export function unwrapFeildValue(
     case "text":
     case "number":
     case "textarea":
-      return unwrapped;
+      return value;
     case "password":
-      return "●".repeat(unwrapped.length);
+      return "●".repeat(value.length);
     case "switch":
     case "checkbox":
-      return parseCheckboxValue(unwrapped);
+      return parseCheckboxValue(value);
     default:
-      return unwrapped;
+      return value;
   }
 }
 
