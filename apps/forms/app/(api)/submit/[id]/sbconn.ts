@@ -5,16 +5,13 @@ import { FormValue } from "@/services/form";
 import { createXSupabaseClient } from "@/services/x-supabase";
 import { ConnectionSupabaseJoint, GridaSupabase, Option } from "@/types";
 import type { JSONSchemaType } from "ajv";
-import { unflatten } from "flat";
 
 export async function sbconn_insert({
+  data,
   connection,
-  formdata,
-  enums,
 }: {
+  data: Record<string, any>;
   connection: ConnectionSupabaseJoint;
-  formdata: FormData | URLSearchParams | Map<string, string>;
-  enums: Option[];
 }) {
   // fetch connection table
   const { data: supabase_project, error: supabase_project_err } =
@@ -40,30 +37,28 @@ export async function sbconn_insert({
 
   const schema = sb_table_schema as JSONSchemaType<Record<string, any>>;
 
-  const data = parseFormData(formdata, { schema, enums });
+  const row = asTableRowData(data, { schema });
 
   const sbclient = await createXSupabaseClient(connection.supabase_project_id, {
     // TODO: use service key only if configured to do so
     service_role: true,
   });
 
-  return sbclient.from(sb_table_name).insert(data).select().single();
+  return sbclient.from(sb_table_name).insert(row).select().single();
 }
 
-function parseFormData(
-  formdata: FormData | URLSearchParams | Map<string, string>,
+function asTableRowData(
+  data: Record<string, any>,
   {
     schema,
-    enums,
   }: {
     schema: JSONSchemaType<Record<string, any>>;
-    enums: Option[];
   }
 ) {
   //
 
   // data contains only recognized keys
-  const data: { [key: string]: any } = {};
+  const row: { [key: string]: any } = {};
 
   Object.keys(schema.properties).forEach((key) => {
     let parsedvalue: any;
@@ -74,42 +69,31 @@ function parseFormData(
 
     switch (type) {
       case "number": {
-        parsedvalue = Number(formdata.get(key));
+        parsedvalue = Number(data[key]);
         break;
       }
       case "boolean": {
-        // TODO: this needs to be cross cheked with the form field type (e.g. checkbox)
-        const sval = formdata.get(key);
-        const bval = sval === "on" || sval === "true" || sval === "1";
-        parsedvalue = bval;
-
+        parsedvalue = data[key] === true;
         break;
       }
       default: {
-        const { value } = FormValue.parse(formdata.get(key), {
-          // type: TODO:
-          enums,
-        });
+        const value = data[key];
         if (format === "json" || format === "jsonb") {
-          //
-          const constructedjson = FlatPostgREST.unflatten(
-            Array.from(formdata.keys()).reduce((acc, k) => {
-              acc[k] = formdata.get(k);
-              return acc;
-            }, {} as any),
-            undefined,
-            {
-              key: (k) => k.startsWith(key + "."),
-              value: (k, v) => {
-                //     // TODO: need scalar type support
-                const { value } = FormValue.parse(v, {
-                  // type: TODO:
-                  enums,
-                });
-                return value;
-              },
-            }
-          );
+          // if value is already an object, we use it as is
+          // TODO: this needs to be fixed in the future. even a object field can be used as a jsonpath field value.
+          // this is not possible just yet, but we need to be prepared for that. - have a analyzer and overriding
+          // currentlu this is used for 'richtext' field value
+          if (typeof value === "object") {
+            parsedvalue = value;
+            break;
+          }
+
+          const constructedjson = FlatPostgREST.unflatten(data, undefined, {
+            key: (k) => k.startsWith(key + "."),
+            value: (k, v) => {
+              return v;
+            },
+          });
 
           parsedvalue = constructedjson as any;
           break;
@@ -126,8 +110,8 @@ function parseFormData(
         parsedvalue = [parsedvalue];
       }
     }
-    data[key] = parsedvalue;
+    row[key] = parsedvalue;
   });
 
-  return data;
+  return row;
 }
