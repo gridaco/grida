@@ -4,6 +4,7 @@ import "@blocknote/core/fonts/inter.css";
 import { useCreateBlockNote } from "@blocknote/react";
 import { BlockNoteView } from "@blocknote/mantine";
 import "@blocknote/mantine/style.css";
+import { useState } from "react";
 import "./styles.css";
 // import { BlockNoteView } from "@blocknote/shadcn";
 // https://github.com/TypeCellOS/BlockNote/issues/880
@@ -35,11 +36,36 @@ import "./styles.css";
 //   Tooltip,
 // }}
 
-export function RichTextEditor() {
-  const editor = useCreateBlockNote();
+export function RichTextEditorField({
+  name,
+  required,
+}: {
+  name: string;
+  required?: boolean;
+}) {
+  const [txtjsonvalue, settxtjsonvalue] = useState<string | undefined>(
+    undefined
+  );
+
+  const editor = useCreateBlockNote({
+    _tiptapOptions: {
+      onUpdate: ({ editor }) => {
+        // TODO: consider adding a debounce here
+        const json = editor.getJSON();
+        settxtjsonvalue(JSON.stringify(json));
+      },
+    },
+  });
 
   return (
     <div className="shadow-sm h-full w-full rounded-md border border-input bg-transparent text-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50">
+      <input
+        type="text"
+        name={name}
+        value={txtjsonvalue}
+        required={required}
+        className="sr-only"
+      />
       <BlockNoteView
         data-theming-ui-css-variables
         editor={editor}
