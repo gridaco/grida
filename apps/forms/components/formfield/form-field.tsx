@@ -269,7 +269,13 @@ function MonoFormField({
         );
       }
       case "richtext": {
-        return <RichTextEditorField name={name} required={required} />;
+        return (
+          <RichTextEditorField
+            name={name}
+            required={required}
+            placeholder={placeholder}
+          />
+        );
       }
       case "tel": {
         if (vanilla) {

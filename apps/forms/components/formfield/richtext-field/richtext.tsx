@@ -2,27 +2,30 @@
 
 import { ThemedRichTextEditorContent } from "@/components/richtext";
 import { useCreateBlockNote } from "@blocknote/react";
+import { locales } from "@blocknote/core";
 import { useEffect, useState } from "react";
 
 export function RichTextEditorField({
   name,
   required,
+  placeholder,
 }: {
   name: string;
   required?: boolean;
+  placeholder?: string;
 }) {
   const [txtjsonvalue, settxtjsonvalue] = useState<string | undefined>(
     undefined
   );
 
   const editor = useCreateBlockNote({
-    // _tiptapOptions: {
-    //   onUpdate: ({ editor }) => {
-    //     // TODO: consider adding a debounce here
-    //     const json = editor.getJSON();
-    //     settxtjsonvalue(JSON.stringify(json));
-    //   },
-    // },
+    dictionary: {
+      ...locales.en,
+      placeholders: {
+        ...locales.en.placeholders,
+        default: placeholder || locales.en.placeholders.default,
+      },
+    },
   });
 
   useEffect(() => {
