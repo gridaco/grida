@@ -5,6 +5,7 @@ import { useCreateBlockNote } from "@blocknote/react";
 import { Block, locales } from "@blocknote/core";
 import { useEffect, useState } from "react";
 import type { FileResolverFn, FileUploaderFn } from "../file-upload-field";
+import { RichTextStagedFileUtils } from "@/services/form";
 
 type FileHandler =
   | {
@@ -51,20 +52,20 @@ export function RichTextEditorField({
       ? async (file) => {
           const { path } = await uploader(file);
           // https://github.com/TypeCellOS/BlockNote/issues/886
-          return "grida-tmp://" + path! + "?grida-tmp=true";
+          return RichTextStagedFileUtils.encodeTmpUrl(path!);
         }
       : undefined,
     resolveFileUrl: resolver
       ? async (url) => {
-          if (url.startsWith("grida-tmp://")) {
-            url = url.replace("grida-tmp://", "");
-            url = url.replace("?grida-tmp=true", "");
-            const resolved = await resolver?.({
-              path: url,
-            });
-            return resolved!.publicUrl;
-          } else {
-            return url;
+          const decoded = RichTextStagedFileUtils.decodeTmpUrl(url);
+          switch (decoded.type) {
+            case "url":
+              return decoded.url;
+            case "grida-tmp":
+              const resolved = await resolver?.({
+                path: decoded.path,
+              });
+              return resolved!.publicUrl;
           }
         }
       : undefined,

@@ -73,3 +73,119 @@ export namespace FormValue {
     return JSON.parse(JSON.stringify(data));
   }
 }
+
+export namespace RichTextStagedFileUtils {
+  export const TMP_PREFIX_SCHEMA = "grida-tmp://";
+  export const TMP_SUFFIX_QUERY = "?grida-tmp=true";
+
+  // Define the prefix and suffix regex patterns
+  const _TMP_PREFIX_REGEXP = /grida-tmp:\/\//;
+  const _TMP_SUFFIX_REGEXP = /\?grida-tmp=true/;
+  const _PATH_REGEXP = /grida-tmp:\/\/(.+)\?grida-tmp=true/;
+
+  export function encodeTmpUrl(path: string) {
+    return TMP_PREFIX_SCHEMA + path + TMP_SUFFIX_QUERY;
+  }
+
+  export function decodeTmpUrl(url: string):
+    | {
+        type: "grida-tmp";
+        path: string;
+      }
+    | {
+        type: "url";
+        url: string;
+      } {
+    if (url.startsWith(TMP_PREFIX_SCHEMA)) {
+      url = url.replace(TMP_PREFIX_SCHEMA, "");
+      url = url.replace(TMP_SUFFIX_QUERY, "");
+
+      return {
+        type: "grida-tmp",
+        path: url,
+      };
+    }
+
+    return {
+      type: "url",
+      url,
+    };
+  }
+
+  export function parseDocument(doc: object | string) {
+    const paths: string[] = [];
+
+    if (typeof doc === "object") {
+      doc = JSON.stringify(doc);
+    }
+
+    let match;
+    while ((match = _PATH_REGEXP.exec(doc)) !== null) {
+      paths.push(match[1]);
+    }
+
+    return {
+      staged_file_paths: paths,
+    };
+  }
+
+  export function renderDocument(
+    doc: object | string,
+    context: {
+      file_paths: Record<string, string>;
+    }
+  ): string {
+    const { file_paths } = context;
+
+    // Ensure the document is a string
+    let docString = typeof doc === "string" ? doc : JSON.stringify(doc);
+
+    // Define the formatter function
+    const formatter = (
+      match: string,
+      ps: { prefix: string; suffix: string }
+    ) => {
+      return file_paths[match] || `${ps.prefix}${match}${ps.suffix}`;
+    };
+
+    // Replace the placeholders in the document string
+    docString = replacePVSTemplate(
+      docString,
+      _TMP_PREFIX_REGEXP,
+      _TMP_SUFFIX_REGEXP,
+      formatter
+    );
+
+    return docString;
+  }
+}
+
+/**
+ * Replace template matches in the text based on the provided prefix, suffix, and formatter function.
+ * P(prefix) + V(match) + S(suffix) => formatter(V, { P, S })
+ * @param text - The text to be processed.
+ * @param prefix - The regular expression for the prefix of the template to be matched.
+ * @param suffix - The regular expression for the suffix of the template to be matched.
+ * @param formatter - A function that takes prefix, suffix, and match, and returns a formatted string.
+ * @returns The text with the templates replaced.
+ */
+function replacePVSTemplate(
+  text: string,
+  prefix: RegExp,
+  suffix: RegExp,
+  formatter: (matche: string, ps: { prefix: string; suffix: string }) => string
+): string {
+  // Convert prefix and suffix regex to strings
+  const prefixStr = prefix.source;
+  const suffixStr = suffix.source;
+
+  // Construct the regex pattern
+  const regex = new RegExp(`${prefixStr}(.+?)${suffixStr}`, "g");
+
+  return text.replace(regex, (_, group) => {
+    return formatter(group, {
+      prefix: prefixStr,
+      suffix: suffixStr,
+    });
+  });
+}
