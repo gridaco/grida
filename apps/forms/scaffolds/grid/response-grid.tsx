@@ -423,7 +423,8 @@ function FieldCell({ column, row }: RenderCellProps<GFResponseRow>) {
   const { type, value, options, files } = data;
 
   const unwrapped = unwrapFeildValue(
-    FormValue.value(value, {
+    FormValue.parse(value, {
+      type,
       enums: options
         ? Object.keys(options).map((key) => ({
             id: key,

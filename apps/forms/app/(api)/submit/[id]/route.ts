@@ -564,7 +564,8 @@ async function submit({
 
       // the field's value can be a input value or a reference to form_field_option
       const value_or_reference = data.get(name);
-      const { value, enum_id } = FormValue.value(value_or_reference, {
+      const { value, enum_id } = FormValue.parse(value_or_reference, {
+        type: type,
         enums: options,
       });
 

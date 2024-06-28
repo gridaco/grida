@@ -72,9 +72,11 @@ export default async function SubmitCompletePage({
       const key = fields.find((f) => f.id === field.form_field_id)?.name;
       if (!key) return acc; // this can't happen - but just in case
 
-      try {
-        acc[key] = FormValue.value(field.value, { enums: options }).value;
-      } catch (e) {}
+      acc[key] = FormValue.parse(field.value, {
+        type: field.type,
+        enums: options,
+      }).value;
+
       return acc;
     },
     {} as Record<string, string>

@@ -86,7 +86,10 @@ function parseFormData(
         break;
       }
       default: {
-        const { value } = FormValue.value(formdata.get(key), { enums });
+        const { value } = FormValue.parse(formdata.get(key), {
+          // type: TODO:
+          enums,
+        });
         if (format === "json" || format === "jsonb") {
           //
           const constructedjson = FlatPostgREST.unflatten(
@@ -99,7 +102,10 @@ function parseFormData(
               key: (k) => k.startsWith(key + "."),
               value: (k, v) => {
                 //     // TODO: need scalar type support
-                const { value } = FormValue.value(v, { enums });
+                const { value } = FormValue.parse(v, {
+                  // type: TODO:
+                  enums,
+                });
                 return value;
               },
             }
