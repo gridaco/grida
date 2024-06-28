@@ -33,6 +33,7 @@ import { Label } from "../ui/label";
 import {
   FileUploadField,
   getMaxUploadSize,
+  makeResolver,
   makeUploader,
 } from "./file-upload-field";
 import {
@@ -40,7 +41,7 @@ import {
   GRIDA_FORMS_RESPONSE_FILES_MAX_COUNT_PER_FIELD,
   GRIDA_FORMS_RESPONSE_MULTIPART_FILE_UOLOAD_LIMIT,
 } from "@/k/env";
-import type { FieldUploadStrategy } from "@/lib/forms";
+import type { FileResolveStrategy, FileUploadStrategy } from "@/lib/forms";
 import assert from "assert";
 import {
   ReferenceSearch,
@@ -78,7 +79,8 @@ interface IInputField {
   multiple?: boolean;
   labelCapitalize?: boolean;
   data?: FormFieldDataSchema | null;
-  fileupload?: FieldUploadStrategy;
+  fileupload?: FileUploadStrategy;
+  fileresolve?: FileResolveStrategy;
   onValueChange?: (value: string) => void;
   onCheckedChange?: (checked: boolean) => void;
 }
@@ -163,6 +165,7 @@ function MonoFormField({
   max,
   data,
   fileupload,
+  fileresolve,
   novalidate,
   vanilla,
   locked,
@@ -268,19 +271,6 @@ function MonoFormField({
           />
         );
       }
-      case "richtext": {
-        return (
-          <RichTextEditorField
-            name={name}
-            required={required}
-            placeholder={placeholder}
-            initialContent={defaultValue ? JSON.parse(defaultValue) : undefined}
-            onContentChange={(content) => {
-              onValueChange?.(JSON.stringify(content));
-            }}
-          />
-        );
-      }
       case "tel": {
         if (vanilla) {
           return (
@@ -343,6 +333,21 @@ function MonoFormField({
             }
             maxSize={getMaxUploadSize(fileupload?.type)}
             uploader={makeUploader(fileupload)}
+          />
+        );
+      }
+      case "richtext": {
+        return (
+          <RichTextEditorField
+            name={name}
+            required={required}
+            placeholder={placeholder}
+            initialContent={defaultValue ? JSON.parse(defaultValue) : undefined}
+            onContentChange={(content) => {
+              onValueChange?.(JSON.stringify(content));
+            }}
+            uploader={makeUploader(fileupload)}
+            resolver={makeResolver(fileresolve)}
           />
         );
       }

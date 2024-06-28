@@ -480,6 +480,12 @@ function BlockRenderer({
                           .upload
                       : undefined
                   }
+                  fileresolve={
+                    FieldSupports.file_upload(type)
+                      ? (field as ClientFileUploadFieldRenderBlock["field"])
+                          .resolve
+                      : undefined
+                  }
                   onValueChange={onValueChange}
                   onCheckedChange={onValueChange}
                 />

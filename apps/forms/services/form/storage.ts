@@ -41,7 +41,7 @@ export async function createSignedUpsertUploadUrl({
         );
 
         const storage = new FileStorage(client, bucket);
-        return storage.sign(path, {
+        return storage.createSignedUploadUrl(path, {
           upsert: true,
         });
       }
@@ -94,12 +94,12 @@ export namespace SessionStorageServices {
           switch (mode) {
             case "direct": {
               const storage = new FileStorage(client, bucket);
-              return storage.sign(path);
+              return storage.createSignedUploadUrl(path);
               break;
             }
             case "staged": {
               const storage = new SessionStagedFileStorage(client, bucket);
-              return storage.sessionStagedUploadPresingedUrl(
+              return storage.createStagedSignedUploadUrl(
                 {
                   field_id: field.id,
                   session_id: session_id,
@@ -122,7 +122,7 @@ export namespace SessionStorageServices {
         GRIDA_FORMS_RESPONSE_BUCKET
       );
 
-      return storage.sessionStagedUploadPresingedUrl(
+      return storage.createStagedSignedUploadUrl(
         {
           field_id: field.id,
           session_id: session_id,
@@ -130,6 +130,52 @@ export namespace SessionStorageServices {
         file.name,
         config?.unique
       );
+    }
+  }
+
+  export async function getPublicUrl({
+    field,
+    file,
+    connection,
+  }: {
+    field: Pick<FormFieldDefinition, "id" | "storage">;
+    file: {
+      path: string;
+    };
+    connection: {
+      supabase_connection: ConnectionSupabaseJoint | null;
+    };
+  }) {
+    //
+    if (field.storage) {
+      const { type, bucket } = field.storage as any as FormFieldStorageSchema;
+
+      switch (type) {
+        case "x-supabase": {
+          assert(
+            connection.supabase_connection,
+            "supabase_connection not found"
+          );
+          const client = await createXSupabaseClient(
+            connection.supabase_connection.supabase_project_id,
+            {
+              // we don't need service role here - we are getting public url (does not require api request)
+              service_role: false,
+            }
+          );
+
+          const storage = new FileStorage(client, bucket);
+          return storage.getPublicUrl(file.path);
+        }
+        case "grida":
+        case "x-s3":
+        default:
+          throw new Error("storage type not supported");
+      }
+    } else {
+      const storage = new FileStorage(client, GRIDA_FORMS_RESPONSE_BUCKET);
+
+      return storage.getPublicUrl(file.path);
     }
   }
 }

@@ -4,6 +4,17 @@ import { ThemedRichTextEditorContent } from "@/components/richtext";
 import { useCreateBlockNote } from "@blocknote/react";
 import { Block, locales } from "@blocknote/core";
 import { useEffect, useState } from "react";
+import type { FileResolverFn, FileUploaderFn } from "../file-upload-field";
+
+type FileHandler =
+  | {
+      uploader?: FileUploaderFn;
+      resolver?: FileResolverFn;
+    }
+  | {
+      uploader: FileUploaderFn;
+      resolver: FileResolverFn;
+    };
 
 export function RichTextEditorField({
   name,
@@ -11,13 +22,15 @@ export function RichTextEditorField({
   placeholder,
   initialContent,
   onContentChange,
+  uploader,
+  resolver,
 }: {
   name: string;
   required?: boolean;
   placeholder?: string;
   initialContent?: Block[];
   onContentChange?: (content: Block[]) => void;
-}) {
+} & FileHandler) {
   const [txtjsonvalue, settxtjsonvalue] = useState<string | undefined>(
     undefined
   );
@@ -30,18 +43,40 @@ export function RichTextEditorField({
         default: placeholder || locales.en.placeholders.default,
       },
     },
-    trailingBlock: false,
+    // https://github.com/TypeCellOS/BlockNote/issues/884
+    // trailingBlock: false,
     initialContent: initialContent,
     // TODO:
-    // uploadFile: async (file) => file,
-    // resolveFileUrl: async (url) => url,
+    uploadFile: uploader
+      ? async (file) => {
+          const { path } = await uploader(file);
+          // https://github.com/TypeCellOS/BlockNote/issues/886
+          return "grida-tmp://" + path! + "?grida-tmp=true";
+        }
+      : undefined,
+    resolveFileUrl: resolver
+      ? async (url) => {
+          if (url.startsWith("grida-tmp://")) {
+            url = url.replace("grida-tmp://", "");
+            url = url.replace("?grida-tmp=true", "");
+            const resolved = await resolver?.({
+              path: url,
+            });
+            return resolved!.publicUrl;
+          } else {
+            return url;
+          }
+        }
+      : undefined,
   });
 
   useEffect(() => {
     const fn = () => {
       const content = editor.document;
-      settxtjsonvalue(JSON.stringify(content));
-      onContentChange?.(content);
+      try {
+        settxtjsonvalue(JSON.stringify(content));
+        onContentChange?.(content);
+      } catch (e) {}
     };
     editor.onEditorContentChange(fn);
   }, [editor, onContentChange]);

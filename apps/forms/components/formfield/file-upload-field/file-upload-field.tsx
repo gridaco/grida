@@ -13,9 +13,9 @@ import { Spinner } from "@/components/spinner";
 import { Card } from "@/components/ui/card";
 import { ExclamationTriangleIcon, FileIcon } from "@radix-ui/react-icons";
 import { DropzoneOptions } from "react-dropzone";
-import { FileUploaderFn } from "./uploader";
-import Image from "next/image";
 import { UploadStatus, useFileUploader } from "./use-file-uploader";
+import type { FileUploaderFn } from "./uploader";
+import Image from "next/image";
 
 type Accept = {
   [key: string]: string[];
