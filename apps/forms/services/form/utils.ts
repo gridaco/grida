@@ -2,7 +2,7 @@ import { is_uuid_v4 } from "@/utils/is";
 import type { FormInputType, Option } from "@/types";
 
 export namespace FormValue {
-  export function parse(
+  export function value(
     value_or_reference: any,
     extra?: { enums?: { id: string; value: string }[] }
   ) {
@@ -20,13 +20,6 @@ export namespace FormValue {
       value,
       enum_id: is_value_fkey_and_found ? is_value_fkey_and_found.id : null,
     };
-  }
-
-  export function encode(
-    value: any,
-    extra?: { enums?: { id: string; value: string }[] }
-  ) {
-    return JSON.stringify(value);
   }
 
   export function safejson(data: any) {

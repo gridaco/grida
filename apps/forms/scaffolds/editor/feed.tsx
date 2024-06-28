@@ -120,7 +120,7 @@ export function ResponseSyncProvider({
 
         if (prevField) {
           // check if field value is updated
-          if (prevField.value !== cell.value) {
+          if (!equal(prevField.value, cell.value)) {
             const _ = sync(cell.id, {
               value: cell.value,
               option_id: cell.form_field_option_id,

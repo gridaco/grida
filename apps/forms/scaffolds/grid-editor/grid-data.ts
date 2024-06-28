@@ -235,7 +235,7 @@ export namespace GridData {
           );
           row.fields[field.id] = {
             type: responseField?.type || field.type,
-            value: responseField?.value || null,
+            value: responseField?.value,
             multiple: field.multiple || false,
             option_id: responseField?.form_field_option_id,
             options: field.options?.reduce(

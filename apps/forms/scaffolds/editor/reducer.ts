@@ -697,10 +697,7 @@ export function reducer(
               column,
               data,
             } = <DataGridCellChangeAction>action;
-            const { value: _value, option_id } = data;
-
-            // FIXME: WRAP-UNWRAP
-            const value = JSON.parse(_value);
+            const { value, option_id } = data;
 
             const field = state.fields.find((f) => f.id === column);
             if (!field) return;
