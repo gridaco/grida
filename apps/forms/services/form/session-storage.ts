@@ -14,7 +14,7 @@ interface SessionStoragePath {
 }
 
 export const requesturl = ({ session_id, field_id }: SessionStoragePath) =>
-  `/v1/session/${session_id}/field/${field_id}/upload/signed-url`;
+  `/v1/session/${session_id}/field/${field_id}/file/upload/signed-url`;
 
 /**
  * build the path for the temporary storage object
