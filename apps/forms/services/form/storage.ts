@@ -28,8 +28,7 @@ export async function createSignedUpsertUploadUrl({
   assert(field, "field not found");
 
   if (field.storage) {
-    const { type, bucket } =
-      field.storage as any as FormFieldStorageSchema;
+    const { type, bucket } = field.storage as any as FormFieldStorageSchema;
 
     switch (type) {
       case "x-supabase": {
@@ -58,46 +57,32 @@ export async function createSignedUpsertUploadUrl({
 
 export async function session_storage_createSignedUploadUrl({
   session_id,
-  field_id,
+  field,
   file,
   config,
+  connection,
 }: {
   session_id: string;
-  field_id: string;
+  field: Pick<FormFieldDefinition, "id" | "storage">;
   file: {
     name: string;
   };
   config?: {
     unique?: boolean;
   };
+  connection: {
+    supabase_connection: ConnectionSupabaseJoint | null;
+  };
 }) {
-  const { data, error } = await client
-    .from("response_session")
-    .select(
-      `id, form:form( fields:form_field( id, storage ), supabase_connection:connection_supabase(*) )`
-    )
-    .eq("id", session_id)
-    .single();
-
-  if (error || !data) {
-    throw error;
-  }
-
-  const { form } = data;
-  assert(form, "form not found");
-
-  const field = form.fields.find((field) => field.id === field_id);
-  assert(field, "form not found");
-
   if (field.storage) {
     const { type, mode, bucket, path } =
       field.storage as any as FormFieldStorageSchema;
 
     switch (type) {
       case "x-supabase": {
-        assert(form.supabase_connection, "supabase_connection not found");
+        assert(connection.supabase_connection, "supabase_connection not found");
         const client = await createXSupabaseClient(
-          form.supabase_connection.supabase_project_id,
+          connection.supabase_connection.supabase_project_id,
           {
             service_role: true,
           }
@@ -112,7 +97,7 @@ export async function session_storage_createSignedUploadUrl({
             const storage = new SessionStagedFileStorage(client, bucket);
             return storage.sessionStagedUploadPresingedUrl(
               {
-                field_id: field_id,
+                field_id: field.id,
                 session_id: session_id,
               },
               file.name,
@@ -135,7 +120,7 @@ export async function session_storage_createSignedUploadUrl({
 
     return storage.sessionStagedUploadPresingedUrl(
       {
-        field_id: field_id,
+        field_id: field.id,
         session_id: session_id,
       },
       file.name,
