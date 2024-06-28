@@ -48,6 +48,12 @@ import {
 } from "./reference-search-field";
 import { PhoneField } from "./phone-field";
 import { FieldProperties } from "@/k/supported_field_types";
+import dynamic from "next/dynamic";
+import { Skeleton } from "../ui/skeleton";
+
+const RichTextEditor = dynamic(() => import("./richtext-field"), {
+  loading: () => <Skeleton className="w-full h-28" />,
+});
 
 /**
  * this disables the auto zoom in input text tag safari on iphone by setting font-size to 16px
@@ -266,6 +272,9 @@ function MonoFormField({
             {...(sharedInputProps as React.ComponentProps<"textarea">)}
           />
         );
+      }
+      case "richtext": {
+        return <RichTextEditor />;
       }
       case "tel": {
         if (vanilla) {
@@ -653,11 +662,11 @@ function MonoFormField({
   }
 
   return (
-    <label data-field-type={type} className="flex flex-col gap-1">
+    <div data-field-type={type} className="grid gap-2">
       <LabelText />
       {renderInput()}
       <HelpText />
-    </label>
+    </div>
   );
 }
 
