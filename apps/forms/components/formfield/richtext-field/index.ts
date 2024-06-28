@@ -1,1 +1,1 @@
-export { RichTextEditorField as default } from "./richtext";
+export * from "./richtext";

@@ -47,13 +47,8 @@ import {
   ReferenceSearchPreview,
 } from "./reference-search-field";
 import { PhoneField } from "./phone-field";
+import { RichTextEditorField } from "./richtext-field";
 import { FieldProperties } from "@/k/supported_field_types";
-import dynamic from "next/dynamic";
-import { Skeleton } from "../ui/skeleton";
-
-const RichTextEditor = dynamic(() => import("./richtext-field"), {
-  loading: () => <Skeleton className="w-full h-28" />,
-});
 
 /**
  * this disables the auto zoom in input text tag safari on iphone by setting font-size to 16px
@@ -274,7 +269,7 @@ function MonoFormField({
         );
       }
       case "richtext": {
-        return <RichTextEditor name={name} required={required} />;
+        return <RichTextEditorField name={name} required={required} />;
       }
       case "tel": {
         if (vanilla) {

@@ -25,20 +25,16 @@ import { useTheme } from "next-themes";
 import { useMonacoTheme } from "@/components/monaco";
 import { Button } from "@/components/ui/button";
 
-export function ResponseEditPanel({
-  title,
+export function RowEditPanel({
   onSave,
   init,
-  disableAI,
   ...props
 }: React.ComponentProps<typeof SidePanel> & {
-  title?: string;
   init?: Partial<{
     response: FormResponse;
     response_fields: FormResponseField[];
     field_defs: FormFieldDefinition[];
   }>;
-  disableAI?: boolean;
   onSave?: (field: FormFieldInit) => void;
 }) {
   const { response, response_fields, field_defs } = init ?? {};
@@ -52,7 +48,7 @@ export function ResponseEditPanel({
 
   return (
     <SidePanel {...props}>
-      <PanelHeader>{title}</PanelHeader>
+      <PanelHeader>{`Response ${init?.response?.local_index ? fmt_local_index(init.response?.local_index) : ""}`}</PanelHeader>
       <PanelContent>
         <PanelPropertySection>
           <PanelPropertySectionTitle>General</PanelPropertySectionTitle>
