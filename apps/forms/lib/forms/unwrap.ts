@@ -6,24 +6,10 @@ export function unwrapFeildValue(
 ): string | number | boolean | undefined | null {
   if (value === null) return null;
   if (value === undefined) return undefined;
-  try {
-    const unwrapped = JSON.parse(value);
 
-    switch (type) {
-      case "email":
-      case "tel":
-      case "text":
-      case "number":
-      case "textarea":
-        return unwrapped;
-      case "password":
-        return "●".repeat(unwrapped.length);
-      case "switch":
-      case "checkbox":
-        return parseCheckboxValue(unwrapped);
-      default:
-        return unwrapped;
-    }
+  let unwrapped = value;
+  try {
+    unwrapped = JSON.parse(value);
   } catch (e) {
     switch (typeof value) {
       case "object":
@@ -32,8 +18,24 @@ export function unwrapFeildValue(
       case "function":
         return "N/A";
       default:
-        return value;
+        break; // continue
     }
+  }
+
+  switch (type) {
+    case "email":
+    case "tel":
+    case "text":
+    case "number":
+    case "textarea":
+      return unwrapped;
+    case "password":
+      return "●".repeat(unwrapped.length);
+    case "switch":
+    case "checkbox":
+      return parseCheckboxValue(unwrapped);
+    default:
+      return unwrapped;
   }
 }
 
