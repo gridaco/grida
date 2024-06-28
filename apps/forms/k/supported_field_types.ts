@@ -19,6 +19,8 @@ export const supported_field_types: FormInputType[] = [
   "week",
   "file",
   "image",
+  "audio",
+  "video",
   "color",
   "hidden",
   "range",
@@ -27,8 +29,7 @@ export const supported_field_types: FormInputType[] = [
 
 if (process.env.NODE_ENV === "development") {
   const dev: FormInputType[] = [
-    "audio",
-    "video",
+    "richtext",
     //
     "checkboxes",
     "signature",
