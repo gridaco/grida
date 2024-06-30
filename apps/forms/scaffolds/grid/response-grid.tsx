@@ -656,6 +656,7 @@ function FieldEditCell(props: RenderEditCellProps<GFResponseRow>) {
           />
         );
       }
+      case "range":
       case "number": {
         return (
           <input

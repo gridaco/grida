@@ -137,7 +137,7 @@ function asTableRowData(
           // TODO: this needs to be fixed in the future. even a object field can be used as a jsonpath field value.
           // this is not possible just yet, but we need to be prepared for that. - have a analyzer and overriding
           // currentlu this is used for 'richtext' field value
-          if (typeof value === "object" || typeof value === "undefined") {
+          if (typeof value === "object") {
             parsedvalue = value;
             break;
           }
@@ -150,6 +150,15 @@ function asTableRowData(
           });
 
           console.log("constructedjson", constructedjson);
+
+          if (
+            typeof value === "undefined" &&
+            Object.keys(constructedjson).length === 0
+          ) {
+            // if the value is undefined and the constructed json is empty, we use undefined
+            parsedvalue = undefined;
+            break;
+          }
 
           parsedvalue = constructedjson as any;
           break;
