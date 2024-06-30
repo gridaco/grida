@@ -64,8 +64,12 @@ export class XSupabaseQueryBuilder {
     return this;
   }
 
-  delete() {
-    this.query = (this.query as PostgrestQueryBuilder<any, any>).delete();
+  delete(
+    ...parameters: Parameters<PostgrestQueryBuilder<any, any, any>["delete"]>
+  ) {
+    this.query = (this.query as PostgrestQueryBuilder<any, any>).delete(
+      ...parameters
+    );
     return this;
   }
 

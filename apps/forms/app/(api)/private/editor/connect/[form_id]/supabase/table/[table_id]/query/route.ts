@@ -111,7 +111,7 @@ export async function DELETE(req: NextRequest, context: Context) {
 
   const res = await query
     .from(main_supabase_table.sb_table_name)
-    .delete()
+    .delete({ count: "exact" })
     .fromFilters(body.filters)
     .done();
 

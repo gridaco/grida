@@ -300,6 +300,43 @@ function DataLoadingIndicator() {
   );
 }
 
+async function xsupabase_delete_query({
+  form_id,
+  main_table_id,
+  column,
+  values,
+}: {
+  form_id: string;
+  main_table_id: number;
+  column: string;
+  values: any[];
+}) {
+  const res = await fetch(
+    `/private/editor/connect/${form_id}/supabase/table/${main_table_id}/query`,
+    {
+      method: "DELETE",
+      body: JSON.stringify({
+        filters: [
+          {
+            type: "in",
+            column: column,
+            values: values,
+          },
+        ],
+      } satisfies XSupabaseQuery.Body),
+    }
+  );
+
+  const { error, count } = await res.json();
+
+  if (error || !count) {
+    console.error("Failed to delete rows", error);
+    throw error;
+  }
+
+  return true;
+}
+
 function DeleteSelectedRowsButton() {
   const supabase = createClientFormsClient();
   const [state, dispatch] = useEditorState();
@@ -332,21 +369,12 @@ function DeleteSelectedRowsButton() {
       return;
     }
 
-    const res = fetch(
-      `/private/editor/connect/${state.form_id}/supabase/table/${state.connections!.supabase!.main_supabase_table_id}/query`,
-      {
-        method: "DELETE",
-        body: JSON.stringify({
-          filters: [
-            {
-              type: "in",
-              column: state.x_supabase_main_table.gfpk,
-              values: Array.from(selected_rows),
-            },
-          ],
-        } satisfies XSupabaseQuery.Body),
-      }
-    ).then(() => {
+    const res = xsupabase_delete_query({
+      form_id: state.form_id,
+      main_table_id: state.connections!.supabase!.main_supabase_table_id!,
+      column: state.x_supabase_main_table.gfpk,
+      values: Array.from(selected_rows),
+    }).then(() => {
       dispatch({
         type: "editor/data-grid/delete/selected",
       });
