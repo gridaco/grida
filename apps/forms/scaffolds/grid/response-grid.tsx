@@ -83,6 +83,7 @@ export function ResponseGrid({
   columns: {
     key: string;
     name: string;
+    readonly: boolean;
     type?: FormInputType;
   }[];
   rows: GFResponseRow[];
@@ -197,7 +198,8 @@ export function ResponseGrid({
               />
             ),
             renderCell: FieldCell,
-            renderEditCell: !readonly ? FieldEditCell : undefined,
+            renderEditCell:
+              !readonly && !col.readonly ? FieldEditCell : undefined,
           }) as Column<any>
       )
     )

@@ -130,6 +130,7 @@ function FieldEditPanelProvider({ children }: React.PropsWithChildren<{}>) {
                 help_text: field.help_text ?? "",
                 placeholder: field.placeholder ?? "",
                 required: field.required,
+                readonly: field.readonly,
                 pattern: field.pattern,
                 step: field.step ?? undefined,
                 min: field.min ?? undefined,

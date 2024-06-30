@@ -460,6 +460,7 @@ function BlockRenderer({
                   type={field.type}
                   is_array={field.is_array}
                   required={field.required}
+                  readonly={field.readonly}
                   requiredAsterisk
                   helpText={field.help_text}
                   options={field.options}

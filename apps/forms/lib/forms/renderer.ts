@@ -54,6 +54,7 @@ export interface ClientFieldRenderBlock<T extends FormInputType = FormInputType>
     max?: number;
     pattern?: string;
     required?: boolean;
+    readonly?: boolean;
     minlength?: number;
     maxlength?: number;
     placeholder?: string;
@@ -420,6 +421,7 @@ export class FormRenderTree {
       placeholder: field.placeholder || undefined,
       accept: field.accept || undefined,
       required: field.required ?? undefined,
+      readonly: field.readonly ?? undefined,
       multiple: field.multiple ?? undefined,
       autocomplete: toArrayOf(field.autocomplete)?.join(" ") ?? undefined,
       step: field.step ?? undefined,

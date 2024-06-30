@@ -50,6 +50,7 @@ export namespace GridData {
     columns: {
       key: string;
       name: string;
+      readonly: boolean;
       type?: FormInputType;
     }[];
   } {
@@ -58,6 +59,7 @@ export namespace GridData {
       .map((field) => ({
         key: field.id,
         name: field.name,
+        readonly: field.readonly || false,
         type: field.type,
       }));
 
@@ -189,6 +191,7 @@ export namespace GridData {
             gfRow.fields[field.id] = {
               type: field.type,
               value: valuefn(row, field),
+              readonly: field.readonly || false,
               options: field.options?.reduce(
                 (
                   acc: { [key: string]: { value: string; label?: string } },
@@ -236,6 +239,7 @@ export namespace GridData {
           row.fields[field.id] = {
             type: responseField?.type || field.type,
             value: responseField?.value,
+            readonly: field.readonly || false,
             multiple: field.multiple || false,
             option_id: responseField?.form_field_option_id,
             options: field.options?.reduce(
@@ -356,6 +360,7 @@ export namespace GridData {
           row.fields[key] = {
             value: value,
             type: field?.type,
+            readonly: field?.readonly || false,
           };
         });
         return row;
