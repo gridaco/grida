@@ -137,7 +137,7 @@ function asTableRowData(
           // TODO: this needs to be fixed in the future. even a object field can be used as a jsonpath field value.
           // this is not possible just yet, but we need to be prepared for that. - have a analyzer and overriding
           // currentlu this is used for 'richtext' field value
-          if (typeof value === "object") {
+          if (typeof value === "object" || typeof value === "undefined") {
             parsedvalue = value;
             break;
           }

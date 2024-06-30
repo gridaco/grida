@@ -121,6 +121,11 @@ async function submit({
 }) {
   // console.log("form_id", form_id);
 
+  // check for mandatory meta
+  if (meta.utc_offset === undefined) {
+    console.warn("utc_offset is missing");
+  }
+
   // check if form exists
   const { data: form_reference } = await client
     .from("form")
@@ -540,6 +545,7 @@ async function submit({
           FormValue.parse(value_or_reference, {
             type: type,
             enums: options,
+            utc_offset: meta.utc_offset,
           }).value,
         ];
       });
@@ -609,6 +615,7 @@ async function submit({
       // the field's value can be a input value or a reference to form_field_option
       const value_or_reference = formdata.get(name);
       const { value, enum_id } = FormValue.parse(value_or_reference, {
+        utc_offset: meta.utc_offset,
         type: type,
         enums: options,
       });
@@ -721,6 +728,7 @@ async function submit({
         const { value } = FormValue.parse(
           (formdata as FormData).get(field.name),
           {
+            utc_offset: meta.utc_offset,
             enums: field.options,
             type: field.type,
           }
@@ -804,6 +812,7 @@ async function submit({
       const { value } = FormValue.parse(
         (formdata as FormData).get(field.name),
         {
+          utc_offset: meta.utc_offset,
           enums: field.options,
           type: field.type,
         }
