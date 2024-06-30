@@ -33,7 +33,7 @@ import { qval } from "@/utils/qs";
 import { notFound } from "next/navigation";
 import { FormSubmitErrorCode } from "@/types/private/api";
 import { SessionMeta, meta } from "./meta";
-import { sbconn_insert } from "./sbconn";
+import { sbconn_insert, sbconn_update } from "./sbconn";
 import { FieldSupports } from "@/k/supported_field_types";
 import { UniqueFileNameGenerator } from "@/lib/forms/storage";
 import {
@@ -50,6 +50,7 @@ import { createXSupabaseClient } from "@/services/x-supabase";
 import { FormValue } from "@/services/form";
 import { XSupabase } from "@/services/x-supabase";
 import { TemplateVariables } from "@/lib/templating";
+import { RichTextStagedFileUtils } from "@/services/form/utils";
 
 const HOST = process.env.HOST || "http://localhost:3000";
 
@@ -79,7 +80,7 @@ export async function GET(
   // #endregion
   const data = req.nextUrl.searchParams;
   return submit({
-    data: data,
+    formdata: data,
     form_id,
     meta: meta(req, data),
   });
@@ -106,16 +107,16 @@ export async function POST(
   }
   // #endregion
 
-  return submit({ data, form_id, meta: meta(req, data) });
+  return submit({ formdata: data, form_id, meta: meta(req, data) });
 }
 
 async function submit({
-  data,
+  formdata,
   form_id,
   meta,
 }: {
   form_id: string;
-  data: FormData | URLSearchParams | Map<string, string>;
+  formdata: FormData | URLSearchParams | Map<string, string>;
   meta: SessionMeta;
 }) {
   // console.log("form_id", form_id);
@@ -162,11 +163,11 @@ async function submit({
     options,
   } = form_reference;
 
-  const entries = data.entries();
+  const entries = formdata.entries();
 
-  const __keys_all = Array.from(data.keys());
+  const __keys_all = Array.from(formdata.keys());
 
-  const system_keys = parseGFKeys(data);
+  const system_keys = parseGFKeys(formdata);
 
   const nonsystem_keys = __keys_all.filter(
     (key) => !Object.keys(system_keys).includes(key)
@@ -182,10 +183,10 @@ async function submit({
   // customer handling
 
   const _gf_customer_uuid: string | null = qval(
-    data.get(SYSTEM_GF_CUSTOMER_UUID_KEY) as string
+    formdata.get(SYSTEM_GF_CUSTOMER_UUID_KEY) as string
   );
 
-  const _fp_fingerprintjs_visitorid: string | null = data.get(
+  const _fp_fingerprintjs_visitorid: string | null = formdata.get(
     SYSTEM_GF_FINGERPRINT_VISITORID_KEY
   ) as string;
 
@@ -268,7 +269,7 @@ async function submit({
 
   const missing_required_hidden_fields = required_hidden_fields.filter((f) => {
     // TODO: to be more clear, rather than checking if the value is present, check if the value matches the required format, e.g. uuidv4 for __gf_customer_uuid
-    return !(__keys_all.includes(f.name) && !!data.get(f.name));
+    return !(__keys_all.includes(f.name) && !!formdata.get(f.name));
   });
 
   if (missing_required_hidden_fields.length > 0) {
@@ -309,12 +310,12 @@ async function submit({
 
     // TODO: now we only support one inventory option selection per form
     const data_present_option_fields = fields.filter((f) => {
-      return f.options.length > 0 && !!data.get(f.name);
+      return f.options.length > 0 && !!formdata.get(f.name);
     });
 
     // get the option id that is both present in inventory and form data
     const possible_selection_option_ids = data_present_option_fields
-      .map((f) => String(data.get(f!.name)))
+      .map((f) => String(formdata.get(f!.name)))
       .filter((id) => inventory_keys.includes(id));
 
     assert(
@@ -387,37 +388,6 @@ async function submit({
   }
 
   // endregion
-
-  // ==================================================
-  // region user supabase connection
-
-  let RECORD: any = undefined;
-  if (supabase_connection && supabase_connection.main_supabase_table_id) {
-    try {
-      const insertion = await sbconn_insert({
-        connection: supabase_connection,
-        formdata: data,
-        enums: options,
-      });
-
-      console.log("sbconn_insertion", insertion);
-
-      const { data: sbconn_inserted, error: sbconn_insertion_error } =
-        insertion;
-
-      if (sbconn_insertion_error) {
-        console.error("submit/err/sbconn", sbconn_insertion_error);
-        // TODO: use 400 - developer error with error info
-        return error(500, { form_id }, meta);
-      }
-
-      RECORD = sbconn_inserted;
-    } catch (e) {
-      console.error("submit/err/sbconn", e);
-      // TODO: enhance error message
-      return error(500, { form_id }, meta);
-    }
-  }
 
   // create new form response
   const { data: response_reference_obj, error: response_insertion_error } =
@@ -552,10 +522,82 @@ async function submit({
     v_form_fields!.push(...new_fields?.map((f) => ({ ...f, options: [] }))!);
   }
 
+  // ==================================================
+  // region user supabase connection
+
+  let RECORD: Record<string, any> | undefined = undefined;
+  let X_SUPABASE_MAIN_TABLE_PKS: string[] = [];
+  if (supabase_connection && supabase_connection.main_supabase_table_id) {
+    try {
+      // parsed values
+      const entries = v_form_fields.map((field) => {
+        const { type, name, options } = field;
+        const value_or_reference = formdata.get(name);
+        return [
+          // name: column name
+          field.name,
+          // value: parsed value
+          FormValue.parse(value_or_reference, {
+            type: type,
+            enums: options,
+          }).value,
+        ];
+      });
+      const data: Record<string, any> = Object.fromEntries(entries);
+
+      const { pks, insertion } = await sbconn_insert({
+        data: data,
+        connection: supabase_connection,
+      });
+
+      const { data: sbconn_inserted, error: sbconn_insertion_error } =
+        await insertion;
+
+      console.log("sbconn_insertion", {
+        sbconn_inserted,
+        sbconn_insertion_error,
+      });
+
+      if (sbconn_insertion_error) {
+        console.error("submit/err/sbconn", sbconn_insertion_error);
+        // TODO: use 400 - developer error with error info
+        return error(500, { form_id }, meta);
+      }
+
+      X_SUPABASE_MAIN_TABLE_PKS = pks;
+      RECORD = sbconn_inserted;
+    } catch (e) {
+      console.error("submit/err/sbconn", e);
+      // TODO: enhance error message
+      return error(500, { form_id }, meta);
+    }
+  }
+
+  // endregion
+
   const field_file_uploads: Record<
     string,
     Promise<SupabaseStorageUploadReturnType[]>
   > = {};
+
+  // @ts-ignore // TODO: provide all context - currently this is only used for x-supabase storage
+  const pathrendercontext: TemplateVariables.ConnectedDatasourcePostgresTransactionCompleteContext =
+    {
+      TABLE: { pks: X_SUPABASE_MAIN_TABLE_PKS },
+      NEW: RECORD!,
+      RECORD: RECORD!,
+    };
+
+  const field_file_processor = new ResponseFieldFilesProcessor(
+    {
+      session_id: meta.session || undefined,
+      response_id: response_reference_obj.id,
+    },
+    {
+      supabase: supabase_connection,
+    },
+    pathrendercontext
+  );
 
   // save each field value
   const { error: v_fields_error } = await client.from("response_field").insert(
@@ -563,35 +605,47 @@ async function submit({
       const { type, name, options } = field;
 
       // the field's value can be a input value or a reference to form_field_option
-      const value_or_reference = data.get(name);
+      const value_or_reference = formdata.get(name);
       const { value, enum_id } = FormValue.parse(value_or_reference, {
         type: type,
         enums: options,
       });
 
       // handle file uploads
-      if (FieldSupports.file_alias(type)) {
-        const files = (data as FormData).getAll(name);
+      if (FieldSupports.file_upload(type)) {
+        if (FieldSupports.file_alias(type)) {
+          const files = (formdata as FormData).getAll(name);
 
-        console.log("submit/file", files);
+          console.log("submit/files", files);
 
-        field_file_uploads[field.id] = process_response_field_files(
-          files,
-          {
-            session_id: meta.session || undefined,
-            response_id: response_reference_obj!.id,
-            field_id: field.id,
-          },
-          {
-            storage: field.storage as FormFieldStorageSchema | null,
-            supabase: supabase_connection,
-            // @ts-ignore // TODO: provide all context - currently this is only used for x-supabase storage
-            context: {
-              NEW: RECORD,
-              RECORD: RECORD,
-            },
-          }
-        );
+          field_file_uploads[field.id] =
+            field_file_processor.process_field_files(
+              {
+                id: field.id,
+                storage: field.storage as FormFieldStorageSchema | null,
+              },
+              files
+            );
+        } else if (FieldSupports.richtext(type)) {
+          // 1. parse the tmp files
+          const { staged_file_paths } =
+            RichTextStagedFileUtils.parseDocument(value);
+
+          console.log("submit/richtext/files", staged_file_paths);
+
+          // 2. upload the files
+          field_file_uploads[field.id] =
+            field_file_processor.process_field_files(
+              {
+                id: field.id,
+                storage: field.storage as FormFieldStorageSchema | null,
+              },
+              staged_file_paths
+            );
+
+          // 3. replace the tmp file path with the uploaded file path
+          // => this will happen after the file upload is completed - FileProcessCompleteContext
+        }
       }
 
       return {
@@ -599,7 +653,6 @@ async function submit({
         response_id: response_reference_obj!.id,
         form_field_id: field.id,
         form_id: form_id,
-        // TODO: save value with schema type accordinglly (number, boolean, etc.)
         value: value,
         form_field_option_id: enum_id,
       };
@@ -635,32 +688,144 @@ async function submit({
     field_file_upload_results[field_id] = await results;
   }
 
-  const file_upserts = Object.keys(field_file_uploads).map((field_id, i) => {
+  // ==================================================
+  // post-upload processing - x-supabase
+  // ==================================================
+
+  const x_supabase_row_with_resolved_file_upate_data = Object.keys(
+    field_file_uploads
+  ).reduce(
+    (acc, field_id) => {
+      const field = v_form_fields!.find((f) => f.id === field_id);
+
+      if (!field) {
+        throw new Error(
+          "field not found - unknown fields are not allowed with x-supabase connection"
+        );
+      }
+
+      const success_results = field_file_upload_results[field_id].filter(
+        (res) => !!res.data
+      );
+
+      const uploadedfileval = success_results.map((res) => {
+        return filename(res.data!.path);
+      }) as string[];
+
+      // TODO: this not yet supports object_path columns
+      // this is partially implemented only for 'richtext' cms implementation
+      if (FieldSupports.richtext(field.type)) {
+        // const value = RECORD![field.name]; // -> this can cause side effects with user's db trugger. (but also makes sence to use the updated one?)
+        const { value } = FormValue.parse(
+          (formdata as FormData).get(field.name),
+          {
+            enums: field.options,
+            type: field.type,
+          }
+        );
+
+        const document = RichTextStagedFileUtils.renderDocument(value, {
+          files: field_file_processor.file_commits[field_id],
+        });
+
+        return {
+          ...acc,
+          [field.name]: document,
+        };
+      }
+
+      return acc;
+    },
+    {} as Record<string, any>
+  );
+
+  if (
+    supabase_connection &&
+    // only update if changes are present
+    Object.keys(x_supabase_row_with_resolved_file_upate_data).length > 0
+  ) {
+    const xsupabasepostfileuploadupdate = await sbconn_update(
+      {
+        OLD: RECORD!,
+        NEW: x_supabase_row_with_resolved_file_upate_data,
+        pks: X_SUPABASE_MAIN_TABLE_PKS,
+      },
+      supabase_connection
+    );
+
+    if (xsupabasepostfileuploadupdate.error) {
+      console.error(
+        "submit/err/post-upload/sbconn",
+        xsupabasepostfileuploadupdate.error
+      );
+    }
+
+    // do not throw since the response / row is already created
+  }
+
+  //
+
+  // ==================================================
+  // post-upload processing - response_field & response
+  // ==================================================
+
+  const response_field_with_resolved_file_upserts = Object.keys(
+    field_file_uploads
+  ).map((field_id, i) => {
+    const field = v_form_fields!.find((f) => f.id === field_id);
+    if (!field) {
+      throw new Error(
+        "field not found - this is possibly caused by dynamic field, where we do not allow file uploads in dynamic fields."
+      );
+    }
+
     const success_results = field_file_upload_results[field_id].filter(
       (res) => !!res.data
     );
 
     const uploadedfileval = success_results.map((res) => {
-      const filename = res.data!.path.split("/").pop();
-      return filename;
+      return filename(res.data!.path);
     }) as string[];
 
-    const upsertion: InsertDto<"response_field"> = {
+    const upsertion_base: Omit<InsertDto<"response_field">, "value"> = {
       form_field_id: field_id,
       response_id: response_reference_obj!.id,
       form_id: form_id,
-      value: uploadedfileval,
       storage_object_paths: success_results.map(
         (res) => res.data!.path
       ) as string[],
     };
-    return upsertion;
+
+    if (FieldSupports.richtext(field.type)) {
+      const { value } = FormValue.parse(
+        (formdata as FormData).get(field.name),
+        {
+          enums: field.options,
+          type: field.type,
+        }
+      );
+
+      const document = RichTextStagedFileUtils.renderDocument(value, {
+        files: field_file_processor.file_commits[field_id],
+      });
+
+      return {
+        ...upsertion_base,
+        value: document as {},
+      } satisfies InsertDto<"response_field">;
+    }
+
+    // return upsertion;
+    return {
+      ...upsertion_base,
+      value: uploadedfileval,
+    } satisfies InsertDto<"response_field">;
   });
 
-  if (file_upserts.length > 0) {
+  if (response_field_with_resolved_file_upserts.length > 0) {
     const { error: file_upload_upsertion_error } = await client
       .from("response_field")
-      .upsert(file_upserts, {
+      .upsert(response_field_with_resolved_file_upserts, {
         onConflict: "response_id, form_field_id",
       });
     if (file_upload_upsertion_error) {
@@ -826,155 +991,240 @@ type SupabaseStorageUploadReturnType =
 
 // region file upload
 
-/**
- * Handles the uploading of response files, ensuring that each file has a unique name within its path.
- *
- * @param pathparams - An object containing the response ID and field ID.
- * @param files - An array of FormDataEntryValue containing the files to be uploaded.
- * @returns A promise that resolves when all file uploads are complete.
- *
- * TODO: this should return a error info
- */
-async function process_response_field_files(
-  files: FormDataEntryValue[],
-  pathparams: {
-    session_id?: string;
-    response_id: string;
-    field_id: string;
-  },
-  connections?: {
-    supabase: ConnectionSupabaseJoint | null;
-    storage: FormFieldStorageSchema | null;
-    context: TemplateVariables.ConnectedDatasourcePostgresTransactionCompleteContext;
-  }
-) {
-  const uploads: Promise<SupabaseStorageUploadReturnType>[] = [];
-  const { response_id, field_id, session_id } = pathparams;
-  const basepath = `response/${response_id}/${field_id}/`;
+class ResponseFieldFilesProcessor {
+  constructor(
+    readonly response_path_params: {
+      session_id?: string;
+      response_id: string;
+    },
+    readonly connections: {
+      supabase: ConnectionSupabaseJoint | null;
+    },
+    readonly context: TemplateVariables.ConnectedDatasourcePostgresTransactionCompleteContext
+  ) {}
 
-  const uniqueFileNameGenerator = new UniqueFileNameGenerator();
-
-  for (const file of files) {
-    if (file instanceof File) {
-      if (
-        file.size == 0 ||
-        file.size > GRIDA_FORMS_RESPONSE_BUCKET_UPLOAD_LIMIT
-      ) {
-        // silently ignore the file
-        console.warn(
-          `File '${file.name}' (${file.size} bytes) size is 0 or exceeds the upload limit. (limit: ${GRIDA_FORMS_RESPONSE_BUCKET_UPLOAD_LIMIT} bytes)`
-        );
-      } else {
-        const uniqueFileName = uniqueFileNameGenerator.name(file.name);
-        const path = basepath + uniqueFileName;
-
-        const upload = client.storage
-          .from(GRIDA_FORMS_RESPONSE_BUCKET)
-          .upload(path, file);
-        uploads.push(upload);
+  // this can be reused since we only support one connection per form.
+  private _m_client: XSupabase.Client | null = null;
+  private async createXSupabaseClient() {
+    if (this._m_client) return this._m_client;
+    assert(this.connections.supabase, "supabase_connection not found");
+    this._m_client = await createXSupabaseClient(
+      this.connections.supabase.supabase_project_id,
+      {
+        service_role: true,
       }
-    } else {
-      // if not file, it means it is already uploaded on client side with session, it needs to be moved to response folder.
-      // from : {bucket}/tmp/{session_id}/{field_id}/{i}
-      // to: {bucket}/response/{response_id}/{field_id}/{i}
+    );
 
-      const pl = String(file);
+    return this._m_client;
+  }
 
-      if (!pl) continue; // empty string
+  /**
+   * { field_id: { from: to } }
+   */
+  private _m_file_commits: Record<
+    string,
+    Record<
+      string,
+      {
+        path: string;
+        publicUrl: string;
+      }
+    >
+  > = {};
 
-      // when file input is uploaded and includes the path, the input will have a value of path[], which on formdata, it will be a comma separated string
-      for (const tmppath of pl.split(",")) {
-        try {
-          const _p = parse_tmp_storage_object_path(tmppath);
+  /**
+   * stores the successful file commits - be sure to call this after the process_field_files is fully awaited
+   * RISK: developer should be aware to call this within the right lifecycle
+   * This should be carefully used only for staged strategy, e.g. 'richtext' field
+   * TODO: room for improvements
+   */
+  get file_commits() {
+    return this._m_file_commits;
+  }
 
-          assert(
-            _p.session_id === session_id,
-            `session_id mismatch. expected: ${session_id}, got: ${_p.session_id}`
+  private async commitStagedFile(
+    storage: SessionStagedFileStorage,
+    commit: {
+      from: string;
+      to: string;
+      field_id: string;
+    }
+  ) {
+    const { from, to, field_id } = commit;
+    const result = await storage.commitStagedFile(from, to);
+
+    if (result.error) {
+      console.error("submit/err/tmp-mv", from, error);
+      return result;
+    }
+
+    if (!this._m_file_commits[field_id]) {
+      this._m_file_commits[field_id] = {};
+    }
+    this._m_file_commits[field_id][from] = {
+      path: to,
+      publicUrl: storage.getPublicUrl(to).data.publicUrl,
+    };
+
+    return result;
+  }
+
+  /**
+   * Handles the uploading of response files, ensuring that each file has a unique name within its path.
+   *
+   * @param pathparams - An object containing the response ID and field ID.
+   * @param files - An array of FormDataEntryValue containing the files to be uploaded.
+   * @returns A promise that resolves when all file uploads are complete.
+   *
+   * TODO: this should return a error info
+   * TODO: need to handle the case where file size exceeds the limit
+   * TODO: theres a room for m=optimization in performance (speed)
+   * TODO: this needs a naming context window since the session files paths are ensured to be unique, but the mv commit is based on the file name, wich can be duplicated (when user uploads multiple files with the same filename). refer: *(1)
+   *
+   */
+  async process_field_files(
+    field: {
+      id: string;
+      storage: FormFieldStorageSchema | null;
+    },
+    files: FormDataEntryValue[]
+  ) {
+    const uploads: Promise<SupabaseStorageUploadReturnType>[] = [];
+    const { response_id, session_id } = this.response_path_params;
+    const { id: field_id, storage } = field;
+
+    const basepath = `response/${response_id}/${field_id}/`;
+
+    const uniqueFileNameGenerator = new UniqueFileNameGenerator();
+
+    for (const file of files) {
+      if (file instanceof File) {
+        if (
+          file.size == 0 ||
+          file.size > GRIDA_FORMS_RESPONSE_BUCKET_UPLOAD_LIMIT
+        ) {
+          // silently ignore the file
+          console.warn(
+            `File '${file.name}' (${file.size} bytes) size is 0 or exceeds the upload limit. (limit: ${GRIDA_FORMS_RESPONSE_BUCKET_UPLOAD_LIMIT} bytes)`
           );
+        } else {
+          const uniqueFileName = uniqueFileNameGenerator.name(file.name);
+          const path = basepath + uniqueFileName;
 
-          if (connections?.storage) {
-            try {
-              const { type, mode, bucket, path } = connections.storage;
+          const upload = client.storage
+            .from(GRIDA_FORMS_RESPONSE_BUCKET)
+            .upload(path, file);
+          uploads.push(upload);
+        }
+      } else {
+        // if not file, it means it is already uploaded on client side with session, it needs to be moved to response folder.
+        // from : {bucket}/tmp/{session_id}/{field_id}/{i}
+        // to: {bucket}/response/{response_id}/{field_id}/{i}
 
-              switch (type) {
-                case "x-supabase": {
-                  assert(mode === "staged", "mode must be staged");
-                  assert(connections.supabase, "supabase_connection not found");
-                  const client = await createXSupabaseClient(
-                    connections.supabase.supabase_project_id,
-                    {
-                      service_role: true,
+        const pl = String(file);
+
+        if (!pl) continue; // empty string
+
+        // when file input is uploaded and includes the path, the input will have a value of path[], which on formdata, it will be a comma separated string
+        for (const tmppath of pl.split(",")) {
+          try {
+            const _p = parse_tmp_storage_object_path(tmppath);
+
+            assert(
+              _p.session_id === session_id,
+              `session_id mismatch. expected: ${session_id}, got: ${_p.session_id}`
+            );
+
+            if (storage) {
+              try {
+                const { type, mode, bucket, path } = storage;
+
+                switch (type) {
+                  case "x-supabase": {
+                    assert(mode === "staged", "mode must be staged");
+                    assert(
+                      this.connections.supabase,
+                      "supabase_connection not found"
+                    );
+                    const client = await this.createXSupabaseClient();
+
+                    const renderedpath = XSupabase.Storage.renderpath(
+                      path,
+                      this.context
+                    );
+                    // const renderedpath = render(path, connections.context);
+                    const storage = new SessionStagedFileStorage(
+                      client,
+                      bucket
+                    );
+
+                    const { error } = await this.commitStagedFile(storage, {
+                      from: tmppath,
+                      to: renderedpath,
+                      field_id,
+                    });
+
+                    if (error) {
+                      // skip the file
+                      continue;
                     }
-                  );
 
-                  const renderedpath = XSupabase.Storage.renderpath(
-                    path,
-                    connections.context
-                  );
-                  // const renderedpath = render(path, connections.context);
-                  const storage = new SessionStagedFileStorage(client, bucket);
-                  const { error } = await storage.resolveStagedFile(
-                    tmppath,
-                    renderedpath
-                  );
-                  if (error) {
-                    console.error("submit/err/tmp-mv", tmppath, error);
-                    continue;
+                    uploads.push(
+                      Promise.resolve({
+                        data: { path: renderedpath },
+                        error: null,
+                      })
+                    );
+                    break;
                   }
-                  uploads.push(
-                    Promise.resolve({
-                      data: { path: renderedpath },
-                      error: null,
-                    })
-                  );
-                  break;
+                  case "grida":
+                  case "x-s3":
+                  default:
+                    throw new Error("storage type not supported");
                 }
-                case "grida":
-                case "x-s3":
-                default:
-                  throw new Error("storage type not supported");
+              } catch (e) {
+                console.error("submit/err/storageconn", e);
+                continue;
               }
-            } catch (e) {
-              console.error("submit/err/storageconn", e);
-              continue;
+            } else {
+              // default grida forms behavior
+              // refer: *(1) (see comment above)
+              const targetpath = basepath + _p.name;
+              const storage = new SessionStagedFileStorage(
+                client,
+                GRIDA_FORMS_RESPONSE_BUCKET
+              );
+
+              const { error } = await this.commitStagedFile(storage, {
+                from: tmppath,
+                to: targetpath,
+                field_id,
+              });
+
+              if (error) {
+                // skip the file
+                continue;
+              }
+
+              // push the result (mocked)
+              uploads.push(
+                Promise.resolve({
+                  data: { path: targetpath },
+                  error: null,
+                })
+              );
             }
-          } else {
-            // default grida forms behavior
-            const targetpath = basepath + _p.name;
-            const storage = new SessionStagedFileStorage(
-              client,
-              GRIDA_FORMS_RESPONSE_BUCKET
-            );
-
-            const { error } = await storage.resolveStagedFile(
-              tmppath,
-              targetpath
-            );
-
-            if (error) {
-              console.error("submit/err/tmp-mv", tmppath, error);
-              continue;
-            }
-
-            // push the result (mocked)
-            uploads.push(
-              Promise.resolve({
-                data: { path: targetpath },
-                error: null,
-              })
-            );
+          } catch (e) {
+            console.log("submit/err/unknown-file", file);
+            console.error("submit/err/tmp-path-parse", e);
+            continue;
           }
-        } catch (e) {
-          console.log("submit/err/unknown-file", file);
-          console.error("submit/err/tmp-path-parse", e);
-          continue;
         }
       }
     }
-  }
 
-  // TODO: need to handle the case where file size exceeds the limit
-  return Promise.all(uploads);
+    return Promise.all(uploads);
+  }
 }
 
 // endregion
@@ -1147,4 +1397,8 @@ async function fetchipinfo(ip?: string | null) {
     console.error(e);
     return null;
   }
+}
+
+function filename(path: string) {
+  return path.split("/").pop();
 }

@@ -83,6 +83,9 @@ export namespace TemplateVariables {
   export interface ConnectedDatasourcePostgresTransactionCompleteContext<
     R extends Record<string, any> = Record<string, any>,
   > extends FormResponseContext {
+    TABLE: {
+      pks: string[];
+    };
     NEW: R;
     RECORD: R;
   }

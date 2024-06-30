@@ -40,7 +40,7 @@ import type {
   Option,
 } from "@/types";
 import { Features } from "@/lib/features/scheduling";
-import { requesturl } from "@/services/form/session-storage";
+import { requesterurl, resolverurl } from "@/services/form/session-storage";
 import { type GFKeys, parseGFKeys } from "@/lib/forms/gfkeys";
 import { RawdataProcessing } from "@/lib/forms/rawdata";
 
@@ -314,9 +314,16 @@ export async function GET(
     undefined,
     {
       option_renderer: mkoption,
-      upload_resolver: (field_id: string) => ({
+      file_uploader: (field_id: string) => ({
         type: "requesturl",
-        request_url: requesturl({
+        request_url: requesterurl({
+          session_id: session.id,
+          field_id: field_id,
+        }),
+      }),
+      file_resolver: (field_id: string) => ({
+        type: "requesturl",
+        resolve_url: resolverurl({
           session_id: session.id,
           field_id: field_id,
         }),

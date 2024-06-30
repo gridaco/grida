@@ -25,11 +25,11 @@ export const supported_field_types: FormInputType[] = [
   "hidden",
   "range",
   "search",
+  "richtext",
 ];
 
 if (process.env.NODE_ENV === "development") {
   const dev: FormInputType[] = [
-    "richtext",
     //
     "checkboxes",
     "signature",
@@ -213,8 +213,13 @@ export namespace FieldSupports {
     return options(type);
   }
 
-  export function file_alias(type: FormInputType) {
+  export function file_alias(type?: FormInputType) {
+    if (!type) return false;
     return html5_file_alias_field_types.includes(type);
+  }
+
+  export function file_upload(type: FormInputType) {
+    return file_alias(type) || richtext(type);
   }
 
   export function fk(type: FormInputType) {

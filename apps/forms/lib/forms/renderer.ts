@@ -78,18 +78,34 @@ export type FileUploadStrategyRequesUploadtUrl = {
   request_url: string;
 };
 
-export type FieldUploadStrategy =
+export type FileUploadStrategy =
   | FileUploadStrategyMultipart
   | FileUploadStrategySignedUrl
   | FileUploadStrategyRequesUploadtUrl;
 
+export type FileResolveStrategyRequestUrl = {
+  type: "requesturl";
+  resolve_url: string;
+};
+
+export type FileResolveStrategy =
+  | FileResolveStrategyRequestUrl
+  | {
+      type: "none";
+    };
+
 export interface ClientFileUploadFieldRenderBlock
-  extends ClientFieldRenderBlock<"file" | "image"> {
-  field: ClientFieldRenderBlock<"file" | "image">["field"] & {
+  extends ClientFieldRenderBlock<
+    "file" | "image" | "audio" | "video" | "richtext"
+  > {
+  field: ClientFieldRenderBlock<
+    "file" | "image" | "audio" | "video" | "richtext"
+  >["field"] & {
     accept?: string;
     multiple?: boolean;
   } & {
-    upload: FieldUploadStrategy;
+    upload: FileUploadStrategy;
+    resolve?: FileResolveStrategy;
   };
 }
 
@@ -166,7 +182,8 @@ export class FormRenderTree {
     private readonly config?: RenderTreeConfig,
     private readonly plugins?: {
       option_renderer: (option: Option) => Option;
-      upload_resolver?: (field_id: string) => FieldUploadStrategy;
+      file_uploader?: (field_id: string) => FileUploadStrategy;
+      file_resolver?: (field_id: string) => FileResolveStrategy;
     }
   ) {
     this._m_render_blocks = _m_blocks
@@ -369,12 +386,25 @@ export class FormRenderTree {
             : (option) => option
         );
 
-    const mkupload = (): FieldUploadStrategy | undefined => {
-      if (FieldSupports.file_alias(field.type)) {
-        if (this.plugins?.upload_resolver) {
-          return this.plugins.upload_resolver(field.id);
+    const mkfileupload = (): FileUploadStrategy | undefined => {
+      if (FieldSupports.file_upload(field.type)) {
+        if (this.plugins?.file_uploader) {
+          return this.plugins.file_uploader(field.id);
         } else {
           return { type: "multipart" };
+        }
+        //
+      } else {
+        return undefined;
+      }
+    };
+
+    const mkfileresolve = (): FileResolveStrategy | undefined => {
+      if (FieldSupports.file_upload(field.type)) {
+        if (this.plugins?.file_resolver) {
+          return this.plugins.file_resolver(field.id);
+        } else {
+          return { type: "none" };
         }
         //
       } else {
@@ -397,10 +427,11 @@ export class FormRenderTree {
       max: field.max ?? undefined,
     };
 
-    if (FieldSupports.file_alias(field.type)) {
+    if (FieldSupports.file_upload(field.type)) {
       return {
         ...base,
-        upload: mkupload(),
+        upload: mkfileupload(),
+        resolve: mkfileresolve(),
       } as ClientFileUploadFieldRenderBlock["field"];
     } else {
       return base as ClientFieldRenderBlock["field"];

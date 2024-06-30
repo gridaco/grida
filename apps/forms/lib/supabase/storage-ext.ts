@@ -97,10 +97,14 @@ export namespace SupabaseStorageExtensions {
       if (response.ok) {
         const uploaded = await response.json();
 
+        // the key returns full path starting from bucket name. (but without host)
+        // e.g. "grida-forms-response/tmp/46451287-7f6d-464d-9f6c-745884a79de8/e5fd589a-6b27-45c9-9224-31a1d31e8a2a/1719589606743/image.png"
+        const { Key } = uploaded;
+
         return {
           data: {
-            path: uploaded.Key.split("/").slice(1).join("/"),
-            fullPath: uploaded.Key,
+            path: Key.split("/").slice(1).join("/"),
+            fullPath: Key,
           },
           error: null,
         };

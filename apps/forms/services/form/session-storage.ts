@@ -13,8 +13,11 @@ interface SessionStoragePath {
   field_id: string;
 }
 
-export const requesturl = ({ session_id, field_id }: SessionStoragePath) =>
-  `/v1/session/${session_id}/field/${field_id}/upload/signed-url`;
+export const requesterurl = ({ session_id, field_id }: SessionStoragePath) =>
+  `/v1/session/${session_id}/field/${field_id}/file/upload/signed-url`;
+
+export const resolverurl = ({ session_id, field_id }: SessionStoragePath) =>
+  `/v1/session/${session_id}/field/${field_id}/file/preview/public-url`;
 
 /**
  * build the path for the temporary storage object
@@ -94,7 +97,7 @@ export class FileStorage {
     //
   }
 
-  sign(path: string, options?: { upsert: boolean }) {
+  createSignedUploadUrl(path: string, options?: { upsert: boolean }) {
     return (
       this.client.storage
         .from(this.bucket)
@@ -102,10 +105,14 @@ export class FileStorage {
         .createSignedUploadUrl(path, options)
     );
   }
+
+  getPublicUrl(path: string) {
+    return this.client.storage.from(this.bucket).getPublicUrl(path);
+  }
 }
 
 export class SessionStagedFileStorage extends FileStorage {
-  async sessionStagedUploadPresingedUrl(
+  async createStagedSignedUploadUrl(
     path: SessionStoragePath,
     name: string,
     unique?: boolean
@@ -115,7 +122,7 @@ export class SessionStagedFileStorage extends FileStorage {
       rejectComma: true,
     });
 
-    return this.sign(
+    return this.createSignedUploadUrl(
       tmp_storage_object_path({
         ...path,
         unique: unique ? Date.now().toString() : undefined,
@@ -125,7 +132,7 @@ export class SessionStagedFileStorage extends FileStorage {
     //
   }
 
-  async resolveStagedFile(tmp: string, target: string) {
+  async commitStagedFile(tmp: string, target: string) {
     return this.client.storage.from(this.bucket).move(tmp, target);
   }
 }
@@ -161,7 +168,7 @@ export async function prepare_response_file_upload_storage_presigned_url(
   const tasks = [];
 
   for (let i = 0; i < n; i++) {
-    const task = storage.sign(
+    const task = storage.createSignedUploadUrl(
       tmp_storage_object_path({
         name: i.toString(),
         field_id: field_id,
