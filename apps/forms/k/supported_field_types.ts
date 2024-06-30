@@ -213,7 +213,8 @@ export namespace FieldSupports {
     return options(type);
   }
 
-  export function file_alias(type: FormInputType) {
+  export function file_alias(type?: FormInputType) {
+    if (!type) return false;
     return html5_file_alias_field_types.includes(type);
   }
 

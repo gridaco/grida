@@ -59,6 +59,7 @@ import {
 } from "@/components/ui/select";
 import { FileEditCell } from "./file-cell";
 import { RichTextEditCell } from "./richtext-cell";
+import { FieldSupports } from "@/k/supported_field_types";
 
 function rowKeyGetter(row: GFResponseRow) {
   return row.__gf_id;
@@ -437,7 +438,10 @@ function FieldCell({ column, row }: RenderCellProps<GFResponseRow>) {
     type as FormInputType
   );
 
-  if (unwrapped === null || unwrapped === "" || unwrapped === undefined) {
+  if (
+    !FieldSupports.file_alias(type) &&
+    (unwrapped === null || unwrapped === "" || unwrapped === undefined)
+  ) {
     return (
       <span className="text-muted-foreground/50">
         <Empty value={unwrapped} />
@@ -457,7 +461,7 @@ function FieldCell({ column, row }: RenderCellProps<GFResponseRow>) {
             className="aspect-square min-w-4 rounded bg-neutral-500 border border-ring"
             style={{ backgroundColor: unwrapped as string }}
           />
-          <span>{unwrapped.toString()}</span>
+          <span>{unwrapped?.toString()}</span>
         </div>
       );
     }
@@ -497,7 +501,23 @@ function FieldCell({ column, row }: RenderCellProps<GFResponseRow>) {
       );
     }
     case "richtext": {
-      return <div>{JSON.stringify(unwrapped)}</div>;
+      if (unwrapped === null || unwrapped === "" || unwrapped === undefined) {
+        return (
+          <span className="text-muted-foreground/50">
+            <Empty value={unwrapped} />
+          </span>
+        );
+      }
+
+      return (
+        <div>
+          <FileTypeIcon
+            type="richtext"
+            className="inline w-4 h-4 align-middle me-2"
+          />{" "}
+          DOCUMENT
+        </div>
+      );
     }
     default:
       return (
@@ -669,7 +689,14 @@ function FieldEditCell(props: RenderEditCellProps<GFResponseRow>) {
         );
       }
       case "richtext": {
-        return <RichTextEditCell defaultValue={unwrapped} />;
+        return (
+          <RichTextEditCell
+            defaultValue={unwrapped}
+            onValueCommit={(v) => {
+              commit({ value: v });
+            }}
+          />
+        );
       }
       case "switch":
       case "checkbox": {

@@ -14,7 +14,7 @@ import {
   FileIcon,
   MagnifyingGlassIcon,
   ClockIcon,
-  Component1Icon,
+  FileTextIcon,
 } from "@radix-ui/react-icons";
 import {
   CreditCardIcon,
@@ -43,7 +43,7 @@ export function FormFieldTypeIcon({
     case "text":
       return <TextIcon {...props} />;
     case "richtext":
-      return <Component1Icon {...props} />;
+      return <FileTypeIcon type={type} {...props} />;
     case "tel":
       return <PhoneIcon {...props} />;
     case "email":
@@ -103,7 +103,7 @@ export function FileTypeIcon({
   type,
   className,
 }: {
-  type: "file" | "image" | "audio" | "video";
+  type: "file" | "image" | "audio" | "video" | "richtext";
   className?: string;
 }) {
   const props = {
@@ -117,6 +117,8 @@ export function FileTypeIcon({
       return <FileAudioIcon {...props} />;
     case "video":
       return <FileVideoIcon {...props} />;
+    case "richtext":
+      return <FileTextIcon {...props} />;
     case "file":
     default:
       return <FileIcon {...props} />;
