@@ -25,11 +25,11 @@ export const supported_field_types: FormInputType[] = [
   "hidden",
   "range",
   "search",
+  "richtext",
 ];
 
 if (process.env.NODE_ENV === "development") {
   const dev: FormInputType[] = [
-    "richtext",
     //
     "checkboxes",
     "signature",
