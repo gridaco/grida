@@ -18,6 +18,10 @@
       "type": "boolean",
       "default": false
     },
+    "readonly": {
+      "type": "boolean",
+      "default": false
+    },
     "pattern": {
       "type": "string",
       "format": "regex"

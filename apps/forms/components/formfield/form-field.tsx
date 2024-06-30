@@ -65,6 +65,7 @@ interface IInputField {
   placeholder?: string;
   helpText?: string;
   required?: boolean;
+  readonly?: boolean;
   requiredAsterisk?: boolean;
   defaultValue?: string;
   options?: Option[];
@@ -72,7 +73,6 @@ interface IInputField {
   step?: number;
   min?: number;
   max?: number;
-  readonly?: boolean;
   disabled?: boolean;
   autoComplete?: string;
   accept?: string;

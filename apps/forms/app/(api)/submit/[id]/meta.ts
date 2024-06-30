@@ -1,5 +1,6 @@
 import {
   SYSTEM_GF_SESSION_KEY,
+  SYSTEM_GF_TIMEZONE_UTC_OFFSET_KEY,
   SYSTEM_X_GF_GEO_CITY_KEY,
   SYSTEM_X_GF_GEO_COUNTRY_KEY,
   SYSTEM_X_GF_GEO_LATITUDE_KEY,
@@ -17,6 +18,10 @@ export interface SessionMeta {
   accept: "application/json" | "text/html";
   //
   session?: string | null;
+  /**
+   * The offset in minutes from UTC
+   */
+  utc_offset?: number;
   ip: string | null;
   geo?: Geo | null;
   referer: string | null;
@@ -40,8 +45,10 @@ export function meta(
   const system_keys = parseGFKeys(data);
 
   const session = system_keys[SYSTEM_GF_SESSION_KEY];
+  const utc_offset = system_keys[SYSTEM_GF_TIMEZONE_UTC_OFFSET_KEY];
 
   const meta: SessionMeta = {
+    utc_offset: utc_offset,
     session: session,
     accept: haccept(req.headers.get("accept")),
     useragent: req.headers.get("user-agent"),

@@ -25,6 +25,7 @@ import { useFingerprint } from "@/scaffolds/fingerprint";
 import {
   SYSTEM_GF_FINGERPRINT_VISITORID_KEY,
   SYSTEM_GF_SESSION_KEY,
+  SYSTEM_GF_TIMEZONE_UTC_OFFSET_KEY,
 } from "@/k/system";
 import {
   ClientFieldRenderBlock,
@@ -262,6 +263,7 @@ function Body({
           className="p-4 h-full md:h-auto flex-1"
         >
           <div hidden>
+            <BrowserTimezoneOffsetField />
             <FingerprintField />
             {session_id && (
               <input
@@ -460,6 +462,7 @@ function BlockRenderer({
                   type={field.type}
                   is_array={field.is_array}
                   required={field.required}
+                  readonly={field.readonly}
                   requiredAsterisk
                   helpText={field.help_text}
                   options={field.options}
@@ -566,6 +569,17 @@ function BlockRenderer({
 
 function GroupLayout({ children }: React.PropsWithChildren<{}>) {
   return <div className="flex flex-col gap-8">{children}</div>;
+}
+
+function BrowserTimezoneOffsetField() {
+  const offset = useMemo(() => new Date().getTimezoneOffset(), []);
+  return (
+    <input
+      type="hidden"
+      name={SYSTEM_GF_TIMEZONE_UTC_OFFSET_KEY}
+      value={offset}
+    />
+  );
 }
 
 function FingerprintField() {

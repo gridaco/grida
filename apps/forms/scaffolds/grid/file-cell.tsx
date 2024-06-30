@@ -200,7 +200,9 @@ export function FileEditCell({
             <Tooltip>
               <TooltipTrigger className="w-full">
                 <Button
-                  disabled={!canAddNewFile}
+                  // FIXME: allow upload - need service layer
+                  disabled
+                  // disabled={!canAddNewFile}
                   variant="outline"
                   size="sm"
                   className="w-full"

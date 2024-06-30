@@ -8,6 +8,7 @@ export type GFSystemColumnTypes =
 export type GFResponseFieldData = {
   type?: FormInputType;
   value: any;
+  readonly?: boolean;
   multiple?: boolean;
   option_id?: string | null;
   options?: {

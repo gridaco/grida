@@ -239,6 +239,7 @@ export function FieldEditPanel({
   const [placeholder, setPlaceholder] = useState(init?.placeholder || "");
   const [helpText, setHelpText] = useState(init?.help_text || "");
   const [required, setRequired] = useState(init?.required || false);
+  const [readonly, setReadonly] = useState(init?.readonly || false);
   const [pattern, setPattern] = useState<string | undefined>(init?.pattern);
 
   // numeric
@@ -360,6 +361,7 @@ export function FieldEditPanel({
       help_text: helpText,
       type,
       required,
+      readonly,
       pattern: supports_pattern ? pattern : undefined,
       step,
       min,
@@ -439,6 +441,7 @@ export function FieldEditPanel({
                   placeholder={preview_placeholder}
                   helpText={helpText}
                   required={required}
+                  readonly={readonly}
                   requiredAsterisk
                   disabled={preview_disabled}
                   options={supports_options ? options : undefined}
@@ -704,6 +707,33 @@ export function FieldEditPanel({
                   }
                 >
                   <Switch checked={multiple} onCheckedChange={setMultiple} />
+                </PanelPropertyField>
+              )}
+              {FieldSupports.readonly(type) && (
+                <PanelPropertyField
+                  label={"Readonly"}
+                  help={
+                    <>
+                      Because a read-only field cannot have its value changed by
+                      a user interaction,{" "}
+                      <Link
+                        href="https://developer.mozilla.org/en-US/docs/Web/HTML/Attributes/readonly"
+                        target="_blank"
+                      >
+                        required
+                      </Link>{" "}
+                      does not have any effect on inputs with the readonly
+                      attribute also specified.{" "}
+                      <Link
+                        href="https://developer.mozilla.org/en-US/docs/Web/HTML/Attributes/readonly#attribute_interactions"
+                        target="_blank"
+                      >
+                        (MDN)
+                      </Link>
+                    </>
+                  }
+                >
+                  <Switch checked={readonly} onCheckedChange={setReadonly} />
                 </PanelPropertyField>
               )}
               {!FieldSupports.checkbox_alias(type) && type !== "range" && (

@@ -62,6 +62,7 @@ export async function POST(
       placeholder: init.placeholder,
       help_text: init.help_text,
       required: init.required,
+      readonly: init.readonly,
       pattern: init.pattern,
       step: init.step,
       min: init.min,

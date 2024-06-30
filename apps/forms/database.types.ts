@@ -1111,6 +1111,7 @@ export type Database = {
           name: string
           pattern: Json | null
           placeholder: string | null
+          readonly: boolean
           reference: Json | null
           required: boolean
           step: number | null
@@ -1141,6 +1142,7 @@ export type Database = {
           name: string
           pattern?: Json | null
           placeholder?: string | null
+          readonly?: boolean
           reference?: Json | null
           required?: boolean
           step?: number | null
@@ -1171,6 +1173,7 @@ export type Database = {
           name?: string
           pattern?: Json | null
           placeholder?: string | null
+          readonly?: boolean
           reference?: Json | null
           required?: boolean
           step?: number | null
@@ -1929,6 +1932,7 @@ export type Database = {
           json: Json | null
           jsonb: Json | null
           numeric: number | null
+          richtext: Json | null
           text: string
           user_id: string | null
           varchar: string | null
@@ -1945,6 +1949,7 @@ export type Database = {
           json?: Json | null
           jsonb?: Json | null
           numeric?: number | null
+          richtext?: Json | null
           text: string
           user_id?: string | null
           varchar?: string | null
@@ -1961,6 +1966,7 @@ export type Database = {
           json?: Json | null
           jsonb?: Json | null
           numeric?: number | null
+          richtext?: Json | null
           text?: string
           user_id?: string | null
           varchar?: string | null

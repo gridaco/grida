@@ -60,6 +60,7 @@ import {
 import { FileEditCell } from "./file-cell";
 import { RichTextEditCell } from "./richtext-cell";
 import { FieldSupports } from "@/k/supported_field_types";
+import { format } from "date-fns";
 
 function rowKeyGetter(row: GFResponseRow) {
   return row.__gf_id;
@@ -83,6 +84,7 @@ export function ResponseGrid({
   columns: {
     key: string;
     name: string;
+    readonly: boolean;
     type?: FormInputType;
   }[];
   rows: GFResponseRow[];
@@ -197,7 +199,8 @@ export function ResponseGrid({
               />
             ),
             renderCell: FieldCell,
-            renderEditCell: !readonly ? FieldEditCell : undefined,
+            renderEditCell:
+              !readonly && !col.readonly ? FieldEditCell : undefined,
           }) as Column<any>
       )
     )
@@ -352,6 +355,10 @@ function DefaultPropertyDateCell({
   }
 
   return <>{fmtdate(date, dateformat, tztostr(datetz))}</>;
+}
+
+function fmtdatetimelocal(date: Date | string) {
+  return format(date, "yyyy-MM-dd'T'HH:mm");
 }
 
 function fmtdate(
@@ -519,6 +526,13 @@ function FieldCell({ column, row }: RenderCellProps<GFResponseRow>) {
         </div>
       );
     }
+    case "datetime-local": {
+      return (
+        <div>
+          {fmtdate(unwrapped as string, "datetime", tztostr(state.datetz))}
+        </div>
+      );
+    }
     default:
       return (
         <div>
@@ -600,6 +614,11 @@ function FieldEditCell(props: RenderEditCellProps<GFResponseRow>) {
       case "number":
         val = parseFloat(val);
         break;
+      case "datetime-local": {
+        // convert local time to UTC
+        const date = new Date(val);
+        val = date.toISOString();
+      }
     }
 
     commit({ value: val });
@@ -649,8 +668,19 @@ function FieldEditCell(props: RenderEditCellProps<GFResponseRow>) {
           />
         );
       }
+      case "datetime-local": {
+        return (
+          <input
+            ref={ref as React.RefObject<HTMLInputElement>}
+            type={type}
+            className="w-full px-2 appearance-none outline-none border-none"
+            defaultValue={fmtdatetimelocal(unwrapped as string)}
+            onKeyDown={onKeydown}
+            onBlur={onBlur}
+          />
+        );
+      }
       case "date":
-      case "datetime-local":
       case "time":
       case "month":
       case "week": {

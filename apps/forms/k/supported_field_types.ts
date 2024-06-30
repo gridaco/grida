@@ -107,8 +107,9 @@ const html5_file_alias_field_types: FormInputType[] = [
 
 const html5_multiple_supported_field_types: FormInputType[] = [
   ...html5_file_alias_field_types,
-  "email",
-  "select",
+  // TODO: this needs to be supported - work with the db first.
+  // "email",
+  // "select",
 ];
 
 const html5_accept_supported_field_types: FormInputType[] = [
@@ -135,6 +136,25 @@ const html5_pattern_supported_field_types: FormInputType[] = [
   "url",
   "password",
   "search",
+];
+
+/**
+ * @see https://developer.mozilla.org/en-US/docs/Web/HTML/Attributes/readonly
+ */
+const html5_readonly_supported_field_types: FormInputType[] = [
+  "text",
+  "search",
+  "url",
+  "tel",
+  "email",
+  "password",
+  "date",
+  "month",
+  "week",
+  "time",
+  "datetime-local",
+  "number",
+  "textarea",
 ];
 
 const html5_checkbox_alias_field_types: FormInputType[] = [
@@ -228,6 +248,10 @@ export namespace FieldSupports {
 
   export function pattern(type: FormInputType) {
     return html5_pattern_supported_field_types.includes(type);
+  }
+
+  export function readonly(type: FormInputType) {
+    return html5_readonly_supported_field_types.includes(type);
   }
 
   /**

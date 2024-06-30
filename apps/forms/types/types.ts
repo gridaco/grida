@@ -169,6 +169,7 @@ export type FormFieldInit = {
   type: FormInputType;
   placeholder: string;
   required: boolean;
+  readonly: boolean;
   help_text: string;
   pattern?: string;
   step?: number;
@@ -191,6 +192,7 @@ export interface IFormField {
   is_array?: boolean;
   placeholder?: string | null;
   required: boolean;
+  readonly: boolean;
   help_text?: string | null;
   pattern?: any | null;
   step?: number | null;

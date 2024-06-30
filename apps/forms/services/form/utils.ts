@@ -1,12 +1,15 @@
 import { is_uuid_v4 } from "@/utils/is";
-import type { FormInputType, Option } from "@/types";
+import type { FormInputType } from "@/types";
 import { FieldSupports } from "@/k/supported_field_types";
 import { unwrapFeildValue } from "@/lib/forms/unwrap";
+import { toDate } from "date-fns-tz";
 
 export namespace FormValue {
   export function parse(
     value_or_reference: any,
     extra: {
+      // in minutes, where the givven value is the offset from UTC
+      utc_offset?: number;
       enums?: { id: string; value: string }[];
       type?: FormInputType;
     }
@@ -16,6 +19,25 @@ export namespace FormValue {
       return {
         value: value_or_reference,
       };
+    }
+
+    if (type === "datetime-local") {
+      if (!value_or_reference) return { value: undefined };
+
+      if (extra.utc_offset !== undefined) {
+        const tz = offsetToEtcGMT(extra.utc_offset);
+        const clientdate = toDate(new Date(value_or_reference), {
+          timeZone: tz,
+        });
+        return {
+          value: clientdate.toISOString(),
+        };
+      } else {
+        // If no client offset is provided, return the original date in ISO format
+        return {
+          value: new Date(value_or_reference).toISOString(),
+        };
+      }
     }
 
     if (FieldSupports.numeric(type)) {
@@ -31,6 +53,12 @@ export namespace FormValue {
     if (FieldSupports.jsonobject(type)) {
       switch (typeof value_or_reference) {
         case "string": {
+          // Note: not sure this is the right way to handle empty string - (although empty stings are common in formdata.)
+          if (value_or_reference === "") {
+            return {
+              value: undefined,
+            };
+          }
           return {
             value: JSON.parse(value_or_reference),
           };
@@ -195,4 +223,15 @@ function replacePVSTemplate(
       suffix: suffixStr,
     });
   });
+}
+
+/**
+ * @param offset offset in minutes
+ * @returns Etc/GMT formatted tz string
+ */
+function offsetToEtcGMT(offset: number): string {
+  const hours = Math.floor(Math.abs(offset) / 60);
+  const minutes = Math.abs(offset) % 60;
+  const sign = offset > 0 ? "-" : "+";
+  return `Etc/GMT${sign}${String(hours).padStart(2, "0")}${String(minutes).padStart(2, "0")}`;
 }
