@@ -31,6 +31,12 @@ export namespace FormValue {
     if (FieldSupports.jsonobject(type)) {
       switch (typeof value_or_reference) {
         case "string": {
+          // Note: not sure this is the right way to handle empty string - (although empty stings are common in formdata.)
+          if (value_or_reference === "") {
+            return {
+              value: undefined,
+            };
+          }
           return {
             value: JSON.parse(value_or_reference),
           };

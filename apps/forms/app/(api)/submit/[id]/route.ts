@@ -560,6 +560,7 @@ async function submit({
 
       if (sbconn_insertion_error) {
         console.error("submit/err/sbconn", sbconn_insertion_error);
+        console.info("input was", data);
         // TODO: use 400 - developer error with error info
         return error(500, { form_id }, meta);
       }
@@ -568,6 +569,7 @@ async function submit({
       RECORD = sbconn_inserted;
     } catch (e) {
       console.error("submit/err/sbconn", e);
+      console.info("input was", Object.fromEntries(formdata.entries()));
       // TODO: enhance error message
       return error(500, { form_id }, meta);
     }
@@ -724,9 +726,11 @@ async function submit({
           }
         );
 
-        const document = RichTextStagedFileUtils.renderDocument(value, {
-          files: field_file_processor.file_commits[field_id],
-        });
+        const document = value
+          ? RichTextStagedFileUtils.renderDocument(value, {
+              files: field_file_processor.file_commits[field_id],
+            })
+          : undefined;
 
         return {
           ...acc,
@@ -805,9 +809,11 @@ async function submit({
         }
       );
 
-      const document = RichTextStagedFileUtils.renderDocument(value, {
-        files: field_file_processor.file_commits[field_id],
-      });
+      const document = value
+        ? RichTextStagedFileUtils.renderDocument(value, {
+            files: field_file_processor.file_commits[field_id],
+          })
+        : undefined;
 
       return {
         ...upsertion_base,

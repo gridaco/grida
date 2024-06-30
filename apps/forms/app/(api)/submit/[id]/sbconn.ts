@@ -149,6 +149,8 @@ function asTableRowData(
             },
           });
 
+          console.log("constructedjson", constructedjson);
+
           parsedvalue = constructedjson as any;
           break;
         }
