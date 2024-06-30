@@ -2,7 +2,12 @@
 
 import { ThemedRichTextEditorContent } from "@/components/richtext";
 import { useCreateBlockNote } from "@blocknote/react";
-import { Block, locales } from "@blocknote/core";
+import {
+  Block,
+  BlockNoteSchema,
+  defaultBlockSpecs,
+  locales,
+} from "@blocknote/core";
 import { useEffect, useState } from "react";
 import type { FileResolverFn, FileUploaderFn } from "../file-upload-field";
 import { RichTextStagedFileUtils } from "@/services/form";
@@ -16,6 +21,12 @@ type FileHandler =
       uploader: FileUploaderFn;
       resolver: FileResolverFn;
     };
+
+// https://github.com/TypeCellOS/BlockNote/issues/881#issuecomment-2197197942
+const { table: _noop1, ...remainingSpecs } = defaultBlockSpecs;
+const schema = BlockNoteSchema.create({
+  blockSpecs: remainingSpecs,
+});
 
 export function RichTextEditorField({
   name,
@@ -37,6 +48,10 @@ export function RichTextEditorField({
   );
 
   const editor = useCreateBlockNote({
+    schema: schema,
+    // @ts-ignore
+    initialContent: initialContent,
+    // disableExtensions: [],
     dictionary: {
       ...locales.en,
       placeholders: {
@@ -46,8 +61,6 @@ export function RichTextEditorField({
     },
     // https://github.com/TypeCellOS/BlockNote/issues/884
     // trailingBlock: false,
-    initialContent: initialContent,
-    // TODO:
     uploadFile: uploader
       ? async (file) => {
           const { path } = await uploader(file);
@@ -83,7 +96,10 @@ export function RichTextEditorField({
   }, [editor, onContentChange]);
 
   return (
-    <div className="shadow-sm h-full w-full py-10 rounded-md border border-input bg-transparent text-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50">
+    <div
+      className="shadow-sm h-full w-full py-10 rounded-md border border-input bg-transparent text-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+      onClick={() => editor.focus()}
+    >
       <ThemedRichTextEditorContent editor={editor}>
         <input
           type="text"
