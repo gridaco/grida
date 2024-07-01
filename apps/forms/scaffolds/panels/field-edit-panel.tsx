@@ -903,7 +903,7 @@ export function FieldEditPanel({
               </PanelPropertyField>
             </PanelPropertyFields>
           </PanelPropertySection>
-          {FieldSupports.file_alias(type) && state.connections.supabase && (
+          {FieldSupports.file_upload(type) && state.connections.supabase && (
             <>
               <hr />
               <SupabaseStorageSettings
@@ -999,9 +999,14 @@ function SupabaseStorageSettings({
       <PanelPropertyFields>
         <PanelPropertyField
           label={"Enabled Storage"}
-          description="Enable Supabase Storage to store files in your Supabase project."
+          description="Enable Supabase Storage to store files in your Supabase project. (Required)"
         >
-          <Switch checked={enabled} onCheckedChange={onEnabledChange} />
+          <Switch
+            // IMPORTANT: the custom storage is required since we do not provide a alternate cdn solution. built in storage works only with a 'response' model, where we can't enforce this on x-supabase connection.
+            required
+            checked={enabled}
+            onCheckedChange={onEnabledChange}
+          />
         </PanelPropertyField>
         {enabled && (
           <>
@@ -1046,7 +1051,7 @@ function SupabaseStorageSettings({
               description="The file upload path. (Leave leading and trailing slashes off)"
             >
               <PropertyTextInput
-                placeholder="public/{{NEW.id}}/photos/{{file.name}}"
+                placeholder="public/{{RECORD.id}}/photos/{{file.name}}"
                 value={path}
                 required
                 pattern="^(?!\/).*"

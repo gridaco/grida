@@ -7,9 +7,25 @@ export namespace TemplateVariables {
     | FormAgentContext
     | FormSessionContext
     | FormResponseContext
-    | ConnectedDatasourcePostgresTransactionCompleteContext;
+    | FormConnectedDatasourcePostgresTransactionCompleteContext
+    | XSupabase.PostgresQuerySelectContext;
 
-  export interface GlobalContext {}
+  export interface GlobalContext {
+    /**
+     * getter - system generated uuidv4 - unique on each render
+     */
+    uuid?: string;
+  }
+
+  export interface CurrentFileContext {
+    file: {
+      name: File["name"];
+      size: File["size"];
+      type: File["type"];
+      lastModified: File["lastModified"];
+      index?: number;
+    };
+  }
 
   /**
    * form context - contains basic information about the form
@@ -80,24 +96,124 @@ export namespace TemplateVariables {
     };
   }
 
-  export interface ConnectedDatasourcePostgresTransactionCompleteContext<
+  export namespace XSupabase {
+    export interface PostgresQuerySelectContext<
+      R extends Record<string, any> = Record<string, any>,
+    > extends GlobalContext {
+      TABLE: {
+        pks: string[];
+      };
+      RECORD: R;
+      NEW: R;
+    }
+  }
+
+  export interface FormConnectedDatasourcePostgresTransactionCompleteContext<
     R extends Record<string, any> = Record<string, any>,
-  > extends FormResponseContext {
+  > extends FormResponseContext,
+      XSupabase.PostgresQuerySelectContext<R> {}
+
+  export interface ContextVariableInfo {
+    type: string;
+    context:
+      | "global"
+      | "form"
+      | "form_agent"
+      | "form_session"
+      | "form_response"
+      | "connected_datasource_postgres_transaction_complete"
+      | "connected_datasource_postgres_select_record";
+    available: "always" | "conditional";
+    evaluation: "runtime" | "compiletime";
+  }
+
+  type AllKeys = keyof (GlobalContext &
+    FormContext &
+    FormAgentContext &
+    FormSessionContext &
+    FormResponseContext &
+    FormConnectedDatasourcePostgresTransactionCompleteContext);
+
+  export const variables: Record<AllKeys, ContextVariableInfo> = {
+    uuid: {
+      type: "string",
+      context: "global",
+      available: "always",
+      evaluation: "runtime",
+    },
+    form_title: {
+      type: "string",
+      context: "form",
+      available: "always",
+      evaluation: "compiletime",
+    },
+    title: {
+      type: "string",
+      context: "form_agent",
+      available: "always",
+      evaluation: "compiletime",
+    },
+    language: {
+      type: "string",
+      context: "form_agent",
+      available: "always",
+      evaluation: "compiletime",
+    },
+    fields: {
+      type: "object",
+      context: "form_session",
+      available: "always",
+      evaluation: "compiletime",
+    },
+    session: {
+      type: "object",
+      context: "form_session",
+      available: "always",
+      evaluation: "compiletime",
+    },
+    customer: {
+      type: "object",
+      context: "form_response",
+      available: "always",
+      evaluation: "compiletime",
+    },
+    response: {
+      type: "object",
+      context: "form_response",
+      available: "always",
+      evaluation: "compiletime",
+    },
     TABLE: {
-      pks: string[];
-    };
-    NEW: R;
-    RECORD: R;
-  }
+      type: "object",
+      context: "connected_datasource_postgres_transaction_complete",
+      available: "always",
+      evaluation: "compiletime",
+    },
+    NEW: {
+      type: "object",
+      context: "connected_datasource_postgres_transaction_complete",
+      available: "always",
+      evaluation: "compiletime",
+    },
+    RECORD: {
+      type: "object",
+      context: "connected_datasource_postgres_select_record",
+      available: "always",
+      evaluation: "compiletime",
+    },
+  } as const;
 
-  export interface ConnectedDatasourcePostgresSelectRecordContext<
-    R extends Record<string, any> = Record<string, any>,
-  > {
-    RECORD: R;
-    NEW: R;
-  }
+  export type ContextSchema =
+    | typeof GlobalContextSchema
+    | typeof FormResonseContextSchema;
 
-  export const schema = z.object({
+  export const GlobalContextSchema = z.object({
+    uuid: z
+      .string()
+      .describe("system generated uuidv4 - unique on each render"),
+  });
+
+  export const FormResonseContextSchema = z.object({
     form_title: z.string().describe("Form title"),
     title: z.string().describe("Page / Campaign title"),
     language: z.string().describe("Language of the form"),
@@ -137,4 +253,28 @@ export namespace TemplateVariables {
         .describe("#123 hash representation of the response index"),
     }),
   });
+
+  export const ConnectedDatasourcePostgresSelectRecordContextSchema =
+    GlobalContextSchema.merge(
+      z.object({
+        RECORD: z.record(z.unknown()).describe("Record from the select query"),
+        NEW: z.record(z.unknown()).describe("New record from the select query"),
+      })
+    );
+
+  export namespace Validation {
+    export type ContextPropertyAvailability<T> = {
+      [K in keyof T]: boolean;
+    };
+
+    export function availability<T extends ContextSchema>(
+      context: T,
+      policyfn: (property: ContextVariableInfo) => boolean
+    ): ContextPropertyAvailability<T> {
+      return Object.keys(context).reduce((acc, key) => {
+        acc[key as keyof T] = policyfn(variables[key as keyof Context]);
+        return acc;
+      }, {} as ContextPropertyAvailability<T>);
+    }
+  }
 }

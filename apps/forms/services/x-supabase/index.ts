@@ -127,12 +127,21 @@ export namespace XSupabase {
         };
 
     export class ConnectedClient {
+      /**
+       * dummy table info since this does not use a table variable
+       */
+      table_dummy: TemplateVariables.XSupabase.PostgresQuerySelectContext["TABLE"] =
+        {
+          pks: [] as string[],
+        };
+
       constructor(public readonly storage: SupabaseClient["storage"]) {}
 
       async exists(storage: XSupabaseStorageSchema, row: Record<string, any>) {
         assert(storage.type === "x-supabase");
         const { bucket, path: pathtemplate } = storage;
         const renderedpath = renderpath(pathtemplate, {
+          TABLE: this.table_dummy,
           NEW: row,
           RECORD: row,
         });
@@ -151,6 +160,7 @@ export namespace XSupabase {
         assert(fieldstorage.type === "x-supabase");
         const { bucket, path: pathtemplate } = fieldstorage;
         const renderedpath = renderpath(pathtemplate, {
+          TABLE: this.table_dummy,
           NEW: row,
           RECORD: row,
         });
@@ -172,6 +182,7 @@ export namespace XSupabase {
           ([bucket, fields]: [string, XSupabaseStorageSchema[]]) => {
             const paths = fields.map((f) => {
               const renderedpath = renderpath(f.path, {
+                TABLE: this.table_dummy,
                 NEW: row,
                 RECORD: row,
               });
@@ -213,7 +224,7 @@ export namespace XSupabase {
       R extends Record<string, any> = Record<string, any>,
     >(
       pathtemplate: string,
-      data: TemplateVariables.ConnectedDatasourcePostgresSelectRecordContext<R>
+      data: TemplateVariables.XSupabase.PostgresQuerySelectContext<R>
     ) {
       return render(pathtemplate, data);
     }

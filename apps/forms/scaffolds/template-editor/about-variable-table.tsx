@@ -36,7 +36,7 @@ function flattenSchema(
   return result;
 }
 export function ContextVariablesTable() {
-  const about = flattenSchema(TemplateVariables.schema);
+  const about = flattenSchema(TemplateVariables.FormResonseContextSchema);
 
   return (
     <Table>
