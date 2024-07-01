@@ -20,26 +20,28 @@ type Context = {
 export async function POST(req: NextRequest, context: Context) {
   const { form_id, field_id } = context.params;
 
-  const path = queryorbody("path", {
-    searchParams: req.nextUrl.searchParams,
-    body: await req.json(),
-  });
+  throw new Error("Not implemented");
 
-  assert(path);
+  // const path = queryorbody("path", {
+  //   searchParams: req.nextUrl.searchParams,
+  //   body: await req.json(),
+  // });
 
-  const { data, error } = await sign({
-    form_id,
-    field_id,
-    path,
-    options: {
-      upsert: false,
-    },
-  });
+  // assert(path);
 
-  return NextResponse.json(<FormsApiResponse<SignedUploadUrlData>>{
-    data: data,
-    error: error,
-  });
+  // const { data, error } = await sign({
+  //   form_id,
+  //   field_id,
+  //   path,
+  //   options: {
+  //     upsert: false,
+  //   },
+  // });
+
+  // return NextResponse.json(<FormsApiResponse<SignedUploadUrlData>>{
+  //   data: data,
+  //   error: error,
+  // });
 }
 
 export async function PUT(req: NextRequest, context: Context) {
