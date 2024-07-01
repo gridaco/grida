@@ -12,46 +12,65 @@ import {
 } from "@/types";
 import assert from "assert";
 
-export async function createSignedUpsertUploadUrl({
+export async function createSignedUploadUrl({
   form,
   field_id,
-  path,
+  file,
+  options,
 }: {
   field_id: string;
-  path: string;
+  file: { path: string };
   form: {
+    id: string;
     fields: FormFieldDefinition[];
     supabase_connection: ConnectionSupabaseJoint | null;
+  };
+  options?: {
+    upsert: boolean;
   };
 }) {
   const field = form.fields.find((field) => field.id === field_id);
   assert(field, "field not found");
 
   if (field.storage) {
-    const { type, bucket } = field.storage as any as FormFieldStorageSchema;
+    const {
+      type,
+      bucket,
+      path: pathtemplate,
+      mode,
+    } = field.storage as any as FormFieldStorageSchema;
 
-    switch (type) {
-      case "x-supabase": {
-        assert(form.supabase_connection, "supabase_connection not found");
-        const client = await createXSupabaseClient(
-          form.supabase_connection.supabase_project_id,
-          {
-            service_role: true,
-          }
-        );
+    if (options?.upsert) {
+      switch (type) {
+        case "x-supabase": {
+          assert(form.supabase_connection, "supabase_connection not found");
+          const client = await createXSupabaseClient(
+            form.supabase_connection.supabase_project_id,
+            {
+              service_role: true,
+            }
+          );
 
-        const storage = new FileStorage(client, bucket);
-        return storage.createSignedUploadUrl(path, {
-          upsert: true,
-        });
+          const storage = new FileStorage(client, bucket);
+          return storage.createSignedUploadUrl(file.path, {
+            upsert: true,
+          });
+        }
+        case "grida":
+        case "x-s3":
+        default:
+          throw new Error("storage type not supported");
       }
-      case "grida":
-      case "x-s3":
-      default:
-        throw new Error("storage type not supported");
+    } else {
+      // non upsert operation is not supported yet.
+      throw new Error("not implemented");
     }
   } else {
     throw new Error("not implemented");
+
+    const storage = new FileStorage(client, GRIDA_FORMS_RESPONSE_BUCKET);
+
+    return storage.createSignedUploadUrl(file.path, options);
   }
 }
 

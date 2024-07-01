@@ -1,5 +1,5 @@
 import { createRouteHandlerClient } from "@/lib/supabase/server";
-import { createSignedUpsertUploadUrl } from "@/services/form/storage";
+import { createSignedUploadUrl } from "@/services/form/storage";
 import { ConnectionSupabaseJoint, FormFieldDefinition } from "@/types";
 import type {
   FormsApiResponse,
@@ -17,12 +17,79 @@ type Context = {
   };
 };
 
+export async function POST(req: NextRequest, context: Context) {
+  const { form_id, field_id } = context.params;
+
+  const path = queryorbody("path", {
+    searchParams: req.nextUrl.searchParams,
+    body: await req.json(),
+  });
+
+  assert(path);
+
+  const { data, error } = await sign({
+    form_id,
+    field_id,
+    path,
+    options: {
+      upsert: false,
+    },
+  });
+
+  return NextResponse.json(<FormsApiResponse<SignedUploadUrlData>>{
+    data: data,
+    error: error,
+  });
+}
+
 export async function PUT(req: NextRequest, context: Context) {
   const { form_id, field_id } = context.params;
 
-  const path = req.nextUrl.searchParams.get("path");
+  const path = queryorbody("path", {
+    searchParams: req.nextUrl.searchParams,
+    body: await req.json(),
+  });
+
   assert(path);
 
+  const { data, error } = await sign({
+    form_id,
+    field_id,
+    path,
+    options: {
+      upsert: true,
+    },
+  });
+
+  return NextResponse.json(<FormsApiResponse<SignedUploadUrlData>>{
+    data: data,
+    error: error,
+  });
+}
+
+function queryorbody(
+  key: string,
+  b: {
+    searchParams: URLSearchParams;
+    body: any;
+  }
+) {
+  return b.searchParams.get(key) || b.body?.[key];
+}
+
+async function sign({
+  form_id,
+  field_id,
+  path,
+  options,
+}: {
+  form_id: string;
+  field_id: string;
+  path: string;
+  options?: {
+    upsert: boolean;
+  };
+}) {
   const cookieStore = cookies();
   const supabase = createRouteHandlerClient(cookieStore);
 
@@ -41,17 +108,13 @@ export async function PUT(req: NextRequest, context: Context) {
   if (formerr) console.error(formerr);
   if (!form) return notFound();
 
-  const { data, error } = await createSignedUpsertUploadUrl({
+  return await createSignedUploadUrl({
     field_id,
-    path,
+    file: { path },
     form: form satisfies {
       fields: Pick<FormFieldDefinition, "id" | "storage">[];
       supabase_connection: ConnectionSupabaseJoint | null;
     } as any,
-  });
-
-  return NextResponse.json(<FormsApiResponse<SignedUploadUrlData>>{
-    data: data,
-    error: error,
+    options: options,
   });
 }
