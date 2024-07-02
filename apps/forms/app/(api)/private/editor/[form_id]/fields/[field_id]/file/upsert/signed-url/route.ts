@@ -21,9 +21,16 @@ type Context = {
 export async function PUT(req: NextRequest, context: Context) {
   const { form_id, field_id } = context.params;
 
+  let body = {};
+  try {
+    body = await req.json();
+  } catch (e) {
+    // when body is empty and only query params are present (this is ok.)
+  }
+
   const path = queryorbody("path", {
     searchParams: req.nextUrl.searchParams,
-    body: await req.json(),
+    body: body,
   });
 
   assert(path);
