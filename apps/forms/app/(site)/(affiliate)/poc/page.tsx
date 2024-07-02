@@ -15,6 +15,14 @@ const demo_1_categories = [
   "미술",
   "사이버펑크",
 ];
+const images = {
+  이벤트: "/affiliate/poc/images/formbuilder-section-event-image.png",
+  스포츠: "/affiliate/poc/images/formbuilder-section-sports-image.png",
+  음악: "/affiliate/poc/images/formbuilder-section-music-image.png",
+  패션: "/affiliate/poc/images/formbuilder-section-fashion-image.png",
+  미술: "/affiliate/poc/images/formbuilder-section-art-image.png",
+  사이버펑크: "/affiliate/poc/images/formbuilder-section-cyberfunk-image.png",
+};
 const demo_2_categories = [
   "캠페인 매니저",
   "대용량 트래픽",
@@ -97,8 +105,8 @@ export default function PartnerPOC() {
                   <TabsContent key={category} value={category}>
                     <Image
                       className="md:h-[776px] w-full rounded-xl shadow-xl overflow-hidden object-cover"
-                      src="/images/abstract-placeholder.jpg"
-                      alt=""
+                      src={images[category]}
+                      alt={category}
                       width={1400}
                       height={776}
                     />
