@@ -50,6 +50,7 @@ export async function PUT(req: NextRequest, context: Context) {
   if (!field) return notFound();
 
   const fs = new FieldStorageService(
+    field.id,
     field.storage as FormFieldStorageSchema,
     form.supabase_connection
   );

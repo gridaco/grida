@@ -1,4 +1,5 @@
 import { GRIDA_FORMS_RESPONSE_BUCKET } from "@/k/env";
+import { UniqueFileNameGenerator } from "@/lib/forms/storage";
 import { SupabasePostgRESTOpenApi } from "@/lib/supabase-postgrest";
 import { client } from "@/lib/supabase/server";
 import { TemplateVariables } from "@/lib/templating";
@@ -21,6 +22,7 @@ import assert from "assert";
 
 export class FieldStorageService {
   constructor(
+    readonly field_id: string,
     readonly storage: FormFieldStorageSchema | null,
     readonly supabase_connection: ConnectionSupabaseJoint | null
   ) {
@@ -122,9 +124,13 @@ export class FieldStorageService {
           throw new Error("storage type not supported");
         }
       }
+    } else {
+      const basepath = `response/${row_id}/${this.field_id}/`;
+      const uniqueFileNameGenerator = new UniqueFileNameGenerator();
+      const uniqueFileName = uniqueFileNameGenerator.name(file.name);
+      const renderedpath = basepath + uniqueFileName;
+      return this.createSignedUploadUrl(renderedpath, options);
     }
-
-    throw new Error("storage type not supported");
   }
 
   async createSignedUpsertUrlFromPath(path: string) {

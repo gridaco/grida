@@ -64,6 +64,7 @@ async function handler(
   assert(field);
 
   const fs = new FieldStorageService(
+    field.id,
     field.storage as FormFieldStorageSchema,
     form.supabase_connection
   );
