@@ -11,6 +11,7 @@ import type { GFFile, GFResponseRow, GFSystemColumnTypes } from "../grid/types";
 import type { DataGridFilterSettings } from "../editor/state";
 import { FlatPostgREST } from "@/lib/supabase-postgrest/flat";
 import { FieldSupports } from "@/k/supported_field_types";
+import { PrivateEditorApi } from "@/lib/private";
 
 export namespace GridData {
   type DataGridInput = {
@@ -145,22 +146,24 @@ export namespace GridData {
               ?.map((obj) => {
                 const { path, signedUrl } = obj;
 
-                const thumbnail = file_preview_url({
-                  params: {
+                const thumbnail =
+                  PrivateEditorApi.FormFieldFile.file_preview_url({
+                    params: {
+                      form_id: input.form_id,
+                      field_id: field.id,
+                      filepath: path,
+                    },
+                    options: {
+                      width: 200,
+                    },
+                  });
+
+                const upsert =
+                  PrivateEditorApi.FormFieldFile.file_request_upsert_url({
                     form_id: input.form_id,
                     field_id: field.id,
                     filepath: path,
-                  },
-                  options: {
-                    width: 200,
-                  },
-                });
-
-                const upsert = file_request_upsert_url({
-                  form_id: input.form_id,
-                  field_id: field.id,
-                  filepath: path,
-                });
+                  });
 
                 return {
                   // use thumbnail as src
@@ -270,59 +273,20 @@ export namespace GridData {
     );
   }
 
-  function file_request_upsert_url({
-    form_id,
-    field_id,
-    filepath,
-  }: {
-    form_id: string;
-    field_id: string;
-    filepath: string;
-  }) {
-    return `/private/editor/${form_id}/fields/${field_id}/file/upload/signed-url?path=${filepath}`;
-  }
-
-  function file_preview_url({
-    params,
-    options,
-  }: {
-    params: {
-      form_id: string;
-      field_id: string;
-      filepath: string;
-    };
-    options?: {
-      width?: number;
-      download?: boolean;
-    };
-  }) {
-    const { form_id, field_id, filepath } = params;
-
-    const base = `/private/editor/${form_id}/fields/${field_id}/file/preview/src?path=${filepath}`;
-
-    if (options) {
-      const { width, download } = options;
-      const params = new URLSearchParams();
-      if (width) params.set("width", width.toString());
-      if (download) params.set("download", "true");
-
-      return base + "&" + params.toString();
-    }
-
-    return base;
-  }
-
   function gf_response_file(params: {
     form_id: string;
     field_id: string;
     filepath: string;
   }): GFFile {
-    const base = file_preview_url({
+    const base = PrivateEditorApi.FormFieldFile.file_preview_url({
       params: params,
     });
-    const src = file_preview_url({ params: params, options: { width: 200 } });
+    const src = PrivateEditorApi.FormFieldFile.file_preview_url({
+      params: params,
+      options: { width: 200 },
+    });
 
-    const download = file_preview_url({
+    const download = PrivateEditorApi.FormFieldFile.file_preview_url({
       params: params,
       options: { download: true },
     });

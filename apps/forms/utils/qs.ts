@@ -12,3 +12,13 @@ export const qval = (v?: string | null) => {
 export const qboolean = (v: string | null): boolean => {
   return v === "1" || v === "true" || v === "on";
 };
+
+export function queryorbody(
+  key: string,
+  b: {
+    searchParams: URLSearchParams;
+    body: any;
+  }
+) {
+  return b.searchParams.get(key) || b.body?.[key];
+}

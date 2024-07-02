@@ -36,13 +36,15 @@ export type FormsApiResponse<T, E = any> = (
   | { data: T; error: null }
 ) & { message?: string };
 
-export interface CreateSessionSignedUploadUrlRequest {
+export interface CreateSignedUploadUrlRequest {
   file: {
     name: string;
     size: number;
+    type: string;
+    lastModified: number;
   };
 }
-
+export type CreateSessionSignedUploadUrlRequest = CreateSignedUploadUrlRequest;
 export interface SignedUploadUrlData {
   signedUrl: string;
   path: string;
@@ -51,6 +53,6 @@ export interface SignedUploadUrlData {
 
 export type SessionSignedUploadUrlData = SignedUploadUrlData;
 
-export type SessionPublicUrlData = {
+export type StoragePublicUrlData = {
   publicUrl: string;
 };

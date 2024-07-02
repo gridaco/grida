@@ -79,6 +79,7 @@ import { NameInput } from "./name-input";
 import { LockClosedIcon, ReloadIcon } from "@radix-ui/react-icons";
 import { PrivateEditorApi } from "@/lib/private";
 import { Badge } from "@/components/ui/badge";
+import { ContextVariablesTable } from "../template-editor/about-variable-table";
 
 // @ts-ignore
 const default_field_init: {
@@ -903,7 +904,7 @@ export function FieldEditPanel({
               </PanelPropertyField>
             </PanelPropertyFields>
           </PanelPropertySection>
-          {FieldSupports.file_alias(type) && state.connections.supabase && (
+          {FieldSupports.file_upload(type) && state.connections.supabase && (
             <>
               <hr />
               <SupabaseStorageSettings
@@ -911,6 +912,10 @@ export function FieldEditPanel({
                 onValueChange={setStorage}
                 enabled={storage_enabled}
                 onEnabledChange={__set_storage_enabled}
+                rules={{
+                  pathpolicy: xsupabase_path_policy({ multiple, type }),
+                  bucketpolicy: xsupabase_bucket_policy({ type }),
+                }}
               />
             </>
           )}
@@ -948,11 +953,18 @@ function SupabaseStorageSettings({
   onValueChange,
   enabled,
   onEnabledChange,
+  rules,
 }: {
   value?: Partial<FormFieldStorageSchema> | null | undefined;
   onValueChange?: (value: Partial<FormFieldStorageSchema>) => void;
   enabled?: boolean;
   onEnabledChange?: (enabled: boolean) => void;
+  rules: {
+    pathpolicy:
+      | "x-supabase-storage-compile-time-renderable-single-file-path-template"
+      | undefined;
+    bucketpolicy: "public" | "private" | "any";
+  };
 }) {
   const [state] = useEditorState();
   const [buckets, setBuckets] = useState<GridaSupabase.SupabaseBucket[]>();
@@ -999,54 +1011,91 @@ function SupabaseStorageSettings({
       <PanelPropertyFields>
         <PanelPropertyField
           label={"Enabled Storage"}
-          description="Enable Supabase Storage to store files in your Supabase project."
+          description="Enable Supabase Storage to store files in your Supabase project. (Required)"
         >
-          <Switch checked={enabled} onCheckedChange={onEnabledChange} />
+          <Switch
+            // IMPORTANT: the custom storage is required since we do not provide a alternate cdn solution. built in storage works only with a 'response' model, where we can't enforce this on x-supabase connection.
+            required
+            checked={enabled}
+            onCheckedChange={onEnabledChange}
+          />
         </PanelPropertyField>
         {enabled && (
           <>
             <PanelPropertyField
               label={"Bucket"}
               description="The bucket name to upload the file to."
+              help={
+                rules.bucketpolicy === "public" && (
+                  <>
+                    Public bucket is required for this field.
+                    <br />
+                    <br />
+                    <i>List of types required for public bucket:</i>
+                    <ul>
+                      <li>
+                        <code>richtext</code>
+                      </li>
+                    </ul>
+                  </>
+                )
+              }
             >
-              <Select
-                required
-                value={bucket}
-                onValueChange={(value) => setBucket(value)}
-              >
-                <SelectTrigger>
-                  <SelectValue
-                    placeholder={
-                      buckets ? (
-                        <>Select Bucket</>
-                      ) : (
-                        <div className="flex gap-2">
-                          <Spinner /> Loading...
-                        </div>
-                      )
-                    }
-                  />
-                </SelectTrigger>
-                <SelectContent>
-                  {buckets?.map((bucket) => (
-                    <SelectItem key={bucket.id} value={bucket.id}>
-                      <span>
-                        {bucket.name}
-                        <small className="ms-2 text-muted-foreground">
-                          {bucket.public ? "public" : ""}
-                        </small>
-                      </span>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              {buckets ? (
+                <>
+                  <Select
+                    required
+                    value={bucket}
+                    onValueChange={(value) => setBucket(value)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select Bucket" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {buckets?.map((bucket) => (
+                        <SelectItem
+                          key={bucket.id}
+                          value={bucket.id}
+                          disabled={!validatebucket(bucket, rules.bucketpolicy)}
+                        >
+                          <span>
+                            {bucket.name}
+                            <small className="ms-2 text-muted-foreground">
+                              {bucket.public ? "public" : "private"}
+                            </small>
+                          </span>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </>
+              ) : (
+                <>
+                  <Select required disabled>
+                    <SelectTrigger>
+                      <SelectValue
+                        placeholder={
+                          <div className="flex gap-2">
+                            <Spinner /> Loading...
+                          </div>
+                        }
+                      />
+                    </SelectTrigger>
+                  </Select>
+                </>
+              )}
             </PanelPropertyField>
             <PanelPropertyField
               label={"Upload Path"}
               description="The file upload path. (Leave leading and trailing slashes off)"
+              help={
+                <>
+                  <ContextVariablesTable schema="x-supabase.postgrest_query_insert_select" />
+                </>
+              }
             >
               <PropertyTextInput
-                placeholder="public/{{NEW.id}}/photos/{{file.name}}"
+                placeholder="public/{{RECORD.id}}/photos/{{file.name}}"
                 value={path}
                 required
                 pattern="^(?!\/).*"
@@ -1269,4 +1318,41 @@ function next_option_default(options: Option[]): Option {
 function buildPreviewLabel({ name, label }: { name: string; label?: string }) {
   let txt = label || fmt_snake_case_to_human_text(name);
   return txt;
+}
+
+function xsupabase_path_policy({
+  type,
+  multiple,
+}: {
+  type: FormInputType;
+  multiple: boolean;
+}):
+  | "x-supabase-storage-compile-time-renderable-single-file-path-template"
+  | undefined {
+  if (multiple)
+    return "x-supabase-storage-compile-time-renderable-single-file-path-template";
+
+  if (FieldSupports.richtext(type))
+    return "x-supabase-storage-compile-time-renderable-single-file-path-template";
+
+  return undefined;
+}
+
+function xsupabase_bucket_policy({
+  type,
+}: {
+  type: FormInputType;
+}): "public" | "private" | "any" {
+  if (FieldSupports.richtext(type)) return "public";
+
+  return "any";
+}
+
+function validatebucket(
+  bucket: { public: boolean },
+  policy: "public" | "private" | "any"
+): boolean {
+  if (policy === "private") return !bucket.public;
+  if (policy === "public") return bucket.public;
+  return true;
 }

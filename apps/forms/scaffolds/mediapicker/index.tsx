@@ -10,14 +10,24 @@ import { Label } from "@/components/ui/label";
 import { Spinner } from "@/components/spinner";
 import { useUploadFile } from "../media";
 
+export function AdminMediaPicker({
+  ...props
+}: Omit<React.ComponentProps<typeof MediaPicker>, "uploader">) {
+  const uploadFile = useUploadFile();
+
+  return <MediaPicker {...props} uploader={uploadFile} />;
+}
+
 export function MediaPicker({
   open,
   onOpenChange,
   onUseImage,
+  uploader,
 }: {
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
   onUseImage?: (url: string) => void;
+  uploader?: (file: File | Blob) => Promise<string>;
 }) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -37,7 +47,7 @@ export function MediaPicker({
               <FromUrl />
             </TabsContent>
             <TabsContent value="upload" className="h-full">
-              <FromFilePicker onUseImage={onUseImage} />
+              <FromFilePicker uploader={uploader} onUseImage={onUseImage} />
             </TabsContent>
             <TabsContent value="search" className="h-full">
               <div>Search content</div>
@@ -79,8 +89,10 @@ function FromUrl() {
 
 function FromFilePicker({
   onUseImage,
+  uploader,
 }: {
   onUseImage?: (url: string) => void;
+  uploader?: (file: File | Blob) => Promise<string>;
 }) {
   const [uploading, setUploading] = useState(false);
   const [src, setSrc] = useState<string | null>(null);
@@ -95,8 +107,6 @@ function FromFilePicker({
   const plainfile = plainFiles[0];
   const file = filesContent[0];
 
-  const uploadFile = useUploadFile();
-
   useEffect(() => {
     if (file) {
       const blob = new Blob([file.content], { type: file.type });
@@ -107,7 +117,7 @@ function FromFilePicker({
   useEffect(() => {
     if (plainfile) {
       setUploading(true);
-      uploadFile(plainfile)
+      uploader?.(plainfile)
         .then(setSrc)
         .finally(() => setUploading(false));
     }

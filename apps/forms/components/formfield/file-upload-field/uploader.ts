@@ -12,7 +12,7 @@ import type {
 import type {
   CreateSessionSignedUploadUrlRequest,
   FormsApiResponse,
-  SessionPublicUrlData,
+  StoragePublicUrlData,
   SessionSignedUploadUrlData,
 } from "@/types/private/api";
 import { SupabaseStorageExtensions } from "@/lib/supabase/storage-ext";
@@ -135,7 +135,7 @@ function makeRequestUrlResolver({
       },
     });
 
-    const data = (await res.json()) as FormsApiResponse<SessionPublicUrlData>;
+    const data = (await res.json()) as FormsApiResponse<StoragePublicUrlData>;
     return data.data;
   };
 }

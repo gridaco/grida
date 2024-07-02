@@ -615,9 +615,13 @@ function FieldEditCell(props: RenderEditCellProps<GFResponseRow>) {
         val = parseFloat(val);
         break;
       case "datetime-local": {
-        // convert local time to UTC
-        const date = new Date(val);
-        val = date.toISOString();
+        try {
+          const date = new Date(val);
+          val = date.toISOString();
+        } catch (e) {
+          // when user leaves the field empty
+          return;
+        }
       }
     }
 
@@ -625,7 +629,12 @@ function FieldEditCell(props: RenderEditCellProps<GFResponseRow>) {
   };
 
   try {
-    const unwrapped = value ? unwrapFeildValue(value, type) : undefined;
+    const unwrapped = unwrapFeildValue(value, type);
+
+    if (!FieldSupports.file_alias(type) && unwrapped === undefined) {
+      console.log("unwrapped", unwrapped);
+      return <NotSupportedEditCell />;
+    }
 
     switch (type as FormInputType) {
       case "email":
@@ -675,7 +684,9 @@ function FieldEditCell(props: RenderEditCellProps<GFResponseRow>) {
             ref={ref as React.RefObject<HTMLInputElement>}
             type={type}
             className="w-full px-2 appearance-none outline-none border-none"
-            defaultValue={fmtdatetimelocal(unwrapped as string)}
+            defaultValue={
+              unwrapped ? fmtdatetimelocal(unwrapped as string) : undefined
+            }
             onKeyDown={onKeydown}
             onBlur={onBlur}
           />
@@ -722,6 +733,8 @@ function FieldEditCell(props: RenderEditCellProps<GFResponseRow>) {
       case "richtext": {
         return (
           <RichTextEditCell
+            row_id={row.__gf_id}
+            field_id={column.key}
             defaultValue={unwrapped}
             onValueCommit={(v) => {
               commit({ value: v });
@@ -776,16 +789,20 @@ function FieldEditCell(props: RenderEditCellProps<GFResponseRow>) {
       case "signature":
       case "payment":
       default:
-        return (
-          <div className="px-2 w-full text-muted-foreground">
-            This field can&apos;t be edited
-          </div>
-        );
+        return <NotSupportedEditCell />;
     }
   } catch (e) {
     console.error(e);
     return <JsonEditCell {...props} />;
   }
+}
+
+function NotSupportedEditCell() {
+  return (
+    <div className="px-2 w-full text-muted-foreground">
+      This field can&apos;t be edited
+    </div>
+  );
 }
 
 function Empty({ value }: { value?: null | undefined | "" }) {

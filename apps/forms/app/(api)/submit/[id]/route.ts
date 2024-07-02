@@ -589,7 +589,7 @@ async function submit({
   > = {};
 
   // @ts-ignore // TODO: provide all context - currently this is only used for x-supabase storage
-  const pathrendercontext: TemplateVariables.ConnectedDatasourcePostgresTransactionCompleteContext =
+  const pathrendercontext: TemplateVariables.FormConnectedDatasourcePostgresTransactionCompleteContext =
     {
       TABLE: { pks: X_SUPABASE_MAIN_TABLE_PKS },
       NEW: RECORD!,
@@ -1015,7 +1015,7 @@ class ResponseFieldFilesProcessor {
     readonly connections: {
       supabase: ConnectionSupabaseJoint | null;
     },
-    readonly context: TemplateVariables.ConnectedDatasourcePostgresTransactionCompleteContext
+    readonly context: TemplateVariables.FormConnectedDatasourcePostgresTransactionCompleteContext
   ) {}
 
   // this can be reused since we only support one connection per form.

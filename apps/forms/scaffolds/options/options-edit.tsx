@@ -30,7 +30,7 @@ import {
 import { fmt_snake_case_to_human_text } from "@/utils/fmt";
 import { restrictToVerticalAxis } from "@dnd-kit/modifiers";
 import { Button } from "@/components/ui/button";
-import { MediaPicker } from "../mediapicker";
+import { AdminMediaPicker } from "../mediapicker";
 import type { Option } from "@/types";
 import { Input } from "@/components/ui/input";
 
@@ -251,7 +251,7 @@ function OptionEditItem({
             onChange={(e) => setLabel(e.target.value)}
           />
           <div>
-            <MediaPicker
+            <AdminMediaPicker
               open={mediaPickerOpen}
               onOpenChange={setMediaPickerOpen}
               onUseImage={(src) => {

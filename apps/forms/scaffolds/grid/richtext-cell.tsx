@@ -13,7 +13,10 @@ import {
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { BlockNoteSchema, defaultBlockSpecs } from "@blocknote/core";
 import { useCreateBlockNote } from "@blocknote/react";
-import { useEffect } from "react";
+import { useEditorState } from "../editor";
+import { SupabaseStorageExtensions } from "@/lib/supabase/storage-ext";
+import { PrivateEditorApi } from "@/lib/private";
+import { filemeta } from "@/utils/file";
 
 const { table: _noop1, ...remainingSpecs } = defaultBlockSpecs;
 const schema = BlockNoteSchema.create({
@@ -28,15 +31,60 @@ function safevalue(value: any) {
 }
 
 export function RichTextEditCell({
+  row_id,
+  field_id,
   defaultValue,
   onValueCommit,
 }: {
+  row_id: string;
+  field_id: string;
   defaultValue?: any;
   onValueCommit?: (value: any) => void;
 }) {
+  const [state] = useEditorState();
+  const uploader = async (file: File) => {
+    const createsignedres = await PrivateEditorApi.Files.createSignedUploadUrl({
+      form_id: state.form_id,
+      field_id: field_id,
+      row_id: row_id,
+      file: filemeta(file),
+    });
+
+    const { data, error } = createsignedres.data;
+
+    if (error || !data) {
+      throw error;
+    }
+
+    const uploaded =
+      await SupabaseStorageExtensions.uploadToSupabaseS3SignedUrl(
+        data.signedUrl,
+        file
+      );
+
+    if (uploaded.error || !uploaded.data) {
+      throw uploaded.error;
+    }
+
+    const path = uploaded.data.path;
+
+    const publicurlres = await PrivateEditorApi.FormFieldFile.getPublicUrl({
+      field_id: field_id,
+      form_id: state.form_id,
+      filepath: path,
+    });
+
+    if (publicurlres.data.error || !publicurlres.data.data) {
+      throw publicurlres.data.error;
+    }
+
+    return publicurlres.data.data.publicUrl;
+  };
+
   const editor = useCreateBlockNote({
     schema: schema,
     initialContent: safevalue(defaultValue),
+    uploadFile: uploader,
   });
 
   const onSaveClick = () => {

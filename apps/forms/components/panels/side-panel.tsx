@@ -95,7 +95,7 @@ export function PanelPropertyField({
                 <HoverCardTrigger type="button">
                   <QuestionMarkCircledIcon className="inline ms-2 align-middle opacity-50" />
                 </HoverCardTrigger>
-                <HoverCardContent>
+                <HoverCardContent className="max-w-md w-full">
                   <article className="prose prose-sm dark:prose-invert text-muted-foreground">
                     {help}
                   </article>

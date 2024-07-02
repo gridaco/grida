@@ -1,7 +1,90 @@
-import type { ConnectionSupabaseJoint, GridaSupabase } from "@/types";
+import type { GridaSupabase } from "@/types";
+import {
+  CreateSignedUploadUrlRequest,
+  EditorApiResponse,
+  SignedUploadUrlData,
+  StoragePublicUrlData,
+} from "@/types/private/api";
 import Axios from "axios";
 
 export namespace PrivateEditorApi {
+  export namespace Files {
+    export function createSignedUploadUrl({
+      form_id,
+      field_id,
+      row_id,
+      file,
+    }: {
+      form_id: string;
+      field_id: string;
+      row_id: string;
+      file: CreateSignedUploadUrlRequest["file"];
+    }) {
+      return Axios.post<EditorApiResponse<SignedUploadUrlData>>(
+        `/private/editor/${form_id}/rows/${row_id}/fields/${field_id}/files/signed-upload-url`,
+        { file }
+      );
+    }
+  }
+
+  export namespace FormFieldFile {
+    export function getPublicUrl({
+      form_id,
+      field_id,
+      filepath,
+    }: {
+      form_id: string;
+      field_id: string;
+      filepath: string;
+    }) {
+      return Axios.get<EditorApiResponse<StoragePublicUrlData>>(
+        `/private/editor/${form_id}/fields/${field_id}/file/preview/public-url?path=${filepath}`
+      );
+    }
+
+    export function file_request_upsert_url({
+      form_id,
+      field_id,
+      filepath,
+    }: {
+      form_id: string;
+      field_id: string;
+      filepath: string;
+    }) {
+      return `/private/editor/${form_id}/fields/${field_id}/file/upsert/signed-url?path=${filepath}`;
+    }
+
+    export function file_preview_url({
+      params,
+      options,
+    }: {
+      params: {
+        form_id: string;
+        field_id: string;
+        filepath: string;
+      };
+      options?: {
+        width?: number;
+        download?: boolean;
+      };
+    }) {
+      const { form_id, field_id, filepath } = params;
+
+      const base = `/private/editor/${form_id}/fields/${field_id}/file/preview/src?path=${filepath}`;
+
+      if (options) {
+        const { width, download } = options;
+        const params = new URLSearchParams();
+        if (width) params.set("width", width.toString());
+        if (download) params.set("download", "true");
+
+        return base + "&" + params.toString();
+      }
+
+      return base;
+    }
+  }
+
   export namespace SupabaseConnection {
     export async function createConnection(
       form_id: string,

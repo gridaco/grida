@@ -1,6 +1,5 @@
 import { createRouteHandlerClient } from "@/lib/supabase/server";
-import { createSignedUpsertUploadUrl } from "@/services/form/storage";
-import { ConnectionSupabaseJoint, FormFieldDefinition } from "@/types";
+import type { FormFieldStorageSchema } from "@/types";
 import type {
   FormsApiResponse,
   SignedUploadUrlData,
@@ -8,6 +7,8 @@ import type {
 import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
 import { NextRequest, NextResponse } from "next/server";
+import { queryorbody } from "@/utils/qs";
+import { FieldStorageService } from "@/services/form/storage";
 import assert from "assert";
 
 type Context = {
@@ -20,7 +21,11 @@ type Context = {
 export async function PUT(req: NextRequest, context: Context) {
   const { form_id, field_id } = context.params;
 
-  const path = req.nextUrl.searchParams.get("path");
+  const path = queryorbody("path", {
+    searchParams: req.nextUrl.searchParams,
+    body: await req.json(),
+  });
+
   assert(path);
 
   const cookieStore = cookies();
@@ -41,14 +46,15 @@ export async function PUT(req: NextRequest, context: Context) {
   if (formerr) console.error(formerr);
   if (!form) return notFound();
 
-  const { data, error } = await createSignedUpsertUploadUrl({
-    field_id,
-    path,
-    form: form satisfies {
-      fields: Pick<FormFieldDefinition, "id" | "storage">[];
-      supabase_connection: ConnectionSupabaseJoint | null;
-    } as any,
-  });
+  const field = form.fields.find((f) => f.id === field_id);
+  if (!field) return notFound();
+
+  const fs = new FieldStorageService(
+    field.id,
+    field.storage as FormFieldStorageSchema,
+    form.supabase_connection
+  );
+  const { data, error } = await fs.createSignedUpsertUrlFromPath(path);
 
   return NextResponse.json(<FormsApiResponse<SignedUploadUrlData>>{
     data: data,
