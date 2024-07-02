@@ -2,6 +2,50 @@ import type { ConnectionSupabaseJoint, GridaSupabase } from "@/types";
 import Axios from "axios";
 
 export namespace PrivateEditorApi {
+  export namespace FormFieldFile {
+    export function file_request_upsert_url({
+      form_id,
+      field_id,
+      filepath,
+    }: {
+      form_id: string;
+      field_id: string;
+      filepath: string;
+    }) {
+      return `/private/editor/${form_id}/fields/${field_id}/file/upload/signed-url?path=${filepath}`;
+    }
+
+    export function file_preview_url({
+      params,
+      options,
+    }: {
+      params: {
+        form_id: string;
+        field_id: string;
+        filepath: string;
+      };
+      options?: {
+        width?: number;
+        download?: boolean;
+      };
+    }) {
+      const { form_id, field_id, filepath } = params;
+
+      const base = `/private/editor/${form_id}/fields/${field_id}/file/preview/src?path=${filepath}`;
+
+      if (options) {
+        const { width, download } = options;
+        const params = new URLSearchParams();
+        if (width) params.set("width", width.toString());
+        if (download) params.set("download", "true");
+
+        return base + "&" + params.toString();
+      }
+
+      return base;
+    }
+  }
+
   export namespace SupabaseConnection {
     export async function createConnection(
       form_id: string,
