@@ -1,5 +1,6 @@
 import { GRIDA_FORMS_RESPONSE_BUCKET } from "@/k/env";
 import { client } from "@/lib/supabase/server";
+import { TemplateVariables } from "@/lib/templating";
 import {
   FileStorage,
   SessionStagedFileStorage,
@@ -10,67 +11,61 @@ import {
   FormFieldDefinition,
   FormFieldStorageSchema,
 } from "@/types";
+import { CreateSignedUploadUrlRequest } from "@/types/private/api";
 import assert from "assert";
 
-export async function createSignedUploadUrl({
-  form,
-  field_id,
-  file,
-  options,
-}: {
-  field_id: string;
-  file: { path: string };
-  form: {
-    id: string;
-    fields: FormFieldDefinition[];
-    supabase_connection: ConnectionSupabaseJoint | null;
-  };
-  options?: {
-    upsert: boolean;
-  };
-}) {
-  const field = form.fields.find((field) => field.id === field_id);
-  assert(field, "field not found");
+export class FieldStorageService {
+  constructor(
+    readonly storage: FormFieldStorageSchema | null,
+    readonly supabase_connection: ConnectionSupabaseJoint | null
+  ) {
+    //
+  }
 
-  if (field.storage) {
-    const {
-      type,
-      bucket,
-      path: pathtemplate,
-      mode,
-    } = field.storage as any as FormFieldStorageSchema;
-
-    if (options?.upsert) {
-      switch (type) {
-        case "x-supabase": {
-          assert(form.supabase_connection, "supabase_connection not found");
-          const client = await createXSupabaseClient(
-            form.supabase_connection.supabase_project_id,
-            {
-              service_role: true,
-            }
-          );
-
-          const storage = new FileStorage(client, bucket);
-          return storage.createSignedUploadUrl(file.path, {
-            upsert: true,
-          });
-        }
-        case "grida":
-        case "x-s3":
-        default:
-          throw new Error("storage type not supported");
-      }
-    } else {
-      // non upsert operation is not supported yet.
-      throw new Error("not implemented");
+  private _m_fileStorage: FileStorage | null = null;
+  private async getFileStorage() {
+    if (this._m_fileStorage) {
+      return this._m_fileStorage;
     }
-  } else {
-    throw new Error("not implemented");
 
-    const storage = new FileStorage(client, GRIDA_FORMS_RESPONSE_BUCKET);
+    if (this.storage) {
+      if (this.storage.type === "x-supabase") {
+        assert(this.supabase_connection, "supabase_connection not found");
+        const client = await createXSupabaseClient(
+          this.supabase_connection.supabase_project_id,
+          {
+            service_role: true,
+          }
+        );
 
-    return storage.createSignedUploadUrl(file.path, options);
+        this._m_fileStorage = new FileStorage(client, this.storage.bucket);
+        return this._m_fileStorage;
+      }
+
+      throw new Error("storage type not supported");
+    }
+
+    this._m_fileStorage = new FileStorage(client, GRIDA_FORMS_RESPONSE_BUCKET);
+    return this._m_fileStorage;
+  }
+
+  async createSignedUploadUrlFromFile(
+    file: CreateSignedUploadUrlRequest["file"],
+    context: TemplateVariables.Context
+  ) {
+    // /
+  }
+
+  async createSignedUpsertUrlFromPath(path: string) {
+    return this.createSignedUploadUrl(path, { upsert: true });
+  }
+
+  private async createSignedUploadUrl(
+    path: string,
+    options?: { upsert: boolean }
+  ) {
+    const fs = await this.getFileStorage();
+    return fs.createSignedUploadUrl(path, options);
   }
 }
 

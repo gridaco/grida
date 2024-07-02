@@ -1,6 +1,5 @@
 import { createRouteHandlerClient } from "@/lib/supabase/server";
-import { createSignedUploadUrl } from "@/services/form/storage";
-import { ConnectionSupabaseJoint, FormFieldDefinition } from "@/types";
+import type { FormFieldStorageSchema } from "@/types";
 import type {
   FormsApiResponse,
   SignedUploadUrlData,
@@ -8,8 +7,9 @@ import type {
 import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
 import { NextRequest, NextResponse } from "next/server";
-import assert from "assert";
 import { queryorbody } from "@/utils/qs";
+import { FieldStorageService } from "@/services/form/storage";
+import assert from "assert";
 
 type Context = {
   params: {
@@ -18,7 +18,6 @@ type Context = {
   };
 };
 
-// upsert: true
 export async function PUT(req: NextRequest, context: Context) {
   const { form_id, field_id } = context.params;
 
@@ -29,34 +28,6 @@ export async function PUT(req: NextRequest, context: Context) {
 
   assert(path);
 
-  const { data, error } = await sign({
-    form_id,
-    field_id,
-    path,
-    options: {
-      upsert: true,
-    },
-  });
-
-  return NextResponse.json(<FormsApiResponse<SignedUploadUrlData>>{
-    data: data,
-    error: error,
-  });
-}
-
-async function sign({
-  form_id,
-  field_id,
-  path,
-  options,
-}: {
-  form_id: string;
-  field_id: string;
-  path: string;
-  options?: {
-    upsert: boolean;
-  };
-}) {
   const cookieStore = cookies();
   const supabase = createRouteHandlerClient(cookieStore);
 
@@ -75,13 +46,17 @@ async function sign({
   if (formerr) console.error(formerr);
   if (!form) return notFound();
 
-  return await createSignedUploadUrl({
-    field_id,
-    file: { path },
-    form: form satisfies {
-      fields: Pick<FormFieldDefinition, "id" | "storage">[];
-      supabase_connection: ConnectionSupabaseJoint | null;
-    } as any,
-    options: options,
+  const field = form.fields.find((f) => f.id === field_id);
+  if (!field) return notFound();
+
+  const fs = new FieldStorageService(
+    field.storage as FormFieldStorageSchema,
+    form.supabase_connection
+  );
+  const { data, error } = await fs.createSignedUpsertUrlFromPath(path);
+
+  return NextResponse.json(<FormsApiResponse<SignedUploadUrlData>>{
+    data: data,
+    error: error,
   });
 }
