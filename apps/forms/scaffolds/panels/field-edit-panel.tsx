@@ -79,6 +79,7 @@ import { NameInput } from "./name-input";
 import { LockClosedIcon, ReloadIcon } from "@radix-ui/react-icons";
 import { PrivateEditorApi } from "@/lib/private";
 import { Badge } from "@/components/ui/badge";
+import { ContextVariablesTable } from "../template-editor/about-variable-table";
 
 // @ts-ignore
 const default_field_init: {
@@ -1057,6 +1058,11 @@ function SupabaseStorageSettings({
             <PanelPropertyField
               label={"Upload Path"}
               description="The file upload path. (Leave leading and trailing slashes off)"
+              help={
+                <>
+                  <ContextVariablesTable schema="x-supabase.postgrest_query_insert_select" />
+                </>
+              }
             >
               <PropertyTextInput
                 placeholder="public/{{RECORD.id}}/photos/{{file.name}}"

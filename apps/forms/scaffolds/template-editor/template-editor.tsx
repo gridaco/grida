@@ -232,7 +232,7 @@ export function TemplateEditor({
                           <TabsTrigger value="data">Test Data</TabsTrigger>
                         </TabsList>
                         <TabsContent value="variables">
-                          <ContextVariablesTable />
+                          <ContextVariablesTable schema="form_response" />
                         </TabsContent>
                         <TabsContent value="data" className="relative">
                           <header className="absolute right-4 top-4">
