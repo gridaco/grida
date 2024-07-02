@@ -439,17 +439,17 @@ function SolutionCard({
 
 const imageUrls = [
   [
-    "/affiliate/poc/images/main-card-image-1.png",
-    "/affiliate/poc/images/main-card-image-2.png",
+    "/affiliate/poc/images/main-section/main-card-image-1.png",
+    "/affiliate/poc/images/main-section/main-card-image-2.png",
   ],
   [
-    "/affiliate/poc/images/main-card-image-3.png",
-    "/affiliate/poc/images/main-card-image-4.png",
-    "/affiliate/poc/images/main-card-image-5.png",
+    "/affiliate/poc/images/main-section/main-card-image-3.png",
+    "/affiliate/poc/images/main-section/main-card-image-4.png",
+    "/affiliate/poc/images/main-section/main-card-image-5.png",
   ],
   [
-    "/affiliate/poc/images/main-card-image-1.png",
-    "/affiliate/poc/images/main-card-image-2.png",
+    "/affiliate/poc/images/main-section/main-card-image-1.png",
+    "/affiliate/poc/images/main-section/main-card-image-2.png",
   ],
 ];
 
