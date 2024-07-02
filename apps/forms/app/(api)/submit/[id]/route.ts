@@ -966,7 +966,7 @@ async function submit({
             rid: response_reference_obj.id,
           }),
           {
-            status: 301,
+            status: 302,
           }
         );
       }
@@ -976,7 +976,7 @@ async function submit({
         redirect_after_response_uri
       ) {
         return NextResponse.redirect(redirect_after_response_uri, {
-          status: 301,
+          status: 307,
         });
       }
 
@@ -985,7 +985,7 @@ async function submit({
           rid: response_reference_obj.id,
         }),
         {
-          status: 301,
+          status: 302,
         }
       );
     }
@@ -1271,12 +1271,12 @@ function error(
       }
       case 400: {
         return NextResponse.redirect(formlink(HOST, form_id, "badrequest"), {
-          status: 301,
+          status: 303,
         });
       }
       case 500: {
         return NextResponse.redirect(formlink(HOST, form_id, "badrequest"), {
-          status: 301,
+          status: 303,
         });
       }
       case "INTERNAL_SERVER_ERROR":
@@ -1290,7 +1290,7 @@ function error(
       case "FORM_SOLD_OUT":
       case "FORM_OPTION_UNAVAILABLE": {
         return NextResponse.redirect(formerrorlink(HOST, code, data), {
-          status: 301,
+          status: 307,
         });
       }
     }

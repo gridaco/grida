@@ -16,7 +16,7 @@ export async function GET(req: NextRequest) {
   const { data: auth } = await supabase.auth.getUser();
   if (!auth.user) {
     return NextResponse.redirect(origin + "/sign-in", {
-      status: 301,
+      status: 302,
     });
   }
 
@@ -39,7 +39,7 @@ export async function GET(req: NextRequest) {
 
   if (!membership) {
     return NextResponse.redirect(origin + "/organizations/new", {
-      status: 301,
+      status: 307,
     });
   }
 
@@ -53,6 +53,6 @@ export async function GET(req: NextRequest) {
   const { name: project_name } = membership.organization!.projects[0];
 
   return NextResponse.redirect(origin + "/" + project_name, {
-    status: 301,
+    status: 307,
   });
 }
