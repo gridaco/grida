@@ -15,22 +15,60 @@ const demo_1_categories = [
   "미술",
   "사이버펑크",
 ];
-const images = {
-  이벤트: "/affiliate/poc/images/formbuilder-section-event-image.png",
-  스포츠: "/affiliate/poc/images/formbuilder-section-sports-image.png",
-  음악: "/affiliate/poc/images/formbuilder-section-music-image.png",
-  패션: "/affiliate/poc/images/formbuilder-section-fashion-image.png",
-  미술: "/affiliate/poc/images/formbuilder-section-art-image.png",
-  사이버펑크: "/affiliate/poc/images/formbuilder-section-cyberfunk-image.png",
-};
+
 const demo_2_categories = [
   "캠페인 매니저",
   "대용량 트래픽",
   "티켓/인벤토리",
   "고객관리",
-  "실시간 모니터링",
   "개발자",
 ];
+
+const imagesDemo1 = {
+  이벤트:
+    "/affiliate/poc/images/demo-1-images/formbuilder-section-event-image.png",
+  스포츠:
+    "/affiliate/poc/images/demo-1-images/formbuilder-section-sports-image.png",
+  음악: "/affiliate/poc/images/demo-1-images/formbuilder-section-music-image.png",
+  패션: "/affiliate/poc/images/demo-1-images/formbuilder-section-fashion-image.png",
+  미술: "/affiliate/poc/images/demo-1-images/formbuilder-section-art-image.png",
+  사이버펑크:
+    "/affiliate/poc/images/demo-1-images/formbuilder-section-cyberfunk-image.png",
+} as const;
+
+const imagesDemo2 = {
+  "캠페인 매니저": [
+    "/affiliate/poc/images/demo-2-images/campaign-image-main.png",
+    "/affiliate/poc/images/demo-2-images/campaign-image-sub1.png",
+    "/affiliate/poc/images/demo-2-images/campaign-image-sub2.png",
+    "/affiliate/poc/images/demo-2-images/campaign-image-sub3.png",
+  ],
+  "대용량 트래픽": [
+    "/affiliate/poc/images/demo-2-images/traffic-image-main.png",
+    "/affiliate/poc/images/demo-2-images/traffic-image-sub1.png",
+    "/affiliate/poc/images/demo-2-images/traffic-image-sub2.png",
+    "/affiliate/poc/images/demo-2-images/traffic-image-sub3.png",
+  ],
+  "티켓/인벤토리": [
+    "/affiliate/poc/images/demo-2-images/ticketing-image-main.png",
+    "/affiliate/poc/images/demo-2-images/ticketing-image-sub1.png",
+    "/affiliate/poc/images/demo-2-images/ticketing-image-sub2.png",
+    "/affiliate/poc/images/demo-2-images/ticketing-image-sub3.png",
+  ],
+  고객관리: [
+    "/affiliate/poc/images/demo-2-images/customer-image-main.png",
+    "/affiliate/poc/images/demo-2-images/customer-image-sub1.png",
+    "/affiliate/poc/images/demo-2-images/customer-image-sub2.png",
+    "/affiliate/poc/images/demo-2-images/customer-image-sub3.png",
+  ],
+
+  개발자: [
+    "/affiliate/poc/images/demo-2-images/developer-image-main.png",
+    "/affiliate/poc/images/demo-2-images/developer-image-sub1.png",
+    "/affiliate/poc/images/demo-2-images/developer-image-sub2.png",
+    "/affiliate/poc/images/demo-2-images/developer-image-sub3.png",
+  ],
+};
 
 export default function PartnerPOC() {
   return (
@@ -105,7 +143,7 @@ export default function PartnerPOC() {
                   <TabsContent key={category} value={category}>
                     <Image
                       className="md:h-[776px] w-full rounded-xl shadow-xl overflow-hidden object-cover"
-                      src={images[category]}
+                      src={imagesDemo1[category]}
                       alt={category}
                       width={1400}
                       height={776}
@@ -151,30 +189,30 @@ export default function PartnerPOC() {
                     <div className="flex flex-col gap-5 px-8 sm:px-24">
                       <Image
                         className="md:h-[776px] w-full rounded-xl shadow-xl overflow-hidden object-cover"
-                        src="/images/abstract-placeholder.jpg"
-                        alt=""
+                        src={imagesDemo2[category][0]}
+                        alt={`${category}-main`}
                         width={1400}
                         height={776}
                       />
                       <div className="flex flex-col md:grid md:grid-cols-4 gap-5">
                         <Image
                           className="md:h-[340px] w-full md:col-start-1 md:col-span-2 rounded-xl shadow-xl overflow-hidden object-cover"
-                          src="/images/abstract-placeholder.jpg"
-                          alt=""
+                          src={imagesDemo2[category][1]}
+                          alt={`${category}-sub1`}
                           width={680}
                           height={340}
                         />
                         <Image
                           className=" md:h-[340px] w-full rounded-xl shadow-xl overflow-hidden object-cover"
-                          src="/images/abstract-placeholder.jpg"
-                          alt=""
+                          src={imagesDemo2[category][2]}
+                          alt={`${category}-sub2`}
                           width={340}
                           height={340}
                         />
                         <Image
                           className="md:h-[340px] w-full rounded-xl shadow-xl overflow-hidden object-cover"
-                          src="/images/abstract-placeholder.jpg"
-                          alt=""
+                          src={imagesDemo2[category][3]}
+                          alt={`${category}-sub3`}
                           width={340}
                           height={340}
                         />
