@@ -18,7 +18,11 @@ export async function GET(
 ) {
   const { form_id, field_id } = context.params;
   const qpath = req.nextUrl.searchParams.get("path");
-  const options = parseStorageUrlOptions(req.nextUrl.searchParams);
+
+  // passing the options will make image transform (even without empty options) - which will occur 403 on free plan tiers.
+  // @see https://sweetcoding.tistory.com/257
+  // const options = parseStorageUrlOptions(req.nextUrl.searchParams);
+
   // TODO: support RLS
   // const cookieStore = cookies();
   // const supabase = createRouteHandlerClient(cookieStore);
@@ -63,7 +67,7 @@ export async function GET(
 
         const { data: singed } = client.storage
           .from(bucket)
-          .getPublicUrl(qpath, options);
+          .getPublicUrl(qpath);
 
         const src = singed?.publicUrl;
 
@@ -83,7 +87,7 @@ export async function GET(
 
   const { data: singed } = await supabase.storage
     .from(GRIDA_FORMS_RESPONSE_BUCKET)
-    .getPublicUrl(qpath, options);
+    .getPublicUrl(qpath);
 
   const src = singed?.publicUrl;
 
