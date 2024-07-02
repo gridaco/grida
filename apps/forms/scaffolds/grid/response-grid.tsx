@@ -722,6 +722,7 @@ function FieldEditCell(props: RenderEditCellProps<GFResponseRow>) {
       case "richtext": {
         return (
           <RichTextEditCell
+            row_id={row.__gf_id}
             field_id={column.key}
             defaultValue={unwrapped}
             onValueCommit={(v) => {

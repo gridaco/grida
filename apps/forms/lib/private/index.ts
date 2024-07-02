@@ -1,7 +1,31 @@
-import type { ConnectionSupabaseJoint, GridaSupabase } from "@/types";
+import type { GridaSupabase } from "@/types";
+import {
+  CreateSignedUploadUrlRequest,
+  EditorApiResponse,
+  SignedUploadUrlData,
+} from "@/types/private/api";
 import Axios from "axios";
 
 export namespace PrivateEditorApi {
+  export namespace Files {
+    export function createSignedUploadUrl({
+      form_id,
+      field_id,
+      row_id,
+      file,
+    }: {
+      form_id: string;
+      field_id: string;
+      row_id: string;
+      file: CreateSignedUploadUrlRequest["file"];
+    }) {
+      return Axios.post<EditorApiResponse<SignedUploadUrlData>>(
+        `/private/editor/${form_id}/rows/${row_id}/fields/${field_id}/files/create-upload-url`,
+        { file }
+      );
+    }
+  }
+
   export namespace FormFieldFile {
     export function file_request_upsert_url({
       form_id,
