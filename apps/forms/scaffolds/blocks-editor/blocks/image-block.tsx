@@ -22,7 +22,7 @@ import {
 } from "./base-block";
 import { useEditorState } from "@/scaffolds/editor";
 import * as Tooltip from "@radix-ui/react-tooltip";
-import { MediaPicker } from "@/scaffolds/mediapicker";
+import { AdminMediaPicker } from "@/scaffolds/mediapicker";
 
 export function ImageBlock({
   id,
@@ -90,7 +90,7 @@ export function ImageBlock({
         </div>
       </BlockHeader>
       <div>
-        <MediaPicker
+        <AdminMediaPicker
           open={pickerOpen}
           onOpenChange={setPickerOpen}
           onUseImage={onChangeImage}
