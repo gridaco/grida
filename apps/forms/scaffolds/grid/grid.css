@@ -40,3 +40,11 @@
   box-shadow: inset 0 0 0 1px var(--rdg-selection-color);
   outline: 2px solid var(--rdg-selection-color);
 }
+
+.rdg-cell-frozen {
+  box-shadow: var(--rdg-cell-frozen-box-shadow);
+}
+
+.rdg-cell-frozen-last {
+  box-shadow: var(--rdg-cell-frozen-box-shadow);
+}
