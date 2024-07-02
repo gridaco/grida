@@ -912,6 +912,10 @@ export function FieldEditPanel({
                 onValueChange={setStorage}
                 enabled={storage_enabled}
                 onEnabledChange={__set_storage_enabled}
+                rules={{
+                  pathpolicy: xsupabase_path_policy({ multiple, type }),
+                  bucketpolicy: xsupabase_bucket_policy({ type }),
+                }}
               />
             </>
           )}
@@ -949,11 +953,18 @@ function SupabaseStorageSettings({
   onValueChange,
   enabled,
   onEnabledChange,
+  rules,
 }: {
   value?: Partial<FormFieldStorageSchema> | null | undefined;
   onValueChange?: (value: Partial<FormFieldStorageSchema>) => void;
   enabled?: boolean;
   onEnabledChange?: (enabled: boolean) => void;
+  rules: {
+    pathpolicy:
+      | "x-supabase-storage-compile-time-renderable-single-file-path-template"
+      | undefined;
+    bucketpolicy: "public" | "private" | "any";
+  };
 }) {
   const [state] = useEditorState();
   const [buckets, setBuckets] = useState<GridaSupabase.SupabaseBucket[]>();
@@ -1014,6 +1025,21 @@ function SupabaseStorageSettings({
             <PanelPropertyField
               label={"Bucket"}
               description="The bucket name to upload the file to."
+              help={
+                rules.bucketpolicy === "public" && (
+                  <>
+                    Public bucket is required for this field.
+                    <br />
+                    <br />
+                    <i>List of types required for public bucket:</i>
+                    <ul>
+                      <li>
+                        <code>richtext</code>
+                      </li>
+                    </ul>
+                  </>
+                )
+              }
             >
               {buckets ? (
                 <>
@@ -1027,11 +1053,15 @@ function SupabaseStorageSettings({
                     </SelectTrigger>
                     <SelectContent>
                       {buckets?.map((bucket) => (
-                        <SelectItem key={bucket.id} value={bucket.id}>
+                        <SelectItem
+                          key={bucket.id}
+                          value={bucket.id}
+                          disabled={!validatebucket(bucket, rules.bucketpolicy)}
+                        >
                           <span>
                             {bucket.name}
                             <small className="ms-2 text-muted-foreground">
-                              {bucket.public ? "public" : ""}
+                              {bucket.public ? "public" : "private"}
                             </small>
                           </span>
                         </SelectItem>
@@ -1288,4 +1318,41 @@ function next_option_default(options: Option[]): Option {
 function buildPreviewLabel({ name, label }: { name: string; label?: string }) {
   let txt = label || fmt_snake_case_to_human_text(name);
   return txt;
+}
+
+function xsupabase_path_policy({
+  type,
+  multiple,
+}: {
+  type: FormInputType;
+  multiple: boolean;
+}):
+  | "x-supabase-storage-compile-time-renderable-single-file-path-template"
+  | undefined {
+  if (multiple)
+    return "x-supabase-storage-compile-time-renderable-single-file-path-template";
+
+  if (FieldSupports.richtext(type))
+    return "x-supabase-storage-compile-time-renderable-single-file-path-template";
+
+  return undefined;
+}
+
+function xsupabase_bucket_policy({
+  type,
+}: {
+  type: FormInputType;
+}): "public" | "private" | "any" {
+  if (FieldSupports.richtext(type)) return "public";
+
+  return "any";
+}
+
+function validatebucket(
+  bucket: { public: boolean },
+  policy: "public" | "private" | "any"
+): boolean {
+  if (policy === "private") return !bucket.public;
+  if (policy === "public") return bucket.public;
+  return true;
 }
