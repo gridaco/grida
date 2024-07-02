@@ -1014,37 +1014,45 @@ function SupabaseStorageSettings({
               label={"Bucket"}
               description="The bucket name to upload the file to."
             >
-              <Select
-                required
-                value={bucket}
-                onValueChange={(value) => setBucket(value)}
-              >
-                <SelectTrigger>
-                  <SelectValue
-                    placeholder={
-                      buckets ? (
-                        <>Select Bucket</>
-                      ) : (
-                        <div className="flex gap-2">
-                          <Spinner /> Loading...
-                        </div>
-                      )
-                    }
-                  />
-                </SelectTrigger>
-                <SelectContent>
-                  {buckets?.map((bucket) => (
-                    <SelectItem key={bucket.id} value={bucket.id}>
-                      <span>
-                        {bucket.name}
-                        <small className="ms-2 text-muted-foreground">
-                          {bucket.public ? "public" : ""}
-                        </small>
-                      </span>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              {buckets ? (
+                <>
+                  <Select
+                    required
+                    value={bucket}
+                    onValueChange={(value) => setBucket(value)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select Bucket" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {buckets?.map((bucket) => (
+                        <SelectItem key={bucket.id} value={bucket.id}>
+                          <span>
+                            {bucket.name}
+                            <small className="ms-2 text-muted-foreground">
+                              {bucket.public ? "public" : ""}
+                            </small>
+                          </span>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </>
+              ) : (
+                <>
+                  <Select required disabled>
+                    <SelectTrigger>
+                      <SelectValue
+                        placeholder={
+                          <div className="flex gap-2">
+                            <Spinner /> Loading...
+                          </div>
+                        }
+                      />
+                    </SelectTrigger>
+                  </Select>
+                </>
+              )}
             </PanelPropertyField>
             <PanelPropertyField
               label={"Upload Path"}
