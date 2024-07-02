@@ -20,7 +20,7 @@ export namespace PrivateEditorApi {
       file: CreateSignedUploadUrlRequest["file"];
     }) {
       return Axios.post<EditorApiResponse<SignedUploadUrlData>>(
-        `/private/editor/${form_id}/rows/${row_id}/fields/${field_id}/files/create-upload-url`,
+        `/private/editor/${form_id}/rows/${row_id}/fields/${field_id}/files/signed-upload-url`,
         { file }
       );
     }

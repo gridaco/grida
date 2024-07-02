@@ -63,7 +63,7 @@ async function handler(
     form.supabase_connection
   );
 
-  const res = fs.createSignedUploadUrlFromFile(row_id, file, options);
+  const res = await fs.createSignedUploadUrlFromFile(row_id, file, options);
 
   return NextResponse.json(res);
 }

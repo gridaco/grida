@@ -16,6 +16,7 @@ import { useCreateBlockNote } from "@blocknote/react";
 import { useEditorState } from "../editor";
 import { SupabaseStorageExtensions } from "@/lib/supabase/storage-ext";
 import { PrivateEditorApi } from "@/lib/private";
+import { filemeta } from "@/utils/file";
 
 const { table: _noop1, ...remainingSpecs } = defaultBlockSpecs;
 const schema = BlockNoteSchema.create({
@@ -46,7 +47,7 @@ export function RichTextEditCell({
       form_id: state.form_id,
       field_id: field_id,
       row_id: row_id,
-      file: { name: file.name, size: file.size },
+      file: filemeta(file),
     });
 
     const { data, error } = res.data;
