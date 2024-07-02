@@ -17,7 +17,6 @@ export async function GET(
   }
 ) {
   const { form_id, field_id } = context.params;
-  const expiresIn = 60 * 60;
   const qpath = req.nextUrl.searchParams.get("path");
   const options = parseStorageUrlOptions(req.nextUrl.searchParams);
   // TODO: support RLS
@@ -61,17 +60,18 @@ export async function GET(
             service_role: true,
           }
         );
-        const { data: singed } = await client.storage
-          .from(bucket)
-          .createSignedUrl(qpath, expiresIn, options);
 
-        const src = singed?.signedUrl;
+        const { data: singed } = client.storage
+          .from(bucket)
+          .getPublicUrl(qpath, options);
+
+        const src = singed?.publicUrl;
 
         if (!src) {
           return notFound();
         }
 
-        return NextResponse.redirect(src);
+        return NextResponse.json({ data: singed, error: null });
         //
       }
       case "grida":
@@ -83,17 +83,13 @@ export async function GET(
 
   const { data: singed } = await supabase.storage
     .from(GRIDA_FORMS_RESPONSE_BUCKET)
-    .createSignedUrl(qpath, expiresIn, options);
-  const src = singed?.signedUrl;
+    .getPublicUrl(qpath, options);
+
+  const src = singed?.publicUrl;
 
   if (!src) {
     return notFound();
   }
 
-  return NextResponse.redirect(src, {
-    status: 301,
-    headers: {
-      "Cache-Control": `public, max-age=${expiresIn}, s-maxage=${expiresIn}, stale-while-revalidate=59`,
-    },
-  });
+  return NextResponse.json({ data: singed, error: null });
 }

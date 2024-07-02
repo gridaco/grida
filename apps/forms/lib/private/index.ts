@@ -3,6 +3,7 @@ import {
   CreateSignedUploadUrlRequest,
   EditorApiResponse,
   SignedUploadUrlData,
+  StoragePublicUrlData,
 } from "@/types/private/api";
 import Axios from "axios";
 
@@ -27,6 +28,20 @@ export namespace PrivateEditorApi {
   }
 
   export namespace FormFieldFile {
+    export function getPublicUrl({
+      form_id,
+      field_id,
+      filepath,
+    }: {
+      form_id: string;
+      field_id: string;
+      filepath: string;
+    }) {
+      return Axios.get<EditorApiResponse<StoragePublicUrlData>>(
+        `/private/editor/${form_id}/fields/${field_id}/file/preview/public-url?path=${filepath}`
+      );
+    }
+
     export function file_request_upsert_url({
       form_id,
       field_id,

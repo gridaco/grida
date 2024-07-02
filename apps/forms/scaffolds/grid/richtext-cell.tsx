@@ -43,14 +43,14 @@ export function RichTextEditCell({
 }) {
   const [state] = useEditorState();
   const uploader = async (file: File) => {
-    const res = await PrivateEditorApi.Files.createSignedUploadUrl({
+    const createsignedres = await PrivateEditorApi.Files.createSignedUploadUrl({
       form_id: state.form_id,
       field_id: field_id,
       row_id: row_id,
       file: filemeta(file),
     });
 
-    const { data, error } = res.data;
+    const { data, error } = createsignedres.data;
 
     if (error || !data) {
       throw error;
@@ -66,8 +66,19 @@ export function RichTextEditCell({
       throw uploaded.error;
     }
 
-    // TODO: we need a public url.
-    return uploaded.data.path;
+    const path = uploaded.data.path;
+
+    const publicurlres = await PrivateEditorApi.FormFieldFile.getPublicUrl({
+      field_id: field_id,
+      form_id: state.form_id,
+      filepath: path,
+    });
+
+    if (publicurlres.data.error || !publicurlres.data.data) {
+      throw publicurlres.data.error;
+    }
+
+    return publicurlres.data.data.publicUrl;
   };
 
   const editor = useCreateBlockNote({

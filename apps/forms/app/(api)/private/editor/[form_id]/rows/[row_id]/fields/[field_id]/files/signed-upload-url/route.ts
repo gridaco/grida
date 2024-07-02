@@ -5,6 +5,7 @@ import { createRouteHandlerClient } from "@/lib/supabase/server";
 import { notFound } from "next/navigation";
 import { FieldStorageService } from "@/services/form/storage";
 import type { FormFieldStorageSchema } from "@/types";
+import assert from "assert";
 
 type Context = {
   params: {
@@ -50,13 +51,17 @@ async function handler(
       `
     )
     .eq("id", form_id)
+    .filter("fields.id", "eq", field_id)
     .single();
 
   if (formerr) console.error(formerr);
   if (!form) return notFound();
 
-  const field = form.fields.find((f) => f.id === field_id);
-  if (!field) return notFound();
+  const { fields } = form;
+
+  assert(fields.length === 1);
+  const field = fields[0];
+  assert(field);
 
   const fs = new FieldStorageService(
     field.storage as FormFieldStorageSchema,

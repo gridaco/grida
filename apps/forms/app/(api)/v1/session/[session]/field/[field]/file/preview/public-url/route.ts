@@ -1,6 +1,6 @@
 import { client } from "@/lib/supabase/server";
 import { SessionStorageServices } from "@/services/form/storage";
-import { FormsApiResponse, SessionPublicUrlData } from "@/types/private/api";
+import { FormsApiResponse, StoragePublicUrlData } from "@/types/private/api";
 import assert from "assert";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -46,7 +46,7 @@ export async function GET(
     file: { path: path },
   });
 
-  return NextResponse.json(<FormsApiResponse<SessionPublicUrlData>>{
+  return NextResponse.json(<FormsApiResponse<StoragePublicUrlData>>{
     data: publicurldata,
     error: null,
   });

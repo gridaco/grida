@@ -53,6 +53,6 @@ export interface SignedUploadUrlData {
 
 export type SessionSignedUploadUrlData = SignedUploadUrlData;
 
-export type SessionPublicUrlData = {
+export type StoragePublicUrlData = {
   publicUrl: string;
 };

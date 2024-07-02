@@ -264,3 +264,22 @@ export namespace SessionStorageServices {
     }
   }
 }
+
+export function parseStorageUrlOptions(searchParams: URLSearchParams) {
+  const qwidth = searchParams.get("width");
+  const width = Number(qwidth) || undefined;
+  const qdownload = searchParams.get("download");
+  const download = qdownload === "true" || qdownload === "1";
+  const format = download ? "origin" : undefined;
+  const options = {
+    download: download,
+    format: format,
+    transform: {
+      width: width,
+      height: width,
+      // resize: width ? ("contain" as const) : undefined,
+    },
+  };
+
+  return options;
+}
