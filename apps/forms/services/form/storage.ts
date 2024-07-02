@@ -99,10 +99,11 @@ export class FieldStorageService {
           assert(row, "row not found");
 
           const rowcontext = TemplateVariables.createContext(
-            "x-supabase.postgrest_query_select",
+            "x-supabase.postgrest_query_insert_select",
             {
               TABLE: { pks },
               RECORD: row,
+              NEW: row,
             }
           );
 

@@ -19,6 +19,7 @@ export namespace TemplateVariables {
     form_response: FormResponseContext;
     connected_datasource_postgres_transaction_complete: FormConnectedDatasourcePostgresTransactionCompleteContext;
     "x-supabase.postgrest_query_select": XSupabase.PostgresQuerySelectContext;
+    "x-supabase.postgrest_query_insert_select": XSupabase.PostgresQueryInsertSelectContext;
   };
 
   export interface GlobalContext {
@@ -116,12 +117,18 @@ export namespace TemplateVariables {
       };
       RECORD: R;
     }
+
+    export interface PostgresQueryInsertSelectContext<
+      R extends Record<string, any> = Record<string, any>,
+    > extends PostgresQuerySelectContext<R> {
+      NEW: R;
+    }
   }
 
   export interface FormConnectedDatasourcePostgresTransactionCompleteContext<
     R extends Record<string, any> = Record<string, any>,
   > extends FormResponseContext,
-      XSupabase.PostgresQuerySelectContext<R> {
+      XSupabase.PostgresQueryInsertSelectContext<R> {
     NEW: R;
   }
 
