@@ -80,6 +80,11 @@ export function FileEditCell({
 
   const canAddNewFile = multiple || files?.length === 0;
 
+  const uploader = async (file: File | Blob) => {
+    // TODO: commit the changes
+    return "";
+  };
+
   return (
     <Popover open modal>
       <PopoverTrigger asChild>
@@ -200,13 +205,14 @@ export function FileEditCell({
             <Tooltip>
               <TooltipTrigger className="w-full">
                 <Button
-                  // FIXME: allow upload - need service layer
-                  disabled
-                  // disabled={!canAddNewFile}
+                  disabled={!canAddNewFile}
                   variant="outline"
                   size="sm"
                   className="w-full"
-                  onClick={() => setMediaPickerOpen(true)}
+                  onClick={() => {
+                    toast.error("Not implemented yet - contact support");
+                    // setMediaPickerOpen(true)
+                  }}
                 >
                   <PlusIcon className="me-2" />
                   Add File
@@ -218,8 +224,8 @@ export function FileEditCell({
                 </TooltipContent>
               )}
             </Tooltip>
-            {/* TODO: need a custom uploader */}
             <MediaPicker
+              uploader={uploader}
               open={mediaPickerOpen}
               onOpenChange={setMediaPickerOpen}
               onUseImage={(src) => {
