@@ -34,7 +34,7 @@ const imagesDemo1 = {
   미술: "/affiliate/poc/images/demo-1-images/formbuilder-section-art-image.png",
   사이버펑크:
     "/affiliate/poc/images/demo-1-images/formbuilder-section-cyberfunk-image.png",
-} as const;
+};
 
 const imagesDemo2 = {
   "캠페인 매니저": [
@@ -143,6 +143,7 @@ export default function PartnerPOC() {
                   <TabsContent key={category} value={category}>
                     <Image
                       className="md:h-[776px] w-full rounded-xl shadow-xl overflow-hidden object-cover"
+                      //@ts-ignore
                       src={imagesDemo1[category]}
                       alt={category}
                       width={1400}
@@ -189,6 +190,7 @@ export default function PartnerPOC() {
                     <div className="flex flex-col gap-5 px-8 sm:px-24">
                       <Image
                         className="md:h-[776px] w-full rounded-xl shadow-xl overflow-hidden object-cover"
+                        //@ts-ignore
                         src={imagesDemo2[category][0]}
                         alt={`${category}-main`}
                         width={1400}
@@ -197,6 +199,7 @@ export default function PartnerPOC() {
                       <div className="flex flex-col md:grid md:grid-cols-4 gap-5">
                         <Image
                           className="md:h-[340px] w-full md:col-start-1 md:col-span-2 rounded-xl shadow-xl overflow-hidden object-cover"
+                          //@ts-ignore
                           src={imagesDemo2[category][1]}
                           alt={`${category}-sub1`}
                           width={680}
@@ -204,6 +207,7 @@ export default function PartnerPOC() {
                         />
                         <Image
                           className=" md:h-[340px] w-full rounded-xl shadow-xl overflow-hidden object-cover"
+                          //@ts-ignore
                           src={imagesDemo2[category][2]}
                           alt={`${category}-sub2`}
                           width={340}
@@ -211,6 +215,7 @@ export default function PartnerPOC() {
                         />
                         <Image
                           className="md:h-[340px] w-full rounded-xl shadow-xl overflow-hidden object-cover"
+                          //@ts-ignore
                           src={imagesDemo2[category][3]}
                           alt={`${category}-sub3`}
                           width={340}
