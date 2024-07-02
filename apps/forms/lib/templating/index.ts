@@ -10,6 +10,17 @@ export namespace TemplateVariables {
     | FormConnectedDatasourcePostgresTransactionCompleteContext
     | XSupabase.PostgresQuerySelectContext;
 
+  type ContextMap = {
+    global: GlobalContext;
+    current_file: CurrentFileContext;
+    form: FormContext;
+    form_agent: FormAgentContext;
+    form_session: FormSessionContext;
+    form_response: FormResponseContext;
+    connected_datasource_postgres_transaction_complete: FormConnectedDatasourcePostgresTransactionCompleteContext;
+    "x-supabase.postgrest_query_select": XSupabase.PostgresQuerySelectContext;
+  };
+
   export interface GlobalContext {
     /**
      * getter - system generated uuidv4 - unique on each render
@@ -104,25 +115,19 @@ export namespace TemplateVariables {
         pks: string[];
       };
       RECORD: R;
-      NEW: R;
     }
   }
 
   export interface FormConnectedDatasourcePostgresTransactionCompleteContext<
     R extends Record<string, any> = Record<string, any>,
   > extends FormResponseContext,
-      XSupabase.PostgresQuerySelectContext<R> {}
+      XSupabase.PostgresQuerySelectContext<R> {
+    NEW: R;
+  }
 
   export interface ContextVariableInfo {
     type: string;
-    context:
-      | "global"
-      | "form"
-      | "form_agent"
-      | "form_session"
-      | "form_response"
-      | "connected_datasource_postgres_transaction_complete"
-      | "connected_datasource_postgres_select_record";
+    context: keyof ContextMap;
     available: "always" | "conditional";
     evaluation: "runtime" | "compiletime";
   }
@@ -185,7 +190,7 @@ export namespace TemplateVariables {
     },
     TABLE: {
       type: "object",
-      context: "connected_datasource_postgres_transaction_complete",
+      context: "x-supabase.postgrest_query_select",
       available: "always",
       evaluation: "compiletime",
     },
@@ -197,7 +202,7 @@ export namespace TemplateVariables {
     },
     RECORD: {
       type: "object",
-      context: "connected_datasource_postgres_select_record",
+      context: "x-supabase.postgrest_query_select",
       available: "always",
       evaluation: "compiletime",
     },
@@ -261,6 +266,13 @@ export namespace TemplateVariables {
         NEW: z.record(z.unknown()).describe("New record from the select query"),
       })
     );
+
+  export function createContext<K extends keyof ContextMap = keyof ContextMap>(
+    context: K,
+    data: Omit<ContextMap[K], "uuid">
+  ) {
+    return data;
+  }
 
   export namespace Validation {
     export type ContextPropertyAvailability<T> = {

@@ -40,6 +40,8 @@ export interface CreateSignedUploadUrlRequest {
   file: {
     name: string;
     size: number;
+    type: string;
+    lastModified: number;
   };
 }
 export type CreateSessionSignedUploadUrlRequest = CreateSignedUploadUrlRequest;

@@ -220,13 +220,12 @@ export namespace XSupabase {
       }
     }
 
-    export function renderpath<
-      R extends Record<string, any> = Record<string, any>,
-    >(
+    export function renderpath<R extends Record<string, any> = Record<string, any>>(
       pathtemplate: string,
-      data: TemplateVariables.XSupabase.PostgresQuerySelectContext<R>
+      data: TemplateVariables.XSupabase.PostgresQuerySelectContext<R> &
+        TemplateVariables.CurrentFileContext
     ) {
-      return render(pathtemplate, data);
+      return render(pathtemplate, data, { strict: true });
     }
   }
 }

@@ -22,9 +22,13 @@ function createGridaHandlebars(
   return GridaHandlebars;
 }
 
-export function render(source: string, context: TemplateVariables.Context) {
+export function render(
+  source: string,
+  context: TemplateVariables.Context,
+  options?: CompileOptions
+) {
   const GridaHandlebars = createGridaHandlebars();
-  return GridaHandlebars.compile(source)(context);
+  return GridaHandlebars.compile(source, options)(context);
 }
 
 // export function validate(
