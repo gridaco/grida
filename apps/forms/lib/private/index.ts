@@ -12,7 +12,7 @@ export namespace PrivateEditorApi {
       field_id: string;
       filepath: string;
     }) {
-      return `/private/editor/${form_id}/fields/${field_id}/file/upload/signed-url?path=${filepath}`;
+      return `/private/editor/${form_id}/fields/${field_id}/file/upsert/signed-url?path=${filepath}`;
     }
 
     export function file_preview_url({

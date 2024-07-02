@@ -9,6 +9,7 @@ import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
 import { NextRequest, NextResponse } from "next/server";
 import assert from "assert";
+import { queryorbody } from "@/utils/qs";
 
 type Context = {
   params: {
@@ -16,33 +17,6 @@ type Context = {
     field_id: string;
   };
 };
-
-// Note: this is currentlu not used.
-// upsert: false
-export async function POST(req: NextRequest, context: Context) {
-  const { form_id, field_id } = context.params;
-
-  const path = queryorbody("path", {
-    searchParams: req.nextUrl.searchParams,
-    body: await req.json(),
-  });
-
-  assert(path);
-
-  const { data, error } = await sign({
-    form_id,
-    field_id,
-    path,
-    options: {
-      upsert: false,
-    },
-  });
-
-  return NextResponse.json(<FormsApiResponse<SignedUploadUrlData>>{
-    data: data,
-    error: error,
-  });
-}
 
 // upsert: true
 export async function PUT(req: NextRequest, context: Context) {
@@ -68,16 +42,6 @@ export async function PUT(req: NextRequest, context: Context) {
     data: data,
     error: error,
   });
-}
-
-function queryorbody(
-  key: string,
-  b: {
-    searchParams: URLSearchParams;
-    body: any;
-  }
-) {
-  return b.searchParams.get(key) || b.body?.[key];
 }
 
 async function sign({
