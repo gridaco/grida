@@ -17,33 +17,34 @@ type Context = {
   };
 };
 
+// Note: this is currentlu not used.
+// upsert: false
 export async function POST(req: NextRequest, context: Context) {
   const { form_id, field_id } = context.params;
 
-  throw new Error("Not implemented");
+  const path = queryorbody("path", {
+    searchParams: req.nextUrl.searchParams,
+    body: await req.json(),
+  });
 
-  // const path = queryorbody("path", {
-  //   searchParams: req.nextUrl.searchParams,
-  //   body: await req.json(),
-  // });
+  assert(path);
 
-  // assert(path);
+  const { data, error } = await sign({
+    form_id,
+    field_id,
+    path,
+    options: {
+      upsert: false,
+    },
+  });
 
-  // const { data, error } = await sign({
-  //   form_id,
-  //   field_id,
-  //   path,
-  //   options: {
-  //     upsert: false,
-  //   },
-  // });
-
-  // return NextResponse.json(<FormsApiResponse<SignedUploadUrlData>>{
-  //   data: data,
-  //   error: error,
-  // });
+  return NextResponse.json(<FormsApiResponse<SignedUploadUrlData>>{
+    data: data,
+    error: error,
+  });
 }
 
+// upsert: true
 export async function PUT(req: NextRequest, context: Context) {
   const { form_id, field_id } = context.params;
 
