@@ -30,8 +30,12 @@ interface FormDashboardItem extends Form {
 }
 
 export default async function DashboardProjectsPage({
+  params,
   searchParams,
 }: {
+  params: {
+    org: string;
+  };
   searchParams: {
     layout?: "grid" | "list";
   };
@@ -48,10 +52,26 @@ export default async function DashboardProjectsPage({
     return redirect("/sign-in");
   }
 
+  // const { data: state, error: stateerr } = await wsclient
+  //   .from("user_project_access_state")
+  //   .select()
+  //   .eq("user_id", auth.user.id)
+  //   .single();
+
+  // const lastproject = state?.project_id
+  //   ? organizations
+  //       ?.flatMap((o) => o.projects)
+  //       .find((p) => p.id === state.project_id)
+  //   : null;
+
+  // const organization = lastproject
+  //   ? organizations.find((o) => o.id === lastproject?.organization_id)!
+  //   : organizations[0];
+
   const { data: organization, error: err } = await wsclient
     .from("organization")
     .select(`*, projects:project(*)`)
-    .limit(1)
+    .eq("name", params.org)
     .single();
 
   if (err) console.error(err);
@@ -177,7 +197,7 @@ export default async function DashboardProjectsPage({
           {organization.projects.map((p) => {
             const projectforms = forms.filter((f) => f.project_id === p.id);
             return (
-              <div className="mb-10">
+              <div key={p.id} className="mb-10">
                 <header className="py-4 mb-2 flex justify-between items-center">
                   <div>
                     <h2 className="text-2xl font-bold">{p.name}</h2>

@@ -7,19 +7,10 @@ import { GridaLogo } from "@/components/grida-logo";
 import { SlashIcon } from "@radix-ui/react-icons";
 import { Tabs } from "@/scaffolds/d/tabs";
 import { FormEditorProvider } from "@/scaffolds/editor";
-import { Inter } from "next/font/google";
-import { GoogleAnalytics } from "@next/third-parties/google";
 import { FormPage } from "@/types";
 import { PreviewButton } from "@/components/preview-button";
-import { ThemeProvider } from "@/components/theme-provider";
-import { ToasterWithMax } from "@/components/toaster";
 import { GridaXSupabaseService } from "@/services/x-supabase";
-import { EditorHelpFab } from "@/scaffolds/help/editor-help-fab";
 import type { Metadata } from "next";
-import clsx from "clsx";
-import "../../../editor.css";
-
-const inter = Inter({ subsets: ["latin"] });
 
 export async function generateMetadata({
   params,
@@ -51,7 +42,7 @@ export async function generateMetadata({
 
 export const revalidate = 0;
 
-export default async function RootLayout({
+export default async function Layout({
   params,
   children,
 }: Readonly<{
@@ -94,52 +85,30 @@ export default async function RootLayout({
     : null;
 
   return (
-    <html lang="en" suppressHydrationWarning>
-      <body
-        className={clsx(
-          inter.className,
-          // to prevent the whole page from scrolling by sr-only or other hidden absolute elements
-          "h-screen overflow-hidden"
-        )}
+    <div className="h-screen flex flex-col">
+      <Header form_id={id} title={data.title} />
+      <FormEditorProvider
+        initial={{
+          project_id: data.project_id,
+          connections: {
+            store_id: data.store_connection?.store_id,
+            supabase: supabase_connection_state || undefined,
+          },
+          form_id: id,
+          form_title: data.title,
+          scheduling_tz: data.scheduling_tz || undefined,
+          page_id: data.default_form_page_id,
+          fields: data.fields,
+          blocks: data.default_page
+            ? // there's a bug with supabase typegen, where the default_page will not be a array, but cast it to array.
+              // it's safe to assume as non array.
+              (data.default_page as unknown as FormPage).blocks || []
+            : [],
+        }}
       >
-        {process.env.NEXT_PUBLIC_GAID && (
-          <GoogleAnalytics gaId={process.env.NEXT_PUBLIC_GAID} />
-        )}
-        <ToasterWithMax position="bottom-center" max={5} />
-        <div className="h-screen flex flex-col">
-          <ThemeProvider
-            attribute="class"
-            defaultTheme="system"
-            enableSystem
-            disableTransitionOnChange
-          >
-            <Header form_id={id} title={data.title} />
-            <FormEditorProvider
-              initial={{
-                project_id: data.project_id,
-                connections: {
-                  store_id: data.store_connection?.store_id,
-                  supabase: supabase_connection_state || undefined,
-                },
-                form_id: id,
-                form_title: data.title,
-                scheduling_tz: data.scheduling_tz || undefined,
-                page_id: data.default_form_page_id,
-                fields: data.fields,
-                blocks: data.default_page
-                  ? // there's a bug with supabase typegen, where the default_page will not be a array, but cast it to array.
-                    // it's safe to assume as non array.
-                    (data.default_page as unknown as FormPage).blocks || []
-                  : [],
-              }}
-            >
-              <div className="flex flex-1 overflow-y-auto">{children}</div>
-            </FormEditorProvider>
-            <EditorHelpFab />
-          </ThemeProvider>
-        </div>
-      </body>
-    </html>
+        <div className="flex flex-1 overflow-y-auto">{children}</div>
+      </FormEditorProvider>
+    </div>
   );
 }
 

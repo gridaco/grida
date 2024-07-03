@@ -11,7 +11,6 @@ import { CreateNewFormButton } from "@/components/create-form-button";
 import { Form } from "@/types";
 import { Metadata } from "next";
 import { ProjectStats } from "@/scaffolds/analytics/stats";
-import { EditorHelpFab } from "@/scaffolds/help/editor-help-fab";
 import { PoweredByGridaFooter } from "@/scaffolds/e/form/powered-by-brand-footer";
 import { OrganizationAvatar } from "@/components/organization-avatar";
 import { GridCard, RowCard } from "@/components/site/form-card";
@@ -135,7 +134,6 @@ export default async function FormsDashboardPage({
       <footer className="mt-10 mb-5">
         <PoweredByGridaFooter />
       </footer>
-      <EditorHelpFab />
     </main>
   );
 }

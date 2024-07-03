@@ -4,7 +4,7 @@ import { ThemeProvider } from "@/components/theme-provider";
 import { ToasterWithMax } from "@/components/toaster";
 import { EditorHelpFab } from "@/scaffolds/help/editor-help-fab";
 import clsx from "clsx";
-import "../../editor.css";
+import "../editor.css";
 
 const inter = Inter({ subsets: ["latin"] });
 
