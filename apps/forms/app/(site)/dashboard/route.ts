@@ -16,7 +16,7 @@ export async function GET(req: NextRequest) {
   const { data: auth } = await supabase.auth.getUser();
   if (!auth.user) {
     return NextResponse.redirect(origin + "/sign-in", {
-      status: 301,
+      status: 302,
     });
   }
 
@@ -38,29 +38,21 @@ export async function GET(req: NextRequest) {
     .single();
 
   if (!membership) {
-    // TODO: WROKSPACE MANAGEMENT
-    // TODO: redirect to a page that says the user is not part of any organization
-    return NextResponse.json(
-      {
-        error: "User is not part of any organization",
-      },
-      { status: 204 }
-    );
+    return NextResponse.redirect(origin + "/organizations/new", {
+      status: 307,
+    });
   }
 
   if (membership.organization!.projects.length === 0) {
     // TODO: redirect to a page that says the user's organization has no projects
-    return NextResponse.json(
-      {
-        error: "User's organization has no projects",
-      },
-      { status: 204 }
-    );
+    return NextResponse.json({
+      error: "User's organization has no projects",
+    });
   }
 
   const { name: project_name } = membership.organization!.projects[0];
 
   return NextResponse.redirect(origin + "/" + project_name, {
-    status: 301,
+    status: 307,
   });
 }

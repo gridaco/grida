@@ -2,7 +2,7 @@ import clsx from "clsx";
 
 export function Spinner({ className }: { className?: string }) {
   return (
-    <div role="status">
+    <div role="status" className="inline">
       <svg
         aria-hidden="true"
         className={clsx(

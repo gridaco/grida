@@ -1929,11 +1929,11 @@ export type Database = {
           id: number
           int2: number | null
           int4: number | null
-          json: Json | null
           jsonb: Json | null
           numeric: number | null
           richtext: Json | null
           text: string
+          timestamptz: string | null
           user_id: string | null
           varchar: string | null
         }
@@ -1946,11 +1946,11 @@ export type Database = {
           id?: number
           int2?: number | null
           int4?: number | null
-          json?: Json | null
           jsonb?: Json | null
           numeric?: number | null
           richtext?: Json | null
           text: string
+          timestamptz?: string | null
           user_id?: string | null
           varchar?: string | null
         }
@@ -1963,11 +1963,11 @@ export type Database = {
           id?: number
           int2?: number | null
           int4?: number | null
-          json?: Json | null
           jsonb?: Json | null
           numeric?: number | null
           richtext?: Json | null
           text?: string
+          timestamptz?: string | null
           user_id?: string | null
           varchar?: string | null
         }
@@ -1985,6 +1985,7 @@ export type Database = {
         Row: {
           avatar_path: string | null
           created_at: string
+          email: string | null
           id: number
           name: string
           owner_id: string
@@ -1993,6 +1994,7 @@ export type Database = {
         Insert: {
           avatar_path?: string | null
           created_at?: string
+          email?: string | null
           id?: number
           name: string
           owner_id?: string
@@ -2001,6 +2003,7 @@ export type Database = {
         Update: {
           avatar_path?: string | null
           created_at?: string
+          email?: string | null
           id?: number
           name?: string
           owner_id?: string
