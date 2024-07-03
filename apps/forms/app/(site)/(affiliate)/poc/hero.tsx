@@ -24,7 +24,7 @@ const imageUrls = [
 
 export function Hero() {
   return (
-    <section className="flex min-h-screen max-h-screen relative">
+    <section className="flex min-h-screen max-h-screen relative overflow-hidden">
       <div className="absolute inset-0 z-[-50]">
         <BgSvg />
       </div>
