@@ -16,13 +16,10 @@ import {
 } from "@radix-ui/react-icons";
 import { CreateNewFormButton } from "@/components/create-form-button";
 import { Form } from "@/types";
-import { Metadata } from "next";
 import { ProjectStats } from "@/scaffolds/analytics/stats";
-import { EditorHelpFab } from "@/scaffolds/help/editor-help-fab";
 import { PoweredByGridaFooter } from "@/scaffolds/e/form/powered-by-brand-footer";
 import { OrganizationAvatar } from "@/components/organization-avatar";
 import { GridCard, RowCard } from "@/components/site/form-card";
-import { GridaLogo } from "@/components/grida-logo";
 import { cn } from "@/utils";
 import { PanelsTopLeftIcon } from "lucide-react";
 
@@ -67,8 +64,6 @@ export default async function DashboardProjectsPage({
         .data.publicUrl
     : null;
 
-  // const project_id = project_ref.id;
-
   // fetch forms with responses count
   const { data: __forms, error } = await supabase
     .from("form")
@@ -93,9 +88,9 @@ export default async function DashboardProjectsPage({
   //
 
   return (
-    <div className="flex h-screen">
-      <nav className="w-60 h-full shrink-0 border-e">
-        <header className="mx-2 my-2">
+    <div className="h-full flex flex-1 w-full">
+      <nav className="relative w-60 h-full shrink-0 overflow-y-auto border-e">
+        <header className="sticky top-2 mx-2 py-2 bg-background border-b">
           <MenuItem className="py-2">
             <OrganizationAvatar
               className="inline w-5 h-5 me-2"
@@ -104,31 +99,30 @@ export default async function DashboardProjectsPage({
             />
             <span>{organization.name}</span>
           </MenuItem>
+          <section className="my-2">
+            <ul className="flex flex-col gap-0.5">
+              <li>
+                <MenuItem muted>
+                  <HomeIcon className="inline align-middle me-2 w-4 h-4" />
+                  <Link href="/dashboard/settings">Home</Link>
+                </MenuItem>
+              </li>
+              <li>
+                <MenuItem muted>
+                  <MagnifyingGlassIcon className="inline align-middle me-2 w-4 h-4" />
+                  <Link href="/dashboard/settings">Search</Link>
+                </MenuItem>
+              </li>
+              <li>
+                <MenuItem muted>
+                  <GearIcon className="inline align-middle me-2 w-4 h-4" />
+                  <Link href="/dashboard/settings">Settings</Link>
+                </MenuItem>
+              </li>
+            </ul>
+          </section>
         </header>
-        <section className="mx-2 mb-2">
-          <ul className="flex flex-col gap-0.5">
-            <li>
-              <MenuItem muted>
-                <HomeIcon className="inline align-middle me-2 w-4 h-4" />
-                <Link href="/dashboard/settings">Home</Link>
-              </MenuItem>
-            </li>
-            <li>
-              <MenuItem muted>
-                <MagnifyingGlassIcon className="inline align-middle me-2 w-4 h-4" />
-                <Link href="/dashboard/settings">Search</Link>
-              </MenuItem>
-            </li>
-            <li>
-              <MenuItem muted>
-                <GearIcon className="inline align-middle me-2 w-4 h-4" />
-                <Link href="/dashboard/settings">Settings</Link>
-              </MenuItem>
-            </li>
-          </ul>
-        </section>
-        {/* HERE! */}
-        <div className="overflow-y-auto h-full">
+        <div className="h-full">
           <section className="mx-2 mb-2">
             <SectionHeader>
               <span>Projects</span>
@@ -138,18 +132,24 @@ export default async function DashboardProjectsPage({
                 const projectforms = forms.filter((f) => f.project_id === p.id);
                 return (
                   <>
-                    <MenuItem key={p.name} muted>
-                      <PanelsTopLeftIcon className="inline align-middle me-2 w-4 h-4" />
-                      <Link href={`/dashboard/projects/${p.id}`}>{p.name}</Link>
-                    </MenuItem>
+                    <Link href={`/dashboard/projects/${p.ref_id}`}>
+                      <MenuItem key={p.name} muted>
+                        <PanelsTopLeftIcon className="inline align-middle me-2 w-4 h-4" />
+                        {p.name}
+                      </MenuItem>
+                    </Link>
 
                     {projectforms.map((form, i) => (
-                      <MenuItem key={i} level={1} muted>
-                        <FileIcon className="inline align-middle w-4 h-4 me-2" />
-                        <Link href={`/d/${form.id}`} prefetch={false}>
+                      <Link
+                        key={form.id}
+                        href={`/d/${form.id}`}
+                        prefetch={false}
+                      >
+                        <MenuItem level={1} muted>
+                          <FileIcon className="inline align-middle w-4 h-4 me-2" />
                           {form.title}
-                        </Link>
-                      </MenuItem>
+                        </MenuItem>
+                      </Link>
                     ))}
                   </>
                 );
@@ -158,39 +158,44 @@ export default async function DashboardProjectsPage({
           </section>
         </div>
       </nav>
-      <main hidden className="container mx-auto">
-        <header className="py-10 flex justify-between">
-          <div>
-            <span className="text-2xl font-black">Forms</span>
-          </div>
-          <div>{/* <CreateNewFormButton project_id={project_id} /> */}</div>
-        </header>
-        <section>{/* <ProjectStats project_id={project_id} /> */}</section>
-        <section className="w-full flex justify-end gap-2 mt-10">
-          <Link href="?layout=grid" replace>
-            <ViewGridIcon />
-          </Link>
-          <Link href="?layout=list" replace>
-            <ViewHorizontalIcon />
-          </Link>
-        </section>
-        <hr className="mb-10 mt-5 dark:border-neutral-700" />
-        {organization.projects.map((p) => {
-          const projectforms = forms.filter((f) => f.project_id === p.id);
-          return (
-            <div className="mb-10">
-              <div className="py-4">
-                <h2 className="text-2xl font-bold">{p.name}</h2>
-              </div>
-              <FormsGrid forms={projectforms} layout={layout} />
+      <main className="w-full h-full overflow-y-scroll">
+        <div className="container mx-auto">
+          <header className="py-10">
+            <div>
+              <span className="text-2xl font-black">Forms</span>
             </div>
-          );
-        })}
-        <footer className="mt-10 mb-5">
-          <PoweredByGridaFooter />
-        </footer>
+          </header>
+          <section className="w-full flex justify-end gap-2 mt-10">
+            <Link href="?layout=grid" replace>
+              <ViewGridIcon />
+            </Link>
+            <Link href="?layout=list" replace>
+              <ViewHorizontalIcon />
+            </Link>
+          </section>
+          <hr className="mb-10 mt-5 dark:border-neutral-700" />
+          {organization.projects.map((p) => {
+            const projectforms = forms.filter((f) => f.project_id === p.id);
+            return (
+              <div className="mb-10">
+                <header className="py-4 mb-2 flex justify-between items-center">
+                  <div>
+                    <h2 className="text-2xl font-bold">{p.name}</h2>
+                  </div>
+                  <CreateNewFormButton project_id={p.id} />
+                </header>
+                <section className="py-10">
+                  <ProjectStats project_id={p.id} />
+                </section>
+                <FormsGrid forms={projectforms} layout={layout} />
+              </div>
+            );
+          })}
+          <footer className="mt-10 mb-5">
+            <PoweredByGridaFooter />
+          </footer>
+        </div>
       </main>
-      <EditorHelpFab />
     </div>
   );
 }
@@ -261,6 +266,7 @@ function MenuItem({
       data-muted={muted}
       className={cn(
         "w-full px-2 py-1 rounded hover:bg-accent text-sm font-medium text-foreground data-[muted='true']:text-muted-foreground",
+        "text-ellipsis whitespace-nowrap overflow-hidden",
         className
       )}
       style={{

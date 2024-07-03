@@ -14,10 +14,10 @@ import { PreviewButton } from "@/components/preview-button";
 import { ThemeProvider } from "@/components/theme-provider";
 import { ToasterWithMax } from "@/components/toaster";
 import { GridaXSupabaseService } from "@/services/x-supabase";
+import { EditorHelpFab } from "@/scaffolds/help/editor-help-fab";
 import type { Metadata } from "next";
 import clsx from "clsx";
 import "../../../editor.css";
-import { EditorHelpFab } from "@/scaffolds/help/editor-help-fab";
 
 const inter = Inter({ subsets: ["latin"] });
 
