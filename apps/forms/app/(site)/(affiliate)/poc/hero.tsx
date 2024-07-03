@@ -4,6 +4,7 @@ import { GridaLogo } from "@/components/grida-logo";
 import Image from "next/image";
 import React from "react";
 import { TopBottomFadingGradientOverlay } from "./gradient";
+import BgSvg from "./bg-color-animate";
 
 const imageUrls = [
   [
@@ -24,6 +25,18 @@ const imageUrls = [
 export function Hero() {
   return (
     <section className="flex min-h-screen max-h-screen relative">
+      <div className="absolute inset-0 z-[-50]">
+        <BgSvg />
+      </div>
+      <div className="absolute inset-0 z-[-50]">
+        <Image
+          src="/affiliate/poc/images/bg-grid.png"
+          alt="Background Grid"
+          width={1000}
+          height={1000}
+          className="w-full h-full object-cover"
+        />
+      </div>
       {/* <div
         aria-hidden="true"
         className="pointer-events-none lg:absolute lg:inset-y-0 lg:mx-auto lg:w-full lg:max-w-7xl"
@@ -35,7 +48,7 @@ export function Hero() {
 
       <aside className="flex flex-1">
         {/*  */}
-        <div className="pl-20 flex-1 flex items-center justify-center sm:justify-start">
+        <div className="sm:pl-20 flex-1 flex items-center justify-center sm:justify-start">
           <div className="flex flex-col items-center sm:items-start gap-10">
             <div className="flex items-center justify-center gap-2">
               <GridaLogo />
@@ -52,8 +65,8 @@ export function Hero() {
         </div>
       </aside>
       <TopBottomFadingGradientOverlay className="overflow-hidden -z-50">
-        <aside className="absolute md:relative flex-1">
-          <div className="translate-x-1/4 lg:translate-x-10">
+        <aside className="absolute lg:relative flex-1">
+          <div className="translate-x-1/4 xl:translate-x-10">
             <ImageGrid />
           </div>
         </aside>

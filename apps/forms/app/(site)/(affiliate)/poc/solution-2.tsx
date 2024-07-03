@@ -9,19 +9,19 @@ export function Solutions2() {
   return (
     <section className="flex flex-col my-40">
       <div className=" bg-muted/50 w-full mx-0 sm:px-32 overflow-hidden">
-        <div className="flex flex-col md:flex-row">
-          <aside className="md:flex-1 py-32">
-            <h2 className=" text-4xl font-bold text-center sm:text-left">
+        <div className="flex flex-col lg:flex-row">
+          <aside className="lg:flex-1 py-32">
+            <h2 className=" text-4xl font-bold text-center lg:text-left">
               다양한 기업과의
               <br />
               행사 기획부터 개최까지
             </h2>
-            <p className=" text-muted-foreground mt-6 text-center sm:text-left">
+            <p className=" text-muted-foreground mt-6 text-center lg:text-left">
               저희는 공공기관부터 스포츠 브랜드에 이르기까지
               <br />
               다양한 분야의 기업들과 행사를 기획해왔습니다.
             </p>
-            <ul className="flex flex-col mt-8 font-medium gap-2 text-muted-foreground items-center sm:items-start">
+            <ul className="flex flex-col mt-8 font-medium gap-2 text-muted-foreground items-center lg:items-start">
               {[
                 "서울특별시 여의나루역 러너스테이션 사업",
                 "한국관광공사 인구감소지역 관광활성화 ‘디주 런트립’",
@@ -48,8 +48,8 @@ export function Solutions2() {
 
       <div>
         <section className="w-full mx-0 sm:px-32 overflow-hidden">
-          <div className="flex flex-col-reverse md:flex-row">
-            <aside className="md:flex-1">
+          <div className="flex flex-col-reverse lg:flex-row">
+            <aside className="lg:flex-1">
               <TopBottomFadingGradientOverlay>
                 <Image
                   src="/affiliate/poc/images/section-cover-2.png"
@@ -62,12 +62,12 @@ export function Solutions2() {
             </aside>
             <aside className="md:flex-1 py-32 content-center">
               <div className="flex flex-col sm:px-32">
-                <h2 className=" text-4xl font-bold text-center sm:text-left">
+                <h2 className=" text-4xl font-bold text-center lg:text-left">
                   POC와 함께라면
                   <br />
                   정말 쉬운 이벤트 준비
                 </h2>
-                <p className=" text-muted-foreground mt-6 text-center sm:text-left">
+                <p className=" text-muted-foreground mt-6 text-center lg:text-left">
                   기업 및 브랜드에 알맞은 이벤트 폼으로,
                   <br />
                   고객의 높은 참여율과 편리한 이벤트 관리를 보장할 수 있습니다.
@@ -78,9 +78,9 @@ export function Solutions2() {
         </section>
       </div>
       <div className="bg-muted/50 w-full mx-0 sm:px-32 overflow-hidden">
-        <div className="flex flex-col md:flex-row">
-          <aside className="flex flex-col md:flex-1 py-32 items-center sm:items-start">
-            <h2 className=" text-4xl font-bold text-center sm:text-left">
+        <div className="flex flex-col lg:flex-row">
+          <aside className="flex flex-col lg:flex-1 py-32 items-center lg:items-start">
+            <h2 className=" text-4xl font-bold text-center lg:text-left">
               오직 여기서만 가능한.
             </h2>
             <p className=" text-muted-foreground mt-6 text-center sm:text-left">

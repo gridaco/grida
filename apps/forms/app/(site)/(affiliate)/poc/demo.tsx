@@ -6,10 +6,29 @@ import clsx from "clsx";
 import * as k from "./data";
 import { GridaLogo } from "@/components/grida-logo";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { TopBottomFadingGradientOverlay } from "./gradient";
 
 export function Demo() {
   return (
     <section className="w-full mx-0 py-40">
+      <div className="absolute inset-0 z-[-50]">
+        <Image
+          src="/affiliate/poc/images/bg-color.svg"
+          alt="Background"
+          width={1000}
+          height={1000}
+          className="w-full h-full object-cover blur-3xl opacity-25"
+        />
+      </div>
+      <div className="absolute inset-0 z-[-50]">
+        <Image
+          src="/affiliate/poc/images/bg-grid.png"
+          alt="Background Grid"
+          width={1000}
+          height={1000}
+          className="w-full h-full object-cover"
+        />
+      </div>
       <div className="flex flex-col gap-10">
         <header className="flex flex-col gap-4">
           <div className="flex flex-row items-center justify-center gap-2">

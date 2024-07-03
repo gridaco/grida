@@ -49,7 +49,7 @@ const logos = [
 ];
 export function Logos() {
   return (
-    <div className="flex flex-wrap gap-10 p-8 rounded justify-center items-center dark:bg-white">
+    <div className="grayscale flex flex-wrap gap-10 p-8 rounded justify-center items-center dark:bg-white">
       {logos.map((src, i) => (
         <Image key={i} src={src} alt="adidas" height={40} />
       ))}
