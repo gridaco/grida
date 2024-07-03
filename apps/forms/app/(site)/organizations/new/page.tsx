@@ -5,7 +5,6 @@ import { GridaLogo } from "@/components/grida-logo";
 import {
   Breadcrumb,
   BreadcrumbItem,
-  BreadcrumbLink,
   BreadcrumbList,
   BreadcrumbPage,
   BreadcrumbSeparator,
