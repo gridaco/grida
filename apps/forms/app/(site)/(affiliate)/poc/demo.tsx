@@ -51,7 +51,7 @@ export function Demo() {
                     height={776}
                   />
 
-                  <div className="flex flex-col md:grid md:grid-cols-4 gap-5">
+                  <div className="flex flex-col lg:grid lg:grid-cols-4 gap-5">
                     {k.imagesDemo2[category].subs.map((sub, i) => {
                       return (
                         <DemoSubCard
@@ -63,7 +63,7 @@ export function Demo() {
                           className={clsx(
                             "relative rounded-xl shadow-lg w-full border overflow-hidden",
                             "md:h-[340px]",
-                            i === 0 ? "md:col-start-1 md:col-span-2" : ""
+                            i === 0 ? "lg:col-start-1 lg:col-span-2" : ""
                           )}
                         />
                       );
@@ -96,11 +96,11 @@ function DemoSubCard({
     // md:h-[340px] w-full md:col-start-1 md:col-span-2
     <div className={className}>
       <div className="flex flex-col gap-3 p-8">
-        <h6 className="text-4xl font-bold">{text1}</h6>
+        <h6 className=" text-xl md:text-4xl font-bold">{text1}</h6>
         <span className="max-w-sm text-sm text-muted-foreground">{text2}</span>
       </div>
       <Image
-        className="absolute inset-0 overflow-hidden object-right-bottom object-cover w-full h-full -z-10"
+        className=" hidden md:block absolute inset-0 overflow-hidden object-right-bottom object-cover w-full h-full -z-10"
         src={artwork}
         alt={alt}
         width={500}
