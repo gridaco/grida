@@ -95,7 +95,7 @@ export default async function DashboardProjectsPage({
     <div className="h-full flex flex-1 w-full">
       <nav className="relative w-60 h-full shrink-0 overflow-y-auto border-e">
         <header className="sticky top-0 mx-2 pt-4 py-2 bg-background border-b">
-          <WorkspaceMenu>
+          <WorkspaceMenu current={organization.id}>
             <MenuItem className="py-2">
               <OrganizationAvatar
                 className="inline-flex align-middle w-6 h-6 me-2 border rounded"

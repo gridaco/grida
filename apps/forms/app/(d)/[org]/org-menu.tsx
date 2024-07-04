@@ -12,11 +12,16 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { createClientWorkspaceClient } from "@/lib/supabase/client";
 import { PublicUrls } from "@/services/public-urls";
 import type { Organization } from "@/types";
-import { PlusIcon } from "@radix-ui/react-icons";
+import { CheckIcon, PlusIcon } from "@radix-ui/react-icons";
 import Link from "next/link";
 import React, { useEffect, useMemo, useState } from "react";
 
-export function WorkspaceMenu({ children }: React.PropsWithChildren<{}>) {
+export function WorkspaceMenu({
+  current,
+  children,
+}: React.PropsWithChildren<{
+  current?: number;
+}>) {
   const supabase = useMemo(() => createClientWorkspaceClient(), []);
 
   const [orgs, setOrgs] = useState<Organization[]>([]);
@@ -50,20 +55,26 @@ export function WorkspaceMenu({ children }: React.PropsWithChildren<{}>) {
         className="w-80 max-w-sm overflow-hidden max-h-[80vh]"
       >
         <ScrollArea>
-          {orgs.map((org) => (
-            <Link key={org.id} href={`/${org.name}`}>
-              <DropdownMenuItem>
-                <OrganizationAvatar
-                  className="inline w-7 h-7 me-2 border shadow-sm rounded"
-                  avatar_url={
-                    org.avatar_path ? avatar_url(org.avatar_path) : undefined
-                  }
-                  alt={org.name}
-                />
-                {org.name}
-              </DropdownMenuItem>
-            </Link>
-          ))}
+          {orgs.map((org) => {
+            const iscurrent = current === org.id;
+            return (
+              <Link key={org.id} href={`/${org.name}`}>
+                <DropdownMenuItem>
+                  <OrganizationAvatar
+                    className="inline w-7 h-7 me-2 border shadow-sm rounded"
+                    avatar_url={
+                      org.avatar_path ? avatar_url(org.avatar_path) : undefined
+                    }
+                    alt={org.name}
+                  />
+                  {org.name}
+                  {iscurrent && (
+                    <CheckIcon className="inline w-4 h-4 ms-auto" />
+                  )}
+                </DropdownMenuItem>
+              </Link>
+            );
+          })}
         </ScrollArea>
         <DropdownMenuSeparator />
         <Link href="/organizations/new">
