@@ -22,6 +22,8 @@ import { OrganizationAvatar } from "@/components/organization-avatar";
 import { GridCard, RowCard } from "@/components/site/form-card";
 import { cn } from "@/utils";
 import { PanelsTopLeftIcon } from "lucide-react";
+import { WorkspaceMenu } from "./ord-menu";
+import { PublicUrls } from "@/services/public-urls";
 
 export const revalidate = 0;
 
@@ -63,10 +65,7 @@ export default async function DashboardProjectsPage({
     return notFound();
   }
 
-  const avatar_url = organization.avatar_path
-    ? supabase.storage.from("avatars").getPublicUrl(organization?.avatar_path)
-        .data.publicUrl
-    : null;
+  const avatar_url = PublicUrls.organization_avatar_url(supabase);
 
   // fetch forms with responses count
   const { data: __forms, error } = await supabase
@@ -94,35 +93,41 @@ export default async function DashboardProjectsPage({
   return (
     <div className="h-full flex flex-1 w-full">
       <nav className="relative w-60 h-full shrink-0 overflow-y-auto border-e">
-        <header className="sticky top-2 mx-2 py-2 bg-background border-b">
-          <MenuItem className="py-2">
-            <OrganizationAvatar
-              className="inline w-5 h-5 me-2"
-              avatar_url={avatar_url}
-              alt={organization?.name}
-            />
-            <span>{organization.name}</span>
-          </MenuItem>
+        <header className="sticky top-0 mx-2 pt-4 py-2 bg-background border-b">
+          <WorkspaceMenu>
+            <MenuItem className="py-2">
+              <OrganizationAvatar
+                className="inline w-5 h-5 me-2"
+                avatar_url={
+                  organization.avatar_path
+                    ? avatar_url(organization.avatar_path)
+                    : undefined
+                }
+                alt={organization?.name}
+              />
+              <span>{organization.name}</span>
+            </MenuItem>
+          </WorkspaceMenu>
           <section className="my-2">
             <ul className="flex flex-col gap-0.5">
               <li>
                 <MenuItem muted>
                   <HomeIcon className="inline align-middle me-2 w-4 h-4" />
-                  <Link href="/dashboard/settings">Home</Link>
+                  <Link href="/dashboard">Home</Link>
                 </MenuItem>
               </li>
-              <li>
+              {/* <li>
                 <MenuItem muted>
                   <MagnifyingGlassIcon className="inline align-middle me-2 w-4 h-4" />
                   <Link href="/dashboard/settings">Search</Link>
                 </MenuItem>
-              </li>
-              <li>
+              </li> */}
+              {/* <li>
                 <MenuItem muted>
                   <GearIcon className="inline align-middle me-2 w-4 h-4" />
                   <Link href="/dashboard/settings">Settings</Link>
                 </MenuItem>
-              </li>
+              </li> */}
             </ul>
           </section>
         </header>
@@ -136,7 +141,7 @@ export default async function DashboardProjectsPage({
                 const projectforms = forms.filter((f) => f.project_id === p.id);
                 return (
                   <>
-                    <Link href={`/dashboard/projects/${p.ref_id}`}>
+                    <Link href={`/${organization.name}/${p.name}`}>
                       <MenuItem key={p.name} muted>
                         <PanelsTopLeftIcon className="inline align-middle me-2 w-4 h-4" />
                         {p.name}

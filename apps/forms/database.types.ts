@@ -1989,7 +1989,6 @@ export type Database = {
           id: number
           name: string
           owner_id: string
-          uuid: string
         }
         Insert: {
           avatar_path?: string | null
@@ -1998,7 +1997,6 @@ export type Database = {
           id?: number
           name: string
           owner_id?: string
-          uuid?: string
         }
         Update: {
           avatar_path?: string | null
@@ -2007,7 +2005,6 @@ export type Database = {
           id?: number
           name?: string
           owner_id?: string
-          uuid?: string
         }
         Relationships: [
           {

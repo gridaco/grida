@@ -18,10 +18,7 @@ export function OrganizationAvatar({
         width={40}
         height={40}
         alt={alt ?? "organization avatar"}
-        className={clsx(
-          "rounded-full shadow border overflow-hidden object-cover",
-          className
-        )}
+        className={clsx("overflow-hidden object-cover", className)}
       />
     );
   }
