@@ -105,6 +105,8 @@ export function TossPaymentsCheckout({
 
       paymentMethodsWidgetRef.current = paymentMethodsWidget;
     })();
+
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session?.customerKey, session?.price]);
 
   return (

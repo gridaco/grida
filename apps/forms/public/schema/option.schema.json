@@ -1,0 +1,23 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://forms.grida.co/schema/option.schema.json",
+  "title": "Option",
+  "type": "object",
+  "properties": {
+    "value": {
+      "type": "string"
+    },
+    "label": {
+      "type": "string"
+    },
+    "src": {
+      "type": "string",
+      "format": "uri"
+    },
+    "disabled": {
+      "type": "boolean",
+      "default": false
+    }
+  },
+  "required": ["value"]
+}

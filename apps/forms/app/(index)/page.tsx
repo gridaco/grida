@@ -9,44 +9,23 @@ import {
   AnalysisIcon,
   VisualStudioIcon,
 } from "@/www/icons";
+import { plans } from "@/www/data/plans";
+import { Header } from "../(site)/header";
+import Hero from "./sections/hero";
+import Demo from "./sections/demo";
 import Link from "next/link";
 
 export default function Home() {
   return (
     <main className="relative">
       <Header />
-      <section className="relative flex flex-col  h-[100vh] items-center justify-center">
-        <div className="text-black dark:text-white">
-          <div className="flex flex-col items-center text-center">
-            <h1 className="text-6xl font-bold py-10 text-center">
-              Forms for developers
-            </h1>
-            <p className="text-lg opacity-80 max-w-md">
-              Grida Forms is a{" "}
-              <span>
-                <code className="underline">headless & api-first</code> form
-              </span>
-              builder for developers
-            </p>
-            <Link href="/dashboard/new?plan=free">
-              <button className="mt-16 px-3 py-2 bg-neutral-800 text-white rounded border border-neutral-800 hover:invert transition-all">
-                Start your project
-              </button>
-            </Link>
-          </div>
-        </div>
-        <iframe
-          className="absolute inset-0 w-screen h-screen -z-10"
-          src="/wwwembeddings/aurora"
-          width="100vw"
-          height="100vh"
-        />
-      </section>
+      <Hero />
+      <Demo />
       <div className="container mx-auto px-4">
         <div className="h-16 sm:h-32 lg:h-64" />
         <section>
           <div>
-            <h2 className="text-4xl font-semibold text-center py-20">
+            <h2 className="text-4xl font-semibold text-center py-20 max-w-lg mx-auto">
               Elevate User Experience with Tailored Interactivity{" "}
             </h2>
           </div>
@@ -102,9 +81,9 @@ export default function Home() {
         <section className="mt-72">
           <div className="py-80 flex flex-col items-center gap-7">
             <GridaLogo />
-            <p className="text-4xl font-semibold text-center">
+            <h2 className="text-4xl font-semibold text-center max-w-2xl mx-auto">
               Create Effortlessly, Expand Boundlessly
-            </p>
+            </h2>
             <Link href="/dashboard/new?plan=free">
               <button
                 className="mt-10 px-3 py-2 text-white bg-neutral-800 rounded border border-neutral-800 hover:invert
@@ -198,43 +177,5 @@ function FeatureCard({
         </div>
       </div>
     </div>
-  );
-}
-
-async function Header() {
-  return (
-    <header className="absolute top-0 left-0 right-0 py-4 px-4 md:py-14 md:px-24 flex justify-between items-center z-50">
-      <div className="flex">
-        <span className="flex items-center gap-2">
-          <Link href="https://grida.co" target="_blank">
-            <GridaLogo />
-          </Link>
-          <SlashIcon width={20} height={20} />
-          <Link href="/">
-            <span className="text-2xl font-bold dark:text-white">
-              Grida Forms
-            </span>
-          </Link>
-        </span>
-      </div>
-      <div className="flex gap-10 items-center">
-        <Link
-          href="https://github.com/gridaco/grida/tree/main/apps/forms"
-          target="_blank"
-        >
-          <button className="flex justify-center items-center">
-            <GitHubLogoIcon className="fill-black" width={24} height={24} />
-          </button>
-        </Link>
-        <Link href="/sign-in" className="hidden md:block">
-          <button>Sign in</button>
-        </Link>
-        <Link href="/dashboard/new?plan=free">
-          <button className="px-4 py-2 rounded bg-black text-white dark:bg-white dark:text-black">
-            Get Started
-          </button>
-        </Link>
-      </div>
-    </header>
   );
 }

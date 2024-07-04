@@ -7,7 +7,7 @@ export function DashBoardCustomizeIcon({ size = 30 }: { size?: number }) {
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
     >
-      <g clip-path="url(#clip0_135_232)">
+      <g clipPath="url(#clip0_135_232)">
         <path
           d="M3.75 13.75H13.75V3.75H3.75V13.75ZM6.25 6.25H11.25V11.25H6.25V6.25Z"
           fill="currentColor"

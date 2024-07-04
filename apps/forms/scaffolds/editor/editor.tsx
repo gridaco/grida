@@ -1,20 +1,18 @@
 "use client";
 
-import React, { useCallback, useEffect, useMemo } from "react";
+import React, { useCallback, useMemo } from "react";
 import { StateProvider, useEditorState } from "./provider";
 import { reducer } from "./reducer";
-import {
-  FormEditorInit,
-  FormEditorState,
-  initialFormEditorState,
-} from "./state";
-import { FieldEditPanel } from "../panels/field-edit-panel";
-import { FormFieldDefinition, NewFormFieldInit } from "@/types";
-import { createClientClient } from "@/lib/supabase/client";
-import toast from "react-hot-toast";
+import { FormEditorInit, initialFormEditorState } from "./state";
+import { FieldEditPanel, FormFieldSave } from "../panels/field-edit-panel";
+import { FormFieldDefinition } from "@/types";
 import { FormFieldUpsert, EditorApiResponse } from "@/types/private/api";
 import { TooltipProvider } from "@radix-ui/react-tooltip";
-import { ResponseEditPanel } from "../panels/response-edit-panel";
+import { RowEditPanel } from "../panels/response-edit-panel";
+import { CustomerEditPanel } from "../panels/customer-panel";
+import { BlockEditPanel } from "../panels/block-edit-panel";
+import { MediaViewerProvider } from "../mediaviewer";
+import toast from "react-hot-toast";
 
 export function FormEditorProvider({
   initial,
@@ -28,145 +26,16 @@ export function FormEditorProvider({
   return (
     <StateProvider state={state} dispatch={dispatch}>
       <TooltipProvider>
-        <FieldEditPanelProvider>
-          <ResponseEditPanelProvider>{children}</ResponseEditPanelProvider>
-        </FieldEditPanelProvider>
+        <MediaViewerProvider>
+          <BlockEditPanel />
+          <FieldEditPanelProvider />
+          <RowEditPanelProvider />
+          <CustomerPanelProvider />
+          {children}
+        </MediaViewerProvider>
       </TooltipProvider>
     </StateProvider>
   );
-}
-
-export function InitialResponsesProvider({
-  children,
-}: React.PropsWithChildren<{}>) {
-  const [state, dispatch] = useEditorState();
-
-  const supabase = useMemo(() => createClientClient(), []);
-
-  const initially_fetched_responses = React.useRef(false);
-
-  const fetchResponses = useCallback(async () => {
-    // fetch the responses
-    const { data, error } = await supabase
-      .from("response")
-      .select(
-        `
-            *,
-            fields:response_field(*)
-        `
-      )
-      .eq("form_id", state.form_id)
-      .limit(state.responses_pagination_rows ?? 100);
-
-    if (error) {
-      throw new Error();
-    }
-
-    return data;
-  }, [supabase, state.responses_pagination_rows, state.form_id]);
-
-  useEffect(() => {
-    // initially fetch the responses
-    // this should be done only once
-    if (initially_fetched_responses.current) {
-      return;
-    }
-
-    initially_fetched_responses.current = true;
-
-    const feed = fetchResponses().then((data) => {
-      dispatch({
-        type: "editor/response/feed",
-        data: data,
-      });
-    });
-
-    toast.promise(feed, {
-      loading: "Fetching responses...",
-      success: "Responses fetched",
-      error: "Failed to fetch responses",
-    });
-  }, [dispatch, fetchResponses]);
-
-  return <>{children}</>;
-}
-
-export function FormResponsesProvider({
-  children,
-}: React.PropsWithChildren<{}>) {
-  const [state, dispatch] = useEditorState();
-
-  const supabase = useMemo(() => createClientClient(), []);
-
-  const fetchResponse = useCallback(
-    async (id: string) => {
-      const { data, error } = await supabase
-        .from("response")
-        .select(
-          `
-            *,
-            fields:response_field(*)
-          `
-        )
-        .eq("id", id)
-        .single();
-
-      if (error) {
-        throw new Error();
-      }
-
-      return data;
-    },
-    [supabase]
-  );
-
-  useEffect(() => {
-    const changes = supabase
-      .channel("table-filter-changes")
-      .on(
-        "postgres_changes",
-        {
-          event: "*",
-          schema: "grida_forms",
-          table: "response",
-          filter: `form_id=eq.${state.form_id}`,
-        },
-        (payload) => {
-          const { old, new: _new } = payload;
-
-          // if deleted, the `new` is empty object `{}`
-          const new_id: string | undefined = (_new as { id: string }).id;
-
-          if (new_id) {
-            // fetch the response in detail (delay is required for nested fields to be available)
-            setTimeout(() => {
-              const newresponse = fetchResponse(
-                (_new as { id: string }).id
-              ).then((data) => {
-                console.log("new response", data);
-                dispatch({
-                  type: "editor/response/feed",
-                  data: [data],
-                });
-              });
-
-              toast.promise(newresponse, {
-                loading: "Fetching new response...",
-                success: "New response fetched",
-                error: "Failed to fetch new response",
-              });
-            }, 1000);
-          }
-        }
-      )
-      .subscribe();
-
-    return () => {
-      changes.unsubscribe();
-    };
-  }, [dispatch, fetchResponse, state.form_id, supabase]);
-
-  return <>{children}</>;
 }
 
 function FieldEditPanelProvider({ children }: React.PropsWithChildren<{}>) {
@@ -188,7 +57,7 @@ function FieldEditPanelProvider({ children }: React.PropsWithChildren<{}>) {
   );
 
   const onSaveField = useCallback(
-    (init: NewFormFieldInit) => {
+    (init: FormFieldSave) => {
       const data: FormFieldUpsert = {
         ...init,
         options: init.options?.length ? init.options : undefined,
@@ -198,9 +67,9 @@ function FieldEditPanelProvider({ children }: React.PropsWithChildren<{}>) {
         data: init.data,
       };
 
-      console.log("[EDITOR] saving..", data);
+      // console.log("[EDITOR] saving..", data);
 
-      const promise = fetch("/private/editor/fields", {
+      const promise = fetch(`/private/editor/${state.form_id}/fields`, {
         body: JSON.stringify(data),
         method: "POST",
         headers: {
@@ -215,15 +84,20 @@ function FieldEditPanelProvider({ children }: React.PropsWithChildren<{}>) {
           const { data } =
             (await res.json()) as EditorApiResponse<FormFieldDefinition>;
 
-          // else save the field
-          dispatch({
-            type: "editor/field/save",
-            field_id: data.id,
-            data: data,
-          });
+          if (data) {
+            // else save the field
+            dispatch({
+              type: "editor/field/save",
+              field_id: data.id,
+              data: data,
+            });
+
+            // only close when successful
+            closeFieldPanel({ refresh: true });
+          }
         })
         .finally(() => {
-          closeFieldPanel({ refresh: true });
+          //
         });
 
       toast.promise(promise, {
@@ -249,18 +123,27 @@ function FieldEditPanelProvider({ children }: React.PropsWithChildren<{}>) {
         init={
           field
             ? {
+                id: field.id,
                 name: field.name,
                 type: field.type,
                 label: field.label ?? "",
-                helpText: field.help_text ?? "",
+                help_text: field.help_text ?? "",
                 placeholder: field.placeholder ?? "",
-                options: field.options,
                 required: field.required,
+                readonly: field.readonly,
                 pattern: field.pattern,
+                step: field.step ?? undefined,
+                min: field.min ?? undefined,
+                max: field.max ?? undefined,
                 autocomplete: field.autocomplete,
                 data: field.data,
                 accept: field.accept,
                 multiple: field.multiple ?? undefined,
+                options: field.options,
+                storage: field.storage,
+                reference: field.reference,
+                // TODO: add inventory support
+                // options_inventory: undefined,
               }
             : undefined
         }
@@ -275,22 +158,57 @@ function FieldEditPanelProvider({ children }: React.PropsWithChildren<{}>) {
   );
 }
 
-function ResponseEditPanelProvider({ children }: React.PropsWithChildren<{}>) {
+function RowEditPanelProvider({ children }: React.PropsWithChildren<{}>) {
   const [state, dispatch] = useEditorState();
 
-  const response = useMemo(() => {
-    return state.responses?.find((r) => r.id === state.focus_response_id);
+  const focusresponse = useMemo(() => {
+    return state.responses?.rows?.find((r) => r.id === state.focus_response_id);
   }, [state.responses, state.focus_response_id]);
+
+  const focusxsupabasemaintablerow = useMemo(() => {
+    const pk = state.x_supabase_main_table?.gfpk;
+    if (!pk) return;
+    return state.x_supabase_main_table?.rows?.find(
+      (r) => r[pk] === state.focus_response_id // TODO: - pk
+    );
+  }, [
+    state.x_supabase_main_table?.rows,
+    state.x_supabase_main_table?.gfpk,
+    state.focus_response_id,
+  ]);
 
   return (
     <>
-      <ResponseEditPanel
-        key={response?.id}
-        title="Edit Response"
+      <RowEditPanel
+        key={focusresponse?.id}
         open={state.is_response_edit_panel_open}
-        init={{ response, field_defs: state.fields }}
+        init={{
+          response: focusresponse,
+          response_fields: focusresponse?.id
+            ? state.responses.fields[focusresponse?.id]
+            : [],
+          field_defs: state.fields,
+        }}
         onOpenChange={(open) => {
           dispatch({ type: "editor/responses/edit", open });
+        }}
+      />
+      {children}
+    </>
+  );
+}
+
+function CustomerPanelProvider({ children }: React.PropsWithChildren<{}>) {
+  const [state, dispatch] = useEditorState();
+
+  return (
+    <>
+      <CustomerEditPanel
+        key={state.focus_customer_id}
+        customer_id={state.focus_customer_id}
+        open={state.is_customer_edit_panel_open}
+        onOpenChange={(open) => {
+          dispatch({ type: "editor/customers/edit", open });
         }}
       />
       {children}

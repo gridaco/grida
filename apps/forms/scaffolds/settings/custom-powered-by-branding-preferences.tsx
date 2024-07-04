@@ -1,15 +1,16 @@
 "use client";
 
 import React, { useState } from "react";
-import { Toggle } from "@/components/toggle";
 import {
   PreferenceBody,
   PreferenceBox,
   PreferenceBoxFooter,
   PreferenceBoxHeader,
-  cls_save_button,
 } from "@/components/preferences";
 import { PoweredByGridaWaterMark } from "@/components/powered-by-branding";
+import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 
 export function CustomPoweredByBrandingPreferences({
   form_id,
@@ -32,27 +33,31 @@ export function CustomPoweredByBrandingPreferences({
           method="POST"
         >
           <input type="hidden" name="form_id" value={form_id} />
-          <Toggle
-            name="is_powered_by_branding_enabled"
-            value={enabled}
-            label={enabled ? "Enabled" : "Disabled"}
-            onChange={setEnabled}
-          />
+          <div className="flex items-center space-x-2">
+            <Switch
+              id="is_powered_by_branding_enabled"
+              name="is_powered_by_branding_enabled"
+              checked={enabled}
+              onCheckedChange={setEnabled}
+            />
+            <Label htmlFor="is_powered_by_branding_enabled">
+              {enabled ? "Enabled" : "Disabled"}
+            </Label>
+          </div>
         </form>
         {enabled && (
-          <div className="flex items-center justify-center select-none p-2 bg-neutral-500/10">
+          <div className="mt-10 flex items-center justify-center select-none p-2 bg-neutral-500/10">
             <PoweredByGridaWaterMark />
           </div>
         )}
       </PreferenceBody>
       <PreferenceBoxFooter>
-        <button
+        <Button
           form="/private/editor/settings/powered-by-branding"
           type="submit"
-          className={cls_save_button}
         >
           Save
-        </button>
+        </Button>
       </PreferenceBoxFooter>
     </PreferenceBox>
   );

@@ -11,11 +11,17 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from "@editor-ui/dropdown-menu";
+} from "@/components/ui/dropdown-menu";
 import { EditorFlatFormBlock } from "@/scaffolds/editor/state";
 import { useEditorState } from "@/scaffolds/editor";
-import { BlockHeader, FlatBlockBase, useDeleteBlock } from "./base-block";
+import {
+  BlockHeader,
+  FlatBlockBase,
+  useBlockFocus,
+  useDeleteBlock,
+} from "./base-block";
 import TextareaAutosize from "react-textarea-autosize";
+import { Button } from "@/components/ui/button";
 
 export function HeaderBlock({
   id,
@@ -24,6 +30,7 @@ export function HeaderBlock({
 }: EditorFlatFormBlock) {
   const [state, dispatch] = useEditorState();
   const deleteBlock = useDeleteBlock();
+  const [focused, setFocus] = useBlockFocus(id);
 
   const onEditTitle = useCallback(
     (title: string) => {
@@ -48,7 +55,7 @@ export function HeaderBlock({
   );
 
   return (
-    <FlatBlockBase invalid={false}>
+    <FlatBlockBase focused={focused} invalid={false} onPointerDown={setFocus}>
       <BlockHeader>
         <div className="flex flex-row items-center gap-8">
           <div className="flex flex-col gap-1">
@@ -61,13 +68,13 @@ export function HeaderBlock({
         <div>
           <DropdownMenu modal={false}>
             <DropdownMenuTrigger asChild>
-              <button>
+              <Button variant="ghost" size="icon">
                 <DotsHorizontalIcon />
-              </button>
+              </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent>
               <DropdownMenuItem onClick={() => deleteBlock(id)}>
-                <TrashIcon />
+                <TrashIcon className="me-2 align-middle" />
                 Delete Block
               </DropdownMenuItem>
             </DropdownMenuContent>
@@ -75,7 +82,7 @@ export function HeaderBlock({
         </div>
       </BlockHeader>
       <div>
-        <div className="bg-neutral-200 dark:bg-neutral-800 rounded overflow-hidden border border-black/20 aspect-auto">
+        <div className="bg-card rounded overflow-hidden border border-black/20 aspect-auto">
           <input
             type="text"
             className="w-full p-4 text-2xl font-bold outline-none dark:text-white dark:bg-neutral-900"

@@ -39,18 +39,25 @@ export function PreferenceBody({ children }: React.PropsWithChildren<{}>) {
 
 export function PreferenceBoxHeader({
   heading,
+  description,
   headingBadge,
   actions,
 }: {
   heading?: React.ReactNode;
   headingBadge?: React.ReactNode;
+  description?: React.ReactNode;
   actions?: React.ReactNode;
 }) {
   return (
-    <header className="flex items-center px-6 py-4">
+    <header className="flex items-center px-6 py-4 border-b">
       <div className="w-full flex items-center justify-between">
         <div className="flex items-center gap-x-2">
-          <h2 className="text-lg font-semibold">{heading}</h2>
+          <div>
+            <h2 className="text-lg font-semibold">{heading}</h2>
+            {description && (
+              <PreferenceDescription>{description}</PreferenceDescription>
+            )}
+          </div>
           {headingBadge && (
             <div className="inline-flex items-center rounded-full bg-opacity-10 bg-surface-200 text-foreground-light border border-strong px-2.5 py-0.5 text-xs">
               {headingBadge}
@@ -76,8 +83,23 @@ export function PreferenceBoxFooter({ children }: React.PropsWithChildren<{}>) {
   );
 }
 
-export function Sector({ children }: React.PropsWithChildren<{}>) {
-  return <section className="py-5">{children}</section>;
+export function PreferenceDescription({
+  children,
+}: React.PropsWithChildren<{}>) {
+  return <p className="my-2 text-sm opacity-50">{children}</p>;
+}
+
+export function Sector({
+  id,
+  children,
+}: React.PropsWithChildren<{
+  id?: string;
+}>) {
+  return (
+    <section className="py-5" id={id}>
+      {children}
+    </section>
+  );
 }
 
 export function SectorHeader({ children }: React.PropsWithChildren<{}>) {

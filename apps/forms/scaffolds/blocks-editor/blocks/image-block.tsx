@@ -11,12 +11,18 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from "@editor-ui/dropdown-menu";
+} from "@/components/ui/dropdown-menu";
+import { Button } from "@/components/ui/button";
 import { EditorFlatFormBlock } from "@/scaffolds/editor/state";
-import { BlockHeader, FlatBlockBase, useDeleteBlock } from "./base-block";
+import {
+  BlockHeader,
+  FlatBlockBase,
+  useBlockFocus,
+  useDeleteBlock,
+} from "./base-block";
 import { useEditorState } from "@/scaffolds/editor";
 import * as Tooltip from "@radix-ui/react-tooltip";
-import { MediaPicker } from "@/scaffolds/mediapicker";
+import { AdminMediaPicker } from "@/scaffolds/mediapicker";
 
 export function ImageBlock({
   id,
@@ -27,6 +33,7 @@ export function ImageBlock({
 }: EditorFlatFormBlock) {
   const [state, dispatch] = useEditorState();
   const [pickerOpen, setPickerOpen] = React.useState(false);
+  const [focused, setFocus] = useBlockFocus(id);
 
   const deleteBlock = useDeleteBlock();
 
@@ -42,7 +49,7 @@ export function ImageBlock({
   );
 
   return (
-    <FlatBlockBase>
+    <FlatBlockBase invalid={!src} focused={focused} onPointerDown={setFocus}>
       <BlockHeader>
         <div className="flex flex-row items-center gap-8">
           <span className="flex flex-row gap-2 items-center">
@@ -69,13 +76,13 @@ export function ImageBlock({
           </Tooltip.Root>
           <DropdownMenu modal={false}>
             <DropdownMenuTrigger asChild>
-              <button>
+              <Button variant="ghost" size="icon">
                 <DotsHorizontalIcon />
-              </button>
+              </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent>
               <DropdownMenuItem onClick={() => deleteBlock(id)}>
-                <TrashIcon />
+                <TrashIcon className="me-2 align-middle" />
                 Delete Block
               </DropdownMenuItem>
             </DropdownMenuContent>
@@ -83,7 +90,7 @@ export function ImageBlock({
         </div>
       </BlockHeader>
       <div>
-        <MediaPicker
+        <AdminMediaPicker
           open={pickerOpen}
           onOpenChange={setPickerOpen}
           onUseImage={onChangeImage}

@@ -1,7 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
-import { Toggle } from "@/components/toggle";
+import React from "react";
 import {
   PreferenceBody,
   PreferenceBox,
@@ -10,6 +9,7 @@ import {
   cls_save_button,
   cls_textarea,
 } from "@/components/preferences";
+import { Button } from "@/components/ui/button";
 
 export function TrustedOriginPreferences({}: {}) {
   return (
@@ -34,9 +34,9 @@ export function TrustedOriginPreferences({}: {}) {
         </div>
       </PreferenceBody>
       <PreferenceBoxFooter>
-        <button form="redirect-uri" type="submit" className={cls_save_button}>
+        <Button form="redirect-uri" type="submit" className={cls_save_button}>
           Save
-        </button>
+        </Button>
       </PreferenceBoxFooter>
     </PreferenceBox>
   );

@@ -4,18 +4,6 @@ import React, { useCallback, useEffect, useId, useRef } from "react";
 import { type EditorFlatFormBlock, DRAFT_ID_START_WITH } from "../editor/state";
 import { useEditorState } from "../editor";
 import {
-  CodeIcon,
-  DividerHorizontalIcon,
-  HeadingIcon,
-  ImageIcon,
-  PlusCircledIcon,
-  PlusIcon,
-  ReaderIcon,
-  SectionIcon,
-  TextIcon,
-  VideoIcon,
-} from "@radix-ui/react-icons";
-import {
   DndContext,
   PointerSensor,
   closestCorners,
@@ -23,15 +11,14 @@ import {
   useSensors,
 } from "@dnd-kit/core";
 import { Block, BlocksCanvas } from "./blocks";
-import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { restrictToVerticalAxis } from "@dnd-kit/modifiers";
 import {
   SortableContext,
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
-import { createClientClient } from "@/lib/supabase/client";
+import { createClientFormsClient } from "@/lib/supabase/client";
 import toast from "react-hot-toast";
-import { FormBlockType } from "@/types";
+import { NewBlockButton } from "./new-block-button";
 
 export default function BlocksEditorRoot() {
   return (
@@ -80,7 +67,7 @@ function DndContextProvider({ children }: React.PropsWithChildren<{}>) {
 function PendingBlocksResolver() {
   const [state, dispatch] = useEditorState();
 
-  const supabase = createClientClient();
+  const supabase = createClientFormsClient();
 
   const insertBlock = useCallback(
     async (block: EditorFlatFormBlock) => {
@@ -88,7 +75,6 @@ function PendingBlocksResolver() {
       const { data, error } = await supabase
         .from("form_block")
         .insert({
-          data: {},
           form_id: state.form_id,
           type: block.type,
           form_page_id: state.page_id,
@@ -125,7 +111,7 @@ function PendingBlocksResolver() {
           dispatch({
             type: "blocks/resolve",
             block_id: block.id,
-            block: data,
+            block: { ...data, v_hidden: data.v_hidden as any },
           });
         })
         .catch((e) => {
@@ -145,7 +131,7 @@ function PendingBlocksResolver() {
 function useSyncBlocks(blocks: EditorFlatFormBlock[]) {
   // TODO: add debounce
 
-  const supabase = createClientClient();
+  const supabase = createClientFormsClient();
   const prevBlocksRef = useRef(blocks);
 
   useEffect(() => {
@@ -160,6 +146,7 @@ function useSyncBlocks(blocks: EditorFlatFormBlock[]) {
           !block.parent_id?.startsWith(DRAFT_ID_START_WITH)) ||
         block.local_index !== prevBlock.local_index ||
         block.form_field_id !== prevBlock.form_field_id ||
+        !shallowEqual(block.v_hidden, prevBlock.v_hidden) ||
         block.title_html !== prevBlock.title_html ||
         block.description_html !== prevBlock.description_html ||
         block.body_html !== prevBlock.body_html ||
@@ -177,11 +164,11 @@ function useSyncBlocks(blocks: EditorFlatFormBlock[]) {
             parent_id: block.parent_id,
             local_index: block.local_index,
             form_field_id: block.form_field_id,
+            v_hidden: block.v_hidden,
             title_html: block.title_html,
             description_html: block.description_html,
             body_html: block.body_html,
             src: block.src,
-            updated_at: new Date().toISOString(),
           })
           .eq("id", block.id)
           .single();
@@ -222,9 +209,9 @@ function BlocksEditor() {
     <div>
       <PendingBlocksResolver />
       <OptimisticBlocksSyncProvider />
-      <div className="sticky top-20 z-50">
+      <div className="sticky top-20 z-10">
         <div className="absolute -left-6">
-          <AddBlockButton />
+          <NewBlockButton />
         </div>
       </div>
       <BlocksCanvas id="root" className="flex flex-col gap-4 mt-10">
@@ -245,88 +232,28 @@ function BlocksEditor() {
   );
 }
 
-function AddBlockButton() {
-  const [state, dispatch] = useEditorState();
+function shallowEqual(obj1: any, obj2: any) {
+  if (obj1 === obj2) return true;
 
-  const addBlock = useCallback(
-    (block: FormBlockType) => {
-      dispatch({
-        type: "blocks/new",
-        block: block,
-      });
-    },
-    [dispatch]
-  );
+  if (
+    typeof obj1 !== "object" ||
+    obj1 === null ||
+    typeof obj2 !== "object" ||
+    obj2 === null
+  ) {
+    return false;
+  }
 
-  const addSectionBlock = useCallback(() => addBlock("section"), [addBlock]);
-  const addFieldBlock = useCallback(() => addBlock("field"), [addBlock]);
-  const addHtmlBlock = useCallback(() => addBlock("html"), [addBlock]);
-  const addDividerBlock = useCallback(() => addBlock("divider"), [addBlock]);
-  const addHeaderBlock = useCallback(() => addBlock("header"), [addBlock]);
-  const addImageBlock = useCallback(() => addBlock("image"), [addBlock]);
-  const addVideoBlock = useCallback(() => addBlock("video"), [addBlock]);
-  const addPdfBlock = useCallback(() => addBlock("pdf"), [addBlock]);
+  let keys1 = Object.keys(obj1);
+  let keys2 = Object.keys(obj2);
 
-  return (
-    <DropdownMenu.Root modal={false}>
-      <DropdownMenu.Trigger asChild>
-        <button className="rounded-full w-12 h-12 flex items-center justify-center border bg-white dark:bg-neutral-800 dark:border-neutral-700 p-2">
-          <PlusIcon />
-        </button>
-      </DropdownMenu.Trigger>
-      <DropdownMenu.Portal>
-        <DropdownMenu.Content
-          className="z-50 flex flex-col rounded border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 shadow-lg p-4 gap-2"
-          align="start"
-        >
-          <BlockItem onClick={addFieldBlock}>
-            <PlusCircledIcon />
-            Field
-          </BlockItem>
-          <BlockItem onClick={addImageBlock}>
-            <ImageIcon />
-            Image
-          </BlockItem>
-          <BlockItem onClick={addVideoBlock}>
-            <VideoIcon />
-            Video
-          </BlockItem>
-          <BlockItem onClick={addHtmlBlock}>
-            <CodeIcon />
-            HTML
-          </BlockItem>
-          <BlockItem onClick={addPdfBlock}>
-            <ReaderIcon />
-            Pdf
-          </BlockItem>
-          <BlockItem onClick={addDividerBlock}>
-            <DividerHorizontalIcon />
-            Divider
-          </BlockItem>
-          <BlockItem onClick={addSectionBlock}>
-            <SectionIcon />
-            Section
-          </BlockItem>
-          <BlockItem onClick={addHeaderBlock}>
-            <HeadingIcon />
-            Header
-          </BlockItem>
-        </DropdownMenu.Content>
-      </DropdownMenu.Portal>
-    </DropdownMenu.Root>
-  );
-}
+  if (keys1.length !== keys2.length) return false;
 
-function BlockItem({
-  children,
-  ...props
-}: React.ComponentProps<typeof DropdownMenu.Item>) {
-  return (
-    <DropdownMenu.Item
-      {...props}
-      className="flex gap-2 items-center p-1 cursor-pointer"
-    >
-      {children}
-    </DropdownMenu.Item>
-  );
+  for (let key of keys1) {
+    if (obj1[key] !== obj2[key]) {
+      return false;
+    }
+  }
+
+  return true;
 }

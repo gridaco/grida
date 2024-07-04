@@ -1,16 +1,22 @@
 "use client";
 
 import React, { useState } from "react";
-import { Toggle } from "@/components/toggle";
 import {
   PreferenceBody,
   PreferenceBox,
   PreferenceBoxFooter,
   PreferenceBoxHeader,
-  cls_save_button,
+  PreferenceDescription,
 } from "@/components/preferences";
-import { Select } from "@/components/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { FormResponseUnknownFieldHandlingStrategyType } from "@/types";
+import { Button } from "@/components/ui/button";
 
 export function UnknownFieldPreferences({
   form_id,
@@ -28,12 +34,17 @@ export function UnknownFieldPreferences({
 
   return (
     <PreferenceBox>
-      <PreferenceBoxHeader heading={<>Dynamic Fields</>} />
+      <PreferenceBoxHeader
+        heading={<>Dynamic Fields</>}
+        description={
+          <>
+            When a form is submitted with fields that are not defined in the
+            form schema, you can choose to ignore them or store them as
+            metadata.
+          </>
+        }
+      />
       <PreferenceBody>
-        <p className="opacity-80">
-          When a form is submitted with fields that are not defined in the form
-          schema, you can choose to ignore them or store them as metadata.
-        </p>
         <form
           id="/private/editor/settings/unknown-fields"
           action="/private/editor/settings/unknown-fields"
@@ -46,30 +57,31 @@ export function UnknownFieldPreferences({
                 <Select
                   name="unknown_field_handling_strategy"
                   value={strategy}
-                  onChange={(e) => {
-                    setStrategy(e.target.value as any);
+                  onValueChange={(value) => {
+                    setStrategy(value as any);
                   }}
                 >
-                  <option value="accept">Accept</option>
-                  <option value="ignore">Ignore</option>
-                  <option value="reject">Reject</option>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="accept">Accept</SelectItem>
+                    <SelectItem value="ignore">Ignore</SelectItem>
+                    <SelectItem value="reject">Reject</SelectItem>
+                  </SelectContent>
                 </Select>
-                <div className="opacity-80">
+                <PreferenceDescription>
                   {strategy_descriptions[strategy]}
-                </div>
+                </PreferenceDescription>
               </div>
             </section>
           </div>
         </form>
       </PreferenceBody>
       <PreferenceBoxFooter>
-        <button
-          form="/private/editor/settings/unknown-fields"
-          type="submit"
-          className={cls_save_button}
-        >
+        <Button form="/private/editor/settings/unknown-fields" type="submit">
           Save
-        </button>
+        </Button>
       </PreferenceBoxFooter>
     </PreferenceBox>
   );

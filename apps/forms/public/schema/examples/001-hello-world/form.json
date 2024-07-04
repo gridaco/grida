@@ -1,0 +1,32 @@
+{
+  "$schema": "https://forms.grida.co/schema/form.schema.json",
+  "fields": [
+    {
+      "label": "Name",
+      "name": "name",
+      "type": "text",
+      "required": true
+    },
+    {
+      "label": "Gender",
+      "name": "gender",
+      "type": "select",
+      "required": true,
+      "options": [
+        {
+          "value": "male",
+          "label": "🤦‍♂️"
+        },
+        {
+          "value": "female",
+          "label": "👩‍🔬"
+        }
+      ]
+    },
+    {
+      "name": "birth",
+      "label": "Date of Birth",
+      "type": "date"
+    }
+  ]
+}

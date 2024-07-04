@@ -77,7 +77,6 @@ export async function seed_form_page_blocks({
       type: "section",
       form_id,
       form_page_id,
-      data: {},
       local_index: 0,
     })
     .select("id")
@@ -91,7 +90,6 @@ export async function seed_form_page_blocks({
       form_id,
       form_page_id,
       parent_id: section_1_id,
-      data: {},
       title_html: "Untitled Section",
       local_index: 0,
     },
@@ -100,7 +98,6 @@ export async function seed_form_page_blocks({
       form_id,
       form_page_id,
       parent_id: section_1_id,
-      data: {},
       local_index: 0,
     },
   ]);

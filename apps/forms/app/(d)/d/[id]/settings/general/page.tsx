@@ -13,6 +13,13 @@ import {
 } from "@/components/preferences";
 import { notFound } from "next/navigation";
 import { AboutThisForm } from "@/scaffolds/settings/about-this-form";
+import {
+  MaxRespoonses,
+  RestrictNumberOfResponseByCustomer,
+} from "@/scaffolds/settings/response-preferences";
+import { ClosingFormPreferences } from "@/scaffolds/settings/closing-preference";
+import { SchedulingPreferences } from "@/scaffolds/settings/scheduling-preference";
+import { FormMethodPreference } from "@/scaffolds/settings/form-method-preference";
 
 export default async function FormGeneralSettingsPage({
   params,
@@ -35,7 +42,19 @@ export default async function FormGeneralSettingsPage({
     return notFound();
   }
 
-  const { unknown_field_handling_strategy } = data!;
+  const {
+    unknown_field_handling_strategy,
+    max_form_responses_by_customer,
+    is_max_form_responses_by_customer_enabled,
+    max_form_responses_in_total,
+    is_max_form_responses_in_total_enabled,
+    is_force_closed,
+    is_scheduling_enabled,
+    scheduling_open_at,
+    scheduling_close_at,
+    scheduling_tz,
+    method,
+  } = data!;
 
   return (
     <main className="max-w-2xl mx-auto">
@@ -45,16 +64,63 @@ export default async function FormGeneralSettingsPage({
         </SectorHeader> */}
         <AboutThisForm form_id={form_id} />
       </Sector>
+      <Sector id="access">
+        <SectorHeader>
+          <SectorHeading>Access</SectorHeading>
+          <SectorDescription>
+            Manage how responses are collected and protected
+          </SectorDescription>
+        </SectorHeader>
+        <SectorBlocks>
+          <ClosingFormPreferences
+            form_id={form_id}
+            init={{
+              is_force_closed,
+            }}
+          />
+          <SchedulingPreferences
+            form_id={form_id}
+            init={{
+              is_scheduling_enabled,
+              scheduling_open_at,
+              scheduling_close_at,
+              scheduling_tz,
+            }}
+          />
+          <RestrictNumberOfResponseByCustomer
+            form_id={form_id}
+            init={{
+              is_max_form_responses_by_customer_enabled,
+              max_form_responses_by_customer,
+            }}
+          />
+          <MaxRespoonses
+            form_id={form_id}
+            init={{
+              is_max_form_responses_in_total_enabled,
+              max_form_responses_in_total,
+            }}
+          />
+        </SectorBlocks>
+      </Sector>
       <Sector>
         <SectorHeader>
-          <SectorHeading>Data Integrity</SectorHeading>
+          <SectorHeading>Data</SectorHeading>
         </SectorHeader>
-        <UnknownFieldPreferences
-          form_id={form_id}
-          init={{
-            unknown_field_handling_strategy,
-          }}
-        />
+        <SectorBlocks>
+          <UnknownFieldPreferences
+            form_id={form_id}
+            init={{
+              unknown_field_handling_strategy,
+            }}
+          />
+          <FormMethodPreference
+            form_id={form_id}
+            init={{
+              method: method,
+            }}
+          />
+        </SectorBlocks>
       </Sector>
       <Sector>
         <SectorHeader>

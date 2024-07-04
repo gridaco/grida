@@ -1,10 +1,13 @@
 "use client";
 
-import React, { useCallback } from "react";
+import React, { useCallback, useState } from "react";
 import {
   DotsHorizontalIcon,
+  GearIcon,
   InputIcon,
+  MixIcon,
   Pencil1Icon,
+  PlusIcon,
   TrashIcon,
 } from "@radix-ui/react-icons";
 import {
@@ -12,14 +15,35 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from "@editor-ui/dropdown-menu";
+} from "@/components/ui/dropdown-menu";
 import { EditorFlatFormBlock } from "@/scaffolds/editor/state";
-import { BlockHeader, FlatBlockBase, useDeleteBlock } from "./base-block";
+import {
+  BlockHeader,
+  FlatBlockBase,
+  useBlockFocus,
+  useDeleteBlock,
+} from "./base-block";
 import { useEditorState } from "@/scaffolds/editor";
 import { FormFieldDefinition } from "@/types";
-import { Select } from "@/components/select";
 import Link from "next/link";
-import { FormFieldPreview } from "@/components/formfield";
+import FormFieldPreview from "@/components/formfield";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import clsx from "clsx";
 
 export function FieldBlock({
   id,
@@ -28,6 +52,7 @@ export function FieldBlock({
   data,
 }: EditorFlatFormBlock) {
   const [state, dispatch] = useEditorState();
+  const [focused, setFocus] = useBlockFocus(id);
 
   const form_field: FormFieldDefinition | undefined = state.fields.find(
     (f) => f.id === form_field_id
@@ -35,12 +60,10 @@ export function FieldBlock({
 
   const is_hidden_field = form_field?.type === "hidden";
 
-  const { available_field_ids } = state;
+  const { available_field_ids, fields } = state;
+  const [advanced, setAdvanced] = useState(false);
 
-  const no_available_fields = available_field_ids.length === 0;
-
-  const can_create_new_field_from_this_block =
-    no_available_fields && !form_field;
+  const can_advanced_mode = fields.length > 0;
 
   const deleteBlock = useDeleteBlock();
 
@@ -57,50 +80,152 @@ export function FieldBlock({
 
   const onNewFieldClick = useCallback(() => {
     dispatch({
+      type: "blocks/field/change",
+      block_id: id,
+      field_id: null,
+    });
+    dispatch({
       type: "blocks/field/new",
       block_id: id,
     });
   }, [dispatch, id]);
 
-  const onEditClick = useCallback(() => {
+  const onFieldEditClick = useCallback(() => {
     dispatch({
       type: "editor/field/edit",
       field_id: form_field_id!,
     });
   }, [dispatch, form_field_id]);
 
+  const onLogicEditClick = useCallback(() => {
+    dispatch({
+      type: "editor/panels/block-edit",
+      block_id: id,
+      open: true,
+    });
+  }, [dispatch, id]);
+
   return (
-    <FlatBlockBase invalid={!form_field}>
-      <BlockHeader>
+    <FlatBlockBase
+      focused={focused}
+      invalid={!form_field}
+      onPointerDown={setFocus}
+    >
+      <BlockHeader border>
         <div className="flex flex-row items-center gap-8">
           <span className="flex flex-row gap-2 items-center">
             <InputIcon />
-            <Select
-              value={form_field_id ?? ""}
-              onChange={(e) => {
-                if (e.target.value === "__gf_new") {
-                  onNewFieldClick();
-                  return;
+            <Dialog
+              open={advanced}
+              onOpenChange={(open) => {
+                if (!open) {
+                  setAdvanced(false);
                 }
-                onFieldChange(e.target.value);
               }}
             >
-              <option value="" disabled>
-                Select Field
-              </option>
-              {state.fields.map((f) => (
-                <option
-                  key={f.id}
-                  value={f.id}
-                  disabled={!available_field_ids.includes(f.id)}
+              <DialogContent>
+                <DialogHeader>Advanced Mode</DialogHeader>
+                <DialogDescription>
+                  In advanced mode, you can re-use already referenced field.
+                  This is useful when there are multiple blocks that should be
+                  visible optionally. (Use with caution, only one value will be
+                  accepted if there are multiple rendered blocks with the same
+                  field)
+                </DialogDescription>
+                <div>
+                  <Select
+                    value={form_field_id ?? ""}
+                    onValueChange={(value) => {
+                      onFieldChange(value);
+                    }}
+                  >
+                    <SelectTrigger id="category" aria-label="Select category">
+                      <SelectValue placeholder="Select Field" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {state.fields.map((f) => (
+                        <SelectItem key={f.id} value={f.id} disabled={false}>
+                          {f.name}{" "}
+                          <small>
+                            {!available_field_ids.includes(f.id) &&
+                              `${(() => {
+                                const t = state.blocks.filter(
+                                  (b) => b.form_field_id === f.id
+                                ).length;
+
+                                return `(${t} ${t <= 1 ? "usage" : "usages"})`;
+                              })()} 
+                            `}
+                          </small>
+                          <small className="ms-1 font-mono opacity-50">
+                            {f.id}
+                          </small>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <DialogFooter>
+                  <DialogClose asChild>
+                    <Button>Save</Button>
+                  </DialogClose>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+            {fields.length === 0 ? (
+              <>
+                <Button variant="outline" size="sm" onClick={onNewFieldClick}>
+                  <PlusIcon className="me-2" />
+                  Create Field
+                </Button>
+              </>
+            ) : (
+              <>
+                <Select
+                  value={form_field_id ?? ""}
+                  onValueChange={(value) => {
+                    if (value === "__gf_new") {
+                      onNewFieldClick();
+                      return;
+                    }
+                    if (value === "__gf_advanced") {
+                      setAdvanced(true);
+                      return;
+                    }
+                    onFieldChange(value);
+                  }}
                 >
-                  {f.name}
-                </option>
-              ))}
-              {can_create_new_field_from_this_block && (
-                <option value="__gf_new">Create New Field</option>
-              )}
-            </Select>
+                  <SelectTrigger id="category" aria-label="Select category">
+                    <SelectValue placeholder="Select Field" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {state.fields.map((f) => (
+                      <SelectItem
+                        key={f.id}
+                        value={f.id}
+                        disabled={!available_field_ids.includes(f.id)}
+                      >
+                        {f.name}
+                      </SelectItem>
+                    ))}
+                    <SelectItem value="__gf_new">
+                      <div className="flex items-center">
+                        <PlusIcon className="me-2" />
+                        Create New Field
+                      </div>
+                    </SelectItem>
+                    {can_advanced_mode && (
+                      <SelectItem value="__gf_advanced">
+                        <div className="flex items-center">
+                          <GearIcon className="me-2" />
+                          Advanced
+                        </div>
+                      </SelectItem>
+                    )}
+                  </SelectContent>
+                </Select>
+              </>
+            )}
           </span>
         </div>
         <div>
@@ -112,20 +237,24 @@ export function FieldBlock({
             </DropdownMenuTrigger>
             <DropdownMenuContent>
               {form_field_id && (
-                <DropdownMenuItem onClick={onEditClick}>
-                  <Pencil1Icon />
+                <DropdownMenuItem onClick={onFieldEditClick}>
+                  <Pencil1Icon className="me-2 align-middle" />
                   Edit Field Definition
                 </DropdownMenuItem>
               )}
+              <DropdownMenuItem onClick={onLogicEditClick}>
+                <MixIcon className="me-2 align-middle" />
+                Logic
+              </DropdownMenuItem>
               <DropdownMenuItem onClick={() => deleteBlock(id)}>
-                <TrashIcon />
+                <TrashIcon className="me-2 align-middle" />
                 Delete Block
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
       </BlockHeader>
-      <div className="w-full min-h-40 bg-neutral-200 dark:bg-neutral-800 rounded p-10 border border-black/20">
+      <div className={clsx("w-full bg-card rounded px-4 py-10")}>
         {is_hidden_field ? (
           <div>
             <p className="text-xs opacity-50">
@@ -141,11 +270,17 @@ export function FieldBlock({
         ) : (
           <FormFieldPreview
             readonly
+            preview
             disabled={!!!form_field}
             name={form_field?.name ?? ""}
             label={form_field?.label ?? ""}
             type={form_field?.type ?? "text"}
             required={form_field?.required ?? false}
+            requiredAsterisk
+            pattern={form_field?.pattern ?? ""}
+            step={form_field?.step ?? undefined}
+            min={form_field?.min ?? undefined}
+            max={form_field?.max ?? undefined}
             helpText={form_field?.help_text ?? ""}
             placeholder={form_field?.placeholder ?? ""}
             options={form_field?.options}

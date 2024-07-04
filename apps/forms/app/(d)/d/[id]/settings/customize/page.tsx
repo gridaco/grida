@@ -1,11 +1,7 @@
 import React from "react";
 import { createServerComponentClient } from "@/lib/supabase/server";
 import { FormPageLanguagePreferences } from "@/scaffolds/settings/form-page-language-preferences";
-import { RedirectPreferences } from "@/scaffolds/settings/redirect-preferences";
-import {
-  MaxRespoonses,
-  RestrictNumberOfResponseByCustomer,
-} from "@/scaffolds/settings/response-preferences";
+import { EndingRedirectPreferences } from "@/scaffolds/settings/ending-redirect-preferences";
 import { cookies } from "next/headers";
 import {
   Sector,
@@ -18,7 +14,8 @@ import { notFound } from "next/navigation";
 import { CustomPoweredByBrandingPreferences } from "@/scaffolds/settings/custom-powered-by-branding-preferences";
 import { CustomSectionStylePreferences } from "@/scaffolds/settings/custom-section-style-preferences";
 import { CustomPageBackgroundPreferences } from "@/scaffolds/settings/custom-page-background-preferences";
-import { FormPage } from "@/types";
+import { EndingPageI18nOverrides, FormPage } from "@/types";
+import { EndingPagePreferences } from "@/scaffolds/settings/ending-page-preferences";
 
 export default async function FormsCustomizeSettingsPage({
   params,
@@ -49,15 +46,15 @@ export default async function FormsCustomizeSettingsPage({
   }
 
   const {
+    title,
     default_form_page_language,
     is_powered_by_branding_enabled,
     redirect_after_response_uri,
     is_redirect_after_response_uri_enabled,
-    max_form_responses_by_customer,
-    is_max_form_responses_by_customer_enabled,
-    max_form_responses_in_total,
-    is_max_form_responses_in_total_enabled,
     default_page,
+    is_ending_page_enabled,
+    ending_page_template_id,
+    ending_page_i18n_overrides,
   } = data!;
 
   const { background, stylesheet } = default_page as any as FormPage;
@@ -77,43 +74,32 @@ export default async function FormsCustomizeSettingsPage({
       </Sector>
       <Sector>
         <SectorHeader>
-          <SectorHeading>Responses</SectorHeading>
+          <SectorHeading>Ending</SectorHeading>
           <SectorDescription>
-            Manage how responses are collected and protected
+            Redirect or show custom page after form submission
           </SectorDescription>
         </SectorHeader>
         <SectorBlocks>
-          <RestrictNumberOfResponseByCustomer
+          <EndingRedirectPreferences
             form_id={form_id}
             init={{
-              is_max_form_responses_by_customer_enabled,
-              max_form_responses_by_customer,
+              is_redirect_after_response_uri_enabled:
+                is_redirect_after_response_uri_enabled,
+              redirect_after_response_uri: redirect_after_response_uri ?? "",
             }}
           />
-          <MaxRespoonses
+          <EndingPagePreferences
             form_id={form_id}
+            lang={default_form_page_language}
+            title={title}
             init={{
-              is_max_form_responses_in_total_enabled,
-              max_form_responses_in_total,
+              enabled: is_ending_page_enabled,
+              template_id: ending_page_template_id as any,
+              i18n_overrides:
+                ending_page_i18n_overrides as {} as EndingPageI18nOverrides,
             }}
           />
         </SectorBlocks>
-      </Sector>
-      <Sector>
-        <SectorHeader>
-          <SectorHeading>Redirection</SectorHeading>
-          <SectorDescription>
-            Customize redirection url after submission
-          </SectorDescription>
-        </SectorHeader>
-        <RedirectPreferences
-          form_id={form_id}
-          init={{
-            is_redirect_after_response_uri_enabled:
-              is_redirect_after_response_uri_enabled,
-            redirect_after_response_uri: redirect_after_response_uri ?? "",
-          }}
-        />
       </Sector>
       <Sector>
         <SectorHeader>

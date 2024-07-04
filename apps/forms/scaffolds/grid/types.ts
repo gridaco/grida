@@ -1,4 +1,49 @@
-export interface GFRow {
+import type { FormInputType, GridaSupabase } from "@/types";
+
+export type GFSystemColumnTypes =
+  | "__gf_display_id"
+  | "__gf_created_at"
+  | "__gf_customer_id";
+
+export type GFResponseFieldData = {
+  type?: FormInputType;
+  value: any;
+  readonly?: boolean;
+  multiple?: boolean;
+  option_id?: string | null;
+  options?: {
+    [key: string]: { value: string; label?: string };
+  };
+  files?: GFFile[];
+};
+
+export type GFFile = {
+  src: string;
+  srcset: {
+    thumbnail: string;
+    original: string;
+  };
+  download: string;
+  upsert?: string;
+  name: string;
+};
+
+export type GFResponseRow = {
   __gf_id: string;
-  [key: string]: string | number | boolean;
-}
+  __gf_display_id: string;
+  __gf_created_at?: string;
+  __gf_customer_id?: string | null;
+  fields: Record<string, GFResponseFieldData>;
+};
+
+export type CFCustomerRow = {
+  uid: string;
+  email: string | null;
+  // name: string;
+  phone: string | null;
+  // address: string;
+  created_at: string;
+  last_seen_at: string;
+};
+
+export type XSupabaseReferenceTableRow = GridaSupabase.SupabaseUser | any;

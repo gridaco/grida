@@ -10,15 +10,15 @@ const type_form_field_type = `export type FormFieldType = | ${supported_field_ty
 
 const interface_txt = `
 \`\`\`
-export type NewFormFieldInit = {
+export type FormField = {
   name: string; // The input's name, identifier. Recommended to use lowercase and use an underscore to separate words e.g. column_name
   label: string; // Human readable label
-  placeholder: string; // Placeholder text
-  helpText: string; // Help text, displayed below the field
   type: FormFieldType; // Type of field
+  placeholder: string; // Placeholder text
   required: boolean; // Whether the field is required
-  options?: { label: string; value: string }[]; // Options for [select, radio]
+  help_text: string; // Help text, displayed below the field
   pattern?: string; // Regular expression pattern for validation (for html input pattern attribute)
+  options?: { label: string; value: string }[]; // Options for [select, radio]
 };
 
 ${type_form_field_type}
@@ -41,13 +41,13 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const prompt = `Based on the user's field description: "${description}", create a form field schema with the \`NewFormFieldInit\` interface. The json should be acceptable by the following interface with JSON.parse()
+  const prompt = `Based on the user's field description: "${description}", create a form field schema with the \`FormField\` interface. The json should be acceptable by the following interface with JSON.parse()
 ${interface_txt}
 `;
 
   try {
     const response = await openai.chat.completions.create({
-      model: "gpt-4-1106-preview",
+      model: "gpt-4o",
       messages: [
         {
           role: "system",
@@ -68,9 +68,9 @@ ${interface_txt}
     });
 
     const content = response.choices[0].message.content!;
-    console.log(content);
+    console.log("ai", content);
     let schema = JSON.parse(content);
-    console.log(schema);
+    console.log("ai", schema);
 
     // Validate the type field
     if (!supported_field_types.includes(schema.type)) {

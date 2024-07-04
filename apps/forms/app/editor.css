@@ -1,32 +1,3 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
-
 /* https://github.com/adazzle/react-data-grid/issues/3460#issuecomment-2016837753 */
 @import "react-data-grid/lib/styles.css";
-
-:root {
-  --foreground-rgb: 0, 0, 0;
-  --background-rgb: 250, 250, 250;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --foreground-rgb: 255, 255, 255;
-    --background-rgb: 23, 23, 23;
-  }
-}
-
-body {
-  color: rgb(var(--foreground-rgb));
-  background: rgb(var(--background-rgb));
-}
-
-@layer base {
-  *,
-  ::before,
-  ::after {
-    @apply border-neutral-300;
-    @apply dark:border-neutral-700;
-  }
-}
+@import "./ui.css";

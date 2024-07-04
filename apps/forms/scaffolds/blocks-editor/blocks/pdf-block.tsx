@@ -1,6 +1,5 @@
 "use client";
 
-import { useCallback, useState } from "react";
 import {
   DotsHorizontalIcon,
   ReaderIcon,
@@ -11,9 +10,15 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from "@editor-ui/dropdown-menu";
+} from "@/components/ui/dropdown-menu";
+import { Button } from "@/components/ui/button";
 import { EditorFlatFormBlock } from "@/scaffolds/editor/state";
-import { BlockHeader, FlatBlockBase, useDeleteBlock } from "./base-block";
+import {
+  BlockHeader,
+  FlatBlockBase,
+  useBlockFocus,
+  useDeleteBlock,
+} from "./base-block";
 import { useEditorState } from "@/scaffolds/editor";
 import { PDFViewer } from "@/components/pdf-viewer";
 
@@ -25,11 +30,12 @@ export function PdfBlock({
   data,
 }: EditorFlatFormBlock) {
   const [state, dispatch] = useEditorState();
+  const [focused, setFocus] = useBlockFocus(id);
 
   const deleteBlock = useDeleteBlock();
 
   return (
-    <FlatBlockBase invalid={!src}>
+    <FlatBlockBase focused={focused} onPointerDown={setFocus} invalid={!src}>
       <BlockHeader>
         <div className="flex flex-col gap-2">
           <div className="flex flex-row items-center gap-8">
@@ -43,13 +49,13 @@ export function PdfBlock({
         <div>
           <DropdownMenu modal={false}>
             <DropdownMenuTrigger asChild>
-              <button>
+              <Button variant="ghost" size="icon">
                 <DotsHorizontalIcon />
-              </button>
+              </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent>
               <DropdownMenuItem onClick={() => deleteBlock(id)}>
-                <TrashIcon />
+                <TrashIcon className="me-2 align-middle" />
                 Delete Block
               </DropdownMenuItem>
             </DropdownMenuContent>
