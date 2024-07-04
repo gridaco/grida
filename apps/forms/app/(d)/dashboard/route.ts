@@ -1,7 +1,4 @@
-import {
-  createRouteHandlerClient,
-  workspaceclient,
-} from "@/lib/supabase/server";
+import { createRouteHandlerWorkspaceClient } from "@/lib/supabase/server";
 import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -11,7 +8,7 @@ export async function GET(req: NextRequest) {
   const origin = req.nextUrl.origin;
 
   const cookieStore = cookies();
-  const supabase = createRouteHandlerClient(cookieStore);
+  const supabase = createRouteHandlerWorkspaceClient(cookieStore);
 
   const { data: auth } = await supabase.auth.getUser();
   if (!auth.user) {
@@ -20,9 +17,8 @@ export async function GET(req: NextRequest) {
     });
   }
 
-  // TODO: use extra table to store last accessed project rather than using the first project under the organization
   // get the user organization
-  const { data: membership, error } = await workspaceclient
+  const { data: memberships, error } = await supabase
     .from("organization_member")
     .select(
       `
@@ -33,26 +29,40 @@ export async function GET(req: NextRequest) {
       )
     `
     )
-    .eq("user_id", auth.user.id)
-    .limit(1)
-    .single();
+    .eq("user_id", auth.user.id);
 
-  if (!membership) {
+  if (error) console.error(error);
+  if (!memberships || memberships.length === 0) {
     return NextResponse.redirect(origin + "/organizations/new", {
       status: 307,
     });
   }
 
-  if (membership.organization!.projects.length === 0) {
-    // TODO: redirect to a page that says the user's organization has no projects
-    return NextResponse.json({
-      error: "User's organization has no projects",
-    });
-  }
+  const { data: state, error: stateerr } = await supabase
+    .from("user_project_access_state")
+    .select()
+    .eq("user_id", auth.user.id)
+    .single();
 
-  const { name: project_name } = membership.organization!.projects[0];
+  const organizations = memberships.map((m) => m.organization);
 
-  return NextResponse.redirect(origin + "/" + project_name, {
+  const lastproject = state?.project_id
+    ? organizations
+        ?.flatMap((o) => o!.projects)
+        .find((p) => p.id === state.project_id)
+    : null;
+
+  const organization = lastproject
+    ? organizations.find((o) => o!.id === lastproject?.organization_id)!
+    : organizations[0]!;
+
+  const dashboard =
+    origin +
+    "/" +
+    organization.name +
+    (lastproject ? "/" + lastproject.name : "");
+
+  return NextResponse.redirect(dashboard, {
     status: 307,
   });
 }

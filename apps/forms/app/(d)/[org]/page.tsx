@@ -52,22 +52,6 @@ export default async function DashboardProjectsPage({
     return redirect("/sign-in");
   }
 
-  // const { data: state, error: stateerr } = await wsclient
-  //   .from("user_project_access_state")
-  //   .select()
-  //   .eq("user_id", auth.user.id)
-  //   .single();
-
-  // const lastproject = state?.project_id
-  //   ? organizations
-  //       ?.flatMap((o) => o.projects)
-  //       .find((p) => p.id === state.project_id)
-  //   : null;
-
-  // const organization = lastproject
-  //   ? organizations.find((o) => o.id === lastproject?.organization_id)!
-  //   : organizations[0];
-
   const { data: organization, error: err } = await wsclient
     .from("organization")
     .select(`*, projects:project(*)`)
