@@ -7,6 +7,8 @@ import * as k from "./data";
 import { GridaLogo } from "@/components/grida-logo";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { TopBottomFadingGradientOverlay } from "./gradient";
+import bentomainbg from "../../../../public/affiliate/poc/images/bento-fullsize-video-card-background.png";
+import { cn } from "@/utils";
 
 export function Demo() {
   return (
@@ -42,19 +44,53 @@ export function Demo() {
             </TabsList>
             {k.demo_2_categories.map((category) => (
               <TabsContent key={category} value={category}>
-                <div className="flex flex-col gap-5 px-8 sm:px-24">
-                  <Image
-                    className="border md:h-[776px] w-full rounded-xl shadow-lg overflow-hidden object-cover"
-                    src={k.imagesDemo2[category].main.artwork}
-                    alt={`${category}-main`}
-                    width={1400}
-                    height={776}
-                  />
+                <div className="container flex flex-col gap-5 px-8">
+                  <div className="relative rounded-xl shadow-lg overflow-hidden border">
+                    <div className="absolute top-10 left-10 md:top-20 md:left-20">
+                      <span className="flex flex-col gap-1">
+                        {k.imagesDemo2[category].main.text.map((t, i) => {
+                          const islast =
+                            i === k.imagesDemo2[category].main.text.length - 1;
+                          return (
+                            <BentoCardKeyword
+                              key={i}
+                              className="text-4xl md:text-7xl font-black"
+                              steps={
+                                islast
+                                  ? k.imagesDemo2[category].main
+                                      .highlightColorStops
+                                  : undefined
+                              }
+                            >
+                              {t}
+                            </BentoCardKeyword>
+                          );
+                        })}
+                      </span>
+                    </div>
+                    <Image
+                      priority
+                      className=" md:h-[776px] w-full object-cover"
+                      src={k.imagesDemo2[category].main.artwork}
+                      alt={`${category}-main`}
+                      width={1400}
+                      height={776}
+                    />
+                    <Image
+                      priority
+                      className="absolute inset-0 w-full h-full object-cover -z-10"
+                      src={bentomainbg}
+                      alt={`${category}-main`}
+                      width={1400}
+                      height={776}
+                    />
+                    {/* bento-fullsize-video-card-background.png */}
+                  </div>
 
                   <div className="flex flex-col lg:grid lg:grid-cols-4 gap-5">
                     {k.imagesDemo2[category].subs.map((sub, i) => {
                       return (
-                        <DemoSubCard
+                        <BentoCard
                           key={i}
                           artwork={sub.artwork}
                           alt={`${category}-sub2`}
@@ -62,7 +98,7 @@ export function Demo() {
                           text2={sub.description}
                           className={clsx(
                             "relative rounded-xl shadow-lg w-full border overflow-hidden",
-                            "md:h-[340px]",
+                            "md:h-[320px]",
                             i === 0 ? "lg:col-start-1 lg:col-span-2" : ""
                           )}
                         />
@@ -79,7 +115,29 @@ export function Demo() {
   );
 }
 
-function DemoSubCard({
+function BentoCardKeyword({
+  className,
+  steps,
+  children,
+}: React.PropsWithChildren<{
+  className?: string;
+  steps?: [string, string, string];
+}>) {
+  //
+  const gradientClasses = steps
+    ? `text-transparent bg-gradient-to-r ${steps.join(" ")} bg-clip-text`
+    : "";
+
+  return (
+    <span>
+      <h1 className={cn(gradientClasses, "inline-block", className)}>
+        {children}
+      </h1>
+    </span>
+  );
+}
+
+function BentoCard({
   artwork,
   alt,
   text1,
@@ -100,7 +158,7 @@ function DemoSubCard({
         <span className="max-w-sm text-sm text-muted-foreground">{text2}</span>
       </div>
       <Image
-        className=" hidden md:block absolute inset-0 overflow-hidden object-right-bottom object-cover w-full h-full -z-10"
+        className=" hidden md:block absolute right-0 top-0 bottom-0 overflow-hidden object-right-bottom object-cover w-auto h-full -z-10"
         src={artwork}
         alt={alt}
         width={500}

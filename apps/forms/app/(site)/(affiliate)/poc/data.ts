@@ -36,12 +36,18 @@ interface DemoCardData {
 export const imagesDemo2: Record<
   string,
   {
-    main: { artwork: string };
+    main: {
+      text: string[];
+      highlightColorStops: [string, string, string];
+      artwork: string;
+    };
     subs: DemoCardData[];
   }
 > = {
   "캠페인 매니저": {
     main: {
+      text: ["플랜", "프리뷰", "오픈"],
+      highlightColorStops: ["from-orange-600", "via-red-500", "to-orange-400"],
       artwork: "/affiliate/poc/images/demo-2-images/campaign-image-main.png",
     },
     subs: [
@@ -66,6 +72,8 @@ export const imagesDemo2: Record<
   },
   "대용량 트래픽": {
     main: {
+      text: ["강력한", "큐 관리"],
+      highlightColorStops: ["from-blue-700", "via-blue-500", "to-green-400"],
       artwork: "/affiliate/poc/images/demo-2-images/traffic-image-main.png",
     },
     subs: [
@@ -91,6 +99,8 @@ export const imagesDemo2: Record<
   },
   "티켓/인벤토리": {
     main: {
+      text: ["티켓팅", "인벤토리"],
+      highlightColorStops: ["from-red-400", "via-pink-400", "to-purple-500"],
       artwork: "/affiliate/poc/images/demo-2-images/ticketing-image-main.png",
     },
     subs: [
@@ -115,6 +125,12 @@ export const imagesDemo2: Record<
   },
   고객관리: {
     main: {
+      text: ["똑똑한", "고객 관리"],
+      highlightColorStops: [
+        "from-orange-500",
+        "via-yellow-400",
+        "to-orange-200",
+      ],
       artwork: "/affiliate/poc/images/demo-2-images/customer-image-main.png",
     },
     subs: [
@@ -138,6 +154,8 @@ export const imagesDemo2: Record<
   },
   개발자: {
     main: {
+      text: ["바닥부터", "Headless"],
+      highlightColorStops: ["from-green-700", "via-green-500", "to-green-300"],
       artwork: "/affiliate/poc/images/demo-2-images/developer-image-main.png",
     },
     subs: [
