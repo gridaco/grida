@@ -9,6 +9,7 @@ import {
 import {
   CaretDownIcon,
   DotIcon,
+  DotsHorizontalIcon,
   FileIcon,
   GearIcon,
   HomeIcon,
@@ -31,7 +32,7 @@ import {
   SidebarMenuList,
   SidebarSectionHeader,
   SidebarSectionHeaderAction,
-  SidebarSectionHeaderActions,
+  SidebarMenuItemActions,
   SidebarSectionHeaderLabel,
 } from "@/components/sidebar";
 import { CreateNewProjectDialog } from "./new-project-dialog";
@@ -111,7 +112,7 @@ export default async function DashboardProjectsPage({
   return (
     <div className="h-full flex flex-1 w-full">
       <nav className="relative w-60 h-full shrink-0 overflow-y-auto border-e">
-        <header className="sticky top-0 mx-2 pt-4 py-2 bg-background border-b">
+        <header className="sticky top-0 mx-2 pt-4 py-2 bg-background border-b z-10">
           <WorkspaceMenu current={organization.id}>
             <SidebarMenuItem className="py-2">
               <OrganizationAvatar
@@ -158,13 +159,13 @@ export default async function DashboardProjectsPage({
               <SidebarSectionHeaderLabel>
                 <span>Projects</span>
               </SidebarSectionHeaderLabel>
-              <SidebarSectionHeaderActions>
+              <SidebarMenuItemActions>
                 <CreateNewProjectDialog org={organization.name}>
                   <SidebarSectionHeaderAction>
                     <PlusIcon className="w-4 h-4" />
                   </SidebarSectionHeaderAction>
                 </CreateNewProjectDialog>
-              </SidebarSectionHeaderActions>
+              </SidebarMenuItemActions>
             </SidebarSectionHeader>
             <SidebarMenuList>
               {organization.projects.map((p) => {
@@ -175,6 +176,11 @@ export default async function DashboardProjectsPage({
                       <SidebarMenuItem key={p.name} muted>
                         <PanelsTopLeftIcon className="inline align-middle me-2 w-4 h-4" />
                         {p.name}
+                        <SidebarMenuItemActions>
+                          <SidebarSectionHeaderAction>
+                            <DotsHorizontalIcon className="w-4 h-4" />
+                          </SidebarSectionHeaderAction>
+                        </SidebarMenuItemActions>
                       </SidebarMenuItem>
                     </Link>
 

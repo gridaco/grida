@@ -22,6 +22,7 @@ export function SidebarMenuItem({
       data-level={level}
       data-muted={muted}
       className={cn(
+        "relative group",
         "w-full px-2 py-1 rounded hover:bg-accent text-sm font-medium text-foreground data-[muted='true']:text-muted-foreground",
         "text-ellipsis whitespace-nowrap overflow-hidden",
         className
@@ -42,7 +43,7 @@ export function SidebarSectionHeader({
   return (
     <div
       className={cn(
-        "group",
+        "relative group",
         "w-full px-2 py-1 my-1 rounded hover:bg-accent text-sm font-medium text-foreground data-[muted='true']:text-muted-foreground",
         "text-ellipsis whitespace-nowrap overflow-hidden",
         "flex justify-between items-center",
@@ -64,11 +65,11 @@ export function SidebarSectionHeaderLabel({
   );
 }
 
-export function SidebarSectionHeaderActions({
+export function SidebarMenuItemActions({
   children,
 }: React.PropsWithChildren<{}>) {
   return (
-    <div className="align-middle inline-flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+    <div className="absolute right-1 top-0 bottom-0 flex gap-2 items-center bg-background opacity-0 group-hover:opacity-100 group-hover:bg-accent transition-opacity rounded">
       {children}
     </div>
   );
