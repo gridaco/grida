@@ -29,9 +29,10 @@ import {
 } from "@dnd-kit/core";
 import { fmt_snake_case_to_human_text } from "@/utils/fmt";
 import { restrictToVerticalAxis } from "@dnd-kit/modifiers";
-import type { Option } from "@/types";
 import { Button } from "@/components/ui/button";
-import { MediaPicker } from "../mediapicker";
+import { AdminMediaPicker } from "../mediapicker";
+import type { Option } from "@/types";
+import { Input } from "@/components/ui/input";
 
 export function OptionsEdit({
   options,
@@ -227,8 +228,8 @@ function OptionEditItem({
           <DragHandleDots2Icon className="opacity-50" />
         </button>
         <label className="flex-1">
-          <input
-            className="block w-full p-2 text-gray-900 border border-gray-300 rounded-lg bg-gray-50 text-xs focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500"
+          <Input
+            className="block w-full"
             type="text"
             placeholder="option_value"
             value={value}
@@ -242,17 +243,15 @@ function OptionEditItem({
             "relative gap-2 flex-[2]"
           )}
         >
-          <input
-            className={
-              "block w-full p-2 text-gray-900 border border-gray-300 rounded-lg bg-gray-50 text-xs focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500"
-            }
+          <Input
+            className={"block w-full"}
             type="text"
             placeholder="Option Label"
             value={label}
             onChange={(e) => setLabel(e.target.value)}
           />
           <div>
-            <MediaPicker
+            <AdminMediaPicker
               open={mediaPickerOpen}
               onOpenChange={setMediaPickerOpen}
               onUseImage={(src) => {

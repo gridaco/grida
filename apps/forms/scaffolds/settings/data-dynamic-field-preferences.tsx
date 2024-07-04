@@ -1,14 +1,12 @@
 "use client";
 
 import React, { useState } from "react";
-import { Toggle } from "@/components/toggle";
 import {
   PreferenceBody,
   PreferenceBox,
   PreferenceBoxFooter,
   PreferenceBoxHeader,
   PreferenceDescription,
-  cls_save_button,
 } from "@/components/preferences";
 import {
   Select,

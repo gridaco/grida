@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import { ThemeProvider } from "@/components/theme-provider";
-import { Toaster } from "react-hot-toast";
+import { ToasterWithMax } from "@/components/toaster";
 
 import "../editor.css";
 
@@ -19,7 +19,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={inter.className}>
-        <Toaster />
+        <ToasterWithMax position="bottom-center" max={5} />
         <ThemeProvider
           attribute="class"
           defaultTheme="system"

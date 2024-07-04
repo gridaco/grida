@@ -2,23 +2,29 @@ import type { FormInputType } from "@/types";
 
 export function unwrapFeildValue(
   value: any,
-  type: FormInputType,
-  options?: {
-    obscure?: boolean;
-  }
-): string | number | boolean {
-  const unwrapped = JSON.parse(value);
+  type?: FormInputType
+): object | string | number | boolean | undefined | null {
+  if (value === null) return null;
+  if (value === undefined) return undefined;
 
   switch (type) {
     case "email":
     case "tel":
     case "text":
-      return unwrapped;
+    case "number":
+    case "textarea":
+      return value;
     case "password":
-      return options?.obscure ? "●".repeat(unwrapped.length) : unwrapped;
+      return "●".repeat(value.length);
+    case "switch":
     case "checkbox":
-      return unwrapped as boolean;
+      return parseCheckboxValue(value);
     default:
-      return unwrapped;
+      return value;
   }
+}
+
+function parseCheckboxValue(value: "on" | "off" | boolean): boolean {
+  if (typeof value === "boolean") return value;
+  return value === "on";
 }

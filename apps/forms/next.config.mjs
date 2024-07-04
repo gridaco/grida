@@ -6,6 +6,18 @@ const nextConfig = withMDX()({
   experimental: {
     mdxRs: true,
   },
+  images: {
+    remotePatterns: [
+      {
+        protocol: "https",
+        hostname: "mozagqllybnbytfcmvdh.supabase.co",
+      },
+      {
+        protocol: "https",
+        hostname: "base.grida.co",
+      },
+    ],
+  },
   webpack: (config) => {
     // https://github.com/wojtekmaj/react-pdf?tab=readme-ov-file#nextjs
     config.resolve.alias.canvas = false;

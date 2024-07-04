@@ -13,7 +13,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { SignatureCanvas } from "../signature-canvas";
+import { SignatureCanvas } from "./signature-canvas";
 import { StripePaymentFormFieldPreview } from "./form-field-preview-payment-stripe";
 import { TossPaymentsPaymentFormFieldPreview } from "./form-field-preview-payment-tosspayments";
 import clsx from "clsx";
@@ -21,7 +21,7 @@ import { ClockIcon, PlusIcon } from "@radix-ui/react-icons";
 import { Checkbox } from "@/components/ui/checkbox";
 import useSafeSelectValue from "./use-safe-select-value";
 import { Switch } from "../ui/switch";
-import { Slider } from "../ui/slider";
+import { Slider } from "../ui/slider"; // TODO: this causes hydration error
 import { Toggle } from "../ui/toggle";
 import { ToggleGroup, ToggleGroupItem } from "../ui/toggle-group";
 import { RadioGroup, RadioGroupItem } from "../ui/radio-group";
@@ -30,6 +30,26 @@ import { Input } from "../ui/input";
 import { Button } from "../ui/button";
 import { Card } from "../ui/card";
 import { Label } from "../ui/label";
+import {
+  FileUploadField,
+  getMaxUploadSize,
+  makeResolver,
+  makeUploader,
+} from "./file-upload-field";
+import {
+  GRIDA_FORMS_RESPONSE_BUCKET_UPLOAD_LIMIT,
+  GRIDA_FORMS_RESPONSE_FILES_MAX_COUNT_PER_FIELD,
+  GRIDA_FORMS_RESPONSE_MULTIPART_FILE_UOLOAD_LIMIT,
+} from "@/k/env";
+import type { FileResolveStrategy, FileUploadStrategy } from "@/lib/forms";
+import assert from "assert";
+import {
+  ReferenceSearch,
+  ReferenceSearchPreview,
+} from "./reference-search-field";
+import { PhoneField } from "./phone-field";
+import { RichTextEditorField } from "./richtext-field";
+import { FieldProperties } from "@/k/supported_field_types";
 
 /**
  * this disables the auto zoom in input text tag safari on iphone by setting font-size to 16px
@@ -38,23 +58,29 @@ import { Label } from "../ui/label";
 const cls_input_ios_zoom_disable = "!text-base sm:!text-sm";
 
 interface IInputField {
+  id?: string;
   name: string;
   label?: string;
   type: FormInputType;
   placeholder?: string;
   helpText?: string;
   required?: boolean;
+  readonly?: boolean;
   requiredAsterisk?: boolean;
   defaultValue?: string;
   options?: Option[];
   pattern?: string;
-  readonly?: boolean;
+  step?: number;
+  min?: number;
+  max?: number;
   disabled?: boolean;
   autoComplete?: string;
   accept?: string;
   multiple?: boolean;
   labelCapitalize?: boolean;
   data?: FormFieldDataSchema | null;
+  fileupload?: FileUploadStrategy;
+  fileresolve?: FileResolveStrategy;
   onValueChange?: (value: string) => void;
   onCheckedChange?: (checked: boolean) => void;
 }
@@ -117,6 +143,7 @@ function FormField({ is_array, ...props }: IFormFieldRenderingProps) {
 }
 
 function MonoFormField({
+  id,
   name,
   label,
   labelCapitalize,
@@ -133,7 +160,12 @@ function MonoFormField({
   accept,
   multiple,
   pattern,
+  step,
+  min,
+  max,
   data,
+  fileupload,
+  fileresolve,
   novalidate,
   vanilla,
   locked,
@@ -167,9 +199,9 @@ function MonoFormField({
     pattern: novalidate ? undefined : pattern || undefined,
     // minLength: novalidate ? undefined : data?.min_length,
     // maxLength: novalidate ? undefined : data?.max_length,
-    // min: novalidate ? undefined : data?.min,
-    // max: novalidate ? undefined : data?.max,
-    // step: novalidate ? undefined : data?.step,
+    min: novalidate ? undefined : min,
+    max: novalidate ? undefined : max,
+    step: novalidate ? undefined : step,
 
     // extended
     onChange: __onchange,
@@ -202,7 +234,6 @@ function MonoFormField({
   function renderInput() {
     switch (type) {
       case "text":
-      case "tel":
       case "email":
       case "number":
       case "url":
@@ -240,10 +271,83 @@ function MonoFormField({
           />
         );
       }
-      case "file": {
+      case "tel": {
+        if (vanilla) {
+          return (
+            <HtmlInput
+              type={type}
+              {...(sharedInputProps as React.ComponentProps<"input">)}
+            />
+          );
+        }
+
+        if (process.env.NODE_ENV === "development") {
+          // TODO: phone field is not ready yet due to lack of reliable way for setting initial country code
+          return (
+            // @ts-ignore
+            <PhoneField
+              {...(sharedInputProps as React.ComponentProps<"input">)}
+            />
+          );
+        }
+
         return (
-          <HtmlFileInput
+          // @ts-ignore
+          <Input
+            type={type}
             {...(sharedInputProps as React.ComponentProps<"input">)}
+          />
+        );
+      }
+      case "image":
+      case "audio":
+      case "video":
+      case "file": {
+        const accept =
+          (sharedInputProps as React.ComponentProps<"input">).accept ??
+          FieldProperties.accept(type);
+
+        if (vanilla) {
+          assert(
+            fileupload?.type === "multipart" || fileupload?.type === undefined,
+            "fileupload type must be multipart"
+          );
+
+          return (
+            <HtmlFileInput
+              type="file"
+              {...(sharedInputProps as React.ComponentProps<"input">)}
+              accept={accept}
+            />
+          );
+        }
+
+        return (
+          <FileUploadField
+            name={sharedInputProps.name}
+            required={novalidate ? false : required}
+            accept={accept}
+            multiple={multiple}
+            maxFiles={
+              multiple ? GRIDA_FORMS_RESPONSE_FILES_MAX_COUNT_PER_FIELD : 1
+            }
+            maxSize={getMaxUploadSize(fileupload?.type)}
+            uploader={makeUploader(fileupload)}
+          />
+        );
+      }
+      case "richtext": {
+        return (
+          <RichTextEditorField
+            name={name}
+            required={required}
+            placeholder={placeholder}
+            initialContent={defaultValue ? JSON.parse(defaultValue) : undefined}
+            onContentChange={(content) => {
+              onValueChange?.(JSON.stringify(content));
+            }}
+            uploader={makeUploader(fileupload)}
+            resolver={makeResolver(fileresolve)}
           />
         );
       }
@@ -385,10 +489,8 @@ function MonoFormField({
       case "range": {
         return (
           // @ts-ignore
-          <Slider
+          <SliderWithValueLabel
             {...(sharedInputProps as React.ComponentProps<"input">)}
-            // TODO:
-            // onValueChange={}
           />
         );
       }
@@ -397,6 +499,19 @@ function MonoFormField({
           // TODO: this is not accepted by form.
           <SignatureCanvas
             {...(sharedInputProps as React.ComponentProps<"input">)}
+          />
+        );
+      }
+
+      case "search": {
+        if (preview) {
+          return <ReferenceSearchPreview />;
+        }
+        return (
+          // @ts-ignore
+          <ReferenceSearch
+            {...(sharedInputProps as React.ComponentProps<"input">)}
+            field_id={id ?? ""}
           />
         );
       }
@@ -557,11 +672,11 @@ function MonoFormField({
   }
 
   return (
-    <label data-field-type={type} className="flex flex-col gap-1">
+    <div data-field-type={type} className="grid gap-2">
       <LabelText />
       {renderInput()}
       <HelpText />
-    </label>
+    </div>
   );
 }
 
@@ -618,8 +733,8 @@ function SelectWithSafeValue({
     // @ts-ignore
     <Select
       {...(inputProps as React.ComponentProps<"select">)}
-      // this is required, unless, the real native select won't change and fail to validate accurately
-      key={value}
+      // !!this is required, otherwise, the real native select won't change and fail to validate accurately
+      /*!!*/ key={value} /*!!*/
       value={value || undefined}
       // TODO: same reason, disabling defaultValue to display placeholder
       defaultValue={(defaultValue || undefined) as string}
@@ -799,6 +914,29 @@ function PaymentField({
     default:
       return <StripePaymentFormFieldPreview />;
   }
+}
+
+function SliderWithValueLabel(
+  props: Omit<React.ComponentProps<typeof Slider>, "onValueChange">
+) {
+  const [value, setValue] = useState(props.value);
+
+  const onValueChange = (value: number[]) => {
+    setValue(value);
+  };
+
+  return (
+    <div className="relative">
+      <Slider {...props} onValueChange={onValueChange} />
+      <div className="absolute end-0 bottom-2">
+        {value && (
+          <span className="text-sm text-muted-foreground">
+            {value?.[0]}/{props.max ?? 100}
+          </span>
+        )}
+      </div>
+    </div>
+  );
 }
 
 export default FormField;

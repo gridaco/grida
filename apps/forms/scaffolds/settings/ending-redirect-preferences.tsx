@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useState } from "react";
-import { Toggle } from "@/components/toggle";
 import {
   PreferenceBody,
   PreferenceBox,
@@ -9,9 +8,11 @@ import {
   PreferenceBoxHeader,
   PreferenceDescription,
   cls_input,
-  cls_save_button,
 } from "@/components/preferences";
 import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
 
 export function EndingRedirectPreferences({
   form_id,
@@ -37,16 +38,20 @@ export function EndingRedirectPreferences({
           method="POST"
         >
           <input type="hidden" name="form_id" value={form_id} />
-          <Toggle
-            name="is_redirect_after_response_uri_enabled"
-            value={enabled}
-            label={enabled ? "Enabled" : "Disabled"}
-            onChange={setEnabled}
-          />
-
-          <div className="flex flex-col gap-8">
-            <label className="flex flex-col gap-2">
-              <input
+          <div className="flex flex-col gap-2">
+            <div className="flex items-center space-x-2">
+              <Switch
+                id="is_redirect_after_response_uri_enabled"
+                name="is_redirect_after_response_uri_enabled"
+                checked={enabled}
+                onCheckedChange={setEnabled}
+              />
+              <Label htmlFor="is_redirect_after_response_uri_enabled">
+                {enabled ? "Enabled" : "Disabled"}
+              </Label>
+            </div>
+            <label className="flex flex-col">
+              <Input
                 name="redirect_after_response_uri"
                 type="text"
                 disabled={!enabled}

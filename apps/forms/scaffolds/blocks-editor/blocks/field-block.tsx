@@ -15,7 +15,7 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from "@editor-ui/dropdown-menu";
+} from "@/components/ui/dropdown-menu";
 import { EditorFlatFormBlock } from "@/scaffolds/editor/state";
 import {
   BlockHeader,
@@ -62,10 +62,6 @@ export function FieldBlock({
 
   const { available_field_ids, fields } = state;
   const [advanced, setAdvanced] = useState(false);
-  const no_available_fields = available_field_ids.length === 0;
-
-  const can_create_new_field_from_this_block =
-    no_available_fields && !form_field;
 
   const can_advanced_mode = fields.length > 0;
 
@@ -83,6 +79,11 @@ export function FieldBlock({
   );
 
   const onNewFieldClick = useCallback(() => {
+    dispatch({
+      type: "blocks/field/change",
+      block_id: id,
+      field_id: null,
+    });
     dispatch({
       type: "blocks/field/new",
       block_id: id,
@@ -110,7 +111,7 @@ export function FieldBlock({
       invalid={!form_field}
       onPointerDown={setFocus}
     >
-      <BlockHeader>
+      <BlockHeader border>
         <div className="flex flex-row items-center gap-8">
           <span className="flex flex-row gap-2 items-center">
             <InputIcon />
@@ -207,14 +208,12 @@ export function FieldBlock({
                         {f.name}
                       </SelectItem>
                     ))}
-                    {can_create_new_field_from_this_block && (
-                      <SelectItem value="__gf_new">
-                        <div className="flex items-center">
-                          <PlusIcon className="me-2" />
-                          Create New Field
-                        </div>
-                      </SelectItem>
-                    )}
+                    <SelectItem value="__gf_new">
+                      <div className="flex items-center">
+                        <PlusIcon className="me-2" />
+                        Create New Field
+                      </div>
+                    </SelectItem>
                     {can_advanced_mode && (
                       <SelectItem value="__gf_advanced">
                         <div className="flex items-center">
@@ -239,27 +238,23 @@ export function FieldBlock({
             <DropdownMenuContent>
               {form_field_id && (
                 <DropdownMenuItem onClick={onFieldEditClick}>
-                  <Pencil1Icon />
+                  <Pencil1Icon className="me-2 align-middle" />
                   Edit Field Definition
                 </DropdownMenuItem>
               )}
               <DropdownMenuItem onClick={onLogicEditClick}>
-                <MixIcon />
+                <MixIcon className="me-2 align-middle" />
                 Logic
               </DropdownMenuItem>
               <DropdownMenuItem onClick={() => deleteBlock(id)}>
-                <TrashIcon />
+                <TrashIcon className="me-2 align-middle" />
                 Delete Block
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
       </BlockHeader>
-      <div
-        className={clsx(
-          "w-full min-h-40 bg-neutral-200 dark:bg-neutral-800 rounded p-10 border border-black/20"
-        )}
-      >
+      <div className={clsx("w-full bg-card rounded px-4 py-10")}>
         {is_hidden_field ? (
           <div>
             <p className="text-xs opacity-50">
@@ -282,6 +277,10 @@ export function FieldBlock({
             type={form_field?.type ?? "text"}
             required={form_field?.required ?? false}
             requiredAsterisk
+            pattern={form_field?.pattern ?? ""}
+            step={form_field?.step ?? undefined}
+            min={form_field?.min ?? undefined}
+            max={form_field?.max ?? undefined}
             helpText={form_field?.help_text ?? ""}
             placeholder={form_field?.placeholder ?? ""}
             options={form_field?.options}

@@ -18,6 +18,8 @@ import {
   RestrictNumberOfResponseByCustomer,
 } from "@/scaffolds/settings/response-preferences";
 import { ClosingFormPreferences } from "@/scaffolds/settings/closing-preference";
+import { SchedulingPreferences } from "@/scaffolds/settings/scheduling-preference";
+import { FormMethodPreference } from "@/scaffolds/settings/form-method-preference";
 
 export default async function FormGeneralSettingsPage({
   params,
@@ -47,6 +49,11 @@ export default async function FormGeneralSettingsPage({
     max_form_responses_in_total,
     is_max_form_responses_in_total_enabled,
     is_force_closed,
+    is_scheduling_enabled,
+    scheduling_open_at,
+    scheduling_close_at,
+    scheduling_tz,
+    method,
   } = data!;
 
   return (
@@ -71,6 +78,15 @@ export default async function FormGeneralSettingsPage({
               is_force_closed,
             }}
           />
+          <SchedulingPreferences
+            form_id={form_id}
+            init={{
+              is_scheduling_enabled,
+              scheduling_open_at,
+              scheduling_close_at,
+              scheduling_tz,
+            }}
+          />
           <RestrictNumberOfResponseByCustomer
             form_id={form_id}
             init={{
@@ -89,14 +105,22 @@ export default async function FormGeneralSettingsPage({
       </Sector>
       <Sector>
         <SectorHeader>
-          <SectorHeading>Data Integrity</SectorHeading>
+          <SectorHeading>Data</SectorHeading>
         </SectorHeader>
-        <UnknownFieldPreferences
-          form_id={form_id}
-          init={{
-            unknown_field_handling_strategy,
-          }}
-        />
+        <SectorBlocks>
+          <UnknownFieldPreferences
+            form_id={form_id}
+            init={{
+              unknown_field_handling_strategy,
+            }}
+          />
+          <FormMethodPreference
+            form_id={form_id}
+            init={{
+              method: method,
+            }}
+          />
+        </SectorBlocks>
       </Sector>
       <Sector>
         <SectorHeader>

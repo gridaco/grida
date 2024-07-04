@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React from "react";
 import {
   PanelClose,
   PanelContent,
@@ -15,45 +15,57 @@ import {
 } from "@/components/panels/side-panel";
 import {
   FormFieldDefinition,
-  FormInputType,
   FormResponse,
   FormFieldInit,
+  FormResponseField,
 } from "@/types";
-import { LockClosedIcon } from "@radix-ui/react-icons";
-import toast from "react-hot-toast";
-import { Editor } from "@monaco-editor/react";
+import { Editor, useMonaco } from "@monaco-editor/react";
 import { fmt_local_index } from "@/utils/fmt";
+import { useTheme } from "next-themes";
+import { useMonacoTheme } from "@/components/monaco";
+import { Button } from "@/components/ui/button";
 
-export function ResponseEditPanel({
-  title,
+export function RowEditPanel({
   onSave,
   init,
-  disableAI,
   ...props
 }: React.ComponentProps<typeof SidePanel> & {
-  title?: string;
-  init?: Partial<{ response: FormResponse; field_defs: FormFieldDefinition[] }>;
-  disableAI?: boolean;
+  init?: Partial<{
+    response: FormResponse;
+    response_fields: FormResponseField[];
+    field_defs: FormFieldDefinition[];
+  }>;
   onSave?: (field: FormFieldInit) => void;
 }) {
-  const { response, field_defs } = init ?? {};
+  const { response, response_fields, field_defs } = init ?? {};
+
+  const { resolvedTheme } = useTheme();
+
+  const monaco = useMonaco();
+  useMonacoTheme(monaco, resolvedTheme ?? "light");
 
   const onSaveClick = () => {};
 
   return (
     <SidePanel {...props}>
-      <PanelHeader>{title}</PanelHeader>
+      <PanelHeader>{`Response ${init?.response?.local_index ? fmt_local_index(init.response?.local_index) : ""}`}</PanelHeader>
       <PanelContent>
         <PanelPropertySection>
           <PanelPropertySectionTitle>General</PanelPropertySectionTitle>
           <PanelPropertyFields>
-            <PanelPropertyField label={"ID"}>
+            <PanelPropertyField label={"Local Index"}>
+              <PropertyTextInput value={response?.local_index} disabled />
+            </PanelPropertyField>
+            <PanelPropertyField label={"IDX"}>
               <PropertyTextInput
                 value={fmt_local_index(response?.local_index ?? NaN)}
                 disabled
               />
             </PanelPropertyField>
-            <PanelPropertyField label={"Instance ID"}>
+            <PanelPropertyField label={"Local ID"}>
+              <PropertyTextInput value={response?.local_id ?? ""} disabled />
+            </PanelPropertyField>
+            <PanelPropertyField label={"UUID"}>
               <PropertyTextInput value={response?.id} disabled />
             </PanelPropertyField>
             <PanelPropertyField label={"Created At"}>
@@ -83,7 +95,7 @@ export function ResponseEditPanel({
             <PanelPropertySectionTitle>Response</PanelPropertySectionTitle>
             <PanelPropertyFields>
               {field_defs?.map((def) => {
-                const record = response?.fields?.find(
+                const record = response_fields?.find(
                   (f) => f.form_field_id === def.id
                 );
 
@@ -132,9 +144,7 @@ export function ResponseEditPanel({
       </PanelContent>
       <PanelFooter>
         <PanelClose>
-          <button className="rounded p-2 bg-neutral-100 dark:bg-neutral-900">
-            Close
-          </button>
+          <Button variant="secondary">Close</Button>
         </PanelClose>
         {/* <button onClick={onSaveClick} className="rounded p-2 bg-neutral-100">
           Save

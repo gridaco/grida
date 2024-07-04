@@ -19,18 +19,19 @@ import useSWR from "swr";
 import { FormCustomerDetail } from "@/app/(api)/private/editor/customers/[uid]/route";
 import { fmt_local_index } from "@/utils/fmt";
 import Link from "next/link";
-import { Link1Icon, Link2Icon } from "@radix-ui/react-icons";
+import { Link2Icon } from "@radix-ui/react-icons";
+import { Skeleton } from "@/components/ui/skeleton";
+import clsx from "clsx";
+import { provisional } from "@/services/customer/utils";
 
 export function CustomerEditPanel({
-  title,
   customer_id,
   ...props
 }: React.ComponentProps<typeof Sheet> & {
-  title: React.ReactNode;
-  customer_id: string;
+  customer_id?: string;
 }) {
   const { data: customer } = useSWR<FormCustomerDetail>(
-    `/private/editor/customers/${customer_id}`,
+    customer_id ? `/private/editor/customers/${customer_id}` : undefined,
     async (url: string) => {
       const res = await fetch(url);
       return res.json();
@@ -39,12 +40,15 @@ export function CustomerEditPanel({
 
   return (
     <Sheet {...props}>
-      <SheetContent>
+      <SheetContent className="overflow-y-scroll">
         <SheetHeader>
-          <SheetTitle>{title}</SheetTitle>
-          <SheetDescription>{/* // */}</SheetDescription>
+          {/* <SheetTitle>{title}</SheetTitle> */}
+          {/* <SheetDescription></SheetDescription> */}
         </SheetHeader>
-        <div className="grid gap-4 py-4">
+        <div className={clsx("py-4", !customer ? "block" : "hidden")}>
+          <Loading />
+        </div>
+        <div className={clsx("grid gap-4 py-4", !customer && "hidden")}>
           <div className="grid grid-cols-4 items-center gap-4">
             <Avatar className="w-24 h-24">
               {/* <AvatarImage src="https://github.com/shadcn.png" /> */}
@@ -84,7 +88,10 @@ export function CustomerEditPanel({
               id="email"
               readOnly
               placeholder="Empty"
-              value={customer?.email ?? undefined}
+              value={provisional(
+                customer?.email,
+                customer?.email_provisional
+              ).join(", ")}
               className="col-span-3"
             />
           </div>
@@ -96,7 +103,10 @@ export function CustomerEditPanel({
               id="phone"
               readOnly
               placeholder="Empty"
-              value={customer?.phone ?? undefined}
+              value={provisional(
+                customer?.phone,
+                customer?.phone_provisional
+              ).join(", ")}
               className="col-span-3"
             />
           </div>
@@ -142,4 +152,18 @@ function avatar_txt(customer: Customer) {
   }
 
   return "#" + customer.uid.split("").splice(0, 4).join("").toUpperCase();
+}
+
+function Loading() {
+  return (
+    <>
+      <Skeleton className="h-24 w-24 rounded-full" />
+      <div className="mt-10 flex flex-col gap-2">
+        <Skeleton className="h-5" />
+        <Skeleton className="h-5" />
+        <Skeleton className="h-5" />
+        <Skeleton className="h-5" />
+      </div>
+    </>
+  );
 }

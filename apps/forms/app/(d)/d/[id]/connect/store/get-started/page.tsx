@@ -102,7 +102,7 @@ function ConnectStoreForm() {
       id="connect-store-form"
       action={`/private/editor/connect/${state.form_id}/store/connection`}
       method="POST"
-      className="prose"
+      className="prose dark:prose-invert"
     >
       <Select
         value={store_id}

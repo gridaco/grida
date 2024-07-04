@@ -29,7 +29,7 @@ export async function GET(
     return NextResponse.redirect(
       editorlink(origin, form_id, "connect/store/get-started"),
       {
-        status: 301,
+        status: 307,
       }
     );
   }
@@ -37,7 +37,7 @@ export async function GET(
   return NextResponse.redirect(
     editorlink(origin, form_id, "connect/store/products"),
     {
-      status: 301,
+      status: 302,
     }
   );
 }
