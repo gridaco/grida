@@ -386,3 +386,12 @@ export interface ConnectionSupabaseJoint {
   main_supabase_table_id: number | null;
   supabase_project_id: number;
 }
+
+export interface Organization {
+  avatar_path: string | null;
+  created_at: string;
+  email: string | null;
+  id: number;
+  name: string;
+  owner_id: string;
+}

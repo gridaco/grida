@@ -12,6 +12,7 @@ export default function PlaygroundPreview() {
       <ThemeProvider
         attribute="class"
         defaultTheme="system"
+        storageKey="playground-embed-theme"
         enableSystem
         disableTransitionOnChange
       >

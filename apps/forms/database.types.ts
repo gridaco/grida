@@ -1929,11 +1929,11 @@ export type Database = {
           id: number
           int2: number | null
           int4: number | null
-          json: Json | null
           jsonb: Json | null
           numeric: number | null
           richtext: Json | null
           text: string
+          timestamptz: string | null
           user_id: string | null
           varchar: string | null
         }
@@ -1946,11 +1946,11 @@ export type Database = {
           id?: number
           int2?: number | null
           int4?: number | null
-          json?: Json | null
           jsonb?: Json | null
           numeric?: number | null
           richtext?: Json | null
           text: string
+          timestamptz?: string | null
           user_id?: string | null
           varchar?: string | null
         }
@@ -1963,11 +1963,11 @@ export type Database = {
           id?: number
           int2?: number | null
           int4?: number | null
-          json?: Json | null
           jsonb?: Json | null
           numeric?: number | null
           richtext?: Json | null
           text?: string
+          timestamptz?: string | null
           user_id?: string | null
           varchar?: string | null
         }
@@ -1985,26 +1985,26 @@ export type Database = {
         Row: {
           avatar_path: string | null
           created_at: string
+          email: string | null
           id: number
           name: string
           owner_id: string
-          uuid: string
         }
         Insert: {
           avatar_path?: string | null
           created_at?: string
+          email?: string | null
           id?: number
           name: string
           owner_id?: string
-          uuid?: string
         }
         Update: {
           avatar_path?: string | null
           created_at?: string
+          email?: string | null
           id?: number
           name?: string
           owner_id?: string
-          uuid?: string
         }
         Relationships: [
           {
@@ -2080,6 +2080,39 @@ export type Database = {
             columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "organization"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_project_access_state: {
+        Row: {
+          project_id: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          project_id: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          project_id?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_project_access_state_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "project"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_project_access_state_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "users"
             referencedColumns: ["id"]
           },
         ]

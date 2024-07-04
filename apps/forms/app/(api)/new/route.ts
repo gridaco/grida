@@ -31,7 +31,7 @@ export async function POST(request: NextRequest) {
     }
 
     return NextResponse.redirect(origin + `/d/${form_id}/blocks`, {
-      status: 301,
+      status: 302,
     });
   } catch (e) {
     console.error("error while creating new form", e);
