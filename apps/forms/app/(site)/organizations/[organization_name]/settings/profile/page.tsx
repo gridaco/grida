@@ -17,9 +17,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { createRouteHandlerWorkspaceClient } from "@/lib/supabase/server";
 import { cookies } from "next/headers";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
 import { GridaLogo } from "@/components/grida-logo";
+import { DeleteOrganizationConfirm } from "./delete";
+import { Badge } from "@/components/ui/badge";
 
 export default async function OrganizationsSettingsProfilePage({
   params,
@@ -33,6 +35,12 @@ export default async function OrganizationsSettingsProfilePage({
 
   const supabase = createRouteHandlerWorkspaceClient(cookieStore);
 
+  const { data: auth } = await supabase.auth.getUser();
+
+  if (!auth.user) {
+    return redirect("/sign-in");
+  }
+
   const { data, error } = await supabase
     .from("organization")
     .select()
@@ -44,8 +52,10 @@ export default async function OrganizationsSettingsProfilePage({
     return notFound();
   }
 
+  const isowner = data.owner_id === auth.user.id;
+
   return (
-    <main className="container mx-auto max-w-screen-md mt-20">
+    <main className="container mx-auto max-w-screen-md mt-20 mb-40 grid gap-40">
       <Nav org={organization_name} />
       <Card>
         <CardHeader>
@@ -58,37 +68,70 @@ export default async function OrganizationsSettingsProfilePage({
               <Input disabled readOnly value={data.name} />
             </div>
             <div className="grid gap-2">
-              <Label>Organization display name</Label>
+              <Label htmlFor="display_name">Organization display name</Label>
               <Input
+                id="display_name"
                 name="display_name"
                 placeholder="Organization display name"
               />
             </div>
             <div className="grid gap-2">
-              <Label>Email (will be public)</Label>
+              <Label htmlFor="email">Email (will be public)</Label>
               <Input
                 type="email"
+                id="email"
                 name="email"
                 placeholder="alice@acme.com"
                 defaultValue={data.email ?? undefined}
               />
             </div>
             <div className="grid gap-2">
-              <Label>Description</Label>
+              <Label htmlFor="description">Description</Label>
               <Input
+                id="description"
                 name="description"
                 placeholder="Organization description"
               />
             </div>
             <div className="grid gap-2">
-              <Label>URL</Label>
-              <Input type="url" name="url" placeholder="https://acme.com" />
+              <Label htmlFor="url">URL</Label>
+              <Input
+                type="url"
+                id="url"
+                name="url"
+                placeholder="https://acme.com"
+              />
             </div>
           </form>
         </CardContent>
         <CardFooter className="flex justify-end items-center border-t pt-6">
           <Button>Save</Button>
         </CardFooter>
+      </Card>
+      <Card className="border-destructive">
+        <CardHeader>
+          <CardTitle className="text-destructive">Danger Zone</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <form className="flex justify-between items-center gap-10 py-4 border-y">
+            <div className="grid gap-1">
+              <span className="font-bold">
+                Delete this organization
+                <Badge variant="secondary" className="inline ms-2 align-middle">
+                  owner
+                </Badge>
+              </span>
+              <span>
+                Once deleted, it will be gone forever. Please be certain.
+              </span>
+            </div>
+            <DeleteOrganizationConfirm org={organization_name}>
+              <Button disabled={!isowner} variant="destructive">
+                Delete this organization
+              </Button>
+            </DeleteOrganizationConfirm>
+          </form>
+        </CardContent>
       </Card>
     </main>
   );
