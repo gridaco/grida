@@ -134,12 +134,14 @@ export default async function DashboardProjectsPage({
                   <Link href="/dashboard/settings">Search</Link>
                 </MenuItem>
               </li> */}
-              {/* <li>
-                <MenuItem muted>
+              <li>
+                <SidebarMenuItem muted>
                   <GearIcon className="inline align-middle me-2 w-4 h-4" />
-                  <Link href="/dashboard/settings">Settings</Link>
-                </MenuItem>
-              </li> */}
+                  <Link href={`/organizations/${organization.name}/settings`}>
+                    Settings
+                  </Link>
+                </SidebarMenuItem>
+              </li>
             </ul>
           </section>
         </header>

@@ -43,6 +43,7 @@ export function CreateNewProjectDialog({
     `Your project url will be https://grida.co/${org}/project-name`
   );
   const [pending, setPending] = useState(false);
+  const [busy, setBusy] = useState(false);
 
   const value = useDebounce(name, 500);
 
@@ -81,6 +82,9 @@ export function CreateNewProjectDialog({
           action={`/private/accounts/organizations/${org}/projects/new`}
           method="post"
           id="new-project"
+          onSubmit={(e) => {
+            setBusy(true);
+          }}
         >
           <div className="grid gap-2">
             <Label htmlFor="name">Project name</Label>
@@ -113,7 +117,7 @@ export function CreateNewProjectDialog({
           <DialogClose>
             <Button variant="ghost">Close</Button>
           </DialogClose>
-          <Button form="new-project" disabled={!valid}>
+          <Button form="new-project" disabled={!valid || busy}>
             Create Project
           </Button>
         </DialogFooter>
