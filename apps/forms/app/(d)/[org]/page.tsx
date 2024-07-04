@@ -7,6 +7,7 @@ import {
   createServerComponentWorkspaceClient,
 } from "@/lib/supabase/server";
 import {
+  DotIcon,
   FileIcon,
   GearIcon,
   HomeIcon,
@@ -22,7 +23,7 @@ import { OrganizationAvatar } from "@/components/organization-avatar";
 import { GridCard, RowCard } from "@/components/site/form-card";
 import { cn } from "@/utils";
 import { PanelsTopLeftIcon } from "lucide-react";
-import { WorkspaceMenu } from "./ord-menu";
+import { WorkspaceMenu } from "./org-menu";
 import { PublicUrls } from "@/services/public-urls";
 
 export const revalidate = 0;
@@ -155,7 +156,7 @@ export default async function DashboardProjectsPage({
                         prefetch={false}
                       >
                         <MenuItem level={1} muted>
-                          <FileIcon className="inline align-middle w-4 h-4 me-2" />
+                          <DotIcon className="inline align-middle w-4 h-4 me-2" />
                           {form.title}
                         </MenuItem>
                       </Link>
