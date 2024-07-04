@@ -34,9 +34,6 @@ export const pricing: Pricing = {
     features: [
       {
         title: "Smart Customer Identity",
-        // tooltips: {
-        //   main: "The sum of all objects' size in your storage buckets.\nBilling is based on the average daily size in GB throughout your billing period.",
-        // },
         plans: {
           free: false,
           pro: true,

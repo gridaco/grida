@@ -68,7 +68,7 @@ function SolutionCard({
   title: React.ReactNode;
 }) {
   return (
-    <div className="max-w-sm px-4 py-4 border bg-white/5 border-muted rounded shadow-lg transition-transform duration-200 ease-in-out hover:scale-105">
+    <div className="max-w-80 w-full px-4 py-4 border bg-white/5 border-muted rounded shadow-lg transition-transform duration-200 ease-in-out hover:scale-105">
       <Image
         src={cover}
         alt={alt ?? ""}

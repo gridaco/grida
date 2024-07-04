@@ -7,8 +7,8 @@ import { TopBottomFadingGradientOverlay } from "./gradient";
 
 export function Solutions2() {
   return (
-    <section className="flex flex-col my-40">
-      <div className=" bg-muted/50 w-full mx-0 sm:px-32 overflow-hidden">
+    <section className="bg-muted/50 flex flex-col my-40">
+      <section className="container w-full overflow-hidden">
         <div className="flex flex-col lg:flex-row">
           <aside className="lg:flex-1 py-32">
             <h2 className=" text-4xl font-bold text-center lg:text-left">
@@ -44,41 +44,39 @@ export function Solutions2() {
             />
           </aside>
         </div>
-      </div>
+      </section>
 
-      <div>
-        <section className="w-full mx-0 sm:px-32 overflow-hidden">
-          <div className="flex flex-col-reverse lg:flex-row">
-            <aside className="lg:flex-1">
-              <TopBottomFadingGradientOverlay>
-                <Image
-                  src="/affiliate/poc/images/section-cover-2.png"
-                  alt="section 2"
-                  width={650}
-                  height={400}
-                  className="transition-transform duration-200 ease-in-out hover:scale-105"
-                />
-              </TopBottomFadingGradientOverlay>
-            </aside>
-            <aside className="md:flex-1 py-32 content-center">
-              <div className="flex flex-col sm:px-32">
-                <h2 className=" text-4xl font-bold text-center lg:text-left">
-                  POC와 함께라면
-                  <br />
-                  정말 쉬운 이벤트 준비
-                </h2>
-                <p className=" text-muted-foreground mt-6 text-center lg:text-left">
-                  기업 및 브랜드에 알맞은 이벤트 폼으로,
-                  <br />
-                  고객의 높은 참여율과 편리한 이벤트 관리를 보장할 수 있습니다.
-                </p>
-              </div>
-            </aside>
-          </div>
-        </section>
-      </div>
-      <div className="bg-muted/50 w-full mx-0 sm:px-32 overflow-hidden">
-        <div className="flex flex-col lg:flex-row">
+      <section className="w-full overflow-hidden bg-background">
+        <div className="container flex flex-col-reverse lg:flex-row">
+          <aside className="lg:flex-1">
+            <TopBottomFadingGradientOverlay>
+              <Image
+                src="/affiliate/poc/images/section-cover-2.png"
+                alt="section 2"
+                width={650}
+                height={400}
+                className="transition-transform duration-200 ease-in-out hover:scale-105"
+              />
+            </TopBottomFadingGradientOverlay>
+          </aside>
+          <aside className="md:flex-1 py-32 content-center">
+            <div className="flex flex-col sm:px-32">
+              <h2 className=" text-4xl font-bold text-center lg:text-left">
+                POC와 함께라면
+                <br />
+                정말 쉬운 이벤트 준비
+              </h2>
+              <p className=" text-muted-foreground mt-6 text-center lg:text-left">
+                기업 및 브랜드에 알맞은 이벤트 폼으로,
+                <br />
+                고객의 높은 참여율과 편리한 이벤트 관리를 보장할 수 있습니다.
+              </p>
+            </div>
+          </aside>
+        </div>
+      </section>
+      <section className="bg-muted/50 w-full mx-0 overflow-hidden">
+        <div className="container flex flex-col lg:flex-row">
           <aside className="flex flex-col lg:flex-1 py-32 items-center lg:items-start">
             <h2 className=" text-4xl font-bold text-center lg:text-left">
               오직 여기서만 가능한.
@@ -102,7 +100,7 @@ export function Solutions2() {
             />
           </aside>
         </div>
-      </div>
+      </section>
     </section>
   );
 }
