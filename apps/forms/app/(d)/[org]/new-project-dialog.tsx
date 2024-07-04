@@ -69,7 +69,7 @@ export function CreateNewProjectDialog({
 
   return (
     <Dialog>
-      <DialogTrigger>{children}</DialogTrigger>
+      <DialogTrigger asChild>{children}</DialogTrigger>
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Create a new project</DialogTitle>
@@ -78,7 +78,7 @@ export function CreateNewProjectDialog({
           </DialogDescription>
         </DialogHeader>
         <form
-          action={`/private/accounts/organizations/${org}/new`}
+          action={`/private/accounts/organizations/${org}/projects/new`}
           method="post"
           id="new-project"
         >

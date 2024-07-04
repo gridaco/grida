@@ -42,7 +42,10 @@ export async function POST(
   });
 
   if (error) {
-    console.error(error);
+    console.error("project/new", error, {
+      organization_id: orgref.id,
+      name: String(name),
+    });
     return NextResponse.error();
   }
 
