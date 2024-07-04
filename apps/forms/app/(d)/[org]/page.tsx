@@ -207,7 +207,7 @@ export default async function DashboardProjectsPage({
           {organization.projects.map((p) => {
             const projectforms = forms.filter((f) => f.project_id === p.id);
             return (
-              <div key={p.id} className="mb-10">
+              <div key={p.id} className="mb-40">
                 <header className="py-4 mb-2 flex justify-between items-center">
                   <div>
                     <h2 className="text-2xl font-bold">{p.name}</h2>
