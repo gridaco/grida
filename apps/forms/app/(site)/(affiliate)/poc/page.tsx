@@ -7,6 +7,7 @@ import { Solutions } from "./solution";
 import { Solutions2 } from "./solution-2";
 import { ShowCase } from "./showcase";
 import { Demo } from "./demo";
+import Footer from "@/www/footer/footer";
 
 export default function PartnerPOC() {
   return (
@@ -44,6 +45,7 @@ export default function PartnerPOC() {
           </button>
         </div>
       </div>
+      <Footer />
     </main>
   );
 }
