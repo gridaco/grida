@@ -37,9 +37,13 @@ export function ShowCase() {
               ))}
             </TabsList>
             {k.demo_1_categories.map((category) => (
-              <TabsContent key={category} value={category}>
+              <TabsContent
+                key={category}
+                value={category}
+                className="container bg-background md:h-[776px] w-full rounded-xl shadow-xl overflow-hidden"
+              >
                 <Image
-                  className="md:h-[776px] w-full rounded-xl shadow-xl overflow-hidden object-cover"
+                  className="w-full h-full object-cover"
                   src={k.imagesDemo1[category as keyof typeof k.imagesDemo1]}
                   alt={category}
                   width={1400}
