@@ -13,6 +13,7 @@ import {
   GearIcon,
   HomeIcon,
   MagnifyingGlassIcon,
+  PlusIcon,
   ViewGridIcon,
   ViewHorizontalIcon,
 } from "@radix-ui/react-icons";
@@ -22,10 +23,17 @@ import { ProjectStats } from "@/scaffolds/analytics/stats";
 import { PoweredByGridaFooter } from "@/scaffolds/e/form/powered-by-brand-footer";
 import { OrganizationAvatar } from "@/components/organization-avatar";
 import { GridCard, RowCard } from "@/components/site/form-card";
-import { cn } from "@/utils";
 import { PanelsTopLeftIcon } from "lucide-react";
 import { WorkspaceMenu } from "./org-menu";
 import { PublicUrls } from "@/services/public-urls";
+import {
+  SidebarMenuItem,
+  SidebarMenuList,
+  SidebarSectionHeader,
+  SidebarSectionHeaderAction,
+  SidebarSectionHeaderActions,
+  SidebarSectionHeaderLabel,
+} from "@/components/sidebar";
 
 export const revalidate = 0;
 
@@ -97,7 +105,7 @@ export default async function DashboardProjectsPage({
       <nav className="relative w-60 h-full shrink-0 overflow-y-auto border-e">
         <header className="sticky top-0 mx-2 pt-4 py-2 bg-background border-b">
           <WorkspaceMenu current={organization.id}>
-            <MenuItem className="py-2">
+            <SidebarMenuItem className="py-2">
               <OrganizationAvatar
                 className="inline-flex align-middle w-6 h-6 me-2 border rounded"
                 avatar_url={
@@ -109,15 +117,15 @@ export default async function DashboardProjectsPage({
               />
               <span>{organization.name}</span>
               <CaretDownIcon className="inline w-4 h-4 ms-2 text-muted-foreground" />
-            </MenuItem>
+            </SidebarMenuItem>
           </WorkspaceMenu>
           <section className="my-2">
             <ul className="flex flex-col gap-0.5">
               <li>
-                <MenuItem muted>
+                <SidebarMenuItem muted>
                   <HomeIcon className="inline align-middle me-2 w-4 h-4" />
                   <Link href="/dashboard">Home</Link>
-                </MenuItem>
+                </SidebarMenuItem>
               </li>
               {/* <li>
                 <MenuItem muted>
@@ -136,19 +144,26 @@ export default async function DashboardProjectsPage({
         </header>
         <div className="h-full">
           <section className="mx-2 mb-2">
-            <SectionHeader>
-              <span>Projects</span>
-            </SectionHeader>
-            <MenuList>
+            <SidebarSectionHeader>
+              <SidebarSectionHeaderLabel>
+                <span>Projects</span>
+              </SidebarSectionHeaderLabel>
+              <SidebarSectionHeaderActions>
+                <SidebarSectionHeaderAction>
+                  <PlusIcon className="w-4 h-4" />
+                </SidebarSectionHeaderAction>
+              </SidebarSectionHeaderActions>
+            </SidebarSectionHeader>
+            <SidebarMenuList>
               {organization.projects.map((p) => {
                 const projectforms = forms.filter((f) => f.project_id === p.id);
                 return (
                   <>
                     <Link href={`/${organization.name}/${p.name}`}>
-                      <MenuItem key={p.name} muted>
+                      <SidebarMenuItem key={p.name} muted>
                         <PanelsTopLeftIcon className="inline align-middle me-2 w-4 h-4" />
                         {p.name}
-                      </MenuItem>
+                      </SidebarMenuItem>
                     </Link>
 
                     {projectforms.map((form, i) => (
@@ -157,16 +172,16 @@ export default async function DashboardProjectsPage({
                         href={`/d/${form.id}`}
                         prefetch={false}
                       >
-                        <MenuItem level={1} muted>
+                        <SidebarMenuItem level={1} muted>
                           <DotIcon className="inline align-middle w-4 h-4 me-2" />
                           {form.title}
-                        </MenuItem>
+                        </SidebarMenuItem>
                       </Link>
                     ))}
                   </>
                 );
               })}
-            </MenuList>
+            </SidebarMenuList>
           </section>
         </div>
       </nav>
@@ -246,56 +261,6 @@ function FormsGrid({
           <RowCard {...form} />
         </Link>
       ))}
-    </div>
-  );
-}
-
-// function Sidebar() {
-//   return (
-
-//   );
-// }
-
-function MenuList({ children }: React.PropsWithChildren<{}>) {
-  return <ul className="flex flex-col gap-0.5">{children}</ul>;
-}
-
-function MenuItem({
-  level,
-  muted,
-  selected,
-  className,
-  children,
-}: React.PropsWithChildren<{
-  level?: number;
-  muted?: boolean;
-  selected?: boolean;
-  className?: string;
-}>) {
-  return (
-    <div
-      data-level={level}
-      data-muted={muted}
-      className={cn(
-        "w-full px-2 py-1 rounded hover:bg-accent text-sm font-medium text-foreground data-[muted='true']:text-muted-foreground",
-        "text-ellipsis whitespace-nowrap overflow-hidden",
-        className
-      )}
-      style={{
-        paddingLeft: level ? `${level * 1}rem` : undefined,
-      }}
-    >
-      {children}
-    </div>
-  );
-}
-
-function SectionHeader({ children }: React.PropsWithChildren<{}>) {
-  return (
-    <div className="w-full px-2 py-2">
-      <span className="text-xs font-normal text-muted-foreground">
-        {children}
-      </span>
     </div>
   );
 }
