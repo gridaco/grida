@@ -23,7 +23,7 @@ import { ProjectStats } from "@/scaffolds/analytics/stats";
 import { PoweredByGridaFooter } from "@/scaffolds/e/form/powered-by-brand-footer";
 import { OrganizationAvatar } from "@/components/organization-avatar";
 import { GridCard, RowCard } from "@/components/site/form-card";
-import { PanelsTopLeftIcon } from "lucide-react";
+import { BoxSelectIcon, PanelsTopLeftIcon } from "lucide-react";
 import { WorkspaceMenu } from "./org-menu";
 import { PublicUrls } from "@/services/public-urls";
 import {
@@ -35,6 +35,13 @@ import {
   SidebarSectionHeaderLabel,
 } from "@/components/sidebar";
 import { CreateNewProjectDialog } from "./new-project-dialog";
+import {
+  Card,
+  CardContent,
+  CardFooter,
+  CardHeader,
+} from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 
 export const revalidate = 0;
 
@@ -206,6 +213,24 @@ export default async function DashboardProjectsPage({
             </Link>
           </section>
           <hr className="mb-10 mt-5 dark:border-neutral-700" />
+          {organization.projects.length === 0 && (
+            <Card>
+              <CardContent>
+                <CardHeader />
+                <div className="flex flex-col items-center justify-center gap-4">
+                  <BoxSelectIcon className="w-12 h-12 text-muted-foreground" />
+                  <h2 className="text-lg font-bold mt-4">No project yet</h2>
+                  <CreateNewProjectDialog org={organization.name}>
+                    <Button variant="secondary">
+                      <PlusIcon className="inline w-4 h-4 me-2" />
+                      Create your first project
+                    </Button>
+                  </CreateNewProjectDialog>
+                </div>
+                <CardFooter />
+              </CardContent>
+            </Card>
+          )}
           {organization.projects.map((p) => {
             const projectforms = forms.filter((f) => f.project_id === p.id);
             return (
