@@ -97,7 +97,7 @@ export default async function DashboardProjectsPage({
           <WorkspaceMenu>
             <MenuItem className="py-2">
               <OrganizationAvatar
-                className="inline w-5 h-5 me-2"
+                className="inline-flex align-middle w-6 h-6 me-2 border rounded"
                 avatar_url={
                   organization.avatar_path
                     ? avatar_url(organization.avatar_path)

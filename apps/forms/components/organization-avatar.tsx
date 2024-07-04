@@ -1,5 +1,7 @@
+"use client";
+
 import clsx from "clsx";
-import { GridaLogo } from "@/components/grida-logo";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import Image from "next/image";
 
 export function OrganizationAvatar({
@@ -11,16 +13,21 @@ export function OrganizationAvatar({
   className?: string;
   alt?: string;
 }) {
-  if (avatar_url) {
-    return (
-      <Image
-        src={avatar_url}
-        width={40}
-        height={40}
-        alt={alt ?? "organization avatar"}
-        className={clsx("overflow-hidden object-cover", className)}
-      />
-    );
-  }
-  return <GridaLogo className={className} />;
+  return (
+    <Avatar className={className}>
+      {avatar_url ? (
+        <Image
+          src={avatar_url}
+          width={40}
+          height={40}
+          alt={alt ?? "organization avatar"}
+          className={clsx("overflow-hidden object-cover")}
+        />
+      ) : (
+        <AvatarFallback className="rounded-none font-bold">
+          {alt?.charAt(0).toUpperCase()}
+        </AvatarFallback>
+      )}
+    </Avatar>
+  );
 }

@@ -12,6 +12,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { createClientWorkspaceClient } from "@/lib/supabase/client";
 import { PublicUrls } from "@/services/public-urls";
 import type { Organization } from "@/types";
+import { PlusIcon } from "@radix-ui/react-icons";
 import Link from "next/link";
 import React, { useEffect, useMemo, useState } from "react";
 
@@ -31,6 +32,12 @@ export function WorkspaceMenu({ children }: React.PropsWithChildren<{}>) {
         setOrgs(organizations!);
       });
   }, [supabase]);
+
+  const onLogoutClick = () => {
+    supabase.auth.signOut().then(() => {
+      window.location.href = "/";
+    });
+  };
 
   return (
     <DropdownMenu>
@@ -59,8 +66,13 @@ export function WorkspaceMenu({ children }: React.PropsWithChildren<{}>) {
           ))}
         </ScrollArea>
         <DropdownMenuSeparator />
-        <DropdownMenuItem>New organization</DropdownMenuItem>
-        <DropdownMenuItem>Log out</DropdownMenuItem>
+        <Link href="/organizations/new">
+          <DropdownMenuItem>
+            <PlusIcon className="inline w-4 h-4 me-2" />
+            New organization
+          </DropdownMenuItem>
+        </Link>
+        <DropdownMenuItem onSelect={onLogoutClick}>Log out</DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
   );

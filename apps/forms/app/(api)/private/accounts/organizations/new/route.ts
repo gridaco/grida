@@ -49,5 +49,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.error();
   }
 
-  return NextResponse.redirect(origin + `/organizations/${data.name}/invite`);
+  // TODO: invitation is not ready
+  // return NextResponse.redirect(origin + `/organizations/${data.name}/invite`);
+
+  return NextResponse.redirect(origin + `/${data.name}`);
 }
