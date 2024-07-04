@@ -46,7 +46,9 @@ export function WorkspaceMenu({
 
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger asChild>{children}</DropdownMenuTrigger>
+      <DropdownMenuTrigger asChild className="cursor-pointer">
+        {children}
+      </DropdownMenuTrigger>
 
       <DropdownMenuContent
         align="start"

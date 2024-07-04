@@ -7,6 +7,7 @@ import {
   createServerComponentWorkspaceClient,
 } from "@/lib/supabase/server";
 import {
+  CaretDownIcon,
   DotIcon,
   FileIcon,
   GearIcon,
@@ -107,6 +108,7 @@ export default async function DashboardProjectsPage({
                 alt={organization?.name}
               />
               <span>{organization.name}</span>
+              <CaretDownIcon className="inline w-4 h-4 ms-2 text-muted-foreground" />
             </MenuItem>
           </WorkspaceMenu>
           <section className="my-2">
