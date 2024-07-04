@@ -1,11 +1,11 @@
 import clsx from "clsx";
 
 export const GridaLogo = ({
-  size = 24,
   className,
+  size = 24,
 }: {
-  size?: number;
   className?: string;
+  size?: number;
 }) => {
   return (
     <svg
