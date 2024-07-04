@@ -11,6 +11,7 @@ import {
   PricingTableRowMobile,
 } from "./pricing-table-row";
 import { Button } from "@/components/ui/button";
+import Link from "next/link";
 
 const PricingComparisonTable = ({ plans }: { plans: PricingInformation[] }) => {
   const [activeMobilePlan, setActiveMobilePlan] = useState("Free");
@@ -246,7 +247,7 @@ const PricingComparisonTable = ({ plans }: { plans: PricingInformation[] }) => {
       <div className="hidden lg:block">
         <table className="h-px w-full table-fixed">
           <caption className="sr-only">Pricing plan comparison</caption>
-          <thead className="bg-white dark:bg-black sticky top-0 z-10">
+          <thead className="bg-background sticky top-0 z-10">
             <tr>
               <th
                 className="text-foreground w-1/3 px-6 pt-2 pb-2 text-left text-sm font-normal"
@@ -287,7 +288,9 @@ const PricingComparisonTable = ({ plans }: { plans: PricingInformation[] }) => {
                         )}
                       </p>
                     </span>
-                    <Button className="mt-2">{plan.cta}</Button>
+                    <Link href={plan.href} className="w-full">
+                      <Button className="mt-2 w-full">{plan.cta}</Button>
+                    </Link>
                   </span>
                 </th>
               ))}

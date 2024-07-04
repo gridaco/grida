@@ -17,7 +17,7 @@ export const PricingTableRowDesktop = (props: any) => {
         id={`${props.sectionId}-desktop`}
       >
         <th
-          className="bg-white dark:bg-black text-foreground sticky top-[60px] xl:top-[40px] z-10 py-3 pl-6 text-left text-sm font-medium"
+          className="bg-background text-foreground sticky top-[60px] xl:top-[40px] z-10 py-3 pl-6 text-left text-sm font-medium"
           scope="colgroup"
         >
           <div className="flex items-center gap-4">

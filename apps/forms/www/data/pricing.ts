@@ -33,40 +33,10 @@ export const pricing: Pricing = {
     title: "Features",
     features: [
       {
-        title: "Smart Customer Identity",
-        plans: {
-          free: false,
-          pro: true,
-          team: true,
-          enterprise: true,
-        },
-        usage_based: true,
-      },
-      {
-        title: "Connect Customer Identity",
-        plans: {
-          free: false,
-          pro: true,
-          team: true,
-          enterprise: true,
-        },
-        usage_based: false,
-      },
-      {
         title: "Visual Editor",
         plans: {
           free: true,
           pro: true,
-          team: true,
-          enterprise: true,
-        },
-        usage_based: false,
-      },
-      {
-        title: "Advanced Analytics",
-        plans: {
-          free: false,
-          pro: false,
           team: true,
           enterprise: true,
         },
@@ -83,9 +53,9 @@ export const pricing: Pricing = {
         usage_based: false,
       },
       {
-        title: "Remove branding on built-in form page",
+        title: "Themes & Custom CSS",
         plans: {
-          free: false,
+          free: true,
           pro: true,
           team: true,
           enterprise: true,
@@ -163,7 +133,47 @@ export const pricing: Pricing = {
         usage_based: false,
       },
       {
+        title: "Smart Customer Identity",
+        plans: {
+          free: false,
+          pro: true,
+          team: true,
+          enterprise: true,
+        },
+        usage_based: true,
+      },
+      {
+        title: "Connect Customer Identity",
+        plans: {
+          free: false,
+          pro: true,
+          team: true,
+          enterprise: true,
+        },
+        usage_based: false,
+      },
+      {
         title: "Limit number of responses",
+        plans: {
+          free: false,
+          pro: true,
+          team: true,
+          enterprise: true,
+        },
+        usage_based: false,
+      },
+      {
+        title: "Advanced Analytics",
+        plans: {
+          free: false,
+          pro: false,
+          team: true,
+          enterprise: true,
+        },
+        usage_based: false,
+      },
+      {
+        title: "Remove branding on built-in form page",
         plans: {
           free: false,
           pro: true,
@@ -205,20 +215,20 @@ export const pricing: Pricing = {
       {
         title: "Receive file uploads",
         plans: {
-          free: true,
-          pro: true,
-          team: true,
-          enterprise: true,
+          free: "Up to 4.5MB",
+          pro: "Up to 150MB",
+          team: "Up to 1GB",
+          enterprise: "Unlimited",
         },
         usage_based: false,
       },
       {
         title: "File Storage Included",
         plans: {
-          free: false,
-          pro: true,
-          team: true,
-          enterprise: true,
+          free: "100MB",
+          pro: "30GB",
+          team: "1TB",
+          enterprise: "Unlimited",
         },
         usage_based: false,
       },
@@ -238,10 +248,40 @@ export const pricing: Pricing = {
         usage_based: false,
       },
       {
+        title: "Connect to Notion Database",
+        plans: {
+          free: false,
+          pro: false,
+          team: false,
+          enterprise: true,
+        },
+        usage_based: false,
+      },
+      {
         title: "Payments with Stripe",
         plans: {
-          free: true,
-          pro: true,
+          free: "5% fee",
+          pro: "No additional fee",
+          team: "No additional fee",
+          enterprise: "No additional fee",
+        },
+        usage_based: false,
+      },
+      {
+        title: "Payments with Toss (for 🇰🇷)",
+        plans: {
+          free: false,
+          pro: false,
+          team: false,
+          enterprise: true,
+        },
+        usage_based: false,
+      },
+      {
+        title: "Ticketing for Events",
+        plans: {
+          free: false,
+          pro: false,
           team: true,
           enterprise: true,
         },
@@ -258,6 +298,16 @@ export const pricing: Pricing = {
         usage_based: false,
       },
       {
+        title: "Custom Domain",
+        plans: {
+          free: false,
+          pro: "$9 / domain / mo",
+          team: "$9 / domain / mo",
+          enterprise: "$9 / domain / mo",
+        },
+        usage_based: false,
+      },
+      {
         title: "Supabase Integration",
         plans: {
           free: false,
@@ -270,14 +320,44 @@ export const pricing: Pricing = {
     ],
   },
   commingsoon: {
-    title: "Comming Soon",
+    title: "Channels",
     features: [
       {
-        title: "Payments with Toss (For South Korea)",
+        title: "Email Notifications",
+        plans: {
+          free: true,
+          pro: true,
+          team: true,
+          enterprise: true,
+        },
+        usage_based: false,
+      },
+      {
+        title: "SMS Notifications",
+        plans: {
+          free: false,
+          pro: true,
+          team: true,
+          enterprise: true,
+        },
+        usage_based: false,
+      },
+      {
+        title: "WhatsApp Notifications",
+        plans: {
+          free: false,
+          pro: true,
+          team: true,
+          enterprise: true,
+        },
+        usage_based: false,
+      },
+      {
+        title: "KakaoTalk Notifications (for 🇰🇷)",
         plans: {
           free: false,
           pro: false,
-          team: true,
+          team: false,
           enterprise: true,
         },
         usage_based: false,

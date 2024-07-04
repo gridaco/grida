@@ -123,7 +123,7 @@ export const plans: PricingInformation[] = [
   {
     id: "tier_enterprise",
     name: "Enterprise",
-    href: "/enterprise",
+    href: "https://forms.grida.co/d/e/c3cf8937-f4f3-4c69-81f3-8d3b9e109013",
     description:
       "For large-scale and building custom solutions on top fo Grida Forms.",
     features: [
