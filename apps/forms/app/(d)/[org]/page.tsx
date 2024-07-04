@@ -34,6 +34,7 @@ import {
   SidebarSectionHeaderActions,
   SidebarSectionHeaderLabel,
 } from "@/components/sidebar";
+import { CreateNewProjectDialog } from "./new-project-dialog";
 
 export const revalidate = 0;
 
@@ -149,9 +150,11 @@ export default async function DashboardProjectsPage({
                 <span>Projects</span>
               </SidebarSectionHeaderLabel>
               <SidebarSectionHeaderActions>
-                <SidebarSectionHeaderAction>
-                  <PlusIcon className="w-4 h-4" />
-                </SidebarSectionHeaderAction>
+                <CreateNewProjectDialog org={organization.name}>
+                  <SidebarSectionHeaderAction>
+                    <PlusIcon className="w-4 h-4" />
+                  </SidebarSectionHeaderAction>
+                </CreateNewProjectDialog>
               </SidebarSectionHeaderActions>
             </SidebarSectionHeader>
             <SidebarMenuList>
