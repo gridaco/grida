@@ -121,9 +121,9 @@ export default async function DashboardProjectsPage({
                     ? avatar_url(organization.avatar_path)
                     : undefined
                 }
-                alt={organization?.name}
+                alt={organization.display_name}
               />
-              <span>{organization.name}</span>
+              <span>{organization.display_name}</span>
               <CaretDownIcon className="inline w-4 h-4 ms-2 text-muted-foreground" />
             </SidebarMenuItem>
           </WorkspaceMenu>

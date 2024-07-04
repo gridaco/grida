@@ -391,6 +391,9 @@ export interface Organization {
   avatar_path: string | null;
   created_at: string;
   email: string | null;
+  blog: string | null;
+  description: string | null;
+  display_name: string;
   id: number;
   name: string;
   owner_id: string;

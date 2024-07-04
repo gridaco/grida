@@ -1984,7 +1984,10 @@ export type Database = {
       organization: {
         Row: {
           avatar_path: string | null
+          blog: string | null
           created_at: string
+          description: string | null
+          display_name: string
           email: string | null
           id: number
           name: string
@@ -1992,7 +1995,10 @@ export type Database = {
         }
         Insert: {
           avatar_path?: string | null
+          blog?: string | null
           created_at?: string
+          description?: string | null
+          display_name?: string
           email?: string | null
           id?: number
           name: string
@@ -2000,7 +2006,10 @@ export type Database = {
         }
         Update: {
           avatar_path?: string | null
+          blog?: string | null
           created_at?: string
+          description?: string | null
+          display_name?: string
           email?: string | null
           id?: number
           name?: string

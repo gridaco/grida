@@ -62,7 +62,13 @@ export default async function OrganizationsSettingsProfilePage({
           <CardTitle>General</CardTitle>
         </CardHeader>
         <CardContent>
-          <form className="flex flex-col gap-10 py-4">
+          <form
+            id="profile"
+            action={`/private/accounts/organizations/${organization_name}/profile`}
+            encType="multipart/form-data"
+            method="POST"
+            className="flex flex-col gap-10 py-4"
+          >
             <div className="grid gap-2">
               <Label>Name</Label>
               <Input disabled readOnly value={data.name} />
@@ -72,7 +78,9 @@ export default async function OrganizationsSettingsProfilePage({
               <Input
                 id="display_name"
                 name="display_name"
+                required
                 placeholder="Organization display name"
+                defaultValue={data.display_name ?? undefined}
               />
             </div>
             <div className="grid gap-2">
@@ -81,6 +89,7 @@ export default async function OrganizationsSettingsProfilePage({
                 type="email"
                 id="email"
                 name="email"
+                required
                 placeholder="alice@acme.com"
                 defaultValue={data.email ?? undefined}
               />
@@ -91,21 +100,23 @@ export default async function OrganizationsSettingsProfilePage({
                 id="description"
                 name="description"
                 placeholder="Organization description"
+                defaultValue={data.description ?? undefined}
               />
             </div>
             <div className="grid gap-2">
-              <Label htmlFor="url">URL</Label>
+              <Label htmlFor="blog">URL</Label>
               <Input
                 type="url"
-                id="url"
-                name="url"
+                id="blog"
+                name="blog"
                 placeholder="https://acme.com"
+                defaultValue={data.blog ?? undefined}
               />
             </div>
           </form>
         </CardContent>
         <CardFooter className="flex justify-end items-center border-t pt-6">
-          <Button>Save</Button>
+          <Button form="profile">Save</Button>
         </CardFooter>
       </Card>
       <Card className="border-destructive">
