@@ -5,11 +5,12 @@ import clsx from "clsx";
 import React, { useState } from "react";
 import { Component1Icon } from "@radix-ui/react-icons";
 import { pricing } from "../data/pricing";
-import { PricingInformation, plans, save_plans } from "../data/plans";
+import { PricingInformation } from "../data/plans";
 import {
   PricingTableRowDesktop,
   PricingTableRowMobile,
 } from "./pricing-table-row";
+import { Button } from "@/components/ui/button";
 
 const PricingComparisonTable = ({ plans }: { plans: PricingInformation[] }) => {
   const [activeMobilePlan, setActiveMobilePlan] = useState("Free");
@@ -49,9 +50,7 @@ const PricingComparisonTable = ({ plans }: { plans: PricingInformation[] }) => {
 
           <p className="p opacity-50">{priceDescription}</p>
         </div>
-        <button className=" text-white flex flex-col bg-neutral-800 rounded justify-between h-full py-2 px-6 mt-2 hover:invert transition-all">
-          {selectedPlan.cta}
-        </button>
+        <Button className="mt-2">{selectedPlan.cta}</Button>
       </div>
     );
   };
@@ -59,12 +58,12 @@ const PricingComparisonTable = ({ plans }: { plans: PricingInformation[] }) => {
   return (
     <div
       id="compare-plans"
-      className="sm:pb-18 container relative top-48 mx-auto px-4 pb-16 md:pb-16 lg:px-16 xl:px-20"
+      className="sm:pb-18 container relative top-48 mx-auto px-0 pb-16 md:pb-16 lg:px-16 xl:px-20"
     >
       {/* <!-- xs to lg --> */}
       <div className="lg:hidden">
         {/* Free - Mobile  */}
-        <div className="bg-background p-2 sticky top-14 z-10 pt-4">
+        <div className="bg-background p-2 sticky top-0 z-10 pt-4">
           <div className="bg-surface-100 rounded-lg border dark:border-white dark:border-opacity-25 py-2 px-4 flex justify-between items-center">
             <label className="text-foreground-lighter">Change plan</label>
             <select
@@ -288,13 +287,7 @@ const PricingComparisonTable = ({ plans }: { plans: PricingInformation[] }) => {
                         )}
                       </p>
                     </span>
-                    <span className="flex flex-col bg-neutral-800 rounded justify-between h-full py-2 mt-2 hover:invert transition-all">
-                      {
-                        <button className="text-sm text-white">
-                          {plan.cta}
-                        </button>
-                      }
-                    </span>
+                    <Button className="mt-2">{plan.cta}</Button>
                   </span>
                 </th>
               ))}

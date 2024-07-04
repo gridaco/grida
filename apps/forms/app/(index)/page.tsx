@@ -14,6 +14,8 @@ import { Header } from "../(site)/header";
 import Hero from "./sections/hero";
 import Demo from "./sections/demo";
 import Link from "next/link";
+import { Button } from "@/components/ui/button";
+import { FAQ } from "./sections/faq";
 
 export default function Home() {
   return (
@@ -21,7 +23,7 @@ export default function Home() {
       <Header />
       <Hero />
       <Demo />
-      <div className="container mx-auto px-4">
+      <div className="container mx-auto px-8">
         <div className="h-16 sm:h-32 lg:h-64" />
         <section>
           <div>
@@ -30,7 +32,7 @@ export default function Home() {
             </h2>
           </div>
           <div className="mt-20">
-            <div className="columns-1 lg:columns-2 2xl:columns-3 grid-rows-2 space-y-20">
+            <div className="columns-2 lg:columns-3 2xl:columns-3 grid-rows-2 space-y-20">
               <FeatureCard
                 icon={<SmartToyIcon size={24} />}
                 title={"Smart Customer Identity"}
@@ -85,59 +87,11 @@ export default function Home() {
               Create Effortlessly, Expand Boundlessly
             </h2>
             <Link href="/dashboard/new?plan=free">
-              <button
-                className="mt-10 px-3 py-2 text-white bg-neutral-800 rounded border border-neutral-800 hover:invert
-        transition-all"
-              >
-                Start your project
-              </button>
+              <Button className="mt-10">Start your project</Button>
             </Link>
           </div>
         </section>
-        {/* <section>
-          <div id="accordion-collapse" data-accordion="collapse">
-            <h2 id="accordion-collapse-heading-1">
-              <button
-                type="button"
-                className="flex items-center justify-between w-full p-5 font-sm rtl:text-right rounded-xl dark:focus:ring-gray-800 dark:hover:bg-neutral-800 gap-3"
-                data-accordion-target="#accordion-collapse-body-1"
-                aria-expanded="true"
-                aria-controls="accordion-collapse-body-1"
-              >
-                <span>What is Grida Forms?</span>
-                <svg
-                  data-accordion-icon
-                  className="w-3 h-3 rotate-180 shrink-0"
-                  aria-hidden="true"
-                  xmlns="http://www.w3.org/2000/svg"
-                  fill="none"
-                  viewBox="0 0 10 6"
-                >
-                  <path
-                    stroke="currentColor"
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    stroke-width="2"
-                    d="M9 5 5 1 1 5"
-                  />
-                </svg>
-              </button>
-            </h2>
-          </div>
-          <div
-            id="accordion-collapse-body-1"
-            className="hidden"
-            aria-labelledby="accordion-collapse-heading-1"
-          >
-            <div className="p-5 dark:bg-gray-900">
-              <p className="mb-2 text-gray-500 dark:text-gray-400">
-                Flowbite is an open-source library of interactive components
-                built on top of Tailwind CSS including buttons, dropdowns,
-                modals, navbars, and more.
-              </p>
-            </div>
-          </div>
-        </section> */}
+        {/* <FAQ /> */}
       </div>
       <footer className="mx-auto mt-32 w-full max-w-container px-4 sm:px-6 lg:px-8">
         <div className="border-t border-neutral-400 border-opacity-25 py-10">

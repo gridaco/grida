@@ -34,11 +34,8 @@ export const pricing: Pricing = {
     features: [
       {
         title: "Smart Customer Identity",
-        // tooltips: {
-        //   main: "The sum of all objects' size in your storage buckets.\nBilling is based on the average daily size in GB throughout your billing period.",
-        // },
         plans: {
-          free: true,
+          free: false,
           pro: true,
           team: true,
           enterprise: true,
@@ -48,7 +45,7 @@ export const pricing: Pricing = {
       {
         title: "Connect Customer Identity",
         plans: {
-          free: true,
+          free: false,
           pro: true,
           team: true,
           enterprise: true,
@@ -128,7 +125,7 @@ export const pricing: Pricing = {
       {
         title: "Webhooks",
         plans: {
-          free: true,
+          free: false,
           pro: true,
           team: true,
           enterprise: true,
@@ -148,7 +145,7 @@ export const pricing: Pricing = {
       {
         title: "Window postMessage interface",
         plans: {
-          free: true,
+          free: false,
           pro: true,
           team: true,
           enterprise: true,
@@ -233,7 +230,7 @@ export const pricing: Pricing = {
       {
         title: "Connect to Google sheets",
         plans: {
-          free: true,
+          free: false,
           pro: true,
           team: true,
           enterprise: true,

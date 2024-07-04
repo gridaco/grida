@@ -1,3 +1,4 @@
+import { Button } from "@/components/ui/button";
 import { CheckIcon } from "@radix-ui/react-icons";
 import clsx from "clsx";
 import React from "react";
@@ -30,26 +31,30 @@ export function PricingCard({
     <div
       data-highlight={highlight}
       className="
-      bg-neutral-50 dark:bg-neutral-900
-        flex-1 flex flex-col p-7 border border-neutral-500/10 dark:border-neutral-500/50 gap-8 rounded-lg
-        data-[highlight='true']:bg-neutral-100 data-[highlight='true']:dark:bg-neutral-100 data-[highlight='true']:dark:text-black
+        bg-background
+        flex-1 flex flex-col p-5 border gap-8 rounded-lg
+        data-[highlight='true']:border-2
+        data-[highlight='true']:border-foreground
         hover:scale-[1.02]
         transition-all
+        shadow
         "
     >
       <div className="flex flex-col gap-1">
-        <span className="text-3xl font-semibold">{plan}</span>
-        <span className=" text-sm font-normal opacity-50">{excerpt}</span>
+        <span className="text-2xl font-semibold">{plan}</span>
+        <span className=" text-sm font-normal text-muted-foreground">
+          {excerpt}
+        </span>
       </div>
       <div>
-        <span className="text-[48px] font-medium">{price.primary}</span>
+        <span className="text-4xl font-bold">{price.primary}</span>
         {price.secondary && (
-          <span className="ml-2 text-sm font-normal opacity-50">
+          <span className="ml-2 text-sm font-normal text-muted-foreground">
             {price.secondary}
           </span>
         )}
       </div>
-      <hr className=" opacity-15" />
+      <hr />
       <div className="flex flex-col gap-5">
         {features.map((feature, i) => (
           <PricingFeatureRow key={i} {...feature} />
@@ -67,18 +72,9 @@ export function PricingCardButton({
   inverted?: boolean;
 }>) {
   return (
-    <button
-      className={clsx(
-        `
-          w-full text-lg font-medium px-5 py-3 rounded text-black dark:text-white bg-neutral-200 dark:bg-neutral-800
-          hover:invert
-          transition-all
-        `,
-        inverted && "invert"
-      )}
-    >
+    <Button variant={inverted ? "default" : "outline"} className="w-full">
       {children}
-    </button>
+    </Button>
   );
 }
 
