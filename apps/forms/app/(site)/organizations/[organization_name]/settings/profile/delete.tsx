@@ -3,7 +3,6 @@
 import React, { useState } from "react";
 import {
   AlertDialog,
-  AlertDialogAction,
   AlertDialogCancel,
   AlertDialogContent,
   AlertDialogDescription,
@@ -12,7 +11,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { Button, buttonVariants } from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 
@@ -21,6 +20,7 @@ export function DeleteOrganizationConfirm({
   children,
 }: React.PropsWithChildren<{ org: string }>) {
   const [confirm, setConfirm] = useState("");
+  const [busy, setBusy] = useState(false);
 
   const match = confirm === org;
 
@@ -43,6 +43,7 @@ export function DeleteOrganizationConfirm({
           id="delete"
           action={`/private/accounts/organizations/${org}/delete`}
           method="post"
+          onSubmit={() => setBusy(true)}
         >
           <div className="grid gap-2">
             <Label htmlFor="confirm">
@@ -59,7 +60,7 @@ export function DeleteOrganizationConfirm({
         </form>
         <AlertDialogFooter>
           <AlertDialogCancel>Cancel</AlertDialogCancel>
-          <Button variant="destructive" form="delete" disabled={!match}>
+          <Button variant="destructive" form="delete" disabled={!match || busy}>
             Cancel plan and delete this organization
           </Button>
           {/* <AlertDialogAction
