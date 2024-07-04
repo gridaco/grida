@@ -1,7 +1,6 @@
 import { workspaceclient } from "@/lib/supabase/server";
+import { isValidUsername, messages } from "@/services/utils/username";
 import { NextRequest, NextResponse } from "next/server";
-
-const USERNAME_REGEX = /^[a-z\d](?:[a-z\d]|-(?=[a-z\d])){0,38}$/i;
 
 export async function POST(req: NextRequest) {
   const { value } = await req.json();
@@ -18,7 +17,7 @@ export async function POST(req: NextRequest) {
   }
 
   const available = data.length === 0;
-  const valid = USERNAME_REGEX.test(value);
+  const valid = isValidUsername(value);
 
   return NextResponse.json({
     ok: available && valid,
@@ -29,10 +28,3 @@ export async function POST(req: NextRequest) {
       : messages.taken,
   });
 }
-
-const messages = {
-  available: "This name is available",
-  invalid:
-    "Must be lowercase alphanumeric and start with a letter, and can contain hyphens",
-  taken: "This name is taken",
-};

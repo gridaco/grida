@@ -39,6 +39,7 @@ export default function NewOrganizationSetupPage({
   const [name, setName] = useState("");
   const [ok, setOK] = useState(false);
   const [error, setError] = useState(!!searchParams.error);
+  const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState(
     searchParams.error
       ? searchParams.error
@@ -82,6 +83,9 @@ export default function NewOrganizationSetupPage({
         action={`/private/accounts/organizations/new`}
         method="post"
         className="flex flex-col gap-8"
+        onSubmit={(e) => {
+          setBusy(true);
+        }}
       >
         <div className="grid gap-2">
           <Label htmlFor="name">Organization name</Label>
@@ -124,7 +128,7 @@ export default function NewOrganizationSetupPage({
           </span>
         </div>
         <footer className="w-full py-10 border-t">
-          <Submit disabled={!valid} />
+          <Submit disabled={!valid || busy} />
         </footer>
       </form>
       {/*  */}
@@ -133,12 +137,8 @@ export default function NewOrganizationSetupPage({
 }
 
 function Submit({ disabled }: { disabled?: boolean }) {
-  const { pending } = useFormStatus();
   return (
-    <Button
-      disabled={disabled || pending}
-      className="w-full disabled:cursor-not-allowed"
-    >
+    <Button disabled={disabled} className="w-full disabled:cursor-not-allowed">
       Next
     </Button>
   );

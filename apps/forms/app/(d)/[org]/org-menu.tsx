@@ -67,9 +67,9 @@ export function WorkspaceMenu({
                     avatar_url={
                       org.avatar_path ? avatar_url(org.avatar_path) : undefined
                     }
-                    alt={org.name}
+                    alt={org.display_name}
                   />
-                  {org.name}
+                  {org.display_name}
                   {iscurrent && (
                     <CheckIcon className="inline w-4 h-4 ms-auto" />
                   )}
