@@ -1,10 +1,11 @@
 import React from "react";
-import { type Form } from "@/types";
-import { FileIcon } from "@radix-ui/react-icons";
 import Image from "next/image";
+import { ResourceTypeIcon } from "../resource-type-icon";
+import type { ConnectionSupabaseJoint, Form } from "@/types";
 
 interface FormDashboardItem extends Form {
   responses: number;
+  supabase_connection: ConnectionSupabaseJoint | null;
 }
 
 export function GridCard({
@@ -13,6 +14,7 @@ export function GridCard({
   thumbnail,
   is_max_form_responses_in_total_enabled,
   max_form_responses_in_total,
+  supabase_connection,
 }: FormDashboardItem & { thumbnail?: string }) {
   return (
     <div className="rounded border border-neutral-500/10 bg-white dark:bg-neutral-900 shadow-md">
@@ -26,7 +28,10 @@ export function GridCard({
         />
       ) : (
         <div className="p-2 aspect-square w-full flex items-center justify-center border-b">
-          <FileIcon className="w-10 h-10" />
+          <ResourceTypeIcon
+            type={supabase_connection ? "form-x-supabase" : "form"}
+            className="w-10 h-10"
+          />
         </div>
       )}
       <div className="px-4 py-2 flex flex-col gap-2">
@@ -53,6 +58,7 @@ export function RowCard({
   updated_at,
   is_max_form_responses_in_total_enabled,
   max_form_responses_in_total,
+  supabase_connection,
 }: FormDashboardItem & { thumbnail?: string }) {
   return (
     <div className="flex items-center border rounded-md overflow-hidden h-16 shadow bg-white dark:bg-neutral-900">
@@ -66,7 +72,10 @@ export function RowCard({
         />
       ) : (
         <div className="p-2 aspect-square h-full flex items-center justify-center border-r">
-          <FileIcon className="w-5 h-5" />
+          <ResourceTypeIcon
+            type={supabase_connection ? "form-x-supabase" : "form"}
+            className="w-5 h-5"
+          />
         </div>
       )}
       <div className="flex-1 px-6 font-medium text-gray-900 whitespace-nowrap dark:text-white">
