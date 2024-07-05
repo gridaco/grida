@@ -139,8 +139,7 @@ export default async function FormsCustomizeSettingsPage({
           <CustomSectionStylePreferences
             form_id={form_id}
             init={{
-              background,
-              stylesheet,
+              section: stylesheet?.section,
             }}
           />
         </SectorBlocks>

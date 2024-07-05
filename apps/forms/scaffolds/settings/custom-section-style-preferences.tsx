@@ -15,7 +15,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { FormPageBackgroundSchema } from "@/types";
 import { section_style_glass_morphism } from "@/theme/section/css";
 import { Button } from "@/components/ui/button";
 
@@ -25,11 +24,12 @@ export function CustomSectionStylePreferences({
 }: {
   form_id: string;
   init: {
-    background?: FormPageBackgroundSchema;
-    stylesheet?: any;
+    section?: string;
   };
 }) {
-  const [css, setCss] = useState(init.stylesheet?.section);
+  const [css, setCss] = useState(init.section);
+
+  console.log(init, css);
 
   return (
     <PreferenceBox>
@@ -60,9 +60,7 @@ export function CustomSectionStylePreferences({
         {css && (
           <div className="mt-4 flex items-center justify-center select-none">
             <section className={css}>
-              <p className="text-neutral-900 dark:text-neutral-100">
-                This is a sample section with the selected style.
-              </p>
+              <p>This is a sample section with the selected style.</p>
             </section>
           </div>
         )}
