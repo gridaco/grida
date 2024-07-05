@@ -12,7 +12,9 @@ import yellow from "./yellow";
 import zinc from "./zinc";
 import * as hc from "./v-highcontrast";
 import * as designer_ryu from "./v-ryu";
+import * as satu from "./v-saturation";
 
+// NOTE: do not change the export name as this name is saved in the database
 export const basic = {
   blue,
   gray,
@@ -35,6 +37,7 @@ const highcontrast_red = hc.red;
 const highcontrast_violet = hc.violet;
 const highcontrast_yellow = hc.yellow;
 
+// NOTE: do not change the export name as this name is saved in the database
 export const highcontrast = {
   highcontrast_blue,
   highcontrast_green,
@@ -44,16 +47,35 @@ export const highcontrast = {
   highcontrast_yellow,
 };
 
-const _001_teal = designer_ryu._001_teal;
+const saturation_blue = satu.blue;
+const saturation_green = satu.green;
+const saturation_orange = satu.orange;
+const saturation_red = satu.red;
+const saturation_violet = satu.violet;
+const saturation_yellow = satu.yellow;
 
+// NOTE: do not change the export name as this name is saved in the database
+export const saturation = {
+  saturation_blue,
+  saturation_green,
+  saturation_orange,
+  saturation_red,
+  saturation_violet,
+  saturation_yellow,
+};
+
+const ryu_001_teal = designer_ryu._001_teal;
+
+// NOTE: do not change the export name as this name is saved in the database
 export const ryu = {
-  "001_teal": _001_teal,
+  ryu_001_teal,
 };
 
 // NOTE: do not change the export name as this name is saved in the database
 const palettes = {
   ...basic,
   ...highcontrast,
+  ...saturation,
   ...ryu,
 };
 
