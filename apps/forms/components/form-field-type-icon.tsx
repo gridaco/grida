@@ -11,19 +11,20 @@ import {
   RadiobuttonIcon,
   SwitchIcon,
   SliderIcon,
-  FileIcon,
-  MagnifyingGlassIcon,
-  ClockIcon,
   FileTextIcon,
 } from "@radix-ui/react-icons";
 import {
   CreditCardIcon,
+  FileIcon,
+  SearchIcon,
   FileAudioIcon,
   FileImageIcon,
   FilePenLineIcon,
   FileVideoIcon,
   KeyRoundIcon,
   MapPinnedIcon,
+  HashIcon,
+  ClockIcon,
   PhoneIcon,
 } from "lucide-react";
 
@@ -75,6 +76,7 @@ export function FormFieldTypeIcon({
     case "switch":
       return <SwitchIcon {...props} />;
     case "number":
+      return <HashIcon {...props} />;
     case "range":
       return <SliderIcon {...props} />;
     case "image":
@@ -89,7 +91,7 @@ export function FormFieldTypeIcon({
       // TODO: replace icon
       return <CreditCardIcon {...props} />;
     case "search":
-      return <MagnifyingGlassIcon {...props} />;
+      return <SearchIcon {...props} />;
     case "latlng":
       return <MapPinnedIcon {...props} />;
     case "country":

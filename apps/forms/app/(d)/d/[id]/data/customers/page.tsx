@@ -45,7 +45,7 @@ export default async function Customers({
     <div className="h-full flex flex-1 w-full">
       {/* side */}
       <aside className="hidden lg:flex h-full">
-        <Siebar />
+        <Siebar mode="data" />
       </aside>
       <div className="w-full h-full overflow-x-hidden">
         <main className="flex flex-col h-full">

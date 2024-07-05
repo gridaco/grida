@@ -14,6 +14,32 @@ export function SidebarMenuList({ children }: React.PropsWithChildren<{}>) {
   return <ul className="flex flex-col gap-0.5">{children}</ul>;
 }
 
+export function SidebarMenuGrid({ children }: React.PropsWithChildren<{}>) {
+  return <div className="grid grid-cols-3 gap-2">{children}</div>;
+}
+
+export function SidebarMenuGridItem({
+  children,
+  className,
+}: React.PropsWithChildren<{
+  className?: string;
+}>) {
+  return (
+    <div
+      className={cn(
+        "aspect-square",
+        "relative group",
+        "w-full px-2 py-1 rounded hover:bg-accent text-sm font-medium text-foreground data-[muted='true']:text-muted-foreground",
+        "text-ellipsis whitespace-nowrap overflow-hidden",
+        "flex flex-col items-center justify-center",
+        className
+      )}
+    >
+      {children}
+    </div>
+  );
+}
+
 export function SidebarMenuItem({
   level,
   muted,
