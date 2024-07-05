@@ -29,8 +29,6 @@ export function CustomSectionStylePreferences({
 }) {
   const [css, setCss] = useState(init.section);
 
-  console.log(init, css);
-
   return (
     <PreferenceBox>
       <PreferenceBoxHeader heading={<>Section Style</>} />

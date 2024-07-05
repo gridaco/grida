@@ -140,13 +140,13 @@ export function SchedulingPreferences({
       error: "Failed to save",
     });
 
-    console.log({
-      form_id,
-      is_scheduling_enabled,
-      scheduling_open_at: scheduling_open_at?.toISOString(),
-      scheduling_close_at: scheduling_close_at?.toISOString(),
-      scheduling_tz: openTz, // Save the timezone used
-    });
+    // console.log({
+    //   form_id,
+    //   is_scheduling_enabled,
+    //   scheduling_open_at: scheduling_open_at?.toISOString(),
+    //   scheduling_close_at: scheduling_close_at?.toISOString(),
+    //   scheduling_tz: openTz, // Save the timezone used
+    // });
   };
 
   return (
