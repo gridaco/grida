@@ -1,6 +1,6 @@
 import { produce } from "immer";
 import { EditorFlatFormBlock, FormEditorState } from "./state";
-import {
+import type {
   BlockDescriptionAction,
   BlockTitleAction,
   BlockVHiddenAction,
@@ -45,7 +45,7 @@ import { VIDEO_BLOCK_SRC_DEFAULT_VALUE } from "@/k/video_block_defaults";
 import { IMAGE_BLOCK_SRC_DEFAULT_VALUE } from "@/k/image_block_defaults";
 import { PDF_BLOCK_SRC_DEFAULT_VALUE } from "@/k/pdf_block_defaults";
 import { draftid } from "@/utils/id";
-import { FormBlockType, GridaSupabase } from "@/types";
+import type { FormBlockType, FormInputType, GridaSupabase } from "@/types";
 import { FlatPostgREST } from "@/lib/supabase-postgrest/flat";
 
 export function reducer(
@@ -122,11 +122,30 @@ export function reducer(
           });
         }
         case "field": {
+          let init: { type: FormInputType } | null = null;
+          if ("init" in action) {
+            init = action.init;
+          }
+
           return produce(state, (draft) => {
             const { available_field_ids } = state;
 
-            // find unused field id (if any)
-            const field_id = available_field_ids[0] ?? null;
+            let field_id: string | null = null;
+
+            if (init) {
+              // if init provided, always create new.
+              draft.field_draft_init = init;
+            } else {
+              draft.field_draft_init = null;
+              // find unused field id (if any)
+              field_id = available_field_ids[0] ?? null;
+              if (field_id) {
+                // remove the field id from available_field_ids
+                draft.available_field_ids = available_field_ids.filter(
+                  (id) => id !== field_id
+                );
+              }
+            }
 
             draft.blocks.push({
               ...__shared,
@@ -141,11 +160,6 @@ export function reducer(
               })
             );
             // ========
-
-            // remove the field id from available_field_ids
-            draft.available_field_ids = available_field_ids.filter(
-              (id) => id !== field_id
-            );
 
             // update focus block id
             draft.focus_block_id = id;
@@ -189,6 +203,7 @@ export function reducer(
       const { block_id } = <CreateFielFromBlockdAction>action;
       // trigger new field from empty field block
       return produce(state, (draft) => {
+        draft.field_draft_init = null;
         // update focus block id
         draft.focus_block_id = block_id;
         draft.focus_field_id = null;
@@ -408,6 +423,9 @@ export function reducer(
           });
 
           let unused_field_id: string | null = field_id;
+
+          // clear init
+          draft.field_draft_init = null;
 
           // if new field, and focus block has no assigned field, use this.
           if (draft.focus_block_id) {

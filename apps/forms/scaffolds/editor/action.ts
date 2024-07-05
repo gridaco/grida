@@ -1,9 +1,8 @@
-import {
+import type {
   FormBlockType,
   FormFieldDefinition,
-  FormFieldInit,
+  FormInputType,
   FormResponse,
-  FormResponseField,
   FormResponseWithFields,
   GridaSupabase,
 } from "@/types";
@@ -48,10 +47,18 @@ export type BlocksEditorAction =
   | DataGridCellChangeAction
   | FeedXSupabaseMainTableRowsAction;
 
-export interface CreateNewPendingBlockAction {
-  type: "blocks/new";
-  block: FormBlockType;
-}
+export type CreateNewPendingBlockAction =
+  | {
+      type: "blocks/new";
+      block: FormBlockType;
+    }
+  | {
+      type: "blocks/new";
+      block: "field";
+      init: {
+        type: FormInputType;
+      };
+    };
 
 export interface ResolvePendingBlockAction {
   type: "blocks/resolve";

@@ -249,6 +249,20 @@ export function FieldEditPanel({
   const [min, setMin] = useState<number | undefined>(init?.min);
   const [max, setMax] = useState<number | undefined>(init?.max);
 
+  useEffect(() => {
+    setType(init?.type || "text");
+    setName(init?.name || "");
+    setLabel(init?.label || "");
+    setPlaceholder(init?.placeholder || "");
+    setHelpText(init?.help_text || "");
+    setRequired(init?.required || false);
+    setReadonly(init?.readonly || false);
+    setPattern(init?.pattern);
+    setStep(init?.step);
+    setMin(init?.min);
+    setMax(init?.max);
+  }, [init]);
+
   // options
   const [options, setOptions] = useState<Option[]>(
     Array.from(init?.options ?? []).sort(

@@ -144,8 +144,16 @@ function ModeBlocks() {
   );
 
   const addFieldBlock = useCallback(
-    (field: FormInputType) => addBlock("field"),
-    [addBlock]
+    (type: FormInputType) => {
+      dispatch({
+        type: "blocks/new",
+        block: "field",
+        init: {
+          type: type,
+        },
+      });
+    },
+    [dispatch]
   );
 
   return (

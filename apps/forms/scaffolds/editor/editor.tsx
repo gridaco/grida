@@ -42,8 +42,10 @@ function FieldEditPanelProvider({ children }: React.PropsWithChildren<{}>) {
   const [state, dispatch] = useEditorState();
 
   const field = useMemo(() => {
-    return state.fields.find((f) => f.id === state.focus_field_id);
-  }, [state.focus_field_id, state.fields]);
+    const focusfound = state.fields.find((f) => f.id === state.focus_field_id);
+    if (focusfound) return focusfound;
+    return state.field_draft_init;
+  }, [state.focus_field_id, state.fields, state.field_draft_init]);
 
   const closeFieldPanel = useCallback(
     (options: { refresh: boolean }) => {
@@ -109,7 +111,7 @@ function FieldEditPanelProvider({ children }: React.PropsWithChildren<{}>) {
     [closeFieldPanel, state.form_id, state.focus_field_id, dispatch]
   );
 
-  const is_existing_field = !!field;
+  const is_existing_field = !!field?.id;
 
   return (
     <>
