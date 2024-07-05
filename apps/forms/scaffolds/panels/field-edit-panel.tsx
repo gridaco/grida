@@ -52,6 +52,7 @@ import {
   FieldSupports,
   supported_field_autocomplete_types,
   supported_field_types,
+  fieldlabels,
 } from "@/k/supported_field_types";
 import {
   payments_service_providers,
@@ -199,7 +200,7 @@ export function TypeSelect({
                   />
                   <div className="flex items-center gap-2">
                     <FormFieldTypeIcon type={t} className="w-4 h-4" />
-                    <span className="capitalize">{t}</span>
+                    <span className="capitalize">{fieldlabels[t]}</span>
                   </div>
                 </CommandItem>
               ))}
