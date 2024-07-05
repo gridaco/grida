@@ -99,7 +99,7 @@ export function RowEditPanel({
                   (f) => f.form_field_id === def.id
                 );
 
-                const txt = record?.value ? JSON.parse(record?.value) : "";
+                const txt = record?.value ?? "";
 
                 return (
                   <PanelPropertyField key={def.id} label={def.name}>
