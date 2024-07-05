@@ -28,7 +28,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import PlaygroundPreview from "./preview";
 import { ThemePalette } from "../theme-editor/palette-editor";
 import { stringfyThemeVariables } from "@/theme/palettes/utils";
-import * as palettes from "@/theme/palettes";
+import palettes from "@/theme/palettes";
 import { useTheme } from "next-themes";
 import { useMonacoTheme } from "@/components/monaco";
 

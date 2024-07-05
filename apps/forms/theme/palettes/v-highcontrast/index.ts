@@ -3,12 +3,12 @@ import blue from "./blue";
 import green from "./green";
 // import neutral from "./neutral";
 import orange from "./orange";
-// import red from "./red";
+import red from "./red";
 // import rose from "./rose";
 // import slate from "./slate";
 // import stone from "./stone";
 import violet from "./violet";
-// import yellow from "./yellow";
+import yellow from "./yellow";
 // import zinc from "./zinc";
 
 export {
@@ -17,11 +17,11 @@ export {
   green,
   // neutral,
   orange,
-  // red,
+  red,
   // rose,
   // slate,
   // stone,
   violet,
-  // yellow,
+  yellow,
   // zinc,
 };

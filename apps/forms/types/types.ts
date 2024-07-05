@@ -1,6 +1,6 @@
 import { IpInfo } from "@/lib/ipinfo";
 import type { JSONBooleanValueDescriptor } from "./logic";
-import * as palettes from "@/theme/palettes";
+import palettes from "@/theme/palettes";
 
 type UUID = string;
 

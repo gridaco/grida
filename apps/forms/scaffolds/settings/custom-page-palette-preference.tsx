@@ -9,7 +9,7 @@ import {
 } from "@/components/preferences";
 import { FormStyleSheetV1Schema } from "@/types";
 import { Button } from "@/components/ui/button";
-import * as palettes from "@/theme/palettes";
+import palettes from "@/theme/palettes";
 import clsx from "clsx";
 import { Badge } from "@/components/ui/badge";
 import { useEditorState } from "../editor";

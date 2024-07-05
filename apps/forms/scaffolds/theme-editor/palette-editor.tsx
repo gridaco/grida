@@ -7,7 +7,7 @@ import React, { use, useEffect, useState } from "react";
 import { HslColorPicker } from "react-colorful";
 import { z } from "zod";
 import type { Palette, Theme } from "@/theme/palettes/types";
-import * as palettes from "@/theme/palettes";
+import palettes from "@/theme/palettes";
 import clsx from "clsx";
 import { MoonIcon, SunIcon } from "@radix-ui/react-icons";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";

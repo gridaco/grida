@@ -1,4 +1,4 @@
-import * as palettes from "@/theme/palettes";
+import palettes from "@/theme/palettes";
 import useVariablesCSS from "../playground/use-variables-css";
 import { stringfyThemeVariables } from "@/theme/palettes/utils";
 import { FormStyleSheetV1Schema } from "@/types";
