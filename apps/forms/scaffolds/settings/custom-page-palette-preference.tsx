@@ -9,11 +9,13 @@ import {
 } from "@/components/preferences";
 import { FormStyleSheetV1Schema } from "@/types";
 import { Button } from "@/components/ui/button";
-import palettes from "@/theme/palettes";
-import * as variants from "@/theme/palettes";
+import * as _variants from "@/theme/palettes";
 import clsx from "clsx";
 import { Badge } from "@/components/ui/badge";
 import { useEditorState } from "../editor";
+
+// exclude default
+const { default: _, ...variants } = _variants;
 
 const HOST_NAME = process.env.NEXT_PUBLIC_HOST_NAME || "http://localhost:3000";
 
