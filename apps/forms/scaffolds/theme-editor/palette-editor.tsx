@@ -56,7 +56,7 @@ export function ThemePalette({
                   }}
                   className={clsx(
                     "w-6 h-6 border-2 rounded-full",
-                    "data-[selected='true']:border-white"
+                    "data-[selected='true']:outline data-[selected='true']:outline-foreground data-[selected='true']:border-background"
                   )}
                   style={{
                     backgroundColor: `hsl(${primary.h}, ${primary.s}%, ${primary.l}%)`,
