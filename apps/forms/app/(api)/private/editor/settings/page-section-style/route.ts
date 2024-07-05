@@ -39,7 +39,7 @@ export async function POST(req: NextRequest) {
         ...oldstylesheet,
         section: css,
       } satisfies FormStyleSheetV1Schema)
-    : null;
+    : oldstylesheet;
 
   await supabase
     .from("form_page")
