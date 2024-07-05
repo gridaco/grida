@@ -14,8 +14,8 @@ export async function POST(req: NextRequest) {
 
   const form_id = String(formdata.get("form_id"));
 
-  const __raw_css = formdata.get("css");
-  const css = __raw_css ? String(__raw_css) : null;
+  const __raw_palette_name = formdata.get("palette");
+  const palette = __raw_palette_name ? String(__raw_palette_name) : null;
 
   if (!form_id) {
     return notFound();
@@ -38,10 +38,10 @@ export async function POST(req: NextRequest) {
     return notFound();
   }
 
-  const stylesheet = css
+  const stylesheet = palette
     ? ({
         ...((old.stylesheet as {}) || {}),
-        section: css,
+        palette: palette as FormStyleSheetV1Schema["palette"],
       } satisfies FormStyleSheetV1Schema)
     : old;
 

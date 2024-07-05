@@ -41,8 +41,7 @@ function Tab({
       data-selected={selected}
       className="
         py-2 border-b-2 border-transparent opacity-50
-        data-[selected='true']:border-black
-        dark:data-[selected='true']:border-white
+        data-[selected='true']:border-foreground
         data-[selected='true']:opacity-100
         transition-all
         font-medium text-sm

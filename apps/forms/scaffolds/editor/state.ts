@@ -8,6 +8,7 @@ import type {
   FormResponse,
   FormResponseField,
   FormResponseSession,
+  FormStyleSheetV1Schema,
   GridaSupabase,
 } from "@/types";
 import { LOCALTZ } from "./symbols";
@@ -24,6 +25,7 @@ export interface FormEditorInit {
     store_id?: number | null;
     supabase?: GridaSupabase.SupabaseConnectionState;
   };
+  theme: FormEditorState["theme"];
   form_title: string;
   page_id: string | null;
   blocks: EditorFlatFormBlock[];
@@ -48,6 +50,9 @@ export function initialFormEditorState(init: FormEditorInit): FormEditorState {
       project_id: init.project_id,
       store_id: init.connections?.store_id,
       supabase: init.connections?.supabase,
+    },
+    theme: {
+      palette: init.theme.palette,
     },
     form_id: init.form_id,
     form_title: init.form_title,
@@ -152,6 +157,9 @@ export interface FormEditorState {
     fields: { [key: string]: FormResponseField[] };
   };
   sessions?: FormResponseSession[];
+  theme: {
+    palette?: FormStyleSheetV1Schema["palette"];
+  };
   tables: GFTable[];
   datagrid_rows_per_page: number;
   datagrid_table: "response" | "session" | "x-supabase-main-table";

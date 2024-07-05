@@ -37,6 +37,7 @@ import type {
   FeedXSupabaseMainTableRowsAction,
   DataTableRefreshAction,
   DataTableLoadingAction,
+  EditorThemePaletteAction,
 } from "./action";
 import { arrayMove } from "@dnd-kit/sortable";
 import { blockstreeflat } from "@/lib/forms/tree";
@@ -775,6 +776,12 @@ export function reducer(
         return;
       });
       //
+    }
+    case "editor/theme/palette": {
+      const { palette } = <EditorThemePaletteAction>action;
+      return produce(state, (draft) => {
+        draft.theme.palette = palette;
+      });
     }
     default:
       return state;

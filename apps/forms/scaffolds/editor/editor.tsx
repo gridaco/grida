@@ -13,6 +13,7 @@ import { CustomerEditPanel } from "../panels/customer-panel";
 import { BlockEditPanel } from "../panels/block-edit-panel";
 import { MediaViewerProvider } from "../mediaviewer";
 import toast from "react-hot-toast";
+import { PaletteProvider } from "@/scaffolds/agent/theme";
 
 export function FormEditorProvider({
   initial,
@@ -25,6 +26,7 @@ export function FormEditorProvider({
 
   return (
     <StateProvider state={state} dispatch={dispatch}>
+      <PaletteProvider palette={state.theme.palette} />
       <TooltipProvider>
         <MediaViewerProvider>
           <BlockEditPanel />

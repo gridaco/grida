@@ -7,7 +7,7 @@ import React, { use, useEffect, useState } from "react";
 import { HslColorPicker } from "react-colorful";
 import { z } from "zod";
 import type { Palette, Theme } from "@/theme/palettes/types";
-import * as palettes from "@/theme/palettes";
+import palettes from "@/theme/palettes";
 import clsx from "clsx";
 import { MoonIcon, SunIcon } from "@radix-ui/react-icons";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
@@ -56,7 +56,7 @@ export function ThemePalette({
                   }}
                   className={clsx(
                     "w-6 h-6 border-2 rounded-full",
-                    "data-[selected='true']:border-white"
+                    "data-[selected='true']:outline data-[selected='true']:outline-foreground data-[selected='true']:border-background"
                   )}
                   style={{
                     backgroundColor: `hsl(${primary.h}, ${primary.s}%, ${primary.l}%)`,

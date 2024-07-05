@@ -84,6 +84,10 @@ export default async function Layout({
     ? await client.getConnection(data.supabase_connection)
     : null;
 
+  // there's a bug with supabase typegen, where the default_page will not be a array, but cast it to array.
+  // it's safe to assume as non array.
+  const default_page = data.default_page as unknown as FormPage;
+
   return (
     <div className="h-screen flex flex-col">
       <Header form_id={id} title={data.title} />
@@ -94,16 +98,15 @@ export default async function Layout({
             store_id: data.store_connection?.store_id,
             supabase: supabase_connection_state || undefined,
           },
+          theme: {
+            palette: default_page?.stylesheet?.palette,
+          },
           form_id: id,
           form_title: data.title,
           scheduling_tz: data.scheduling_tz || undefined,
           page_id: data.default_form_page_id,
           fields: data.fields,
-          blocks: data.default_page
-            ? // there's a bug with supabase typegen, where the default_page will not be a array, but cast it to array.
-              // it's safe to assume as non array.
-              (data.default_page as unknown as FormPage).blocks || []
-            : [],
+          blocks: default_page ? default_page.blocks || [] : [],
         }}
       >
         <div className="flex flex-1 overflow-y-auto">{children}</div>

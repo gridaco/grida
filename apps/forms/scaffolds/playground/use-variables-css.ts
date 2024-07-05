@@ -5,18 +5,29 @@ function useVariablesCSS(css?: string | null) {
 
   useEffect(() => {
     if (css) {
-      // Create a style element
-      const style = document.createElement("style");
-      style.id = "dynamic-variables-style";
-      style.innerHTML = css;
+      // Check if the style element already exists
+      let style = styleRef.current;
 
-      // Append the style element to the head
-      document.head.appendChild(style);
-      styleRef.current = style;
+      if (!style) {
+        // Create a new style element if it doesn't exist
+        style = document.createElement("style");
+        style.id = "dynamic-variables-style";
+        document.head.appendChild(style);
+        styleRef.current = style;
+      }
+
+      // Update the style element's content
+      style.innerHTML = css;
+    } else {
+      // Remove the style element if css is null or undefined
+      if (styleRef.current) {
+        document.head.removeChild(styleRef.current);
+        styleRef.current = null;
+      }
     }
 
     return () => {
-      // Remove the style element from the head on cleanup
+      // Cleanup the style element on component unmount
       if (styleRef.current) {
         document.head.removeChild(styleRef.current);
         styleRef.current = null;
