@@ -32,7 +32,7 @@ export function CustomSectionStylePreferences({
   const [css, setCss] = useState(init.stylesheet?.section);
 
   return (
-    <PreferenceBox beta>
+    <PreferenceBox>
       <PreferenceBoxHeader heading={<>Section Style</>} />
       <PreferenceBody>
         <form
