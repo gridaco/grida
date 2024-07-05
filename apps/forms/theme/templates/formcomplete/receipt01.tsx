@@ -42,7 +42,7 @@ export function Component({
     <Card className="w-full max-w-md p-4">
       <CardHeader className="flex flex-col items-center">
         <h1 // h1
-          className="text-5xl text-center font-black text-accent-foreground mb-4"
+          className="text-5xl text-center font-black mb-4"
           dangerouslySetInnerHTML={{
             __html: h1,
           }}
