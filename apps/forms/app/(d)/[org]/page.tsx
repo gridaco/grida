@@ -30,10 +30,12 @@ import { PublicUrls } from "@/services/public-urls";
 import {
   SidebarMenuItem,
   SidebarMenuList,
-  SidebarSectionHeader,
+  SidebarSectionHeaderItem,
   SidebarSectionHeaderAction,
   SidebarMenuItemActions,
   SidebarSectionHeaderLabel,
+  SidebarRoot,
+  SidebarSection,
 } from "@/components/sidebar";
 import { CreateNewProjectDialog } from "./new-project-dialog";
 import {
@@ -120,7 +122,7 @@ export default async function DashboardProjectsPage({
 
   return (
     <div className="h-full flex flex-1 w-full">
-      <nav className="relative w-60 h-full shrink-0 overflow-y-auto border-e">
+      <SidebarRoot>
         <header className="sticky top-0 mx-2 pt-4 py-2 bg-background border-b z-10">
           <WorkspaceMenu current={organization.id}>
             <SidebarMenuItem className="py-2">
@@ -163,8 +165,8 @@ export default async function DashboardProjectsPage({
           </section>
         </header>
         <div className="h-full">
-          <section className="mx-2 mb-2">
-            <SidebarSectionHeader>
+          <SidebarSection>
+            <SidebarSectionHeaderItem>
               <SidebarSectionHeaderLabel>
                 <span>Projects</span>
               </SidebarSectionHeaderLabel>
@@ -175,7 +177,7 @@ export default async function DashboardProjectsPage({
                   </SidebarSectionHeaderAction>
                 </CreateNewProjectDialog>
               </SidebarMenuItemActions>
-            </SidebarSectionHeader>
+            </SidebarSectionHeaderItem>
             <SidebarMenuList>
               {organization.projects.map((p) => {
                 const projectforms = forms.filter((f) => f.project_id === p.id);
@@ -219,9 +221,9 @@ export default async function DashboardProjectsPage({
                 );
               })}
             </SidebarMenuList>
-          </section>
+          </SidebarSection>
         </div>
-      </nav>
+      </SidebarRoot>
       <main className="w-full h-full overflow-y-scroll">
         <div className="container mx-auto">
           <header className="py-10">

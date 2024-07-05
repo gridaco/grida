@@ -1,45 +1,44 @@
 "use client";
 
-import { SideNavBadge, SideNavItem } from "@/components/sidenav";
-import {
-  ArchiveIcon,
-  AvatarIcon,
-  BoxIcon,
-  BoxModelIcon,
-  CodeIcon,
-  FileIcon,
-  Link2Icon,
-  PieChartIcon,
-} from "@radix-ui/react-icons";
+import { AvatarIcon, PieChartIcon } from "@radix-ui/react-icons";
 import Link from "next/link";
 import { useEditorState } from "../editor";
 import { Table2Icon, TabletSmartphoneIcon } from "lucide-react";
+import {
+  SidebarMenuItem,
+  SidebarMenuList,
+  SidebarRoot,
+  SidebarSection,
+  SidebarSectionHeaderItem,
+  SidebarSectionHeaderLabel,
+} from "@/components/sidebar";
 
 export function Siebar() {
   const [state] = useEditorState();
 
   const { form_id } = state;
   return (
-    <nav className="py-4 col-span-1 max-w-xs min-w-60 w-min border-r dark:border-r-neutral-800 h-full">
-      <ul className="flex flex-col">
-        <label className="text-xs text-muted-foreground py-4 px-4">Table</label>
-        <li>
+    <SidebarRoot>
+      <SidebarSection>
+        <SidebarSectionHeaderItem>
+          <SidebarSectionHeaderLabel>
+            <span>Table</span>
+          </SidebarSectionHeaderLabel>
+        </SidebarSectionHeaderItem>
+        <SidebarMenuList>
           <Link href={`/d/${form_id}/data/responses`}>
-            <SideNavItem>
-              <Table2Icon className="w-4 h-4" />
+            <SidebarMenuItem muted>
+              <Table2Icon className="inline align-middle w-4 h-4 me-2" />
               Form
-            </SideNavItem>
+            </SidebarMenuItem>
           </Link>
-        </li>
-        <li>
           <Link href={`/d/${form_id}/data/customers`}>
-            <SideNavItem>
-              <AvatarIcon className="w-4 h-4" />
+            <SidebarMenuItem muted>
+              <AvatarIcon className="inline align-middle w-4 h-4 me-2" />
               Customers
-            </SideNavItem>
+            </SidebarMenuItem>
           </Link>
-        </li>
-        {/* <li>
+          {/* <li>
           <Link href={`/d/${form_id}/data/files`}>
             <SideNavItem>
               <FileIcon className="w-4 h-4" />
@@ -47,18 +46,24 @@ export function Siebar() {
             </SideNavItem>
           </Link>
         </li> */}
-        <label className="text-xs text-muted-foreground py-4 px-4">
-          App / Campaign
-        </label>
-        <li>
+        </SidebarMenuList>
+      </SidebarSection>
+      <SidebarSection>
+        <SidebarSectionHeaderItem>
+          <SidebarSectionHeaderLabel>
+            <span>App / Campaign</span>
+          </SidebarSectionHeaderLabel>
+        </SidebarSectionHeaderItem>
+        <SidebarMenuList>
           <Link href={`/d/${form_id}/blocks`}>
-            <SideNavItem>
-              <TabletSmartphoneIcon className="w-4 h-4" />
+            <SidebarMenuItem muted>
+              <TabletSmartphoneIcon className="inline align-middle w-4 h-4 me-2" />
               Main
-            </SideNavItem>
+            </SidebarMenuItem>
           </Link>
-        </li>
-        {/* <label className="text-xs text-muted-foreground py-4 px-4">
+        </SidebarMenuList>
+      </SidebarSection>
+      {/* <label className="text-xs text-muted-foreground py-4 px-4">
           Commerce
         </label>
         <li>
@@ -77,18 +82,21 @@ export function Siebar() {
             </SideNavItem>
           </Link>
         </li> */}
-        <label className="text-xs text-muted-foreground py-4 px-4">
-          Analytics
-        </label>
-        <li>
+      <SidebarSection>
+        <SidebarSectionHeaderItem>
+          <SidebarSectionHeaderLabel>
+            <span>Analytics</span>
+          </SidebarSectionHeaderLabel>
+        </SidebarSectionHeaderItem>
+        <SidebarMenuList>
           <Link href={`/d/${form_id}/data/analytics`}>
-            <SideNavItem>
-              <PieChartIcon className="w-4 h-4" />
+            <SidebarMenuItem muted>
+              <PieChartIcon className="inline align-middle w-4 h-4 me-2" />
               Realtime
-            </SideNavItem>
+            </SidebarMenuItem>
           </Link>
-        </li>
-      </ul>
-    </nav>
+        </SidebarMenuList>
+      </SidebarSection>
+    </SidebarRoot>
   );
 }

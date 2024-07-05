@@ -1,5 +1,14 @@
-import { cn } from "@/utils";
+import React from "react";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/utils";
+
+export function SidebarRoot({ children }: React.PropsWithChildren<{}>) {
+  return (
+    <nav className="relative w-60 h-full shrink-0 overflow-y-auto border-e">
+      {children}
+    </nav>
+  );
+}
 
 export function SidebarMenuList({ children }: React.PropsWithChildren<{}>) {
   return <ul className="flex flex-col gap-0.5">{children}</ul>;
@@ -36,7 +45,11 @@ export function SidebarMenuItem({
   );
 }
 
-export function SidebarSectionHeader({
+export function SidebarSection({ children }: React.PropsWithChildren<{}>) {
+  return <section className="mx-2 mb-2">{children}</section>;
+}
+
+export function SidebarSectionHeaderItem({
   className,
   children,
 }: React.PropsWithChildren<{ className?: string }>) {
