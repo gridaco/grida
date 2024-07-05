@@ -19,21 +19,23 @@ import {
   ViewHorizontalIcon,
 } from "@radix-ui/react-icons";
 import { CreateNewFormButton } from "@/components/create-form-button";
-import { Form } from "@/types";
+import { ConnectionSupabaseJoint, Form } from "@/types";
 import { ProjectStats } from "@/scaffolds/analytics/stats";
 import { PoweredByGridaFooter } from "@/scaffolds/e/form/powered-by-brand-footer";
 import { OrganizationAvatar } from "@/components/organization-avatar";
 import { GridCard, RowCard } from "@/components/site/form-card";
-import { BoxSelectIcon, PanelsTopLeftIcon } from "lucide-react";
+import { BoxSelectIcon, FolderDotIcon, PanelsTopLeftIcon } from "lucide-react";
 import { WorkspaceMenu } from "./org-menu";
 import { PublicUrls } from "@/services/public-urls";
 import {
   SidebarMenuItem,
   SidebarMenuList,
-  SidebarSectionHeader,
+  SidebarSectionHeaderItem,
   SidebarSectionHeaderAction,
   SidebarMenuItemActions,
   SidebarSectionHeaderLabel,
+  SidebarRoot,
+  SidebarSection,
 } from "@/components/sidebar";
 import { CreateNewProjectDialog } from "./new-project-dialog";
 import {
@@ -43,11 +45,14 @@ import {
   CardHeader,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { SupabaseLogo } from "@/components/logos";
+import { ResourceTypeIcon } from "@/components/resource-type-icon";
 
 export const revalidate = 0;
 
 interface FormDashboardItem extends Form {
   responses: number;
+  supabase_connection: ConnectionSupabaseJoint | null;
 }
 
 export default async function DashboardProjectsPage({
@@ -89,7 +94,13 @@ export default async function DashboardProjectsPage({
   // fetch forms with responses count
   const { data: __forms, error } = await supabase
     .from("form")
-    .select("*, response(count) ")
+    .select(
+      `
+        *,
+        response(count),
+        supabase_connection:connection_supabase(*)
+      `
+    )
     .in(
       "project_id",
       organization.projects.map((p) => p.id)
@@ -111,7 +122,7 @@ export default async function DashboardProjectsPage({
 
   return (
     <div className="h-full flex flex-1 w-full">
-      <nav className="relative w-60 h-full shrink-0 overflow-y-auto border-e">
+      <SidebarRoot>
         <header className="sticky top-0 mx-2 pt-4 py-2 bg-background border-b z-10">
           <WorkspaceMenu current={organization.id}>
             <SidebarMenuItem className="py-2">
@@ -154,8 +165,8 @@ export default async function DashboardProjectsPage({
           </section>
         </header>
         <div className="h-full">
-          <section className="mx-2 mb-2">
-            <SidebarSectionHeader>
+          <SidebarSection>
+            <SidebarSectionHeaderItem>
               <SidebarSectionHeaderLabel>
                 <span>Projects</span>
               </SidebarSectionHeaderLabel>
@@ -166,7 +177,7 @@ export default async function DashboardProjectsPage({
                   </SidebarSectionHeaderAction>
                 </CreateNewProjectDialog>
               </SidebarMenuItemActions>
-            </SidebarSectionHeader>
+            </SidebarSectionHeaderItem>
             <SidebarMenuList>
               {organization.projects.map((p) => {
                 const projectforms = forms.filter((f) => f.project_id === p.id);
@@ -174,7 +185,10 @@ export default async function DashboardProjectsPage({
                   <>
                     <Link href={`/${organization.name}/${p.name}`}>
                       <SidebarMenuItem key={p.name} muted>
-                        <PanelsTopLeftIcon className="inline align-middle me-2 w-4 h-4" />
+                        <ResourceTypeIcon
+                          type="project"
+                          className="inline align-middle me-2 w-4 h-4"
+                        />
                         {p.name}
                         <SidebarMenuItemActions>
                           <SidebarSectionHeaderAction>
@@ -191,7 +205,14 @@ export default async function DashboardProjectsPage({
                         prefetch={false}
                       >
                         <SidebarMenuItem level={1} muted>
-                          <DotIcon className="inline align-middle w-4 h-4 me-2" />
+                          <ResourceTypeIcon
+                            type={
+                              form.supabase_connection
+                                ? "form-x-supabase"
+                                : "form"
+                            }
+                            className="inline align-middle w-4 h-4 me-2"
+                          />
                           {form.title}
                         </SidebarMenuItem>
                       </Link>
@@ -200,9 +221,9 @@ export default async function DashboardProjectsPage({
                 );
               })}
             </SidebarMenuList>
-          </section>
+          </SidebarSection>
         </div>
-      </nav>
+      </SidebarRoot>
       <main className="w-full h-full overflow-y-scroll">
         <div className="container mx-auto">
           <header className="py-10">
