@@ -1,4 +1,4 @@
-import { Palette, Theme } from "@/theme/palettes/types";
+import { Palette, Theme } from "./types";
 import * as csstree from "css-tree";
 import { z } from "zod";
 
