@@ -34,7 +34,7 @@ export function Siebar({ mode }: { mode: "data" | "blocks" }) {
   const { form_id } = state;
   return (
     <SidebarRoot>
-      <div className="h-10" />
+      <div className="h-5" />
       {mode === "data" && <ModeData />}
       {mode === "blocks" && <ModeBlocks />}
     </SidebarRoot>
@@ -197,7 +197,7 @@ function ModeBlocks() {
       <SidebarSection>
         <SidebarSectionHeaderItem>
           <SidebarSectionHeaderLabel>
-            <span>Inputs</span>
+            <span>Fields</span>
           </SidebarSectionHeaderLabel>
         </SidebarSectionHeaderItem>
         <SidebarMenuGrid>
@@ -225,7 +225,15 @@ function ModeBlocks() {
               >
                 <div className="relative">
                   <div className="flex justify-between items-center">
-                    <span className="font-bold">{fieldlabels[field_type]}</span>
+                    <div>
+                      <FormFieldTypeIcon
+                        type={field_type}
+                        className="inline align-middle me-2 w-8 h-8 p-2 border rounded shadow-sm"
+                      />
+                      <span className="font-bold">
+                        {fieldlabels[field_type]}
+                      </span>
+                    </div>
                     <Button
                       size="sm"
                       variant="outline"
