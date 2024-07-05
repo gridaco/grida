@@ -1,26 +1,18 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   PreferenceBody,
   PreferenceBox,
   PreferenceBoxFooter,
   PreferenceBoxHeader,
-  cls_save_button,
 } from "@/components/preferences";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { FormPageBackgroundSchema, FormStyleSheetV1Schema } from "@/types";
+import { FormStyleSheetV1Schema } from "@/types";
 import { Button } from "@/components/ui/button";
 import * as palettes from "@/theme/palettes";
 import clsx from "clsx";
 import { Badge } from "@/components/ui/badge";
-import PlaygroundPreview from "../playground/preview";
+import { useEditorState } from "../editor";
 
 const HOST_NAME = process.env.NEXT_PUBLIC_HOST_NAME || "http://localhost:3000";
 
@@ -33,7 +25,15 @@ export function CustomPagePalettePreferences({
     palette?: FormStyleSheetV1Schema["palette"];
   };
 }) {
+  const [state, dispatch] = useEditorState();
   const [palette, setPalette] = useState(init.palette);
+
+  useEffect(() => {
+    dispatch({
+      type: "editor/theme/palette",
+      palette,
+    });
+  }, [dispatch, palette]);
 
   return (
     <PreferenceBox>
@@ -76,7 +76,7 @@ export function CustomPagePalettePreferences({
             })}
           </div>
         </form>
-        {palette && (
+        {/* {palette && (
           <div className="mt-4 flex items-center justify-center select-none">
             <PlaygroundPreview
               schema={"{}" || ""}
@@ -84,7 +84,7 @@ export function CustomPagePalettePreferences({
               // dark={}
             />
           </div>
-        )}
+        )} */}
       </PreferenceBody>
       <PreferenceBoxFooter>
         <Button form="/private/editor/settings/page-palette" type="submit">

@@ -4,6 +4,7 @@ import type {
   FormInputType,
   FormResponse,
   FormResponseWithFields,
+  FormStyleSheetV1Schema,
   GridaSupabase,
 } from "@/types";
 import type { EditorFlatFormBlock, FormEditorState } from "./state";
@@ -45,7 +46,8 @@ export type BlocksEditorAction =
   | DataTableRefreshAction
   | DataTableLoadingAction
   | DataGridCellChangeAction
-  | FeedXSupabaseMainTableRowsAction;
+  | FeedXSupabaseMainTableRowsAction
+  | EditorThemePaletteAction;
 
 export type CreateNewPendingBlockAction =
   | {
@@ -250,4 +252,9 @@ export interface DataGridCellChangeAction {
 export interface FeedXSupabaseMainTableRowsAction {
   type: "editor/x-supabase/main-table/feed";
   data: GridaSupabase.XDataRow[];
+}
+
+export interface EditorThemePaletteAction {
+  type: "editor/theme/palette";
+  palette?: FormStyleSheetV1Schema["palette"];
 }
