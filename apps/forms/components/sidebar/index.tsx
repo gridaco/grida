@@ -21,9 +21,8 @@ export function SidebarMenuGrid({ children }: React.PropsWithChildren<{}>) {
 export function SidebarMenuGridItem({
   children,
   className,
-}: React.PropsWithChildren<{
-  className?: string;
-}>) {
+  ...props
+}: React.PropsWithChildren<React.HtmlHTMLAttributes<HTMLDivElement>>) {
   return (
     <div
       className={cn(
@@ -34,6 +33,7 @@ export function SidebarMenuGridItem({
         "flex flex-col items-center justify-center",
         className
       )}
+      {...props}
     >
       {children}
     </div>
