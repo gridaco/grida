@@ -3,6 +3,8 @@ type Pricing = {
   integrations: PricingCategory;
   storage: PricingCategory;
   support: PricingCategory;
+  ticketing: PricingCategory;
+  commerce: PricingCategory;
   commingsoon: PricingCategory;
 };
 
@@ -173,7 +175,7 @@ export const pricing: Pricing = {
         usage_based: false,
       },
       {
-        title: "Remove branding on built-in form page",
+        title: "Remove branding from Sites",
         plans: {
           free: false,
           pro: true,
@@ -258,6 +260,58 @@ export const pricing: Pricing = {
         usage_based: false,
       },
       {
+        title: "Custom Domain",
+        plans: {
+          free: false,
+          pro: "$10 / domain / mo",
+          team: "$10 / domain / mo",
+          enterprise: "$10 / domain / mo, + $0.5 per 100,000 views",
+        },
+        usage_based: false,
+      },
+      {
+        title: "Supabase Integration",
+        plans: {
+          free: false,
+          pro: false,
+          team: true,
+          enterprise: true,
+        },
+        usage_based: false,
+      },
+    ],
+  },
+  ticketing: {
+    title: "Ticketing",
+    features: [
+      {
+        title: "Concurrent Users",
+        plans: {
+          free: "Up to 50 concurrencies",
+          pro: "Up to 100 concurrencies",
+          team: "Up to 250 concurrencies",
+          enterprise:
+            "250 concurrencies included. then $100 / 500 concurrencies",
+        },
+        usage_based: true,
+      },
+      {
+        title: "Dedicated Servers for High demand",
+        plans: {
+          free: false,
+          pro: false,
+          team: false,
+          enterprise:
+            "$3,000 initially. then $2,500 per 10,000 concurrencies (may vary)",
+        },
+        usage_based: true,
+      },
+    ],
+  },
+  commerce: {
+    title: "Commerce",
+    features: [
+      {
         title: "Payments with Stripe",
         plans: {
           free: "5% fee",
@@ -272,8 +326,8 @@ export const pricing: Pricing = {
         plans: {
           free: false,
           pro: false,
-          team: false,
-          enterprise: true,
+          team: "Contact Sales",
+          enterprise: "Contact Sales",
         },
         usage_based: false,
       },
@@ -289,36 +343,6 @@ export const pricing: Pricing = {
       },
       {
         title: "Inventory Management",
-        plans: {
-          free: false,
-          pro: false,
-          team: true,
-          enterprise: true,
-        },
-        usage_based: false,
-      },
-      {
-        title: "Custom Domain",
-        plans: {
-          free: false,
-          pro: "$10 / domain / mo",
-          team: "$10 / domain / mo",
-          enterprise: "$10 / domain / mo, + $0.5 per 100,000 views",
-        },
-        usage_based: false,
-      },
-      {
-        title: "Concurrent Users",
-        plans: {
-          free: "Up to 50 concurrencies",
-          pro: "Up to 100 concurrencies",
-          team: "Up to 250 concurrencies",
-          enterprise: "$100 / 500 concurrencies",
-        },
-        usage_based: false,
-      },
-      {
-        title: "Supabase Integration",
         plans: {
           free: false,
           pro: false,
@@ -346,9 +370,9 @@ export const pricing: Pricing = {
         title: "SMS Notifications",
         plans: {
           free: false,
-          pro: true,
-          team: true,
-          enterprise: true,
+          pro: "Contact Sales",
+          team: "Contact Sales",
+          enterprise: "Contact Sales",
         },
         usage_based: false,
       },
@@ -368,7 +392,7 @@ export const pricing: Pricing = {
           free: false,
           pro: false,
           team: false,
-          enterprise: true,
+          enterprise: "Contact Sales",
         },
         usage_based: false,
       },

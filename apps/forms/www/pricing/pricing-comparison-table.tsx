@@ -108,16 +108,24 @@ const PricingComparisonTable = ({ plans }: { plans: PricingInformation[] }) => {
               sectionId="integrations"
             />
             <PricingTableRowMobile
-              category={pricing.support}
+              category={pricing.commerce}
               plan={"free"}
               icon={<Component1Icon />}
-              sectionId="support"
+            />
+            <PricingTableRowMobile
+              category={pricing.ticketing}
+              plan={"free"}
+              icon={<Component1Icon />}
             />
             <PricingTableRowMobile
               category={pricing.commingsoon}
               plan={"free"}
               icon={<Component1Icon />}
-              sectionId="commingsoon"
+            />
+            <PricingTableRowMobile
+              category={pricing.support}
+              plan={"free"}
+              icon={<Component1Icon />}
             />
           </>
         )}
@@ -150,12 +158,22 @@ const PricingComparisonTable = ({ plans }: { plans: PricingInformation[] }) => {
               icon={<Component1Icon />}
             />
             <PricingTableRowMobile
-              category={pricing.support}
+              category={pricing.commerce}
+              plan={"pro"}
+              icon={<Component1Icon />}
+            />
+            <PricingTableRowMobile
+              category={pricing.ticketing}
               plan={"pro"}
               icon={<Component1Icon />}
             />
             <PricingTableRowMobile
               category={pricing.commingsoon}
+              plan={"pro"}
+              icon={<Component1Icon />}
+            />
+            <PricingTableRowMobile
+              category={pricing.support}
               plan={"pro"}
               icon={<Component1Icon />}
             />
@@ -190,12 +208,22 @@ const PricingComparisonTable = ({ plans }: { plans: PricingInformation[] }) => {
               icon={<Component1Icon />}
             />
             <PricingTableRowMobile
-              category={pricing.support}
+              category={pricing.commerce}
+              plan={"team"}
+              icon={<Component1Icon />}
+            />
+            <PricingTableRowMobile
+              category={pricing.ticketing}
               plan={"team"}
               icon={<Component1Icon />}
             />
             <PricingTableRowMobile
               category={pricing.commingsoon}
+              plan={"team"}
+              icon={<Component1Icon />}
+            />
+            <PricingTableRowMobile
+              category={pricing.support}
               plan={"team"}
               icon={<Component1Icon />}
             />
@@ -230,12 +258,22 @@ const PricingComparisonTable = ({ plans }: { plans: PricingInformation[] }) => {
               icon={<Component1Icon />}
             />
             <PricingTableRowMobile
-              category={pricing.support}
+              category={pricing.commerce}
+              plan={"enterprise"}
+              icon={<Component1Icon />}
+            />
+            <PricingTableRowMobile
+              category={pricing.ticketing}
               plan={"enterprise"}
               icon={<Component1Icon />}
             />
             <PricingTableRowMobile
               category={pricing.commingsoon}
+              plan={"enterprise"}
+              icon={<Component1Icon />}
+            />
+            <PricingTableRowMobile
+              category={pricing.support}
               plan={"enterprise"}
               icon={<Component1Icon />}
             />
@@ -311,6 +349,16 @@ const PricingComparisonTable = ({ plans }: { plans: PricingInformation[] }) => {
               category={pricing.integrations}
               icon={<Component1Icon />}
               sectionId="integrations"
+            />
+            <PricingTableRowDesktop
+              category={pricing.commerce}
+              icon={<Component1Icon />}
+              sectionId="commerce"
+            />
+            <PricingTableRowDesktop
+              category={pricing.ticketing}
+              icon={<Component1Icon />}
+              sectionId="ticketing"
             />
             <PricingTableRowDesktop
               category={pricing.support}
