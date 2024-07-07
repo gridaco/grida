@@ -18,6 +18,7 @@ import { EndingPageI18nOverrides, FormPage } from "@/types";
 import { EndingPagePreferences } from "@/scaffolds/settings/ending-page-preferences";
 import { CustomPagePalettePreferences } from "@/scaffolds/settings/custom-page-palette-preference";
 import { CustomPageCssPreferences } from "@/scaffolds/settings/custom-page-css-preference";
+import { CustomPageFontFamilyPreferences } from "@/scaffolds/settings/custom-page-font-family-preference";
 
 export default async function FormsCustomizeSettingsPage({
   params,
@@ -135,6 +136,12 @@ export default async function FormsCustomizeSettingsPage({
             form_id={form_id}
             init={{
               palette: stylesheet?.palette,
+            }}
+          />
+          <CustomPageFontFamilyPreferences
+            form_id={form_id}
+            init={{
+              "font-family": stylesheet?.["font-family"],
             }}
           />
           <CustomSectionStylePreferences
