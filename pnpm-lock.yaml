@@ -323,7 +323,7 @@ importers:
         specifier: ^9.101.0
         version: 9.105.6(@react-three/fiber@8.16.6)(@types/react@18.2.58)(@types/three@0.149.0)(immer@9.0.21)(react-dom@18.3.1)(react@18.3.1)(three@0.150.1)
       '@react-three/fiber':
-        specifier: ^8.15.19
+        specifier: ^8.16.6
         version: 8.16.6(react-dom@18.3.1)(react@18.3.1)(three@0.150.1)
       '@supabase/auth-helpers-nextjs':
         specifier: ^0.9.0
@@ -419,7 +419,7 @@ importers:
         specifier: ^6.0.1
         version: 6.0.1
       framer-motion:
-        specifier: ^11.0.24
+        specifier: ^11.1.9
         version: 11.1.9(react-dom@18.3.1)(react@18.3.1)
       fuse.js:
         specifier: ^7.0.0
@@ -514,6 +514,9 @@ importers:
       resend:
         specifier: ^3.2.0
         version: 3.2.0
+      shadergradient:
+        specifier: ^1.2.14
+        version: 1.2.14(@react-spring/three@9.7.3)(@react-three/drei@9.105.6)(@react-three/fiber@8.16.6)(react@18.3.1)(three@0.150.1)
       signature_pad:
         specifier: ^4.2.0
         version: 4.2.0
@@ -16332,6 +16335,22 @@ packages:
       '@react-spring/core': 9.6.1(react@18.3.1)
       '@react-spring/shared': 9.6.1(react@18.3.1)
       '@react-spring/types': 9.6.1
+      '@react-three/fiber': 8.16.6(react-dom@18.3.1)(react@18.3.1)(three@0.150.1)
+      react: 18.3.1
+      three: 0.150.1
+    dev: false
+
+  /@react-spring/three@9.7.3(@react-three/fiber@8.16.6)(react@18.3.1)(three@0.150.1):
+    resolution: {integrity: sha512-Q1p512CqUlmMK8UMBF/Rj79qndhOWq4XUTayxMP9S892jiXzWQuj+xC3Xvm59DP/D4JXusXpxxqfgoH+hmOktA==}
+    peerDependencies:
+      '@react-three/fiber': '>=6.0'
+      react: ^18.2.0
+      three: '>=0.126'
+    dependencies:
+      '@react-spring/animated': 9.7.3(react@18.3.1)
+      '@react-spring/core': 9.7.3(react@18.3.1)
+      '@react-spring/shared': 9.7.3(react@18.3.1)
+      '@react-spring/types': 9.7.3
       '@react-three/fiber': 8.16.6(react-dom@18.3.1)(react@18.3.1)(three@0.150.1)
       react: 18.3.1
       three: 0.150.1
@@ -41312,6 +41331,22 @@ packages:
       inherits: 2.0.4
       safe-buffer: 5.2.1
     dev: true
+
+  /shadergradient@1.2.14(@react-spring/three@9.7.3)(@react-three/drei@9.105.6)(@react-three/fiber@8.16.6)(react@18.3.1)(three@0.150.1):
+    resolution: {integrity: sha512-x3FxPJsBIu2K9Bs/inQFVnLlQIy9xr/5He4KHz5m/cXeya8Q4muXh02mZd6jrE3derF/eOFgmmsBA5bT3g9NDQ==}
+    peerDependencies:
+      '@react-spring/three': '*'
+      '@react-three/drei': '*'
+      '@react-three/fiber': '*'
+      react: ^18.2.0
+      three: 0.154.0
+    dependencies:
+      '@react-spring/three': 9.7.3(@react-three/fiber@8.16.6)(react@18.3.1)(three@0.150.1)
+      '@react-three/drei': 9.105.6(@react-three/fiber@8.16.6)(@types/react@18.2.58)(@types/three@0.149.0)(immer@9.0.21)(react-dom@18.3.1)(react@18.3.1)(three@0.150.1)
+      '@react-three/fiber': 8.16.6(react-dom@18.3.1)(react@18.3.1)(three@0.150.1)
+      react: 18.3.1
+      three: 0.150.1
+    dev: false
 
   /shallow-clone@3.0.1:
     resolution: {integrity: sha512-/6KqX+GVUdqPuPPd2LxDDxzX6CAbjJehAAOKlNpqqUpAqPM6HeL8f+o3a+JsyGjn2lv0WY8UsTgUJjU9Ok55NA==}
