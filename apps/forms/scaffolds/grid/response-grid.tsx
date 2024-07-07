@@ -59,6 +59,7 @@ import {
 } from "@/components/ui/select";
 import { FileEditCell } from "./file-cell";
 import { RichTextEditCell } from "./richtext-cell";
+import Highlight from "@/components/highlight";
 import { FieldSupports } from "@/k/supported_field_types";
 import { format } from "date-fns";
 
@@ -424,6 +425,9 @@ function FKButton({ onClick }: { onClick?: () => void }) {
 
 function FieldCell({ column, row }: RenderCellProps<GFResponseRow>) {
   const [state] = useEditorState();
+
+  const { datagrid_filter } = state;
+
   const data = row.fields[column.key];
 
   if (!data) {
@@ -468,7 +472,12 @@ function FieldCell({ column, row }: RenderCellProps<GFResponseRow>) {
             className="aspect-square min-w-4 rounded bg-neutral-500 border border-ring"
             style={{ backgroundColor: unwrapped as string }}
           />
-          <span>{unwrapped?.toString()}</span>
+          <span>
+            <Highlight
+              text={unwrapped?.toString()}
+              tokens={datagrid_filter.localsearch}
+            />
+          </span>
         </div>
       );
     }
@@ -483,7 +492,9 @@ function FieldCell({ column, row }: RenderCellProps<GFResponseRow>) {
                 type={type as "file"}
                 className="inline w-4 h-4 align-middle me-2"
               />
-              {f.name}
+              <span>
+                <Highlight text={f.name} tokens={datagrid_filter.localsearch} />
+              </span>
             </span>
           ))}
         </div>
@@ -534,12 +545,17 @@ function FieldCell({ column, row }: RenderCellProps<GFResponseRow>) {
       );
     }
     default:
+      const display =
+        state.datagrid_filter.masking_enabled && typeof unwrapped === "string"
+          ? mask(unwrapped)
+          : unwrapped?.toString();
       return (
         <div>
-          {state.datagrid_filter.masking_enabled &&
-          typeof unwrapped === "string"
-            ? mask(unwrapped)
-            : unwrapped?.toString()}
+          <Highlight
+            text={display}
+            tokens={datagrid_filter.localsearch}
+            className="bg-foreground text-background"
+          />
         </div>
       );
   }
