@@ -12,16 +12,12 @@ import {
   Link2Icon,
   GearIcon,
   MagicWandIcon,
+  LockClosedIcon,
 } from "@radix-ui/react-icons";
 import Link from "next/link";
 import { useEditorState } from "../editor";
 import { Table2Icon, TabletSmartphoneIcon } from "lucide-react";
-import {
-  StripeLogo1,
-  StripeLogo2,
-  SupabaseLogo,
-  TossLogo,
-} from "@/components/logos";
+import { StripeLogo1, SupabaseLogo, TossLogo } from "@/components/logos";
 import { Badge } from "@/components/ui/badge";
 import {
   SidebarMenuGrid,
@@ -474,12 +470,27 @@ function ModeSettings() {
               Customize
             </SidebarMenuItem>
           </Link>
+        </SidebarMenuList>
+      </SidebarSection>
+      <SidebarSection>
+        <SidebarSectionHeaderItem>
+          <SidebarSectionHeaderLabel>
+            <span>Developers</span>
+          </SidebarSectionHeaderLabel>
+        </SidebarSectionHeaderItem>
+        <SidebarMenuList>
+          <Link href={`/d/${form_id}/settings/security`}>
+            <SidebarMenuItem>
+              <LockClosedIcon className="inline align-middle w-4 h-4 me-2" />
+              Data & Security
+            </SidebarMenuItem>
+          </Link>
           {/* <Link href={`/d/${id}/settings/api`}> */}
           <SidebarMenuItem disabled>
             <CodeIcon className="inline align-middle w-4 h-4 me-2" />
             API Keys
             <Badge variant="outline" className="ms-auto">
-              soon
+              enterprise
             </Badge>
           </SidebarMenuItem>
           {/* </Link> */}

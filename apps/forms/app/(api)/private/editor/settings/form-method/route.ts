@@ -34,7 +34,7 @@ export async function POST(req: NextRequest) {
     .single();
 
   // redirect to the page requested
-  return NextResponse.redirect(origin + `/d/${form_id}/settings/general`, {
+  return NextResponse.redirect(origin + `/d/${form_id}/settings/security`, {
     status: 301,
   });
 }
